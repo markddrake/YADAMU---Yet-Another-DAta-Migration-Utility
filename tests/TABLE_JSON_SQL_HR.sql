@@ -1,0 +1,66 @@
+set echo on
+DEF SCHEMA = HR
+spool logs/TABLE_JSON_SQL_&SCHEMA..log
+--
+set pages 0
+set lines 256
+set long 1000000000
+--
+column SQL_STATEMENT FORMAT A256
+column JSON_DOCUMENT FORMAT A256
+--
+VAR JSON CLOB
+--
+spool logs/TABLE_JSON_SQL_&SCHEMA..log APPEND
+--
+DEF TABLE = REGIONS
+--
+@@TABLE_SQL_JSON
+--
+set lines 256
+spool logs/TABLE_JSON_SQL_&SCHEMA..log APPEND
+--
+DEF TABLE = LOCATIONS
+--
+@@TABLE_SQL_JSON
+--
+set lines 256
+spool logs/TABLE_JSON_SQL_&SCHEMA..log APPEND
+--
+DEF TABLE = DEPARTMENTS
+--
+@@TABLE_SQL_JSON
+--
+set lines 256
+spool logs/TABLE_JSON_SQL_&SCHEMA..log APPEND
+--
+DEF TABLE = JOBS
+--
+@@TABLE_SQL_JSON
+--
+set lines 256
+spool logs/TABLE_JSON_SQL_&SCHEMA..log APPEND
+--
+DEF TABLE = EMPLOYEES
+--
+@@TABLE_SQL_JSON
+--
+set lines 256
+spool logs/TABLE_JSON_SQL_&SCHEMA..log APPEND
+--
+DEF TABLE = JOB_HISTORY
+--
+@@TABLE_SQL_JSON
+--
+set lines 256
+spool logs/TABLE_JSON_SQL_&SCHEMA..log APPEND
+--
+DEF TABLE = COUNTRIES
+--
+@@TABLE_SQL_JSON
+--
+set lines 256
+spool logs/TABLE_JSON_SQL_&SCHEMA..log APPEND
+--
+quit
+

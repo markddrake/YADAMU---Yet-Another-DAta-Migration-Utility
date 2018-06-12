@@ -1,0 +1,15 @@
+--
+desc &SCHEMA..&TABLE
+--
+begin 
+  select COLUMN_VALUE
+    into :JSON
+	from TABLE(JSON_EXPORT.EXPORT_TABLE('&SCHEMA','&TABLE'));
+end;
+/
+select SQL_STATEMENT
+  from TABLE(JSON_EXPORT.EXPORT_METADATA)
+/
+--
+@@DUMP_JSON &TABLE
+--
