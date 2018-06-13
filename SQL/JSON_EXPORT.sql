@@ -323,7 +323,7 @@ as
 		       /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
 		       case
 			     when DATA_TYPE = 'BFILE'
-				    then 'case when "' || COLUMN_NAME || '" is NULL then NULL else CHAR2BFILE("' || COLUMN_NAME || '") end'
+				    then 'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.CHAR2BFILE("' || COLUMN_NAME || '") end'
 			     when DATA_TYPE = 'XMLTYPE'
 				    then 'case when "' || COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || COLUMN_NAME || '") end'
 				 when DATA_TYPE = 'ANYDATA'
@@ -335,7 +335,7 @@ as
   				   then '"#' || DATA_TYPE || '"("' || COLUMN_NAME || '")'
 			     when DATA_TYPE = 'BLOB'
     		        $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-				    then 'case when "' || COLUMN_NAME || '" is NULL then NULL else HEXBINARY2BLOB("' || COLUMN_NAME || '") end'
+				    then 'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.HEXBINARY2BLOB("' || COLUMN_NAME || '") end'
 				    $ELSE
 				    then 'case when "' || COLUMN_NAME || '" is NULL then NULL else HEXTOTAW("' || COLUMN_NAME || '") end'
 				 $END
@@ -570,13 +570,23 @@ begin
 	DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
 
     for i in 1 .. EXPORT_METADATA_TABLE.count loop
-	  V_SQL_FRAGMENT := C_SINGLE_QUOTE || EXPORT_METADATA_TABLE(i).TABLE_NAME || C_SINGLE_QUOTE || ' value ( select JSON_ARRAYAGG(JSON_ARRAY(';
+      $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+	  V_SQL_FRAGMENT := C_SINGLE_QUOTE || EXPORT_METADATA_TABLE(i).TABLE_NAME || C_SINGLE_QUOTE || ' value ( select TREAT(COALESCE(JSON_ARRAYAGG(JSON_ARRAY(';
+      $ELSE
+	  V_SQL_FRAGMENT := C_SINGLE_QUOTE || EXPORT_METADATA_TABLE(i).TABLE_NAME || C_SINGLE_QUOTE || ' value ( select JSON_QUERY(COALESCE(JSON_ARRAYAGG(JSON_ARRAY(';
+      $END
       if (i > 1) then
         V_SQL_FRAGMENT := ',' || V_SQL_FRAGMENT;
 	  end if;
 	  DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
 	  DBMS_LOB.APPEND(SQL_STATEMENT,EXPORT_METADATA_TABLE(i).EXPORT_SELECT_LIST);
-      V_SQL_FRAGMENT := ' NULL ON NULL returning CLOB) returning CLOB) FROM "' || EXPORT_METADATA_TABLE(i).OWNER || '"."' || EXPORT_METADATA_TABLE(i).TABLE_NAME || '")' || C_NEWLINE;
+      V_SQL_FRAGMENT := ' NULL ON NULL returning CLOB) returning CLOB)'
+                     $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+                     || ',TO_CLOB(''[]'')) AS JSON)' || C_NEWLINE
+                     $ELSE
+                     || ',TO_CLOB(''[]'')),'$')' || C_NEWLINE
+                     $END
+					 || 'FROM "' || EXPORT_METADATA_TABLE(i).OWNER || '"."' || EXPORT_METADATA_TABLE(i).TABLE_NAME || '")' || C_NEWLINE;
 	  DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
     end loop;
     V_SQL_FRAGMENT := '             returning CLOB' || C_NEWLINE

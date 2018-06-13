@@ -10,12 +10,18 @@ as
    ,SQL_STATEMENT   CLOB
    ,SQLCODE         NUMBER
    ,RESULT          VARCHAR2(4000)
+   ,STATUS          VARCHAR2(4000)
   );
    
   TYPE T_SQL_OPERATIONS_TAB is TABLE of T_SQL_OPERATION_REC;
 
   SQL_OPERATIONS_TABLE   T_SQL_OPERATIONS_TAB; 
   
+  C_SUCCESS          CONSTANT VARCHAR2(32) := 'SUCCESS';
+  C_FATAL_ERROR      CONSTANT VARCHAR2(32) := 'FATAL';
+  C_WARNING          CONSTANT VARCHAR2(32) := 'WARNING';
+  C_IGNOREABLE       CONSTANT VARCHAR2(32) := 'IGNORE';
+
   function VERSION return NUMBER deterministic;
   procedure DATA_ONLY_MODE(P_DATA_ONLY_MODE BOOLEAN);
   procedure DDL_ONLY_MODE(P_DDL_ONLY_MODE BOOLEAN);
@@ -117,6 +123,7 @@ begin
 		 '         COLUMNS(' || C_NEWLINE ||  COLUMN_PATTERNS || C_NEWLINE || '))' 
 	    ,NULL
 	    ,NULL
+		,NULL
 	bulk collect into V_SQL_OPERATIONS
     from JSON_TABLE(
 	        P_JSON_DUMP_FILE,
@@ -158,6 +165,7 @@ begin
 		,'ALTER TABLE "' || P_TARGET_SCHEMA || '"."' || TABLE_NAME  || '" DISABLE CONSTRAINT "' || CONSTRAINT_NAME || '"'
 	    ,NULL
 	    ,NULL
+		,NULL
     bulk collect into V_SQL_OPERATIONS
     from ALL_CONSTRAINTS
    where OWNER = P_TARGET_SCHEMA 
@@ -173,6 +181,7 @@ begin
   select OWNER
         ,TABLE_NAME
 		,'ALTER TABLE "' || P_TARGET_SCHEMA || '"."' || TABLE_NAME  || '" ENABLE CONSTRAINT "' || CONSTRAINT_NAME || '"' 
+		,NULL
 		,NULL
 		,NULL
     bulk collect into V_SQL_OPERATIONS
@@ -246,11 +255,13 @@ begin
    V_START_TIME := SYSTIMESTAMP;
    execute immediate P_SQL_OPERATION.SQL_STATEMENT using P_JSON_DUMP_FILE, out V_ROW_COUNT;
    V_END_TIME := SYSTIMESTAMP;		
-   P_SQL_OPERATION.RESULT := 'Operation completed succecssfully. Processed ' || V_ROW_COUNT || ' rows. Elapsed time: ' || (V_END_TIME - V_START_TIME) || '.';
-   
+   P_SQL_OPERATION.RESULT := 'Operation completed succecssfully at ' || SYS_EXTRACT_UTC(SYSTIMESTAMP) || '. Processed ' || V_ROW_COUNT || ' rows. Elapsed time: ' || (V_END_TIME - V_START_TIME) || '.';
+   P_SQL_OPERATION.STATUS := C_SUCCESS;
+
 exception
   when OTHERS then
 	P_SQL_OPERATION.RESULT := DBMS_UTILITY.format_error_stack;	   
+    P_SQL_OPERATION.STATUS := C_FATAL_ERROR;
 end;
 --
 procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY CLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
@@ -270,7 +281,6 @@ begin
 
   if (G_INCLUDE_DATA) then
 
-
     SQL_OPERATIONS_TABLE := GENERATE_DISABLE_CONSTRAINT_DDL(P_TARGET_SCHEMA) 
 	                        MULTISET UNION ALL
 							GENERATE_DML_STATEMENTS(P_JSON_DUMP_FILE)
@@ -285,18 +295,21 @@ begin
 		  V_START_TIME := SYSTIMESTAMP;
           execute immediate SQL_OPERATIONS_TABLE(i).SQL_STATEMENT; 
 		  V_END_TIME := SYSTIMESTAMP;		
-		  SQL_OPERATIONS_TABLE(i).RESULT := 'Operation completed succecssfully. Elapsed time: ' || (V_END_TIME - V_START_TIME) || '.';
+		  SQL_OPERATIONS_TABLE(i).RESULT := 'Operation completed succecssfully at ' || SYS_EXTRACT_UTC(SYSTIMESTAMP) || '. Elapsed time: ' || (V_END_TIME - V_START_TIME) || '.';
+		  SQL_OPERATIONS_TABLE(i).STATUS := C_SUCCESS;
 		else
 		  V_START_TIME := SYSTIMESTAMP;
           execute immediate SQL_OPERATIONS_TABLE(i).SQL_STATEMENT using P_JSON_DUMP_FILE;  
-		  SQL_OPERATIONS_TABLE(i).RESULT := 'Operation completed succecssfully. Processed ' || TO_CHAR(SQL%ROWCOUNT)|| ' rows. Elapsed time: ' || (V_END_TIME - V_START_TIME) || '.';
+		  SQL_OPERATIONS_TABLE(i).RESULT := 'Operation completed succecssfully at ' || SYS_EXTRACT_UTC(SYSTIMESTAMP) || '. Processed ' || TO_CHAR(SQL%ROWCOUNT)|| ' rows. Elapsed time: ' || (V_END_TIME - V_START_TIME) || '.';
 		  commit;
+		  SQL_OPERATIONS_TABLE(i).STATUS := C_SUCCESS;
 		end if;
 	  exception
         when MUTATING_TABLE then
            MANAGE_MUTATING_TABLE(SQL_OPERATIONS_TABLE(i),P_JSON_DUMP_FILE);		
 		when others then
 		  SQL_OPERATIONS_TABLE(i).RESULT := DBMS_UTILITY.format_error_stack;
+		  SQL_OPERATIONS_TABLE(i).STATUS := C_FATAL_ERROR;
 	  end;
     end loop;
 	REFRESH_MATERIALIZED_VIEWS(P_TARGET_SCHEMA);

@@ -58,5 +58,7 @@ create or replace public synonym OBJECT_SERIALIZATION for OBJECT_SERIALIZATION
 /
 create or replace public synonym JSON_FEATURE_DETECTION for JSON_FEATURE_DETECTION
 /
+create or replace public synonym CHUNKED_CLOB_T for CHUNKED_CLOB_T ;
+  
 spool off
 --
