@@ -186,7 +186,7 @@ begin
   end loop;
 
   for i in indexedColumnList(P_SCHEMA) loop
-    pipe row ('BEGIN &CURRENT_SCHEMA..JSON_EXPORT_DDL.RENAME_INDEX(''' || i.TABLE_NAME  || ''',''' || i.INDEXED_COLUMN_LIST || ''',''' || i.INDEX_NAME || '''); END;');
+    pipe row ('BEGIN JSON_EXPORT_DDL.RENAME_INDEX(''' || i.TABLE_NAME  || ''',''' || i.INDEXED_COLUMN_LIST || ''',''' || i.INDEX_NAME || '''); END;');
   end loop;
   
 end;

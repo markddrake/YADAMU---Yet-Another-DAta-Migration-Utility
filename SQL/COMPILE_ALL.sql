@@ -8,11 +8,6 @@ set echo on
 --
 ALTER SESSION SET PLSQL_CCFLAGS = 'DEBUG:TRUE'
 /
-COLUMN CURRENT_SCHEMA new_value CURRENT_SCHEMA
---
-select SYS_CONTEXT('USERENV','CURRENT_SCHEMA') CURRENT_SCHEMA
- from DUAL
-/
 set serveroutput on
 --
 spool logs/JSON_FEATURE_DETECTION.log
@@ -52,6 +47,16 @@ begin
   DBMS_OUTPUT.put_line('JSON_FEATURE_DETECTION.CLOB_SUPPORTED:            ' || case when JSON_FEATURE_DETECTION.CLOB_SUPPORTED  then 'TRUE' else 'FALSE' end);
   DBMS_OUTPUT.put_line('JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED: ' || case when JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED  then 'TRUE' else 'FALSE' end);
 end;
+/
+create or replace  public synonym JSON_EXPORT for JSON_EXPORT
+/
+create or replace public synonym JSON_IMPORT for JSON_IMPORT
+/
+create or replace  public synonym JSON_EXPORT_DDL for JSON_EXPORT_DDL
+/
+create or replace public synonym OBJECT_SERIALIZATION for OBJECT_SERIALIZATION
+/
+create or replace public synonym JSON_FEATURE_DETECTION for JSON_FEATURE_DETECTION
 /
 spool off
 --
