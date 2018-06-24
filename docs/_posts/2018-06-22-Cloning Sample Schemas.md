@@ -88,11 +88,11 @@ After making the changes outlined above, all of the EXPORT_SCHMEA and IMPORT_JSO
 | IX     | ✔️             | ✔️ (Duplicates,References,AQ) | ✔️                 |
 | BI     | ✔️             | ✔️                            | ✔️                 |
 
-The scripts VALIDATE_STRUCTURE.sql and VALIDATE_CONTENT.sql, located in the test folder, test  the fidelity of the cloned schema. VALIDATE_STRUCTURE use the ALL_OBJECTS view  to compare the structure of the source and target schema  and generates a report showing any consistencies detected. 
+The scripts VALIDATE_STRUCTURE.sql and VALIDATE_CONTENT.sql, located in the test folder, test  the fidelity of the cloned schema. VALIDATE_STRUCTURE use the ALL_OBJECTS view  to compare the structure of the source and target schema  ane generates a report showing any consistencies detected. 
 
 VALIDATE_CONTENT uses the SQL minus operator to compare the content of each table in the source and target schema, and generates a summary report summarizing any mismatched data.  The SQL minus operator does not extended data types such as LOBs, XMLType and Oracle object types. VALIDATE_CONTENT compares values in columns of these types by using the hash function on package DBMS_CRYTPO to compute a SHA-256 Hash of the (serialized) content of the column. This can only be done if the user running VALIDATE_CONTENT has been granted execute permission on DBMS_CRYPTO.
 
-The results of running VALIDATE_STRUCTURE and VALIDATE_CONTENT are shown below. End to End testing has only been completed on Oracle 12cR2 without the patch to enabl CLOB as a return type for JSON_OBJECT, JSON_ARRAY and JSON_ARRAYAGG.
+The results of running VALIDATE_STRUCTURE and VALIDATE_CONTENT are shown below. End to End testing has only been completed on Oracle 12cR2 without the patch to enable CLOB as a return type for JSON_OBJECT, JSON_ARRAY and JSON_ARRAYAGG.
 
 | Schema | STRUCTURE       | CONTENT (-CLOB)               | CONTENT (+CLOB)          |
 | ------ | --------------- | ----------------------------- | ------------------------ |
