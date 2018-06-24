@@ -1,6 +1,4 @@
 --
-create or replace TYPE CHUNKED_CLOB_T is TABLE of VARCHAR2(4000);
-/
 create or replace package OBJECT_SERIALIZATION
 AUTHID CURRENT_USER
 as
@@ -13,25 +11,24 @@ as
 
   TYPE TYPE_LIST_TAB is TABLE of TYPE_LIST_T;
   
-  function SERIALIZE_TYPE(P_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2) return CLOB;
-  function SERIALIZE_TABLE_TYPES(P_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
-  function SERIALIZE_TABLE_TYPES(P_OWNER VARCHAR2,P_TABLE_LIST XDB.XDB$STRING_LIST_T) return CLOB;
+  function SERIALIZE_TYPE(P_SOURCE_SCHEMA VARCHAR2, P_TYPE_NAME VARCHAR2) return CLOB;
+  function SERIALIZE_TABLE_TYPES(P_SOURCE_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
+  function SERIALIZE_TABLE_TYPES(P_SOURCE_SCHEMA VARCHAR2,P_TABLE_LIST T_VC4000_TABLE) return CLOB;
 
-  function DESERIALIZE_TYPE(P_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2) return CLOB;
-  function DESERIALIZE_TABLE_TYPES(P_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
-  function DESERIALIZE_TABLE_TYPES(P_OWNER VARCHAR2,P_TABLE_LIST XDB.XDB$STRING_LIST_T) return CLOB;
+  function DESERIALIZE_TYPE(P_TARGET_SCHEMA VARCHAR2, P_TYPE_NAME VARCHAR2) return CLOB;
+  function DESERIALIZE_TABLE_TYPES(P_TARGET_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
+  function DESERIALIZE_TABLE_TYPES(P_TARGET_SCHEMA VARCHAR2,P_TABLE_LIST T_VC4000_TABLE) return CLOB;
 
-  function FUNCTION_BFILE2CHAR return VARCHAR2 deterministic;
-  function FUNCTION_BLOB2BASE64 return VARCHAR2 deterministic;
-  function FUNCTION_BLOB2HEXBINARY return VARCHAR2 deterministic;
+  function CODE_BFILE2CHAR return VARCHAR2 deterministic;
+  function CODE_BLOB2BASE64 return VARCHAR2 deterministic;
+  function CODE_BLOB2HEXBINARY return VARCHAR2 deterministic;
 
-  function FUNCTION_CHAR2BFILE return VARCHAR2 deterministic;
-  -- function FUNCTION_BLOB2BASE64 return VARCHAR2 deterministic;
-  function FUNCTION_HEXBINARY2BLOB return VARCHAR2 deterministic;
+  function CODE_CHAR2BFILE return VARCHAR2 deterministic;
+  -- function CODE_BLOB2BASE64 return VARCHAR2 deterministic;
+  function CODE_HEXBINARY2BLOB return VARCHAR2 deterministic;
   
-  function PROCEDURE_CHECK_SIZE return VARCHAR2 deterministic;
-  function PROCEDURE_SERIALIZE_ANYDATA return VARCHAR2 deterministic;
-  function FUNCTION_SERIALIZE_OBJECT return VARCHAR2 deterministic;
+  function CODE_SERIALIZE_ANYDATA return VARCHAR2 deterministic;
+  function CODE_SERIALIZE_OBJECT return VARCHAR2 deterministic;
 
   function CHAR2BFILE(P_SERIALIZATION VARCHAR2) return BFILE;
   function CHUNKS2BLOB(P_CHUNKED_CLOB CHUNKED_CLOB_T)  return BLOB;
@@ -44,33 +41,19 @@ show errors;
 create or replace package body OBJECT_SERIALIZATION
 as
 --
-$IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-C_PROCEDURE_SIZE_CHECK CONSTANT VARCHAR2(1024) := 
-'procedure SIZE_CHECK(P_CLOB IN OUT NOCOPY CLOB, P_SOURCE_DETAILS VARCHAR2)
-as
-begin
-  NULL;
-end;
-';
-$ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-C_PROCEDURE_SIZE_CHECK CONSTANT VARCHAR2(1024) := 
-'procedure SIZE_CHECK(P_CLOB IN OUT NOCOPY CLOB, P_SOURCE_DETAILS VARCHAR2)
-as
-begin
-  if (DBMS_LOB.GETLENGTH(P_CLOB) > 32767) THEN P_CLOB := ''OVERFLOW: '' || P_SOURCE_DETAILS || ''. Size ('' || DBMS_LOB.GETLENGTH(P_CLOB) || '')  exceeds maximum supported by source database [VARCHAR2(32767)].''; end if;
-end;
-';
-$ELSE
-C_PROCEDURE_SIZE_CHECK CONSTANT VARCHAR2(1024) := 
-'procedure SIZE_CHECK(P_CLOB IN OUT NOCOPY CLOB, P_SOURCE_DETAILS VARCHAR2)
-as
-begin
-  if (DBMS_LOB.GETLENGTH(P_CLOB) > 4000) THEN P_CLOB := ''OVERFLOW: '' || P_SOURCE_DETAILS || ''. Size ('' || DBMS_LOB.GETLENGTH(P_CLOB) || '')  exceeds maximum supported by source database [VARCHAR2(4000)].''; end if;
-end;
-';
-$END
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := DBMS_LOB.LOBMAXSIZE;
+  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := 32767;
+  $ELSE
+  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := 4000;
+  $END
 --
-C_FUNCTION_BFILE2CHAR CONSTANT VARCHAR2(512) := 
+  C_NEWLINE       CONSTANT CHAR(1) := CHR(10);
+  C_SINGLE_QUOTE  CONSTANT CHAR(1) := CHR(39);
+--
+  C_BFILE2CHAR CONSTANT VARCHAR2(512) := 
+--
 'function BFILE2CHAR(P_BFILE BFILE) return VARCHAR2
 as
   V_SINGLE_QUOTE     CONSTANT CHAR(1) := CHR(39);
@@ -81,9 +64,11 @@ begin
   return ''BFILENAME('' || V_SINGLE_QUOTE || V_DIRECTORY_ALIAS || V_SINGLE_QUOTE || '','' || V_SINGLE_QUOTE || V_PATH2FILE || V_SINGLE_QUOTE || '')'';
 end;
 ';
--- 
-C_FUNCTION_CHAR2BFILE CONSTANT VARCHAR2(512) := 
-'function CHAR2BFILE(P_SERIALIZATION VARCHAR2) return BFILE
+--
+  C_CHAR2BFILE CONSTANT VARCHAR2(512) := 
+--
+'function CHAR2BFILE(P_SERIALIZATION VARCHAR2) 
+return BFILE
 as
   V_BFILE BFILE;
 begin
@@ -91,54 +76,61 @@ begin
   return V_BFILE;
 end;
 ';
+--  
+  C_BLOB2HEXBINARY CONSTANT VARCHAR2(1024) := 
 --
-C_FUNCTION_BLOB2BASE64 CONSTANT VARCHAR2(1024) := 
-'function BLOB2BASE64(P_BLOB BLOB)
-return CLOB
-is
-  V_CLOB CLOB;
-  V_OFFSET INTEGER := 1;
-  V_AMOUNT INTEGER := 2000;
-  V_BLOB_LENGTH NUMBER := DBMS_LOB.GETLENGTH(P_BLOB);
-  V_RAW_DATA RAW(2000);
-  V_BASE64_DATA VARCHAR2(32767);
-begin
-  DBMS_LOB.CREATETEMPORARY(V_CLOB,TRUE,DBMS_LOB.CALL);
-  while (V_OFFSET <= V_BLOB_LENGTH) loop
-    DBMS_LOB.READ(P_BLOB,V_AMOUNT,V_OFFSET,V_RAW_DATA);
- 	V_OFFSET := V_OFFSET + V_AMOUNT;
-  	V_AMOUNT := 2000;
-    V_BASE64_DATA := UTL_RAW.CAST_TO_VARCHAR2(UTL_ENCODE.BASE64_ENCODE(V_RAW_DATA));
-    DBMS_LOB.WRITEAPPEND(V_CLOB,LENGTH(V_BASE64_DATA),V_BASE64_DATA);
-  end loop;
-  SIZE_CHECK(V_CLOB,''BLOB to BASE64'');
-  return V_CLOB;
-end;
-';
---
-C_FUNCTION_BLOB2HEXBINARY CONSTANT VARCHAR2(1024) := 
 'function BLOB2HEXBINARY(P_BLOB BLOB)
 return CLOB
 is
-  V_CLOB CLOB;
-  V_OFFSET INTEGER := 1;
-  V_AMOUNT INTEGER := 2000;
-  V_INPUT_LENGTH NUMBER := DBMS_LOB.GETLENGTH(P_BLOB);
-  V_RAW_DATA RAW(2000);
+  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := ' || (TRUNC(C_MAX_SUPPORTED_SIZE / 2) - 4) || ';
+  V_BLOB_SIZE      NUMBER := DBMS_LOB.GETLENGTH(P_BLOB);
+  V_HEXBINARY_CLOB CLOB;
+  V_OFFSET         INTEGER := 1;
+  V_AMOUNT         INTEGER := 2000;
+  V_RAW_CONTENT    RAW(2000);
 begin
-  DBMS_LOB.CREATETEMPORARY(V_CLOB,TRUE,DBMS_LOB.CALL);
-  while (V_OFFSET <= V_INPUT_LENGTH) loop
+  if (V_BLOB_SIZE > C_MAX_SUPPORTED_SIZE) then
+    return TO_CLOB(''BLOB2HEXBINARY: Input size ('' || V_BLOB_SIZE || '') exceeds maximum supported size ('' || C_MAX_SUPPORTED_SIZE || '').'');
+  end if;
+  DBMS_LOB.CREATETEMPORARY(V_HEXBINARY_CLOB,TRUE,DBMS_LOB.CALL);
+  while (V_OFFSET <= V_BLOB_SIZE) loop
     V_AMOUNT := 2000;
-    DBMS_LOB.READ(P_BLOB,V_AMOUNT,V_OFFSET,V_RAW_DATA);
-	   V_OFFSET := V_OFFSET + V_AMOUNT;
-    DBMS_LOB.APPEND(V_CLOB,TO_CLOB(RAWTOHEX(V_RAW_DATA)));
+    DBMS_LOB.READ(P_BLOB,V_AMOUNT,V_OFFSET,V_RAW_CONTENT);
+	V_OFFSET := V_OFFSET + V_AMOUNT;
+    DBMS_LOB.APPEND(V_HEXBINARY_CLOB,TO_CLOB(RAWTOHEX(V_RAW_CONTENT)));
   end loop;
-  SIZE_CHECK(V_CLOB,''BLOB to HEXBINARY'');
-  return V_CLOB;
+  return V_HEXBINARY_CLOB;
 end;
 ';
 --
-C_FUNCTION_HEXBINARY2BLOB CONSTANT VARCHAR2(1024) := 
+  C_BLOB2BASE64 CONSTANT VARCHAR2(1024) := 
+--
+'function BLOB2BASE64(P_BLOB BLOB)
+return CLOB
+is
+  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := ' || (TRUNC(C_MAX_SUPPORTED_SIZE / 1.5) - 4) || ';
+  V_BLOB_SIZE      NUMBER := DBMS_LOB.GETLENGTH(P_BLOB);
+  V_BASE64_CLOB    CLOB;
+  V_OFFSET         INTEGER := 1;
+  V_AMOUNT         INTEGER := 2000;drop 
+  V_RAW_CONTENT    RAW(2000);
+begin
+  if (V_BLOB_SIZE > C_MAX_SUPPORTED_SIZE) then
+    return TO_CLOB(''BLOB2BASE64: Input size ('' || V_BLOB_SIZE || '') exceeds maximum supported size ('' || C_MAX_SUPPORTED_SIZE || '').'');
+  end if;
+  DBMS_LOB.CREATETEMPORARY(V_BASE64_CLOB,TRUE,DBMS_LOB.CALL);
+  while (V_OFFSET <= V_BLOB_SIZE) loop
+    V_AMOUNT := 2000;
+    DBMS_LOB.READ(P_BLOB,V_AMOUNT,V_OFFSET,V_RAW_CONTENT);
+	V_OFFSET := V_OFFSET + V_AMOUNT;
+    DBMS_LOB.APPEND(V_BASE64_CLOB,UTL_RAW.CAST_TO_VARCHAR2(UTL_ENCODE.BASE64_ENCODE(V_RAW_DATA)));
+  end loop;
+  return V_BASE64_CLOB;
+end;
+';
+--
+  C_HEXBINARY2BLOB CONSTANT VARCHAR2(1024) := 
+--
 'function HEXBINARY2BLOB(P_SERIALIZATION CLOB)
 return BLOB
 is
@@ -148,7 +140,7 @@ is
   V_INPUT_LENGTH NUMBER := DBMS_LOB.GETLENGTH(P_SERIALIZATION);
   V_HEXBINARY_DATA VARCHAR2(32000);
 begin
-  if (DBMS_LOB.substr(P_SERIALIZATION,8,1) = ''OVERFLOW'') then return NULL; end if;
+  if (DBMS_LOB.substr(P_SERIALIZATION,15,1) = ''BLOB2HEXBINARY:'') then return NULL; end if;
   DBMS_LOB.CREATETEMPORARY(V_BLOB,TRUE,DBMS_LOB.CALL);
   while (V_OFFSET <= V_INPUT_LENGTH) loop
     V_AMOUNT := 32000;
@@ -160,7 +152,8 @@ begin
 end;
 ';
 --
-C_FUNCTION_CHUNKS2CLOB CONSTANT VARCHAR2(1024) := 
+  C_CHUNKS2CLOB CONSTANT VARCHAR2(1024) := 
+--
 'function CHUNKS2CLOB(P_CHUNKED_CLOB CHUNKED_CLOB_T)  return CLOB 
 as 
   V_CLOB CLOB; 
@@ -176,7 +169,8 @@ begin
 end;
 ';
 --
-C_FUNCTION_CHUNKS2BLOB CONSTANT VARCHAR2(1024) := 
+  C_CHUNKS2BLOB CONSTANT VARCHAR2(1024) := 
+--
 'function CHUNKS2BLOB(P_CHUNKED_CLOB CHUNKED_CLOB_T)  return BLOB 
 as 
   V_BLOB BLOB; 
@@ -191,16 +185,16 @@ begin
   return V_BLOB; 
 end;
 ';
---
+-- 
+  C_BLOB2CHUNKS CONSTANT VARCHAR2(2048) := 
+-- 
 /* 
-**
 ** Converts the BLOB to an ARRAY of HEXBINARY encoded Strings.. 
-**
 */
-C_FUNCTION_BLOB2CHUNKS CONSTANT VARCHAR2(1024) := 
 'function BLOB2CHUNKS(P_BLOB BLOB)
 return CLOB
 is
+  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := ' || (C_MAX_SUPPORTED_SIZE - 4)   || ';
   C_SINGLE_QUOTE CONSTANT CHAR(1)  := CHR(39);
   C_CHUNK_SIZE   CONSTANT NUMBER := 2000;
   V_CLOB         CLOB;
@@ -212,7 +206,7 @@ is
 begin
   DBMS_LOB.createTemporary(V_CLOB,TRUE,DBMS_LOB.CALL); 
   V_CHUNK := ''OBJECT_SERIALIZATION.CHUNKS2BLOB(CHUNKED_CLOB_T('';
-  DBMS_LOB.WRITEAPPEND(V_CLOB,LENGTH(V_CHUNK),V_CHUNK); 
+  DBMS_LOB.WRITEAPPEND(V_CLOB,length(V_CHUNK),V_CHUNK); 
   while (V_OFFSET <= V_BLOB_LENGTH) loop
     V_AMOUNT := C_CHUNK_SIZE;
     DBMS_LOB.READ(P_BLOB,V_AMOUNT,V_OFFSET,V_RAW_DATA);
@@ -221,16 +215,22 @@ begin
     if (V_OFFSET < V_BLOB_LENGTH) then 
       V_CHUNK := V_CHUNK || '',''; 
     end if; 
-	DBMS_LOB.WRITEAPPEND(V_CLOB,LENGTH(V_CHUNK),V_CHUNK); 
+	DBMS_LOB.WRITEAPPEND(V_CLOB,length(V_CHUNK),V_CHUNK); 
   end loop;
   DBMS_LOB.WRITEAPPEND(V_CLOB,2,''))''); 
-  return V_CLOB;
+  if (DBMS_LOB.GETLENGTH(V_CLOB) > C_MAX_SUPPORTED_SIZE) then
+    return TO_CLOB(''BLOB2CHUNKS: Serialized size ('' || DBMS_LOB.GETLENGTH(V_CLOB) || '') exceeds maximum supported size ('' || C_MAX_SUPPORTED_SIZE || '').'');
+  else
+    return V_CLOB;
+  end if;
 end;
 ';
 --
-C_FUNCTION_CLOB2CHUNKS CONSTANT VARCHAR2(2048) := 
+  C_CLOB2CHUNKS CONSTANT VARCHAR2(2048) := 
+--
 'function CLOB2CHUNKS(P_CLOB CLOB) return CLOB 
 as 
+  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := ' || (C_MAX_SUPPORTED_SIZE - 4)   || ';
   C_SINGLE_QUOTE CONSTANT CHAR(1)  := CHR(39);
   C_CHUNK_SIZE   CONSTANT NUMBER := 4000;
   V_CLOB         CLOB; 
@@ -241,7 +241,7 @@ as
 begin 
   DBMS_LOB.createTemporary(V_CLOB,TRUE,DBMS_LOB.CALL); 
   V_CHUNK := ''OBJECT_SERIALIZATION.CHUNKS2CLOB(CHUNKED_CLOB_T('';
-  DBMS_LOB.WRITEAPPEND(V_CLOB,LENGTH(V_CHUNK),V_CHUNK); 
+  DBMS_LOB.WRITEAPPEND(V_CLOB,length(V_CHUNK),V_CHUNK); 
   while (V_OFFSET < V_CLOB_LENGTH) loop 
     V_AMOUNT := C_CHUNK_SIZE - 3; 
     DBMS_LOB.READ(P_CLOB,V_AMOUNT,V_OFFSET,V_CHUNK); 
@@ -250,10 +250,14 @@ begin
     if (V_OFFSET < V_CLOB_LENGTH) then 
       V_CHUNK := V_CHUNK || '',''; 
     end if; 
-	DBMS_LOB.WRITEAPPEND(V_CLOB,LENGTH(V_CHUNK),V_CHUNK); 
+	DBMS_LOB.WRITEAPPEND(V_CLOB,length(V_CHUNK),V_CHUNK); 
   end loop; 
   DBMS_LOB.WRITEAPPEND(V_CLOB,2,''))''); 
-  return V_CLOB;
+  if (DBMS_LOB.GETLENGTH(V_CLOB) > C_MAX_SUPPORTED_SIZE) then
+    return TO_CLOB(''CLOB2CHUNKS: Serialized size ('' || DBMS_LOB.GETLENGTH(V_CLOB) || '') exceeds maximum supported size ('' || C_MAX_SUPPORTED_SIZE || '').'');
+  else
+    return V_CLOB;
+  end if;
 end; 
 function CHUNKLARGECLOB(P_CLOB CLOB) return CLOB 
 as 
@@ -267,13 +271,14 @@ begin
 end;
 ';
 --
--- Cannot handle OBJECT TYPES as it is necessary to create a variable of the type in order to get payaload, which requires the TYPES to be known in advance.
--- Also cannot handle types with certain oracle data types such as INTEGER, since the ANYTYPE does not support ''GETTERS'' for these data types.
--- Obvious solution to handle these cases using Dynamic SQL does not work for nested objects as context for the ''PIECEWISE'' operations is lost when the
--- ANYDATA object is passed to EXECUTE IMMEDIATE
--- Also the ''GETTER'' for ROWID appears to be missing ???
+  C_SERIALIZE_ANYDATA CONSTANT VARCHAR2(32767) := 
 --
-C_PROCEDURE_SERIALIZE_ANYDATA CONSTANT VARCHAR2(32767) := 
+/*
+** Cannot handle OBJECT TYPES as it is necessary to create a variable of the type in order to get payaload, which requires the TYPES to be known in advance.
+** Also cannot handle types with certain oracle data types such as INTEGER, since the ANYTYPE does not support ''GETTERS'' for these data types.
+** Obvious solution to handle these cases using Dynamic SQL does not work for nested objects as context for the ''PIECEWISE'' operations is lost when the** ANYDATA object is passed to EXECUTE IMMEDIATE
+** Also the ''GETTER'' for ROWID appears to be missing ???
+*/
 'procedure SERIALIZE_ANYDATA(P_ANYDATA ANYDATA, P_SERIALIZATION IN OUT NOCOPY CLOB)
 as
   V_SINGLE_QUOTE         CONSTANT CHAR(1) := CHR(39);
@@ -281,7 +286,7 @@ as
     TYPE_ID              NUMBER
    ,PRECISION            NUMBER
    ,SCALE                NUMBER
-   ,LENGTH               NUMBER
+   ,length               NUMBER
    ,CSID                 NUMBER
    ,CSFRM                NUMBER
    ,SCHEMA_NAME          VARCHAR2(128)
@@ -325,7 +330,7 @@ begin
   V_TYPE_INFO.TYPE_ID := V_TYPE_METADATA.getInfo(
     V_TYPE_INFO.PRECISION,
     V_TYPE_INFO.SCALE,
-    V_TYPE_INFO.LENGTH,
+    V_TYPE_INFO.length,
     V_TYPE_INFO.CSID,
     V_TYPE_INFO.CSFRM,
     V_TYPE_INFO.SCHEMA_NAME,
@@ -431,30 +436,37 @@ begin
 	else
 	  V_ANYDATA_PAYLOAD := ''Unsupported ANYDATA content [''|| V_TYPE_ID || '']: UNKNOWN.'';
   end case;
-  DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_ANYDATA_CONTENT_TYPE),V_ANYDATA_CONTENT_TYPE);
+  DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_ANYDATA_CONTENT_TYPE),V_ANYDATA_CONTENT_TYPE);
   DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'','');
-  SIZE_CHECK(V_ANYDATA_PAYLOAD,''SERIALIZE ANYDATA'');
   DBMS_LOB.APPEND(P_SERIALIZATION,V_ANYDATA_PAYLOAD);
   DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'')'');
 end;
-function SERIALIZE_ANYDATA(P_ANYDATA ANYDATA) return CLOB
+function SERIALIZE_ANYDATA(P_ANYDATA ANYDATA) 
+return CLOB
 as
-  V_SERIALIZATION CLOB;
+  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := ' || (C_MAX_SUPPORTED_SIZE - 4)  || ';
+  V_SERIALIZATION    CLOB;
 begin
   DBMS_LOB.CREATETEMPORARY(V_SERIALIZATION,TRUE,DBMS_LOB.CALL);
   SERIALIZE_ANYDATA(P_ANYDATA,V_SERIALIZATION);
-  return V_SERIALIZATION;
+  if (DBMS_LOB.GETLENGTH(V_SERIALIZATION) > C_MAX_SUPPORTED_SIZE) then
+    return TO_CLOB(''SERIALIZE_ANYDATA: Serialized size ('' || DBMS_LOB.GETLENGTH(V_SERIALIZATION) || '') exceeds maximum supported size ('' || C_MAX_SUPPORTED_SIZE || '').'');
+  else
+    return V_SERIALIZATION;
+  end if;
 end;
 ';
 --
-C_PROCEDURE_SERIALIZE_OBJECT CONSTANT VARCHAR2(32767) := 'procedure SERIALIZE_OBJECT(P_ANYDATA ANYDATA, P_SERIALIZATION IN OUT NOCOPY CLOB)
+  C_SERIALIZE_OBJECT_PART1 VARCHAR2(32767) := 
+--
+'procedure SERIALIZE_OBJECT(P_ANYDATA ANYDATA, P_SERIALIZATION IN OUT NOCOPY CLOB)
 as
   V_SINGLE_QUOTE        CONSTANT CHAR(1) := CHR(39);
   TYPE TYPE_INFO_T is RECORD (
     TYPE_ID             NUMBER
    ,PRECISION           NUMBER
    ,SCALE               NUMBER
-   ,LENGTH              NUMBER
+   ,length              NUMBER
    ,CSID                NUMBER
    ,CSFRM               NUMBER
    ,OWNER               VARCHAR2(128)
@@ -466,7 +478,7 @@ as
     TYPE_ID             NUMBER
    ,PRECISION           NUMBER
    ,SCALE               NUMBER
-   ,LENGTH              NUMBER
+   ,length              NUMBER
    ,CSID                NUMBER
    ,CSFRM               NUMBER
    ,ATTR_TYPE_METADATA  ANYTYPE
@@ -485,7 +497,7 @@ begin
   V_TYPE_INFO.TYPE_ID := V_TYPE_METADATA.getInfo(
     V_TYPE_INFO.PRECISION,
     V_TYPE_INFO.SCALE,
-    V_TYPE_INFO.LENGTH,
+    V_TYPE_INFO.length,
     V_TYPE_INFO.CSID,
     V_TYPE_INFO.CSFRM,
     V_TYPE_INFO.OWNER,
@@ -496,104 +508,97 @@ begin
   case
 ';
 --
-  C_NEWLINE       CONSTANT CHAR(1) := CHR(10);
-  C_SINGLE_QUOTE  CONSTANT CHAR(1) := CHR(39);
+  C_SERIALIZE_OBJECT CONSTANT VARCHAR(1024) :=
 --
-function FUNCTION_BFILE2CHAR
-return VARCHAR2
-deterministic
+'function SERIALIZE_OBJECT(P_ANYDATA ANYDATA)
+return CLOB
+as
+  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := ' || (C_MAX_SUPPORTED_SIZE - 4) || ';
+  V_SERIALIZATION    CLOB;
+begin
+  DBMS_LOB.CREATETEMPORARY(V_SERIALIZATION,TRUE,DBMS_LOB.CALL);
+  SERIALIZE_OBJECT(P_ANYDATA,V_SERIALIZATION);
+  if (DBMS_LOB.GETLENGTH(V_SERIALIZATION) > C_MAX_SUPPORTED_SIZE) then
+    return TO_CLOB(''SERIALIZE_OBJECT: Serialized size ('' || DBMS_LOB.GETLENGTH(V_SERIALIZATION) || '') exceeds maximum supported size ('' || C_MAX_SUPPORTED_SIZE || '').'');
+  else
+    return V_SERIALIZATION;
+  end if;
+end;
+';
+--
+function CODE_BFILE2CHAR return VARCHAR2 deterministic
 as
 begin
-  return C_FUNCTION_BFILE2CHAR;
+  return C_BFILE2CHAR;
 end;
 --	
-function PROCEDURE_CHECK_SIZE
-return VARCHAR2
-deterministic
+function CODE_BLOB2HEXBINARY return VARCHAR2 deterministic
 as
 begin
-  return C_PROCEDURE_SIZE_CHECK;
+  return C_BLOB2HEXBINARY;
 end;
 --
-function FUNCTION_CHAR2BFILE
-return VARCHAR2
-deterministic
-as
-  
-begin
-  return C_FUNCTION_CHAR2BFILE;
-end;
---
-function FUNCTION_BLOB2BASE64
-return VARCHAR2
-deterministic
+function CODE_CHAR2BFILE return VARCHAR2 deterministic
 as
 begin
-  return C_FUNCTION_BLOB2BASE64;
+  return C_CHAR2BFILE;
 end;
 --
-function FUNCTION_BLOB2HEXBINARY
-return VARCHAR2
-deterministic
+function CODE_BLOB2BASE64 return VARCHAR2 deterministic
 as
 begin
-  return C_FUNCTION_BLOB2HEXBINARY;
+  return C_BLOB2BASE64;
 end;
 --
-function FUNCTION_HEXBINARY2BLOB
-return VARCHAR2
-deterministic
+function CODE_HEXBINARY2BLOB return VARCHAR2 deterministic
 as
 begin
-  return C_FUNCTION_HEXBINARY2BLOB;
+  return C_HEXBINARY2BLOB;
 end;
 --
-function FUNCTION_CHUNKS2CLOB
-return VARCHAR2
+function CODE_CHUNKS2CLOB return VARCHAR2 deterministic 
+as begin
+  return C_CHUNKS2CLOB;
+end;
+--
+function CODE_CHUNKS2BLOB return VARCHAR2 deterministic
 as
 begin
-  return C_FUNCTION_CHUNKS2CLOB;
+  return C_CHUNKS2BLOB;
 end;
 --
-function FUNCTION_CHUNKS2BLOB
-return VARCHAR2
+function CODE_BLOB2CHUNKS return VARCHAR2 deterministic
 as
 begin
-  return C_FUNCTION_CHUNKS2BLOB;
+  return C_BLOB2CHUNKS;
 end;
 --
-function FUNCTION_BLOB2CHUNKS
-return VARCHAR2
+function CODE_CLOB2CHUNKS return VARCHAR2 deterministic
 as
 begin
-  return C_FUNCTION_BLOB2CHUNKS;
+  return C_CLOB2CHUNKS;
 end;
 --
-function FUNCTION_CLOB2CHUNKS
-return VARCHAR2
+function CODE_SERIALIZE_ANYDATA return VARCHAR2 deterministic
 as
 begin
-  return C_FUNCTION_CLOB2CHUNKS;
+  return C_SERIALIZE_ANYDATA;
 end;
 --
-function PROCEDURE_SERIALIZE_ANYDATA
-return VARCHAR2
-deterministic
+function CODE_SERIALIZE_OBJECT return VARCHAR2 deterministic
 as
 begin
-  return C_PROCEDURE_SERIALIZE_ANYDATA;
+  return C_SERIALIZE_OBJECT;
 end;
 --
-function PROCEDURE_SERIALIZE_OBJECT
-return VARCHAR2
-deterministic
+function CODE_SERIALIZE_OBJECT_PART1 return VARCHAR2 deterministic
 as
 begin
-  return C_PROCEDURE_SERIALIZE_OBJECT;
+  return C_SERIALIZE_OBJECT_PART1;
 end;
 --
-function CHAR2BFILE(P_SERIALIZATION VARCHAR2) return 
-BFILE
+function CHAR2BFILE(P_SERIALIZATION VARCHAR2) 
+return BFILE
 as
   V_BFILE BFILE;
 begin
@@ -640,7 +645,7 @@ is
   V_INPUT_LENGTH NUMBER := DBMS_LOB.GETLENGTH(P_SERIALIZATION);
   V_HEXBINARY_DATA VARCHAR2(32000);
 begin
-  if (DBMS_LOB.substr(P_SERIALIZATION,8,1) = 'OVERFLOW') then return NULL; end if;
+  if (DBMS_LOB.substr(P_SERIALIZATION,15,1) = 'BLOB2HEXBINARY:') then return NULL; end if;
   DBMS_LOB.CREATETEMPORARY(V_BLOB,TRUE,DBMS_LOB.CALL);
   while (V_OFFSET <= V_INPUT_LENGTH) loop
     V_AMOUNT := 32000;
@@ -680,22 +685,6 @@ exception
    RAISE;
 end;
 --
-function FUNCTION_SERIALIZE_OBJECT
-return VARCHAR2
-deterministic
-as
-  C_FUNCTION  CONSTANT VARCHAR(512)    := 'function SERIALIZE_OBJECT(P_ANYDATA ANYDATA) return CLOB' || C_NEWLINE
-                                       || 'as' || C_NEWLINE
-                                       || '  V_SERIALIZATION CLOB;' || C_NEWLINE
-                                       || 'begin' || C_NEWLINE
-                                       || '  DBMS_LOB.CREATETEMPORARY(V_SERIALIZATION,TRUE,DBMS_LOB.CALL);' || C_NEWLINE
-                                       || '  SERIALIZE_OBJECT(P_ANYDATA,V_SERIALIZATION);' || C_NEWLINE
-                                       || '  return V_SERIALIZATION;' || C_NEWLINE
-                                       || 'end;' || CHR(13) || C_NEWLINE;
-begin
-  return C_FUNCTION;
-end;
---
 function serializeAttr(P_ATTR_NAME VARCHAR2, P_ATTR_TYPE_OWNER VARCHAR2, P_ATTR_TYPE_NAME VARCHAR2, P_ATTR_TYPE_MOD VARCHAR2, P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
 return VARCHAR2
 as
@@ -712,15 +701,15 @@ begin
         when P_ATTR_TYPE_NAME = 'BINARY DOUBLE' then
           V_PLSQL := V_PLSQL
                   || '         V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  || '         DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  || '         DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'BFILE' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := BFILE2CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'BINARY FLOAT' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'BLOB' then
           V_PLSQL := V_PLSQL
                   ||'          DBMS_LOB.APPEND(P_SERIALIZATION,BLOB2CHUNKS(' || P_ATTR_NAME || '));' || C_NEWLINE;
@@ -728,32 +717,32 @@ begin
         when P_ATTR_TYPE_NAME = 'CHAR' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || ' || P_ATTR_NAME || ' || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'CLOB' then
           V_PLSQL := V_PLSQL
                   ||'          DBMS_LOB.APPEND(P_SERIALIZATION,CLOB2CHUNKS(' || P_ATTR_NAME || '));' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'DATE' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'INTERVAL DAY TO SECOND' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'INTEGER' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'INTERVAL YEAR TO MONTH' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         --  when P_ATTR_TYPE_NAME = MLSLABEL then
         when P_ATTR_TYPE_NAME = 'NCHAR' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
                   ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE
                   ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'NCLOB' then
           V_PLSQL := V_PLSQL
@@ -763,44 +752,44 @@ begin
         when P_ATTR_TYPE_NAME = 'NUMBER' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'NVARCHAR2' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
                   ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE
                   ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE;
         --  when P_ATTR_TYPE_NAME = OPAQUE then
         when P_ATTR_TYPE_NAME = 'RAW' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         --  when P_ATTR_TYPE_NAME = REF then
         when P_ATTR_TYPE_NAME = 'TIMESTAMP' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'TIMESTAMP WITH LOCAL TIME ZONE' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'TIMESTAMP WITH TIME ZONE' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'UROWID' then
           V_PLSQL := V_PLSQL
                   ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'VARCHAR2' then
           V_PLSQL := V_PLSQL
                   ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(' || P_ATTR_NAME || '),' || P_ATTR_NAME || ');' || C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(' || P_ATTR_NAME || '),' || P_ATTR_NAME || ');' || C_NEWLINE
                   ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'VARCHAR'  then
           V_PLSQL := V_PLSQL
                   ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(' || P_ATTR_NAME || '),' || P_ATTR_NAME || ');' || C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(' || P_ATTR_NAME || '),' || P_ATTR_NAME || ');' || C_NEWLINE
                   ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE;
         else
           DBMS_OUTPUT.PUT_LINE('Unsupported Type: "' || P_ATTR_TYPE_NAME || '".');
@@ -810,10 +799,10 @@ begin
 	  V_PLSQL := V_PLSQL
               ||'          -- V_SERIALIZED_VALUE := REFTOHEX(' || P_ATTR_NAME || ');' || C_NEWLINE
 		      ||'          select ''HEXTOREF('' || V_SINGLE_QUOTE || REFTOHEX(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE || '')'' into V_SERIALIZED_VALUE from dual;' || C_NEWLINE
-              ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
-    when P_ATTR_TYPE_OWNER is NOT NULL then
+              ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+    when P_ATTR_TYPE_OWNER is not NULL then
       V_TYPECODE := extendTypeList(P_TYPE_LIST, P_ATTR_TYPE_OWNER, P_ATTR_TYPE_NAME);
-      $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('Adding "' || P_ATTR_TYPE_OWNER || '"."' || P_ATTR_TYPE_NAME || '": Type = "' || V_TYPECODE || '". Type count = ' || P_TYPE_LIST.count); $END
+      $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('Adding "' || P_ATTR_TYPE_OWNER || '"."' || P_ATTR_TYPE_NAME || '": Type = "' || V_TYPECODE || '". Type count = ' || P_TYPE_LIST.count); $end
       case
         when V_TYPECODE = 'COLLECTION' then
           V_PLSQL := V_PLSQL
@@ -827,14 +816,14 @@ begin
     else
       V_PLSQL := V_PLSQL
               ||'           V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-              ||'           DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+              ||'           DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
   end case;
 
   return V_PLSQL;
 
 end;
 
-function serializeType(P_TYPE_RECORD TYPE_LIST_T,P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function serializeType(P_SOURCE_SCHEMA VARCHAR2, P_TYPE_RECORD TYPE_LIST_T,P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
 return CLOB
 /*
 **
@@ -864,7 +853,7 @@ as
      and TYPE_NAME = P_TYPE_RECORD.TYPE_NAME;
 
 begin
-  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('serializeType() : Processing Type: "' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '".'); $END
+  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('serializeType() : Processing Type: "' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '".'); $end
   DBMS_LOB.CREATETEMPORARY(V_PLSQL_BLOCK,TRUE,DBMS_LOB.CALL);
 
 
@@ -885,21 +874,27 @@ begin
           || '        if (V_OBJECT is NULL) then' || C_NEWLINE
           || '          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,4,''NULL'');' || C_NEWLINE
           || '          return;' || C_NEWLINE
-          || '        end if; ' || C_NEWLINE
-          || '        if (V_TYPE_INFO.OWNER = SYS_CONTEXT(''USERENV'',''CURRENT_SCHEMA'')) then' || C_NEWLINE
-          || '          V_OBJECT_CONSTRUCTOR := ''"'|| P_TYPE_RECORD.TYPE_NAME || '"('';'|| C_NEWLINE
-		  || '        else' || C_NEWLINE
-          || '          V_OBJECT_CONSTRUCTOR := ''"' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '"('';' || C_NEWLINE
-          || '        end if; ' || C_NEWLINE
-          || '        DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,LENGTH(V_OBJECT_CONSTRUCTOR),V_OBJECT_CONSTRUCTOR);' || C_NEWLINE;
+          || '        end if; ' || C_NEWLINE;
+		  
+  if (P_TYPE_RECORD.OWNER = P_SOURCE_SCHEMA) then
+    V_PLSQL := V_PLSQL
+            || '          V_OBJECT_CONSTRUCTOR := ''"'|| P_TYPE_RECORD.TYPE_NAME || '"('';'|| C_NEWLINE;
+  else 
+    V_PLSQL := V_PLSQL
+            || '          V_OBJECT_CONSTRUCTOR := ''"' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '"('';' || C_NEWLINE;
+   end if;
+		  
+  V_PLSQL := V_PLSQL
 
-  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,LENGTH(V_PLSQL),V_PLSQL);
+  || '        DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_OBJECT_CONSTRUCTOR),V_OBJECT_CONSTRUCTOR);' || C_NEWLINE;
+
+  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(V_PLSQL),V_PLSQL);
 
   if P_TYPE_RECORD.TYPECODE = 'OBJECT' then
 
     for a in getAttributes loop
 
-      $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('serializeType() : Processing Attribute: ' || a.ATTR_NAME || '. Data Type: ' || a.ATTR_TYPE_NAME); $END
+      $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('serializeType() : Processing Attribute: ' || a.ATTR_NAME || '. Data Type: ' || a.ATTR_TYPE_NAME); $end
 
       V_PLSQL := serializeAttr('V_OBJECT."' || a.ATTR_NAME || '"', a.ATTR_TYPE_OWNER, a.ATTR_TYPE_NAME, a.ATTR_TYPE_MOD, P_TYPE_LIST);
 
@@ -914,7 +909,7 @@ begin
                 || '        DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'')'');' || C_NEWLINE;
       end if;
 
-      DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,LENGTH(V_PLSQL),V_PLSQL);
+      DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(V_PLSQL),V_PLSQL);
 
     end loop;
   else
@@ -928,17 +923,17 @@ begin
               || '        end loop;' || C_NEWLINE
               || '        DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'')'');' || C_NEWLINE;
     end loop;
-    DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,LENGTH(V_PLSQL),V_PLSQL);
+    DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(V_PLSQL),V_PLSQL);
   end if;
 
   V_PLSQL := '      end;' || C_NEWLINE;
-  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,LENGTH(V_PLSQL),V_PLSQL);
+  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(V_PLSQL),V_PLSQL);
 
   return V_PLSQL_BLOCK;
 
 end;
 --
-function serializeTypes(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function serializeTypes(P_SOURCE_SCHEMA VARCHAR2,P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
 return CLOB
 as
 --
@@ -950,23 +945,22 @@ as
 
 begin
   DBMS_LOB.CREATETEMPORARY(V_PLSQL_BLOCK,TRUE,DBMS_LOB.CALL);
-  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(PROCEDURE_CHECK_SIZE),PROCEDURE_CHECK_SIZE);
-  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(FUNCTION_BFILE2CHAR),FUNCTION_BFILE2CHAR);
-  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(FUNCTION_BLOB2HEXBINARY),FUNCTION_BLOB2HEXBINARY);
-  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(FUNCTION_CLOB2CHUNKS),FUNCTION_CLOB2CHUNKS);
-  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(FUNCTION_BLOB2CHUNKS),FUNCTION_BLOB2CHUNKS);
-  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(PROCEDURE_SERIALIZE_ANYDATA),PROCEDURE_SERIALIZE_ANYDATA);
-  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(PROCEDURE_SERIALIZE_OBJECT),PROCEDURE_SERIALIZE_OBJECT);
+  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(CODE_BFILE2CHAR),CODE_BFILE2CHAR);
+  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(CODE_BLOB2HEXBINARY),CODE_BLOB2HEXBINARY);
+  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(CODE_CLOB2CHUNKS),CODE_CLOB2CHUNKS);
+  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(CODE_BLOB2CHUNKS),CODE_BLOB2CHUNKS);
+  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(CODE_SERIALIZE_ANYDATA),CODE_SERIALIZE_ANYDATA);
+  DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(CODE_SERIALIZE_OBJECT_PART1),CODE_SERIALIZE_OBJECT_PART1);
   
-  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.serializeTypes(): Type count = ' || P_TYPE_LIST.count); $END
+  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.serializeTypes(): Type count = ' || P_TYPE_LIST.count); $end
 
   if (P_TYPE_LIST.count = 0) then
     return NULL;
   end if;
 
   loop
-    $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.serializeTypes() : Processing[' || V_IDX || '].'); $END
-    V_CASE_BLOCK := serializeType(P_TYPE_LIST(V_IDX),P_TYPE_LIST);
+    $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.serializeTypes() : Processing[' || V_IDX || '].'); $end
+    V_CASE_BLOCK := serializeType(P_SOURCE_SCHEMA, P_TYPE_LIST(V_IDX),P_TYPE_LIST);
     DBMS_LOB.APPEND(V_PLSQL_BLOCK,V_CASE_BLOCK);
     DBMS_LOB.FREETEMPORARY(V_CASE_BLOCK);
     exit when (V_IDX = P_TYPE_LIST.count);
@@ -974,18 +968,17 @@ begin
   end loop;
 
   V_SQL_FRAGMENT := '  end case;' || C_NEWLINE
-                 || '  SIZE_CHECK(P_SERIALIZATION,''SERIALIZE_OBJECT("'' || V_TYPE_INFO.OWNER || ''"."'' || V_TYPE_INFO.TYPE_NAME || ''")'');' || C_NEWLINE
                  || 'end;' || C_NEWLINE;
 
-  DBMS_LOB.writeAppend(V_PLSQL_BLOCK,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+  DBMS_LOB.writeAppend(V_PLSQL_BLOCK,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
 
-  DBMS_LOB.writeAppend(V_PLSQL_BLOCK,LENGTH(FUNCTION_SERIALIZE_OBJECT),FUNCTION_SERIALIZE_OBJECT);
+  DBMS_LOB.writeAppend(V_PLSQL_BLOCK,length(CODE_SERIALIZE_OBJECT),CODE_SERIALIZE_OBJECT);
 
   return V_PLSQL_BLOCK;
 
 end;
 --
-function SERIALIZE_TYPE(P_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2)
+function SERIALIZE_TYPE(P_SOURCE_SCHEMA VARCHAR2, P_TYPE_NAME VARCHAR2)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB;
@@ -993,13 +986,13 @@ begin
    select OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
      bulk collect into V_TYPE_LIST
      from ALL_TYPES
-          start with OWNER = P_OWNER and TYPE_NAME = P_TYPE_NAME
+          start with OWNER = P_SOURCE_SCHEMA and TYPE_NAME = P_TYPE_NAME
           connect by prior TYPE_NAME = SUPERTYPE_NAME
                        and OWNER = SUPERTYPE_OWNER;
-  return serializeTypes(V_TYPE_LIST);
+  return serializeTypes(P_SOURCE_SCHEMA,V_TYPE_LIST);
 end;
 --
-function SERIALIZE_TABLE_TYPES(P_OWNER VARCHAR2,P_TABLE_NAME VARCHAR2)
+function SERIALIZE_TABLE_TYPES(P_SOURCE_SCHEMA VARCHAR2,P_TABLE_NAME VARCHAR2)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB;
@@ -1012,12 +1005,8 @@ begin
            from ALL_TAB_COLS atc
           where atc.DATA_TYPE_OWNER is not NULL
             and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-	        and (
-	             ((atc.HIDDEN_COLUMN = 'NO') and (atc.VIRTUAL_COLUMN = 'NO'))
-                 or 
-		         ((atc.HIDDEN_COLUMN = 'YES') and (atc.VIRTUAL_COLUMN = 'YES') and (COLUMN_NAME ='SYS_NC_ROWINFO$'))
-		        )       
-            and atc.OWNER = P_OWNER
+	        and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+            and atc.OWNER = P_SOURCE_SCHEMA
             and atc.TABLE_NAME = P_TABLE_NAME
        ) tlt
        start with at.TYPE_NAME = tlt.DATA_TYPE
@@ -1025,10 +1014,10 @@ begin
                   connect by prior at.TYPE_NAME = SUPERTYPE_NAME
                                and at.OWNER = SUPERTYPE_OWNER;
 
-  return serializeTypes(V_TYPE_LIST);
+  return serializeTypes(P_SOURCE_SCHEMA,V_TYPE_LIST);
 end;
 --
-function SERIALIZE_TABLE_TYPES(P_OWNER VARCHAR2,P_TABLE_LIST XDB.XDB$STRING_LIST_T)
+function SERIALIZE_TABLE_TYPES(P_SOURCE_SCHEMA VARCHAR2,P_TABLE_LIST T_VC4000_TABLE)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB;
@@ -1041,12 +1030,8 @@ begin
            from ALL_TAB_COLS atc, TABLE(P_TABLE_LIST) tl
           where atc.DATA_TYPE_OWNER is not NULL
             and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-	        and (
-	             ((atc.HIDDEN_COLUMN = 'NO') and (atc.VIRTUAL_COLUMN = 'NO'))
-                 or 
-		         ((atc.HIDDEN_COLUMN = 'YES') and (atc.VIRTUAL_COLUMN = 'YES') and (COLUMN_NAME ='SYS_NC_ROWINFO$'))
-		        )       
-            and atc.OWNER = P_OWNER
+	        and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+            and atc.OWNER = P_SOURCE_SCHEMA
             and atc.TABLE_NAME = tl.COLUMN_VALUE
        ) tlt
        start with at.TYPE_NAME = tlt.DATA_TYPE
@@ -1054,10 +1039,10 @@ begin
                   connect by prior at.TYPE_NAME = SUPERTYPE_NAME
                                and at.OWNER = SUPERTYPE_OWNER;
 
-  return serializeTypes(V_TYPE_LIST);
+  return serializeTypes(P_SOURCE_SCHEMA,V_TYPE_LIST);
 end;
 --
-function deserializeTypes(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function deserializeTypes(P_TARGET_SCHEMA VARCHAR2, P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
 return CLOB
 as
 --
@@ -1069,58 +1054,56 @@ as
   
 begin
 
-  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.deserializeTypes(): Type count = ' || P_TYPE_LIST.count); $END
+  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.deserializeTypes(): Type count = ' || P_TYPE_LIST.count); $end
  
   if (P_TYPE_LIST.count = 0) then
     return NULL;
   end if;
   
   DBMS_LOB.CREATETEMPORARY(V_PLSQL_BLOCK,TRUE,DBMS_LOB.CALL);
-  -- DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(FUNCTION_CHAR2BFILE),FUNCTION_CHAR2BFILE);
-  -- DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(FUNCTION_HEXBINARY2BLOB),FUNCTION_HEXBINARY2BLOB);
-  -- DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(FUNCTION_CHUNKS2CLOB),FUNCTION_CHUNKS2CLOB);
-  -- DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(FUNCTION_CHUNKS2BLOB),FUNCTION_CHUNKS2BLOB);
-    
+  
+
   for V_IDX in 1 .. P_TYPE_LIST.count loop
-    if (P_TYPE_LIST(V_IDX).OWNER = SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) then
+    if (P_TYPE_LIST(V_IDX).OWNER = P_TARGET_SCHEMA) then
       V_TYPE_REFERENCE := '"' || P_TYPE_LIST(V_IDX).TYPE_NAME || '"';
     else 
       V_TYPE_REFERENCE := '"' || P_TYPE_LIST(V_IDX).OWNER|| '"."' || P_TYPE_LIST(V_IDX).TYPE_NAME || '"';
     end if;
 
-    $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.deserializeTypes() : Processing[' || V_IDX || '].'); $END
+    $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.deserializeTypes() : Processing[' || V_IDX || '].'); $end
 
 	V_SQL_FRAGMENT := 'function "#' || P_TYPE_LIST(V_IDX).TYPE_NAME || '"(P_SERIALIZATION CLOB)' || C_NEWLINE
 	               || 'return ' ||  V_TYPE_REFERENCE || C_NEWLINE
 				   || 'as' || C_NEWLINE
 				   || '   V_OBJECT ' || V_TYPE_REFERENCE ||';' || C_NEWLINE
 				   || 'begin' || C_NEWLINE
-				   || '  if (P_SERIALIZATION is NULL) then return NULL; end if;' || C_NEWLINE   
+				   || '  if (P_SERIALIZATION is NULL) then return NULL; end if;' || C_NEWLINE  
+                   || '  if (DBMS_LOB.SUBSTR(P_SERIALIZATION,17,1) = ''SERIALIZE_OBJECT:'') then return NULL; end if;	'|| C_NEWLINE			   
 				   || '  EXECUTE IMMEDIATE ''SELECT '' || P_SERIALIZATION || '' FROM DUAL'' into V_OBJECT;' || C_NEWLINE
 				   || '  return V_OBJECT;' || C_NEWLINE
 				   || 'end;' || C_NEWLINE;
 				
-    DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+    DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   end loop;
 
-  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.deserializeTypes(): Size = ' || DBMS_LOB.GETLENGTH(V_PLSQL_BLOCK)); $END
+  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.deserializeTypes(): Size = ' || DBMS_LOB.GETLENGTH(V_PLSQL_BLOCK)); $end
 
   return V_PLSQL_BLOCK;
 
 end;
 --
-function DESERIALIZE_TYPE(P_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2)
+function DESERIALIZE_TYPE(P_TARGET_SCHEMA VARCHAR2, P_TYPE_NAME VARCHAR2)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB := TYPE_LIST_TAB();
 begin
   V_TYPE_LIST.extend();
-  V_TYPE_LIST(1).OWNER := P_OWNER;
+  V_TYPE_LIST(1).OWNER := P_TARGET_SCHEMA;
   V_TYPE_LIST(1).TYPE_NAME := P_TYPE_NAME;
-  return deserializeTypes(V_TYPE_LIST);
+  return deserializeTypes(P_TARGET_SCHEMA,V_TYPE_LIST);
 end;
 --
-function DESERIALIZE_TABLE_TYPES(P_OWNER VARCHAR2,P_TABLE_NAME VARCHAR2)
+function DESERIALIZE_TABLE_TYPES(P_TARGET_SCHEMA VARCHAR2,P_TABLE_NAME VARCHAR2)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB;
@@ -1130,17 +1113,13 @@ begin
     from ALL_TAB_COLS atc
    where atc.DATA_TYPE_OWNER is not NULL
      and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-	 and (
-	      ((atc.HIDDEN_COLUMN = 'NO') and (atc.VIRTUAL_COLUMN = 'NO'))
-          or 
-		  ((atc.HIDDEN_COLUMN = 'YES') and (atc.VIRTUAL_COLUMN = 'YES') and (COLUMN_NAME ='SYS_NC_ROWINFO$'))
-		 )       
-     and atc.OWNER = P_OWNER
+     and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+     and atc.OWNER = P_TARGET_SCHEMA
      and atc.TABLE_NAME = P_TABLE_NAME;
-  return deserializeTypes(V_TYPE_LIST);
+  return deserializeTypes(P_TARGET_SCHEMA,V_TYPE_LIST);
 end;
 --
-function DESERIALIZE_TABLE_TYPES(P_OWNER VARCHAR2,P_TABLE_LIST XDB.XDB$STRING_LIST_T)
+function DESERIALIZE_TABLE_TYPES(P_TARGET_SCHEMA VARCHAR2,P_TABLE_LIST T_VC4000_TABLE)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB;
@@ -1150,14 +1129,10 @@ begin
     from ALL_TAB_COLS atc, TABLE(P_TABLE_LIST) tl
    where atc.DATA_TYPE_OWNER is not NULL
      and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-	 and (
-	      ((atc.HIDDEN_COLUMN = 'NO') and (atc.VIRTUAL_COLUMN = 'NO'))
-          or 
-		  ((atc.HIDDEN_COLUMN = 'YES') and (atc.VIRTUAL_COLUMN = 'YES') and (COLUMN_NAME ='SYS_NC_ROWINFO$'))
-		 )       
-     and atc.OWNER = P_OWNER
+    and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+     and atc.OWNER = P_TARGET_SCHEMA
      and atc.TABLE_NAME = tl.COLUMN_VALUE;
-  return deserializeTypes(V_TYPE_LIST);
+  return deserializeTypes(P_TARGET_SCHEMA,V_TYPE_LIST);
 end;
 --
 end;

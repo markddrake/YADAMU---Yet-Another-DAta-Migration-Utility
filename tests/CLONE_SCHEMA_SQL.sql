@@ -1,0 +1,13 @@
+--
+def SOURCE_SCHEMA = &1
+--
+def TARGET_SCHEMA = &2
+--
+@@EXPORT_SCHEMA &SOURCE_SCHEMA
+--
+set pages  100 lines 256 trimspool on long 1000000
+--
+@@EXPORT_TABLE_SQL &SOURCE_SCHEMA
+--
+@@CLONE_IMPORT_SCHEMA &TARGET_SCHEMA
+--

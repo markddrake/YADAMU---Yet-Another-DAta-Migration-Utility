@@ -1,145 +1,81 @@
 --
 create or replace package JSON_EXPORT
-AUTHID CURRENT_USER
+authid CURRENT_USER
 as
-/*
-**
-**  VERSION 7
-**
-**  Include matadata about the source database  ans export utility
-**  Object de-serialization
-**  Column Patterns for Object and XMLTYPE tables
-**  Export DDL required to recreate database schema objects before importing data
-**  DATA ONLY mode and DDL_ONLY mode
-**  Supported data types in JSON_TABLE column patterns
-**
-** ### TODO LIST
-**     Export references as REFERENCE(SCHMEA.OBJECT, OID)
-**     Export ACLOID and OWNERID as ACL(PATH), OWNER(NAME)
-**
-*/
-  C_VERSION_NUMBER constant NUMBER(4,2) := 1.0;
-
-  type T_CLOB_TAB is table of CLOB;
-
-  type T_JSON_ARRAY_OUTPUT_TAB is table of
-    $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-    CLOB;
-    $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-    VARCHAR2(32767);
-    $ELSE
-    VARCHAR2(4000);
-    $END
-
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-     SQL_STATEMENT CLOB;
-  $END
-
-  type T_EXPORT_METADATA_REC is record (
-     OWNER                     VARCHAR2(128)
-   , TABLE_NAME                VARCHAR2(128)
-   , EXPORT_SELECT_LIST        CLOB
-   , TABLE_METADATA            CLOB
-   $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-   $ELSE
-   , SQL_STATEMENT             CLOB
-   $END
-  );
-
-  type T_EXPORT_METADATA_TAB is table of T_EXPORT_METADATA_REC;
-
-  EXPORT_METADATA_TABLE T_EXPORT_METADATA_TAB;
-
-  function VERSION return NUMBER deterministic;
-  function DATABASE_RELEASE return NUMBER deterministic;
-  function JSON_FEATURES return VARCHAR2 deterministic;
+  ROW_LIMIT NUMBER := -1;
+  procedure SET_ROW_LIMIT(P_ROW_LIMIT NUMBER);	
   procedure DATA_ONLY_MODE(P_DATA_ONLY_MODE BOOLEAN);
-  procedure DDL_ONLY_MODE(P_DDL_ONLY_MODE BOOLEAN);
-
-  procedure GENERATE_EXPORT_METADATA(P_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2 DEFAULT NULL);
-  function EXPORT_METADATA return T_EXPORT_METADATA_TAB pipelined;
-
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  procedure DDL_ONLY_MODE(P_DDL_ONLY_MODE BOOLEAN);  
+--  
+$IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
+  SQL_STATEMENT CLOB;
   function DUMP_SQL_STATEMENT return CLOB;
-  $ELSE
-  function EXPORT_TABLE_DATA(P_CURSOR SYS_REFCURSOR) return T_JSON_ARRAY_OUTPUT_TAB pipelined;
-  $END
-
-  function EXPORT_TABLE(P_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2) return T_CLOB_TAB pipelined;
-  function EXPORT_SCHEMA(P_SCHEMA VARCHAR2) return T_CLOB_TAB pipelined;
-
+--
+$ELSE
+--
+  type T_EXPORT_METADATA_RECORD is record(
+    OWNER         VARCHAR2(128)
+   ,TABLE_NAME    VARCHAR2(128)
+   ,METADATA      CLOB 
+   ,SQL_STATEMENT CLOB
+  );
+  
+  type T_EXPORT_METADATA_TABLE is table of T_EXPORT_METADATA_RECORD;
+  EXPORT_METADATA_CACHE T_EXPORT_METADATA_TABLE;
+--  
+  function EXPORT_METADATA return T_EXPORT_METADATA_TABLE pipelined;
+$END  
+--
+  function EXPORT_VERSION return NUMBER deterministic;
+  function JSON_FEATURES return VARCHAR2 deterministic;
+  function DATABASE_RELEASE return NUMBER deterministic;
+  
+  function EXPORT_SCHEMA(P_SOURCE_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
 end;
 /
 --
-show errors
+show errors 
 --
 create or replace package body JSON_EXPORT
 as
 --
   C_NEWLINE         CONSTANT CHAR(1) := CHR(10);
   C_SINGLE_QUOTE    CONSTANT CHAR(1) := CHR(39);
-
+  
   G_INCLUDE_DATA    BOOLEAN := TRUE;
   G_INCLUDE_DDL     BOOLEAN := FALSE;
 --
-function VERSION
-return NUMBER deterministic
-as
-begin
-  return C_VERSION_NUMBER;
-end;
---
-function DATABASE_RELEASE
-return NUMBER deterministic
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  C_RETURN_TYPE     CONSTANT VARCHAR2(32) := 'CLOB'; 
+  C_MAX_OUTPUT_SIZE CONSTANT NUMBER       := DBMS_LOB.LOBMAXSIZE;
+  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+  C_RETURN_TYPE     CONSTANT VARCHAR2(32):= 'VARCHAR2(32767)';
+  C_MAX_OUTPUT_SIZE CONSTANT NUMBER      := 32767;
+  $ELSE
+  C_RETURN_TYPE     CONSTANT VARCHAR2(32):= 'VARCHAR2(4000)';
+  C_MAX_OUTPUT_SIZE CONSTANT NUMBER      := 4000;
+  $END  
+--  
+function DATABASE_RELEASE return NUMBER deterministic
 as
 begin
   return DBMS_DB_VERSION.VERSION || '.' || DBMS_DB_VERSION.RELEASE;
 end;
 --
-function JSON_FEATURES
-return VARCHAR2
-deterministic
-as
-$IF DBMS_DB_VERSION.VER_LE_12_2 $THEN
-  V_JSON_FEATURES VARCHAR2(32767) := JSON_OBJECT(
-                                       'treatAsJSON'     value JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED
-									   ,'CLOB'           value JSON_FEATURE_DETECTION.CLOB_SUPPORTED
-									   ,'extendedString' value JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED
-									  );
-begin		
-$ELSE
-  V_JSON_FEATURES VARCHAR2(32767);
-begin		
-   V_JSON_FEATURES := JSON_OBJECT(
-                       'treatAsJSON'    value JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED
-					  ,'CLOB'           value JSON_FEATURE_DETECTION.CLOB_SUPPORTED
-				      ,'extendedString' value JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED
-					);
-$END
-  return V_JSON_FEATURES;
-end;
---  
-$IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-function DUMP_SQL_STATEMENT
-return CLOB
+function JSON_FEATURES return VARCHAR2 deterministic
 as
 begin
-  return SQL_STATEMENT;
+  return JSON_OBJECT(
+          'treatAsJSON'     value JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED
+	 	 ,'CLOB'           value JSON_FEATURE_DETECTION.CLOB_SUPPORTED
+		 ,'extendedString' value JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED
+		 );
 end;
-$END
---
-function EXPORT_METADATA
-return T_EXPORT_METADATA_TAB
-pipelined
+function EXPORT_VERSION return NUMBER deterministic
 as
-  cursor getRecords
-  is
-  select *
-    from TABLE(EXPORT_METADATA_TABLE);
 begin
-  for r in getRecords loop
-    pipe row (r);
-  end loop;
+  return 1.0;
 end;
 --
 procedure DATA_ONLY_MODE(P_DATA_ONLY_MODE BOOLEAN)
@@ -162,164 +98,182 @@ begin
   end if;
 end;
 --
-procedure SET_CURRENT_SCHEMA(P_TARGET_SCHEMA VARCHAR2)
+$IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
+function DUMP_SQL_STATEMENT
+return CLOB
 as
-  USER_NOT_FOUND EXCEPTION ; PRAGMA EXCEPTION_INIT( USER_NOT_FOUND , -01435 );
-  V_SQL_STATEMENT CONSTANT VARCHAR2(4000) := 'ALTER SESSION SET CURRENT_SCHEMA = ' || P_TARGET_SCHEMA;
 begin
-  if (SYS_CONTEXT('USERENV','CURRENT_SCHEMA') <> P_TARGET_SCHEMA) then
-    execute immediate V_SQL_STATEMENT;
-  end if;
+  return SQL_STATEMENT;
 end;
 --
-FUNCTION TABLE_TO_LIST(P_TABLE XDB.XDB$STRING_LIST_T,P_DELIMITER VARCHAR2 DEFAULT ',')
+$ELSE
+--
+function EXPORT_METADATA
+return T_EXPORT_METADATA_TABLE
+pipelined
+as
+  cursor getRecords
+  is
+  select *
+    from TABLE(EXPORT_METADATA_CACHE);
+begin
+  for r in getRecords loop
+    pipe row (r);
+  end loop;
+end;
+--
+$END
+--
+procedure SET_ROW_LIMIT(P_ROW_LIMIT NUMBER)
+as
+begin
+  ROW_LIMIT := P_ROW_LIMIT;
+end;
+--
+function TABLE_TO_LIST(P_TABLE T_VC4000_TABLE,P_DELIMITER VARCHAR2 DEFAULT ',') 
 return CLOB
 as
   V_LIST CLOB;
 begin
   DBMS_LOB.CREATETEMPORARY(V_LIST,TRUE,DBMS_LOB.CALL);
-  for i in P_TABLE.FIRST .. P_TABLE.LAST loop
-    if (i > 1) then
-  	  DBMS_LOB.WRITEAPPEND(V_LIST,LENGTH(P_DELIMITER),P_DELIMITER);
-	end if;
-	DBMS_LOB.WRITEAPPEND(V_LIST,LENGTH(P_TABLE(i)),P_TABLE(i));
+  for i in P_TABLE.first .. P_TABLE.last loop
+    if (i > 1) then 
+      DBMS_LOB.WRITEAPPEND(V_LIST,length(P_DELIMITER),P_DELIMITER); 
+    end if;
+    DBMS_LOB.WRITEAPPEND(V_LIST,length(P_TABLE(i)),P_TABLE(i));
   end loop;
   return V_LIST;
 end;
 --
-procedure GENERATE_EXPORT_METADATA(P_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2)
+$IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+function GENERATE_WITH_CLAUSE(P_SOURCE_SCHEMA VARCHAR2, P_TABLE_NAME_LIST T_VC4000_TABLE, P_BFILE_COUNT NUMBER, P_BLOB_COUNT NUMBER, P_ANYDATA_COUNT NUMBER, P_SQL_STATEMENT IN OUT CLOB)
+return VARCHAR2
+as
+  V_OBJECT_SERIALIZER CLOB;
+  V_FUNCTION_LIST VARCHAR(32767) := '';
+begin
+  V_OBJECT_SERIALIZER := OBJECT_SERIALIZATION.SERIALIZE_TABLE_TYPES(P_SOURCE_SCHEMA,P_TABLE_NAME_LIST);
+$ELSE
+function GENERATE_WITH_CLAUSE(P_SOURCE_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2, P_BFILE_COUNT NUMBER, P_BLOB_COUNT NUMBER, P_ANYDATA_COUNT NUMBER, P_SQL_STATEMENT IN OUT CLOB)
+return VARCHAR2
+as
+  V_OBJECT_SERIALIZER CLOB;
+  V_FUNCTION_LIST VARCHAR(32767) := '';
+begin
+  V_OBJECT_SERIALIZER :=  OBJECT_SERIALIZATION.SERIALIZE_TABLE_TYPES(P_SOURCE_SCHEMA,P_TABLE_NAME); 
+$END
+  if ((P_BFILE_COUNT + P_BLOB_COUNT + P_ANYDATA_COUNT = 0) AND (V_OBJECT_SERIALIZER is NULL)) then
+    return V_FUNCTION_LIST;
+  end if;
+
+  DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB('WITH' || C_NEWLINE));
+
+  if (V_OBJECT_SERIALIZER is not null) then
+    DBMS_LOB.APPEND(P_SQL_STATEMENT,V_OBJECT_SERIALIZER);
+	V_FUNCTION_LIST := 'OBJECTS';
+  else
+    /*
+	** Deserialization functions for BFILE and BLOB data types are exposed direclty by the OBJECT_SERIALIZATION package
+	** This allows them to called from EXECUTE IMMEDIATE operations when they appear inside serialized objects 
+	** Since the functions are exposed by OBJECT_SERIALIZATION they do not need to be supplied using a WITH clause
+	** ANYDATA is de-serialised using methods exposed by the ANYDATA type.
+	*/
+    if ((P_BFILE_COUNT > 0) or (P_ANYDATA_COUNT > 0)) then
+      DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(OBJECT_SERIALIZATION.CODE_BFILE2CHAR));
+    end if;
+    if ((P_BLOB_COUNT > 0) or (P_ANYDATA_COUNT > 0)) then
+      DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(OBJECT_SERIALIZATION.CODE_BLOB2HEXBINARY));
+    end if;
+    if (P_ANYDATA_COUNT > 0) then
+      DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(OBJECT_SERIALIZATION.CODE_SERIALIZE_ANYDATA));
+    end if;
+ end if;
+ return V_FUNCTION_LIST;
+end;
+--
+procedure GENERATE_STATEMENT(P_SOURCE_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2 DEFAULT NULL)
 /*
-**
-** Generate metadata and a SQL Select Statement for each table to be be exported the statements in a PL/SQL table
-**
+** Generate SQL Statement to create a JSON document from the contents of the supplied schema
 */
 as
   V_SQL_FRAGMENT  VARCHAR2(32767);
-  V_SQL_STATEMENT CLOB;
-
-  V_WITH_BLOCK_REQUIRED BOOLEAN;
-  V_OBJECT_SERIALIZER   CLOB;
-
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  V_RETURN_TYPE VARCHAR2(32) := 'CLOB';
-  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-  V_RETURN_TYPE VARCHAR2(32):= 'VARCHAR2(32767)';
-  $ELSE
-  V_RETURN_TYPE VARCHAR2(32):= 'VARCHAR2(4000)';
-  $END
-  
-  V_COLUMN_LIST          CLOB;
-  V_DATA_TYPE_LIST       CLOB;
-  V_EXPORT_SELECT_LIST   CLOB;
-  V_COLUMN_PATTERN_LIST  CLOB;
-  V_IMPORT_SELECT_LIST   CLOB;
-  V_EXPORT_METADATA      CLOB;
-  V_OBJECT_DESERIALIZER  CLOB;
-
+ 
   cursor getTableMetadata
   is
   select aat.owner
         ,aat.table_name
-  	    ,SUM(CASE WHEN DATA_TYPE = 'BLOB'  THEN 1 ELSE 0 END) BLOB_COUNT
-  	    ,SUM(CASE WHEN DATA_TYPE = 'BFILE' THEN 1 ELSE 0 END) BFILE_COUNT
-        ,SUM(CASE WHEN DATA_TYPE = 'ANYDATA' THEN 1 ELSE 0 END) ANYDATA_COUNT
- 		,cast(collect('"' || COLUMN_NAME || '"' ORDER BY INTERNAL_COLUMN_ID) as XDB.XDB$STRING_LIST_T) COLUMN_LIST
-		,cast(collect(case when DATA_TYPE_OWNER is null then '"' || DATA_TYPE || '"' else '"' || DATA_TYPE_OWNER || '"."' || DATA_TYPE || '"' end ORDER BY INTERNAL_COLUMN_ID) as XDB.XDB$STRING_LIST_T) DATA_TYPE_LIST
-	    ,cast(collect(
-			   case
-  		         $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
-			     $ELSE
-			     /*
-			     **
-			     ** Pre 18.1 Some Scalar Data Types are not natively supported by JSON_ARRAY()
-			     **
-			     */
-			     when DATA_TYPE in ('BINARY_DOUBLE','BINARY_FLOAT')
-			       then 'TO_CHAR("' || COLUMN_NAME || '")'
-			     when DATA_TYPE LIKE 'TIMESTAMP%WITH LOCAL TIME ZONE'
-				   then 'TO_CHAR(SYS_EXTRACT_UTC("' || COLUMN_NAME || '"),''IYYY-MM-DD"T"HH24:MI:SS.FF9"Z"'')'
-			     when DATA_TYPE LIKE 'INTERVAL DAY% TO SECOND%'
-			       then '''P''
-				        || extract(DAY FROM "' || COLUMN_NAME || '") || ''D''
-                        || ''T'' || CASE WHEN extract(HOUR FROM  "' || COLUMN_NAME || '") <> 0 THEN extract(HOUR FROM  "' || COLUMN_NAME || '") ||  ''H'' END
-	                    || CASE WHEN extract(MINUTE FROM  "' || COLUMN_NAME || '") <> 0 THEN extract(MINUTE FROM  "' || COLUMN_NAME || '") || ''M'' end
-	                    || CASE WHEN extract(SECOND FROM  "' || COLUMN_NAME || '") <> 0 THEN extract(SECOND FROM  "' || COLUMN_NAME || '") ||  ''S'' end'
-			     when DATA_TYPE  LIKE 'INTERVAL YEAR% TO MONTH%'
-			       then '''P''
-				        || extract(YEAR FROM "' || COLUMN_NAME || '") || ''Y''
-	                    || CASE WHEN extract(MONTH FROM  "' || COLUMN_NAME || '") <> 0 THEN extract(MONTH FROM  "' || COLUMN_NAME || '") || ''M'' end'
-				 when DATA_TYPE in ('NCHAR','NVARCHAR2')
-			       then 'TO_CHAR("' || COLUMN_NAME || '")'
-			     when DATA_TYPE = 'NCLOB'
-			       then 'TO_CLOB("' || COLUMN_NAME || '")'
-				 $END
-				 /*
-				 **
-				 ** 18.1 compatible handling of BLOB
-				 **
-				 */
-			     when DATA_TYPE = 'BLOB'
-			       then 'BLOB2HEXBINARY("' || COLUMN_NAME || '")' 				 /*
-				 **
-				 ** Quick Fixes for datatypes not natively supported
-				 **
-				 */
-	 			 when DATA_TYPE = 'XMLTYPE'  -- Can be owned by SYS or PUBLIC
+        ,sum(case when DATA_TYPE = 'BLOB'  then 1 else 0 end) BLOB_COUNT
+        ,sum(case when DATA_TYPE = 'BFILE' then 1 else 0 end) BFILE_COUNT
+        ,sum(case when DATA_TYPE = 'ANYDATA' then 1 else 0 end) ANYDATA_COUNT
+        ,cast(collect('"' || COLUMN_NAME || '"' ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST
+		,cast(collect(case when DATA_TYPE_OWNER is null then '"' || DATA_TYPE || '"' else '"' || DATA_TYPE_OWNER || '"."' || DATA_TYPE || '"' end ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) DATA_TYPE_LIST
+        ,cast(collect(
+               case
+                 -- For some reason RAW columns have DATA_TYPE_OWNER set to the current schema.
+                 when DATA_TYPE = 'RAW'
+                   then '"' || COLUMN_NAME || '"'
+                 $IF not JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                 /*
+                 ** Pre 18.1 Some Scalar Data Types are not natively supported by JSON_ARRAY()
+                 */
+                 when DATA_TYPE in ('BINARY_DOUBLE','BINARY_FLOAT')
+                   then 'TO_CHAR("' || COLUMN_NAME || '")'
+                 when DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
+                   then 'TO_CHAR(SYS_EXTRACT_UTC("' || COLUMN_NAME || '"),''IYYY-MM-DD"T"HH24:MI:SS.FF9"Z"'')'
+                 when DATA_TYPE like 'INTERVAL DAY% TO SECOND%'
+                   then '''P''
+                        || extract(DAY FROM "' || COLUMN_NAME || '") || ''D''
+                        || ''T'' || case when extract(HOUR FROM  "' || COLUMN_NAME || '") <> 0 then extract(HOUR FROM  "' || COLUMN_NAME || '") ||  ''H'' end
+                        || case when extract(MINUTE FROM  "' || COLUMN_NAME || '") <> 0 then extract(MINUTE FROM  "' || COLUMN_NAME || '") || ''M'' end
+                        || case when extract(SECOND FROM  "' || COLUMN_NAME || '") <> 0 then extract(SECOND FROM  "' || COLUMN_NAME || '") ||  ''S'' end'
+                 when DATA_TYPE  like 'INTERVAL YEAR% TO MONTH%'
+                   then '''P''
+                        || extract(YEAR FROM "' || COLUMN_NAME || '") || ''Y''
+                        || case when extract(MONTH FROM  "' || COLUMN_NAME || '") <> 0 then extract(MONTH FROM  "' || COLUMN_NAME || '") || ''M'' end'
+                 when DATA_TYPE in ('NCHAR','NVARCHAR2')
+                   then 'TO_CHAR("' || COLUMN_NAME || '")'
+                 when DATA_TYPE = 'NCLOB'
+                   then 'TO_CLOB("' || COLUMN_NAME || '")'
+                 /*
+                 ** 18.1 compatible handling of BLOB
+                 */
+                 when DATA_TYPE = 'BLOB'
+                   then 'BLOB2HEXBINARY("' || COLUMN_NAME || '")'                          
+                 $END
+                 /*
+                 ** Quick Fixes for datatypes not natively supported
+                 */
+                 when DATA_TYPE = 'XMLTYPE'  -- Can be owned by SYS or PUBLIC
                    then 'case when "' ||  COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  COLUMN_NAME || '" as CLOB) end'
-	 			 when DATA_TYPE = 'ROWID' or DATA_TYPE = 'UROWID'
-			       then 'ROWIDTOCHAR("' || COLUMN_NAME || '")'
-				 /*   				 /*
-				 **
-				 ** Fix for BFILENAME
-				 **
-				 */
-			     when DATA_TYPE = 'BFILE'
-			       then 'BFILE2CHAR("' || COLUMN_NAME || '")'
-	 			 when DATA_TYPE = 'ANYDATA'  -- Can be owned by SYS or PUBLIC
+                 when DATA_TYPE = 'ROWID' or DATA_TYPE = 'UROWID'
+                   then 'ROWIDTOCHAR("' || COLUMN_NAME || '")'
+                 /*
+                 ** Fix for BFILENAME
+                 */
+                 when DATA_TYPE = 'BFILE'
+                   then 'BFILE2CHAR("' || COLUMN_NAME || '")'
+                 /*
+                 **
+                 ** Support ANYDATA, OBJECT and COLLECTION types
+                 **
+                 */
+                 when DATA_TYPE = 'ANYDATA'  -- Can be owned by SYS or PUBLIC
                    then 'case when "' ||  COLUMN_NAME || '" is NULL then NULL else SERIALIZE_ANYDATA("' ||  COLUMN_NAME || '") end'
-				 /*
-				 **
-				 ** Support OBJECT and COLLECTION types
-				 **
-				 */
-				 when TYPECODE = 'COLLECTION'
-			       then 'case when "' || COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(ANYDATA.convertCollection("' || COLUMN_NAME || '")) end'
-				 when TYPECODE = 'OBJECT'
-  				   then 'case when "' || COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(ANYDATA.convertObject("' || COLUMN_NAME || '")) end'
-			     /*
-				 **
-				 ** Comment out Unsupported Data Types including objects and collections
-				 **
-				 */
-			   	 when DATA_TYPE in ('LONG','LONG RAW')
-			       then '''"' || COLUMN_NAME || '". Unsupported data type ["' || DATA_TYPE || '"]'''
-			     else
-   			       '"' || COLUMN_NAME || '"'
-		       end
-		 ORDER BY INTERNAL_COLUMN_ID) as XDB.XDB$STRING_LIST_T) EXPORT_SELECT_LIST
-	    ,cast(collect(
-		       /* JSON_TABLE column patterns in the form: COLUMN_NAME DATA_TYPE PATH '$[idx]' */
-		       '"' || COLUMN_NAME || '" ' ||
-			   case
-                 /* Map data types not supported by JSON_TABLE to data types supported by JSON_TABLE */
-			     when DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','LONG','LONG RAW','BFILE','ROWID','UROWID') or DATA_TYPE like 'INTERVAL%'
-                   then 'VARCHAR2'
-				 when DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
-				   then 'TIMESTAMP WITH TIME ZONE'
-				 /* Oracle Data types BLOB, XMLTYPE, NCLOB are not supported by JSON_TABLE */
-				 when DATA_TYPE in ('XMLTYPE','CLOB','NCLOB','BLOB') or TYPECODE is not NULL
-                   $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-	               then 'CLOB'
-                   $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-	               then 'VARCHAR2(32767)'
-                   $ELSE
-                   then 'VARCHAR2(4000)'
-			       $END
-			   else
-              	 DATA_TYPE
-			   end
-		 ORDER BY INTERNAL_COLUMN_ID) as XDB.XDB$STRING_LIST_T) COLUMN_PATTERN_LIST
- 		,cast(collect(
+                 when TYPECODE = 'COLLECTION'
+                   then 'case when "' || COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(ANYDATA.convertCollection("' || COLUMN_NAME || '")) end'
+                 when TYPECODE = 'OBJECT'
+                   then 'case when "' || COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(ANYDATA.convertObject("' || COLUMN_NAME || '")) end'
+                 /*     
+                 ** Comment out unsupported scalar data types and Object types
+                 */
+                 when DATA_TYPE in ('LONG','LONG RAW')
+                   then '''"' || COLUMN_NAME || '". Unsupported data type ["' || DATA_TYPE || '"]'''
+                 else
+                   '"' || COLUMN_NAME || '"'
+               end
+        order by INTERNAL_COLUMN_ID) as T_VC4000_TABLE) EXPORT_SELECT_LIST
+	   ,cast(collect(
 		       /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
 		       case
 			     when DATA_TYPE = 'BFILE'
@@ -337,348 +291,397 @@ as
     		        $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 				    then 'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.HEXBINARY2BLOB("' || COLUMN_NAME || '") end'
 				    $ELSE
-				    then 'case when "' || COLUMN_NAME || '" is NULL then NULL else HEXTOTAW("' || COLUMN_NAME || '") end'
+				    then 'case when "' || COLUMN_NAME || '" is NULL then NULL when substr("' || COLUMN_NAME || '",1,15) = ''BLOB2HEXBINARY:'' then NULL else HEXTORAW("' || COLUMN_NAME || '") end'
 				 $END
 				 else
 				    '"' || COLUMN_NAME || '"'
 			   end
-	     ORDER BY INTERNAL_COLUMN_ID) as XDB.XDB$STRING_LIST_T) IMPORT_SELECT_LIST
+	     ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) IMPORT_SELECT_LIST
+       ,cast(collect(
+               /* JSON_TABLE column patterns in the form: COLUMN_NAME DATA_TYPE PATH '$[idx]' */
+               '"' || COLUMN_NAME || '" ' ||
+               case
+                 /* Map data types not supported by JSON_TABLE to data types supported by JSON_TABLE */
+                 when DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','LONG','LONG RAW','BFILE','ROWID','UROWID') or DATA_TYPE like 'INTERVAL%'
+                   then 'VARCHAR2'
+                 when DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
+                   then 'TIMESTAMP WITH TIME ZONE'
+                 /* Oracle Data types BLOB, XMLTYPE, NCLOB are not supported by JSON_TABLE */
+                 when DATA_TYPE in ('XMLTYPE','CLOB','NCLOB','BLOB') or TYPECODE is not NULL
+                   $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                   then 'CLOB'
+                   $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                   then 'VARCHAR2(32767)'
+                   $ELSE
+                   then 'VARCHAR2(4000)'
+                   $END
+               else
+                 DATA_TYPE
+               end
+         order by INTERNAL_COLUMN_ID) as T_VC4000_TABLE) COLUMN_PATTERN_LIST
     from ALL_ALL_TABLES aat
-	     inner join ALL_TAB_COLS atc
-		         on atc.OWNER = aat.OWNER
-		        and atc.TABLE_NAME = aat.TABLE_NAME
-         left outer join ALL_TYPES at
-	                  on at.TYPE_NAME = atc.DATA_TYPE
-                     and at.OWNER = atc.DATA_TYPE_OWNER
-		 left outer join ALL_MVIEWS amv
+         inner join ALL_TAB_COLS atc
+                 on atc.OWNER = aat.OWNER
+                and atc.TABLE_NAME = aat.TABLE_NAME
+    left outer join ALL_TYPES at
+                 on at.TYPE_NAME = atc.DATA_TYPE
+                and at.OWNER = atc.DATA_TYPE_OWNER
+    left outer join ALL_MVIEWS amv
 		         on amv.OWNER = aat.OWNER
 		        and amv.MVIEW_NAME = aat.TABLE_NAME
    where aat.STATUS = 'VALID'
      and aat.DROPPED = 'NO'
-	 and aat.TEMPORARY = 'N'
+     and aat.TEMPORARY = 'N'
      and aat.EXTERNAL = 'NO'
-	 and aat.NESTED = 'NO'
-	 and aat.SECONDARY = 'N'
-	 and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = 'IOT')
+     and aat.NESTED = 'NO'
+     and aat.SECONDARY = 'N'
+     and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = 'IOT')
+     and (
+           ((TABLE_TYPE is NULL) and (HIDDEN_COLUMN = 'NO'))
+         or 
+           ((TABLE_TYPE is not NULL) and (COLUMN_NAME in ('SYS_NC_ROWINFO$','SYS_NC_OID$','ACLOID','OWNERID')))
+         )        
 	 and amv.MVIEW_NAME is NULL
-	 /*
-     **
-	 ** For a relational table we want all columns that are not marked hidden or virtual.
-     ** Note binary XMLTYPE columns are marked virtual and should be included
-	 **
-	 ** For an object table we want the OID and CONTENT columns, additonally if the object table
-	 ** is a hierarchically enabled XMLTYPE table then we also need the ACL and Owner information
-	 **
-	 */
-	 and (
-	      ((aat.TABLE_TYPE is NULL) and ((atc.HIDDEN_COLUMN = 'NO') and ((atc.VIRTUAL_COLUMN = 'NO') or ((atc.VIRTUAL_COLUMN = 'YES') and (atc.DATA_TYPE = 'XMLTYPE')))))
-          or
-		  ((aat.TABLE_TYPE is not NULL) and (COLUMN_NAME in ('SYS_NC_OID$','SYS_NC_ROWINFO$')))
-	      or
-		  ((aat.TABLE_TYPE = 'XMLTYPE') and (COLUMN_NAME in ('ACLOID', 'OWNERID')))
-		 )
-     and aat.OWNER = P_SCHEMA
+     and aat.OWNER = P_SOURCE_SCHEMA
      and case
-		   when P_TABLE_NAME is NULL then 1
+    	   when P_TABLE_NAME is NULL then 1
 	       when P_TABLE_NAME is not NULL and aat.TABLE_NAME = P_TABLE_NAME then 1
 		   else 0
   		 end = 1
    group by aat.OWNER, aat.TABLE_NAME;
-
-  V_BLOB_COUNT           NUMBER := 0;
-  V_BFILE_COUNT          NUMBER := 0;
-  V_ANYDATA_COUNT        NUMBER := 0;
-
-  V_TABLE_NAME_LIST      XDB.XDB$STRING_LIST_T;
-
+   
+  V_FIRST_ROW BOOLEAN := TRUE;
+  V_DESERIALIZTION_LIST CLOB;
 begin
-  EXPORT_METADATA_TABLE := T_EXPORT_METADATA_TAB();
-  for t in getTableMetadata loop
-
-    -- Append the indexes to the JSON_TABLE column patterns.
-    for i in 1 .. t.COLUMN_PATTERN_LIST.count() loop
-      t.COLUMN_PATTERN_LIST(i) := t.COLUMN_PATTERN_LIST(i) || ' PATH ''$[' || TO_CHAR(i-1) || ']''';
-    end loop;
-
-	EXPORT_METADATA_TABLE.extend();
-	EXPORT_METADATA_TABLE(EXPORT_METADATA_TABLE.count).OWNER := t.OWNER;
-	EXPORT_METADATA_TABLE(EXPORT_METADATA_TABLE.count).TABLE_NAME := t.TABLE_NAME;
-
-	V_COLUMN_LIST := TABLE_TO_LIST(t.COLUMN_LIST);
-	V_DATA_TYPE_LIST := TABLE_TO_LIST(t.DATA_TYPE_LIST);
-	V_EXPORT_SELECT_LIST := TABLE_TO_LIST(t.EXPORT_SELECT_LIST);
-    V_COLUMN_PATTERN_LIST := TABLE_TO_LIST(t.COLUMN_PATTERN_LIST);
-	V_IMPORT_SELECT_LIST := TABLE_TO_LIST(t.IMPORT_SELECT_LIST);
-	
-    $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-	V_SQL_STATEMENT  := NULL;
-  	V_BFILE_COUNT    := V_BFILE_COUNT + t.BFILE_COUNT;
-	V_BLOB_COUNT     := V_BLOB_COUNT    + t.BLOB_COUNT;
-	V_ANYDATA_COUNT  := V_ANYDATA_COUNT + t.ANYDATA_COUNT;
-    V_OBJECT_DESERIALIZER := OBJECT_SERIALIZATION.DESERIALIZE_TABLE_TYPES(t.OWNER,t.TABLE_NAME);
-    $ELSE
-    DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENT,TRUE,DBMS_LOB.CALL);
-
-	V_OBJECT_SERIALIZER :=  OBJECT_SERIALIZATION.SERIALIZE_TABLE_TYPES(t.OWNER,t.TABLE_NAME);	
-	V_WITH_BLOCK_REQUIRED := (V_OBJECT_SERIALIZER is not NULL) or ((t.BFILE_COUNT + t.BLOB_COUNT + t.ANYDATA_COUNT) > 0);
-
-    if (V_WITH_BLOCK_REQUIRED) then
-      V_SQL_FRAGMENT := 'WITH' ||  C_NEWLINE;
-      DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-
-      if (V_OBJECT_SERIALIZER is not null) then
-        DBMS_LOB.APPEND(V_SQL_STATEMENT,V_OBJECT_SERIALIZER);
-        V_OBJECT_DESERIALIZER := OBJECT_SERIALIZATION.DESERIALIZE_TABLE_TYPES(t.OWNER,t.TABLE_NAME);
-	  else
-        V_SQL_FRAGMENT := OBJECT_SERIALIZATION.PROCEDURE_CHECK_SIZE;
-        DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-  	    if ((t.BFILE_COUNT > 0) or (t.ANYDATA_COUNT > 0)) then
-          V_SQL_FRAGMENT := OBJECT_SERIALIZATION.FUNCTION_BFILE2CHAR;
-          DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-          DBMS_LOB.CREATETEMPORARY(V_OBJECT_DESERIALIZER,TRUE,DBMS_LOB.CALL);
-		  DBMS_LOB.WRITEAPPEND(V_OBJECT_DESERIALIZER,LENGTH(OBJECT_SERIALIZATION.FUNCTION_CHAR2BFILE),OBJECT_SERIALIZATION.FUNCTION_CHAR2BFILE);
-	    end if;
-	    if ((t.BLOB_COUNT > 0) or (t.ANYDATA_COUNT > 0)) then
-          V_SQL_FRAGMENT := OBJECT_SERIALIZATION.FUNCTION_BLOB2HEXBINARY;
-          DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-		  if (V_OBJECT_DESERIALIZER is NULL) then
-            DBMS_LOB.CREATETEMPORARY(V_OBJECT_DESERIALIZER,TRUE,DBMS_LOB.CALL);
-		  end if;
-		  DBMS_LOB.WRITEAPPEND(V_OBJECT_DESERIALIZER,LENGTH(OBJECT_SERIALIZATION.FUNCTION_HEXBINARY2BLOB),OBJECT_SERIALIZATION.FUNCTION_HEXBINARY2BLOB);
-	    end if;
-	    if (t.ANYDATA_COUNT > 0) then
-          V_SQL_FRAGMENT := OBJECT_SERIALIZATION.PROCEDURE_SERIALIZE_ANYDATA;
-          DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-	    end if;
-	  end if;
-    end if;
-
-    V_SQL_FRAGMENT := 'select JSON_ARRAY(';
-    DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-    DBMS_LOB.APPEND(V_SQL_STATEMENT,V_EXPORT_SELECT_LIST);
-    V_SQL_FRAGMENT := ' NULL on NULL returning '|| V_RETURN_TYPE || ') FROM "' || t.OWNER || '"."' || t.TABLE_NAME || '"';
-    DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-    EXPORT_METADATA_TABLE(EXPORT_METADATA_TABLE.count).SQL_STATEMENT := V_SQL_STATEMENT;
-	$END
-	
-	begin
-	  /*
-	  **
-	  ** PL/SQL JSON_OBJECT does not support CLOB return, even in 18.1
-	  **
-	  */
-	  select JSON_OBJECT(
-	           'owner' value t.OWNER
-	          ,'tableName' value t.TABLE_NAME
-	          ,'columns' value V_COLUMN_LIST
-			  ,'dataTypes'  value V_DATA_TYPE_LIST
-	          ,'exportSelectList' value V_EXPORT_SELECT_LIST
-	          ,'importSelectList' value V_IMPORT_SELECT_LIST
-			  ,'columnPatterns' value V_COLUMN_PATTERN_LIST
-			  ,'deserializer' value V_OBJECT_DESERIALIZER
-			   $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-			   returning CLOB
-			   $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-	           returning VARCHAR2(32767)
-               $ELSE
-               returning VARCHAR2(4000)
-               $END
-             )
-	    into V_EXPORT_METADATA
-		from dual;
-    exception
-	  when OTHERS then
-	    V_EXPORT_METADATA := JSON_OBJECT(
-                              'tableName' value t.TABLE_NAME
-		                     ,'error' value 'ORA-' || SQLCODE
-							 ,'message' value SQLERRM
-							);
-	end;
-	
-    EXPORT_METADATA_TABLE(EXPORT_METADATA_TABLE.count).EXPORT_SELECT_LIST := V_EXPORT_SELECT_LIST;
-	EXPORT_METADATA_TABLE(EXPORT_METADATA_TABLE.count).TABLE_METADATA := V_EXPORT_METADATA;
-
-  end loop;
-
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
+$IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
   DBMS_LOB.CREATETEMPORARY(SQL_STATEMENT,TRUE,DBMS_LOB.CALL);
 
-  select TABLE_NAME
-	bulk collect into V_TABLE_NAME_LIST
-	from TABLE(EXPORT_METADATA_TABLE);
+  declare
+    V_BFILE_COUNT     NUMBER := 0;
+    V_BLOB_COUNT      NUMBER := 0;
+    V_ANYDATA_COUNT   NUMBER := 0;
+    V_TABLE_NAME_LIST T_VC4000_TABLE := T_VC4000_TABLE();
+  begin 
+    for t in getTableMetadata loop  
+      V_BFILE_COUNT    := V_BFILE_COUNT   + t.BFILE_COUNT;
+      V_BLOB_COUNT     := V_BLOB_COUNT    + t.BLOB_COUNT;
+      V_ANYDATA_COUNT  := V_ANYDATA_COUNT + t.ANYDATA_COUNT;
+      V_TABLE_NAME_LIST.extend();
+      V_TABLE_NAME_LIST(V_TABLE_NAME_LIST.count) := t.TABLE_NAME;
+ 
+      declare
+        V_COLUMN_LIST         CLOB := TABLE_TO_LIST(t.COLUMN_LIST);
+	    V_DATA_TYPE_LIST      CLOB := TABLE_TO_LIST(t.DATA_TYPE_LIST);
+		V_EXPORT_SELECT_LIST  CLOB := TABLE_TO_LIST(t.EXPORT_SELECT_LIST);
+		V_COLUMN_PATTERN_LIST CLOB;
+      begin
+        for i in 1 .. t.COLUMN_PATTERN_LIST.count() loop
+          t.COLUMN_PATTERN_LIST(i) := t.COLUMN_PATTERN_LIST(i) || ' PATH ''$[' || TO_CHAR(i-1) || ']''';
+        end loop;
+		V_COLUMN_PATTERN_LIST := TABLE_TO_LIST(t.COLUMN_PATTERN_LIST);
 
-  V_OBJECT_SERIALIZER := OBJECT_SERIALIZATION.SERIALIZE_TABLE_TYPES(P_SCHEMA,V_TABLE_NAME_LIST);
-  V_WITH_BLOCK_REQUIRED := (V_OBJECT_SERIALIZER is not NULL) or ((V_BFILE_COUNT + V_BLOB_COUNT + V_ANYDATA_COUNT) > 0);
+        /*
+        **
+        ** PL/SQL JSON_OBJECT does not support CLOB return, even in 18.1
+        **
+        */
 
-  if (V_WITH_BLOCK_REQUIRED) then
-    V_SQL_FRAGMENT := 'WITH' ||  C_NEWLINE;
-    DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-
-	if (V_OBJECT_SERIALIZER is not null) then
-      DBMS_LOB.APPEND(SQL_STATEMENT,V_OBJECT_SERIALIZER);
-	else
-      V_SQL_FRAGMENT := OBJECT_SERIALIZATION.PROCEDURE_CHECK_SIZE;
-      DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-  	  if ((V_BFILE_COUNT > 0) or (V_ANYDATA_COUNT > 0)) then
-        V_SQL_FRAGMENT := OBJECT_SERIALIZATION.FUNCTION_BFILE2CHAR;
-        DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-	  end if;
-	  if ((V_BLOB_COUNT > 0) or (V_ANYDATA_COUNT > 0)) then
-        V_SQL_FRAGMENT := OBJECT_SERIALIZATION.FUNCTION_BLOB2HEXBINARY;
-        DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-      end if;
-	  if (V_ANYDATA_COUNT > 0) then
-        V_SQL_FRAGMENT := OBJECT_SERIALIZATION.PROCEDURE_SERIALIZE_ANYDATA;
-        DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-	  end if;
-	end if;
-  end if;
-
-  V_SQL_FRAGMENT := 'select JSON_OBJECT('|| C_NEWLINE
-                 || '        ''systemInformation'' value'|| C_NEWLINE
-		         || '         JSON_OBJECT( '|| C_NEWLINE
-	             || '           ''date''            value SYS_EXTRACT_UTC(SYSTIMESTAMP)'|| C_NEWLINE
-	             || '          ,''schema''          value ''' || P_SCHEMA || '''' || C_NEWLINE
-		         || '          ,''exportVersion''   value JSON_EXPORT.VERSION'|| C_NEWLINE
-	             || '          ,''sessionUser''     value SYS_CONTEXT(''USERENV'',''SESSION_USER'')'|| C_NEWLINE
-		         || '          ,''dbName''          value SYS_CONTEXT(''USERENV'',''DB_NAME'')'|| C_NEWLINE
-		         || '          ,''serverHostName''  value SYS_CONTEXT(''USERENV'',''SERVER_HOST'')'|| C_NEWLINE
-		         || '          ,''databaseVersion'' value JSON_EXPORT.DATABASE_RELEASE'|| C_NEWLINE
-		         || '          ,''nlsInformation''  value (select JSON_OBJECTAGG(parameter, value) from "NLS_DATABASE_PARAMETERS")'|| C_NEWLINE
-		         || '         )'|| C_NEWLINE;
-
-  if (G_INCLUDE_DDL) then
-    V_SQL_FRAGMENT := V_SQL_FRAGMENT
-	               || '         ,' || C_NEWLINE
-				   || '        ''ddl'' value'|| C_NEWLINE
-				   || '          (select JSON_ARRAYAGG(COLUMN_VALUE returning CLOB) from TABLE(JSON_EXPORT_DDL.FETCH_DDL_STATEMENTS(''' || P_SCHEMA || ''')))';
-  end if;
-  DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-
-  if (G_INCLUDE_DATA) then
-    V_SQL_FRAGMENT := '         ,' || C_NEWLINE
-                   || '         ''metadata'' value' || C_NEWLINE
-                   $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
-				   || '           (select JSON_OBJECTAGG(TABLE_NAME,TREAT(TABLE_METADATA as JSON) returning CLOB) from TABLE(:JSON)) '|| C_NEWLINE
-	    		   $ELSE
-                   || '           (select JSON_OBJECTAGG(TABLE_NAME,JSON_QUERY(TABLE_METADATA, ''$'' RETURNING CLOB) returning CLOB) from TABLE(:1))' || C_NEWLINE
-                   $END
-				   || '         ,' || C_NEWLINE
-                   || '         ''data'' value' || C_NEWLINE
-				   || '           JSON_OBJECT(' || C_NEWLINE;
-
-	DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-
-    for i in 1 .. EXPORT_METADATA_TABLE.count loop
-      $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
-	  V_SQL_FRAGMENT := C_SINGLE_QUOTE || EXPORT_METADATA_TABLE(i).TABLE_NAME || C_SINGLE_QUOTE || ' value ( select TREAT(COALESCE(JSON_ARRAYAGG(JSON_ARRAY(';
-      $ELSE
-	  V_SQL_FRAGMENT := C_SINGLE_QUOTE || EXPORT_METADATA_TABLE(i).TABLE_NAME || C_SINGLE_QUOTE || ' value ( select JSON_QUERY(COALESCE(JSON_ARRAYAGG(JSON_ARRAY(';
-      $END
-      if (i > 1) then
-        V_SQL_FRAGMENT := ',' || V_SQL_FRAGMENT;
-	  end if;
-	  DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-	  DBMS_LOB.APPEND(SQL_STATEMENT,EXPORT_METADATA_TABLE(i).EXPORT_SELECT_LIST);
-      V_SQL_FRAGMENT := ' NULL ON NULL returning CLOB) returning CLOB)'
-                     $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
-                     || ',TO_CLOB(''[]'')) AS JSON)' || C_NEWLINE
-                     $ELSE
-                     || ',TO_CLOB(''[]'')),'$')' || C_NEWLINE
-                     $END
-					 || 'FROM "' || EXPORT_METADATA_TABLE(i).OWNER || '"."' || EXPORT_METADATA_TABLE(i).TABLE_NAME || '")' || C_NEWLINE;
-	  DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+        select JSON_OBJECT(
+                 'owner'            value t.OWNER
+                ,'tableName'        value t.TABLE_NAME
+                ,'columns'          value V_COLUMN_LIST
+                ,'dataTypes'        value V_DATA_TYPE_LIST
+                ,'exportSelectList' value V_EXPORT_SELECT_LIST
+                ,'columnPatterns'   value V_COLUMN_PATTERN_LIST
+                 $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                 returning CLOB
+                 $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                 returning VARCHAR2(32767)
+                $ELSE
+                returning VARCHAR2(4000)
+                $END
+               )
+          into V_TABLE_METADATA
+          from dual;
+      exception
+        when OTHERS then
+          V_TABLE_METADATA := JSON_OBJECT(
+                                 'tableName' value t.TABLE_NAME
+                                ,'error'     value 'ORA-' || SQLCODE
+                                ,'message'   value SQLERRM
+                               );
+      end;  
+	  
     end loop;
-    V_SQL_FRAGMENT := '             returning CLOB' || C_NEWLINE
-	               || '           )' || C_NEWLINE;
-    DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-  end if;
-  V_SQL_FRAGMENT := '         returning CLOB' || C_NEWLINE
+    V_DESERIALIZTION_LIST := GENERATE_WITH_CLAUSE(P_SOURCE_SCHEMA, V_TABLE_NAME_LIST, V_BFILE_COUNT, V_BLOB_COUNT, V_ANYDATA_COUNT, SQL_STATEMENT);
+  end; 
+    
+  V_SQL_FRAGMENT := 'select JSON_OBJECT(
+                              ''systemInformation''
+                              value JSON_OBJECT(
+	                                  ''date''            value SYS_EXTRACT_UTC(SYSTIMESTAMP)
+	                                 ,''schema''          value P_SOURCE_SCHEMA
+		                             ,''exportVersion''   value JSON_EXPORT.EXPORT_VERSION()' || C_NEWLINE ||
+									$IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+		                            ',''jsonFeatures''    value treat(JSON_EXPORT.JSON_FEATURES() as JSON)' || C_NEWLINE ||
+									$ELSE
+		                            ',''jsonFeatures''    value JSON_QUERY((JSON_EXPORT.JSON_FEATURES(),''$'')' || C_NEWLINE ||
+									$END
+	                                ',''sessionUser''     value SYS_CONTEXT(''USERENV'',''SESSION_USER'')
+		                             ,''dbName''          value SYS_CONTEXT(''USERENV'',''DB_NAME'')
+		                             ,''serverHostName''  value SYS_CONTEXT(''USERENV'',''SERVER_HOST'')
+		                             ,''databaseVersion'' value JSON_EXPORT.DATABASE_RELEASE()
+		                             ,''nlsInformation''  value JSON_OBJECTAGG(parameter, value)
+	                                )
+							  ),
+    						  ''metadata'' 
+							  value' || C_NEWLINE ||
+                             $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+				             '  (select JSON_OBJECTAGG(TABLE_NAME,TREAT(TABLE_METADATA as JSON) returning CLOB) from TABLE(:JSON)),'|| C_NEWLINE ||
+	    		             $ELSE
+                             '  (select JSON_OBJECTAGG(TABLE_NAME,JSON_QUERY(TABLE_METADATA, ''$'' RETURNING CLOB) returning CLOB) from TABLE(:JSON)),' || C_NEWLINE ||
+                             $END
+                              '''data'' 
+							   value JSON_OBJECT(' || C_NEWLINE;
+  
+  DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+
+  for t in getTableMetadata loop  
+    V_SQL_FRAGMENT := C_SINGLE_QUOTE || t.TABLE_NAME || C_SINGLE_QUOTE || ' value ( select JSON_ARRAYAGG(JSON_ARRAY(';
+    if (not V_FIRST_ROW) then
+      V_SQL_FRAGMENT := ',' || V_SQL_FRAGMENT;
+    end if;
+    V_FIRST_ROW := FALSE;
+    DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+    DBMS_LOB.APPEND(SQL_STATEMENT,TABLE_TO_LIST(t.EXPORT_SELECT_LIST));
+    V_SQL_FRAGMENT := ' NULL on NULL returning ' || C_RETURN_TYPE || ') returning ' || C_RETURN_TYPE || ') from "' || t.OWNER || '"."' || t.TABLE_NAME || '"';
+    if (ROW_LIMIT > -1) then
+      V_SQL_FRAGMENT := V_SQL_FRAGMENT || 'where ROWNUM < ' || ROW_LIMIT;
+    end if;
+    V_SQL_FRAGMENT :=  V_SQL_FRAGMENT || ')' || C_NEWLINE;
+    DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+  end loop;
+
+  V_SQL_FRAGMENT := '             returning ' || C_RETURN_TYPE || C_NEWLINE
+                 || '           )' || C_NEWLINE
+                 || '         returning ' || C_RETURN_TYPE || C_NEWLINE
                  || '       )' || C_NEWLINE
                  || '  from DUAL';
-  DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-  $END
+  DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+-- 
+$ELSE
+--
+  declare
+    V_SQL_STATEMENT       CLOB;
+    V_TABLE_METADATA      CLOB;
+  begin
+    EXPORT_METADATA_CACHE := T_EXPORT_METADATA_TABLE();
+    for t in getTableMetadata loop  
+      EXPORT_METADATA_CACHE.extend();
+      EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).OWNER := t.OWNER;
+      EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).TABLE_NAME := t.TABLE_NAME;
 
+      DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENT,TRUE,DBMS_LOB.CALL);
+      V_DESERIALIZTION_LIST := GENERATE_WITH_CLAUSE(P_SOURCE_SCHEMA, t.TABLE_NAME, t.BFILE_COUNT, t.BLOB_COUNT, t.ANYDATA_COUNT, V_SQL_STATEMENT); 
+      V_SQL_FRAGMENT := 'select JSON_ARRAY(';
+      DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+      DBMS_LOB.APPEND(V_SQL_STATEMENT,TABLE_TO_LIST(t.EXPORT_SELECT_LIST));
+      V_SQL_FRAGMENT := ' NULL on NULL returning '|| C_RETURN_TYPE 
+                      --  ### if only || ' DEFAULT ''["ROW[['' || TO_CHAR(ROWID) || '']: Maximum return size (' || C_MAX_OUTPUT_SIZE || ') for JSON_ARRAY operator exceeded."]'' ON ERROR 
+                      || ') from "' || t.OWNER || '"."' || t.TABLE_NAME || '"';
+      if (ROW_LIMIT > -1) then
+        V_SQL_FRAGMENT := V_SQL_FRAGMENT || 'where ROWNUM < ' || ROW_LIMIT;
+      end if;
+      DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+      EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).SQL_STATEMENT := V_SQL_STATEMENT;  
+
+      declare
+        V_COLUMN_LIST         CLOB := TABLE_TO_LIST(t.COLUMN_LIST);
+	    V_DATA_TYPE_LIST      CLOB := TABLE_TO_LIST(t.DATA_TYPE_LIST);
+		V_EXPORT_SELECT_LIST  CLOB := TABLE_TO_LIST(t.EXPORT_SELECT_LIST);
+		V_IMPORT_SELECT_LIST  CLOB := TABLE_TO_LIST(t.IMPORT_SELECT_LIST);
+		V_COLUMN_PATTERN_LIST CLOB;
+      begin
+        for i in 1 .. t.COLUMN_PATTERN_LIST.count() loop
+          t.COLUMN_PATTERN_LIST(i) := t.COLUMN_PATTERN_LIST(i) || ' PATH ''$[' || TO_CHAR(i-1) || ']''';
+        end loop;
+		V_COLUMN_PATTERN_LIST := TABLE_TO_LIST(t.COLUMN_PATTERN_LIST);
+
+        /*
+        **
+        ** PL/SQL JSON_OBJECT does not support CLOB return, even in 18.1
+        **
+        */
+
+        select JSON_OBJECT(
+                 'owner'                       value t.OWNER
+                ,'tableName'                   value t.TABLE_NAME
+                ,'columns'                     value V_COLUMN_LIST
+                ,'dataTypes'                   value V_DATA_TYPE_LIST
+                ,'exportSelectList'            value V_EXPORT_SELECT_LIST
+				,'insertSelectList'            value V_IMPORT_SELECT_LIST
+				,'deserializationFunctions'    value V_DESERIALIZTION_LIST
+                ,'columnPatterns'              value V_COLUMN_PATTERN_LIST
+                 $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                 returning CLOB
+                 $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                 returning VARCHAR2(32767)
+                $ELSE
+                returning VARCHAR2(4000)
+                $END
+               )
+          into V_TABLE_METADATA
+          from dual;
+      exception
+        when OTHERS then
+          V_TABLE_METADATA := JSON_OBJECT(
+                                 'tableName' value t.TABLE_NAME
+                                ,'error'     value 'ORA-' || SQLCODE
+                                ,'message'   value SQLERRM
+                               );
+      end;  
+      EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).METADATA := V_TABLE_METADATA;  
+    end loop;
+  end;  
+$END
+--
 end;
 --
 $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-/*
-**
-** Generate a select statement that leverages the returning CLOB feature to retrieve all the data in a single operation
-**
-** Release 18.1: JSON_ARRAYAGG with CLOB and TREAT AS JSON are supported
-** Release 12.2 with Patch: JSON_ARRAYAGG with CLOB is supported. TREAT AS JSON is not supported
-**
-*/
-function PROCESS_TABLE_LIST(P_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2 DEFAULT NULL)
+--
+function EXPORT_SCHEMA(P_SOURCE_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')))
 return CLOB
 as
-  V_CURRENT_SCHEMA           CONSTANT VARCHAR2(128) := SYS_CONTEXT('USERENV','CURRENT_SCHEMA');
-  TYPE T_CURSOR is REF CURSOR;
-  V_CURSOR      T_CURSOR;
-  V_EXPORT_CONTENTS      CLOB;
-
+  V_JSON_DOCUMENT CLOB;
+  V_CURSOR      SYS_REFCURSOR;
 begin
-  SET_CURRENT_SCHEMA(P_SCHEMA);
-  GENERATE_EXPORT_METADATA(P_SCHEMA,P_TABLE_NAME);
+  GENERATE_STATEMENT(P_SOURCE_SCHEMA);
+  open V_CURSOR for SQL_STATEMENT;
+  fetch V_CURSOR into V_JSON_DOCUMENT;
+  close V_CURSOR;
+  return V_JSON_DOCUMENT;
+end;
+--  
+$ELSE
+--
+procedure PROCESS_WIDE_TABLE(P_METADATA_INDEX NUMBER, P_JSON_DOCUMENT IN OUT CLOB)
+as
+   C_SELECT_LIST_START    CONSTANT VARCHAR2(32) := 'select JSON_ARRAY(';
+   C_SELECT_LIST_END      CONSTANT VARCHAR2(32) := ' NULL on NULL';
+   V_SQL_STATEMENT        CLOB;
+   V_SELECT_LIST          T_VC4000_TABLE := T_VC4000_TABLE();
+   V_SELECT_LIST_ITEM     VARCHAR2(4000);
+   V_SELECT_LIST_START    PLS_INTEGER;
+   V_SELECT_LIST_END      PLS_INTEGER;
+   V_FROM_CLAUSE_START    PLS_INTEGER;
+   V_CURRENT_OFFSET       PLS_INTEGER;
+   V_COLUMN_OFFSET        PLS_INTEGER;
+   
+   V_FROM_WHERE_CLAUSE    VARCHAR2(32767);
+   
+   V_COLUMN_LIST          T_VC4000_TABLE := T_VC4000_TABLE();
+   V_COLUMN_NAME          VARCHAR2(132);
+   V_COLUMN_NAME_START    PLS_INTEGER;
+   V_COLUMN_NAME_END      PLS_INTEGER;
 
-  if (G_INCLUDE_DATA) then
-    OPEN V_CURSOR FOR SQL_STATEMENT using EXPORT_METADATA_TABLE;
-  else 
-    OPEN V_CURSOR FOR SQL_STATEMENT;
-  end if;
-  
-  FETCH V_CURSOR INTO V_EXPORT_CONTENTS;
-  CLOSE V_CURSOR;
+   V_CURSOR               SYS_REFCURSOR;
+   V_CURSOR_ID            NUMBER := DBMS_SQL.OPEN_CURSOR;
+   V_COLUMN_DESCRIPTIONS  DBMS_SQL.DESC_TAB2;
+   V_COLUMN_COUNT         NUMBER;
+   V_COLUMN_VALUE         VARCHAR2(32767);
+   V_FIRST_ROW            BOOLEAN := TRUE;
+   V_FIRST_COLUMN         BOOLEAN := TRUE;
 
-  SET_CURRENT_SCHEMA(V_CURRENT_SCHEMA);
-  return V_EXPORT_CONTENTS;
-exception
-  when OTHERS then
-    SET_CURRENT_SCHEMA(V_CURRENT_SCHEMA);
-    RAISE;
+   V_INDEX                PLS_INTEGER;
+begin
+   V_SQL_STATEMENT      := EXPORT_METADATA_CACHE(P_METADATA_INDEX).SQL_STATEMENT;
+   V_SELECT_LIST_START  := DBMS_LOB.INSTR(V_SQL_STATEMENT,C_SELECT_LIST_START) + LENGTH(C_SELECT_LIST_START);
+   V_SELECT_LIST_END    := DBMS_LOB.INSTR(V_SQL_STATEMENT,C_SELECT_LIST_END) - 1;
+   V_CURRENT_OFFSET := V_SELECT_LIST_START;
+   loop
+     V_COLUMN_OFFSET := DBMS_LOB.INSTR(V_SQL_STATEMENT,',',V_CURRENT_OFFSET); 
+     exit when ((V_COLUMN_OFFSET < 1) or (V_COLUMN_OFFSET > V_SELECT_LIST_END));
+     V_SELECT_LIST.extend;
+     V_COLUMN_LIST.extend;
+     V_INDEX := V_SELECT_LIST.count;
+     V_SELECT_LIST_ITEM  := DBMS_LOB.SUBSTR(V_SQL_STATEMENT,V_COLUMN_OFFSET - V_CURRENT_OFFSET,V_CURRENT_OFFSET);
+
+     V_COLUMN_NAME_START := instr(V_SELECT_LIST_ITEM,'"');
+     V_COLUMN_NAME_END   := instr(V_SELECT_LIST_ITEM,'"',V_COLUMN_NAME_START+1)+1;
+     V_COLUMN_NAME       := substr(V_SELECT_LIST_ITEM,V_COLUMN_NAME_START,V_COLUMN_NAME_END-V_COLUMN_NAME_START);
+
+     V_SELECT_LIST_ITEM  := 'JSON_ARRAY(' 
+                         || V_SELECT_LIST_ITEM 
+                         || ' NULL on NULL RETURNING VARCHAR2(' 
+                         || C_MAX_OUTPUT_SIZE || ')) ' 
+                        || V_COLUMN_NAME;
+                        
+     V_SELECT_LIST(V_INDEX) :=  V_SELECT_LIST_ITEM;
+     v_COLUMN_LIST(V_INDEX) :=  V_COLUMN_NAME;
+     V_CURRENT_OFFSET := V_COLUMN_OFFSET + 1;
+   end loop;
+
+   V_FROM_CLAUSE_START := DBMS_LOB.INSTR(V_SQL_STATEMENT,' from ',V_SELECT_LIST_END);
+   V_FROM_WHERE_CLAUSE := DBMS_LOB.SUBSTR(V_SQL_STATEMENT,32767,V_FROM_CLAUSE_START);
+   DBMS_LOB.TRIM(V_SQL_STATEMENT,V_SELECT_LIST_START - 12);
+   DBMS_LOB.APPEND(V_SQL_STATEMENT,TABLE_TO_LIST(V_SELECT_LIST));
+   DBMS_LOB.APPEND(V_SQL_STATEMENT,TO_CLOB(V_FROM_WHERE_CLAUSE));
+   EXPORT_METADATA_CACHE(P_METADATA_INDEX).SQL_STATEMENT := V_SQL_STATEMENT;
+   V_FIRST_ROW := TRUE;
+   open V_CURSOR for EXPORT_METADATA_CACHE(P_METADATA_INDEX).SQL_STATEMENT;
+   V_CURSOR_ID := DBMS_SQL.TO_CURSOR_NUMBER(V_CURSOR);
+   DBMS_SQL.DESCRIBE_COLUMNS2(V_CURSOR_ID, V_COLUMN_COUNT, V_COLUMN_DESCRIPTIONS);
+   V_COLUMN_NAME_START := 2;
+   for i in 1..V_COLUMN_COUNT loop
+     DBMS_SQL.DEFINE_COLUMN(V_CURSOR_ID,i,V_COLUMN_LIST(i),32767);
+   end loop;
+   while (DBMS_SQL.FETCH_ROWS(V_CURSOR_ID) > 0) loop
+     if (not V_FIRST_ROW) then
+       DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,1,',');
+     end if;
+     V_FIRST_ROW := FALSE;
+     V_FIRST_COLUMN := TRUE;
+     DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,1,'[');
+     for i in 1..V_COLUMN_COUNT loop
+       DBMS_SQL.COLUMN_VALUE(V_CURSOR_ID,i,V_COLUMN_VALUE);
+       V_COLUMN_VALUE := substr(V_COLUMN_VALUE,2,length(V_COLUMN_VALUE)-2);
+       if (not V_FIRST_COLUMN) then
+         V_COLUMN_VALUE := ',' || V_COLUMN_VALUE;
+       end if;
+       V_FIRST_COLUMN := FALSE;
+       DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,length(V_COLUMN_VALUE),V_COLUMN_VALUE);
+     end loop;
+     DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,1,']');
+   end loop;
+   DBMS_SQL.CLOSE_CURSOR(V_CURSOR_ID);
 end;
 --
-$ELSE
-/*
-**
-** Iterate over the selected tables generating a JSON ARRAY from each row in each table.
-** Concatenate the results into a single JSON document using PL/SQL.
-**
-** Release 12.2 without CLOB Support Patch. Using the native JSON_ARRAYAGG operator with a return type of VARCHAR2 is not a realistic option
-**
-*/
-procedure APPEND_SYSTEM_INFORMATION(P_SCHEMA VARCHAR2, P_EXPORT_CONTENTS IN OUT NOCOPY CLOB)
+procedure APPEND_SYSTEM_INFORMATION(P_SOURCE_SCHEMA VARCHAR2, P_JSON_DOCUMENT IN OUT NOCOPY CLOB)
 as
-  cursor getSystemInformation
-  is
+  V_SYSTEM_INFORMATION VARCHAR2(32767);
+begin
   select JSON_OBJECT(
            'systemInformation'
 		   value JSON_OBJECT(
-	              'date'            value SYS_EXTRACT_UTC(SYSTIMESTAMP)
-	             ,'schema'          value P_SCHEMA
-		         ,'exportVersion'   value JSON_EXPORT.VERSION
-                 $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
-		         ,'jsonFeatures'    value TREAT(JSON_EXPORT.JSON_FEATURES AS JSON)
-     		     $ELSE
-		         ,'jsonFeatures'    value JSON_QUERY(JSON_EXPORT.JSON_FEATURES,'$')
-                 $END
-	             ,'sessionUser'     value SYS_CONTEXT('USERENV','SESSION_USER')
-		         ,'dbName'          value SYS_CONTEXT('USERENV','DB_NAME')
-		         ,'serverHostName'  value SYS_CONTEXT('USERENV','SERVER_HOST')
-		         ,'databaseVersion' value JSON_EXPORT.DATABASE_RELEASE
-		         ,'nlsInformation'  value JSON_OBJECTAGG(parameter, value)
+	               'date'            value SYS_EXTRACT_UTC(SYSTIMESTAMP)
+	              ,'schema'          value P_SOURCE_SCHEMA
+		          ,'exportVersion'   value JSON_EXPORT.EXPORT_VERSION()
+		          ,'jsonFeatures'    value JSON_QUERY(JSON_EXPORT.JSON_FEATURES(),'$')
+	              ,'sessionUser'     value SYS_CONTEXT('USERENV','SESSION_USER')
+		          ,'dbName'          value SYS_CONTEXT('USERENV','DB_NAME')
+		          ,'serverHostName'  value SYS_CONTEXT('USERENV','SERVER_HOST')
+		          ,'databaseVersion' value JSON_EXPORT.DATABASE_RELEASE()
+		          ,'nlsInformation'  value JSON_OBJECTAGG(parameter, value)
 	             )
 		 ) SYSTEM_INFORMATION
+	into V_SYSTEM_INFORMATION
     from NLS_DATABASE_PARAMETERS;
-
-begin
-  for i in getSystemInformation loop
-    DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,length(i.SYSTEM_INFORMATION)-2,substr(i.SYSTEM_INFORMATION,2,length(i.SYSTEM_INFORMATION)-2));
-  end loop;
+  DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,length(V_SYSTEM_INFORMATION)-2,substr(V_SYSTEM_INFORMATION,2,length(V_SYSTEM_INFORMATION)-2));
 end;
 --
-procedure APPEND_DDL_OBJECT(P_SCHEMA VARCHAR2, P_EXPORT_CONTENTS IN OUT NOCOPY CLOB)
+procedure APPEND_DDL_OBJECT(P_SOURCE_SCHEMA VARCHAR2, P_JSON_DOCUMENT IN OUT NOCOPY CLOB)
 as
   V_JSON_FRAGMENT VARCHAR2(4000);
   V_FIRST_ITEM    BOOLEAN := TRUE;
@@ -691,175 +694,124 @@ as
   $ELSE
   select JSON_ARRAY(COLUMN_VALUE returning  VARCHAR2(4000)) DDL
   $END
-    from TABLE(JSON_EXPORT_DDL.FETCH_DDL_STATEMENTS(P_SCHEMA));
+    from TABLE(JSON_EXPORT_DDL.FETCH_DDL_STATEMENTS(P_SOURCE_SCHEMA));
 
 begin
   V_JSON_FRAGMENT := '"ddl":[';
-  DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
+  DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
   for r in getDDLStatements loop
 	if (NOT V_FIRST_ITEM) then
-      DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,1,',');
+      DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,1,',');
 	end if;
     V_FIRST_ITEM := FALSE;
 	-- Cursor returns a JSON_ARRAY containing 1 Element which is a correctly encoded JSON string eg ["...."]
 	-- Use String manipulation to remove the leading and trailing [] characters and write the result to the LOB
-    DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,LENGTH(r.DDL)-2,substr(r.DDL,2,LENGTH(r.DDL)-2));
+    DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,LENGTH(r.DDL)-2,substr(r.DDL,2,LENGTH(r.DDL)-2));
   end loop;
-  DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,1,']');
+  DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,1,']');
 end;
 --
-procedure APPEND_METADATA_OBJECT(P_EXPORT_CONTENTS IN OUT NOCOPY CLOB)
+procedure APPEND_METADATA_OBJECT(P_JSON_DOCUMENT IN OUT NOCOPY CLOB)
 as
   V_JSON_FRAGMENT VARCHAR2(4000);
 begin
   V_JSON_FRAGMENT := '"metadata":{';
-  DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
-  for i in 1 .. EXPORT_METADATA_TABLE.count loop
-    V_JSON_FRAGMENT := '"' || EXPORT_METADATA_TABLE(i).table_name || '":';
+  DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
+  for i in 1 .. EXPORT_METADATA_CACHE.count loop
+    V_JSON_FRAGMENT := '"' || EXPORT_METADATA_CACHE(i).table_name || '":';
 	if (i > 1) then
   	  V_JSON_FRAGMENT := ',' || V_JSON_FRAGMENT;
 	end if;
-    DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
-	DBMS_LOB.APPEND(P_EXPORT_CONTENTS,EXPORT_METADATA_TABLE(i).TABLE_METADATA);
+    DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
+	DBMS_LOB.APPEND(P_JSON_DOCUMENT,EXPORT_METADATA_CACHE(i).METADATA);
   end loop;
-  DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,1,'}');
+  DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,1,'}');
 end;
 --
-FUNCTION GET_TABLE_CURSOR(P_SQL_STATEMENT CLOB)
-return SYS_REFCURSOR
+function EXPORT_SCHEMA(P_SOURCE_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
+return CLOB
 as
-  V_CURSOR_ID NUMBER;
-  V_DUMMY  PLS_INTEGER;
-  V_CURSOR SYS_REFCURSOR;
-begin
-  V_CURSOR_ID := DBMS_SQL.OPEN_CURSOR;
-  DBMS_SQL.PARSE(V_CURSOR_ID,P_SQL_STATEMENT,DBMS_SQL.NATIVE);
-  V_DUMMY := DBMS_SQL.EXECUTE(V_CURSOR_ID);
-  return DBMS_SQL.TO_REFCURSOR(V_CURSOR_ID);
-end;
---
-function EXPORT_TABLE_DATA(P_CURSOR SYS_REFCURSOR)
-return T_JSON_ARRAY_OUTPUT_TAB
-pipelined
-/*
-**
-** Return each row in the table as a JSON ARRAY
-**
-*/
-is
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  V_JSON_ARRAY CLOB;
-  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+  JSON_ARRAY_OVERFLOW EXCEPTION; PRAGMA EXCEPTION_INIT (JSON_ARRAY_OVERFLOW, -40478);
+
+  V_JSON_DOCUMENT CLOB;
+  V_CURSOR        SYS_REFCURSOR;
+
+  V_JSON_FRAGMENT VARCHAR2(4000);
+  
+  V_FIRST_TABLE   BOOLEAN := TRUE;
+  V_FIRST_ITEM    BOOLEAN := TRUE;
+--  
+  $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
   V_JSON_ARRAY VARCHAR2(32767);
   $ELSE
   V_JSON_ARRAY VARCHAR2(4000);
-  $END
+  $END  
+--  
+  V_START_TABLE_DATA NUMBER;
 begin
-  loop
-    fetch P_CURSOR into V_JSON_ARRAY;
-	exit when P_CURSOR%notfound;
-    pipe row (V_JSON_ARRAY);
-  end loop;
-end;
---
-procedure APPEND_DATA_OBJECT(P_EXPORT_CONTENTS IN OUT NOCOPY CLOB)
-as
-  V_JSON_FRAGMENT VARCHAR2(4000);
-  V_FIRST_ITEM    BOOLEAN := TRUE;
-  V_CURSOR        SYS_REFCURSOR;
+  GENERATE_STATEMENT(P_SOURCE_SCHEMA);
+  DBMS_LOB.CREATETEMPORARY(V_JSON_DOCUMENT,TRUE,DBMS_LOB.CALL);
+  DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,'{');
 
-  cursor exportTableData(C_CURSOR SYS_REFCURSOR)
-  is
-  select COLUMN_VALUE
-    from TABLE(JSON_EXPORT.EXPORT_TABLE_DATA(C_CURSOR));
-begin
-  V_JSON_FRAGMENT := '"data":{';
-  DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
-  for i in 1 .. EXPORT_METADATA_TABLE.count loop
-    V_JSON_FRAGMENT := '"' || EXPORT_METADATA_TABLE(i).table_name || '":[';
-	if (i > 1) then
-  	  V_JSON_FRAGMENT := ',' || V_JSON_FRAGMENT;
-	end if;
-	DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
-    V_FIRST_ITEM := TRUE;
-	V_CURSOR := GET_TABLE_CURSOR(EXPORT_METADATA_TABLE(i).SQL_STATEMENT);
-    for r in exportTableData(V_CURSOR) loop
-	  if (NOT V_FIRST_ITEM) then
-    	DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,1,',');
-	  end if;
- 	  V_FIRST_ITEM := FALSE;
-      DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,LENGTH(r.COLUMN_VALUE),r.COLUMN_VALUE);
-	end loop;
-	CLOSE V_CURSOR;
-    DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,1,']');
-  end loop;
-  DBMS_LOB.WRITEAPPEND(P_EXPORT_CONTENTS,1,'}');
-end;
---
-function PROCESS_TABLE_LIST(P_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2 DEFAULT NULL)
-return CLOB
-as
-  V_CURRENT_SCHEMA       CONSTANT VARCHAR2(128) := SYS_CONTEXT('USERENV','CURRENT_SCHEMA');
-  V_EXPORT_CONTENTS      CLOB;
-begin
-  SET_CURRENT_SCHEMA(P_SCHEMA);
-  GENERATE_EXPORT_METADATA(P_SCHEMA,P_TABLE_NAME);
-  DBMS_LOB.CREATETEMPORARY(V_EXPORT_CONTENTS,TRUE,DBMS_LOB.CALL);
-  -- Start outer JSON Object
-  DBMS_LOB.WRITEAPPEND(V_EXPORT_CONTENTS,1,'{');
-  APPEND_SYSTEM_INFORMATION(P_SCHEMA,V_EXPORT_CONTENTS);
+  APPEND_SYSTEM_INFORMATION(P_SOURCE_SCHEMA,V_JSON_DOCUMENT);
+
   if (G_INCLUDE_DDL) then
-    if (DBMS_LOB.GETLENGTH(V_EXPORT_CONTENTS) > 1) then
-      DBMS_LOB.WRITEAPPEND(V_EXPORT_CONTENTS,1,',');
-	end if;
     -- Add ddl object
-    APPEND_DDL_OBJECT(P_SCHEMA,V_EXPORT_CONTENTS);
+    DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,',');
+    APPEND_DDL_OBJECT(P_SOURCE_SCHEMA,V_JSON_DOCUMENT);
   end if;
+  
   if (G_INCLUDE_DATA) then
-    if (DBMS_LOB.GETLENGTH(V_EXPORT_CONTENTS) > 1) then
-      DBMS_LOB.WRITEAPPEND(V_EXPORT_CONTENTS,1,',');
-	end if;
-    -- Add metadata object
-    APPEND_METADATA_OBJECT(V_EXPORT_CONTENTS);
-    DBMS_LOB.WRITEAPPEND(V_EXPORT_CONTENTS,1,',');
-    -- Add data object
-    APPEND_DATA_OBJECT(V_EXPORT_CONTENTS);
+    -- Add metadata and data objects
+    DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,',');
+
+    APPEND_METADATA_OBJECT(V_JSON_DOCUMENT);
+    DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,',');
+
+    V_JSON_FRAGMENT := '"data":{';
+    DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
+    for i in 1 .. EXPORT_METADATA_CACHE.count loop
+      V_JSON_FRAGMENT := '"' || EXPORT_METADATA_CACHE(i).table_name || '":[';
+      if (not V_FIRST_TABLE) then 
+        V_JSON_FRAGMENT := ',' || V_JSON_FRAGMENT;
+      end if;
+      V_FIRST_TABLE := false;
+      DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
+      V_START_TABLE_DATA := DBMS_LOB.GETLENGTH(V_JSON_DOCUMENT);
+      V_FIRST_ITEM := TRUE;
+      open V_CURSOR for EXPORT_METADATA_CACHE(i).SQL_STATEMENT;
+      loop 
+        begin
+          fetch V_CURSOR into V_JSON_ARRAY;
+          exit when V_CURSOR%notfound;      
+          if (not V_FIRST_ITEM) then
+            DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,',');
+          end if;
+          V_FIRST_ITEM := FALSE;
+          DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_ARRAY),V_JSON_ARRAY);
+        exception
+          when JSON_ARRAY_OVERFLOW then
+            DBMS_LOB.TRIM(V_JSON_DOCUMENT,V_START_TABLE_DATA);
+            PROCESS_WIDE_TABLE(i,V_JSON_DOCUMENT);
+            exit;
+          when OTHERS then
+            raise;
+        end;
+      end loop;
+      close V_CURSOR;
+      DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,']');
+    end loop;
+    DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,'}');
   end if;
-  -- Close outer JSON Object
-  DBMS_LOB.WRITEAPPEND(V_EXPORT_CONTENTS,1,'}');
-  SET_CURRENT_SCHEMA(V_CURRENT_SCHEMA);
-  return V_EXPORT_CONTENTS;
-exception
-  when OTHERS then
-    SET_CURRENT_SCHEMA(V_CURRENT_SCHEMA);
-    RAISE;
+  DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,'}');
+  return V_JSON_DOCUMENT;
 end;
 --
 $END
 --
-function EXPORT_TABLE(P_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2)
-return T_CLOB_TAB
-pipelined
-as
---
--- Exports a speciic table in the specified schema
---
-begin
-  pipe row (PROCESS_TABLE_LIST(P_SCHEMA, P_TABLE_NAME));
-end;
---
-function EXPORT_SCHEMA(P_SCHEMA VARCHAR2)
-return T_CLOB_TAB
-pipelined
-as
---
--- Exports all tables in the specified schema
---
-begin
-  pipe row (PROCESS_TABLE_LIST(P_SCHEMA));
-end;
---
 end;
 /
 show errors
+--
+spool off
 --
