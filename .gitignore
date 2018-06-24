@@ -1,4 +1,5 @@
-/saas-cache/*/*
-/saas-cache/*
-/.site/*
-/vendor/*
+docs\
+docs\.saas-cache\
+docs\_site\
+docs\vendor\
+
