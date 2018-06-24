@@ -17,7 +17,7 @@ title: JSON Exchange by AppDev4DB
 email: mdd@appdev4db.com
 description: >- # this means to ignore newlines until "baseurl:"
   Currently a work in progress - rather like life iself.
-baseurl: "/" # the subpath of your site, e.g. /blog
+baseurl: "/JSONExchange" # the subpath of your site, e.g. /blog
 url: "https://appdev4db.com" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: markddrake
 github_username:  markddrake
