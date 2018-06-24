@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.5.0 -->
+<title>JSON_EXPORT | JSON Exchange</title>
+<meta name="generator" content="Jekyll v3.8.3" />
+<meta property="og:title" content="JSON_EXPORT" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="A PL/SQL package for exporting an Oracle Schema as JSON. The previous post in this blog showed how to generate a JSON representation of the contents of an Oracle database schema. This post outlines the basics of a PL/SQL package that can automate the process of exporting an entire database schema, or a subset of a database schema as a JSON document. The previous post mentioned that in (an unpatched) 12cR2 database, JSON operators cannot generate documents larger that 32K, and that in Oracle 18 this limit no longer applies. In an attempt to avoid the 32K limit on JSON generation in Oracle 12.2 , the PL/SQL package will use PL/SQL conditional compilation to bypass the use of JSON_QUERY and JSON_ARRAYAGG in databases where CLOB is not a supported return type. Conditional compilation requires a PL/SQL package is required that provides static constants that accurately describe the state of the database. In this project the package JSON_FEATURE_DETECTION exposes constants TREAT_AS_JSON_SUPPORTED, CLOB_SUPPORED and EXTENDED_STRING_SUPPORTED. TREAT_AS_JSON_SUPPORTED is set TRUE if the database supports the TREAT( AS JSON) feature. Treat as JSON is supported starting with Oracle 18. CLOB_SUPPORTED will be set TRUE in all 18c databases as well as patched 12.2 databases. EXTENDED_STRING_SUPPORTED will be set true in database where extended data type support has been enabled The JSON_FEATURE_DETECTION package is generated dynamically by a PL/SQL block that uses ‘Duck Typing’ to detect which features are supported. Duck Typing, for this not familiar with the term, is based on the assumption that if it “walks like a duck”, “swims like a duck” and “quacks like a duck” that is is “probably a member of Anatidae family”, eg a DUCK. In this case the lack of each feature is detected by executing a SQL statement that makes use of the feature and catching the exception thrown if the feature in question is not supported by the database. At first glance creating a PL/SQL package that will generate the required SQL seems quite simple. All that is needed is a list of the tables, along with the set of columns for each table. This appears to be a perfect fit for the LISTAGG operator. select TABLE_NAME, LISTAGG(COLUMN_NAME,&#39;,&#39;) WITHIN GROUP (ORDER BY COLUMN_ID) COLUMN_LIST from ALL_TAB_COLUMNS where OWNER = &#39;HR&#39; group by TABLE_NAME TABLE_NAME COLUMN_LIST COUNTRIES COUNTRY_ID,COUNTRY_NAME,REGION_ID DEPARTMENTS DEPARTMENT_ID,DEPARTMENT_NAME,MANAGER_ID,LOCATION_ID EMPLOYEES EMPLOYEE_ID,FIRST_NAME,LAST_NAME,EMAIL,PHONE_NUMBER,HIRE_DATE,JOB_ID,SALARY,COMMISSION_PCT,MANAGER_ID,DEPARTMENT_ID EMP_DETAILS_VIEW EMPLOYEE_ID,JOB_ID,MANAGER_ID,DEPARTMENT_ID,LOCATION_ID,COUNTRY_ID,FIRST_NAME,LAST_NAME,SALARY,COMMISSION_PCT,DEPARTMENT_NAME,JOB_TITLE,CITY,STATE_PROVINCE,COUNTRY_NAME,REGION_NAME JOBS JOB_ID,JOB_TITLE,MIN_SALARY,MAX_SALARY JOB_HISTORY EMPLOYEE_ID,START_DATE,END_DATE,JOB_ID,DEPARTMENT_ID LOCATIONS LOCATION_ID,STREET_ADDRESS,POSTAL_CODE,CITY,STATE_PROVINCE,COUNTRY_ID REGIONS REGION_ID,REGION_NAME Unfortunately if we do the math, in a a database that supports 128 character identifiers, the results of this query could easily exceed the maximum size supported by LISTAGG. Consequently the column list is captured as a collection, using a CAST(COLLECT COLUMN_NAME) AS TABLE_TYPE_OBECT) operation. The table is then converted into a list using a PL/SQL function that returns a CLOB. The type T_VC4000_TABLE is defined for this purpose. The JSON_EXPORT package is split into two main areas of functionality. The first, encapsulated by the function GENERATE_STATEMENT, generates the SQL statement that will be used to export the contents of the schema as JSON. The second, encapsulated in the function EXECUTE_STAETMENT executes the generated statement and returns the resulting JSON document. The initial version of the GENERATE_STATEMENT procedure is shown below procedure GENERATE_STATEMENT(P_SCHEMA VARCHAR2) as V_SQL_FRAGMENT VARCHAR2(32767); $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN V_RETURN_TYPE VARCHAR2(32) := &#39;CLOB&#39;; $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN V_RETURN_TYPE VARCHAR2(32):= &#39;VARCHAR2(32767)&#39;; $ELSE V_RETURN_TYPE VARCHAR2(32):= &#39;VARCHAR2(4000)&#39;; $END cursor getTableMetadata is select aat.owner ,aat.table_name ,cast(collect(&#39;&quot;&#39; || COLUMN_NAME || &#39;&quot;&#39; ORDER BY COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST from ALL_ALL_TABLES aat inner join ALL_TAB_COLUMNS atc on atc.OWNER = aat.OWNER and atc.TABLE_NAME = aat.TABLE_NAME where aat.OWNER = P_SCHEMA group by aat.OWNER, aat.TABLE_NAME; V_FIRST_ROW BOOLEAN := TRUE; begin DBMS_LOB.CREATETEMPORARY(SQL_STATEMENT,TRUE,DBMS_LOB.CALL); V_SQL_FRAGMENT := &#39;select JSON_OBJECT(&#39;&#39;data&#39;&#39; value JSON_OBJECT (&#39; || C_NEWLINE; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); for t in getTableMetadata loop V_SQL_FRAGMENT := C_SINGLE_QUOTE || t.TABLE_NAME || C_SINGLE_QUOTE || &#39; value ( select JSON_ARRAYAGG(JSON_ARRAY(&#39;; if (NOT V_FIRST_ROW) then V_SQL_FRAGMENT := &#39;,&#39; || V_SQL_FRAGMENT; end if; V_FIRST_ROW := FALSE; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); DBMS_LOB.APPEND(SQL_STATEMENT,TABLE_TO_LIST(t.COLUMN_LIST)); V_SQL_FRAGMENT := &#39; NULL ON NULL returning &#39; || V_RETURN_TYPE || &#39;) returning &#39; || V_RETURN_TYPE || &#39;) FROM &quot;&#39; || t.OWNER || &#39;&quot;.&quot;&#39; || t.TABLE_NAME || &#39;&quot;)&#39; || C_NEWLINE; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); end loop; V_SQL_FRAGMENT := &#39; returning &#39; || V_RETURN_TYPE || C_NEWLINE || &#39; )&#39; || C_NEWLINE || &#39; returning &#39; || V_RETURN_TYPE || C_NEWLINE || &#39; )&#39; || C_NEWLINE || &#39; from DUAL&#39;; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); end; It basically queries the data dictionary tables ALL_TAB_COLUMNS and ALL_ALL_TABLES to generate the list of columns for each table in the schema and then iterates over the result set constructing a JSON_ARRAYAGG sub-query for each table. Note how it uses conditional compilation to determine what return type will be used with the SQL operators. The generated SQL is written into the CLOB variable SQL_STATEMENT. The initial version of the EXPORT_SCHEMA function is shown below function EXPORT_SCHEMA(P_SCHEMA VARCHAR2) return CLOB as V_JSON_DOCUMENT CLOB; V_CURSOR SYS_REFCURSOR; begin GENERATE_STATEMENT(P_SCHEMA); OPEN V_CURSOR FOR SQL_STATEMENT; FETCH V_CURSOR INTO V_JSON_DOCUMENT; CLOSE V_CURSOR; return V_JSON_DOCUMENT; end; This function takes the output of GENERATE_STATEMENT, and executes it using a cursor. Since the generated statement only returns a single row the function simply opens the cursor, fetches the row and closes the cursor. The JSON export file can now be generated by simply calling the EXPORT_SCHEMA function. select JSON_EXPORT.EXPORT_SCHEMA(&#39;HR&#39;) from dual; { &quot;data&quot; : { &quot;JOBS&quot; : [[&quot;AD_PRES&quot;,&quot;President&quot;,20080,40000] ,[&quot;AD_VP&quot;,&quot;Administration Vice President&quot;,15000,30000] ,.... ,[&quot;PR_REP&quot;,&quot;Public Relations Representative&quot;,4500,10500] ], &quot;REGIONS&quot; : [[1,&quot;Europe&quot;],[2,&quot;Americas&quot;],[3,&quot;Asia&quot;],[4,&quot;Middle East and Africa&quot;]], &quot;COUNTRIES&quot; : [[... After invoking the EXPORT_SCHEMA method, the method DUMP_SQL_STATEMENT can be used to retrieve the SQL generated by the GENERTE_STATEMENT method. The next challenge is what happens with a larger dataset, such as the ‘SH’ schema. Invoking EXPORT_SCHEMA for the ‘SH’ schema results in the following error select JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;) from dual; ORA-40654: Input to JSON generation function has unsupported data type. Looking at the data types used by the tables in the SH schema, it appears that there are two tables that contain ROWID columns. ROWID is one a number of data types not currently supported by the JSON generation functions, Fortunately in this case these tables are not schema data tables, but are secondary tables, used by the Oracle Text index and consequently their content should not be included in the export file. To prevent unwanted tables from being included in the output file, the SQL used by GENERATE_TABLES is modified to exclude the following types of table: INVALID TABLES, DROPPED TABLES, TEMORARY_TABLES, EXTERNAL_TABLES, SECONDARY_TABLES, NESTED_TABLES and IOT_OVERFLOW tables. OBJECT tables are also excluded for the moment, as they will require special handling. After applying the filter conditions the select statement used by GENERATE_TABLES is as follows select aat.owner ,aat.table_name ,cast(collect(&#39;&quot;&#39; || COLUMN_NAME || &#39;&quot;&#39; ORDER BY COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST from ALL_ALL_TABLES aat inner join ALL_TAB_COLUMNS atc on atc.OWNER = aat.OWNER and atc.TABLE_NAME = aat.TABLE_NAME where aat.STATUS = &#39;VALID&#39; and aat.DROPPED = &#39;NO&#39; and aat.TEMPORARY = &#39;N&#39; and aat.EXTERNAL = &#39;NO&#39; and aat.NESTED = &#39;NO&#39; and aat.SECONDARY = &#39;N&#39; and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = &#39;IOT&#39;) and aat.TABLE_TYPE is NULL and aat.OWNER = P_SCHEMA group by aat.OWNER, aat.TABLE_NAME; After modifying the GENERATE_STATEMENT method, invoking EXPORT_SCHEMA on the SH schema in an unpatched 12.2 results in ORA-40459: output value too large (actual: 32801, maximum: 32767) Since generating a JSON representation of the SH schema results in a document much larger than 32K. One way of avoiding this problem is to limit the number of rows processed for each table in the schema. This can done by making it possible set a row limit and then using row limit value in a WHERE clause that restricts the number of rows passed to the JSON_ARRAYAGG operations. Limiting the number of rows processed by the EXPORT_SCHEMA function somewhat defeats the purpose of an export utility. Clearly an alternative solution is required in databases where CLOB is not a supported return type for the JSON operators. One way of approaching this is to manually print the output the JSON_ARRAY operations directly into a CLOB. In general, using string concatenation to generate JSON is a really bad idea. In particular there are a lot of nuances around correctly handling special characters in text values, and it is very easy to make mistakes that result in the creation of invalid JSON documents. However in this case, string concatenation is an acceptable approach, since the all string conversions are handled by the JSON_ARRAY operator and the results can safely be combined to form the desired output. The 12.2 implementation of GENERATE_STATEMENT method returns a SQL statement for each table, rather than one statement for the entire schema. This allow the results for each table to inserted as a distinct key in the main document. declare V_SQL_STATEMENT CLOB; begin EXPORT_METADATA_CACHE := T_EXPORT_METADATA_TABLE(); for t in getTableMetadata loop EXPORT_METADATA_CACHE.extend(); EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).OWNER := t.OWNER; EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).TABLE_NAME := t.TABLE_NAME; DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENT,TRUE,DBMS_LOB.CALL); V_SQL_FRAGMENT := &#39;select JSON_ARRAY(&#39;; DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); DBMS_LOB.APPEND(V_SQL_STATEMENT,TABLE_TO_LIST(t.COLUMN_LIST)); V_SQL_FRAGMENT := &#39; NULL on NULL returning &#39;|| V_RETURN_TYPE || &#39;) FROM &quot;&#39; || t.OWNER || &#39;&quot;.&quot;&#39; || t.TABLE_NAME || &#39;&quot; &#39;; if (ROW_LIMIT &gt; -1) then V_SQL_FRAGMENT := V_SQL_FRAGMENT || &#39;WHERE ROWNUM &lt; &#39; || ROW_LIMIT; end if; DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).SQL_STATEMENT := V_SQL_STATEMENT; end loop; end; The 12.2 implementation of EXPORT_SCHEMA starts by printing the outer { “data” : to the CLOB. Next it loops over the set of SQL statements produced by GENERATE_STATEMENT. For each statement it appends a key based on the table name whose value is an array. It then executes the SQL for that table and appends the rows returned by the query as the members of the array. Conditional compilation, based on CLOB_SUPPORTED, is used in both implementations to determine which path is executed. function EXPORT_SCHEMA(P_SCHEMA VARCHAR2) return CLOB as V_JSON_DOCUMENT CLOB; V_CURSOR SYS_REFCURSOR; V_JSON_FRAGMENT VARCHAR2(4000); V_FIRST_TABLE BOOLEAN := TRUE; V_FIRST_ITEM BOOLEAN := TRUE; $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN V_JSON_ARRAY VARCHAR2(32767); $ELSE V_JSON_ARRAY VARCHAR2(4000); $END begin DBMS_LOB.CREATETEMPORARY(V_JSON_DOCUMENT,TRUE,DBMS_LOB.CALL); V_JSON_FRAGMENT := &#39;{&quot;data&quot;:{&#39;; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT); GENERATE_STATEMENT(P_SCHEMA); for i in 1 .. EXPORT_METADATA_CACHE.count loop V_JSON_FRAGMENT := &#39;&quot;&#39; || EXPORT_METADATA_CACHE(i).table_name || &#39;&quot;:[&#39;; if (not V_FIRST_TABLE) then V_JSON_FRAGMENT := &#39;,&#39; || V_JSON_FRAGMENT; end if; V_FIRST_TABLE := false; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT); V_FIRST_ITEM := TRUE; OPEN V_CURSOR for EXPORT_METADATA_CACHE(i).SQL_STATEMENT; loop FETCH V_CURSOR into V_JSON_ARRAY; EXIT WHEN V_CURSOR%notfound; if (NOT V_FIRST_ITEM) then DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;,&#39;); end if; V_FIRST_ITEM := FALSE; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,LENGTH(V_JSON_ARRAY),V_JSON_ARRAY); end loop; CLOSE V_CURSOR; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;]&#39;); end loop; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;}&#39;); DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;}&#39;); return V_JSON_DOCUMENT; end; The EXPORT_SCHEMA function can now successfully return the full content of the both the HR and SH schemas, even in a 12.2 database where the JSON operators do support CLOB. SQL&gt; select JSON_EXPORT.EXPORT_SCHEMA(&#39;HR&#39;) from dual {&quot;data&quot;:{&quot;JOBS&quot;:[[&quot;AD_PRES&quot;,&quot;President&quot;,20080,40000],[&quot;AD_VP&quot;,&quot;Administration Vic SQL&gt; select JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;) from dual; {&quot;data&quot;:{&quot;COSTS&quot;:[],&quot;SALES&quot;:[[13,987,&quot;1998-01-10T00:00:00&quot;,3,999,1,1232.16],[13,1 SQL&gt; select DBMS_LOB.GETLENGTH(JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;)) from dual; 58582866 As can be seen the size of the document generated when processing the SH schema is almost 60MB. The IS JSON condition can be used to verify that the generated document is valid JSON. SQL&gt; select 1 &quot;VALID JSON&quot; from dual where JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;) is JSON; VALID JSON ---------- 1 1 row selected. Note this statement would return no rows if the generated document was not valid JSON. A quick and the dirty was to output the generated document to a file is to use a simple SQL*PLUS script which spools the results to a file. DEF SCHEMA_NAME = &amp;1 set lines 1024 column JSON format A1024 set feedback off set heading off set termout off set verify off set long 1000000000 set pages 0 set echo off spool JSON/&amp;SCHEMA_NAME..json select JSON_EXPORT.EXPORT_SCHEMA(&#39;&amp;SCHEMA_NAME&#39;) JSON from dual; spool off set echo on set pages 100 set verify on set termout on set heading on set feedback on Unfortunately SQL*PLUS inserts ‘hard’ end-of-line characters into the JSON after each block of 1024 characters, these need to be stripped out before the file can be processed as JSON. The next post will investigate what happens when we attempt to export the OE schema, which contains a much richer set of Oracle data types, than the HR and SH schemas." />
+<meta property="og:description" content="A PL/SQL package for exporting an Oracle Schema as JSON. The previous post in this blog showed how to generate a JSON representation of the contents of an Oracle database schema. This post outlines the basics of a PL/SQL package that can automate the process of exporting an entire database schema, or a subset of a database schema as a JSON document. The previous post mentioned that in (an unpatched) 12cR2 database, JSON operators cannot generate documents larger that 32K, and that in Oracle 18 this limit no longer applies. In an attempt to avoid the 32K limit on JSON generation in Oracle 12.2 , the PL/SQL package will use PL/SQL conditional compilation to bypass the use of JSON_QUERY and JSON_ARRAYAGG in databases where CLOB is not a supported return type. Conditional compilation requires a PL/SQL package is required that provides static constants that accurately describe the state of the database. In this project the package JSON_FEATURE_DETECTION exposes constants TREAT_AS_JSON_SUPPORTED, CLOB_SUPPORED and EXTENDED_STRING_SUPPORTED. TREAT_AS_JSON_SUPPORTED is set TRUE if the database supports the TREAT( AS JSON) feature. Treat as JSON is supported starting with Oracle 18. CLOB_SUPPORTED will be set TRUE in all 18c databases as well as patched 12.2 databases. EXTENDED_STRING_SUPPORTED will be set true in database where extended data type support has been enabled The JSON_FEATURE_DETECTION package is generated dynamically by a PL/SQL block that uses ‘Duck Typing’ to detect which features are supported. Duck Typing, for this not familiar with the term, is based on the assumption that if it “walks like a duck”, “swims like a duck” and “quacks like a duck” that is is “probably a member of Anatidae family”, eg a DUCK. In this case the lack of each feature is detected by executing a SQL statement that makes use of the feature and catching the exception thrown if the feature in question is not supported by the database. At first glance creating a PL/SQL package that will generate the required SQL seems quite simple. All that is needed is a list of the tables, along with the set of columns for each table. This appears to be a perfect fit for the LISTAGG operator. select TABLE_NAME, LISTAGG(COLUMN_NAME,&#39;,&#39;) WITHIN GROUP (ORDER BY COLUMN_ID) COLUMN_LIST from ALL_TAB_COLUMNS where OWNER = &#39;HR&#39; group by TABLE_NAME TABLE_NAME COLUMN_LIST COUNTRIES COUNTRY_ID,COUNTRY_NAME,REGION_ID DEPARTMENTS DEPARTMENT_ID,DEPARTMENT_NAME,MANAGER_ID,LOCATION_ID EMPLOYEES EMPLOYEE_ID,FIRST_NAME,LAST_NAME,EMAIL,PHONE_NUMBER,HIRE_DATE,JOB_ID,SALARY,COMMISSION_PCT,MANAGER_ID,DEPARTMENT_ID EMP_DETAILS_VIEW EMPLOYEE_ID,JOB_ID,MANAGER_ID,DEPARTMENT_ID,LOCATION_ID,COUNTRY_ID,FIRST_NAME,LAST_NAME,SALARY,COMMISSION_PCT,DEPARTMENT_NAME,JOB_TITLE,CITY,STATE_PROVINCE,COUNTRY_NAME,REGION_NAME JOBS JOB_ID,JOB_TITLE,MIN_SALARY,MAX_SALARY JOB_HISTORY EMPLOYEE_ID,START_DATE,END_DATE,JOB_ID,DEPARTMENT_ID LOCATIONS LOCATION_ID,STREET_ADDRESS,POSTAL_CODE,CITY,STATE_PROVINCE,COUNTRY_ID REGIONS REGION_ID,REGION_NAME Unfortunately if we do the math, in a a database that supports 128 character identifiers, the results of this query could easily exceed the maximum size supported by LISTAGG. Consequently the column list is captured as a collection, using a CAST(COLLECT COLUMN_NAME) AS TABLE_TYPE_OBECT) operation. The table is then converted into a list using a PL/SQL function that returns a CLOB. The type T_VC4000_TABLE is defined for this purpose. The JSON_EXPORT package is split into two main areas of functionality. The first, encapsulated by the function GENERATE_STATEMENT, generates the SQL statement that will be used to export the contents of the schema as JSON. The second, encapsulated in the function EXECUTE_STAETMENT executes the generated statement and returns the resulting JSON document. The initial version of the GENERATE_STATEMENT procedure is shown below procedure GENERATE_STATEMENT(P_SCHEMA VARCHAR2) as V_SQL_FRAGMENT VARCHAR2(32767); $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN V_RETURN_TYPE VARCHAR2(32) := &#39;CLOB&#39;; $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN V_RETURN_TYPE VARCHAR2(32):= &#39;VARCHAR2(32767)&#39;; $ELSE V_RETURN_TYPE VARCHAR2(32):= &#39;VARCHAR2(4000)&#39;; $END cursor getTableMetadata is select aat.owner ,aat.table_name ,cast(collect(&#39;&quot;&#39; || COLUMN_NAME || &#39;&quot;&#39; ORDER BY COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST from ALL_ALL_TABLES aat inner join ALL_TAB_COLUMNS atc on atc.OWNER = aat.OWNER and atc.TABLE_NAME = aat.TABLE_NAME where aat.OWNER = P_SCHEMA group by aat.OWNER, aat.TABLE_NAME; V_FIRST_ROW BOOLEAN := TRUE; begin DBMS_LOB.CREATETEMPORARY(SQL_STATEMENT,TRUE,DBMS_LOB.CALL); V_SQL_FRAGMENT := &#39;select JSON_OBJECT(&#39;&#39;data&#39;&#39; value JSON_OBJECT (&#39; || C_NEWLINE; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); for t in getTableMetadata loop V_SQL_FRAGMENT := C_SINGLE_QUOTE || t.TABLE_NAME || C_SINGLE_QUOTE || &#39; value ( select JSON_ARRAYAGG(JSON_ARRAY(&#39;; if (NOT V_FIRST_ROW) then V_SQL_FRAGMENT := &#39;,&#39; || V_SQL_FRAGMENT; end if; V_FIRST_ROW := FALSE; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); DBMS_LOB.APPEND(SQL_STATEMENT,TABLE_TO_LIST(t.COLUMN_LIST)); V_SQL_FRAGMENT := &#39; NULL ON NULL returning &#39; || V_RETURN_TYPE || &#39;) returning &#39; || V_RETURN_TYPE || &#39;) FROM &quot;&#39; || t.OWNER || &#39;&quot;.&quot;&#39; || t.TABLE_NAME || &#39;&quot;)&#39; || C_NEWLINE; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); end loop; V_SQL_FRAGMENT := &#39; returning &#39; || V_RETURN_TYPE || C_NEWLINE || &#39; )&#39; || C_NEWLINE || &#39; returning &#39; || V_RETURN_TYPE || C_NEWLINE || &#39; )&#39; || C_NEWLINE || &#39; from DUAL&#39;; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); end; It basically queries the data dictionary tables ALL_TAB_COLUMNS and ALL_ALL_TABLES to generate the list of columns for each table in the schema and then iterates over the result set constructing a JSON_ARRAYAGG sub-query for each table. Note how it uses conditional compilation to determine what return type will be used with the SQL operators. The generated SQL is written into the CLOB variable SQL_STATEMENT. The initial version of the EXPORT_SCHEMA function is shown below function EXPORT_SCHEMA(P_SCHEMA VARCHAR2) return CLOB as V_JSON_DOCUMENT CLOB; V_CURSOR SYS_REFCURSOR; begin GENERATE_STATEMENT(P_SCHEMA); OPEN V_CURSOR FOR SQL_STATEMENT; FETCH V_CURSOR INTO V_JSON_DOCUMENT; CLOSE V_CURSOR; return V_JSON_DOCUMENT; end; This function takes the output of GENERATE_STATEMENT, and executes it using a cursor. Since the generated statement only returns a single row the function simply opens the cursor, fetches the row and closes the cursor. The JSON export file can now be generated by simply calling the EXPORT_SCHEMA function. select JSON_EXPORT.EXPORT_SCHEMA(&#39;HR&#39;) from dual; { &quot;data&quot; : { &quot;JOBS&quot; : [[&quot;AD_PRES&quot;,&quot;President&quot;,20080,40000] ,[&quot;AD_VP&quot;,&quot;Administration Vice President&quot;,15000,30000] ,.... ,[&quot;PR_REP&quot;,&quot;Public Relations Representative&quot;,4500,10500] ], &quot;REGIONS&quot; : [[1,&quot;Europe&quot;],[2,&quot;Americas&quot;],[3,&quot;Asia&quot;],[4,&quot;Middle East and Africa&quot;]], &quot;COUNTRIES&quot; : [[... After invoking the EXPORT_SCHEMA method, the method DUMP_SQL_STATEMENT can be used to retrieve the SQL generated by the GENERTE_STATEMENT method. The next challenge is what happens with a larger dataset, such as the ‘SH’ schema. Invoking EXPORT_SCHEMA for the ‘SH’ schema results in the following error select JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;) from dual; ORA-40654: Input to JSON generation function has unsupported data type. Looking at the data types used by the tables in the SH schema, it appears that there are two tables that contain ROWID columns. ROWID is one a number of data types not currently supported by the JSON generation functions, Fortunately in this case these tables are not schema data tables, but are secondary tables, used by the Oracle Text index and consequently their content should not be included in the export file. To prevent unwanted tables from being included in the output file, the SQL used by GENERATE_TABLES is modified to exclude the following types of table: INVALID TABLES, DROPPED TABLES, TEMORARY_TABLES, EXTERNAL_TABLES, SECONDARY_TABLES, NESTED_TABLES and IOT_OVERFLOW tables. OBJECT tables are also excluded for the moment, as they will require special handling. After applying the filter conditions the select statement used by GENERATE_TABLES is as follows select aat.owner ,aat.table_name ,cast(collect(&#39;&quot;&#39; || COLUMN_NAME || &#39;&quot;&#39; ORDER BY COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST from ALL_ALL_TABLES aat inner join ALL_TAB_COLUMNS atc on atc.OWNER = aat.OWNER and atc.TABLE_NAME = aat.TABLE_NAME where aat.STATUS = &#39;VALID&#39; and aat.DROPPED = &#39;NO&#39; and aat.TEMPORARY = &#39;N&#39; and aat.EXTERNAL = &#39;NO&#39; and aat.NESTED = &#39;NO&#39; and aat.SECONDARY = &#39;N&#39; and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = &#39;IOT&#39;) and aat.TABLE_TYPE is NULL and aat.OWNER = P_SCHEMA group by aat.OWNER, aat.TABLE_NAME; After modifying the GENERATE_STATEMENT method, invoking EXPORT_SCHEMA on the SH schema in an unpatched 12.2 results in ORA-40459: output value too large (actual: 32801, maximum: 32767) Since generating a JSON representation of the SH schema results in a document much larger than 32K. One way of avoiding this problem is to limit the number of rows processed for each table in the schema. This can done by making it possible set a row limit and then using row limit value in a WHERE clause that restricts the number of rows passed to the JSON_ARRAYAGG operations. Limiting the number of rows processed by the EXPORT_SCHEMA function somewhat defeats the purpose of an export utility. Clearly an alternative solution is required in databases where CLOB is not a supported return type for the JSON operators. One way of approaching this is to manually print the output the JSON_ARRAY operations directly into a CLOB. In general, using string concatenation to generate JSON is a really bad idea. In particular there are a lot of nuances around correctly handling special characters in text values, and it is very easy to make mistakes that result in the creation of invalid JSON documents. However in this case, string concatenation is an acceptable approach, since the all string conversions are handled by the JSON_ARRAY operator and the results can safely be combined to form the desired output. The 12.2 implementation of GENERATE_STATEMENT method returns a SQL statement for each table, rather than one statement for the entire schema. This allow the results for each table to inserted as a distinct key in the main document. declare V_SQL_STATEMENT CLOB; begin EXPORT_METADATA_CACHE := T_EXPORT_METADATA_TABLE(); for t in getTableMetadata loop EXPORT_METADATA_CACHE.extend(); EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).OWNER := t.OWNER; EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).TABLE_NAME := t.TABLE_NAME; DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENT,TRUE,DBMS_LOB.CALL); V_SQL_FRAGMENT := &#39;select JSON_ARRAY(&#39;; DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); DBMS_LOB.APPEND(V_SQL_STATEMENT,TABLE_TO_LIST(t.COLUMN_LIST)); V_SQL_FRAGMENT := &#39; NULL on NULL returning &#39;|| V_RETURN_TYPE || &#39;) FROM &quot;&#39; || t.OWNER || &#39;&quot;.&quot;&#39; || t.TABLE_NAME || &#39;&quot; &#39;; if (ROW_LIMIT &gt; -1) then V_SQL_FRAGMENT := V_SQL_FRAGMENT || &#39;WHERE ROWNUM &lt; &#39; || ROW_LIMIT; end if; DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).SQL_STATEMENT := V_SQL_STATEMENT; end loop; end; The 12.2 implementation of EXPORT_SCHEMA starts by printing the outer { “data” : to the CLOB. Next it loops over the set of SQL statements produced by GENERATE_STATEMENT. For each statement it appends a key based on the table name whose value is an array. It then executes the SQL for that table and appends the rows returned by the query as the members of the array. Conditional compilation, based on CLOB_SUPPORTED, is used in both implementations to determine which path is executed. function EXPORT_SCHEMA(P_SCHEMA VARCHAR2) return CLOB as V_JSON_DOCUMENT CLOB; V_CURSOR SYS_REFCURSOR; V_JSON_FRAGMENT VARCHAR2(4000); V_FIRST_TABLE BOOLEAN := TRUE; V_FIRST_ITEM BOOLEAN := TRUE; $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN V_JSON_ARRAY VARCHAR2(32767); $ELSE V_JSON_ARRAY VARCHAR2(4000); $END begin DBMS_LOB.CREATETEMPORARY(V_JSON_DOCUMENT,TRUE,DBMS_LOB.CALL); V_JSON_FRAGMENT := &#39;{&quot;data&quot;:{&#39;; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT); GENERATE_STATEMENT(P_SCHEMA); for i in 1 .. EXPORT_METADATA_CACHE.count loop V_JSON_FRAGMENT := &#39;&quot;&#39; || EXPORT_METADATA_CACHE(i).table_name || &#39;&quot;:[&#39;; if (not V_FIRST_TABLE) then V_JSON_FRAGMENT := &#39;,&#39; || V_JSON_FRAGMENT; end if; V_FIRST_TABLE := false; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT); V_FIRST_ITEM := TRUE; OPEN V_CURSOR for EXPORT_METADATA_CACHE(i).SQL_STATEMENT; loop FETCH V_CURSOR into V_JSON_ARRAY; EXIT WHEN V_CURSOR%notfound; if (NOT V_FIRST_ITEM) then DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;,&#39;); end if; V_FIRST_ITEM := FALSE; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,LENGTH(V_JSON_ARRAY),V_JSON_ARRAY); end loop; CLOSE V_CURSOR; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;]&#39;); end loop; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;}&#39;); DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;}&#39;); return V_JSON_DOCUMENT; end; The EXPORT_SCHEMA function can now successfully return the full content of the both the HR and SH schemas, even in a 12.2 database where the JSON operators do support CLOB. SQL&gt; select JSON_EXPORT.EXPORT_SCHEMA(&#39;HR&#39;) from dual {&quot;data&quot;:{&quot;JOBS&quot;:[[&quot;AD_PRES&quot;,&quot;President&quot;,20080,40000],[&quot;AD_VP&quot;,&quot;Administration Vic SQL&gt; select JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;) from dual; {&quot;data&quot;:{&quot;COSTS&quot;:[],&quot;SALES&quot;:[[13,987,&quot;1998-01-10T00:00:00&quot;,3,999,1,1232.16],[13,1 SQL&gt; select DBMS_LOB.GETLENGTH(JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;)) from dual; 58582866 As can be seen the size of the document generated when processing the SH schema is almost 60MB. The IS JSON condition can be used to verify that the generated document is valid JSON. SQL&gt; select 1 &quot;VALID JSON&quot; from dual where JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;) is JSON; VALID JSON ---------- 1 1 row selected. Note this statement would return no rows if the generated document was not valid JSON. A quick and the dirty was to output the generated document to a file is to use a simple SQL*PLUS script which spools the results to a file. DEF SCHEMA_NAME = &amp;1 set lines 1024 column JSON format A1024 set feedback off set heading off set termout off set verify off set long 1000000000 set pages 0 set echo off spool JSON/&amp;SCHEMA_NAME..json select JSON_EXPORT.EXPORT_SCHEMA(&#39;&amp;SCHEMA_NAME&#39;) JSON from dual; spool off set echo on set pages 100 set verify on set termout on set heading on set feedback on Unfortunately SQL*PLUS inserts ‘hard’ end-of-line characters into the JSON after each block of 1024 characters, these need to be stripped out before the file can be processed as JSON. The next post will investigate what happens when we attempt to export the OE schema, which contains a much richer set of Oracle data types, than the HR and SH schemas." />
+<link rel="canonical" href="http://localhost:4000/json/export/import/oracle/2018/06/15/JSON_EXPORT.html" />
+<meta property="og:url" content="http://localhost:4000/json/export/import/oracle/2018/06/15/JSON_EXPORT.html" />
+<meta property="og:site_name" content="JSON Exchange" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2018-06-15T18:00:00-07:00" />
+<script type="application/ld+json">
+{"description":"A PL/SQL package for exporting an Oracle Schema as JSON. The previous post in this blog showed how to generate a JSON representation of the contents of an Oracle database schema. This post outlines the basics of a PL/SQL package that can automate the process of exporting an entire database schema, or a subset of a database schema as a JSON document. The previous post mentioned that in (an unpatched) 12cR2 database, JSON operators cannot generate documents larger that 32K, and that in Oracle 18 this limit no longer applies. In an attempt to avoid the 32K limit on JSON generation in Oracle 12.2 , the PL/SQL package will use PL/SQL conditional compilation to bypass the use of JSON_QUERY and JSON_ARRAYAGG in databases where CLOB is not a supported return type. Conditional compilation requires a PL/SQL package is required that provides static constants that accurately describe the state of the database. In this project the package JSON_FEATURE_DETECTION exposes constants TREAT_AS_JSON_SUPPORTED, CLOB_SUPPORED and EXTENDED_STRING_SUPPORTED. TREAT_AS_JSON_SUPPORTED is set TRUE if the database supports the TREAT( AS JSON) feature. Treat as JSON is supported starting with Oracle 18. CLOB_SUPPORTED will be set TRUE in all 18c databases as well as patched 12.2 databases. EXTENDED_STRING_SUPPORTED will be set true in database where extended data type support has been enabled The JSON_FEATURE_DETECTION package is generated dynamically by a PL/SQL block that uses ‘Duck Typing’ to detect which features are supported. Duck Typing, for this not familiar with the term, is based on the assumption that if it “walks like a duck”, “swims like a duck” and “quacks like a duck” that is is “probably a member of Anatidae family”, eg a DUCK. In this case the lack of each feature is detected by executing a SQL statement that makes use of the feature and catching the exception thrown if the feature in question is not supported by the database. At first glance creating a PL/SQL package that will generate the required SQL seems quite simple. All that is needed is a list of the tables, along with the set of columns for each table. This appears to be a perfect fit for the LISTAGG operator. select TABLE_NAME, LISTAGG(COLUMN_NAME,&#39;,&#39;) WITHIN GROUP (ORDER BY COLUMN_ID) COLUMN_LIST from ALL_TAB_COLUMNS where OWNER = &#39;HR&#39; group by TABLE_NAME TABLE_NAME COLUMN_LIST COUNTRIES COUNTRY_ID,COUNTRY_NAME,REGION_ID DEPARTMENTS DEPARTMENT_ID,DEPARTMENT_NAME,MANAGER_ID,LOCATION_ID EMPLOYEES EMPLOYEE_ID,FIRST_NAME,LAST_NAME,EMAIL,PHONE_NUMBER,HIRE_DATE,JOB_ID,SALARY,COMMISSION_PCT,MANAGER_ID,DEPARTMENT_ID EMP_DETAILS_VIEW EMPLOYEE_ID,JOB_ID,MANAGER_ID,DEPARTMENT_ID,LOCATION_ID,COUNTRY_ID,FIRST_NAME,LAST_NAME,SALARY,COMMISSION_PCT,DEPARTMENT_NAME,JOB_TITLE,CITY,STATE_PROVINCE,COUNTRY_NAME,REGION_NAME JOBS JOB_ID,JOB_TITLE,MIN_SALARY,MAX_SALARY JOB_HISTORY EMPLOYEE_ID,START_DATE,END_DATE,JOB_ID,DEPARTMENT_ID LOCATIONS LOCATION_ID,STREET_ADDRESS,POSTAL_CODE,CITY,STATE_PROVINCE,COUNTRY_ID REGIONS REGION_ID,REGION_NAME Unfortunately if we do the math, in a a database that supports 128 character identifiers, the results of this query could easily exceed the maximum size supported by LISTAGG. Consequently the column list is captured as a collection, using a CAST(COLLECT COLUMN_NAME) AS TABLE_TYPE_OBECT) operation. The table is then converted into a list using a PL/SQL function that returns a CLOB. The type T_VC4000_TABLE is defined for this purpose. The JSON_EXPORT package is split into two main areas of functionality. The first, encapsulated by the function GENERATE_STATEMENT, generates the SQL statement that will be used to export the contents of the schema as JSON. The second, encapsulated in the function EXECUTE_STAETMENT executes the generated statement and returns the resulting JSON document. The initial version of the GENERATE_STATEMENT procedure is shown below procedure GENERATE_STATEMENT(P_SCHEMA VARCHAR2) as V_SQL_FRAGMENT VARCHAR2(32767); $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN V_RETURN_TYPE VARCHAR2(32) := &#39;CLOB&#39;; $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN V_RETURN_TYPE VARCHAR2(32):= &#39;VARCHAR2(32767)&#39;; $ELSE V_RETURN_TYPE VARCHAR2(32):= &#39;VARCHAR2(4000)&#39;; $END cursor getTableMetadata is select aat.owner ,aat.table_name ,cast(collect(&#39;&quot;&#39; || COLUMN_NAME || &#39;&quot;&#39; ORDER BY COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST from ALL_ALL_TABLES aat inner join ALL_TAB_COLUMNS atc on atc.OWNER = aat.OWNER and atc.TABLE_NAME = aat.TABLE_NAME where aat.OWNER = P_SCHEMA group by aat.OWNER, aat.TABLE_NAME; V_FIRST_ROW BOOLEAN := TRUE; begin DBMS_LOB.CREATETEMPORARY(SQL_STATEMENT,TRUE,DBMS_LOB.CALL); V_SQL_FRAGMENT := &#39;select JSON_OBJECT(&#39;&#39;data&#39;&#39; value JSON_OBJECT (&#39; || C_NEWLINE; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); for t in getTableMetadata loop V_SQL_FRAGMENT := C_SINGLE_QUOTE || t.TABLE_NAME || C_SINGLE_QUOTE || &#39; value ( select JSON_ARRAYAGG(JSON_ARRAY(&#39;; if (NOT V_FIRST_ROW) then V_SQL_FRAGMENT := &#39;,&#39; || V_SQL_FRAGMENT; end if; V_FIRST_ROW := FALSE; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); DBMS_LOB.APPEND(SQL_STATEMENT,TABLE_TO_LIST(t.COLUMN_LIST)); V_SQL_FRAGMENT := &#39; NULL ON NULL returning &#39; || V_RETURN_TYPE || &#39;) returning &#39; || V_RETURN_TYPE || &#39;) FROM &quot;&#39; || t.OWNER || &#39;&quot;.&quot;&#39; || t.TABLE_NAME || &#39;&quot;)&#39; || C_NEWLINE; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); end loop; V_SQL_FRAGMENT := &#39; returning &#39; || V_RETURN_TYPE || C_NEWLINE || &#39; )&#39; || C_NEWLINE || &#39; returning &#39; || V_RETURN_TYPE || C_NEWLINE || &#39; )&#39; || C_NEWLINE || &#39; from DUAL&#39;; DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); end; It basically queries the data dictionary tables ALL_TAB_COLUMNS and ALL_ALL_TABLES to generate the list of columns for each table in the schema and then iterates over the result set constructing a JSON_ARRAYAGG sub-query for each table. Note how it uses conditional compilation to determine what return type will be used with the SQL operators. The generated SQL is written into the CLOB variable SQL_STATEMENT. The initial version of the EXPORT_SCHEMA function is shown below function EXPORT_SCHEMA(P_SCHEMA VARCHAR2) return CLOB as V_JSON_DOCUMENT CLOB; V_CURSOR SYS_REFCURSOR; begin GENERATE_STATEMENT(P_SCHEMA); OPEN V_CURSOR FOR SQL_STATEMENT; FETCH V_CURSOR INTO V_JSON_DOCUMENT; CLOSE V_CURSOR; return V_JSON_DOCUMENT; end; This function takes the output of GENERATE_STATEMENT, and executes it using a cursor. Since the generated statement only returns a single row the function simply opens the cursor, fetches the row and closes the cursor. The JSON export file can now be generated by simply calling the EXPORT_SCHEMA function. select JSON_EXPORT.EXPORT_SCHEMA(&#39;HR&#39;) from dual; { &quot;data&quot; : { &quot;JOBS&quot; : [[&quot;AD_PRES&quot;,&quot;President&quot;,20080,40000] ,[&quot;AD_VP&quot;,&quot;Administration Vice President&quot;,15000,30000] ,.... ,[&quot;PR_REP&quot;,&quot;Public Relations Representative&quot;,4500,10500] ], &quot;REGIONS&quot; : [[1,&quot;Europe&quot;],[2,&quot;Americas&quot;],[3,&quot;Asia&quot;],[4,&quot;Middle East and Africa&quot;]], &quot;COUNTRIES&quot; : [[... After invoking the EXPORT_SCHEMA method, the method DUMP_SQL_STATEMENT can be used to retrieve the SQL generated by the GENERTE_STATEMENT method. The next challenge is what happens with a larger dataset, such as the ‘SH’ schema. Invoking EXPORT_SCHEMA for the ‘SH’ schema results in the following error select JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;) from dual; ORA-40654: Input to JSON generation function has unsupported data type. Looking at the data types used by the tables in the SH schema, it appears that there are two tables that contain ROWID columns. ROWID is one a number of data types not currently supported by the JSON generation functions, Fortunately in this case these tables are not schema data tables, but are secondary tables, used by the Oracle Text index and consequently their content should not be included in the export file. To prevent unwanted tables from being included in the output file, the SQL used by GENERATE_TABLES is modified to exclude the following types of table: INVALID TABLES, DROPPED TABLES, TEMORARY_TABLES, EXTERNAL_TABLES, SECONDARY_TABLES, NESTED_TABLES and IOT_OVERFLOW tables. OBJECT tables are also excluded for the moment, as they will require special handling. After applying the filter conditions the select statement used by GENERATE_TABLES is as follows select aat.owner ,aat.table_name ,cast(collect(&#39;&quot;&#39; || COLUMN_NAME || &#39;&quot;&#39; ORDER BY COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST from ALL_ALL_TABLES aat inner join ALL_TAB_COLUMNS atc on atc.OWNER = aat.OWNER and atc.TABLE_NAME = aat.TABLE_NAME where aat.STATUS = &#39;VALID&#39; and aat.DROPPED = &#39;NO&#39; and aat.TEMPORARY = &#39;N&#39; and aat.EXTERNAL = &#39;NO&#39; and aat.NESTED = &#39;NO&#39; and aat.SECONDARY = &#39;N&#39; and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = &#39;IOT&#39;) and aat.TABLE_TYPE is NULL and aat.OWNER = P_SCHEMA group by aat.OWNER, aat.TABLE_NAME; After modifying the GENERATE_STATEMENT method, invoking EXPORT_SCHEMA on the SH schema in an unpatched 12.2 results in ORA-40459: output value too large (actual: 32801, maximum: 32767) Since generating a JSON representation of the SH schema results in a document much larger than 32K. One way of avoiding this problem is to limit the number of rows processed for each table in the schema. This can done by making it possible set a row limit and then using row limit value in a WHERE clause that restricts the number of rows passed to the JSON_ARRAYAGG operations. Limiting the number of rows processed by the EXPORT_SCHEMA function somewhat defeats the purpose of an export utility. Clearly an alternative solution is required in databases where CLOB is not a supported return type for the JSON operators. One way of approaching this is to manually print the output the JSON_ARRAY operations directly into a CLOB. In general, using string concatenation to generate JSON is a really bad idea. In particular there are a lot of nuances around correctly handling special characters in text values, and it is very easy to make mistakes that result in the creation of invalid JSON documents. However in this case, string concatenation is an acceptable approach, since the all string conversions are handled by the JSON_ARRAY operator and the results can safely be combined to form the desired output. The 12.2 implementation of GENERATE_STATEMENT method returns a SQL statement for each table, rather than one statement for the entire schema. This allow the results for each table to inserted as a distinct key in the main document. declare V_SQL_STATEMENT CLOB; begin EXPORT_METADATA_CACHE := T_EXPORT_METADATA_TABLE(); for t in getTableMetadata loop EXPORT_METADATA_CACHE.extend(); EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).OWNER := t.OWNER; EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).TABLE_NAME := t.TABLE_NAME; DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENT,TRUE,DBMS_LOB.CALL); V_SQL_FRAGMENT := &#39;select JSON_ARRAY(&#39;; DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); DBMS_LOB.APPEND(V_SQL_STATEMENT,TABLE_TO_LIST(t.COLUMN_LIST)); V_SQL_FRAGMENT := &#39; NULL on NULL returning &#39;|| V_RETURN_TYPE || &#39;) FROM &quot;&#39; || t.OWNER || &#39;&quot;.&quot;&#39; || t.TABLE_NAME || &#39;&quot; &#39;; if (ROW_LIMIT &gt; -1) then V_SQL_FRAGMENT := V_SQL_FRAGMENT || &#39;WHERE ROWNUM &lt; &#39; || ROW_LIMIT; end if; DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT); EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).SQL_STATEMENT := V_SQL_STATEMENT; end loop; end; The 12.2 implementation of EXPORT_SCHEMA starts by printing the outer { “data” : to the CLOB. Next it loops over the set of SQL statements produced by GENERATE_STATEMENT. For each statement it appends a key based on the table name whose value is an array. It then executes the SQL for that table and appends the rows returned by the query as the members of the array. Conditional compilation, based on CLOB_SUPPORTED, is used in both implementations to determine which path is executed. function EXPORT_SCHEMA(P_SCHEMA VARCHAR2) return CLOB as V_JSON_DOCUMENT CLOB; V_CURSOR SYS_REFCURSOR; V_JSON_FRAGMENT VARCHAR2(4000); V_FIRST_TABLE BOOLEAN := TRUE; V_FIRST_ITEM BOOLEAN := TRUE; $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN V_JSON_ARRAY VARCHAR2(32767); $ELSE V_JSON_ARRAY VARCHAR2(4000); $END begin DBMS_LOB.CREATETEMPORARY(V_JSON_DOCUMENT,TRUE,DBMS_LOB.CALL); V_JSON_FRAGMENT := &#39;{&quot;data&quot;:{&#39;; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT); GENERATE_STATEMENT(P_SCHEMA); for i in 1 .. EXPORT_METADATA_CACHE.count loop V_JSON_FRAGMENT := &#39;&quot;&#39; || EXPORT_METADATA_CACHE(i).table_name || &#39;&quot;:[&#39;; if (not V_FIRST_TABLE) then V_JSON_FRAGMENT := &#39;,&#39; || V_JSON_FRAGMENT; end if; V_FIRST_TABLE := false; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT); V_FIRST_ITEM := TRUE; OPEN V_CURSOR for EXPORT_METADATA_CACHE(i).SQL_STATEMENT; loop FETCH V_CURSOR into V_JSON_ARRAY; EXIT WHEN V_CURSOR%notfound; if (NOT V_FIRST_ITEM) then DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;,&#39;); end if; V_FIRST_ITEM := FALSE; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,LENGTH(V_JSON_ARRAY),V_JSON_ARRAY); end loop; CLOSE V_CURSOR; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;]&#39;); end loop; DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;}&#39;); DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,&#39;}&#39;); return V_JSON_DOCUMENT; end; The EXPORT_SCHEMA function can now successfully return the full content of the both the HR and SH schemas, even in a 12.2 database where the JSON operators do support CLOB. SQL&gt; select JSON_EXPORT.EXPORT_SCHEMA(&#39;HR&#39;) from dual {&quot;data&quot;:{&quot;JOBS&quot;:[[&quot;AD_PRES&quot;,&quot;President&quot;,20080,40000],[&quot;AD_VP&quot;,&quot;Administration Vic SQL&gt; select JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;) from dual; {&quot;data&quot;:{&quot;COSTS&quot;:[],&quot;SALES&quot;:[[13,987,&quot;1998-01-10T00:00:00&quot;,3,999,1,1232.16],[13,1 SQL&gt; select DBMS_LOB.GETLENGTH(JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;)) from dual; 58582866 As can be seen the size of the document generated when processing the SH schema is almost 60MB. The IS JSON condition can be used to verify that the generated document is valid JSON. SQL&gt; select 1 &quot;VALID JSON&quot; from dual where JSON_EXPORT.EXPORT_SCHEMA(&#39;SH&#39;) is JSON; VALID JSON ---------- 1 1 row selected. Note this statement would return no rows if the generated document was not valid JSON. A quick and the dirty was to output the generated document to a file is to use a simple SQL*PLUS script which spools the results to a file. DEF SCHEMA_NAME = &amp;1 set lines 1024 column JSON format A1024 set feedback off set heading off set termout off set verify off set long 1000000000 set pages 0 set echo off spool JSON/&amp;SCHEMA_NAME..json select JSON_EXPORT.EXPORT_SCHEMA(&#39;&amp;SCHEMA_NAME&#39;) JSON from dual; spool off set echo on set pages 100 set verify on set termout on set heading on set feedback on Unfortunately SQL*PLUS inserts ‘hard’ end-of-line characters into the JSON after each block of 1024 characters, these need to be stripped out before the file can be processed as JSON. The next post will investigate what happens when we attempt to export the OE schema, which contains a much richer set of Oracle data types, than the HR and SH schemas.","@type":"BlogPosting","url":"http://localhost:4000/json/export/import/oracle/2018/06/15/JSON_EXPORT.html","headline":"JSON_EXPORT","dateModified":"2018-06-15T18:00:00-07:00","datePublished":"2018-06-15T18:00:00-07:00","mainEntityOfPage":{"@type":"WebPage","@id":"http://localhost:4000/json/export/import/oracle/2018/06/15/JSON_EXPORT.html"},"@context":"http://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="http://localhost:4000/feed.xml" title="JSON Exchange" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">JSON Exchange</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">JSON_EXPORT</h1>
+    <p class="post-meta">
+      <time class="dt-published" datetime="2018-06-15T18:00:00-07:00" itemprop="datePublished">Jun 15, 2018
+      </time></p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <h2 id="a-plsql-package-for-exporting-an-oracle-schema-as-json">A PL/SQL package for exporting an Oracle Schema as JSON.</h2>
+
+<p>The <a href="/json/export/import/oracle/2018/06/14/Introduction.html">previous</a> post in this blog showed how to generate a JSON representation of the contents of an Oracle database schema. This post outlines the basics of a PL/SQL package that can automate the process of exporting an entire database schema, or a subset of a database schema as a JSON document.</p>
+
+<p>The previous post mentioned that in (an unpatched) 12cR2 database, JSON operators cannot  generate documents larger that  32K, and that in Oracle 18 this limit no longer applies. In an attempt to avoid the 32K limit on JSON generation in  Oracle 12.2 , the PL/SQL package will use PL/SQL conditional compilation to bypass the use of JSON_QUERY and JSON_ARRAYAGG in databases where CLOB is not a supported return type.</p>
+
+<p>Conditional compilation requires a PL/SQL package is required that provides static constants that accurately describe the state of the database. In this project the package JSON_FEATURE_DETECTION exposes constants TREAT_AS_JSON_SUPPORTED, CLOB_SUPPORED and EXTENDED_STRING_SUPPORTED. TREAT_AS_JSON_SUPPORTED is set TRUE if the database supports the TREAT( AS JSON) feature. Treat as JSON is supported starting with Oracle 18. CLOB_SUPPORTED will be set TRUE in all 18c databases as well as patched 12.2 databases.  EXTENDED_STRING_SUPPORTED will be set true in database where extended data type support has been enabled</p>
+
+<p>The JSON_FEATURE_DETECTION  package is generated dynamically by a PL/SQL block that uses ‘Duck Typing’ to detect which features are supported. Duck Typing, for this not familiar with the term, is based on the assumption that if it “walks like a duck”, “swims like a duck” and “quacks like a duck” that is is “probably a member of Anatidae family”, eg a DUCK. In this case the lack of each feature is detected by executing a SQL statement that makes use of the feature and catching the exception thrown if the feature in question is not supported by the database.</p>
+
+<p>At first glance creating a PL/SQL package that will generate the required SQL seems quite simple. All that is needed is a list of the tables, along with the set of columns for each table. This appears to be a perfect fit for the LISTAGG operator.</p>
+
+<pre><code class="language-SQL">select TABLE_NAME, LISTAGG(COLUMN_NAME,',') WITHIN GROUP (ORDER BY COLUMN_ID) COLUMN_LIST
+  from ALL_TAB_COLUMNS
+ where OWNER = 'HR'
+ group by TABLE_NAME
+</code></pre>
+
+<table>
+  <thead>
+    <tr>
+      <th>TABLE_NAME</th>
+      <th>COLUMN_LIST</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>COUNTRIES</td>
+      <td>COUNTRY_ID,COUNTRY_NAME,REGION_ID</td>
+    </tr>
+    <tr>
+      <td>DEPARTMENTS</td>
+      <td>DEPARTMENT_ID,DEPARTMENT_NAME,MANAGER_ID,LOCATION_ID</td>
+    </tr>
+    <tr>
+      <td>EMPLOYEES</td>
+      <td>EMPLOYEE_ID,FIRST_NAME,LAST_NAME,EMAIL,PHONE_NUMBER,HIRE_DATE,JOB_ID,SALARY,COMMISSION_PCT,MANAGER_ID,DEPARTMENT_ID</td>
+    </tr>
+    <tr>
+      <td>EMP_DETAILS_VIEW</td>
+      <td>EMPLOYEE_ID,JOB_ID,MANAGER_ID,DEPARTMENT_ID,LOCATION_ID,COUNTRY_ID,FIRST_NAME,LAST_NAME,SALARY,COMMISSION_PCT,DEPARTMENT_NAME,JOB_TITLE,CITY,STATE_PROVINCE,COUNTRY_NAME,REGION_NAME</td>
+    </tr>
+    <tr>
+      <td>JOBS</td>
+      <td>JOB_ID,JOB_TITLE,MIN_SALARY,MAX_SALARY</td>
+    </tr>
+    <tr>
+      <td>JOB_HISTORY</td>
+      <td>EMPLOYEE_ID,START_DATE,END_DATE,JOB_ID,DEPARTMENT_ID</td>
+    </tr>
+    <tr>
+      <td>LOCATIONS</td>
+      <td>LOCATION_ID,STREET_ADDRESS,POSTAL_CODE,CITY,STATE_PROVINCE,COUNTRY_ID</td>
+    </tr>
+    <tr>
+      <td>REGIONS</td>
+      <td>REGION_ID,REGION_NAME</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Unfortunately if we do the math, in a a database that supports 128 character identifiers, the results of this query could easily exceed the maximum size supported by LISTAGG. Consequently the column list is captured as a collection, using a CAST(COLLECT <em>COLUMN_NAME</em>) AS <em>TABLE_TYPE_OBECT</em>) operation. The table is then converted into a list using a PL/SQL function that returns a CLOB. The type T_VC4000_TABLE is defined for this purpose.</p>
+
+<p>The JSON_EXPORT package is split into two main areas of functionality. The first, encapsulated by the function GENERATE_STATEMENT, generates the SQL statement that will be used to export the contents of the schema as JSON. The second, encapsulated in the function EXECUTE_STAETMENT executes the generated statement and returns the resulting JSON document.</p>
+
+<p>The initial version of the GENERATE_STATEMENT procedure is shown below</p>
+
+<pre><code class="language-SQL">procedure GENERATE_STATEMENT(P_SCHEMA VARCHAR2)
+as
+  V_SQL_FRAGMENT  VARCHAR2(32767);
+
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+	V_RETURN_TYPE VARCHAR2(32) := 'CLOB';
+  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+	V_RETURN_TYPE VARCHAR2(32):= 'VARCHAR2(32767)';
+  $ELSE
+    V_RETURN_TYPE VARCHAR2(32):= 'VARCHAR2(4000)';
+  $END  
+
+  cursor getTableMetadata
+  is
+  select aat.owner
+        ,aat.table_name
+		,cast(collect('"' || COLUMN_NAME || '"' ORDER BY COLUMN_ID) 
+              as T_VC4000_TABLE) COLUMN_LIST
+    from ALL_ALL_TABLES aat
+	     inner join ALL_TAB_COLUMNS atc
+		         on atc.OWNER = aat.OWNER
+		        and atc.TABLE_NAME = aat.TABLE_NAME
+   where aat.OWNER = P_SCHEMA
+   group by aat.OWNER, aat.TABLE_NAME;
+    
+  V_FIRST_ROW BOOLEAN := TRUE;
+begin
+
+  DBMS_LOB.CREATETEMPORARY(SQL_STATEMENT,TRUE,DBMS_LOB.CALL);
+  V_SQL_FRAGMENT := 'select JSON_OBJECT(''data'' value JSON_OBJECT (' || C_NEWLINE;
+  DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+
+  for t in getTableMetadata loop  
+	V_SQL_FRAGMENT := C_SINGLE_QUOTE || t.TABLE_NAME || C_SINGLE_QUOTE 
+	               || ' value ( select JSON_ARRAYAGG(JSON_ARRAY(';
+    if (NOT V_FIRST_ROW) then
+      V_SQL_FRAGMENT := ',' || V_SQL_FRAGMENT;
+	end if;
+	V_FIRST_ROW := FALSE;
+	DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+	DBMS_LOB.APPEND(SQL_STATEMENT,TABLE_TO_LIST(t.COLUMN_LIST));
+    V_SQL_FRAGMENT := ' NULL ON NULL returning ' || V_RETURN_TYPE || ') returning '
+                   || V_RETURN_TYPE || ') FROM "' 
+                   || t.OWNER || '"."' || t.TABLE_NAME || '")' || C_NEWLINE;
+	DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+  end loop;
+
+  V_SQL_FRAGMENT := '             returning ' || V_RETURN_TYPE || C_NEWLINE
+                 || '           )' || C_NEWLINE
+                 || '         returning ' || V_RETURN_TYPE || C_NEWLINE
+                 || '       )' || C_NEWLINE
+                 || '  from DUAL';
+  DBMS_LOB.WRITEAPPEND(SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+end;
+</code></pre>
+<p>It basically queries the data dictionary tables ALL_TAB_COLUMNS and ALL_ALL_TABLES to generate the list of columns for each table in the schema and then iterates over the result set constructing a JSON_ARRAYAGG sub-query for each table. Note how it uses conditional compilation to determine what return type will be used with the SQL operators. The generated SQL is written into the CLOB variable SQL_STATEMENT.</p>
+
+<p>The initial version of the EXPORT_SCHEMA function is shown below</p>
+
+<pre><code class="language-SQL">function EXPORT_SCHEMA(P_SCHEMA VARCHAR2)
+return CLOB
+as
+  V_JSON_DOCUMENT CLOB;
+  V_CURSOR        SYS_REFCURSOR;
+begin
+  GENERATE_STATEMENT(P_SCHEMA);
+  OPEN V_CURSOR FOR SQL_STATEMENT;
+  FETCH V_CURSOR INTO V_JSON_DOCUMENT;
+  CLOSE V_CURSOR;
+  return V_JSON_DOCUMENT;
+end;
+</code></pre>
+
+<p>This function takes the output of GENERATE_STATEMENT, and executes it using a cursor. Since the generated statement only returns a single row the function  simply opens the cursor, fetches the row  and closes the cursor.</p>
+
+<p>The JSON export file can now be generated by simply calling the EXPORT_SCHEMA function.</p>
+
+<pre><code class="language-SQL">select JSON_EXPORT.EXPORT_SCHEMA('HR') from dual;
+</code></pre>
+
+<pre><code class="language-JSON">{
+   "data" : {
+      "JOBS" : [["AD_PRES","President",20080,40000]
+               ,["AD_VP","Administration Vice President",15000,30000]
+               ,....
+               ,["PR_REP","Public Relations Representative",4500,10500]
+               ],
+      "REGIONS" : [[1,"Europe"],[2,"Americas"],[3,"Asia"],[4,"Middle East and Africa"]],
+      "COUNTRIES" : [[...
+</code></pre>
+
+<p>After invoking the EXPORT_SCHEMA method, the method DUMP_SQL_STATEMENT can be used to retrieve the SQL generated by the GENERTE_STATEMENT method.</p>
+
+<p>The next challenge is what happens with a larger dataset, such as the ‘SH’ schema. Invoking EXPORT_SCHEMA for the ‘SH’ schema results in the following error</p>
+
+<pre><code class="language-SQL">select JSON_EXPORT.EXPORT_SCHEMA('SH') from dual;
+</code></pre>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ORA-40654: Input to JSON generation function has unsupported data type.
+</code></pre></div></div>
+
+<p>Looking at the data types used by the tables in the SH schema, it appears that there are two tables that contain ROWID columns. ROWID is one a number of data types not currently supported by the JSON generation functions, Fortunately in this case these tables are not  schema data tables, but are secondary tables, used by the Oracle Text index and consequently their content should not be included in the export file.</p>
+
+<p>To prevent unwanted tables from being included in the output file, the SQL used by GENERATE_TABLES is modified to exclude the following types of table: INVALID TABLES, DROPPED TABLES, TEMORARY_TABLES, EXTERNAL_TABLES, SECONDARY_TABLES, NESTED_TABLES and IOT_OVERFLOW tables. OBJECT tables are also excluded for the moment, as they will require special handling. After applying the filter conditions the select statement used by GENERATE_TABLES is as follows</p>
+
+<pre><code class="language-SQL"> select aat.owner
+        ,aat.table_name
+		,cast(collect('"' || COLUMN_NAME || '"' ORDER BY COLUMN_ID) as T_VC4000_TABLE) 
+		 COLUMN_LIST
+    from ALL_ALL_TABLES aat
+	     inner join ALL_TAB_COLUMNS atc
+		         on atc.OWNER = aat.OWNER
+		        and atc.TABLE_NAME = aat.TABLE_NAME
+   where aat.STATUS = 'VALID'
+     and aat.DROPPED = 'NO'
+	 and aat.TEMPORARY = 'N'
+     and aat.EXTERNAL = 'NO'
+	 and aat.NESTED = 'NO'
+	 and aat.SECONDARY = 'N'
+	 and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = 'IOT')
+	 and aat.TABLE_TYPE is NULL
+	 and aat.OWNER = P_SCHEMA
+   group by aat.OWNER, aat.TABLE_NAME;
+</code></pre>
+
+<p>After modifying the GENERATE_STATEMENT method, invoking EXPORT_SCHEMA on the SH schema in an unpatched 12.2 results in</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ORA-40459: output value too large (actual: 32801, maximum: 32767)
+</code></pre></div></div>
+
+<p>Since generating a JSON representation of the SH schema results in a document much larger than 32K. One way of avoiding this problem is to limit the number of rows processed for each table in the schema. This can done by making it possible set a row limit and then using row limit value in a WHERE clause that restricts the number of rows passed to the JSON_ARRAYAGG operations. Limiting the number of rows processed by the EXPORT_SCHEMA function somewhat defeats the purpose of an export utility. Clearly an alternative solution is required in databases where CLOB is not a supported return type for the JSON operators.</p>
+
+<p>One way of approaching this is to manually print the output the JSON_ARRAY operations directly into a CLOB. In general, using string concatenation to generate JSON is a really bad idea. In particular there are a lot of nuances around correctly handling special characters in text values, and it is very easy to make mistakes that result in the creation of invalid JSON documents.  However in this case, string concatenation is an acceptable approach, since the all string conversions are handled by the JSON_ARRAY operator and the results can safely be combined to form the desired output.</p>
+
+<p>The 12.2 implementation of GENERATE_STATEMENT method returns a SQL statement for each table, rather than one statement for the entire schema. This allow the results for each table to inserted as a distinct key in the main document.</p>
+
+<pre><code class="language-SQL">declare
+    V_SQL_STATEMENT CLOB;
+begin
+  EXPORT_METADATA_CACHE := T_EXPORT_METADATA_TABLE();
+  for t in getTableMetadata loop  
+    EXPORT_METADATA_CACHE.extend();
+    EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).OWNER := t.OWNER;
+    EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).TABLE_NAME := t.TABLE_NAME;
+    DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENT,TRUE,DBMS_LOB.CALL);
+    V_SQL_FRAGMENT := 'select JSON_ARRAY(';
+    DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+    DBMS_LOB.APPEND(V_SQL_STATEMENT,TABLE_TO_LIST(t.COLUMN_LIST));
+    V_SQL_FRAGMENT := ' NULL on NULL returning '|| V_RETURN_TYPE || ') FROM "' 
+                   || t.OWNER || '"."' || t.TABLE_NAME || '" ';
+    if (ROW_LIMIT &gt; -1) then
+	  V_SQL_FRAGMENT := V_SQL_FRAGMENT || 'WHERE ROWNUM &lt; ' || ROW_LIMIT;
+	end if;
+    DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+    EXPORT_METADATA_CACHE(EXPORT_METADATA_CACHE.count).SQL_STATEMENT := V_SQL_STATEMENT;	
+  end loop;
+end;
+</code></pre>
+<p>The 12.2 implementation of EXPORT_SCHEMA starts by printing the outer  <em>{ “data” :</em>  to the CLOB. Next it loops over the set of SQL statements produced by GENERATE_STATEMENT. For each statement it  appends a key based on the table name whose value is an array. It then executes the SQL for that table and appends the rows returned by the query as the members of the array. Conditional compilation, based on CLOB_SUPPORTED, is used in both implementations to determine which path is executed.</p>
+
+<pre><code class="language-SQL">function EXPORT_SCHEMA(P_SCHEMA VARCHAR2)
+return CLOB
+as
+  V_JSON_DOCUMENT CLOB;
+  V_CURSOR        SYS_REFCURSOR;
+
+  V_JSON_FRAGMENT VARCHAR2(4000);
+
+  V_FIRST_TABLE   BOOLEAN := TRUE;
+  V_FIRST_ITEM    BOOLEAN := TRUE;
+
+  $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+  V_JSON_ARRAY VARCHAR2(32767);
+  $ELSE
+  V_JSON_ARRAY VARCHAR2(4000);
+  $END  
+
+begin
+  DBMS_LOB.CREATETEMPORARY(V_JSON_DOCUMENT,TRUE,DBMS_LOB.CALL);
+  V_JSON_FRAGMENT := '{"data":{';
+  DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
+  GENERATE_STATEMENT(P_SCHEMA);
+  for i in 1 .. EXPORT_METADATA_CACHE.count loop
+    V_JSON_FRAGMENT := '"' || EXPORT_METADATA_CACHE(i).table_name || '":[';
+	if (not V_FIRST_TABLE) then 
+  	  V_JSON_FRAGMENT := ',' || V_JSON_FRAGMENT;
+	end if;
+	V_FIRST_TABLE := false;
+	DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
+    V_FIRST_ITEM := TRUE;
+    OPEN V_CURSOR for EXPORT_METADATA_CACHE(i).SQL_STATEMENT;
+	loop
+	  FETCH V_CURSOR into V_JSON_ARRAY;
+	  EXIT WHEN V_CURSOR%notfound;	  
+	  if (NOT V_FIRST_ITEM) then
+    	DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,',');
+	  end if;
+ 	  V_FIRST_ITEM := FALSE;
+      DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,LENGTH(V_JSON_ARRAY),V_JSON_ARRAY);
+	end loop;
+	CLOSE V_CURSOR;
+    DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,']');
+  end loop;
+  DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,'}');
+  DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,'}');
+  return V_JSON_DOCUMENT;
+end;
+</code></pre>
+<p>The EXPORT_SCHEMA function can now successfully return the full content of the both the HR and SH schemas, even in a 12.2 database where the JSON operators do support CLOB.</p>
+
+<pre><code class="language-SQL">SQL&gt; select JSON_EXPORT.EXPORT_SCHEMA('HR') from dual
+</code></pre>
+
+<pre><code class="language-JSON">{"data":{"JOBS":[["AD_PRES","President",20080,40000],["AD_VP","Administration Vic
+</code></pre>
+
+<pre><code class="language-SQL">SQL&gt; select JSON_EXPORT.EXPORT_SCHEMA('SH') from dual;
+</code></pre>
+
+<pre><code class="language-JSON">{"data":{"COSTS":[],"SALES":[[13,987,"1998-01-10T00:00:00",3,999,1,1232.16],[13,1
+</code></pre>
+
+<pre><code class="language-SQl">SQL&gt; select DBMS_LOB.GETLENGTH(JSON_EXPORT.EXPORT_SCHEMA('SH')) from dual;
+</code></pre>
+
+<pre><code class="language-SQL">58582866
+</code></pre>
+
+<p>As can be seen the size of the document generated when processing the SH schema is almost 60MB.  The IS JSON condition can be used to verify that the generated document is valid JSON.</p>
+
+<pre><code class="language-SQL">SQL&gt; select 1 "VALID JSON" from dual where JSON_EXPORT.EXPORT_SCHEMA('SH') is JSON;
+</code></pre>
+
+<pre><code class="language-SQL">VALID JSON
+----------
+         1
+1 row selected.
+</code></pre>
+<p>Note this statement would return no rows if the generated document was not valid JSON.</p>
+
+<p>A quick and the dirty was to output the generated document to a file is to use a simple SQL*PLUS script which spools the results to a file.</p>
+
+<pre><code class="language-SQL">DEF SCHEMA_NAME = &amp;1
+set lines 1024
+column JSON format A1024
+set feedback off
+set heading off
+set termout off
+set verify off
+set long 1000000000
+set pages 0
+set echo off
+spool JSON/&amp;SCHEMA_NAME..json
+select JSON_EXPORT.EXPORT_SCHEMA('&amp;SCHEMA_NAME') JSON from dual;
+spool off
+set echo on
+set pages 100
+set verify on
+set termout on
+set heading on
+set feedback on
+</code></pre>
+
+<p>Unfortunately SQL*PLUS inserts ‘hard’ end-of-line characters into the JSON after each block of 1024 characters, these need to be stripped out before the file can be processed as JSON.</p>
+
+<p>The <a href="/json/export/import/oracle/2018/06/16/Unsupported-Scalar-Types.html">next</a> post will investigate what happens when we attempt to export the OE schema, which contains a much richer set of Oracle data types, than the HR and SH schemas.</p>
+
+  </div><a class="u-url" href="/json/export/import/oracle/2018/06/15/JSON_EXPORT.html" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">JSON Exchange</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">JSON Exchange</li><li><a class="u-email" href="mailto:mdd@appdev4db.com">mdd@appdev4db.com</a></li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"><li><a href="https://github.com/markddrake"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">markddrake</span></a></li><li><a href="https://www.twitter.com/markddrake"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg> <span class="username">markddrake</span></a></li></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>A simple utility for exporting and importing data using JSON</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
