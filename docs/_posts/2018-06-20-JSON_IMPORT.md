@@ -331,7 +331,7 @@ The log showed that operations on the EMPLOYEES and DEPARTMENTS tables failed du
 
 Additional code was added to the IMPORT_JSON function to disable referential integrity constraints prior to commencing an import operation and then re-enable them once the operation is complete. At this point importing an export file generated from the HR schema into the HR2 schema completed without any errors being reported.
 
-The next post will examine the issues that arise when attempting to use JSON_EXPORT and JSON_IMPORT to clone the SH, OE, PM and IX schemas and to verify that the clone operations have competed successfully.
+The [next]({% link _posts/2018-06-21-DDL Operations.md%}) post will examine the issues that arise when attempting to use JSON_EXPORT and JSON_IMPORT to clone the SH, OE, PM and IX schemas and to verify that the clone operations have competed successfully.
 
 
 
