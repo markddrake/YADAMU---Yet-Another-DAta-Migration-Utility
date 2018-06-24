@@ -7,7 +7,7 @@ categories: JSON Export Import Oracle
 
 ## The Devil's in the Details: Unsupported scalar data types
 
-In the [previous]({% link _posts/2018-06-15-JSON_EXPORT.md%}) post, the first attempt to run EXPORT_SCHEMA on the SH schema failed due to fact one of the tables contained a BLOB column. Fortunately, in that case of the SH schema, the BLOB column was in a table that needed to be excluded from the export operation, and all remaining tables in the SH schema use data types that are directly supported by the JSON_ARRAY operator However that incident was simply a precursor for the problems that are encountered when attempting to process the OE schema. 
+In the [previous]({{ site.baseurl }}{% link _posts/2018-06-15-JSON_EXPORT.md%}) post, the first attempt to run EXPORT_SCHEMA on the SH schema failed due to fact one of the tables contained a BLOB column. Fortunately, in that case of the SH schema, the BLOB column was in a table that needed to be excluded from the export operation, and all remaining tables in the SH schema use data types that are directly supported by the JSON_ARRAY operator However that incident was simply a precursor for the problems that are encountered when attempting to process the OE schema. 
 
 ```SQL
 SQL> select JSON_EXPORT.EXPORT_SCHEMA('OE') from dual;
@@ -142,4 +142,4 @@ After implementing these changes  an EXPORT_SCHEMA operation on the OE schema su
 | CATEOGORIES         | ❌       | Skipped OBJECT Table           |
 | PURCHASEORDER       | ❌       | Skipped OBJECT (XMLTYPE) Table |
 
-At this point EXPORT_SCHEMA is capable of handling most of the common scalar data types supported by the Oracle Database. The [next]({% link _posts/2018-06-17-BFILE and BLOB.md%}) post will explain how in-line PL/SQL procedures can be used to enable support for BIFLE and BLOB data types.
+At this point EXPORT_SCHEMA is capable of handling most of the common scalar data types supported by the Oracle Database. The [next]({{ site.baseurl }}{% link _posts/2018-06-17-BFILE and BLOB.md%}) post will explain how in-line PL/SQL procedures can be used to enable support for BIFLE and BLOB data types.

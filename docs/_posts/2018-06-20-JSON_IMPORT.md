@@ -7,7 +7,7 @@ categories: JSON Export Import Oracle
 
 ## The Yin to JSON_EXPORT's Yang
 
-The [previous]({% link _posts/2018-06-19-Object and Wide Tables.md%}) posts describe a package, JSON_EXPORT, that can export the contents of Oracle database schema's as a JSON document. The next post will examine a package, JSON_IMPORT, that is capable of taking output generated using JSON_EXPORT and converting it back into relational format.
+The [previous]({{ site.baseurl }}{% link _posts/2018-06-19-Object and Wide Tables.md%}) posts describe a package, JSON_EXPORT, that can export the contents of Oracle database schema's as a JSON document. The next post will examine a package, JSON_IMPORT, that is capable of taking output generated using JSON_EXPORT and converting it back into relational format.
 
 The idea behind JSON_IMPORT is quite simple, take the output of JSON_EXPORT and covert it back into relational format. The JSON_TABLE operator makes this a relatively simple process. Assuming we have a simple JSON document like this
 
@@ -331,7 +331,7 @@ The log showed that operations on the EMPLOYEES and DEPARTMENTS tables failed du
 
 Additional code was added to the IMPORT_JSON function to disable referential integrity constraints prior to commencing an import operation and then re-enable them once the operation is complete. At this point importing an export file generated from the HR schema into the HR2 schema completed without any errors being reported.
 
-The [next]({% link _posts/2018-06-21-DDL Operations.md%}) post will examine the issues that arise when attempting to use JSON_EXPORT and JSON_IMPORT to clone the SH, OE, PM and IX schemas and to verify that the clone operations have competed successfully.
+The [next]({{ site.baseurl }}{% link _posts/2018-06-21-DDL Operations.md%}) post will examine the issues that arise when attempting to use JSON_EXPORT and JSON_IMPORT to clone the SH, OE, PM and IX schemas and to verify that the clone operations have competed successfully.
 
 
 

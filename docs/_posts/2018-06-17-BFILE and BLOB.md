@@ -7,7 +7,7 @@ categories: JSON Export Import Oracle
 
 ## Supporting BFILE and BLOB using in-line PL/SQL
 
-The [previous]({% link _posts/2018-06-16-Unsupported Scalar Types.md%}) post showed how to use SQL conversions to extend the set of data types that can be used with JSON_ARRAY. This post will build on that concept showing how in-line PL/SQL can be used in places where pure SQL is not sufficient. 
+The [previous]({{ site.baseurl }}{% link _posts/2018-06-16-Unsupported Scalar Types.md%}) post showed how to use SQL conversions to extend the set of data types that can be used with JSON_ARRAY. This post will build on that concept showing how in-line PL/SQL can be used in places where pure SQL is not sufficient. 
 
 JSON_ARRAY does not support the BFILE data type in any current release of the Oracle Database. A BFILE is basically a pointer to a file stored outside the database. The pointer consists of two components, a SQL Directory name and a path to the file, relative to the folder associated with the directory. There are 2 approaches to supporting the BFILE datatype.  The first is to inline the content of the file directly into the export, the second is to serialize the BFILE as a directory name and a relative path. In the current implementation of EXPORT_SCHEMA the second option is used.
 
@@ -80,4 +80,4 @@ begin
 end;
 
 ```
-This method is invoked in GENERATE schema prior to printing the 'select' into the LOB that contains the generated SQL statement. The [next]({% link _posts/2018-06-18-Objects and ANYDATA.md%}) post will discuss how a similar technique can be used to support Oracle OBJECT types and the ANYDATA type.
+This method is invoked in GENERATE schema prior to printing the 'select' into the LOB that contains the generated SQL statement. The [next]({{ site.baseurl }}{% link _posts/2018-06-18-Objects and ANYDATA.md%}) post will discuss how a similar technique can be used to support Oracle OBJECT types and the ANYDATA type.

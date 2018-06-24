@@ -7,7 +7,7 @@ categories: JSON Export Import Oracle
 
 ## Object Tables and Wide Tables
 
-The [previous]({% link _posts/2018-06-18-Objects and ANYDATA.md%}) post explained how to export columns based on Oracle object types by including a serialized representation of the object in the JSON. This post will explain how  support for object serialization can be applied to object tables. 
+The [previous]({{ site.baseurl }}{% link _posts/2018-06-18-Objects and ANYDATA.md%}) post explained how to export columns based on Oracle object types by including a serialized representation of the object in the JSON. This post will explain how  support for object serialization can be applied to object tables. 
 
 In Oracle, object tables are based on an Object type or on the XMLType data type. Object tables have two columns, a unique identifier, SYS_NC_OID$ and a content column, SYS_NC_ROWINFO$.  XMLType tables that manage content associated with the XMLDB repository have 2 additional columns, ACLOID and OWNERID.
 
@@ -159,7 +159,7 @@ end;
 
 With these modifications the EXPORT_SCHEMA function can successfully process the PM and IX schemas.
 
-The [next]({% link _posts/2018-06-20-JSON_IMPORT.md%}) post will examine how the JSON_TABLE operator can be used to build an IMPORT_SCHEMA function that can convert the content of these export files back into relational and object-relational data.
+The [next]({{ site.baseurl }}{% link _posts/2018-06-20-JSON_IMPORT.md%}) post will examine how the JSON_TABLE operator can be used to build an IMPORT_SCHEMA function that can convert the content of these export files back into relational and object-relational data.
 
 
 

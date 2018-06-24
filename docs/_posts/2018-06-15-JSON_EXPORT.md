@@ -7,7 +7,7 @@ categories: JSON Export Import Oracle
 
 ## Automatically generating JSON from an Oracle schema
 
-The [previous]({% link _posts/2018-06-14-Introduction.md%}) post in this blog showed how to generate a JSON representation of the contents of an Oracle database schema. This post outlines the basics of a PL/SQL package that can automate the process of exporting an entire database schema, or a subset of a database schema as a JSON document. 
+The [previous]({{ site.baseurl }}{% link _posts/2018-06-14-Introduction.md%}) post in this blog showed how to generate a JSON representation of the contents of an Oracle database schema. This post outlines the basics of a PL/SQL package that can automate the process of exporting an entire database schema, or a subset of a database schema as a JSON document. 
 
 The previous post mentioned that in (an unpatched) 12cR2 database, JSON operators cannot  generate documents larger that  32K, and that in Oracle 18 this limit no longer applies. In an attempt to avoid the 32K limit on JSON generation in  Oracle 12.2 , the PL/SQL package will use PL/SQL conditional compilation to bypass the use of JSON_QUERY and JSON_ARRAYAGG in databases where CLOB is not a supported return type.
 
@@ -331,4 +331,4 @@ set feedback on
 
 Unfortunately SQL*PLUS inserts 'hard' end-of-line characters into the JSON after each block of 1024 characters, these need to be stripped out before the file can be processed as JSON.
 
-The [next]({% link _posts/2018-06-16-Unsupported Scalar Types.md%}) post will investigate what happens when we attempt to export the OE schema, which contains a much richer set of Oracle data types, than the HR and SH schemas.
+The [next]({{ site.baseurl }}{% link _posts/2018-06-16-Unsupported Scalar Types.md%}) post will investigate what happens when we attempt to export the OE schema, which contains a much richer set of Oracle data types, than the HR and SH schemas.

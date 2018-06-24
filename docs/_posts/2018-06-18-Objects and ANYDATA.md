@@ -7,7 +7,7 @@ categories: JSON Export Import Oracle
 
 ## Objects, Collections and ANYDATA.
 
-The [previous]({% link _posts/2018-06-17-BFILE and BLOB.md%}) post showed how to use simple In-line PL/SQL procedures to support the BFILE and BLOB data types. This post will expand on that idea to add support for Object Types, Collection Types and the ANYDATA data type.
+The [previous]({{ site.baseurl }}{% link _posts/2018-06-17-BFILE and BLOB.md%}) post showed how to use simple In-line PL/SQL procedures to support the BFILE and BLOB data types. This post will expand on that idea to add support for Object Types, Collection Types and the ANYDATA data type.
 
 At first glance supporting Objects and Collections appeared to be simple, but as was mentioned earlier the Devil's in the details. The first approach considered was to leverage Oracle's ability to generate XML from an Object and to then covert that XML back into objects. Unfortunately as the following simple example shows that approach appears to be a non-starter  since it appears that NULL objects are transformed into empty objects
 
@@ -115,4 +115,4 @@ $END
 end;
 ```
 
-Once the necessary modifications have been made, EXPORT_SCHEMA successfully includes the content of the  WAREHOUSE and CUSTOMERS tables in the export file. However the Object tables CATEOGORIES_TAB and PURCHASEORDER are still excluded. The [next]({% link _posts/2018-06-19-Object and Wide Tables.md%}) post will examine what is required to add support for object tables to  the EXPORT_SCHEMA function.
+Once the necessary modifications have been made, EXPORT_SCHEMA successfully includes the content of the  WAREHOUSE and CUSTOMERS tables in the export file. However the Object tables CATEOGORIES_TAB and PURCHASEORDER are still excluded. The [next]({{ site.baseurl }}{% link _posts/2018-06-19-Object and Wide Tables.md%}) post will examine what is required to add support for object tables to  the EXPORT_SCHEMA function.
