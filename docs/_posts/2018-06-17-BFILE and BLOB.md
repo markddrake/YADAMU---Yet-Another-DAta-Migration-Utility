@@ -1,11 +1,11 @@
 ---
 layout: post
-title:  "Unsupported Data Types (Part 2)"
+title:  "Part IV: Unsupported data types (2)"
 date:   2018-06-17 18:00:00-0700
 categories: JSON Export Import Oracle
 ---
 
-## Using In-line PL/SQL to support BFILE and BLOB
+## Supporting BFILE and BLOB using in-line PL/SQL
 
 The [previous]({% link _posts/2018-06-16-Unsupported Scalar Types.md%}) post showed how to use SQL conversions to extend the set of data types that can be used with JSON_ARRAY. This post will build on that concept showing how in-line PL/SQL can be used in places where pure SQL is not sufficient. 
 

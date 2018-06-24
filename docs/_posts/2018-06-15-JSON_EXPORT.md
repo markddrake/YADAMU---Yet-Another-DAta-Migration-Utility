@@ -1,11 +1,11 @@
 ---
 layout: post
-title:  "JSON_EXPORT"
+title:  "Part II: Package JSON_EXPORT"
 date:   2018-06-15 18:00:00-0700
 categories: JSON Export Import Oracle
 ---
 
-## A PL/SQL package for exporting an Oracle Schema as JSON.
+## Automatically generating JSON from an Oracle schema
 
 The [previous]({% link _posts/2018-06-14-Introduction.md%}) post in this blog showed how to generate a JSON representation of the contents of an Oracle database schema. This post outlines the basics of a PL/SQL package that can automate the process of exporting an entire database schema, or a subset of a database schema as a JSON document. 
 

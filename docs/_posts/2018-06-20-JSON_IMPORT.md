@@ -1,11 +1,11 @@
 ---
 layout: post
-title:  "Introduction to JSON_IMPORT"
+title:  "Part VII: Package JSON_IMPORT"
 date:   2018-06-20 18:00:00-0700
 categories: JSON Export Import Oracle
 ---
 
-## JSON_IMPORT: The Yin to JSON_EXPORT's Yang
+## The Yin to JSON_EXPORT's Yang
 
 The [previous]({% link _posts/2018-06-19-Object and Wide Tables.md%}) posts describe a package, JSON_EXPORT, that can export the contents of Oracle database schema's as a JSON document. The next post will examine a package, JSON_IMPORT, that is capable of taking output generated using JSON_EXPORT and converting it back into relational format.
 

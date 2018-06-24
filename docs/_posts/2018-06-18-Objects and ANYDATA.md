@@ -1,13 +1,11 @@
 ---
 layout: post
-title:  "Unsupported Data Types (Part 3)"
+title:  "Part V: Unsupported data types (3)"
 date:   2018-06-18 18:00:00-0700
 categories: JSON Export Import Oracle
 ---
 
-
-
-## Adding Support for Objects, Collections and ANYDATA.
+## Objects, Collections and ANYDATA.
 
 The [previous]({% link _posts/2018-06-17-BFILE and BLOB.md%}) post showed how to use simple In-line PL/SQL procedures to support the BFILE and BLOB data types. This post will expand on that idea to add support for Object Types, Collection Types and the ANYDATA data type.
 

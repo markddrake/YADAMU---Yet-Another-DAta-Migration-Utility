@@ -1,11 +1,11 @@
 ---
 layout: post
-title:  "Object Tables and Wide Tables"
+title:  "Part VI: Further complications"
 date:   2018-06-19 18:00:00-0700
 categories: JSON Export Import Oracle
 ---
 
-## Supporting Object Tables and Wide Tables
+## Object Tables and Wide Tables
 
 The [previous]({% link _posts/2018-06-18-Objects and ANYDATA.md%}) post explained how to export columns based on Oracle object types by including a serialized representation of the object in the JSON. This post will explain how  support for object serialization can be applied to object tables. 
 

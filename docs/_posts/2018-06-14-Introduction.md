@@ -1,10 +1,10 @@
 ---
 layout: post
-title:  "Introduction"
+title:  "Part I: Introduction"
 date:   2018-06-14 18:00:00-0700
 categories: JSON Export Import Oracle
 ---
-## An introduction to generating JSON with Oracle.
+## Generating JSON with Oracle
 
 The JSON-Exchange project uses the JSON generation features of Oracle 12.2 and 18 to develop a simple JSON based replacement for the traditional Oracle EXP and IMP utilities. The basic concept is extremely simple, but as is often the case the devil is in the details. 
 
