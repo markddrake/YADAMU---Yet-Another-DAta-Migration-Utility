@@ -39,7 +39,7 @@ begin
   end;
 
   begin
-    execute immediate 'select JSON_ARRAYAGG(JSON_ARRAY(DUMMY) returning VARCHAR2(32767)) from DUAL';
+    execute immediate 'select * from json_table(''[]'',''$'' columns X VARCHAR2(32767) PATH ''$'')';
     V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                     || '  EXTENDED_STRING_SUPPORTED CONSTANT BOOLEAN := TRUE;';
   exception

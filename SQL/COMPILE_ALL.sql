@@ -68,3 +68,4 @@ end;
 /
 spool off
 --
+exit
