@@ -2,6 +2,13 @@
 create or replace package OBJECT_SERIALIZATION
 AUTHID CURRENT_USER
 as
+  TYPE T_TABLE_INFO_RECORD is RECORD (
+    OWNER      VARCHAR2(128)
+   ,TABLE_NAME VARCHAR2(128)
+   );  
+
+  TYPE T_TABLE_INFO_TABLE is TABLE of T_TABLE_INFO_RECORD;
+  
   TYPE TYPE_LIST_T is RECORD (
     OWNER               VARCHAR2(128)
   , TYPE_NAME           VARCHAR2(128)
@@ -11,13 +18,13 @@ as
 
   TYPE TYPE_LIST_TAB is TABLE of TYPE_LIST_T;
   
-  function SERIALIZE_TYPE(P_SOURCE_SCHEMA VARCHAR2, P_TYPE_NAME VARCHAR2) return CLOB;
-  function SERIALIZE_TABLE_TYPES(P_SOURCE_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
-  function SERIALIZE_TABLE_TYPES(P_SOURCE_SCHEMA VARCHAR2,P_TABLE_LIST T_VC4000_TABLE) return CLOB;
+  function SERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2) return CLOB;
+  function SERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
+  function SERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE) return CLOB;
 
-  function DESERIALIZE_TYPE(P_TARGET_SCHEMA VARCHAR2, P_TYPE_NAME VARCHAR2) return CLOB;
-  function DESERIALIZE_TABLE_TYPES(P_TARGET_SCHEMA VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
-  function DESERIALIZE_TABLE_TYPES(P_TARGET_SCHEMA VARCHAR2,P_TABLE_LIST T_VC4000_TABLE) return CLOB;
+  function DESERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2) return CLOB;
+  function DESERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
+  function DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE) return CLOB;
 
   function CODE_BFILE2CHAR return VARCHAR2 deterministic;
   function CODE_BLOB2BASE64 return VARCHAR2 deterministic;
@@ -459,7 +466,7 @@ end;
 --
   C_SERIALIZE_OBJECT_PART1 VARCHAR2(32767) := 
 --
-'procedure SERIALIZE_OBJECT(P_ANYDATA ANYDATA, P_SERIALIZATION IN OUT NOCOPY CLOB)
+'procedure SERIALIZE_OBJECT(P_TABLE_OWNER VARCHAR2,P_ANYDATA ANYDATA, P_SERIALIZATION IN OUT NOCOPY CLOB)
 as
   V_SINGLE_QUOTE        CONSTANT CHAR(1) := CHR(39);
   TYPE TYPE_INFO_T is RECORD (
@@ -510,14 +517,14 @@ begin
 --
   C_SERIALIZE_OBJECT CONSTANT VARCHAR(1024) :=
 --
-'function SERIALIZE_OBJECT(P_ANYDATA ANYDATA)
+'function SERIALIZE_OBJECT(P_TABLE_OWNER VARCHAR2,P_ANYDATA ANYDATA)
 return CLOB
 as
   C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := ' || (C_MAX_SUPPORTED_SIZE - 4) || ';
   V_SERIALIZATION    CLOB;
 begin
   DBMS_LOB.CREATETEMPORARY(V_SERIALIZATION,TRUE,DBMS_LOB.CALL);
-  SERIALIZE_OBJECT(P_ANYDATA,V_SERIALIZATION);
+  SERIALIZE_OBJECT(P_TABLE_OWNER,P_ANYDATA,V_SERIALIZATION);
   if (DBMS_LOB.GETLENGTH(V_SERIALIZATION) > C_MAX_SUPPORTED_SIZE) then
     return TO_CLOB(''SERIALIZE_OBJECT: Serialized size ('' || DBMS_LOB.GETLENGTH(V_SERIALIZATION) || '') exceeds maximum supported size ('' || C_MAX_SUPPORTED_SIZE || '').'');
   else
@@ -812,7 +819,7 @@ begin
                   ||'          V_ANYDATA := ANYDATA.convertObject(' || P_ATTR_NAME || ');' || C_NEWLINE;
       end case;
       V_PLSQL := V_PLSQL
-              || '          serialize_Object(V_ANYDATA,P_SERIALIZATION);' || C_NEWLINE;
+              || '          serialize_Object(P_TABLE_OWNER,V_ANYDATA,P_SERIALIZATION);' || C_NEWLINE;
     else
       V_PLSQL := V_PLSQL
               ||'           V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
@@ -823,7 +830,7 @@ begin
 
 end;
 
-function serializeType(P_SOURCE_SCHEMA VARCHAR2, P_TYPE_RECORD TYPE_LIST_T,P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function serializeType(P_TYPE_RECORD TYPE_LIST_T,P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
 return CLOB
 /*
 **
@@ -874,15 +881,12 @@ begin
           || '        if (V_OBJECT is NULL) then' || C_NEWLINE
           || '          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,4,''NULL'');' || C_NEWLINE
           || '          return;' || C_NEWLINE
-          || '        end if; ' || C_NEWLINE;
-		  
-  if (P_TYPE_RECORD.OWNER = P_SOURCE_SCHEMA) then
-    V_PLSQL := V_PLSQL
-            || '          V_OBJECT_CONSTRUCTOR := ''"'|| P_TYPE_RECORD.TYPE_NAME || '"('';'|| C_NEWLINE;
-  else 
-    V_PLSQL := V_PLSQL
-            || '          V_OBJECT_CONSTRUCTOR := ''"' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '"('';' || C_NEWLINE;
-   end if;
+          || '        end if; ' || C_NEWLINE
+		  || '        if (P_TABLE_OWNER = ''' || P_TYPE_RECORD.OWNER || ''') then ' || C_NEWLINE
+		  || '   	    V_OBJECT_CONSTRUCTOR := ''"'|| P_TYPE_RECORD.TYPE_NAME || '"('';' || C_NEWLINE
+		  || '        else' || C_NEWLINE
+		  || '   	    V_OBJECT_CONSTRUCTOR := ''"' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '"('';' || C_NEWLINE
+		  || '        end if;' ||C_NEWLINE;
 		  
   V_PLSQL := V_PLSQL
 
@@ -933,7 +937,7 @@ begin
 
 end;
 --
-function serializeTypes(P_SOURCE_SCHEMA VARCHAR2,P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function serializeTypes(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
 return CLOB
 as
 --
@@ -960,7 +964,7 @@ begin
 
   loop
     $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.serializeTypes() : Processing[' || V_IDX || '].'); $end
-    V_CASE_BLOCK := serializeType(P_SOURCE_SCHEMA, P_TYPE_LIST(V_IDX),P_TYPE_LIST);
+    V_CASE_BLOCK := serializeType(P_TYPE_LIST(V_IDX),P_TYPE_LIST);
     DBMS_LOB.APPEND(V_PLSQL_BLOCK,V_CASE_BLOCK);
     DBMS_LOB.FREETEMPORARY(V_CASE_BLOCK);
     exit when (V_IDX = P_TYPE_LIST.count);
@@ -978,26 +982,26 @@ begin
 
 end;
 --
-function SERIALIZE_TYPE(P_SOURCE_SCHEMA VARCHAR2, P_TYPE_NAME VARCHAR2)
+function SERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB;
 begin
-   select OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+   select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
      bulk collect into V_TYPE_LIST
      from ALL_TYPES
-          start with OWNER = P_SOURCE_SCHEMA and TYPE_NAME = P_TYPE_NAME
+          start with OWNER = P_TYPE_OWNER and TYPE_NAME = P_TYPE_NAME
           connect by prior TYPE_NAME = SUPERTYPE_NAME
-                       and OWNER = SUPERTYPE_OWNER;
-  return serializeTypes(P_SOURCE_SCHEMA,V_TYPE_LIST);
+                 and prior OWNER = SUPERTYPE_OWNER;
+  return serializeTypes(V_TYPE_LIST);
 end;
 --
-function SERIALIZE_TABLE_TYPES(P_SOURCE_SCHEMA VARCHAR2,P_TABLE_NAME VARCHAR2)
+function SERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB;
 begin
-  select OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
     bulk collect into V_TYPE_LIST
   from ALL_TYPES at,
        (
@@ -1006,23 +1010,23 @@ begin
           where atc.DATA_TYPE_OWNER is not NULL
             and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
 	        and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-            and atc.OWNER = P_SOURCE_SCHEMA
+            and atc.OWNER = P_TABLE_OWNER
             and atc.TABLE_NAME = P_TABLE_NAME
        ) tlt
        start with at.TYPE_NAME = tlt.DATA_TYPE
               and at.OWNER = tlt.DATA_TYPE_OWNER
                   connect by prior at.TYPE_NAME = SUPERTYPE_NAME
-                               and at.OWNER = SUPERTYPE_OWNER;
+                         and prior at.OWNER = SUPERTYPE_OWNER;
 
-  return serializeTypes(P_SOURCE_SCHEMA,V_TYPE_LIST);
+  return serializeTypes(V_TYPE_LIST);
 end;
 --
-function SERIALIZE_TABLE_TYPES(P_SOURCE_SCHEMA VARCHAR2,P_TABLE_LIST T_VC4000_TABLE)
+function SERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB;
 begin
-  select OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
     bulk collect into V_TYPE_LIST
   from ALL_TYPES at,
        (
@@ -1031,18 +1035,18 @@ begin
           where atc.DATA_TYPE_OWNER is not NULL
             and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
 	        and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-            and atc.OWNER = P_SOURCE_SCHEMA
-            and atc.TABLE_NAME = tl.COLUMN_VALUE
+            and atc.OWNER = tl.OWNER
+            and atc.TABLE_NAME = tl.TABLE_NAME
        ) tlt
        start with at.TYPE_NAME = tlt.DATA_TYPE
               and at.OWNER = tlt.DATA_TYPE_OWNER
                   connect by prior at.TYPE_NAME = SUPERTYPE_NAME
-                               and at.OWNER = SUPERTYPE_OWNER;
+                         and prior at.OWNER = SUPERTYPE_OWNER;
 
-  return serializeTypes(P_SOURCE_SCHEMA,V_TYPE_LIST);
+  return serializeTypes(V_TYPE_LIST);
 end;
 --
-function deserializeTypes(P_TARGET_SCHEMA VARCHAR2, P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function deserializeTypes(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
 return CLOB
 as
 --
@@ -1064,13 +1068,7 @@ begin
   
 
   for V_IDX in 1 .. P_TYPE_LIST.count loop
-    if (P_TYPE_LIST(V_IDX).OWNER = P_TARGET_SCHEMA) then
-      V_TYPE_REFERENCE := '"' || P_TYPE_LIST(V_IDX).TYPE_NAME || '"';
-    else 
-      V_TYPE_REFERENCE := '"' || P_TYPE_LIST(V_IDX).OWNER|| '"."' || P_TYPE_LIST(V_IDX).TYPE_NAME || '"';
-    end if;
-
-    $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.deserializeTypes() : Processing[' || V_IDX || '].'); $end
+    V_TYPE_REFERENCE := '"' || P_TYPE_LIST(V_IDX).OWNER|| '"."' || P_TYPE_LIST(V_IDX).TYPE_NAME || '"';
 
 	V_SQL_FRAGMENT := 'function "#' || P_TYPE_LIST(V_IDX).TYPE_NAME || '"(P_SERIALIZATION CLOB)' || C_NEWLINE
 	               || 'return ' ||  V_TYPE_REFERENCE || C_NEWLINE
@@ -1092,18 +1090,18 @@ begin
 
 end;
 --
-function DESERIALIZE_TYPE(P_TARGET_SCHEMA VARCHAR2, P_TYPE_NAME VARCHAR2)
+function DESERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB := TYPE_LIST_TAB();
 begin
   V_TYPE_LIST.extend();
-  V_TYPE_LIST(1).OWNER := P_TARGET_SCHEMA;
+  V_TYPE_LIST(1).OWNER := P_TYPE_OWNER;
   V_TYPE_LIST(1).TYPE_NAME := P_TYPE_NAME;
-  return deserializeTypes(P_TARGET_SCHEMA,V_TYPE_LIST);
+  return deserializeTypes(V_TYPE_LIST);
 end;
 --
-function DESERIALIZE_TABLE_TYPES(P_TARGET_SCHEMA VARCHAR2,P_TABLE_NAME VARCHAR2)
+function DESERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2,P_TABLE_NAME VARCHAR2)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB;
@@ -1114,12 +1112,12 @@ begin
    where atc.DATA_TYPE_OWNER is not NULL
      and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
      and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-     and atc.OWNER = P_TARGET_SCHEMA
+     and atc.OWNER = P_TABLE_OWNER
      and atc.TABLE_NAME = P_TABLE_NAME;
-  return deserializeTypes(P_TARGET_SCHEMA,V_TYPE_LIST);
+  return deserializeTypes(V_TYPE_LIST);
 end;
 --
-function DESERIALIZE_TABLE_TYPES(P_TARGET_SCHEMA VARCHAR2,P_TABLE_LIST T_VC4000_TABLE)
+function DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB;
@@ -1130,9 +1128,9 @@ begin
    where atc.DATA_TYPE_OWNER is not NULL
      and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
     and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-     and atc.OWNER = P_TARGET_SCHEMA
-     and atc.TABLE_NAME = tl.COLUMN_VALUE;
-  return deserializeTypes(P_TARGET_SCHEMA,V_TYPE_LIST);
+     and atc.OWNER = tl.OWNER
+     and atc.TABLE_NAME = tl.TABLE_NAME;
+  return deserializeTypes(V_TYPE_LIST);
 end;
 --
 end;

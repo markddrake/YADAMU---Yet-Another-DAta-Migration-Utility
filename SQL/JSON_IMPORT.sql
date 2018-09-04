@@ -32,7 +32,9 @@ as
   
   function GENERATE_DESERIALIZATION_FUNTIONS(P_OWNER VARCHAR2,P_TABLE_NAME VARCHAR2,P_DESERIALIZATION_FUNCTIONS CLOB) return CLOB;
   procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY CLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'));
+  function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY CLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
   function IMPORT_DML_LOG return T_SQL_OPERATIONS_TAB pipelined;
+  
 end;
 /
 show errors
@@ -45,6 +47,14 @@ as
   
   G_INCLUDE_DATA    BOOLEAN := TRUE;
   G_INCLUDE_DDL     BOOLEAN := FALSE;
+--
+function GET_MILLISECONDS(P_START_TIME TIMESTAMP, P_END_TIME TIMESTAMP) 
+return NUMBER
+as
+  V_INTERVAL INTERVAL DAY TO SECOND := P_END_TIME - P_START_TIME;
+begin
+  return (((((((extract(DAY FROM V_INTERVAL) * 24)  + extract(HOUR FROM  V_INTERVAL)) * 60 ) + extract(MINUTE FROM V_INTERVAL)) * 60 ) + extract(SECOND FROM  V_INTERVAL)) * 1000);
+end;
 --
 procedure DATA_ONLY_MODE(P_DATA_ONLY_MODE BOOLEAN)
 as
@@ -262,12 +272,13 @@ begin
    V_START_TIME := SYSTIMESTAMP;
    execute immediate P_SQL_OPERATION.SQL_STATEMENT using P_JSON_DUMP_FILE, out V_ROW_COUNT;
    V_END_TIME := SYSTIMESTAMP;		
-   P_SQL_OPERATION.RESULT := 'Operation completed succecssfully at ' || SYS_EXTRACT_UTC(SYSTIMESTAMP) || '. Processed ' || V_ROW_COUNT || ' rows. Elapsed time: ' || (V_END_TIME - V_START_TIME) || '.';
+   P_SQL_OPERATION.RESULT := JSON_OBJECT( 'startTine' value SYS_EXTRACT_UTC(V_START_TIME), 'endTime' value SYS_EXTRACT_UTC(V_END_TIME), 'elaspsedTimeMs' value GET_MILLISECONDS(V_START_TIME,V_END_TIME), 'recordCount'  value V_ROW_COUNT);
    P_SQL_OPERATION.STATUS := C_SUCCESS;
 
 exception
+
   when OTHERS then
-	P_SQL_OPERATION.RESULT := DBMS_UTILITY.format_error_stack;	   
+	P_SQL_OPERATION.RESULT := JSON_OBJECT('stack' value DBMS_UTILITY.format_error_stack);	   
     P_SQL_OPERATION.STATUS := C_FATAL_ERROR;
 end;
 --
@@ -316,14 +327,15 @@ begin
       begin
   	  if instr(SQL_OPERATIONS_TABLE(i).SQL_STATEMENT,'ALTER') = 1 then
   	    V_START_TIME := SYSTIMESTAMP;
-          execute immediate SQL_OPERATIONS_TABLE(i).SQL_STATEMENT; 
-    	    V_END_TIME := SYSTIMESTAMP;		
-  		SQL_OPERATIONS_TABLE(i).RESULT := 'Operation completed succecssfully at ' || SYS_EXTRACT_UTC(SYSTIMESTAMP) || '. Elapsed time: ' || (V_END_TIME - V_START_TIME) || '.';
+        execute immediate SQL_OPERATIONS_TABLE(i).SQL_STATEMENT; 
+    	V_END_TIME := SYSTIMESTAMP;		
+  		SQL_OPERATIONS_TABLE(i).RESULT := JSON_OBJECT( 'startTine' value SYS_EXTRACT_UTC(V_START_TIME), 'endTime' value SYS_EXTRACT_UTC(V_END_TIME), 'elaspsedTimeMs' value GET_MILLISECONDS(V_START_TIME,V_END_TIME));
   		SQL_OPERATIONS_TABLE(i).STATUS := C_SUCCESS;
         else
   		V_START_TIME := SYSTIMESTAMP;
-          execute immediate SQL_OPERATIONS_TABLE(i).SQL_STATEMENT using P_JSON_DUMP_FILE;  
-  		SQL_OPERATIONS_TABLE(i).RESULT := 'Operation completed succecssfully at ' || SYS_EXTRACT_UTC(SYSTIMESTAMP) || '. Processed ' || TO_CHAR(SQL%ROWCOUNT)|| ' rows. Elapsed time: ' || (V_END_TIME - V_START_TIME) || '.';
+        execute immediate SQL_OPERATIONS_TABLE(i).SQL_STATEMENT using P_JSON_DUMP_FILE;  
+  	  	V_END_TIME := SYSTIMESTAMP;		
+     	SQL_OPERATIONS_TABLE(i).RESULT := JSON_OBJECT( 'startTine' value SYS_EXTRACT_UTC(V_START_TIME), 'endTime' value SYS_EXTRACT_UTC(V_END_TIME), 'elaspsedTimeMs' value GET_MILLISECONDS(V_START_TIME,V_END_TIME), 'recordCount'  value TO_CHAR(SQL%ROWCOUNT));
   		commit;
   		SQL_OPERATIONS_TABLE(i).STATUS := C_SUCCESS;	
         end if;
@@ -331,7 +343,7 @@ begin
         when MUTATING_TABLE then
           MANAGE_MUTATING_TABLE(SQL_OPERATIONS_TABLE(i),P_JSON_DUMP_FILE);		
         when others then
-  	    SQL_OPERATIONS_TABLE(i).RESULT := DBMS_UTILITY.format_error_stack;
+  	    SQL_OPERATIONS_TABLE(i).RESULT := JSON_OBJECT('stack' value DBMS_UTILITY.format_error_stack);	
   		SQL_OPERATIONS_TABLE(i).STATUS := C_FATAL_ERROR;
   	end;
     end loop;
@@ -343,6 +355,54 @@ exception
     SET_CURRENT_SCHEMA(V_CURRENT_SCHEMA);
 	RAISE;
 end;
+--
+function GENERATE_IMPORT_LOG
+return CLOB
+as
+   V_IMPORT_LOG CLOB;
+begin
+  select JSON_OBJECT(
+           'ddl' value 
+		     ( 
+		       select JSON_ARRAYAGG(
+			             JSON_OBJECT(
+			               'status' value STATUS, 
+				           'sql'    value SQL_STATEMENT, 
+				           'result' value TREAT(RESULT as JSON)
+						   returning CLOB
+			             )
+						 returning CLOB
+			           )
+	           from table(JSON_EXPORT_DDL.IMPORT_DDL_LOG)
+			)
+	      ,'dml' value 
+		    (
+			  select JSON_ARRAYAGG(
+			           JSON_OBJECT(
+					     'table'  value TABLE_NAME,
+		                 'status' value STATUS, 
+				         'sql'    value SQL_STATEMENT, 
+				         'result' value TREAT(RESULT as JSON)
+ 					     returning CLOB
+			           )
+					   returning CLOB
+			         )
+	           from table(JSON_IMPORT.IMPORT_DML_LOG)
+		   ) 
+		   returning CLOB
+		 )
+    into V_IMPORT_LOG
+    from dual;	 
+  return V_IMPORT_LOG;
+end;
+--
+function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY CLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
+return CLOB
+as
+begin
+  IMPORT_JSON(P_JSON_DUMP_FILE, P_TARGET_SCHEMA);
+  return GENERATE_IMPORT_LOG();
+end;  
 --
 end;
 /
