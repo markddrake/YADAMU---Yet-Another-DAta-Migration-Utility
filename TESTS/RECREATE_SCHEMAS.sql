@@ -1,28 +1,30 @@
 set echo on
-spool createSchemas.log
+spool recreateSchemas.log
 --
-drop user HR2 cascade
+def ID = 1
+--
+drop user HR&ID cascade
 /
-grant connect, resource, unlimited tablespace to HR2 identified by oracle
+grant connect, resource, unlimited tablespace to HR&ID identified by oracle
 /
-drop user SH2 cascade
+drop user SH&ID cascade
 /
-grant connect, resource, unlimited tablespace to SH2 identified by oracle
+grant connect, resource, unlimited tablespace to SH&ID identified by oracle
 /
-drop user OE2 cascade
+drop user OE&ID cascade
 /
-grant connect, resource, unlimited tablespace to OE2 identified by oracle
+grant connect, resource, unlimited tablespace to OE&ID identified by oracle
 /
-drop user PM2 cascade
+drop user PM&ID cascade
 /
-grant connect, resource, unlimited tablespace to PM2 identified by oracle
+grant connect, resource, unlimited tablespace to PM&ID identified by oracle
 /
-drop user IX2 cascade
+drop user IX&ID cascade
 /
-grant connect, resource, unlimited tablespace to IX2 identified by oracle
+grant connect, resource, unlimited tablespace to IX&ID identified by oracle
 /
-drop user BI2 cascade
+drop user BI&ID cascade
 /
-grant connect, resource, unlimited tablespace to BI2 identified by oracle
+grant connect, resource, unlimited tablespace to BI&ID identified by oracle
 /
 quit

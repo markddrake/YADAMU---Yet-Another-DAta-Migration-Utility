@@ -356,6 +356,8 @@ exception
 	RAISE;
 end;
 --
+$IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN   
+--
 function GENERATE_IMPORT_LOG
 return CLOB
 as
@@ -395,6 +397,84 @@ begin
     from dual;	 
   return V_IMPORT_LOG;
 end;
+--
+$ELSE
+--
+function GENERATE_IMPORT_LOG
+return CLOB
+as
+  JSON_ARRAY_OVERFLOW EXCEPTION; PRAGMA EXCEPTION_INIT (JSON_ARRAY_OVERFLOW, -40478);
+  V_IMPORT_LOG CLOB;
+   
+  cursor ddlLogRecords
+  is
+  select JSON_OBJECT(
+		   'status' value STATUS, 
+		   'sql'    value SQL_STATEMENT, 
+		   'result' value JSON_QUERY(RESULT,'$')
+--  
+           $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+           returning VARCHAR2(32767)
+           $ELSE
+           returning VARCHAR2(4000)
+           $END  
+--  
+         ) LOG_RECORD
+    from table(JSON_EXPORT_DDL.IMPORT_DDL_LOG);
+	 
+   cursor dmlLogRecords
+   is
+   select JSON_OBJECT(
+             'table'  value TABLE_NAME,
+			 'status' value STATUS, 
+			 'sql'    value SQL_STATEMENT, 
+  		     'result' value JSON_QUERY(RESULT,'$')
+--  
+           $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+           returning VARCHAR2(32767)
+           $ELSE
+           returning VARCHAR2(4000)
+           $END  
+--  
+		  ) LOG_RECORD
+	 from table(JSON_IMPORT.IMPORT_DML_LOG);
+	
+  V_JSON_DOCUMENT CLOB;
+  V_JSON_FRAGMENT VARCHAR2(4000);
+  
+  V_FIRST_ITEM    BOOLEAN := TRUE;
+  V_START_TABLE_DATA NUMBER;
+begin
+  DBMS_LOB.CREATETEMPORARY(V_JSON_DOCUMENT,TRUE,DBMS_LOB.CALL);
+
+  V_JSON_FRAGMENT := '{"ddl":[';
+  DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
+
+  V_FIRST_ITEM := TRUE;
+  for i in ddlLogRecords loop
+    if (not V_FIRST_ITEM) then
+      DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,',');
+    end if;
+    V_FIRST_ITEM := FALSE;
+    DBMS_LOB.APPEND(V_JSON_DOCUMENT,i.LOG_RECORD);
+  end loop;
+
+  V_JSON_FRAGMENT := ',"dml":[';
+  DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
+  
+  V_FIRST_ITEM := TRUE;
+  for i in dmlLogRecords loop
+    if (not V_FIRST_ITEM) then
+      DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,',');
+    end if;
+    V_FIRST_ITEM := FALSE;
+    DBMS_LOB.APPEND(V_JSON_DOCUMENT,i.LOG_RECORD);
+  end loop;
+  DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,2,']}');  
+  return V_JSON_DOCUMENT;
+end;
+--
+$END
 --
 function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY CLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
 return CLOB

@@ -19,8 +19,6 @@ $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
  
   SQL_STATEMENT  CLOB;
   SCHEMA_METADATA CLOB;
-  function DUMP_SQL_STATEMENT return CLOB;
-  function DUMP_SQL_STATEMENT(P_DUMMY VARCHAR2) return CLOB;
 --
 $ELSE
 --
@@ -45,6 +43,8 @@ $END
 
   
   function EXPORT_SCHEMA(P_OWNER_LIST VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
+  function DUMP_SQL_STATEMENT return CLOB;
+
 end;
 /
 --
@@ -113,13 +113,6 @@ end;
 --
 $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
-function DUMP_SQL_STATEMENT(P_DUMMY VARCHAR2)
-return CLOB
-as
-begin
-   return DUMP_SQL_STATEMENT;
-end;
---
 function DUMP_SQL_STATEMENT
 return CLOB
 as
@@ -141,6 +134,26 @@ begin
   for r in getRecords loop
     pipe row (r);
   end loop;
+end;
+--
+function DUMP_SQL_STATEMENT
+return CLOB
+as
+  V_SQL_STATEMENTS CLOB;
+
+  cursor getRecords
+  is
+  select ROWNUM, SQL_STATEMENT
+    from TABLE(EXPORT_METADATA_CACHE);
+begin
+  DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENTS,TRUE,DBMS_LOB.CALL);
+  for r in getRecords loop
+	if (r.ROWNUM > 1) then
+      DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENTS,2,C_NEWLINE || C_NEWLINE);
+	end if;
+    DBMS_LOB.APPEND(V_SQL_STATEMENTS,r.SQL_STATEMENT);
+  end loop;
+  return V_SQL_STATEMENTS;
 end;
 --
 $END
@@ -613,7 +626,7 @@ $ELSE
           V_TABLE_METADATA := JSON_OBJECT(
                                  'tableName' value t.TABLE_NAME
                                 ,'error'     value 'ORA-' || SQLCODE
-                                ,'message'   value SQLERRM
+                                ,'message'   value DBMS_UTILITY.FORMAT_ERROR_STACK
                                );
       end;  
 
@@ -648,7 +661,6 @@ return CLOB
 as
   V_JSON_DOCUMENT CLOB;
   V_CURSOR      SYS_REFCURSOR;
-  V_SQLERRM     VARCHAR2(4000);
 begin
   GENERATE_STATEMENT(P_OWNER_LIST);
   if (G_INCLUDE_DDL) then
@@ -665,12 +677,11 @@ begin
   return V_JSON_DOCUMENT;
 exception
  when others then 
-   V_SQLERRM := SQLERRM;
    select JSON_OBJECT(
-             'schema' value P_OWNER_LIST,
-             'error' value V_SQLERRM,
+             'schema'   value P_OWNER_LIST,
 			 'metadata' value TREAT(SCHEMA_METADATA as JSON),
-			 'sql' value SQL_STATEMENT
+			 'sql'      value SQL_STATEMENT,
+             'error'    value DBMS_UTILITY.FORMAT_ERROR_STACK
 			 returning CLOB
 	      )
      into V_JSON_DOCUMENT
@@ -712,15 +723,30 @@ as
 begin
    V_SQL_STATEMENT      := EXPORT_METADATA_CACHE(P_METADATA_INDEX).SQL_STATEMENT;
    V_SELECT_LIST_START  := DBMS_LOB.INSTR(V_SQL_STATEMENT,C_SELECT_LIST_START) + LENGTH(C_SELECT_LIST_START);
-   V_SELECT_LIST_END    := DBMS_LOB.INSTR(V_SQL_STATEMENT,C_SELECT_LIST_END) - 1;
-   V_CURRENT_OFFSET := V_SELECT_LIST_START;
+   V_SELECT_LIST_END    := DBMS_LOB.INSTR(V_SQL_STATEMENT,C_SELECT_LIST_END);
+   V_CURRENT_OFFSET     := V_SELECT_LIST_START;
    loop
-     V_COLUMN_OFFSET := DBMS_LOB.INSTR(V_SQL_STATEMENT,',',V_CURRENT_OFFSET); 
-     exit when ((V_COLUMN_OFFSET < 1) or (V_COLUMN_OFFSET > V_SELECT_LIST_END));
      V_SELECT_LIST.extend;
      V_COLUMN_LIST.extend;
      V_INDEX := V_SELECT_LIST.count;
+
+     V_COLUMN_OFFSET := DBMS_LOB.INSTR(V_SQL_STATEMENT,',',V_CURRENT_OFFSET); 
+     
+	 if (V_COLUMN_OFFSET < 1) or (V_COLUMN_OFFSET > V_SELECT_LIST_END) then
+	   V_COLUMN_OFFSET := V_SELECT_LIST_END;
+     end if;	   
+
      V_SELECT_LIST_ITEM  := DBMS_LOB.SUBSTR(V_SQL_STATEMENT,V_COLUMN_OFFSET - V_CURRENT_OFFSET,V_CURRENT_OFFSET);
+	 
+	 -- Manage select list items that consist of function calls containing comman seperated argument lists
+
+     while (REGEXP_COUNT(V_SELECT_LIST_ITEM,'\(') <> REGEXP_COUNT(V_SELECT_LIST_ITEM,'\)')) loop
+	   V_COLUMN_OFFSET := DBMS_LOB.INSTR(V_SQL_STATEMENT,',',V_COLUMN_OFFSET+1); 
+   	   if (V_COLUMN_OFFSET < 1) or (V_COLUMN_OFFSET > V_SELECT_LIST_END) then
+	     V_COLUMN_OFFSET := V_SELECT_LIST_END;
+       end if;	   
+       V_SELECT_LIST_ITEM  := DBMS_LOB.SUBSTR(V_SQL_STATEMENT,V_COLUMN_OFFSET - V_CURRENT_OFFSET,V_CURRENT_OFFSET);
+     end loop;
 
      V_COLUMN_NAME_START := instr(V_SELECT_LIST_ITEM,'"');
      V_COLUMN_NAME_END   := instr(V_SELECT_LIST_ITEM,'"',V_COLUMN_NAME_START+1)+1;
@@ -734,8 +760,11 @@ begin
                         
      V_SELECT_LIST(V_INDEX) :=  V_SELECT_LIST_ITEM;
      v_COLUMN_LIST(V_INDEX) :=  V_COLUMN_NAME;
+	 exit when (V_COLUMN_OFFSET = V_SELECT_LIST_END);
      V_CURRENT_OFFSET := V_COLUMN_OFFSET + 1;
    end loop;
+
+   V_SELECT_LIST_ITEM  := DBMS_LOB.SUBSTR(V_SQL_STATEMENT,V_COLUMN_OFFSET - V_CURRENT_OFFSET,V_CURRENT_OFFSET);
 
    V_FROM_CLAUSE_START := DBMS_LOB.INSTR(V_SQL_STATEMENT,' from ',V_SELECT_LIST_END);
    V_FROM_WHERE_CLAUSE := DBMS_LOB.SUBSTR(V_SQL_STATEMENT,32767,V_FROM_CLAUSE_START);
@@ -852,6 +881,8 @@ as
 
   V_JSON_FRAGMENT VARCHAR2(4000);
   
+  V_TABLE_ERROR   VARCHAR2(32767);
+  
   V_FIRST_TABLE   BOOLEAN := TRUE;
   V_FIRST_ITEM    BOOLEAN := TRUE;
 --  
@@ -890,35 +921,54 @@ begin
       V_JSON_FRAGMENT := '"data":{';
       DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
       for i in 1 .. EXPORT_METADATA_CACHE.count loop
-        V_JSON_FRAGMENT := '"' || EXPORT_METADATA_CACHE(i).table_name || '":[';
-        if (not V_FIRST_TABLE) then 
-          V_JSON_FRAGMENT := ',' || V_JSON_FRAGMENT;
-        end if;
-        V_FIRST_TABLE := false;
-        DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
-        V_START_TABLE_DATA := DBMS_LOB.GETLENGTH(V_JSON_DOCUMENT);
-        V_FIRST_ITEM := TRUE;
-        open V_CURSOR for EXPORT_METADATA_CACHE(i).SQL_STATEMENT;
-        loop 
-          begin
-            fetch V_CURSOR into V_JSON_ARRAY;
-            exit when V_CURSOR%notfound;      
-            if (not V_FIRST_ITEM) then
-              DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,',');
-            end if;
-            V_FIRST_ITEM := FALSE;
-            DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_ARRAY),V_JSON_ARRAY);
-          exception
-            when JSON_ARRAY_OVERFLOW then
-              DBMS_LOB.TRIM(V_JSON_DOCUMENT,V_START_TABLE_DATA);
-              PROCESS_WIDE_TABLE(i,V_JSON_DOCUMENT);
-              exit;
-            when OTHERS then
-              raise;
-          end;
-        end loop;
-        close V_CURSOR;
-        DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,']');
+		begin
+          V_JSON_FRAGMENT := '"' || EXPORT_METADATA_CACHE(i).table_name || '":[';
+          if (not V_FIRST_TABLE) then 
+            V_JSON_FRAGMENT := ',' || V_JSON_FRAGMENT;
+          end if;
+          V_FIRST_TABLE := false;
+          DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
+          V_START_TABLE_DATA := DBMS_LOB.GETLENGTH(V_JSON_DOCUMENT);
+          V_FIRST_ITEM := TRUE;
+          open V_CURSOR for EXPORT_METADATA_CACHE(i).SQL_STATEMENT;
+          loop 
+            begin
+              fetch V_CURSOR into V_JSON_ARRAY;
+              exit when V_CURSOR%notfound;      
+              if (not V_FIRST_ITEM) then
+                DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,',');
+              end if;
+              V_FIRST_ITEM := FALSE;
+              DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_ARRAY),V_JSON_ARRAY);
+            exception
+              when JSON_ARRAY_OVERFLOW then
+                DBMS_LOB.TRIM(V_JSON_DOCUMENT,V_START_TABLE_DATA);
+                PROCESS_WIDE_TABLE(i,V_JSON_DOCUMENT);
+                exit;
+              when OTHERS then
+                raise;
+            end;
+          end loop;
+          close V_CURSOR;
+          DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,']');
+        exception
+          when others then 
+            select JSON_OBJECT(
+			        'sql' value EXPORT_METADATA_CACHE(i).SQL_STATEMENT,
+					'error' value DBMS_UTILITY.FORMAT_ERROR_STACK
+--  
+                    $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                    returning VARCHAR2(32767)
+                    $ELSE
+                    returning VARCHAR2(4000)
+                    $END  
+-- 			        
+	              )
+             into V_TABLE_ERROR
+	         from DUAL;
+           DBMS_LOB.TRIM(V_JSON_DOCUMENT,V_START_TABLE_DATA);
+           DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,LENGTH(V_TABLE_ERROR),V_TABLE_ERROR);
+		end;
       end loop;
       DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,'}');  
     end if;
