@@ -42,6 +42,12 @@ spool logs/sql/JSON_IMPORT.log
 --
 create or replace public synonym JSON_IMPORT for JSON_IMPORT
 /
+spool logs/sql/NODE_EXPORT.log
+--
+@@NODE_EXPORT
+--
+create or replace  public synonym NODE_EXPORT for NODE_EXPORT
+/
 spool logs/sql/JSON_EXPORT.log
 --
 @@JSON_EXPORT
@@ -58,6 +64,7 @@ desc JSON_IMPORT
 --
 desc JSON_EXPORT
 --
+desc NODE_EXPORT
 set serveroutput on
 --
 begin

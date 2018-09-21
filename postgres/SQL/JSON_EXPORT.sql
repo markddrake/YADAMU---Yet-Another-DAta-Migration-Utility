@@ -1,3 +1,10 @@
+/*
+**
+** Postgress JSON_EXPORT Function.
+**
+** Does not scale. Will work with small datasets but fails to return anything with larger (50MB) document.
+**
+*/
 create or replace function jsonExport(P_SCHEMA VARCHAR)
 returns setof jsonb
 as $$

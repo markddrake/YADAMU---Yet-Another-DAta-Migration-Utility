@@ -50,7 +50,7 @@ function fetchDDL(conn,schema,outStream) {
   return new Promise(async function(resolve,reject) {  
     const stream = await conn.queryStream(ddlStatement,{schema: schema},{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
     stream.on('end',function() {resolve()})
-	stream.on('error',function(err){console.log('Error'),reject(err)});
+	stream.on('error',function(err){reject(err)});
     stream.pipe(parser).pipe(JSONStream.stringify('[',',',']')).pipe(outStream,{end: false })
   })
 }
@@ -70,8 +70,7 @@ async function fetchData(conn,sqlQuery,outStream) {
   
   return new Promise(function(resolve,reject) {  
     jsonStream.on('end',function() {resolve(counter)})
-    // outStream.on('finish',function() {resolve(counter)})
-    stream.on('error',function(err){console.log('Error'),reject(err)});
+    stream.on('error',function(err){reject(err)});
     stream.pipe(parser).pipe(jsonStream).pipe(outStream,{end: false })
   })
 }
@@ -91,22 +90,92 @@ function writeTableName(i,tableName,outStream) {
   })
 }
 
+function resetStream(fileWriteStream,offset) {
+    const path = fileWriteStream.path;
+	fileWriteStream.close();
+	return fs.createWriteStream(path,{start:offset,flags:"r+"});
+}
+	
+async function wideTableWorkaround(conn,tableInfo,varcharSize,outStream) {
+	
+  let selectList = '';
+  const columnList = JSON.parse('[' + tableInfo.COLUMN_LIST + ']');
+  const selectListMembers = [];
+  let start = 0;
+  let level = 0;
+  for (let i=0; i < tableInfo.EXPORT_SELECT_LIST.length; i++) {
+	if (tableInfo.EXPORT_SELECT_LIST[i] === '(') {
+	  level++;
+	  continue;
+	}
+	if (tableInfo.EXPORT_SELECT_LIST[i] === ')') {
+	  level--;
+	  continue;
+	}
+	if ((level === 0) && (tableInfo.EXPORT_SELECT_LIST[i] === ',')) {
+	  selectListMembers.push(tableInfo.EXPORT_SELECT_LIST.substring(start,i));
+	  start = i+1;
+	}
+  }
+  selectListMembers.push(tableInfo.EXPORT_SELECT_LIST.substring(start));
+  columnList.forEach(function(column,index){
+	                   let selectListEntry = `JSON_ARRAY(${selectListMembers[index]} NULL on NULL RETURNING VARCHAR2(${varcharSize})) "${column}"`;
+					   if (index > 0) {
+					     selectListEntry = ',' + selectListEntry;
+					   }
+					   selectList = selectList + selectListEntry;
+  })
+   
+  let sqlStatement = `select ${selectList} from "${tableInfo.OWNER}"."${tableInfo.TABLE_NAME}"`;
+  
+  if (tableInfo.SQL_STATEMENT.indexOf('WITH') === 0) {
+	 const endOfWithClause = tableInfo.SQL_STATEMENT.indexOf('select JSON_ARRAY(');
+	 sqlStatement = tableInfo.SQL_STATEMENT.substring(0,endOfWithClause) + sqlStatement;
+  }
+
+  let counter = 0;
+  const parser = new Transform({objectMode:true});
+  parser._transform = function(data,encodoing,done) {
+	counter++;
+	const rowArray = []
+	data.forEach(function(json) {
+	  rowArray.push(JSON.parse(json)[0]);
+	})
+	this.push(rowArray);
+	done();
+  }
+
+  const stream = await conn.queryStream(sqlStatement)
+  const jsonStream = JSONStream.stringify('[',',',']');
+  
+  return new Promise(function(resolve,reject) {  
+    jsonStream.on('end',function() {resolve(counter)})
+    stream.on('error',function(err){reject(err)});
+    stream.pipe(parser).pipe(jsonStream).pipe(outStream,{end: false })
+  })
+	
+}
+	
 async function main(){
+
+  let conn = undefined;
+  let parameters = undefined;
+  let logWriter = process.stdout;
+  
   try {
-    const parameters = common.processArguments(process.argv,'export');
-	const schema = parameters.OWNER;
-	
-    const dumpFilePath = parameters.FILE;
-    const dumpFile = fs.createWriteStream(dumpFilePath);
-    dumpFile.on('error',function(err) {console.log(err)})
-	
-	let logWriter = process.stdout;
+    parameters = common.processArguments(process.argv,'export');
+
 	if (parameters.LOGFILE) {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE);
     }
 	
-	const conn = await common.doConnect(parameters.USERID);
+	conn = await common.doConnect(parameters.USERID);
 	
+    const dumpFilePath = parameters.FILE;
+    let dumpFile = fs.createWriteStream(dumpFilePath);
+    dumpFile.on('error',function(err) {console.log(err)})
+	
+    const schema = parameters.OWNER;
 	const sysInfo = await getSystemInformation(conn);
 	dumpFile.write('{"systemInformation":');
 	dumpFile.write(JSON.stringify({
@@ -122,7 +191,8 @@ async function main(){
 						,"nlsParameters"      : JSON.parse(sysInfo.NLS_PARAMETERS)
 	}));
 
-
+    const varcharSize = JSON.parse(sysInfo.JSON_FEATURES).extendedString ? 32767 : 4000;
+	
     if (parameters.MODE !== 'DATA_ONLY') {
   	  dumpFile.write(',"ddl":');
 	  await fetchDDL(conn,schema,dumpFile);
@@ -150,24 +220,59 @@ async function main(){
 	
 	  dumpFile.write('},"data":{');
 	   for (let i=0; i < sqlQueries.length; i++) {
-	    const startTime = new Date().getTime()
 	    await writeTableName(i,`"${sqlQueries[i].TABLE_NAME}" :`,dumpFile);
-        const rows = await fetchData(conn,sqlQueries[i].SQL_STATEMENT,dumpFile) 
+		let dataOffset = dumpFile.bytesWritten + dumpFile.writableLength;
+		let rows = undefined;
+		let startTime = undefined;
+		try {
+   	      startTime = new Date().getTime()
+		  rows = await fetchData(conn,sqlQueries[i].SQL_STATEMENT,dumpFile) 
+		} catch(e) {
+		  if ((e.message) && (e.message.indexOf('ORA-40478') == 0)) {
+			if (dumpFile.bytesWritten > dataOffset) {
+			  console.log(dumpFile.bytesWritten);
+			  console.log(dataOffset);
+			  dumpFile = resetStream(dumpFile,dataOffset);
+			}
+			startTime = new Date().getTime()
+            rows = await wideTableWorkaround(conn,sqlQueries[i],varcharSize,dumpFile);
+		  }
+		  else {
+			throw e;
+		  }
+		}
         const elapsedTime = new Date().getTime() - startTime
-	    logWriter.write(`${new Date().toISOString()} - Table: "${sqlQueries[i].TABLE_NAME}. Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
+	    logWriter.write(`${new Date().toISOString()} - Table: "${sqlQueries[i].TABLE_NAME}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
 	  }
       dumpFile.write('}');
 	}
     
     dumpFile.write('}');
-	dumpFile.close();
-	conn.close();
-	console.log('Export Operation completed successfully.');
+    dumpFile.close();
+	
+    common.doRelease(conn);
+	logWriter.write('Export operation successful.');
+    if (logWriter !== process.stdout) {
+	  console.log(`Export operation successful: See "${parameters.LOGFILE}" for details.`);
+    }
   } catch (e) {
-	console.log('Export operation Failed.');
-    console.log(e);
-	conn.close();
+    if (logWriter !== process.stdout) {
+	  console.log(`Export operation failed: See "${parameters.LOGFILE}" for details.`);
+  	  logWriter.write('Export operation failed.\n');
+	  logWriter.write(e.stack);
+    }
+	else {
+    	console.log('Export operation Failed.');
+        console.log(e);
+	}
+	if (conn !== undefined) {
+      common.doRelease(conn);
+   	}
   }
+  
+  if (logWriter !== process.stdout) {
+	logWriter.close();
+  }    
 }
 
 main();

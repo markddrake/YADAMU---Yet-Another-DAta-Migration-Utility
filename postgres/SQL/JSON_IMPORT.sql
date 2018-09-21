@@ -1,4 +1,9 @@
-create or replace function mapOracleDataType(P_DATA_TYPE VARCHAR, P_SIZE_CONSTRAINT VARCHAR) 
+/*
+**
+** Postgress JSON_IMPORT Function.
+**
+*/
+create or replace function map_oracle_data_type(P_DATA_TYPE VARCHAR, P_SIZE_CONSTRAINT VARCHAR) 
 returns VARCHAR
 as $$
 declare
@@ -46,48 +51,17 @@ begin
 end;
 $$ LANGUAGE plpgsql;
 --
-create or replace function createTables(P_JSON jsonb,P_SCHEMA VARCHAR) 
-returns void
-as $$
-declare
-  V_DATA_TYPE_SIZING VARCHAR[];
-  V_STATEMENT        TEXT;
-  T                  RECORD;
-begin
-  for t in select "owner", "tableName", string_to_array("columns",',') "columns", string_to_array("dataTypes",',') "dataTypes", '[' || "dataTypeSizing" || ']' "dataTypeSizing"
-             from JSONB_EACH(P_JSON -> 'metadata')  CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA("owner" TEXT, "tableName" TEXT, "columns" TEXT, "dataTypes" TEXT, "dataTypeSizing" TEXT) loop
-  
-    select ARRAY_AGG(value)
-	  into V_DATA_TYPE_SIZING
-	  from JSON_ARRAY_ELEMENTS_TEXT(t."dataTypeSizing"::json);
-	   
-	raise notice '%', P_SCHEMA;
-	raise notice '%',  t."tableName";
-    V_STATEMENT := 'CREATE TABLE IF NOT EXISTS "' || P_SCHEMA || '"."' || t."tableName" || '"(';		
-	raise notice '%', V_STATEMENT;
-	for c in 1 .. array_upper(t."columns",1) loop
-      if (c > 1) then
-	    V_STATEMENT := V_STATEMENT || ',';
-      end if;
-	  V_STATEMENT := V_STATEMENT || ' ' || t."columns"[c] ||  ' ' || mapOracleDataType(t."dataTypes"[c], V_DATA_TYPE_SIZING[c]);
-	end loop;
-	V_STATEMENT := V_STATEMENT || ')';
-	raise notice '%', V_STATEMENT;
-	EXECUTE V_STATEMENT;
-  end loop;
-end;  
-$$ LANGUAGE plpgsql;
-
-create or replace function loadData(P_JSON jsonb,P_SCHEMA VARCHAR) 
+create or replace function import_json(P_JSON jsonb,P_SCHEMA VARCHAR) 
 returns jsonb
 as $$
 declare
-  V_DATA_TYPE_SIZING VARCHAR[];
-  V_COLUMN_LIST      VARCHAR(128)[];
-  V_STATEMENT        TEXT;
+  V_COLUMN_NAME_ARRAY VARCHAR[];
+  V_DATA_TYPE_ARRAY   VARCHAR[];
+  V_DATA_SIZE_ARRAY   VARCHAR[];
+  V_STATEMENT         TEXT;
+  T                   RECORD;
+
   V_ROW_COUNT        INTEGER;
-  T                  RECORD;
-  
   V_START_TIME       TIMESTAMPTZ;
   V_END_TIME         TIMESTAMPTZ;
   V_ELAPSED_TIME     DOUBLE PRECISION;
@@ -96,21 +70,32 @@ declare
   V_TIMING_REPORT    JSONB;
 begin
   V_SUMMARY := jsonb_build_array();
-  for t in select "owner", "tableName", "columns",  string_to_array("dataTypes",',') "dataTypes", '[' || "dataTypeSizing" || ']' "dataTypeSizing"
+  for t in select "owner", "tableName", "columns", "dataTypes","dataTypeSizing"
              from JSONB_EACH(P_JSON -> 'metadata')  CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA("owner" TEXT, "tableName" TEXT, "columns" TEXT, "dataTypes" TEXT, "dataTypeSizing" TEXT) loop
+
+    V_COLUMN_NAME_ARRAY := string_to_array(t."columns",','); 
+    V_DATA_TYPE_ARRAY := string_to_array(t."dataTypes",',');
   
     select ARRAY_AGG(value)
-      into V_DATA_TYPE_SIZING
-	  from JSON_ARRAY_ELEMENTS_TEXT(t."dataTypeSizing"::json);
-	 
-	V_COLUMN_LIST := string_to_array(t."columns",','); 
+	  into V_DATA_SIZE_ARRAY
+	  from JSON_ARRAY_ELEMENTS_TEXT(('[' || t."dataTypeSizing" || ']')::json);
+	   
+    V_STATEMENT := 'CREATE TABLE IF NOT EXISTS "' || P_SCHEMA || '"."' || t."tableName" || '"(';		
+	for c in 1 .. array_upper(V_COLUMN_NAME_ARRAY,1) loop
+      if (c > 1) then
+	    V_STATEMENT := V_STATEMENT || ',';
+      end if;
+	  V_STATEMENT := V_STATEMENT || ' ' || V_COLUMN_NAME_ARRAY[c] ||  ' ' || MAP_ORACLE_DATA_TYPE(V_DATA_TYPE_ARRAY[c], V_DATA_SIZE_ARRAY[c]);
+	end loop;
+	V_STATEMENT := V_STATEMENT || ')';
+	EXECUTE V_STATEMENT;
 
 	V_STATEMENT := 'INSERT into "' || P_SCHEMA || '"."' || t."tableName" || '"(' || t.columns || ') select ';
-	for c in 1 .. array_upper(V_COLUMN_LIST,1) loop
+	for c in 1 .. array_upper(V_COLUMN_NAME_ARRAY,1) loop
 	  if (c > 1) then
 	    V_STATEMENT := V_STATEMENT || ',';
       end if;
-      V_STATEMENT := V_STATEMENT || 'cast( value ->> ' || c-1 || ' as ' ||  mapOracleDataType(t."dataTypes"[c], V_DATA_TYPE_SIZING[c]) || ') ' || V_COLUMN_LIST[c];
+      V_STATEMENT := V_STATEMENT || 'cast( value ->> ' || c-1 || ' as ' ||  MAP_ORACLE_DATA_TYPE(V_DATA_TYPE_ARRAY[c], V_DATA_SIZE_ARRAY[c]) || ') ' || V_COLUMN_NAME_ARRAY[c];
 	end loop;
 	V_STATEMENT := V_STATEMENT ||  ' from jsonb_array_elements($1 -> ''data'' -> ''' || t."tableName" || ''')';
 	V_START_TIME := clock_timestamp();
@@ -120,17 +105,8 @@ begin
 	V_ELAPSED_TIME := 1000 * ( extract(epoch from V_END_TIME) - extract(epoch from V_START_TIME) );
 	V_TIMING_REPORT := jsonb_build_object('tableName',t."tableName",'rowCount',V_ROW_COUNT,'elapsedTime',V_ELAPSED_TIME);
 	V_SUMMARY := jsonb_insert(V_SUMMARY,'{0}',V_TIMING_REPORT);
-  end loop;
-    return V_SUMMARY;
-end;  
-$$ LANGUAGE plpgsql;
 
-create or replace function jsonImport(P_JSON jsonb,P_SCHEMA VARCHAR) 
-returns jsonb
-as $$ 
-declare
-begin
-  perform createTables(P_JSON,P_SCHEMA);
-  return loadData(P_JSON,P_SCHEMA);
-end; 
+  end loop;
+  return V_SUMMARY;
+end;  
 $$ LANGUAGE plpgsql;

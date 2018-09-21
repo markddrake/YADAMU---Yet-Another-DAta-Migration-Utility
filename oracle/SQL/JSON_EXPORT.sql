@@ -620,7 +620,7 @@ $ELSE
                 ,'tableName'                   value t.TABLE_NAME
                 ,'columns'                     value JSON_EXPORT.TABLE_TO_LIST(t.COLUMN_LIST)
                 ,'dataTypes'                   value JSON_EXPORT.TABLE_TO_LIST(t.DATA_TYPE_LIST)
-                ,'dataTypeSizing'              value JSON_EXPORT.TABLE_TO_LIST(t.SIZE_CONSTRAINT_LIST_LIST)
+                ,'dataTypeSizing'              value JSON_EXPORT.TABLE_TO_LIST(t.SIZE_CONSTRAINT_LIST)
                 ,'exportSelectList'            value JSON_EXPORT.TABLE_TO_LIST(t.EXPORT_SELECT_LIST)
 				,'insertSelectList'            value JSON_EXPORT.TABLE_TO_LIST(t.IMPORT_SELECT_LIST)
 				,'deserializationFunctions'    value V_DESERIALIZATION_LIST

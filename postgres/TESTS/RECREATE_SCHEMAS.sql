@@ -1,5 +1,5 @@
 --
-\set ID 1
+\set ID 2
 --
 select 'HR' || :ID "SCHEMA" \gset
 --

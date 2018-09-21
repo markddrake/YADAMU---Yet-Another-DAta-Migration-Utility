@@ -29,15 +29,10 @@ function processValue(parameterValue) {
 function processArguments(args,operation) {
 
    const parameters = {
-	                 FILE     : "export.json"
-                    ,MODE     : "DDL_AND_CONTENT"
-					,USERNAME : 'postgress'
-					,PASSWORD : null
-					,HOSTNAME : 'localhost'
-					,DATABASE : 'postgres'
-					,PORT     : 5432
+	                 FILE : "export.json"
+                    ,MODE : "DDL_AND_CONTENT"
    }
-   
+
    process.argv.forEach(function (arg) {
 	   
 	 if (arg.indexOf('=') > -1) {
@@ -72,7 +67,7 @@ function processArguments(args,operation) {
 	      case '--FILE':
 	        parameters.FILE = parameterValue;
 			break;
-          case 'OWNER':
+	      case 'OWNER':
 	      case '--OWNER':
 		    parameters.OWNER = processValue(parameterValue);
 			break;
@@ -89,7 +84,6 @@ function processArguments(args,operation) {
 		    parameters.LOGFILE = parameterValue;
 			break;
 	      case 'MODE':
-	      case '--MODE':
 		    parameters.MODE = parameterValue.toUpperCase();
 			break;
 		  default:

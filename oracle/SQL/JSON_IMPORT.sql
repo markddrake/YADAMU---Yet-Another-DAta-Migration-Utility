@@ -12,7 +12,7 @@ as
    ,TABLE_NAME      VARCHAR2(128)
    ,SQL_STATEMENT   CLOB
    ,SQLCODE         NUMBER
-   ,RESULT          VARCHAR2(4000)
+   ,LOGENTRY        VARCHAR2(4000)
    ,STATUS          VARCHAR2(4000)
   );
    
@@ -307,14 +307,14 @@ begin
    V_START_TIME := SYSTIMESTAMP;
    execute immediate P_SQL_OPERATION.SQL_STATEMENT using P_JSON_DUMP_FILE, out V_ROW_COUNT;
    V_END_TIME := SYSTIMESTAMP;		
-   P_SQL_OPERATION.RESULT := JSON_OBJECT( 'startTine' value SYS_EXTRACT_UTC(V_START_TIME), 'endTime' value SYS_EXTRACT_UTC(V_END_TIME), 'elaspsedTimeMs' value GET_MILLISECONDS(V_START_TIME,V_END_TIME), 'recordCount'  value V_ROW_COUNT);
    P_SQL_OPERATION.STATUS := C_SUCCESS;
+   P_SQL_OPERATION.LOGENTRY := JSON_OBJECT('DML' value JSON_OBJECT('tableName' value P_SQL_OPERATION.TABLE_NAME, 'rowCount' value V_ROW_COUNT,'elapsedTime' value GET_MILLISECONDS(V_START_TIME,V_END_TIME), 'sql' value V_SQL_STATEMENT));
 
 exception
-
   when OTHERS then
-	P_SQL_OPERATION.RESULT := JSON_OBJECT('stack' value DBMS_UTILITY.format_error_stack);	   
-    P_SQL_OPERATION.STATUS := C_FATAL_ERROR;
+    V_END_TIME := SYSTIMESTAMP;		
+	P_SQL_OPERATION.STATUS := C_FATAL_ERROR;
+	P_SQL_OPERATION.LOGENTRY := JSON_OBJECT(C_FATAL_ERROR value JSON_OBJECT('tableName' value P_SQL_OPERATION.TABLE_NAME, 'elapsedTime' value GET_MILLISECONDS(V_START_TIME,V_END_TIME), 'sql' value V_SQL_STATEMENT,'stack' value DBMS_UTILITY.format_error_stack));
 end;
 --
 procedure REFRESH_MATERIALIZED_VIEWS(P_TARGET_SCHEMA VARCHAR2)
@@ -341,6 +341,7 @@ as
   V_OBJECT_DESERIALIZER  CLOB;
   V_SQL_STATEMENT        CLOB;
 
+  V_ROW_COUNT  NUMBER;
   V_START_TIME TIMESTAMP(6);
   V_END_TIME   TIMESTAMP(6);  
 begin
@@ -360,27 +361,29 @@ begin
   							
     for i in 1 .. SQL_OPERATIONS_TABLE.count loop
       begin
-  	  if instr(SQL_OPERATIONS_TABLE(i).SQL_STATEMENT,'ALTER') = 1 then
-  	    V_START_TIME := SYSTIMESTAMP;
-        execute immediate SQL_OPERATIONS_TABLE(i).SQL_STATEMENT; 
-    	V_END_TIME := SYSTIMESTAMP;		
-  		SQL_OPERATIONS_TABLE(i).RESULT := JSON_OBJECT( 'startTine' value SYS_EXTRACT_UTC(V_START_TIME), 'endTime' value SYS_EXTRACT_UTC(V_END_TIME), 'elaspsedTimeMs' value GET_MILLISECONDS(V_START_TIME,V_END_TIME));
-  		SQL_OPERATIONS_TABLE(i).STATUS := C_SUCCESS;
+    	if instr(SQL_OPERATIONS_TABLE(i).SQL_STATEMENT,'ALTER') = 1 then
+  	      V_START_TIME := SYSTIMESTAMP;
+          execute immediate SQL_OPERATIONS_TABLE(i).SQL_STATEMENT; 
+    	  V_END_TIME := SYSTIMESTAMP;		
+  		  SQL_OPERATIONS_TABLE(i).STATUS := C_SUCCESS;
+		  SQL_OPERATIONS_TABLE(i).LOGENTRY := JSON_OBJECT('DDL' value JSON_OBJECT('tableName' value SQL_OPERATIONS_TABLE(i).TABLE_NAME,'elapsedTime' value GET_MILLISECONDS(V_START_TIME,V_END_TIME), 'sql' value SQL_OPERATIONS_TABLE(i).SQL_STATEMENT));
         else
-  		V_START_TIME := SYSTIMESTAMP;
-        execute immediate SQL_OPERATIONS_TABLE(i).SQL_STATEMENT using P_JSON_DUMP_FILE;  
-  	  	V_END_TIME := SYSTIMESTAMP;		
-     	SQL_OPERATIONS_TABLE(i).RESULT := JSON_OBJECT( 'startTine' value SYS_EXTRACT_UTC(V_START_TIME), 'endTime' value SYS_EXTRACT_UTC(V_END_TIME), 'elaspsedTimeMs' value GET_MILLISECONDS(V_START_TIME,V_END_TIME), 'recordCount'  value TO_CHAR(SQL%ROWCOUNT));
-  		commit;
-  		SQL_OPERATIONS_TABLE(i).STATUS := C_SUCCESS;	
+  		  V_START_TIME := SYSTIMESTAMP;
+          execute immediate SQL_OPERATIONS_TABLE(i).SQL_STATEMENT using P_JSON_DUMP_FILE;  
+  	  	  V_END_TIME := SYSTIMESTAMP;
+		  V_ROW_COUNT := SQL%ROWCOUNT;
+  		  commit;
+  		  SQL_OPERATIONS_TABLE(i).STATUS := C_SUCCESS;	
+		  SQL_OPERATIONS_TABLE(i).LOGENTRY := JSON_OBJECT('DML' value JSON_OBJECT('tableName' value SQL_OPERATIONS_TABLE(i).TABLE_NAME,'rowCount' value V_ROW_COUNT, 'elapsedTime' value GET_MILLISECONDS(V_START_TIME,V_END_TIME), 'sql' value SQL_OPERATIONS_TABLE(i).SQL_STATEMENT));
         end if;
       exception
         when MUTATING_TABLE then
           MANAGE_MUTATING_TABLE(SQL_OPERATIONS_TABLE(i),P_JSON_DUMP_FILE);		
         when others then
-  	    SQL_OPERATIONS_TABLE(i).RESULT := JSON_OBJECT('stack' value DBMS_UTILITY.format_error_stack);	
-  		SQL_OPERATIONS_TABLE(i).STATUS := C_FATAL_ERROR;
-  	end;
+  	  	  V_END_TIME := SYSTIMESTAMP;		
+  		  SQL_OPERATIONS_TABLE(i).STATUS := C_FATAL_ERROR;
+		  SQL_OPERATIONS_TABLE(i).LOGENTRY := JSON_OBJECT('Error' value JSON_OBJECT('tableName' value SQL_OPERATIONS_TABLE(i).TABLE_NAME, 'elapsedTime' value GET_MILLISECONDS(V_START_TIME,V_END_TIME), 'sql' value SQL_OPERATIONS_TABLE(i).SQL_STATEMENT,'stack' value DBMS_UTILITY.format_error_stack));
+  	  end;
     end loop;
     REFRESH_MATERIALIZED_VIEWS(P_TARGET_SCHEMA);
   end if;  
@@ -398,38 +401,15 @@ return CLOB
 as
    V_IMPORT_LOG CLOB;
 begin
-  select JSON_OBJECT(
-           'ddl' value 
-		     ( 
-		       select JSON_ARRAYAGG(
-			             JSON_OBJECT(
-			               'status' value STATUS, 
-				           'sql'    value SQL_STATEMENT, 
-				           'result' value TREAT(RESULT as JSON)
-						   returning CLOB
-			             )
-						 returning CLOB
-			           )
-	           from table(JSON_EXPORT_DDL.IMPORT_DDL_LOG)
-			)
-	      ,'dml' value 
-		    (
-			  select JSON_ARRAYAGG(
-			           JSON_OBJECT(
-					     'table'  value TABLE_NAME,
-		                 'status' value STATUS, 
-				         'sql'    value SQL_STATEMENT, 
-				         'result' value TREAT(RESULT as JSON)
- 					     returning CLOB
-			           )
-					   returning CLOB
-			         )
-	           from table(JSON_IMPORT.IMPORT_DML_LOG)
-		   ) 
-		   returning CLOB
-		 )
+  select JSON_ARRAYAGG(TREAT (LOGENTRY as JSON) returning CLOB)
     into V_IMPORT_LOG
-    from dual;	 
+    from (  
+           select LOGENTRY
+			 from table(JSON_EXPORT_DDL.IMPORT_DDL_LOG)
+			union all
+           select LOGENTRY
+	         from table(JSON_IMPORT.IMPORT_DML_LOG)
+		 );
   return V_IMPORT_LOG;
 end;
 --
@@ -438,75 +418,32 @@ $ELSE
 function GENERATE_IMPORT_LOG
 return CLOB
 as
-  JSON_ARRAY_OVERFLOW EXCEPTION; PRAGMA EXCEPTION_INIT (JSON_ARRAY_OVERFLOW, -40478);
   V_IMPORT_LOG CLOB;
-   
-  cursor ddlLogRecords
-  is
-  select JSON_OBJECT(
-		   'status' value STATUS, 
-		   'sql'    value SQL_STATEMENT, 
-		   'result' value JSON_QUERY(RESULT,'$')
---  
-           $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-           returning VARCHAR2(32767)
-           $ELSE
-           returning VARCHAR2(4000)
-           $END  
---  
-         ) LOG_RECORD
-    from table(JSON_EXPORT_DDL.IMPORT_DDL_LOG);
-	 
-   cursor dmlLogRecords
-   is
-   select JSON_OBJECT(
-             'table'  value TABLE_NAME,
-			 'status' value STATUS, 
-			 'sql'    value SQL_STATEMENT, 
-  		     'result' value JSON_QUERY(RESULT,'$')
---  
-           $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-           returning VARCHAR2(32767)
-           $ELSE
-           returning VARCHAR2(4000)
-           $END  
---  
-		  ) LOG_RECORD
-	 from table(JSON_IMPORT.IMPORT_DML_LOG);
-	
-  V_JSON_DOCUMENT CLOB;
-  V_JSON_FRAGMENT VARCHAR2(4000);
-  
   V_FIRST_ITEM    BOOLEAN := TRUE;
-  V_START_TABLE_DATA NUMBER;
-begin
-  DBMS_LOB.CREATETEMPORARY(V_JSON_DOCUMENT,TRUE,DBMS_LOB.CALL);
-
-  V_JSON_FRAGMENT := '{"ddl":[';
-  DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
-
-  V_FIRST_ITEM := TRUE;
-  for i in ddlLogRecords loop
-    if (not V_FIRST_ITEM) then
-      DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,',');
-    end if;
-    V_FIRST_ITEM := FALSE;
-    DBMS_LOB.APPEND(V_JSON_DOCUMENT,i.LOG_RECORD);
-  end loop;
-
-  V_JSON_FRAGMENT := ',"dml":[';
-  DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,length(V_JSON_FRAGMENT),V_JSON_FRAGMENT);
   
-  V_FIRST_ITEM := TRUE;
-  for i in dmlLogRecords loop
+  cursor getLogRecords
+  is
+  select LOGENTRY
+    from table(JSON_EXPORT_DDL.IMPORT_DDL_LOG)
+   union all
+  select LOGENTRY
+	from table(JSON_IMPORT.IMPORT_DML_LOG);
+	
+begin
+  DBMS_LOB.CREATETEMPORARY(V_IMPORT_LOG,TRUE,DBMS_LOB.CALL);
+
+  DBMS_LOB.WRITEAPPEND(V_IMPORT_LOG,1,'[');
+
+  for i in getLogRecords loop
     if (not V_FIRST_ITEM) then
-      DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,1,',');
+      DBMS_LOB.WRITEAPPEND(V_IMPORT_LOG,1,',');
     end if;
     V_FIRST_ITEM := FALSE;
-    DBMS_LOB.APPEND(V_JSON_DOCUMENT,i.LOG_RECORD);
+    DBMS_LOB.APPEND(V_IMPORT_LOG,i.LOGENTRY);
   end loop;
-  DBMS_LOB.WRITEAPPEND(V_JSON_DOCUMENT,2,']}');  
-  return V_JSON_DOCUMENT;
+
+  DBMS_LOB.WRITEAPPEND(V_IMPORT_LOG,1,']');  
+  return V_IMPORT_LOG;
 end;
 --
 $END
