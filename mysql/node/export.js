@@ -38,26 +38,30 @@ async function getSystemInformation(conn) {
 
 async function generateQueries(conn,schema) {    	
 	const sqlStatement = 
- `select table_schema
-        ,table_name
-		,group_concat(concat('"',column_name,'"') separator ',')  "columns"
-		,group_concat(concat('"',data_type,'"') separator ',')  "dataTypes"
-		,group_concat(concat('"',	
-                             case when data_type = 'decimal'	
-                                    then concat(numeric_precision,',',numeric_scale)	
-                                  when data_type = 'varchar'	
-                                    then character_maximum_length	
-                                  when data_type = 'char'	
-                                    then character_maximum_length	
-                                  when data_type = 'character'	
-                                    then character_maximum_length	
-                                  else	
-                                    ''	
-                             end,	
-                             '"') separator ',') "sizeConstraints"
-	    ,concat('select json_array(',group_concat('"',column_name,'"'),') "json" from "',table_schema,'"."',table_name,'"') QUERY	
-    from information_schema.columns	
-   where table_schema = ? group by table_schema, table_name`;
+`select table_schema
+       ,table_name
+  	   ,group_concat(concat('"',column_name,'"') separator ',')  "columns"
+	   ,group_concat(concat('"',data_type,'"') separator ',')  "dataTypes"
+	   ,group_concat(concat('"',	
+                            case when data_type = 'decimal'	
+                                   then concat(numeric_precision,',',numeric_scale)	
+                                 when data_type = 'varchar'	
+                                   then character_maximum_length	
+                                 when data_type = 'char'	
+                                   then character_maximum_length	
+                                 when data_type = 'character'	
+                                   then character_maximum_length	
+                                 else	
+                                   ''	
+                            end,	
+                            '"') separator ',') "sizeConstraints"
+	   ,concat('select json_array(',group_concat('"',column_name,'"'),') "json" from "',table_schema,'"."',table_name,'"') QUERY	
+   from information_schema.columns	c, information_schema.tables t
+  where t.table_name = c.table_name 
+    and t.table_schema = c.table_schema
+    and t.table_type = 'BASE TABLE'
+    and t.table_schema = ?
+  group by t.table_schema, t.table_name`;
 
    const results = await query(conn,sqlStatement,[schema]);
    return results;
@@ -113,7 +117,6 @@ async function main(){
 	
     const schema = parameters.OWNER;
 	const sysInfo = await getSystemInformation(conn);
-	console.log
 	dumpFile.write('{"systemInformation":');
 	dumpFile.write(JSON.stringify({
 		                 "date"            : new Date().toISOString()

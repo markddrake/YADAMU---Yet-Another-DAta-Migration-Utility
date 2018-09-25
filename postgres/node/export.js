@@ -14,25 +14,30 @@ async function getSystemInformation(pgClient) {
 }
 
 async function generateQueries(pgClient,schema) {    	
-	const sqlStatement = `select table_schema, table_name, 
-	                             string_agg('"' || column_name || '"',',') "columns", 
-								 string_agg('"' || data_type || '"',',') "dataTypes", 
-								 string_agg('"' || case when data_type = 'numeric' 
-								                           then numeric_precision || ',' || numeric_scale
-														when data_type = 'character varying' 
-														  then cast(character_maximum_length as varchar)
-														when data_type = 'character' 
-														  then cast(character_maximum_length as varchar)
-														else
-														  ''
-												  end
-								 || '"',',') "sizeConstraints",
-								 'select jsonb_build_array(' || string_agg('"' || column_name || '"',',')|| ') "json" from "' || table_schema || '"."' || table_name ||'"' QUERY 
-					        from information_schema.columns 
-						   where table_schema = $1 group by table_schema, table_name`;
+	const sqlStatement = 
+`select table_schema, table_name
+	   ,string_agg('"' || column_name || '"',',') "columns", 
+	   ,string_agg('"' || data_type || '"',',') "dataTypes"
+	   ,string_agg('"' || case when data_type = 'numeric' 
+  	                             then numeric_precision || ',' || numeric_scale
+							   when data_type = 'character varying' 
+								 then cast(character_maximum_length as varchar)
+							   when data_type = 'character' 
+								 then cast(character_maximum_length as varchar)
+							   else
+								 ''
+						  end
+						  || '"',',') "sizeConstraints"
+	   ,'select jsonb_build_array(' || string_agg('"' || column_name || '"',',')|| ') "json" from "' || table_schema || '"."' || table_name ||'"' QUERY 
+   from information_schema.columns c, information_schema.tables t
+  where t.table_name = c.table_name 
+	and t.table_schema = c.table_schema
+	and t.table_type = 'BASE TABLE'
+    and t.table_schema = $1
+  group by t.table_schema, t.table_name`';
 						   
-	const results = await pgClient.query(sqlStatement,[schema]);
-	return results.rows;
+  const results = await pgClient.query(sqlStatement,[schema]);
+  return results.rows;
 }
 
 function fetchData(pgClient,sqlQuery,outStream) {

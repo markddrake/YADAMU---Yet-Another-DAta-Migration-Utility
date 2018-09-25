@@ -1,2 +1,19 @@
 docs\vendor\
+MSSQL\node\node_modules\
+MSSQL\work\
+MSSQL\JSON\
+MSSQL\logs\
+postrges\node\node_modules\
+postgres\work\
+postgres\JSON\
+postgres\logs\
+Oracle\node\node_modules\
+Oracle\JSON\
+Oracle\logs\
+Oracle\work\
+MYSQL\node\node_modules\
+MYSQL\JSON\
+MYSQL\work
+MYSQL\logs\
+
 

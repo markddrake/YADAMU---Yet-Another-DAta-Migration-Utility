@@ -21,7 +21,7 @@ async function loadStagingTable(pgClient,dumpFileStream) {
     const copyStatement = `copy "JSON_STAGING" from STDIN csv quote e'\x01' delimiter e'\x02'`;
     const stream = pgClient.query(copyFrom(copyStatement));
     stream.on('end',function() {resolve(new Date().getTime() - startTime)})
-	stream.on('error',function(err){console.log('Error'),reject(err)});
+	stream.on('error',function(err){reject(err)});
 	startTime = new Date().getTime();
     dumpFileStream.pipe(stream);
   })  
