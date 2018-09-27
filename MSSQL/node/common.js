@@ -29,9 +29,12 @@ function processValue(parameterValue) {
 function processArguments(args,operation) {
 
    const parameters = {
-	                 FILE : "export.json"
-					,PORT : 1433
-                    ,MODE : "DDL_AND_CONTENT"
+	                 FILE     : "export.json"
+					,PORT     : 1433
+					,OWNER    : 'dbo'
+					,TOUSER   : 'dbo'
+					,FROMUSER : 'dbo'
+                    ,MODE     : "DDL_AND_CONTENT"
    }
 
    process.argv.forEach(function (arg) {

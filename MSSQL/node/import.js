@@ -9,20 +9,20 @@ async function loadStagingTable(dbConn,stagingTable,dumpFilePath) {
 
   async function dropStagingTable(request,target) {
     try {
-      const statement = `drop table "${target.schema === undefined ? target.table_name : target.schema + '"."' + target.tableName}"`;
+      const statement = `drop table if exists "${target.table_name}"`;
       const results = await request.batch(statement)
       return results;
     } catch (e) {}
   }
 	
   async function createStagingTable(request,target) {
-   const statement = `create table "${target.schema === undefined ? target.table_name : target.schema + '"."' + target.tableName}" ("${target.column_name}" NVARCHAR(MAX))`;
+   const statement = `create table "${target.table_name}" ("${target.column_name}" NVARCHAR(MAX))`;
    const results = await request.batch(statement)
    return results;
   } 
 
   async function initializeStagingTable(request,target) {
-   const statement = `insert into "${target.schema === undefined ? target.table_name : target.schema + '"."' + target.tableName}" values ('')`;
+   const statement = `insert into "${target.table_name}" values ('')`;
    const results = await request.batch(statement)
    return results;
   } 
@@ -47,7 +47,7 @@ async function loadStagingTable(dbConn,stagingTable,dumpFilePath) {
   }	  
 
   const request = new sql.Request(dbConn);	  
-  const statement = `update "${stagingTable.schema === undefined ? stagingTable.table_name : stagingTable.schema + '"."' + stagingTable.tableName}" set "${stagingTable.column_name}" .write(@data,null,null)`;
+  const statement = `update "${stagingTable.table_name}" set "${stagingTable.column_name}" .write(@data,null,null)`;
      
   const inputStream = fs.createReadStream(dumpFilePath);
   const loader = new fileLoader(request,statement);
@@ -67,17 +67,66 @@ async function loadStagingTable(dbConn,stagingTable,dumpFilePath) {
 }
 
 async function verifyDataLoad(dbConn,stagingTable) {    	
-    const statement = `select ISJSON("${stagingTable.column_name}") "VALID_JSON" from "${stagingTable.schema === undefined ? stagingTable.table_name : stagingTable.schema + '"."' + stagingTable.tableName}"`;
+    const statement = `select ISJSON("${stagingTable.column_name}") "VALID_JSON" from "${stagingTable.table_name}"`;
 	const startTime = new Date().getTime();
     const results = await dbConn.query(statement);
 	console.log(`${new Date().toISOString()}: Upload succesful: ${results.recordsets[0][0].VALID_JSON === 1}. Elapsed time ${new Date().getTime() - startTime}ms.`);
 	return results;
 }
 
-async function processStagingTable(dbConn,schema) {    	
+function timeout(duration) {
+  return new Promise(function(resolve, reject) {
+			           setTimeout(
+				         function(){
+			               resolve();
+   			             }, 
+			             duration
+			           )
+	                 })
+};
+
+async function untilFinished(request,stagingTable) {
+
+  return new Promise(async function(resolve,reject) {
+	                         try {
+							   while (true) {
+                                 let results = await request.input('CONTEXT_ITEM',sql.NVARCHAR,'JSON_IMPORT').query(`select SESSION_CONTEXT(@CONTEXT_ITEM) IMPORT_STATE`);								 console.log(`${new Date().toISOString()}: [${JSON.stringify(results.recordsets[0][0].IMPORT_STATE)}]`)
+                                 if (results.recordsets[0][0].IMPORT_STATE === 'IN-PROGRESS') {
+ 								   await timeout(10000);
+								 }
+								 else {
+                                   if (results.recordsets[0][0].IMPORT_STATE === 'COMPLETED') {
+								     const statement = `select  "${stagingTable.column_name}" "IMPORT_JSON" from "${stagingTable.table_name}" `;
+								     results = await request.batch(statement)
+									 resolve(results.recordsets[0][0])
+								   }
+								   else {
+									  reject(`Data extraction process failed. IMPORT_STATE: ${results.recordsets[0][0].IMPORT_STATE}.`);
+								   }
+								}
+                              }
+							 } catch (e) {
+                               reject(e);
+							 }
+                           })
+                        								 
+}							
+
+async function processStagingTable(dbConn,stagingTable,schema) {    	
   const request = new sql.Request(dbConn);	  
-  request.input('TARGET_DATABASE',sql.VARCHAR,schema);
-  const results = await request.execute('IMPORT_JSON');
+  let results = undefined;
+
+  try {
+    results = await request.input('TARGET_DATABASE',sql.VARCHAR,schema).execute('IMPORT_JSON');
+  } catch (e) {
+	  if (e.code == 'ETIMEOUT') {
+		results = await untilFinished(request,stagingTable);
+	  }
+	  else {
+		throw(e);
+	  }
+  }
+
   return results.recordsets[0][0];
 }
 
@@ -109,7 +158,7 @@ async function main(){
      ,port      : parameters.PORT
 	 ,options: {
         encrypt: false // Use this if you're on Windows Azure
-   	   ,requestTimeout: 24*60*60*1000
+
       }
     }
 
@@ -125,21 +174,30 @@ async function main(){
     const fileSizeInBytes = stats.size
 
 	const stagingTable = { table_name : 'JSON_STAGING', column_name : 'DATA'}
-
+    
 	const startTime = new Date().getTime();
 	results = await loadStagingTable(dbConn,stagingTable,dumpFilePath);
 	const elapsedTime = new Date().getTime() - startTime;
     logWriter.write(`${new Date().toISOString()}: Import Data file "${dumpFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
 	results = await verifyDataLoad(dbConn,stagingTable);
-	results = await processStagingTable(dbConn,schema);
-	const jsonKey = Object.keys(results)[0];
-	results = JSON.parse(results[jsonKey])
+	results = await processStagingTable(dbConn,stagingTable,schema);
+	const jsonKey = Object.keys(results)[0]
+    if (results[jsonKey].length > 0) {
+	  results = JSON.parse(results[jsonKey])
+	  results.forEach( function(logEntry) {
+  	                    logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elapsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.\n`)
+						if (logEntry.error !== '{}') {
+						  logWriter.write(`${new Date().toISOString()}:${logEntry.error}.\n`)
+						  logWriter.write(`${new Date().toISOString()}:${logEntry.ddlStatement}.\n`)
+						  logWriter.write(`${new Date().toISOString()}:${logEntry.dmlStatement}.\n`)
+	                    }
+	  })
+	}
+	else {
+      logWriter.write(`${new Date().toISOString()}: No tables found.\n`)
+	}
 	
-	results.forEach( function(logEntry) {
-  	                  logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elapsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.\n`)
-	})
-
 	await dbConn.close();
 	logWriter.write('Import operation successful.\n');
     if (logWriter !== process.stdout) {

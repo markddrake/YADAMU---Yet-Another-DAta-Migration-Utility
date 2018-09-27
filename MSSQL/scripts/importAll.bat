@@ -1,6 +1,6 @@
-node node\import --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=mdd --TOUSER=\"HR2\" --FILE=c:\\Development\\MySQL\\JSON\\HR.json
-node node\import --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=mdd --TOUSER=\"SH2\" --FILE=c:\\Development\\MySQL\\JSON\\SH.json
-node node\import --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=mdd --TOUSER=\"OE2\" --FILE=c:\\Development\\MySQL\\JSON\\OE.json
-node node\import --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=mdd --TOUSER=\"PM2\" --FILE=c:\\Development\\MySQL\\JSON\\PM.json
-node node\import --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=mdd --TOUSER=\"IX2\" --FILE=c:\\Development\\MySQL\\JSON\\IX.json
-node node\import --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=mdd --TOUSER=\"BI2\" --FILE=c:\\Development\\MySQL\\JSON\\BI.json
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"HR1\" --FILE=c:JSON\\HR.json
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"SH1\" --FILE=c:JSON\\SH.json
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"OE1\" --FILE=c:JSON\\OE.json
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"PM1\" --FILE=c:JSON\\PM.json
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"IX1\" --FILE=c:JSON\\IX.json
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"BI1\" --FILE=c:JSON\\BI.json

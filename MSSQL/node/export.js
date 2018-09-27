@@ -12,34 +12,32 @@ async function getSystemInformation(dbConn) {
 
 async function generateQueries(dbConn,schema) {    	
 	const sqlStatement = 
-`select t.table_schema
-        ,t.table_name
-		,STRING_AGG('"' + column_name + '"',',')  "columns"
-		,STRING_AGG('"' + data_type   + '"',',')  "dataTypes"
-		,STRING_AGG('"'
-		          + case 
-				      when data_type = 'decimal'	
-                        then  cast(numeric_precision as VARCHAR) + ',' + cast(numeric_scale as VARCHAR)
-                      when data_type = 'varchar'	
-                        then cast(character_maximum_length as varchar)
-                      when data_type = 'char'	
-                        then cast(character_maximum_length as varchar)
-                      when data_type = 'character'	
-                        then cast(character_maximum_length as varchar)
-                      else	
-                         ''	
-                    end
-                  + '"',',') "sizeConstraints"
-	      -- ,'select ' + STRING_AGG('"' + column_name + '" as [' + cast(ORDINAL_POSITION as VARCHAR) + ']',',') + ' from "' + t.table_schema + '"."' + t.table_name + '"' QUERY	
-	      ,'select ' + STRING_AGG('"' + column_name + '"',',') + ' from "' + t.table_schema + '"."' + t.table_name + '"' QUERY	
-      from information_schema.columns c, information_schema.tables t
-     where t.table_name = c.table_name 
-	   and t.table_schema = c.table_schema
-	   and t.table_type = 'BASE TABLE'
-       and t.table_schema = 'dbo' 
-	 group by t.table_schema, t.table_name`;	
-  
-   const results = await dbConn.query(sqlStatement,[schema]);
+`SELECT t.table_schema
+       ,t.table_name
+           ,STRING_AGG(CONCAT('"',c.column_name,'"'),',')  "columns"
+           ,STRING_AGG(CONCAT('"',data_type,'"'),',')  "dataTypes"
+           ,STRING_AGG(CONCAT('"'
+                              ,CASE
+                                 WHEN data_type = 'decimal'
+                                   THEN CONCAT(numeric_precision,',',numeric_scale)
+                                 WHEN data_type in ('varchar','char','nchar','nvarchar','binary','varbinary')
+                                   THEN character_maximum_length
+                                 ELSE
+                                   ''
+                               END
+                              ,'"'
+                             )
+                             ,','
+                            ) "sizeConstraints"
+            ,CONCAT('select ',STRING_AGG(CONCAT('"',column_name,'"'),','),' from "',t.table_schema,'"."',t.table_name,'"') QUERY
+    from information_schema.columns c, information_schema.tables t
+   where t.table_name = c.table_name
+     and t.table_schema = c.table_schema
+         and t.table_type = 'BASE TABLE'
+     and t.table_schema = @SCHEMA
+   group by t.table_schema, t.table_name`;	
+   
+   const results = await new sql.Request(dbConn).input('SCHEMA',sql.VARCHAR,schema).batch(sqlStatement);
    return results.recordsets[0]
 }
 
@@ -85,6 +83,15 @@ function fetchData(request,tableInfo,outStream) {
   })
 }
 
+function closeFile(outStream) {
+		
+  return new Promise(function(resolve,reject) {
+	outStream.on('finish',function() { resolve() });
+	outStream.close();
+  })
+
+}
+
 async function main(){
 	
   let parameters = undefined;
@@ -119,7 +126,6 @@ async function main(){
     const schema = parameters.OWNER;
 	
 	const sysInfo = await getSystemInformation(dbConn);
-	console.log(sysInfo);
 	dumpFile.write('{"systemInformation":');
 	dumpFile.write(JSON.stringify({
 		                 "date"            : new Date().toISOString()
@@ -147,6 +153,7 @@ async function main(){
                                                     ,"columns"        : row.columns
                                                     ,"dataTypes"      : row.dataTypes
 												    ,"dataTypeSizing" : row.sizeConstraints
+													,selectList       : row.selectList
 	                 })}`)				   
 	}
 	dumpFile.write('},"data":{');
@@ -163,7 +170,8 @@ async function main(){
 	}
 
     dumpFile.write('}}');
-	dumpFile.close();
+	
+	await closeFile(dumpFile);
 	
 	await dbConn.release();
 	logWriter.write('Export operation successful.\n');
