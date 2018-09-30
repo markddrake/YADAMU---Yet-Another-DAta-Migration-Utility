@@ -1,7 +1,7 @@
 # YADAMU - Yet Another Data Migration Utility
 
 This project has morphed in scope from being a simple drop in replacement for Oracle's traditional IMP and EXP utilities.
-It now supports IMPORT and EXPORT homegeneous operations on Oracle 12c, Postgres, MySQL and SQL Server, as well as hetrogeneous migrations between any of the supported databases. Hence the new name - YADAMU. 
+It now supports homegeneous IMPORT and EXPORT operations on Oracle 12c, Postgres, MySQL and SQL Server, as well as hetrogeneous migrations between any of the supported databases. Hence the new name - YADAMU. 
 
 YADAMU migrates DDL and Content.
 
