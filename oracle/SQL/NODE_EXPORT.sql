@@ -19,7 +19,7 @@ as
   function JSON_EXPORT_DDL(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL) return NODE_EXPORT_METADATA_TABLE PIPELINED;
   function JSON_FEATURES return VARCHAR2 deterministic;
   function DATABASE_RELEASE return NUMBER deterministic;
-
+	
 END;
 /
 --

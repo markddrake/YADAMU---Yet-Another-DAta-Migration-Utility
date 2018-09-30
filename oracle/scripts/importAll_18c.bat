@@ -1,4 +1,4 @@
-sqlplus system/oracle@ORCL18c @TESTS/RECREATE_SCHEMAS.sql
+sqlplus system/oracle@ORCL18c @TESTS/RECREATE_SCHEMAS.sql 1
 node node\import userid=SYSTEM/oracle@ORCL18c File=JSON\18c\HR.json toUser=HR1 logfile=logs\18c\import\HR.log
 node node\import userid=SYSTEM/oracle@ORCL18c File=JSON\18c\SH.json toUser=SH1 logfile=logs\18c\import\SH.log
 node node\import userid=SYSTEM/oracle@ORCL18c File=JSON\18c\OE.json toUser=OE1 logfile=logs\18c\import\OE.log

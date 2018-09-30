@@ -1,7 +1,7 @@
 set echo on
 spool logs/sql/RECREATE_SCHEMAS.log
 --
-def ID = 1
+def ID = &1
 --
 drop user HR&ID cascade
 /

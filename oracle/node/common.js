@@ -34,7 +34,7 @@ function doRelease(conn) {
 };
 
 async function createTempLob(conn) {
-  return conn.createLob(oracledb.CLOB);
+  return conn.createLob(oracledb.BLOB);
 };
 
 
@@ -200,6 +200,12 @@ function processArguments(args,operation) {
 			break;
 	      case 'LOGFILE':
 		    parameters.LOGFILE = parameterValue;
+			break;
+	      case 'SQLTRACE':
+		    parameters.SQLTRACE = parameterValue;
+			break;
+	      case 'DUMPLOG':
+		    parameters.DUMPLOG = parameterValue.toUpperCase();
 			break;
 	      case 'MODE':
 		    parameters.MODE = parameterValue.toUpperCase();

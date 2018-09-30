@@ -7,10 +7,10 @@ postrges\node\node_modules\
 postgres\work\
 postgres\JSON\
 postgres\logs\
-Oracle\node\node_modules\
-Oracle\JSON\
-Oracle\logs\
-Oracle\work\
+oracle\node\node_modules
+oracle\JSON\
+oracle\logs\
+oracle\work\
 MYSQL\node\node_modules\
 MYSQL\JSON\
 MYSQL\work
