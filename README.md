@@ -7,7 +7,7 @@ YADAMU migrates DDL and Content.
 
 For homogeneous Oracle migrations all schema objects supported by DBMS_METADATA are migrated.
 
-For homogeneous Postgres, MySQL and SQL Server migrations, or hetrogeneous migrations DDL support operations are currently limited to table layout. Migration of indexes and other schema objects is not currently supported.
+For homogeneous Postgres, MySQL and SQL Server migrations, or hetrogeneous migrations DDL operations are currently restriced to table layouts. Migration of indexes and other schema objects is not currently supported.
 
 Details about this project can be found [here](http://markddrake.github.io/YADAMU---Yet-Another-DAta-Migration-Utility/docs)
 
