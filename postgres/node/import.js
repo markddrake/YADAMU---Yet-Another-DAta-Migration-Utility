@@ -36,8 +36,13 @@ async function processStagingTable(pgClient,schema) {
 async function main(){
   
   let pgClient = undefined
-  let parameters = undefined
-  let logWriter = process.stdout;
+  let parameters = undefined;
+  let logWriter = process.stdout;   
+  let sqlTrace = undefined;
+  
+  let errorRaised = false;
+  let warningRaised = false;
+  let statusMsg = 'successfully';
   
   try {
     parameters = common.processArguments(process.argv,'export');
@@ -46,6 +51,19 @@ async function main(){
 	  logWriter = fs.createWriteStream(parameters.LOGFILE);
     }
 	
+    if (parameters.SQLTRACE) {
+      sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
+    }
+
+    const dumpFilePath = parameters.FILE;   
+    const stats = fs.statSync(dumpFilePath)
+    const fileSizeInBytes = stats.size
+
+    const logDML         = (parameters.LOGLEVEL && (parameters.loglevel > 0));
+    const logDDL         = (parameters.LOGLEVEL && (parameters.loglevel > 1));
+    const logDDLIssues   = (parameters.LOGLEVEL && (parameters.loglevel > 2));
+    const logTrace       = (parameters.LOGLEVEL && (parameters.loglevel > 3));
+    
     const connectionDetails = {
       user      : parameters.USERNAME
      ,host      : parameters.HOSTNAME
@@ -56,11 +74,13 @@ async function main(){
 
     const pgClient = new Client(connectionDetails);
 	await pgClient.connect();
-	pgClient.on('notice',function(msg){ console.log(msg)});
-	
-    const dumpFilePath = parameters.FILE;	
-	const stats = fs.statSync(dumpFilePath)
-    const fileSizeInBytes = stats.size
+	pgClient.on('notice',function(n){ 
+	                        const notice = JSON.parse(JSON.stringify(n));
+							if (notice.code != '42P07') /* Duplicate Table */ {
+							  console.log(n);
+							}
+	})
+
     const dumpFile = fs.createReadStream(dumpFilePath);
     dumpFile.on('error',function(err) {console.log(err)})
 	
@@ -72,20 +92,63 @@ async function main(){
     logWriter.write(`${new Date().toISOString()}: Import Data file "${dumpFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
 	const results = await processStagingTable(pgClient,schema);	
-	results.forEach( function(result) {
-  	                  logWriter.write(`${new Date().toISOString()}: Table "${result.tableName}". Rows ${result.rowCount}. Elaspsed Time${Math.round(result.elapsedTime)}ms. Throughput ${Math.round((result.rowCount/Math.round(result.elapsedTime)) * 1000)} rows/s.\n`)
-	})
+
+    if ((parameters.DUMPLOG) && (parameters.DUMPLOG == 'TRUE')) {
+      const dumpFilePath = `${parameters.FILE.substring(0,parameters.FILE.lastIndexOf('.'))}.dump.import.${new Date().toISOString().replace(/:/g,'').replace(/-/g,'')}.json`;
+      fs.writeFileSync(dumpFilePath,JSON.stringify(results));
+    }
+       
+    results.forEach(function(result) {
+                      const logEntryType = Object.keys(result)[0];
+                      const logEntry = result[logEntryType];
+                      switch (true) {
+                        case (logEntryType === "dml") : 
+                             logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.\n`)
+                             break;
+                        case (logEntryType === "info") :
+                             logWriter.write(`${new Date().toISOString()}[INFO]: "${JSON.stringify(logEntry)}".\n`);
+                             break;
+                        case (logDML && (logEntryType === "dml")) :
+                             logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}".\n`)
+                             break;
+                        case (logDDL && (logEntryType === "ddl")) :
+                             logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}".\n`) 
+                             break;
+                        case (logTrace && (logEntryType === "trace")) :
+                             logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}".\n`)
+                             break;
+                        case (logEntryType === "error"):
+						     switch (true) {
+		                        case (logEntry.severity === 'FATAL') :
+                                  errorRaised = true;
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+								  break
+								case (logEntry.severity === 'WARNING') :
+                                  warningRaised = true;
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+                                  break;
+                                case (logDDLIssues) :
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+                             } 	
+                      }
+					  if ((parameters.SQLTRACE) && (logEntry.sqlStatement)) {
+						sqlTrace.write(`${logEntry.sqlStatement}\n\/\n`)
+					  }
+    })
 
 	await pgClient.end();
-	logWriter.write('Import operation successful.');
+    statusMsg = warningRaised ? 'with warnings' : statusMsg;
+    statusMsg = errorRaised ? 'with errors'  : statusMsg;
+    
+    logWriter.write(`Import operation completed ${statusMsg}.`);
     if (logWriter !== process.stdout) {
-	  console.log(`Import operation successful: See "${parameters.LOGFILE}" for details.`);
+      console.log(`Import operation completed ${statusMsg}: See "${parameters.LOGFILE}" for details.`);
     }
   } catch (e) {
     if (logWriter !== process.stdout) {
 	  console.log(`Import operation failed: See "${parameters.LOGFILE}" for details.`);
   	  logWriter.write('Import operation failed.');
-	  logWriter.log(e);
+	  logWriter.write(e.stack);
     }
 	else {
     	console.log('Import operation Failed.');
@@ -98,6 +161,9 @@ async function main(){
   
   if (logWriter !== process.stdout) {
     logWriter.close();
+  }
+  if (parameters.SQLTRACE) {
+    sqlTrace.close();
   }
   
 }

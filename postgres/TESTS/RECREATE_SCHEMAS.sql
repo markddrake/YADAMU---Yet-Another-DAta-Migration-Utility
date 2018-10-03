@@ -1,6 +1,4 @@
 --
-\set ID 2
---
 select 'HR' || :ID "SCHEMA" \gset
 --
 drop schema :"SCHEMA" cascade;

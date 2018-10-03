@@ -83,7 +83,19 @@ function processArguments(args,operation) {
 	      case '--LOGFILE':
 		    parameters.LOGFILE = parameterValue;
 			break;
-	      case 'MODE':
+	      case 'SQLTRACE':
+	      case '--SQLTRACE':
+		    parameters.SQLTRACE = parameterValue;
+			break;
+	      case 'LOGLEVEL':
+	      case '--LOGLEVEL':
+		    parameters.LOGLEVEL = parameterValue;
+			break;
+	      case 'DUMPLOG':
+	      case '--DUMPLOG':
+		    parameters.DUMPLOG = parameterValue.toUpperCase();
+			break;
+          case 'MODE':
 		    parameters.MODE = parameterValue.toUpperCase();
 			break;
 		  default:

@@ -204,6 +204,9 @@ function processArguments(args,operation) {
 	      case 'SQLTRACE':
 		    parameters.SQLTRACE = parameterValue;
 			break;
+	      case 'LOGLEVEL':
+		    parameters.LOGLEVEL = parameterValue;
+			break;
 	      case 'DUMPLOG':
 		    parameters.DUMPLOG = parameterValue.toUpperCase();
 			break;

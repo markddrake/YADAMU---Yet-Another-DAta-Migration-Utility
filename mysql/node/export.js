@@ -6,6 +6,36 @@ const mysql = require('mysql');
 const JSONStream = require('JSONStream')
 const Transform = require('stream').Transform;
 
+const sqltAnsiQuotingMode =
+`SET SESSION SQL_MODE=ANSI_QUOTES`
+
+const sqlGetSystemInformation = 
+`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION"`;					   
+
+const sqlGenerateTables = 
+`select t.table_schema
+       ,t.table_name
+  	   ,group_concat(concat('"',column_name,'"') separator ',')  "columns"
+	   ,group_concat(concat('"',data_type,'"') separator ',')  "dataTypes"
+	   ,group_concat(concat('"',	
+                            case when (numeric_precision is not null) and (numeric_scale is not null)
+                                   then concat(numeric_precision,',',numeric_scale)	
+                                 when (numeric_precision is not null)
+                                   then numeric_precision
+                                 when (character_maximum_length is not null)
+                                   then character_maximum_length
+                                 else	
+                                   ''	
+                            end,	
+                            '"') separator ',') "sizeConstraints"
+	   ,concat('select json_array(',group_concat('"',column_name,'"'),') "json" from "',t.table_schema,'"."',t.table_name,'"') QUERY	
+   from information_schema.columns	c, information_schema.tables t
+  where t.table_name = c.table_name 
+    and t.table_schema = c.table_schema
+    and t.table_type = 'BASE TABLE'
+    and t.table_schema = ?
+	  group by t.table_schema, t.table_name`;
+
 function connect(conn) {
 	
   return new Promise(function(resolve,reject) {
@@ -19,7 +49,7 @@ function connect(conn) {
 }	
 	  
 function query(conn,sqlQuery,args) {
-	
+    
   return new Promise(function(resolve,reject) {
 	                   conn.query(sqlQuery,args,function(err,rows,fields) {
 		                                     if (err) {
@@ -31,39 +61,15 @@ function query(conn,sqlQuery,args) {
 }  
 
 async function getSystemInformation(conn) {    	
-	const sqlStatement = `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION"`;					   
-	const results = await query(conn,sqlStatement); 
+
+	const results = await query(conn,sqlGetSystemInformation); 
 	return results;
+
 }
 
 async function generateQueries(conn,schema) {    	
-	const sqlStatement = 
-`select table_schema
-       ,table_name
-  	   ,group_concat(concat('"',column_name,'"') separator ',')  "columns"
-	   ,group_concat(concat('"',data_type,'"') separator ',')  "dataTypes"
-	   ,group_concat(concat('"',	
-                            case when data_type = 'decimal'	
-                                   then concat(numeric_precision,',',numeric_scale)	
-                                 when data_type = 'varchar'	
-                                   then character_maximum_length	
-                                 when data_type = 'char'	
-                                   then character_maximum_length	
-                                 when data_type = 'character'	
-                                   then character_maximum_length	
-                                 else	
-                                   ''	
-                            end,	
-                            '"') separator ',') "sizeConstraints"
-	   ,concat('select json_array(',group_concat('"',column_name,'"'),') "json" from "',table_schema,'"."',table_name,'"') QUERY	
-   from information_schema.columns	c, information_schema.tables t
-  where t.table_name = c.table_name 
-    and t.table_schema = c.table_schema
-    and t.table_type = 'BASE TABLE'
-    and t.table_schema = ?
-  group by t.table_schema, t.table_name`;
 
-   const results = await query(conn,sqlStatement,[schema]);
+   const results = await query(conn,sqlGenerateTables,[schema]);
    return results;
 }
 
@@ -91,6 +97,7 @@ async function main(){
 	
   let conn = undefined;
   let parameters = undefined;
+  let sqlTrace = undefined;
   let logWriter = process.stdout;
 	
   try {
@@ -100,7 +107,11 @@ async function main(){
 	if (parameters.LOGFILE) {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE);
     }
-	
+    
+    if (parameters.SQLTRACE) {
+      sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
+    }
+
     const connectionDetails = {
             host      : parameters.HOSTNAME
            ,user      : parameters.USERNAME
@@ -109,13 +120,19 @@ async function main(){
 
     conn = mysql.createConnection(connectionDetails);
 	await connect(conn);
-    await query(conn,'SET SESSION SQL_MODE=ANSI_QUOTES');
+    if (parameters.SQLTRACE) {
+      sqlTrace.write(`${sqltAnsiQuotingMode}\n\/\n`)
+    }
+    await query(conn,sqltAnsiQuotingMode);
 	
     const dumpFilePath = parameters.FILE;	
     const dumpFile = fs.createWriteStream(dumpFilePath);
-    dumpFile.on('error',function(err) {console.log(err)})
+    // dumpFile.on('error',function(err) {console.log(err)})
 	
     const schema = parameters.OWNER;
+    if (parameters.SQLTRACE) {
+      sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
+    }
 	const sysInfo = await getSystemInformation(conn);
 	dumpFile.write('{"systemInformation":');
 	dumpFile.write(JSON.stringify({
@@ -130,6 +147,9 @@ async function main(){
 	}));
 	
 	dumpFile.write(',"metadata":{');
+    if (parameters.SQLTRACE) {
+      sqlTrace.write(`${sqlGenerateTables}\n\/\n`)
+    }
 	const sqlQueries = await generateQueries(conn,schema);
 	for (let i=0; i < sqlQueries.length; i++) {
 	  const row = sqlQueries[i];
@@ -147,11 +167,14 @@ async function main(){
 	dumpFile.write('},"data":{');
 	for (let i=0; i < sqlQueries.length; i++) {
       const row = sqlQueries[i]
-	  const startTime = new Date().getTime()
 	  if (i > 0) {
 		dumpFile.write(',');
       }
 	  dumpFile.write(`"${row.TABLE_NAME}" :`);
+      if (parameters.SQLTRACE) {
+        sqlTrace.write(`${row.QUERY}\n\/\n`)
+      }
+	  const startTime = new Date().getTime()
       const rows = await fetchData(conn,row.QUERY,dumpFile) 
       const elapsedTime = new Date().getTime() - startTime
       logWriter.write(`${new Date().toISOString()} - Table: "${row.TABLE_NAME}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
@@ -183,6 +206,11 @@ async function main(){
   if (logWriter !== process.stdout) {
 	logWriter.close();
   }  
+
+  if (parameters.SQLTRACE) {
+    sqlTrace.close();
+  }
+  
 }
 
 main();

@@ -148,7 +148,7 @@ procedure LOG_ERROR(P_SEVERITY VARCHAR2, P_TABLE_NAME VARCHAR2,P_SQL_STATEMENT C
 as
 begin
   RESULTS_CACHE.extend;
-  select JSON_OBJECT('error' value JSON_OBJECT('severity' value P_SEVERITY, 'tableName' value P_TABLE_NAME, 'sqlStatement' value P_SQL_STATEMENT, 'code' value P_SQLCODE, 'msg' value P_SQLERRM, 'stack' value P_STACK
+  select JSON_OBJECT('error' value JSON_OBJECT('severity' value P_SEVERITY, 'tableName' value P_TABLE_NAME, 'sqlStatement' value P_SQL_STATEMENT, 'code' value P_SQLCODE, 'msg' value P_SQLERRM, 'details' value P_STACK
                      $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB) returning CLOB)
                      $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
@@ -180,12 +180,77 @@ return VARCHAR2
 as
 begin
   case
-    when P_DATA_TYPE = 'varchar'
-      then return 'VARCHAR2';
+    --
+    -- SQLSERVER Conversions
+	--
+    when P_DATA_TYPE = 'bigint'
+      then return 'NUMBER(19)';
+    when P_DATA_TYPE = 'binary' and (P_DATA_TYPE_LENGTH = -1)
+      then return 'BLOB';
+    when P_DATA_TYPE = 'binary'
+      then return 'RAW';
+    when P_DATA_TYPE = 'bit'
+      then return 'RAW(1)';
+    when P_DATA_TYPE = 'datetime'
+      then return 'DATE';
     when P_DATA_TYPE = 'decimal'
       then return 'NUMBER';
+    when P_DATA_TYPE = 'float'
+      then return 'FLOAT(49)';
+    when P_DATA_TYPE = 'geography'
+	  -- TODO : Add IS JSON Constraint. Mag Geography --> GeoJSON --> "MDSYS.SPATIAL"
+      then return 'VARCHAR2(4000)';
+    when P_DATA_TYPE = 'geometry'
+	  -- TODO : Add IS JSON Constraint. Mag Geography --> GeoJSON --> "MDSYS.SPATIAL"
+      then return 'VARCHAR2(4000)';
+    when P_DATA_TYPE = 'hierarchyid'
+	  -- Assume DATA_TYPE_LENGTH is characters required to represent value as HEXBINARY (Default appears to 892)
+      then return 'RAW(' || (P_DATA_TYPE_LENGTH / 2) ||')';
+    when P_DATA_TYPE = 'image'
+      then return 'BLOB';
+    when P_DATA_TYPE = 'int'
+      then return 'NUMBER(10)';
+    when P_DATA_TYPE = 'money'
+      then return 'NUMBER(19,4)';
+    when P_DATA_TYPE = 'ntext'
+      then return 'NCLOB';
+    when P_DATA_TYPE = 'nvarchar'and (P_DATA_TYPE_LENGTH = -1)
+      then return 'NCLOB';
+    when P_DATA_TYPE = 'nvarchar'and (P_DATA_TYPE_LENGTH > 2000)
+	  -- Cannot create NVARCHAR2(2001) at least with AL32UTF8 Database Character Set
+      then return 'NCLOB';
+    when P_DATA_TYPE = 'nvarchar'
+      then return 'NVARCHAR2';
+    when P_DATA_TYPE = 'numeric'
+      then return 'NUMBER';
+    when P_DATA_TYPE = 'real'
+      then return 'FLOAT(23)';
+    when P_DATA_TYPE = 'smalldatetime'
+      then return 'DATE';
+    when P_DATA_TYPE = 'smallmoney'
+      then return 'NUMBER(10,4)';
+    when P_DATA_TYPE = 'smallint'
+      then return 'NUMBER(5)';
+    when P_DATA_TYPE = 'text'
+      then return 'CLOB';
+    when P_DATA_TYPE = 'time'
+      then return 'DATE';
+    when P_DATA_TYPE = 'tinyint'
+      then return 'NUMBER(3)';
+    when P_DATA_TYPE = 'uniqueidentifier'
+      then return 'CHAR(36)';
+    when P_DATA_TYPE = 'varbinary' and (P_DATA_TYPE_LENGTH = -1)
+      then return 'BLOB';
+    when P_DATA_TYPE = 'varbinary'
+      then return 'RAW';
+    when P_DATA_TYPE = 'varchar'  and (P_DATA_TYPE_LENGTH = -1)
+      then return 'CLOB';
+    when P_DATA_TYPE = 'varchar'
+      then return 'VARCHAR2';
+    when P_DATA_TYPE = 'xml'
+      then return 'XMLTYPE';
     else
-      return P_DATA_TYPE;
+      return UPPER(P_DATA_TYPE);
   end case;
 end;
 --
@@ -195,6 +260,7 @@ as
   V_NEXT_SEPERATOR            PLS_INTEGER;
   V_FUNCTION_NAME             VARCHAR2(130);
 begin
+
   if (P_REQUIRED_FUNCTIONS = '"OBJECTS"') then
     OBJECT_SERIALIZATION.DESERIALIZE_TABLE_TYPES(P_OWNER,P_TABLE_NAME,P_SQL_STATEMENT);
   else
@@ -253,13 +319,13 @@ as
            cast(collect(
                         '"' || COLUMN_NAME || '" ' ||
                         case
-                          when (INSTR(DATA_TYPE,'"."') > 0)
+                          when (INSTR(TARGET_DATA_TYPE,'"."') > 0)
                             then case
-                                   when SUBSTR(DATA_TYPE,1,INSTR(DATA_TYPE,'"."')-1) = P_TABLE_OWNER
-                                     then '"' || P_TARGET_SCHEMA || '"."' || SUBSTR(DATA_TYPE,INSTR(DATA_TYPE,'"."')+3) || '"'
-                                     else '"' || DATA_TYPE || '"'
+                                   when SUBSTR(TARGET_DATA_TYPE,1,INSTR(TARGET_DATA_TYPE,'"."')-1) = P_TABLE_OWNER
+                                     then '"' || P_TARGET_SCHEMA || '"."' || SUBSTR(TARGET_DATA_TYPE,INSTR(TARGET_DATA_TYPE,'"."')+3) || '"'
+                                     else '"' || TARGET_DATA_TYPE || '"'
                                  end
-                          when DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID') or (DATA_TYPE LIKE 'INTERVAL%')
+                          when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE LIKE '%(%)')
                             then TARGET_DATA_TYPE
                           when DATA_TYPE_SCALE is not NULL
                             then TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH || ',' || DATA_TYPE_SCALE || ')'
@@ -277,16 +343,24 @@ as
            cast(collect(
                         /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
                         case
-                          when DATA_TYPE = 'BFILE'
+                          when DATA_TYPE = 'real'
+                            then 'cast( "' || COLUMN_NAME || '" as FLOAT)'
+                          when DATA_TYPE = 'bit'
+                            then 'HEXTORAW(case when "' || COLUMN_NAME || '" = ''true'' then ''1'' else ''0'' end)'
+                          when DATA_TYPE = 'hierarchyid'
+                            then 'HEXTORAW("' || COLUMN_NAME || '")'
+                          -- when DATA_TYPE = 'date'
+                            -- then 'TO_DATE("' || COLUMN_NAME || '",''YYYY-MM-DDT"HH24:MI:SS.FFFTZHTZM'')'
+                          when TARGET_DATA_TYPE = 'BFILE'
                             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.CHAR2BFILE("' || COLUMN_NAME || '") end'
-                          when (DATA_TYPE = 'XMLTYPE') or (SUBSTR("DATA_TYPE",INSTR("DATA_TYPE",'"."')+3) = 'XMLTYPE')
+                          when (TARGET_DATA_TYPE = 'XMLTYPE') or (SUBSTR("TARGET_DATA_TYPE",INSTR("TARGET_DATA_TYPE",'"."')+3) = 'XMLTYPE')
                             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || COLUMN_NAME || '") end'
-                          when (DATA_TYPE = 'ANYDATA') or (SUBSTR("DATA_TYPE",INSTR("DATA_TYPE",'"."')+3) = 'ANYDATA')
+                          when (TARGET_DATA_TYPE = 'ANYDATA') or (SUBSTR("TARGET_DATA_TYPE",INSTR("TARGET_DATA_TYPE",'"."')+3) = 'ANYDATA')
                             -- ### TODO - Better deserialization of ANYDATA.
                             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || COLUMN_NAME || '") end'
-                          when INSTR(DATA_TYPE,'"."') > 0
-                            then '"#' || SUBSTR(DATA_TYPE,INSTR(DATA_TYPE,'"."')+3) || '"("' || COLUMN_NAME || '")'
-                          when DATA_TYPE = 'BLOB'
+                          when INSTR(TARGET_DATA_TYPE,'"."') > 0
+                            then '"#' || SUBSTR(TARGET_DATA_TYPE,INSTR(TARGET_DATA_TYPE,'"."')+3) || '"("' || COLUMN_NAME || '")'
+                          when TARGET_DATA_TYPE = 'BLOB'
                             $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.HEXBINARY2BLOB("' || COLUMN_NAME || '") end'
                             $ELSE
@@ -304,14 +378,32 @@ as
            cast(collect(
                         '"' || COLUMN_NAME || '" ' ||
                         case
-                          when DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (DATA_TYPE like 'INTERVAL%')
+                          when TARGET_DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (TARGET_DATA_TYPE like 'INTERVAL%')
                             then 'VARCHAR2'
-                          when DATA_TYPE in ('XMLTYPE','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (INSTR(DATA_TYPE,'"."') > 0)
+                          when TARGET_DATA_TYPE in ('XMLTYPE','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (INSTR(TARGET_DATA_TYPE,'"."') > 0) 
                             then C_RETURN_TYPE
-                          when "DATA_TYPE" in ('DATE','DATETIME')
+                          when "TARGET_DATA_TYPE" in ('DATE','DATETIME')
                             then "TARGET_DATA_TYPE"
-                          when DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
+                          when TARGET_DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
                             then 'TIMESTAMP WITH TIME ZONE'
+                          when DATA_TYPE = 'uniqueidentifier'
+                            then 'VARCHAR2(36)'
+                          when DATA_TYPE = 'geography'
+                            then 'VARCHAR2(4000) FORMAT JSON'
+                          when DATA_TYPE = 'geometry'
+                            then 'VARCHAR2(4000) FORMAT JSON'
+                          when DATA_TYPE = 'hierarchyid'
+                            then 'VARCHAR2'
+                          when DATA_TYPE = 'float'
+                            then 'VARCHAR2(49)'
+                          when DATA_TYPE = 'real'
+                            then 'VARCHAR2(23)'
+                          when DATA_TYPE = 'datetime'
+                            then 'DATE'
+                          when DATA_TYPE = 'bit'
+                            then 'VARCHAR2(5)'
+                          when "TARGET_DATA_TYPE"  LIKE '%(%)'
+                            then "TARGET_DATA_TYPE"
                           when "DATA_TYPE_SCALE" is not NULL
                             then "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ',' || "DATA_TYPE_SCALE" || ')'
                           when "DATA_TYPE_LENGTH"  is not NULL
@@ -319,7 +411,7 @@ as
                           else
                             "TARGET_DATA_TYPE"
                         end
-                        || ' PATH ''$[' || (st."INDEX" - 1) || ']''' || C_NEWLINE
+                        || ' PATH ''$[' || (st."INDEX" - 1) || ']'' ERROR ON ERROR' || C_NEWLINE
                         order by st."INDEX"
                 )
                 as T_VC4000_TABLE
@@ -333,13 +425,13 @@ as
   -- cast(collect(...) causes ORA-22814: attribute or element value is larger than specified in type in 12.2
   select '"' || COLUMN_NAME || '" ' ||
          case
-           when (INSTR(DATA_TYPE,'"."') > 0)
+           when (INSTR(TARGET_DATA_TYPE,'"."') > 0)
              then case
-                    when SUBSTR(DATA_TYPE,1,INSTR(DATA_TYPE,'"."')-1) = P_TABLE_OWNER
-                      then '"' || P_TARGET_SCHEMA || '"."' || SUBSTR(DATA_TYPE,INSTR(DATA_TYPE,'"."')+3) || '"'
-                      else '"' || DATA_TYPE || '"'
+                    when SUBSTR(TARGET_DATA_TYPE,1,INSTR(TARGET_DATA_TYPE,'"."')-1) = P_TABLE_OWNER
+                      then '"' || P_TARGET_SCHEMA || '"."' || SUBSTR(TARGET_DATA_TYPE,INSTR(TARGET_DATA_TYPE,'"."')+3) || '"'
+                      else '"' || TARGET_DATA_TYPE || '"'
                   end
-           when DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID') or (DATA_TYPE LIKE 'INTERVAL%')
+           when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID') or (TARGET_DATA_TYPE LIKE 'INTERVAL%')
              then TARGET_DATA_TYPE
            when DATA_TYPE_SCALE is not NULL
              then TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH || ',' || DATA_TYPE_SCALE || ')'
@@ -350,19 +442,19 @@ as
          end || C_NEWLINE COLUMNS_CLAUSE
          /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
         ,case
-           when DATA_TYPE = 'BFILE'
+           when TARGET_DATA_TYPE = 'BFILE'
              then 'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.CHAR2BFILE("' || COLUMN_NAME || '") end'
-           when (DATA_TYPE = 'XMLTYPE') or (SUBSTR("DATA_TYPE",INSTR("DATA_TYPE",'"."')+3) = 'XMLTYPE')
+           when (TARGET_DATA_TYPE = 'XMLTYPE') or (SUBSTR("TARGET_DATA_TYPE",INSTR("TARGET_DATA_TYPE",'"."')+3) = 'XMLTYPE')
              then 'case when "' || COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || COLUMN_NAME || '") end'
-           when (DATA_TYPE = 'ANYDATA') or (SUBSTR("DATA_TYPE",INSTR("DATA_TYPE",'"."')+3) = 'ANYDATA')
+           when (TARGET_DATA_TYPE = 'ANYDATA') or (SUBSTR("TARGET_DATA_TYPE",INSTR("TARGET_DATA_TYPE",'"."')+3) = 'ANYDATA')
              -- ### TODO - Better deserialization of ANYDATA.
              then 'case when "' || COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || COLUMN_NAME || '") end'
-           when DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
+           when TARGET_DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
              -- Problems with ORA-1881
              then 'TO_TIMESTAMP_TZ("' || COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FFTZHTZM'')'
-           when INSTR(DATA_TYPE,'"."') > 0
-             then '"#' || SUBSTR(DATA_TYPE,INSTR(DATA_TYPE,'"."')+3) || '"("' || COLUMN_NAME || '")'
-           when DATA_TYPE = 'BLOB'
+           when INSTR(TARGET_DATA_TYPE,'"."') > 0
+             then '"#' || SUBSTR(TARGET_DATA_TYPE,INSTR(TARGET_DATA_TYPE,'"."')+3) || '"("' || COLUMN_NAME || '")'
+           when TARGET_DATA_TYPE = 'BLOB'
              $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
              then 'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.HEXBINARY2BLOB("' || COLUMN_NAME || '") end'
              $ELSE
@@ -373,13 +465,13 @@ as
          end INSERT_SELECT_LIST
         ,'"' || COLUMN_NAME || '" ' ||
          case
-           when DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (DATA_TYPE like 'INTERVAL%')
+           when TARGET_DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (TARGET_DATA_TYPE like 'INTERVAL%')
              then 'VARCHAR2'
-           when DATA_TYPE in ('XMLTYPE','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (INSTR(DATA_TYPE,'"."') > 0)
+           when TARGET_DATA_TYPE in ('XMLTYPE','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (INSTR(TARGET_DATA_TYPE,'"."') > 0)
              then C_RETURN_TYPE
-           when "DATA_TYPE" in ('DATE','DATETIME')
+           when "TARGET_DATA_TYPE" in ('DATE','DATETIME')
              then "TARGET_DATA_TYPE"
-           when DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
+           when TARGET_DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
              -- Problems with ORA-1881
 			 -- then 'TIMESTAMP WITH TIME ZONE'
              then 'VARCHAR2'
@@ -390,7 +482,7 @@ as
            else
              "TARGET_DATA_TYPE"
          end
-         || ' PATH ''$[' || (st."INDEX" - 1) || ']''' || C_NEWLINE COLUMN_PATTERNS
+         || ' PATH ''$[' || (st."INDEX" - 1) || ']'' ERROR ON ERROR' || C_NEWLINE COLUMN_PATTERNS
     from "SOURCE_TABLE_DEFINITION" st, "TARGET_TABLE_DEFINITION" tt
    where st."INDEX" = tt."INDEX"
    order by st."INDEX";
@@ -422,6 +514,7 @@ exception
     null;
 end;';
 begin
+
   DBMS_LOB.CREATETEMPORARY(P_DDL_STATEMENT,TRUE,DBMS_LOB.SESSION);
   DBMS_LOB.CREATETEMPORARY(P_DML_STATEMENT,TRUE,DBMS_LOB.SESSION);
 
@@ -450,7 +543,7 @@ begin
 --
    $END
 --
-   V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK1 || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (';
+   V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK1 || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (' || C_NEWLINE || ' ';
    DBMS_LOB.WRITEAPPEND(P_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
    DBMS_LOB.APPEND(P_DDL_STATEMENT,V_COLUMNS_CLAUSE);
    V_SQL_FRAGMENT := C_NEWLINE || C_CREATE_TABLE_BLOCK2;
@@ -466,7 +559,8 @@ begin
      V_SQL_FRAGMENT :=  'WITH' || C_NEWLINE;
      DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
      APPEND_DESERIALIZATION_FUNCTIONS(P_TARGET_SCHEMA,P_TABLE_NAME,P_DESERIALIZATION_FUNCTIONS,P_DML_STATEMENT);
-   end if;
+
+	 end if;
    V_SQL_FRAGMENT := 'select ';
    DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
    DBMS_LOB.APPEND(P_DML_STATEMENT,V_INSERT_SELECT_LIST );
@@ -474,6 +568,13 @@ begin
    DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
    DBMS_LOB.APPEND(P_DML_STATEMENT,V_COLUMN_PATTERNS);
    DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,2,'))');
+exception
+  when others then 
+    LOG_INFO('[' || P_COLUMN_LIST || ']');
+    LOG_INFO('[' || REPLACE(P_DATA_TYPE_LIST,'"."','\".\"') || ']');
+    LOG_INFO('[' || P_DATA_SIZE_LIST || ']');
+    LOG_ERROR(C_FATAL_ERROR,'PROCEUDRE JSON_IMPORT.GENERATE_STATEMENTS',NULL,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
+    raise;
 end;
 --
 procedure SET_CURRENT_SCHEMA(P_TARGET_SCHEMA VARCHAR2)
@@ -758,6 +859,10 @@ as
 begin
   IMPORT_JSON(P_JSON_DUMP_FILE, P_TARGET_SCHEMA);
   return GENERATE_IMPORT_LOG();
+exception
+  when others then
+    LOG_ERROR(C_FATAL_ERROR,'PROCEUDRE IMPORT_JSON',NULL,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
+    return GENERATE_IMPORT_LOG();
 end;
 --
 end;

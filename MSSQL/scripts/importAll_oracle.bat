@@ -1,6 +1,7 @@
-node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"HR\" --FILE=c:\\Development\\MySQL\\JSON\\oracle\\HR.json
-node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"SH\" --FILE=c:\\Development\\MySQL\\JSON\\oracle\\SH.json
-node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"OE\" --FILE=c:\\Development\\MySQL\\JSON\\oracle\\OE.json
-node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"PM\" --FILE=c:\\Development\\MySQL\\JSON\\oracle\\PM.json
-node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"IX\" --FILE=c:\\Development\\MySQL\\JSON\\oracle\\IX.json
-node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"BI\" --FILE=c:\\Development\\MySQL\\JSON\\oracle\\BI.json
+sqlcmd -Usa -Poracle -S192.168.1.250 -d clone -I -e -i TESTS\RECREATE_SCHEMAS.sql -v ID=1
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"HR1\" --FILE=..\JSON\oracle\18c\HR.json
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"SH1\" --FILE=..\JSON\oracle\18c\SH.json
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"OE1\" --FILE=..\JSON\oracle\18c\OE.json
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"PM1\" --FILE=..\JSON\oracle\18c\PM.json
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"IX1\" --FILE=..\JSON\oracle\18c\IX.json
+node node\import --USERNAME=sa --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=clone --TOUSER=\"BI1\" --FILE=..\JSON\oracle\18c\BI.json

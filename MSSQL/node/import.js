@@ -3,8 +3,8 @@
 const fs = require('fs');
 const common = require('./common.js');
 const sql = require('mssql');
-const stream = require('stream');
-	 
+const stream = require('stream');     
+     
 async function loadStagingTable(dbConn,stagingTable,dumpFilePath) {    	
 
   async function dropStagingTable(request,target) {
@@ -126,19 +126,15 @@ async function processStagingTable(dbConn,stagingTable,schema) {
 		throw(e);
 	  }
   }
-
-  return results.recordsets[0][0];
-}
-
-async function createTargetDatabase(dbConn,schema) {    	
-	const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;					   
-	const results = await query(dbConn,sqlStatement,schema);
-	return results;
+  
+  return results.recordset;
 }
 
 async function main(){
 	
+  let dbConn = undefined;
   let parameters = undefined;
+  let sqlTrace = undefined;
   let logWriter = process.stdout;
 	
   try {
@@ -149,7 +145,11 @@ async function main(){
 	if (parameters.LOGFILE) {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE);
     }
-	
+		
+    if (parameters.SQLTRACE) {
+      sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
+    }
+    
 	const config = {
       server    : parameters.HOSTNAME
      ,user      : parameters.USERNAME
@@ -162,18 +162,22 @@ async function main(){
       }
     }
 
-    const dbConn = new sql.ConnectionPool(config);
+    dbConn = new sql.ConnectionPool(config);
 	await dbConn.connect()
 	await dbConn.query(`SET QUOTED_IDENTIFIER ON`);
 	
     const schema = parameters.TOUSER;
-	// results = await createTargetDatabase(dbConn,schema);
 	
     const dumpFilePath = parameters.FILE;	
 	const stats = fs.statSync(dumpFilePath)
     const fileSizeInBytes = stats.size
-
-	const stagingTable = { table_name : 'JSON_STAGING', column_name : 'DATA'}
+    
+    const logDML         = (parameters.LOGLEVEL && (parameters.loglevel > 0));
+    const logDDL         = (parameters.LOGLEVEL && (parameters.loglevel > 1));
+    const logDDLIssues   = (parameters.LOGLEVEL && (parameters.loglevel > 2));
+    const logTrace       = (parameters.LOGLEVEL && (parameters.loglevel > 3));
+	
+    const stagingTable = { table_name : 'JSON_STAGING', column_name : 'DATA'}
     
 	const startTime = new Date().getTime();
 	results = await loadStagingTable(dbConn,stagingTable,dumpFilePath);
@@ -182,21 +186,45 @@ async function main(){
 
 	results = await verifyDataLoad(dbConn,stagingTable);
 	results = await processStagingTable(dbConn,stagingTable,schema);
-	const jsonKey = Object.keys(results)[0]
-    if (results[jsonKey].length > 0) {
-	  results = JSON.parse(results[jsonKey])
-	  results.forEach( function(logEntry) {
-  	                    logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elapsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.\n`)
-						if (logEntry.error !== '{}') {
-						  logWriter.write(`${new Date().toISOString()}:${logEntry.error}.\n`)
-						  logWriter.write(`${new Date().toISOString()}:${logEntry.ddlStatement}.\n`)
-						  logWriter.write(`${new Date().toISOString()}:${logEntry.dmlStatement}.\n`)
-	                    }
-	  })
-	}
-	else {
-      logWriter.write(`${new Date().toISOString()}: No tables found.\n`)
-	}
+  
+    results.forEach(function(record) {
+                      const result = JSON.parse(record.LOG_ENTRY)[0];
+                      const logEntryType = Object.keys(result)[0];
+                      const logEntry = result[logEntryType];
+                      switch (true) {
+                        case (logEntryType === "dml") : 
+                             logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.\n`)
+                             break;
+                        case (logEntryType === "info") :
+                             logWriter.write(`${new Date().toISOString()}[INFO]: "${JSON.stringify(logEntry)}".\n`);
+                             break;
+                        case (logDML && (logEntryType === "dml")) :
+                             logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}".\n`)
+                             break;
+                        case (logDDL && (logEntryType === "ddl")) :
+                             logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}".\n`) 
+                             break;
+                        case (logTrace && (logEntryType === "trace")) :
+                             logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}".\n`)
+                             break;
+                        case (logEntryType === "error"):
+						     switch (true) {
+		                        case (logEntry.severity === 'FATAL') :
+                                  errorRaised = true;
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+								  break
+								case (logEntry.severity === 'WARNING') :
+                                  warningRaised = true;
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+                                  break;
+                                case (logDDLIssues) :
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+                             } 	
+                      }
+					  if ((parameters.SQLTRACE) && (logEntry.sqlStatement)) {
+						sqlTrace.write(`${logEntry.sqlStatement}\n\/\n`)
+					  }
+    })
 	
 	await dbConn.close();
 	logWriter.write('Import operation successful.\n');

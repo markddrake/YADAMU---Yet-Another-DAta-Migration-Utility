@@ -4,32 +4,27 @@ const fs = require('fs');
 const common = require('./common.js');
 const sql = require('mssql');
 
-async function getSystemInformation(dbConn) {    	
-	const sqlStatement = `select db_Name() "DATABASE_NAME", current_user "CURRENT_USER", session_user "SESSION_USER", CONVERT(NVARCHAR(20),SERVERPROPERTY('ProductVersion')) "DATABASE_VERSION",CONVERT(NVARCHAR(128),SERVERPROPERTY('MachineName')) "HOSTNAME"`;					   
-	const results = await await dbConn.query(sqlStatement);
-	return results.recordsets[0];
-}
+const sqlGetSystemInformation =  
+`select db_Name() "DATABASE_NAME", current_user "CURRENT_USER", session_user "SESSION_USER", CONVERT(NVARCHAR(20),SERVERPROPERTY('ProductVersion')) "DATABASE_VERSION",CONVERT(NVARCHAR(128),SERVERPROPERTY('MachineName')) "HOSTNAME"`;					   
 
-async function generateQueries(dbConn,schema) {    	
-	const sqlStatement = 
-`SELECT t.table_schema
+const sqlGenerateQueries =
+`select t.table_schema
        ,t.table_name
-           ,STRING_AGG(CONCAT('"',c.column_name,'"'),',')  "columns"
-           ,STRING_AGG(CONCAT('"',data_type,'"'),',')  "dataTypes"
-           ,STRING_AGG(CONCAT('"'
-                              ,CASE
-                                 WHEN data_type = 'decimal'
-                                   THEN CONCAT(numeric_precision,',',numeric_scale)
-                                 WHEN data_type in ('varchar','char','nchar','nvarchar','binary','varbinary')
-                                   THEN character_maximum_length
-                                 ELSE
-                                   ''
-                               END
-                              ,'"'
-                             )
-                             ,','
-                            ) "sizeConstraints"
-            ,CONCAT('select ',STRING_AGG(CONCAT('"',column_name,'"'),','),' from "',t.table_schema,'"."',t.table_name,'"') QUERY
+           ,string_agg(concat('"',c.column_name,'"'),',')  "columns"
+           ,string_agg(concat('"',data_type,'"'),',')  "dataTypes"
+           ,string_agg(case
+                         when (numeric_precision is not null) and (numeric_scale is not null) 
+                           then concat('"',numeric_precision,',',numeric_scale,'"')
+                         when (numeric_precision is not null) 
+                           then concat('"',numeric_precision,'"')
+                         when (character_maximum_length is not null)
+                           then  concat('"',character_maximum_length,'"')
+                         else
+                           '""'
+                       end
+                      ,','
+                     ) "sizeConstraints"
+            ,concat('select ',string_agg(concat('"',column_name,'"'),','),' from "',t.table_schema,'"."',t.table_name,'"') QUERY
     from information_schema.columns c, information_schema.tables t
    where t.table_name = c.table_name
      and t.table_schema = c.table_schema
@@ -37,8 +32,18 @@ async function generateQueries(dbConn,schema) {
      and t.table_schema = @SCHEMA
    group by t.table_schema, t.table_name`;	
    
-   const results = await new sql.Request(dbConn).input('SCHEMA',sql.VARCHAR,schema).batch(sqlStatement);
+async function getSystemInformation(dbConn) {    	
+
+	const results = await await dbConn.query(sqlGetSystemInformation);
+	return results.recordsets[0];
+    
+}
+
+async function generateQueries(dbConn,schema) {    	
+
+   const results = await new sql.Request(dbConn).input('SCHEMA',sql.VARCHAR,schema).batch(sqlGenerateQueries);
    return results.recordsets[0]
+
 }
 
 function fetchData(request,tableInfo,outStream) {
@@ -94,7 +99,9 @@ function closeFile(outStream) {
 
 async function main(){
 	
+  let dbConn = undefined;
   let parameters = undefined;
+  let sqlTrace = undefined;
   let logWriter = process.stdout;
 	
   try {
@@ -105,6 +112,10 @@ async function main(){
 	  logWriter = fs.createWriteStream(parameters.LOGFILE);
     }
 	
+    if (parameters.SQLTRACE) {
+      sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
+    }
+    
 	const config = {
       server    : parameters.HOSTNAME
      ,user      : parameters.USERNAME
@@ -116,15 +127,18 @@ async function main(){
       }
     }
 
-    const dbConn = new sql.ConnectionPool(config);
+    dbConn = new sql.ConnectionPool(config);
 	await dbConn.connect()
 	
     const dumpFilePath = parameters.FILE;	
     const dumpFile = fs.createWriteStream(dumpFilePath);
-    dumpFile.on('error',function(err) {console.log(err)})
+    // dumpFile.on('error',function(err) {console.log(err)})
 	
     const schema = parameters.OWNER;
 	
+    if (parameters.SQLTRACE) {
+      sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
+    }
 	const sysInfo = await getSystemInformation(dbConn);
 	dumpFile.write('{"systemInformation":');
 	dumpFile.write(JSON.stringify({
@@ -140,6 +154,9 @@ async function main(){
 	}));
 
 	dumpFile.write(',"metadata":{')
+    if (parameters.SQLTRACE) {
+      sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
+    }
 	const sqlQueries = await generateQueries(dbConn,schema);
 
 	for (let i=0; i < sqlQueries.length; i++) {
@@ -159,11 +176,14 @@ async function main(){
 	dumpFile.write('},"data":{');
 	for (let i=0; i < sqlQueries.length; i++) {
       const row = sqlQueries[i]
-	  const startTime = new Date().getTime()
 	  if (i > 0) {
 		dumpFile.write(',');
       }
 	  dumpFile.write(`"${row.table_name}" :`);
+      if (parameters.SQLTRACE) {
+        sqlTrace.write(`${row.QUERY}\n\/\n`)
+      }
+	  const startTime = new Date().getTime()
       const rows = await fetchData(new sql.Request(dbConn),row,dumpFile) 
       const elapsedTime = new Date().getTime() - startTime
       logWriter.write(`${new Date().toISOString()} - Table: "${row.table_name}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
@@ -196,7 +216,13 @@ async function main(){
   if (logWriter !== process.stdout) {
 	logWriter.close();
   }  
+
+  if (parameters.SQLTRACE) {
+    sqlTrace.close();
+  }
+  
   process.exit()
 }
+
 
 main();
