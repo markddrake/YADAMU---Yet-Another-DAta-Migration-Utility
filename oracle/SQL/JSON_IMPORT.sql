@@ -6,6 +6,11 @@ create or replace package JSON_IMPORT
 AUTHID CURRENT_USER
 as
   C_VERSION_NUMBER constant NUMBER(4,2) := 1.0;
+
+  C_SUCCESS          CONSTANT VARCHAR2(32) := 'SUCCESS';
+  C_FATAL_ERROR      CONSTANT VARCHAR2(32) := 'FATAL';
+  C_WARNING          CONSTANT VARCHAR2(32) := 'WARNING';
+  C_IGNOREABLE       CONSTANT VARCHAR2(32) := 'IGNORE';
 --
   $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
   C_RETURN_TYPE     CONSTANT VARCHAR2(32) := 'CLOB';
@@ -20,11 +25,6 @@ as
 --
   TYPE T_RESULTS_CACHE is VARRAY(2147483647) of CLOB;
   RESULTS_CACHE        T_RESULTS_CACHE := T_RESULTS_CACHE();
-
-  C_SUCCESS          CONSTANT VARCHAR2(32) := 'SUCCESS';
-  C_FATAL_ERROR      CONSTANT VARCHAR2(32) := 'FATAL';
-  C_WARNING          CONSTANT VARCHAR2(32) := 'WARNING';
-  C_IGNOREABLE       CONSTANT VARCHAR2(32) := 'IGNORE';
 
   procedure DATA_ONLY_MODE(P_DATA_ONLY_MODE BOOLEAN);
   procedure DDL_ONLY_MODE(P_DDL_ONLY_MODE BOOLEAN);
@@ -181,7 +181,7 @@ as
 begin
   case
     --
-    -- SQLSERVER Conversions
+    -- SQLSERVER, MYSQL Conversions
 	--
     when P_DATA_TYPE = 'bigint'
       then return 'NUMBER(19)';
@@ -195,6 +195,12 @@ begin
       then return 'DATE';
     when P_DATA_TYPE = 'decimal'
       then return 'NUMBER';
+    when P_DATA_TYPE = 'double'
+      then return 'FLOAT(24)';
+    when P_DATA_TYPE = 'double precision'
+      then return 'FLOAT(24)';
+    when P_DATA_TYPE = 'enum'
+      then return 'VARCHAR2';
     when P_DATA_TYPE = 'float'
       then return 'FLOAT(49)';
     when P_DATA_TYPE = 'geography'
@@ -210,6 +216,16 @@ begin
       then return 'BLOB';
     when P_DATA_TYPE = 'int'
       then return 'NUMBER(10)';
+    when P_DATA_TYPE = 'longblob'
+      then return 'BLOB';
+    when P_DATA_TYPE = 'longtext'
+      then return 'CLOB';
+    when P_DATA_TYPE = 'mediumblob'
+      then return 'BLOB';
+    when P_DATA_TYPE = 'mediumint'
+      then return 'NUMBER(7,0)';
+    when P_DATA_TYPE = 'mediumblob'
+      then return 'BLOB';
     when P_DATA_TYPE = 'money'
       then return 'NUMBER(19,4)';
     when P_DATA_TYPE = 'ntext'
@@ -223,8 +239,10 @@ begin
       then return 'NVARCHAR2';
     when P_DATA_TYPE = 'numeric'
       then return 'NUMBER';
+    when P_DATA_TYPE = 'set'
+      then return 'VARCHAR2';
     when P_DATA_TYPE = 'real'
-      then return 'FLOAT(23)';
+      then return 'FLOAT(24)';
     when P_DATA_TYPE = 'smalldatetime'
       then return 'DATE';
     when P_DATA_TYPE = 'smallmoney'
@@ -235,8 +253,12 @@ begin
       then return 'CLOB';
     when P_DATA_TYPE = 'time'
       then return 'DATE';
+    when P_DATA_TYPE = 'tinyblob'
+      then return 'RAW';
     when P_DATA_TYPE = 'tinyint'
       then return 'NUMBER(3)';
+    when P_DATA_TYPE = 'tinytext'
+      then return 'VARCHAR2';
     when P_DATA_TYPE = 'uniqueidentifier'
       then return 'CHAR(36)';
     when P_DATA_TYPE = 'varbinary' and (P_DATA_TYPE_LENGTH = -1)
@@ -249,68 +271,107 @@ begin
       then return 'VARCHAR2';
     when P_DATA_TYPE = 'xml'
       then return 'XMLTYPE';
+    when P_DATA_TYPE = 'year'
+      then return 'NUMBER(4)';
     else
       return UPPER(P_DATA_TYPE);
   end case;
 end;
 --
-procedure APPEND_DESERIALIZATION_FUNCTIONS(P_OWNER VARCHAR2,P_TABLE_NAME VARCHAR2,P_REQUIRED_FUNCTIONS VARCHAR2, P_SQL_STATEMENT IN OUT CLOB)
+procedure APPEND_DESERIALIZATION_FUNCTIONS(P_DESERIALIZATION_FUNCTIONS T_VC4000_TABLE, P_BLOB_COUNT NUMBER, P_BFILE_COUNT NUMBER, P_ANYDATA_COUNT NUMBER, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_SQL_STATEMENT IN OUT CLOB)
 as
-  V_CURRENT_OFFSET            PLS_INTEGER := 1;
-  V_NEXT_SEPERATOR            PLS_INTEGER;
-  V_FUNCTION_NAME             VARCHAR2(130);
+  V_IDX   PLS_INTEGER;
 begin
-
-  if (P_REQUIRED_FUNCTIONS = '"OBJECTS"') then
-    OBJECT_SERIALIZATION.DESERIALIZE_TABLE_TYPES(P_OWNER,P_TABLE_NAME,P_SQL_STATEMENT);
-  else
-    loop
-      V_NEXT_SEPERATOR:= instr(P_REQUIRED_FUNCTIONS,',',V_CURRENT_OFFSET);
-      exit when (V_NEXT_SEPERATOR < 1);
-      V_FUNCTION_NAME  := substr(P_REQUIRED_FUNCTIONS,V_NEXT_SEPERATOR - V_CURRENT_OFFSET,V_CURRENT_OFFSET);
-      if (V_FUNCTION_NAME = '"CHAR2BFILE"') then
-        DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(OBJECT_SERIALIZATION.CODE_CHAR2BFILE));
-        CONTINUE;
-      end if;
-      if  (V_FUNCTION_NAME = '"HEXBINARY2BLOB"') then
-        DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(OBJECT_SERIALIZATION.CODE_HEXBINARY2BLOB));
-        CONTINUE;
-      end if;
-      V_CURRENT_OFFSET := V_NEXT_SEPERATOR + 1;
-    end loop;
+  if ((P_DESERIALIZATION_FUNCTIONS.count > 0) or ((P_BFILE_COUNT + P_BLOB_COUNT + P_ANYDATA_COUNT) > 0)) then
+    DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB('WITH' || C_NEWLINE));
+    if ((P_BFILE_COUNT + P_ANYDATA_COUNT + P_DESERIALIZATION_FUNCTIONS.count) > 0) then
+      DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(OBJECT_SERIALIZATION.CODE_CHAR2BFILE));
+    end if;
+    if ((P_BLOB_COUNT  + P_ANYDATA_COUNT + P_DESERIALIZATION_FUNCTIONS.count) > 0) then
+      DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(OBJECT_SERIALIZATION.CODE_HEXBINARY2BLOB));
+    end if;
+	if (P_DESERIALIZATION_FUNCTIONS.count > 0) then
+      for V_IDX in 1.. P_DESERIALIZATION_FUNCTIONS.count loop
+        DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(P_DESERIALIZATION_FUNCTIONS(V_IDX)));
+      end loop;
+    end if;
   end if;
 end;
 --
-procedure GENERATE_STATEMENTS(P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_LIST CLOB, P_DATA_SIZE_LIST CLOB, P_DESERIALIZATION_FUNCTIONS VARCHAR2, P_DDL_STATEMENT IN OUT NOCOPY CLOB, P_DML_STATEMENT  IN OUT NOCOPY CLOB)
+procedure GENERATE_STATEMENTS(P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_LIST CLOB, P_DATA_SIZE_LIST CLOB, P_DDL_STATEMENT IN OUT NOCOPY CLOB, P_DML_STATEMENT  IN OUT NOCOPY CLOB)
 as
   CURSOR generateStatementComponents
   is
-  with "SOURCE_TABLE_DEFINITION" as (
-          select c."KEY" "INDEX"
-                ,c."VALUE" "COLUMN_NAME"
-                ,t."VALUE" "DATA_TYPE"
-                ,case
-                   when s.VALUE = ''
-                     then NULL
-                   when INSTR(s."VALUE",',') > 0
-                     then SUBSTR(s."VALUE",1,INSTR(s."VALUE",',')-1)
-                   else
-                     s."VALUE"
-                 end "DATA_TYPE_LENGTH"
-                ,case
-                   when INSTR(s."VALUE",',') > 0
-                     then SUBSTR(s."VALUE", INSTR(s."VALUE",',')+1)
-                   else
-                     NULL
-                 end "DATA_TYPE_SCALE"
-            from JSON_TABLE('[' || P_COLUMN_LIST || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, "VALUE" PATH '$') c
-                ,JSON_TABLE('[' || REPLACE(P_DATA_TYPE_LIST,'"."','\".\"') || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, "VALUE" PATH '$') t
-                ,JSON_TABLE('[' || P_DATA_SIZE_LIST || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, "VALUE" PATH '$') s
-           where (c."KEY" = t."KEY") and (c."KEY" = s."KEY")
+  with 
+  "SOURCE_TABLE_DEFINITION" 
+  as (
+    select c."KEY" IDX
+          ,c."VALUE" "COLUMN_NAME"
+          ,t."VALUE" "DATA_TYPE"
+          ,case
+             when s.VALUE = ''
+               then NULL
+             when INSTR(s."VALUE",',') > 0
+               then SUBSTR(s."VALUE",1,INSTR(s."VALUE",',')-1)
+             else
+               s."VALUE"
+           end "DATA_TYPE_LENGTH"
+          ,case
+             when INSTR(s."VALUE",',') > 0
+               then SUBSTR(s."VALUE", INSTR(s."VALUE",',')+1)
+             else
+               NULL
+           end "DATA_TYPE_SCALE"
+          ,case
+             when (INSTR(t."VALUE",'"."') > 0) 
+               -- Data Type is a schema qualified object type
+               then case 
+                      -- Remap types defined by the source schema to the target schema.
+                      when SUBSTR(t."VALUE",1,INSTR(t."VALUE",'.')-2)  = P_TABLE_OWNER
+                        then P_TARGET_SCHEMA
+                      else
+                        SUBSTR(t."VALUE",1,INSTR(t."VALUE",'.')-2)
+                      end
+             else 
+               NULL
+           end "TYPE_OWNER"     
+          ,case
+             when (INSTR(t."VALUE",'"."') > 0)
+               then SUBSTR(t."VALUE",INSTR(t."VALUE",'.')+2)
+             else 
+               NULL 
+           end "TYPE_NAME"
+         from JSON_TABLE('[' || P_COLUMN_LIST || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, "VALUE" PATH '$') c
+             ,JSON_TABLE('[' || REPLACE(P_DATA_TYPE_LIST,'"."','\".\"') || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, "VALUE" PATH '$') t
+             ,JSON_TABLE('[' || P_DATA_SIZE_LIST || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, "VALUE" PATH '$') s
+        where (c."KEY" = t."KEY") and (c."KEY" = s."KEY")
   ),
-  "TARGET_TABLE_DEFINITION" as (
-    select "INDEX", MAP_FOREIGN_DATATYPE("DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
-      from "SOURCE_TABLE_DEFINITION"
+  "TARGET_TABLE_DEFINITION" 
+  as (
+    select IDX
+          , MAP_FOREIGN_DATATYPE("DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
+          ,case
+             -- Probe rather than Join since most rows are not objects.
+             when (TYPE_NAME is not null)
+               then case 
+                      when (TYPE_OWNER = P_TABLE_OWNER)
+                        -- Original Type belonged to the same schema as the table. Resolve the type in the target Schema
+                        then (select 1 from ALL_TYPES at where OWNER = P_TARGET_SCHEMA and at.TYPE_NAME = s.TYPE_NAME)
+                      else
+                        -- Original Type belonged to different schema as the table. Resolve the type in the original Schema
+                        (select 1 from ALL_TYPES at where at.OWNER = s.TYPE_OWNER and at.TYPE_NAME = s.TYPE_NAME)
+                    end
+             else
+               NULL
+           end "TYPE_EXISTS"
+      from "SOURCE_TABLE_DEFINITION" s
+  ),
+  "DESERIALIZATION_FUNCTIONS"
+  as (
+  select st.IDX,
+         case when TYPE_EXISTS = 1 then OBJECT_SERIALIZATION.DESERIALIZE_TYPE(TYPE_OWNER,TYPE_NAME) else NULL end  "DESERIALIZATION_FUNCTION"
+    from "SOURCE_TABLE_DEFINITION" st,"TARGET_TABLE_DEFINITION" tt
+   where st.IDX = tt.IDX
   )
 --
   $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
@@ -319,12 +380,11 @@ as
            cast(collect(
                         '"' || COLUMN_NAME || '" ' ||
                         case
-                          when (INSTR(TARGET_DATA_TYPE,'"."') > 0)
-                            then case
-                                   when SUBSTR(TARGET_DATA_TYPE,1,INSTR(TARGET_DATA_TYPE,'"."')-1) = P_TABLE_OWNER
-                                     then '"' || P_TARGET_SCHEMA || '"."' || SUBSTR(TARGET_DATA_TYPE,INSTR(TARGET_DATA_TYPE,'"."')+3) || '"'
-                                     else '"' || TARGET_DATA_TYPE || '"'
-                                 end
+                          when TYPE_EXISTS = 1 
+                            then '"' || TYPE_OWNER || '"."' || TYPE_NAME || '"'
+                          when TYPE_NAME is not NULL
+                            then 'CLOB'
+                          -- Type Exist is NULL.
                           when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE LIKE '%(%)')
                             then TARGET_DATA_TYPE
                           when DATA_TYPE_SCALE is not NULL
@@ -334,14 +394,14 @@ as
                           else
                             TARGET_DATA_TYPE
                         end || C_NEWLINE
-                        order by st."INDEX"
+                        order by st.IDX
                 )
                 as T_VC4000_TABLE
            )
          ) COLUMNS_CLAUSE
         ,SERIALIZE_TABLE(
            cast(collect(
-                        /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
+                        -- Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results
                         case
                           when DATA_TYPE = 'real'
                             then 'cast( "' || COLUMN_NAME || '" as FLOAT)'
@@ -353,13 +413,13 @@ as
                             -- then 'TO_DATE("' || COLUMN_NAME || '",''YYYY-MM-DDT"HH24:MI:SS.FFFTZHTZM'')'
                           when TARGET_DATA_TYPE = 'BFILE'
                             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.CHAR2BFILE("' || COLUMN_NAME || '") end'
-                          when (TARGET_DATA_TYPE = 'XMLTYPE') or (SUBSTR("TARGET_DATA_TYPE",INSTR("TARGET_DATA_TYPE",'"."')+3) = 'XMLTYPE')
+                          when (TARGET_DATA_TYPE = 'XMLTYPE')
                             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || COLUMN_NAME || '") end'
-                          when (TARGET_DATA_TYPE = 'ANYDATA') or (SUBSTR("TARGET_DATA_TYPE",INSTR("TARGET_DATA_TYPE",'"."')+3) = 'ANYDATA')
+                          when (TARGET_DATA_TYPE = 'ANYDATA')
                             -- ### TODO - Better deserialization of ANYDATA.
                             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || COLUMN_NAME || '") end'
-                          when INSTR(TARGET_DATA_TYPE,'"."') > 0
-                            then '"#' || SUBSTR(TARGET_DATA_TYPE,INSTR(TARGET_DATA_TYPE,'"."')+3) || '"("' || COLUMN_NAME || '")'
+                          when TYPE_EXISTS = 1
+                            then '"#' || TYPE_NAME || '"("' || COLUMN_NAME || '")'
                           when TARGET_DATA_TYPE = 'BLOB'
                             $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.HEXBINARY2BLOB("' || COLUMN_NAME || '") end'
@@ -369,7 +429,7 @@ as
                           else
                             '"' || COLUMN_NAME || '"'
                         end
-                        order by st."INDEX"
+                        order by st.IDX
                )
                as T_VC4000_TABLE
            )
@@ -380,7 +440,7 @@ as
                         case
                           when TARGET_DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (TARGET_DATA_TYPE like 'INTERVAL%')
                             then 'VARCHAR2'
-                          when TARGET_DATA_TYPE in ('XMLTYPE','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (INSTR(TARGET_DATA_TYPE,'"."') > 0) 
+                          when TARGET_DATA_TYPE in ('XMLTYPE','ANYDATA','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (TYPE_NAME is not NULL)
                             then C_RETURN_TYPE
                           when "TARGET_DATA_TYPE" in ('DATE','DATETIME')
                             then "TARGET_DATA_TYPE"
@@ -411,14 +471,19 @@ as
                           else
                             "TARGET_DATA_TYPE"
                         end
-                        || ' PATH ''$[' || (st."INDEX" - 1) || ']'' ERROR ON ERROR' || C_NEWLINE
-                        order by st."INDEX"
+                        || ' PATH ''$[' || (st.IDX - 1) || ']'' ERROR ON ERROR' || C_NEWLINE
+                        order by st.IDX
                 )
                 as T_VC4000_TABLE
            )
          ) COLUMN_PATTERNS
-    from "SOURCE_TABLE_DEFINITION" st, "TARGET_TABLE_DEFINITION" tt
-   where st."INDEX" = tt."INDEX";
+        , cast(collect( DESERIALIZATION_FUNCTION) as T_VC4000_TABLE) "DESERIALIZATION_FUNCTIONS"
+        , SUM(CASE WHEN TARGET_DATA_TYPE = 'BLOB' THEN 1 ELSE 0 END) BLOB_COUNT
+        , SUM(CASE WHEN TARGET_DATA_TYPE = 'BFILE' THEN 1 ELSE 0 END) BFILE_COUNT
+        , SUM(CASE WHEN TARGET_DATA_TYPE = 'ANYDATA' THEN 1 ELSE 0 END) ANYDATA_COUNT
+        , SUM(CASE WHEN TYPE_EXISTS = 1 THEN 1 ELSE 0 END) OBJECT_COUNT
+    from "SOURCE_TABLE_DEFINITION" st, "TARGET_TABLE_DEFINITION" tt, "DESERIALIZATION_FUNCTIONS" df
+   where st.IDX = tt.IDX and st.IDX = df.IDX;
 --
   $ELSE
 --
@@ -482,10 +547,10 @@ as
            else
              "TARGET_DATA_TYPE"
          end
-         || ' PATH ''$[' || (st."INDEX" - 1) || ']'' ERROR ON ERROR' || C_NEWLINE COLUMN_PATTERNS
-    from "SOURCE_TABLE_DEFINITION" st, "TARGET_TABLE_DEFINITION" tt
-   where st."INDEX" = tt."INDEX"
-   order by st."INDEX";
+         || ' PATH ''$[' || (st.IDX - 1) || ']'' ERROR ON ERROR' || C_NEWLINE COLUMN_PATTERNS
+    from "SOURCE_TABLE_DEFINITION" st, "TARGET_TABLE_DEFINITION" tt, "DESERIALIZATION_FUNCTIONS" df
+   where st.IDX = tt.IDX and st.IDX = df.IDX;
+   order by st.IDX;
 
    V_COLUMNS_CLAUSE_TABLE      T_VC4000_TABLE;
    V_INSERT_SELECT_TABLE       T_VC4000_TABLE;
@@ -495,6 +560,12 @@ as
    V_COLUMNS_CLAUSE            CLOB;
    V_INSERT_SELECT_LIST        CLOB;
    V_COLUMN_PATTERNS           CLOB;
+   V_DESERIALIZATIONS          T_VC4000_TABLE;
+
+   V_OBJECT_COUNT              NUMBER;
+   V_BLOB_COUNT                NUMBER;
+   V_ANYDATA_COUNT             NUMBER;
+   V_BFILE_COUNT               NUMBER;
 
    V_SQL_FRAGMENT VARCHAR2(32767);
    V_INSERT_HINT  VARCHAR2(128) := '';
@@ -512,66 +583,73 @@ begin
 exception
   when TABLE_EXISTS then
     null;
+  when others then  
+    RAISE;
 end;';
 begin
 
   DBMS_LOB.CREATETEMPORARY(P_DDL_STATEMENT,TRUE,DBMS_LOB.SESSION);
   DBMS_LOB.CREATETEMPORARY(P_DML_STATEMENT,TRUE,DBMS_LOB.SESSION);
-
-   if (P_DESERIALIZATION_FUNCTIONS is not NULL) then
-     V_INSERT_HINT := ' /*+ WITH_PLSQL */';
-   end if;
 --
   $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
 --
    -- Cursor only generates one row (Aggregration Operation),
-   for o in generateStatementComponents loop
-     V_COLUMNS_CLAUSE := o.COLUMNS_CLAUSE;
-     V_INSERT_SELECT_LIST := o.INSERT_SELECT_LIST;
-     V_COLUMN_PATTERNS := o.COLUMN_PATTERNS;
-   end loop;
---
-   $ELSE
---
-   open generateStatementComponents;
-   fetch generateStatementComponents
-         bulk collect into V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_COLUMN_PATTERNS_TABLE;
+  for o in generateStatementComponents loop
+    V_COLUMNS_CLAUSE     := o.COLUMNS_CLAUSE;
+    V_INSERT_SELECT_LIST := o.INSERT_SELECT_LIST;
+    V_COLUMN_PATTERNS    := o.COLUMN_PATTERNS;
+    V_OBJECT_COUNT       := o.OBJECT_COUNT;
+    V_BFILE_COUNT        := o.BFILE_COUNT;
+    V_BLOB_COUNT         := o.BLOB_COUNT;
+    V_ANYDATA_COUNT      := o.ANYDATA_COUNT;
+    
+    select distinct COLUMN_VALUE 
+      bulk collect into V_DESERIALIZATIONS
+      from table(o.DESERIALIZATION_FUNCTIONS);
 
-   V_COLUMNS_CLAUSE := SERIALIZE_TABLE(V_COLUMNS_CLAUSE_TABLE);
-   V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
-   V_COLUMN_PATTERNS := SERIALIZE_TABLE(V_COLUMN_PATTERNS_TABLE);
+    end loop;
 --
-   $END
+  $ELSE
 --
-   V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK1 || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (' || C_NEWLINE || ' ';
-   DBMS_LOB.WRITEAPPEND(P_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-   DBMS_LOB.APPEND(P_DDL_STATEMENT,V_COLUMNS_CLAUSE);
-   V_SQL_FRAGMENT := C_NEWLINE || C_CREATE_TABLE_BLOCK2;
-   DBMS_LOB.WRITEAPPEND(P_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+  open generateStatementComponents;
+  fetch generateStatementComponents
+        bulk collect into V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_COLUMN_PATTERNS_TABLE;
 
-   V_SQL_FRAGMENT := 'insert' || V_INSERT_HINT || ' into "' || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (';
-   DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-   DBMS_LOB.APPEND(P_DML_STATEMENT,P_COLUMN_LIST);
-   V_SQL_FRAGMENT :=  ')' || C_NEWLINE;
-   DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+  V_COLUMNS_CLAUSE := SERIALIZE_TABLE(V_COLUMNS_CLAUSE_TABLE);
+  V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
+  V_COLUMN_PATTERNS := SERIALIZE_TABLE(V_COLUMN_PATTERNS_TABLE);
+--
+  $END
+--
+  V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK1 || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (' || C_NEWLINE || ' ';
+  DBMS_LOB.WRITEAPPEND(P_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+  DBMS_LOB.APPEND(P_DDL_STATEMENT,V_COLUMNS_CLAUSE);
+  V_SQL_FRAGMENT := C_NEWLINE || C_CREATE_TABLE_BLOCK2;
+  DBMS_LOB.WRITEAPPEND(P_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
 
-   if (P_DESERIALIZATION_FUNCTIONS is not NULL) then
-     V_SQL_FRAGMENT :=  'WITH' || C_NEWLINE;
-     DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-     APPEND_DESERIALIZATION_FUNCTIONS(P_TARGET_SCHEMA,P_TABLE_NAME,P_DESERIALIZATION_FUNCTIONS,P_DML_STATEMENT);
+  if ((V_OBJECT_COUNT + V_BLOB_COUNT + V_BFILE_COUNT + V_ANYDATA_COUNT) > 0) then
+    V_INSERT_HINT := ' /*+ WITH_PLSQL */';
+  end if;
 
-	 end if;
-   V_SQL_FRAGMENT := 'select ';
-   DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-   DBMS_LOB.APPEND(P_DML_STATEMENT,V_INSERT_SELECT_LIST );
-   V_SQL_FRAGMENT := C_NEWLINE || '  from JSON_TABLE(:JSON,''$.data."' || P_TABLE_NAME || '"[*]''' || C_NEWLINE || '         COLUMNS(' || C_NEWLINE || ' ';
-   DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-   DBMS_LOB.APPEND(P_DML_STATEMENT,V_COLUMN_PATTERNS);
-   DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,2,'))');
+  V_SQL_FRAGMENT := 'insert' || V_INSERT_HINT || ' into "' || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (';
+  DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+  DBMS_LOB.APPEND(P_DML_STATEMENT,P_COLUMN_LIST);
+  V_SQL_FRAGMENT :=  ')' || C_NEWLINE;
+  DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+  
+  APPEND_DESERIALIZATION_FUNCTIONS(V_DESERIALIZATIONS,V_BLOB_COUNT,V_BFILE_COUNT,V_ANYDATA_COUNT,P_TARGET_SCHEMA,P_TABLE_NAME,P_DML_STATEMENT);
+   
+  V_SQL_FRAGMENT := 'select ';
+  DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+  DBMS_LOB.APPEND(P_DML_STATEMENT,V_INSERT_SELECT_LIST );
+  V_SQL_FRAGMENT := C_NEWLINE || '  from JSON_TABLE(:JSON,''$.data."' || P_TABLE_NAME || '"[*]''' || C_NEWLINE || '         COLUMNS(' || C_NEWLINE || ' ';
+  DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+  DBMS_LOB.APPEND(P_DML_STATEMENT,V_COLUMN_PATTERNS);
+  DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,2,'))');
 exception
   when others then 
     LOG_INFO('[' || P_COLUMN_LIST || ']');
-    LOG_INFO('[' || REPLACE(P_DATA_TYPE_LIST,'"."','\".\"') || ']');
+    LOG_INFO('[' || REPLACE(P_DATA_TYPE_LIST,'"."','"."') || ']');
     LOG_INFO('[' || P_DATA_SIZE_LIST || ']');
     LOG_ERROR(C_FATAL_ERROR,'PROCEUDRE JSON_IMPORT.GENERATE_STATEMENTS',NULL,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
     raise;
@@ -710,7 +788,6 @@ as
         ,COLUMN_LIST
         ,DATA_TYPE_LIST
         ,SIZE_CONSTRAINTS
-        ,DESERIALIZATION_FUNCTIONS
     from JSON_TABLE(
            P_JSON_DUMP_FILE,
            '$.metadata.*'
@@ -736,7 +813,6 @@ as
            ,  INSERT_COLUMN_LIST         VARCHAR2(4000) PATH '$.insertSelectList'
            ,  COLUMN_PATTERNS            VARCHAR2(4000) PATH '$.columnPatterns'
            $END
-           ,  DESERIALIZATION_FUNCTIONS  VARCHAR2(4000) PATH '$.deserializationFunctions'
            )
          );
 begin
@@ -754,7 +830,7 @@ begin
   DISABLE_CONSTRAINTS(P_TARGET_SCHEMA) ;
 
     for o in operationsList loop
-      GENERATE_STATEMENTS(P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.COLUMN_LIST, o.DATA_TYPE_LIST, o.SIZE_CONSTRAINTS, o.DESERIALIZATION_FUNCTIONS, V_DDL_STATEMENT, V_DML_STATEMENT);
+      GENERATE_STATEMENTS(P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.COLUMN_LIST, o.DATA_TYPE_LIST, o.SIZE_CONSTRAINTS, V_DDL_STATEMENT, V_DML_STATEMENT);
       begin
         execute immediate V_DDL_STATEMENT;
         LOG_DDL_OPERATION(o.TABLE_NAME,V_DDL_STATEMENT);

@@ -173,8 +173,6 @@ async function main(){
         console.log(e);
 	}
     if (conn !== undefined) {
-      const results = await fetchLogRecords(conn);
-	  console.log(results);
 	  await conn.end();
 	}
   }

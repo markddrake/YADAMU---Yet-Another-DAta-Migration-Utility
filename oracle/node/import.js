@@ -7,7 +7,7 @@ async function importJSON (conn, parameters, json) {
 
   let sqlStatement = "BEGIN" + "\n";
   switch (parameters.MODE) {
-	 case 'DDL_AND_CONTENT':
+	 case 'DDL_AND_DATA':
        sqlStatement = `${sqlStatement}  JSON_IMPORT.DATA_ONLY_MODE(FALSE);\n  JSON_IMPORT.DDL_ONLY_MODE(FALSE);\n`;
 	   break;	   break
 	 case 'DATA_ONLY':

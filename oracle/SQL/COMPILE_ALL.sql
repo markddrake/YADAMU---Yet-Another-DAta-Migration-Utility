@@ -34,7 +34,7 @@ spool logs/sql/JSON_EXPORT_DDL.log
 --
 @@JSON_EXPORT_DDL
 --
-create or replace  public synonym JSON_EXPORT_DDL for JSON_EXPORT_DDL
+create or replace public synonym JSON_EXPORT_DDL for JSON_EXPORT_DDL
 /
 spool logs/sql/JSON_IMPORT.log
 --
@@ -42,17 +42,17 @@ spool logs/sql/JSON_IMPORT.log
 --
 create or replace public synonym JSON_IMPORT for JSON_IMPORT
 /
-spool logs/sql/NODE_EXPORT.log
---
-@@NODE_EXPORT
---
-create or replace  public synonym NODE_EXPORT for NODE_EXPORT
-/
 spool logs/sql/JSON_EXPORT.log
 --
 @@JSON_EXPORT
 --
-create or replace  public synonym JSON_EXPORT for JSON_EXPORT
+create or replace public synonym JSON_EXPORT for JSON_EXPORT
+/
+spool logs/sql/JSON_EXPORT_PLSQL.log
+--
+@@JSON_EXPORT_PLSQL
+--
+create or replace public synonym JSON_EXPORT_PLSQL for JSON_EXPORT_PLSQL
 /
 spool logs/sql/COMPILE_ALL.log APPEND
 --
@@ -62,9 +62,10 @@ desc JSON_EXPORT_DDL
 --
 desc JSON_IMPORT
 --
+desc JSON_EXPORT_PLSQL
+--
 desc JSON_EXPORT
 --
-desc NODE_EXPORT
 set serveroutput on
 --
 begin

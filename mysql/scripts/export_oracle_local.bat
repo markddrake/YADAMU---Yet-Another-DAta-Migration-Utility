@@ -1,0 +1,6 @@
+node node\export --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=HR1 --OWNER=\"HR1\" --FILE=JSON\HR1.json
+node node\export --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=SH1 --OWNER=\"SH1\" --FILE=JSON\SH1.json
+node node\export --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=OE1 --OWNER=\"OE1\" --FILE=JSON\OE1.json
+node node\export --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=PM1 --OWNER=\"PM1\" --FILE=JSON\PM1.json
+node node\export --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=IX1 --OWNER=\"IX1\" --FILE=JSON\IX1.json
+node node\export --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=BI1 --OWNER=\"BI1\" --FILE=JSON\BI1.json

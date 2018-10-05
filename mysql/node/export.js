@@ -15,8 +15,8 @@ const sqlGetSystemInformation =
 const sqlGenerateTables = 
 `select t.table_schema
        ,t.table_name
-  	   ,group_concat(concat('"',column_name,'"') separator ',')  "columns"
-	   ,group_concat(concat('"',data_type,'"') separator ',')  "dataTypes"
+  	   ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "columns"
+	   ,group_concat(concat('"',data_type,'"') order by ordinal_position separator ',')  "dataTypes"
 	   ,group_concat(concat('"',	
                             case when (numeric_precision is not null) and (numeric_scale is not null)
                                    then concat(numeric_precision,',',numeric_scale)	
@@ -27,8 +27,37 @@ const sqlGenerateTables =
                                  else	
                                    ''	
                             end,	
-                            '"') separator ',') "sizeConstraints"
-	   ,concat('select json_array(',group_concat('"',column_name,'"'),') "json" from "',t.table_schema,'"."',t.table_name,'"') QUERY	
+                            '"'
+                           ) 
+                           order by ordinal_position separator ','
+                    ) "sizeConstraints"
+	   ,concat(
+          'select json_array('
+          ,group_concat(
+            case 
+              when data_type = 'timestamp'
+                -- Force ISO 8601 rendering of value 
+                then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%TZ'')')
+              when data_type = 'datetime'
+                -- Force ISO 8601 rendering of value 
+                then concat('DATE_FORMAT("', column_name, '", ''%Y-%m-%dT%T'')')
+              when data_type = 'year'
+                -- Prevent rendering of value as base64:type13: 
+                then concat('CAST("', column_name, '"as DECIMAL)')
+              when data_type like '%blob'
+                -- Force HEXBINARY rendering of value
+                then concat('HEX("', column_name, '")')
+              else
+                concat('"',column_name,'"')
+            end
+            order by ordinal_position separator ','
+          )
+          ,') "json" from "'
+          ,t.table_schema
+          ,'"."'
+          ,t.table_name
+          ,'"'
+        ) QUERY	
    from information_schema.columns	c, information_schema.tables t
   where t.table_name = c.table_name 
     and t.table_schema = c.table_schema
@@ -79,7 +108,8 @@ function fetchData(conn,sqlQuery,outStream) {
   const parser = new Transform({objectMode:true});
   parser._transform = function(data,encodoing,done) {
 	counter++;
-	this.push(data.json);
+    // We get a string, not JSON, and the string can contain \r or \n....
+ 	this.push(JSON.parse(data.json.replace(/\r?\n|\r/g,"")))
 	done();
   }
  

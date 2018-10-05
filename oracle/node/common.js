@@ -174,7 +174,7 @@ function processArguments(args,operation) {
 
    const parameters = {
 	                 FILE : "export.json"
-                    ,MODE : "DDL_AND_CONTENT"
+                    ,MODE : "DDL_AND_DATA"
    }
 
    process.argv.forEach(function (arg) {

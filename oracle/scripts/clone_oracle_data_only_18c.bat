@@ -1,0 +1,3 @@
+call scripts\import_master_data_only_18c.bat
+call scripts\export_oracle_18c.bat
+call scripts\import_oracle_18c.bat

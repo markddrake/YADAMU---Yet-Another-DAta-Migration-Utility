@@ -1,0 +1,3 @@
+call scripts\import_oracle_master.bat
+call scripts\export_oracle_local.bat
+call scripts\import_oracle_local.bat

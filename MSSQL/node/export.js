@@ -10,8 +10,8 @@ const sqlGetSystemInformation =
 const sqlGenerateQueries =
 `select t.table_schema
        ,t.table_name
-           ,string_agg(concat('"',c.column_name,'"'),',')  "columns"
-           ,string_agg(concat('"',data_type,'"'),',')  "dataTypes"
+           ,string_agg(concat('"',c.column_name,'"'),',' order by ordinal_position)  "columns"
+           ,string_agg(concat('"',data_type,'"'),',' order by ordinal_position)  "dataTypes"
            ,string_agg(case
                          when (numeric_precision is not null) and (numeric_scale is not null) 
                            then concat('"',numeric_precision,',',numeric_scale,'"')
@@ -22,9 +22,9 @@ const sqlGenerateQueries =
                          else
                            '""'
                        end
-                      ,','
+                      ,',' order by ordinal_position
                      ) "sizeConstraints"
-            ,concat('select ',string_agg(concat('"',column_name,'"'),','),' from "',t.table_schema,'"."',t.table_name,'"') QUERY
+            ,concat('select ',string_agg(concat('"',column_name,'"'),',' order by ordinal_position),' from "',t.table_schema,'"."',t.table_name,'"') QUERY
     from information_schema.columns c, information_schema.tables t
    where t.table_name = c.table_name
      and t.table_schema = c.table_schema

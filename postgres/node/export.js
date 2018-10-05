@@ -13,8 +13,8 @@ const sqlGetSystemInformation =
 
 const sqlGenerateQueries =
 `select t.table_schema, t.table_name
-	   ,string_agg('"' || column_name || '"',',') "columns" 
-	   ,string_agg('"' || data_type || '"',',') "dataTypes"
+	   ,string_agg('"' || column_name || '"',',' order by ordinal_position) "columns" 
+	   ,string_agg('"' || data_type || '"',',' order by ordinal_position) "dataTypes"
        ,string_agg('"' ||
                    case
                      when (numeric_precision is not null) and (numeric_scale is not null) 
@@ -27,9 +27,9 @@ const sqlGenerateQueries =
                        ''
                    end
                    || '"'
-                  ,','
+                  ,',' order by ordinal_position
                  ) "sizeConstraints"
-	   ,'select jsonb_build_array(' || string_agg('"' || column_name || '"',',')|| ') "json" from "' || t.table_schema || '"."' || t.table_name ||'"' QUERY 
+	   ,'select jsonb_build_array(' || string_agg('"' || column_name || '"',',' order by ordinal_position)|| ') "json" from "' || t.table_schema || '"."' || t.table_name ||'"' QUERY 
    from information_schema.columns c, information_schema.tables t
   where t.table_name = c.table_name 
 	and t.table_schema = c.table_schema

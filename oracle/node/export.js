@@ -12,8 +12,8 @@ const Transform = require('stream').Transform;
 const Readable = require('stream').Readable;
 
 const sqlGetSystemInformation = 
-`select NODE_EXPORT.JSON_FEATURES() JSON_FEATURES, 
-        NODE_EXPORT.DATABASE_RELEASE() DATABASE_RELEASE, 
+`select JSON_EXPORT.JSON_FEATURES() JSON_FEATURES, 
+        JSON_EXPORT.DATABASE_RELEASE() DATABASE_RELEASE, 
         SYS_CONTEXT('USERENV','SESSION_USER') SESSION_USER, 
         SYS_CONTEXT('USERENV','DB_NAME') DATABASE_NAME, 
         SYS_CONTEXT('USERENV','SERVER_HOST') SERVER_HOST,
@@ -26,7 +26,7 @@ const sqlFetchDDL =
 
 const sqlGenerateQueries = 
 `select * 
-   from table(NODE_EXPORT.GET_DML_STATEMENTS(:schema))`;
+   from table(JSON_EXPORT.GET_DML_STATEMENTS(:schema))`;
 
 async function getSystemInformation(conn) {     
     const results = await conn.execute(sqlGetSystemInformation,[],{outFormat: oracledb.OBJECT , fetchInfo: {COLUMN_LIST:{type: oracledb.STRING},DATA_TYPE_LIST:{type: oracledb.STRING},SIZE_CONSTRAINTS:{type: oracledb.STRING},SQL_STATEMENT:{type: oracledb.STRING}}});
