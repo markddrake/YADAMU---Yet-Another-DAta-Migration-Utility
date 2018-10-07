@@ -9,8 +9,10 @@ const PgError = require("pg-error")
 // pgClient.connection.parseE = PgError.parse
 // pgClient.connection.parseN = PgError.parse
 	
-async function createStagingTable(pgClient) {    	
-	const sqlStatement = `create temporary table if not exists "JSON_STAGING" (data jsonb) on commit preserve rows`;					   
+async function createStagingTable(pgClient,useBinaryJSON) {
+	let sqlStatement = `drop table if exists "JSON_STAGING"`;					   
+	await pgClient.query(sqlStatement);
+	sqlStatement = `create temporary table if not exists "JSON_STAGING" (data ${useBinaryJSON ? 'jsonb' : 'json'}) on commit preserve rows`;					   
 	await pgClient.query(sqlStatement);
 }
 
@@ -27,10 +29,15 @@ async function loadStagingTable(pgClient,dumpFileStream) {
   })  
 }
 
-async function processStagingTable(pgClient,schema) {    	
-	const sqlStatement = `select import_json(data,$1) from "JSON_STAGING"`;
+async function processStagingTable(pgClient,schema,useBinaryJSON) {  	
+	const sqlStatement = `select ${useBinaryJSON ? 'import_jsonb' : 'import_json'}(data,$1) from "JSON_STAGING"`;
 	var results = await pgClient.query(sqlStatement,[schema]);
-	return results.rows[0].import_json;
+    if (useBinaryJSON) {
+	  return results.rows[0].import_jsonb;  
+    }
+    else {
+	  return results.rows[0].import_json;  
+    }
 }
 
 async function main(){
@@ -39,6 +46,7 @@ async function main(){
   let parameters = undefined;
   let logWriter = process.stdout;   
   let sqlTrace = undefined;
+  let useBinaryJSON = true;
   
   let errorRaised = false;
   let warningRaised = false;
@@ -76,22 +84,43 @@ async function main(){
 	await pgClient.connect();
 	pgClient.on('notice',function(n){ 
 	                        const notice = JSON.parse(JSON.stringify(n));
-							if (notice.code != '42P07') /* Duplicate Table */ {
-							  console.log(n);
-							}
+                            switch (notice.code) {
+                              case '42P07': // Table exists on Create Table if not exists
+                                break;
+                              case '00000': // Table not found on Drop Table if exists
+							    break;
+                              default:
+                                console.log(n);
+                            }
 	})
 
-    const dumpFile = fs.createReadStream(dumpFilePath);
+    let dumpFile = fs.createReadStream(dumpFilePath);
     dumpFile.on('error',function(err) {console.log(err)})
 	
 	const schema = parameters.TOUSER;
-    await createStagingTable(pgClient);
-    const elapsedTime = await loadStagingTable(pgClient,dumpFile);	
-	dumpFile.close();
+    await createStagingTable(pgClient,useBinaryJSON);
+    let elapsedTime = undefined;
+    
+    try {
+      elapsedTime = await loadStagingTable(pgClient,dumpFile);	
+    }
+    catch (e) {
+      if (e.code && (e.code === '54000')) {
+        // Switch to Character JSON
+        logWriter.write(`${new Date().toISOString()}: Import Data file "${dumpFilePath}". Size ${fileSizeInBytes} cannot be loaded as binary JSON. Switching to textual JSON.\n`)
+        dumpFile.close();
+        useBinaryJSON = false;
+        await createStagingTable(pgClient,useBinaryJSON);
+        dumpFile = fs.createReadStream(dumpFilePath);
+        dumpFile.on('error',function(err) {console.log(err)})
+        elapsedTime = await loadStagingTable(pgClient,dumpFile);	
+      }      
+    }
+    dumpFile.close();
 	
     logWriter.write(`${new Date().toISOString()}: Import Data file "${dumpFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
-	const results = await processStagingTable(pgClient,schema);	
+	const results = await processStagingTable(pgClient,schema,useBinaryJSON);	
 
     if ((parameters.DUMPLOG) && (parameters.DUMPLOG == 'TRUE')) {
       const dumpFilePath = `${parameters.FILE.substring(0,parameters.FILE.lastIndexOf('.'))}.dump.import.${new Date().toISOString().replace(/:/g,'').replace(/-/g,'')}.json`;
@@ -121,14 +150,14 @@ async function main(){
 						     switch (true) {
 		                        case (logEntry.severity === 'FATAL') :
                                   errorRaised = true;
-                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:${logEntry.code} - ${logEntry.msg}\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
 								  break
 								case (logEntry.severity === 'WARNING') :
                                   warningRaised = true;
-                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:${logEntry.code} - ${logEntry.msg}\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
                                   break;
                                 case (logDDLIssues) :
-                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:${logEntry.code} - ${logEntry.msg}\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
                              } 	
                       }
 					  if ((parameters.SQLTRACE) && (logEntry.sqlStatement)) {

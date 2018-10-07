@@ -76,6 +76,9 @@ async function main() {
                       const logEntryType = Object.keys(result)[0];
                       const logEntry = result[logEntryType];
                       switch (true) {
+                        case (logEntryType === "message") : 
+                             logWriter.write(`${new Date().toISOString()}: ${logEntry}.\n`)
+                             break;
                         case (logEntryType === "dml") : 
                              logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.\n`)
                              break;

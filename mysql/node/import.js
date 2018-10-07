@@ -76,11 +76,16 @@ async function main(){
 	if (parameters.LOGFILE) {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE);
     }
+
+	if (parameters.SQLTRACE) {
+	  sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
+    }
 	
     const connectionDetails = {
             host      : parameters.HOSTNAME
            ,user      : parameters.USERNAME
            ,password  : parameters.PASSWORD
+
 		   ,database  : parameters.DATABASE
 		   ,multipleStatements: true
     }
@@ -108,7 +113,8 @@ async function main(){
     logWriter.write(`${new Date().toISOString()}: Import Data file "${dumpFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
 	results = await processStagingTable(conn,schema);
-	results = JSON.parse(results[2][0].logRecords)
+    results = results.pop();
+	results = JSON.parse(results[0].logRecords)
 
     if ((parameters.DUMPLOG) && (parameters.DUMPLOG == 'TRUE')) {
       const dumpFilePath = `${parameters.FILE.substring(0,parameters.FILE.lastIndexOf('.'))}.dump.import.${new Date().toISOString().replace(/:/g,'').replace(/-/g,'')}.json`;
@@ -138,14 +144,14 @@ async function main(){
 						     switch (true) {
 		                        case (logEntry.severity === 'FATAL') :
                                   errorRaised = true;
-                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.code} - ${logEntry.msg}\nSQL:${logEntry.sqlStatement}\n`)
 								  break
 								case (logEntry.severity === 'WARNING') :
                                   warningRaised = true;
-                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.code} - ${logEntry.msg}}\nSQL:${logEntry.sqlStatement}\n`)
                                   break;
                                 case (logDDLIssues) :
-                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.details}SQL:\n${logEntry.sqlStatement}\n`)
+                                  logWriter.write(`${new Date().toISOString()}[${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName : ''}". Details:\n${logEntry.code} - ${logEntry.msg}\nSQL:${logEntry.sqlStatement}\n`)
                              } 	
                       }
 					  if ((parameters.SQLTRACE) && (logEntry.sqlStatement)) {

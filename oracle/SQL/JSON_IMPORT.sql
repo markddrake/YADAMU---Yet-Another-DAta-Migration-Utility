@@ -175,6 +175,21 @@ begin
      from DUAL;
 end;
 --
+procedure LOG_MESSAGE(V_PAYLOAD CLOB)
+as
+begin
+  RESULTS_CACHE.extend;
+  $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+  select JSON_OBJECT('message' value V_PAYLOAD returning CLOB)
+  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+  select JSON_OBJECT('message' value V_PAYLOAD returning VARCHAR2(32767))
+  $ELSE
+  select JSON_OBJECT('message' value V_PAYLOAD returning VARCHAR2(4000))
+  $END
+     into RESULTS_CACHE(RESULTS_CACHE.count)
+     from DUAL;
+end;
+--
 function MAP_FOREIGN_DATATYPE(P_DATA_TYPE VARCHAR2, P_DATA_TYPE_LENGTH NUMBER, P_DATA_TYPE_SCALE NUMBER)
 return VARCHAR2
 as
@@ -278,7 +293,7 @@ begin
   end case;
 end;
 --
-procedure APPEND_DESERIALIZATION_FUNCTIONS(P_DESERIALIZATION_FUNCTIONS T_VC4000_TABLE, P_BLOB_COUNT NUMBER, P_BFILE_COUNT NUMBER, P_ANYDATA_COUNT NUMBER, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_SQL_STATEMENT IN OUT CLOB)
+procedure APPEND_DESERIALIZATION_FUNCTIONS(P_DESERIALIZATION_FUNCTIONS T_VC4000_TABLE, P_BLOB_COUNT NUMBER, P_BFILE_COUNT NUMBER, P_ANYDATA_COUNT NUMBER, P_SQL_STATEMENT IN OUT CLOB)
 as
   V_IDX   PLS_INTEGER;
 begin
@@ -303,52 +318,52 @@ as
   CURSOR generateStatementComponents
   is
   with 
-  "SOURCE_TABLE_DEFINITION" 
+  "SOURCE_TABLE_DEFINITIONS" 
   as (
     select c."KEY" IDX
-          ,c."VALUE" "COLUMN_NAME"
-          ,t."VALUE" "DATA_TYPE"
+          ,c.VALUE "COLUMN_NAME"
+          ,t.VALUE "DATA_TYPE"
           ,case
              when s.VALUE = ''
                then NULL
-             when INSTR(s."VALUE",',') > 0
-               then SUBSTR(s."VALUE",1,INSTR(s."VALUE",',')-1)
+             when INSTR(s.VALUE,',') > 0
+               then SUBSTR(s.VALUE,1,INSTR(s.VALUE,',')-1)
              else
-               s."VALUE"
+               s.VALUE
            end "DATA_TYPE_LENGTH"
           ,case
-             when INSTR(s."VALUE",',') > 0
-               then SUBSTR(s."VALUE", INSTR(s."VALUE",',')+1)
+             when INSTR(s.VALUE,',') > 0
+               then SUBSTR(s.VALUE, INSTR(s.VALUE,',')+1)
              else
                NULL
            end "DATA_TYPE_SCALE"
           ,case
-             when (INSTR(t."VALUE",'"."') > 0) 
+             when (INSTR(t.VALUE,'"."') > 0) 
                -- Data Type is a schema qualified object type
                then case 
                       -- Remap types defined by the source schema to the target schema.
-                      when SUBSTR(t."VALUE",1,INSTR(t."VALUE",'.')-2)  = P_TABLE_OWNER
+                      when SUBSTR(t.VALUE,1,INSTR(t.VALUE,'.')-2)  = P_TABLE_OWNER
                         then P_TARGET_SCHEMA
                       else
-                        SUBSTR(t."VALUE",1,INSTR(t."VALUE",'.')-2)
+                        SUBSTR(t.VALUE,1,INSTR(t.VALUE,'.')-2)
                       end
              else 
                NULL
            end "TYPE_OWNER"     
           ,case
-             when (INSTR(t."VALUE",'"."') > 0)
-               then SUBSTR(t."VALUE",INSTR(t."VALUE",'.')+2)
+             when (INSTR(t.VALUE,'"."') > 0)
+               then SUBSTR(t.VALUE,INSTR(t.VALUE,'.')+2)
              else 
                NULL 
            end "TYPE_NAME"
-         from JSON_TABLE('[' || P_COLUMN_LIST || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, "VALUE" PATH '$') c
-             ,JSON_TABLE('[' || REPLACE(P_DATA_TYPE_LIST,'"."','\".\"') || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, "VALUE" PATH '$') t
-             ,JSON_TABLE('[' || P_DATA_SIZE_LIST || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, "VALUE" PATH '$') s
+         from JSON_TABLE('[' || P_COLUMN_LIST || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') c
+             ,JSON_TABLE('[' || REPLACE(P_DATA_TYPE_LIST,'"."','\".\"') || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') t
+             ,JSON_TABLE('[' || P_DATA_SIZE_LIST || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') s
         where (c."KEY" = t."KEY") and (c."KEY" = s."KEY")
   ),
-  "TARGET_TABLE_DEFINITION" 
+  "TARGET_TABLE_DEFINITIONS" 
   as (
-    select IDX
+    select std.*
           , MAP_FOREIGN_DATATYPE("DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
           ,case
              -- Probe rather than Join since most rows are not objects.
@@ -356,22 +371,21 @@ as
                then case 
                       when (TYPE_OWNER = P_TABLE_OWNER)
                         -- Original Type belonged to the same schema as the table. Resolve the type in the target Schema
-                        then (select 1 from ALL_TYPES at where OWNER = P_TARGET_SCHEMA and at.TYPE_NAME = s.TYPE_NAME)
+                        then (select 1 from ALL_TYPES at where OWNER = P_TARGET_SCHEMA and at.TYPE_NAME = std.TYPE_NAME)
                       else
                         -- Original Type belonged to different schema as the table. Resolve the type in the original Schema
-                        (select 1 from ALL_TYPES at where at.OWNER = s.TYPE_OWNER and at.TYPE_NAME = s.TYPE_NAME)
+                        (select 1 from ALL_TYPES at where at.OWNER = std.TYPE_OWNER and at.TYPE_NAME = std.TYPE_NAME)
                     end
              else
                NULL
            end "TYPE_EXISTS"
-      from "SOURCE_TABLE_DEFINITION" s
+      from "SOURCE_TABLE_DEFINITIONS" std
   ),
-  "DESERIALIZATION_FUNCTIONS"
+  "EXTENDED_TABLE_DEFINITIONS"
   as (
-  select st.IDX,
+  select ttd.*,
          case when TYPE_EXISTS = 1 then OBJECT_SERIALIZATION.DESERIALIZE_TYPE(TYPE_OWNER,TYPE_NAME) else NULL end  "DESERIALIZATION_FUNCTION"
-    from "SOURCE_TABLE_DEFINITION" st,"TARGET_TABLE_DEFINITION" tt
-   where st.IDX = tt.IDX
+    from "TARGET_TABLE_DEFINITIONS" ttd
   )
 --
   $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
@@ -394,7 +408,7 @@ as
                           else
                             TARGET_DATA_TYPE
                         end || C_NEWLINE
-                        order by st.IDX
+                        order by IDX
                 )
                 as T_VC4000_TABLE
            )
@@ -429,7 +443,7 @@ as
                           else
                             '"' || COLUMN_NAME || '"'
                         end
-                        order by st.IDX
+                        order by IDX
                )
                as T_VC4000_TABLE
            )
@@ -444,6 +458,8 @@ as
                             then C_RETURN_TYPE
                           when "TARGET_DATA_TYPE" in ('DATE','DATETIME')
                             then "TARGET_DATA_TYPE"
+                          when TARGET_DATA_TYPE  = 'FLOAT'
+                            then 'NUMBER'
                           when TARGET_DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
                             then 'TIMESTAMP WITH TIME ZONE'
                           when DATA_TYPE = 'uniqueidentifier'
@@ -471,8 +487,8 @@ as
                           else
                             "TARGET_DATA_TYPE"
                         end
-                        || ' PATH ''$[' || (st.IDX - 1) || ']'' ERROR ON ERROR' || C_NEWLINE
-                        order by st.IDX
+                        || ' PATH ''$[' || (IDX - 1) || ']'' ERROR ON ERROR' || C_NEWLINE
+                        order by IDX
                 )
                 as T_VC4000_TABLE
            )
@@ -482,8 +498,7 @@ as
         , SUM(CASE WHEN TARGET_DATA_TYPE = 'BFILE' THEN 1 ELSE 0 END) BFILE_COUNT
         , SUM(CASE WHEN TARGET_DATA_TYPE = 'ANYDATA' THEN 1 ELSE 0 END) ANYDATA_COUNT
         , SUM(CASE WHEN TYPE_EXISTS = 1 THEN 1 ELSE 0 END) OBJECT_COUNT
-    from "SOURCE_TABLE_DEFINITION" st, "TARGET_TABLE_DEFINITION" tt, "DESERIALIZATION_FUNCTIONS" df
-   where st.IDX = tt.IDX and st.IDX = df.IDX;
+    from "EXTENDED_TABLE_DEFINITIONS";
 --
   $ELSE
 --
@@ -548,9 +563,8 @@ as
              "TARGET_DATA_TYPE"
          end
          || ' PATH ''$[' || (st.IDX - 1) || ']'' ERROR ON ERROR' || C_NEWLINE COLUMN_PATTERNS
-    from "SOURCE_TABLE_DEFINITION" st, "TARGET_TABLE_DEFINITION" tt, "DESERIALIZATION_FUNCTIONS" df
-   where st.IDX = tt.IDX and st.IDX = df.IDX;
-   order by st.IDX;
+    from "EXTENDED_TABLE_DEFINITIONS"
+   order by IDX;
 
    V_COLUMNS_CLAUSE_TABLE      T_VC4000_TABLE;
    V_INSERT_SELECT_TABLE       T_VC4000_TABLE;
@@ -637,7 +651,7 @@ begin
   V_SQL_FRAGMENT :=  ')' || C_NEWLINE;
   DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   
-  APPEND_DESERIALIZATION_FUNCTIONS(V_DESERIALIZATIONS,V_BLOB_COUNT,V_BFILE_COUNT,V_ANYDATA_COUNT,P_TARGET_SCHEMA,P_TABLE_NAME,P_DML_STATEMENT);
+  APPEND_DESERIALIZATION_FUNCTIONS(V_DESERIALIZATIONS,V_BLOB_COUNT,V_BFILE_COUNT,V_ANYDATA_COUNT,P_DML_STATEMENT);
    
   V_SQL_FRAGMENT := 'select ';
   DBMS_LOB.WRITEAPPEND(P_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
@@ -815,6 +829,8 @@ as
            $END
            )
          );
+   
+   V_NOTHING_DONE BOOLEAN := TRUE;
 begin
   -- LOG_INFO(JSON_OBJECT('startTime' value SYSTIMESTAMP, 'includeData' value G_INCLUDE_DATA, 'includeDDL' value G_INCLUDE_DDL));
 
@@ -830,6 +846,7 @@ begin
   DISABLE_CONSTRAINTS(P_TARGET_SCHEMA) ;
 
     for o in operationsList loop
+      V_NOTHING_DONE := FALSE;
       GENERATE_STATEMENTS(P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.COLUMN_LIST, o.DATA_TYPE_LIST, o.SIZE_CONSTRAINTS, V_DDL_STATEMENT, V_DML_STATEMENT);
       begin
         execute immediate V_DDL_STATEMENT;
@@ -863,6 +880,10 @@ begin
           LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_DML_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
       end;
     end loop;
+    
+    if (V_NOTHING_DONE) then
+      LOG_MESSAGE('Warning: No data imported');
+    end if;
 
     ENABLE_CONSTRAINTS(P_TARGET_SCHEMA);
     REFRESH_MATERIALIZED_VIEWS(P_TARGET_SCHEMA);
