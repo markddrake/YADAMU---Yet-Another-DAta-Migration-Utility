@@ -100,9 +100,9 @@ function closeFile(outStream) {
 
 async function main(){
 	
-  let dbConn = undefined;
-  let parameters = undefined;
-  let sqlTrace = undefined;
+  let dbConn;
+  let parameters;
+  let sqlTrace;
   let logWriter = process.stdout;
 	
   try {

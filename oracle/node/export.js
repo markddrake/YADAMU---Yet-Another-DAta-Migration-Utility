@@ -18,7 +18,7 @@ const sqlGetSystemInformation =
         SYS_CONTEXT('USERENV','DB_NAME') DATABASE_NAME, 
         SYS_CONTEXT('USERENV','SERVER_HOST') SERVER_HOST,
         JSON_OBJECTAGG(parameter, value) NLS_PARAMETERS
-        from NLS_DATABASE_PARAMETERS` ;
+        from NLS_DATABASE_PARAMETERS`;
 
 const sqlFetchDDL = 
 `select COLUMN_VALUE JSON 
@@ -170,9 +170,9 @@ async function wideTableWorkaround(conn,tableInfo,varcharSize,outStream) {
     
 async function main(){
 
-  let conn = undefined;
-  let parameters = undefined;
-  let sqlTrace = undefined;
+  let conn;
+  let parameters;
+  let sqlTrace;
   let logWriter = process.stdout;
   
   try {
@@ -248,8 +248,8 @@ async function main(){
        for (let i=0; i < sqlQueries.length; i++) {
         await writeTableName(i,`"${sqlQueries[i].TABLE_NAME}" :`,dumpFile);
         let dataOffset = dumpFile.bytesWritten + dumpFile.writableLength;
-        let rows = undefined;
-        let startTime = undefined;
+        let rows;
+        let startTime;
         try {
           if (parameters.SQLTRACE) {
             sqlTrace.write(`${sqlQueries[i].SQL_STATEMENT}\n\/\n`)

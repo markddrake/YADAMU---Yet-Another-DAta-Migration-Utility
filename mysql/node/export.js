@@ -6,7 +6,7 @@ const mysql = require('mysql');
 const JSONStream = require('JSONStream')
 const Transform = require('stream').Transform;
 
-const sqltAnsiQuotingMode =
+const sqlAnsiQuotingMode =
 `SET SESSION SQL_MODE=ANSI_QUOTES`
 
 const sqlGetSystemInformation = 
@@ -125,9 +125,9 @@ function fetchData(conn,sqlQuery,outStream) {
 
 async function main(){
 	
-  let conn = undefined;
-  let parameters = undefined;
-  let sqlTrace = undefined;
+  let conn;
+  let parameters;
+  let sqlTrace;
   let logWriter = process.stdout;
 	
   try {
@@ -151,9 +151,9 @@ async function main(){
     conn = mysql.createConnection(connectionDetails);
 	await connect(conn);
     if (parameters.SQLTRACE) {
-      sqlTrace.write(`${sqltAnsiQuotingMode}\n\/\n`)
+      sqlTrace.write(`${sqlAnsiQuotingMode}\n\/\n`)
     }
-    await query(conn,sqltAnsiQuotingMode);
+    await query(conn,sqlAnsiQuotingMode);
 	
     const dumpFilePath = parameters.FILE;	
     const dumpFile = fs.createWriteStream(dumpFilePath);

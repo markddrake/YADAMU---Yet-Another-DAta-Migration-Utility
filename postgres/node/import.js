@@ -19,7 +19,7 @@ async function createStagingTable(pgClient,useBinaryJSON) {
 async function loadStagingTable(pgClient,dumpFileStream) {
 
   return new Promise(async function(resolve,reject) {  
-    let startTime = undefined;
+    let startTime;
     const copyStatement = `copy "JSON_STAGING" from STDIN csv quote e'\x01' delimiter e'\x02'`;
     const stream = pgClient.query(copyFrom(copyStatement));
     stream.on('end',function() {resolve(new Date().getTime() - startTime)})
@@ -43,9 +43,9 @@ async function processStagingTable(pgClient,schema,useBinaryJSON) {
 async function main(){
   
   let pgClient = undefined
-  let parameters = undefined;
+  let parameters;
   let logWriter = process.stdout;   
-  let sqlTrace = undefined;
+  let sqlTrace;
   let useBinaryJSON = true;
   
   let errorRaised = false;
@@ -99,7 +99,7 @@ async function main(){
 	
 	const schema = parameters.TOUSER;
     await createStagingTable(pgClient,useBinaryJSON);
-    let elapsedTime = undefined;
+    let elapsedTime;
     
     try {
       elapsedTime = await loadStagingTable(pgClient,dumpFile);	

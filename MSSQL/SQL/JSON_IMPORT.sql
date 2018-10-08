@@ -33,12 +33,6 @@ BEGIN
 	  then 'nvarchar'
 	else
 	  @DATA_TYPE
- /*  
-   	  if ((instr(V_DATA_TYPE,'INTERVAL') = 1)) then
-	    return 'VARCHAR(16)';
-      end if;
-	  return @DATA_TYPE;
-*/
   END
 END
 --

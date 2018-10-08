@@ -270,9 +270,10 @@ BEGIN
                                    then concat('(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
                                  when DATA_TYPE_LENGTH is not NULL
                                    then case when TARGET_DATA_TYPE in ('double')
-                                     concat('(',DATA_TYPE_LENGTH,',0)')
-                                   else
-                                     concat('(',DATA_TYPE_LENGTH,')')
+                                               then concat('(',DATA_TYPE_LENGTH,',0)')
+                                             else
+                                               concat('(',DATA_TYPE_LENGTH,')')
+                                             end
                                  else
                                    ''
                                end,
@@ -298,10 +299,11 @@ BEGIN
                                    then concat('(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
                                  when DATA_TYPE_LENGTH is not NULL
                                    then case when TARGET_DATA_TYPE in ('double')
-                                     concat('(',DATA_TYPE_LENGTH,',0)')
-                                   else
-                                     concat('(',DATA_TYPE_LENGTH,')')
-y                                 else
+                                               then concat('(',DATA_TYPE_LENGTH,',0)')
+                                             else
+                                               concat('(',DATA_TYPE_LENGTH,')')
+                                        end
+                                 else
                                    ''
                                end,
                                ' PATH ''$[',IDX-1,']''',CHAR(32)

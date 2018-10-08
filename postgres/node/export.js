@@ -73,9 +73,9 @@ function fetchData(pgClient,sqlQuery,outStream) {
 
 async function main(){
 
-  let pgClient = undefined;
-  let parameters = undefined;
-  let sqlTrace = undefined;
+  let pgClient;
+  let parameters;
+  let sqlTrace;
   let logWriter = process.stdout;
 
   try {

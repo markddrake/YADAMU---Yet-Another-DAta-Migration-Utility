@@ -56,7 +56,7 @@ async function loadStagingTable(dbConn,stagingTable,dumpFilePath) {
   results = await createStagingTable(request,stagingTable);
   results = await initializeStagingTable(request,stagingTable);
 
-  let startTime = undefined;
+  let startTime;
   return new Promise(function(resolve, reject) {
 	loader.on('finish',function(chunk) {resolve(new Date().getTime() - startTime)})
 	inputStream.on('error',function(err){reject(err)});
@@ -114,7 +114,7 @@ async function untilFinished(request,stagingTable) {
 
 async function processStagingTable(dbConn,stagingTable,schema) {    	
   const request = new sql.Request(dbConn);	  
-  let results = undefined;
+  let results;
 
   try {
     results = await request.input('TARGET_DATABASE',sql.VARCHAR,schema).execute('IMPORT_JSON');
@@ -132,14 +132,14 @@ async function processStagingTable(dbConn,stagingTable,schema) {
 
 async function main(){
 	
-  let dbConn = undefined;
-  let parameters = undefined;
-  let sqlTrace = undefined;
+  let dbConn;
+  let parameters;
+  let sqlTrace;
   let logWriter = process.stdout;
 	
   try {
 
-    let results = undefined;
+    let results;
     parameters = common.processArguments(process.argv,'import');
 
 	if (parameters.LOGFILE) {

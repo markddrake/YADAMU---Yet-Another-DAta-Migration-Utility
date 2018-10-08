@@ -60,9 +60,9 @@ async function createTargetDatabase(conn,schema) {
 
 async function main(){
 	
-  let conn = undefined;
-  let parameters = undefined;
-  let sqlTrace = undefined;
+  let conn;
+  let parameters;
+  let sqlTrace;
   let logWriter = process.stdout;
     
   let errorRaised = false;

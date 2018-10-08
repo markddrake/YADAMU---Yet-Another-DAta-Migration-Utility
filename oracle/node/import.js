@@ -28,8 +28,8 @@ async function importJSON (conn, parameters, json) {
 async function main() {
     
   let conn = undefined
-  let parameters = undefined;
-  let sqlTrace = undefined;
+  let parameters;
+  let sqlTrace;
   let logWriter = process.stdout;   
   
   let errorRaised = false;
