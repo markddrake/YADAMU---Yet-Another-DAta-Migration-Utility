@@ -85,7 +85,6 @@ async function main(){
             host      : parameters.HOSTNAME
            ,user      : parameters.USERNAME
            ,password  : parameters.PASSWORD
-
 		   ,database  : parameters.DATABASE
 		   ,multipleStatements: true
     }

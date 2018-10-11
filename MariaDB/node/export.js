@@ -47,6 +47,8 @@ const sqlGenerateTables =
               when data_type like '%blob'
                 -- Force HEXBINARY rendering of value
                 then concat('HEX("', column_name, '")')
+             when data_type = 'geometry' 
+               then concat('JSON_QUERY(ST_AsGeoJSON("', column_name, '"),''$'')')
               else
                 concat('"',column_name,'"')
             end

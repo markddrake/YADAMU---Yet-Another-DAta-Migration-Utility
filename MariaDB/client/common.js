@@ -32,7 +32,7 @@ function processArguments(args,operation) {
 	                 FILE       : "export.json"
                     ,MODE       : "DDL_AND_CONTENT"
                     ,BATCHSIZE  : 100
-                    ,COMMITROWS : 1000
+                    ,COMMITSIZE : 1000
    }
 
    process.argv.forEach(function (arg) {
@@ -99,11 +99,11 @@ function processArguments(args,operation) {
 			break;
 	      case 'BATCHSIZE':
 	      case '--BATCHSIZE':
-		    parameters.BATCHSIZE = parameterValue
+		    parameters.BATCHSIZE = parseInt(parameterValue)
 			break;
 	      case 'COMMITSIZE':
 	      case '--COMMITSIZE':
-		    parameters.COMMITSIZE = parameterValue
+		    parameters.COMMITSIZE = parseInt(parameterValue)
 			break;
           case 'MODE':
 		    parameters.MODE = parameterValue.toUpperCase();
