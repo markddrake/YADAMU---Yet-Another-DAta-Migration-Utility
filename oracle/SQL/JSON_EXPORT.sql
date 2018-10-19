@@ -126,13 +126,15 @@ as
                 ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) DATA_TYPE_LIST
 	    ,cast(collect( 
 		       case
-			     when DATA_TYPE in ('VARCHAR2', 'CHAR', 'NVARCHAR2') 
+			     when DATA_TYPE in ('VARCHAR2', 'CHAR') 
                    then case 
                           when (CHAR_LENGTH < DATA_LENGTH) 
                             then '"' || CHAR_LENGTH || '"'
                             else '"' || DATA_LENGTH || '"'
                         end
-                 when DATA_TYPE in ('NVARCHAR2', 'CHAR', 'UROWID', 'RAW') or  DATA_TYPE LIKE 'INTERVAL%' 
+                 when DATA_TYPE in ('NVARCHAR2', 'NCHAR')
+                   then '"' || CHAR_LENGTH || '"'
+                 when DATA_TYPE in ('UROWID', 'RAW') or  DATA_TYPE LIKE 'INTERVAL%' 
                    then '"' || DATA_LENGTH || '"'
                  when DATA_TYPE = 'NUMBER' 
                    then case 

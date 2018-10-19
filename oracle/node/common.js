@@ -1,13 +1,16 @@
 module.exports.doConnect            = doConnect
 module.exports.doRelease            = doRelease
-module.exports.createTempLob        = createTempLob
 module.exports.closeTempLob         = closeTempLob
-module.exports.loadTempLobFromFile  = loadTempLobFromFile
+module.exports.lobFromStream        = lobFromStream
+module.exports.lobFromFile          = lobFromFile
+module.exports.lobFromJSON          = lobFromJSON
 module.exports.writeClobToFile      = writeClobToFile
 module.exports.processArguments     = processArguments
 
 const oracledb = require('oracledb');
 const fs = require('fs');
+
+const Readable = require('stream').Readable;
 
 function doConnect(connectionString) {
 	
@@ -33,64 +36,33 @@ function doRelease(conn) {
   });
 };
 
-async function createTempLob(conn) {
-  return conn.createLob(oracledb.BLOB);
-};
-
-
 function closeTempLob (tempLob) {
  templob.close();
 };
 
-function loadTempLobFromFile (conn,filename) {
-
-  var errorHandled = false;
+function lobFromStream (conn,inStream) {
 
   return new Promise(async function(resolve,reject) {
-
-    const tempLob =  await createTempLob(conn);
-	
-    tempLob.on(
-      'close',
-      function() {
-        console.log("templob.on 'close' event");
-    });
-
-    tempLob.on(
-      'error',
-      function(err) {
-        // console.log("templob.on 'error' event");
-        if (!errorHandled) {
-          errorHandled = true;
-  		  console.log(err);
-		  reject(err);
-        }
-    });
-
-    tempLob.on(
-      'finish',
-      function() {
-		// console.log(`loadTempLobFromFile("${filename}"): Read ${tempLob.iLob.offset-1} bytes.`);
-        // The data was loaded into the temporary LOB
-        if (!errorHandled) {
-          resolve(tempLob);
-        }
-    });
-
-    // console.log('Reading from ' + filename);
-    var inStream = fs.createReadStream(filename);
-    inStream.on(
-      'error',
-      function(err) {
-        // console.log("inStream.on 'error' event");
-        if (!errorHandled) {
-        errorHandled = true;
-		console.log(err);
-        reject(err);
-      }
-    });
+    const tempLob =  await conn.createLob(oracledb.BLOB);
+    tempLob.on('error',function(err) {reject(err);});
+    tempLob.on('finish', function() {resolve(tempLob);});
+    inStream.on('error', function(err) {reject(err);});
     inStream.pipe(tempLob);  // copies the text to the temporary LOB
   });  
+};
+
+function lobFromFile (conn,filename) {
+   const inStream = fs.createReadStream(filename);
+   return lobFromStream(conn,inStream);
+};
+
+function lobFromJSON(conn,json) {
+  
+  const s = new Readable();
+  s.push(JSON.stringify(json));
+  s.push(null);
+   
+  return lobFromStream(conn,s);
 };
 
 async function writeClobToFile(lob, filename) {
@@ -99,33 +71,9 @@ async function writeClobToFile(lob, filename) {
     lob.setEncoding('utf8');  // set the encoding so we get a 'string' not a 'buffer'
     var errorHandled = false;
 
-    lob.on(
-      'error',
-      function(err) {
-        // console.log("lob.on 'error' event");
-        if (!errorHandled) {
-          errorHandled = true;
-          lob.close(function() {
-            reject(err);
-          });
-        }
-      });
-
-   lob.on(
-      'end',
-      function() {
-        resolve();
-      });
+    lob.on('error', function(err) {lob.close(function() {reject(err);})});
+    lob.on('finish', function() {resolve();});
 	  
-    lob.on(
-     'close',
-      function() {
-        // console.log("lob.on 'close' event");
-        if (!errorHandled) {
-          return
-	    }
-      });
-
     var outStream = fs.createWriteStream(filename);
     outStream.on(
       'error',
@@ -173,8 +121,11 @@ function processValue(parameterValue) {
 function processArguments(args,operation) {
 
    const parameters = {
-	                 FILE : "export.json"
-                    ,MODE : "DDL_AND_DATA"
+	                 FILE         : "export.json"
+                    ,MODE         : "DDL_AND_DATA"
+                    ,BATCHSIZE    : 1000000
+                    ,COMMITSIZE   : 1000000
+                    ,LOBCACHESIZE : 512
    }
 
    process.argv.forEach(function (arg) {
@@ -210,7 +161,16 @@ function processArguments(args,operation) {
 	      case 'DUMPLOG':
 		    parameters.DUMPLOG = parameterValue.toUpperCase();
 			break;
-	      case 'MODE':
+	      case 'BATCHSIZE':
+		    parameters.BATCHSIZE = parseInt(parameterValue)
+			break;
+	      case 'COMMITSIZE':
+		    parameters.COMMITSIZE = parseInt(parameterValue)
+			break;	      
+	      case 'LOBCACHESIZE':
+		    parameters.LOBCACHESIZE = parseInt(parameterValue)
+			break;	      
+          case 'MODE':
 		    parameters.MODE = parameterValue.toUpperCase();
 			break;
 		  default:

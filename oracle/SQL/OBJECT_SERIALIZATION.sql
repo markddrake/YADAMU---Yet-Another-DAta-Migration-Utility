@@ -29,6 +29,7 @@ as
   procedure DESERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_PLSQL_BLOCK IN OUT NOCOPY CLOB);
   procedure DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE, P_PLSQL_BLOCK IN OUT NOCOPY CLOB);
 
+  function CLOB2XMLTYPE(P_SERIALIZATION CLOB) return XMLTYPE;
   
   function CODE_BFILE2CHAR return VARCHAR2 deterministic;
   function CODE_BLOB2BASE64 return VARCHAR2 deterministic;
@@ -81,9 +82,11 @@ end;
 'function CHAR2BFILE(P_SERIALIZATION VARCHAR2) 
 return BFILE
 as
-  V_BFILE BFILE;
+  V_BFILE BFILE := NULL;
 begin
-  EXECUTE IMMEDIATE ''select '' || P_SERIALIZATION || '' from dual'' into V_BFILE;
+  if (P_SERIALIZATION is not NULL) then
+    EXECUTE IMMEDIATE ''select '' || P_SERIALIZATION || '' from dual'' into V_BFILE;
+  end if;
   return V_BFILE;
 end;
 ';
@@ -151,6 +154,7 @@ is
   V_INPUT_LENGTH NUMBER := DBMS_LOB.GETLENGTH(P_SERIALIZATION);
   V_HEXBINARY_DATA VARCHAR2(32000);
 begin
+  if (P_SERIALIZATION is NULL) then return NULL; end if;
   if (DBMS_LOB.substr(P_SERIALIZATION,15,1) = ''BLOB2HEXBINARY:'') then return NULL; end if;
   DBMS_LOB.CREATETEMPORARY(V_BLOB,TRUE,DBMS_LOB.CALL);
   while (V_OFFSET <= V_INPUT_LENGTH) loop
@@ -608,12 +612,24 @@ begin
   return C_SERIALIZE_OBJECT_PART1;
 end;
 --
+function CLOB2XMLTYPE(P_SERIALIZATION CLOB) 
+return XMLTYPE
+as
+begin
+  if (P_SERIALIZATION is not NULL) then
+    return XMLTYPE(P_SERIALIZATION);
+  end if;
+  return NULL;
+end;
+--
 function CHAR2BFILE(P_SERIALIZATION VARCHAR2) 
 return BFILE
 as
-  V_BFILE BFILE;
+  V_BFILE BFILE := NULL;
 begin
-  EXECUTE IMMEDIATE 'select ' || P_SERIALIZATION || ' from dual' into V_BFILE;
+  if (P_SERIALIZATION is not NULL) then
+    EXECUTE IMMEDIATE 'select ' || P_SERIALIZATION || ' from dual' into V_BFILE;
+  end if;
   return V_BFILE;
 end;
 --
@@ -656,6 +672,7 @@ is
   V_INPUT_LENGTH NUMBER := DBMS_LOB.GETLENGTH(P_SERIALIZATION);
   V_HEXBINARY_DATA VARCHAR2(32000);
 begin
+  if (P_SERIALIZATION is NULL) then return NULL; end if;
   if (DBMS_LOB.substr(P_SERIALIZATION,15,1) = 'BLOB2HEXBINARY:') then return NULL; end if;
   DBMS_LOB.CREATETEMPORARY(V_BLOB,TRUE,DBMS_LOB.CALL);
   while (V_OFFSET <= V_INPUT_LENGTH) loop

@@ -60,7 +60,7 @@ async function main() {
     const logTrace       = (parameters.LOGLEVEL && (parameters.loglevel > 3));
     
     const startTime = new Date().getTime();
-    const json = await common.loadTempLobFromFile(conn,dumpFilePath);
+    const json = await common.lobFromFile(conn,dumpFilePath);
     const elapsedTime = new Date().getTime() - startTime;
     logWriter.write(`${new Date().toISOString()}: Import Data file "${dumpFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
