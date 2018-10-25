@@ -110,7 +110,7 @@ async function main(){
             host      : parameters.HOSTNAME
            ,user      : parameters.USERNAME
            ,password  : parameters.PASSWORD
-           ,port      : parameters.PORT ? parameters.PORT : 3306
+           ,port      : parameters.PORT ? parameters.PORT : 3307
     }
     
     pool = mariadb.createPool(connectionDetails);

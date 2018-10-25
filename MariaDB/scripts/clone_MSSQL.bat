@@ -1,10 +1,16 @@
-mkdir JSON\MSSQL
-mysql -u root -poracle -Dsys -h 192.168.1.250 -v -f <SQL/JSON_IMPORT.sql
-mysql -u root -poracle -Dsys -h 192.168.1.250 -v -f --init-command="SET @SCHEMA='ADVWRK'; SET @ID=1" <TESTS\RECREATE_SCHEMA.sql
-call scripts\import_master_MSSQL.bat ADVWRK1
-node node\export --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=sys --OWNER=\"ADVWRK1\" --FILE=JSON\MSSQL\AdventureWorks1.json
-mysql -u root -poracle -Dsys -h 192.168.1.250 -v -f --init-command="SET @SCHEMA='ADVWRK'; SET @ID=2" <TESTS\RECREATE_SCHEMA.sql
-node node\import --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=sys --TOUSER=\"ADVWRK2\" --FILE=JSON\MSSQL\AdventureWorks1.json
-node node\export --USERNAME=root --PASSWORD=oracle --HOSTNAME=192.168.1.250 --DATABASE=sys --OWNER=\"ADVWRK2\" --FILE=JSON\MSSQL\AdventureWorks2.json
-dir JSON\MSSQL\*1*.json
-dir JSON\MSSQL\*2*.json
+@set DIR=JSON\MSSQL
+@set ID=1
+@set FILENAME=AdventureWorks
+@set SCHEMA=ADVWRK
+@set ID=1
+mkdir %DIR%
+mysql -uroot -poracle -h192.168.1.250 -Dmysql -P3307 -v -f <SQL/JSON_IMPORT.sql
+mysql -uroot -poracle -h192.168.1.250 -Dmysql -P3307 -v -f --init-command="SET @SCHEMA='%SCHEMA%'; SET @ID=%ID%" <TESTS\RECREATE_SCHEMA.sql
+call scripts\import_MSSQL.bat ..\JSON\MSSQL %SCHEMA%%ID%
+node node\export --USERNAME=root --HOSTNAME=192.168.1.250 --PORT=3307 --PASSWORD=oracle --DATABASE=mysql --File=%DIR%\%FILENAME%%ID%.json owner=%SCHEMA%%ID%
+@set ID=2
+mysql -uroot -poracle -h192.168.1.250 -Dmysql -P3307 -v -f --init-command="SET @SCHEMA='%SCHEMA%'; SET @ID=2" <TESTS\RECREATE_SCHEMA.sql
+node node\jSaxImport --USERNAME=root --HOSTNAME=192.168.1.250 --PORT=3307 --PASSWORD=oracle --DATABASE=mysql --File=%DIR%\%FILENAME%1.json toUser=%SCHEMA%%ID%
+node node\export --USERNAME=root --HOSTNAME=192.168.1.250 --PORT=3307 --PASSWORD=oracle --DATABASE=mysql --File=%DIR%\%FILENAME%%ID%.json owner=%SCHEMA%%ID%
+dir %DIR%\*1.json
+dir %DIR%\*2.json
