@@ -1,11 +1,16 @@
 "use strict"
+
 const { Transform } = require('stream');
 const { Writable } = require('stream');
-const mariadb = require('mariadb');
+const Readable = require('stream').Readable;
 const common = require('./common.js');
 const clarinet = require('c:/Development/github/clarinet/clarinet.js');
 // const clarinet = require('clarinet');
 const fs = require('fs');
+const {Client} = require('pg')
+const copyFrom = require('pg-copy-streams').from;
+
+
 
 const unboundedTypes = ['tinyint','smallint','mediumint','int','set','enum','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json'];
 const spatialTypes = ['geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection'];
@@ -59,265 +64,6 @@ function processLog(log,status,logWriter) {
 		        }
   })
 }    
-
-function mapForeignDataType(dataType, dataTypeLength, dataTypeSize) {
-  switch (dataType) {
-    // TODO : Enable Roundtrip for ENUM and SET
-	case 'set':
-      return 'text';
-	case 'enum':
-     return 'text';
-    // Oracle Mappings
-	case 'VARCHAR2':
-     return 'varchar';
-	case 'NVARCHAR2':
-     return 'nvarchar';
-	case 'NUMBER':
-      return 'decimal';
-	case 'CLOB':
-      return 'text';
-	case 'NCLOB':
-      return 'text';
-	case 'BFILE':
-      return 'varchar(2048)';
-	case 'ROWID':
-      return 'varchar(32)';
-	case 'RAW':
-      return 'varbinary';
- 	case 'ROWID':
-      return 'varchar(32)';
- 	case 'ANYDATA':
-      return 'longtext';
-  // SQLServer Mapppings
-	case 'nchar':
-      return 'char';
-	case 'tinyint':
-      return 'tinyint unsigned';
-	case 'bit':
-      return 'tinyint(1)';
-	case 'real':
-      return 'float';
-	case 'numeric':
-      return 'decimal';
-	case 'money':
-      return 'decimal';
-	case 'smallmoney':
-      return 'decimal';
-	case 'char':
-      switch (true) {
-        case (dataTypeLength === -1):
-          return 'longtext';
-        case (dataTypeLength > 16777215):
-          return 'longtext';
-        case (dataTypeLength > 65535):
-          return 'mediumtext';
-         case (dataTypeLength > 255):
-           return 'text';
-         default:
-           return 'char';
-      }
-	case 'nchar':
-      switch (true) {
-         case (dataTypeLength === -1):
-           return 'longtext';
-         case (dataTypeLength > 16777215):
-           return 'longtext';
-         case (dataTypeLength > 65535):
-           return 'mediumtext';
-         case (dataTypeLength > 255):
-           return 'text';
-         default:
-          return 'char';
-      }
-	case 'nvarchar':
-      switch (true) {
-        case (dataTypeLength === -1):
-          return 'longtext';
-        case (dataTypeLength > 16777215):
-          return 'longtext';
-        case (dataTypeLength > 65535):
-          return 'mediumtext';
-        default:
-          return 'varchar';
-      }
-	case 'varchar':
-      switch (true) {
-        case (dataTypeLength === -1):
-          return 'longtext';
-        case (dataTypeLength > 16777215):
-          return 'longtext';
-        case (dataTypeLength > 65535):
-          return 'mediumtext';
-        default:
-           return 'varchar';
-      }
-	case 'datetime2':
-      return 'datatime';
-	case 'smalldate':
-      return 'datatime';
-	case 'datetimeoffset':
-      return 'datatime';
-	case 'rowversion':
-      return 'datatime';
-	case 'binary':
-      switch (true) {
-        case (dataTypeLength > 16777215):
-          return 'longblob';
-        case (dataTypeLength > 65535):
-          return 'mediumblob';
-        case (dataTypeLength > 255):
-          return 'blob';
-        default:
-          return 'tinyblob';
-      }
-	case 'varbinary':
-      switch (true) {
-        case (dataTypeLength === -1):
-          return 'longblob';
-        case (dataTypeLength > 16777215):
-          return 'longblob';
-        case (dataTypeLength > 65535):
-          return 'mediumblob';
-        default:
-          return 'varbinary';
-      }
-	case 'text':
-      switch (true) {
-        case (dataTypeLength === -1):
-          return 'longtext';
-        case (dataTypeLength > 16777215):
-          return 'longtext';
-        case (dataTypeLength > 65535):
-          return 'mediumtext';
-        case (dataTypeLength > 255):
-          return 'text';
-        default:
-          return 'char';
-      }
-	case 'ntext':
-      switch (true) {
-        case (dataTypeLength === -1):
-          return 'longtext';
-        case (dataTypeLength > 16777215):
-          return 'longtext';
-        case (dataTypeLength > 65535):
-          return 'mediumtext';
-        case (dataTypeLength > 255):
-          return 'text';
-        default:
-          return 'char';
-      }
-	case 'image':
-      switch (true) {
-        case (dataTypeLength === -1):
-          return 'longblob';
-        case (dataTypeLength > 16777215):
-          return 'longblob';
-        case (dataTypeLength > 65535):
-          return 'mediumblob';
-        case (dataTypeLength > 255):
-          return 'blob';
-        default:
-          return 'tinyblob';
-      }
-	case 'uniqueidentifier':
-      return 'varchar(64)';
-	case 'hierarchyid':
-      return 'varbinary(446)';
-	case 'xml':
-      return 'longtext';
-	case 'geography':
-      return 'longtext';
-	default:
-   	  if (dataType.indexOf('TIME ZONE') > -1) {
-	    return 'timestamp';	
-      }
-  	  if (dataType.indexOf('XMLTYPE') > -1) { 
-	    return 'longtext';
-      }
-	  if (dataType.indexOf('.') > -1) { 
-	    return 'longtext';
-      }
-      if (spatialTypes.includes(dataType)) {
-        return 'text';
-      }
-   	  if ((dataType.indexOf('INTERVAL') === 0)) {
-	    return 'varchar(16)';
-      }
-	  return dataType.toLowerCase();
-  }
-}
-    
-function generateStatements(schema, metadata) {
-    
-   const columnNames = metadata.columns.split(',');
-   const dataTypes = metadata.dataTypes.split(',');
-   const sizeConstraints = JSON.parse('[' + metadata.dataTypeSizing.replace(/\"\.\"/g, '\",\"') + ']');
-   const argsList = [];
-   const columnClauses = columnNames.map(function(columnName,idx) {    
-                                           const dataType = dataTypes[idx].replace(/\"/g, "");
-                                           const sizeConstraint = sizeConstraints[idx].replace(/\"/g, "");
-                                           let dataLength = null;
-                                           let dataScale = null;
-                                           let qualifier = ''
-                                         
-                                           if (sizeConstraint.length > 0) {
-                                             dataLength = sizeConstraint;
-                                             const scaleOffset = dataLength.indexOf(',');
-                                             if (scaleOffset > -1) {
-                                               dataScale = parseInt(dataLength.substring(scaleOffset+1))
-                                               dataLength = parseInt(dataLength.substring(0,scaleOffset))
-                                             }
-                                             else {
-                                               dataLength = parseInt(dataLength);
-                                             }
-                                           }
-                                           let targetDataType = mapForeignDataType(dataType,dataLength,dataScale);
-   
-                                           switch (true) {
-                                              case (targetDataType.indexOf('(') > -1):
-                                                break;
-                                              case (targetDataType.endsWith(" unsigned")):
-                                                break;
-                                              case unboundedTypes.includes(targetDataType):
-                                                break;
-                                              case spatialTypes.includes(targetDataType):
-                                                break;
-                                              case nationalTypes.includes(targetDataType):
-                                                targetDataType = targetDataType + '(' + dataLength + ')';
-                                                break;
-                                              case (dataScale != null):
-                                                targetDataType = targetDataType + '(' + dataLength + ',' + dataScale + ')';
-                                                break;
-                                              case (dataLength != null):
-                                                switch (true) {
-                                                  case (targetDataType === 'double'):
-                                                    targetDataType = targetDataType + '(' + dataLength + ',0)';
-                                                    break;
-                                                  default:
-                                                    targetDataType = targetDataType + '(' + dataLength + ')';
-                                                    break;
-                                                }
-                                                break;
-                                              default:
-                                           }
-                                           
-                                           switch (true) {
-                                             default:
-                                               argsList[idx] = '?';
-                                           }
-                                            
-                                           return `${columnName} ${targetDataType} ${qualifier}\n `;
-                                        })
-                                       
-    
-    const createStatement = `create table if not exists "${schema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
-    const insertStatement = `insert into "${schema}"."${metadata.tableName}"(${metadata.columns}) values`
-
-    // The extra comma on the end of the args list allows it to be easily replicated when performing batch inserts
-    
-    return { ddl : createStatement, dml : { sql : insertStatement, args : '(' + argsList.join(',') + '),'}}
-}
 
 class RowParser extends Transform {
   
@@ -515,27 +261,22 @@ class RowParser extends Transform {
 
 async function createTables(conn, schema, metadata, status) {
     
-  const ddlStatements = []
-  const dmlStatements = {};
+  const results = await conn.query(`select GENERATE_SQL($1,$2)`,[{metadata : metadata},schema]);
+  const sql = results.rows[0].generate_sql;
   const tables = Object.keys(metadata); 
-  tables.forEach(function(table,idx) {
-                   const tableMetadata = metadata[table];
-                   const sql = generateStatements(schema,tableMetadata);
-                   ddlStatements[idx] = sql.ddl;
-                   dmlStatements[table] =  sql.dml
-  });
+  await Promise.all(tables.map(async function(table,idx) {
+                           try {
+                             if (status.sqlTrace) {
+                               status.sqlTrace.write(`${sql[table][0]};\n--\n`);
+                             }
+                             const results = await conn.query(sql[table][0]);
+                             sql[table][1] = sql[table][1].substr(0,sql[table][1].indexOf('select ')-1) + '\nvalues ';
+                           } catch (e) {
+                             console.log(e);
+                           }
+  }));
   
-  for (let i=0; i<ddlStatements.length;i++) {
-    try {
-      if (status.sqlTrace) {
-        status.sqlTrace.write(`${ddlStatements[i]};\n--\n`);
-      }
-      results = await conn.query(ddlStatements[i]);   
-    } catch (e) {
-      console.log(e);
-    }
-  }
-  return dmlStatements;
+  return sql;
 }
 
 class DbWriter extends Writable {
@@ -557,8 +298,8 @@ class DbWriter extends Writable {
     this.statementCache = undefined;
     
     this.tableName = undefined;
+    this.tableColumnCount = undefined;
     this.insertStatement = undefined;
-    this.args = undefined;
     this.rowCount = undefined; 
     this.startTime = undefined;
     this.skipTable = true;
@@ -570,8 +311,8 @@ class DbWriter extends Writable {
   async setTable(tableName) {
        
     this.tableName = tableName
-    this.insertStatement =  this.statementCache[tableName].sql;
-    this.args =  this.statementCache[tableName].args;
+    this.insertStatement =  this.statementCache[tableName][1];
+    this.tableColumnCount = parseInt(this.statementCache[tableName][2]);
     this.rowCount = 0;
     this.batch.length = 0;
     this.tableLobIndex = 0;
@@ -583,20 +324,23 @@ class DbWriter extends Writable {
    async writeBatch(status) {
     try {
       // Slice removes the unwanted last comma from the replicated args list.
-      const args = this.args.repeat(this.batchRowCount).slice(0,-1); 
-      const results = await this.conn.query(this.insertStatement+args,this.batch);
+      let argNumber = 1;
+      const args = Array(this.batchRowCount).fill(0).map(function() {return `(${Array(this.tableColumnCount).fill(0).map(function(){return `$${argNumber++}`}).join(',')})`},this).join(',');
+      const statement = this.insertStatement + args
+      const results = await this.conn.query(statement,this.batch);
       const endTime = new Date().getTime();
-      await this.conn.commit();
       this.batch.length = 0;
       this.batchRowCount = 0;
       return endTime
     } catch (e) {
+      await this.conn.query(`rollback transaction`);
       this.batch.length = 0;
       this.batchRowCount = 0;
       this.skipTable = true;
       this.status.warningRaised = true;
       this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping table. Reason: ${e.message}\n`)
       if (this.logDDLIssues) {
+          
         this.logWriter.write(`${this.insertStatement}\n`);
         this.logWriter.write(`${JSON.stringify(this.args)}\n`);
         this.logWriter.write(`${this.batch}\n`);
@@ -620,7 +364,7 @@ class DbWriter extends Writable {
             if (this.batchRowCount > 0) {
               // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Final Batch contains ${this.batchRowCount} rows.`);
               this.endTime = await this.writeBatch(this.status);
-              await this.conn.commit();
+              await this.conn.query(`commit transaction`);
             }  
             if (!this.skipTable) {
               const elapsedTime = this.endTime - this.startTime;
@@ -628,7 +372,6 @@ class DbWriter extends Writable {
             }
           }
           this.setTable(obj.table);
-          await this.conn.beginTransaction();
           if (this.status.sqlTrace) {
              this.status.sqlTrace.write(`${this.insertStatement} ${this.args.slice(0,-1)};\n--\n`);
           }
@@ -640,16 +383,19 @@ class DbWriter extends Writable {
           this.batch.push(...obj.data);
           this.batchRowCount++;
           //  this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Batch contains ${this.batchRowCount} rows.`);
-          if (this.batchRowCount  === this.batchSize) {
+          if ((this.batchRowCount  === this.batchSize) || ( this.batch.length > 32768)) {
               //  this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Completed Batch contains ${this.batchRowCount} rows.`);
               this.endTime = await this.writeBatch(this.status);
           }  
           this.rowCount++;
+          if (this.rowCount === 1) {
+            await this.conn.query(`begin transaction`);
+          }
           if ((this.rowCount % this.commitSize) === 0) {
-             await this.conn.commit();
+             await this.conn.query(`commit transaction`);
              const elapsedTime = this.endTime - this.startTime;
-             // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Commit after Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
              await this.conn.beginTransaction();
+             // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Commit after Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
           }
           break;
         default:
@@ -667,7 +413,7 @@ class DbWriter extends Writable {
       if (this.batchRowCount > 0) {
         // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Final Batch contains ${this.batchRowCount} rows.`);
         this.endTime = await this.writeBatch();
-        await this.conn.commit();
+        await this.conn.query(`commit transaction`);
       }  
       if (this.tableName) {        
         if (!this.skipTable) {
@@ -731,31 +477,28 @@ async function main() {
     }
 	
     const connectionDetails = {
-            host      : parameters.HOSTNAME
-           ,user      : parameters.USERNAME
-           ,password  : parameters.PASSWORD
-           ,port      : parameters.PORT ? parameters.PORT : 3307
-           ,database  : parameters.DATABASE
-           ,multipleStatements: true
+      user      : parameters.USERNAME
+     ,host      : parameters.HOSTNAME
+     ,database  : parameters.DATABASE
+     ,password  : parameters.PASSWORD
+     ,port      : parameters.PORT
     }
-    
-    pool = mariadb.createPool(connectionDetails);
-    conn = await pool.getConnection();
-    const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
-    results = await conn.query(`SHOW variables like 'max_allowed_packet'`);
 
-    if (parseInt(results[0].Value) <  maxAllowedPacketSize) {
-        logWriter.write(`${new Date().toISOString()}: Increasing MAX_ALLOWED_PACKET to 1G.\n`);
-        results = await conn.query(`SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`);
-        await conn.end();
-        await pool.end();
-        pool = mariadb.createPool(connectionDetails);
-        conn = await pool.getConnection();
-    }
-  
-    results = await conn.query(`SET SESSION SQL_MODE=ANSI_QUOTES`);
-    results = await conn.query(`CREATE DATABASE IF NOT EXISTS "${parameters.TOUSER}"`);	
-    
+    const pgClient = new Client(connectionDetails);
+	await pgClient.connect();
+	
+    pgClient.on('notice',function(n){ 
+	                        const notice = JSON.parse(JSON.stringify(n));
+                            switch (notice.code) {
+                              case '42P07': // Table exists on Create Table if not exists
+                                break;
+                              case '00000': // Table not found on Drop Table if exists
+							    break;
+                              default:
+                                console.log(n);
+                            }
+	})
+
 	const stats = fs.statSync(parameters.FILE)
     const fileSizeInBytes = stats.size
 	
@@ -763,10 +506,9 @@ async function main() {
        status.loglevel = parameters.LOGLEVEL;
     }
     	
-    await processFile(conn, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);
+    await processFile(pgClient, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);
     
-    await conn.end();
-    await pool.end();
+	await pgClient.end();
 
     status.statusMsg = status.warningRaised ? 'with warnings' : status.statusMsg;
     status.statusMsg = status.errorRaised ? 'with errors'  : status.statusMsg;

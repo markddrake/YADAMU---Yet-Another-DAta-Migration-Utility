@@ -1,3 +1,5 @@
+"use strict" 
+
 const { Transform } = require('stream');
 const { Writable } = require('stream');
 const Readable = require('stream').Readable;

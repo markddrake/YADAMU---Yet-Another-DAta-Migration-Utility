@@ -49,7 +49,7 @@ async function generateQueries(pgClient,schema) {
   return results.rows;
 }
 
-function fetchData(pgClient,sqlQuery,outStream) {
+async function fetchData(pgClient,sqlQuery,outStream) {
 
   let counter = 0;
 
@@ -66,9 +66,10 @@ function fetchData(pgClient,sqlQuery,outStream) {
   return new Promise(async function(resolve,reject) {  
     const stream = await pgClient.query(query)
     jsonStream.on('end',function() {resolve(counter)})
-	stream.on('error',function(err){reject(err)});
+	stream.on('error',function(err){console.log('Error'),reject(err)});
     stream.pipe(parser).pipe(jsonStream).pipe(outStream,{end: false })
   })
+  
 }
 
 async function main(){

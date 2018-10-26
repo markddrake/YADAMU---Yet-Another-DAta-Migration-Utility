@@ -147,7 +147,8 @@ as $$
 declare
   V_COLUMNS_CLAUSE     TEXT;
   V_INSERT_SELECT_LIST TEXT;
-  V_STATEMENTS       TEXT[] := '{}';
+  V_COLUMN_COUNT       TEXT;
+  V_STATEMENTS         TEXT[] := '{}';
 begin
 
   with
@@ -199,16 +200,17 @@ begin
                    ,CHR(13) || '  ,'
                    ) COLUMNS_CLAUSE
         ,STRING_AGG('cast( value ->> ' || IDX-1 || ' as ' || TARGET_DATA_TYPE || ') "' || COLUMN_NAME || '"', CHR(13) || '  ,') INSERT_SELECT_LIST
-    into V_COLUMNS_CLAUSE, V_INSERT_SELECT_LIST
+        ,CAST(COUNT(*) AS TEXT) COLUMN_COUNT
+    into V_COLUMNS_CLAUSE, V_INSERT_SELECT_LIST, V_COLUMN_COUNT
     from TARGET_TABLE_DEFINITIONS;
 
   V_STATEMENTS[1] := 'CREATE TABLE IF NOT EXISTS "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || CHR(13) || '   ' || V_COLUMNS_CLAUSE || CHR(13) || ')';        
   V_STATEMENTS[2] := 'INSERT into "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || P_COLUMNS || ')' || CHR(13) || 'select ' || V_INSERT_SELECT_LIST || CHR(13) || '  from ' || case WHEN P_BINARY_JSON then 'jsonb_array_elements' else 'json_array_elements' end || '($1 -> ''data'' -> ''' || P_TABLE_NAME || ''')';
+  V_STATEMENTS[3] := V_COLUMN_COUNT;
   return V_STATEMENTS;
 end;  
 $$ LANGUAGE plpgsql;
 --
-  
 create or replace function IMPORT_JSONB(P_JSON jsonb,P_SCHEMA VARCHAR) 
 returns jsonb[]
 as $$
@@ -261,6 +263,17 @@ exception
 end;  
 $$ LANGUAGE plpgsql;
 --
+create or replace function GENERATE_SQL(P_JSON json, P_SCHEMA VARCHAR)
+returns SETOF jsonb
+as $$
+declare
+begin
+  RETURN QUERY
+  select jsonb_object_agg("tableName",GENERATE_STATEMENTS(P_SCHEMA,"tableName","columns","dataTypes","dataTypeSizing",FALSE))
+    from JSON_EACH(P_JSON -> 'metadata')  CROSS JOIN LATERAL JSON_TO_RECORD(value) as METADATA("owner" VARCHAR, "tableName" VARCHAR, "columns" TEXT, "dataTypes" TEXT, "dataTypeSizing" TEXT);
+end;
+$$ LANGUAGE plpgsql;
+--
 create or replace function IMPORT_JSON(P_JSON json,P_SCHEMA VARCHAR) 
 returns jsonb[]
 as $$
@@ -279,7 +292,7 @@ begin
   for r in select "owner", "tableName", "columns", "dataTypes","dataTypeSizing"
              from JSON_EACH(P_JSON -> 'metadata')  CROSS JOIN LATERAL JSON_TO_RECORD(value) as METADATA("owner" VARCHAR, "tableName" VARCHAR, "columns" TEXT, "dataTypes" TEXT, "dataTypeSizing" TEXT) loop
 
-             V_STATEMENTS := GENERATE_STATEMENTS(P_SCHEMA,r."tableName",r."columns",r."dataTypes",r."dataTypeSizing",FALSE);
+    V_STATEMENTS := GENERATE_STATEMENTS(P_SCHEMA,r."tableName",r."columns",r."dataTypes",r."dataTypeSizing",FALSE);
   
     begin
       EXECUTE V_STATEMENTS[1];
