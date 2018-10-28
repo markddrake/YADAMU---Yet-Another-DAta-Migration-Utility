@@ -92,6 +92,9 @@ async function main(){
     conn = mysql.createConnection(connectionDetails);
 	await connect(conn);
     await query(conn,'SET SESSION SQL_MODE=ANSI_QUOTES');
+    await query(conn,`SET GLOBAL local_infile = 'ON'`);
+    
+    ;
 	
     const dumpFilePath = parameters.FILE;	
 	const stats = fs.statSync(dumpFilePath)

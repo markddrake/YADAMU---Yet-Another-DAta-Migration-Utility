@@ -163,17 +163,17 @@ async function main(){
     if (parameters.SQLTRACE) {
       sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
     }
-	const sysInfo = await getSystemInformation(conn);
-	dumpFile.write('{"systemInformation":');
+	const mysqlInfo = await getSystemInformation(conn);
+	dumpFile.write('{"mysqltemInformation":');
 	dumpFile.write(JSON.stringify({
 		                 "date"            : new Date().toISOString()
 					    ,"vendor"          : "MySQL"
 					    ,"schema"          : schema
 					    ,"exportVersion"   : 1
-						,"sessionUser"     : sysInfo[0].SESSION_USER
-						,"currentUser"     : sysInfo[0].CURRENT_USER
-						,"dbName"          : sysInfo[0].DATABASE_NAME
-						,"databaseVersion" : sysInfo[0].DATABASE_VERSION
+						,"sessionUser"     : mysqlInfo[0].SESSION_USER
+						,"currentUser"     : mysqlInfo[0].CURRENT_USER
+						,"dbName"          : mysqlInfo[0].DATABASE_NAME
+						,"databaseVersion" : mysqlInfo[0].DATABASE_VERSION
 	}));
 	
 	dumpFile.write(',"metadata":{');
