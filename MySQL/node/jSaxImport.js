@@ -7,10 +7,6 @@ const clarinet = require('c:/Development/github/clarinet/clarinet.js');
 // const clarinet = require('clarinet');
 const fs = require('fs');
 
-const unboundedTypes = ['tinyint','smallint','mediumint','int','set','enum','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json'];
-const spatialTypes = ['geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection'];
-const nationalTypes = ['nchar','nvarchar'];
-   
 function connect(conn) {
 	
   return new Promise(function(resolve,reject) {
@@ -24,7 +20,7 @@ function connect(conn) {
 }	
 	  
 function query(conn,sqlQuery,args) {
-	
+    
   return new Promise(function(resolve,reject) {
 	                   conn.query(sqlQuery,args,function(err,rows,fields) {
 		                                     if (err) {
@@ -33,56 +29,7 @@ function query(conn,sqlQuery,args) {
 											 resolve(rows);
                                            })
                      })
-}     
-   
-function processLog(log,status,logWriter) {
-
-  const logDML         = (status.loglevel && (status.loglevel > 0));
-  const logDDL         = (status.loglevel && (status.loglevel > 1));
-  const logDDLIssues   = (status.loglevel && (status.loglevel > 2));
-  const logTrace       = (status.loglevel && (status.loglevel > 3));
-    
-  log.forEach(function(result) {
-                const logEntryType = Object.keys(result)[0];
-                const logEntry = result[logEntryType];
-                switch (true) {
-                  case (logEntryType === "message") : 
-                    logWriter.write(`${new Date().toISOString()}: ${logEntry}.\n`)
-                    break;
-                  case (logEntryType === "dml") : 
-                    logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.\n`)
-                    break;
-                  case (logEntryType === "info") :
-                    logWriter.write(`${new Date().toISOString()}[INFO]: "${JSON.stringify(logEntry)}".\n`);
-                    break;
-                  case (logDML && (logEntryType === "dml")) :
-                    logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}.\n`)
-                    break;
-                  case (logDDL && (logEntryType === "ddl")) :
-                    logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}.\n`) 
-                    break;
-                  case (logTrace && (logEntryType === "trace")) :
-                    logWriter.write(`${new Date().toISOString()} [TRACE]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".\n' : '\n'}${logEntry.sqlStatement}.\n`)
-                    break;
-                  case (logEntryType === "error"):
-	                switch (true) {
-		              case (logEntry.severity === 'FATAL') :
-                        status.errorRaised = true;
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.details}\n${logEntry.sqlStatement}\n`)
-				        break
-					  case (logEntry.severity === 'WARNING') :
-                        status.warningRaised = true;
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.details}${logEntry.sqlStatement}\n`)
-                        break;
-                      case (logDDLIssues) :
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.details}${logEntry.sqlStatement}\n`)
-                    } 	
-                } 
-				if ((status.sqlTrace) && (logEntry.sqlStatement)) {
-				  status.sqlTrace.write(`${logEntry.sqlStatement}\n\/\n`)
-		        }
-  })
-}    
+}  
 
 class RowParser extends Transform {
   
@@ -278,7 +225,7 @@ class RowParser extends Transform {
   };
 }
 
-async function createTables(conn, schema, metadata, status) {
+async function generateStatementCache(conn, schema, metadata, status,logWriter) {
     
   const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;					   
  
@@ -286,18 +233,18 @@ async function createTables(conn, schema, metadata, status) {
   results = results.pop();
   const statementCache = JSON.parse(results[0].SQL_STATEMENTS)
   const tables = Object.keys(metadata); 
-  tables.forEach(async function(table,idx) {
-                   const tableMetadata = metadata[table];
-                   statementCache[table].dml = statementCache[table].dml.substr(0,statementCache[table].dml.indexOf(') select')+1) + "\nvalues ?";
-                   try {
-                     if (status.sqlTrace) {
-                       status.sqlTrace.write(`${statementCache[table].ddl};\n--\n`);
-                     }
-                     const results = await query(conn,statementCache[table].ddl);   
-                   } catch (e) {
-                     console.log(e);
-                   }  
-  });
+  await Promise.all(tables.map(async function(table,idx) {
+                                       const tableInfo = statementCache[table];
+                                       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + "\nvalues ?";
+                                       if (status.sqlTrace) {
+                                         status.sqlTrace.write(`${tableInfo.ddl};\n--\n`);
+                                       }
+                                       try {
+                                         const results = await query(conn,tableInfo.ddl);   
+                                       } catch (e) {
+                                         logWriter.write(`${e}\n${tableInfo.ddl}\n`)
+                                       }  
+  }));
   
   return statementCache;
 }
@@ -316,12 +263,12 @@ class DbWriter extends Writable {
     this.status = status;
     this.logWriter = logWriter;
 
-    this.mysqltemInformation = undefined;
+    this.systemInformation = undefined;
     this.metadata = undefined;
     this.statementCache = undefined;
     
     this.tableName = undefined;
-    this.insertStatement = undefined;
+    this.tableInfo = undefined;
     this.rowCount = undefined; 
     this.startTime = undefined;
     this.skipTable = true;
@@ -332,10 +279,9 @@ class DbWriter extends Writable {
   async setTable(tableName) {
        
     this.tableName = tableName
-    this.insertStatement =  this.statementCache[tableName].dml;
+    this.tableInfo =  this.statementCache[tableName]
     this.rowCount = 0;
     this.batch.length = 0;
-    this.tableLobIndex = 0;
     this.startTime = new Date().getTime();
     this.endTime = undefined;
     this.skipTable = false;
@@ -343,9 +289,8 @@ class DbWriter extends Writable {
   
    async writeBatch(status) {
     try {
-      const results = await query(this.conn,this.insertStatement,[this.batch]);
+      const results = await query(this.conn,this.tableInfo.dml,[this.batch]);
       const endTime = new Date().getTime();
-      await this.conn.commit();
       this.batch.length = 0;
       return endTime
     } catch (e) {
@@ -354,7 +299,7 @@ class DbWriter extends Writable {
       this.status.warningRaised = true;
       this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping table. Reason: ${e.message}\n`)
       if (this.logDDLIssues) {
-        this.logWriter.write(`${this.insertStatement}\n`);
+        this.logWriter.write(`${this.tableInfo.dml}\n`);
         this.logWriter.write(`${JSON.stringify(this.args)}\n`);
         this.logWriter.write(`${this.batch}\n`);
       }      
@@ -364,12 +309,12 @@ class DbWriter extends Writable {
   async _write(obj, encoding, callback) {
     try {
       switch (Object.keys(obj)[0]) {
-        case 'mysqltemInformation':
-          this.mysqltemInformation = obj.mysqltemInformation;
+        case 'systemInformation':
+          this.systemInformation = obj.systemInformation;
           break;
         case 'metadata':
           this.metadata = obj.metadata;
-          this.statementCache = await createTables(this.conn, this.schema, this.metadata, this.status, this.logWriter);
+          this.statementCache = await generateStatementCache(this.conn, this.schema, this.metadata, this.status, this.logWriter);
           break;
         case 'table':
           // this.logWriter.write(`${new Date().toISOString()}: Switching to Table "${obj.table}".\n`);
@@ -387,7 +332,7 @@ class DbWriter extends Writable {
           this.setTable(obj.table);
           await this.conn.beginTransaction();
           if (this.status.sqlTrace) {
-             this.status.sqlTrace.write(`${this.insertStatement} ${this.args.slice(0,-1)};\n--\n`);
+             this.status.sqlTrace.write(`${this.tableInfo.dml} ${this.args.slice(0,-1)};\n--\n`);
           }
           break;
         case 'data': 
@@ -419,16 +364,15 @@ class DbWriter extends Writable {
  
   async _final(callback) {
     try {
-      const elapsedTime = new Date().getTime() - this.startTime;
-      if (this.batch.length > 0) {
-        // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Final Batch contains ${this.batch.length} rows.`);
-        this.endTime = await this.writeBatch();
-        await this.conn.commit();
-      }  
       if (this.tableName) {        
         if (!this.skipTable) {
+          if (this.batch.length > 0) {
+            // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Final Batch contains ${this.batch.length} rows.`);
+           this.endTime = await this.writeBatch();
+          }  
           const elapsedTime = this.endTime - this.startTime;
           this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+          await this.conn.commit();
         }
       }          
       else {

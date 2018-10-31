@@ -1,0 +1,32 @@
+:setVAR DATABASE Northwind       
+DROP DATABASE $(DATABASE)$(ID)
+go
+create DATABASE $(DATABASE)$(ID)
+go
+:setVAR DATABASE AdventureWorksDW
+DROP DATABASE $(DATABASE)$(ID)
+go
+create DATABASE $(DATABASE)$(ID)
+go
+:setVAR DATABASE AdventureWorks  
+DROP DATABASE $(DATABASE)$(ID)
+go
+create DATABASE $(DATABASE)$(ID)
+go
+use $(DATABASE)$(ID)
+go
+:setVAR SCHEMA HumanResources
+CREATE SCHEMA $(SCHEMA)
+go
+:setVAR SCHEMA Person
+CREATE SCHEMA $(SCHEMA)
+go
+:setVAR SCHEMA Production
+CREATE SCHEMA $(SCHEMA)
+go
+:setVAR SCHEMA Purchasing
+CREATE SCHEMA $(SCHEMA)
+go
+:setVAR SCHEMA Sales     
+CREATE SCHEMA $(SCHEMA)
+go

@@ -333,100 +333,107 @@ async function enableConstraints(conn, schema, status, logWriter) {
   }    
 }
 
-async function createTables(conn, schema, metadata, status, ddlRequired, logWriter) {
+function generateBinds(tableInfo, dataTypeSizes) {
+
+   const dataTypeArray = JSON.parse('[' +  tableInfo.targetDataTypes.replace(/(\"\.\")/g, '\\".\\"') + ']')
+   const dataLengthArray = JSON.parse('[' + dataTypeSizes + ']')
+
+   return dataTypeArray.map(function (dataType,idx) {
+     switch (dataType) {
+       case 'CLOB':
+         // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
+         tableInfo.lobColumns.push(idx);
+         return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
+       case 'NCLOB':
+         // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
+         tableInfo.lobColumns.push(idx);
+         return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
+       case 'BLOB':
+         // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
+         tableInfo.lobColumns.push(idx);
+         return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
+       case 'XMLTYPE':
+         // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
+         tableInfo.lobColumns.push(idx);
+         return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
+       case 'ANYDATA':
+         // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
+         tableInfo.lobColumns.push(idx);
+         return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
+       case 'NUMBER':
+         return { type: oracledb.NUMBER }
+       case 'FLOAT':
+         return { type: oracledb.NUMBER }
+       case 'CHAR':
+         return { type :oracledb.STRING, maxSize : parseInt(dataLengthArray[idx])}
+       case 'NCHAR':
+         return { type :oracledb.STRING, maxSize : parseInt(dataLengthArray[idx]*2)}
+       case 'NVARCHAR2':
+         return { type :oracledb.STRING, maxSize : parseInt(dataLengthArray[idx]*2)}
+       case 'VARCHAR':
+         return { type :oracledb.STRING, maxSize : parseInt(ataLengthArray[idx])}
+       case 'VARCHAR2':
+         return { type :oracledb.STRING, maxSize : parseInt(dataLengthArray[idx])}
+       case 'DATE':
+         return { type :oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType]}
+       case 'RAW':
+         return { type :oracledb.STRING, maxSize : parseInt(dataLengthArray[idx])*2}
+       case 'RAW(1)':
+         return { type :oracledb.STRING, maxSize : 5}
+       case 'BFILE':
+         return { type :oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
+       default:
+         if (dataType.startsWith('NUMBER')) {
+           return { type: oracledb.NUMBER }
+         }
+         if (dataType.startsWith('RAW(')) {
+           return { type: oracledb.STRING, maxSize : parseInt(dataType.match(/\((\d+)\)/)[0].slice(1,-1))*2}
+         }
+         if ((dataType.startsWith('CHAR(')) || (dataType.startsWith('VARCHAR2(')) || (dataType.startsWith('NCHAR(')) || (dataType.startsWith('NVARCHAR2('))){
+           return { type: oracledb.STRING, maxSize : parseInt(dataType.match(/\((\d+)\)/)[0].slice(1,-1))}
+         }
+         if (dataType.startsWith('FLOAT')) {
+           return { type: oracledb.NUMBER }
+         }
+         if (dataType.startsWith('TIMESTAMP')) {
+           return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH['TIMESTAMP']  }
+         }
+         if (dataType.startsWith('INTERVAL')) {
+           return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH['TIMESTAMP']  }
+         }
+         if (dataType.indexOf('.') > -1) {
+           // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH['OBJECT']  }
+           tableInfo.lobColumns.push(idx);
+           return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH['OBJECT'] }
+         }
+         return {type : dataType};
+     }
+   })
+
+}
+
+
+async function generateStatementCache(conn, schema, metadata, status, ddlRequired, logWriter) {
 
   const sqlStatement = `begin :sql := JSON_IMPORT.GENERATE_STATEMENTS(:metadata, :schema);\nEND;`;
     
   try {
-    const ddlStatements = [];    
+    const ddlStatements = [];  
     const metadataLob = await common.lobFromJSON(conn,{metadata: metadata});  
     const results = await conn.execute(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:schema});
     await metadataLob.close();
-    const insertDetails = JSON.parse(results.outBinds.sql);
-    const tables = Object.keys(insertDetails); 
+    const statementCache = JSON.parse(results.outBinds.sql);
+    const tables = Object.keys(metadata); 
     tables.forEach(function(table,idx) {
-                     const tableInfo = insertDetails[table];
-                     const tableMetadata = metadata[table];   
+                     const tableInfo = statementCache[table];
                      ddlStatements[idx] = tableInfo.ddl             
-                     const dataTypeArray = JSON.parse('[' +  tableInfo.targetDataTypes.replace(/(\"\.\")/g, '\\".\\"') + ']')
-                     const dataLengthArray = JSON.parse('[' + tableMetadata.dataTypeSizing + ']')
+                     tableInfo.lobColumns = [];
+                     tableInfo.binds = generateBinds(tableInfo,metadata[table].dataTypeSizing)
                      /*
                      logWriter.write(tableMetadata.tableName)
                      logWriter.write(dataTypeArray)
                      logWriter.write(dataLengthArray);
                      */
-                     tableInfo.lobColumns = [];
-                     tableInfo.binds = dataTypeArray.map(function (dataType,idx) {
-                       switch (dataType) {
-                         case 'CLOB':
-                           // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
-                           tableInfo.lobColumns.push(idx);
-                           return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
-                         case 'NCLOB':
-                           // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
-                           tableInfo.lobColumns.push(idx);
-                           return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
-                         case 'BLOB':
-                           // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
-                           tableInfo.lobColumns.push(idx);
-                           return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
-                         case 'XMLTYPE':
-                           // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
-                           tableInfo.lobColumns.push(idx);
-                           return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
-                         case 'ANYDATA':
-                           // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
-                           tableInfo.lobColumns.push(idx);
-                           return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
-                         case 'NUMBER':
-                           return { type: oracledb.NUMBER }
-                         case 'FLOAT':
-                           return { type: oracledb.NUMBER }
-                         case 'CHAR':
-                           return { type :oracledb.STRING, maxSize : parseInt(dataLengthArray[idx])}
-                         case 'NCHAR':
-                           return { type :oracledb.STRING, maxSize : parseInt(dataLengthArray[idx]*2)}
-                         case 'NVARCHAR2':
-                           return { type :oracledb.STRING, maxSize : parseInt(dataLengthArray[idx]*2)}
-                         case 'VARCHAR':
-                           return { type :oracledb.STRING, maxSize : parseInt(ataLengthArray[idx])}
-                         case 'VARCHAR2':
-                           return { type :oracledb.STRING, maxSize : parseInt(dataLengthArray[idx])}
-                         case 'DATE':
-                           return { type :oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType]}
-                         case 'RAW':
-                           return { type :oracledb.STRING, maxSize : parseInt(dataLengthArray[idx])*2}
-                         case 'RAW(1)':
-                           return { type :oracledb.STRING, maxSize : 5}
-                         case 'BFILE':
-                           return { type :oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType] }
-                         default:
-                           if (dataType.startsWith('NUMBER')) {
-                             return { type: oracledb.NUMBER }
-                           }
-                           if (dataType.startsWith('RAW(')) {
-                             return { type: oracledb.STRING, maxSize : parseInt(dataType.match(/\((\d+)\)/)[0].slice(1,-1))*2}
-                           }
-                           if ((dataType.startsWith('CHAR(')) || (dataType.startsWith('VARCHAR2(')) || (dataType.startsWith('NCHAR(')) || (dataType.startsWith('NVARCHAR2('))){
-                             return { type: oracledb.STRING, maxSize : parseInt(dataType.match(/\((\d+)\)/)[0].slice(1,-1))}
-                           }
-                           if (dataType.startsWith('FLOAT')) {
-                             return { type: oracledb.NUMBER }
-                           }
-                           if (dataType.startsWith('TIMESTAMP')) {
-                             return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH['TIMESTAMP']  }
-                           }
-                           if (dataType.startsWith('INTERVAL')) {
-                             return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH['TIMESTAMP']  }
-                           }
-                           if (dataType.indexOf('.') > -1) {
-                             // return {type : oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH['OBJECT']  }
-                             tableInfo.lobColumns.push(idx);
-                             return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH['OBJECT'] }
-                           }
-                           return {type : dataType};
-                       }
-                     })
     });
     
     if (ddlRequired) {
@@ -434,7 +441,7 @@ async function createTables(conn, schema, metadata, status, ddlRequired, logWrit
       await executeDDL(conn, schema, ddl, status, logWriter);
     }
     
-    return insertDetails
+    return statementCache
   } catch (e) {
     logWriter.write(`${e}\n${e.stack}\n`);
   }
@@ -464,13 +471,10 @@ class DbWriter extends Writable {
     this.systemInformation = undefined;
     this.metadata = undefined;
 
-    this.insertCache = undefined
+    this.statementCache = undefined
+
     this.tableName = undefined;
-    this.tableBatchSize = undefined;
-    this.tableLobIndex = undefined;
-    this.insertStatement = undefined;
-    this.lobColumns = undefined;
-    this.binds = undefined;
+    this.tableInfo = undefined;
     this.rowCount = undefined;
     this.startTime = undefined;
     this.skipTable = true;
@@ -525,8 +529,8 @@ class DbWriter extends Writable {
   async convertLobs(data) {
       
     try {
-      const lobList = await Promise.all(this.lobColumns.map(async function (lobIndex,idx) {
-                                                                    data[lobIndex] = await this.stringToLob(this.conn, data[lobIndex],this.lobCache, this.tableLobIndex+idx);
+      const lobList = await Promise.all(this.tableInfo.lobColumns.map(async function (lobIndex,idx) {
+                                                                    data[lobIndex] = await this.stringToLob(this.conn, data[lobIndex],this.lobCache, this.tableInfo.lobIndex+idx);
                                                                     return data[lobIndex]
       },this))
       return lobList.length
@@ -538,18 +542,15 @@ class DbWriter extends Writable {
     
   async setTable(tableName) {
     this.tableName = tableName
-    this.insertStatement =  this.insertCache[tableName].dml;
-    this.binds = this.insertCache[tableName].binds;
-    this.lobColumns = this.insertCache [tableName].lobColumns
-    this.tableBatchSize = this.batchSize;
-    if (this.lobColumns.length > 0) {
+    this.tableInfo =  this.statementCache[tableName];
+    this.tableInfo.lobIndex = 0;
+    if (this.tableInfo.lobColumns.length > 0) {
       // Adjust Batchsize to accomodate lobCacheSize
-      let lobBatchSize = Math.floor(this.lobCacheSize/this.lobColumns.length);
-      this.tableBatchSize = (lobBatchSize > this.tableBatchSize) ? this.tableBatchSize : lobBatchSize;
+      let lobBatchSize = Math.floor(this.lobCacheSize/this.tableInfo.lobColumns.length);
+      this.tableInfo.batchSize = (lobBatchSize > this.tableInfo.batchSize) ? this.tableInfo.batchSize : lobBatchSize;
     }
     this.rowCount = 0;
     this.batch.length = 0;
-    this.tableLobIndex = 0;
     this.startTime = new Date().getTime();
     this.endTime = undefined;
     this.skipTable = false;
@@ -598,9 +599,8 @@ end;`
       
   async writeBatch(status) {
     try {
-      const results = await this.conn.executeMany(this.insertStatement,this.batch,{bindDefs : this.binds});
+      const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
       const endTime = new Date().getTime();
-      await this.conn.commit();
       this.batch.length = 0;
       return endTime
     } catch (e) {
@@ -608,14 +608,13 @@ end;`
         // Mutating Table - Convert to PL/SQL Block
         status.warningRaised = true;
         this.logWriter.write(`${new Date().toISOString()} [WARNING]: Table ${this.tableName} : executeMany(INSERT) failed. ${e}. Retrying with PL/SQL Block.\n`);
-        this.insertStatement = this.avoidMutatingTable(this.insertStatement);
+        this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
         if (status.sqlTrace) {
-          status.sqlTrace.write(`${this.insertStatement}\n/\n`);
+          status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
         }
         try {
-          const results = await this.conn.executeMany(this.insertStatement,this.batch,{bindDefs : this.binds});
+          const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
           const endTime = new Date().getTime();
-          await this.conn.commit();
           this.batch.length = 0;
           return endTime
         } catch (e) {
@@ -633,20 +632,20 @@ end;`
 
     try {
       for (let row in this.batch) {
-        let results = await this.conn.execute(this.insertStatement,this.batch[row],{bindDefs : this.binds})
+        let results = await this.conn.execute(this.tableInfo.dml,this.batch[row],{bindDefs : this.tableInfo.binds})
       }
       const endTime = new Date().getTime();
-      await this.conn.commit();
       this.batch.length = 0;
       return endTime
     } catch (e) {
       this.batch.length = 0;
       this.skipTable = true;
+      this.conn.rollback();
       this.status.warningRaised = true;
       this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping table. Reason: ${e.message}\n`)
       if (this.logDDLIssues) {
-        this.logWriter.write(`${this.insertStatement}\n`);
-        this.logWriter.write(`${JSON.stringify(this.binds)}\n`);
+        this.logWriter.write(`${this.tableInfo.dml}\n`);
+        this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
         this.logWriter.write(`${this.batch}\n`);
       }
     }
@@ -666,7 +665,7 @@ end;`
           break;
         case 'metadata':
           this.metadata = obj.metadata;
-          this.insertCache = await createTables(this.conn, this.schema, this.metadata, this.status, this.ddlRequired, this.logWriter);
+          this.statementCache = await generateStatementCache(this.conn, this.schema, this.metadata, this.status, this.ddlRequired, this.logWriter);
           break;
         case 'table':
           // this.logWriter.write(`${new Date().toISOString()}: Switching to Table "${obj.table}".\n`);
@@ -686,19 +685,19 @@ end;`
           }
           this.setTable(obj.table);
           if (this.status.sqlTrace) {
-            this.status.sqlTrace.write(`${this.insertStatement}\n\/\n`)
+            this.status.sqlTrace.write(`${this.tableInfo.dml}\n\/\n`)
 	      }
           break;
         case 'data': 
           if (this.skipTable) {
             break;
           }
-          if (this.lobColumns.length > 0) {
-            this.tableLobIndex += await this.convertLobs(obj.data)
+          if (this.tableInfo.lobColumns.length > 0) {
+            this.tableInfo.lobIndex += await this.convertLobs(obj.data)
           }
           this.batch.push(obj.data);
           // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Batch contains ${this.batch.length} rows.`);
-          if (this.batch.length === this.tableBatchSize) { 
+          if (this.batch.length === this.tableInfo.batchSize) { 
               // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Completed Batch contains ${this.batch.length} rows.`);
              this.endTime = await this.writeBatch(this.status);
           }  
@@ -720,18 +719,18 @@ end;`
  
   async _final(callback) {
     try {
-      if (this.batch.length > 0) {
-        // this.logWriter.write(`${new Date().toISOString()}:_final() Table "${this.tableName}". Final Batch contains ${this.batch.length} rows.`);
-        this.endTime = await this.writeBatch(this.status);
-      }   
       if (this.tableName) {
         if (!this.skipTable) {
+          if (this.batch.length > 0) {
+            // this.logWriter.write(`${new Date().toISOString()}:_final() Table "${this.tableName}". Final Batch contains ${this.batch.length} rows.`);
+           this.endTime = await this.writeBatch(this.status);
+          }   
           const elapsedTime = this.endTime - this.startTime;
           this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+          await enableConstraints(this.conn, this.schema, this.status, this.logWriter);
+          await this.closeLobCache();
+          await this.conn.commit();
         }
-        await this.closeLobCache();
-        await this.conn.commit();
-        await enableConstraints(this.conn, this.schema, this.status, this.logWriter);
       }
       else {
         this.logWriter.write(`${new Date().toISOString()}: No tables found.\n`);

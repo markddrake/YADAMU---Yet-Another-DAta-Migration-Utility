@@ -35,6 +35,9 @@ function processArguments(args,operation) {
 					,TOUSER   : 'dbo'
 					,FROMUSER : 'dbo'
                     ,MODE     : "DDL_AND_CONTENT"
+                    ,BATCHSIZE  : 500
+                    ,COMMITROWS : 1000
+
    }
 
    process.argv.forEach(function (arg) {
