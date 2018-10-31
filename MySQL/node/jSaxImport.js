@@ -3,7 +3,7 @@ const { Transform } = require('stream');
 const { Writable } = require('stream');
 const mysql = require('mysql')
 const common = require('./common.js');
-const clarinet = require('c:/Development/github/clarinet/clarinet.js');
+const clarinet = require('../../clarinet/clarinet.js');
 // const clarinet = require('clarinet');
 const fs = require('fs');
 
