@@ -10,18 +10,25 @@ const sqlAnsiQuotingMode =
 `SET SESSION SQL_MODE=ANSI_QUOTES`
 
 const sqlGetSystemInformation = 
-`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION"`;					   
+`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID"`;					   
 
 const sqlGenerateTables = 
-`select t.table_schema
-       ,t.table_name
+`select t.table_schema "table_schema"
+       ,t.table_name "table_name"
   	   ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "columns"
 	   ,group_concat(concat('"',data_type,'"') order by ordinal_position separator ',')  "dataTypes"
 	   ,group_concat(concat('"',	
                             case when (numeric_precision is not null) and (numeric_scale is not null)
                                    then concat(numeric_precision,',',numeric_scale)	
                                  when (numeric_precision is not null)
-                                   then numeric_precision
+                                   then case
+                                          when column_type like '%unsigned' 
+                                            then numeric_precision
+                                          else
+                                            numeric_precision + 1
+                                        end
+                                 when (datetime_precision is not null)
+                                   then datetime_precision
                                  when (character_maximum_length is not null)
                                    then character_maximum_length
                                  else	
@@ -47,6 +54,12 @@ const sqlGenerateTables =
               when data_type like '%blob'
                 -- Force HEXBINARY rendering of value
                 then concat('HEX("', column_name, '")')
+              when data_type = 'varbinary'
+                -- Force HEXBINARY rendering of value
+                then concat('HEX("', column_name, '")')
+              when data_type = 'binary'
+                -- Force HEXBINARY rendering of value
+                then concat('HEX("', column_name, '")')
               else
                 concat('"',column_name,'"')
             end
@@ -57,9 +70,10 @@ const sqlGenerateTables =
           ,'"."'
           ,t.table_name
           ,'"'
-        ) QUERY	
+        ) "query"	
    from information_schema.columns	c, information_schema.tables t
   where t.table_name = c.table_name 
+    and c.extra <> 'VIRTUAL GENERATED'
     and t.table_schema = c.table_schema
     and t.table_type = 'BASE TABLE'
     and t.table_schema = ?
@@ -164,7 +178,7 @@ async function main(){
       sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
     }
 	const mysqlInfo = await getSystemInformation(conn);
-	dumpFile.write('{"mysqltemInformation":');
+	dumpFile.write('{"systemInformation":');
 	dumpFile.write(JSON.stringify({
 		                 "date"            : new Date().toISOString()
 					    ,"vendor"          : "MySQL"
@@ -174,6 +188,7 @@ async function main(){
 						,"currentUser"     : mysqlInfo[0].CURRENT_USER
 						,"dbName"          : mysqlInfo[0].DATABASE_NAME
 						,"databaseVersion" : mysqlInfo[0].DATABASE_VERSION
+                        ,"serverVendor"    : mysqlInfo[0].SERVER_VENDOR_ID
 	}));
 	
 	dumpFile.write(',"metadata":{');
@@ -186,9 +201,9 @@ async function main(){
 	  if (i > 0) {
 		dumpFile.write(',');
       }
-	  dumpFile.write(`"${row.TABLE_NAME}" : ${JSON.stringify({
-						                             "owner"          : row.TABLE_SCHEMA
-                                                    ,"tableName"      : row.TABLE_NAME
+	  dumpFile.write(`"${row.table_name}" : ${JSON.stringify({
+						                             "owner"          : row.table_schema
+                                                    ,"tableName"      : row.table_name
                                                     ,"columns"        : row.columns
                                                     ,"dataTypes"      : row.dataTypes
 												    ,"dataTypeSizing" : row.sizeConstraints
@@ -200,14 +215,14 @@ async function main(){
 	  if (i > 0) {
 		dumpFile.write(',');
       }
-	  dumpFile.write(`"${row.TABLE_NAME}" :`);
+	  dumpFile.write(`"${row.table_name}" :`);
       if (parameters.SQLTRACE) {
-        sqlTrace.write(`${row.QUERY}\n\/\n`)
+        sqlTrace.write(`${row.query}\n\/\n`)
       }
 	  const startTime = new Date().getTime()
-      const rows = await fetchData(conn,row.QUERY,dumpFile) 
+      const rows = await fetchData(conn,row.query,dumpFile) 
       const elapsedTime = new Date().getTime() - startTime
-      logWriter.write(`${new Date().toISOString()} - Table: "${row.TABLE_NAME}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
+      logWriter.write(`${new Date().toISOString()} - Table: "${row.table_name}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
 	}
 
     dumpFile.write('}}');

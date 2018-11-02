@@ -1,8 +1,8 @@
-@set DIR=JSON\MYSQL
-@set MDIR=..\JSON\MYSQL
+@set DIR=JSON\JSON
+@set MDIR=..\JSON\JSON
 @set ID=1
-@set FILENAME=sakila
-@set SCHEMA=sakila
+@set FILENAME=testcase
+@set SCHEMA=jtest
 @set ID=1
 mkdir %DIR%
 mysql -uroot -poracle -h192.168.1.250 -Dsys -P3306 -v -f <SQL/JSON_IMPORT.sql
