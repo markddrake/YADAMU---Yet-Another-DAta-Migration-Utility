@@ -4,9 +4,9 @@ export ID=1
 export SCHEMA=ADVWRK
 export FILENAME=AdventureWorks
 mkdir $DIR
-mysql -uroot -poracle -h192.168.1.250 -Dsys -P3306 -v -f <../sql/JSON_IMPORT.sql
+mysql -uroot -poracle -h192.168.1.250 -Dsys -P3306 -v -f <../../sql/JSON_IMPORT.sql
 mysql -uroot -poracle -h192.168.1.250 -Dsys -P3306 -v -f --init-command="SET @SCHEMA='$SCHEMA'; SET @ID=$ID" <sql/RECREATE_SCHEMA.sql
-call windows/import_MSSQL_ALL_jSax.sh $MDIR$ $SCHEMA$ $ID "" 
+./unix/import_MSSQL_ALL_jSax.sh $MDIR$ $SCHEMA$ $ID "" 
 node ../node/export --USERNAME=root --HOSTNAME=192.168.1.250 --PORT=3306 --PASSWORD=oracle --DATABASE=sys --File=$DIR/$FILENAME$ID.json owner=$SCHEMA$ID
 export ID=2
 mysql -uroot -poracle -h192.168.1.250 -Dsys -P3306 -v -f --init-command="SET @SCHEMA='$SCHEMA'; SET @ID=2" <sql/RECREATE_SCHEMA.sql
