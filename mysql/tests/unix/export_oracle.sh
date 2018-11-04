@@ -1,9 +1,9 @@
-export TGT=$~1
-export UID=$~2
-export VER=$~3
-node ../node/export --USERNAME=root --HOSTNAME=192.168.1.250 --PASSWORD=oracle --PORT=3306 --DATABASE=sys --File=$TGT/HR$VER.json --owner=HR$UID$
-node ../node/export --USERNAME=root --HOSTNAME=192.168.1.250 --PASSWORD=oracle --PORT=3306 --DATABASE=sys --File=$TGT/SH$VER.json --owner=SH$UID$
-node ../node/export --USERNAME=root --HOSTNAME=192.168.1.250 --PASSWORD=oracle --PORT=3306 --DATABASE=sys --File=$TGT/OE$VER.json --owner=OE$UID$
-node ../node/export --USERNAME=root --HOSTNAME=192.168.1.250 --PASSWORD=oracle --PORT=3306 --DATABASE=sys --File=$TGT/PM$VER.json --owner=PM$UID$
-node ../node/export --USERNAME=root --HOSTNAME=192.168.1.250 --PASSWORD=oracle --PORT=3306 --DATABASE=sys --File=$TGT/IX$VER.json --owner=IX$UID$
-node ../node/export --USERNAME=root --HOSTNAME=192.168.1.250 --PASSWORD=oracle --PORT=3306 --DATABASE=sys --File=$TGT/BI$VER.json --owner=BI$UID$
+export TGT=$1
+export USRID=$2
+export VER=$3
+node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBASE --File=$TGT/HR$VER.json --owner=HR$USRID$
+node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBASE --File=$TGT/SH$VER.json --owner=SH$USRID$
+node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBASE --File=$TGT/OE$VER.json --owner=OE$USRID$
+node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBASE --File=$TGT/PM$VER.json --owner=PM$USRID$
+node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBASE --File=$TGT/IX$VER.json --owner=IX$USRID$
+node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBASE --File=$TGT/BI$VER.json --owner=BI$USRID$

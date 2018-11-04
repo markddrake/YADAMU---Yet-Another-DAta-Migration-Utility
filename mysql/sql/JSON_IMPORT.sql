@@ -147,7 +147,7 @@ BEGIN
       then return lower(P_DATA_TYPE);
     when 'MySQL'
       then case P_DATA_TYPE
-             -- Metadata does not contain sufficnet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM and SET to TEXT.
+             -- Metadata does not contain sufficinet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM and SET to TEXT.
              when 'set' 
                then return 'text';
              when 'enum' 
@@ -207,7 +207,7 @@ BEGIN
                  NULL
              end "DATA_TYPE_SCALE"
            from JSON_TABLE(CONCAT('[',P_COLUMN_LIST,']'),'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(128) PATH '$')) c
-               ,JSON_TABLE(CONCAT('[',REPLACE(P_DATA_TYPE_LIST,'"."','\\".\\"'),']'),'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(32) PATH '$')) t
+               ,JSON_TABLE(CONCAT('[',REPLACE(P_DATA_TYPE_LIST,'"."','\\".\\"'),']'),'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(128) PATH '$')) t
                ,JSON_TABLE(CONCAT('[',P_SIZE_CONSTRAINTS,']'),'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(32) PATH '$')) s
           where (c."KEY" = t."KEY") and (c."KEY" = s."KEY")
     ),
@@ -223,7 +223,7 @@ BEGIN
                                    then ''
                                  when TARGET_DATA_TYPE like '%unsigned' 
                                    then ''
-                                 when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','set','enum','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json') 
+                                 when TARGET_DATA_TYPE in ('date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum') 
                                    then ''
                                  when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection')
                                    then '' 
@@ -231,7 +231,7 @@ BEGIN
                                    then concat('(',DATA_TYPE_LENGTH,')',' CHARACTER SET UTF8MB4 ')
                                  when DATA_TYPE_SCALE is not NULL
                                    then case 
-                                          when DATA_TYPE in ('tinyint','smallint','int','bigint') 
+                                          when DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
                                             then concat('(',DATA_TYPE_LENGTH,')')
                                           else
                                             concat('(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
@@ -257,7 +257,7 @@ BEGIN
                                    then TARGET_DATA_TYPE
                                  when TARGET_DATA_TYPE like '%unsigned' 
                                    then TARGET_DATA_TYPE
-                                 when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','set','enum','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json') 
+                                 when TARGET_DATA_TYPE in ('date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum') 
                                    then TARGET_DATA_TYPE
                                  when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection')
                                    then TARGET_DATA_TYPE
@@ -265,12 +265,12 @@ BEGIN
                                    then concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')',' CHARACTER SET UTF8MB4 ')
                                  when DATA_TYPE_SCALE is not NULL
                                    then case 
-                                          when DATA_TYPE in ('tinyint','smallint','int','bigint') 
+                                          when DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
                                             then concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')')
                                           else
                                             concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
                                         end
-                                 when DATA_TYPE_LENGTH is not NULL
+                                 when DATA_TYPE_LENGTH is not NULL and DATA_TYPE_LENGTH <> 0
                                    then case 
                                           when TARGET_DATA_TYPE in ('double')
                                             -- Do not add length restriction when scale is not specified
@@ -285,37 +285,54 @@ BEGIN
                               )
                      separator '  ,'
                     ) TARGET_DATA_TYPES
-          ,group_concat(concat('"',COLUMN_NAME,'"') separator ',') INSERT_SELECT_LIST
+          ,group_concat(concat(case
+                                when TARGET_DATA_TYPE = 'timestamp' 
+                                  then concat('convert_tz(data."',COLUMN_NAME,'",''+00:00'',@@session.time_zone)')
+                                when TARGET_DATA_TYPE = 'geometry' 
+                                  then concat('ST_GEOMFROMGEOJSON(data."',COLUMN_NAME,'")')
+                                when TARGET_DATA_TYPE like '%blob'
+                                  then concat('UNHEX(data."',COLUMN_NAME,'")')
+                                when TARGET_DATA_TYPE like '%binary%'
+                                  then concat('UNHEX(data."',COLUMN_NAME,'")')
+                                else
+                                  concat('data."',COLUMN_NAME,'"')
+                               end
+                              ) 
+                     separator ','
+                    ) INSERT_SELECT_LIST
           ,group_concat(concat('"',COLUMN_NAME,'" ',
-                               TARGET_DATA_TYPE,
                                case
                                  when TARGET_DATA_TYPE like '%(%)'
-                                   then ''
+                                   then TARGET_DATA_TYPE
                                  when TARGET_DATA_TYPE like '%unsigned' 
-                                   then ''
-                                 when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','set','enum','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json') 
-                                   then ''
+                                   then TARGET_DATA_TYPE
+                                 when TARGET_DATA_TYPE like '%blob' 
+                                   then 'longtext'
+                                 when TARGET_DATA_TYPE in ('geometry','geography')
+                                   then 'json'
+                                 when TARGET_DATA_TYPE in ('tinytext','mediumtext','text','longtext','json','set','enum') 
+                                   then TARGET_DATA_TYPE
                                  when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection')
-                                   then '' 
+                                   then TARGET_DATA_TYPE 
                                  when DATA_TYPE_SCALE is not NULL
                                    then case 
-                                          when DATA_TYPE in ('tinyint','smallint','int','bigint') 
-                                            then concat('(',DATA_TYPE_LENGTH,')')
+                                          when DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
+                                            then concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')')
                                           else
-                                            concat('(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
+                                            concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
                                         end
-                                 when DATA_TYPE_LENGTH is not NULL
+                                 when DATA_TYPE_LENGTH is not NULL and DATA_TYPE_LENGTH <> 0
                                    then case 
                                           when TARGET_DATA_TYPE in ('double')
                                             -- Do not add length restriction when scale is not specified
-                                            then ''                                            
+                                            then TARGET_DATA_TYPE
                                           else
-                                            concat('(',DATA_TYPE_LENGTH,')')
+                                            concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')')
                                         end
                                  else
-                                   ''
+                                   TARGET_DATA_TYPE
                                end,
-                               ' PATH ''$[',IDX-1,']''',CHAR(32)
+                               ' PATH ''$[',IDX-1,']'' NULL ON ERROR',CHAR(32)
                               )
                      separator '    ,'
                     ) COLUMN_PATTERNS
@@ -324,7 +341,7 @@ BEGIN
       
      
     SET V_DDL_STATEMENT = concat('create table if not exists "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',CHAR(32),V_COLUMNS_CLAUSE,')'); 
-    SET V_DML_STATEMENT = concat('insert into "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',P_COLUMN_LIST,')',CHAR(32),'select ',V_INSERT_SELECT_LIST,CHAR(32),'  from "JSON_STAGING",JSON_TABLE("DATA",''$.data."',P_TABLE_NAME,'"[*]'' COLUMNS (',CHAR(32),V_COLUMN_PATTERNS,')) data');
+    SET V_DML_STATEMENT = concat('insert into "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',P_COLUMN_LIST,')',CHAR(32),'select ',V_INSERT_SELECT_LIST,CHAR(32),'  from "JSON_STAGING" js,JSON_TABLE(js."DATA",''$.data."',P_TABLE_NAME,'"[*]'' COLUMNS (',CHAR(32),V_COLUMN_PATTERNS,')) data');
     
     SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',V_TARGET_DATA_TYPES);
     
@@ -360,9 +377,9 @@ BEGIN
   DECLARE TABLE_METADATA 
   CURSOR FOR 
   select VENDOR, TABLE_NAME, COLUMN_LIST, DATA_TYPE_LIST, SIZE_CONSTRAINTS
-    from JSON_STAGING,
+    from JSON_STAGING js,
          JSON_TABLE(
-           DATA,
+           js.DATA,
            '$'
            COLUMNS (
              VENDOR                           VARCHAR(32) PATH '$.systemInformation.vendor',
@@ -399,6 +416,10 @@ BEGIN
     IF NO_MORE_ROWS THEN
       LEAVE PROCESS_TABLE;
     END IF;
+    
+    IF (V_TABLE_NAME IS NULL) THEN
+      LEAVE PROCESS_TABLE;
+    END IF; 
     
     CALL GENERATE_SQL(V_VENDOR, P_TARGET_SCHEMA, V_TABLE_NAME, V_COLUMN_LIST, V_DATA_TYPE_LIST, V_SIZE_CONSTRAINTS, V_TABLE_INFO);
        

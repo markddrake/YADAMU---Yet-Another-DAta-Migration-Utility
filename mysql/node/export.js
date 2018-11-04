@@ -229,7 +229,7 @@ async function main(){
 	dumpFile.close();
 	
 	await conn.end();
-	logWriter.write('Export operation successful.');
+	logWriter.write(`Export operation successful.\n`);
     if (logWriter !== process.stdout) {
 	  console.log(`Export operation successful: See "${parameters.LOGFILE}" for details.`);
     }

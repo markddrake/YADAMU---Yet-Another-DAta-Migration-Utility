@@ -8,7 +8,7 @@ const clarinet = require('../../clarinet/clarinet.js');
 const fs = require('fs');
 
 
-const unboundedTypes = ['tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json'];
+const unboundedTypes = ['date','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum'];
 const spatialTypes   = ['geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection'];
 const nationalTypes  = ['nchar','nvarchar'];
 const integerTypes   = ['tinyint','mediumint','smallint','int','bigint']
@@ -372,10 +372,14 @@ function mapForeignDataType(vendor, dataType, dataTypeLength, dataTypeSize) {
     
 function generateStatements(vendor, schema, metadata) {
     
+   let useSetClause = false;
+   
    const columnNames = metadata.columns.split(',');
    const dataTypes = metadata.dataTypes.split(',');
    const sizeConstraints = JSON.parse('[' + metadata.dataTypeSizing.replace(/\"\.\"/g, '\",\"') + ']');
    const targetDataTypes = [];
+   const setOperators = []
+
    const columnClauses = columnNames.map(function(columnName,idx) {    
                                            const dataType = dataTypes[idx].replace(/\"/g, "");
                                            const sizeConstraint = sizeConstraints[idx].replace(/\"/g, "");
@@ -396,6 +400,16 @@ function generateStatements(vendor, schema, metadata) {
 
                                            let targetDataType = mapForeignDataType(vendor,dataType,dataLength,dataScale);
                                            targetDataTypes.push(targetDataType);
+                                           
+                                           switch (targetDataType) {
+                                             case 'geometry':
+                                                useSetClause = true;
+                                                setOperators.push(' "' + columnName + '" = ST_GEOMFROMGEOJSON(?)');
+                                                break;
+                                                
+                                             default:
+                                               setOperators.push(' "' + columnName + '" = ?')
+                                           }
                                            
                                            switch (true) {
                                               case (RegExp(/\(.*\)/).test(targetDataType)):
@@ -433,14 +447,19 @@ function generateStatements(vendor, schema, metadata) {
                                            return `${columnName} ${targetDataType} ${qualifier}\n `;
                                         })
                                       
-    const args = Array(columnNames.length).fill('?').join(',') + ','
     const createStatement = `create table if not exists "${schema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
-    const insertStatement = `insert into "${schema}"."${metadata.tableName}"(${metadata.columns}) values ?`    
-    return { ddl : createStatement, dml : insertStatement, args : args, targetDataTypes : targetDataTypes}
+    let insertStatement = `insert into "${schema}"."${metadata.tableName}"`;
+    if (useSetClause) {
+      insertStatement += ` set` + setOperators.join(',');
+    }
+    else {
+      insertStatement += `(${metadata.columns}) values ?`;
+    }
+    return { ddl : createStatement, dml : insertStatement, targetDataTypes : targetDataTypes, useSetClause : useSetClause}
 }
 
 async function generateStatementCacheLocal(conn, schema, systemInformation, metadata, status, logWriter) {
-  
+
   const statementCache = {}
   const tables = Object.keys(metadata); 
   await Promise.all(tables.map(async function(table,idx) {
@@ -461,6 +480,7 @@ async function generateStatementCacheLocal(conn, schema, systemInformation, meta
 
 async function generateStatementCacheRemote(conn, schema, systemInformation, metadata, status,logWriter) {
     
+ 
   const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;                       
  
   let results = await query(conn,sqlStatement,[JSON.stringify({systemInformation: systemInformation, metadata : metadata}),schema]);
@@ -469,8 +489,27 @@ async function generateStatementCacheRemote(conn, schema, systemInformation, met
   const tables = Object.keys(metadata); 
   await Promise.all(tables.map(async function(table,idx) {
                                        const tableInfo = statementCache[table];
+                                       const columnNames = JSON.parse('[' + metadata[table].columns + ']');
                                        tableInfo.targetDataTypes = JSON.parse('[' + tableInfo.targetDataTypes + ']');
-                                       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + "\nvalues ?";
+
+                                       tableInfo.useSetClause = false;
+                                       const setOperators = tableInfo.targetDataTypes.map(function(targetDataType,idx) {
+                                                                                            switch (targetDataType) {
+                                                                                              case 'geometry':
+                                                                                                 tableInfo.useSetClause = true;
+                                                                                                return ' "' + columnNames[idx] + '" = ST_GEOMFROMGEOJSON(?)';
+                                                                                              default:
+                                                                                                return ' "' + columnNames[idx] + '" = ?'
+                                                                                            }
+                                       })
+                                       
+                                       if (tableInfo.useSetClause) {
+                                         tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('(')) + ` set ` + setOperators.join(',');
+                                       }
+                                       else {
+                                         tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + `  values ?`;
+                                         }
+                                        
                                        if (status.sqlTrace) {
                                          status.sqlTrace.write(`${tableInfo.ddl};\n--\n`);
                                        }
@@ -526,17 +565,35 @@ class DbWriter extends Writable {
   }
   
    async writeBatch(status) {
-    try {
-      const results = await query(this.conn,this.tableInfo.dml,[this.batch]);
+    
+     try {
+      if (this.tableInfo.useSetClause) {
+        for (const i in this.batch) {
+          try {
+            const results = await query(this.conn,this.tableInfo.dml,this.batch[i]);
+          } catch(e) {
+            if (e.errno && ((e.errno === 3616) || (e.errno === 3617))) {
+              this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping Row Reason: ${e.message}\n`)
+              this.rowCount--;
+            }
+            else {
+              throw e;
+            }
+          }    
+        }
+      }
+      else {  
+        const results = await query(this.conn,this.tableInfo.dml,[this.batch]);
+      }
       const endTime = new Date().getTime();
       this.batch.length = 0;
       return endTime
     } catch (e) {
-      this.batch.length = 0;
-      this.skipTable = true;
       this.status.warningRaised = true;
       this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping table. Reason: ${e.message}\n`)
-      this.logWriter.write(`${this.tableInfo.dml}\n`);
+      this.logWriter.write(`${this.tableInfo.dml}[${this.batch.length}]...\n`);
+      this.batch.length = 0;
+      this.skipTable = true;
       if (this.logDDLIssues) {
         this.logWriter.write(`${this.tableInfo.dml}\n`);
         this.logWriter.write(`${this.batch}\n`);
@@ -599,8 +656,14 @@ class DbWriter extends Writable {
                                                        case "binary" :
                                                          obj.data[idx] = Buffer.from(obj.data[idx],'hex');
                                                          break;
+                                                       case "geometry":
+                                                         obj.data[idx] = JSON.stringify(obj.data[idx]);
+                                                         break;
                                                        case "json" :
                                                          obj.data[idx] = JSON.stringify(obj.data[idx]);
+                                                         break;
+                                                       case "timezone" :
+                                                         obj.data[idx] = new Date(Date.parse(obj.data[idx]));
                                                          break;
                                                        default :
                                                      }
@@ -729,7 +792,7 @@ async function main() {
     }
   
     // Force 5.7 Code Path
-    generateStatementCache = generateStatementCacheLocal
+    // generateStatementCache = generateStatementCacheLocal
  
     results = await query(conn,`SET SESSION SQL_MODE=ANSI_QUOTES`);
     results = await query(conn,`CREATE DATABASE IF NOT EXISTS "${parameters.TOUSER}"`); 

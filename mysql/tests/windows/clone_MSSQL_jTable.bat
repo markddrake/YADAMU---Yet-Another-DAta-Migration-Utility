@@ -1,5 +1,5 @@
 @set DIR=JSON\\MSSQL
-@set MDIR=..\\..\\JSON\MSSQL 
+@set MDIR=..\\..\\JSON\\MSSQL 
 @set ID=1
 @set SCHEMA=ADVWRK
 @set FILENAME=AdventureWorks
