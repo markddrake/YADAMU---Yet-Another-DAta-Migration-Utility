@@ -1,4 +1,5 @@
 @set DIR=..\..\JSON\MYSQL
 @set SCHEMA=sakila
 @set FILENAME=sakila
-node ..\node\export --USERNAME=root --HOSTNAME=192.168.1.250 --PORT=3306 --PASSWORD=oracle --DATABASE=sys --File=%DIR%\%FILENAME%.json owner=%SCHEMA%
+call env\connection.bat
+node ..\node\export --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PORT=%DB_PORT% --PASSWORD=%DB_PWD% --DATABASE=%DB_DBNAME% --File=%DIR%\%FILENAME%.json owner=%SCHEMA%

@@ -4,11 +4,12 @@
 @set MDIR=..\..\JSON\%TNS%\%MODE%
 @set ID=1
 mkdir %DIR%
-mysql -uroot -poracle -h192.168.1.250 -Dsys -P3306 -v -f <..\sql\JSON_IMPORT.sql
-mysql -uroot -poracle -h192.168.1.250 -Dsys -P3306 -v -f --init-command="SET @ID=1" <sql\RECREATE_ORACLE_ALL.sql
+call env\connection.bat
+mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f <..\sql\JSON_IMPORT.sql
+mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="SET @ID=1" <sql\RECREATE_ORACLE_ALL.sql
 call windows\import_oracle.bat %MDIR% %ID% ""
 call windows\export_oracle.bat %DIR% %ID% %ID%
-mysql -uroot -poracle -h192.168.1.250 -Dsys -P3306 -v -f --init-command="SET @ID=2" <sql\RECREATE_ORACLE_ALL.sql
+mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="SET @ID=2" <sql\RECREATE_ORACLE_ALL.sql
 @set ID=2
 call windows\import_oracle.bat %DIR% %ID% 1
 call windows\export_oracle.bat %DIR% %ID% %ID%
