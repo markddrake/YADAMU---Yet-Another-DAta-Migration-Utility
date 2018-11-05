@@ -310,7 +310,7 @@ BEGIN
                                    then 'longtext'
                                  when TARGET_DATA_TYPE in ('geometry','geography')
                                    then 'json'
-                                 when TARGET_DATA_TYPE in ('tinytext','mediumtext','text','longtext','json','set','enum') 
+                                 when TARGET_DATA_TYPE in ('date','time','tinytext','mediumtext','text','longtext','json','set','enum') 
                                    then TARGET_DATA_TYPE
                                  when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection')
                                    then TARGET_DATA_TYPE 
