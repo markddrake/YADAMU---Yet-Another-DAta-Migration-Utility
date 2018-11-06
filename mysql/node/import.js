@@ -8,7 +8,7 @@ const clarinet = require('../../clarinet/clarinet.js');
 const fs = require('fs');
 
 
-const unboundedTypes = ['date','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum'];
+const unboundedTypes = ['date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum'];
 const spatialTypes   = ['geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection'];
 const nationalTypes  = ['nchar','nvarchar'];
 const integerTypes   = ['tinyint','mediumint','smallint','int','bigint']
