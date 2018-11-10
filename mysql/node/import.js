@@ -7,7 +7,7 @@ const Readable = require('stream').Readable;
 const Yadamu = require('../../common/yadamuCore.js');
 const RowParser = require('../../common/rowParser.js');
 const MySQLCore = require('./mysqlCore.js');
-const MySQLShared = require('../common/mysql/mariadbShared.js'
+const MySQLShared = require('../../common/mysql/mariadbShared.js');
 
 // Will be set to MySQLShared.generateStatementCache if JSON_TABLE is not supported or generateStatementCacheif JSON_TABLE is supported
 // JSON_TABLE is supported starting with MYSQL 8.0
@@ -38,7 +38,7 @@ function query(conn,sqlQuery,args) {
                      })
 }  
 
-async function generateStatementCache(conn, schema, systemInformation, metadata, status,logWriter) {
+async function localGenerateStatementCache(conn, schema, systemInformation, metadata, status,logWriter) {
     
   const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;                       
  
@@ -168,7 +168,9 @@ class DbWriter extends Writable {
           break;
         case 'metadata':
           this.metadata = obj.metadata;
-          this.statementCache = await generateStatementCache(this.conn, this.schema, this.systemInformation, this.metadata, this.status, this.logWriter)
+          if (Object.keys(this.metadata).length > 0) {
+            this.statementCache = await generateStatementCache(this.conn, this.schema, this.systemInformation, this.metadata, this.status, this.logWriter);
+          }
           break;
         case 'table':
           // this.logWriter.write(`${new Date().toISOString()}: Switching to Table "${obj.table}".\n`);
@@ -344,14 +346,14 @@ async function main() {
 
     results = await query(conn,`SELECT @@version`);
     if (results[0]['@@version'] > '6.0') {
-       generateStatementCache = generateStatementCache
+       generateStatementCache = localGenerateStatementCache
     }
     else {
       generateStatementCache = MySQLShared.generateStatementCache
     }
   
     // Force 5.7 Code Path
-    // generateStatementCache = generateStatementCacheLocal
+    // generateStatementCache = MySQLShared.generateStatementCache
  
     results = await query(conn,`SET SESSION SQL_MODE=ANSI_QUOTES`);
     results = await query(conn,`CREATE DATABASE IF NOT EXISTS "${parameters.TOUSER}"`); 

@@ -1,4 +1,4 @@
-export DIR=JSON/MariaDB
+export DIR=JSON/MYSQL
 export MDIR=../../JSON/MYSQL
 export ID=1
 export SCHEMA=sakila

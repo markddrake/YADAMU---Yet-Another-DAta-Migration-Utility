@@ -101,7 +101,9 @@ class DbWriter extends Writable {
           break;
         case 'metadata':
           this.metadata = obj.metadata;
-          this.statementCache = await generateStatementCache(this.conn, this.schema, this.systemInformation, this.metadata, this.status, this.logWriter);
+          if (Object.keys(this.metadata).length > 0) {
+            this.statementCache = await generateStatementCache(this.conn, this.schema, this.systemInformation, this.metadata, this.status, this.logWriter);
+          }
           break;
         case 'table':
           // this.logWriter.write(`${new Date().toISOString()}: Switching to Table "${obj.table}".\n`);
@@ -117,6 +119,7 @@ class DbWriter extends Writable {
             }
           }
           this.setTable(obj.table);
+          await this.conn.commit();
           await this.conn.beginTransaction();
           if (this.status.sqlTrace) {
              this.status.sqlTrace.write(`${this.tableInfo.dml};\n--\n`);
@@ -162,6 +165,7 @@ class DbWriter extends Writable {
                                                    }
                                                  },this)
           this.batch.push(...obj.data);
+          this.batchRowCount++;
           //  this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Batch contains ${this.batchRowCount} rows.`);
           if (this.batchRowCount  === this.batchSize) {
               //  this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Completed Batch contains ${this.batchRowCount} rows.`);

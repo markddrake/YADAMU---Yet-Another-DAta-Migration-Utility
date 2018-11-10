@@ -1,4 +1,4 @@
-@set DIR=JSON\MariaDB
+@set DIR=JSON\MYSQL
 @set MDIR=..\..\JSON\MYSQL
 @set ID=1
 @set SCHEMA=sakila

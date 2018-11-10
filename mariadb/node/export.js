@@ -13,13 +13,15 @@ const sqlGetSystemInformation =
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID"`;					   
 
 const sqlGenerateTables = 
-`select t.table_schema "table_schema"
-       ,t.table_name "table_name"
-  	   ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "columns"
-	   ,group_concat(concat('"',data_type,'"') order by ordinal_position separator ',')  "dataTypes"
-	   ,group_concat(concat('"',	
+// Cannot use JSON_ARRAYAGG for DATA_TYPES and SIZE_CONSTRAINTS beacuse MYSQL implementation of JSON_ARRAYAGG does not support ordering
+ 
+`select c.table_schema "table_schema"
+       ,c.table_name "table_name"
+       ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "columns"
+       ,concat('[',group_concat(json_quote(data_type) order by ordinal_position separator ','),']')  "dataTypes"
+       ,concat('[',group_concat(json_quote(
                             case when (numeric_precision is not null) and (numeric_scale is not null)
-                                   then concat(numeric_precision,',',numeric_scale)	
+                                   then concat(numeric_precision,',',numeric_scale) 
                                  when (numeric_precision is not null)
                                    then case
                                           when column_type like '%unsigned' 
@@ -31,14 +33,13 @@ const sqlGenerateTables =
                                    then datetime_precision
                                  when (character_maximum_length is not null)
                                    then character_maximum_length
-                                 else	
-                                   ''	
-                            end,	
-                            '"'
+                                 else   
+                                   ''   
+                            end
                            ) 
                            order by ordinal_position separator ','
-                    ) "sizeConstraints"
-	   ,concat(
+                    ),']') "sizeConstraints"
+       ,concat(
           'select json_array('
           ,group_concat(
             case 
@@ -60,17 +61,15 @@ const sqlGenerateTables =
               when data_type = 'binary'
                 -- Force HEXBINARY rendering of value
                 then concat('HEX("', column_name, '")')
-             when data_type = 'geometry' 
-               then concat('JSON_QUERY(ST_AsGeoJSON("', column_name, '"),''$'')')
               else
                 concat('"',column_name,'"')
             end
             order by ordinal_position separator ','
           )
           ,') "json" from "'
-          ,t.table_schema
+          ,c.table_schema
           ,'"."'
-          ,t.table_name
+          ,c.table_name
           ,'"'
         ) "query"
    from information_schema.columns c, information_schema.tables t
@@ -179,11 +178,11 @@ async function main(){
 		dumpFile.write(',');
       }
 	  dumpFile.write(`"${row.table_name}" : ${JSON.stringify({
-						                             "owner"          : row.table_schema
-                                                    ,"tableName"      : row.table_name
-                                                    ,"columns"        : row.columns
-                                                    ,"dataTypes"      : JSON.parse('[' + row.dataTypes + ']')
-												    ,"sizeConstraints" : JSON.parse('[' + row.sizeConstraints + ']')
+						                             "owner"           : row.table_schema
+                                                    ,"tableName"       : row.table_name
+                                                    ,"columns"         : row.columns
+                                                    ,"dataTypes"       : JSON.parse(row.dataTypes)
+												    ,"sizeConstraints" : JSON.parse(row.sizeConstraints)
 	                 })}`)				   
 	}
 	dumpFile.write('},"data":{');
