@@ -1,10 +1,11 @@
 "use strict";
  
 const fs = require('fs');
-const common = require('./common.js');
 const mysql = require('mysql');
 const JSONStream = require('JSONStream')
 const Transform = require('stream').Transform;
+
+const MySQLCore = require('./mysqlCore.js');
 
 const sqlAnsiQuotingMode =
 `SET SESSION SQL_MODE=ANSI_QUOTES`
@@ -13,11 +14,14 @@ const sqlGetSystemInformation =
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID"`;                     
 
 const sqlGenerateMetadata =
+
+ // Cannot use JSON_ARRAYAGG for DATA_TYPES and SIZE_CONSTRAINTS beacuse MYSQL implementation of JSON_ARRAYAGG does not support ordering
+ 
 `select c.table_schema "table_schema"
        ,c.table_name "table_name"
        ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "columns"
-       ,group_concat(concat('"',data_type,'"') order by ordinal_position separator ',')  "dataTypes"
-       ,group_concat(concat('"',    
+       ,concat('[',group_concat(json_quote(data_type) order by ordinal_position separator ','),']')  "dataTypes"
+       ,concat('[',group_concat(json_quote(
                             case when (numeric_precision is not null) and (numeric_scale is not null)
                                    then concat(numeric_precision,',',numeric_scale) 
                                  when (numeric_precision is not null)
@@ -33,11 +37,10 @@ const sqlGenerateMetadata =
                                    then character_maximum_length
                                  else   
                                    ''   
-                            end,    
-                            '"'
+                            end
                            ) 
                            order by ordinal_position separator ','
-                    ) "sizeConstraints"
+                    ),']') "sizeConstraints"
        ,concat(
           'select json_array('
           ,group_concat(
@@ -209,7 +212,7 @@ async function main(){
 
   try {
 
-    parameters = common.processArguments(process.argv,'export');
+    parameters = MySQLCore.processArguments(process.argv,'export');
 
     if (parameters.LOGFILE) {
       logWriter = fs.createWriteStream(parameters.LOGFILE);
@@ -244,6 +247,7 @@ async function main(){
     dumpFile.write('{"systemInformation":');
     dumpFile.write(JSON.stringify({
                          "date"            : new Date().toISOString()
+                        ,"timeZoneOffset"  : new Date().getTimezoneOffset()
                         ,"vendor"          : "MySQL"
                         ,"schema"          : schema
                         ,"exportVersion"   : 1
@@ -270,8 +274,8 @@ async function main(){
                                                      "owner"          : row.table_schema
                                                     ,"tableName"      : row.table_name
                                                     ,"columns"        : row.columns
-                                                    ,"dataTypes"      : row.dataTypes
-                                                    ,"dataTypeSizing" : row.sizeConstraints
+                                                    ,"dataTypes"      : JSON.parse(row.dataTypes)
+                                                    ,"sizeConstraints" : JSON.parse(row.sizeConstraints)
                      })}`)                 
     }
     dumpFile.write('},"data":{');

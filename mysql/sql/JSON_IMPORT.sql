@@ -143,7 +143,7 @@ BEGIN
              else
                return lower(P_DATA_TYPE);
            end case;
-    when 'postgres'
+    when 'Postges'
       then return lower(P_DATA_TYPE);
     when 'MySQL'
       then case P_DATA_TYPE
@@ -177,7 +177,7 @@ DELIMITER $$
 --
 DROP PROCEDURE IF EXISTS GENERATE_SQL;
 --
-CREATE PROCEDURE GENERATE_SQL(P_SOURCE_VENDOR VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_TABLE_NAME VARCHAR(128), P_COLUMN_LIST TEXT, P_DATA_TYPE_LIST TEXT, P_SIZE_CONSTRAINTS TEXT, OUT P_TABLE_INFO JSON)
+CREATE PROCEDURE GENERATE_SQL(P_SOURCE_VENDOR VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_TABLE_NAME VARCHAR(128), P_COLUMN_LIST TEXT, P_DATA_TYPE_LIST JSON, P_SIZE_CONSTRAINTS JSON, OUT P_TABLE_INFO JSON)
 BEGIN
   DECLARE V_COLUMNS_CLAUSE     TEXT;
   DECLARE V_INSERT_SELECT_LIST TEXT;
@@ -207,8 +207,8 @@ BEGIN
                  NULL
              end "DATA_TYPE_SCALE"
            from JSON_TABLE(CONCAT('[',P_COLUMN_LIST,']'),'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(128) PATH '$')) c
-               ,JSON_TABLE(CONCAT('[',REPLACE(P_DATA_TYPE_LIST,'"."','\\".\\"'),']'),'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(128) PATH '$')) t
-               ,JSON_TABLE(CONCAT('[',P_SIZE_CONSTRAINTS,']'),'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(32) PATH '$')) s
+               ,JSON_TABLE(P_DATA_TYPE_LIST,'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(128) PATH '$')) t
+               ,JSON_TABLE(P_SIZE_CONSTRAINTS,'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(32) PATH '$')) s
           where (c."KEY" = t."KEY") and (c."KEY" = s."KEY")
     ),
     "TARGET_TABLE_DEFINITIONS" 
@@ -249,9 +249,9 @@ BEGIN
                                end,
                                CHAR(32)
                               )
-                     separator '  ,'
+                     order by "IDX" separator '  ,'
                     ) COLUMNS_CLAUSE
-        ,group_concat(concat('"',
+        ,concat('[',group_concat(JSON_QUOTE(
                                case
                                  when TARGET_DATA_TYPE like '%(%)'
                                    then TARGET_DATA_TYPE
@@ -280,11 +280,10 @@ BEGIN
                                         end
                                  else
                                    TARGET_DATA_TYPE
-                               end,
-                               '"'
+                               end
                               )
-                     separator '  ,'
-                    ) TARGET_DATA_TYPES
+                     order by "IDX" separator '  ,'
+                    ),']') TARGET_DATA_TYPES
           ,group_concat(concat(case
                                 when TARGET_DATA_TYPE = 'timestamp' 
                                   then concat('convert_tz(data."',COLUMN_NAME,'",''+00:00'',@@session.time_zone)')
@@ -334,7 +333,7 @@ BEGIN
                                end,
                                ' PATH ''$[',IDX-1,']'' NULL ON ERROR',CHAR(32)
                               )
-                     separator '    ,'
+                     order by "IDX" separator '    ,'
                     ) COLUMN_PATTERNS
       into V_COLUMNS_CLAUSE, V_TARGET_DATA_TYPES, V_INSERT_SELECT_LIST, V_COLUMN_PATTERNS
       from "TARGET_TABLE_DEFINITIONS";
@@ -343,7 +342,8 @@ BEGIN
     SET V_DDL_STATEMENT = concat('create table if not exists "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',CHAR(32),V_COLUMNS_CLAUSE,')'); 
     SET V_DML_STATEMENT = concat('insert into "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',P_COLUMN_LIST,')',CHAR(32),'select ',V_INSERT_SELECT_LIST,CHAR(32),'  from "JSON_STAGING" js,JSON_TABLE(js."DATA",''$.data."',P_TABLE_NAME,'"[*]'' COLUMNS (',CHAR(32),V_COLUMN_PATTERNS,')) data');
     
-    SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',V_TARGET_DATA_TYPES);
+    SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',CAST(V_TARGET_DATA_TYPES as JSON));
+    -- SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',V_TARGET_DATA_TYPES);
     
 END;
 $$
@@ -361,8 +361,8 @@ BEGIN
   DECLARE V_VENDOR           VARCHAR(32);
   DECLARE V_TABLE_NAME       VARCHAR(128);
   DECLARE V_COLUMN_LIST      TEXT;
-  DECLARE V_DATA_TYPE_LIST   TEXT;
-  DECLARE V_SIZE_CONSTRAINTS TEXT;
+  DECLARE V_DATA_TYPE_LIST   JSON;
+  DECLARE V_SIZE_CONSTRAINTS JSON;
   DECLARE V_TABLE_INFO       JSON;
   
   DECLARE V_STATEMENT         TEXT;
@@ -388,8 +388,8 @@ BEGIN
                 OWNER                        VARCHAR(128) PATH '$.owner'
                ,TABLE_NAME                   VARCHAR(128) PATH '$.tableName'
                ,COLUMN_LIST                          TEXT PATH '$.columns'
-               ,DATA_TYPE_LIST                       TEXT PATH '$.dataTypes'
-               ,SIZE_CONSTRAINTS                     TEXT PATH '$.dataTypeSizing'
+               ,DATA_TYPE_LIST                       JSON PATH '$.dataTypes'
+               ,SIZE_CONSTRAINTS                     JSON PATH '$.sizeConstraints'
                ,INSERT_SELECT_LIST                   TEXT PATH '$.insertSelectList'
                ,COLUMN_PATTERNS                      TEXT PATH '$.columnPatterns'
              )
@@ -422,7 +422,7 @@ BEGIN
     END IF; 
     
     CALL GENERATE_SQL(V_VENDOR, P_TARGET_SCHEMA, V_TABLE_NAME, V_COLUMN_LIST, V_DATA_TYPE_LIST, V_SIZE_CONSTRAINTS, V_TABLE_INFO);
-       
+      
     SET V_STATEMENT = JSON_UNQUOTE(JSON_EXTRACT(V_TABLE_INFO,'$.ddl'));
     SET @STATEMENT = V_STATEMENT;
     PREPARE STATEMENT FROM @STATEMENT;
@@ -462,8 +462,8 @@ BEGIN
   DECLARE V_VENDOR           VARCHAR(32);
   DECLARE V_TABLE_NAME       VARCHAR(128);
   DECLARE V_COLUMN_LIST      TEXT;
-  DECLARE V_DATA_TYPE_LIST   TEXT;
-  DECLARE V_SIZE_CONSTRAINTS TEXT;
+  DECLARE V_DATA_TYPE_LIST   JSON;
+  DECLARE V_SIZE_CONSTRAINTS JSON;
   DECLARE V_TABLE_INFO       JSON;
   
   DECLARE V_SQLSTATE         INT;
@@ -482,8 +482,8 @@ BEGIN
                 OWNER                        VARCHAR(128) PATH '$.owner'
                ,TABLE_NAME                   VARCHAR(128) PATH '$.tableName'
                ,COLUMN_LIST                          TEXT PATH '$.columns'
-               ,DATA_TYPE_LIST                       TEXT PATH '$.dataTypes'
-               ,SIZE_CONSTRAINTS                     TEXT PATH '$.dataTypeSizing'
+               ,DATA_TYPE_LIST                       JSON PATH '$.dataTypes'
+               ,SIZE_CONSTRAINTS                     JSON PATH '$.sizeConstraints'
                ,INSERT_SELECT_LIST                   TEXT PATH '$.insertSelectList'
                ,COLUMN_PATTERNS                      TEXT PATH '$.columnPatterns'
              )

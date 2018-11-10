@@ -1,12 +1,12 @@
-"use strict"
-const { Transform } = require('stream');
-const { Writable } = require('stream');
-const mysql = require('mysql')
-const common = require('./common.js');
-// const clarinet = require('clarinet');
-const clarinet = require('../../clarinet/clarinet.js');
+"use strict";
 const fs = require('fs');
+const mysql = require('mysql')
+const Writable = require('stream').Writable
+const Readable = require('stream').Readable;
 
+const Yadamu = require('../../common/yadamuCore.js');
+const RowParser = require('../../common/rowParser.js');
+const MySQLCore = require('./mysqlCore.js');
 
 const unboundedTypes = ['date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum'];
 const spatialTypes   = ['geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection'];
@@ -41,215 +41,6 @@ function query(conn,sqlQuery,args) {
                                            })
                      })
 }  
-
-class RowParser extends Transform {
-  
-  constructor(logWriter, options) {
-
-    super({objectMode: true });  
-  
-    const rowParser = this;
-    
-    this.logWriter = logWriter;
-
-    this.saxJParser = clarinet.createStream();
-    this.saxJParser.on('error',function(err) {this.logWriter.write(`$(err}\n`);})
-    
-    this.objectStack = [];
-    this.dataPhase = false;     
-    
-    this.currentObject = undefined;
-    this.chunks = [];
-
-    this.jDepth = 0;
-       
-    this.saxJParser.onkey = function (key) {
-      // rowParser.logWriter.write(`onKey(${rowParser.jDepth},${key})\n`);
-      
-      switch (rowParser.jDepth){
-        case 1:
-          // Push the completed first level object/array downstream. Replace the current top level object with an empty object of the same type.
-          rowParser.push(rowParser.currentObject);
-          if (Array.isArray(rowParser.currentObject)) {
-             rowParser.currentObject = [];
-          }
-          else {
-             rowParser.currentObject = {};
-          }
-          if (key === 'data') {
-            rowParser.dataPhase = true;
-          }
-          break;
-        case 2:
-          if (rowParser.dataPhase) {
-            rowParser.push({ table : key});
-          }
-          break;
-        default:
-      }
-      // Push the current object onto the stack and the current object to the key
-      rowParser.objectStack.push(rowParser.currentObject);
-      rowParser.currentObject = key;
-    };
-
-    this.saxJParser.onopenobject = function (key) {
-      // rowParser.logWriter.write(`onOpenObject(${rowParser.jDepth}:, Key:"${key}". ObjectStack:${rowParser.objectStack}\n`);      
-      
-      if (rowParser.jDepth > 0) {
-        rowParser.objectStack.push(rowParser.currentObject);
-      }
-         
-      switch (rowParser.jDepth) {
-        case 0:
-          // Push the completed first level object/array downstream. Replace the current top level object with an empty object of the same type.
-          if (rowParser.currentObject !== undefined) {
-            rowParser.push(rowParser.currentObject);
-          }  
-          if (key === 'data') {
-            rowParser.dataPhase = true;
-          }
-          break;
-        case 1:
-          if ((rowParser.dataPhase) && (key != undefined)) {
-            rowParser.push({ table : key});
-          }
-          break;
-        default:
-      }
-      // If the object has a key put the object on the stack and set the current object to the key. 
-      rowParser.currentObject = {}
-      rowParser.jDepth++;
-      if (key !== undefined) {
-        rowParser.objectStack.push(rowParser.currentObject);
-        rowParser.currentObject = key;
-      }
-    };
-
-    this.saxJParser.onopenarray = function () {
-      // rowParser.logWriter.write(`onOpenArray(${rowParser.jDepth}): ObjectStack:${rowParser.objectStack}\n`);
-      if (rowParser.jDepth > 0) {
-        rowParser.objectStack.push(rowParser.currentObject);
-      }
-      rowParser.currentObject = [];
-      rowParser.jDepth++;
-    };
-
-
-    this.saxJParser.onvaluechunk = function (v) {
-      rowParser.chunks.push(v);  
-    };
-       
-    this.saxJParser.onvalue = function (v) {
-      // rowParser.logWriter.write(`onvalue(${rowParser.jDepth}: ObjectStack:${rowParser.objectStack}\n`);        
-      if (rowParser.chunks.length > 0) {
-        rowParser.chunks.push(v);
-        v = rowParser.chunks.join('');
-        rowParser.chunks = []
-      }
-      
-      if (typeof v === 'boolean') {
-        v = new Boolean(v).toString();
-      }
-      
-      if (Array.isArray(rowParser.currentObject)) {
-          // currentObject is an ARRAY. We got a value so add it to the Array
-          rowParser.currentObject.push(v);
-      }
-      else {
-          // currentObject is an Key. We got a value so fetch the parent object and add the KEY:VALUE pair to it. Parent Object becomes the Current Object.
-          const parentObject = rowParser.objectStack.pop();
-          parentObject[rowParser.currentObject] = v;
-          rowParser.currentObject = parentObject;
-      }
-    }
-      
-    this.saxJParser.oncloseobject = async function () {
-      // rowParser.logWriter.write(`onCloseObject(${rowParser.jDepth}):\nObjectStack:${rowParser.objectStack})\nCurrentObject:${rowParser.currentObject}\n`);           
-      rowParser.jDepth--;
-
-      // An object can belong to an Array or a Key
-      if (rowParser.objectStack.length > 0) {
-        let owner = rowParser.objectStack.pop()
-        let parentObject = undefined;
-        if (Array.isArray(owner)) {   
-          parentObject = owner;
-          parentObject.push(rowParser.currentObject);
-        }    
-        else {
-          parentObject = rowParser.objectStack.pop()
-          if (!this.emptyObject) {
-            parentObject[owner] = rowParser.currentObject;
-          }
-        }   
-        rowParser.currentObject = parentObject;
-      }
-    }
-   
-    this.saxJParser.onclosearray = function () {
-      // rowParser.logWriter.write(`onclosearray(${rowParser.jDepth}: ObjectStack:${rowParser.objectStack}. CurrentObject:${rowParser.currentObject}\n`);          
-      let skipObject = false;
-      
-      if ((rowParser.dataPhase) && (rowParser.jDepth === 4)) {
-        rowParser.push({ data : rowParser.currentObject});
-        skipObject = true;
-      }
-
-      rowParser.jDepth--;
-
-      // An Array can belong to an Array or a Key
-      if (rowParser.objectStack.length > 0) {
-        let owner = rowParser.objectStack.pop()
-        let parentObject = undefined;
-        if (Array.isArray(owner)) {   
-          parentObject = owner;
-          if (!skipObject) {
-            parentObject.push(rowParser.currentObject);
-          }
-        }    
-        else {
-          parentObject = rowParser.objectStack.pop()
-          if (!skipObject) {
-            parentObject[owner] = rowParser.currentObject;
-          }
-        }
-        rowParser.currentObject = parentObject;
-      }   
-    }
-
-   }  
-   
-  _transform(data,enc,callback) {
-    this.saxJParser.write(data);
-    callback();
-  };
-}
-
-function decomposeDataType(targetDataType) {
-    
-  const results = {};
-    
-  let components = targetDataType.split('(');
-  results.type = components[0];
-  if (components.length > 1 ) {
-    components = components[1].split(')');
-    components = components[0].split(',');
-    if (components.length > 1 ) {
-      results.length = parseInt(components[0]);
-      results.scale = parseInt(components[1]);
-    }
-    else {
-      if (components[0] === 'max') {
-        results.length = sql.MAX;
-      }
-      else {
-        results.length = parseInt(components[0])
-      }
-    }
-  }           
-   
-  return results;      
-    
-}      
 
 function mapForeignDataType(vendor, dataType, dataTypeLength, dataTypeSize) {
   switch (vendor) {
@@ -375,30 +166,14 @@ function generateStatements(vendor, schema, metadata) {
    let useSetClause = false;
    
    const columnNames = metadata.columns.split(',');
-   const dataTypes = metadata.dataTypes.split(',');
-   const sizeConstraints = JSON.parse('[' + metadata.dataTypeSizing.replace(/\"\.\"/g, '\",\"') + ']');
+   const dataTypes = metadata.dataTypes
+   const sizeConstraints = metadata.sizeConstraints
    const targetDataTypes = [];
    const setOperators = []
 
    const columnClauses = columnNames.map(function(columnName,idx) {    
-                                           const dataType = dataTypes[idx].replace(/\"/g, "");
-                                           const sizeConstraint = sizeConstraints[idx].replace(/\"/g, "");
-                                           let dataLength = null;
-                                           let dataScale = null;
-                                           let qualifier = ''
-                                           if (sizeConstraint.length > 0) {
-                                             dataLength = sizeConstraint;
-                                             const scaleOffset = dataLength.indexOf(',');
-                                             if (scaleOffset > -1) {
-                                               dataScale = parseInt(dataLength.substring(scaleOffset+1))
-                                               dataLength = parseInt(dataLength.substring(0,scaleOffset))
-                                             }
-                                             else {
-                                               dataLength = parseInt(dataLength);
-                                             }
-                                           }
-
-                                           let targetDataType = mapForeignDataType(vendor,dataType,dataLength,dataScale);
+                                           const dataType = Yadamu.decomposeDataType(dataTypes[idx])
+                                           let targetDataType = mapForeignDataType(vendor,dataType.type,dataLength.type,dataScale.scale);
                                            targetDataTypes.push(targetDataType);
                                            
                                            switch (targetDataType) {
@@ -480,7 +255,6 @@ async function generateStatementCacheLocal(conn, schema, systemInformation, meta
 
 async function generateStatementCacheRemote(conn, schema, systemInformation, metadata, status,logWriter) {
     
- 
   const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;                       
  
   let results = await query(conn,sqlStatement,[JSON.stringify({systemInformation: systemInformation, metadata : metadata}),schema]);
@@ -490,9 +264,9 @@ async function generateStatementCacheRemote(conn, schema, systemInformation, met
   await Promise.all(tables.map(async function(table,idx) {
                                        const tableInfo = statementCache[table];
                                        const columnNames = JSON.parse('[' + metadata[table].columns + ']');
-                                       tableInfo.targetDataTypes = JSON.parse('[' + tableInfo.targetDataTypes + ']');
 
                                        tableInfo.useSetClause = false;
+                                       
                                        const setOperators = tableInfo.targetDataTypes.map(function(targetDataType,idx) {
                                                                                             switch (targetDataType) {
                                                                                               case 'geometry':
@@ -635,7 +409,7 @@ class DbWriter extends Writable {
             break;
           }
           this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
-                                                 const dataType = decomposeDataType(targetDataType);
+                                                   const dataType = Yadamu.decomposeDataType(targetDataType);
                                                    if (obj.data[idx] !== null) {
                                                      switch (dataType.type) {
                                                        case "tinyblob" :
@@ -751,7 +525,7 @@ async function main() {
       logWriter.write(`${err}\n${err.stack}\n`);
     })
     
-    parameters = common.processArguments(process.argv,'export');
+    parameters = MySQLCore.processArguments(process.argv,'export');
 
     if (parameters.LOGFILE) {
       logWriter = fs.createWriteStream(parameters.LOGFILE);
@@ -808,13 +582,7 @@ async function main() {
     
     await conn.end();
 
-    status.statusMsg = status.warningRaised ? 'with warnings' : status.statusMsg;
-    status.statusMsg = status.errorRaised ? 'with errors'  : status.statusMsg;
-     
-    logWriter.write(`Import operation completed ${status.statusMsg}.\n`);
-    if (logWriter !== process.stdout) {
-       console.log(`Import operation completed ${status.statusMsg}: See "${parameters.LOGFILE}" for details.`);
-    }
+    Yadamu.reportStatus(status,logWriter)
   } catch (e) {
     if (logWriter !== process.stdout) {
       console.log(`Import operation failed: See "${parameters.LOGFILE}" for details.`);
@@ -840,6 +608,3 @@ async function main() {
 }
     
 main()
-
-
- 

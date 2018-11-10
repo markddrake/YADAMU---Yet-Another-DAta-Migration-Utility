@@ -6,11 +6,11 @@
 mkdir %DIR%
 call env\connection.bat
 mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f <..\sql\JSON_IMPORT.sql
-mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="SET @ID=1" <sql\RECREATE_ORACLE_ALL.sql
+mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="SET @ID=%ID%" <sql\RECREATE_ORACLE_ALL.sql
 call windows\import_Oracle_jTable.bat %MDIR% %ID% ""
 call windows\export_Oracle.bat %DIR% %ID% %ID%
-mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="SET @ID=2" <sql\RECREATE_ORACLE_ALL.sql
 @set ID=2
+mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="SET @ID=%ID%" <sql\RECREATE_ORACLE_ALL.sql
 call windows\import_Oracle_jTable.bat %DIR% %ID% 1
 call windows\export_Oracle.bat %DIR% %ID% %ID%
 dir %DIR%\*1.json
