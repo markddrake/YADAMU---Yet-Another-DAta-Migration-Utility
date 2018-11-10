@@ -145,20 +145,60 @@ function mapForeignDataType(vendor, dataType, dataTypeLength, dataTypeSize) {
        break
      case 'MySQL':
        switch (dataType) {
-         case 'set':                             return 'text';
-         case 'enum':                            return 'text';
+         case 'set':                             return 'varchar(512)';
+         case 'enum':                            return 'varchar(512)';
          default:                                return dataType.toLowerCase();
        }
        break;
      case 'MariaDB':
        switch (dataType) {
-         case 'set':                             return 'text';
-         case 'enum':                            return 'text';
+         case 'set':                             return 'varchar(512)';
+         case 'enum':                            return 'varchar(512)';
          default:                                return dataType.toLowerCase();
        }
        break;
      default:                                    return dataType.toLowerCase();
   }  
+}
+
+function getColumnDataType(targetDataType, length, scale) {
+
+   if (RegExp(/\(.*\)/).test(targetDataType)) {
+     return targetDataType
+   }
+   
+   if (targetDataType.endsWith(" unsigned")) {
+     return targetDataType
+   }
+
+   if (unboundedTypes.includes(targetDataType)) {
+     return targetDataType
+   }
+
+   if (spatialTypes.includes(targetDataType)) {
+     return targetDataType
+   }
+
+   if (nationalTypes.includes(targetDataType)) {
+     return targetDataType
+   }
+
+   if (scale) {
+     if (integerTypes.includes(targetDataType)) {
+       return targetDataType + '(' + length + ')';
+     }
+     return targetDataType + '(' + length + ',' + scale + ')';
+   }                                                   
+
+   if (length) {
+     if (targetDataType === 'double')  {
+       return targetDataType
+     }
+     if (length)
+     return targetDataType + '(' + length + ')';
+   }
+
+   return targetDataType;     
 }
     
 function generateStatements(vendor, schema, metadata) {
@@ -172,8 +212,22 @@ function generateStatements(vendor, schema, metadata) {
    const setOperators = []
 
    const columnClauses = columnNames.map(function(columnName,idx) {    
-                                           const dataType = Yadamu.decomposeDataType(dataTypes[idx])
-                                           let targetDataType = mapForeignDataType(vendor,dataType.type,dataLength.type,dataScale.scale);
+                                           
+                                           const dataType = {
+                                                    type : dataTypes[idx]
+                                                 }    
+                                           
+                                           const sizeConstraint = sizeConstraints[idx]
+                                           if (sizeConstraint.length > 0) {
+                                              const components = sizeConstraint.split(',');
+                                              dataType.length = parseInt(components[0])
+                                              if (components.length > 1) {
+                                                dataType.scale = parseInt(components[1])
+                                              }
+                                           }
+                                        
+                                           let targetDataType = mapForeignDataType(vendor,dataType.type,dataType.length,dataType.scale);
+                                       
                                            targetDataTypes.push(targetDataType);
                                            
                                            switch (targetDataType) {
@@ -185,41 +239,7 @@ function generateStatements(vendor, schema, metadata) {
                                              default:
                                                setOperators.push(' "' + columnName + '" = ?')
                                            }
-                                           
-                                           switch (true) {
-                                              case (RegExp(/\(.*\)/).test(targetDataType)):
-                                                break;
-                                              case (targetDataType.endsWith(" unsigned")):
-                                                break;
-                                              case unboundedTypes.includes(targetDataType):
-                                                break;
-                                              case spatialTypes.includes(targetDataType):
-                                                break;
-                                              case nationalTypes.includes(targetDataType):
-                                                targetDataType = targetDataType + '(' + dataLength + ')';
-                                                break;
-                                              case (dataScale != null):
-                                                switch (true) {
-                                                   case integerTypes.includes(targetDataType):
-                                                     targetDataType = targetDataType + '(' + dataLength + ')';
-                                                     break;
-                                                   default:
-                                                     targetDataType = targetDataType + '(' + dataLength + ',' + dataScale + ')';
-                                                }
-                                                break;
-                                              case (dataLength != null):
-                                                switch (true) {
-                                                  case (targetDataType === 'double'):
-                                                    // Do not add length restriction when scale is not specified
-                                                    break;
-                                                  default:
-                                                    targetDataType = targetDataType + '(' + dataLength + ')';
-                                                    break;
-                                                }
-                                                break;
-                                              default:
-                                           }
-                                           return `${columnName} ${targetDataType} ${qualifier}\n `;
+                                           return `${columnName} ${getColumnDataType(targetDataType,dataType.length,dataType.scale)}`
                                         })
                                       
     const createStatement = `create table if not exists "${schema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;

@@ -59,11 +59,14 @@ function processLog(log,status,logWriter) {
 function decomposeDataType(targetDataType) {
     
   const results = {};
-    
+ 
   let components = targetDataType.split('(');
   results.type = components[0].split(' ')[0];
   if (components.length > 1 ) {
     components = components[1].split(')');
+    if (components.length > 1 ) {
+      results.qualifier = components[1]
+    }
     components = components[0].split(',');
     if (components.length > 1 ) {
       results.length = parseInt(components[0]);
