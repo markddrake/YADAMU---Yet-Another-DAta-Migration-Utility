@@ -1,27 +1,34 @@
-"use strict";
- 
+"use strict"; 
 const fs = require('fs');
-const common = require('./common.js');
 const mariadb = require('mariadb');
-// const JSONStream = require('JSONStream')
 const Transform = require('stream').Transform;
+
+const Yadamu = require('../../common/yadamuCore.js');
+const MariaCore = require('./mariaCore.js');
 
 const sqlAnsiQuotingMode =
 `SET SESSION SQL_MODE=ANSI_QUOTES`
 
 const sqlGetSystemInformation = 
-`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION"`;					   
+`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID"`;					   
 
 const sqlGenerateTables = 
-`select t.table_schema
-       ,t.table_name
+`select t.table_schema "table_schema"
+       ,t.table_name "table_name"
   	   ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "columns"
 	   ,group_concat(concat('"',data_type,'"') order by ordinal_position separator ',')  "dataTypes"
 	   ,group_concat(concat('"',	
                             case when (numeric_precision is not null) and (numeric_scale is not null)
                                    then concat(numeric_precision,',',numeric_scale)	
                                  when (numeric_precision is not null)
-                                   then numeric_precision
+                                   then case
+                                          when column_type like '%unsigned' 
+                                            then numeric_precision
+                                          else
+                                            numeric_precision + 1
+                                        end
+                                 when (datetime_precision is not null)
+                                   then datetime_precision
                                  when (character_maximum_length is not null)
                                    then character_maximum_length
                                  else	
@@ -47,6 +54,12 @@ const sqlGenerateTables =
               when data_type like '%blob'
                 -- Force HEXBINARY rendering of value
                 then concat('HEX("', column_name, '")')
+              when data_type = 'varbinary'
+                -- Force HEXBINARY rendering of value
+                then concat('HEX("', column_name, '")')
+              when data_type = 'binary'
+                -- Force HEXBINARY rendering of value
+                then concat('HEX("', column_name, '")')
              when data_type = 'geometry' 
                then concat('JSON_QUERY(ST_AsGeoJSON("', column_name, '"),''$'')')
               else
@@ -59,9 +72,10 @@ const sqlGenerateTables =
           ,'"."'
           ,t.table_name
           ,'"'
-        ) QUERY	
-   from information_schema.columns	c, information_schema.tables t
+        ) "query"
+   from information_schema.columns c, information_schema.tables t
   where t.table_name = c.table_name 
+     and c.extra <> 'VIRTUAL GENERATED'
     and t.table_schema = c.table_schema
     and t.table_type = 'BASE TABLE'
     and t.table_schema = ?
@@ -73,11 +87,17 @@ function fetchData(conn,sqlQuery,outStream) {
    
    return new Promise(function(resolve,reject) {
      conn.queryStream(sqlQuery).on('data',function(row) {
-                                           if (counter > 0) {
-                                             outStream.write(',')
-                                           }
-                                           outStream.write(row.json);
-                                          counter++;
+                                            if (counter > 0) {
+                                              outStream.write(',')
+                                            }
+                                            if (typeof row.json === 'object') {
+                                              // Working with MySQL 8.0 ?
+                                              outStream.write(JSON.stringify(row.json));
+                                            }
+                                            else {
+                                             outStream.write(row.json);
+                                            }
+                                           counter++;
                              }).on('end',function() {
                                            resolve(counter);
                              }).on('error',function(err) {
@@ -96,7 +116,7 @@ async function main(){
 	
   try {
 
-    parameters = common.processArguments(process.argv,'export');
+    parameters = MariaCore.processArguments(process.argv,'export');
 
 	if (parameters.LOGFILE) {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE);
@@ -107,10 +127,11 @@ async function main(){
     }
 
     const connectionDetails = {
-            host      : parameters.HOSTNAME
-           ,user      : parameters.USERNAME
-           ,password  : parameters.PASSWORD
-           ,port      : parameters.PORT ? parameters.PORT : 3307
+            host        : parameters.HOSTNAME
+           ,user        : parameters.USERNAME
+           ,password    : parameters.PASSWORD
+           ,port        : parameters.PORT ? parameters.PORT : 3307
+           ,rowsAsArray : false
     }
     
     pool = mariadb.createPool(connectionDetails);
@@ -131,18 +152,20 @@ async function main(){
       sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
     }
     
-	const sysInfo = await conn.query(sqlGetSystemInformation);
+	const mysqlInfo = await conn.query(sqlGetSystemInformation);
 	
 	dumpFile.write('{"systemInformation":');
 	dumpFile.write(JSON.stringify({
 		                 "date"            : new Date().toISOString()
+                        ,"timeZoneOffset"  : new Date().getTimezoneOffset()
 					    ,"vendor"          : "MariaDB"
 					    ,"schema"          : schema
 					    ,"exportVersion"   : 1
-						,"sessionUser"     : sysInfo[0].SESSION_USER
-						,"currentUser"     : sysInfo[0].CURRENT_USER
-						,"dbName"          : sysInfo[0].DATABASE_NAME
-						,"databaseVersion" : sysInfo[0].DATABASE_VERSION
+						,"sessionUser"     : mysqlInfo[0].SESSION_USER
+						,"currentUser"     : mysqlInfo[0].CURRENT_USER
+						,"dbName"          : mysqlInfo[0].DATABASE_NAME
+						,"databaseVersion" : mysqlInfo[0].DATABASE_VERSION
+                        ,"serverVendor"    : mysqlInfo[0].SERVER_VENDOR_ID
 	}));
 	
 	dumpFile.write(',"metadata":{');
@@ -159,8 +182,8 @@ async function main(){
 						                             "owner"          : row.table_schema
                                                     ,"tableName"      : row.table_name
                                                     ,"columns"        : row.columns
-                                                    ,"dataTypes"      : row.dataTypes
-												    ,"dataTypeSizing" : row.sizeConstraints
+                                                    ,"dataTypes"      : JSON.parse('[' + row.dataTypes + ']')
+												    ,"sizeConstraints" : JSON.parse('[' + row.sizeConstraints + ']')
 	                 })}`)				   
 	}
 	dumpFile.write('},"data":{');
@@ -174,7 +197,7 @@ async function main(){
         sqlTrace.write(`${row.QUERY}\n\/\n`)
       }
 	  const startTime = new Date().getTime()
-      const rows = await fetchData(conn,row.QUERY,dumpFile) 
+      const rows = await fetchData(conn,row.query,dumpFile) 
       const elapsedTime = new Date().getTime() - startTime
       dumpFile.write(']');
       logWriter.write(`${new Date().toISOString()} - Table: "${row.table_name}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
@@ -185,7 +208,7 @@ async function main(){
 	
 	await conn.end();
  	await pool.end();
-	logWriter.write('Export operation successful.');
+	logWriter.write(`Export operation successful.`);
     if (logWriter !== process.stdout) {
 	  console.log(`Export operation successful: See "${parameters.LOGFILE}" for details.`);
     }

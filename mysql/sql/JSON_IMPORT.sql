@@ -149,9 +149,9 @@ BEGIN
       then case P_DATA_TYPE
              -- Metadata does not contain sufficinet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM and SET to TEXT.
              when 'set' 
-               then return 'text';
+               then return 'varchar(512)';
              when 'enum' 
-               then return 'text';
+               then return 'varchar(512)';
              else
                return lower(P_DATA_TYPE);
            end case;       
@@ -159,9 +159,9 @@ BEGIN
       then case P_DATA_TYPE
              -- Metadata does not contain sufficnet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM and SET to TEXT.
              when 'set' 
-               then return 'text';
+               then return 'varchar(512)';
              when 'enum' 
-               then return 'text';
+               then return 'varchar(512)';
              else
                return lower(P_DATA_TYPE);
            end case;       

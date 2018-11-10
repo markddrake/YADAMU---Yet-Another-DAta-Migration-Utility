@@ -1,31 +1,7 @@
-module.exports.processArguments     = processArguments
+"use strict";
 
-function convertQuotedIdentifer(parameterValue) {
+const Yadamu = require('../../common/yadamuCore.js');
 
-  if ((parameterValue.indexOf('"') === 0) && (parameterValue.substring(1).indexOf('"') === parameterValue.length - 2)) {
-    return parameterValue.substring(1,parameterValue.length-1);
-  }
-  else {
-    return parameterValue.toUpperCase()
-  }	
-}
-
-function processValue(parameterValue) {
-
-  if ((parameterValue.indexOf('(') === 0) && (parameterValue.indexOf(')') === parameterValue.length - 1)) {
-	console.log(parameterValue)
-	let parameterValues = parameterValue.substring(1,parameterValue.length-1).split(',');
-	parameterValues = parameterValues.map(function(value) {
-      return convertQutotedIdentifer(value);
-	})
-	console.log(parameterValues)
-	return parameterValues
-  }
-  else {
-    return convertQuotedIdentifer(parameterValue);
-  }
-}
-	
 function processArguments(args,operation) {
 
    const parameters = {
@@ -71,15 +47,15 @@ function processArguments(args,operation) {
 			break;
 	      case 'OWNER':
 	      case '--OWNER':
-		    parameters.OWNER = processValue(parameterValue);
+		    parameters.OWNER = Yadamu.processValue(parameterValue);
 			break;
 	      case 'FROMUSER':
 	      case '--FROMUSER':
-		    parameters.FROMUSER = processValue(parameterValue);
+		    parameters.FROMUSER = Yadamu.processValue(parameterValue);
 			break;
 	      case 'TOUSER':
 	      case '--TOUSER':
-		    parameters.TOUSER = processValue(parameterValue);
+		    parameters.TOUSER = Yadamu.processValue(parameterValue);
 			break;
 	      case 'LOGFILE':
 	      case '--LOGFILE':
@@ -116,3 +92,5 @@ function processArguments(args,operation) {
    
    return parameters;
 }
+
+module.exports.processArguments       = processArguments
