@@ -10,8 +10,8 @@ function processLog(log,status,logWriter) {
   const logDDLIssues   = (status.loglevel && (status.loglevel > 2));
   const logTrace       = (status.loglevel && (status.loglevel > 3));
 
-  if (status.logFileName) {
-    fs.writeFileSync(status.logFileName,JSON.stringify(log));
+  if (status.dumpFileName) {
+    fs.writeFileSync(status.dumpFileName,JSON.stringify(log));
   }
   
   log.forEach(function(result) {
@@ -122,12 +122,16 @@ function getStatus(parameters) {
 	status.sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
   }
 
+  if (parameters.LOGFILE) {
+    status.logFileName = parameters.LOGFILE;
+  }
+
   if (parameters.LOGLEVEL) {
     status.loglevel = parameters.LOGLEVEL;
   }
     	
   if ((parameters.DUMPLOG) && (parameters.DUMPLOG == 'TRUE')) {
-     status.logFileName = path.basename(parameters.FILE,'.json') + '.log.json';
+     status.dumpFileName = path.basename(parameters.FILE,'.json') + '.log.json';
   }
 
   return status;
@@ -142,7 +146,7 @@ function reportStatus(status,logWriter) {
 
   logWriter.write(`Import operation completed ${status.statusMsg}.\n`);
   if (logWriter !== process.stdout) {
-    console.log(`Import operation completed ${status.statusMsg}: See "${parameters.LOGFILE}" for details.`);
+    console.log(`Import operation completed ${status.statusMsg}: See "${status.logFileName}" for details.`);
   }
 
 }

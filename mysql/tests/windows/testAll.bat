@@ -1,6 +1,8 @@
 @set TNS=%~1
 cls
 mkdir logs
+@set LOGFILE=logs\Summary.log
+del %LOGFILE%
 call windows\export_Master.bat
 call windows\clone_JSON.bat
 call windows\clone_MYSQL.bat
@@ -22,3 +24,4 @@ dir JSON\MSSQL\*.json > logs\%RESULTS%
 dir JSON\MYSQL\*.json >> logs\%RESULTS%
 dir JSON\JSON\*.json  >> logs\%RESULTS%
 dir JSON\%TNS%\*.json >> logs\%RESULTS%
+type %LOGFILE%

@@ -14,35 +14,11 @@ const MySQLShared = require('../../common/mysql/mariadbShared.js');
 
 let generateStatementCache = undefined;
 
-function connect(conn) {
-    
-  return new Promise(function(resolve,reject) {
-                       conn.connect(function(err) {
-                                      if (err) {
-                                        reject(err);
-                                      }
-                                      resolve();
-                                    })
-                    })
-}   
-      
-function query(conn,sqlQuery,args) {
-    
-  return new Promise(function(resolve,reject) {
-                       conn.query(sqlQuery,args,function(err,rows,fields) {
-                                             if (err) {
-                                               reject(err);
-                                             }
-                                             resolve(rows);
-                                           })
-                     })
-}  
-
-async function localGenerateStatementCache(conn, schema, systemInformation, metadata, status,logWriter) {
+async function localGenerateStatementCache(conn, schema, systemInformation, metadata, status, logWriter) {
     
   const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;                       
  
-  let results = await query(conn,sqlStatement,[JSON.stringify({systemInformation: systemInformation, metadata : metadata}),schema]);
+  let results = await MySQLCore.query(conn,status,sqlStatement,[JSON.stringify({systemInformation: systemInformation, metadata : metadata}),schema]);
   results = results.pop();
   const statementCache = JSON.parse(results[0].SQL_STATEMENTS)
   const tables = Object.keys(metadata); 
@@ -69,11 +45,8 @@ async function localGenerateStatementCache(conn, schema, systemInformation, meta
                                          tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + `  values ?`;
                                          }
                                         
-                                       if (status.sqlTrace) {
-                                         status.sqlTrace.write(`${tableInfo.ddl};\n--\n`);
-                                       }
                                        try {
-                                         const results = await query(conn,tableInfo.ddl);   
+                                         const results = await MySQLCore.query(conn,status,tableInfo.ddl);   
                                        } catch (e) {
                                          logWriter.write(`${e}\n${tableInfo.ddl}\n`)
                                        }  
@@ -96,11 +69,14 @@ class DbWriter extends Writable {
     this.batchSize = batchSize;
     this.commitSize = commitSize;
     this.mode = mode;
-    this.status = status;
     this.logWriter = logWriter;
+    this.status = status;
 
+    this.batch = [];
+    
     this.systemInformation = undefined;
     this.metadata = undefined;
+    
     this.statementCache = undefined;
     
     this.tableName = undefined;
@@ -109,7 +85,8 @@ class DbWriter extends Writable {
     this.startTime = undefined;
     this.skipTable = true;
     
-    this.batch = [];
+    this.logDDLIssues   = (status.loglevel && (status.loglevel > 2));
+    // this.logDDLIssues   = true;
   }      
   
   async setTable(tableName) {
@@ -129,7 +106,7 @@ class DbWriter extends Writable {
       if (this.tableInfo.useSetClause) {
         for (const i in this.batch) {
           try {
-            const results = await query(this.conn,this.tableInfo.dml,this.batch[i]);
+            const results = await MySQLCore.query(this.conn,this.status,this.tableInfo.dml,this.batch[i]);
           } catch(e) {
             if (e.errno && ((e.errno === 3616) || (e.errno === 3617))) {
               this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping Row Reason: ${e.message}\n`)
@@ -142,7 +119,7 @@ class DbWriter extends Writable {
         }
       }
       else {  
-        const results = await query(this.conn,this.tableInfo.dml,[this.batch]);
+        const results = await MySQLCore.query(this.conn,this.status,this.tableInfo.dml,[this.batch]);
       }
       const endTime = new Date().getTime();
       this.batch.length = 0;
@@ -187,9 +164,6 @@ class DbWriter extends Writable {
           }
           this.setTable(obj.table);
           await this.conn.beginTransaction();
-          if (this.status.sqlTrace) {
-             this.status.sqlTrace.write(`${this.tableInfo.dml};\n--\n`);
-          }
           break;
         case 'data': 
           if (this.skipTable) {
@@ -278,12 +252,12 @@ class DbWriter extends Writable {
   } 
 }
 
-function processFile(conn, schema, dumpFilePath, batchSize, commitSize, mode, status, logWriter) {
+function processFile(conn, schema, importFilePath, batchSize, commitSize, mode, status, logWriter) {
   
   return new Promise(function (resolve,reject) {
     const dbWriter = new DbWriter(conn,schema,batchSize,commitSize,mode,status,logWriter);
     const rowGenerator = new RowParser(logWriter);
-    const readStream = fs.createReadStream(dumpFilePath);    
+    const readStream = fs.createReadStream(importFilePath);    
     dbWriter.on('finish', function() { resolve()});
     readStream.pipe(rowGenerator).pipe(dbWriter);
   })
@@ -294,14 +268,8 @@ async function main() {
   let pool; 
   let conn;
   let parameters;
-  let sqlTrace;
   let logWriter = process.stdout;
-  
-  const status = {
-    errorRaised   : false
-   ,warningRaised : false
-   ,statusMsg     : 'successfully'
-  }
+  let status;
   
   let results;
   
@@ -313,15 +281,12 @@ async function main() {
     })
     
     parameters = MySQLCore.processArguments(process.argv,'export');
-
-    if (parameters.LOGFILE) {
-      logWriter = fs.createWriteStream(parameters.LOGFILE);
-    }
-
-    if (parameters.SQLTRACE) {
-      status.sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
-    }
+    status = Yadamu.getStatus(parameters);
     
+    if (parameters.LOGFILE) {
+      logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
+    }
+
     const connectionDetails = {
             host      : parameters.HOSTNAME
            ,user      : parameters.USERNAME
@@ -331,20 +296,15 @@ async function main() {
     }
 
     conn = mysql.createConnection(connectionDetails);
-    await connect(conn);
+ 	await MySQLCore.connect(conn);
+    if (await MySQLCore.setMaxAllowedPacketSize(conn,status,logWriter)) {
+       conn = mysql.createConnection(connectionDetails);
+       await MySQLCore.connect(conn);
+    }
+    await MySQLCore.configureSession(conn,status);
 
-    const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
-    results = await query(conn,`SELECT @@max_allowed_packet`);
-    
-    if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
-        logWriter.write(`${new Date().toISOString()}: Increasing MAX_ALLOWED_PACKET to 1G.\n`);
-        results = await query(conn,`SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`);
-        await conn.end();
-        conn = mysql.createConnection(connectionDetails);
-        await connect(conn);
-    }    
-
-    results = await query(conn,`SELECT @@version`);
+    const sqlGetVersion = `SELECT @@version`
+    results = await MySQLCore.query(conn,status,sqlGetVersion);
     if (results[0]['@@version'] > '6.0') {
        generateStatementCache = localGenerateStatementCache
     }
@@ -355,8 +315,7 @@ async function main() {
     // Force 5.7 Code Path
     // generateStatementCache = MySQLShared.generateStatementCache
  
-    results = await query(conn,`SET SESSION SQL_MODE=ANSI_QUOTES`);
-    results = await query(conn,`CREATE DATABASE IF NOT EXISTS "${parameters.TOUSER}"`); 
+ 	results = await MySQLCore.createTargetDatabase(conn,status,parameters.TOUSER);
     
     const stats = fs.statSync(parameters.FILE)
     const fileSizeInBytes = stats.size

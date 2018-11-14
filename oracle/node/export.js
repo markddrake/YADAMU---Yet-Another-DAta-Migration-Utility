@@ -1,15 +1,15 @@
-
 "use strict";
-
-const EXPORT_VERSION = 1.0;
-const DATABASE_VENDOR = 'Oracle';
-
 const fs = require('fs');
-const common = require('./common.js');
 const oracledb = require('oracledb');
 const JSONStream = require('JSONStream')
 const Transform = require('stream').Transform;
 const Readable = require('stream').Readable;
+
+const Yadamu = require('../../common/yadamuCore.js');
+const OracleCore = require('./oracleCore.js');
+
+const EXPORT_VERSION = 1.0;
+const DATABASE_VENDOR = 'Oracle';
 
 const sqlGetSystemInformation = 
 `select JSON_EXPORT.JSON_FEATURES() JSON_FEATURES, 
@@ -17,6 +17,7 @@ const sqlGetSystemInformation =
         SYS_CONTEXT('USERENV','SESSION_USER') SESSION_USER, 
         SYS_CONTEXT('USERENV','DB_NAME') DATABASE_NAME, 
         SYS_CONTEXT('USERENV','SERVER_HOST') SERVER_HOST,
+        SESSIONTIMEZONE SESSION_TIME_ZONE,
         JSON_OBJECTAGG(parameter, value) NLS_PARAMETERS
         from NLS_DATABASE_PARAMETERS`;
 
@@ -28,12 +29,19 @@ const sqlGenerateQueries =
 `select * 
    from table(JSON_EXPORT.GET_DML_STATEMENTS(:schema))`;
 
-async function getSystemInformation(conn) {     
-    const results = await conn.execute(sqlGetSystemInformation,[],{outFormat: oracledb.OBJECT , fetchInfo: {COLUMN_LIST:{type: oracledb.STRING},DATA_TYPE_LIST:{type: oracledb.STRING},SIZE_CONSTRAINTS:{type: oracledb.STRING},SQL_STATEMENT:{type: oracledb.STRING}}});
+async function getSystemInformation(conn,status) {     
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
+    }
+
+    const results = await conn.execute(sqlGetSystemInformation,[],{outFormat: oracledb.OBJECT ,});
     return results.rows[0];
 }
 
-async function generateQueries(conn,schema) {       
+async function generateQueries(conn,status,schema) {       
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
+    }
 
     const results = await conn.execute(sqlGenerateQueries,{schema: schema},{outFormat: oracledb.OBJECT , fetchInfo: {
                                                                                                            COLUMN_LIST:{type: oracledb.STRING}
@@ -49,7 +57,8 @@ async function generateQueries(conn,schema) {
     return results.rows;
 }
 
-function fetchDDL(conn,schema,outStream) {
+function fetchDDL(conn,status,schema,outStream) {
+   
 
   const parser = new Transform({objectMode:true});
   parser._transform = function(data,encodoing,done) {
@@ -58,6 +67,9 @@ function fetchDDL(conn,schema,outStream) {
   }
   
   return new Promise(async function(resolve,reject) {  
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${sqlFetchDDL}\n\/\n`)
+    }
     const stream = await conn.queryStream(sqlFetchDDL,{schema: schema},{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
     stream.on('end',function() {resolve()})
     stream.on('error',function(err){reject(err)});
@@ -65,7 +77,7 @@ function fetchDDL(conn,schema,outStream) {
   })
 }
 
-async function fetchData(conn,sqlQuery,outStream) {
+async function fetchData(conn,status,sqlQuery,outStream) {
 
   let counter = 0;
   const parser = new Transform({objectMode:true});
@@ -73,6 +85,10 @@ async function fetchData(conn,sqlQuery,outStream) {
     counter++;
     this.push(JSON.parse(data.JSON));
     done();
+  }
+
+  if (status.sqlTrace) {
+    status.sqlTrace.write(`${sqlQuery}\n\/\n`)
   }
 
   const stream = await conn.queryStream(sqlQuery,[],{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
@@ -106,7 +122,7 @@ function resetStream(fileWriteStream,offset) {
     return fs.createWriteStream(path,{start:offset,flags:"r+"});
 }
     
-async function wideTableWorkaround(conn,tableInfo,varcharSize,outStream) {
+async function wideTableWorkaround(tableInfo,varcharSize,outStream) {
     
   let selectList = '';
   const columnList = JSON.parse('[' + tableInfo.COLUMN_LIST + ']');
@@ -172,36 +188,31 @@ async function main(){
 
   let conn;
   let parameters;
-  let sqlTrace;
   let logWriter = process.stdout;
+  let status;
   
   try {
-    parameters = common.processArguments(process.argv,'export');
-
+    parameters = OracleCore.processArguments(process.argv,'export');
+    status = Yadamu.getStatus(parameters);
+    
     if (parameters.LOGFILE) {
-      logWriter = fs.createWriteStream(parameters.LOGFILE);
+      logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
     
-    if (parameters.SQLTRACE) {
-      sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
-    }
+    conn = await OracleCore.doConnect(parameters.USERID,status);
     
-    conn = await common.doConnect(parameters.USERID);
+    const exportFilePath = parameters.FILE;
+    let exportFile = fs.createWriteStream(exportFilePath);
+    // exportFile.on('error',function(err) {console.log(err)})
     
-    const dumpFilePath = parameters.FILE;
-    let dumpFile = fs.createWriteStream(dumpFilePath);
-    // dumpFile.on('error',function(err) {console.log(err)})
-    
-    const schema = parameters.OWNER;
-    if (parameters.SQLTRACE) {
-      sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
-    }
-    const sysInfo = await getSystemInformation(conn);
-    dumpFile.write('{"systemInformation":');
-    dumpFile.write(JSON.stringify({
+    const sysInfo = await getSystemInformation(conn,status);
+    exportFile.write('{"systemInformation":');
+    exportFile.write(JSON.stringify({
                          "date"               : new Date().toISOString()
+                        ,"timeZoneOffset"     : new Date().getTimezoneOffset()
+                        ,"sessionTimeZone"    : sysInfo.SESSION_TIME_ZONE
                         ,"vendor"             : DATABASE_VENDOR
-                        ,"schema"             : schema
+                        ,"schema"             : parameters.OWNER
                         ,"exportVersion"      : EXPORT_VERSION
                         ,"sessionUser"        : sysInfo.SESSION_USER
                         ,"dbName"             : sysInfo.DATABASE_NAME
@@ -214,29 +225,23 @@ async function main(){
     const varcharSize = JSON.parse(sysInfo.JSON_FEATURES).extendedString ? 32767 : 4000;
     
     if (parameters.MODE !== 'DATA_ONLY') {
-      if (parameters.SQLTRACE) {
-        sqlTrace.write(`${sqlFetchDDL}\n\/\n`)
-      }
-      dumpFile.write(',"ddl":');
-      await fetchDDL(conn,schema,dumpFile);
+      exportFile.write(',"ddl":');
+      await fetchDDL(conn,status,parameters.OWNER,exportFile);
     }
     
     if (parameters.MODE !== 'DDL_ONLY') {
-      if (parameters.SQLTRACE) {
-        sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
-      }
-      dumpFile.write(',"metadata":{');
-      const sqlQueries = await generateQueries(conn,schema);
+      exportFile.write(',"metadata":{');
+      const sqlQueries = await generateQueries(conn,status,parameters.OWNER);
       for (let i=0; i < sqlQueries.length; i++) {
         if (i > 0) {
-          dumpFile.write(',');
+          exportFile.write(',');
         }
-        dumpFile.write(`"${sqlQueries[i].TABLE_NAME}" : ${JSON.stringify({
+        exportFile.write(`"${sqlQueries[i].TABLE_NAME}" : ${JSON.stringify({
                                                            "owner"                    : sqlQueries[i].OWNER
                                                           ,"tableName"                : sqlQueries[i].TABLE_NAME
                                                           ,"columns"                  : sqlQueries[i].COLUMN_LIST
-                                                          ,"dataTypes"                : sqlQueries[i].DATA_TYPE_LIST
-                                                          ,"dataTypeSizing"           : sqlQueries[i].SIZE_CONSTRAINTS
+                                                          ,"dataTypes"                : JSON.parse(sqlQueries[i].DATA_TYPE_LIST)
+                                                          ,"sizeConstraints"           : JSON.parse(sqlQueries[i].SIZE_CONSTRAINTS)
                                                           ,"exportSelectList"         : sqlQueries[i].EXPORT_SELECT_LIST
                                                           ,"insertSelectList"         : sqlQueries[i].IMPORT_SELECT_LIST
                                                           ,"deserializationFunctions" : sqlQueries[i].DESERIALIZATION_INFO
@@ -244,31 +249,25 @@ async function main(){
                       })}`)                
       }
     
-      dumpFile.write('},"data":{');
+      exportFile.write('},"data":{');
        for (let i=0; i < sqlQueries.length; i++) {
-        await writeTableName(i,`"${sqlQueries[i].TABLE_NAME}" :`,dumpFile);
-        let dataOffset = dumpFile.bytesWritten + dumpFile.writableLength;
+        await writeTableName(i,`"${sqlQueries[i].TABLE_NAME}" :`,exportFile);
+        let dataOffset = exportFile.bytesWritten + exportFile.writableLength;
         let rows;
         let startTime;
         try {
-          if (parameters.SQLTRACE) {
-            sqlTrace.write(`${sqlQueries[i].SQL_STATEMENT}\n\/\n`)
-          }
           startTime = new Date().getTime()
-          rows = await fetchData(conn,sqlQueries[i].SQL_STATEMENT,dumpFile) 
+          rows = await fetchData(conn,status,sqlQueries[i].SQL_STATEMENT,exportFile) 
         } catch(e) {
           if ((e.message) && (e.message.indexOf('ORA-40478') == 0)) {
-            if (dumpFile.bytesWritten > dataOffset) {
-              console.log(dumpFile.bytesWritten);
+            if (exportFile.bytesWritten > dataOffset) {
+              console.log(exportFile.bytesWritten);
               console.log(dataOffset);
-              dumpFile = resetStream(dumpFile,dataOffset);
+              exportFile = resetStream(exportFile,dataOffset);
             }
-            const sqlWideTable = wideTableWorkaround(conn,sqlQueries[i],varcharSize,dumpFile);
-            if (parameters.SQLTRACE) {
-              sqlTrace.write(`${sqlWideTable}\n\/\n`)
-            }
+            const sqlWideTable = wideTableWorkaround(sqlQueries[i],varcharSize,exportFile);
             startTime = new Date().getTime()
-            rows = await fetchData(conn,sqlWideTable.SQL_STATEMENT,dumpFile) 
+            rows = await fetchData(conn,status,sqlWideTable.SQL_STATEMENT,exportFile) 
           }
           else {
             throw e;
@@ -277,14 +276,14 @@ async function main(){
         const elapsedTime = new Date().getTime() - startTime
         logWriter.write(`${new Date().toISOString()} - Table: "${sqlQueries[i].TABLE_NAME}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
       }
-      dumpFile.write('}');
+      exportFile.write('}');
     }
     
-    dumpFile.write('}');
-    dumpFile.close();
+    exportFile.write('}');
+    exportFile.close();
     
-    common.doRelease(conn);
-    logWriter.write('Export operation successful.');
+    OracleCore.doRelease(conn);
+    logWriter.write(`Export operation successful.\n`);
     if (logWriter !== process.stdout) {
       console.log(`Export operation successful: See "${parameters.LOGFILE}" for details.`);
     }
@@ -299,7 +298,7 @@ async function main(){
         console.log(e);
     }
     if (conn !== undefined) {
-      common.doRelease(conn);
+      OracleCore.doRelease(conn);
     }
   }
   
@@ -307,7 +306,7 @@ async function main(){
     logWriter.close();
   }    
 
-  if (parameters.SQLTRACE) {
+  if (status.sqlTrace) {
     sqlTrace.close();
   }
   

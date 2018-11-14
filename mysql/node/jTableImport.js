@@ -4,58 +4,28 @@ const mysql = require('mysql');
 
 const Yadamu = require('../../common/yadamuCore.js');
 const MySQLCore = require('./mysqlCore.js');
-
-function connect(conn) {
-	
-  return new Promise(function(resolve,reject) {
-	                   conn.connect(function(err) {
-		                              if (err) {
-		                                reject(err);
-	                                  }
-  			                          resolve();
-                                    })
-				    })
-}	
-	  
-function query(conn,sqlQuery,args) {
-	
-  return new Promise(function(resolve,reject) {
-	                   conn.query(sqlQuery,args,function(err,rows,fields) {
-		                                     if (err) {
-		                                       reject(err);
-	                                         }
-											 resolve(rows);
-                                           })
-                     })
-}  
 	 
-async function createStagingTable(conn) {    	
+async function createStagingTable(conn,status) {    	
 	const sqlStatement = `CREATE TEMPORARY TABLE IF NOT EXISTS "JSON_STAGING"("DATA" JSON)`;					   
-	const results = await query(conn,sqlStatement);
+	const results = await MySQLCore.query(conn,status,sqlStatement);
 	return results;
 }
 
-async function loadStagingTable(conn,dumpfilePath) {    	
+async function loadStagingTable(conn,status,dumpfilePath) {    	
 	const sqlStatement = `LOAD DATA LOCAL INFILE '${dumpfilePath}' INTO TABLE "JSON_STAGING" FIELDS ESCAPED BY ''`;					   
-	const results = await query(conn,sqlStatement);
+	const results = await MySQLCore.query(conn,status,sqlStatement);
 	return results;
 }
 
-async function verifyDataLoad(conn) {    	
+async function verifyDataLoad(conn,status) {    	
 	const sqlStatement = `SELECT COUNT(*) FROM "JSON_STAGING"`;				
-	const results = await query(conn,sqlStatement);
+	const results = await MySQLCore.query(conn,status,sqlStatement);
 	return results;
 }
 
-async function processStagingTable(conn,schema) {    	
+async function processStagingTable(conn,status,schema) {    	
 	const sqlStatement = `SET @RESULTS = ''; CALL IMPORT_JSON(?,@RESULTS); SELECT @RESULTS "logRecords";`;					   
-	const results = await query(conn,sqlStatement,schema);
-	return results;
-}
-
-async function createTargetDatabase(conn,schema) {    	
-	const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;					   
-	const results = await query(conn,sqlStatement,schema);
+	const results = await MySQLCore.query(conn,status,sqlStatement,schema);
 	return results;
 }
 
@@ -63,7 +33,6 @@ async function main(){
 	
   let conn;
   let parameters;
-  let sqlTrace;
   let logWriter = process.stdout;    
   let status;
 
@@ -73,7 +42,7 @@ async function main(){
     status = Yadamu.getStatus(parameters);
   
 	if (parameters.LOGFILE) {
-	  logWriter = fs.createWriteStream(parameters.LOGFILE);
+	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
 
     const connectionDetails = {
@@ -85,24 +54,29 @@ async function main(){
     }
 
     conn = mysql.createConnection(connectionDetails);
-	await connect(conn);
-    await query(conn,'SET SESSION SQL_MODE=ANSI_QUOTES');
-    await query(conn,`SET GLOBAL local_infile = 'ON'`);
+	await MySQLCore.connect(conn);
+    if (await MySQLCore.setMaxAllowedPacketSize(conn,status,logWriter)) {
+       conn = mysql.createConnection(connectionDetails);
+       await connect(conn);
+    }
 
-    const dumpFilePath = parameters.FILE;	
-	const stats = fs.statSync(dumpFilePath)
+    await MySQLCore.configureSession(conn,status);
+    await MySQLCore.query(conn,status,`SET GLOBAL local_infile = 'ON'`);
+    
+    const importFilePath = parameters.FILE;	
+	const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
 	
 	let results = null;
     const schema = parameters.TOUSER;
-	results = await createTargetDatabase(conn,schema);
-	results = await createStagingTable(conn);
+	results = await MySQLCore.createTargetDatabase(conn,status,schema);
+	results = await createStagingTable(conn,status);
 	const startTime = new Date().getTime();
-	results = await loadStagingTable(conn,dumpFilePath);
+	results = await loadStagingTable(conn,status,importFilePath);
 	const elapsedTime = new Date().getTime() - startTime;
-    logWriter.write(`${new Date().toISOString()}: Import Data file "${dumpFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
+    logWriter.write(`${new Date().toISOString()}: Import Data file "${importFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
-	results = await processStagingTable(conn,schema);
+	results = await processStagingTable(conn,status,schema);
     results = results.pop();
 	results = JSON.parse(results[0].logRecords)
     Yadamu.processLog(results, status, logWriter)    

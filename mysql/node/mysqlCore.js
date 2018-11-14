@@ -2,6 +2,67 @@
 
 const Yadamu = require('../../common/yadamuCore.js');
 
+function connect(conn) {
+    
+  return new Promise(function(resolve,reject) {
+                       conn.connect(function(err) {
+                                      if (err) {
+                                        reject(err);
+                                      }
+                                      resolve();
+                                    })
+                    })
+}   
+      
+function query(conn,status,sqlQuery,args) {
+    
+  return new Promise(function(resolve,reject) {
+                       if (status.sqlTrace) {
+                         status.sqlTrace.write(`${sqlQueryPacketSize};\n--\n`);
+                       }
+                       conn.query(sqlQuery,args,function(err,rows,fields) {
+                                             if (err) {
+                                               reject(err);
+                                             }
+                                             resolve(rows);
+                                           })
+                     })
+}  
+
+async function configureSession(conn,status) {
+
+   const sqlAnsiQuotes = `SET SESSION SQL_MODE=ANSI_QUOTES`;
+   await query(conn,status,sqlAnsiQuotes);
+   
+   const sqlTimeZone = `SET TIME_ZONE = '+00:00'`;
+   await query(conn,status,sqlTimeZone);
+
+}
+
+async function setMaxAllowedPacketSize(conn,status,logWriter) {
+
+  const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
+  const sqlQueryPacketSize = `SELECT @@max_allowed_packet`;
+  const sqlSetPacketSize = `SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`
+    
+  let results = await query(conn,status,sqlQueryPacketSize);
+    
+  if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
+    logWriter.write(`${new Date().toISOString()}: Increasing MAX_ALLOWED_PACKET to 1G.\n`);
+    results = await query(conn,status,sqlSetPacketSize);
+    await conn.end();
+    return true;
+  }    
+  return false;
+}
+
+async function createTargetDatabase(conn,status,schema) {    	
+	const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;					   
+	const results = await query(conn,status,sqlStatement,schema);
+	return results;
+}
+
+
 function processArguments(args,operation) {
 
    const parameters = {
@@ -83,4 +144,9 @@ function processArguments(args,operation) {
    return parameters;
 }
 
-module.exports.processArguments       = processArguments
+module.exports.processArguments        = processArguments
+module.exports.connect                 = connect
+module.exports.configureSession        = configureSession
+module.exports.query                   = query
+module.exports.setMaxAllowedPacketSize = setMaxAllowedPacketSize
+module.exports.createTargetDatabase    = createTargetDatabase

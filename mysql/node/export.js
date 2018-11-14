@@ -5,13 +5,15 @@ const mysql = require('mysql');
 const JSONStream = require('JSONStream')
 const Transform = require('stream').Transform;
 
+
+const Yadamu = require('../../common/yadamuCore.js');
 const MySQLCore = require('./mysqlCore.js');
 
 const sqlAnsiQuotingMode =
 `SET SESSION SQL_MODE=ANSI_QUOTES`
 
 const sqlGetSystemInformation = 
-`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID"`;                     
+`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE"`;                     
 
 const sqlGenerateMetadata =
 
@@ -115,38 +117,14 @@ const sqlInformationSchemaFix  =
    ) c
   group by c.table_schema, c.table_name`;
 
-function connect(conn) {
-    
-  return new Promise(function(resolve,reject) {
-                       conn.connect(function(err) {
-                                      if (err) {
-                                        reject(err);
-                                      }
-                                      resolve();
-                                    })
-                    })
-}   
-      
-function query(conn,sqlQuery,args) {
-    
-  return new Promise(function(resolve,reject) {
-                       conn.query(sqlQuery,args,function(err,rows,fields) {
-                                             if (err) {
-                                               reject(err);
-                                             }
-                                             resolve(rows);
-                                           })
-                     })
-}  
+async function getSystemInformation(conn,status) {     
 
-async function getSystemInformation(conn) {     
-
-    const results = await query(conn,sqlGetSystemInformation); 
+    const results = await MySQLCore.query(conn,status,sqlGetSystemInformation); 
     return results;
 
 }
 
-async function getMetadataQuery(conn,schema,logWriter,sqlTrace) { 
+async function getMetadataQuery(conn,status,schema,logWriter) { 
 
    /*
    **
@@ -158,11 +136,7 @@ async function getMetadataQuery(conn,schema,logWriter,sqlTrace) {
    ** 
    */   
    
-   if (sqlTrace) {
-     sqlTrace.write(`${sqlCheckInformationSchemaState}\n\/\n`)
-   }
-
-   const results = await query(conn,sqlCheckInformationSchemaState,[schema]);
+   const results = await MySQLCore.query(conn,status,sqlCheckInformationSchemaState,[schema]);
    if (results.length ===  0) {
      return sqlGenerateMetadata + sqlInformationSchemaClean;
    }
@@ -175,14 +149,14 @@ async function getMetadataQuery(conn,schema,logWriter,sqlTrace) {
    
 }
 
-async function generateQueries(conn,schema,sqlGenerateTables) {       
+async function generateQueries(conn,status,schema,sqlGenerateTables) {       
 
-   const results = await query(conn,sqlGenerateTables,[schema]);
+   const results = await MySQLCore.query(conn,status,sqlGenerateTables,[schema]);
    return results;
 
    }
 
-function fetchData(conn,sqlQuery,outStream) {
+function fetchData(conn,status,sqlQuery,outStream) {
 
   let counter = 0;
   const parser = new Transform({objectMode:true});
@@ -196,6 +170,9 @@ function fetchData(conn,sqlQuery,outStream) {
   const jsonStream = JSONStream.stringify('[',',',']');
   
   return new Promise(async function(resolve,reject) {  
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${sqlQuery};\n--\n`);
+    }
     const stream = conn.query(sqlQuery).stream();
     jsonStream.on('end',function() {resolve(counter)})
     stream.on('error',function(err){reject(err)});
@@ -207,21 +184,18 @@ async function main(){
     
   let conn;
   let parameters;
-  let sqlTrace;
   let logWriter = process.stdout;
+  let status;
 
   try {
 
     parameters = MySQLCore.processArguments(process.argv,'export');
+    status = Yadamu.getStatus(parameters);
 
     if (parameters.LOGFILE) {
-      logWriter = fs.createWriteStream(parameters.LOGFILE);
+      logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
     
-    if (parameters.SQLTRACE) {
-      sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
-    }
-
     const connectionDetails = {
             host      : parameters.HOSTNAME
            ,user      : parameters.USERNAME
@@ -229,27 +203,22 @@ async function main(){
     }
 
     conn = mysql.createConnection(connectionDetails);
-    await connect(conn);
-    if (parameters.SQLTRACE) {
-      sqlTrace.write(`${sqlAnsiQuotingMode}\n\/\n`)
-    }
-    await query(conn,sqlAnsiQuotingMode);
+    await MySQLCore.connect(conn);
+
+    await MySQLCore.query(conn,status,sqlAnsiQuotingMode);
     
-    const dumpFilePath = parameters.FILE;   
-    const dumpFile = fs.createWriteStream(dumpFilePath);
-    // dumpFile.on('error',function(err) {console.log(err)})
+    const exportFilePath = parameters.FILE;   
+    const exportFile = fs.createWriteStream(exportFilePath);
+    // exportFile.on('error',function(err) {console.log(err)})
     
-    const schema = parameters.OWNER;
-    if (parameters.SQLTRACE) {
-      sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
-    }
-    const mysqlInfo = await getSystemInformation(conn);
-    dumpFile.write('{"systemInformation":');
-    dumpFile.write(JSON.stringify({
+    const mysqlInfo = await getSystemInformation(conn,status);
+    exportFile.write('{"systemInformation":');
+    exportFile.write(JSON.stringify({
                          "date"            : new Date().toISOString()
                         ,"timeZoneOffset"  : new Date().getTimezoneOffset()
+                        ,"sessionTimeZone" : mysqlInfo[0].SESSION_TIME_ZONE
                         ,"vendor"          : "MySQL"
-                        ,"schema"          : schema
+                        ,"schema"          : parameters.OWNER
                         ,"exportVersion"   : 1
                         ,"sessionUser"     : mysqlInfo[0].SESSION_USER
                         ,"currentUser"     : mysqlInfo[0].CURRENT_USER
@@ -258,19 +227,16 @@ async function main(){
                         ,"serverVendor"    : mysqlInfo[0].SERVER_VENDOR_ID
     }));
         
-    const sqlGenerateTables = await getMetadataQuery(conn,schema,logWriter,sqlTrace);
+    const sqlGenerateTables = await getMetadataQuery(conn,status,parameters.OWNER,logWriter);
        
-    dumpFile.write(',"metadata":{');
-    if (parameters.SQLTRACE) {
-      sqlTrace.write(`${sqlGenerateTables}\n\/\n`)
-    }
-    const sqlQueries = await generateQueries(conn,schema,sqlGenerateTables);
+    exportFile.write(',"metadata":{');
+    const sqlQueries = await generateQueries(conn,status,parameters.OWNER,sqlGenerateTables);
     for (let i=0; i < sqlQueries.length; i++) {
       const row = sqlQueries[i];
       if (i > 0) {
-        dumpFile.write(',');
+        exportFile.write(',');
       }
-      dumpFile.write(`"${row.table_name}" : ${JSON.stringify({
+      exportFile.write(`"${row.table_name}" : ${JSON.stringify({
                                                      "owner"          : row.table_schema
                                                     ,"tableName"      : row.table_name
                                                     ,"columns"        : row.columns
@@ -278,24 +244,21 @@ async function main(){
                                                     ,"sizeConstraints" : JSON.parse(row.sizeConstraints)
                      })}`)                 
     }
-    dumpFile.write('},"data":{');
+    exportFile.write('},"data":{');
     for (let i=0; i < sqlQueries.length; i++) {
       const row = sqlQueries[i]
       if (i > 0) {
-        dumpFile.write(',');
+        exportFile.write(',');
       }
-      dumpFile.write(`"${row.table_name}" :`);
-      if (parameters.SQLTRACE) {
-        sqlTrace.write(`${row.query}\n\/\n`)
-      }
+      exportFile.write(`"${row.table_name}" :`);
       const startTime = new Date().getTime()
-      const rows = await fetchData(conn,row.query,dumpFile) 
+      const rows = await fetchData(conn,status,row.query,exportFile) 
       const elapsedTime = new Date().getTime() - startTime
       logWriter.write(`${new Date().toISOString()} - Table: "${row.table_name}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
     }
 
-    dumpFile.write('}}');
-    dumpFile.close();
+    exportFile.write('}}');
+    exportFile.close();
     
     await conn.end();
     logWriter.write(`Export operation successful.\n`);
