@@ -43,12 +43,12 @@ async function setCurrentSchema(conn, schema, status, logWriter) {
   }    
 }
 
-async function executeDDL(conn, schema, ddl, status, logWriter) {
+async function executeDDL(conn, schema, systemInformation, ddl, status, logWriter) {
 
   const sqlStatement = `begin :log := JSON_EXPORT_DDL.APPLY_DDL_STATEMENTS(:ddl, :schema); end;`;
       
   try {
-    const ddlLob = await OracleCore.lobFromJSON(conn,ddl);  
+    const ddlLob = await OracleCore.lobFromJSON(conn, { systemInformation : systemInformation, ddl : ddl});  
     const results = await conn.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , ddl:ddlLob, schema:schema});
     await ddlLob.close();
     const log = JSON.parse(results.outBinds.log);
@@ -219,9 +219,8 @@ async function generateStatementCache(conn, schema, systemInformation, metadata,
 
     });
     
-    if (ddlRequired) {
-      const ddl = { ddl : ddlStatements};
-      await executeDDL(conn, schema, ddl, status, logWriter);
+    if (ddlRequired) {;
+      await executeDDL(conn, schema, systemInformation, ddlStatements, status, logWriter);
     }
     
     return statementCache
@@ -390,7 +389,7 @@ end;`
         this.logWriter.write(`${new Date().toISOString()} [WARNING]: Table ${this.tableName} : executeMany(INSERT) failed. ${e}. Retrying with PL/SQL Block.\n`);
         this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
         if (status.sqlTrace) {
-          status.status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
+          status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
         }
         try {
           const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
@@ -452,7 +451,8 @@ end;`
           break;
         case 'ddl':
           if (this.ddlRequired) {
-            await executeDDL(this.conn, this.schema, obj.ddl, this.status, this.logWriter);
+            await executeDDL(this.conn, this.schema, this.systemInformation, obj.ddl, this.status, this.logWriter);
+            ths.ddlRequired = false;
           }
           break;
         case 'metadata':
@@ -480,7 +480,7 @@ end;`
           }
           this.setTable(obj.table);
           if (this.status.sqlTrace) {
-            this.status.status.sqlTrace.write(`${this.tableInfo.dml}\n\/\n`)
+            this.status.sqlTrace.write(`${this.tableInfo.dml}\n\/\n`)
 	      }
           break;
         case 'data': 

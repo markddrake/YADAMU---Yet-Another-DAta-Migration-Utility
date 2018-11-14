@@ -5,7 +5,7 @@ set verify off
 --
 -- Enable Empty Strings ("") as command line parameter values
 --
-select '', "1", '' "2", '' "3", '' "4", '' "5"  from dual where rownum = 0
+select '' "1", '' "2", '' "3", '' "4", '' "5"  from dual where rownum = 0
 /
 def LOGDIR = "&1"
 --

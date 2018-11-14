@@ -7,7 +7,7 @@ export SCHVER=1
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @sql/RECREATE_ORACLE_ALL.sql $LOGDIR  $SCHVER SAX $MODE
 sh unix/import_Oracle.sh $MDIR $SCHVER ""
 sh unix/export_Oracle.sh $DIR $SCHVER $SCHVER $MODE
-sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @sql/COMPARE_ORACLE_ALL.sql $LOGDIR  "''" 1 SAX $MODE
+sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @sql/COMPARE_ORACLE_ALL.sql $LOGDIR  "" 1 SAX $MODE
 export SCHVER=2
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @sql/RECREATE_ORACLE_ALL.sql $LOGDIR  $SCHVER SAX $MODE
 sh unix/import_Oracle.sh $DIR $SCHVER 1 

@@ -5,7 +5,6 @@ export SCHEMA=SAKILA
 export FILENAME=sakila
 export SCHVER=1
 mkdir -p $DIR
-. env/connection.sh
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @../sql/COMPILE_ALL.sql $LOGDIR 
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @sql/RECREATE_SCHEMA.sql $LOGDIR  $SCHEMA $SCHVER JSON_TABLE
 node ../node/jTableImport userid=$DB_USER/$DB_PWD@$DB_CONNECTION  file=$MDIR/$FILENAME.json toUser=\"$SCHEMA$SCHVER\"

@@ -22,7 +22,7 @@ async function doConnect(connectionString,status) {
   });
   const sqlStatement = `ALTER SESSION SET TIME_ZONE = '+00:00'`
   if (status.sqlTrace) {
-     status.status.sqlTrace.write(sqlStatement);
+     status.sqlTrace.write(sqlStatement);
   }
   const result = await conn.execute(sqlStatement);
   return conn;
@@ -126,7 +126,7 @@ function processArguments(args,operation) {
 		    parameters.LOGFILE = parameterValue;
 			break;
 	      case 'SQLTRACE':
-		    parameters.sqlTrace = parameterValue;
+		    parameters.SQLTRACE = parameterValue;
 			break;
 	      case 'LOGLEVEL':
 		    parameters.LOGLEVEL = parameterValue;

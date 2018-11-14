@@ -1,4 +1,4 @@
-export TESTDATA=..\..\JSON
+export TESTDATA=../../JSON
 export ORCL=ORCL18c
 export JSON=JSON
 export MSSQL=MSSQL
