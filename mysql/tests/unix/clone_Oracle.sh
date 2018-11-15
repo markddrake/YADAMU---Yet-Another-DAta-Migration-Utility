@@ -1,17 +1,16 @@
-export TNS=$1
-export DIR=JSON/$TNS
-export MODE=DATA_ONLY
-export MDIR=../../JSON/$TNS/$MODE
-export ID=1
+. env/setEnvironment.bat
+export DIR=JSON/$ORCL
+export MDIR=$TESTDATA/$ORCL/$MODE
+export SCHVER=1
 mkdir -p $DIR
-. ./env/connection.sh
-mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f <../sql/JSON_IMPORT.sql
-mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="SET @ID=$ID" <sql/RECREATE_ORACLE_ALL.sql
-. ./unix/import_Oracle.sh $MDIR $ID ""
-. ./unix/export_Oracle.sh $DIR $ID $ID
-export ID=2
-mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="SET @ID=$ID" <sql/RECREATE_ORACLE_ALL.sql
-. ./unix/import_Oracle.sh $DIR $ID 1
-. ./unix/export_Oracle.sh $DIR $ID $ID
-ls -l $DIR/*1.json
-ls -l $DIR/*2.json
+mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f <../sql/JSON_IMPORT.sql >$LOGDIR/install/JSON_IMPORT.log
+mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @ID=$SCHVER; set @METHOD='SAX';"<sql/RECREATE_ORACLE_ALL.sql >>$LOGDIR/RECREATE_SCHEMA.log
+. windows/import_Oracle.bat $MDIR $SCHVER ""
+. windows/export_Oracle.bat $DIR $SCHVER $SCHVER $MODE
+export SCHVER=2
+mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @ID=$SCHVER; set @METHOD='SAX';"<sql/RECREATE_ORACLE_ALL.sql>>$LOGDIR/RECREATE_SCHEMA.log
+. windows/import_Oracle.bat $DIR $SCHVER 1 
+mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @ID1=1; set @ID2=$SCHVER; set @METHOD='SAX'" --table  <sql/COMPARE_ORACLE_ALL.sql >>$LOGDIR/COMPARE_SCHEMA.log
+. windows/export_Oracle.bat $DIR $SCHVER $SCHVER $MODE 
+node ../../utilities/compareFileSizes $LOGDIR $MDIR $DIR
+node ../../utilities/compareArrayContent $LOGDIR $MDIR $DIR false

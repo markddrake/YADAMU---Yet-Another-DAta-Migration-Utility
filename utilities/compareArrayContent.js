@@ -35,8 +35,14 @@ function deepCompare(content,tableInfo) {
 }
   
 function shallowCompare(content,tableInfo) {
-  tableInfo.rowCounts.push(content.length)
-  tableInfo.byteCounts.push(JSON.stringify(content).length)
+  if (content === undefined) {
+    tableInfo.rowCounts.push(-1);
+    tableInfo.byteCounts.push(-1)
+  }
+  else {
+    tableInfo.rowCounts.push(content.length)
+    tableInfo.byteCounts.push(JSON.stringify(content).length)
+  }
 }
 
 function compareFiles(files){
@@ -91,11 +97,11 @@ function compareFiles(files){
                             + `${info.rowCounts[0].toString().replace(regExp, ",").padStart(10)},`
                             + `${info.rowCounts[1].toString().replace(regExp, ",").padStart(10)},`
                             + `${info.rowCounts[2].toString().replace(regExp, ",").padStart(10)}].` 
-                            + `${((info.rowCounts[0] === info.rowCounts[1]) && (info.rowCounts[1] === info.rowCounts[2])) ? ' Success'.padEnd(16) : ' Row Count Mismatch'.padEnd(16)} Byte Counts: [`
+                            + `${((info.rowCounts[0] === info.rowCounts[1]) && (info.rowCounts[1] === info.rowCounts[2])) ? ' Success'.padEnd(16) : ' Mismatch'.padEnd(16)} Byte Counts: [`
                             + `${info.byteCounts[0].toString().replace(regExp, ",").padStart(10)},`
                             + `${info.byteCounts[1].toString().replace(regExp, ",").padStart(10)},`
                             + `${info.byteCounts[2].toString().replace(regExp, ",").padStart(10)}].` 
-                            + `${((info.byteCounts[0] === info.byteCounts[1]) && (info.byteCounts[1] === info.byteCounts[2])) ? ' Success'.padEnd(16) : ' Byte Count Mismatch'.padEnd(16)} `
+                            + `${((info.byteCounts[0] === info.byteCounts[1]) && (info.byteCounts[1] === info.byteCounts[2])) ? ' Success'.padEnd(16) : ' Mismatch'.padEnd(16)} `
                             + `${(info.hashes) ? 'Hashes: [' + info.hashes[0] + ',' + info.hashes[1] +',' + info.hashes[2] + '].' : ''}`
                             + `\n`)
                              

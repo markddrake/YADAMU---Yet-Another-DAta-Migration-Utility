@@ -17,7 +17,7 @@ class RowParser extends Transform {
     this.logWriter = logWriter;
 
     this.saxJParser = clarinet.createStream();
-    this.saxJParser.on('error',function(err) {this.logWriter.write(`$(err}\n`);})
+    this.saxJParser.on('error',function(err) {rowParser.logWriter.write(`$(err}\n`);})
     
     this.objectStack = [];
     this.dataPhase = false;     

@@ -1,27 +1,21 @@
-@set TNS=%~1
 cls
+call env\setEnvironment.bat
 mkdir logs
-@set LOGFILE=logs\Summary.log
-del %LOGFILE%
-call windows\export_Master.bat
+rmdir /s /q %LOGDIR%
+mkdir %LOGDIR%
+mkdir %LOGDIR%\install
+call windows\export_Master.bat 
+@set MODE=DATA_ONLY
 call windows\clone_JSON.bat
 call windows\clone_MYSQL.bat
-call windows\clone_Oracle.bat %TNS%
-call windows\clone_MSSQL.bat
+call windows\clone_Oracle.bat 
 call windows\clone_MSSQL_ALL.bat
-set RESULTS=jSax.log
-dir JSON\MSSQL\*.json > logs\%RESULTS%
-dir JSON\MYSQL\*.json >> logs\%RESULTS%
-dir JSON\JSON\*.json  >> logs\%RESULTS%
-dir JSON\%TNS%\*.json >> logs\%RESULTS%
+call windows\clone_MSSQL.bat
 call windows\clone_JSON_jTable.bat
 call windows\clone_MYSQL_jTable.bat
-call windows\clone_Oracle_jTable.bat %TNS%
-call windows\clone_MSSQL_jTable.bat
+call windows\clone_Oracle_jTable.bat
 call windows\clone_MSSQL_ALL_jTable.bat
-set RESULTS=jTable.log
-dir JSON\MSSQL\*.json > logs\%RESULTS%
-dir JSON\MYSQL\*.json >> logs\%RESULTS%
-dir JSON\JSON\*.json  >> logs\%RESULTS%
-dir JSON\%TNS%\*.json >> logs\%RESULTS%
-type %LOGFILE%
+call windows\clone_MSSQL_jTable.bat
+@set MODE=DDL_AND_DATA
+call windows\clone_Oracle.bat 
+call windows\clone_Oracle_jTable.bat 

@@ -1,10 +1,9 @@
-export SRC=$1
-export USRID=$2
-export VER=$3
-node ../node/jTableImport --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$SRC/HR$VER.json --toUser=\"HR$USRID\"
-node ../node/jTableImport --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$SRC/SH$VER.json --toUser=\"SH$USRID\"
-node ../node/jTableImport --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$SRC/OE$VER.json --toUser=\"OE$USRID\"
-node ../node/jTableImport --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$SRC/PM$VER.json --toUser=\"PM$USRID\"
-node ../node/jTableImport --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$SRC/IX$VER.json --toUser=\"IX$USRID\"
-node ../node/jTableImport --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$SRC/BI$VER.json --toUser=\"BI$USRID\"
-
+export SRC=$~1
+export SCHVER=$~2
+export VER=$~3
+node ../node/jTableImport  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/HR$VER.json toUser="HR$SCHVER" logFile=$IMPORTLOG
+node ../node/jTableImport  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/SH$VER.json toUser="SH$SCHVER" logFile=$IMPORTLOG
+node ../node/jTableImport  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/OE$VER.json toUser="OE$SCHVER" logFile=$IMPORTLOG
+node ../node/jTableImport  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/PM$VER.json toUser="PM$SCHVER" logFile=$IMPORTLOG
+node ../node/jTableImport  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/IX$VER.json toUser="IX$SCHVER" logFile=$IMPORTLOG
+node ../node/jTableImport  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/BI$VER.json toUser="BI$SCHVER" logFile=$IMPORTLOG$

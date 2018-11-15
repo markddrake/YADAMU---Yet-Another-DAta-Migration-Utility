@@ -1,6 +1,8 @@
 "use strict";
 const fs = require('fs');
 const mysql = require('mysql');
+const path = require('path');
+
 
 const Yadamu = require('../../common/yadamuCore.js');
 const MySQLCore = require('./mysqlCore.js');
@@ -11,8 +13,9 @@ async function createStagingTable(conn,status) {
 	return results;
 }
 
-async function loadStagingTable(conn,status,dumpfilePath) {    	
-	const sqlStatement = `LOAD DATA LOCAL INFILE '${dumpfilePath}' INTO TABLE "JSON_STAGING" FIELDS ESCAPED BY ''`;					   
+async function loadStagingTable(conn,status,dumpfilePath) { 
+    const localFilePath = dumpfilePath.replace(/\\/g, "\\\\");
+	const sqlStatement = `LOAD DATA LOCAL INFILE '${localFilePath}' INTO TABLE "JSON_STAGING" FIELDS ESCAPED BY ''`;					   
 	const results = await MySQLCore.query(conn,status,sqlStatement);
 	return results;
 }
@@ -63,7 +66,8 @@ async function main(){
     await MySQLCore.configureSession(conn,status);
     await MySQLCore.query(conn,status,`SET GLOBAL local_infile = 'ON'`);
     
-    const importFilePath = parameters.FILE;	
+    const importFilePath = path.resolve(parameters.FILE);
+    
 	const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
 	

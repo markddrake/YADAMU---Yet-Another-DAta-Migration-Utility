@@ -1,10 +1,10 @@
-export SRC=$1
-export USRID=$2
-export VER=$3
-node ../node/import  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/Northwind$VER.json        --TOUSER=\"Northwind$USRID\" 
-node ../node/import  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/Sales$VER.json            --TOUSER=\"Sales$USRID\" 
-node ../node/import  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/Person$VER.json           --TOUSER=\"Person$USRID\" 
-node ../node/import  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/Production$VER.json       --TOUSER=\"Production$USRID\" 
-node ../node/import  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/Purchasing$VER.json       --TOUSER=\"Purchasing$USRID\" 
-node ../node/import  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/HumanResources$VER.json   --TOUSER=\"HumanResources$USRID\" 
-node ../node/import  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/AdventureWorksDW$VER.json --TOUSER=\"DW$USRID\" 
+export SRC=$~1
+export SCHVER=$~2
+export VER=$~3
+node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Northwind$VER.json        toUser="Northwind$SCHVER"      logFile=$IMPORTLOG  
+node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Sales$VER.json            toUser="Sales$SCHVER"          logFile=$IMPORTLOG
+node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Person$VER.json           toUser="Person$SCHVER"         logFile=$IMPORTLOG
+node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Production$VER.json       toUser="Production$SCHVER"     logFile=$IMPORTLOG
+node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Purchasing$VER.json       toUser="Purchasing$SCHVER"     logFile=$IMPORTLOG
+node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/HumanResources$VER.json   toUser="HumanResources$SCHVER" logFile=$IMPORTLOG
+node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/AdventureWorksDW$VER.json toUser="DW$SCHVER"             logFile=$IMPORTLOG

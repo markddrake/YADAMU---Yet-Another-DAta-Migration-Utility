@@ -22,7 +22,7 @@ async function doConnect(connectionString,status) {
   });
   const sqlStatement = `ALTER SESSION SET TIME_ZONE = '+00:00'`
   if (status.sqlTrace) {
-     status.sqlTrace.write(sqlStatement);
+     status.sqlTrace.write(`${sqlStatement}\n/\n`);
   }
   const result = await conn.execute(sqlStatement);
   return conn;

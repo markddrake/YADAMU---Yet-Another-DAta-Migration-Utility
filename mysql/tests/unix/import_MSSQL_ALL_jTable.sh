@@ -1,11 +1,11 @@
-export SRC=$1
-export USCHEMA=$2
-export USRID=$3
-export VER=$4
-node ../node/jTableImport  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/Northwind$VER.json        --TOUSER=\"$USCHEMA$USRID\" 
-node ../node/jTableImport  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/Sales$VER.json            --TOUSER=\"$USCHEMA$USRID\" 
-node ../node/jTableImport  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/Person$VER.json           --TOUSER=\"$USCHEMA$USRID\" 
-node ../node/jTableImport  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/Production$VER.json       --TOUSER=\"$USCHEMA$USRID\" 
-node ../node/jTableImport  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/Purchasing$VER.json       --TOUSER=\"$USCHEMA$USRID\" 
-node ../node/jTableImport  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/HumanResources$VER.json   --TOUSER=\"$USCHEMA$USRID\" 
-node ../node/jTableImport  --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD  --PORT=$DB_PORT --DATABASE=$DB_DBNAME --FILE=$SRC/AdventureWorksDW$VER.json --TOUSER=\"$USCHEMA$USRID\" 
+export SRC=$~1
+export USCHEMA=$~2
+export SCHVER=$~3
+export VER=$~4
+node ../node/jTableImport   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Northwind$VER.json        toUser="$USCHEMA$SCHVER" logFile=$IMPORTLOG
+node ../node/jTableImport   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Sales$VER.json            toUser="$USCHEMA$SCHVER" logFile=$IMPORTLOG
+node ../node/jTableImport   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Person$VER.json           toUser="$USCHEMA$SCHVER" logFile=$IMPORTLOG
+node ../node/jTableImport   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Production$VER.json       toUser="$USCHEMA$SCHVER" logFile=$IMPORTLOG
+node ../node/jTableImport   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Purchasing$VER.json       toUser="$USCHEMA$SCHVER" logFile=$IMPORTLOG
+node ../node/jTableImport   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/HumanResources$VER.json   toUser="$USCHEMA$SCHVER" logFile=$IMPORTLOG
+node ../node/jTableImport   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/AdventureWorksDW$VER.json toUser="$USCHEMA$SCHVER" logFile=$IMPORTLOG

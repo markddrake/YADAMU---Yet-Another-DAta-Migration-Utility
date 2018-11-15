@@ -1,6 +1,7 @@
 "use strict";
 const fs = require('fs');
 const oracledb = require('oracledb');
+const path = require('path');
 
 const Yadamu = require('../../common/yadamuCore.js');
 const OracleCore = require('./oracleCore.js');
@@ -45,7 +46,7 @@ async function main() {
 
     let conn = await OracleCore.doConnect(parameters.USERID,status);
 
-    const importFilePath = parameters.FILE;   
+    const importFilePath = path.resolve(parameters.FILE);
     const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
 

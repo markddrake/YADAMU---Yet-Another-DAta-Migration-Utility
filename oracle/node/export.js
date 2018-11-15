@@ -4,6 +4,7 @@ const oracledb = require('oracledb');
 const JSONStream = require('JSONStream')
 const Transform = require('stream').Transform;
 const Readable = require('stream').Readable;
+const path = require('path');
 
 const Yadamu = require('../../common/yadamuCore.js');
 const OracleCore = require('./oracleCore.js');
@@ -201,9 +202,10 @@ async function main(){
     
     conn = await OracleCore.doConnect(parameters.USERID,status);
     
-    const exportFilePath = parameters.FILE;
+    const exportFilePath = path.resovle(parameters.FILE);
     let exportFile = fs.createWriteStream(exportFilePath);
     // exportFile.on('error',function(err) {console.log(err)})
+    logWriter.write(`${new Date().toISOString()}[Export]: Generating file "${exportFilePath}".\n`)
     
     const sysInfo = await getSystemInformation(conn,status);
     exportFile.write('{"systemInformation":');

@@ -342,9 +342,9 @@ end;`
           tempLob = lobCache[lobCacheIndex];
           // tempLob.truncate(0);
           await conn.execute('begin DBMS_LOB.trim(:1,0); end;',[tempLob]);
-        }  
+        }
         tempLob.on('error',function(err) {reject(err);});
-        tempLob.on('finish', function() {resolve(tempLob);});
+        tempLob.on('finish', function() {resolve(tempLob)});
         s.on('error', function(err) {reject(err);});
         s.pipe(tempLob);  // copies the text to the temporary LOB
       }
@@ -374,31 +374,41 @@ end;`
     // Infortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
     // So we have to free the current tempLob Cache and create a new one for each batch
     
-    try {
-      this.insertMode = 'Batch';
-      const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
-      const endTime = new Date().getTime();
-      this.batch.length = 0;
-      this.lobUsage = await this.clearLobCache();
-      return endTime
-    } catch (e) {
-      await this.conn.rollback();
-      if (e.errorNum && (e.errorNum === 4091)) {
-        // Mutating Table - Convert to PL/SQL Block
-        status.warningRaised = true;
-        this.logWriter.write(`${new Date().toISOString()} [WARNING]: Table ${this.tableName} : executeMany(INSERT) failed. ${e}. Retrying with PL/SQL Block.\n`);
-        this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
-        if (status.sqlTrace) {
-          status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
-        }
-        try {
-          const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
-          const endTime = new Date().getTime();
-          this.batch.length = 0;
-          this.lobUsage = await this.clearLobCache();
-          return endTime
-        } catch (e) {
-          await this.conn.rollback();
+    if (!this.tableInfo.containsObjects) {
+      try {
+        this.insertMode = 'Batch';
+        const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
+        const endTime = new Date().getTime();
+        this.batch.length = 0;
+        this.lobUsage = await this.clearLobCache();
+        return endTime
+      } catch (e) {
+        await this.conn.rollback();
+         if (e.errorNum && (e.errorNum === 4091)) {
+          // Mutating Table - Convert to PL/SQL Block
+          status.warningRaised = true;
+          this.logWriter.write(`${new Date().toISOString()} [WARNING]: Table ${this.tableName} : executeMany(INSERT) failed. ${e}. Retrying with PL/SQL Block.\n`);
+          this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
+          if (status.sqlTrace) {
+            status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
+          }
+          try {
+            const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
+            const endTime = new Date().getTime();
+            this.batch.length = 0;
+            this.lobUsage = await this.clearLobCache();
+            return endTime
+          } catch (e) {
+            await this.conn.rollback();
+            if (this.logDDLIssues) {
+              this.logWriter.write(`${new Date().toISOString()}:_write(${this.tableName},${this.batch.length}) : executeMany() failed. ${e}. Retrying using execute() loop.\n`);
+              this.logWriter.write(`${this.tableInfo.dml}\n`);
+              this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
+              this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
+            }
+          }
+        } 
+        else {  
           if (this.logDDLIssues) {
             this.logWriter.write(`${new Date().toISOString()}:_write(${this.tableName},${this.batch.length}) : executeMany() failed. ${e}. Retrying using execute() loop.\n`);
             this.logWriter.write(`${this.tableInfo.dml}\n`);
@@ -407,21 +417,13 @@ end;`
           }
         }
       }
-      else {  
-        if (this.logDDLIssues) {
-          this.logWriter.write(`${new Date().toISOString()}:_write(${this.tableName},${this.batch.length}) : executeMany() failed. ${e}. Retrying using execute() loop.\n`);
-          this.logWriter.write(`${this.tableInfo.dml}\n`);
-          this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
-          this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
-        }
-      }
     }
 
     let row = undefined;
     this.insertMode = 'Iterative';
     try {
       for (row in this.batch) {
-        let results = await this.conn.execute(this.tableInfo.dml,this.batch[row],{bindDefs : this.tableInfo.binds})
+        let results = await this.conn.execute(this.tableInfo.dml,this.batch[row])
       }
       const endTime = new Date().getTime();
       this.batch.length = 0;
@@ -436,7 +438,7 @@ end;`
       if (this.logDDLIssues) {
         this.logWriter.write(`${this.tableInfo.dml}\n`);
         this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
-        this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
+        console.log(this.batch[row])
         this.logWriter.write(`${JSON.stringify(this.batch[row])}\n`);
       }
       this.batch.length = 0;
@@ -452,7 +454,7 @@ end;`
         case 'ddl':
           if (this.ddlRequired) {
             await executeDDL(this.conn, this.schema, this.systemInformation, obj.ddl, this.status, this.logWriter);
-            ths.ddlRequired = false;
+            this.ddlRequired = false;
           }
           break;
         case 'metadata':
@@ -488,45 +490,44 @@ end;`
             break;
           }
           this.tableInfo.targetDataTypes.forEach(async function(targetDataType,idx) {
-                                                                 const dataType = Yadamu.decomposeDataType(targetDataType);
                                                                  if (obj.data[idx] !== null) {
-                                                                   // If column is bound to a CLOB: convert data to CLOB 
                                                                    if (this.tableInfo.binds[idx].type === oracledb.CLOB) {
-                                                                     obj.data[idx] = this.stringToLob(this.conn, obj.data[idx], this.lobCache, this.lobUsage)                                                                    
+                                                                     obj.data[idx] = await this.stringToLob(this.conn, obj.data[idx], this.lobCache, this.lobUsage)                                                                    
                                                                      this.lobUsage++
+                                                                     return
                                                                    }
+                                                                   const dataType = Yadamu.decomposeDataType(targetDataType);
                                                                    switch (dataType.type) {
                                                                      case "BLOB" :
                                                                        obj.data[idx] = Buffer.from(obj.data[idx],'hex');
-                                                                       break;
+                                                                       return;
                                                                      case "RAW":
                                                                        obj.data[idx] = Buffer.from(obj.data[idx],'hex');
-                                                                       break;
+                                                                       return;
                                                                      case "XMLTYPE" :
                                                                        // Cannot passs XMLTYPE as BUFFER
                                                                        // Reason: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
                                                                        // obj.data[idx] = Buffer.from(obj.data[idx]);
-                                                                       break;
+                                                                       return;
                                                                      case "JSON" :
                                                                        // Default JSON Storage model is JSON store as CLOB.
                                                                        // JSON must be shipped in Serialized Form
                                                                        obj.data[idx] = JSON.stringify(obj.data[idx])
                                                                        // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
                                                                        // obj.data[idx] = Buffer.from(JSON.stringify(obj.data[idx]))
-                                                                       break;
+                                                                       return;
                                                                      case "DATE":
                                                                      case "TIMESTAMP" :
                                                                        // Javascript assumes a timestamp with no timezone is in the processes time zone. 
                                                                        // There appears to be no easy way of coercing the process to UTC. 
                                                                        // A Timestamp not explicitly marked as UTC should be coerced to UTC.
                                                                        obj.data[idx] = new Date(Date.parse(obj.data[idx].endsWith('Z') ? obj.data[idx] : obj.data[idx] + 'Z'));
-                                                                       break;
+                                                                       return;
                                                                      default :
                                                                    }
                                                                  }
           },this)
-          // Resolve all promises before pushing data to batch.
-          this.batch.push(await Promise.all(obj.data));
+          this.batch.push(obj.data);
           // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Batch contains ${this.batch.length} rows.`);
           if (this.batch.length === this.tableInfo.batchSize) { 
               // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Completed Batch contains ${this.batch.length} rows.`);

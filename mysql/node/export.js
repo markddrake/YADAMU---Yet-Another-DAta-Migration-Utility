@@ -1,10 +1,9 @@
 "use strict";
- 
 const fs = require('fs');
 const mysql = require('mysql');
 const JSONStream = require('JSONStream')
 const Transform = require('stream').Transform;
-
+const path = require('path');
 
 const Yadamu = require('../../common/yadamuCore.js');
 const MySQLCore = require('./mysqlCore.js');
@@ -207,9 +206,10 @@ async function main(){
 
     await MySQLCore.query(conn,status,sqlAnsiQuotingMode);
     
-    const exportFilePath = parameters.FILE;   
+    const exportFilePath = path.resolve(parameters.FILE); 
     const exportFile = fs.createWriteStream(exportFilePath);
     // exportFile.on('error',function(err) {console.log(err)})
+    logWriter.write(`${new Date().toISOString()}[Export]: Generating file "${exportFilePath}".\n`)
     
     const mysqlInfo = await getSystemInformation(conn,status);
     exportFile.write('{"systemInformation":');

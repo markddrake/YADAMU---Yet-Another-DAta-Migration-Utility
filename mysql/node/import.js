@@ -3,6 +3,7 @@ const fs = require('fs');
 const mysql = require('mysql')
 const Writable = require('stream').Writable
 const Readable = require('stream').Readable;
+const path = require('path');
 
 const Yadamu = require('../../common/yadamuCore.js');
 const RowParser = require('../../common/rowParser.js');
@@ -319,6 +320,7 @@ async function main() {
     
     const stats = fs.statSync(parameters.FILE)
     const fileSizeInBytes = stats.size
+    logWriter.write(`${new Date().toISOString()}[Clarinet]: Processing file "${path.resolve(parameters.FILE)}". Size ${fileSizeInBytes} bytes.\n`)
     
     if (parameters.LOGLEVEL) {
        status.loglevel = parameters.LOGLEVEL;

@@ -1,5 +1,6 @@
-@set DIR=..\..\JSON\MYSQL
+call env\setEnvironment.bat
+@set MDIR=%TESTDATA%\MySQL
+mkdir %MDIR%
 @set SCHEMA=sakila
 @set FILENAME=sakila
-call env\connection.bat
-node ..\node\export --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PORT=%DB_PORT% --PASSWORD=%DB_PWD% --DATABASE=%DB_DBNAME% --File=%DIR%\%FILENAME%.json owner=%SCHEMA%
+node ..\node\export --username=%DB_USER% --hostname=%DB_HOST% --port=%DB_PORT% --password=%DB_PWD% --database=%DB_DBNAME% --file=%MDIR%\%FILENAME%.json owner=\"%SCHEMA%\" mode=%MODE% logFile=%EXPORTLOG%

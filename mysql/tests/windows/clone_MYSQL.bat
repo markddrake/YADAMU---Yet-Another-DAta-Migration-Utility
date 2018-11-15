@@ -1,18 +1,20 @@
-@set DIR=JSON\MYSQL
-@set MDIR=..\..\JSON\MYSQL
-@set ID=1
-@set SCHEMA=sakila
+call env\setEnvironment.bat
+@set DIR=JSON\%MYSQL%
+@set MDIR=%TESTDATA%\%MYSQL%
+@set SCHVER=1
+@set SCHEMA=SAKILA
 @set FILENAME=sakila
-@set ID=1
+@set SCHVER=1
 mkdir %DIR%
-call env\connection.bat
-mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f <..\sql\JSON_IMPORT.sql >>%TESTSQL%\JSON_IMPORT.log
-mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="SET @SCHEMA='%SCHEMA%'; SET @ID=%ID%" <sql\RECREATE_SCHEMA.sql  >> %TESTLOG%\RECREATE_SCHEMA.log
-node ..\node\import --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PORT=%DB_PORT% --PASSWORD=%DB_PWD% --DATABASE=%DB_DBNAME% --File=%MDIR%\%FILENAME%.json toUser=%SCHEMA%%ID%
-node ..\node\export --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PORT=%DB_PORT% --PASSWORD=%DB_PWD% --DATABASE=%DB_DBNAME% --File=%DIR%\%FILENAME%%ID%.json owner=%SCHEMA%%ID%
-@set ID=2
-mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="SET @SCHEMA='%SCHEMA%'; SET @ID=%ID%" <sql\RECREATE_SCHEMA.sql  >> %TESTLOG%\RECREATE_SCHEMA.log
-node ..\node\import --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PORT=%DB_PORT% --PASSWORD=%DB_PWD% --DATABASE=%DB_DBNAME% --File=%DIR%\%FILENAME%1.json toUser=%SCHEMA%%ID%
-node ..\node\export --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PORT=%DB_PORT% --PASSWORD=%DB_PWD% --DATABASE=%DB_DBNAME% --File=%DIR%\%FILENAME%%ID%.json owner=%SCHEMA%%ID%
-node ..\..\utilities\compareFileSizes %LOGFILE% %MDIR% %DIR%
-node ..\..\utilities\compareArrayContent %LOGFILE% %MDIR% %DIR% false
+mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f <..\sql\JSON_IMPORT.sql >%LOGDIR%\install\JSON_IMPORT.log
+mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT%  -v -f --init-command="set @SCHEMA='%SCHEMA%'; set @ID=%SCHVER%; set @METHOD='SAX'" <sql\RECREATE_SCHEMA.sql >>%LOGDIR%\RECREATE_SCHEMA.log
+node ..\node\import  --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD%  --port=%DB_PORT% --database=%DB_DBNAME%  file=%MDIR%\%FILENAME%.json toUser=\"%SCHEMA%%SCHVER%\" logFile=%IMPORTLOG%
+mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="set @SCHEMA='%SCHEMA%'; set @ID1=''; set @ID2=%SCHVER%; set @METHOD='SAX'" --table  <sql\COMPARE_SCHEMA.sql >>%LOGDIR%\COMPARE_SCHEMA.log
+node ..\node\export  --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD%  --port=%DB_PORT% --database=%DB_DBNAME%  file=%DIR%\%FILENAME%%SCHVER%.json owner=\"%SCHEMA%%SCHVER%\" mode=%MODE% logFile=%EXPORTLOG%
+@set SCHVER=2
+mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="set @SCHEMA='%SCHEMA%'; set @ID=%SCHVER%; set @METHOD='JSON_TABLE'"  <sql\RECREATE_SCHEMA.sql >>%LOGDIR%\RECREATE_SCHEMA.log
+node ..\node\import  --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD%  --port=%DB_PORT% --database=%DB_DBNAME%  file=%DIR%\%FILENAME%1.json toUser=\"%SCHEMA%%SCHVER%\" logFile=%IMPORTLOG%
+mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="set @SCHEMA='%SCHEMA%'; set @ID1=1; set @ID2=%SCHVER%; set @METHOD='SAX'" --table  <sql\COMPARE_SCHEMA.sql >>%LOGDIR%\COMPARE_SCHEMA.log
+node ..\node\export  --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD%  --port=%DB_PORT% --database=%DB_DBNAME%  file=%DIR%\%FILENAME%%SCHVER%.json owner=\"%SCHEMA%%SCHVER%\" mode=%MODE% logFile=%EXPORTLOG%
+node ..\..\utilities\compareFileSizes %LOGDIR% %MDIR% %DIR%
+node ..\..\utilities\compareArrayContent %LOGDIR% %MDIR% %DIR% false

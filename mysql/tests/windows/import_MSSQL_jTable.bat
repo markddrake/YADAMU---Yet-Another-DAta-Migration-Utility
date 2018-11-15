@@ -1,10 +1,10 @@
 @set SRC=%~1
-@set UID=%~2
+@set SCHVER=%~2
 @set VER=%~3
-node ..\node\jTableImport  --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD%  --PORT=%DB_PORT% --DATABASE=%DB_DBNAME% --FILE=%SRC%\\Northwind%VER%.json        --TOUSER=\"Northwind%UID%\" 
-node ..\node\jTableImport  --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD%  --PORT=%DB_PORT% --DATABASE=%DB_DBNAME% --FILE=%SRC%\\Sales%VER%.json            --TOUSER=\"Sales%UID%\" 
-node ..\node\jTableImport  --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD%  --PORT=%DB_PORT% --DATABASE=%DB_DBNAME% --FILE=%SRC%\\Person%VER%.json           --TOUSER=\"Person%UID%\" 
-node ..\node\jTableImport  --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD%  --PORT=%DB_PORT% --DATABASE=%DB_DBNAME% --FILE=%SRC%\\Production%VER%.json       --TOUSER=\"Production%UID%\" 
-node ..\node\jTableImport  --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD%  --PORT=%DB_PORT% --DATABASE=%DB_DBNAME% --FILE=%SRC%\\Purchasing%VER%.json       --TOUSER=\"Purchasing%UID%\" 
-node ..\node\jTableImport  --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD%  --PORT=%DB_PORT% --DATABASE=%DB_DBNAME% --FILE=%SRC%\\HumanResources%VER%.json   --TOUSER=\"HumanResources%UID%\" 
-node ..\node\jTableImport  --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD%  --PORT=%DB_PORT% --DATABASE=%DB_DBNAME% --FILE=%SRC%\\AdventureWorksDW%VER%.json --TOUSER=\"DW%UID%\" 
+node ..\node\jTableImport   --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD%  --port=%DB_PORT% --database=%DB_DBNAME% file=%SRC%\Northwind%VER%.json        toUser=\"Northwind%SCHVER%\" 
+node ..\node\jTableImport   --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD%  --port=%DB_PORT% --database=%DB_DBNAME% file=%SRC%\Sales%VER%.json            toUser=\"Sales%SCHVER%\" 
+node ..\node\jTableImport   --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD%  --port=%DB_PORT% --database=%DB_DBNAME% file=%SRC%\Person%VER%.json           toUser=\"Person%SCHVER%\" 
+node ..\node\jTableImport   --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD%  --port=%DB_PORT% --database=%DB_DBNAME% file=%SRC%\Production%VER%.json       toUser=\"Production%SCHVER%\" 
+node ..\node\jTableImport   --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD%  --port=%DB_PORT% --database=%DB_DBNAME% file=%SRC%\Purchasing%VER%.json       toUser=\"Purchasing%SCHVER%\" 
+node ..\node\jTableImport   --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD%  --port=%DB_PORT% --database=%DB_DBNAME% file=%SRC%\HumanResources%VER%.json   toUser=\"HumanResources%SCHVER%\" 
+node ..\node\jTableImport   --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD%  --port=%DB_PORT% --database=%DB_DBNAME% file=%SRC%\AdventureWorksDW%VER%.json toUser=\"DW%SCHVER%\" 

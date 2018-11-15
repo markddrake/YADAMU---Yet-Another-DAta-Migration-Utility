@@ -6,7 +6,7 @@ mkdir -p $DIR
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @../sql/COMPILE_ALL.sql $LOGDIR 
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @sql/RECREATE_MSSQL_ALL.sql $LOGDIR  $SCHVER SAX
 sh unix/import_MSSQL.sh $MDIR $SCHVER ""
-sh unix/export_MSSQL $DIR $SCHVER $SCHVER
+sh unix/export_MSSQL.sh $DIR $SCHVER $SCHVER
 export SCHVER=2
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @sql/RECREATE_MSSQL_ALL.sql $LOGDIR  $SCHVER SAX
 sh unix/import_MSSQL.sh $DIR $SCHVER 1
