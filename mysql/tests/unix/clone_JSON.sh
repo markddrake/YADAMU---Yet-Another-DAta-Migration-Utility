@@ -1,4 +1,4 @@
-. env/setEnvironment.bat
+. env/setEnvironment.sh
 export DIR=JSON/$JSON
 export MDIR=$TESTDATA/$JSON&
 export SCHEMA=JTEST

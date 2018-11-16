@@ -1,4 +1,4 @@
-. env/setEnvironment.bat
+. env/setEnvironment.sh
 export DIR=JSON/$MYSQL
 export MDIR=$TESTDATA/$MYSQL
 export SCHEMA=SAKILA

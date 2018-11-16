@@ -1,4 +1,4 @@
-. env/setEnvironment.bat
+. env/setEnvironment.sh
 export MDIR=$TESTDATA/MySQL
 mkdir -p $MDIR
 export SCHEMA=sakila

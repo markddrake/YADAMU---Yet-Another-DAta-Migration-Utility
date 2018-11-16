@@ -2,12 +2,10 @@
 const fs = require('fs');
 const mariadb = require('mariadb');
 const Transform = require('stream').Transform;
+const path = require('path');
 
 const Yadamu = require('../../common/yadamuCore.js');
 const MariaCore = require('./mariaCore.js');
-
-const sqlAnsiQuotingMode =
-`SET SESSION SQL_MODE=ANSI_QUOTES`
 
 const sqlGetSystemInformation = 
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID"`;					   
@@ -110,21 +108,19 @@ async function main(){
   let pool;
   let conn;
   let parameters;
-  let sqlTrace;
+
   let logWriter = process.stdout;
+  let status;             
 	
   try {
 
     parameters = MariaCore.processArguments(process.argv,'export');
+    status = Yadamu.getStatus(parameters);                                         
 
 	if (parameters.LOGFILE) {
-	  logWriter = fs.createWriteStream(parameters.LOGFILE);
+	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
     
-    if (parameters.SQLTRACE) {
-      sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
-    }
-
     const connectionDetails = {
             host        : parameters.HOSTNAME
            ,user        : parameters.USERNAME
@@ -135,16 +131,12 @@ async function main(){
     
     pool = mariadb.createPool(connectionDetails);
     conn = await pool.getConnection();
-
-    if (parameters.SQLTRACE) {
-      sqlTrace.write(`${sqlAnsiQuotingMode}\n\/\n`)
-    }
-    
-    await conn.query(sqlAnsiQuotingMode);
+    MariaCore.configureSession(conn,status);
 	
-    const dumpFilePath = parameters.FILE;	
-    const dumpFile = fs.createWriteStream(dumpFilePath);
-    // dumpFile.on('error',function(err) {console.log(err)})
+    const exportFilePath = path.resolve(parameters.FILE); 
+    const exportFile = fs.createWriteStream(exportFilePath);
+    // exportFile.on('error',function(err) {console.log(err)})
+    logWriter.write(`${new Date().toISOString()}[Export]: Generating file "${exportFilePath}".\n`)
 	
     const schema = parameters.OWNER;
     if (parameters.SQLTRACE) {
@@ -153,8 +145,8 @@ async function main(){
     
 	const mysqlInfo = await conn.query(sqlGetSystemInformation);
 	
-	dumpFile.write('{"systemInformation":');
-	dumpFile.write(JSON.stringify({
+	exportFile.write('{"systemInformation":');
+	exportFile.write(JSON.stringify({
 		                 "date"            : new Date().toISOString()
                         ,"timeZoneOffset"  : new Date().getTimezoneOffset()
 					    ,"vendor"          : "MariaDB"
@@ -167,17 +159,17 @@ async function main(){
                         ,"serverVendor"    : mysqlInfo[0].SERVER_VENDOR_ID
 	}));
 	
-	dumpFile.write(',"metadata":{');
-    if (parameters.SQLTRACE) {
-      sqlTrace.write(`${sqlGenerateTables}\n\/\n`)
+	exportFile.write(',"metadata":{');
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${sqlGenerateTables}\n\/\n`)
     }
 	const sqlQueries = await conn.query(sqlGenerateTables,[schema]);
 	for (let i=0; i < sqlQueries.length; i++) {
 	  const row = sqlQueries[i];
 	  if (i > 0) {
-		dumpFile.write(',');
+		exportFile.write(',');
       }
-	  dumpFile.write(`"${row.table_name}" : ${JSON.stringify({
+	  exportFile.write(`"${row.table_name}" : ${JSON.stringify({
 						                             "owner"           : row.table_schema
                                                     ,"tableName"       : row.table_name
                                                     ,"columns"         : row.columns
@@ -185,29 +177,29 @@ async function main(){
 												    ,"sizeConstraints" : JSON.parse(row.sizeConstraints)
 	                 })}`)				   
 	}
-	dumpFile.write('},"data":{');
+	exportFile.write('},"data":{');
 	for (let i=0; i < sqlQueries.length; i++) {
       const row = sqlQueries[i]
 	  if (i > 0) {
-		dumpFile.write(',');
+		exportFile.write(',');
       }
-	  dumpFile.write(`"${row.table_name}" :[`);
-      if (parameters.SQLTRACE) {
-        sqlTrace.write(`${row.QUERY}\n\/\n`)
+	  exportFile.write(`"${row.table_name}" :[`);
+      if (status.sqlTrace) {
+        status.sqlTrace.write(`${row.QUERY}\n\/\n`)
       }
 	  const startTime = new Date().getTime()
-      const rows = await fetchData(conn,row.query,dumpFile) 
+      const rows = await fetchData(conn,row.query,exportFile) 
       const elapsedTime = new Date().getTime() - startTime
-      dumpFile.write(']');
+      exportFile.write(']');
       logWriter.write(`${new Date().toISOString()} - Table: "${row.table_name}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
 	}
 
-    dumpFile.write('}}');
-	dumpFile.close();
+    exportFile.write('}}');
+	exportFile.close();
 	
 	await conn.end();
  	await pool.end();
-	logWriter.write(`Export operation successful.`);
+	logWriter.write(`Export operation successful.\n`);
     if (logWriter !== process.stdout) {
 	  console.log(`Export operation successful: See "${parameters.LOGFILE}" for details.`);
     }

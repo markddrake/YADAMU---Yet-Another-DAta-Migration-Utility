@@ -1,9 +1,9 @@
-export TGT=$1
-export USRID=$2
-export VER=$3
-node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$TGT/HR$VER.json --owner=\"HR$USRID\"
-node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$TGT/SH$VER.json --owner=\"SH$USRID\"
-node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$TGT/OE$VER.json --owner=\"OE$USRID\"
-node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$TGT/PM$VER.json --owner=\"PM$USRID\"
-node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$TGT/IX$VER.json --owner=\"IX$USRID\"
-node ../node/export --USERNAME=$DB_USER --HOSTNAME=$DB_HOST --PASSWORD=$DB_PWD --PORT=$DB_PORT --DATABASE=$DB_DBNAME --File=$TGT/BI$VER.json --owner=\"BI$USRID\"
+export TGT=$~1
+export SCHVER=$~2
+export VER=$~3
+node ../node/export  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$TGT/HR$VER.json owner="HR$SCHVER" mode=$MODE logFile=$EXPORTLOG
+node ../node/export  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$TGT/SH$VER.json owner="SH$SCHVER" mode=$MODE logFile=$EXPORTLOG
+node ../node/export  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$TGT/OE$VER.json owner="OE$SCHVER" mode=$MODE logFile=$EXPORTLOG
+node ../node/export  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$TGT/PM$VER.json owner="PM$SCHVER" mode=$MODE logFile=$EXPORTLOG
+node ../node/export  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$TGT/IX$VER.json owner="IX$SCHVER" mode=$MODE logFile=$EXPORTLOG
+node ../node/export  --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$TGT/BI$VER.json owner="BI$SCHVER" mode=$MODE logFile=$EXPORTLOG

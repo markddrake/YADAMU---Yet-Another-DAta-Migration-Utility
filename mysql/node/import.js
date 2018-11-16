@@ -93,7 +93,7 @@ class DbWriter extends Writable {
   async setTable(tableName) {
        
     this.tableName = tableName
-    this.tableInfo =  this.statementCache[tableName]
+    this.tableInfo =  this.statementCache[tableName];
     this.rowCount = 0;
     this.batch.length = 0;
     this.startTime = new Date().getTime();
@@ -322,9 +322,6 @@ async function main() {
     const fileSizeInBytes = stats.size
     logWriter.write(`${new Date().toISOString()}[Clarinet]: Processing file "${path.resolve(parameters.FILE)}". Size ${fileSizeInBytes} bytes.\n`)
     
-    if (parameters.LOGLEVEL) {
-       status.loglevel = parameters.LOGLEVEL;
-    }
         
     await processFile(conn, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);
     await conn.end();

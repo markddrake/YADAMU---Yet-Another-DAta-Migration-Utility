@@ -1,13 +1,14 @@
-@set TNS=%~1
 cls
+call env\setEnvironment.bat
 mkdir logs
+rmdir /s /q %LOGDIR%
+mkdir %LOGDIR%
+mkdir %LOGDIR%\install
+@set MODE=DATA_ONLY
 call windows\clone_JSON.bat
 call windows\clone_MYSQL.bat
-call windows\clone_Oracle.bat %TNS%
-call windows\clone_MSSQL.bat
+call windows\clone_Oracle.bat 
 call windows\clone_MSSQL_ALL.bat
-set RESULTS=jSax.log
-dir JSON\MSSQL\*.json > logs\%RESULTS%
-dir JSON\MariaDB\*.json >> logs\%RESULTS%
-dir JSON\JSON\*.json  >> logs\%RESULTS%
-dir JSON\%TNS%\*.json >> logs\%RESULTS%
+call windows\clone_MSSQL.bat
+@set MODE=DDL_AND_DATA
+call windows\clone_Oracle.bat

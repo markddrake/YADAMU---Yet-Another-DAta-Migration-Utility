@@ -2,6 +2,56 @@
 
 const Yadamu = require('../../common/yadamuCore.js');
 
+
+async function configureSession(conn,status) {
+
+   const sqlAnsiQuotes = `SET SESSION SQL_MODE=ANSI_QUOTES`;
+   if (status.sqlTrace) {
+     status.sqlTrace.write(`${sqlAnsiQuotes};\n--\n`);
+   }
+   await conn.query(sqlAnsiQuotes);
+   
+   const sqlTimeZone = `SET TIME_ZONE = '+00:00'`;
+   if (status.sqlTrace) {
+     status.sqlTrace.write(`${sqlTimeZone};\n--\n`);
+   }
+   await conn.query(sqlTimeZone);
+
+}
+
+async function setMaxAllowedPacketSize(pool,conn,status,logWriter) {
+
+  const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
+  const sqlQueryPacketSize = `SELECT @@max_allowed_packet`;
+  const sqlSetPacketSize = `SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`
+    
+  if (status.sqlTrace) {
+    status.sqlTrace.write(`${sqlQueryPacketSize};\n--\n`);
+  }
+  let results = await conn.query(sqlQueryPacketSize);
+    
+  if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
+    logWriter.write(`${new Date().toISOString()}: Increasing MAX_ALLOWED_PACKET to 1G.\n`);
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${sqlSetPacketSize};\n--\n`);
+    }
+    results = await conn.query(sqlSetPacketSize);
+    await conn.end();
+    await pool.end();
+    return true;
+  }    
+  return false;
+}
+
+async function createTargetDatabase(conn,status,schema) {    	
+  const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;					   
+  if (status.sqlTrace) {
+    status.sqlTrace.write(`${sqlStatement};\n--\n`);
+  }
+  const results = await conn.query(sqlStatement,schema);
+  return results;
+}
+
 function processArguments(args,operation) {
 
    const parameters = {
@@ -94,3 +144,6 @@ function processArguments(args,operation) {
 }
 
 module.exports.processArguments       = processArguments
+module.exports.configureSession        = configureSession
+module.exports.setMaxAllowedPacketSize = setMaxAllowedPacketSize
+module.exports.createTargetDatabase    = createTargetDatabase

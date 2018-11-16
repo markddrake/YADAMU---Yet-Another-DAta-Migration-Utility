@@ -10,8 +10,8 @@ const sourceDir = process.argv[3];
 const targetDir = process.argv[4];
 
 
-const contentCompare = ( process.argv[5] === 'true' );
-const sortedCompare = ( process.argv[6] === 'true' );
+const compareArrayContent = ( process.argv[5] === 'true' );
+const sortArrays = ( process.argv[6] === 'true' );
 
 function sortRows(array) {
     
@@ -25,27 +25,77 @@ function sortRows(array) {
   return array
 }
 
-function deepCompare(content,tableInfo) {
-  if (sortedCompare) {
+function deepCompare(tableInfo,content) {
+ 
+  if (sortArrays) {
     tableInfo.hashes.unshift(crypto.createHash('sha256').update(JSON.stringify(sortRows(content))).digest('hex'));
-  }
+    }
   else {
     tableInfo.hashes.unshift(crypto.createHash('sha256').update(JSON.stringify(content)).digest('hex'));
   }
 }
-  
+
 function shallowCompare(content,tableInfo) {
-  if (content === undefined) {
-    tableInfo.rowCounts.push(-1);
-    tableInfo.byteCounts.push(-1)
-  }
-  else {
-    tableInfo.rowCounts.push(content.length)
-    tableInfo.byteCounts.push(JSON.stringify(content).length)
-  }
+
+  tableInfo.rowCounts.push(content.length)
+  tableInfo.byteCounts.push(JSON.stringify(content).length)
+
 }
 
-function compareFiles(files){
+function checkVendor(systemInformation) {
+    
+  if (systemInformation.serverVendor && ((systemInformation.serverVendor.indexOf('mariadb') > -1) || (systemInformation.serverVendor.indexOf('MySQL') > -1))) {
+    return true;
+  }
+  return false;
+}
+
+function processArrayContent(tableName,tableInfo,content) {
+
+   // Avoid content comapare if rows count or byte count do not match
+   
+  const tableData = tableInfo[tableName];
+  
+  if ((tableData.rowCounts[0] === tableData.rowCounts[1]) && (tableData.rowCounts[0] === tableData.rowCounts[2])) {
+    if ((tableData.byteCounts[0] === tableData.byteCounts[1]) && (tableData.byteCounts[0] === tableData.byteCounts[2])) {
+      const tryLowerCaseName = checkVendor(content.systemInformation);
+      let arrayContent = content.data[tableName]
+      if (arrayContent) {
+        deepCompare(tableData,arrayContent);
+      }
+      else {
+        if (tryLowerCaseName) {
+          arrayContent = content.data[tableName.toLowerCase()]
+          deepCompare(tableData,arrayContent);
+        }
+      }
+    }
+  }
+}
+   
+function processArrayMetadata(tableName,tableInfo,content) {
+
+  const tryLowerCaseName = checkVendor(content.systemInformation);
+  let arrayContent = content.data[tableName]
+  const tableData = tableInfo[tableName];
+  
+  if (arrayContent) {
+    shallowCompare(arrayContent,tableData);
+  }
+  else {
+    if (tryLowerCaseName) {
+      arrayContent = content.data[tableName.toLowerCase()]
+      shallowCompare(arrayContent,tableData);
+    }
+    else {
+      tableData.rowCounts.push(-1);
+      tableData.byteCounts.push(-1)
+    }           
+  }
+  
+}
+
+function compareArrayMetadata(files){
           
   const regExp =  new RegExp("\B(?=(\d{3})+(?!\d))","g");
 
@@ -62,31 +112,33 @@ function compareFiles(files){
   })
               
   tables.forEach(function(table) {
-     shallowCompare(content.data[table],tableInfo[table]);
+     processArrayMetadata(table,tableInfo,content);
   })
 
   content = require(files[1].path);
   tables.forEach(function(table) {
-     shallowCompare(content.data[table],tableInfo[table]);
+     processArrayMetadata(table,tableInfo,content);
   })
   
   content = require(files[2].path);
   tables.forEach(function(table) {
-     shallowCompare(content.data[table],tableInfo[table]);
+     processArrayMetadata(table,tableInfo,content);
   })
-
-  if (contentCompare) {   
+  
+  if (compareArrayContent) {
+    // Process tables in reverse order. - Saves reading the third file twice.
+  
     tables.forEach(function(table) {
-       tableInfo.hashes = []
-       deepCompare(content.data[table],tableInfo[table]);
+       tableInfo[table].hashes = []
+       processArrayContent(table,tableInfo,content);
     })
     content = require(files[1].path);
     tables.forEach(function(table) {
-       deepCompare(content.data[table],tableInfo[table]);
+       processArrayContent(table,tableInfo,content);
     })
     content = require(files[0].path);
     tables.forEach(function(table) {
-       deepCompare(content.data[table],tableInfo[table]);
+       processArrayContent(table,tableInfo,content);
     })
   }
  
@@ -101,9 +153,11 @@ function compareFiles(files){
                             + `${info.byteCounts[0].toString().replace(regExp, ",").padStart(10)},`
                             + `${info.byteCounts[1].toString().replace(regExp, ",").padStart(10)},`
                             + `${info.byteCounts[2].toString().replace(regExp, ",").padStart(10)}].` 
-                            + `${((info.byteCounts[0] === info.byteCounts[1]) && (info.byteCounts[1] === info.byteCounts[2])) ? ' Success'.padEnd(16) : ' Mismatch'.padEnd(16)} `
-                            + `${(info.hashes) ? 'Hashes: [' + info.hashes[0] + ',' + info.hashes[1] +',' + info.hashes[2] + '].' : ''}`
-                            + `\n`)
+                            + `${((info.byteCounts[0] === info.byteCounts[1]) && (info.byteCounts[1] === info.byteCounts[2])) ? ' Success'.padEnd(16) : ' Mismatch'.padEnd(16)} `);
+                if (info.hashes && (info.hashes.length > 2)) {
+                  logFile.write(`Hashes : ${((info.hashes[0] === info.hashes[1]) && (info.hashes[1] === info.hashes[2])) ? ' Success'.padEnd(16) : ' Mismatch'.padEnd(16)}`)
+                }
+                logFile.write(`\n`)
                              
   })
 }
@@ -119,7 +173,7 @@ function compareFolders(sourceDir,targetDir,filenames,targetSuffixes) {
          const sourceFilename = filenames[filename].slice(0,-5) + targetSuffixes[s] + ".json"
          files.push({ name: sourceFilename, path : path.resolve(targetDir + path.sep + sourceFilename)});
        }
-       compareFiles(files);
+       compareArrayMetadata(files);
      };
    }
     

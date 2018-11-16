@@ -3,6 +3,7 @@ const fs = require('fs');
 const mariadb = require('mariadb');
 const Writable = require('stream').Writable
 const Readable = require('stream').Readable;
+const path = require('path');
 
 const Yadamu = require('../../common/yadamuCore.js');
 const RowParser = require('../../common/rowParser.js');
@@ -22,11 +23,15 @@ class DbWriter extends Writable {
     this.batchSize = batchSize;
     this.commitSize = commitSize;
     this.mode = mode;
-    this.status = status;
     this.logWriter = logWriter;
+    this.status = status;
+
+    this.batch = [];
+    this.batchRowCount = 0;
 
     this.systemInformation = undefined;
     this.metadata = undefined;
+
     this.statementCache = undefined;
 
     this.tableName = undefined;
@@ -35,8 +40,8 @@ class DbWriter extends Writable {
     this.startTime = undefined;
     this.skipTable = true;
 
-    this.batch = [];
-    this.batchRowCount = 0;
+    this.logDDLIssues   = (status.loglevel && (status.loglevel > 2));
+    // this.logDDLIssues   = true;
   }
 
   async setTable(tableName) {
@@ -58,7 +63,7 @@ class DbWriter extends Writable {
       if (this.tableInfo.useSetClause) {
         for (const i in this.batch) {
           try {
-            const results = await query(this.conn,this.tableInfo.dml,this.batch[i]);
+            const results = await this.conn.query(this.tableInfo.dml,this.batch[i]);
           } catch(e) {
             if (e.errno && ((e.errno === 3616) || (e.errno === 3617))) {
               this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping Row Reason: ${e.message}\n`)
@@ -212,12 +217,12 @@ class DbWriter extends Writable {
   }
 }
 
-function processFile(conn, schema, dumpFilePath, batchSize, commitSize, mode, status, logWriter) {
+function processFile(conn, schema, importFilePath, batchSize, commitSize, mode, status, logWriter) {
 
   return new Promise(function (resolve,reject) {
     const dbWriter = new DbWriter(conn,schema,batchSize,commitSize,mode,status,logWriter);
     const rowGenerator = new RowParser(logWriter);
-    const readStream = fs.createReadStream(dumpFilePath);
+    const readStream = fs.createReadStream(importFilePath);
     dbWriter.on('finish', function() { resolve()});
     readStream.pipe(rowGenerator).pipe(dbWriter);
   })
@@ -228,11 +233,10 @@ async function main() {
   let pool;
   let conn;
   let parameters;
-  let sqlTrace;
-  let logWriter = process.stdout;
 
-  let results;
+  let logWriter = process.stdout;
   let status;
+  let results;
 
   try {
 
@@ -245,7 +249,7 @@ async function main() {
     status = Yadamu.getStatus(parameters);
 
     if (parameters.LOGFILE) {
-      logWriter = fs.createWriteStream(parameters.LOGFILE);
+      logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
 
     const connectionDetails = {
@@ -259,40 +263,22 @@ async function main() {
 
     pool = mariadb.createPool(connectionDetails);
     conn = await pool.getConnection();
-    const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
-    results = await conn.query(`SHOW variables like 'max_allowed_packet'`);
-
     
-    if (parseInt(results[0].Value) <  maxAllowedPacketSize) {
-        logWriter.write(`${new Date().toISOString()}: Increasing MAX_ALLOWED_PACKET to 1G.\n`);
-        results = await conn.query(`SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`);
-        await conn.end();
-        await pool.end();
-        pool = mariadb.createPool(connectionDetails);
-        conn = await pool.getConnection();
+    if (await MariaCore.setMaxAllowedPacketSize(pool,conn,status,logWriter)) {
+       pool = mariadb.createPool(connectionDetails);
+       conn = await pool.getConnection();
+                                                           
     }
+          
 
-    results = await conn.query(`SET SESSION SQL_MODE=ANSI_QUOTES`);
-    results = await conn.query(`CREATE DATABASE IF NOT EXISTS "${parameters.TOUSER}"`);
-
+    await MariaCore.configureSession(conn,status);
+ 	results = await MariaCore.createTargetDatabase(conn,status,parameters.TOUSER);
     const stats = fs.statSync(parameters.FILE)
     const fileSizeInBytes = stats.size
+    logWriter.write(`${new Date().toISOString()}[Clarinet]: Processing file "${path.resolve(parameters.FILE)}". Size ${fileSizeInBytes} bytes.\n`)
 
-    await processFile(conn, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);
-
-    /*
-    results = await conn.query('select count(*) from hr2.regions');
-    console.log(results);
-    await conn.commit();
-    console.log('Committed');
-    results = await conn.query('select count(*) from hr2.regions');
-    console.log(results);
-    await conn.end();
-    conn = await pool.getConnection();
-    results = await conn.query('select count(*) from hr2.regions');
-    console.log(results);
-    */
-    
+    await processFile(conn, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter)
+  
     await conn.end();
     await pool.end();
     Yadamu.reportStatus(status,logWriter)

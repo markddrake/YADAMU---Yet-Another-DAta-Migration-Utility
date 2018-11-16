@@ -68,6 +68,8 @@ function processArguments(args,operation) {
    const parameters = {
 	                 FILE : "export.json"
                     ,MODE : "DDL_AND_CONTENT"
+                    ,BATCHSIZE  : 100
+                    ,COMMITROWS : 1000
    }
 
    process.argv.forEach(function (arg) {
