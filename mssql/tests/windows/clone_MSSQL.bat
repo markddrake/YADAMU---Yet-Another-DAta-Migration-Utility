@@ -7,7 +7,7 @@ call env\setEnvironment.bat
 mkdir %DIR%
 sqlcmd -U%DB_USER% -P%DB_PWD% -S%DB_HOST% -d%DB_DBNAME% -I -e -i..\sql\JSON_IMPORT.sql >> %LOGDIR%\install\JSON_IMPORT.log
 sqlcmd -U%DB_USER% -P%DB_PWD% -S%DB_HOST% -d%DB_DBNAME% -I -e -vSCHEMA=%SCHEMA% -vID=%SCHVER% -vMETHOD=SAX -isql\RECREATE_SCHEMA.sql >>%LOGDIR%\RECREATE_SCHEMA.log 
-call windows\import_MSSQL_ALL.bat %MDIR% %SCHEMA% %SCHVER% "" 
+call windows\import_MSSQL.bat %MDIR% %SCHVER% "" 
 node ..\node\export --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD% --database=%DB_DBNAME% file=%DIR%\%FILENAME%%SCHVER%.json owner=\"%SCHEMA%%SCHVER%\" mode=%MODE% logFile=%EXPORTLOG%
 @set SCHVER=2
 sqlcmd -U%DB_USER% -P%DB_PWD% -S%DB_HOST% -d%DB_DBNAME% -I -e -vSCHEMA=%SCHEMA% -vID=%SCHVER% -vMETHOD=SAX -isql\RECREATE_SCHEMA.sql >>%LOGDIR%\RECREATE_SCHEMA.log

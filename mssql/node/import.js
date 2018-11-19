@@ -1,7 +1,7 @@
 "use strict";
 const fs = require('fs');
 const sql = require('mssql');
-const Readable = require('stream').Readable;
+const path = require('path');
 
 const Yadamu = require('../../common/yadamuCore.js');
 const RowParser = require('../../common/rowParser.js');
@@ -44,25 +44,14 @@ async function main() {
  	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
 
-    const connectionDetails = {
-      server    : parameters.HOSTNAME
-     ,user      : parameters.USERNAME
-     ,database  : parameters.DATABASE
-     ,password  : parameters.PASSWORD
-     ,port      : parameters.PORT
-	 ,options: {
-        encrypt: false // Use this if you're on Windows Azure
-
-      }
-    }
-    
-    pool = await new sql.ConnectionPool(connectionDetails).connect()
+    pool = await MsSQLCore.getConnectionPool(parameters,status);
     const request = pool.request();
 	results = await request.query(`SET QUOTED_IDENTIFIER ON`);
     
 	const stats = fs.statSync(parameters.FILE)
     const fileSizeInBytes = stats.size
-	
+	logWriter.write(`${new Date().toISOString()}[Clarinet]: Processing file "${path.resolve(parameters.FILE)}". Size ${fileSizeInBytes} bytes.\n`)
+
     await processFile(pool, parameters.DATABASE, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);
     
     await pool.close();
@@ -87,7 +76,7 @@ async function main() {
     logWriter.close();
   }
 
-  if (parameters.SQLTRACE) {
+  if (status.sqlTrace) {
     status.sqlTrace.close();
   }
   

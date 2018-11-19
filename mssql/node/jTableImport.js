@@ -5,70 +5,46 @@ const sql = require('mssql');
 const Writable = require('stream').Writable
 
 const MsSQLCore = require('./mssqlCore.js');
-const StagingTable = require('./stagingTable');
+const StagingTable = require('./stagingTable.js');
+const Yadamu = require('../../common/yadamuCore.js');
 
-async function verifyDataLoad(dbConn,stagingTable) {    
-  const statement = `select ISJSON("${stagingTable.column_name}") "VALID_JSON" from "${stagingTable.table_name}"`;
+async function verifyDataLoad(request,tableSpec,status,logWriter) {    
+  const statement = `select ISJSON("${tableSpec.columnName}") "VALID_JSON" from "${tableSpec.tableName}"`;
   const startTime = new Date().getTime();
-  const results = await dbConn.query(statement);
-  console.log(`${new Date().toISOString()}: Upload succesful: ${results.recordsets[0][0].VALID_JSON === 1}. Elapsed time ${new Date().getTime() - startTime}ms.`);
+  if (status.sqlTrace) {
+    status.sqlTrace.write(`${statement}\n\/\n`)
+  }  
+  const results = await request.query(statement);
+  logWriter.write(`${new Date().toISOString()}: Upload succesful: ${results.recordsets[0][0].VALID_JSON === 1}. Elapsed time ${new Date().getTime() - startTime}ms.\n`);
   return results;
 }
 
-async function processStagingTable(dbConn,stagingTable,schema) {    
+async function processStagingTable(request,tableSpec,schema) {    
 
-  const request = new sql.Request(dbConn);    
-  let results;
-
-  try {
-    results = await request.input('TARGET_DATABASE',sql.VARCHAR,schema).execute('IMPORT_JSON');
-  } catch (e) {
-    if (e.code == 'ETIMEOUT') {
-      results = await untilFinished(request,stagingTable);
-    }
-    else {
-      throw(e);
-    }
-  }
+  const results = await request.input('TARGET_DATABASE',sql.VARCHAR,schema).execute('IMPORT_JSON');
   return results.recordset;
 }
 
 async function main(){
     
-  let dbConn;
+  let pool;
   let parameters;
-  let sqlTrace;
   let logWriter = process.stdout;
   let status;
     
   try {
 
     let results;
-    parameters = common.processArguments(process.argv,'import');
+    parameters = MsSQLCore.processArguments(process.argv,'import');
     status = Yadamu.getStatus(parameters);
 
     if (parameters.LOGFILE) {
      logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
         
-    const config = {
-           server    : parameters.HOSTNAME
-          ,user      : parameters.USERNAME
-          ,database  : parameters.DATABASE
-          ,password  : parameters.PASSWORD
-          ,port: parameters.PORT
-          ,options   : {
-             encrypt: false // Use this if you're on Windows Azure
-          }
-          ,pool      : {
-             requestTimeout : 2 * 60 * 60 * 1000
-          }
-        }
+    const pool = await MsSQLCore.getConnectionPool(parameters,status);
+    const request = pool.request();
 
-    dbConn = new sql.ConnectionPool(config);
-    await dbConn.connect()
-    await dbConn.query(`SET QUOTED_IDENTIFIER ON`);
-    
     const schema = parameters.TOUSER;
     
     const importFilePath = parameters.FILE; 
@@ -76,15 +52,18 @@ async function main(){
     const fileSizeInBytes = stats.size;
  
     const startTime = new Date().getTime();
-    const stagingTable = new StagingTable(dbconn, { table_name : 'JSON_STAGING', column_name : 'DATA'}, importFilePath,status); 
-    results = await statingTable.uploadFile()
+    const tableSpec =  { tableName : 'JSON_STAGING', columnName : 'DATA'}
+    const stagingTable = new StagingTable(pool,tableSpec,importFilePath,status); 
+    results = await stagingTable.uploadFile()
     const elapsedTime = new Date().getTime() - startTime;
-    logWriter.write(`${new Date().toISOString()}: Import Data file "${importFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms. Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
+    logWriter.write(`${new Date().toISOString()}[JSON_TABLE()]: Import Data file "${importFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms. Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
-    results = await verifyDataLoad(dbConn,stagingTable);
-    results = await processStagingTable(dbConn,stagingTable,schema);
+    results = await verifyDataLoad(request,tableSpec,status,logWriter);
+    results = await processStagingTable(request,tableSpec,schema);
+    results = results[0][Object.keys(results[0])[0]]
+    results = JSON.parse(results)
     Yadamu.processLog(results, status, logWriter) 
-    await dbConn.close();
+    await pool.close();
     Yadamu.reportStatus(status,logWriter) 
   } catch (e) {
     if (logWriter !== process.stdout) {
@@ -96,8 +75,8 @@ async function main(){
       console.log('Import operation Failed.');
       console.log(e);
     }
-    if (sql !== undefined) {
-      await sql.close();
+    if (pool !== undefined) {
+      await pool.close();
     }
   } 
  

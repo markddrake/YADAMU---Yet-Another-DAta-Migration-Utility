@@ -1,4 +1,5 @@
 "use strict";
+const sql = require('mssql');
 
 const Yadamu = require('../../common/yadamuCore.js');
 
@@ -90,4 +91,33 @@ function processArguments(args,operation) {
  return parameters;
 }
 
-module.exports.processArguments = processArguments
+async function getConnectionPool(parameters,status) {
+
+  const config = {
+          server    : parameters.HOSTNAME
+         ,user      : parameters.USERNAME
+         ,database  : parameters.DATABASE
+         ,password  : parameters.PASSWORD
+         ,port      :  parameters.PORT
+         ,options   : {
+             encrypt: false // Use this if you're on Windows Azure
+          }
+         ,pool      : {
+            requestTimeout : 2 * 60 * 60 * 1000
+          } 
+        }
+        
+    const pool = new sql.ConnectionPool(config);
+    await pool.connect()
+    const statement = `SET QUOTED_IDENTIFIER ON`
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${statement}\n\/\n`)
+    }
+    await pool.query(statement);
+    return pool;
+    
+}
+
+
+module.exports.processArguments  = processArguments
+module.exports.getConnectionPool = getConnectionPool

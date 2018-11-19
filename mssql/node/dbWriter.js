@@ -122,7 +122,7 @@ class DBWriter extends Writable {
             if (!this.skipTable) {
               // await this.transaction.commit();
               const elapsedTime = this.endTime - this.startTime;
-              this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Method ${this.tableInfo.bulkSupported ? 'Bulk' : 'Conventional'}. Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+              this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}"[${this.tableInfo.bulkSupported ? 'Bulk' : 'Conventional'}]. Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
             }
             if (!this.tableInfo.bulkSupported) {
               await this.tableInfo.preparedStatement.unprepare();

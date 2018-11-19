@@ -1,7 +1,9 @@
 "use strict";
 const fs = require('fs');
 const sql = require('mssql');
+const path = require('path');
 
+const Yadamu = require('../../common/yadamuCore.js');
 const MsSQLCore = require('./mssqlCore.js');
 
 const sqlGetSystemInformation = 
@@ -35,114 +37,103 @@ const sqlGenerateQueries =
     and t.table_schema = @SCHEMA
   group by t.table_schema, t.table_name`;    
  
-async function getSystemInformation(dbConn) {   
+async function getSystemInformation(request) {   
 
-    const results = await await dbConn.query(sqlGetSystemInformation);
+    const results = await await request.query(sqlGetSystemInformation);
     return results.recordsets[0];
  
 }
 
-async function generateQueries(dbConn,schema) {     
+async function generateQueries(request,schema) {     
 
- const results = await new sql.Request(dbConn).input('SCHEMA',sql.VARCHAR,schema).batch(sqlGenerateQueries);
+ const results = await request.input('SCHEMA',sql.VARCHAR,schema).batch(sqlGenerateQueries);
  return results.recordsets[0]
 
 }
 
 function fetchData(request,tableInfo,outStream) {
 
- outStream.write('[');
- request.stream = true // You can set streaming differently for each request
+  const column_list = JSON.parse(`[${tableInfo.columns}]`);
+
+  outStream.write('[');
+  request.stream = true // You can set streaming differently for each request
  
- let counter = 0;
+  let counter = 0;
 
- return new Promise(async function(resolve,reject) { 
- 
-     request.on('done', function(result) {
-     outStream.write(']');
-     resolve(counter)
- })
+  return new Promise(async function(resolve,reject) { 
 
-    const column_list = JSON.parse(`[${tableInfo.columns}]`);
+    request.on('done', function(result) {
+      outStream.write(']');
+      resolve(counter)
+    })
 
- request.on('row', function(row){
-        counter++
-        const array = []
-        for (let i=0; i < column_list.length; i++) {
-            if (row[column_list[i]] instanceof Buffer) {
-             array.push(row[column_list[i]].toString('hex'))
-            }
-            else {
-             array.push(row[column_list[i]]);
-            }
+  
+    request.on('row', function(row){
+      counter++
+      const array = []
+      for (let i=0; i < column_list.length; i++) {
+        if (row[column_list[i]] instanceof Buffer) {
+          array.push(row[column_list[i]].toString('hex'))
         }
-        if (counter > 1) {
-         outStream.write(',');
+        else {
+          array.push(row[column_list[i]]);
         }
-        outStream.write(JSON.stringify(array));
- })
+      }
+      if (counter > 1) {
+       outStream.write(',');
+      }
+      outStream.write(JSON.stringify(array));
+    })
 
- request.on('error',function(err) {
-        {reject(err)}
- })
+    request.on('error',function(err) {
+      reject(err)
+    })
  
- request.query(tableInfo.QUERY) // or request.execute(procedure)
-
- })
+    request.query(tableInfo.QUERY) // or request.execute(procedure)
+  })
 }
 
 function closeFile(outStream) {
         
- return new Promise(function(resolve,reject) {
+  return new Promise(function(resolve,reject) {
     outStream.on('finish',function() { resolve() });
     outStream.close();
- })
+  })
 
 }
 
 async function main(){
     
- let dbConn;
- let parameters;
- let sqlTrace;
- let logWriter = process.stdout;
+  let pool;
+  let parameters;
+  let sqlTrace;
+  let logWriter = process.stdout;
+  let status;
     
- try {
+  try {
 
- parameters = MsSQLCore.processArguments(process.argv,'export');
+    parameters = MsSQLCore.processArguments(process.argv,'export');
+    status = Yadamu.getStatus(parameters);
 
     if (parameters.LOGFILE) {
-     logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
- }
+      logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
+    }
     
- if (parameters.SQLTRACE) {
- sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
- }
- 
-    const config = {
- server : parameters.HOSTNAME
- ,user : parameters.USERNAME
- ,database : parameters.DATABASE
- ,password : parameters.PASSWORD
- ,port : parameters.PORT
-     ,options: {
- encrypt: false // Use this if you're on Windows Azure
- }
- }
+    pool = await MsSQLCore.getConnectionPool(parameters,status);
+    const request = pool.request();
+   
+    const exportFilePath = path.resolve(parameters.FILE);
+    const exportFile = fs.createWriteStream(exportFilePath);
+    // exportFile.on('error',function(err) {console.log(err)})
+    logWriter.write(`${new Date().toISOString()}[Export]: Generating file "${exportFilePath}".\n`)
 
- dbConn = new sql.ConnectionPool(config);
-    await dbConn.connect()
+    const schema = parameters.OWNER;
     
- const exportFilePath = parameters.FILE;    
- const exportFile = fs.createWriteStream(exportFilePath);
- // exportFile.on('error',function(err) {console.log(err)})
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
+    }
     
- const schema = parameters.OWNER;
-    
- if (parameters.SQLTRACE) {
- sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
- }
-    const sysInfo = await getSystemInformation(dbConn);
+    const sysInfo = await getSystemInformation(request);
     exportFile.write('{"systemInformation":');
     exportFile.write(JSON.stringify({
                       "date"            : new Date().toISOString()
@@ -154,78 +145,80 @@ async function main(){
                      ,"currentUser"     : sysInfo[0].CURRENT_USER
                      ,"dbName"          : sysInfo[0].DATABASE_NAME
                      ,"databaseVersion" : sysInfo[0].DATABASE_VERSION
+                     ,"softwareVendor"  : "Microsoft Corporation"
                      ,"hostname"        : sysInfo.HOSTNAME
     }));
-
+     
     exportFile.write(',"metadata":{')
-    if (parameters.SQLTRACE) {
-      sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
     }
-    const sqlQueries = await generateQueries(dbConn,schema);
-
+         
+    const sqlQueries = await generateQueries(request,schema);
+     
     for (let i=0; i < sqlQueries.length; i++) {
-     const row = sqlQueries[i];
-     if (i > 0) {
+      const row = sqlQueries[i];
+      if (i > 0) {
         exportFile.write(',');
- }
-     exportFile.write(`"${row.table_name}" : ${JSON.stringify({
-                          "owner" : row.table_schema
-                         ,"tableName" : row.table_name
-                         ,"columns" : row.columns
-                         ,"dataTypes" : JSON.parse('[' + row.dataTypes + ']')
-                                                 ,"sizeConstraints" : JSON.parse('[' + row.sizeConstraints + ']')
-                                                    ,selectList : row.selectList
-     })}`)               
+      }
+      exportFile.write(`"${row.table_name}" : ${JSON.stringify({
+                           "owner" : row.table_schema
+                          ,"tableName" : row.table_name
+                          ,"columns" : row.columns
+                          ,"dataTypes" : JSON.parse('[' + row.dataTypes + ']')
+                          ,"sizeConstraints" : JSON.parse('[' + row.sizeConstraints + ']')
+                          ,selectList : row.selectList
+      })}`)               
     }
+
     exportFile.write('},"data":{');
     for (let i=0; i < sqlQueries.length; i++) {
- const row = sqlQueries[i]
-     if (i > 0) {
+      const row = sqlQueries[i]
+      if (i > 0) {
         exportFile.write(',');
- }
-     exportFile.write(`"${row.table_name}" :`);
- if (parameters.SQLTRACE) {
- sqlTrace.write(`${row.QUERY}\n\/\n`)
- }
-     const startTime = new Date().getTime()
- const rows = await fetchData(new sql.Request(dbConn),row,exportFile) 
- const elapsedTime = new Date().getTime() - startTime
- logWriter.write(`${new Date().toISOString()} - Table: "${row.table_name}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
+      }
+      exportFile.write(`"${row.table_name}" :`);
+      if (status.sqlTrace) {
+        status.sqlTrace.write(`${row.QUERY}\n\/\n`)
+      }
+      const startTime = new Date().getTime()
+      const rows = await fetchData(new sql.Request(pool),row,exportFile) 
+      const elapsedTime = new Date().getTime() - startTime
+      logWriter.write(`${new Date().toISOString()} - Table: "${row.table_name}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
     }
-
- exportFile.write('}}');
     
+    exportFile.write('}}');    
     await closeFile(exportFile);
     
-    await dbConn.release();
+    await pool.release();
     logWriter.write('Export operation successful.\n');
- if (logWriter !== process.stdout) {
-     console.log(`Export operation successful: See "${parameters.LOGFILE}" for details.`);
- }
- } catch (e) {
- if (logWriter !== process.stdout) {
-     console.log(`Export operation failed: See "${parameters.LOGFILE}" for details.`);
-     logWriter.write('Export operation failed.\n');
-     logWriter.write(e.stack);
- }
-    else {
-    console.log('Export operation Failed.');
- console.log(e);
+     if (logWriter !== process.stdout) {
+         console.log(`Export operation successful: See "${parameters.LOGFILE}" for details.`);
+     }
+     } catch (e) {
+     if (logWriter !== process.stdout) {
+         console.log(`Export operation failed: See "${parameters.LOGFILE}" for details.`);
+         logWriter.write('Export operation failed.\n');
+         logWriter.write(e.stack);
+     }
+        else {
+        console.log('Export operation Failed.');
+     console.log(e);
+        }
+        if (sql !== undefined) {
+     await sql.close();
     }
-    if (sql !== undefined) {
- await sql.close();
-    }
- }
+  }
  
- if (logWriter !== process.stdout) {
+  if (logWriter !== process.stdout) {
     logWriter.close();
- } 
+  }  
 
- if (parameters.SQLTRACE) {
- sqlTrace.close();
- }
+  if (status.sqlTrace) {
+    status.sqlTrace.close();
+  }
  
- process.exit()
+  process.exit()
 }
 
 

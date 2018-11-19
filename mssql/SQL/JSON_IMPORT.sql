@@ -228,9 +228,7 @@ BEGIN
   DECLARE @ROW_COUNT        BIGINT;
  
   DECLARE @LOG_ENTRY        NVARCHAR(MAX);
-  DECLARE @RESULTS          TABLE(
-                              "LOG_ENTRY"      NVARCHAR(MAX)
-                            );
+  DECLARE @RESULTS          NVARCHAR(MAX) = '[]';
                             
   DECLARE FETCH_METADATA 
   CURSOR FOR 
@@ -256,7 +254,6 @@ BEGIN
   
   SET QUOTED_IDENTIFIER ON; 
   BEGIN TRY
-    EXEC sys.sp_set_session_context 'JSON_IMPORT', 'IN-PROGRESS'
     OPEN FETCH_METADATA;
     FETCH FETCH_METADATA INTO @TABLE_NAME, @STATEMENTS
 
@@ -270,19 +267,19 @@ BEGIN
           select @TABLE_NAME as [ddl.tableName], @SQL_STATEMENT as [ddl.sqlStatement] 
              for JSON PATH, INCLUDE_NULL_VALUES
         )
-        INSERT INTO @RESULTS VALUES (@LOG_ENTRY)
+        SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
       end TRY
       BEGIN CATCH  
         SET @LOG_ENTRY = (
           select @TABLE_NAME as [error.tableName], @SQL_STATEMENT as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as 'msg'
              for JSON PATH, INCLUDE_NULL_VALUES
         )
-        INSERT INTO @RESULTS VALUES (@LOG_ENTRY)
+        SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
       end CATCH
       
       BEGIN TRY 
         SET @START_TIME = SYSUTCDATETIME();
-        SET @SQL_STATEMENT = JSON_VALUE(@STATEMENTS,'$.ddl')
+        SET @SQL_STATEMENT = JSON_VALUE(@STATEMENTS,'$.dml')
         EXEC(@SQL_STATEMENT)
         SET @ROW_COUNT = @@ROWCOUNT;
         SET @end_TIME = SYSUTCDATETIME();
@@ -291,14 +288,14 @@ BEGIN
           select @TABLE_NAME as [dml.tableName], @ROW_COUNT as [dml.rowCount], @ELAPSED_TIME as [dml.elapsedTime], @SQL_STATEMENT  as [dml.sqlStatement]
              for JSON PATH, INCLUDE_NULL_VALUES
           )
-        INSERT INTO @RESULTS VALUES (@LOG_ENTRY)
+        SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
       end TRY  
       BEGIN CATCH  
         SET @LOG_ENTRY = (
           select @TABLE_NAME as [error.tableName],@SQL_STATEMENT  as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as 'msg'
              for JSON PATH, INCLUDE_NULL_VALUES
         )
-        INSERT INTO @RESULTS VALUES(@LOG_ENTRY);
+        SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
       end CATCH
 
       FETCH FETCH_METADATA INTO @TABLE_NAME, @STATEMENTS
@@ -306,8 +303,6 @@ BEGIN
    
     CLOSE FETCH_METADATA;
     DEALLOCATE FETCH_METADATA;
-    
-    EXEC sys.sp_set_session_context 'JSON_IMPORT', 'COMPLETE'
    
   end TRY 
   BEGIN CATCH
@@ -315,10 +310,10 @@ BEGIN
       select 'IMPORT_JSON' as [error.tableName], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as 'msg'
         for JSON PATH, INCLUDE_NULL_VALUES
     )
-    INSERT INTO @RESULTS VALUES (@LOG_ENTRY)
+    SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
   end CATCH
 --
-  SELECT "LOG_ENTRY" FROM @RESULTS;
+  SELECT @RESULTS;
 end
 --
 GO
