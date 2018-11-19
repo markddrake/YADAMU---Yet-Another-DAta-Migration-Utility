@@ -475,7 +475,7 @@ as
   ),
   "TARGET_TABLE_DEFINITIONS" 
   as (
-    select std.*
+    select st.*
           , MAP_FOREIGN_DATATYPE(P_SOURCE_VENROR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
           ,case
              -- Probe rather than Join since most rows are not objects.
@@ -491,13 +491,13 @@ as
              else
                NULL
            end "TYPE_EXISTS"
-      from "SOURCE_TABLE_DEFINITIONS" std
+      from "SOURCE_TABLE_DEFINITIONS" st
   ),
   "EXTENDED_TABLE_DEFINITIONS"
   as (
-  select ttd.*,
+  select tt.*,
          case when TYPE_EXISTS = 1 then OBJECT_SERIALIZATION.DESERIALIZE_TYPE(TYPE_OWNER,TYPE_NAME) else NULL end  "DESERIALIZATION_FUNCTION"
-    from "TARGET_TABLE_DEFINITIONS" ttd
+    from "TARGET_TABLE_DEFINITIONS" tt
   )
 --
   $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
@@ -1285,8 +1285,11 @@ begin
       null;
     when others then  
       RAISE;
-   end;
+  end;
 
+  DELETE FROM SCHEMA_COMPARE_RESULTS;
+  COMMIT;
+   
   for t in getTableList loop
     V_SQL_STATEMENT := 'insert /*+ WITH_PLSQL */ into SCHEMA_COMPARE_RESULTS ' || C_NEWLINE
                     || 'with'|| C_NEWLINE

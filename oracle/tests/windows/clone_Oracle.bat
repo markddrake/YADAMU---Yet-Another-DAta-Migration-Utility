@@ -1,4 +1,4 @@
-call env\setEnvironment.bat.bat
+call env\setEnvironment.bat
 @set DIR=JSON\%ORCL%
 @set MDIR=%TESTDATA%\%ORCL%\%MODE%
 @set SCHVER=1

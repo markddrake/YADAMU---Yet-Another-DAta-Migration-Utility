@@ -202,7 +202,7 @@ async function main(){
     
     conn = await OracleCore.doConnect(parameters.USERID,status);
     
-    const exportFilePath = path.resovle(parameters.FILE);
+    const exportFilePath = path.resolve(parameters.FILE);
     let exportFile = fs.createWriteStream(exportFilePath);
     // exportFile.on('error',function(err) {console.log(err)})
     logWriter.write(`${new Date().toISOString()}[Export]: Generating file "${exportFilePath}".\n`)

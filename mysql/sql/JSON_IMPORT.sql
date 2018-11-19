@@ -213,9 +213,9 @@ BEGIN
     ),
     "TARGET_TABLE_DEFINITIONS" 
     as (
-      select std.*
+      select st.*
             , MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
-        from "SOURCE_TABLE_DEFINITIONS" std
+        from "SOURCE_TABLE_DEFINITIONS" st
     )
     select group_concat(concat('"',COLUMN_NAME,'" ',TARGET_DATA_TYPE,
                                case
@@ -582,6 +582,9 @@ BEGIN
   EXECUTE STATEMENT;
   DEALLOCATE PREPARE STATEMENT;
 
+  DELETE FROM SCHEMA_COMPARE_RESULTS;
+  COMMIT;
+  
   SET NO_MORE_ROWS = FALSE;
   OPEN TABLE_METADATA;
     
@@ -598,8 +601,7 @@ BEGIN
                              '       ,(select count(*) from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
                              '       ,(select count(*) from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
                              '       ,(select count(*) from (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'") T1 LEFT JOIN  (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'") T2 USING (HASH) WHERE HASH IS NULL)',C_NEWLINE,
-                             '       ,(select count(*) from (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'") T1 LEFT JOIN  (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'") T2 USING (HASH) WHERE HASH IS NULL)');
-    
+                             '       ,(select count(*) from (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'") T1 LEFT JOIN  (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'") T2 USING (HASH) WHERE HASH IS NULL)');   
     
     SET @STATEMENT = V_STATEMENT;
     PREPARE STATEMENT FROM @STATEMENT;

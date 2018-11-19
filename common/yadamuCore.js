@@ -74,7 +74,7 @@ function decomposeDataType(targetDataType) {
     }
     else {
       if (components[0] === 'max') {
-        results.length = sql.MAX;
+        results.length = -1;
       }
       else {
         results.length = parseInt(components[0])
