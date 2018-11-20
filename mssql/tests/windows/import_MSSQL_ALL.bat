@@ -8,4 +8,3 @@ node ..\node\import --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD
 node ..\node\import --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHVER%    file=%SRC%\Purchasing%VER%.json       toUser=Purchasing     logFile=%IMPORTLOG% mode=%MODE%
 node ..\node\import --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHVER%    file=%SRC%\HumanResources%VER%.json   toUser=HumanResources logFile=%IMPORTLOG% mode=%MODE%
 node ..\node\import --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD% --database=AdventureWorksDW%SCHVER%  file=%SRC%\AdventureWorksDW%VER%.json toUser=dbo            logFile=%IMPORTLOG% mode=%MODE%
-y

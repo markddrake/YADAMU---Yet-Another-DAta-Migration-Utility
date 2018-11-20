@@ -367,7 +367,7 @@ end
 --
 GO
 --
-CREATE OR ALTER PROCEDURE COMPARE_SCHEMA(@SOURCE_DATABASE VARCHAR(128),@TARGET_DATABASE VARCHAR(128)) 
+CREATE OR ALTER PROCEDURE COMPARE_SCHEMA(@SOURCE_DATABASE NVARCHAR(128), @SOURCE_SCHEMA NVARCHAR(128), @TARGET_DATABASE NVARCHAR(128), @TARGET_SCHEMA NVARCHAR(128)) 
 AS
 BEGIN
   DECLARE @OWNER            VARCHAR(128);
@@ -382,12 +382,23 @@ BEGIN
   DECLARE FETCH_METADATA 
   CURSOR FOR 
   select t.table_name
-        ,string_agg(concat('"',c.column_name,'"'),',') within group (order by ordinal_position) "columns"
+        ,string_agg(case 
+                      when c.data_type in ('geography','geometry') then
+                        concat('HASHBYTES(''SHA2_256'',"',c.column_name,'".ToString()) "',c.column_name,'"')
+                      when c.data_type in ('xml','text','ntext') then
+                        concat('HASHBYTES(''SHA2_256'',CAST("',c.column_name,'" as NVARCHAR(MAX))) "',c.column_name,'"')
+                      when c.data_type in ('image') then
+                        concat('HASHBYTES(''SHA2_256'',CAST("',c.column_name,'" as VARBINARY(MAX))) "',c.column_name,'"')
+                      else  
+                        concat('"',c.column_name,'"')
+                      end
+                   ,',') 
+         within group (order by ordinal_position) "columns"
    from information_schema.columns c, information_schema.tables t
   where t.table_name = c.table_name
     and t.table_schema = c.table_schema
     and t.table_type = 'BASE TABLE'
-    and t.table_schema = @SOURCE_DATABASE
+    and t.table_schema = @SOURCE_SCHEMA
   group by t.table_schema, t.table_name;
  
   SET QUOTED_IDENTIFIER ON; 
@@ -395,9 +406,11 @@ BEGIN
   FETCH FETCH_METADATA INTO @TABLE_NAME, @COLUMN_LIST
   
   CREATE TABLE #SCHEMA_COMPARE_RESULTS (
-    SOURCE_SCHEMA    VARCHAR(128)
-   ,TARGET_SCHEMA    VARCHAR(128)
-   ,TABLE_NAME       VARCHAR(128)
+    SOURCE_DATATBASE NVARCHAR(128)
+   ,SOURCE_SCHEMA    NVARCHAR(128)
+   ,TARGET_DATABASE  NVARCHAR(128)
+   ,TARGET_SCHEMA    NVARCHAR(128)
+   ,TABLE_NAME       NVARCHAR(128)
    ,SOURCE_ROW_COUNT INT
    ,TARGET_ROW_COUNT INT
    ,MISSINGS_ROWS    INT
@@ -410,12 +423,14 @@ BEGIN
     
     SET @SQL_STATEMENT = CONCAT('insert into #SCHEMA_COMPARE_RESULTS ',@C_NEWLINE,
                              ' select ''',@SOURCE_DATABASE,''' ',@C_NEWLINE,
+                             '       ,''',@SOURCE_SCHEMA,''' ',@C_NEWLINE,
                              '       ,''',@TARGET_DATABASE,''' ',@C_NEWLINE,
+                             '       ,''',@TARGET_SCHEMA,''' ',@C_NEWLINE,
                              '       ,''',@TABLE_NAME,''' ',@C_NEWLINE,
-                             '       ,(select count(*) from "',@SOURCE_DATABASE,'"."',@TABLE_NAME,'")',@C_NEWLINE,
-                             '       ,(select count(*) from "',@TARGET_DATABASE,'"."',@TABLE_NAME,'")',@C_NEWLINE,
-                             '       ,(select count(*) from (SELECT ',@COLUMN_LIST,' FROM "',@SOURCE_DATABASE,'"."',@TABLE_NAME,'" EXCEPT SELECT ',@COLUMN_LIST,' FROM "',@TARGET_DATABASE,'"."',@TABLE_NAME,'") T1)',@C_NEWLINE,
-                             '       ,(select count(*) from (SELECT ',@COLUMN_LIST,' FROM "',@TARGET_DATABASE,'"."',@TABLE_NAME,'" EXCEPT SELECT ',@COLUMN_LIST,' FROM "',@SOURCE_DATABASE,'"."',@TABLE_NAME,'") T2)');
+                             '       ,(select count(*) from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'")',@C_NEWLINE,
+                             '       ,(select count(*) from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'")',@C_NEWLINE,
+                             '       ,(select count(*) from (SELECT ',@COLUMN_LIST,' FROM "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'" EXCEPT SELECT ',@COLUMN_LIST,' FROM "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'") T1)',@C_NEWLINE,
+                             '       ,(select count(*) from (SELECT ',@COLUMN_LIST,' FROM "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'" EXCEPT SELECT ',@COLUMN_LIST,' FROM "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'") T2)');
     
     EXEC(@SQL_STATEMENT);
    

@@ -1,13 +1,6 @@
 --
-:setvar Timestampwidth 48
-select concat( FORMAT(sysutcdatetime(),'yyyy-MM-dd"T"HH:mm:ss.fffff"Z"'),': "$(SCHEMA)$(ID1)", "$(SCHEMA)$(ID2)", "$(METHOD)"') "Timestamp";
-go
+select concat( FORMAT(sysutcdatetime(),'yyyy-MM-dd"T"HH:mm:ss.fffff"Z"'),': "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'", "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'", "$(METHOD)"') "Timestamp";
 --
-exec COMPARE_SCHEMA '$(SCHEMA)$(ID1)','$(SCHEMA)$(ID2)'
-go
---
-select * 
-  from SCHEMA_COMPARE_RESULTS 
- order by SOURCE_SCHEMA, TABLE_NAME;
+exec COMPARE_SCHEMA @SOURCE_DATABASE, @SOURCE_SCHEMA, @TARGET_DATABASE, @TARGET_SCHEMA
 go
 --

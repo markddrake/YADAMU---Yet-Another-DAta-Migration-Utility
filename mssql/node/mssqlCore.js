@@ -94,17 +94,15 @@ function processArguments(args,operation) {
 async function getConnectionPool(parameters,status) {
 
   const config = {
-          server    : parameters.HOSTNAME
-         ,user      : parameters.USERNAME
-         ,database  : parameters.DATABASE
-         ,password  : parameters.PASSWORD
-         ,port      :  parameters.PORT
+          server          : parameters.HOSTNAME
+         ,user            : parameters.USERNAME
+         ,database        : parameters.DATABASE
+         ,password        : parameters.PASSWORD
+         ,port            : parameters.PORT
+         ,requestTimeout  : 2 * 60 * 60 * 10000
          ,options   : {
              encrypt: false // Use this if you're on Windows Azure
           }
-         ,pool      : {
-            requestTimeout : 2 * 60 * 60 * 1000
-          } 
         }
         
     const pool = new sql.ConnectionPool(config);
