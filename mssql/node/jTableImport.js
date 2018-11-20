@@ -3,6 +3,7 @@
 const fs = require('fs');
 const sql = require('mssql');
 const Writable = require('stream').Writable
+const path = require('path')
 
 const MsSQLCore = require('./mssqlCore.js');
 const StagingTable = require('./stagingTable.js');
@@ -47,7 +48,7 @@ async function main(){
 
     const schema = parameters.TOUSER;
     
-    const importFilePath = parameters.FILE; 
+    const importFilePath = path.resolve(parameters.FILE); 
     const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size;
  
