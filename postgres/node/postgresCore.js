@@ -90,7 +90,7 @@ function processArguments(args,operation) {
    return parameters;
 }
 
-async function getClient(parameters,logWriter) {
+async function getClient(parameters,logWriter,status) {
 
   const connectionDetails = {
     user      : parameters.USERNAME
@@ -114,6 +114,12 @@ async function getClient(parameters,logWriter) {
                              logWriter.write(`${new Date().toISOString()}[Notice]:${n}\n`);
                          }
   })
+  
+  const setTimezone = `set timezone to 'UTC'`
+  if (status.sqlTrace) {
+    status.sqlTrace.write(`${setTimezone}\n\/\n`)
+  }
+  await pgClient.query(setTimezone);
   return pgClient;
 }
 module.exports.processArguments       = processArguments

@@ -71,7 +71,7 @@ async function main(){
     const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
     
-	pgClient = await PostgresCore.getClient(parameters,logWriter);
+	pgClient = await PostgresCore.getClient(parameters,logWriter,status);
 
     let importFile = fs.createReadStream(importFilePath);
     importFile.on('error',function(err) {console.log(err)})
@@ -86,7 +86,7 @@ async function main(){
     catch (e) {
       if (e.code && (e.code === '54000')) {
         // Switch to Character JSON
-        logWriter.write(`${new Dring()}[JSON_TABLE()]: Processing Import Data file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
+        logWriter.write(`${new Dring()}[JSON_TABLE()]: Processing Import Data file "${importFilePath}". Size ${fileSizeInBytes}.  Processing Import Data file ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
         importFile.close();
         useBinaryJSON = false;
         await createStagingTable(pgClient,useBinaryJSON,status);
@@ -96,7 +96,7 @@ async function main(){
       }      
     }
     importFile.close();
-    logWriter.write(`${new Date().toISOString()}: Import Data file "${importFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
+    logWriter.write(`${new Date().toISOString()}}[JSON_TABLE()]:  Processing Import Data file "${importFilePath}". Size ${fileSizeInBytes}. Processing Import Data file ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
 	const results = await processStagingTable(pgClient,schema,useBinaryJSON,status);	
     Yadamu.processLog(results, status, logWriter)          

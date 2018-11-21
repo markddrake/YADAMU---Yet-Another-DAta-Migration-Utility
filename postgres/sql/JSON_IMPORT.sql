@@ -255,7 +255,8 @@ begin
                                                                  "columns" TEXT, 
                                                                  "dataTypes" JSONB, 
                                                                  "sizeConstraints" JSONB
-                                                              ) loop
+                                                              ) 
+  loop
                                                               
     begin
       EXECUTE r."TABLE_INFO" ->> 'ddl';
@@ -311,7 +312,8 @@ begin
                                                                 "columns" TEXT, 
                                                                 "dataTypes" JSONB, 
                                                                 "sizeConstraints" JSONB
-                                                              ) loop
+                                                              ) 
+  loop
   
     begin
       EXECUTE r.TABLE_INFO ->> 'ddl';
@@ -363,6 +365,46 @@ begin
                                                        "dataTypes" JSONB, 
                                                        "sizeConstraints" JSONB
                                                      );
+end;
+$$ LANGUAGE plpgsql;
+--
+create or replace procedure COMPARE_SCHEMA(P_SOURCE_SCHEMA VARCHAR,P_TARGET_SCHEMA VARCHAR)
+as $$
+declare
+  R RECORD;
+  V_SQL_STATEMENT TEXT;
+  C_NEWLINE CHAR(1) = CHR(13);
+begin
+  create temporary table if not exists SCHEMA_COMPARE_RESULTS (
+    SOURCE_SCHEMA    VARCHAR(128)
+   ,TARGET_SCHEMA    VARCHAR(128)
+   ,TABLE_NAME       VARCHAR(128)
+   ,SOURCE_ROW_COUNT INT
+   ,TARGET_ROW_COUNT INT
+   ,MISSINGS_ROWS    INT
+   ,EXTRA_ROWS       INT
+  );
+  
+  for r in select t.table_name
+	             ,string_agg('"' || column_name || '"',',' order by ordinal_position) COLUMN_LIST
+             from information_schema.columns c, information_schema.tables t
+            where t.table_name = c.table_name 
+              and t.table_schema = c.table_schema
+	          and t.table_type = 'BASE TABLE'
+              and t.table_schema = P_SOURCE_SCHEMA
+            group by t.table_schema, t.table_name 
+  loop
+    V_SQL_STATEMENT = 'insert into SCHEMA_COMPARE_RESULTS ' || C_NEWLINE
+                    || ' select ''' || P_SOURCE_SCHEMA  || ''' ' || C_NEWLINE
+                    || '       ,''' || P_TARGET_SCHEMA  || ''' ' || C_NEWLINE
+                    || '       ,'''  || r.TABLE_NAME || ''' ' || C_NEWLINE
+                    || '       ,(select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '")'  || C_NEWLINE
+                    || '       ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '")'  || C_NEWLINE
+                    || '       ,(select count(*) from (SELECT ' || r.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '" EXCEPT SELECT ' || r.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '") T1) '  || C_NEWLINE
+                    || '       ,(select count(*) from (SELECT ' || r.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '" EXCEPT SELECT ' || r.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '") T1) '  || C_NEWLINE;
+					
+    EXECUTE V_SQL_STATEMENT;               
+  end loop;
 end;
 $$ LANGUAGE plpgsql;
 --

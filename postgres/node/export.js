@@ -86,7 +86,7 @@ async function main(){
 	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
 
-	pgClient = await PostgresCore.getClient(parameters,logWriter);
+	pgClient = await PostgresCore.getClient(parameters,logWriter,status);
 
     const exportFilePath = path.resolve(parameters.FILE);
     const exportFile = fs.createWriteStream(exportFilePath);

@@ -35,3 +35,4 @@ drop schema :"SCHEMA" cascade;
 --
 create schema :"SCHEMA";
 --
+\quit
