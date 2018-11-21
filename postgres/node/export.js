@@ -1,12 +1,13 @@
 "use strict";
- 
 const fs = require('fs');
-const common = require('./common.js');
 const {Client} = require('pg')
 const QueryStream = require('pg-query-stream')
 const JSONStream = require('JSONStream')
 const Transform = require('stream').Transform;
+const path = require('path');
 
+const Yadamu = require('../../common/yadamuCore.js');
+const PostgresCore = require('./postgresCore.js');
 
 const sqlGetSystemInformation =
 `select current_database() database_name,current_user,session_user,current_setting('server_version_num') database_version`;					   
@@ -14,9 +15,8 @@ const sqlGetSystemInformation =
 const sqlGenerateQueries =
 `select t.table_schema, t.table_name
 	   ,string_agg('"' || column_name || '"',',' order by ordinal_position) "columns" 
-	   ,string_agg('"' || data_type || '"',',' order by ordinal_position) "dataTypes"
-       ,string_agg('"' ||
-                   case
+	   ,jsonb_agg(data_type order by ordinal_position) "dataTypes"
+       ,jsonb_agg(case
                      when (numeric_precision is not null) and (numeric_scale is not null) 
                        then cast(numeric_precision as varchar) || ',' || cast(numeric_scale as varchar)
                      when (numeric_precision is not null) 
@@ -26,8 +26,7 @@ const sqlGenerateQueries =
                      else
                        ''
                    end
-                   || '"'
-                  ,',' order by ordinal_position
+                   order by ordinal_position
                  ) "sizeConstraints"
 	   ,'select jsonb_build_array(' || string_agg('"' || column_name || '"',',' order by ordinal_position)|| ') "json" from "' || t.table_schema || '"."' || t.table_name ||'"' QUERY 
    from information_schema.columns c, information_schema.tables t
@@ -76,46 +75,35 @@ async function main(){
 
   let pgClient;
   let parameters;
-  let sqlTrace;
   let logWriter = process.stdout;
+  let status;
 
   try {
-    parameters = common.processArguments(process.argv,'export');
+    parameters = PostgresCore.processArguments(process.argv,'export');
+    status = Yadamu.getStatus(parameters);
 
 	if (parameters.LOGFILE) {
-	  logWriter = fs.createWriteStream(parameters.LOGFILE);
+	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
 
-    if (parameters.SQLTRACE) {
-      sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
-    }
-	
-	const connectionDetails = {
-      user      : parameters.USERNAME
-     ,host      : parameters.HOSTNAME
-     ,database  : parameters.DATABASE
-     ,password  : parameters.PASSWORD
-     ,port      : parameters.PORT
-    }
+	pgClient = await PostgresCore.getClient(parameters,logWriter);
 
-    pgClient = new Client(connectionDetails);
-	pgClient.on('notice',function(msg){ console.log(msg)});
-	await pgClient.connect();
+    const exportFilePath = path.resolve(parameters.FILE);
+    const exportFile = fs.createWriteStream(exportFilePath);
+    // exportFile.on('error',function(err) {console.log(err)})
+    logWriter.write(`${new Date().toISOString()}[Export]: Generating file "${exportFilePath}".\n`)
+    
 
-    const dumpFilePath = parameters.FILE;	
-    const dumpFile = fs.createWriteStream(dumpFilePath);
-    // dumpFile.on('error',function(err) {console.log(err)})
-		
-	const schema = parameters.OWNER;
-    if (parameters.SQLTRACE) {
-      sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
     }
     const sysInfo = await getSystemInformation(pgClient);
-	dumpFile.write('{"systemInformation":');
-	dumpFile.write(JSON.stringify({
+	exportFile.write('{"systemInformation":');
+	exportFile.write(JSON.stringify({
 		                 "date" : new Date().toISOString()
+                        ,"timeZoneOffset"  : new Date().getTimezoneOffset()
 					    ,"vendor" : "Postges"
-					    ,"schema" : schema
+					    ,"schema" :  parameters.OWNER
 					    ,"exportVersion": 1
 						,"sessionUser" : sysInfo.session_user
 						,"dbName" : sysInfo.database_name
@@ -123,43 +111,45 @@ async function main(){
 	}));
 	
 	
-	dumpFile.write(',"metadata":{');
-    if (parameters.SQLTRACE) {
-      sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
+	exportFile.write(',"metadata":{');
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
     }
-	const sqlQueries = await generateQueries(pgClient,schema);
+	const sqlQueries = await generateQueries(pgClient, parameters.OWNER);
 	for (let i=0; i < sqlQueries.length; i++) {
 	  if (i > 0) {
-		dumpFile.write(',');
+		exportFile.write(',');
       }
-	  dumpFile.write(`"${sqlQueries[i].table_name}" : ${JSON.stringify({
-						                                 "owner"          : sqlQueries[i].table_schema
-                                                        ,"tableName"      : sqlQueries[i].table_name
-                                                        ,"columns"        : sqlQueries[i].columns
-                                                        ,"dataTypes"      : sqlQueries[i].dataTypes
-														,"dataTypeSizing" : sqlQueries[i].sizeConstraints
+
+	  exportFile.write(`"${sqlQueries[i].table_name}" : ${JSON.stringify({
+						                                 "owner"           : sqlQueries[i].table_schema
+                                                        ,"tableName"       : sqlQueries[i].table_name
+                                                        ,"columns"         : sqlQueries[i].columns
+                                                        ,"dataTypes"       : sqlQueries[i].dataTypes
+														,"sizeConstraints" : sqlQueries[i].sizeConstraints
 	                 })}`)				   
 	}
-	dumpFile.write('},"data":{');
+	exportFile.write('},"data":{');
 	for (let i=0; i < sqlQueries.length; i++) {
 	  if (i > 0) {
-		dumpFile.write(',');
+		exportFile.write(',');
       }
-	  dumpFile.write(`"${sqlQueries[i].table_name}" :`);
+	  exportFile.write(`"${sqlQueries[i].table_name}" :`);
 	  const startTime = new Date().getTime()
-      if (parameters.SQLTRACE) {
-        sqlTrace.write(`${sqlQueries[i].query}\n\/\n`)
+      const sqlStatement = sqlQueries[i].query
+      if (status.sqlTrace) {
+        status.sqlTrace.write(`${sqlStatement}\n\/\n`)
       }
-      const rows = await fetchData(pgClient,sqlQueries[i].query,dumpFile) 
+      const rows = await fetchData(pgClient,sqlStatement,exportFile) 
       const elapsedTime = new Date().getTime() - startTime
       logWriter.write(`${new Date().toISOString()} - Table: "${sqlQueries[i].table_name}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
 	}
 
-    dumpFile.write('}}');
-	dumpFile.close();
+    exportFile.write('}}');
+	exportFile.close();
 
 	await pgClient.end();
-	logWriter.write('Export operation successful.');
+	logWriter.write(`Export operation successful.\n`);
     if (logWriter !== process.stdout) {
 	  console.log(`Export operation successful: See "${parameters.LOGFILE}" for details.`);
     }
@@ -167,7 +157,7 @@ async function main(){
     if (logWriter !== process.stdout) {
 	  console.log(`Export operation failed: See "${parameters.LOGFILE}" for details.`);
   	  logWriter.write('Export operation failed.\n');
-	  logWriter.write(e.stack);
+      logWriter.write(`${e}\n${e.stack}\n`);
     }
 	else {
     	console.log('Export operation Failed.');
@@ -182,8 +172,8 @@ async function main(){
 	logWriter.close();
   }
   
-  if (parameters.SQLTRACE) {
-    sqlTrace.close();
+  if (status.sqlTrace) {
+    status.sqlTrace.close();
   }
   
 }
