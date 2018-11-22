@@ -1,6 +1,7 @@
 "use strict";
 const Writable = require('stream').Writable
 
+const Yadamu = require('../../common/yadamuCore.js');
 const StatementGenerator = require('./statementGenerator');
 
 class DBWriter extends Writable {
@@ -61,6 +62,9 @@ class DBWriter extends Writable {
       this.batchRowCount = 0;
       return endTime
     } catch (e) {
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(`rollback transaction;\n--\n`);
+      }
       await this.conn.query(`rollback transaction`);
       this.batch.length = 0;
       this.batchRowCount = 0;
@@ -93,6 +97,9 @@ class DBWriter extends Writable {
             if (this.batchRowCount > 0) {
               // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Final Batch contains ${this.batchRowCount} rows.`);
               this.endTime = await this.writeBatch(this.status);
+              if (this.status.sqlTrace) {
+                this.status.sqlTrace.write(`commit transaction;\n--\n`);
+              }
               await this.conn.query(`commit transaction`);
             }  
             if (!this.skipTable) {
@@ -109,6 +116,22 @@ class DBWriter extends Writable {
           if (this.skipTable) {
             break;
           }
+          this.tableInfo.targetDataTypes.forEach(async function(targetDataType,idx) {
+                                                   const dataType = Yadamu.decomposeDataType(targetDataType);
+                                                   if (obj.data[idx] !== null) {
+                                                     switch (dataType.type) {
+                                                       case "bit" :
+                                                         if (obj.data[idx] === true) {
+                                                           obj.data[idx] = 1
+                                                         }
+                                                         else {
+                                                           obj.data[idx] = 0
+                                                         }  
+                                                         return;
+                                                       default :
+                                                     }
+                                                   }
+          },this)
           this.batch.push(...obj.data);
           this.batchRowCount++;
           //  this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Batch contains ${this.batchRowCount} rows.`);
@@ -118,13 +141,22 @@ class DBWriter extends Writable {
           }  
           this.rowCount++;
           if (this.rowCount === 1) {
+            if (this.status.sqlTrace) {
+              this.status.sqlTrace.write(`begin transaction;\n--\n`);
+            }
             await this.conn.query(`begin transaction`);
           }
           if ((this.rowCount % this.commitSize) === 0) {
-             await this.conn.query(`commit transaction`);
-             const elapsedTime = this.endTime - this.startTime;
-             await this.conn.beginTransaction();
-             // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Commit after Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+            if (this.status.sqlTrace) {
+              this.status.sqlTrace.write(`commit transaction;\n--\n`);
+            }
+            await this.conn.query(`commit transaction`);
+            const elapsedTime = this.endTime - this.startTime;
+            if (this.status.sqlTrace) {
+              this.status.sqlTrace.write(`begin transaction;\n--\n`);
+            }
+            await this.conn.query(`begin transaction`);
+            // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Commit after Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
           }
           break;
         default:
@@ -146,6 +178,9 @@ class DBWriter extends Writable {
           }  
           const elapsedTime = this.endTime - this.startTime;
           this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+          if (this.status.sqlTrace) {
+            this.status.sqlTrace.write(`commit transaction;\n--\n`);
+          }
           await this.conn.query(`commit transaction`);
         }
       }          

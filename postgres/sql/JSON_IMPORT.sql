@@ -207,8 +207,10 @@ begin
                     case 
                       when TARGET_DATA_TYPE like '%(%)' 
                         then ''
-                      when TARGET_DATA_TYPE in ('smallint', 'mediumint', 'int', 'bigint','real','text','bytea','integer','money','xml','json','jsonb','image','date')
+                      when TARGET_DATA_TYPE in ('smallint', 'mediumint', 'int', 'bigint','real','text','bytea','integer','money','xml','json','jsonb','image','date','double precision')
                         then ''
+                      when (TARGET_DATA_TYPE = 'time' and DATA_TYPE_LENGTH::INT > 6)
+                        then '(6)'
                       when TARGET_DATA_TYPE like 'interval%'
                         then ''
                       when DATA_TYPE_LENGTH is NOT NULL and DATA_TYPE_SCALE IS NOT NULL
@@ -374,6 +376,10 @@ declare
   R RECORD;
   V_SQL_STATEMENT TEXT;
   C_NEWLINE CHAR(1) = CHR(13);
+  
+  V_SOURCE_COUNT INT;
+  V_TARGET_COUNT INT;
+  V_ERROR        TEXT;
 begin
   create temporary table if not exists SCHEMA_COMPARE_RESULTS (
     SOURCE_SCHEMA    VARCHAR(128)
@@ -383,10 +389,11 @@ begin
    ,TARGET_ROW_COUNT INT
    ,MISSINGS_ROWS    INT
    ,EXTRA_ROWS       INT
+   ,ERROR            TEXT
   );
   
   for r in select t.table_name
-	             ,string_agg('"' || column_name || '"',',' order by ordinal_position) COLUMN_LIST
+	             ,string_agg('"' || column_name || '"' || case when data_type in ('json','xml')  then '::text' else '' end,',' order by ordinal_position) COLUMN_LIST
              from information_schema.columns c, information_schema.tables t
             where t.table_name = c.table_name 
               and t.table_schema = c.table_schema
@@ -394,16 +401,40 @@ begin
               and t.table_schema = P_SOURCE_SCHEMA
             group by t.table_schema, t.table_name 
   loop
-    V_SQL_STATEMENT = 'insert into SCHEMA_COMPARE_RESULTS ' || C_NEWLINE
-                    || ' select ''' || P_SOURCE_SCHEMA  || ''' ' || C_NEWLINE
-                    || '       ,''' || P_TARGET_SCHEMA  || ''' ' || C_NEWLINE
-                    || '       ,'''  || r.TABLE_NAME || ''' ' || C_NEWLINE
-                    || '       ,(select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '")'  || C_NEWLINE
-                    || '       ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '")'  || C_NEWLINE
-                    || '       ,(select count(*) from (SELECT ' || r.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '" EXCEPT SELECT ' || r.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '") T1) '  || C_NEWLINE
-                    || '       ,(select count(*) from (SELECT ' || r.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '" EXCEPT SELECT ' || r.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '") T1) '  || C_NEWLINE;
-					
-    EXECUTE V_SQL_STATEMENT;               
+    begin
+      V_SQL_STATEMENT = 'insert into SCHEMA_COMPARE_RESULTS ' || C_NEWLINE
+                      || ' select ''' || P_SOURCE_SCHEMA  || ''' ' || C_NEWLINE
+                      || '       ,''' || P_TARGET_SCHEMA  || ''' ' || C_NEWLINE
+                      || '       ,'''  || r.TABLE_NAME || ''' ' || C_NEWLINE
+                      || '       ,(select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '")'  || C_NEWLINE
+                      || '       ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '")'  || C_NEWLINE
+                      || '       ,(select count(*) from (SELECT ' || r.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '" EXCEPT SELECT ' || r.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '") T1) '  || C_NEWLINE
+                      || '       ,(select count(*) from (SELECT ' || r.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '" EXCEPT SELECT ' || r.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '") T1) '  || C_NEWLINE
+                      || '       ,NULL';
+      EXECUTE V_SQL_STATEMENT;               
+    exception  
+      when others then
+        V_ERROR = SQLERRM;
+        V_SOURCE_COUNT = -1;
+        V_TARGET_COUNT = -1;
+
+        begin 
+          EXECUTE 'select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '"' into V_SOURCE_COUNT;
+        exception 
+          when others then
+            null;
+        end;
+         
+        begin 
+          EXECUTE 'select count(*) from "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '"' into V_TARGET_COUNT;
+        exception 
+          when others then
+            null;
+        end;
+		
+        insert into SCHEMA_COMPARE_RESULTS VALUES (P_SOURCE_SCHEMA, P_TARGET_SCHEMA, r.TABLE_NAME, V_SOURCE_COUNT, V_TARGET_COUNT, -1, -1, V_ERROR);            
+    end;               
+                    
   end loop;
 end;
 $$ LANGUAGE plpgsql;

@@ -19,7 +19,7 @@
 --
 \include sql/SCHEMA_COMPARE.sql
 --
-\set SCHEMA HumanRe\includes
+\set SCHEMA HumanResources
 --
 \include sql/SCHEMA_COMPARE.sql
 --

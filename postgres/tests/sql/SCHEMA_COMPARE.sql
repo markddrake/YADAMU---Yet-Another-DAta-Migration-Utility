@@ -6,5 +6,6 @@ call COMPARE_SCHEMA(:'SCHEMA' || :'ID1',:'SCHEMA' || :'ID2');
 --
 select * 
   from SCHEMA_COMPARE_RESULTS 
+ where SOURCE_SCHEMA = :'SCHEMA' || :'ID1'
  order by SOURCE_SCHEMA, TABLE_NAME;
 --

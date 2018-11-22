@@ -10,7 +10,7 @@ call windows\export_MSSQL %DIR% %SCHVER% %SCHVER%
 @set SCHVER=2
 psql -U %DB_USER% -h %DB_HOST% -a -vID=%SCHVER% -vMETHOD=JSON_TABLE -f sql\RECREATE_MSSQL_ALL.sql >>%LOGDIR%\RECREATE_SCHEMA.log
 call windows\import_MSSQL_jTable.bat %DIR% %SCHVER% 1
-psql -U %DB_USER% -h %DB_HOST% -a -vID1=1 -vID2=2-vMETHOD=JSON_TABLE -f sql\COMPARE_MSSQL_ALL.sql >>%LOGDIR%\COMPARE_SCHEMA.log
+psql -U %DB_USER% -h %DB_HOST% -a -vID1=1 -vID2=2 -vMETHOD=JSON_TABLE -f sql\COMPARE_MSSQL_ALL.sql >>%LOGDIR%\COMPARE_SCHEMA.log
 call windows\export_MSSQL %DIR% %SCHVER% %SCHVER%
 node ..\..\utilities\compareFileSizes %LOGDIR% %MDIR% %DIR%
 node ..\..\utilities\compareArrayContent %LOGDIR% %MDIR% %DIR% false
