@@ -223,6 +223,8 @@ begin
                    ,CHR(10) || '  ,'
                    ) COLUMNS_CLAUSE
         ,STRING_AGG(case 
+                      when TARGET_DATA_TYPE = 'time' then  
+                       'cast( value ->> ' || IDX-1 || ' as timestamp)::' || TARGET_DATA_TYPE
                       when TARGET_DATA_TYPE = 'bit' then  
                         'case when value ->> ' || IDX-1 || ' = ''true'' then B''1'' when value ->> ' || IDX-1 || ' = ''false''  then B''0'' else cast( value ->> ' || IDX-1 || ' as ' || TARGET_DATA_TYPE || ') end'
                       else
@@ -400,7 +402,16 @@ begin
   );
   
   for r in select t.table_name
-	             ,string_agg('"' || column_name || '"' || case when data_type in ('json','xml')  then '::text' else '' end,',' order by ordinal_position) COLUMN_LIST
+	             ,string_agg(
+                    case 
+                      when data_type in ('json','xml')  then
+                        '"' || column_name || '"::text' 
+                      else 
+                        '"' || column_name || '"' 
+                    end
+                   ,',' 
+                   order by ordinal_position
+                  ) COLUMN_LIST
              from information_schema.columns c, information_schema.tables t
             where t.table_name = c.table_name 
               and t.table_schema = c.table_schema

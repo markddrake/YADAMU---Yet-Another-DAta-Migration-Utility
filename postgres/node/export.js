@@ -28,7 +28,15 @@ const sqlGenerateQueries =
                    end
                    order by ordinal_position
                  ) "sizeConstraints"
-	   ,'select jsonb_build_array(' || string_agg('"' || column_name || '"',',' order by ordinal_position)|| ') "json" from "' || t.table_schema || '"."' || t.table_name ||'"' QUERY 
+	   ,'select jsonb_build_array(' || string_agg('"' || column_name || '"' ||
+                                                  case  
+                                                    when data_type = 'xml' then
+                                                       '::text'
+                                                    else
+                                                      ''
+                                                  end
+                                                 ,',' order by ordinal_position
+                                                 ) || ') "json" from "' || t.table_schema || '"."' || t.table_name ||'"' QUERY 
    from information_schema.columns c, information_schema.tables t
   where t.table_name = c.table_name 
 	and t.table_schema = c.table_schema
@@ -79,8 +87,8 @@ async function main(){
   let status;
 
   try {
-    parameters = PostgresCore.processArguments(process.argv,'export');
-    status = Yadamu.getStatus(parameters);
+    parameters = PostgresCore.processArguments(process.argv);
+    status = Yadamu.getStatus(parameters,'Export');
 
 	if (parameters.LOGFILE) {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
@@ -149,10 +157,7 @@ async function main(){
 	exportFile.close();
 
 	await pgClient.end();
-	logWriter.write(`Export operation successful.\n`);
-    if (logWriter !== process.stdout) {
-	  console.log(`Export operation successful: See "${parameters.LOGFILE}" for details.`);
-    }
+    Yadamu.reportStatus(status,logWriter);
   } catch (e) {
     if (logWriter !== process.stdout) {
 	  console.log(`Export operation failed: See "${parameters.LOGFILE}" for details.`);

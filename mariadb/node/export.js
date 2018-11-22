@@ -114,8 +114,8 @@ async function main(){
 	
   try {
 
-    parameters = MariaCore.processArguments(process.argv,'export');
-    status = Yadamu.getStatus(parameters);                                         
+    parameters = MariaCore.processArguments(process.argv);
+    status = Yadamu.getStatus(parameters,'Export');                                         
 
 	if (parameters.LOGFILE) {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
@@ -199,10 +199,7 @@ async function main(){
 	
 	await conn.end();
  	await pool.end();
-	logWriter.write(`Export operation successful.\n`);
-    if (logWriter !== process.stdout) {
-	  console.log(`Export operation successful: See "${parameters.LOGFILE}" for details.`);
-    }
+    Yadamu.reportStatus(status,logWriter);
   } catch (e) {
     if (logWriter !== process.stdout) {
 	  console.log(`Export operation failed: See "${parameters.LOGFILE}" for details.`);

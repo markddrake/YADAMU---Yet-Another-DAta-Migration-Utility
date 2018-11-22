@@ -41,8 +41,8 @@ async function main(){
 
   try {
 
-    parameters = MySQLCore.processArguments(process.argv,'export');
-    status = Yadamu.getStatus(parameters);
+    parameters = MySQLCore.processArguments(process.argv);
+    status = Yadamu.getStatus(parameters,'Import');
   
 	if (parameters.LOGFILE) {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});

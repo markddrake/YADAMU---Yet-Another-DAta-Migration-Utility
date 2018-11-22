@@ -483,10 +483,10 @@ as
                 case 
                       when (TYPE_OWNER = P_TABLE_OWNER)
                         -- Original Type belonged to the same schema as the table. Resolve the type in the target Schema
-                        then (select 1 from ALL_TYPES at where OWNER = P_TARGET_SCHEMA and at.TYPE_NAME = std.TYPE_NAME)
+                        then (select 1 from ALL_TYPES at where OWNER = P_TARGET_SCHEMA and at.TYPE_NAME = st.TYPE_NAME)
                       else
                         -- Original Type belonged to different schema as the table. Resolve the type in the original Schema
-                        (select 1 from ALL_TYPES at where at.OWNER = std.TYPE_OWNER and at.TYPE_NAME = std.TYPE_NAME)
+                        (select 1 from ALL_TYPES at where at.OWNER = st.TYPE_OWNER and at.TYPE_NAME = st.TYPE_NAME)
                     end
              else
                NULL

@@ -63,7 +63,7 @@ async function createTargetDatabase(conn,status,schema) {
 }
 
 
-function processArguments(args,operation) {
+function processArguments(args) {
 
    const parameters = {
 	                 FILE : "export.json"

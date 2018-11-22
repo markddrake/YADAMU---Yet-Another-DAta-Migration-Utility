@@ -91,7 +91,7 @@ async function writeClobToFile(lob, filename) {
   });
 };
 
-function processArguments(args,operation) {
+function processArguments(args) {
 
    const parameters = {
 	                 FILE         : "export.json"

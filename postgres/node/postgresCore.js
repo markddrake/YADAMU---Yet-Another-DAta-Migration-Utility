@@ -3,7 +3,7 @@ const {Client} = require('pg')
 
 const Yadamu = require('../../common/yadamuCore.js');
 
-function processArguments(args,operation) {
+function processArguments(args) {
 
    const parameters = {
 	                 FILE     : "export.json"

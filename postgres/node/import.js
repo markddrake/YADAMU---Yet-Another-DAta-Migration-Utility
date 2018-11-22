@@ -35,8 +35,8 @@ async function main() {
       logWriter.write(`${err}\n${err.stack}\n`);
     })
     
-    parameters = PostgresCore.processArguments(process.argv,'export');
-    status = Yadamu.getStatus(parameters);
+    parameters = PostgresCore.processArguments(process.argv);
+    status = Yadamu.getStatus(parameters,'Import');
 
 	if (parameters.LOGFILE) {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});

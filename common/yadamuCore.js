@@ -40,14 +40,14 @@ function processLog(log,status,logWriter) {
 	                switch (true) {
 		              case (logEntry.severity === 'FATAL') :
                         status.errorRaised = true;
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.details}\n${logEntry.sqlStatement}\n`)
+                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}\n`)
 				        break
 					  case (logEntry.severity === 'WARNING') :
                         status.warningRaised = true;
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.details}${logEntry.sqlStatement}\n`)
+                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details:  ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
                         break;
                       case (logDDLIssues) :
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.details}${logEntry.sqlStatement}\n`)
+                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
                     } 	
                 } 
 				if ((status.sqlTrace) && (logEntry.sqlStatement)) {
@@ -110,12 +110,29 @@ function processValue(parameterValue) {
   }
 }
 
-function getStatus(parameters) {
+function stringifyDuration(duration) {
+        
+  let milliseconds = parseInt(duration%1000)
+  let seconds = parseInt((duration/1000)%60)
+  let minutes = parseInt((duration/(1000*60))%60)
+  let hours = parseInt((duration/(1000*60*60))%24);
+
+  hours = (hours < 10) ? "0" + hours : hours;
+  minutes = (minutes < 10) ? "0" + minutes : minutes;
+  seconds = (seconds < 10) ? "0" + seconds : seconds;
+
+  return `${hours}:${minutes}:${seconds}.${(milliseconds + '').padStart(3,'0')}`;
+}
+
+
+function getStatus(parameters,operation) {
  
   const status = {
-    errorRaised   : false
+    operation     : operation
+   ,errorRaised   : false
    ,warningRaised : false
    ,statusMsg     : 'successfully'
+   ,startTime     : new Date().getTime()
   }
   
   if (parameters.SQLTRACE) {
@@ -140,14 +157,14 @@ function getStatus(parameters) {
 
 function reportStatus(status,logWriter) {
 
-    
+  const endTime = new Date().getTime();
+      
   status.statusMsg = status.warningRaised ? 'with warnings' : status.statusMsg;
-  status.statusMsg = status.errorRaised ? 'with errors'  : status.statusMsg;
-
-  logWriter.write(`Import operation completed ${status.statusMsg}.\n`);
+  status.statusMsg = status.errorRaised ? 'with errors'  : status.statusMsg;  
+  
+  logWriter.write(`${status.operation} operation completed ${status.statusMsg}. Elapsed time: ${stringifyDuration(endTime - status.startTime)}.\n`);
   if (logWriter !== process.stdout) {
-    console.log(`Import operation completed ${status.statusMsg}: See "${status.logFileName}" for details.`);
-  }
+    console.log(`${status.operation} operation completed ${status.statusMsg}. Elapsed time: ${stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  }
 
 }
 module.exports.processLog             = processLog

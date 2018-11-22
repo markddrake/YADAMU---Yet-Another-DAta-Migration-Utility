@@ -36,8 +36,8 @@ async function main(){
   try {
 
     let results;
-    parameters = MsSQLCore.processArguments(process.argv,'import');
-    status = Yadamu.getStatus(parameters);
+    parameters = MsSQLCore.processArguments(process.argv);
+    status = Yadamu.getStatus(parameters,'Import');
 
     if (parameters.LOGFILE) {
      logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});

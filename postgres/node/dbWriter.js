@@ -128,6 +128,10 @@ class DBWriter extends Writable {
                                                            obj.data[idx] = 0
                                                          }  
                                                          return;
+                                                       case "time" :
+                                                         let components = obj.data[idx].split('T')
+                                                         obj.data[idx] = components.length === 1 ? components[0] : components[1]
+                                                         obj.data[idx] = obj.data[idx].split('Z')[0]
                                                        default :
                                                      }
                                                    }

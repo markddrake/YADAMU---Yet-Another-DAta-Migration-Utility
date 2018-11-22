@@ -37,8 +37,8 @@ async function main() {
   
   try {
     
-    parameters = OracleCore.processArguments(process.argv,'import');
-    status = Yadamu.getStatus(parameters);
+    parameters = OracleCore.processArguments(process.argv);
+    status = Yadamu.getStatus(parameters,'Import');
 
     if (parameters.LOGFILE) {
       logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});

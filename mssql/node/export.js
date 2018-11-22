@@ -112,8 +112,8 @@ async function main(){
     
   try {
 
-    parameters = MsSQLCore.processArguments(process.argv,'export');
-    status = Yadamu.getStatus(parameters);
+    parameters = MsSQLCore.processArguments(process.argv);
+    status = Yadamu.getStatus(parameters,'Export');
 
     if (parameters.LOGFILE) {
       logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
@@ -191,21 +191,18 @@ async function main(){
     await closeFile(exportFile);
     
     await pool.release();
-    logWriter.write('Export operation successful.\n');
-     if (logWriter !== process.stdout) {
-         console.log(`Export operation successful: See "${parameters.LOGFILE}" for details.`);
-     }
-     } catch (e) {
-     if (logWriter !== process.stdout) {
-         console.log(`Export operation failed: See "${parameters.LOGFILE}" for details.`);
-         logWriter.write('Export operation failed.\n');
-         logWriter.write(e.stack);
-     }
-        else {
-        console.log('Export operation Failed.');
-     console.log(e);
-        }
-        if (sql !== undefined) {
+    Yadamu.reportStatus(status,logWriter);
+  } catch (e) {
+    if (logWriter !== process.stdout) {
+      console.log(`Export operation failed: See "${parameters.LOGFILE}" for details.`);
+      logWriter.write('Export operation failed.\n');
+      logWriter.write(e.stack);
+    }
+    else {
+      console.log('Export operation Failed.');
+      console.log(e);
+    }
+    if (sql !== undefined) {
      await sql.close();
     }
   }

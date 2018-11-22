@@ -58,8 +58,8 @@ async function main() {
       logWriter.write(`${err}\n${err.stack}\n`);
     })
 
-    parameters = OracleCore.processArguments(process.argv,'export');
-    status = Yadamu.getStatus(parameters);
+    parameters = OracleCore.processArguments(process.argv);
+    status = Yadamu.getStatus(parameters,'Import');
     
 	if (parameters.LOGFILE) {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});

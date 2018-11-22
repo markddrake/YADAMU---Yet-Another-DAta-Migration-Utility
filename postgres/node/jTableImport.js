@@ -68,8 +68,8 @@ async function main(){
   let status; 
   
   try {
-    parameters = PostgresCore.processArguments(process.argv,'export');
-    status = Yadamu.getStatus(parameters);
+    parameters = PostgresCore.processArguments(process.argv);
+    status = Yadamu.getStatus(parameters,'Import');
 	
 	if (parameters.LOGFILE) {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
@@ -100,7 +100,7 @@ async function main(){
         await createStagingTable(pgClient,useBinaryJSON,status);
         importFile = fs.createReadStream(importFilePath,status);
         importFile.on('error',function(err) {console.log(err)})
-        elapsedTime = await loadStagingTable(pgClient,useBinaryJSON,status);	
+        elapsedTime = await loadStagingTable(pgClient,importFile,status);	
       }      
     }
     importFile.close();
