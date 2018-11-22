@@ -36,17 +36,25 @@ async function loadStagingTable(pgClient,importFileStream,status) {
   })  
 }
 
-async function processStagingTable(pgClient,schema,useBinaryJSON,status) {  	
+async function processStagingTable(pgClient,schema,useBinaryJSON,status,logWriter) {  	
 	const sqlStatement = `select ${useBinaryJSON ? 'import_jsonb' : 'import_json'}(data,$1) from "JSON_STAGING"`;
     if (status.sqlTrace) {
       status.sqlTrace.write(`${sqlStatement}\n\/\n`)
     }    
 	var results = await pgClient.query(sqlStatement,[schema]);
-    if (useBinaryJSON) {
-	  return results.rows[0].import_jsonb;  
+    if (results.rows.length > 0) {
+      if (useBinaryJSON) {
+	    return results.rows[0].import_jsonb;  
+      }
+      else {
+	    return results.rows[0].import_json;  
+      }
     }
     else {
-	  return results.rows[0].import_json;  
+      logWriter.write(`$${new Date().toISOString()}}[JSON_TABLE()]: Unexpected Error. No response from ${ useBinaryJSON === true ? 'CALL IMPORT_JSONB()' : 'CALL_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.\n`);
+      status.errorRaised = true;
+      return [];
+
     }
 }
 
@@ -86,7 +94,7 @@ async function main(){
     catch (e) {
       if (e.code && (e.code === '54000')) {
         // Switch to Character JSON
-        logWriter.write(`${new Dring()}[JSON_TABLE()]: Processing Import Data file "${importFilePath}". Size ${fileSizeInBytes}.  Processing Import Data file ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
+        logWriter.write(`$${new Date().toISOString()}}[JSON_TABLE()]: Processing Import Data file "${importFilePath}". Size ${fileSizeInBytes}.  Processing Import Data file ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
         importFile.close();
         useBinaryJSON = false;
         await createStagingTable(pgClient,useBinaryJSON,status);
@@ -98,7 +106,7 @@ async function main(){
     importFile.close();
     logWriter.write(`${new Date().toISOString()}}[JSON_TABLE()]:  Processing Import Data file "${importFilePath}". Size ${fileSizeInBytes}. Processing Import Data file ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
-	const results = await processStagingTable(pgClient,schema,useBinaryJSON,status);	
+	const results = await processStagingTable(pgClient,schema,useBinaryJSON,status,logWriter);	
     Yadamu.processLog(results, status, logWriter)          
 	await pgClient.end();
     Yadamu.reportStatus(status,logWriter)    
@@ -121,7 +129,7 @@ async function main(){
     logWriter.close();
   }
   if (status.sqlTrace) {
-    sqlTrace.close();
+    status.sqlTrace.close();
   }
   
 }

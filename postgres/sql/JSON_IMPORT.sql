@@ -220,16 +220,23 @@ begin
                       else
                         ''
                     end
-                   ,CHR(13) || '  ,'
+                   ,CHR(10) || '  ,'
                    ) COLUMNS_CLAUSE
-        ,STRING_AGG('cast( value ->> ' || IDX-1 || ' as ' || TARGET_DATA_TYPE || ') "' || COLUMN_NAME || '"', CHR(13) || '  ,') INSERT_SELECT_LIST
+        ,STRING_AGG(case 
+                      when TARGET_DATA_TYPE = 'bit' then  
+                        'case when value ->> ' || IDX-1 || ' = ''true'' then B''1'' when value ->> ' || IDX-1 || ' = ''false''  then B''0'' else cast( value ->> ' || IDX-1 || ' as ' || TARGET_DATA_TYPE || ') end'
+                      else
+                       'cast( value ->> ' || IDX-1 || ' as ' || TARGET_DATA_TYPE || ')'
+                    end 
+                    || ' "' || COLUMN_NAME || '"', CHR(10) || '  ,'
+                   ) INSERT_SELECT_LIST
         ,JSONB_AGG(TARGET_DATA_TYPE) TARGET_DATA_TYPES
     into V_COLUMNS_CLAUSE, V_INSERT_SELECT_LIST, V_TARGET_DATA_TYPES
     from TARGET_TABLE_DEFINITIONS;
 
   return JSONB_BUILD_OBJECT(
-                    'ddl', 'CREATE TABLE IF NOT EXISTS "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || CHR(13) || '   ' || V_COLUMNS_CLAUSE || CHR(13) || ')',       
-                    'dml', 'INSERT into "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || P_COLUMNS || ')' || CHR(13) || 'select ' || V_INSERT_SELECT_LIST || CHR(13) || '  from ' || case WHEN P_BINARY_JSON then 'jsonb_array_elements' else 'json_array_elements' end || '($1 -> ''data'' -> ''' || P_TABLE_NAME || ''')',
+                    'ddl', 'CREATE TABLE IF NOT EXISTS "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || CHR(10) || '   ' || V_COLUMNS_CLAUSE || CHR(10) || ')',       
+                    'dml', 'INSERT into "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || P_COLUMNS || ')' || CHR(10) || 'select ' || V_INSERT_SELECT_LIST || CHR(10) || '  from ' || case WHEN P_BINARY_JSON then 'jsonb_array_elements' else 'json_array_elements' end || '($1 -> ''data'' -> ''' || P_TABLE_NAME || ''')',
                     'targetDataTypes', V_TARGET_DATA_TYPES 
                );
 end;  
@@ -375,7 +382,7 @@ as $$
 declare
   R RECORD;
   V_SQL_STATEMENT TEXT;
-  C_NEWLINE CHAR(1) = CHR(13);
+  C_NEWLINE CHAR(1) = CHR(10);
   
   V_SOURCE_COUNT INT;
   V_TARGET_COUNT INT;

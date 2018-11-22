@@ -67,7 +67,7 @@ function processArguments(args,operation) {
 			break;
 	      case 'SQLTRACE':
 	      case '--SQLTRACE':
-		    status.sqlTrace = parameterValue;
+		    parameters.SQLTRACE = parameterValue;
 			break;
 	      case 'LOGLEVEL':
 	      case '--LOGLEVEL':
