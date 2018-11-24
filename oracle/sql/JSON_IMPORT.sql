@@ -203,10 +203,10 @@ procedure LOG_INFO(P_PAYLOAD CLOB)
 as
 begin
   RESULTS_CACHE.extend;
-  $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
   select JSON_OBJECT('info' value TREAT(P_PAYLOAD as JSON) returning CLOB)
   $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-  select JSON_OBJECT('info' value JSON_QUERY(P_PAYLOAD,'$' returning VARCHAR2(32767)) returning VARCHAR2(32767))
+  select JSON_OBJECT('info' value JSON_QUERY(P_PAYLOAD,'$' returning VARCHAR2(32767))  returning VARCHAR2(32767))
   $ELSE
   select JSON_OBJECT('info' value JSON_QUERY(P_PAYLOAD,'$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
   $END
@@ -218,13 +218,14 @@ procedure LOG_MESSAGE(V_PAYLOAD CLOB)
 as
 begin
   RESULTS_CACHE.extend;
-  $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
-  select JSON_OBJECT('message' value V_PAYLOAD returning CLOB)
-  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-  select JSON_OBJECT('message' value V_PAYLOAD returning VARCHAR2(32767))
-  $ELSE
-  select JSON_OBJECT('message' value V_PAYLOAD returning VARCHAR2(4000))
-  $END
+  select JSON_OBJECT('message' value V_PAYLOAD
+                     $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                     returning CLOB)
+                     $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                     returning  VARCHAR2(32767))
+                     $ELSE
+                     returning  VARCHAR2(4000))
+                     $END
      into RESULTS_CACHE(RESULTS_CACHE.count)
      from DUAL;
 end;
@@ -630,67 +631,106 @@ as
   -- cast(collect(...) causes ORA-22814: attribute or element value is larger than specified in type in 12.2
   select '"' || COLUMN_NAME || '" ' ||
          case
-           when (INSTR(TARGET_DATA_TYPE,'"."') > 0) then
-              case
-                when SUBSTR(TARGET_DATA_TYPE,1,INSTR(TARGET_DATA_TYPE,'"."')-1) = P_TABLE_OWNER
-                  then '"' || P_TARGET_SCHEMA || '"."' || SUBSTR(TARGET_DATA_TYPE,INSTR(TARGET_DATA_TYPE,'"."')+3) || '"'
-                  else '"' || TARGET_DATA_TYPE || '"'
-                end
-           when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') then
-              TARGET_DATA_TYPE
-           when DATA_TYPE_SCALE is not NULL then
-              TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH || ',' || DATA_TYPE_SCALE || ')'
-           when DATA_TYPE_LENGTH  is not NULL then
-              TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH|| ')'
+           when TYPE_EXISTS = 1 
+             then '"' || TYPE_OWNER || '"."' || TYPE_NAME || '"'
+           when TYPE_NAME is not NULL
+             then 'CLOB'
+           -- Type Exist is NULL.
+           when TARGET_DATA_TYPE = 'JSON'
+             -- BLOB results in Error: ORA-40479: internal JSON serializer error during export operations.
+             then 'CLOB CHECK ("' || COLUMN_NAME || '" IS JSON)'
+           when TARGET_DATA_TYPE = 'BOOLEAN'
+             then 'VARCHAR2(5)'
+           when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID','BINARY_FLOAT','BINARY_DOUBLE') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE like '% TIME ZONE') or (TARGET_DATA_TYPE LIKE '%(%)')
+             then TARGET_DATA_TYPE
+           when DATA_TYPE_SCALE is not NULL
+             then TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH || ',' || DATA_TYPE_SCALE || ')'
+           when DATA_TYPE_LENGTH  is not NULL
+             then TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH|| ')'
            else
              TARGET_DATA_TYPE
-         end || C_NEWLINE COLUMNS_CLAUSE
+         end || C_NEWLINE 
+         COLUMNS_CLAUSE
          /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
         ,case
-           when TARGET_DATA_TYPE = 'BFILE' then
-             'OBJECT_SERIALIZATION.CHAR2BFILE("' || COLUMN_NAME || '")'
-           when (TARGET_DATA_TYPE = 'XMLTYPE') or (SUBSTR("TARGET_DATA_TYPE",INSTR("TARGET_DATA_TYPE",'"."')+3) = 'XMLTYPE') then
-             'case when "' || COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || COLUMN_NAME || '") end'
-           when (TARGET_DATA_TYPE = 'ANYDATA') or (SUBSTR("TARGET_DATA_TYPE",INSTR("TARGET_DATA_TYPE",'"."')+3) = 'ANYDATA') then
+           when TYPE_EXISTS = 1
+             then '"#' || TYPE_NAME || '"("' || COLUMN_NAME || '")'
+           when TARGET_DATA_TYPE = 'BOOLEAN'
+             then 'HEXTORAW(case when "' || COLUMN_NAME || '" = ''true'' then ''1'' else ''0'' end)'
+           when TARGET_DATA_TYPE = 'BFILE'
+             then 'OBJECT_SERIALIZATION.CHAR2BFILE("' || COLUMN_NAME || '")'
+           when (TARGET_DATA_TYPE = 'XMLTYPE')
+              -- Cannot map directly to XMLTYPE constructor as we need to test for NULL. 
+             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || COLUMN_NAME || '") end'
+           when (TARGET_DATA_TYPE = 'ANYDATA')
              -- ### TODO - Better deserialization of ANYDATA.
-             'case when "' || COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || COLUMN_NAME || '") end'
+             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || COLUMN_NAME || '") end'
            when TARGET_DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE' then
-             -- Problems with ORA-1881              'TO_TIMESTAMP_TZ("' || COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FFTZHTZM'')'
-           when INSTR(TARGET_DATA_TYPE,'"."') > 0  then
-             '"#' || SUBSTR(TARGET_DATA_TYPE,INSTR(TARGET_DATA_TYPE,'"."')+3) || '"("' || COLUMN_NAME || '")'
-           when TARGET_DATA_TYPE = 'BLOB' then
-             $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN             'OBJECT_SERIALIZATION.HEXBINARY2BLOB("' || COLUMN_NAME || '")'
-             $ELSE             'case when "' || COLUMN_NAME || '" is NULL then NULL when substr("' || COLUMN_NAME || '",1,15) = ''BLOB2HEXBINARY:'' then NULL else HEXTORAW("' || COLUMN_NAME || '") end'
+             -- Problems with ORA-1881
+              'TO_TIMESTAMP_TZ("' || COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FFTZHTZM'')'
+           when TARGET_DATA_TYPE = 'BLOB'
+             $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+             then 'OBJECT_SERIALIZATION.HEXBINARY2BLOB("' || COLUMN_NAME || '")'
+             $ELSE
+             then 'case when "' || COLUMN_NAME || '" is NULL then NULL when substr("' || COLUMN_NAME || '",1,15) = ''BLOB2HEXBINARY:'' then NULL else HEXTORAW("' || COLUMN_NAME || '") end'
              $END
            else
              '"' || COLUMN_NAME || '"'
-         end INSERT_SELECT_LIST
+         end 
+         INSERT_SELECT_LIST
+        ,'"' ||
+           case
+             when TYPE_EXISTS = 1 
+               then REPLACE(TARGET_DATA_TYPE,'"','\"')
+             when TYPE_NAME is not NULL
+               then 'CLOB'
+            -- Type Exist is NULL.
+             else
+               TARGET_DATA_TYPE
+             end || '"' 
+         TARGET_DATA_TYPES
         ,'"' || COLUMN_NAME || '" ' ||
          case
-           when TARGET_DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (TARGET_DATA_TYPE like 'INTERVAL%') then
-             'VARCHAR2'
-           when TARGET_DATA_TYPE in ('XMLTYPE','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (INSTR(TARGET_DATA_TYPE,'"."') > 0) then
-             C_RETURN_TYPE
-           when "TARGET_DATA_TYPE" in ('DATE','DATETIME') then
-             "TARGET_DATA_TYPE"
-           when TARGET_DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE' then
-             -- Problems with ORA-1881
-             -- then 'TIMESTAMP WITH TIME ZONE'
-             'VARCHAR2'
-           when "DATA_TYPE_SCALE" is not NULL then
-             "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ',' || "DATA_TYPE_SCALE" || ')'
-           when "DATA_TYPE_LENGTH"  is not NULL then
-             "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ')'
+           when TYPE_EXISTS = 1 
+             then 'CLOB'
+           when TARGET_DATA_TYPE  = 'BOOLEAN'
+             then 'VARCHAR2(5)'
+           when TARGET_DATA_TYPE = 'JSON'
+             then C_RETURN_TYPE || ' FORMAT JSON'
+           when TARGET_DATA_TYPE  = 'FLOAT'
+             then 'NUMBER'
+           when TARGET_DATA_TYPE = 'BINARY_FLOAT'
+             then 'VARCHAR2(29)'
+           when TARGET_DATA_TYPE = 'BINARY_DOUBLE'
+             then 'VARCHAR2(53)'
+           when TARGET_DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
+             then 'TIMESTAMP WITH TIME ZONE'
+           when TARGET_DATA_TYPE like 'RAW(%)'
+             then 'VARCHAR2'
+           when TARGET_DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (TARGET_DATA_TYPE like 'INTERVAL%')
+             then 'VARCHAR2'
+           when TARGET_DATA_TYPE in ('XMLTYPE','ANYDATA','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (TYPE_NAME is not NULL)
+             then C_RETURN_TYPE
+           when "TARGET_DATA_TYPE" in ('DATE','DATETIME')
+             then "TARGET_DATA_TYPE"
+           when "TARGET_DATA_TYPE"  LIKE '%(%)'
+             then "TARGET_DATA_TYPE"
+           when "DATA_TYPE_SCALE" is not NULL
+             then "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ',' || "DATA_TYPE_SCALE" || ')'
+           when "DATA_TYPE_LENGTH"  is not NULL
+             then "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ')'
            else
-             "TARGET_DATA_TYPE"
-         end
-         || ' PATH ''$[' || (st.IDX - 1) || ']'' ERROR ON ERROR' || C_NEWLINE COLUMN_PATTERNS
+            "TARGET_DATA_TYPE"
+         end  || ' PATH ''$[' || (IDX - 1) || ']'' ERROR ON ERROR' || C_NEWLINE 
+         COLUMN_PATTERNS
+        ,DESERIALIZATION_FUNCTION
     from "EXTENDED_TABLE_DEFINITIONS"
    order by IDX;
 
    V_COLUMNS_CLAUSE_TABLE      T_VC4000_TABLE;
    V_INSERT_SELECT_TABLE       T_VC4000_TABLE;
    V_COLUMN_PATTERNS_TABLE     T_VC4000_TABLE;
+   V_TARGET_DATA_TYPES_TABLE   T_VC4000_TABLE;
    $END
 --
    V_COLUMNS_CLAUSE            CLOB;
@@ -760,11 +800,21 @@ begin
 --
   open generateStatementComponents;
   fetch generateStatementComponents
-        bulk collect into V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_COLUMN_PATTERNS_TABLE;
+        bulk collect into V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_TARGET_DATA_TYPES_TABLE, V_COLUMN_PATTERNS_TABLE, V_DESERIALIZATIONS;
 
+  select COLUMN_VALUE
+    bulk collect into V_DESERIALIZATIONS
+    from table(V_DESERIALIZATIONS)
+   where COLUMN_VALUE is not null;
+        
   V_COLUMNS_CLAUSE := SERIALIZE_TABLE(V_COLUMNS_CLAUSE_TABLE);
   V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
+  V_TARGET_DATA_TYPES := SERIALIZE_TABLE(V_TARGET_DATA_TYPES_TABLE);
   V_COLUMN_PATTERNS := SERIALIZE_TABLE(V_COLUMN_PATTERNS_TABLE);
+  select count(*) into V_BLOB_COUNT    from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE = 'BLOB';
+  select count(*) into V_ANYDATA_COUNT from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE = 'BFILE';
+  select count(*) into V_BFILE_COUNT   from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE = 'ANYDATA';
+  select count(*) into V_OBJECT_COUNT  from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE like '"%"."%"';
 --
   $END
 --
@@ -797,7 +847,19 @@ begin
   
   V_TARGET_DATA_TYPES := '[' || V_TARGET_DATA_TYPES || ']';
   
-  select JSON_OBJECT('ddl' value V_DDL_STATEMENT, 'dml' value V_DML_STATEMENT,'targetDataTypes' value TREAT(V_TARGET_DATA_TYPES AS JSON) returning CLOB)
+  select JSON_OBJECT('ddl' value V_DDL_STATEMENT, 
+                     'dml' value V_DML_STATEMENT,
+                     'targetDataTypes'
+                     $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                     value TREAT(V_TARGET_DATA_TYPES AS JSON)
+                     returning CLOB)
+                     $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                     value JSON_QUERY(V_TARGET_DATA_TYPES,'$' returning  VARCHAR2(32767))
+                     returning  VARCHAR2(32767))
+                     $ELSE
+                     value JSON_QUERY(V_TARGET_DATA_TYPES,'$' returning  VARCHAR2(4000))
+                     returning  VARCHAR2(4000))
+                     $END
     into V_RESULTS
     from DUAL;    
 
@@ -833,7 +895,13 @@ as
 begin
   RESULTS_CACHE := T_RESULTS_CACHE();
   SET_CURRENT_SCHEMA(P_TARGET_SCHEMA);
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
   select JSON_ARRAYAGG(TREAT (COLUMN_VALUE as JSON) returning CLOB)
+  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(32767)) returning VARCHAR2(32767))
+  $ELSE
+  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
+  $END
     into V_RESULTS
     from table(RESULTS_CACHE);
   RESULTS_CACHE := T_RESULTS_CACHE();
@@ -868,7 +936,13 @@ as
 begin
   RESULTS_CACHE := T_RESULTS_CACHE();
   DISABLE_CONSTRAINTS(P_TARGET_SCHEMA);
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
   select JSON_ARRAYAGG(TREAT (COLUMN_VALUE as JSON) returning CLOB)
+  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(32767)) returning VARCHAR2(32767))
+  $ELSE
+  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
+  $END
     into V_RESULTS
     from table(RESULTS_CACHE);
   RESULTS_CACHE := T_RESULTS_CACHE();
@@ -903,7 +977,13 @@ as
 begin
   RESULTS_CACHE := T_RESULTS_CACHE();
   ENABLE_CONSTRAINTS(P_TARGET_SCHEMA);
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
   select JSON_ARRAYAGG(TREAT (COLUMN_VALUE as JSON) returning CLOB)
+  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(32767)) returning VARCHAR2(32767))
+  $ELSE
+  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
+  $END
     into V_RESULTS
     from table(RESULTS_CACHE);
   RESULTS_CACHE := T_RESULTS_CACHE();
@@ -1287,7 +1367,7 @@ begin
       RAISE;
   end;
 
-  DELETE FROM SCHEMA_COMPARE_RESULTS;
+  execute immediate 'DELETE FROM SCHEMA_COMPARE_RESULTS';
   COMMIT;
    
   for t in getTableList loop
@@ -1336,8 +1416,6 @@ end;
 --
 end;
 /
-show errors
---
 set TERMOUT on
 --
 show errors
