@@ -196,7 +196,7 @@ async function main(){
     if (logWriter !== process.stdout) {
       console.log(`Export operation failed: See "${parameters.LOGFILE}" for details.`);
       logWriter.write('Export operation failed.\n');
-      logWriter.write(e.stack);
+      logWriter.write(`${e.stack}\n`);
     }
     else {
       console.log('Export operation Failed.');

@@ -411,12 +411,14 @@ as
 begin
   if ((P_DESERIALIZATION_FUNCTIONS.count > 0) or ((P_BFILE_COUNT + P_BLOB_COUNT + P_ANYDATA_COUNT) > 0)) then
     DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB('WITH' || C_NEWLINE));
+    /*
     if ((P_BFILE_COUNT + P_ANYDATA_COUNT + P_DESERIALIZATION_FUNCTIONS.count) > 0) then
       DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(OBJECT_SERIALIZATION.CODE_CHAR2BFILE));
     end if;
     if ((P_BLOB_COUNT  + P_ANYDATA_COUNT + P_DESERIALIZATION_FUNCTIONS.count) > 0) then
       DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(OBJECT_SERIALIZATION.CODE_HEXBINARY2BLOB));
     end if;
+    */
     if (P_DESERIALIZATION_FUNCTIONS.count > 0) then
       for V_IDX in 1.. P_DESERIALIZATION_FUNCTIONS.count loop
         DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(P_DESERIALIZATION_FUNCTIONS(V_IDX)));
@@ -516,7 +518,7 @@ as
                             -- BLOB results in Error: ORA-40479: internal JSON serializer error during export operations.
                             then 'CLOB CHECK ("' || COLUMN_NAME || '" IS JSON)'
                           when TARGET_DATA_TYPE = 'BOOLEAN'
-                            then 'VARCHAR2(5)'
+                            then 'RAW(1)'
                           when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID','BINARY_FLOAT','BINARY_DOUBLE') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE like '% TIME ZONE') or (TARGET_DATA_TYPE LIKE '%(%)')
                             then TARGET_DATA_TYPE
                           when DATA_TYPE_SCALE is not NULL
@@ -640,7 +642,7 @@ as
              -- BLOB results in Error: ORA-40479: internal JSON serializer error during export operations.
              then 'CLOB CHECK ("' || COLUMN_NAME || '" IS JSON)'
            when TARGET_DATA_TYPE = 'BOOLEAN'
-             then 'VARCHAR2(5)'
+             then 'RAW(1)'
            when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID','BINARY_FLOAT','BINARY_DOUBLE') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE like '% TIME ZONE') or (TARGET_DATA_TYPE LIKE '%(%)')
              then TARGET_DATA_TYPE
            when DATA_TYPE_SCALE is not NULL
@@ -692,7 +694,7 @@ as
         ,'"' || COLUMN_NAME || '" ' ||
          case
            when TYPE_EXISTS = 1 
-             then 'CLOB'
+             then C_RETURN_TYPE
            when TARGET_DATA_TYPE  = 'BOOLEAN'
              then 'VARCHAR2(5)'
            when TARGET_DATA_TYPE = 'JSON'
@@ -731,6 +733,7 @@ as
    V_INSERT_SELECT_TABLE       T_VC4000_TABLE;
    V_COLUMN_PATTERNS_TABLE     T_VC4000_TABLE;
    V_TARGET_DATA_TYPES_TABLE   T_VC4000_TABLE;
+   V_DESERIALIZATION_FUNCTIONS T_VC4000_TABLE;
    $END
 --
    V_COLUMNS_CLAUSE            CLOB;
@@ -800,13 +803,13 @@ begin
 --
   open generateStatementComponents;
   fetch generateStatementComponents
-        bulk collect into V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_TARGET_DATA_TYPES_TABLE, V_COLUMN_PATTERNS_TABLE, V_DESERIALIZATIONS;
+        bulk collect into V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_TARGET_DATA_TYPES_TABLE, V_COLUMN_PATTERNS_TABLE, V_DESERIALIZATION_FUNCTIONS;
 
-  select COLUMN_VALUE
+  select distinct COLUMN_VALUE
     bulk collect into V_DESERIALIZATIONS
-    from table(V_DESERIALIZATIONS)
+    from table(V_DESERIALIZATION_FUNCTIONS)
    where COLUMN_VALUE is not null;
-        
+
   V_COLUMNS_CLAUSE := SERIALIZE_TABLE(V_COLUMNS_CLAUSE_TABLE);
   V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
   V_TARGET_DATA_TYPES := SERIALIZE_TABLE(V_TARGET_DATA_TYPES_TABLE);
@@ -815,6 +818,9 @@ begin
   select count(*) into V_ANYDATA_COUNT from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE = 'BFILE';
   select count(*) into V_BFILE_COUNT   from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE = 'ANYDATA';
   select count(*) into V_OBJECT_COUNT  from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE like '"%"."%"';
+  
+  V_INLINE_PLSQL_REQUIRED := ((V_OBJECT_COUNT + V_BLOB_COUNT + V_BFILE_COUNT + V_ANYDATA_COUNT) > 0);
+  
 --
   $END
 --
@@ -823,7 +829,6 @@ begin
   DBMS_LOB.APPEND(V_DDL_STATEMENT,V_COLUMNS_CLAUSE);
   V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK2;
   DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-  
   
   if ( V_INLINE_PLSQL_REQUIRED) then
     V_INSERT_HINT := ' /*+ WITH_PLSQL */';
@@ -1054,7 +1059,8 @@ end;
 --
 procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
 as
-  MUTATING_TABLE EXCEPTION ; PRAGMA EXCEPTION_INIT( MUTATING_TABLE , -04091 );
+  MUTATING_TABLE      EXCEPTION ; PRAGMA EXCEPTION_INIT( MUTATING_TABLE , -04091 );
+  INVALID_IMPORT_FILE EXCEPTION ; PRAGMA EXCEPTION_INIT( INVALID_IMPORT_FILE , -40441 );
 
   V_CURRENT_SCHEMA    CONSTANT VARCHAR2(128) := SYS_CONTEXT('USERENV','CURRENT_SCHEMA');
 
@@ -1064,6 +1070,11 @@ as
 
   V_STATEMENT         CLOB;
   V_TARGET_DATA_TYPES CLOB;
+  
+  V_VALID_JSON        BOOLEAN := true;
+  V_SQLCODE           NUMBER;
+  V_SQLERRM           VARCHAR2(4000);
+  V_DETAILS           VARCHAR2(4000);
 
   CURSOR operationsList
   is
@@ -1127,31 +1138,42 @@ begin
         when others then
           LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
       end;
-      begin
-        V_STATEMENT := JSON_VALUE(o.TABLE_INFO,'$.dml');
-        V_START_TIME := SYSTIMESTAMP;
-        execute immediate V_STATEMENT using P_JSON_DUMP_FILE;
-        V_ROWCOUNT := SQL%ROWCOUNT;
-        V_END_TIME := SYSTIMESTAMP;
-        commit;
-        LOG_DML_OPERATION(o.TABLE_NAME,V_STATEMENT,V_ROWCOUNT,GET_MILLISECONDS(V_START_TIME,V_END_TIME));
-      exception
-        when MUTATING_TABLE then
-          begin
-            LOG_ERROR(C_WARNING,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
-            MANAGE_MUTATING_TABLE(o.TABLE_NAME,V_STATEMENT);
-            V_START_TIME := SYSTIMESTAMP;
-            execute immediate V_STATEMENT using P_JSON_DUMP_FILE, out V_ROWCOUNT;
-            V_END_TIME := SYSTIMESTAMP;
-            commit;
-            LOG_DML_OPERATION(o.TABLE_NAME,V_STATEMENT,V_ROWCOUNT,GET_MILLISECONDS(V_START_TIME,V_END_TIME));
-          exception
-            when others then
-              LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
-           end;
-        when others then
-          LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
-      end;
+      if (V_VALID_JSON) then
+        begin
+          V_STATEMENT := JSON_VALUE(o.TABLE_INFO,'$.dml');
+          V_START_TIME := SYSTIMESTAMP;
+          execute immediate V_STATEMENT using P_JSON_DUMP_FILE;
+          V_ROWCOUNT := SQL%ROWCOUNT;
+          V_END_TIME := SYSTIMESTAMP;
+          commit;
+          LOG_DML_OPERATION(o.TABLE_NAME,V_STATEMENT,V_ROWCOUNT,GET_MILLISECONDS(V_START_TIME,V_END_TIME));
+        exception
+          when INVALID_IMPORT_FILE then
+            -- If the Import File is not valid JSON do not process any further tables
+            V_VALID_JSON := false;
+            V_SQLCODE := SQLCODE;
+            V_SQLERRM := SQLERRM;
+            V_DETAILS := DBMS_UTILITY.FORMAT_ERROR_STACK();
+            LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_STATEMENT,V_SQLCODE,V_SQLERRM,V_DETAILS);
+          when MUTATING_TABLE then
+            begin
+              LOG_ERROR(C_WARNING,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
+              MANAGE_MUTATING_TABLE(o.TABLE_NAME,V_STATEMENT);
+              V_START_TIME := SYSTIMESTAMP;
+              execute immediate V_STATEMENT using P_JSON_DUMP_FILE, out V_ROWCOUNT;
+              V_END_TIME := SYSTIMESTAMP;
+              commit;
+              LOG_DML_OPERATION(o.TABLE_NAME,V_STATEMENT,V_ROWCOUNT,GET_MILLISECONDS(V_START_TIME,V_END_TIME));
+            exception
+              when others then
+                LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
+             end;
+          when others then
+            LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
+        end;
+      else 
+        LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,'JSON_TABLE() operation skipped.',V_SQLCODE,V_SQLERRM,'Possible corrupt or truncated import file.');
+      end if;
     end loop;
     
     if (V_NOTHING_DONE) then

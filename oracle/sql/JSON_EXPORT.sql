@@ -21,8 +21,8 @@ as
 --
 $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 $ELSE
-  procedure JSON_ARRAYAGG(P_JSON_DOCUMENT IN OUT CLOB, P_SQL_STATEMENT CLOB);
-  function JSON_ARRAYAGG(P_SQL_STATEMENT CLOB) return CLOB;
+  procedure JSON_ARRAYAGG(P_JSON_DOCUMENT IN OUT CLOB, P_CURSOR SYS_REFCURSOR);
+  function JSON_ARRAYAGG(P_CURSOR SYS_REFCURSOR) return CLOB;
 $END
 --
 END;
@@ -129,9 +129,9 @@ as
 		,cast(collect(
                 case 
                   when (jc.FORMAT is not NULL) 
-                    -- Does not attempt to preserve json storage details.
+                    -- Does not attempt to preserve json storage details
                     -- If storage model fidelity is required then set specify MODE=DDL_AND_DATA on the export command line to include DDL statements to the file.
-                    -- If DDL is not included in the file import operations will default to BLOB storage in Oracle 12.1 thru 18c.
+                    -- If DDL is not included in the file import operations will default to CLOB storage in Oracle 12.1 thru 18c.
                     then '"JSON"'
                   when (DATA_TYPE_OWNER is null) 
                     then '"' || atc.DATA_TYPE || '"' 
@@ -195,6 +195,8 @@ as
                    then 'TO_CHAR("' || atc.COLUMN_NAME || '")'
                  when atc.DATA_TYPE = 'NCLOB'
                    then 'TO_CLOB("' || atc.COLUMN_NAME || '")'
+                 when jc.FORMAT is not NULL
+                   then 'JSON_QUERY("' ||  atc.COLUMN_NAME || '",''$'' returning ' || C_RETURN_TYPE || ')'
                  /*
                  ** 18.1 compatible handling of BLOB
                  */
@@ -365,30 +367,32 @@ end;
 --
 $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 $ELSE
-procedure JSON_ARRAYAGG(P_JSON_DOCUMENT IN OUT CLOB, P_SQL_STATEMENT CLOB)
+procedure JSON_ARRAYAGG(P_JSON_DOCUMENT IN OUT CLOB, P_CURSOR SYS_REFCURSOR)
 as
   JSON_ARRAY_OVERFLOW EXCEPTION; PRAGMA EXCEPTION_INIT (JSON_ARRAY_OVERFLOW, -40478);
-  V_CURSOR            SYS_REFCURSOR;
-  V_SEPERATOR         VARCHAR2(1) := '';
-  V_ARRAY_MEMBER      CLOB;
+  V_SEPERATOR         VARCHAR2(1) := ',';
+  $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+  V_ARRAY_MEMBER VARCHAR2(32767);
+  $ELSE
+  V_ARRAY_MEMBER VARCHAR2(4000);
+  $END
   V_START_ARRAY_DATA  PLS_INTEGER;
   V_JSON_ARRAY_ERROR  CLOB;
+  V_FIRST_MEMBER      BOOLEAN := true;
 begin
   DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,1,'[');  
   V_START_ARRAY_DATA := DBMS_LOB.GETLENGTH(P_JSON_DOCUMENT);
-  open V_CURSOR for (P_SQL_STATEMENT);
   loop
     begin
-      fetch V_CURSOR into V_ARRAY_MEMBER;
-      exit when V_CURSOR%notfound;
-      DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,length(V_SEPERATOR),V_SEPERATOR);
-      V_SEPERATOR := ',';
-      DBMS_LOB.APPEND(P_JSON_DOCUMENT,V_ARRAY_MEMBER);
+      fetch P_CURSOR into V_ARRAY_MEMBER;
+      exit when P_CURSOR%notfound;
+      if (NOT V_FIRST_MEMBER) then DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,length(V_SEPERATOR),V_SEPERATOR); end if;
+      V_FIRST_MEMBER := false;
+      DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,length(V_ARRAY_MEMBER),V_ARRAY_MEMBER);
     exception
       when others then
         select JSON_OBJECT(
-	             'sql' value P_SQL_STATEMENT
-	  	        ,'error' value DBMS_UTILITY.FORMAT_ERROR_STACK
+	  	         'error' value DBMS_UTILITY.FORMAT_ERROR_STACK
 --
                  $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
                  returning VARCHAR2(32767)
@@ -407,13 +411,13 @@ begin
   DBMS_LOB.WRITEAPPEND(P_JSON_DOCUMENT,1,']');  
 end;
 --
-function JSON_ARRAYAGG(P_SQL_STATEMENT CLOB) 
+function JSON_ARRAYAGG(P_CURSOR SYS_REFCURSOR) 
 return CLOB
 as
   V_RESULT CLOB;
 begin
   DBMS_LOB.CREATETEMPORARY(V_RESULT,TRUE,DBMS_LOB.SESSION);
-  JSON_ARRAYAGG(V_RESULT,P_SQL_STATEMENT);
+  JSON_ARRAYAGG(V_RESULT,P_CURSOR);
   return V_RESULT;
 end;
 --

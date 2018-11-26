@@ -3,6 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const ImportErrorManager = require('./importErrorManager.js');
+
 function processLog(log,status,logWriter) {
 
   const logDML         = (status.loglevel && (status.loglevel > 0));
@@ -139,6 +141,10 @@ function getStatus(parameters,operation) {
 	status.sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
   }
 
+  if (operation === 'Import') {
+     status.importErrorMgr = new ImportErrorManager(parameters.FILE,1000);
+  }
+  
   if (parameters.LOGFILE) {
     status.logFileName = parameters.LOGFILE;
   }

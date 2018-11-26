@@ -12,178 +12,211 @@ class RowParser extends Transform {
 
     super({objectMode: true });  
   
-    const rowParser = this;
+    const self = this;
     
     this.logWriter = logWriter;
 
-    this.saxJParser = clarinet.createStream();
-    this.saxJParser.on('error',function(err) {rowParser.logWriter.write(`$(err}\n`);})
+    this.parser = clarinet.createStream();
     
-    this.objectStack = [];
-    this.dataPhase = false;     
+    this.parser.on('error',
+    function(err) {
+      self.logWriter.write(`$(err}\n`);
+    })
     
-    this.currentObject = undefined;
-    this.chunks = [];
-
-    this.jDepth = 0;
-       
-    this.saxJParser.onkey = function (key) {
-      // rowParser.logWriter.write(`onKey(${rowParser.jDepth},${key})\n`);
+    this.parser.on('key',
+    function (key) {
+      // self.logWriter.write(`onKey(${self.jDepth},${key})\n`);
       
-      switch (rowParser.jDepth){
+      switch (self.jDepth){
         case 1:
           // Push the completed first level object/array downstream. Replace the current top level object with an empty object of the same type.
-          rowParser.push(rowParser.currentObject);
-          if (Array.isArray(rowParser.currentObject)) {
-             rowParser.currentObject = [];
+          self.push(self.currentObject);
+          if (self.currentObject.metadata) {
+            self.tableList = new Set(Object.keys(self.currentObject.metadata));
+          }
+          if (Array.isArray(self.currentObject)) {
+             self.currentObject = [];
           }
           else {
-             rowParser.currentObject = {};
+             self.currentObject = {};
           }
           if (key === 'data') {
-            rowParser.dataPhase = true;
+            self.dataPhase = true;
           }
           break;
         case 2:
-          if (rowParser.dataPhase) {
-            rowParser.push({ table : key});
+          if (self.dataPhase) {
+            self.tableList.delete(key);
+            self.push({ table : key});
           }
           break;
         default:
       }
       // Push the current object onto the stack and the current object to the key
-      rowParser.objectStack.push(rowParser.currentObject);
-      rowParser.currentObject = key;
-    };
+      self.objectStack.push(self.currentObject);
+      self.currentObject = key;
+    });
 
-    this.saxJParser.onopenobject = function (key) {
-      // rowParser.logWriter.write(`onOpenObject(${rowParser.jDepth}:, Key:"${key}". ObjectStack:${rowParser.objectStack}\n`);      
+    this.parser.on('openobject',
+    function (key) {
+      // self.logWriter.write(`onOpenObject(${self.jDepth}:, Key:"${key}". ObjectStack:${self.objectStack}\n`);      
       
-      if (rowParser.jDepth > 0) {
-        rowParser.objectStack.push(rowParser.currentObject);
+      if (self.jDepth > 0) {
+        self.objectStack.push(self.currentObject);
       }
          
-      switch (rowParser.jDepth) {
+      switch (self.jDepth) {
         case 0:
           // Push the completed first level object/array downstream. Replace the current top level object with an empty object of the same type.
-          if (rowParser.currentObject !== undefined) {
-            rowParser.push(rowParser.currentObject);
+          if (self.currentObject !== undefined) {
+            if (self.currentObject.metadata) {
+              self.tableList = new Set(Object.keys(self.currentObject.metadata));
+            }
+            self.push(self.currentObject);
           }  
           if (key === 'data') {
-            rowParser.dataPhase = true;
+            self.dataPhase = true;
           }
           break;
         case 1:
-          if ((rowParser.dataPhase) && (key != undefined)) {
-            rowParser.push({ table : key});
+          if ((self.dataPhase) && (key != undefined)) {
+            self.tableList.delete(key);
+            self.push({ table : key});
           }
           break;
         default:
       }
       // If the object has a key put the object on the stack and set the current object to the key. 
-      rowParser.currentObject = {}
-      rowParser.jDepth++;
+      self.currentObject = {}
+      self.jDepth++;
       if (key !== undefined) {
-        rowParser.objectStack.push(rowParser.currentObject);
-        rowParser.currentObject = key;
+        self.objectStack.push(self.currentObject);
+        self.currentObject = key;
       }
-    };
+    });
 
-    this.saxJParser.onopenarray = function () {
-      // rowParser.logWriter.write(`onOpenArray(${rowParser.jDepth}): ObjectStack:${rowParser.objectStack}\n`);
-      if (rowParser.jDepth > 0) {
-        rowParser.objectStack.push(rowParser.currentObject);
+    this.parser.on('openarray',
+    function () {
+      // self.logWriter.write(`onOpenArray(${self.jDepth}): ObjectStack:${self.objectStack}\n`);
+      if (self.jDepth > 0) {
+        self.objectStack.push(self.currentObject);
       }
-      rowParser.currentObject = [];
-      rowParser.jDepth++;
-    };
+      self.currentObject = [];
+      self.jDepth++;
+    });
 
 
-    this.saxJParser.onvaluechunk = function (v) {
-      rowParser.chunks.push(v);  
-    };
+    this.parser.on('valuechunk',
+    function (v) {
+      self.chunks.push(v);  
+    });
        
-    this.saxJParser.onvalue = function (v) {
-      // rowParser.logWriter.write(`onvalue(${rowParser.jDepth}: ObjectStack:${rowParser.objectStack}\n`);        
-      if (rowParser.chunks.length > 0) {
-        rowParser.chunks.push(v);
-        v = rowParser.chunks.join('');
-        rowParser.chunks = []
+    this.parser.on('value',
+    function (v) {
+      // self.logWriter.write(`onvalue(${self.jDepth}: ObjectStack:${self.objectStack}\n`);        
+      if (self.chunks.length > 0) {
+        self.chunks.push(v);
+        v = self.chunks.join('');
+        self.chunks = []
       }
       
       if (typeof v === 'boolean') {
         v = new Boolean(v).toString();
       }
       
-      if (Array.isArray(rowParser.currentObject)) {
+      if (Array.isArray(self.currentObject)) {
           // currentObject is an ARRAY. We got a value so add it to the Array
-          rowParser.currentObject.push(v);
+          self.currentObject.push(v);
       }
       else {
           // currentObject is an Key. We got a value so fetch the parent object and add the KEY:VALUE pair to it. Parent Object becomes the Current Object.
-          const parentObject = rowParser.objectStack.pop();
-          parentObject[rowParser.currentObject] = v;
-          rowParser.currentObject = parentObject;
+          const parentObject = self.objectStack.pop();
+          parentObject[self.currentObject] = v;
+          self.currentObject = parentObject;
       }
-    }
+    });
       
-    this.saxJParser.oncloseobject = async function () {
-      // rowParser.logWriter.write(`onCloseObject(${rowParser.jDepth}):\nObjectStack:${rowParser.objectStack})\nCurrentObject:${rowParser.currentObject}\n`);           
-      rowParser.jDepth--;
+    this.parser.on('closeobject',
+    async function () {
+      // self.logWriter.write(`onCloseObject(${self.jDepth}):\nObjectStack:${self.objectStack})\nCurrentObject:${self.currentObject}\n`);           
+      self.jDepth--;
 
       // An object can belong to an Array or a Key
-      if (rowParser.objectStack.length > 0) {
-        let owner = rowParser.objectStack.pop()
+      if (self.objectStack.length > 0) {
+        let owner = self.objectStack.pop()
         let parentObject = undefined;
         if (Array.isArray(owner)) {   
           parentObject = owner;
-          parentObject.push(rowParser.currentObject);
+          parentObject.push(self.currentObject);
         }    
         else {
-          parentObject = rowParser.objectStack.pop()
+          parentObject = self.objectStack.pop()
           if (!this.emptyObject) {
-            parentObject[owner] = rowParser.currentObject;
+            parentObject[owner] = self.currentObject;
           }
         }   
-        rowParser.currentObject = parentObject;
+        self.currentObject = parentObject;
       }
-    }
+    });
    
-    this.saxJParser.onclosearray = function () {
-      // rowParser.logWriter.write(`onclosearray(${rowParser.jDepth}: ObjectStack:${rowParser.objectStack}. CurrentObject:${rowParser.currentObject}\n`);          
+    this.parser.on('closearray',
+    function () {
+      // self.logWriter.write(`onclosearray(${self.jDepth}: ObjectStack:${self.objectStack}. CurrentObject:${self.currentObject}\n`);          
       let skipObject = false;
       
-      if ((rowParser.dataPhase) && (rowParser.jDepth === 4)) {
-        rowParser.push({ data : rowParser.currentObject});
+      if ((self.dataPhase) && (self.jDepth === 4)) {
+        self.push({ data : self.currentObject});
         skipObject = true;
       }
 
-      rowParser.jDepth--;
+      self.jDepth--;
 
       // An Array can belong to an Array or a Key
-      if (rowParser.objectStack.length > 0) {
-        let owner = rowParser.objectStack.pop()
+      if (self.objectStack.length > 0) {
+        let owner = self.objectStack.pop()
         let parentObject = undefined;
         if (Array.isArray(owner)) {   
           parentObject = owner;
           if (!skipObject) {
-            parentObject.push(rowParser.currentObject);
+            parentObject.push(self.currentObject);
           }
         }    
         else {
-          parentObject = rowParser.objectStack.pop()
+          parentObject = self.objectStack.pop()
           if (!skipObject) {
-            parentObject[owner] = rowParser.currentObject;
+            parentObject[owner] = self.currentObject;
           }
         }
-        rowParser.currentObject = parentObject;
+        self.currentObject = parentObject;
       }   
-    }
+    });  
+   
+   
+    this.tableList  = undefined;
+    this.objectStack = [];
+    this.dataPhase = false;     
+    
+    this.currentObject = undefined;
+    this.chunks = [];
 
-   }  
+    this.jDepth = 0; 
+  }     
+     
+
+  checkState() {
+    if (this.tableList.size === 0) {
+      return false;
+    }
+    else {
+      this.tableList.forEach(function(table) {
+        this.logWriter.write(`${new Date().toISOString()}[WARNING]: Table "${table}". No records found - Possible corrupt or truncated import file.\n`);
+      },this)
+      return true;
+    }
+  };
    
   _transform(data,enc,callback) {
-    this.saxJParser.write(data);
+    this.parser.write(data);
     callback();
   };
 }

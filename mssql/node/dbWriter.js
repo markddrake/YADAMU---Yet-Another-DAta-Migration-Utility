@@ -9,7 +9,7 @@ class DBWriter extends Writable {
   
   constructor(conn,database,schema,batchSize,commitSize,mode,status,logWriter,options) {
     super({objectMode: true });
-    const dbWriter = this;
+    const self = this;
     
     this.conn = conn;
     this.transaction = undefined;

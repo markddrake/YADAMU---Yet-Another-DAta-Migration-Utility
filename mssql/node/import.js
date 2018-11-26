@@ -11,11 +11,17 @@ const MsSQLCore = require('./mssqlCore.js');
 function processFile(conn, database, schema, importFilePath, batchSize, commitSize, mode, status, logWriter) {
   
   return new Promise(function (resolve,reject) {
-    const dbWriter = new DBWriter(conn,database,schema,batchSize,commitSize,mode,status,logWriter);
-    const rowGenerator = new RowParser(logWriter);
-    const readStream = fs.createReadStream(importFilePath);    
-    dbWriter.on('finish', function() { resolve()});
-    readStream.pipe(rowGenerator).pipe(dbWriter);
+    try {
+      const dbWriter = new DBWriter(conn,database,schema,batchSize,commitSize,mode,status,logWriter);
+      dbWriter.on('error',function(err){logWriter.write(`${err}\n${err.stack}\n`);})
+      dbWriter.on('finish', function(){resolve(parser.checkState())});
+      const parser = new RowParser(logWriter);
+      const readStream = fs.createReadStream(importFilePath);    
+      readStream.pipe(parser).pipe(dbWriter);
+    } catch (e) {
+      logWriter.write(`${e}\n${e.stack}\n`);
+      reject(e);
+    }
   })
 }
     
@@ -52,7 +58,7 @@ async function main() {
     const fileSizeInBytes = stats.size
 	logWriter.write(`${new Date().toISOString()}[Clarinet]: Processing file "${path.resolve(parameters.FILE)}". Size ${fileSizeInBytes} bytes.\n`)
 
-    await processFile(pool, parameters.DATABASE, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);
+    status.warningsRaised = await processFile(pool, parameters.DATABASE, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);
     
     await pool.close();
     

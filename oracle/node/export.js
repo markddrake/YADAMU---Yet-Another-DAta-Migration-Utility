@@ -263,8 +263,6 @@ async function main(){
         } catch(e) {
           if ((e.message) && (e.message.indexOf('ORA-40478') == 0)) {
             if (exportFile.bytesWritten > dataOffset) {
-              console.log(exportFile.bytesWritten);
-              console.log(dataOffset);
               exportFile = resetStream(exportFile,dataOffset);
             }
             const sqlWideTable = wideTableWorkaround(sqlQueries[i],varcharSize,exportFile);
@@ -290,7 +288,7 @@ async function main(){
     if (logWriter !== process.stdout) {
       console.log(`Export operation failed: See "${parameters.LOGFILE}" for details.`);
       logWriter.write('Export operation failed.\n');
-      logWriter.write(e.stack);
+      logWriter.write(`${e.stack}\n`);
     }
     else {
         console.log('Export operation Failed.');
@@ -305,9 +303,8 @@ async function main(){
     logWriter.close();
   }    
 
-  if (status.sqlTrace) {
-    sqlTrace.close();
-  }
+
+  
   
 }
 

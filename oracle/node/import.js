@@ -28,12 +28,12 @@ function processFile(conn, schema, importFilePath,batchSize,commitSize,lobCacheS
   return new Promise(function (resolve,reject) {
     try {
       const dbWriter = new DBWriter(conn,schema,batchSize,commitSize,lobCacheSize,mode,status,logWriter);
-      dbWriter.on('error',function(err) {logWriter.write(`${err}\n${err.stack}\n`);})
-      dbWriter.on('finish', function() { resolve()});
-      const rowGenerator = new RowParser(logWriter);
-      rowGenerator.on('error',function(err) {logWriter.write(`${err}\n${err.stack}\n`);})
+      dbWriter.on('error',function(err){logWriter.write(`${err}\n${err.stack}\n`);})
+      dbWriter.on('finish', function(){resolve(parser.checkState())});
+      const parser = new RowParser(logWriter);
+      parser.on('error',function(err) {logWriter.write(`${err}\n${err.stack}\n`);})
       const readStream = fs.createReadStream(importFilePath);    
-      readStream.pipe(rowGenerator).pipe(dbWriter);
+      readStream.pipe(parser).pipe(dbWriter);
     } catch (e) {
       logWriter.write(`${e}\n${e.stack}\n`);
       reject(e);
@@ -72,11 +72,10 @@ async function main() {
     const fileSizeInBytes = stats.size
     logWriter.write(`${new Date().toISOString()}[Clarinet]: Processing file "${path.resolve(parameters.FILE)}". Size ${fileSizeInBytes} bytes.\n`)
 
-    await processFile(conn, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.LOBCACHESIZE, parameters.MODE, status, logWriter);
+    status.warningsRaised = await processFile(conn, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.LOBCACHESIZE, parameters.MODE, status, logWriter);
     const currentUser = Yadamu.convertQuotedIdentifer(parameters.USERID.split('/')[0])
     await setCurrentSchema(conn, currentUser, status, logWriter);
-    
-    OracleCore.doRelease(conn);						   
+    await conn.close();					   
 
     Yadamu.reportStatus(status,logWriter)    
   } catch (e) {
@@ -94,13 +93,17 @@ async function main() {
     }
   }
   
+  if (status.sqlTrace) {
+    status.sqlTrace.close();
+  }
+  
+  status.importErrorMgr.close();
+
   if (logWriter !== process.stdout) {
     logWriter.close();
   }
 
-  if (status.sqlTrace) {
-    status.sqlTrace.close();
-  }
+
 }
     
 main()

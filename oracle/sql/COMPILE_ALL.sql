@@ -28,25 +28,25 @@ create or replace public synonym JSON_FEATURE_DETECTION for JSON_FEATURE_DETECTI
 /
 spool &LOGDIR/install/OBJECT_SERIALIZATION.log
 --
-@@OBJECT_SERIALIZATION
+@@OBJECT_SERIALIZATION.sql
 --
 create or replace public synonym OBJECT_SERIALIZATION for OBJECT_SERIALIZATION
 /
 spool &LOGDIR/install/JSON_EXPORT_DDL.log
 --
-@@JSON_EXPORT_DDL
+@@JSON_EXPORT_DDL.sql
 --
 create or replace public synonym JSON_EXPORT_DDL for JSON_EXPORT_DDL
 /
 spool &LOGDIR/install/JSON_IMPORT.log
 --
-@@JSON_IMPORT
+@@JSON_IMPORT.sql
 --
 create or replace public synonym JSON_IMPORT for JSON_IMPORT
 /
 spool &LOGDIR/install/JSON_EXPORT.log
 --
-@@JSON_EXPORT
+@@JSON_EXPORT.sql
 --
 create or replace public synonym JSON_EXPORT for JSON_EXPORT
 /

@@ -28,11 +28,42 @@ async function doConnect(connectionString,status) {
   return conn;
 }
 
-function doRelease(conn) {
-  conn.close(function (err) {
-    if (err)
-      console.error(err.message);
+async function getConnectionPool(connectionString,status) {
+	
+  const user = Yadamu.convertQuotedIdentifer(connectionString.substring(0,connectionString.indexOf('/')));
+  let password = connectionString.substring(connectionString.indexOf('/')+1);
+  let connectString = '';
+  if (password.indexOf('@') > -1) {
+	connectString = password.substring(password.indexOf('@')+1);
+	password = password.substring(password,password.indexOf('@'));
+  }
+  const pool = await oracledb.createPool(
+  {
+      user          : user,
+      password      : password,
+      connectString : connectString
   });
+  return pool;
+}
+
+
+async function getConnection(pool,status) {
+
+  const conn = pool.getConnection();
+  const sqlStatement = `ALTER SESSION SET TIME_ZONE = '+00:00'`
+  if (status.sqlTrace) {
+     status.sqlTrace.write(`${sqlStatement}\n/\n`);
+  }
+  const result = await conn.execute(sqlStatement);
+  return conn;
+}
+
+async function doRelease(conn) {
+  try {
+    await conn.close();
+  } catch (e) {
+    console.log(e);
+  }
 };
 
 function closeTempLob (tempLob) {

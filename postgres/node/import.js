@@ -11,11 +11,17 @@ const PostgresCore = require('./postgresCore.js');
 function processFile(conn, schema, importFilePath, batchSize, commitSize, mode, status, logWriter) {
   
   return new Promise(function (resolve,reject) {
-    const dbWriter = new DBWriter(conn,schema,batchSize,commitSize,mode,status,logWriter);
-    const rowGenerator = new RowParser(logWriter);
-    const readStream = fs.createReadStream(importFilePath);    
-    dbWriter.on('finish', function() { resolve()});
-    readStream.pipe(rowGenerator).pipe(dbWriter);
+    try {
+      const dbWriter = new DBWriter(conn,schema,batchSize,commitSize,mode,status,logWriter);
+      dbWriter.on('finish', function(){resolve(parser.checkState())});
+      dbWriter.on('error',function(err){logWriter.write(`${err}\n${err.stack}\n`);})
+      const parser = new RowParser(logWriter);
+      const readStream = fs.createReadStream(importFilePath);    
+      readStream.pipe(parser).pipe(dbWriter);
+    } catch (e) {
+      logWriter.write(`${e}\n${e.stack}\n`);
+      reject(e);
+    }
   })
 }
     
@@ -48,7 +54,7 @@ async function main() {
     const fileSizeInBytes = stats.size
     logWriter.write(`${new Date().toISOString()}[Clarinet]: Processing file "${path.resolve(parameters.FILE)}". Size ${fileSizeInBytes} bytes.\n`)
 	
-    await processFile(pgClient, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);
+    status.warningsRaised = await processFile(pgClient, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);
     
 	await pgClient.end();
 

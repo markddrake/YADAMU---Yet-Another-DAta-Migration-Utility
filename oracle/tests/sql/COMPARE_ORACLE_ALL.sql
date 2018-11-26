@@ -11,28 +11,36 @@ def LOGDIR = "&1"
 --
 spool &LOGDIR/COMPARE_SCHEMA.log append
 --
+def ID1 = "&2"
+--
+def ID2 = "&3"
+--
+def METHOD = "&4"
+--
+def MODE = "&5"
+--
 def SCHEMA = HR
 --
-@@DO_SCHEMA_COMPARE
+@@SCHEMA_COMPARE.sql
 --
 def SCHEMA = SH
 --
-@@DO_SCHEMA_COMPARE
+@@SCHEMA_COMPARE.sql
 --
 def SCHEMA = OE
 --
-@@DO_SCHEMA_COMPARE
+@@SCHEMA_COMPARE.sql
 --
 def SCHEMA = PM
 --
-@@DO_SCHEMA_COMPARE
+@@SCHEMA_COMPARE.sql
 --
 def SCHEMA = IX
 --
-@@DO_SCHEMA_COMPARE
+@@SCHEMA_COMPARE.sql
 --
 def SCHEMA = BI
 --
-@@DO_SCHEMA_COMPARE
+@@SCHEMA_COMPARE.sql
 --
 quit

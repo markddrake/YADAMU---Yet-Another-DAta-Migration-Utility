@@ -11,8 +11,7 @@ class DBWriter extends Writable {
   constructor(conn,schema,batchSize,commitSize,lobCacheSize,mode,status,logWriter,options) {
 
     super({objectMode: true });
-       
-    const dbWriter = this;
+    const self = this;
     
     this.conn = conn;
     this.schema = schema;
@@ -24,7 +23,6 @@ class DBWriter extends Writable {
     this.logWriter = logWriter;
     
     this.batch = [];
-    this.lobCache = [];
 
     this.systemInformation = undefined;
     this.metadata = undefined;
@@ -34,7 +32,6 @@ class DBWriter extends Writable {
     this.tableName  = undefined;
     this.tableInfo  = undefined;
     this.rowCount   = undefined;
-    this.lobUsage   = undefined;
     this.startTime  = undefined;
     this.insertMode = 'Empty';
     this.skipTable = true;
@@ -48,9 +45,9 @@ class DBWriter extends Writable {
   async setTable(tableName) {
     this.tableName = tableName
     this.tableInfo =  this.statementCache[tableName];
-    if (this.tableInfo.lobIndexList.length > 0) {
-      // If some columns are bound as tempCLOB restrict batchsize based on lobCacheSize
-      let lobBatchSize = Math.floor(this.lobCacheSize/this.tableInfo.lobIndexList.length);
+    if (this.tableInfo.lobCount > 0) {
+      // If some columns are bound as CLOB or BLOB restrict batchsize based on lobCacheSize
+      let lobBatchSize = Math.floor(this.lobCacheSize/this.tableInfo.lobCount);
       this.batchSize = (lobBatchSize > this.batchSize) ? this.batchSize : lobBatchSize;
     }
     this.rowCount = 0;
@@ -132,7 +129,7 @@ end;`
     return plsqlBlock;
   }
 
-  stringToLob(conn,str,lobCache,lobCacheIndex) {
+  string2Clob(conn,str) {
 
     const s = new Readable();
     s.push(str);
@@ -141,91 +138,62 @@ end;`
     return new Promise(async function(resolve,reject) {
       try {
         let tempLob = undefined;
-        /*
-        if (lobCacheIndex >= lobCache.length) {
-          tempLob = await  conn.createLob(oracledb.CLOB);
-          lobCache.push(tempLob);
-        }
-        else {
-          tempLob = lobCache[lobCacheIndex];
-          // tempLob.truncate(0);
-          await conn.execute('begin DBMS_LOB.trim(:1,0); end;',[tempLob]);
-        }
-        */
         tempLob = await  conn.createLob(oracledb.CLOB);
-        lobCache.push(tempLob);
         tempLob.on('error',function(err) {reject(err);});
         tempLob.on('finish', function() {resolve(tempLob)});
         s.on('error', function(err) {reject(err);});
         s.pipe(tempLob);  // copies the text to the temporary LOB
       }
       catch (e) {
-        console.log('Oops');
         reject(e);
       }
     });  
   }
       
-  
-  async clearLobCache() {
-    this.lobCache.forEach(async function(lob) {
-                            try {
-                              await lob.close();     
-                            } catch (e) {
-                              this.logWriter.write(`Error closing LOB: ${e}\n${e.stack}\n`);
-                            }                        
-    },this)
-    this.lobCache.length = 0;
-    return this.lobCache.length;
-  }
-    
   async writeBatch(status) {
       
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
     // Infortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
     // So we have to free the current tempLob Cache and create a new one for each batch
     
-    if (!this.tableInfo.containsObjects) {
-      try {
-        this.insertMode = 'Batch';
-        const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
-        const endTime = new Date().getTime();
-        this.batch.length = 0;
-        this.lobUsage = await this.clearLobCache();
-        return endTime
-      } catch (e) {
-        await this.conn.rollback();
-         if (e.errorNum && (e.errorNum === 4091)) {
-          // Mutating Table - Convert to PL/SQL Block
-          status.warningRaised = true;
-          this.logWriter.write(`${new Date().toISOString()} [WARNING]: Table ${this.tableName} : executeMany(INSERT) failed. ${e}. Retrying with PL/SQL Block.\n`);
-          this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
-          if (status.sqlTrace) {
-            status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
-          }
-          try {
-            const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
-            const endTime = new Date().getTime();
-            this.batch.length = 0;
-            this.lobUsage = await this.clearLobCache();
-            return endTime
-          } catch (e) {
-            await this.conn.rollback();
-            if (this.logDDLIssues) {
-              this.logWriter.write(`${new Date().toISOString()}:_write(${this.tableName},${this.batch.length}) : executeMany() failed. ${e}. Retrying using execute() loop.\n`);
-              this.logWriter.write(`${this.tableInfo.dml}\n`);
-              this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
-              this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
-            }
-          }
-        } 
-        else {  
+    try {
+      this.insertMode = 'Batch';
+      const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
+      const endTime = new Date().getTime();
+      this.batch.length = 0;
+      return endTime
+    } catch (e) {
+      await this.conn.rollback();
+      
+       if (e.errorNum && (e.errorNum === 4091)) {
+        // Mutating Table - Convert to PL/SQL Block
+        status.warningRaised = true;
+        this.logWriter.write(`${new Date().toISOString()} [WARNING]: Table ${this.tableName} : executeMany(INSERT) failed. ${e}. Retrying with PL/SQL Block.\n`);
+        this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
+        if (status.sqlTrace) {
+          status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
+        }
+        try {
+          const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
+          const endTime = new Date().getTime();
+          this.batch.length = 0;
+          return endTime
+        } catch (e) {
+          await this.conn.rollback();
           if (this.logDDLIssues) {
             this.logWriter.write(`${new Date().toISOString()}:_write(${this.tableName},${this.batch.length}) : executeMany() failed. ${e}. Retrying using execute() loop.\n`);
             this.logWriter.write(`${this.tableInfo.dml}\n`);
             this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
             this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
           }
+        }
+      } 
+      else {  
+        if (this.logDDLIssues) {
+          this.logWriter.write(`${new Date().toISOString()}:_write(${this.tableName},${this.batch.length}) : executeMany() failed. ${e}. Retrying using execute() loop.\n`);
+          this.logWriter.write(`${this.tableInfo.dml}\n`);
+          this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
+          this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
         }
       }
     }
@@ -234,11 +202,17 @@ end;`
     this.insertMode = 'Iterative';
     try {
       for (row in this.batch) {
-        let results = await this.conn.execute(this.tableInfo.dml,this.batch[row])
+        try {
+          let results = await this.conn.execute(this.tableInfo.dml,this.batch[row])
+        }
+        catch (e) {
+          this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping Row ${row}. Reason: ${e.message}\n`)
+          this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
+          this.status.importErrorMgr.logError(this.tableName,this.batch[row]);
+        } 
       }
       const endTime = new Date().getTime();
       this.batch.length = 0;
-      this.lobUsage = await this.clearLobCache();
       return endTime
     } catch (e) {
       await this.conn.rollback();
@@ -249,6 +223,7 @@ end;`
       if (this.logDDLIssues) {
         this.logWriter.write(`${this.tableInfo.dml}\n`);
         this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
+        this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
         this.logWriter.write(`${JSON.stringify(this.batch[row])}\n`);
       }
       this.batch.length = 0;
@@ -301,12 +276,19 @@ end;`
           }
           this.tableInfo.targetDataTypes.forEach(async function(targetDataType,idx) {
                                                                  if (obj.data[idx] !== null) {
+                                                                   const dataType = Yadamu.decomposeDataType(targetDataType);
+                                                                   if (dataType.type === 'JSON') {
+                                                                     // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
+                                                                     // obj.data[idx] = Buffer.from(JSON.stringify(obj.data[idx]))
+                                                                     // Default JSON Storage model is JSON store as CLOB.
+                                                                     // JSON must be shipped in Serialized Form
+                                                                     obj.data[idx] = JSON.stringify(obj.data[idx])
+                                                                   } 
                                                                    if (this.tableInfo.binds[idx].type === oracledb.CLOB) {
-                                                                     obj.data[idx] = await this.stringToLob(this.conn, obj.data[idx], this.lobCache, this.lobUsage)                                                                    
+                                                                     obj.data[idx] = await this.string2Clob(this.conn, obj.data[idx])                                                                    
                                                                      this.lobUsage++
                                                                      return
                                                                    }
-                                                                   const dataType = Yadamu.decomposeDataType(targetDataType);
                                                                    switch (dataType.type) {
                                                                      case "BLOB" :
                                                                        obj.data[idx] = Buffer.from(obj.data[idx],'hex');
@@ -318,13 +300,6 @@ end;`
                                                                        // Cannot passs XMLTYPE as BUFFER
                                                                        // Reason: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
                                                                        // obj.data[idx] = Buffer.from(obj.data[idx]);
-                                                                       return;
-                                                                     case "JSON" :
-                                                                       // Default JSON Storage model is JSON store as CLOB.
-                                                                       // JSON must be shipped in Serialized Form
-                                                                       obj.data[idx] = JSON.stringify(obj.data[idx])
-                                                                       // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
-                                                                       // obj.data[idx] = Buffer.from(JSON.stringify(obj.data[idx]))
                                                                        return;
                                                                      case "DATE":
                                                                      case "TIMESTAMP" :
@@ -370,7 +345,6 @@ end;`
           const elapsedTime = this.endTime - this.startTime;
           this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}"[${this.insertMode}]. Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
           await this.enableConstraints(this.conn, this.schema, this.status, this.logWriter);
-          await this.clearLobCache();
           await this.conn.commit();
         }
       }
