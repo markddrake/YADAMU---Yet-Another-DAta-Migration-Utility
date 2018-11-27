@@ -23,7 +23,8 @@ class DBWriter extends Writable {
     this.logWriter = logWriter;
     
     this.batch = [];
-
+    this.lobList = [];
+    
     this.systemInformation = undefined;
     this.metadata = undefined;
 
@@ -129,7 +130,7 @@ end;`
     return plsqlBlock;
   }
 
-  string2Clob(conn,str) {
+  string2Clob(conn,str,lobList) {
 
     const s = new Readable();
     s.push(str);
@@ -139,6 +140,7 @@ end;`
       try {
         let tempLob = undefined;
         tempLob = await  conn.createLob(oracledb.CLOB);
+        lobList.push(tempLob);
         tempLob.on('error',function(err) {reject(err);});
         tempLob.on('finish', function() {resolve(tempLob)});
         s.on('error', function(err) {reject(err);});
@@ -148,6 +150,16 @@ end;`
         reject(e);
       }
     });  
+  }
+      
+  freeLobList() {
+    this.lobList.forEach(async function(lob,idx) {
+      try {
+        await lob.close();
+      } catch(e) {
+        this.logWriter.write(`LobList[${idx}]: Error ${e}\n`);
+      }   
+    },this)
   }
       
   async writeBatch(status) {
@@ -161,6 +173,7 @@ end;`
       const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
       const endTime = new Date().getTime();
       this.batch.length = 0;
+      // this.freeLobList();
       return endTime
     } catch (e) {
       await this.conn.rollback();
@@ -285,7 +298,7 @@ end;`
                                                                      obj.data[idx] = JSON.stringify(obj.data[idx])
                                                                    } 
                                                                    if (this.tableInfo.binds[idx].type === oracledb.CLOB) {
-                                                                     obj.data[idx] = await this.string2Clob(this.conn, obj.data[idx])                                                                    
+                                                                     obj.data[idx] = await this.string2Clob(this.conn, obj.data[idx],this.lobList)                                                                    
                                                                      this.lobUsage++
                                                                      return
                                                                    }

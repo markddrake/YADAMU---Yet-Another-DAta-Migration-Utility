@@ -405,25 +405,15 @@ begin
   end case;
 end;
 --
-procedure APPEND_DESERIALIZATION_FUNCTIONS(P_DESERIALIZATION_FUNCTIONS T_VC4000_TABLE, P_BLOB_COUNT NUMBER, P_BFILE_COUNT NUMBER, P_ANYDATA_COUNT NUMBER, P_SQL_STATEMENT IN OUT CLOB)
+procedure APPEND_DESERIALIZATION_FUNCTIONS(P_DESERIALIZATION_FUNCTIONS T_VC4000_TABLE, P_SQL_STATEMENT IN OUT CLOB)
 as
   V_IDX   PLS_INTEGER;
 begin
-  if ((P_DESERIALIZATION_FUNCTIONS.count > 0) or ((P_BFILE_COUNT + P_BLOB_COUNT + P_ANYDATA_COUNT) > 0)) then
+  if (P_DESERIALIZATION_FUNCTIONS.count > 0) then
     DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB('WITH' || C_NEWLINE));
-    /*
-    if ((P_BFILE_COUNT + P_ANYDATA_COUNT + P_DESERIALIZATION_FUNCTIONS.count) > 0) then
-      DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(OBJECT_SERIALIZATION.CODE_CHAR2BFILE));
-    end if;
-    if ((P_BLOB_COUNT  + P_ANYDATA_COUNT + P_DESERIALIZATION_FUNCTIONS.count) > 0) then
-      DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(OBJECT_SERIALIZATION.CODE_HEXBINARY2BLOB));
-    end if;
-    */
-    if (P_DESERIALIZATION_FUNCTIONS.count > 0) then
-      for V_IDX in 1.. P_DESERIALIZATION_FUNCTIONS.count loop
-        DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(P_DESERIALIZATION_FUNCTIONS(V_IDX)));
-      end loop;
-    end if;
+    for V_IDX in 1.. P_DESERIALIZATION_FUNCTIONS.count loop
+      DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(P_DESERIALIZATION_FUNCTIONS(V_IDX)));
+    end loop;
   end if;
 end;
 --
@@ -455,13 +445,13 @@ as
           ,case
              when (t.VALUE LIKE '"%"."%"')  then
                -- Data Type is a schema qualified object type
-                case 
-                      -- Remap types defined by the source schema to the target schema.
-                      when (t.VALUE LIKE '"' || P_TABLE_OWNER || '"."%"') 
-                        then P_TARGET_SCHEMA
-                      else
-                        SUBSTR(t.VALUE,2,INSTR(t.VALUE,'.')-3)
-                      end
+               case 
+                 -- Remap types defined by the source schema to the target schema.
+                 when (t.VALUE LIKE '"' || P_TABLE_OWNER || '"."%"') 
+                   then P_TARGET_SCHEMA
+                 else
+                   SUBSTR(t.VALUE,2,INSTR(t.VALUE,'.')-3)
+               end
              else 
                NULL
            end "TYPE_OWNER"     
@@ -479,7 +469,7 @@ as
   "TARGET_TABLE_DEFINITIONS" 
   as (
     select st.*
-          , MAP_FOREIGN_DATATYPE(P_SOURCE_VENROR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
+          ,MAP_FOREIGN_DATATYPE(P_SOURCE_VENROR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
           ,case
              -- Probe rather than Join since most rows are not objects.
              when (TYPE_NAME is not null) then
@@ -567,7 +557,7 @@ as
            cast(collect('"' ||
                         case
                           when TYPE_EXISTS = 1 
-                            then REPLACE(TARGET_DATA_TYPE,'"','\"')
+                            then '\"' || TYPE_OWNER || '\".\"' || TYPE_NAME || '\"'
                           when TYPE_NAME is not NULL
                             then 'CLOB'
                           -- Type Exist is NULL.
@@ -622,9 +612,6 @@ as
            )
          ) COLUMN_PATTERNS
         , cast(collect( DESERIALIZATION_FUNCTION) as T_VC4000_TABLE) "DESERIALIZATION_FUNCTIONS"
-        , SUM(CASE WHEN TARGET_DATA_TYPE = 'BLOB' THEN 1 ELSE 0 END) BLOB_COUNT
-        , SUM(CASE WHEN TARGET_DATA_TYPE = 'BFILE' THEN 1 ELSE 0 END) BFILE_COUNT
-        , SUM(CASE WHEN TARGET_DATA_TYPE = 'ANYDATA' THEN 1 ELSE 0 END) ANYDATA_COUNT
         , SUM(CASE WHEN TYPE_EXISTS = 1 THEN 1 ELSE 0 END) OBJECT_COUNT
     from "EXTENDED_TABLE_DEFINITIONS";
 --
@@ -683,7 +670,7 @@ as
         ,'"' ||
            case
              when TYPE_EXISTS = 1 
-               then REPLACE(TARGET_DATA_TYPE,'"','\"')
+               then '\"' || TYPE_OWNER || '\".\"' || TYPE_NAME || '\"'
              when TYPE_NAME is not NULL
                then 'CLOB'
             -- Type Exist is NULL.
@@ -743,10 +730,6 @@ as
    V_DESERIALIZATIONS          T_VC4000_TABLE;
 
    V_OBJECT_COUNT              NUMBER;
-   V_BLOB_COUNT                NUMBER;
-   V_ANYDATA_COUNT             NUMBER;
-   V_BFILE_COUNT               NUMBER;
-   V_INLINE_PLSQL_REQUIRED     BOOLEAN := FALSE;
 
    V_SQL_FRAGMENT VARCHAR2(32767);
    V_INSERT_HINT  VARCHAR2(128) := '';
@@ -787,16 +770,11 @@ begin
     V_TARGET_DATA_TYPES      := o.TARGET_DATA_TYPES;
     V_COLUMN_PATTERNS        := o.COLUMN_PATTERNS;
     V_OBJECT_COUNT           := o.OBJECT_COUNT;
-    V_BFILE_COUNT            := o.BFILE_COUNT;
-    V_BLOB_COUNT             := o.BLOB_COUNT;
-    V_ANYDATA_COUNT          := o.ANYDATA_COUNT;
     
     select distinct COLUMN_VALUE 
       bulk collect into V_DESERIALIZATIONS
       from table(o.DESERIALIZATION_FUNCTIONS);
     
-    V_INLINE_PLSQL_REQUIRED := ((V_OBJECT_COUNT + V_BLOB_COUNT + V_BFILE_COUNT + V_ANYDATA_COUNT) > 0);
-     
   end loop;
 --
   $ELSE
@@ -814,12 +792,7 @@ begin
   V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
   V_TARGET_DATA_TYPES := SERIALIZE_TABLE(V_TARGET_DATA_TYPES_TABLE);
   V_COLUMN_PATTERNS := SERIALIZE_TABLE(V_COLUMN_PATTERNS_TABLE);
-  select count(*) into V_BLOB_COUNT    from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE = 'BLOB';
-  select count(*) into V_ANYDATA_COUNT from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE = 'BFILE';
-  select count(*) into V_BFILE_COUNT   from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE = 'ANYDATA';
   select count(*) into V_OBJECT_COUNT  from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE like '"%"."%"';
-  
-  V_INLINE_PLSQL_REQUIRED := ((V_OBJECT_COUNT + V_BLOB_COUNT + V_BFILE_COUNT + V_ANYDATA_COUNT) > 0);
   
 --
   $END
@@ -830,7 +803,7 @@ begin
   V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK2;
   DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   
-  if ( V_INLINE_PLSQL_REQUIRED) then
+  if ( V_OBJECT_COUNT > 0) then
     V_INSERT_HINT := ' /*+ WITH_PLSQL */';
   end if;
   
@@ -840,7 +813,7 @@ begin
   V_SQL_FRAGMENT :=  ')' || C_NEWLINE;
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   
-  APPEND_DESERIALIZATION_FUNCTIONS(V_DESERIALIZATIONS,V_BLOB_COUNT,V_BFILE_COUNT,V_ANYDATA_COUNT,V_DML_STATEMENT);
+  APPEND_DESERIALIZATION_FUNCTIONS(V_DESERIALIZATIONS,V_DML_STATEMENT);
    
   V_SQL_FRAGMENT := 'select ';
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);

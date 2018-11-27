@@ -130,7 +130,7 @@ class StatementGenerator {
      */
       
     try {
-      const boundedTypes = ['CHAR','NCHAR','VARCHAR2','NVARCHAR2']
+      const boundedTypes = ['CHAR','NCHAR','VARCHAR2','NVARCHAR2','RAW']
       const ddlStatements = [];  
       const metadataLob = await OracleCore.lobFromJSON(this.conn,{systemInformation : systemInformation, metadata: metadata});  
       const results = await this.conn.execute(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:schema});
