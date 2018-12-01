@@ -32,6 +32,7 @@ as
  ,TARGET_ROW_COUNT NUMBER
  ,MISSINGS_ROWS    NUMBER
  ,EXTRA_ROWS       NUMBER
+ ,SQLERRM          VARCHAR2(4000)
 ) ON COMMIT PRESERVE  ROWS
 ';
 --
@@ -532,7 +533,7 @@ as
                           when TARGET_DATA_TYPE = 'BOOLEAN'
                             then 'HEXTORAW(case when "' || COLUMN_NAME || '" = ''true'' then ''1'' else ''0'' end)'
                           when TARGET_DATA_TYPE = 'BFILE'
-                            then 'OBJECT_SERIALIZATION.CHAR2BFILE("' || COLUMN_NAME || '")'
+                            then 'OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || COLUMN_NAME || '")'
                           when (TARGET_DATA_TYPE = 'XMLTYPE')
                             -- Cannot map directly to XMLTYPE constructor as we need to test for NULL. 
                             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || COLUMN_NAME || '") end'
@@ -541,9 +542,9 @@ as
                             then 'case when "' || COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || COLUMN_NAME || '") end'
                           when TARGET_DATA_TYPE = 'BLOB'
                             $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-                            then 'OBJECT_SERIALIZATION.HEXBINARY2BLOB("' || COLUMN_NAME || '")'
+                            then 'OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || COLUMN_NAME || '")'
                             $ELSE
-                            then 'case when "' || COLUMN_NAME || '" is NULL then NULL when substr("' || COLUMN_NAME || '",1,15) = ''BLOB2HEXBINARY:'' then NULL else HEXTORAW("' || COLUMN_NAME || '") end'
+                            then 'case when "' || COLUMN_NAME || '" is NULL then NULL when substr("' || COLUMN_NAME || '",1,15) = ''SERIALIZE_BLOB_HEX:'' then NULL else HEXTORAW("' || COLUMN_NAME || '") end'
                             $END
                           else
                             '"' || COLUMN_NAME || '"'
@@ -647,7 +648,7 @@ as
            when TARGET_DATA_TYPE = 'BOOLEAN'
              then 'HEXTORAW(case when "' || COLUMN_NAME || '" = ''true'' then ''1'' else ''0'' end)'
            when TARGET_DATA_TYPE = 'BFILE'
-             then 'OBJECT_SERIALIZATION.CHAR2BFILE("' || COLUMN_NAME || '")'
+             then 'OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || COLUMN_NAME || '")'
            when (TARGET_DATA_TYPE = 'XMLTYPE')
               -- Cannot map directly to XMLTYPE constructor as we need to test for NULL. 
              then 'case when "' || COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || COLUMN_NAME || '") end'
@@ -659,9 +660,9 @@ as
               'TO_TIMESTAMP_TZ("' || COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FFTZHTZM'')'
            when TARGET_DATA_TYPE = 'BLOB'
              $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-             then 'OBJECT_SERIALIZATION.HEXBINARY2BLOB("' || COLUMN_NAME || '")'
+             then 'OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || COLUMN_NAME || '")'
              $ELSE
-             then 'case when "' || COLUMN_NAME || '" is NULL then NULL when substr("' || COLUMN_NAME || '",1,15) = ''BLOB2HEXBINARY:'' then NULL else HEXTORAW("' || COLUMN_NAME || '") end'
+             then 'case when "' || COLUMN_NAME || '" is NULL then NULL when substr("' || COLUMN_NAME || '",1,15) = ''SERIALIZE_BLOB_HEX:'' then NULL else HEXTORAW("' || COLUMN_NAME || '") end'
              $END
            else
              '"' || COLUMN_NAME || '"'
@@ -792,8 +793,11 @@ begin
   V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
   V_TARGET_DATA_TYPES := SERIALIZE_TABLE(V_TARGET_DATA_TYPES_TABLE);
   V_COLUMN_PATTERNS := SERIALIZE_TABLE(V_COLUMN_PATTERNS_TABLE);
-  select count(*) into V_OBJECT_COUNT  from TABLE(V_TARGET_DATA_TYPES_TABLE) where COLUMN_VALUE like '"%"."%"';
   
+  select count(*) 
+    into V_OBJECT_COUNT  
+    from TABLE(V_TARGET_DATA_TYPES_TABLE) 
+   where COLUMN_VALUE like '\"%\".\"%\"';
 --
   $END
 --
@@ -1309,7 +1313,7 @@ as
         ,LISTAGG(
 		   case 
 		     when DATA_TYPE = 'BFILE'
-			   then 'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.BFILE2CHAR("' || COLUMN_NAME || '") end' 
+			   then 'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || COLUMN_NAME || '") end' 
 		     when DATA_TYPE = 'XMLTYPE' 
 		       then 'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT "' || COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),getCyptoHash) end' 
 			 when DATA_TYPE in ('CLOB','BLOB','NCLOB')
@@ -1351,6 +1355,7 @@ as
   V_SQL_STATEMENT     CLOB;
   P_SOURCE_COUNT      NUMBER := 0;
   P_TARGET_COUNT      NUMBER := 0;
+  V_SQLERRM           VARCHAR2(4000);
 begin
   
   begin
@@ -1369,7 +1374,6 @@ begin
     V_SQL_STATEMENT := 'insert /*+ WITH_PLSQL */ into SCHEMA_COMPARE_RESULTS ' || C_NEWLINE
                     || 'with'|| C_NEWLINE
 					|| 'function getCyptoHash return number as begin return DBMS_CRYPTO.hash_sh256; end;'|| C_NEWLINE
-					|| OBJECT_SERIALIZATION.CODE_BFILE2CHAR 
                     || ' select ''' || P_SOURCE_SCHEMA  || ''' ' || C_NEWLINE
                     || '       ,''' || P_TARGET_SCHEMA  || ''' ' || C_NEWLINE
                     || '       ,'''  || t.TABLE_NAME || ''' ' || C_NEWLINE
@@ -1377,18 +1381,19 @@ begin
                     || '       ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || C_NEWLINE
                     || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || C_NEWLINE
                     || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || C_NEWLINE
+                    || '       ,null' || C_NEWLINE
 					|| '  from dual';
 	begin
 	  EXECUTE IMMEDIATE V_SQL_STATEMENT;
     exception 
       when OTHERS then
-        DBMS_OUTPUT.PUT_LINE(V_SQL_STATEMENT || ':' || SQLERRM);					  
+        V_SQLERRM := SQLERRM;					  
         begin 
           V_SQL_STATEMENT := 'select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '"';
           execute immediate V_SQL_STATEMENT into P_SOURCE_COUNT;
         exception
           when others then
-            DBMS_OUTPUT.PUT_LINE(V_SQL_STATEMENT || ':' || SQLERRM);					  
+            V_SQLERRM := SQLERRM;					  
             P_SOURCE_COUNT := -1;
         end;
         begin 
@@ -1396,16 +1401,15 @@ begin
           execute immediate V_SQL_STATEMENT into P_TARGET_COUNT;
         exception
           when others then
-            DBMS_OUTPUT.PUT_LINE(V_SQL_STATEMENT || ':' || SQLERRM);					  
+            V_SQLERRM := SQLERRM;					  
             P_TARGET_COUNT := -1;
         end;
-        V_SQL_STATEMENT := 'insert into SCHEMA_COMPARE_RESULTS values (:1,:2,:3,:4,:5,:6,:7)';
-        execute immediate V_SQL_STATEMENT using P_SOURCE_SCHEMA, P_TARGET_SCHEMA, t.TABLE_NAME, P_SOURCE_COUNT, P_TARGET_COUNT, -1, -1;
+        V_SQL_STATEMENT := 'insert into SCHEMA_COMPARE_RESULTS values (:1,:2,:3,:4,:5,:6,:7,:8)';
+        execute immediate V_SQL_STATEMENT using P_SOURCE_SCHEMA, P_TARGET_SCHEMA, t.TABLE_NAME, P_SOURCE_COUNT, P_TARGET_COUNT, -1, -1, V_SQLERRM;
     end;
   end loop;
 exception
   when OTHERS then 
-    DBMS_OUTPUT.PUT_LINE(V_SQL_STATEMENT || ':' || SQLERRM);					  
 	RAISE;
 end;
 --

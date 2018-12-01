@@ -80,7 +80,9 @@ class StatementGenerator {
            return { type: oracledb.STRING, maxSize : dataType.length * 2}
          case 'DATE':
          case 'TIMESTAMP':
-            return { type: oracledb.DATE}
+            // Avoid Javascript Date due to loss of precision
+            // return { type: oracledb.DATE}
+            return { type: oracledb.STRING, maxSize : 48}
          case 'INTERVAL':
             return { type: oracledb.STRING, maxSize : 12}
          case 'CLOB':
@@ -157,7 +159,7 @@ class StatementGenerator {
                               values.push(`XMLTYPE.createXML(:${(idx+1)})`);
                               break
                             case "BFILE":
-                              values.push(`OBJECT_SERIALIZATION.CHAR2BFILE(:${(idx+1)})`);
+                              values.push(`OBJECT_SERIALIZATION.DESERIALIZE_BFILE(:${(idx+1)})`);
                               break;
                            case "ANYDATA":
                              values.push(`ANYDATA.convertVARCHAR2(:${(idx+1)})`);
@@ -201,7 +203,7 @@ class StatementGenerator {
                                                                                 // return 'XMLTYPE(:' + (idx+1) + ",NLS_CHARSET_ID('AL32UTF8'))"
                                                                                 return 'XMLPARSE(DOCUMENT :' + (idx+1) + ')';
                                                                               case "BFILE":
-                                                                                return 'OBJECT_SERIALIZATION.CHAR2BFILE(:' + (idx+1) + ')'
+                                                                                return 'OBJECT_SERIALIZATION.DESERIALIZE_BFILE(:' + (idx+1) + ')'
                                                                               case "ANYDATA":
                                                                                 return 'ANYDATA.convertVARCHAR2(:' + (idx+1) + ')'
                                                                               default:

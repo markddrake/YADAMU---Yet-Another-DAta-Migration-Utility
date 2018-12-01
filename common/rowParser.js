@@ -20,7 +20,7 @@ class RowParser extends Transform {
     
     this.parser.on('error',
     function(err) {
-      self.logWriter.write(`$(err}\n`);
+      self.logWriter.write(`${err}\n`);
     })
     
     this.parser.on('key',

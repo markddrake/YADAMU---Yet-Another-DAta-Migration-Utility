@@ -7,7 +7,7 @@ const Yadamu = require('../../common/yadamuCore.js');
 const RowParser = require('../../common/rowParser.js');
 const DBWriter = require('./dbWriter.js');
 const OracleCore = require('./oracleCore.js');
- 
+
 async function setCurrentSchema(conn, schema, status, logWriter) {
 
   const sqlStatement = `begin :log := JSON_IMPORT.SET_CURRENT_SCHEMA(:schema); end;`;

@@ -3,8 +3,10 @@ const oracledb = require('oracledb');
 const Writable = require('stream').Writable
 const Readable = require('stream').Readable;
 
+const OracleCore = require('./oracleCore.js');
 const Yadamu = require('../../common/yadamuCore.js');
 const StatementGenerator = require('./statementGenerator');
+
 
 class DBWriter extends Writable {
   
@@ -131,7 +133,7 @@ end;`
   }
 
   string2Clob(conn,str,lobList) {
-
+      
     const s = new Readable();
     s.push(str);
     s.push(null);
@@ -177,11 +179,10 @@ end;`
       return endTime
     } catch (e) {
       await this.conn.rollback();
-      
-       if (e.errorNum && (e.errorNum === 4091)) {
-        // Mutating Table - Convert to PL/SQL Block
+      if (e.errorNum && (e.errorNum === 4091)) {
+        // Mutating Table - Convert to Cursor based PL/SQL Block
         status.warningRaised = true;
-        this.logWriter.write(`${new Date().toISOString()} [WARNING]: Table ${this.tableName} : executeMany(INSERT) failed. ${e}. Retrying with PL/SQL Block.\n`);
+        this.logWriter.write(`${new Date().toISOString()} [WARNING]: Table ${this.tableName}. executeMany(${this.batch.length})) failed. ${e}. Retrying with PL/SQL Block.\n`);
         this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
         if (status.sqlTrace) {
           status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
@@ -194,53 +195,52 @@ end;`
         } catch (e) {
           await this.conn.rollback();
           if (this.logDDLIssues) {
-            this.logWriter.write(`${new Date().toISOString()}:_write(${this.tableName},${this.batch.length}) : executeMany() failed. ${e}. Retrying using execute() loop.\n`);
+            this.logWriter.write(`${new Date().toISOString()} [WARNING]: Table (${this.tableName}. executeMany(${this.batch.length}) failed. ${e}. Retrying using execute() loop.\n`);
             this.logWriter.write(`${this.tableInfo.dml}\n`);
             this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
             this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
+            this.logWriter.write(`${JSON.stringify(this.batch[0])}\n`);
           }
         }
       } 
       else {  
         if (this.logDDLIssues) {
-          this.logWriter.write(`${new Date().toISOString()}:_write(${this.tableName},${this.batch.length}) : executeMany() failed. ${e}. Retrying using execute() loop.\n`);
+          this.logWriter.write(`${new Date().toISOString()} [WARNING]: Table (${this.tableName}. executeMany(${this.batch.length}) failed. ${e}. Retrying using execute() loop.\n`);
           this.logWriter.write(`${this.tableInfo.dml}\n`);
           this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
           this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
+          this.logWriter.write(`${JSON.stringify(this.batch[0])}\n`);
         }
       }
     }
 
     let row = undefined;
     this.insertMode = 'Iterative';
-    try {
-      for (row in this.batch) {
-        try {
-          let results = await this.conn.execute(this.tableInfo.dml,this.batch[row])
-        }
-        catch (e) {
-          this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping Row ${row}. Reason: ${e.message}\n`)
-          this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
-          this.status.importErrorMgr.logError(this.tableName,this.batch[row]);
+    for (row in this.batch) {
+      try {
+        let results = await this.conn.execute(this.tableInfo.dml,this.batch[row])
+      } catch (e) {
+        /* ### TODO: Add Max Error Processing
+        await this.conn.rollback();
+        this.skipTable = true;
+        this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping table. Row ${row}. Reason: ${e.message}\n`)
+        this.batch.length = 0;
+        */
+        this.logWriter.write(`${new Date().toISOString()} [ERROR]: Table (${this.tableName}. insert(${row}) failed. Reason: ${e.message}\n`)
+        this.status.warningRaised = true;
+        if (this.logDDLIssues) {
+          this.logWriter.write(`${this.tableInfo.dml}\n`);
+          this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
+          this.logWriter.write(`${JSON.stringify(this.batch[row])}\n`);
         } 
+        // Write Record to 'bad' file.
+        this.status.importErrorMgr.logError(this.tableName,this.batch[row]);
       }
-      const endTime = new Date().getTime();
-      this.batch.length = 0;
-      return endTime
-    } catch (e) {
-      await this.conn.rollback();
-      this.skipTable = true;
-      this.status.warningRaised = true;
-      this.conn.rollback();
-      this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping table. Row ${row}. Reason: ${e.message}\n`)
-      if (this.logDDLIssues) {
-        this.logWriter.write(`${this.tableInfo.dml}\n`);
-        this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
-        this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
-        this.logWriter.write(`${JSON.stringify(this.batch[row])}\n`);
-      }
-      this.batch.length = 0;
-    }
+    } 
+    const endTime = new Date().getTime();
+    this.batch.length = 0;
+    return endTime
+        
   }
 
   async _write(obj, encoding, callback) {
@@ -248,6 +248,7 @@ end;`
       switch (Object.keys(obj)[0]) {
         case 'systemInformation':
           this.systemInformation = obj.systemInformation;
+          await OracleCore.setDateFormatMask(this.conn,this.status,this.systemInformation.vendor);
           break;
         case 'ddl':
           if (this.ddlRequired) {
@@ -287,44 +288,41 @@ end;`
           if (this.skipTable) {
             break;
           }
-          this.tableInfo.targetDataTypes.forEach(async function(targetDataType,idx) {
-                                                                 if (obj.data[idx] !== null) {
-                                                                   const dataType = Yadamu.decomposeDataType(targetDataType);
-                                                                   if (dataType.type === 'JSON') {
-                                                                     // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
-                                                                     // obj.data[idx] = Buffer.from(JSON.stringify(obj.data[idx]))
-                                                                     // Default JSON Storage model is JSON store as CLOB.
-                                                                     // JSON must be shipped in Serialized Form
-                                                                     obj.data[idx] = JSON.stringify(obj.data[idx])
-                                                                   } 
-                                                                   if (this.tableInfo.binds[idx].type === oracledb.CLOB) {
-                                                                     obj.data[idx] = await this.string2Clob(this.conn, obj.data[idx],this.lobList)                                                                    
-                                                                     this.lobUsage++
-                                                                     return
-                                                                   }
-                                                                   switch (dataType.type) {
-                                                                     case "BLOB" :
-                                                                       obj.data[idx] = Buffer.from(obj.data[idx],'hex');
-                                                                       return;
-                                                                     case "RAW":
-                                                                       obj.data[idx] = Buffer.from(obj.data[idx],'hex');
-                                                                       return;
-                                                                     case "XMLTYPE" :
-                                                                       // Cannot passs XMLTYPE as BUFFER
-                                                                       // Reason: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
-                                                                       // obj.data[idx] = Buffer.from(obj.data[idx]);
-                                                                       return;
-                                                                     case "DATE":
-                                                                     case "TIMESTAMP" :
-                                                                       // Javascript assumes a timestamp with no timezone is in the processes time zone. 
-                                                                       // There appears to be no easy way of coercing the process to UTC. 
-                                                                       // A Timestamp not explicitly marked as UTC should be coerced to UTC.
-                                                                       obj.data[idx] = new Date(Date.parse(obj.data[idx].endsWith('Z') ? obj.data[idx] : obj.data[idx] + 'Z'));
-                                                                       return;
-                                                                     default :
-                                                                   }
-                                                                 }
-          },this)
+          obj.data = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
+            if (obj.data[idx] !== null) {
+              const dataType = Yadamu.decomposeDataType(targetDataType);
+              if (dataType.type === 'JSON') {
+                // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
+                // obj.data[idx] = Buffer.from(JSON.stringify(obj.data[idx]))
+                // Default JSON Storage model is JSON store as CLOB.
+                // JSON must be shipped in Serialized Form
+                return JSON.stringify(obj.data[idx])
+              } 
+              if (this.tableInfo.binds[idx].type === oracledb.CLOB) {
+                this.lobUsage++
+                // A promise...
+                return this.string2Clob(this.conn, obj.data[idx],this.lobList)                                                                    
+              }
+              switch (dataType.type) {
+                case "BLOB" :
+                  return Buffer.from(obj.data[idx],'hex');
+                case "RAW":
+                  return Buffer.from(obj.data[idx],'hex');
+                case "DATE":
+                case "TIMESTAMP":
+                  // A Timestamp not explicitly marked as UTC should be coerced to UTC.
+                  // Avoid Javascript dates due to lost of precsion.
+                  // return new Date(Date.parse(obj.data[idx].endsWith('Z') ? obj.data[idx] : obj.data[idx] + 'Z'));
+                  return (obj.data[idx].endsWith('Z') || obj.data[idx].endsWith('+00:00')) ? obj.data[idx] : obj.data[idx] + 'Z';
+                case "XMLTYPE" :
+                  // Cannot passs XMLTYPE as BUFFER
+                  // Reason: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
+                  // obj.data[idx] = Buffer.from(obj.data[idx]);
+                default :
+                  return obj.data[idx]
+              }
+            }
+          },this))
           this.batch.push(obj.data);
           // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Batch contains ${this.batch.length} rows.`);
           if (this.batch.length === this.tableInfo.batchSize) { 

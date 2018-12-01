@@ -5,6 +5,47 @@ const Readable = require('stream').Readable;
 
 const Yadamu = require('../../common/yadamuCore.js');
 
+const dateFormatMasks = {
+        Oracle      : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+       ,MSSQLSERVER : 'YYYY-MM-DD"T"HH24:MI:SS.###"Z"'
+       ,Postgress   : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+       ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+       ,MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+}
+ 
+async function setDateFormatMask(conn,status,vendor) {
+ 
+  const sqlStatement = `ALTER SESSION SET NLS_DATE_FORMAT = '${dateFormatMasks[vendor]}'`
+  if (status.sqlTrace) {
+     status.sqlTrace.write(`${sqlStatement}\n/\n`);
+  }
+  const result = await conn.execute(sqlStatement);
+
+}
+ 
+async function configureConnection(conn,status) {
+  let sqlStatement = `ALTER SESSION SET TIME_ZONE = '+00:00'`
+  if (status.sqlTrace) {
+     status.sqlTrace.write(`${sqlStatement}\n/\n`);
+  }
+  let result = await conn.execute(sqlStatement);
+
+  await setDateFormatMask(conn,status,'Oracle');
+  
+  sqlStatement = `ALTER SESSION SET NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'`
+  if (status.sqlTrace) {
+     status.sqlTrace.write(`${sqlStatement}\n/\n`);
+  }
+  result = await conn.execute(sqlStatement);
+
+  sqlStatement = `ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF6TZH:TZM'`
+  if (status.sqlTrace) {
+     status.sqlTrace.write(`${sqlStatement}\n/\n`);
+  }
+  result = await conn.execute(sqlStatement);
+
+}    
+
 async function doConnect(connectionString,status) {
 	
   const user = Yadamu.convertQuotedIdentifer(connectionString.substring(0,connectionString.indexOf('/')));
@@ -20,11 +61,7 @@ async function doConnect(connectionString,status) {
       password      : password,
       connectString : connectString
   });
-  const sqlStatement = `ALTER SESSION SET TIME_ZONE = '+00:00'`
-  if (status.sqlTrace) {
-     status.sqlTrace.write(`${sqlStatement}\n/\n`);
-  }
-  const result = await conn.execute(sqlStatement);
+  await configureConnection(conn,status);
   return conn;
 }
 
@@ -46,15 +83,10 @@ async function getConnectionPool(connectionString,status) {
   return pool;
 }
 
-
 async function getConnection(pool,status) {
 
   const conn = pool.getConnection();
-  const sqlStatement = `ALTER SESSION SET TIME_ZONE = '+00:00'`
-  if (status.sqlTrace) {
-     status.sqlTrace.write(`${sqlStatement}\n/\n`);
-  }
-  const result = await conn.execute(sqlStatement);
+  await configureConnection(conn.status);
   return conn;
 }
 
@@ -194,3 +226,6 @@ module.exports.lobFromFile            = lobFromFile
 module.exports.lobFromJSON            = lobFromJSON
 module.exports.writeClobToFile        = writeClobToFile
 module.exports.processArguments       = processArguments
+module.exports.setDateFormatMask      = setDateFormatMask
+
+setDateFormatMask

@@ -1,9 +1,11 @@
 "use strict";
 const fs = require('fs');
 const oracledb = require('oracledb');
+oracledb.fetchAsString = [ oracledb.DATE ]
 const JSONStream = require('JSONStream')
 const Transform = require('stream').Transform;
 const Readable = require('stream').Readable;
+const Writable = require('stream').Writable
 const path = require('path');
 
 const Yadamu = require('../../common/yadamuCore.js');
@@ -30,6 +32,43 @@ const sqlGenerateQueries =
 `select * 
    from table(JSON_EXPORT.GET_DML_STATEMENTS(:schema))`;
 
+
+class StringWriter extends Writable {
+   
+  constructor(options) {
+    super(options)
+    this.chunks = []
+  }
+
+  _write(chunk, encoding, done) {
+     this.chunks.push(chunk);
+     done();
+  }
+  
+  toString() {
+    return this.chunks.join('');
+  }
+  
+}
+
+class BufferWriter extends Writable {
+   
+  constructor(options) {
+    super(options)
+    this.chunks = []
+  }
+
+  _write(chunk, encoding, done) {
+     this.chunks.push(chunk);
+     done();
+  }
+  
+  toHexBinary() {
+    return Buffer.concat(this.chunks).toString('hex');
+  }
+  
+}
+
 async function getSystemInformation(conn,status) {     
     if (status.sqlTrace) {
       status.sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
@@ -44,15 +83,17 @@ async function generateQueries(conn,status,schema) {
       status.sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
     }
 
-    const results = await conn.execute(sqlGenerateQueries,{schema: schema},{outFormat: oracledb.OBJECT , fetchInfo: {
-                                                                                                           COLUMN_LIST:{type: oracledb.STRING}
-                                                                                                          ,DATA_TYPE_LIST:{type: oracledb.STRING}
-                                                                                                          ,SIZE_CONSTRAINTS:{type: oracledb.STRING}
-                                                                                                          ,EXPORT_SELECT_LIST:{type: oracledb.STRING}
-                                                                                                          ,IMPORT_SELECT_LIST:{type: oracledb.STRING}
-                                                                                                          ,COLUMN_PATTERN_LIST:{type: oracledb.STRING}
-                                                                                                          ,DESERIALIZATION_INFO:{type: oracledb.STRING}
-                                                                                                          ,SQL_STATEMENT:{type: oracledb.STRING}
+    const results = await conn.execute(sqlGenerateQueries,{schema: schema},{outFormat: oracledb.OBJECT , fetchInfo:{
+                                                                                                           COLUMN_LIST:          {type: oracledb.STRING}
+                                                                                                          ,DATA_TYPE_LIST:       {type: oracledb.STRING}
+                                                                                                          ,SIZE_CONSTRAINTS:     {type: oracledb.STRING}
+                                                                                                          ,EXPORT_SELECT_LIST:   {type: oracledb.STRING}
+                                                                                                          ,NODE_SELECT_LIST:     {type: oracledb.STRING}
+                                                                                                          ,IMPORT_SELECT_LIST:   {type: oracledb.STRING}
+                                                                                                          ,COLUMN_PATTERN_LIST:  {type: oracledb.STRING}
+                                                                                                          ,DESERIALIZATION_INFO: {type: oracledb.STRING}
+                                                                                                          ,WITH_CLAUSE:          {type: oracledb.STRING}
+                                                                                                          ,SQL_STATEMENT:        {type: oracledb.STRING}
                                                                                                          }
     });
     return results.rows;
@@ -78,21 +119,51 @@ function fetchDDL(conn,status,schema,outStream) {
   })
 }
 
-async function fetchData(conn,status,sqlQuery,outStream) {
+
+
+async function jsonFetchData(conn,status,sqlStatement,tableName,outStream,logWriter) {
 
   let counter = 0;
   const parser = new Transform({objectMode:true});
   parser._transform = function(data,encodoing,done) {
     counter++;
-    this.push(JSON.parse(data.JSON));
-    done();
+    let parsingCompleted = false;
+    while(!parsingCompleted) {
+      try {
+        this.push(JSON.parse(data.JSON));
+        parsingCompleted = true;
+        done();
+      } catch(e) {
+        const tokens = e.message.split(' ');
+        if ((tokens[0] === 'Unexpected') && (tokens[1] === 'token')) {
+           const badToken = tokens[2]
+           const offset = tokens.pop();
+           if ((badToken === '.') && (data.JSON[offset-1] === ',')) {
+             // Oracle 12c may render non-integer values < 1 without a leading zero which is invalid JSON...
+             data.JSON = data.JSON.slice(0,offset) + '0' + data.JSON.slice(offset)
+           }
+           else {
+             logWriter.write(`${new Date().toISOString()}["${tableName}"][${counter}]: ${e}\n`);
+             logWriter.write(`${data.JSON}\n`);
+             parsingCompleted = true;
+             done();
+           }
+        }
+        else {
+          logWriter.write(`${new Date().toISOString()}["${tableName}"][${counter}]: ${e}\n`);
+          logWriter.write(`${data.JSON}\n`);
+          parsingCompleted = true;
+          done();
+        }
+      }
+    }
   }
-
+    
   if (status.sqlTrace) {
-    status.sqlTrace.write(`${sqlQuery}\n\/\n`)
+    status.sqlTrace.write(`${sqlStatement}\n\/\n`)
   }
 
-  const stream = await conn.queryStream(sqlQuery,[],{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
+  const stream = await conn.queryStream(sqlStatement,[],{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
   const jsonStream = JSONStream.stringify('[',',',']');
   
   return new Promise(function(resolve,reject) {  
@@ -100,6 +171,155 @@ async function fetchData(conn,status,sqlQuery,outStream) {
     stream.on('error',function(err){reject(err)});
     stream.pipe(parser).pipe(jsonStream).pipe(outStream,{end: false })
   })
+}
+
+async function wideFetchData(conn,status,query,tableName,columnList,outStream,logWriter) {
+
+  let counter = 0;
+  const columns = JSON.parse('[' + columnList + ']');
+  const parser = new Transform({objectMode:true});
+  parser._transform = function(data,encodoing,done) {
+    counter++;
+    const rowArray = []
+    // ### Need to fix  12c invalid JSON issue.
+    columns.forEach(function(column) {
+      rowArray.push(JSON.parse(data[column])[0]);
+    })
+    this.push(rowArray);
+    done();
+  }
+
+  if (status.sqlTrace) {
+    status.sqlTrace.write(`${query.sql}\n\/\n`)
+  }
+
+  const stream = await conn.queryStream(query.sql,[],{outFormat: oracledb.OBJECT,fetchInfo:query.fetchInfo})
+  const jsonStream = JSONStream.stringify('[',',',']');
+  
+  return new Promise(function(resolve,reject) {  
+    jsonStream.on('end',function() {resolve(counter)})
+    stream.on('error',function(err){reject(err)});
+    stream.pipe(parser).pipe(jsonStream).pipe(outStream,{end: false })
+  })
+    
+}
+
+function blob2HexBinary(blob) {
+ 
+  return new Promise(async function(resolve,reject) {
+    try {
+      const bufferWriter = new  BufferWriter();
+      
+      blob.on('error',
+      async function(err) {
+         await blob.close();
+         reject(err);
+      });
+      
+      bufferWriter.on('finish', 
+      async function() {
+        await blob.close(); 
+        resolve(bufferWriter.toHexBinary());
+      });
+     
+      blob.pipe(bufferWriter);
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
+function clob2String(clob) {
+ 
+  return new Promise(async function(resolve,reject) {
+    try {
+      const stringWriter = new  StringWriter();
+      clob.setEncoding('utf8');  // set the encoding so we get a 'string' not a 'buffer'
+      
+      clob.on('error',
+      async function(err) {
+         await clob.close();
+         reject(err);
+      });
+      
+      stringWriter.on('finish', 
+      async function() {
+        await clob.close(); 
+        resolve(stringWriter.toString());
+      });
+     
+      clob.pipe(stringWriter);
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
+async function processClientData(conn,status,query,tableName,columnList,outStream,logWriter) {
+
+  let columnMetadata;
+  let includesLobs = false;
+  let includesJSON = false;
+  
+  let counter = 0;
+  const parser = new Transform({objectMode:true});
+  parser._transform = async function(data,encodoing,done) {
+    counter++;
+    if (includesLobs) {
+      data = await Promise.all(data.map(function (item,idx) {
+               if ((item !== null) && (columnMetadata[idx].fetchType === oracledb.CLOB)) {
+                 return clob2String(item)
+               }
+               if ((item !== null) && (columnMetadata[idx].fetchType === oracledb.BLOB)) {
+                 return blob2HexBinary(item)
+               }  
+               return item
+      }))
+    }  
+    // Convert the JSON columns into JSON objects
+    query.jsonColumns.forEach(function(idx) {
+       if (data[idx] !== null) {
+         try {
+           data[idx] = JSON.parse(data[idx]) 
+         } catch (e) {
+           logWriter.write(`${counter}:${e}\n`);
+           logWriter.write(`${data[idx]}\n`);
+         }
+       }
+    })
+    query.rawColumns.forEach(function(idx) {
+       if (data[idx] !== null) {
+         if(Buffer.isBuffer(data[idx])) {
+           data[idx] = data[idx].toString('hex');
+         }
+       }
+    })
+    this.push(data);
+    done();
+  }
+
+  if (status.sqlTrace) {
+    status.sqlTrace.write(`${query.sql}\n\/\n`)
+  }
+
+  const stream = await conn.queryStream(query.sql,[],{extendedMetaData: true})
+  const jsonStream = JSONStream.stringify('[',',',']');
+  
+  return new Promise(function(resolve,reject) {  
+    jsonStream.on('end',function() {resolve(counter)})
+    stream.on('error',function(err){reject(err)});
+    stream.on('metadata',
+    function(metadata) {
+       columnMetadata = metadata;
+       columnMetadata.forEach(function (column) {
+         if ((column.fetchType === oracledb.CLOB) || (column.fetchType === oracledb.BLOB)) {
+            includesLobs = true;
+         }
+       }) 
+    })
+    stream.pipe(parser).pipe(jsonStream).pipe(outStream,{end: false })
+  })
+    
 }
 
 function writeTableName(i,tableName,outStream) {
@@ -123,35 +343,47 @@ function resetStream(fileWriteStream,offset) {
     return fs.createWriteStream(path,{start:offset,flags:"r+"});
 }
     
-async function wideTableWorkaround(tableInfo,varcharSize,outStream) {
-    
-  let selectList = '';
-  const columnList = JSON.parse('[' + tableInfo.COLUMN_LIST + ']');
-  const selectListMembers = [];
+function decomposeSelectList(exportSelectList) {
+
   let start = 0;
   let level = 0;
-  for (let i=0; i < tableInfo.EXPORT_SELECT_LIST.length; i++) {
-    if (tableInfo.EXPORT_SELECT_LIST[i] === '(') {
+  const selectListMembers = [];
+
+  // A Commma may occur inside function control in which case it's not a column seperator.
+
+  for (let i=0; i < exportSelectList.length; i++) {
+    if (exportSelectList[i] === '(') {
       level++;
       continue;
     }
-    if (tableInfo.EXPORT_SELECT_LIST[i] === ')') {
+    if (exportSelectList[i] === ')') {
       level--;
       continue;
     }
-    if ((level === 0) && (tableInfo.EXPORT_SELECT_LIST[i] === ',')) {
-      selectListMembers.push(tableInfo.EXPORT_SELECT_LIST.substring(start,i));
+    if ((level === 0) && (exportSelectList[i] === ',')) {
+      selectListMembers.push(exportSelectList.substring(start,i));
       start = i+1;
     }
-  }
-  selectListMembers.push(tableInfo.EXPORT_SELECT_LIST.substring(start));
-  columnList.forEach(function(column,index){
-                       let selectListEntry = `JSON_ARRAY(${selectListMembers[index]} NULL on NULL RETURNING VARCHAR2(${varcharSize})) "${column}"`;
-                       if (index > 0) {
-                         selectListEntry = ',' + selectListEntry;
-                       }
-                       selectList = selectList + selectListEntry;
-  })
+  }  
+  selectListMembers.push(exportSelectList.substring(start));
+
+  return selectListMembers
+
+}
+ 
+function wideTableWorkaround(tableInfo,maxVarcharSize) {
+   
+  // rewrite from JSON_ARRAY(A,B,FOO(C)) into JSON_ARRAY(A), JSON_ARRAY(B), JSON_ARRAY(FOO(C))
+   
+  let selectList = '';
+  const columnList = JSON.parse('[' + tableInfo.COLUMN_LIST + ']');
+  const selectListMembers = decomposeSelectList(tableInfo.EXPORT_SELECT_LIST)
+
+  const fetchInfo = {}
+  selectList = columnList.map(function(column,index){
+                                fetchInfo[column] = { type : oracledb.STRING }
+                                return `JSON_ARRAY(${selectListMembers[index]} NULL on NULL RETURNING VARCHAR2(${maxVarcharSize})) "${column}"`;
+  }).join(',');
    
   let sqlStatement = `select ${selectList} from "${tableInfo.OWNER}"."${tableInfo.TABLE_NAME}"`;
   
@@ -160,31 +392,46 @@ async function wideTableWorkaround(tableInfo,varcharSize,outStream) {
      sqlStatement = tableInfo.SQL_STATEMENT.substring(0,endOfWithClause) + sqlStatement;
   }
   
-  return sqlStatement;
+  return {sql: sqlStatement, fetchInfo : fetchInfo}
 
-  let counter = 0;
-  const parser = new Transform({objectMode:true});
-  parser._transform = function(data,encodoing,done) {
-    counter++;
-    const rowArray = []
-    data.forEach(function(json) {
-      rowArray.push(JSON.parse(json)[0]);
-    })
-    this.push(rowArray);
-    done();
-  }
-
-  const stream = await conn.queryStream(sqlStatement)
-  const jsonStream = JSONStream.stringify('[',',',']');
-  
-  return new Promise(function(resolve,reject) {  
-    jsonStream.on('end',function() {resolve(counter)})
-    stream.on('error',function(err){reject(err)});
-    stream.pipe(parser).pipe(jsonStream).pipe(outStream,{end: false })
-  })
-    
 }
-    
+
+function generateClientQuery(tableInfo) {
+   
+  // Perform a traditional relational select..
+  
+  const query = {
+    fetchInfo   : {}
+   ,jsonColumns : []
+   ,rawColumns  : []
+  }   
+  
+  let selectList = '';
+  const columnList = JSON.parse('[' + tableInfo.COLUMN_LIST + ']');
+  
+  const dataTypeList = JSON.parse(tableInfo.DATA_TYPE_LIST);
+  dataTypeList.forEach(function(dataType,idx) {
+    switch (dataType) {
+      case 'JSON':
+        query.jsonColumns.push(idx);
+        break
+      case 'RAW': 
+        query.rawColumns.push(idx);
+        break;
+      default:
+    }
+  })
+  
+  query.sql = `select ${tableInfo.NODE_SELECT_LIST} from "${tableInfo.OWNER}"."${tableInfo.TABLE_NAME}"`; 
+  
+  if (tableInfo.WITH_CLAUSE !== null) {
+     query.sql = `with\n${tableInfo.WITH_CLAUSE}\n${query.sql}`;
+  }
+  
+  return query
+
+}
+
 async function main(){
 
   let conn;
@@ -224,8 +471,10 @@ async function main(){
                         ,"nlsParameters"      : JSON.parse(sysInfo.NLS_PARAMETERS)
     }));
 
-    const varcharSize = JSON.parse(sysInfo.JSON_FEATURES).extendedString ? 32767 : 4000;
-    
+    const maxVarcharSize = JSON.parse(sysInfo.JSON_FEATURES).extendedString ? 32767 : 4000;
+    // const serverGeneration = (JSON.parse(sysInfo.JSON.FEATURES).clobSupported === true)
+    const serverGeneration = false;
+
     if (parameters.MODE !== 'DATA_ONLY') {
       exportFile.write(',"ddl":');
       await fetchDDL(conn,status,parameters.OWNER,exportFile);
@@ -243,8 +492,8 @@ async function main(){
                                                           ,"tableName"                : sqlQueries[i].TABLE_NAME
                                                           ,"columns"                  : sqlQueries[i].COLUMN_LIST
                                                           ,"dataTypes"                : JSON.parse(sqlQueries[i].DATA_TYPE_LIST)
-                                                          ,"sizeConstraints"           : JSON.parse(sqlQueries[i].SIZE_CONSTRAINTS)
-                                                          ,"exportSelectList"         : sqlQueries[i].EXPORT_SELECT_LIST
+                                                          ,"sizeConstraints"          : JSON.parse(sqlQueries[i].SIZE_CONSTRAINTS)
+                                                          ,"exportSelectList"         : (serverGeneration) ? sqlQueries[i].EXPORT_SELECT_LIST : sqlQueries[i].NODE_SELECT_LIST 
                                                           ,"insertSelectList"         : sqlQueries[i].IMPORT_SELECT_LIST
                                                           ,"deserializationFunctions" : sqlQueries[i].DESERIALIZATION_INFO
                                                           ,"columnPatterns"           : sqlQueries[i].COLUMN_PATTERN_LIST
@@ -254,27 +503,34 @@ async function main(){
       exportFile.write('},"data":{');
        for (let i=0; i < sqlQueries.length; i++) {
         await writeTableName(i,`"${sqlQueries[i].TABLE_NAME}" :`,exportFile);
-        let dataOffset = exportFile.bytesWritten + exportFile.writableLength;
         let rows;
         let startTime;
-        try {
-          startTime = new Date().getTime()
-          rows = await fetchData(conn,status,sqlQueries[i].SQL_STATEMENT,exportFile) 
-        } catch(e) {
-          if ((e.message) && (e.message.indexOf('ORA-40478') == 0)) {
-            if (exportFile.bytesWritten > dataOffset) {
-              exportFile = resetStream(exportFile,dataOffset);
-            }
-            const sqlWideTable = wideTableWorkaround(sqlQueries[i],varcharSize,exportFile);
+        if (serverGeneration ) {
+          let dataOffset = exportFile.bytesWritten + exportFile.writableLength;
+          try {
             startTime = new Date().getTime()
-            rows = await fetchData(conn,status,sqlWideTable.SQL_STATEMENT,exportFile) 
-          }
-          else {
-            throw e;
+            rows = await jsonFetchData(conn,status,sqlQueries[i].SQL_STATEMENT,sqlQueries[i].TABLE_NAME,exportFile,logWriter) 
+          } catch(e) {
+            if ((e.message) && (e.message.indexOf('ORA-40478') == 0)) {
+              if (exportFile.bytesWritten > dataOffset) {
+                exportFile = resetStream(exportFile,dataOffset);
+              }
+              const query = wideTableWorkaround(sqlQueries[i],maxVarcharSize);
+              startTime = new Date().getTime()
+              rows = await wideFetchData(conn,status,query,sqlQueries[i].TABLE_NAME,sqlQueries[i].COLUMN_LIST,exportFile,logWriter) 
+            }
+            else {
+              throw e;
+            }
           }
         }
+        else {
+          const query = generateClientQuery(sqlQueries[i]);
+          startTime = new Date().getTime()
+          rows = await processClientData(conn,status,query,sqlQueries[i].TABLE_NAME,sqlQueries[i].COLUMN_LIST,exportFile,logWriter) 
+        }   
         const elapsedTime = new Date().getTime() - startTime
-        logWriter.write(`${new Date().toISOString()} - Table: "${sqlQueries[i].TABLE_NAME}". Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
+        logWriter.write(`${new Date().toISOString()}["${sqlQueries[i].TABLE_NAME}"]: Rows: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
       }
       exportFile.write('}');
     }
