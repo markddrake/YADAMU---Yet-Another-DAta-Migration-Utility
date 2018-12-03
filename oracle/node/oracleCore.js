@@ -1,7 +1,9 @@
 "use strict" 
 const fs = require('fs');
-const oracledb = require('oracledb');
 const Readable = require('stream').Readable;
+
+const oracledb = require('oracledb');
+oracledb.fetchAsString = [ oracledb.DATE ]
 
 const Yadamu = require('../../common/yadamuCore.js');
 

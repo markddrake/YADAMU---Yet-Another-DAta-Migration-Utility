@@ -114,43 +114,44 @@ as
 		,sum(case when ((TYPECODE in ('COLLECTION', 'OBJECT')) and (atc.DATA_TYPE not in ('XMLTYPE','ANYDATA','RAW'))) then 1 else 0 end) OBJECT_COUNT
         ,cast(collect('"' || atc.COLUMN_NAME || '"' ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST
 		,cast(collect(
-                case 
-                  when (jc.FORMAT is not NULL) 
-                    -- Does not attempt to preserve json storage details
-                    -- If storage model fidelity is required then set specify MODE=DDL_AND_DATA on the export command line to include DDL statements to the file.
-                    -- If DDL is not included in the file import operations will default to CLOB storage in Oracle 12.1 thru 18c.
-                    then '"JSON"'
-                  when (DATA_TYPE_OWNER is null) 
-                    then '"' || atc.DATA_TYPE || '"' 
-                  when (atc.DATA_TYPE in ('XMLTYPE','ANYDATA','RAW'))
-                    then '"' || atc.DATA_TYPE || '"' 
-                  else 
+               case 
+                 when (jc.FORMAT is not NULL) then
+                   -- Does not attempt to preserve json storage details
+                   -- If storage model fidelity is required then set specify MODE=DDL_AND_DATA on the export command line to include DDL statements to the file.
+                   -- If DDL is not included in the file import operations will default to CLOB storage in Oracle 12.1 thru 18c.
+                   '"JSON"'
+                 when (DATA_TYPE_OWNER is null) then
+                   '"' || atc.DATA_TYPE || '"' 
+                 when (atc.DATA_TYPE in ('XMLTYPE','ANYDATA','RAW')) then
+                   '"' || atc.DATA_TYPE || '"' 
+                 else 
                     '"\"' || atc.DATA_TYPE_OWNER || '\".\"' || atc.DATA_TYPE || '\""' 
-                end 
-                ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) DATA_TYPE_LIST
+               end 
+               ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) DATA_TYPE_LIST
 	    ,cast(collect( 
 		       case
-			     when atc.DATA_TYPE in ('VARCHAR2', 'CHAR') 
-                   then case 
-                          when (CHAR_LENGTH < DATA_LENGTH) 
-                            then '"' || CHAR_LENGTH || '"'
-                            else '"' || DATA_LENGTH || '"'
-                        end
-                 when atc.DATA_TYPE in ('NVARCHAR2', 'NCHAR')
-                   then '"' || CHAR_LENGTH || '"'
-                 when atc.DATA_TYPE in ('UROWID', 'RAW') or  atc.DATA_TYPE LIKE 'INTERVAL%' 
-                   then '"' || DATA_LENGTH || '"'
-                 when atc.DATA_TYPE = 'NUMBER' 
-                   then case 
-                          when DATA_SCALE is NOT NULL and DATA_SCALE <> 0
-                            then '"' || DATA_PRECISION || ',' || DATA_SCALE || '"'
-                          when DATA_PRECISION is NOT NULL
-                            then '"' || DATA_PRECISION || '"'
-                          else 
-						    '"38"'
-                        end 
-                 when atc.DATA_TYPE = 'FLOAT' 
-                   then '"' || DATA_PRECISION || '"'
+			     when atc.DATA_TYPE in ('VARCHAR2', 'CHAR') then
+                   case 
+                     when (CHAR_LENGTH < DATA_LENGTH) then
+                       '"' || CHAR_LENGTH || '"'
+                     else 
+                       '"' || DATA_LENGTH || '"'
+                   end
+                 when atc.DATA_TYPE in ('NVARCHAR2', 'NCHAR') then
+                   '"' || CHAR_LENGTH || '"'
+                 when atc.DATA_TYPE in ('UROWID', 'RAW') or  atc.DATA_TYPE LIKE 'INTERVAL%' then
+                   '"' || DATA_LENGTH || '"'
+                 when atc.DATA_TYPE = 'NUMBER' then
+                   case 
+                     when DATA_SCALE is NOT NULL and DATA_SCALE <> 0 then
+                       '"' || DATA_PRECISION || ',' || DATA_SCALE || '"'
+                     when DATA_PRECISION is NOT NULL then
+                       '"' || DATA_PRECISION || '"'
+                     else 
+					   '"38"'
+                   end 
+                 when atc.DATA_TYPE = 'FLOAT' then
+                   '"' || DATA_PRECISION || '"'
                  else
                    '""'
                end
@@ -158,66 +159,66 @@ as
         ,cast(collect(
                case
                  -- For some reason RAW columns have atc.DATA_TYPE_OWNER set to the current schema.
-                 when atc.DATA_TYPE = 'RAW'
-                   then '"' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE = 'RAW' then
+                   '"' || atc.COLUMN_NAME || '"'
                  $IF not JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                  /*
                  ** Pre 18.1 Some Scalar Data Types are not natively supported by JSON_ARRAY()
                  */
-                 when atc.DATA_TYPE in ('BINARY_DOUBLE','BINARY_FLOAT')
-                   then 'TO_NUMBER("' || atc.COLUMN_NAME || '")'
-                 when atc.DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
-                   then 'TO_CHAR(SYS_EXTRACT_UTC("' || atc.COLUMN_NAME || '"),''IYYY-MM-DD"T"HH24:MI:SS.FF9"Z"'')'
-                 when atc.DATA_TYPE like 'INTERVAL DAY% TO SECOND%'
-                   then '''P''
-                        || extract(DAY FROM "' || atc.COLUMN_NAME || '") || ''D''
-                        || ''T'' || case when extract(HOUR FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(HOUR FROM  "' || atc.COLUMN_NAME || '") ||  ''H'' end
-                        || case when extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") || ''M'' end
-                        || case when extract(SECOND FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(SECOND FROM  "' || atc.COLUMN_NAME || '") ||  ''S'' end'
-                 when atc.DATA_TYPE  like 'INTERVAL YEAR% TO MONTH%'
-                   then '''P''
-                        || extract(YEAR FROM "' || atc.COLUMN_NAME || '") || ''Y''
-                        || case when extract(MONTH FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MONTH FROM  "' || atc.COLUMN_NAME || '") || ''M'' end'
-                 when atc.DATA_TYPE in ('NCHAR','NVARCHAR2')
-                   then 'TO_CHAR("' || atc.COLUMN_NAME || '")'
-                 when atc.DATA_TYPE = 'NCLOB'
-                   then 'TO_CLOB("' || atc.COLUMN_NAME || '")'
-                 when jc.FORMAT is not NULL
-                   then 'JSON_QUERY("' ||  atc.COLUMN_NAME || '",''$'' returning ' || C_RETURN_TYPE || ')'
+                 when atc.DATA_TYPE in ('BINARY_DOUBLE','BINARY_FLOAT') then
+                   'TO_NUMBER("' || atc.COLUMN_NAME || '")'
+                 when atc.DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE' then
+                   'TO_CHAR(SYS_EXTRACT_UTC("' || atc.COLUMN_NAME || '"),''IYYY-MM-DD"T"HH24:MI:SS.FF9"Z"'')'
+                 when atc.DATA_TYPE like 'INTERVAL DAY% TO SECOND%' then
+                   '''P''
+                   || extract(DAY FROM "' || atc.COLUMN_NAME || '") || ''D''
+                   || ''T'' || case when extract(HOUR FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(HOUR FROM  "' || atc.COLUMN_NAME || '") ||  ''H'' end
+                   || case when extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") || ''M'' end
+                   || case when extract(SECOND FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(SECOND FROM  "' || atc.COLUMN_NAME || '") ||  ''S'' end'
+                 when atc.DATA_TYPE  like 'INTERVAL YEAR% TO MONTH%' then
+                   '''P''
+                   || extract(YEAR FROM "' || atc.COLUMN_NAME || '") || ''Y''
+                   || case when extract(MONTH FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MONTH FROM  "' || atc.COLUMN_NAME || '") || ''M'' end'
+                 when atc.DATA_TYPE in ('NCHAR','NVARCHAR2') then
+                   'TO_CHAR("' || atc.COLUMN_NAME || '")'
+                 when atc.DATA_TYPE = 'NCLOB' then
+                   'TO_CLOB("' || atc.COLUMN_NAME || '")'
+                 when jc.FORMAT is not NULL then
+                   'JSON_QUERY("' ||  atc.COLUMN_NAME || '",''$'' returning ' || C_RETURN_TYPE || ')'
                  /*
                  ** 18.1 compatible handling of BLOB
                  */
-                 when atc.DATA_TYPE = 'BLOB'
-                   then 'OBJECT_SERIALIZATION.SERIALIZE_BLOB_HEX("' || atc.COLUMN_NAME || '")'                          
+                 when atc.DATA_TYPE = 'BLOB' then
+                   'OBJECT_SERIALIZATION.SERIALIZE_BLOB_HEX("' || atc.COLUMN_NAME || '")'                          
                  $END
                  /*
                  ** Quick Fixes for datatypes not natively supported
                  */
-                 when atc.DATA_TYPE = 'XMLTYPE'  -- Can be owned by SYS or PUBLIC
-                   then 'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
-                 when atc.DATA_TYPE = 'ROWID' or atc.DATA_TYPE = 'UROWID'
-                   then 'ROWIDTOCHAR("' || atc.COLUMN_NAME || '")'
+                 when atc.DATA_TYPE = 'XMLTYPE' then -- Can be owned by SYS or PUBLIC
+                   'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE = 'ROWID' or atc.DATA_TYPE = 'UROWID' then
+                   'ROWIDTOCHAR("' || atc.COLUMN_NAME || '")'
                  /*
                  ** Fix for BFILENAME
                  */
-                 when atc.DATA_TYPE = 'BFILE'
-                   then 'OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '")'
+                 when atc.DATA_TYPE = 'BFILE' then
+                   'OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '")'
                  /*
                  **
                  ** Support ANYDATA, OBJECT and COLLECTION types
                  **
                  */
-                 when atc.DATA_TYPE = 'ANYDATA'  -- Can be owned by SYS or PUBLIC
-                   then 'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end' || atc.COLUMN_NAME || '"'
-                 when TYPECODE = 'COLLECTION'
-                   then 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
-                 when TYPECODE = 'OBJECT'
-                   then 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE = 'ANYDATA' then  -- Can be owned by SYS or PUBLIC 
+                   'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end' || atc.COLUMN_NAME || '"'
+                 when TYPECODE = 'COLLECTION' then
+                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+                 when TYPECODE = 'OBJECT' then
+                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
                  /*     
                  ** Comment out unsupported scalar data types and Object types
                  */
-                 when atc.DATA_TYPE in ('LONG','LONG RAW')
-                   then '''"' || atc.COLUMN_NAME || '". Unsupported data type ["' || atc.DATA_TYPE || '"]'''
+                 when atc.DATA_TYPE in ('LONG','LONG RAW') then
+                   '''"' || atc.COLUMN_NAME || '". Unsupported data type ["' || atc.DATA_TYPE || '"]'''
                  else
                    '"' || atc.COLUMN_NAME || '"'
                end
@@ -227,29 +228,29 @@ as
                  /*
                  ** Quick Fixes for datatypes not natively supported by NODE.js Driver
                  */
-                 when atc.DATA_TYPE = 'RAW'
+                 when atc.DATA_TYPE = 'RAW' then
                    -- For some reason RAW columns have atc.DATA_TYPE_OWNER set to the current schema.
-                   then '"' || atc.COLUMN_NAME || '"'
-                 when atc.DATA_TYPE like 'INTERVAL DAY% TO SECOND%'
-                   then '''P''
-                        || extract(DAY FROM "' || atc.COLUMN_NAME || '") || ''D''
-                        || ''T'' || case when extract(HOUR FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(HOUR FROM  "' || atc.COLUMN_NAME || '") ||  ''H'' end
-                        || case when extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") || ''M'' end
-                        || case when extract(SECOND FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(SECOND FROM  "' || atc.COLUMN_NAME || '") ||  ''S'' end "' || atc.COLUMN_NAME || '"'
-                 when atc.DATA_TYPE  like 'INTERVAL YEAR% TO MONTH%'
-                   then '''P''
-                        || extract(YEAR FROM "' || atc.COLUMN_NAME || '") || ''Y''
-                        || case when extract(MONTH FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MONTH FROM  "' || atc.COLUMN_NAME || '") || ''M'' end "' || atc.COLUMN_NAME || '"'
-                 when atc.DATA_TYPE = 'XMLTYPE'  -- Can be owned by SYS or PUBLIC
-                   then 'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
-                 when atc.DATA_TYPE = 'BFILE'
-                   then 'OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
-                 when atc.DATA_TYPE = 'ANYDATA'  -- Can be owned by SYS or PUBLIC
-                   then 'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end "' || atc.COLUMN_NAME || '"'
-                 when TYPECODE = 'COLLECTION'
-                   then 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
-                 when TYPECODE = 'OBJECT'
-                   then 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+                   '"' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE like 'INTERVAL DAY% TO SECOND%' then
+                   '''P''
+                   || extract(DAY FROM "' || atc.COLUMN_NAME || '") || ''D''
+                   || ''T'' || case when extract(HOUR FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(HOUR FROM  "' || atc.COLUMN_NAME || '") ||  ''H'' end
+                   || case when extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") || ''M'' end
+                   || case when extract(SECOND FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(SECOND FROM  "' || atc.COLUMN_NAME || '") ||  ''S'' end "' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE  like 'INTERVAL YEAR% TO MONTH%' then
+                   '''P''
+                   || extract(YEAR FROM "' || atc.COLUMN_NAME || '") || ''Y''
+                   || case when extract(MONTH FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MONTH FROM  "' || atc.COLUMN_NAME || '") || ''M'' end "' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE = 'XMLTYPE' then  -- Can be owned by SYS or PUBLIC
+                   'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE = 'BFILE' then
+                   'OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
+                 when atc.DATA_TYPE = 'ANYDATA' then  -- Can be owned by SYS or PUBLIC
+                   'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end "' || atc.COLUMN_NAME || '"'
+                 when TYPECODE = 'COLLECTION' then
+                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+                 when TYPECODE = 'OBJECT' then
+                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
                  /*     
                  ** Comment out unsupported scalar data types and Object types
                  */
@@ -260,23 +261,23 @@ as
 	   ,cast(collect(
 		       /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
 		       case
-			     when atc.DATA_TYPE = 'BFILE'
-				    then 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || atc.COLUMN_NAME || '") end'
-			     when atc.DATA_TYPE = 'XMLTYPE'
-				    then 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || atc.COLUMN_NAME || '") end'
-				 when atc.DATA_TYPE = 'ANYDATA'
-				    --- ### TODO - Better deserialization of ANYDATA.
-				    then 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || atc.COLUMN_NAME || '") end'
-				 when TYPECODE = 'COLLECTION'
-			       then '"#' || atc.DATA_TYPE || '"("' || atc.COLUMN_NAME || '")'
-				 when TYPECODE = 'OBJECT'
-  				   then '"#' || atc.DATA_TYPE || '"("' || atc.COLUMN_NAME || '")'
-			     when atc.DATA_TYPE = 'BLOB'
-    		        $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-				    then 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || atc.COLUMN_NAME || '") end'
-				    $ELSE
-				    then 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL when substr("' || atc.COLUMN_NAME || '",1,42) = ''OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB:'' then NULL else HEXTORAW("' || atc.COLUMN_NAME || '") end'
-				 $END
+			     when atc.DATA_TYPE = 'BFILE' then  
+				   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || atc.COLUMN_NAME || '") end'
+			     when atc.DATA_TYPE = 'XMLTYPE' then  
+				   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || atc.COLUMN_NAME || '") end'
+				 when atc.DATA_TYPE = 'ANYDATA' then  
+				   --- ### TODO - Better deserialization of ANYDATA.
+				   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || atc.COLUMN_NAME || '") end'
+				 when TYPECODE = 'COLLECTION' then  
+			       '"#' || atc.DATA_TYPE || '"("' || atc.COLUMN_NAME || '")'
+				 when TYPECODE = 'OBJECT' then  
+  				   '"#' || atc.DATA_TYPE || '"("' || atc.COLUMN_NAME || '")'
+			     when atc.DATA_TYPE = 'BLOB' then  
+    		       $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+				   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || atc.COLUMN_NAME || '") end'
+				   $ELSE
+				   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else HEXTORAW("' || atc.COLUMN_NAME || '") end'
+				   $END
 				 else
 				    '"' || atc.COLUMN_NAME || '"'
 			   end
@@ -285,19 +286,12 @@ as
                /* JSON_TABLE column patterns data types */
                /* Map data types not supported by JSON_TABLE to data types supported by JSON_TABLE */
                case
-                 when atc.DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or atc.DATA_TYPE like 'INTERVAL%'
-                   then '"VARCHAR2"'
-                 when atc.DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE'
-                   then '"TIMESTAMP WITH TIME ZONE"'
-                 when atc.DATA_TYPE in ('XMLTYPE','CLOB','NCLOB','BLOB','LONG','LONG RAW') or TYPECODE is not NULL
-                   $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-                   then '"CLOB"'
-                   $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-                   then '"VARCHAR2(32767)"'
-                   $ELSE
-                   then '"VARCHAR2(4000)"'
-				   
-                   $END
+                 when atc.DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or atc.DATA_TYPE like 'INTERVAL%' then  
+                   '"VARCHAR2"'
+                 when atc.DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE' then  
+                   '"TIMESTAMP WITH TIME ZONE"'
+                 when atc.DATA_TYPE in ('XMLTYPE','CLOB','NCLOB','BLOB','LONG','LONG RAW') or TYPECODE is not NULL then  
+                   C_RETURN_TYPE
                else
                  '"' || atc.DATA_TYPE || '"'
                end

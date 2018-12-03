@@ -1,12 +1,13 @@
 "use strict";
 const fs = require('fs');
-const oracledb = require('oracledb');
-oracledb.fetchAsString = [ oracledb.DATE ]
 const JSONStream = require('JSONStream')
 const Transform = require('stream').Transform;
 const Readable = require('stream').Readable;
 const Writable = require('stream').Writable
 const path = require('path');
+
+const oracledb = require('oracledb');
+oracledb.fetchAsString = [ oracledb.DATE ]
 
 const Yadamu = require('../../common/yadamuCore.js');
 const OracleCore = require('./oracleCore.js');
@@ -472,8 +473,8 @@ async function main(){
     }));
 
     const maxVarcharSize = JSON.parse(sysInfo.JSON_FEATURES).extendedString ? 32767 : 4000;
-    // const serverGeneration = (JSON.parse(sysInfo.JSON.FEATURES).clobSupported === true)
-    const serverGeneration = false;
+    const serverGeneration = (JSON.parse(sysInfo.JSON_FEATURES).clobSupported === true)
+    // const serverGeneration = false;
 
     if (parameters.MODE !== 'DATA_ONLY') {
       exportFile.write(',"ddl":');

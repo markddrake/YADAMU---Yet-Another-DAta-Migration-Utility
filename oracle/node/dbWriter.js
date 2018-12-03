@@ -1,7 +1,9 @@
 "use strict";
-const oracledb = require('oracledb');
 const Writable = require('stream').Writable
 const Readable = require('stream').Readable;
+
+const oracledb = require('oracledb');
+oracledb.fetchAsString = [ oracledb.DATE ]
 
 const OracleCore = require('./oracleCore.js');
 const Yadamu = require('../../common/yadamuCore.js');
@@ -40,9 +42,13 @@ class DBWriter extends Writable {
     this.skipTable = true;
     
     this.logDDLIssues   = (status.loglevel && (status.loglevel > 2));
-    this.logDDLIssues   = true;
+    // this.logDDLIssues   = true;
     
     this.statementGenerator = new StatementGenerator(conn, status, logWriter);    
+    
+    this.sqlSetSavePoint = `SAVEPOINT BATCH_INSERT`;
+    this.sqlRollbackSavePoint = `ROLLBACK TO BATCH_INSERT`;
+
   }      
   
   async setTable(tableName) {
@@ -53,6 +59,7 @@ class DBWriter extends Writable {
       let lobBatchSize = Math.floor(this.lobCacheSize/this.tableInfo.lobCount);
       this.batchSize = (lobBatchSize > this.batchSize) ? this.batchSize : lobBatchSize;
     }
+    this.batchCount = 0;
     this.rowCount = 0;
     this.lobUsage = 0;
     this.batch.length = 0;
@@ -79,6 +86,21 @@ class DBWriter extends Writable {
   async enableConstraints() {
   
     const sqlStatement = `begin :log := JSON_IMPORT.ENABLE_CONSTRAINTS(:schema); end;`;
+     
+    try {
+      const results = await this.conn.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.schema});
+      const log = JSON.parse(results.outBinds.log);
+      if (log !== null) {
+        Yadamu.processLog(log, this.status, this.logWriter)
+      }
+    } catch (e) {
+      this.logWriter.write(`${e}\n${e.stack}\n`);
+    }    
+  }
+  
+  async refreshMaterializedViews() {
+  
+    const sqlStatement = `begin :log := JSON_IMPORT.REFRESH_MATERIALIZED_VIEWS(:schema); end;`;
      
     try {
       const results = await this.conn.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.schema});
@@ -141,7 +163,7 @@ end;`
     return new Promise(async function(resolve,reject) {
       try {
         let tempLob = undefined;
-        tempLob = await  conn.createLob(oracledb.CLOB);
+        tempLob = await conn.createLob(oracledb.CLOB);
         lobList.push(tempLob);
         tempLob.on('error',function(err) {reject(err);});
         tempLob.on('finish', function() {resolve(tempLob)});
@@ -164,6 +186,7 @@ end;`
     },this)
   }
       
+  
   async writeBatch(status) {
       
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
@@ -172,13 +195,25 @@ end;`
     
     try {
       this.insertMode = 'Batch';
-      const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
+      if (status.sqlTrace) {
+        status.sqlTrace.write(`${this.sqlSetSavePoint}\n/\n`);
+      }
+      let results = await this.conn.execute(this.sqlSetSavePoint);
+      if (status.sqlTrace) {
+        status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
+      }
+      this.batchCount++;
+      results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
       const endTime = new Date().getTime();
+      // console.log(`Batch:${batchCount}. ${this.batch.length} rows inserted`)
       this.batch.length = 0;
-      // this.freeLobList();
+      this.freeLobList();
       return endTime
     } catch (e) {
-      await this.conn.rollback();
+      if (status.sqlTrace) {
+        status.sqlTrace.write(`${this.sqlRollbackSavePoint}\n/\n`);
+      }
+      let results = await this.conn.execute(this.sqlRollbackSavePoint);
       if (e.errorNum && (e.errorNum === 4091)) {
         // Mutating Table - Convert to Cursor based PL/SQL Block
         status.warningRaised = true;
@@ -188,7 +223,7 @@ end;`
           status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
         }
         try {
-          const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
+          const results = await this.conn.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds}); 
           const endTime = new Date().getTime();
           this.batch.length = 0;
           return endTime
@@ -237,8 +272,11 @@ end;`
         this.status.importErrorMgr.logError(this.tableName,this.batch[row]);
       }
     } 
+    // console.log(`Iterative:${this.batchCount}. ${this.batch.length} rows inserted`)
+    // Iterative must commit to allow a subsequent batch to rollback.
     const endTime = new Date().getTime();
     this.batch.length = 0;
+    this.freeLobList();
     return endTime
         
   }
@@ -324,15 +362,15 @@ end;`
             }
           },this))
           this.batch.push(obj.data);
+          this.rowCount++;
           // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Batch contains ${this.batch.length} rows.`);
-          if (this.batch.length === this.tableInfo.batchSize) { 
+          if (this.batch.length === this.batchSize) { 
               // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Completed Batch contains ${this.batch.length} rows.`);
              this.endTime = await this.writeBatch(this.status);
           }  
-          this.rowCount++;
           if ((this.rowCount % this.commitSize) === 0) {
              await this.conn.commit();
-             const elapsedTime = this.endTime - this.startTime;
+             // const elapsedTime = this.endTime - this.startTime;
              // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Commit after Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
           }
           break;
@@ -355,8 +393,9 @@ end;`
           }   
           const elapsedTime = this.endTime - this.startTime;
           this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}"[${this.insertMode}]. Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
-          await this.enableConstraints(this.conn, this.schema, this.status, this.logWriter);
+          await this.enableConstraints();
           await this.conn.commit();
+          await this.refreshMaterializedViews();
         }
       }
       else {

@@ -1,9 +1,10 @@
 "use strict";
+
 const oracledb = require('oracledb');
+oracledb.fetchAsString = [ oracledb.DATE ]
 
 const Yadamu = require('../../common/yadamuCore.js');
 const OracleCore = require('./oracleCore.js');
-
 
 const LOB_STRING_MAX_LENGTH    = 16 * 1024 * 1024;
 // const LOB_STRING_MAX_LENGTH    = 64 * 1024;
@@ -89,20 +90,24 @@ class StatementGenerator {
          case 'NCLOB':
          case 'ANYDATA':
            tableInfo.lobCount++;
+           // return {type : oracledb.CLOB}
            return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
          case 'BOOLEAN':
             return { type: oracledb.STRING, maxSize : 5}         
          case 'XMLTYPE':
            // Cannot Bind XMLTYPE > 32K as String: ORA-01461: can bind a LONG value only for insert into a LONG column when constructing XMLTYPE
            tableInfo.lobCount++;
+           // return {type : oracledb.CLOB}
            return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
          case 'JSON':
            // Defalt JSON Storeage model: JSON store as CLOB
            // JSON store as BLOB can lead to Error: ORA-40479: internal JSON serializer error during export operations.
            tableInfo.lobCount++;
+           // return {type : oracledb.CLOB}
            return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
          case 'BLOB':
            tableInfo.lobCount++;
+           // return {type : oracledb.BUFFER}
            return {type : oracledb.BUFFER, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
          case 'RAW':
            return { type :oracledb.STRING, maxSize : parseInt(dataTypeSizes[idx])*2}
@@ -113,6 +118,7 @@ class StatementGenerator {
          default:
            if (dataType.type.indexOf('.') > -1) {
              tableInfo.lobCount++;
+             // return {type : oracledb.CLOB}
              return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH['XMLTYPE']}
            }
            return {type : oracledb.STRING, maxSize :  dataType.length}
@@ -156,7 +162,7 @@ class StatementGenerator {
                          const dataType = Yadamu.decomposeDataType(targetDataType);
                          switch (dataType.type) {
                            case "XMLTYPE":
-                              values.push(`XMLTYPE.createXML(:${(idx+1)})`);
+                              values.push(`OBJECT_SERIALIZATION.DESERIALIZE_XML(:${(idx+1)})`);
                               break
                             case "BFILE":
                               values.push(`OBJECT_SERIALIZATION.DESERIALIZE_BFILE(:${(idx+1)})`);

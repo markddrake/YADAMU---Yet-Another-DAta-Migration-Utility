@@ -1,7 +1,9 @@
 "use strict" 
 const fs = require('fs');
-const oracledb = require('oracledb');
 const path = require('path');
+
+const oracledb = require('oracledb');
+oracledb.fetchAsString = [ oracledb.DATE ]
 
 const Yadamu = require('../../common/yadamuCore.js');
 const RowParser = require('../../common/rowParser.js');
