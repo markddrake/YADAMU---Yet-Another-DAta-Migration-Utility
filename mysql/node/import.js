@@ -49,29 +49,14 @@ async function main() {
       logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
 
-    const connectionDetails = {
-            host      : parameters.HOSTNAME
-           ,user      : parameters.USERNAME
-           ,password  : parameters.PASSWORD
-           ,database  : parameters.DATABASE
-           ,multipleStatements: true
-    }
-
-    conn = mysql.createConnection(connectionDetails);
- 	await MySQLCore.connect(conn);
-    if (await MySQLCore.setMaxAllowedPacketSize(conn,status,logWriter)) {
-       conn = mysql.createConnection(connectionDetails);
-       await MySQLCore.connect(conn);
-    }
-    await MySQLCore.configureSession(conn,status);
+    conn = await MySQLCore.getConnection(parameters,status,logWriter);
     
  	results = await MySQLCore.createTargetDatabase(conn,status,parameters.TOUSER);
     
     const stats = fs.statSync(parameters.FILE)
     const fileSizeInBytes = stats.size
     logWriter.write(`${new Date().toISOString()}[Clarinet]: Processing file "${path.resolve(parameters.FILE)}". Size ${fileSizeInBytes} bytes.\n`)
-    
-        
+            
     status.warningsRaised = await processFile(conn, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);
     await conn.end();
     Yadamu.reportStatus(status,logWriter)

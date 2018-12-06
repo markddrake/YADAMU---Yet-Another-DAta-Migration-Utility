@@ -51,7 +51,7 @@ async function processStagingTable(pgClient,schema,useBinaryJSON,status,logWrite
       }
     }
     else {
-      logWriter.write(`$${new Date().toISOString()}}[JSON_TABLE()]: Unexpected Error. No response from ${ useBinaryJSON === true ? 'CALL IMPORT_JSONB()' : 'CALL_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.\n`);
+      logWriter.write(`${new Date().toISOString()}}[JSON_TABLE()]: Unexpected Error. No response from ${ useBinaryJSON === true ? 'CALL IMPORT_JSONB()' : 'CALL_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.\n`);
       status.errorRaised = true;
       return [];
 
@@ -94,7 +94,7 @@ async function main(){
     catch (e) {
       if (e.code && (e.code === '54000')) {
         // Switch to Character JSON
-        logWriter.write(`$${new Date().toISOString()}}[JSON_TABLE()]: Processing Import Data file "${importFilePath}". Size ${fileSizeInBytes}.  Processing Import Data file ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
+        logWriter.write(`${new Date().toISOString()}}[JSON_TABLE()]: Processing Import Data file "${importFilePath}". Size ${fileSizeInBytes}.  Cannot process file using Binary JSON. Reprocessing using character mode operations.\n`)
         importFile.close();
         useBinaryJSON = false;
         await createStagingTable(pgClient,useBinaryJSON,status);

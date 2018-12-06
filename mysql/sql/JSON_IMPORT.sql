@@ -287,6 +287,10 @@ BEGIN
           ,group_concat(concat(case
                                 when TARGET_DATA_TYPE = 'timestamp' 
                                   then concat('convert_tz(data."',COLUMN_NAME,'",''+00:00'',@@session.time_zone)')
+                                when TARGET_DATA_TYPE IN ('varchar','text')
+                                  -- Bug #93498: JSON_TABLE does not handle JSON NULL correctly with VARCHAR
+                                  -- Assume the string 'null' should be the SQL NULL
+                                   then concat('case when data."',column_name, '" = ''null'' then NULL else data."',column_name,'" end')
                                 when TARGET_DATA_TYPE = 'geometry' 
                                   then concat('ST_GEOMFROMGEOJSON(data."',COLUMN_NAME,'")')
                                 when TARGET_DATA_TYPE like '%blob'
@@ -600,8 +604,8 @@ BEGIN
                              '       ,''',V_TABLE_NAME,''' ',C_NEWLINE,
                              '       ,(select count(*) from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
                              '       ,(select count(*) from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
-                             '       ,(select count(*) from (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'") T1 LEFT JOIN  (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'") T2 USING (HASH) WHERE HASH IS NULL)',C_NEWLINE,
-                             '       ,(select count(*) from (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'") T1 LEFT JOIN  (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'") T2 USING (HASH) WHERE HASH IS NULL)');   
+                             '       ,(select count(*) from (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'") T1 LEFT JOIN  (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'") T2 USING (HASH) WHERE T2.HASH IS NULL)',C_NEWLINE,
+                             '       ,(select count(*) from (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'") T1 LEFT JOIN  (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'") T2 USING (HASH) WHERE T2.HASH IS NULL)');   
     
     SET @STATEMENT = V_STATEMENT;
     PREPARE STATEMENT FROM @STATEMENT;
@@ -615,4 +619,9 @@ end;
 $$
 --
 DELIMITER ;
+
+
+
+
+
 --

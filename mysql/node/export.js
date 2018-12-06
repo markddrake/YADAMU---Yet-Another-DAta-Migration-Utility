@@ -8,9 +8,6 @@ const path = require('path');
 const Yadamu = require('../../common/yadamuCore.js');
 const MySQLCore = require('./mysqlCore.js');
 
-const sqlAnsiQuotingMode =
-`SET SESSION SQL_MODE=ANSI_QUOTES`
-
 const sqlGetSystemInformation = 
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE"`;                     
 
@@ -51,7 +48,7 @@ const sqlGenerateMetadata =
                 then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%TZ'')')
               when data_type = 'datetime'
                 -- Force ISO 8601 rendering of value 
-                then concat('DATE_FORMAT("', column_name, '", ''%Y-%m-%dT%T'')')
+                then concat('DATE_FORMAT("', column_name, '", ''%Y-%m-%dT%T.%f'')')
               when data_type = 'year'
                 -- Prevent rendering of value as base64:type13: 
                 then concat('CAST("', column_name, '"as DECIMAL)')
@@ -193,19 +190,11 @@ async function main(){
 
     if (parameters.LOGFILE) {
       logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
+
     }
     
-    const connectionDetails = {
-            host      : parameters.HOSTNAME
-           ,user      : parameters.USERNAME
-           ,password  : parameters.PASSWORD
-    }
+    conn = await MySQLCore.getConnection(parameters,status,logWriter);
 
-    conn = mysql.createConnection(connectionDetails);
-    await MySQLCore.connect(conn);
-
-    await MySQLCore.query(conn,status,sqlAnsiQuotingMode);
-    
     const exportFilePath = path.resolve(parameters.FILE); 
     const exportFile = fs.createWriteStream(exportFilePath);
     // exportFile.on('error',function(err) {console.log(err)})

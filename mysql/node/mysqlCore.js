@@ -1,6 +1,12 @@
 "use strict";
 
+const mysql = require('mysql');
+
 const Yadamu = require('../../common/yadamuCore.js');
+
+const sqlAnsiQuotingMode =
+`SET SESSION SQL_MODE=ANSI_QUOTES`
+
 
 function connect(conn) {
     
@@ -18,7 +24,7 @@ function query(conn,status,sqlQuery,args) {
     
   return new Promise(function(resolve,reject) {
                        if (status.sqlTrace) {
-                         status.sqlTrace.write(`${sqlQueryPacketSize};\n--\n`);
+                         status.sqlTrace.write(`${sqlQuery};\n--\n`);
                        }
                        conn.query(sqlQuery,args,function(err,rows,fields) {
                                              if (err) {
@@ -56,12 +62,37 @@ async function setMaxAllowedPacketSize(conn,status,logWriter) {
   return false;
 }
 
+async function getConnection(parameters,status,logWriter) {
+ 
+  const connectionDetails = {
+          host             : parameters.HOSTNAME
+         ,user             : parameters.USERNAME
+         ,password         : parameters.PASSWORD
+         ,database         : parameters.DATABASE
+         ,multipleStatements: true
+         ,typeCast         : false
+         ,supportBigNumbers: true
+         ,bigNumberStrings : true          
+         ,dateStrings      : true
+  }
+
+  let conn = mysql.createConnection(connectionDetails);
+  await connect(conn);
+
+  if (await setMaxAllowedPacketSize(conn,status,logWriter)) {
+     conn = mysql.createConnection(connectionDetails);
+     await connect(conn);
+  }
+
+  await configureSession(conn,status); 	
+  return conn
+}  
+
 async function createTargetDatabase(conn,status,schema) {    	
 	const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;					   
 	const results = await query(conn,status,sqlStatement,schema);
 	return results;
 }
-
 
 function processArguments(args) {
 
@@ -152,3 +183,4 @@ module.exports.configureSession        = configureSession
 module.exports.query                   = query
 module.exports.setMaxAllowedPacketSize = setMaxAllowedPacketSize
 module.exports.createTargetDatabase    = createTargetDatabase
+module.exports.getConnection           = getConnection

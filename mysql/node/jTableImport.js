@@ -56,14 +56,8 @@ async function main(){
 		   ,multipleStatements: true
     }
 
-    conn = mysql.createConnection(connectionDetails);
-	await MySQLCore.connect(conn);
-    if (await MySQLCore.setMaxAllowedPacketSize(conn,status,logWriter)) {
-       conn = mysql.createConnection(connectionDetails);
-       await connect(conn);
-    }
+    conn = await MySQLCore.getConnection(parameters,status,logWriter);
 
-    await MySQLCore.configureSession(conn,status);
     await MySQLCore.query(conn,status,`SET GLOBAL local_infile = 'ON'`);
     
     const importFilePath = path.resolve(parameters.FILE);
@@ -78,7 +72,7 @@ async function main(){
 	const startTime = new Date().getTime();
 	results = await loadStagingTable(conn,status,importFilePath);
 	const elapsedTime = new Date().getTime() - startTime;
-    logWriter.write(`${new Date().toISOString()}: Import Data file "${importFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
+    logWriter.write(`${new Date().toISOString()}[JSON_TABLE()]: Processing Import Data file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
 	results = await processStagingTable(conn,status,schema);
     results = results.pop();
@@ -105,8 +99,8 @@ async function main(){
 	logWriter.close();
   }
   
-  if (parameters.SQLTRACE) {
-    sqlTrace.close();
+  if (status.sqlTrace) {
+    status.sqlTrace.close();
   }
 }
 

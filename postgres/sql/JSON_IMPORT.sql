@@ -314,6 +314,7 @@ declare
 
   PLPGSQL_CTX        TEXT;
 begin
+
   for r in select "tableName"
                  ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor',P_SCHEMA,"tableName","columns","dataTypes","sizeConstraints",FALSE) "TABLE_INFO"
              from JSON_EACH(P_JSON -> 'metadata')  
@@ -323,29 +324,29 @@ begin
                                                                 "columns" TEXT, 
                                                                 "dataTypes" JSONB, 
                                                                 "sizeConstraints" JSONB
-                                                              ) 
+                                                             ) 
   loop
   
     begin
-      EXECUTE r.TABLE_INFO ->> 'ddl';
-      V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('ddl', jsonb_build_object('tableName',r."tableName",'sqlStatement',r.TABLE_INFO ->> 'ddl')), true);
+      EXECUTE r."TABLE_INFO" ->> 'ddl';
+      V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('ddl', jsonb_build_object('tableName',r."tableName",'sqlStatement',r."TABLE_INFO" ->> 'ddl')), true);
     exception 
       when others then
         GET STACKED DIAGNOSTICS PLPGSQL_CTX = PG_EXCEPTION_CONTEXT;
-        V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName',r."tableName",'sqlStatement',r.TABLE_INFO ->> 'ddl','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
+        V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName',r."tableName",'sqlStatement',r."TABLE_INFO" ->> 'ddl','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
     end; 
   
     begin
       V_START_TIME := clock_timestamp();
-      EXECUTE r.TABLE_INFO ->> 'dml'  using  P_JSON;
+      EXECUTE r."TABLE_INFO" ->> 'dml'  using  P_JSON;
       V_END_TIME := clock_timestamp();
       GET DIAGNOSTICS V_ROW_COUNT := ROW_COUNT;
       V_ELAPSED_TIME := 1000 * ( extract(epoch from V_END_TIME) - extract(epoch from V_START_TIME) );
-      V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS)  || '}' as TEXT[]),  jsonb_build_object('dml', jsonb_build_object('tableName',r."tableName",'rowCount',V_ROW_COUNT,'elapsedTime',V_ELAPSED_TIME,'sqlStatement',r.TABLE_INFO ->> 'dml' )), true);
+      V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS)  || '}' as TEXT[]),  jsonb_build_object('dml', jsonb_build_object('tableName',r."tableName",'rowCount',V_ROW_COUNT,'elapsedTime',V_ELAPSED_TIME,'sqlStatement',r."TABLE_INFO" ->> 'dml' )), true);
     exception
       when others then
         GET STACKED DIAGNOSTICS PLPGSQL_CTX = PG_EXCEPTION_CONTEXT;
-        V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName',r."tableName",'sqlStatement',r.TABLE_INFO ->> 'dml' ,'code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
+        V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName',r."tableName",'sqlStatement',r."TABLE_INFO" ->> 'dml' ,'code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
     end;
 
   end loop;

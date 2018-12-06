@@ -36,7 +36,7 @@ class StatementGenerator {
   
   async generateStatementCache(schema, systemInformation, metadata) {
       
-    const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;                       
+    const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS"`;                       
    
     let results = await MySQLCore.query(this.conn,this.status,sqlStatement,[JSON.stringify({systemInformation: systemInformation, metadata : metadata}),schema]);
     results = results.pop();

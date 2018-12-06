@@ -174,9 +174,6 @@ class DBWriter extends Writable {
                                                        case "json" :
                                                          obj.data[idx] = JSON.stringify(obj.data[idx]);
                                                          break;
-                                                       case "timestamp" :
-                                                         obj.data[idx] = new Date(Date.parse(obj.data[idx]));
-                                                         break;
                                                        default :
                                                      }
                                                    }
