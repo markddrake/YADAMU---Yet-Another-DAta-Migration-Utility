@@ -85,7 +85,7 @@ BEGIN
              -- ###TODO : Solve mapping MSSQL geometry to MYSQL
                then return 'json';
              when 'hierarchyid'
-               then return 'varbinary(446)';
+               then return 'varchar(4000)';
              when 'image'
                then return 'longblob';
              when 'mediumint'

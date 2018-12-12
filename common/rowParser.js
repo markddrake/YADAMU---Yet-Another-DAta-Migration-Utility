@@ -119,10 +119,13 @@ class RowParser extends Transform {
         v = self.chunks.join('');
         self.chunks = []
       }
-      
+ 
+      /*
+      // What was I thinking off.....
       if (typeof v === 'boolean') {
         v = new Boolean(v).toString();
       }
+      */
       
       if (Array.isArray(self.currentObject)) {
           // currentObject is an ARRAY. We got a value so add it to the Array

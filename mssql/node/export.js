@@ -29,13 +29,32 @@ const sqlGenerateQueries =
                   ,','
                  )
                  within group (order by ordinal_position) "sizeConstraints"
-       ,concat('select ',string_agg(concat('"',column_name,'"'),',') within group (order by ordinal_position),' from "',t.table_schema,'"."',t.table_name,'"') QUERY
+       ,concat('select ',string_agg(case 
+                                      when data_type = 'hierarchyid' then
+                                        concat('cast("',column_name,'" as NVARCHAR(4000)) "',column_name,'"') 
+                                      when data_type = 'geography' then
+                                        concat('"',column_name,'".AsTextZM() "',column_name,'"') 
+                                      when data_type = 'geometry' then
+                                        concat('"',column_name,'".AsTextZM() "',column_name,'"') 
+                                      when data_type = 'datetime2' then
+                                        concat('convert(VARCHAR(33),"',column_name,'",127) "',column_name,'"') 
+                                      when data_type = 'datetimeoffset' then
+                                        concat('convert(VARCHAR(33),"',column_name,'",127) "',column_name,'"') 
+                                      else 
+                                        concat('"',column_name,'"') 
+                                    end
+                                   ,','
+                                  ) 
+                                  within group (order by ordinal_position)
+                        ,' from "',t.table_schema,'"."',t.table_name,'"') QUERY
    from information_schema.columns c, information_schema.tables t
   where t.table_name = c.table_name
     and t.table_schema = c.table_schema
     and t.table_type = 'BASE TABLE'
     and t.table_schema = @SCHEMA
   group by t.table_schema, t.table_name`;    
+ 
+ 
  
 async function getSystemInformation(request) {   
 
@@ -66,7 +85,6 @@ function fetchData(request,tableInfo,outStream) {
       outStream.write(']');
       resolve(counter)
     })
-
   
     request.on('row', function(row){
       counter++

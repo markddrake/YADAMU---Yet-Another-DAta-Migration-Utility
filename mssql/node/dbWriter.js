@@ -1,3 +1,5 @@
+
+
 "use strict";
 const sql = require('mssql');
 const Writable = require('stream').Writable
@@ -138,6 +140,7 @@ class DBWriter extends Writable {
             // await this.transaction.begin();
           }
           // Perform SQL Server specific data type conversions before pushing row to bulkOperation row cache
+
           this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
                                                    const dataType = Yadamu.decomposeDataType(targetDataType);
                                                    if (obj.data[idx] !== null) {
@@ -145,29 +148,28 @@ class DBWriter extends Writable {
                                                        case "image" :
                                                          obj.data[idx] = Buffer.from(obj.data[idx],'hex');
                                                          break;
-                                                       case "varbinary" :
+                                                       case "varbinary":
                                                          obj.data[idx] = Buffer.from(obj.data[idx],'hex');
                                                          break;
-                                                       case "datetime2" :
-                                                         obj.data[idx] = new Date(Date.parse(obj.data[idx]));
-                                                         break;
-                                                       case "datetime" :
-                                                         obj.data[idx] = new Date(Date.parse(obj.data[idx]));
-                                                         break;
-                                                       case "datetimeoffset" :
-                                                         obj.data[idx] = new Date(Date.parse(obj.data[idx]));
-                                                         break;
                                                        case "geography" :
+                                                         if (this.systemInformation.vendor !== 'MSSQLSERVER') {
                                                          // Code to convert to WellKnown Goes Here ???
-                                                         obj.data[idx] = null;
+                                                           obj.data[idx] = null;
+                                                         }
                                                          break;
                                                        case "geometry" :
+                                                         if (this.systemInformation.vendor !== 'MSSQLSERVER') {
                                                          // Code to convert to WellKnown Goes Here ???
-                                                         obj.data[idx] = null;
+                                                           obj.data[idx] = null;
+                                                         }
+                                                         // Code to convert to WellKnown Goes Here ???
                                                          break;
-                                                       case "hierarchyid" :
-                                                         // Need to solve this later ?
-                                                         obj.data[idx] = null;
+                                                       case "time":
+                                                       case "date":
+                                                       case "datetime":
+                                                       case "datetime2":
+                                                       case "datetimeoffset":
+                                                         obj.data[idx] = obj.data[idx].endsWith('Z') ? obj.data[idx] : `${obj.data[idx]}Z`
                                                          break;
                                                        default :
                                                      }

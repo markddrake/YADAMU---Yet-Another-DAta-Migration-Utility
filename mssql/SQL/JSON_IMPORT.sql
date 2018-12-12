@@ -52,8 +52,10 @@ BEGIN
       then case 
              when @DATA_TYPE = 'mediumint' 
                then 'int'
+             when @DATA_TYPE = 'datetime' 
+               then 'datetime2'
              when @DATA_TYPE = 'timestamp' 
-               then 'datetime'
+               then 'datetime2'
              when @DATA_TYPE = 'enum'
                then 'varchar(255)'
              when @DATA_TYPE = 'set'
@@ -93,16 +95,16 @@ BEGIN
                 ,c."VALUE" "COLUMN_NAME"
                 ,t."VALUE" "DATA_TYPE"
                 ,case
-                   when s.VALUE = ''
-                     then NULL
-                   when CHARINDEX(',',s."VALUE") > 0 
-                     then LEFT(s."VALUE",CHARINDEX(',',s."VALUE")-1)
+                   when s.VALUE = '' then
+                     NULL
+                   when CHARINDEX(',',s."VALUE") > 0 then
+                     LEFT(s."VALUE",CHARINDEX(',',s."VALUE")-1)
                    else
                      s."VALUE"
                  end "DATA_TYPE_LENGTH"
                 ,case
-                   when CHARINDEX(',',s."VALUE") > 0 
-                     then RIGHT(s."VALUE", CHARINDEX(',',REVERSE(s."VALUE"))-1)
+                   when CHARINDEX(',',s."VALUE") > 0  then 
+                     RIGHT(s."VALUE", CHARINDEX(',',REVERSE(s."VALUE"))-1)
                    else 
                      NULL
                  end "DATA_TYPE_SCALE"
@@ -118,18 +120,19 @@ BEGIN
   SELECT @COLUMNS_CLAUSE =
          STRING_AGG(CONCAT('"',"COLUMN_NAME",'" ',
                            case
-                             when (CHARINDEX('(',"TARGET_DATA_TYPE") > 0)  
-                               then "TARGET_DATA_TYPE"
-                             when "TARGET_DATA_TYPE" in('xml','text','ntext','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney','geography','geometry','hierarchyid','uniqueidentifier')
-                               then "TARGET_DATA_TYPE"                
-                             when "DATA_TYPE_SCALE" IS NOT NULL
-                               then CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
-                             when "DATA_TYPE_LENGTH"  IS NOT NULL 
-                               then case 
-                                      when "DATA_TYPE_LENGTH" = -1 
-                                        then CONCAT("TARGET_DATA_TYPE",'(max)')
-                                        else CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
-                                    end
+                             when (CHARINDEX('(',"TARGET_DATA_TYPE") > 0) then  
+                               "TARGET_DATA_TYPE"
+                             when "TARGET_DATA_TYPE" in('xml','text','ntext','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney','geography','geometry','hierarchyid','uniqueidentifier')  then
+                               "TARGET_DATA_TYPE"                
+                             when "DATA_TYPE_SCALE" IS NOT NULL then
+                               CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
+                             when "DATA_TYPE_LENGTH"  IS NOT NULL  then
+                               case 
+                                 when "DATA_TYPE_LENGTH" = -1  then
+                                   CONCAT("TARGET_DATA_TYPE",'(max)')
+                                 else 
+                                   CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
+                               end
                              else 
                                "TARGET_DATA_TYPE"
                            end
@@ -141,19 +144,19 @@ BEGIN
                 STRING_AGG(CONCAT(
                                   '"',
                                   case
-                                    when TARGET_DATA_TYPE LIKE '%(%}%'
-                                      then "TARGET_DATA_TYPE"
-                                    when "TARGET_DATA_TYPE" in('xml','text','ntext','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney')
-                                      then "TARGET_DATA_TYPE"                 
-                                    when "DATA_TYPE_SCALE" IS NOT NULL
-                                      then CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
-                                    when "DATA_TYPE_LENGTH"  IS NOT NULL 
-                                      then case 
-                                             when "DATA_TYPE_LENGTH" = -1 
-                                               then CONCAT("TARGET_DATA_TYPE",'(max)')
-                                             else 
-                                               CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
-                                           end
+                                    when TARGET_DATA_TYPE LIKE '%(%}%' then
+                                      "TARGET_DATA_TYPE"
+                                    when "TARGET_DATA_TYPE" in('xml','text','ntext','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney') then
+                                      "TARGET_DATA_TYPE"                 
+                                    when "DATA_TYPE_SCALE" IS NOT NULL then
+                                      CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
+                                    when "DATA_TYPE_LENGTH"  IS NOT NULL  then
+                                      case 
+                                        when "DATA_TYPE_LENGTH" = -1  then
+                                          CONCAT("TARGET_DATA_TYPE",'(max)')
+                                        else 
+                                          CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
+                                      end
                                     else 
                                       "TARGET_DATA_TYPE"
                                   end,
@@ -165,40 +168,59 @@ BEGIN
                )
         ,@INSERT_SELECT_LIST = 
          STRING_AGG(case
-                      when "TARGET_DATA_TYPE" in ('binary','varbinary')
-                        then case
-                                when ((DATA_TYPE_LENGTH = -1) OR (DATA_TYPE = 'BLOB') or ((CHARINDEX('"."',DATA_TYPE) > 0)))
-                                  then CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(max),"',"COLUMN_NAME",'") "',COLUMN_NAME,'"')
-                                  else CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",'),"',"COLUMN_NAME",'") "',COLUMN_NAME,'"')
-                             end
-                      when "TARGET_DATA_TYPE" = 'image'
-                        then CONCAT('convert(varchar(max),CONVERT(varbinary(max),"',"COLUMN_NAME",'"),2)')
+                      when "TARGET_DATA_TYPE" = 'image' then
+                        CONCAT('CONVERT(image,CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2))')
+                      when "TARGET_DATA_TYPE" = 'varbinary(max)' then
+                        CONCAT('CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2)')
+                      when "TARGET_DATA_TYPE" in ('binary','varbinary') then
+                        case
+                          when ((DATA_TYPE_LENGTH = -1) OR (DATA_TYPE = 'BLOB') or ((CHARINDEX('"."',DATA_TYPE) > 0))) then
+                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(max),data."',"COLUMN_NAME",'",2) "',COLUMN_NAME,'"')
+                          else 
+                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",'),data."',"COLUMN_NAME",'",2) "',COLUMN_NAME,'"')
+                        end
                       else
-                        CONCAT('"',"COLUMN_NAME",'"')
+                        CONCAT('data."',"COLUMN_NAME",'"')
                     end 
                    ,','                 
                    )
        ,@WITH_CLAUSE =
         STRING_AGG(CONCAT('"',COLUMN_NAME,'" ',
                           case            
-                            when (CHARINDEX('(',"TARGET_DATA_TYPE") > 0)  
-                              then "TARGET_DATA_TYPE"
-                            when "TARGET_DATA_TYPE" in('xml','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney')
-                              then "TARGET_DATA_TYPE"         
-                            when "TARGET_DATA_TYPE" = 'image'
-                              then 'nvarchar(max)'                
-                            when "TARGET_DATA_TYPE" = 'text'
-                              then 'varchar(max)'                 
-                            when "TARGET_DATA_TYPE" = 'ntext'
-                              then 'nvarchar(max)'                
-                            when "TARGET_DATA_TYPE" in ('varchar','nvarchar') 
-                              then CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
-                            when "TARGET_DATA_TYPE" in ('binary','varbinary') 
-                              then CONCAT('varchar(',cast(("DATA_TYPE_LENGTH" * 2) as VARCHAR),')')
-                            when "DATA_TYPE_SCALE" IS NOT NULL
-                              then CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
-                            when "DATA_TYPE_LENGTH" IS NOT NULL 
-                              then CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
+                            when "TARGET_DATA_TYPE" = 'varbinary(max)' then
+                              'varchar(max)'                
+                            when (CHARINDEX('(',"TARGET_DATA_TYPE") > 0) then
+                              "TARGET_DATA_TYPE"
+                            when "TARGET_DATA_TYPE" in('xml','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney') then
+                              "TARGET_DATA_TYPE"         
+                            when "TARGET_DATA_TYPE" = 'image' then
+                              'varchar(max)'                
+                            when "TARGET_DATA_TYPE" = 'text' then
+                              'varchar(max)'                 
+                            when "TARGET_DATA_TYPE" = 'ntext' then
+                              'nvarchar(max)'                
+                            when "TARGET_DATA_TYPE" = 'geography' then
+                              'nvarchar(4000)'                
+                            when "TARGET_DATA_TYPE" = 'geometry' then
+                              'nvarchar(4000)'                
+                            when "TARGET_DATA_TYPE" = 'hierarchyid' then
+                              'nvarchar(4000)'                
+                            when "TARGET_DATA_TYPE" in ('binary','varbinary') then
+                              case
+                                when "DATA_TYPE_LENGTH" < 0  then
+                                  'varchar(max)'
+                                else 
+                                  CONCAT('varchar(',cast(("DATA_TYPE_LENGTH" * 2) as VARCHAR),')')
+                              end
+                            when "DATA_TYPE_SCALE" IS NOT NULL then
+                              CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
+                            when "DATA_TYPE_LENGTH" IS NOT NULL  then
+                              case 
+                                when "DATA_TYPE_LENGTH" < 0  then
+                                  CONCAT("TARGET_DATA_TYPE",'(max)')
+                                else 
+                                  CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
+                              end
                             else 
                               "TARGET_DATA_TYPE"
                           end,
@@ -209,7 +231,7 @@ BEGIN
       FROM "TARGET_TABLE_DEFINITION" tt;
      
    SET @DDL_STATEMENT = CONCAT('if object_id(''"',@SCHEMA,'"."',@TABLE_NAME,'"'',''U'') is NULL create table "',@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMNS_CLAUSE,')');
-   SET @DML_STATEMENT = CONCAT('insert into "' ,@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMN_LIST,') select ',@INSERT_SELECT_LIST,'  from "JSON_STAGING" cross apply OPENJSON("DATA",''$.data."',@TABLE_NAME,'"'') with ( ',@WITH_CLAUSE,') data');
+   SET @DML_STATEMENT = CONCAT('insert into "' ,@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMN_LIST,') select ',@INSERT_SELECT_LIST,'  from "#JSON_STAGING" s cross apply OPENJSON("DATA",''$.data."',@TABLE_NAME,'"'') with ( ',@WITH_CLAUSE,') data');
    RETURN JSON_MODIFY(JSON_MODIFY(JSON_MODIFY('{}','$.ddl',@DDL_STATEMENT),'$.dml',@DML_STATEMENT),'$.targetDataTypes',JSON_QUERY(@TARGET_DATA_TYPES))
 end;
 GO
@@ -234,7 +256,7 @@ BEGIN
   CURSOR FOR 
   select TABLE_NAME, 
          dbo.GENERATE_STATEMENTS(SOURCE_VENDOR, @TARGET_DATABASE, v.TABLE_NAME, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS) as STATEMENTS
-   from "JSON_STAGING"
+   from "#JSON_STAGING"
          cross apply OPENJSON("DATA") 
          with (
            SOURCE_VENDOR nvarchar(128) '$.systemInformation.vendor'
@@ -271,7 +293,7 @@ BEGIN
       end TRY
       BEGIN CATCH  
         SET @LOG_ENTRY = (
-          select @TABLE_NAME as [error.tableName], @SQL_STATEMENT as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as 'msg'
+          select 'FATAL' as 'error.severity', @TABLE_NAME as [error.tableName], @SQL_STATEMENT as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as [error.msg], CONCAT(ERROR_PROCEDURE(),'. Line: ', ERROR_LINE(),'. State',ERROR_STATE(),'. Severity:',ERROR_SEVERITY(),'.') as [error.details]
              for JSON PATH, INCLUDE_NULL_VALUES
         )
         SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
@@ -292,7 +314,7 @@ BEGIN
       end TRY  
       BEGIN CATCH  
         SET @LOG_ENTRY = (
-          select @TABLE_NAME as [error.tableName],@SQL_STATEMENT  as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as 'msg'
+          select 'FATAL' as 'error.severity', @TABLE_NAME as [error.tableName],@SQL_STATEMENT  as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as [error.msg], CONCAT(ERROR_PROCEDURE(),'. Line: ', ERROR_LINE(),'. Severity:',ERROR_SEVERITY(),'.') as [error.details]
              for JSON PATH, INCLUDE_NULL_VALUES
         )
         SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
@@ -307,7 +329,7 @@ BEGIN
   end TRY 
   BEGIN CATCH
     SET @LOG_ENTRY = (
-      select 'IMPORT_JSON' as [error.tableName], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as 'msg'
+      select 'FATAL' as 'error.severity', ERROR_PROCEDURE() as [error.tableName], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as [error.msg], CONCAT(ERROR_PROCEDURE(),'. Line: ', ERROR_LINE(),'. Severity:',ERROR_SEVERITY(),'.') as [error.details]
         for JSON PATH, INCLUDE_NULL_VALUES
     )
     SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
@@ -374,10 +396,11 @@ BEGIN
   DECLARE @TABLE_NAME       VARCHAR(128);
   DECLARE @COLUMN_LIST      NVARCHAR(MAX);
   DECLARE @SQL_STATEMENT    NVARCHAR(MAX);
-  DECLARE @C_NEWLINE        CHAR(1) = CHAR(13);
+  DECLARE @C_NEWLINE        CHAR(1) = CHAR(10);
   
   DECLARE @SOURCE_COUNT BIGINT;
   DECLARE @TARGET_COUNT BIGINT;
+  DECLARE @ERRORMSG     NVARCHAR(2000);
   
   DECLARE FETCH_METADATA 
   CURSOR FOR 
@@ -404,13 +427,9 @@ BEGIN
  
   SET QUOTED_IDENTIFIER ON; 
   
-  select CONCAT( FORMAT(sysutcdatetime(),'yyyy-MM-dd"T"HH:mm:ss.fffff"Z"'),': "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'", "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'", ',@COMMENT) "Timestamp";
-  
-  OPEN FETCH_METADATA;
-  FETCH FETCH_METADATA INTO @TABLE_NAME, @COLUMN_LIST
   
   CREATE TABLE #SCHEMA_COMPARE_RESULTS (
-    SOURCE_DATATBASE NVARCHAR(128)
+    SOURCE_DATABASE  NVARCHAR(128)
    ,SOURCE_SCHEMA    NVARCHAR(128)
    ,TARGET_DATABASE  NVARCHAR(128)
    ,TARGET_SCHEMA    NVARCHAR(128)
@@ -419,12 +438,13 @@ BEGIN
    ,TARGET_ROW_COUNT INT
    ,MISSINGS_ROWS    INT
    ,EXTRA_ROWS       INT
+   ,ERRORMSG         NVARCHAR(2000)
   );
 
+  OPEN FETCH_METADATA;
+  FETCH FETCH_METADATA INTO @TABLE_NAME, @COLUMN_LIST
   WHILE @@FETCH_STATUS = 0 
-  BEGIN 
-    FETCH FETCH_METADATA INTO @TABLE_NAME, @COLUMN_LIST
-    
+  BEGIN    
     SET @SQL_STATEMENT = CONCAT('insert into #SCHEMA_COMPARE_RESULTS ',@C_NEWLINE,
                              ' select ''',@SOURCE_DATABASE,''' ',@C_NEWLINE,
                              '       ,''',@SOURCE_SCHEMA,''' ',@C_NEWLINE,
@@ -434,16 +454,41 @@ BEGIN
                              '       ,(select count(*) from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'")',@C_NEWLINE,
                              '       ,(select count(*) from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'")',@C_NEWLINE,
                              '       ,(select count(*) from (SELECT ',@COLUMN_LIST,' FROM "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'" EXCEPT SELECT ',@COLUMN_LIST,' FROM "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'") T1)',@C_NEWLINE,
-                             '       ,(select count(*) from (SELECT ',@COLUMN_LIST,' FROM "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'" EXCEPT SELECT ',@COLUMN_LIST,' FROM "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'") T2)');
+                             '       ,(select count(*) from (SELECT ',@COLUMN_LIST,' FROM "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'" EXCEPT SELECT ',@COLUMN_LIST,' FROM "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'") T2)',@C_NEWLINE,
+                             '       ,NULL');
     
-    EXEC(@SQL_STATEMENT);
-   
-  end;
+    BEGIN TRY 
+      EXEC(@SQL_STATEMENT)
+    END TRY
+    BEGIN CATCH
+      SET @ERRORMSG = ERROR_MESSAGE()
+      BEGIN TRY
+        SET @SQL_STATEMENT = CONCAT('select @SOURCE_COUNT = count(*) from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"')
+        EXEC SP_EXECUTESQL @SQL_STATEMENT ,'@COUNT INT OUTPUT', @SOURCE_COUNT OUT
+      END TRY
+      BEGIN CATCH
+         SET @ERRORMSG = ERROR_MESSAGE()
+         SET @SOURCE_COUNT = -1
+      END CATCH
+      BEGIN TRY
+        SET @SQL_STATEMENT = CONCAT('select @TARGET_COUNT = count(*) from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"')
+        EXEC SP_EXECUTESQL @SQL_STATEMENT,'@COUNT INT OUTPUT', @TARGET_COUNT OUT
+      END TRY
+      BEGIN CATCH
+         SET @ERRORMSG = ERROR_MESSAGE()
+         SET @TARGET_COUNT = -1
+      END CATCH
+      INSERT INTO #SCHEMA_COMPARE_RESULTS VALUES (@SOURCE_DATABASE, @SOURCE_SCHEMA, @TARGET_DATABASE, @TARGET_SCHEMA, @TABLE_NAME, @SOURCE_COUNT, @TARGET_COUNT, -1, -1, @ERRORMSG)
+    END CATCH;
+    FETCH FETCH_METADATA INTO @TABLE_NAME, @COLUMN_LIST
+  END
    
   CLOSE FETCH_METADATA;
   DEALLOCATE FETCH_METADATA;
-    
-  SELECT * 
+
+  SELECT CAST(CONCAT( FORMAT(sysutcdatetime(),'yyyy-MM-dd"T"HH:mm:ss.fffff"Z"'),': "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'", "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'", ',@COMMENT) as NVARCHAR(132)) "Timestamp"
+  
+  SELECT CAST(FORMATMESSAGE('%32s %32s %32s %32s %48s %12i %12i %12i %12i %64s', SOURCE_DATABASE, SOURCE_SCHEMA, TARGET_DATABASE, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSINGS_ROWS, EXTRA_ROWS, ERRORMSG) as NVARCHAR(256)) "Results"
     FROM #SCHEMA_COMPARE_RESULTS
 end
 --

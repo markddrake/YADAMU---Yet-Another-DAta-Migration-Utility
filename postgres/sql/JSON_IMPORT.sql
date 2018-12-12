@@ -146,7 +146,7 @@ begin
         when 'tinyint' then
           return 'smallint';
         when 'hierarchyid' then
-           return 'bytea';
+           return 'varchar(4000)';
         when 'uniqueidentifier' then
           return 'varchar(36)';
         when 'varbinary' then

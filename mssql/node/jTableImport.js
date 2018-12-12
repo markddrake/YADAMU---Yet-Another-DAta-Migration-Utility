@@ -53,7 +53,7 @@ async function main(){
     const fileSizeInBytes = stats.size;
  
     const startTime = new Date().getTime();
-    const tableSpec =  { tableName : 'JSON_STAGING', columnName : 'DATA'}
+    const tableSpec =  { tableName : '#JSON_STAGING', columnName : 'DATA'}
     const stagingTable = new StagingTable(pool,tableSpec,importFilePath,status); 
     results = await stagingTable.uploadFile()
     const elapsedTime = new Date().getTime() - startTime;

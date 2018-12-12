@@ -3,7 +3,7 @@ set pages 100
 set lines 256
 column SOURCE_SCHEMA format a32
 column TARGET_SCHEMA FORMAT A32
-column TABLE_NAME format A64
+column TABLE_NAME format A48
 column SQLERRM format A64
 --
 set feedback off

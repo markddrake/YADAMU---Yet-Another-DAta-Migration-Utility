@@ -71,7 +71,7 @@ class StatementGenerator {
            case 'datetimeoffset':                  return 'datetime';
            case 'geography':                       return 'json';
            case 'geogmetry':                       return 'json';
-           case 'hierarchyid':                     return 'varbinary(446)';
+           case 'hierarchyid':                     return 'varchar(4000)';
            case 'image':                           return 'longblob';
            case 'mediumint':                       return 'int';
            case 'money':                           return 'decimal(19,4)';

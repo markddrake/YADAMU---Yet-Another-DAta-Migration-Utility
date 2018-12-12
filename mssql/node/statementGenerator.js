@@ -67,7 +67,7 @@ class StatementGenerator {
       const dataType = this.decomposeDataType(targetDataType);
       switch (dataType.type) {
         case 'bit':
-          table.columns.add(columns[idx],sql.Bit, {nullable: true});
+          table.columns.add(columns[idx],sql.Bit);
           break;
         case 'bigint':
           table.columns.add(columns[idx],sql.BigInt, {nullable: true});
@@ -79,7 +79,8 @@ class StatementGenerator {
           table.columns.add(columns[idx],sql.Int, {nullable: true});
           break;
         case 'money':
-          table.columns.add(columns[idx],sql.Money, {nullable: true});
+          table.columns.add(columns[idx],sql.Decimal(19,4), {nullable: true});
+          // table.columns.add(columns[idx],sql.Money, {nullable: true});
           break
         case 'decimal':
           // sql.Decimal ([precision], [scale])
@@ -89,7 +90,8 @@ class StatementGenerator {
           table.columns.add(columns[idx],sql.SmallInt, {nullable: true});
           break;
         case 'smallmoney':
-          table.columns.add(columns[idx],sql.SmallMoney, {nullable: true});
+          table.columns.add(columns[idx],sql.Decimal(10,4), {nullable: true});
+          // table.columns.add(columns[idx],sql.SmallMoney, {nullable: true});
           break;
         case 'real':
           table.columns.add(columns[idx],sql.Real, {nullable: true}, {nullable: true});
@@ -126,24 +128,42 @@ class StatementGenerator {
           break;
         case 'time':
           // sql.Time ([scale])
-          table.columns.add(columns[idx],sql.Time(dataType.length), {nullable: true});
+          // Binding as sql.Time must supply values as type Date. 
+          // table.columns.add(columns[idx],sql.Time(dataType.length), {nullable: true});
+          // Use String to avoid possible loss of precision
+          table.columns.add(columns[idx],sql.VarChar(32), {nullable: true});
           break;
         case 'date':
-          table.columns.add(columns[idx],sql.Date, {nullable: true});
+          // Binding as sql.Date must supply values as type Date. 
+          // table.columns.add(columns[idx],sql.Date, {nullable: true});
+          // Use String to avoid possible loss of precision
+          table.columns.add(columns[idx],sql.VarChar(32), {nullable: true});
           break;
         case 'datetime':
-          table.columns.add(columns[idx],sql.DateTime, {nullable: true});
+          // Binding as sql.DateTime must supply values as type Date. 
+          // table.columns.add(columns[idx],sql.DateTime, {nullable: true});
+          // Use String to avoid possible loss of precision
+          table.columns.add(columns[idx],sql.VarChar(32), {nullable: true});
           break;
         case 'datetime2':
           // sql.DateTime2 ([scale]
-          table.columns.add(columns[idx],sql.DateTime2(), {nullable: true});
+          // Binding as sql.DateTime2 must supply values as type Date. 
+          // table.columns.add(columns[idx],sql.DateTime2(), {nullable: true});
+          // Use String to avoid possible loss of precision
+          table.columns.add(columns[idx],sql.VarChar(32), {nullable: true});
           break;
         case 'datetimeoffset':
           // sql.DateTimeOffset ([scale])
-          table.columns.add(columns[idx],sql.DateTimeOffset(dataType.length), {nullable: true});
+          // Binding as sql.DateTime2 must supply values as type Date. 
+          // table.columns.add(columns[idx],sql.DateTimeOffset(dataType.length), {nullable: true});
+          // Use String to avoid possible loss of precision
+          table.columns.add(columns[idx],sql.VarChar(32), {nullable: true});
           break;
         case 'smalldatetime':
-          table.columns.add(columns[idx],sql.SmallDateTime, {nullable: true});
+          // Binding as sql.SamllDateTime must supply values as type Date. 
+          // table.columns.add(columns[idx],sql.SmallDateTime, {nullable: true});
+          // Use String to avoid possible loss of precision
+          table.columns.add(columns[idx],sql.VarChar(32), {nullable: true});
           break;
         case 'uniqueidentifier':
           // table.columns.add(columns[idx],sql.UniqueIdentifier, {nullable: true});
@@ -179,13 +199,12 @@ class StatementGenerator {
           table.columns.add(columns[idx],sql.Geometry, {nullable: true});
           break;
         case 'hierarchyid':
-          table.columns.add(columns[idx],sql.VarChar(892),{nullable: true});
+          table.columns.add(columns[idx],sql.VarChar(4000),{nullable: true});
           break;
         default:
           console.log(`createBulkOperation(): Unmapped data type [${targetDataType}].`);
       }
     },this)
-    
     return table
   }
 
@@ -209,7 +228,8 @@ class StatementGenerator {
           ps.input(column,sql.Int);
           break;
         case 'money':
-          ps.input(column,sql.Money);
+          // ps.input(column,sql.Money);
+          ps.input(column,sql.Decimal(19,4));
           break
         case 'decimal':
           // sql.Decimal ([precision], [scale])
@@ -219,7 +239,8 @@ class StatementGenerator {
           ps.input(column,sql.SmallInt);
           break;
         case 'smallmoney':
-          ps.input(column,sql.SmallMoney);
+          // ps.input(column,sql.SmallMoney);
+          ps.input(column,sql.Decimal(10,4));
           break;
         case 'real':
           ps.input(column,sql.Real);
@@ -254,24 +275,30 @@ class StatementGenerator {
           break;
         case 'time':
           // sql.Time ([scale])
-          ps.input(column,sql.Time(dataType.length));
+          // ps.input(column,sql.Time(dataType.length));
+          ps.input(column,sql.VarChar(32));
           break;
         case 'date':
-          ps.input(column,sql.Date);
+          // ps.input(column,sql.Date);
+          ps.input(column,sql.VarChar(32));
           break;
         case 'datetime':
-          ps.input(column,sql.DateTime);
+          // ps.input(column,sql.DateTime);
+          ps.input(column,sql.VarChar(32));
           break;
         case 'datetime2':
           // sql.DateTime2 ([scale]
-          ps.input(column,sql.DateTime2());
+          // ps.input(column,sql.DateTime2());
+          ps.input(column,sql.VarChar(32));
           break;
         case 'datetimeoffset':
           // sql.DateTimeOffset ([scale])
-          ps.input(column,sql.DateTimeOffset(dataType.length));
+          // ps.input(column,sql.DateTimeOffset(dataType.length));
+          ps.input(column,sql.VarChar(32));
           break;
         case 'smalldatetime':
-          ps.input(column,sql.SmallDateTime);
+          // ps.input(column,sql.SmallDateTime);
+          ps.input(column,sql.VarChar(32));
           break;
         case 'uniqueidentifier':
           // ps.input(column,sql.UniqueIdentifier);
@@ -303,7 +330,7 @@ class StatementGenerator {
           ps.input(column,sql.NVarChar(sql.MAX));
           break;
         case 'hierarchyid':
-          ps.input(column,sql.VarChar(892));
+          ps.input(column,sql.VarChar(4000));
           break;
         default:
           console.log(`createPreparedStatement(): Unmapped data type [${targetDataType}].`);

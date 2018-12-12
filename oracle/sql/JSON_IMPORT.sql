@@ -313,8 +313,7 @@ begin
         when P_DATA_TYPE = 'xml' then
           return 'XMLTYPE';
         when P_DATA_TYPE = 'hierarchyid' then
-          -- Assume DATA_TYPE_LENGTH is characters required to represent value as HEXBINARY (Default appears to 892)
-           return 'RAW(' || (P_DATA_TYPE_LENGTH / 2) ||')';
+           return 'VARCHAR2(4000)';
         when P_DATA_TYPE = 'uniqueidentifier' then
            return 'VARCHAR2(36)';
         when P_DATA_TYPE = 'geography' then
