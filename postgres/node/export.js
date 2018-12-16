@@ -15,7 +15,7 @@ const sqlGetSystemInformation =
 const sqlGenerateQueries =
 `select t.table_schema, t.table_name
 	   ,string_agg('"' || column_name || '"',',' order by ordinal_position) "columns" 
-	   ,jsonb_agg(data_type order by ordinal_position) "dataTypes"
+	   ,jsonb_agg(case when data_type = 'USER-DEFINED' then udt_name else data_type end order by ordinal_position) "dataTypes"
        ,jsonb_agg(case
                      when (numeric_precision is not null) and (numeric_scale is not null) 
                        then cast(numeric_precision as varchar) || ',' || cast(numeric_scale as varchar)
@@ -29,7 +29,7 @@ const sqlGenerateQueries =
                    order by ordinal_position
                  ) "sizeConstraints"
 	   ,'select jsonb_build_array(' || string_agg('"' || column_name || '"' ||
-                                                  case  
+                                                  case   
                                                     when data_type = 'xml' then
                                                        '::text'
                                                     else

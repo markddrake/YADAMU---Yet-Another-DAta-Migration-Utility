@@ -157,6 +157,7 @@ async function main(){
                       "date"            : new Date().toISOString()
                      ,"timeZoneOffset"  : new Date().getTimezoneOffset()
                      ,"vendor"          : "MSSQLSERVER"
+                     ,"spatialFormat"   : "EWKT"
                      ,"schema"          : schema
                      ,"exportVersion"   : 1
                      ,"sessionUser"     : sysInfo[0].SESSION_USER

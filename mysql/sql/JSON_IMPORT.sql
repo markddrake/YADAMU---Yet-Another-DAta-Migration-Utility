@@ -14,157 +14,157 @@ RETURNS VARCHAR(128) DETERMINISTIC
 BEGIN
 
   case P_SOURCE_VENDOR
-    when 'Oracle'
+    when 'Oracle' then
       -- Oracle Mappings
-      then case P_DATA_TYPE
-             when 'VARCHAR2' 
-               then return 'varchar';
-             when 'NUMBER'
-               then return 'decimal';
-             when 'CLOB'
-               then return 'longtext';
-             when 'BLOB'
-               then return 'longblob';
-             when 'NCLOB'
-               then return 'longtext';
-             when 'BFILE'
-               then return 'varchar(2048)';
-             when 'ROWID'
-               then return 'varchar(32)';
-             when 'XMLTYPE'
-               then return 'longtext';
-             when 'RAW'
-               then return 'binary';
-             when 'NVARCHAR2'
-               then return 'varchar';
-             when 'ANYDATA'
-               then return 'longtext';
-             else
-               -- Oracle Special Cases
-               if (instr(P_DATA_TYPE,'TIME ZONE') > 0) then
-                 return 'timestamp'; 
-               end if;
-               if ((instr(P_DATA_TYPE,'INTERVAL') = 1)) then
-                 return 'varchar(16)';
-               end if;
-               if (INSTR(P_DATA_TYPE,'"."') > 0) then 
-                 return 'text';
-               end if;
-               return lower(P_DATA_TYPE);
-           end case;
-    when 'MSSQLSERVER'
-      then case P_DATA_TYPE
-             -- SQLServer Mapppings
-             when 'binary'
-               then case 
-                      when P_DATA_TYPE_LENGTH > 16777215 then return 'longblob';
-                      when P_DATA_TYPE_LENGTH > 65535  then return 'mediumblob';
-                      when P_DATA_TYPE_LENGTH > 255  then return 'blob';
-                      else return 'tinyblob';
-                    end case;
-             when 'bit'
-               then return 'tinyint(1)';
-             when 'char'
-               then case 
-                      when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
-                      when P_DATA_TYPE_LENGTH > 16777215 then return 'longtext';
-                      when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
-                      when P_DATA_TYPE_LENGTH > 255  then return 'text';
-                      else return 'char';
-                    end case;
-             when 'datetime'
-               then return 'datetime(3)';
-             when 'datetime2'
-               then return 'datatime';
-             when 'datetimeoffset'
-               then return 'datatime';
-             when 'geography'
-             -- ###TODO : Solve mapping MSSQL geography to MYSQL
-               then return 'json';
-             when 'geometry'
-             -- ###TODO : Solve mapping MSSQL geometry to MYSQL
-               then return 'json';
-             when 'hierarchyid'
-               then return 'varchar(4000)';
-             when 'image'
-               then return 'longblob';
-             when 'mediumint'
-               then return 'int';
-             when 'money'
-               then return 'decimal(19,4)';
-             when 'nchar'
-               then case 
-                      when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
-                      when P_DATA_TYPE_LENGTH > 16777215  then return 'longtext';
-                      when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
-                      when P_DATA_TYPE_LENGTH > 255  then return 'text';
-                      else return 'char';
-                    end case;
-             when 'ntext'
-               then return 'longtext';
-             when 'nvarchar'
-               then case
-                      when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
-                      when P_DATA_TYPE_LENGTH > 16777215  then return 'longtext';
-                      when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
-                      when P_DATA_TYPE_LENGTH > 255  then return 'text';
-                      else return 'varchar';
-                    end case;
-             when 'real'
-               then return 'float';
-             when 'rowversion'
-               then return 'binary(8)';
-             when 'smalldate'
-               then return 'datatime';
-             when 'smallmoney'
-               then return 'decimal(10,4)';
-             when 'text'
-               then return 'longtext';
-             when 'tinyint'
-               then return 'smallint';
-             when 'uniqueidentifier'
-               then return 'varchar(64)';
-             when 'varbinary'
-               then case
-                      when P_DATA_TYPE_LENGTH = -1 then return 'longblob';
-                      when P_DATA_TYPE_LENGTH > 16777215  then return 'longblob';
-                      when P_DATA_TYPE_LENGTH > 65535  then return 'mediumblob';
-                      else return 'varbinary';
-                    end case;
-             when 'varchar'
-               then case
-                      when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
-                      when P_DATA_TYPE_LENGTH > 16777215  then return 'longtext';
-                      when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
-                      else return 'varchar';
-                    end case;
-             when 'xml'
-               then return 'longtext';
-             else
-               return lower(P_DATA_TYPE);
-           end case;
-    when 'Postges'
-      then return lower(P_DATA_TYPE);
-    when 'MySQL'
-      then case P_DATA_TYPE
-             -- Metadata does not contain sufficinet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM and SET to TEXT.
-             when 'set' 
-               then return 'varchar(512)';
-             when 'enum' 
-               then return 'varchar(512)';
-             else
-               return lower(P_DATA_TYPE);
-           end case;       
-    when 'MariaDB'
-      then case P_DATA_TYPE
-             -- Metadata does not contain sufficnet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM and SET to TEXT.
-             when 'set' 
-               then return 'varchar(512)';
-             when 'enum' 
-               then return 'varchar(512)';
-             else
-               return lower(P_DATA_TYPE);
-           end case;       
+      case P_DATA_TYPE
+       when 'VARCHAR2'  then
+         return 'varchar';
+       when 'NUMBER' then
+         return 'decimal';
+       when 'CLOB' then
+         return 'longtext';
+       when 'BLOB' then
+         return 'longblob';
+       when 'NCLOB' then
+         return 'longtext';
+       when 'BFILE' then
+         return 'varchar(2048)';
+       when 'ROWID' then
+         return 'varchar(32)';
+       when 'XMLTYPE' then
+         return 'longtext';
+       when 'RAW' then
+         return 'binary';
+       when 'NVARCHAR2' then
+         return 'varchar';
+       when 'ANYDATA' then
+         return 'longtext';
+       when '"MDSYS"."SDO_GEOMETRY"' then
+         return 'geometry';
+       else
+         -- Oracle Special Cases
+         if (instr(P_DATA_TYPE,'TIME ZONE') > 0) then
+           return 'timestamp'; 
+         end if;
+         if ((instr(P_DATA_TYPE,'INTERVAL') = 1)) then
+           return 'varchar(16)';
+         end if;
+         if (INSTR(P_DATA_TYPE,'"."') > 0) then 
+           return 'text';
+         end if;
+         return lower(P_DATA_TYPE);
+     end case;
+    when 'MSSQLSERVER' then
+      case P_DATA_TYPE
+        -- SQLServer Mapppings
+        when 'binary' then
+          case 
+            when P_DATA_TYPE_LENGTH > 16777215 then return 'longblob';
+            when P_DATA_TYPE_LENGTH > 65535  then return 'mediumblob';
+            when P_DATA_TYPE_LENGTH > 255  then return 'blob';
+            else return 'tinyblob';
+          end case;
+        when 'bit' then
+          return 'tinyint(1)';
+        when 'char' then
+          case 
+            when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 16777215 then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
+            when P_DATA_TYPE_LENGTH > 255  then return 'text';
+            else return 'char';
+          end case;
+        when 'datetime' then
+          return 'datetime(3)';
+        when 'datetime2' then
+          return 'datatime';
+        when 'datetimeoffset' then
+          return 'datatime';
+        when 'geography' then
+          return 'geometry';
+        when 'geometry' then
+          return 'geometry';
+        when 'hierarchyid' then
+          return 'varchar(4000)';
+        when 'image' then
+          return 'longblob';
+        when 'mediumint' then
+          return 'int';
+        when 'money' then
+          return 'decimal(19,4)';
+        when 'nchar' then
+          case 
+            when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 16777215  then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
+            when P_DATA_TYPE_LENGTH > 255  then return 'text';
+            else return 'char';
+          end case;
+        when 'ntext' then
+          return 'longtext';
+        when 'nvarchar' then
+          case
+            when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 16777215  then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
+            when P_DATA_TYPE_LENGTH > 255  then return 'text';
+            else return 'varchar';
+          end case;
+        when 'real' then
+          return 'float';
+        when 'rowversion' then
+          return 'binary(8)';
+        when 'smalldate' then
+          return 'datatime';
+        when 'smallmoney' then
+          return 'decimal(10,4)';
+        when 'text' then
+          return 'longtext';
+        when 'tinyint' then
+          return 'smallint';
+        when 'uniqueidentifier' then
+          return 'varchar(64)';
+        when 'varbinary' then
+          case
+            when P_DATA_TYPE_LENGTH = -1 then return 'longblob';
+            when P_DATA_TYPE_LENGTH > 16777215  then return 'longblob';
+            when P_DATA_TYPE_LENGTH > 65535  then return 'mediumblob';
+            else return 'varbinary';
+          end case;
+        when 'varchar' then
+          case
+            when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 16777215  then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
+            else return 'varchar';
+          end case;
+        when 'xml' then
+          return 'longtext';
+        else
+          return lower(P_DATA_TYPE);
+      end case;
+    when 'Postges' then
+      return lower(P_DATA_TYPE);
+    when 'MySQL' then
+      case P_DATA_TYPE
+        -- Metadata does not contain sufficinet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM and SET to TEXT.
+        when 'set' then
+          return 'varchar(512)';
+        when 'enum' then
+          return 'varchar(512)';
+        else
+          return lower(P_DATA_TYPE);
+      end case;       
+    when 'MariaDB' then
+      case P_DATA_TYPE
+        -- Metadata does not contain sufficnet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM and SET to TEXT.
+        when 'set'  then
+          return 'varchar(512)';
+        when 'enum'  then
+          return 'varchar(512)';
+        else
+          return lower(P_DATA_TYPE);
+      end case;       
     else
       return lower(P_DATA_TYPE);
   end case;
@@ -287,12 +287,26 @@ BEGIN
           ,group_concat(concat(case
                                 when TARGET_DATA_TYPE = 'timestamp' 
                                   then concat('convert_tz(data."',COLUMN_NAME,'",''+00:00'',@@session.time_zone)')
-                                when TARGET_DATA_TYPE IN ('varchar','text')
+                                when TARGET_DATA_TYPE IN ('varchar','text') or TARGET_DATA_TYPE like 'varchar(%)%'
                                   -- Bug #93498: JSON_TABLE does not handle JSON NULL correctly with VARCHAR
                                   -- Assume the string 'null' should be the SQL NULL
                                    then concat('case when data."',column_name, '" = ''null'' then NULL else data."',column_name,'" end')
                                 when TARGET_DATA_TYPE = 'geometry' 
-                                  then concat('ST_GEOMFROMGEOJSON(data."',COLUMN_NAME,'")')
+                                  then concat('case when data."',column_name, '" = ''null'' then NULL else ST_GeomFromText(data."',COLUMN_NAME,'") end')
+                                when TARGET_DATA_TYPE = 'point' 
+                                  then concat('case when data."',column_name, '" = ''null'' then NULL else ST_PointFromText(data."',COLUMN_NAME,'") end')
+                                when TARGET_DATA_TYPE = 'linestring' 
+                                  then concat('case when data."',column_name, '" = ''null'' then NULL else ST_LineStringFromText(data."',COLUMN_NAME,'") end')
+                                when TARGET_DATA_TYPE = 'polygon' 
+                                  then concat('case when data."',column_name, '" = ''null'' then NULL else ST_PolygonFromText(data."',COLUMN_NAME,'") end')
+                                when TARGET_DATA_TYPE = 'geometrycollection' 
+                                  then concat('case when data."',column_name, '" = ''null'' then NULL else ST_GeometryCollectionFromText((data."',COLUMN_NAME,'") end')
+                                when TARGET_DATA_TYPE = 'multipoint' 
+                                  then concat('case when data."',column_name, '" = ''null'' then NULL else ST_MultiPointFromText(data."',COLUMN_NAME,'") end')
+                                when TARGET_DATA_TYPE = 'multilinestring' 
+                                  then concat('case when data."',column_name, '" = ''null'' then NULL else ST_MultiLineStringFromText(data."',COLUMN_NAME,'") end')
+                                when TARGET_DATA_TYPE = 'multipolygon' 
+                                  then concat('case when data."',column_name, '" = ''null'' then NULL else ST_MultiPolygonFromText(data."',COLUMN_NAME,'") end')
                                 when TARGET_DATA_TYPE like '%blob'
                                   then concat('UNHEX(data."',COLUMN_NAME,'")')
                                 when TARGET_DATA_TYPE like '%binary%'
@@ -311,12 +325,10 @@ BEGIN
                                    then TARGET_DATA_TYPE
                                  when TARGET_DATA_TYPE like '%blob' 
                                    then 'longtext'
-                                 when TARGET_DATA_TYPE in ('geometry','geography')
-                                   then 'json'
+                                 when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','geometrycollection','multipoint','multilinestring','multipolygon')
+                                   then 'varchar(4096)'
                                  when TARGET_DATA_TYPE in ('date','time','tinytext','mediumtext','text','longtext','json','set','enum') 
                                    then TARGET_DATA_TYPE
-                                 when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection')
-                                   then TARGET_DATA_TYPE 
                                  when DATA_TYPE_SCALE is not NULL
                                    then case 
                                           when DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 

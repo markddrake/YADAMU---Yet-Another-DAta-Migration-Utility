@@ -52,7 +52,7 @@ class StatementGenerator {
                                                                                 switch (targetDataType) {
                                                                                   case 'geometry':
                                                                                     tableInfo.useSetClause = true;
-                                                                                    return ' "' + columnNames[idx] + '" = ST_GEOMFROMGEOJSON(?)';
+                                                                                    return ' "' + columnNames[idx] + '" = ST_GeomFromText(?)';
                                                                                   default:
                                                                                     return ' "' + columnNames[idx] + '" = ?'
                                                                                 }

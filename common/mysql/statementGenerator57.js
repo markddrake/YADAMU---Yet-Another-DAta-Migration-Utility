@@ -21,18 +21,19 @@ class StatementGenerator {
     switch (vendor) {
        case 'Oracle':
          switch (dataType) {
-           case 'VARCHAR2':        return 'varchar';
-           case 'NVARCHAR2':       return 'varchar';
-           case 'NUMBER':          return 'decimal';
-           case 'CLOB':            return 'longtext';
-           case 'BLOB':            return 'longblob';
-           case 'NCLOB':           return 'longtext';
-           case 'XMLTYPE':         return 'longtext';
-           case 'BFILE':           return 'varchar(2048)';
-           case 'ROWID':           return 'varchar(32)';
-           case 'RAW':             return 'binary';
-           case 'ROWID':           return 'varchar(32)';
-           case 'ANYDATA':         return 'longtext';
+           case 'VARCHAR2':                return 'varchar';
+           case 'NVARCHAR2':               return 'varchar';
+           case 'NUMBER':                  return 'decimal';
+           case 'CLOB':                    return 'longtext';
+           case 'BLOB':                    return 'longblob';
+           case 'NCLOB':                   return 'longtext';
+           case 'XMLTYPE':                 return 'longtext';
+           case 'BFILE':                   return 'varchar(2048)';
+           case 'ROWID':                   return 'varchar(32)';
+           case 'RAW':                     return 'binary';
+           case 'ROWID':                   return 'varchar(32)';
+           case 'ANYDATA':                 return 'longtext';
+           case '"MDSYS"."SDO_GEOMETRY"':  return 'geometry';
            default :
              if (dataType.indexOf('TIME ZONE') > -1) {
                return 'timestamp'; 
@@ -69,8 +70,8 @@ class StatementGenerator {
            case 'datetime':                        return 'datetime(3)';
            case 'datetime2':                       return 'datetime';
            case 'datetimeoffset':                  return 'datetime';
-           case 'geography':                       return 'json';
-           case 'geogmetry':                       return 'json';
+           case 'geography':                       return 'geometry';
+           case 'geometry':                        return 'geometry';
            case 'hierarchyid':                     return 'varchar(4000)';
            case 'image':                           return 'longblob';
            case 'mediumint':                       return 'int';
@@ -208,11 +209,11 @@ class StatementGenerator {
                                              switch (targetDataType) {
                                                case 'geometry':
                                                   useSetClause = true;
-                                                  setOperators.push(' "' + columnName + '" = ST_GEOMFROMGEOJSON(?)');
+                                                  setOperators.push(' ' + columnName + ' = ST_GeomFromText(?)');
                                                   break;
                                                   
                                                default:
-                                                 setOperators.push(' "' + columnName + '" = ?')
+                                                 setOperators.push(' ' + columnName + ' = ?')
                                              }
                                              return `${columnName} ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)}`
                                           },this)

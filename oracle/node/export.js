@@ -90,9 +90,6 @@ async function generateQueries(conn,status,schema) {
                                                                                                           ,SIZE_CONSTRAINTS:     {type: oracledb.STRING}
                                                                                                           ,EXPORT_SELECT_LIST:   {type: oracledb.STRING}
                                                                                                           ,NODE_SELECT_LIST:     {type: oracledb.STRING}
-                                                                                                          ,IMPORT_SELECT_LIST:   {type: oracledb.STRING}
-                                                                                                          ,COLUMN_PATTERN_LIST:  {type: oracledb.STRING}
-                                                                                                          ,DESERIALIZATION_INFO: {type: oracledb.STRING}
                                                                                                           ,WITH_CLAUSE:          {type: oracledb.STRING}
                                                                                                           ,SQL_STATEMENT:        {type: oracledb.STRING}
                                                                                                          }
@@ -386,7 +383,7 @@ function wideTableWorkaround(tableInfo,maxVarcharSize) {
                                 return `JSON_ARRAY(${selectListMembers[index]} NULL on NULL RETURNING VARCHAR2(${maxVarcharSize})) "${column}"`;
   }).join(',');
    
-  let sqlStatement = `select ${selectList} from "${tableInfo.OWNER}"."${tableInfo.TABLE_NAME}"`;
+  let sqlStatement = `select ${selectList} from "${tableInfo.OWNER}"."${tableInfo.TABLE_NAME}" t`;
   
   if (tableInfo.SQL_STATEMENT.indexOf('WITH') === 0) {
      const endOfWithClause = tableInfo.SQL_STATEMENT.indexOf('select JSON_ARRAY(');
@@ -423,7 +420,7 @@ function generateClientQuery(tableInfo) {
     }
   })
   
-  query.sql = `select ${tableInfo.NODE_SELECT_LIST} from "${tableInfo.OWNER}"."${tableInfo.TABLE_NAME}"`; 
+  query.sql = `select ${tableInfo.NODE_SELECT_LIST} from "${tableInfo.OWNER}"."${tableInfo.TABLE_NAME}" t`; 
   
   if (tableInfo.WITH_CLAUSE !== null) {
      query.sql = `with\n${tableInfo.WITH_CLAUSE}\n${query.sql}`;
@@ -462,6 +459,7 @@ async function main(){
                         ,"timeZoneOffset"     : new Date().getTimezoneOffset()
                         ,"sessionTimeZone"    : sysInfo.SESSION_TIME_ZONE
                         ,"vendor"             : DATABASE_VENDOR
+                        ,"spatialFormat"      : "WKT"
                         ,"schema"             : parameters.OWNER
                         ,"exportVersion"      : EXPORT_VERSION
                         ,"sessionUser"        : sysInfo.SESSION_USER
@@ -495,9 +493,6 @@ async function main(){
                                                           ,"dataTypes"                : JSON.parse(sqlQueries[i].DATA_TYPE_LIST)
                                                           ,"sizeConstraints"          : JSON.parse(sqlQueries[i].SIZE_CONSTRAINTS)
                                                           ,"exportSelectList"         : (serverGeneration) ? sqlQueries[i].EXPORT_SELECT_LIST : sqlQueries[i].NODE_SELECT_LIST 
-                                                          ,"insertSelectList"         : sqlQueries[i].IMPORT_SELECT_LIST
-                                                          ,"deserializationFunctions" : sqlQueries[i].DESERIALIZATION_INFO
-                                                          ,"columnPatterns"           : sqlQueries[i].COLUMN_PATTERN_LIST
                       })}`)                
       }
     

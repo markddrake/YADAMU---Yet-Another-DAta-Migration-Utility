@@ -61,6 +61,9 @@ const sqlGenerateMetadata =
               when data_type = 'binary'
                 -- Force HEXBINARY rendering of value
                 then concat('HEX("', column_name, '")')
+              when data_type = 'geometry'
+                -- Force WKT rendering of value
+                then concat('ST_asText("', column_name, '")')
               else
                 concat('"',column_name,'"')
             end
@@ -207,6 +210,7 @@ async function main(){
                         ,"timeZoneOffset"  : new Date().getTimezoneOffset()
                         ,"sessionTimeZone" : mysqlInfo[0].SESSION_TIME_ZONE
                         ,"vendor"          : "MySQL"
+                        ,"spatialFormat"   : "WKT"
                         ,"schema"          : parameters.OWNER
                         ,"exportVersion"   : 1
                         ,"sessionUser"     : mysqlInfo[0].SESSION_USER
@@ -226,10 +230,10 @@ async function main(){
         exportFile.write(',');
       }
       exportFile.write(`"${row.table_name}" : ${JSON.stringify({
-                                                     "owner"          : row.table_schema
-                                                    ,"tableName"      : row.table_name
-                                                    ,"columns"        : row.columns
-                                                    ,"dataTypes"      : JSON.parse(row.dataTypes)
+                                                     "owner"           : row.table_schema
+                                                    ,"tableName"       : row.table_name
+                                                    ,"columns"         : row.columns
+                                                    ,"dataTypes"       : JSON.parse(row.dataTypes)
                                                     ,"sizeConstraints" : JSON.parse(row.sizeConstraints)
                      })}`)                 
     }

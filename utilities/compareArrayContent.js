@@ -145,7 +145,7 @@ function compareArrayMetadata(files){
   logFile.write(`${files[0].name}:\n`)
   tables.forEach(function(table) {  
                const info = tableInfo[table]
-               logFile.write(`${info.tableName.padStart(40)} Rows: [`
+               logFile.write(`${info.tableName.padStart(48)} Rows: [`
                             + `${info.rowCounts[0].toString().replace(regExp, ",").padStart(10)},`
                             + `${info.rowCounts[1].toString().replace(regExp, ",").padStart(10)},`
                             + `${info.rowCounts[2].toString().replace(regExp, ",").padStart(10)}].` 

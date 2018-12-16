@@ -92,8 +92,6 @@ class StatementGenerator {
            tableInfo.lobCount++;
            // return {type : oracledb.CLOB}
            return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
-         case 'BOOLEAN':
-            return { type: oracledb.STRING, maxSize : 5}         
          case 'XMLTYPE':
            // Cannot Bind XMLTYPE > 32K as String: ORA-01461: can bind a LONG value only for insert into a LONG column when constructing XMLTYPE
            tableInfo.lobCount++;
@@ -111,10 +109,14 @@ class StatementGenerator {
            return {type : oracledb.BUFFER, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
          case 'RAW':
            return { type :oracledb.STRING, maxSize : parseInt(dataTypeSizes[idx])*2}
-         case 'RAW(1)':
-           return { type :oracledb.STRING, maxSize : 5}
          case 'BFILE':
            return { type :oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
+         case 'BOOLEAN':
+            return { type: oracledb.STRING, maxSize : 5}         
+         case 'GEOMETRY':
+           tableInfo.lobCount++;
+           // return {type : oracledb.CLOB}
+           return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
          default:
            if (dataType.type.indexOf('.') > -1) {
              tableInfo.lobCount++;
@@ -143,6 +145,7 @@ class StatementGenerator {
       const metadataLob = await OracleCore.lobFromJSON(this.conn,{systemInformation : systemInformation, metadata: metadata});  
       const results = await this.conn.execute(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:schema});
       await metadataLob.close();
+
       const statementCache = JSON.parse(results.outBinds.sql);
       const tables = Object.keys(metadata); 
       tables.forEach(function(table,idx) {
@@ -151,7 +154,7 @@ class StatementGenerator {
                        const columns = JSON.parse('[' + tableMetadata.columns + ']');
                        ddlStatements[idx] = tableInfo.ddl;
                        let plsqlRequired = false;         
-                       // /*
+
                        const assignments = [];
                        const operators = [];
                        const variables = []
@@ -161,6 +164,10 @@ class StatementGenerator {
                          let targetDataType =  tableInfo.targetDataTypes[idx];
                          const dataType = Yadamu.decomposeDataType(targetDataType);
                          switch (dataType.type) {
+                           case "GEOMETRY":
+                           case "\"MDSYS\".\"SDO_GEOMETRY\"":
+                              values.push(`OBJECT_SERIALIZATION.DESERIALIZE_GEOMETRY(:${(idx+1)})`);
+                              break;
                            case "XMLTYPE":
                               values.push(`OBJECT_SERIALIZATION.DESERIALIZE_XML(:${(idx+1)})`);
                               break
@@ -197,40 +204,6 @@ class StatementGenerator {
                          tableInfo.dml = `insert into "${schema}"."${table}" (${tableMetadata.columns}) values (${values.join(',')})`;
                        }
                        tableInfo.binds = this.generateBinds(tableInfo,metadata[table].sizeConstraints);
-                       // */
-                       /*
-                       tableInfo.binds = this.generateBinds(tableInfo,metadata[table].sizeConstraints);
-                       const insertAsSelectList = tableInfo.targetDataTypes.map(function(targetDataType,idx) {  
-                                                                            const dataType = Yadamu.decomposeDataType(targetDataType);
-                                                                            switch (dataType.type) {
-                                                                              case "XMLTYPE":
-                                                                                // Cannot passs XMLTYPE as BUFFER
-                                                                                // Reason: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
-                                                                                // return 'XMLTYPE(:' + (idx+1) + ",NLS_CHARSET_ID('AL32UTF8'))"
-                                                                                return 'XMLPARSE(DOCUMENT :' + (idx+1) + ')';
-                                                                              case "BFILE":
-                                                                                return 'OBJECT_SERIALIZATION.DESERIALIZE_BFILE(:' + (idx+1) + ')'
-                                                                              case "ANYDATA":
-                                                                                return 'ANYDATA.convertVARCHAR2(:' + (idx+1) + ')'
-                                                                              default:
-                                                                                if (targetDataType.indexOf('.') > -1) {
-                                                                                  plsqlRequired= true;         
-                                                                                  return '"#' + targetDataType.slice(targetDataType.indexOf(".")+2,-1) + '"(:' + (idx+1) + ')'
-                                                                                }
-                                                                                else {
-                                                                                 return ':' + (idx+1)
-                                                                                }
-                                                                            }
-                       });                                                                                                                     
-                       if (tableInfo.containsObjects) {
-                         tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('\nselect'));
-                         tableInfo.dml += '\nselect ' + insertAsSelectList.join(',') +' from dual;';
-                       }
-                       else {
-                         tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(')')+2);
-                         tableInfo.dml += 'values (' + insertAsSelectList.join(',') +')';
-                       }
-                       */
       },this);
       
       if (this.ddlRequired) {;

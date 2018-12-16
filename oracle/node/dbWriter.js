@@ -217,7 +217,7 @@ end;`
       if (e.errorNum && (e.errorNum === 4091)) {
         // Mutating Table - Convert to Cursor based PL/SQL Block
         status.warningRaised = true;
-        this.logWriter.write(`${new Date().toISOString()} [WARNING]: Table ${this.tableName}. executeMany(${this.batch.length})) failed. ${e}. Retrying with PL/SQL Block.\n`);
+        this.logWriter.write(`${new Date().toISOString()} [INFO]: Table ${this.tableName}. executeMany(${this.batch.length})) failed. ${e}. Retrying with PL/SQL Block.\n`);
         this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
         if (status.sqlTrace) {
           status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
@@ -255,12 +255,6 @@ end;`
       try {
         let results = await this.conn.execute(this.tableInfo.dml,this.batch[row])
       } catch (e) {
-        /* ### TODO: Add Max Error Processing
-        await this.conn.rollback();
-        this.skipTable = true;
-        this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping table. Row ${row}. Reason: ${e.message}\n`)
-        this.batch.length = 0;
-        */
         this.logWriter.write(`${new Date().toISOString()} [ERROR]: Table (${this.tableName}. insert(${row}) failed. Reason: ${e.message}\n`)
         this.status.warningRaised = true;
         if (this.logDDLIssues) {
@@ -269,7 +263,14 @@ end;`
           this.logWriter.write(`${JSON.stringify(this.batch[row])}\n`);
         } 
         // Write Record to 'bad' file.
-        this.status.importErrorMgr.logError(this.tableName,this.batch[row]);
+        try {
+          this.status.importErrorMgr.logError(this.tableName,this.batch[row]);
+        } catch (e) {
+        //  Catch Max Errors Exceeded Assertion
+          await this.conn.rollback();
+          this.skipTable = true;
+          this.logWriter.write(`${new Date().toISOString()} [ERROR]: Table ${this.tableName}. Skipping table. Row ${row}. Reason: ${e.message}\n`)
+        }
       }
     } 
     // console.log(`Iterative:${this.batchCount}. ${this.batch.length} rows inserted`)
@@ -303,7 +304,7 @@ end;`
         case 'table':
           // this.logWriter.write(`${new Date().toISOString()}: Switching to Table "${obj.table}".\n`);
           if (this.tableName === undefined) {
-            // First Table - Disable Constraints
+            // First Table - Disable Constraintsf
             await this.disableConstraints();
           }
           else {
@@ -346,6 +347,17 @@ end;`
                   return Buffer.from(obj.data[idx],'hex');
                 case "RAW":
                   return Buffer.from(obj.data[idx],'hex');
+                case "BOOLEAN":
+                  switch (obj.data[idx]) {
+                    case true:
+                       return 'true';
+                       break;
+                    case false:
+                       return 'false';
+                       break;
+                    default:
+                      return obj.data[idx]
+                  }
                 case "DATE":
                 case "TIMESTAMP":
                   // A Timestamp not explicitly marked as UTC should be coerced to UTC.

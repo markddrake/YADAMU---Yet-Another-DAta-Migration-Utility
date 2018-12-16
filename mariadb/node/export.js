@@ -59,6 +59,9 @@ const sqlGenerateTables =
               when data_type = 'binary'
                 -- Force HEXBINARY rendering of value
                 then concat('HEX("', column_name, '")')
+              when data_type = 'geometry'
+                -- Force WKT rendering of value
+                then concat('ST_asText("', column_name, '")')
               else
                 concat('"',column_name,'"')
             end

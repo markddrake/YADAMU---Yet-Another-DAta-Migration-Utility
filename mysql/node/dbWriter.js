@@ -168,9 +168,6 @@ class DBWriter extends Writable {
                                                        case "binary" :
                                                          obj.data[idx] = Buffer.from(obj.data[idx],'hex');
                                                          break;
-                                                       case "geometry":
-                                                         obj.data[idx] = JSON.stringify(obj.data[idx]);
-                                                         break;
                                                        case "json" :
                                                          obj.data[idx] = JSON.stringify(obj.data[idx]);
                                                          break;

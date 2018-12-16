@@ -1,4 +1,3 @@
---
 DROP PROCEDURE IF EXISTS COMPARE_SCHEMAS;
 --
 DELIMITER $$
@@ -78,8 +77,8 @@ BEGIN
                              '       ,''',V_TABLE_NAME,''' ',C_NEWLINE,
                              '       ,(select count(*) from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
                              '       ,(select count(*) from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
-                             '       ,(select count(*) from (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'") T1 LEFT JOIN  (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'") T2 USING (HASH) WHERE HASH IS NULL)',C_NEWLINE,
-                             '       ,(select count(*) from (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'") T1 LEFT JOIN  (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'") T2 USING (HASH) WHERE HASH IS NULL)');   
+                             '       ,(select count(*) from (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'") T1 LEFT JOIN  (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'") T2 USING (HASH) WHERE T2.HASH IS NULL)',C_NEWLINE,
+                             '       ,(select count(*) from (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'") T1 LEFT JOIN  (SELECT MD5(JSON_ARRAY(',V_COLUMN_LIST,')) HASH FROM "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'") T2 USING (HASH) WHERE T2.HASH IS NULL)');   
     
     SET @STATEMENT = V_STATEMENT;
     PREPARE STATEMENT FROM @STATEMENT;
@@ -93,4 +92,3 @@ end;
 $$
 --
 DELIMITER ;
---

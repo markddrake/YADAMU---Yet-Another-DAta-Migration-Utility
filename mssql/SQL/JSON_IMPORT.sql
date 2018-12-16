@@ -445,6 +445,8 @@ BEGIN
   FETCH FETCH_METADATA INTO @TABLE_NAME, @COLUMN_LIST
   WHILE @@FETCH_STATUS = 0 
   BEGIN    
+  
+  
     SET @SQL_STATEMENT = CONCAT('insert into #SCHEMA_COMPARE_RESULTS ',@C_NEWLINE,
                              ' select ''',@SOURCE_DATABASE,''' ',@C_NEWLINE,
                              '       ,''',@SOURCE_SCHEMA,''' ',@C_NEWLINE,

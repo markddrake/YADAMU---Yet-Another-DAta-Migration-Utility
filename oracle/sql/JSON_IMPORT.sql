@@ -317,13 +317,9 @@ begin
         when P_DATA_TYPE = 'uniqueidentifier' then
            return 'VARCHAR2(36)';
         when P_DATA_TYPE = 'geography' then
-          -- Map to Virtual Data Type JSON so we can process content correclty later
-          -- TODO: Map to SPATIAL: Geography --> GeoJSON --> "MDSYS.SPATIAL"
-           return 'JSON';
+           return 'GEOMETRY';
         when P_DATA_TYPE = 'geometry' then
-           -- Map to Virtual Data Type JSON so we can process content correclty later
-           -- TODO: Map to SPATIAL: Geography --> GeoJSON --> "MDSYS.SPATIAL"
-           return 'JSON';
+           return 'GEOMETRY';
         else
           return UPPER(P_DATA_TYPE);
       end case;
@@ -389,11 +385,9 @@ begin
         when P_DATA_TYPE = 'enum' then
            return 'VARCHAR2(512)';
         when P_DATA_TYPE = 'geography' then
-          -- TODO : Add IS JSON Constraint. Mag Geography --> GeoJSON --> "MDSYS.SPATIAL"
-           return 'JSON';
+           return 'GEOMETRY';
         when P_DATA_TYPE = 'geometry' then
-           -- TODO : Add IS JSON Constraint. Mag Geography --> GeoJSON --> "MDSYS.SPATIAL"
-           return 'JSON';
+           return 'GEOMETRY';
         when P_DATA_TYPE = 'set' then
            return 'VARCHAR2(512)';
         when P_DATA_TYPE = 'year' then
@@ -513,6 +507,8 @@ as
                           when TYPE_NAME is not NULL then
                             'CLOB'
                           -- Type Exist is NULL.
+                          when TARGET_DATA_TYPE = 'GEOMETRY' then
+                            '"MDSYS"."SDO_GEOMETRY"'
                           when TARGET_DATA_TYPE = 'JSON' then
                             -- BLOB results in Error: ORA-40479: internal JSON serializer error during export operations.
                             'CLOB CHECK ("' || COLUMN_NAME || '" IS JSON)'
@@ -536,6 +532,8 @@ as
            cast(collect(
                         -- Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results
                         case
+                          when ((TARGET_DATA_TYPE = 'GEOMETRY') or (TARGET_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"')) then
+                            'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || COLUMN_NAME || '") end'
                           when TYPE_EXISTS = 1 then
                             '"#' || TYPE_NAME || '"("' || COLUMN_NAME || '")'
                           when TARGET_DATA_TYPE = 'BOOLEAN' then
@@ -571,7 +569,7 @@ as
                             'CLOB'
                           -- Type Exist is NULL.
                           else
-                            TARGET_DATA_TYPE
+                            replace(TARGET_DATA_TYPE,'"','\"')
                         end ||
                         '"'
                         order by IDX
@@ -584,6 +582,8 @@ as
                         '"' || COLUMN_NAME || '" ' ||
                         case
                           when TYPE_EXISTS = 1 then
+                            'CLOB'
+                          when TARGET_DATA_TYPE  = 'GEOMETRY' then
                             'CLOB'
                           when TARGET_DATA_TYPE  = 'BOOLEAN' then
                             'VARCHAR2(5)'
@@ -633,6 +633,8 @@ as
            when TYPE_NAME is not NULL then
              'CLOB'  
            -- Type Exist is NULL.
+           when TARGET_DATA_TYPE = 'GEOMETRY' then
+             '"MDSYS"."SDO_GEOMETRY"'
            when TARGET_DATA_TYPE = 'JSON' then 
              -- BLOB results in Error: ORA-40479: internal JSON serializer error during export operations.
              'CLOB CHECK ("' || COLUMN_NAME || '" IS JSON)'
@@ -650,6 +652,8 @@ as
          COLUMNS_CLAUSE
          /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
         ,case
+           when ((TARGET_DATA_TYPE = 'GEOMETRY') or TARGET_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"')then
+             'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || COLUMN_NAME || '") end'
            when TYPE_EXISTS = 1 then 
              '"#' || TYPE_NAME || '"("' || COLUMN_NAME || '")'
            when TARGET_DATA_TYPE = 'BOOLEAN' then 
@@ -694,6 +698,8 @@ as
              C_RETURN_TYPE
            when TARGET_DATA_TYPE  = 'BOOLEAN' then
              'VARCHAR2(5)'
+           when TARGET_DATA_TYPE  = 'GEOMETRY' then
+             C_RETURN_TYPE
            when TARGET_DATA_TYPE = 'JSON' then 
              C_RETURN_TYPE || ' FORMAT JSON'
            when TARGET_DATA_TYPE  = 'FLOAT' then 
@@ -833,7 +839,7 @@ begin
   V_SQL_FRAGMENT := C_NEWLINE || '  from JSON_TABLE(:JSON,''$.data."' || P_TABLE_NAME || '"[*]''' || C_NEWLINE || '         COLUMNS(' || C_NEWLINE || ' ';
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   DBMS_LOB.APPEND(V_DML_STATEMENT,V_COLUMN_PATTERNS);
-  DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,2,'))');
+  DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,7,')) data');
   
   V_TARGET_DATA_TYPES := '[' || V_TARGET_DATA_TYPES || ']';
   
@@ -1104,20 +1110,14 @@ as
                ,  COLUMN_LIST                          CLOB             PATH '$.columns'
                ,  DATA_TYPE_ARRAY                      CLOB FORMAT JSON PATH '$.dataTypes' 
                ,  SIZE_CONSTRAINTS                     CLOB FORMAT JSON PATH '$.sizeConstraints'
-               ,  INSERT_COLUMN_LIST                   CLOB             PATH '$.insertSelectList'
-               ,  COLUMN_PATTERNS                      CLOB             PATH '$.columnPatterns'
                $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
                ,  COLUMN_LIST               VARCHAR2(32767)             PATH '$.columns'
                ,  DATA_TYPE_ARRAY           VARCHAR2(32767) FORMAT JSON PATH '$.dataTypes'
                ,  SIZE_CONSTRAINTS          VARCHAR2(32767) FORMAT JSON PATH '$.sizeConstraints'
-               ,  INSERT_COLUMN_LIST        VARCHAR2(32767)             PATH '$.insertSelectList'
-               ,  COLUMN_PATTERNS           VARCHAR2(32767)             PATH '$.columnPatterns'
                $ELSE
                ,  COLUMN_LIST                VARCHAR2(4000)             PATH '$.columns'
                ,  DATA_TYPE_ARRAY            VARCHAR2(4000) FORMAT JSON PATH '$.dataTypes'
                ,  SIZE_CONSTRAINTS           VARCHAR2(4000) FORMAT JSON PATH '$.sizeConstraints'
-               ,  INSERT_COLUMN_LIST         VARCHAR2(4000)             PATH '$.insertSelectList'
-               ,  COLUMN_PATTERNS            VARCHAR2(4000)             PATH '$.columnPatterns'
                $END
              )
            )
@@ -1233,20 +1233,14 @@ as
                ,  COLUMN_LIST                          CLOB             PATH '$.columns'
                ,  DATA_TYPE_ARRAY                      CLOB FORMAT JSON PATH '$.dataTypes' 
                ,  SIZE_CONSTRAINTS                     CLOB FORMAT JSON PATH '$.sizeConstraints'
-               ,  INSERT_COLUMN_LIST                   CLOB             PATH '$.insertSelectList'
-               ,  COLUMN_PATTERNS                      CLOB             PATH '$.columnPatterns'
                $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
                ,  COLUMN_LIST               VARCHAR2(32767)             PATH '$.columns'
                ,  DATA_TYPE_ARRAY           VARCHAR2(32767) FORMAT JSON PATH '$.dataTypes'
                ,  SIZE_CONSTRAINTS          VARCHAR2(32767) FORMAT JSON PATH '$.sizeConstraints'
-               ,  INSERT_COLUMN_LIST        VARCHAR2(32767)             PATH '$.insertSelectList'
-               ,  COLUMN_PATTERNS           VARCHAR2(32767)             PATH '$.columnPatterns'
                $ELSE
                ,  COLUMN_LIST                VARCHAR2(4000)             PATH '$.columns'
                ,  DATA_TYPE_ARRAY            VARCHAR2(4000) FORMAT JSON PATH '$.dataTypes'
                ,  SIZE_CONSTRAINTS           VARCHAR2(4000) FORMAT JSON PATH '$.sizeConstraints'
-               ,  INSERT_COLUMN_LIST         VARCHAR2(4000)             PATH '$.insertSelectList'
-               ,  COLUMN_PATTERNS            VARCHAR2(4000)             PATH '$.columnPatterns'
                $END
              )
            )
@@ -1345,6 +1339,8 @@ as
   select aat.TABLE_NAME
         ,LISTAGG(
 		   case 
+             when (DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"') then
+               'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.FROMWKTGEOMETRY("' || COLUMN_NAME || '"),getCyptoHash) end'
 		     when DATA_TYPE = 'BFILE' then
 			   'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || COLUMN_NAME || '") end' 
 		     when DATA_TYPE = 'XMLTYPE' then

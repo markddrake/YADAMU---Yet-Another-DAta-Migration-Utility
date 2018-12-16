@@ -163,20 +163,19 @@ class DBWriter extends Writable {
                                                        case "binary" :
                                                          obj.data[idx] = Buffer.from(obj.data[idx],'hex');
                                                          break;
-                                                       case "geometry":
-                                                         obj.data[idx] = JSON.stringify(obj.data[idx]);
-                                                         break;
                                                        case "json" :
                                                          obj.data[idx] = JSON.stringify(obj.data[idx]);
-                                                         break;
-                                                       case "timestamp" :
-                                                         obj.data[idx] = new Date(Date.parse(obj.data[idx]));
                                                          break;
                                                        default :
                                                      }
                                                    }
                                                  },this)
-          this.batch.push(...obj.data);
+          if (this.tableInfo.useSetClause) {
+            this.batch.push(obj.data);
+          }
+          else {
+            this.batch.push(...obj.data);
+          }
           this.batchRowCount++;
           //  this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Batch contains ${this.batchRowCount} rows.`);
           if (this.batchRowCount  === this.batchSize) {

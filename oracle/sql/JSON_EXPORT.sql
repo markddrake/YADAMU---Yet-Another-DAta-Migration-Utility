@@ -194,6 +194,8 @@ as
                  /*
                  ** Quick Fixes for datatypes not natively supported
                  */
+                 when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE  in ('SDO_GEOMETRY'))) then
+                   'case when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT(() else NULL end "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'XMLTYPE' then -- Can be owned by SYS or PUBLIC
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'ROWID' or atc.DATA_TYPE = 'UROWID' then
@@ -241,6 +243,8 @@ as
                    '''P''
                    || extract(YEAR FROM "' || atc.COLUMN_NAME || '") || ''Y''
                    || case when extract(MONTH FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MONTH FROM  "' || atc.COLUMN_NAME || '") || ''M'' end "' || atc.COLUMN_NAME || '"'
+                 when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE  in ('SDO_GEOMETRY'))) then
+                   'case when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'XMLTYPE' then  -- Can be owned by SYS or PUBLIC
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'BFILE' then
@@ -258,44 +262,6 @@ as
                    '"' || atc.COLUMN_NAME || '"'
                end
         order by INTERNAL_COLUMN_ID) as T_VC4000_TABLE) NODE_SELECT_LIST
-	   ,cast(collect(
-		       /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
-		       case
-			     when atc.DATA_TYPE = 'BFILE' then  
-				   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || atc.COLUMN_NAME || '") end'
-			     when atc.DATA_TYPE = 'XMLTYPE' then  
-				   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || atc.COLUMN_NAME || '") end'
-				 when atc.DATA_TYPE = 'ANYDATA' then  
-				   --- ### TODO - Better deserialization of ANYDATA.
-				   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || atc.COLUMN_NAME || '") end'
-				 when TYPECODE = 'COLLECTION' then  
-			       '"#' || atc.DATA_TYPE || '"("' || atc.COLUMN_NAME || '")'
-				 when TYPECODE = 'OBJECT' then  
-  				   '"#' || atc.DATA_TYPE || '"("' || atc.COLUMN_NAME || '")'
-			     when atc.DATA_TYPE = 'BLOB' then  
-    		       $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-				   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || atc.COLUMN_NAME || '") end'
-				   $ELSE
-				   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else HEXTORAW("' || atc.COLUMN_NAME || '") end'
-				   $END
-				 else
-				    '"' || atc.COLUMN_NAME || '"'
-			   end
-	     ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) IMPORT_SELECT_LIST
-       ,cast(collect(
-               /* JSON_TABLE column patterns data types */
-               /* Map data types not supported by JSON_TABLE to data types supported by JSON_TABLE */
-               case
-                 when atc.DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or atc.DATA_TYPE like 'INTERVAL%' then  
-                   '"VARCHAR2"'
-                 when atc.DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE' then  
-                   '"TIMESTAMP WITH TIME ZONE"'
-                 when atc.DATA_TYPE in ('XMLTYPE','CLOB','NCLOB','BLOB','LONG','LONG RAW') or TYPECODE is not NULL then  
-                   C_RETURN_TYPE
-               else
-                 '"' || atc.DATA_TYPE || '"'
-               end
-         order by INTERNAL_COLUMN_ID) as T_VC4000_TABLE) COLUMN_PATTERN_LIST
     from ALL_ALL_TABLES aat
          inner join ALL_TAB_COLS atc
                  on atc.OWNER = aat.OWNER
@@ -359,7 +325,7 @@ begin
       V_SQL_FRAGMENT := 'select JSON_ARRAY(';	  
       DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
       DBMS_LOB.APPEND(V_SQL_STATEMENT,TABLE_TO_LIST(t.EXPORT_SELECT_LIST));
-      V_SQL_FRAGMENT := ' NULL on NULL returning '|| C_RETURN_TYPE || ') "JSON" from "' || t.OWNER || '"."' || t.TABLE_NAME || '"';
+      V_SQL_FRAGMENT := ' NULL on NULL returning '|| C_RETURN_TYPE || ') "JSON" from "' || t.OWNER || '"."' || t.TABLE_NAME || '" t';
       DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
 
  	  V_ROW.OWNER                := t.OWNER;
@@ -369,8 +335,6 @@ begin
 	  V_ROW.SIZE_CONSTRAINTS     := '[' || TABLE_TO_LIST(t.SIZE_CONSTRAINT_LIST) || ']';
 	  V_ROW.EXPORT_SELECT_LIST   := TABLE_TO_LIST(t.EXPORT_SELECT_LIST);
 	  V_ROW.NODE_SELECT_LIST     := TABLE_TO_LIST(t.NODE_SELECT_LIST);
-	  V_ROW.IMPORT_SELECT_LIST   := TABLE_TO_LIST(t.IMPORT_SELECT_LIST);
-	  V_ROW.COLUMN_PATTERN_LIST  := TABLE_TO_LIST(t.COLUMN_PATTERN_LIST);
       V_ROW.WITH_CLAUSE          := V_OBJECT_SERIALIZATION;
 	  V_ROW.SQL_STATEMENT        := V_SQL_STATEMENT;
 	  

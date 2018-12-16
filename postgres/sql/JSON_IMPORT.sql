@@ -36,6 +36,8 @@ begin
            return 'text';
         when 'XMLTYPE'then
            return 'xml';
+        when '"MDSYS"."SDO_GEOMETRY"' then
+           return 'geometry';
         else
           -- Oracle complex mappings
           if (strpos(V_DATA_TYPE,'LOCAL TIME ZONE') > 0) then
@@ -74,9 +76,9 @@ begin
         when 'float' then
            return 'real';
         when 'geometry' then
-           return 'jsonb';
+           return 'geometry';
         when 'geography' then
-           return 'jsonb';
+           return 'geometry';
         when 'tinyint' then
            return 'smallint';
         when 'mediumint' then
@@ -111,6 +113,8 @@ begin
     when 'MSSQLSERVER'  then 
       case V_DATA_TYPE         
         -- MSSQL Direct Mappings
+        when 'bit' then
+           return 'boolean';
         when 'datetime' then
           return 'timestamp';
         when 'datetime2' then
@@ -151,8 +155,12 @@ begin
           return 'varchar(36)';
         when 'varbinary' then
           return 'bytea';
+        when 'geometry' then
+           return 'geometry';
+           -- return 'jsonb';
         when 'geography' then
-          return 'jsonb';
+           return 'geometry';
+           -- return 'jsonb';
         else
           return lower(V_DATA_TYPE);
       end case;
@@ -207,7 +215,7 @@ begin
                     case 
                       when TARGET_DATA_TYPE like '%(%)' 
                         then ''
-                      when TARGET_DATA_TYPE in ('smallint', 'mediumint', 'int', 'bigint','real','text','bytea','integer','money','xml','json','jsonb','image','date','double precision')
+                      when TARGET_DATA_TYPE in ('smallint', 'mediumint', 'int', 'bigint','real','text','bytea','integer','money','xml','json','jsonb','image','date','double precision','geography','geometry')
                         then ''
                       when (TARGET_DATA_TYPE = 'time' and DATA_TYPE_LENGTH::INT > 6)
                         then '(6)'
