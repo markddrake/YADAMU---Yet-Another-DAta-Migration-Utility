@@ -46,7 +46,7 @@ const sqlGenerateTables =
                 then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%TZ'')')
               when data_type = 'datetime'
                 -- Force ISO 8601 rendering of value 
-                then concat('DATE_FORMAT("', column_name, '", ''%Y-%m-%dT%T'')')
+                then concat('DATE_FORMAT("', column_name, '", ''%Y-%m-%dT%T.%f'')')
               when data_type = 'year'
                 -- Prevent rendering of value as base64:type13: 
                 then concat('CAST("', column_name, '"as DECIMAL)')

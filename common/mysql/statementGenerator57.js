@@ -39,7 +39,7 @@ class StatementGenerator {
                return 'timestamp'; 
              }
              if (dataType.indexOf('INTERVAL') === 0) {
-               return 'timestamp'; 
+               return 'varchar(16)'; 
              }
              if (dataType.indexOf('XMLTYPE') > -1) { 
                return 'varchar(16)';
