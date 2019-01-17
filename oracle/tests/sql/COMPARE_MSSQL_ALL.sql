@@ -21,7 +21,7 @@ def MODE = "&5"
 --
 def SCHEMA = Northwind
 --
-@@SCHEMA_COMPARE.sql.sql
+@@SCHEMA_COMPARE.sql
 --
 def SCHEMA = Sales
 --

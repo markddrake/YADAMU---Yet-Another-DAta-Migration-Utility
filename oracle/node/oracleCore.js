@@ -48,27 +48,19 @@ async function configureConnection(conn,status) {
 
 }    
 
-async function doConnect(connectionString,status) {
-	
-  const user = Yadamu.convertQuotedIdentifer(connectionString.substring(0,connectionString.indexOf('/')));
-  let password = connectionString.substring(connectionString.indexOf('/')+1);
-  let connectString = '';
-  if (password.indexOf('@') > -1) {
-	connectString = password.substring(password.indexOf('@')+1);
-	password = password.substring(password,password.indexOf('@'));
+async function getConnection(connectionDetails,status) {
+   	
+  if (typeof connectionDetails === 'string') {
+    connectionDetails = convertConnectionString(connectionDetails)
   }
-  const conn = await oracledb.getConnection(
-  {
-      user          : user,
-      password      : password,
-      connectString : connectString
-  });
+	
+  const conn = await oracledb.getConnection(connectionDetails)
   await configureConnection(conn,status);
   return conn;
 }
 
-async function getConnectionPool(connectionString,status) {
-	
+function convertConnectionString(connectionString) {
+    
   const user = Yadamu.convertQuotedIdentifer(connectionString.substring(0,connectionString.indexOf('/')));
   let password = connectionString.substring(connectionString.indexOf('/')+1);
   let connectString = '';
@@ -76,23 +68,31 @@ async function getConnectionPool(connectionString,status) {
 	connectString = password.substring(password.indexOf('@')+1);
 	password = password.substring(password,password.indexOf('@'));
   }
-  const pool = await oracledb.createPool(
-  {
+  return {
       user          : user,
       password      : password,
       connectString : connectString
-  });
+  }
+}
+
+async function getConnectionPool(connectionDetails) {
+    
+  if (typeof connectionDetails === 'string') {
+    connectionDetails = convertConnectionString(connectionDetails)
+  }
+  const pool = await oracledb.createPool(connectionDetails)
   return pool;
 }
 
-async function getConnection(pool,status) {
+async function getConnectionFromPool(pool,status) {
 
   const conn = pool.getConnection();
   await configureConnection(conn.status);
   return conn;
+  
 }
 
-async function doRelease(conn) {
+async function releaseConnection(conn) {
   try {
     await conn.close();
   } catch (e) {
@@ -220,8 +220,8 @@ function processArguments(args) {
    return parameters;
 }
 
-module.exports.doConnect              = doConnect
-module.exports.doRelease              = doRelease
+module.exports.getConnection          = getConnection
+module.exports.releaseConnection      = releaseConnection
 module.exports.closeTempLob           = closeTempLob
 module.exports.lobFromStream          = lobFromStream
 module.exports.lobFromFile            = lobFromFile

@@ -8,7 +8,7 @@ function processArguments(args) {
    const parameters = {
 	                 FILE     : "export.json"
                     ,MODE     : "DDL_AND_CONTENT"
-					,USERNAME : 'postgress'
+					,USERNAME : 'postgres'
 					,PASSWORD : null
 					,HOSTNAME : 'localhost'
 					,DATABASE : 'postgres'
@@ -90,6 +90,13 @@ function processArguments(args) {
    return parameters;
 }
 
+async function testConnection(connectionDetails) {
+
+  const pgClient = new Client(connectionDetails);
+  await pgClient.connect();
+  return pgClient;
+}
+
 async function getClient(parameters,logWriter,status) {
 
   const connectionDetails = {
@@ -122,5 +129,7 @@ async function getClient(parameters,logWriter,status) {
   await pgClient.query(setTimezone);
   return pgClient;
 }
-module.exports.processArguments       = processArguments
-module.exports.getClient              = getClient
+
+module.exports.processArguments   = processArguments
+module.exports.testConnection     = testConnection
+module.exports.getClient          = getClient

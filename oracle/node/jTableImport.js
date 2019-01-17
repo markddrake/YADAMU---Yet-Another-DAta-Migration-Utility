@@ -46,7 +46,7 @@ async function main() {
       logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
 
-    let conn = await OracleCore.doConnect(parameters.USERID,status);
+    let conn = await OracleCore.getConnection(parameters.USERID,status);
 
     const importFilePath = path.resolve(parameters.FILE);
     const stats = fs.statSync(importFilePath)
@@ -60,7 +60,7 @@ async function main() {
     const log = await importJSON(conn,parameters,json);
     const results = JSON.parse(log);
     Yadamu.processLog(results, status, logWriter)    
-    OracleCore.doRelease(conn);						   
+    await OracleCore.releaseConnection(conn);						   
     Yadamu.reportStatus(status,logWriter)    
   } catch (e) {
     if (logWriter !== process.stdout) {
@@ -73,7 +73,7 @@ async function main() {
         console.log(e);
     }
     if (conn !== undefined) {
-      OracleCore.doRelease(conn);
+      await OracleCore.releaseConnection(conn);
     }
   }
   

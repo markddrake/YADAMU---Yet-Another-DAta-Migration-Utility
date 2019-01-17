@@ -67,7 +67,7 @@ async function main() {
 	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
 
-    conn = await OracleCore.doConnect(parameters.USERID,status);
+    conn = await OracleCore.getConnection(parameters.USERID,status);
     await setCurrentSchema(conn, parameters.TOUSER, status, logWriter);
     
 	const stats = fs.statSync(parameters.FILE)
@@ -77,7 +77,7 @@ async function main() {
     status.warningsRaised = await processFile(conn, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.LOBCACHESIZE, parameters.MODE, status, logWriter);
     const currentUser = Yadamu.convertQuotedIdentifer(parameters.USERID.split('/')[0])
     await setCurrentSchema(conn, currentUser, status, logWriter);
-    await conn.close();					   
+    await OracleCore.releaseConnection(conn);					   
 
     Yadamu.reportStatus(status,logWriter)    
   } catch (e) {
@@ -91,7 +91,7 @@ async function main() {
       console.log(e);
     }
     if (conn !== undefined) {
-      OracleCore.doRelease(conn);
+      await OracleCore.releaseConnection(conn);
     }
   }
   
