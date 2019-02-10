@@ -1,11 +1,12 @@
-
-
 "use strict";
 const sql = require('mssql');
 const Writable = require('stream').Writable
 
 const Yadamu = require('../../common/yadamuCore.js');
 const StatementGenerator = require('./statementGenerator');
+
+const EXPORT_VERSION = 1.0;
+const DATABASE_VENDOR = 'MSSQLSERVER';
 
 class DBWriter extends Writable {
   
@@ -23,7 +24,8 @@ class DBWriter extends Writable {
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
-    
+    this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBWriter ready. Mode: ${this.mode}.\n`)
+
     this.metadata = undefined;
     this.statementCache = undefined;
     
@@ -39,6 +41,12 @@ class DBWriter extends Writable {
     this.statementGenerator = new StatementGenerator(conn, status, logWriter);    
   }      
   
+  objectMode() {
+    
+    return true;
+  
+  }
+   
   async setTable(tableName) {
        
     this.tableName = tableName
@@ -124,7 +132,7 @@ class DBWriter extends Writable {
             if (!this.skipTable) {
               // await this.transaction.commit();
               const elapsedTime = this.endTime - this.startTime;
-              this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}"[${this.tableInfo.bulkSupported ? 'Bulk' : 'Conventional'}]. Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+              this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${this.tableInfo.bulkSupported ? 'Bulk' : 'Conventional'}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
             }
             if (!this.tableInfo.bulkSupported) {
               await this.tableInfo.preparedStatement.unprepare();
@@ -208,7 +216,7 @@ class DBWriter extends Writable {
           }  
           // await this.transaction.commit();
           const elapsedTime = this.endTime - this.startTime;
-          this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Method ${this.tableInfo.bulkSupported ? 'Bulk' : 'Conventional'}. Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+          this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${this.tableInfo.bulkSupported ? 'Bulk' : 'Conventional'}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
           // this.transaction.commit();
         }
         if (!this.tableInfo.bulkSupported) {
@@ -218,7 +226,7 @@ class DBWriter extends Writable {
       else {
         this.logWriter.write(`${new Date().toISOString()}: No tables found.\n`);
       }
-      this.conn.close();
+      // this.conn.close();
       callback();
     } catch (e) {
       this.logWriter.write(`${e}\n`);

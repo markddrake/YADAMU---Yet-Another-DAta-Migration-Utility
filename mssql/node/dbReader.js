@@ -83,7 +83,7 @@ class DBReader extends Readable {
     this.maxVarcharSize = undefined;
   
   }
- 
+
   async getSystemInformation() {     
   
     if (this.status.sqlTrace) {
@@ -137,7 +137,19 @@ class DBReader extends Readable {
     return metadata;    
   }
     
-  async pipeTableData(request,tableInfo,outStream) {
+  async pipeTableData(request,tableInfo,outputStream) {
+
+    function waitUntilEmpty(outputStream,resolve) {
+        
+      const recordsRemaining = outputStream.writableLength;
+      if (recordsRemaining === 0) {
+        resolve(counter);
+      } 
+      else  {
+        // console.log(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBReader Records Reamaining {$recordsRemaining}.`);
+        setTimeout(waitUntilEmpty, 10,outputStream,resolve);
+      }   
+    }
 
     let counter = 0;
     const column_list = JSON.parse(`[${tableInfo.COLUMN_LIST}]`);
@@ -147,14 +159,14 @@ class DBReader extends Readable {
     readStream._read = function() {};
     
     return new Promise(async function(resolve,reject) { 
-      const outStreamError = function(err){reject(err)}        
-      outStream.on('error',outStreamError);
+      const outputStreamError = function(err){reject(err)}        
+      outputStream.on('error',outputStreamError);
 
       request.on('done', 
       function(result) {
         readStream.push(null);
-        outStream.removeListener('error',outStreamError)
-        resolve(counter)
+        outputStream.removeListener('error',outputStreamError)
+        waitUntilEmpty(outputStream,resolve)
       })
   
       request.on('row', 
@@ -169,7 +181,12 @@ class DBReader extends Readable {
             array.push(row[column_list[i]]);
           }
         }
-        readStream.push({data : array})
+        if (!outputStream.objectMode()) {
+          readStream.push({data : JSON.stringify(array)})
+        }
+        else {        
+          readStream.push({data : array})
+        }
       })
       
       request.on('error',
@@ -177,7 +194,7 @@ class DBReader extends Readable {
         reject(err)
       })      
       request.query(tableInfo.SQL_STATEMENT) 
-      readStream.pipe(outStream,{end: false })
+      readStream.pipe(outputStream,{end: false })
     })
   }
     

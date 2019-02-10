@@ -153,8 +153,8 @@ function getStatus(parameters,operation) {
     status.loglevel = parameters.LOGLEVEL;
   }
     	
-  if ((parameters.DUMPLOG) && (parameters.DUMPLOG == 'TRUE')) {
-     status.dumpFileName = path.basename(parameters.FILE,'.json') + '.log.json';
+ if (parameters.DUMPFILE) {
+     status.dumpFileName = parameters.DUMPFILE
   }
 
   return status;

@@ -1,8 +1,119 @@
 /*
 **
-** Postgress JSON_IMPORT Function.
+** Postgress EXPORT_JSON Function.
 **
 */
+--
+create or replace function EXPORT_JSON(P_SCHEMA VARCHAR) 
+returns JSONB
+as $$
+declare
+  R                  RECORD;
+  V_RESULTS          JSONB = '{}';
+  V_SQL_STATEMENT    TEXT = NULL;
+  PLPGSQL_CTX        TEXT;
+  
+  V_SIZE_CONSTRAINTS JSONB;
+begin
+
+  for r in select t.table_schema "TABLE_SCHEMA"
+                 ,t.table_name "TABLE_NAME"
+	             ,string_agg('"' || column_name || '"',',' order by ordinal_position) "COLUMN_LIST" 
+                 ,jsonb_agg(column_name order by ordinal_position) "COLUMN_NAME_ARRAY"
+	             ,jsonb_agg(case when data_type = 'USER-DEFINED' then udt_name else data_type end order by ordinal_position) "DATA_TYPES"
+                 ,jsonb_agg(case
+                              when (numeric_precision is not null) and (numeric_scale is not null) then
+                                cast(numeric_precision as varchar) || ',' || cast(numeric_scale as varchar)
+                              when (numeric_precision is not null) then 
+                                cast(numeric_precision as varchar)
+                              when (character_maximum_length is not null) then 
+                                cast(character_maximum_length as varchar)
+                            end
+                            order by ordinal_position
+                          ) "SIZE_CONSTRAINTS"
+	             ,'select jsonb_build_array(' || string_agg(case   
+                                                              when data_type = 'bytea' then
+                                                                 'encode("' || column_name || '",''hex'')'
+                                                              when data_type = 'xml' then
+                                                                 '"' || column_name || '"' || '::text'
+                                                              when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
+                                                                 'ST_asText("' || column_name || '")'
+                                                              when data_type = 'date' then
+                                                                 'TO_CHAR("' || column_name || '",''YYYY-MM-DD"T"HH24:MI:SS"Z"'')'
+                                                              else
+                                                                '"' || column_name || '"'
+                                                            end
+                                                           ,',' order by ordinal_position
+                                                           ) || ') "json" from "' || t.table_schema || '"."' || t.table_name ||'"' "SQL_STATEMENT" 
+            from information_schema.columns c, information_schema.tables t
+           where t.table_name = c.table_name 
+	         and t.table_schema = c.table_schema
+	         and t.table_type = 'BASE TABLE'
+             and t.table_schema = P_SCHEMA
+        group by t.table_schema, t.table_name
+    
+  loop
+
+    /*
+    **
+    ** Calculate the max length of bytea fields, since Postgres does not maintain a maximum length in the dictionary.
+    **
+    */
+  
+    select 'select jsonb_build_array(' 
+        || string_agg(
+             case
+               when value = 'bytea' 
+                 then 'to_char(max(octet_length("' || (r."COLUMN_NAME_ARRAY" ->> cast((idx -1) as int)) || '")),''FM999999999999999999'')'
+               else
+                 '''' || COALESCE ((r."SIZE_CONSTRAINTS" ->> cast((idx -1) as int)),'') || ''''
+             end
+            ,','
+           ) 
+        || ') FROM "' || r."TABLE_SCHEMA" || '"."' || r."TABLE_NAME" || '"'
+      from  jsonb_array_elements_text(r."DATA_TYPES") WITH ORDINALITY as c(value, idx)
+      into V_SQL_STATEMENT
+     where r."DATA_TYPES" ? 'bytea';
+
+    raise notice '%', V_SQL_STATEMENT;
+     
+    if (V_SQL_STATEMENT is not NULL) then
+      execute V_SQL_STATEMENT into V_SIZE_CONSTRAINTS;
+    else
+      V_SIZE_CONSTRAINTS := r."SIZE_CONSTRAINTS";
+    end if;
+
+    V_RESULTS := jsonb_set(
+                   V_RESULTS
+                  ,('{' || r."TABLE_NAME" || '}')::text[]
+                  ,jsonb_build_object(
+                     'owner',           r."TABLE_SCHEMA"
+                    ,'tableName',       r."TABLE_NAME"
+                    ,'columns',         r."COLUMN_LIST"
+                    ,'dataTypes',       r."DATA_TYPES"
+                    ,'sizeConstraints', V_SIZE_CONSTRAINTS
+                    ,'sqlStatemeent',   r."SQL_STATEMENT"     
+                   )
+                 );
+                                        
+
+  end loop;
+  return V_RESULTS;
+exception
+  when others then
+    GET STACKED DIAGNOSTICS PLPGSQL_CTX = PG_EXCEPTION_CONTEXT;
+    V_RESULTS := '[]';
+    V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call EXPORT_JSON(P_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
+    return V_RESULTS;
+end;  
+$$ LANGUAGE plpgsql;
+--
+/*
+**
+** Postgress IMPORT_JSON Function.
+**
+*/
+--
 create or replace function MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH INT, P_DATA_TYPE_SCALE INT) 
 returns VARCHAR
 as $$
@@ -41,9 +152,6 @@ begin
         else
           -- Oracle complex mappings
           if (strpos(V_DATA_TYPE,'LOCAL TIME ZONE') > 0) then
-            return lower(replace(V_DATA_TYPE,'LOCAL TIME ZONE','TIME ZONE'));  
-          end if;
-          if ((strpos(V_DATA_TYPE,'TIMESTAMP') = 1) and (strpos(V_DATA_TYPE,'LOCAL TIME ZONE') > 0)) then
             return lower(replace(V_DATA_TYPE,'LOCAL TIME ZONE','TIME ZONE'));  
           end if;
           if ((strpos(V_DATA_TYPE,'INTERVAL') = 1) and (strpos(V_DATA_TYPE,'YEAR') > 0) and (strpos(V_DATA_TYPE,'TO MONTH') > 0)) then
@@ -215,7 +323,9 @@ begin
                     case 
                       when TARGET_DATA_TYPE like '%(%)' 
                         then ''
-                      when TARGET_DATA_TYPE in ('smallint', 'mediumint', 'int', 'bigint','real','text','bytea','integer','money','xml','json','jsonb','image','date','double precision','geography','geometry')
+                      when TARGET_DATA_TYPE like '%with time zone' 
+                        then ''
+                      when TARGET_DATA_TYPE in ('smallint', 'mediumint', 'int', 'bigint','real','text','bytea','integer','money','xml','json','jsonb','image','date','double precision','geography','geometry') 
                         then ''
                       when (TARGET_DATA_TYPE = 'time' and DATA_TYPE_LENGTH::INT > 6)
                         then '(6)'
@@ -231,6 +341,8 @@ begin
                    ,CHR(10) || '  ,'
                    ) COLUMNS_CLAUSE
         ,STRING_AGG(case 
+                      when TARGET_DATA_TYPE = 'bytea' then  
+                       'decode( value ->> ' || IDX-1 || ',''hex'')'
                       when TARGET_DATA_TYPE = 'time' then  
                        'cast( value ->> ' || IDX-1 || ' as timestamp)::' || TARGET_DATA_TYPE
                       when TARGET_DATA_TYPE = 'bit' then  
@@ -415,6 +527,8 @@ begin
                     case 
                       when data_type in ('json','xml')  then
                         '"' || column_name || '"::text' 
+                      when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
+                       'st_AsText("' || column_name || '")' 
                       else 
                         '"' || column_name || '"' 
                     end

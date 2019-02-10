@@ -4,10 +4,6 @@ const mysql = require('mysql');
 
 const Yadamu = require('../../common/yadamuCore.js');
 
-const sqlAnsiQuotingMode =
-`SET SESSION SQL_MODE=ANSI_QUOTES`
-
-
 function connect(conn) {
     
   return new Promise(function(resolve,reject) {
@@ -42,6 +38,9 @@ async function configureSession(conn,status) {
    
    const sqlTimeZone = `SET TIME_ZONE = '+00:00'`;
    await query(conn,status,sqlTimeZone);
+   
+   const setGroupConcatLength = `SET SESSION group_concat_max_len = 1024000`
+   await query(conn,status,setGroupConcatLength);
 
 }
 
@@ -161,9 +160,9 @@ function processArguments(args) {
 	      case '--LOGLEVEL':
 		    parameters.LOGLEVEL = parameterValue;
 			break;
-	      case 'DUMPLOG':
-	      case '--DUMPLOG':
-		    parameters.DUMPLOG = parameterValue.toUpperCase();
+	      case 'DUMPFILE':
+	      case '--DUMPFILE':
+		    parameters.DUMPFILE = parameterValue.toUpperCase();
 			break;
           case 'MODE':
 		    parameters.MODE = parameterValue.toUpperCase();

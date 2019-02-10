@@ -34,7 +34,7 @@ BEGIN
        when 'XMLTYPE' then
          return 'longtext';
        when 'RAW' then
-         return 'binary';
+         return 'varbinary';
        when 'NVARCHAR2' then
          return 'varchar';
        when 'ANYDATA' then
@@ -50,7 +50,7 @@ BEGIN
            return 'varchar(16)';
          end if;
          if (INSTR(P_DATA_TYPE,'"."') > 0) then 
-           return 'text';
+           return 'longtext ';
          end if;
          return lower(P_DATA_TYPE);
      end case;

@@ -24,6 +24,12 @@ class FileWriter extends Writable {
     
   }      
     
+  objectMode() {
+    
+    return false;
+  
+  }  
+  
   async _write(obj, encoding, callback) {
     try {
       switch (Object.keys(obj)[0]) {
@@ -59,12 +65,7 @@ class FileWriter extends Writable {
           if (this.rowCount > 0) {
             this.outputStream.write(',');
           }
-          if (obj.data instanceof Object) {
-            this.outputStream.write(JSON.stringify(obj.data));
-          }
-          else {
-            this.outputStream.write(obj.data);
-          }              
+          this.outputStream.write(obj.data);
           this.rowCount++;
           break;
         case 'rowCount':

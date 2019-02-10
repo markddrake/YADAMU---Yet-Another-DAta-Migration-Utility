@@ -10,18 +10,44 @@ const Yadamu = require('../../common/yadamuCore.js');
 const dateFormatMasks = {
         Oracle      : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
        ,MSSQLSERVER : 'YYYY-MM-DD"T"HH24:MI:SS.###"Z"'
-       ,Postgress   : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+       ,Postgres    : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
        ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
        ,MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
 }
+
+const timestampFormatMasks = {
+        Oracle      : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
+       ,MSSQLSERVER : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
+       ,Postgres    : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"+00:00"'
+       ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
+       ,MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
+}
+
+function getDateFormatMask(vendor) {
+    
+ return dateFormatMasks[vendor]
  
+}
+
+function getTimeStampFormatMask(vendor) {
+    
+ return timestampFormatMasks[vendor]
+ 
+}
+
 async function setDateFormatMask(conn,status,vendor) {
  
-  const sqlStatement = `ALTER SESSION SET NLS_DATE_FORMAT = '${dateFormatMasks[vendor]}'`
+  let sqlStatement = `ALTER SESSION SET NLS_DATE_FORMAT = '${dateFormatMasks[vendor]}'`
   if (status.sqlTrace) {
      status.sqlTrace.write(`${sqlStatement}\n/\n`);
   }
-  const result = await conn.execute(sqlStatement);
+  let result = await conn.execute(sqlStatement);
+
+  sqlStatement = `ALTER SESSION SET NLS_TIMESTAMP_FORMAT = '${timestampFormatMasks[vendor]}'`
+  if (status.sqlTrace) {
+     status.sqlTrace.write(`${sqlStatement}\n/\n`);
+  }
+  result = await conn.execute(sqlStatement);
 
 }
  
@@ -34,13 +60,13 @@ async function configureConnection(conn,status) {
 
   await setDateFormatMask(conn,status,'Oracle');
   
-  sqlStatement = `ALTER SESSION SET NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'`
+  sqlStatement = `ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF6TZH:TZM'`
   if (status.sqlTrace) {
      status.sqlTrace.write(`${sqlStatement}\n/\n`);
   }
   result = await conn.execute(sqlStatement);
 
-  sqlStatement = `ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF6TZH:TZM'`
+  sqlStatement = `ALTER SESSION SET NLS_LENGTH_SEMANTICS = 'CHAR'`
   if (status.sqlTrace) {
      status.sqlTrace.write(`${sqlStatement}\n/\n`);
   }
@@ -156,6 +182,21 @@ async function writeClobToFile(lob, filename) {
   });
 };
 
+async function setCurrentSchema(conn, schema, status, logWriter) {
+
+  const sqlStatement = `begin :log := JSON_IMPORT.SET_CURRENT_SCHEMA(:schema); end;`;
+     
+  try {
+    const results = await conn.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 1024} , schema:schema});
+    const log = JSON.parse(results.outBinds.log);
+    if (log !== null) {
+      Yadamu.processLog(log, status, logWriter)
+    }
+  } catch (e) {
+    logWriter.write(`${e}\n${e.stack}\n`);
+  }    
+}
+
 function processArguments(args) {
 
    const parameters = {
@@ -196,8 +237,8 @@ function processArguments(args) {
 	      case 'LOGLEVEL':
 		    parameters.LOGLEVEL = parameterValue;
 			break;
-	      case 'DUMPLOG':
-		    parameters.DUMPLOG = parameterValue.toUpperCase();
+	      case 'DUMPFILE':
+		    parameters.DUMPFILE = parameterValue.toUpperCase();
 			break;
 	      case 'BATCHSIZE':
 		    parameters.BATCHSIZE = parseInt(parameterValue)
@@ -229,5 +270,7 @@ module.exports.lobFromJSON            = lobFromJSON
 module.exports.writeClobToFile        = writeClobToFile
 module.exports.processArguments       = processArguments
 module.exports.setDateFormatMask      = setDateFormatMask
+module.exports.getDateFormatMask      = getDateFormatMask
+module.exports.getTimeStampFormatMask = getTimeStampFormatMask
+module.exports.setCurrentSchema       = setCurrentSchema
 
-setDateFormatMask

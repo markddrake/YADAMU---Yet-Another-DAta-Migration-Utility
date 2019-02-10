@@ -43,9 +43,12 @@ const sqlGenerateMetadata =
           'select json_array('
           ,group_concat(
             case 
-              when data_type = 'timestamp'
+              when data_type = 'date'
                 -- Force ISO 8601 rendering of value 
                 then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%TZ'')')
+              when data_type = 'timestamp'
+                -- Force ISO 8601 rendering of value 
+                then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')')
               when data_type = 'datetime'
                 -- Force ISO 8601 rendering of value 
                 then concat('DATE_FORMAT("', column_name, '", ''%Y-%m-%dT%T.%f'')')
@@ -136,6 +139,12 @@ class DBReader extends Readable {
     this.maxVarcharSize = undefined;
   
   }
+  
+  getNativeDate() {
+     
+    return false;
+    
+  }
  
   async getSystemInformation() {     
 
@@ -204,12 +213,27 @@ class DBReader extends Readable {
   }
   
   
-  pipeTableData(sqlQuery,outStream) {
+  pipeTableData(sqlQuery,outputStream) {
+
+    function waitUntilEmpty(outputStream,resolve) {
+        
+      const recordsRemaining = outputStream.writableLength;
+      if (recordsRemaining === 0) {
+        resolve(counter);
+      } 
+      else  {
+        // console.log(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBReader Records Reamaining {$recordsRemaining}.`);
+        setTimeout(waitUntilEmpty, 10,outputStream,resolve);
+      }   
+    }
 
     let counter = 0;
     const parser = new Transform({objectMode:true});
     parser._transform = function(data,encodoing,done) {
       counter++;
+      if (outputStream.objectMode()) {
+        data.json = JSON.parse(data.json);
+      }
       this.push({data : data.json})
       done();
     }
@@ -220,12 +244,12 @@ class DBReader extends Readable {
     const stream = this.conn.query(sqlQuery).stream();
 
     return new Promise(async function(resolve,reject) {
-      const outStreamError = function(err){reject(err)}        
-      outStream.on('error',outStreamError);
-      parser.on('finish',function() {outStream.removeListener('error',outStreamError);resolve(counter)})
+      const outputStreamError = function(err){reject(err)}        
+      outputStream.on('error',outputStreamError);
+      parser.on('finish',function() {outputStream.removeListener('error',outputStreamError);waitUntilEmpty(outputStream,resolve)})
       parser.on('error',function(err){reject(err)});
       stream.on('error',function(err){reject(err)});
-      stream.pipe(parser).pipe(outStream,{end: false })
+      stream.pipe(parser).pipe(outputStream,{end: false })
     })
   }
     

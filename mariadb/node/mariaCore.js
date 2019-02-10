@@ -17,6 +17,13 @@ async function configureSession(conn,status) {
    }
    await conn.query(sqlTimeZone);
 
+   const setGroupConcatLength = `SET SESSION group_concat_max_len = 1024000`
+   if (status.sqlTrace) {
+     status.sqlTrace.write(`${setGroupConcatLength};\n--\n`);
+   }
+   await conn.query(setGroupConcatLength);
+
+
 }
 
 async function setMaxAllowedPacketSize(pool,conn,status,logWriter) {
@@ -119,9 +126,9 @@ function processArguments(args) {
 	      case '--LOGLEVEL':
 		    parameters.LOGLEVEL = parameterValue;
 			break;
-	      case 'DUMPLOG':
-	      case '--DUMPLOG':
-		    parameters.DUMPLOG = parameterValue.toUpperCase();
+	      case 'DUMPFILE':
+	      case '--DUMPFILE':
+		    parameters.DUMPFILE = parameterValue.toUpperCase();
 			break;
 	      case 'BATCHSIZE':
 	      case '--BATCHSIZE':

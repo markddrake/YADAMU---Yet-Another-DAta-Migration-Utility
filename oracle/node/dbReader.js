@@ -54,7 +54,7 @@ class DBReader extends Readable {
     this.maxVarcharSize = undefined;
   
   }
- 
+  
   async getSystemInformation() {     
 
     if (this.status.sqlTrace) {
@@ -128,7 +128,7 @@ class DBReader extends Readable {
   
   /*
   
-  async jsonFetchData(conn,status,sqlStatement,tableName,outStream,logWriter) {
+  async jsonFetchData(conn,status,sqlStatement,tableName,outputStream,logWriter) {
 
     let counter = 0;
     const parser = new Transform({objectMode:true});
@@ -176,11 +176,11 @@ class DBReader extends Readable {
     return new Promise(function(resolve,reject) {  
       jsonStream.on('end',function() {resolve(counter)})
       stream.on('error',function(err){reject(err)});
-      stream.pipe(parser).pipe(jsonStream).pipe(outStream,{end: false })
+      stream.pipe(parser).pipe(jsonStream).pipe(outputStream,{end: false })
     })
   }
 
-  async wideFetchData(conn,status,query,tableName,columnList,outStream,logWriter) {
+  async wideFetchData(conn,status,query,tableName,columnList,outputStream,logWriter) {
   
     let counter = 0;
     const columns = JSON.parse('[' + columnList + ']');
@@ -206,7 +206,7 @@ class DBReader extends Readable {
     return new Promise(function(resolve,reject) {  
       jsonStream.on('end',function() {resolve(counter)})
       stream.on('error',function(err){reject(err)});
-      stream.pipe(parser).pipe(jsonStream).pipe(outStream,{end: false })
+      stream.pipe(parser).pipe(jsonStream).pipe(outputStream,{end: false })
     })
       
   }
@@ -308,7 +308,19 @@ class DBReader extends Readable {
   
   }
   
-  async pipeTableData(queryInfo,outStream) {
+  async pipeTableData(queryInfo,outputStream) {
+
+    function waitUntilEmpty(outputStream,resolve) {
+        
+      const recordsRemaining = outputStream.writableLength;
+      if (recordsRemaining === 0) {
+        resolve(counter);
+      } 
+      else  {
+        // console.log(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBReader Records Reamaining ${recordsRemaining}.`);
+        setTimeout(waitUntilEmpty, 10,outputStream,resolve);
+      }   
+    }
              
     function blob2HexBinary(blob) {
    
@@ -360,7 +372,7 @@ class DBReader extends Readable {
         }
       });
     };
-  
+      
     let columnMetadata;
     let includesLobs = false;
     let includesJSON = false;
@@ -398,7 +410,11 @@ class DBReader extends Readable {
            }
          }
       })
-      this.push({data:data})
+      if (!outputStream.objectMode()) {
+        data = JSON.stringify(data);
+      }
+      const res = this.push({data:data})
+      // console.log(counter,':',res);
       done();
     }
   
@@ -409,9 +425,9 @@ class DBReader extends Readable {
     const stream = await this.conn.queryStream(queryInfo.sqlStatement,[],{extendedMetaData: true})
     
     return new Promise(function(resolve,reject) {  
-      const outStreamError = function(err){reject(err)}       
-      outStream.on('error',outStreamError);
-      parser.on('finish',function() {outStream.removeListener('error',outStreamError);resolve(counter)})
+      const outputStreamError = function(err){reject(err)}       
+      outputStream.on('error',outputStreamError);
+      parser.on('finish',function() {outputStream.removeListener('error',outputStreamError);waitUntilEmpty(outputStream,resolve)})
       parser.on('error',function(err){reject(err)});
       stream.on('error',function(err){reject(err)});
       stream.on('metadata',  
@@ -423,7 +439,7 @@ class DBReader extends Readable {
            }
          }) 
       })
-      stream.pipe(parser).pipe(outStream,{end: false })
+      stream.pipe(parser).pipe(outputStream,{end: false })
     })
       
   }
@@ -476,7 +492,7 @@ class DBReader extends Readable {
            if (this.mode === 'DATA_ONLY') {
              this.nextPhase = 'metadata';
            }
-           else {
+           else { 
              this.nextPhase = 'ddl';
            }
            break;
@@ -496,13 +512,14 @@ class DBReader extends Readable {
            this.nextPhase = 'table';
            break;
          case 'table' :
-           if (this.tableInfo.length > 0) {
-             this.push({table : this.tableInfo[0].TABLE_NAME})
-             this.nextPhase = 'data'
+           if (this.mode !== 'DDL_ONLY') {
+             if (this.tableInfo.length > 0) {
+               this.push({table : this.tableInfo[0].TABLE_NAME})
+               this.nextPhase = 'data'
+               break;
+             }
            }
-           else {
-             this.push(null);
-           }
+           this.push(null);
            break;
          case 'data' :
            const rows = await this.getTableData(this.tableInfo[0])

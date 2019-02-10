@@ -43,9 +43,12 @@ const sqlGenerateTables =
           'select json_array('
           ,group_concat(
             case 
-              when data_type = 'timestamp'
+              when data_type = 'date'
                 -- Force ISO 8601 rendering of value 
                 then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%TZ'')')
+              when data_type = 'timestamp'
+                -- Force ISO 8601 rendering of value 
+                then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')')
               when data_type = 'datetime'
                 -- Force ISO 8601 rendering of value 
                 then concat('DATE_FORMAT("', column_name, '", ''%Y-%m-%dT%T.%f'')')
@@ -158,13 +161,24 @@ class DBReader extends Readable {
   
   pipeTableData(conn,sqlStatement,outStream) {
 
+    function waitUntilEmpty(outStream,resolve) {
+        
+      const recordsRemaining = outStream.writableLength;
+      if (recordsRemaining === 0) {
+        resolve(counter);
+      } 
+      else  {
+        // console.log(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBReader Records Reamaining {$recordsRemaining}.`);
+        setTimeout(waitUntilEmpty, 10,outStream,resolve);
+      }   
+    }
 
-   let counter = 0;
-   const readStream = new Readable({objectMode: true });
-   readStream._read = function() {};  
+    let counter = 0;
+    const readStream = new Readable({objectMode: true });
+    readStream._read = function() {};  
 
-   return new Promise(async function(resolve,reject) { 
-      const outStreamError = function(err){reject(err)}        
+    return new Promise(async function(resolve,reject) { 
+      const outStreamError = function(err){reject(err)}       
       outStream.on('error',outStreamError);
 
       conn.queryStream(sqlStatement).on('data',
@@ -175,7 +189,7 @@ class DBReader extends Readable {
       function() {
         readStream.push(null);
         outStream.removeListener('error',outStreamError)
-        resolve(counter);
+        waitUntilEmpty(outStream,resolve)
       }).on('error',
       function(err) {
         reject(err);

@@ -73,9 +73,9 @@ function processArguments(args) {
 	      case '--LOGLEVEL':
 		    parameters.LOGLEVEL = parameterValue;
 			break;
-	      case 'DUMPLOG':
-	      case '--DUMPLOG':
-		    parameters.DUMPLOG = parameterValue.toUpperCase();
+	      case 'DUMPFILE':
+	      case '--DUMPFILE':
+		    parameters.DUMPFILE = parameterValue.toUpperCase();
 			break;
   	  	  case 'MODE':
 	      case '--MODE':
@@ -127,7 +127,16 @@ async function getClient(parameters,logWriter,status) {
     status.sqlTrace.write(`${setTimezone}\n\/\n`)
   }
   await pgClient.query(setTimezone);
+  
+  const setIntervalFormat =  `SET intervalstyle = 'iso_8601';`;
+  if (status.sqlTrace) {
+    status.sqlTrace.write(`${setIntervalFormat}\n\/\n`)
+  }
+  await pgClient.query(setIntervalFormat);
+
   return pgClient;
+  
+  
 }
 
 module.exports.processArguments   = processArguments

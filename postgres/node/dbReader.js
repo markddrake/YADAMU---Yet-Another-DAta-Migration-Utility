@@ -10,39 +10,7 @@ const SPATIAL_FORMAT = "WKT";
 const sqlGetSystemInformation =
 `select current_database() database_name,current_user,session_user,current_setting('server_version_num') database_version`;					   
 
-const sqlGenerateQueries =
-`select t.table_schema "TABLE_SCHEMA"
-       ,t.table_name "TABLE_NAME"
-	   ,string_agg('"' || column_name || '"',',' order by ordinal_position) "COLUMN_LIST" 
-	   ,jsonb_agg(case when data_type = 'USER-DEFINED' then udt_name else data_type end order by ordinal_position) "DATA_TYPES"
-       ,jsonb_agg(case
-                     when (numeric_precision is not null) and (numeric_scale is not null) 
-                       then cast(numeric_precision as varchar) || ',' || cast(numeric_scale as varchar)
-                     when (numeric_precision is not null) 
-                       then cast(numeric_precision as varchar)
-                     when (character_maximum_length is not null)
-                       then cast(character_maximum_length as varchar)
-                     else
-                       ''
-                   end
-                   order by ordinal_position
-                 ) "SIZE_CONSTRAINTS"
-	   ,'select jsonb_build_array(' || string_agg('"' || column_name || '"' ||
-                                                  case   
-                                                    when data_type = 'xml' then
-                                                       '::text'
-                                                    else
-                                                      ''
-                                                  end
-                                                 ,',' order by ordinal_position
-                                                 ) || ') "json" from "' || t.table_schema || '"."' || t.table_name ||'"' "SQL_STATEMENT" 
-   from information_schema.columns c, information_schema.tables t
-  where t.table_name = c.table_name 
-	and t.table_schema = c.table_schema
-	and t.table_type = 'BASE TABLE'
-    and t.table_schema = $1
-  group by t.table_schema, t.table_name`;
-
+const sqlGenerateQueries = `select EXPORT_JSON($1)`;
 
 class DBReader extends Readable {  
 
@@ -103,27 +71,36 @@ class DBReader extends Readable {
     }
     
 	const results = await this.pgClient.query(sqlGenerateQueries,[this.schema]);
-    this.tableInfo = results.rows;
-       
-    const metadata = {}
-	for (let table of this.tableInfo) {
-      metadata[table.TABLE_NAME] = {
-        owner                    : table.TABLE_SCHEMA
-       ,tableName                : table.TABLE_NAME
-       ,columns                  : table.COLUMN_LIST
-       ,dataTypes                : table.DATA_TYPES
-       ,sizeConstraints          : table.SIZE_CONSTRAINTS
-      }
-    }
+    const metadata = results.rows[0].export_json;
+    
+    this.tableInfo = Object.keys(metadata).map(function(value) {
+      return {TABLE_NAME : value, SQL_STATEMENT : metadata[value].sqlStatemeent}
+    })
+    
     return metadata;    
   }
   
-  async pipeTableData(sqlStatement,outStream) {
+  async pipeTableData(sqlStatement,outputStream) {
 
+    function waitUntilEmpty(outputStream,resolve) {
+        
+      const recordsRemaining = outputStream.writableLength;
+      if (recordsRemaining === 0) {
+        resolve(counter);
+      } 
+      else  {
+        // console.log(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBReader Records Reamaining ${recordsRemaining}.`);
+        setTimeout(waitUntilEmpty, 10,outputStream,resolve);
+      }   
+    }
+   
     let counter = 0;
     const parser = new Transform({objectMode:true});
     parser._transform = function(data,encodoing,done) {
       counter++;
+      if (!outputStream.objectMode()) {
+        data.json = JSON.stringify(data.json);
+      }
       this.push({data : data.json})
       done();
     }
@@ -136,12 +113,12 @@ class DBReader extends Readable {
     const stream = await this.pgClient.query(queryStream)   
   
     return new Promise(async function(resolve,reject) {
-      const outStreamError = function(err){reject(err)}        
-      outStream.on('error',outStreamError);
-      parser.on('finish',function() {outStream.removeListener('error',outStreamError);resolve(counter)})
+      const outputStreamError = function(err){reject(err)}        
+      outputStream.on('error',outputStreamError);
+      parser.on('finish',function() {outputStream.removeListener('error',outputStreamError);waitUntilEmpty(outputStream,resolve)})
       parser.on('error',function(err){reject(err)});
       stream.on('error',function(err){reject(err)});
-      stream.pipe(parser).pipe(outStream,{end: false })
+      stream.pipe(parser).pipe(outputStream,{end: false })
     })
   }
     
@@ -169,8 +146,8 @@ class DBReader extends Readable {
            }
            break;
          case 'ddl' :
-           const ddl = await this.getDDLOperations();
-           this.push({ddl: ddl});
+           // const ddl = await this.getDDLOperations();
+           this.push({ddl: {}});
            if (this.mode === 'DDL_ONLY') {
              this.push(null);
            }

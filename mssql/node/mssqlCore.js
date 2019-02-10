@@ -75,9 +75,9 @@ function processArguments(args,operation) {
 	 case '--LOGLEVEL':
 		 parameters.LOGLEVEL = parameterValue;
 			break;
-	 case 'DUMPLOG':
-	 case '--DUMPLOG':
-		 parameters.DUMPLOG = parameterValue.toUpperCase();
+	 case 'DUMPFILE':
+	 case '--DUMPFILE':
+		 parameters.DUMPFILE = parameterValue.toUpperCase();
 			break;
 	 case 'MODE':
 		 parameters.MODE = parameterValue.toUpperCase();

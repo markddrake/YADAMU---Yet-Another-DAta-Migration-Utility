@@ -10,21 +10,6 @@ const RowParser = require('../../common/rowParser.js');
 const DBWriter = require('./dbWriter.js');
 const OracleCore = require('./oracleCore.js');
 
-async function setCurrentSchema(conn, schema, status, logWriter) {
-
-  const sqlStatement = `begin :log := JSON_IMPORT.SET_CURRENT_SCHEMA(:schema); end;`;
-     
-  try {
-    const results = await conn.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 1024} , schema:schema});
-    const log = JSON.parse(results.outBinds.log);
-    if (log !== null) {
-      Yadamu.processLog(log, status, logWriter)
-    }
-  } catch (e) {
-    logWriter.write(`${e}\n${e.stack}\n`);
-  }    
-}
-
 function processFile(conn, schema, importFilePath,batchSize,commitSize,lobCacheSize,mode,status,logWriter) {
   
   return new Promise(function (resolve,reject) {
@@ -68,7 +53,7 @@ async function main() {
     }
 
     conn = await OracleCore.getConnection(parameters.USERID,status);
-    await setCurrentSchema(conn, parameters.TOUSER, status, logWriter);
+    await OracleCore.setCurrentSchema(conn, parameters.TOUSER, status, logWriter);
     
 	const stats = fs.statSync(parameters.FILE)
     const fileSizeInBytes = stats.size
@@ -76,7 +61,7 @@ async function main() {
 
     status.warningsRaised = await processFile(conn, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.LOBCACHESIZE, parameters.MODE, status, logWriter);
     const currentUser = Yadamu.convertQuotedIdentifer(parameters.USERID.split('/')[0])
-    await setCurrentSchema(conn, currentUser, status, logWriter);
+    await OracleCore.setCurrentSchema(conn, currentUser, status, logWriter);
     await OracleCore.releaseConnection(conn);					   
 
     Yadamu.reportStatus(status,logWriter)    

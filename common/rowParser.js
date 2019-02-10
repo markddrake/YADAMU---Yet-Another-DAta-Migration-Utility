@@ -195,7 +195,7 @@ class RowParser extends Transform {
     });  
    
    
-    this.tableList  = undefined;
+    this.tableList  = new Set();
     this.objectStack = [];
     this.dataPhase = false;     
     

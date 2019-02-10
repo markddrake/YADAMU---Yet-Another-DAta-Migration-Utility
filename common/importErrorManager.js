@@ -1,12 +1,15 @@
-"use strict"
+"use strict"   
 const fs = require('fs')
+const fsp = require('fs').promises;
+const path = require('path')
 const assert = require('assert')
 
 class ImportErrorManager {
 
   constructor(filename,maxErrors) {
-   
-    this.filename = filename.substring(0,filename.lastIndexOf('.')) + '.bad' + filename.substring(filename.lastIndexOf('.'));
+
+    this.folderPath =  process.cwd() + path.sep + "Invalid" + path.sep + (new Date().toISOString().split(':').join(''))
+    this.filename = this.folderPath + path.sep + path.basename(filename);
     this.maxErrors = maxErrors
     this.errorCount = 0;
     this.tableName = undefined;
@@ -20,6 +23,7 @@ class ImportErrorManager {
     this.errorCount++;
     
     if (this.tableName === undefined) {
+      fs.mkdirSync(this.folderPath, { recursive: true });
       this.ws = fs.createWriteStream(this.filename);
       this.ws.write(`{"errors": { "${tableName}": [`)
       this.tableName = tableName;

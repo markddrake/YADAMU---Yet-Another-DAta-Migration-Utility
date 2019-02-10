@@ -137,6 +137,8 @@ as
                      else 
                        '"' || DATA_LENGTH || '"'
                    end
+			     when atc.DATA_TYPE in ('TIMESTAMP') or atc.DATA_TYPE LIKE '%TIME ZONE' then
+                   '"' || DATA_SCALE || '"'
                  when atc.DATA_TYPE in ('NVARCHAR2', 'NCHAR') then
                    '"' || CHAR_LENGTH || '"'
                  when atc.DATA_TYPE in ('UROWID', 'RAW') or  atc.DATA_TYPE LIKE 'INTERVAL%' then

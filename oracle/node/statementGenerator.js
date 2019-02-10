@@ -36,6 +36,7 @@ class StatementGenerator {
     this.status = status;
     this.logWriter = logWriter;
     this.ddlRequired = true;
+    
   }
  
   async executeDDL(schema, systemInformation, ddl) {
@@ -75,15 +76,13 @@ class StatementGenerator {
          case 'CHAR':
          case 'VARCHAR':
          case 'VARCHAR2':
-           return { type: oracledb.STRING, maxSize : dataType.length}
+           return { type: oracledb.STRING, maxSize : dataType.length * 2}
          case 'NCHAR':
          case 'NVARCHAR2':
            return { type: oracledb.STRING, maxSize : dataType.length * 2}
          case 'DATE':
          case 'TIMESTAMP':
-            // Avoid Javascript Date due to loss of precision
-            // return { type: oracledb.DATE}
-            return { type: oracledb.STRING, maxSize : 48}
+           return { type: oracledb.STRING, maxSize : 48}
          case 'INTERVAL':
             return { type: oracledb.STRING, maxSize : 12}
          case 'CLOB':
@@ -125,12 +124,12 @@ class StatementGenerator {
            }
            return {type : oracledb.STRING, maxSize :  dataType.length}
        }
-     })
+     },this)
   
   }
   
   async generateStatementCache(schema, systemInformation, metadata) {
-  
+   
     const sqlStatement = `begin :sql := JSON_IMPORT.GENERATE_STATEMENTS(:metadata, :schema);\nEND;`;
       
      /*
@@ -138,10 +137,32 @@ class StatementGenerator {
      ** Turn the generated DDL Statements into an array and execute them as single batch via JSON_EXPORT_DDL.APPLY_DDL_STATEMENTS()
      **
      */
-      
+     
     try {
+      const sourceDateFormatMask = OracleCore.getDateFormatMask(systemInformation.vendor);
+      const sourceTimeStampFormatMask = OracleCore.getTimeStampFormatMask(systemInformation.vendor);
+      const oracleDateFormatMask = OracleCore.getDateFormatMask('Oracle');
+      const oracleTimeStampFormatMask = OracleCore.getTimeStampFormatMask('Oracle');
+      
+      let setOracleDateMask = '';
+      let setSourceDateMask = '';
+      
+      if (sourceDateFormatMask !== oracleDateFormatMask) {
+        setOracleDateMask = `execute immediate 'ALTER SESSION SET NLS_DATE_FORMAT = ''${oracleDateFormatMask}''';\n  `; 
+        setSourceDateMask = `;\n  execute immediate 'ALTER SESSION SET NLS_DATE_FORMAT = ''${sourceDateFormatMask}'''`; 
+      }
+      
+      let setOracleTimeStampMask = ''
+      let setSourceTimeStampMask = ''
+      
+      if (sourceTimeStampFormatMask !== oracleTimeStampFormatMask) {
+        setOracleTimeStampMask = `execute immediate 'ALTER SESSION SET NLS_TIMESTAMP_FORMAT = ''${oracleTimeStampFormatMask}''';\n  `; 
+        setSourceTimeStampMask = `;\n  execute immediate 'ALTER SESSION SET NLS_TIMESTAMP_FORMAT = ''${sourceTimeStampFormatMask}'''`; 
+      }
+      
       const boundedTypes = ['CHAR','NCHAR','VARCHAR2','NVARCHAR2','RAW']
       const ddlStatements = [];  
+      
       const metadataLob = await OracleCore.lobFromJSON(this.conn,{systemInformation : systemInformation, metadata: metadata});  
       const results = await this.conn.execute(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:schema});
       await metadataLob.close();
@@ -152,13 +173,16 @@ class StatementGenerator {
                        const tableInfo = statementCache[table];
                        const tableMetadata = metadata[table];
                        const columns = JSON.parse('[' + tableMetadata.columns + ']');
-                       ddlStatements[idx] = tableInfo.ddl;
-                       let plsqlRequired = false;         
+                       if (tableInfo.ddl !== null) {
+                         ddlStatements.push(tableInfo.ddl);
+                       }
+                       let plsqlRequired = false;        
 
                        const assignments = [];
                        const operators = [];
                        const variables = []
                        const values = []
+                       
                        const declarations = columns.map(function(column,idx) {
                          variables.push(`"V_${column}"`);
                          let targetDataType =  tableInfo.targetDataTypes[idx];
@@ -195,7 +219,12 @@ class StatementGenerator {
                        })
                        if (plsqlRequired === true) {
                          const assignments = values.map(function(value,idx) {
-                           return  `${variables[idx]} := ${values[idx]}`
+                           if (value[1] === '#') {
+                             return `${setOracleDateMask}${setOracleTimeStampMask}${variables[idx]} := ${value}${setSourceDateMask}${setSourceTimeStampMask}`;
+                           }
+                           else {
+                             return `${variables[idx]} := ${value}`;
+                           }
                          })
                          let plsqlFunctions = tableInfo.dml.substring(tableInfo.dml.indexOf('\WITH\n')+5,tableInfo.dml.indexOf('\nselect'));
                          tableInfo.dml = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n\n  insert into "${schema}"."${table}" (${tableMetadata.columns}) values (${variables.join(',')});\nend;`;      
@@ -206,7 +235,7 @@ class StatementGenerator {
                        tableInfo.binds = this.generateBinds(tableInfo,metadata[table].sizeConstraints);
       },this);
       
-      if (this.ddlRequired) {;
+      if (this.ddlRequired) {
         await this.executeDDL(schema, systemInformation, ddlStatements);
       }
       

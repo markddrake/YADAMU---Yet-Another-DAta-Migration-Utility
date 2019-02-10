@@ -6,6 +6,9 @@ const StatementGenerator80 = require('./statementGenerator.js');
 const StatementGenerator57 = require('../../common/mysql/statementGenerator57.js');
 const MySQLCore = require('./mysqlCore.js');
 
+const EXPORT_VERSION = 1.0;
+const DATABASE_VENDOR = 'MySQL';
+
 class DBWriter extends Writable {
   
   constructor(conn,schema,batchSize,commitSize,mode,status,logWriter,options) {
@@ -19,8 +22,8 @@ class DBWriter extends Writable {
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
-
-
+    this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBWriter ready. Mode: ${this.mode}.\n`)
+    
     this.batch = [];
     
     this.systemInformation = undefined;
@@ -42,6 +45,12 @@ class DBWriter extends Writable {
     
   }      
   
+  objectMode() {
+    
+    return true;
+  
+  }
+ 
   async setSQLInterface() {
     const sqlGetVersion = `SELECT @@version`
     const results = await MySQLCore.query(this.conn,this.status,sqlGetVersion);
@@ -136,7 +145,7 @@ class DBWriter extends Writable {
             }  
             if (!this.skipTable) {
               const elapsedTime = this.endTime - this.startTime;
-              this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+              this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
             }
           }
           this.setTable(obj.table);
@@ -208,7 +217,7 @@ class DBWriter extends Writable {
            this.endTime = await this.writeBatch();
           }  
           const elapsedTime = this.endTime - this.startTime;
-          this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+          this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
           await this.conn.commit();
         }
       }          

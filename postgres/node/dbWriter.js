@@ -42,6 +42,12 @@ class DBWriter extends Writable {
     this.statementGenerator = new StatementGenerator(conn,status,logWriter);
   }      
   
+  objectMode() {
+    
+    return true;
+  
+  }
+  
   async setTable(tableName) {
        
     this.tableName = tableName
@@ -113,7 +119,7 @@ class DBWriter extends Writable {
           }
           this.setTable(obj.table);
           if (this.status.sqlTrace) {
-             this.status.sqlTrace.write(`${this.tableInfo.dml} ${this.args.slice(0,-1)};\n--\n`);
+             this.status.sqlTrace.write(`${this.tableInfo.dml};\n--\n`);
           }
           break;
         case 'data': 
@@ -131,11 +137,15 @@ class DBWriter extends Writable {
                                                          else {
                                                            obj.data[idx] = 0
                                                          }  
-                                                         return;
+                                                         break;
                                                        case "time" :
                                                          let components = obj.data[idx].split('T')
                                                          obj.data[idx] = components.length === 1 ? components[0] : components[1]
                                                          obj.data[idx] = obj.data[idx].split('Z')[0]
+                                                         break;
+                                                       case "bytea" :
+                                                         obj.data[idx] = Buffer.from(obj.data[idx],'hex');
+                                                         break;
                                                        default :
                                                      }
                                                    }

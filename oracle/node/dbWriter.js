@@ -9,6 +9,12 @@ const OracleCore = require('./oracleCore.js');
 const Yadamu = require('../../common/yadamuCore.js');
 const StatementGenerator = require('./statementGenerator');
 
+const EXPORT_VERSION = 1.0;
+const DATABASE_VENDOR = 'Oracle';
+
+let OPTIONS = {
+  IDENTIFIER_CASE : null
+}
 
 class DBWriter extends Writable {
   
@@ -22,9 +28,11 @@ class DBWriter extends Writable {
     this.batchSize = batchSize;
     this.commitSize = commitSize;
     this.lobCacheSize = lobCacheSize;
+    this.mode = mode;
     this.ddlRequired = (mode !== 'DATA_ONLY');    
     this.status = status;
     this.logWriter = logWriter;
+    this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBWriter ready. Mode: ${this.mode}.\n`)
     
     this.batch = [];
     this.lobList = [];
@@ -51,9 +59,57 @@ class DBWriter extends Writable {
 
   }      
   
+  objectMode() {
+    
+    return true;
+  
+  }
+  
+  setOptions(options) {
+    OPTIONS = options
+  }
+  
+  convertIdentifierCase(metadata) {
+            
+    switch (OPTIONS.IDENTIFIER_CASE) {
+       case 'UPPER':
+         for (let table of Object.keys(metadata)) {
+           metadata[table].columns = metadata[table].columns.toUpperCase();
+           if (table !== table.toUpperCase()){
+             metadata[table].tableName = metadata[table].tableName.toUpperCase();
+             Object.assign(metadata, {[table.toUpperCase()]: metadata[table]});
+             delete metadata[table];
+           }
+         }           
+         break;
+       case 'LOWER':
+         for (let table of Object.keys(metadata)) {
+           metadata[table].columns = metadata[table].columns.toLowerCase();
+           if (table !== table.toLowerCase()) {
+             metadata[table].tableName = metadata[table].tableName.toLowerCase();
+             Object.assign(metadata, {[table.toLowerCase()]: metadata[table]});
+             delete metadata[table];
+           }
+         }     
+         break;         
+      default: 
+    }             
+    return metadata
+  }
+    
   async setTable(tableName) {
-    this.tableName = tableName
-    this.tableInfo =  this.statementCache[tableName];
+    switch (OPTIONS.IDENTIFIER_CASE) {
+       case 'UPPER':
+         this.tableName = tableName.toUpperCase();
+         break;
+       case 'LOWER':
+         this.tableName = tableName.toLowerCase();
+         break;         
+      default: 
+        this.tableName = tableName;
+    }             
+      
+    this.tableInfo =  this.statementCache[this.tableName];
     if (this.tableInfo.lobCount > 0) {
       // If some columns are bound as CLOB or BLOB restrict batchsize based on lobCacheSize
       let lobBatchSize = Math.floor(this.lobCacheSize/this.tableInfo.lobCount);
@@ -264,7 +320,12 @@ end;`
         } 
         // Write Record to 'bad' file.
         try {
-          this.status.importErrorMgr.logError(this.tableName,this.batch[row]);
+          if ( this.status.importErrorMgr ) {
+            this.status.importErrorMgr.logError(this.tableName,this.batch[row]);
+          }
+          else {
+            this.logWriter.write(`${new Date().toISOString()} [ERROR]: Data [${this.batch[row]}].\n`)               
+          }
         } catch (e) {
         //  Catch Max Errors Exceeded Assertion
           await this.conn.rollback();
@@ -296,9 +357,9 @@ end;`
           }
           break;
         case 'metadata':
-          this.metadata = obj.metadata;
+          this.metadata = this.convertIdentifierCase(obj.metadata)
           if (Object.keys(this.metadata).length > 0) {              
-            this.statementCache = await this.statementGenerator.generateStatementCache(this.schema,this.systemInformation,obj.metadata)
+            this.statementCache = await this.statementGenerator.generateStatementCache(this.schema,this.systemInformation,this.metadata)
           } 
           break;
         case 'table':
@@ -315,7 +376,7 @@ end;`
             if (!this.skipTable) {
               await this.conn.commit();
               const elapsedTime = this.endTime - this.startTime;            
-              this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}"[${this.insertMode}]. Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+              this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${this.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
             }
           }
           this.setTable(obj.table);
@@ -359,11 +420,16 @@ end;`
                       return obj.data[idx]
                   }
                 case "DATE":
+                  if (obj.data[idx] instanceof Date) {
+                    return obj.data[idx].toISOString()
+                  }
                 case "TIMESTAMP":
                   // A Timestamp not explicitly marked as UTC should be coerced to UTC.
                   // Avoid Javascript dates due to lost of precsion.
                   // return new Date(Date.parse(obj.data[idx].endsWith('Z') ? obj.data[idx] : obj.data[idx] + 'Z'));
-                  return (obj.data[idx].endsWith('Z') || obj.data[idx].endsWith('+00:00')) ? obj.data[idx] : obj.data[idx] + 'Z';
+                  if (typeof obj.data[idx] === 'string') {
+                    return (obj.data[idx].endsWith('Z') || obj.data[idx].endsWith('+00:00')) ? obj.data[idx] : obj.data[idx] + 'Z';
+                  }
                 case "XMLTYPE" :
                   // Cannot passs XMLTYPE as BUFFER
                   // Reason: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
@@ -404,7 +470,7 @@ end;`
            this.endTime = await this.writeBatch(this.status);
           }   
           const elapsedTime = this.endTime - this.startTime;
-          this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}"[${this.insertMode}]. Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+          this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${this.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
           await this.enableConstraints();
           await this.conn.commit();
           await this.refreshMaterializedViews();
