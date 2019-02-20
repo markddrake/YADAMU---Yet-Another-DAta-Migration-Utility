@@ -5,15 +5,16 @@ const Readable = require('stream').Readable;
 const oracledb = require('oracledb');
 oracledb.fetchAsString = [ oracledb.DATE ]
 
-const OracleCore = require('./oracleCore.js');
 const Yadamu = require('../../common/yadamuCore.js');
+const OracleCore = require('./oracleCore.js');
 const StatementGenerator = require('./statementGenerator');
 
 const EXPORT_VERSION = 1.0;
 const DATABASE_VENDOR = 'Oracle';
 
 let OPTIONS = {
-  IDENTIFIER_CASE : null
+  IDENTIFIER_CASE : null,
+  DISABLE_TRIGGERS : true
 }
 
 class DBWriter extends Writable {
@@ -50,7 +51,7 @@ class DBWriter extends Writable {
     this.skipTable = true;
     
     this.logDDLIssues   = (status.loglevel && (status.loglevel > 2));
-    // this.logDDLIssues   = true;
+    this.logDDLIssues   = true;
     
     this.statementGenerator = new StatementGenerator(conn, status, logWriter);    
     
@@ -60,44 +61,14 @@ class DBWriter extends Writable {
   }      
   
   objectMode() {
-    
-    return true;
-  
+    return true; 
   }
   
   setOptions(options) {
     OPTIONS = options
   }
-  
-  convertIdentifierCase(metadata) {
-            
-    switch (OPTIONS.IDENTIFIER_CASE) {
-       case 'UPPER':
-         for (let table of Object.keys(metadata)) {
-           metadata[table].columns = metadata[table].columns.toUpperCase();
-           if (table !== table.toUpperCase()){
-             metadata[table].tableName = metadata[table].tableName.toUpperCase();
-             Object.assign(metadata, {[table.toUpperCase()]: metadata[table]});
-             delete metadata[table];
-           }
-         }           
-         break;
-       case 'LOWER':
-         for (let table of Object.keys(metadata)) {
-           metadata[table].columns = metadata[table].columns.toLowerCase();
-           if (table !== table.toLowerCase()) {
-             metadata[table].tableName = metadata[table].tableName.toLowerCase();
-             Object.assign(metadata, {[table.toLowerCase()]: metadata[table]});
-             delete metadata[table];
-           }
-         }     
-         break;         
-      default: 
-    }             
-    return metadata
-  }
-    
-  async setTable(tableName) {
+     
+  setTable(tableName) {
     switch (OPTIONS.IDENTIFIER_CASE) {
        case 'UPPER':
          this.tableName = tableName.toUpperCase();
@@ -124,9 +95,13 @@ class DBWriter extends Writable {
     this.skipTable = false;
   }
   
-  async disableConstraints() {
+  async disableConstraints(tableName) {
   
     const sqlStatement = `begin :log := JSON_IMPORT.DISABLE_CONSTRAINTS(:schema); end;`;
+    
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement}\n/\n`);
+    }
      
     try {
       const results = await this.conn.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.schema});
@@ -139,16 +114,50 @@ class DBWriter extends Writable {
     }    
   }
   
-  async enableConstraints() {
+  async enableConstraints(tableName) {
   
     const sqlStatement = `begin :log := JSON_IMPORT.ENABLE_CONSTRAINTS(:schema); end;`;
      
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement}\n/\n`);
+    }
+    
     try {
       const results = await this.conn.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.schema});
       const log = JSON.parse(results.outBinds.log);
       if (log !== null) {
         Yadamu.processLog(log, this.status, this.logWriter)
       }
+    } catch (e) {
+      this.logWriter.write(`${e}\n${e.stack}\n`);
+    }    
+  }
+  
+  async disableTriggers(schema,tableName) {
+  
+    const sqlStatement = `ALTER TABLE "${schema}"."${tableName}" DISABLE ALL TRIGGERS`;
+     
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement}\n/\n`);
+    }
+    
+    try {
+      const results = await this.conn.execute(sqlStatement);
+   } catch (e) {
+      this.logWriter.write(`${e}\n${e.stack}\n`);
+    }    
+  }
+  
+  async enableTriggers(schema,tableName) {
+  
+    const sqlStatement = `ALTER TABLE "${schema}"."${tableName}" ENABLE ALL TRIGGERS`;
+     
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement}\n/\n`);
+    }
+    
+    try {
+      const results = await this.conn.execute(sqlStatement);
     } catch (e) {
       this.logWriter.write(`${e}\n${e.stack}\n`);
     }    
@@ -357,8 +366,12 @@ end;`
           }
           break;
         case 'metadata':
-          this.metadata = this.convertIdentifierCase(obj.metadata)
-          if (Object.keys(this.metadata).length > 0) {              
+          this.metadata = Yadamu.convertIdentifierCase(OPTIONS.IDENTIFIER_CASE,obj.metadata);
+          const targetTableInfo = await OracleCore.getTableInfo(this.conn,this.schema,this.status);
+          if (targetTableInfo.length > 0) {
+             this.metadata = Yadamu.mergeMetadata(OracleCore.generateMetadata(targetTableInfo,false),this.metadata);
+          }
+          if (Object.keys(this.metadata).length > 0) {   
             this.statementCache = await this.statementGenerator.generateStatementCache(this.schema,this.systemInformation,this.metadata)
           } 
           break;
@@ -373,6 +386,9 @@ end;`
               // this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Final Batch contains ${this.batch.length} rows.`);
               this.endTime = await this.writeBatch(this.status);
             }  
+            if (OPTIONS.DISABLE_TRIGGERS === true) {
+               await this.enableTriggers(this.schema,this.tableName)
+            }
             if (!this.skipTable) {
               await this.conn.commit();
               const elapsedTime = this.endTime - this.startTime;            
@@ -383,6 +399,9 @@ end;`
           if (this.status.sqlTrace) {
             this.status.sqlTrace.write(`${this.tableInfo.dml}\n\/\n`)
 	      }
+          if (OPTIONS.DISABLE_TRIGGERS === true) {
+            await this.disableTriggers(this.schema,this.tableName)
+          }
           break;
         case 'data': 
           if (this.skipTable) {
@@ -430,6 +449,9 @@ end;`
                   if (typeof obj.data[idx] === 'string') {
                     return (obj.data[idx].endsWith('Z') || obj.data[idx].endsWith('+00:00')) ? obj.data[idx] : obj.data[idx] + 'Z';
                   }
+                  if (obj.data[idx] instanceof Date) {
+                    return obj.data[idx].toISOString()
+                  }
                 case "XMLTYPE" :
                   // Cannot passs XMLTYPE as BUFFER
                   // Reason: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
@@ -456,7 +478,7 @@ end;`
       }    
       callback();
     } catch (e) {
-      this.logWriter.write(`${new Date().toISOString()}:_write(${this.tableName}): ${e}\n${e.stack}\n`)
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._write()() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     }
   }
@@ -471,17 +493,20 @@ end;`
           }   
           const elapsedTime = this.endTime - this.startTime;
           this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${this.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
-          await this.enableConstraints();
-          await this.conn.commit();
-          await this.refreshMaterializedViews();
         }
+        if (OPTIONS.DISABLE_TRIGGERS === true) {
+          await this.enableTriggers(this.schema,this.tableName)
+        }
+        await this.enableConstraints();
+        await this.conn.commit();
+        await this.refreshMaterializedViews();
       }
       else {
         this.logWriter.write(`${new Date().toISOString()}: No tables found.\n`);
       }  
       callback();
     } catch (e) {
-      this.logWriter.write(`${new Date().toISOString()}:_final(${this.tableName}): ${e}\n${e.stack}\n`)
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._final() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     } 
   } 

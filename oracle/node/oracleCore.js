@@ -7,6 +7,10 @@ oracledb.fetchAsString = [ oracledb.DATE ]
 
 const Yadamu = require('../../common/yadamuCore.js');
 
+const sqlTableInfo =
+`select * 
+   from table(JSON_EXPORT.GET_DML_STATEMENTS(:schema))`;
+
 const dateFormatMasks = {
         Oracle      : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
        ,MSSQLSERVER : 'YYYY-MM-DD"T"HH24:MI:SS.###"Z"'
@@ -28,6 +32,41 @@ function getDateFormatMask(vendor) {
  return dateFormatMasks[vendor]
  
 }
+
+async function getTableInfo(conn,schema,status) {
+    
+  if (status.sqlTrace) {
+    status.sqlTrace.write(`${sqlTableInfo}\n\/\n`)
+  }
+
+  const results = await conn.execute(sqlTableInfo,{schema: schema},{outFormat: oracledb.OBJECT , fetchInfo:{
+                                                                                                   COLUMN_LIST:          {type: oracledb.STRING}
+                                                                                                  ,DATA_TYPE_LIST:       {type: oracledb.STRING}
+                                                                                                  ,SIZE_CONSTRAINTS:     {type: oracledb.STRING}
+                                                                                                  ,EXPORT_SELECT_LIST:   {type: oracledb.STRING}
+                                                                                                  ,NODE_SELECT_LIST:     {type: oracledb.STRING}
+                                                                                                  ,WITH_CLAUSE:          {type: oracledb.STRING}
+                                                                                                  ,SQL_STATEMENT:        {type: oracledb.STRING}
+                                                                                                }
+  });
+  
+  return results.rows;
+}
+
+function generateMetadata(tableInfo,server) {    
+  const metadata = {}
+  for (let table of tableInfo) {
+    metadata[table.TABLE_NAME] = {
+      owner                    : table.OWNER
+     ,tableName                : table.TABLE_NAME
+     ,columns                  : table.COLUMN_LIST
+     ,dataTypes                : JSON.parse(table.DATA_TYPE_LIST)
+     ,sizeConstraints          : JSON.parse(table.SIZE_CONSTRAINTS)
+     ,exportSelectList         : (server) ? table.EXPORT_SELECT_LIST : table.NODE_SELECT_LIST 
+    }
+  }
+  return metadata;    
+}  
 
 function getTimeStampFormatMask(vendor) {
     
@@ -273,4 +312,6 @@ module.exports.setDateFormatMask      = setDateFormatMask
 module.exports.getDateFormatMask      = getDateFormatMask
 module.exports.getTimeStampFormatMask = getTimeStampFormatMask
 module.exports.setCurrentSchema       = setCurrentSchema
+module.exports.getTableInfo           = getTableInfo
+module.exports.generateMetadata       = generateMetadata
 

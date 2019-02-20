@@ -3,6 +3,10 @@ const {Client} = require('pg')
 
 const Yadamu = require('../../common/yadamuCore.js');
 
+
+const sqlGenerateQueries = `select EXPORT_JSON($1)`;
+
+
 function processArguments(args) {
 
    const parameters = {
@@ -97,7 +101,7 @@ async function testConnection(connectionDetails) {
   return pgClient;
 }
 
-async function getClient(parameters,logWriter,status) {
+async function getClient(parameters,status,logWriter) {
 
   const connectionDetails = {
     user      : parameters.USERNAME
@@ -139,6 +143,26 @@ async function getClient(parameters,logWriter,status) {
   
 }
 
+async function generateMetadata(pgClient,schema,status) {
+             
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
+    }
+    
+	const results = await pgClient.query(sqlGenerateQueries,[schema]);
+    return results.rows[0].export_json;
+}
+
+function getTableInfo(metadata) {
+
+  const tableInfo = Object.keys(metadata).map(function(value) {
+    return {TABLE_NAME : value, SQL_STATEMENT : metadata[value].sqlStatemeent}
+  })
+  return tableInfo;    
+} 
+
 module.exports.processArguments   = processArguments
 module.exports.testConnection     = testConnection
 module.exports.getClient          = getClient
+module.exports.generateMetadata   = generateMetadata
+module.exports.getTableInfo       = getTableInfo

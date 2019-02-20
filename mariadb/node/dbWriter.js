@@ -3,6 +3,14 @@ const Writable = require('stream').Writable
 
 const Yadamu = require('../../common/yadamuCore.js');
 const StatementGenerator = require('../../common/mysql/statementGenerator57.js');
+const MariaCore = require('./mariaCore.js')
+
+const EXPORT_VERSION = 1.0;
+const DATABASE_VENDOR = 'MariaDB';
+
+let OPTIONS = {
+  IDENTIFIER_CASE : null
+}
 
 class DBWriter extends Writable {
     
@@ -17,6 +25,7 @@ class DBWriter extends Writable {
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
+    this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBWriter ready. Mode: ${this.mode}.\n`)
 
     this.batch = [];
     this.batchRowCount = 0;
@@ -38,23 +47,41 @@ class DBWriter extends Writable {
     // this.logDDLIssues   = true;
   }
 
+  objectMode() {
+    return true;
+  }
+ 
+  setOptions(options) {
+    OPTIONS = options
+  }
+
   async executeDDL(ddlStatements) {
     await Promise.all(ddlStatements.map(async function(ddlStatement) {
                                           try {
                                             if (this.status.sqlTrace) {
-                                              this.status.sqlTrace.write(`${statementCache[table].ddl};\n--\n`);
+                                              this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
                                             }
                                             return await this.conn.query(ddlStatement) 
                                           } catch (e) {
-                                            this.logWriter.write(`${e}\n${statementCache[table].ddl}\n`)
+                                            this.logWriter.write(`${e}\n${ddlStatement}\n`)
                                           }
     },this))
   }
   
   async setTable(tableName) {
+      
+    switch (OPTIONS.IDENTIFIER_CASE) {
+       case 'UPPER':
+         this.tableName = tableName.toUpperCase();
+         break;
+       case 'LOWER':
+         this.tableName = tableName.toLowerCase();
+         break;         
+      default: 
+        this.tableName = tableName;
+    }                
 
-    this.tableName = tableName
-    this.tableInfo =  this.statementCache[tableName];
+    this.tableInfo =  this.statementCache[this.tableName];
     this.tableInfo.args =  '(' + Array(this.tableInfo.targetDataTypes.length).fill('?').join(',')  + '),';
     this.rowCount = 0;
     this.batch.length = 0;
@@ -112,7 +139,11 @@ class DBWriter extends Writable {
           this.systemInformation = obj.systemInformation;
           break;
         case 'metadata':
-          this.metadata = obj.metadata;
+          this.metadata = Yadamu.convertIdentifierCase(OPTIONS.IDENTIFIER_CASE,obj.metadata);
+          const targetTableInfo = await MariaCore.getTableInfo(this.conn,this.schema,this.status);
+          if (targetTableInfo.length > 0) {
+             this.metadata = Yadamu.mergeMetadata(MariaCore.generateMetadata(targetTableInfo,false),this.metadata);
+          }
           if (Object.keys(this.metadata).length > 0) {
             this.statementCache = await this.statementGenerator.generateStatementCache(this.schema, this.systemInformation, this.metadata);
           }
@@ -127,7 +158,7 @@ class DBWriter extends Writable {
             }
             if (!this.skipTable) {
               const elapsedTime = this.endTime - this.startTime;
-              this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+              this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
             }
           }
           this.setTable(obj.table);
@@ -194,7 +225,7 @@ class DBWriter extends Writable {
       }
       callback();
     } catch (e) {
-      this.logWriter.write(`${e}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._write()() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     }
   }
@@ -208,7 +239,7 @@ class DBWriter extends Writable {
             this.endTime = await this.writeBatch();
           }
           const elapsedTime = this.endTime - this.startTime;
-          this.logWriter.write(`${new Date().toISOString()}: Table "${this.tableName}". Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+          this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
           await this.conn.commit();
         }
       }
@@ -217,7 +248,7 @@ class DBWriter extends Writable {
       }
       callback();
     } catch (e) {
-      this.logWriter.write(`${e}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._final() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     }
   }

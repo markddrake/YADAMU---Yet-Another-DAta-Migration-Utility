@@ -46,7 +46,11 @@ function processLog(log,status,logWriter) {
 				        break
 					  case (logEntry.severity === 'WARNING') :
                         status.warningRaised = true;
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details:  ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
+                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
+                        break;
+					  case (logEntry.severity === 'CONTENT_TOO_LARGE') :
+                        status.errorRaised = true;
+                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: Cannot import columns larger than 32k in 12c.\n`)
                         break;
                       case (logDDLIssues) :
                         logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
@@ -61,7 +65,6 @@ function processLog(log,status,logWriter) {
 function decomposeDataType(targetDataType) {
     
   const results = {};
- 
   let components = targetDataType.split('(');
   results.type = components[0].split(' ')[0];
   if (components.length > 1 ) {
@@ -83,7 +86,6 @@ function decomposeDataType(targetDataType) {
       }
     }
   }           
-   
   return results;      
     
 } 
@@ -173,9 +175,50 @@ function reportStatus(status,logWriter) {
     console.log(`${status.operation} operation completed ${status.statusMsg}. Elapsed time: ${stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  }
 
 }
+
+function convertIdentifierCase(identifierCase, metadata) {
+            
+  switch (identifierCase) {
+     case 'UPPER':
+       for (let table of Object.keys(metadata)) {
+         metadata[table].columns = metadata[table].columns.toUpperCase();
+         if (table !== table.toUpperCase()){
+           metadata[table].tableName = metadata[table].tableName.toUpperCase();
+           Object.assign(metadata, {[table.toUpperCase()]: metadata[table]});
+           delete metadata[table];
+         }
+       }           
+       break;
+     case 'LOWER':
+       for (let table of Object.keys(metadata)) {
+         metadata[table].columns = metadata[table].columns.toLowerCase();
+         if (table !== table.toLowerCase()) {
+           metadata[table].tableName = metadata[table].tableName.toLowerCase();
+           Object.assign(metadata, {[table.toLowerCase()]: metadata[table]});
+           delete metadata[table];
+         }
+       }     
+       break;         
+    default: 
+  }             
+  return metadata
+}
+  
+function mergeMetadata(targetMetadata, sourceMetadata) {
+            
+  for (let table of Object.keys(sourceMetadata)) {
+    if (!targetMetadata.hasOwnProperty(table)) {
+      Object.assign(targetMetadata, {[table] : sourceMetadata[table]})
+    }     
+  }             
+  return targetMetadata
+}
+
 module.exports.processLog             = processLog
 module.exports.decomposeDataType      = decomposeDataType
 module.exports.convertQuotedIdentifer = convertQuotedIdentifer
 module.exports.processValue           = processValue
 module.exports.getStatus              = getStatus
 module.exports.reportStatus           = reportStatus
+module.exports.convertIdentifierCase  = convertIdentifierCase
+module.exports.mergeMetadata          = mergeMetadata

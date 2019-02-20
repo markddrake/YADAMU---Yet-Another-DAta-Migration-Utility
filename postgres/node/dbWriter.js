@@ -3,17 +3,22 @@ const Writable = require('stream').Writable
 
 const Yadamu = require('../../common/yadamuCore.js');
 const StatementGenerator = require('./statementGenerator');
+const PostgresCore = require('./postgresCore');
 
 const EXPORT_VERSION = 1.0;
 const DATABASE_VENDOR = 'Postgres';
 
+let OPTIONS = {
+  IDENTIFIER_CASE : null
+}
+
 class DBWriter extends Writable {
   
-  constructor(conn,schema,batchSize,commitSize,mode,status,logWriter,options) {
+  constructor(pgClient,schema,batchSize,commitSize,mode,status,logWriter,options) {
     super({objectMode: true });
     const self = this;
     
-    this.conn = conn;
+    this.pgClient = pgClient;
     this.schema = schema;
     this.batchSize = batchSize;
     this.commitSize = commitSize;
@@ -39,19 +44,31 @@ class DBWriter extends Writable {
     this.logDDLIssues   = (status.loglevel && (status.loglevel > 2));
     // this.logDDLIssues   = true;    
     
-    this.statementGenerator = new StatementGenerator(conn,status,logWriter);
+    this.statementGenerator = new StatementGenerator(pgClient,status,logWriter);
   }      
   
   objectMode() {
-    
     return true;
+  }
   
+  setOptions(options) {
+    OPTIONS = options
   }
   
   async setTable(tableName) {
        
-    this.tableName = tableName
-    this.tableInfo =  this.statementCache[tableName];
+    switch (OPTIONS.IDENTIFIER_CASE) {
+       case 'UPPER':
+         this.tableName = tableName.toUpperCase();
+         break;
+       case 'LOWER':
+         this.tableName = tableName.toLowerCase();
+         break;         
+      default: 
+        this.tableName = tableName;
+    }          
+    
+    this.tableInfo =  this.statementCache[this.tableName];
     this.rowCount = 0;
     this.batch.length = 0;
     this.tableLobIndex = 0;
@@ -66,7 +83,7 @@ class DBWriter extends Writable {
       let argNumber = 1;
       const args = Array(this.batchRowCount).fill(0).map(function() {return `(${Array(this.tableInfo.targetDataTypes.length).fill(0).map(function(){return `$${argNumber++}`}).join(',')})`},this).join(',');
       const statement = this.tableInfo.dml + args
-      const results = await this.conn.query(statement,this.batch);
+      const results = await this.pgClient.query(statement,this.batch);
       const endTime = new Date().getTime();
       this.batch.length = 0;
       this.batchRowCount = 0;
@@ -75,7 +92,7 @@ class DBWriter extends Writable {
       if (this.status.sqlTrace) {
         this.status.sqlTrace.write(`rollback transaction;\n--\n`);
       }
-      await this.conn.query(`rollback transaction`);
+      await this.pgClient.query(`rollback transaction`);
       this.batch.length = 0;
       this.batchRowCount = 0;
       this.skipTable = true;
@@ -96,7 +113,11 @@ class DBWriter extends Writable {
           this.systemInformation = obj.systemInformation;
           break;
         case 'metadata':
-          this.metadata = obj.metadata;
+          this.metadata = Yadamu.convertIdentifierCase(OPTIONS.IDENTIFIER_CASE,obj.metadata);
+          const schemaMetadata = await PostgresCore.generateMetadata(this.pgClient,this.schema,this.status)
+          if (Object.keys(schemaMetadata).length > 0) {
+            this.metadata = Yadamu.mergeMetadata(schemaMetadata,this.metadata);
+          }
           if (Object.keys(this.metadata).length > 0) {
             this.statementCache = await this.statementGenerator.generateStatementCache(this.schema, this.systemInformation, this.metadata);
           }
@@ -110,7 +131,7 @@ class DBWriter extends Writable {
               if (this.status.sqlTrace) {
                 this.status.sqlTrace.write(`commit transaction;\n--\n`);
               }
-              await this.conn.query(`commit transaction`);
+              await this.pgClient.query(`commit transaction`);
             }  
             if (!this.skipTable) {
               const elapsedTime = this.endTime - this.startTime;
@@ -162,18 +183,18 @@ class DBWriter extends Writable {
             if (this.status.sqlTrace) {
               this.status.sqlTrace.write(`begin transaction;\n--\n`);
             }
-            await this.conn.query(`begin transaction`);
+            await this.pgClient.query(`begin transaction`);
           }
           if ((this.rowCount % this.commitSize) === 0) {
             if (this.status.sqlTrace) {
               this.status.sqlTrace.write(`commit transaction;\n--\n`);
             }
-            await this.conn.query(`commit transaction`);
+            await this.pgClient.query(`commit transaction`);
             const elapsedTime = this.endTime - this.startTime;
             if (this.status.sqlTrace) {
               this.status.sqlTrace.write(`begin transaction;\n--\n`);
             }
-            await this.conn.query(`begin transaction`);
+            await this.pgClient.query(`begin transaction`);
             // this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"]: Commit after Rows ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
           }
           break;
@@ -181,7 +202,7 @@ class DBWriter extends Writable {
       }    
       callback();
     } catch (e) {
-      this.logWriter.write(`${e}\n${e.stack}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._write()() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     }
   }
@@ -199,7 +220,7 @@ class DBWriter extends Writable {
           if (this.status.sqlTrace) {
             this.status.sqlTrace.write(`commit transaction;\n--\n`);
           }
-          await this.conn.query(`commit transaction`);
+          await this.pgClient.query(`commit transaction`);
         }
       }          
       else {
@@ -207,7 +228,7 @@ class DBWriter extends Writable {
       }
       callback();
     } catch (e) {
-      logWriter.write(`${e}\n${e.stack}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._final() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     } 
   } 

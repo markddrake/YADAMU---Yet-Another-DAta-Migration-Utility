@@ -5,6 +5,8 @@ const Transform = require('stream').Transform;
 const oracledb = require('oracledb');
 oracledb.fetchAsString = [ oracledb.DATE ]
 
+const OracleCore = require('./oracleCore.js');
+
 const StringWriter = require('./StringWriter');
 const BufferWriter = require('./BufferWriter');
 
@@ -26,11 +28,6 @@ const sqlGetSystemInformation =
 const sqlFetchDDL = 
 `select COLUMN_VALUE JSON 
    from TABLE(JSON_EXPORT_DDL.FETCH_DDL_STATEMENTS(:schema))`;;
-
-const sqlGenerateQueries = 
-`select * 
-   from table(JSON_EXPORT.GET_DML_STATEMENTS(:schema))`;
-
 
 class DBReader extends Readable {  
 
@@ -93,39 +90,10 @@ class DBReader extends Readable {
   }
   
   async getMetadata() {
-
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
-    }
-
-    const results = await this.conn.execute(sqlGenerateQueries,{schema: this.schema},{outFormat: oracledb.OBJECT , fetchInfo:{
-                                                                                                                     COLUMN_LIST:          {type: oracledb.STRING}
-                                                                                                                    ,DATA_TYPE_LIST:       {type: oracledb.STRING}
-                                                                                                                    ,SIZE_CONSTRAINTS:     {type: oracledb.STRING}
-                                                                                                                    ,EXPORT_SELECT_LIST:   {type: oracledb.STRING}
-                                                                                                                    ,NODE_SELECT_LIST:     {type: oracledb.STRING}
-                                                                                                                    ,WITH_CLAUSE:          {type: oracledb.STRING}
-                                                                                                                    ,SQL_STATEMENT:        {type: oracledb.STRING}
-                                                                                                                   }
-    });
-      
-    this.tableInfo = results.rows;
-    const metadata = {}
-	for (let table of this.tableInfo) {
-      metadata[table.TABLE_NAME] = {
-        owner                    : table.OWNER
-       ,tableName                : table.TABLE_NAME
-       ,columns                  : table.COLUMN_LIST
-       ,dataTypes                : JSON.parse(table.DATA_TYPE_LIST)
-       ,sizeConstraints          : JSON.parse(table.SIZE_CONSTRAINTS)
-       ,exportSelectList         : (this.serverGeneration) ? table.EXPORT_SELECT_LIST : table.NODE_SELECT_LIST 
-      }
-    }
-    return metadata;    
+     this.tableInfo = await OracleCore.getTableInfo(this.conn,this.schema,this.status)
+     return OracleCore.generateMetadata(this.tableInfo,this.serverGeneration)
   }
-  
-
-  
+      
   /*
   
   async jsonFetchData(conn,status,sqlStatement,tableName,outputStream,logWriter) {
@@ -310,15 +278,17 @@ class DBReader extends Readable {
   
   async pipeTableData(queryInfo,outputStream) {
 
-    function waitUntilEmpty(outputStream,resolve) {
+    function waitUntilEmpty(outputStream,outputStreamError,resolve) {
         
       const recordsRemaining = outputStream.writableLength;
       if (recordsRemaining === 0) {
+        outputStream.removeListener('error',outputStreamError)
+        // console.log(`${new Date().toISOString()}[${DATABASE_VENDOR}]: Writer Complete.`);
         resolve(counter);
       } 
       else  {
         // console.log(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBReader Records Reamaining ${recordsRemaining}.`);
-        setTimeout(waitUntilEmpty, 10,outputStream,resolve);
+        setTimeout(waitUntilEmpty, 10,outputStream,outputStreamError,resolve);
       }   
     }
              
@@ -427,7 +397,7 @@ class DBReader extends Readable {
     return new Promise(function(resolve,reject) {  
       const outputStreamError = function(err){reject(err)}       
       outputStream.on('error',outputStreamError);
-      parser.on('finish',function() {outputStream.removeListener('error',outputStreamError);waitUntilEmpty(outputStream,resolve)})
+      parser.on('finish',function() {waitUntilEmpty(outputStream,outputStreamError,resolve)})
       parser.on('error',function(err){reject(err)});
       stream.on('error',function(err){reject(err)});
       stream.on('metadata',  

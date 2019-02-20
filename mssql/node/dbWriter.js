@@ -3,19 +3,24 @@ const sql = require('mssql');
 const Writable = require('stream').Writable
 
 const Yadamu = require('../../common/yadamuCore.js');
+const MsSQLCore = require('./mssqlCore.js');
 const StatementGenerator = require('./statementGenerator');
 
 const EXPORT_VERSION = 1.0;
 const DATABASE_VENDOR = 'MSSQLSERVER';
 
+let OPTIONS = {
+  IDENTIFIER_CASE : null
+}
+
 class DBWriter extends Writable {
   
-  constructor(conn,database,schema,batchSize,commitSize,mode,status,logWriter,options) {
+  constructor(pool,database,schema,batchSize,commitSize,mode,status,logWriter,options) {
     super({objectMode: true });
     const self = this;
     
-    this.conn = conn;
-    this.transaction = undefined;
+    this.pool = pool;
+    // this.transaction = undefined
   
     this.database = database;
     this.schema = schema;
@@ -38,19 +43,31 @@ class DBWriter extends Writable {
     this.logDDLIssues = (status.loglevel && (status.loglevel > 2));
     // this.logDDLIssues = true;          
 
-    this.statementGenerator = new StatementGenerator(conn, status, logWriter);    
+    this.statementGenerator = new StatementGenerator(this.pool, status, logWriter);    
   }      
   
   objectMode() {
-    
     return true;
-  
   }
    
+  setOptions(options) {
+    OPTIONS = options
+  }
+
   async setTable(tableName) {
+      
+    switch (OPTIONS.IDENTIFIER_CASE) {
+       case 'UPPER':
+         this.tableName = tableName.toUpperCase();
+         break;
+       case 'LOWER':
+         this.tableName = tableName.toLowerCase();
+         break;         
+      default: 
+        this.tableName = tableName;
+    }                
        
-    this.tableName = tableName
-    this.tableInfo = this.statementCache[tableName]
+    this.tableInfo = this.statementCache[this.tableName]
     this.tableInfo.bulkOperation.rows.length = 0;
     this.rowCount = 0;
     this.startTime = new Date().getTime();
@@ -61,17 +78,17 @@ class DBWriter extends Writable {
   async writeBatch(status) {
     if (this.tableInfo.bulkSupported) {
       try {
-        const request = await new sql.Request(this.transaction)
-        const results = await request.bulk(this.tableInfo.bulkOperation);
+        const results = await this.pool.request().bulk(this.tableInfo.bulkOperation);
         const endTime = new Date().getTime();
         // console.log(`Bulk(${this.tableName}). Batch size ${this.tableInfo.bulkOperation.rows.length}. Success`);
         this.tableInfo.bulkOperation.rows.length = 0;
         return endTime
       } catch (e) {
-        this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Bulk Operation failed. Reason: ${e.message}\n`)
-        this.logWriter.write(`${new Date().toISOString()}: Switching to conventional insert.\n`)
+        if (this.logDDLIssues) {
+          this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"]: Bulk Operation failed. Reason: ${e.message}\n`)
+        }
         this.tableInfo.bulkSupported = false;
-        this.tableInfo.preparedStatement = await this.statementGenerator.createPreparedStatement(this.transaction, this.tableInfo.dml, this.tableInfo.targetDataTypes) 
+        this.tableInfo.preparedStatement = await this.statementGenerator.createPreparedStatement(this.pool, this.tableInfo.dml, this.tableInfo.targetDataTypes) 
         // console.log(this.tableInfo.bulkOperation.columns);
         if (this.logDDLIssues) {
           this.logWriter.write(`${e.stack}\n`);
@@ -81,8 +98,6 @@ class DBWriter extends Writable {
     }
         
     try {
-      // // await this.transaction.rollback();
-      // await this.transaction.begin();
       for (const r in this.tableInfo.bulkOperation.rows) {
         const args = {}
         for (const c in this.tableInfo.bulkOperation.rows[0]){
@@ -101,7 +116,7 @@ class DBWriter extends Writable {
       this.tableInfo.bulkOperation.rows.length = 0;
       this.skipTable = true;
       this.status.warningRaised = true;
-      this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping table. Reason: ${e.message}\n${e.stack}\n`)
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"]: Skipping table. Reason: ${e.message}\n${e.stack}\n`)
       if (this.logDDLIssues) {
         this.logWriter.write(`${this.tableInfo.bulkOperation.columns}\n`);
         this.logWriter.write(`${this.tableInfo.bulkOperation.rows}\n`);
@@ -116,11 +131,14 @@ class DBWriter extends Writable {
           this.systemInformation = obj.systemInformation;
           break;
         case 'metadata':
-          this.metadata = obj.metadata;
+          this.metadata = Yadamu.convertIdentifierCase(OPTIONS.IDENTIFIER_CASE,obj.metadata);
+          const targetTableInfo = await MsSQLCore.getTableInfo(this.pool.request(),this.schema,this.status);
+          if (targetTableInfo.length > 0) {
+             this.metadata = Yadamu.mergeMetadata(MsSQLCore.generateMetadata(targetTableInfo,false),this.metadata);
+          }
           if (Object.keys(this.metadata).length > 0) {
             this.statementCache = await this.statementGenerator.generateStatementCache(this.database, this.schema, this.systemInformation, obj.metadata, );
           }
-          this.transaction = this.conn;
           break;
         case 'table':
           // this.logWriter.write(`${new Date().toISOString()}: Switching to Table "${obj.table}".\n`);
@@ -130,7 +148,6 @@ class DBWriter extends Writable {
               this.endTime = await this.writeBatch(this.status);
             }  
             if (!this.skipTable) {
-              // await this.transaction.commit();
               const elapsedTime = this.endTime - this.startTime;
               this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${this.tableInfo.bulkSupported ? 'Bulk' : 'Conventional'}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
             }
@@ -159,18 +176,10 @@ class DBWriter extends Writable {
                                                        case "varbinary":
                                                          obj.data[idx] = Buffer.from(obj.data[idx],'hex');
                                                          break;
-                                                       case "geography" :
-                                                         if (this.systemInformation.vendor !== 'MSSQLSERVER') {
-                                                         // Code to convert to WellKnown Goes Here ???
-                                                           obj.data[idx] = null;
+                                                       case "json":
+                                                         if (typeof obj.data[idx] === 'object') {
+                                                           obj.data[idx] = JSON.stringify(obj.data[idx]);
                                                          }
-                                                         break;
-                                                       case "geometry" :
-                                                         if (this.systemInformation.vendor !== 'MSSQLSERVER') {
-                                                         // Code to convert to WellKnown Goes Here ???
-                                                           obj.data[idx] = null;
-                                                         }
-                                                         // Code to convert to WellKnown Goes Here ???
                                                          break;
                                                        case "time":
                                                        case "date":
@@ -201,7 +210,7 @@ class DBWriter extends Writable {
       }    
       callback();
     } catch (e) {
-      this.logWriter.write(`${e}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._write()() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     }
   }
@@ -229,7 +238,7 @@ class DBWriter extends Writable {
       // this.conn.close();
       callback();
     } catch (e) {
-      this.logWriter.write(`${e}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._final() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     } 
   } 

@@ -30,7 +30,7 @@ class StatementGenerator {
            case 'XMLTYPE':                 return 'longtext';
            case 'BFILE':                   return 'varchar(2048)';
            case 'ROWID':                   return 'varchar(32)';
-           case 'RAW':                     return 'binary';
+           case 'RAW':                     return 'varbinary';
            case 'ROWID':                   return 'varchar(32)';
            case 'ANYDATA':                 return 'longtext';
            case '"MDSYS"."SDO_GEOMETRY"':  return 'geometry';
@@ -180,7 +180,7 @@ class StatementGenerator {
   generateStatements(vendor, schema, metadata) {
       
      let useSetClause = false;
-     
+  
      const columnNames = metadata.columns.split(',');
      const dataTypes = metadata.dataTypes
      const sizeConstraints = metadata.sizeConstraints
@@ -205,17 +205,18 @@ class StatementGenerator {
                                              let targetDataType = this.mapForeignDataType(vendor,dataType.type,dataType.length,dataType.scale);
                                          
                                              targetDataTypes.push(targetDataType);
-                                             
+                                             let ensureNullable = false;
                                              switch (targetDataType) {
                                                case 'geometry':
                                                   useSetClause = true;
                                                   setOperators.push(' ' + columnName + ' = ST_GeomFromText(?)');
-                                                  break;
-                                                  
+                                                  break;                                                 
+                                               case 'timestamp':
+                                                  ensureNullable = true;
                                                default:
                                                  setOperators.push(' ' + columnName + ' = ?')
                                              }
-                                             return `${columnName} ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)}`
+                                             return `${columnName} ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)} ${ensureNullable === true ? 'null':''}`
                                           },this)
                                         
       const createStatement = `create table if not exists "${schema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;

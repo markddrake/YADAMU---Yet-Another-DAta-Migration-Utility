@@ -1,6 +1,5 @@
 "use strict"
 const fs = require('fs');
-const mariadb = require('mariadb');
 const path = require('path');
 
 const Yadamu = require('../../common/yadamuCore.js');
@@ -49,25 +48,9 @@ async function main() {
       logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
 
-    const connectionDetails = {
-            host      : parameters.HOSTNAME
-           ,user      : parameters.USERNAME
-           ,password  : parameters.PASSWORD
-           ,port      : parameters.PORT ? parameters.PORT : 3307
-           ,database  : parameters.DATABASE
-           ,multipleStatements: true
-    }
+    pool = await MariaCore.getConnectionPool(parameters,status,logWriter);
+    conn = await MariaCore.getConnectionFromPool(pool,status,logWriter);
 
-    pool = mariadb.createPool(connectionDetails);
-    conn = await pool.getConnection();
-    
-    if (await MariaCore.setMaxAllowedPacketSize(pool,conn,status,logWriter)) {
-       pool = mariadb.createPool(connectionDetails);
-       conn = await pool.getConnection();
-                                                           
-    }     
-
-    await MariaCore.configureSession(conn,status);
  	results = await MariaCore.createTargetDatabase(conn,status,parameters.TOUSER);
     const stats = fs.statSync(parameters.FILE)
     const fileSizeInBytes = stats.size
@@ -76,7 +59,7 @@ async function main() {
     status.warningsRaised = await processFile(conn, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter)
   
     await conn.end();
-    await pool.end();
+    conn = undefined;
     Yadamu.reportStatus(status,logWriter)
   } catch (e) {
     if (logWriter !== process.stdout) {
@@ -91,9 +74,10 @@ async function main() {
     if (conn !== undefined) {
       await conn.end();
     }
-    if (pool !== undefined) {
-      await pool.end();
-    }
+  }
+
+  if (pool !== undefined) {
+    await pool.end();
   }
 
   if (logWriter !== process.stdout) {
@@ -103,6 +87,8 @@ async function main() {
   if (parameters.SQLTRACE) {
     status.sqlTrace.close();
   }
+  
+  setTimeout(function() { process.exit()},500)
 }
 
 main()

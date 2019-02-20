@@ -3,14 +3,14 @@ const Readable = require('stream').Readable;
 const Transform = require('stream').Transform;
 const QueryStream = require('pg-query-stream')
 
+const PostgresCore = require('./postgresCore');
+
 const EXPORT_VERSION = 1.0;
 const DATABASE_VENDOR = 'Postgres';
 const SPATIAL_FORMAT = "WKT";
 
 const sqlGetSystemInformation =
 `select current_database() database_name,current_user,session_user,current_setting('server_version_num') database_version`;					   
-
-const sqlGenerateQueries = `select EXPORT_JSON($1)`;
 
 class DBReader extends Readable {  
 
@@ -65,32 +65,26 @@ class DBReader extends Readable {
   }
    
   async getMetadata() {
-             
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
-    }
     
-	const results = await this.pgClient.query(sqlGenerateQueries,[this.schema]);
-    const metadata = results.rows[0].export_json;
-    
-    this.tableInfo = Object.keys(metadata).map(function(value) {
-      return {TABLE_NAME : value, SQL_STATEMENT : metadata[value].sqlStatemeent}
-    })
-    
-    return metadata;    
+    const metadata = await PostgresCore.generateMetadata(this.pgClient,this.schema,this.status);      
+    this.tableInfo = PostgresCore.getTableInfo(metadata);
+    return metadata
+  
   }
   
-  async pipeTableData(sqlStatement,outputStream) {
+  async pipeTableData(sqlStatement,outputStream) {44
 
-    function waitUntilEmpty(outputStream,resolve) {
+    function waitUntilEmpty(outputStream,outputStreamError,resolve) {
         
       const recordsRemaining = outputStream.writableLength;
       if (recordsRemaining === 0) {
+        outputStream.removeListener('error',outputStreamError)
+        // console.log(`${new Date().toISOString()}[${DATABASE_VENDOR}]: Writer Complete.`);
         resolve(counter);
       } 
       else  {
         // console.log(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBReader Records Reamaining ${recordsRemaining}.`);
-        setTimeout(waitUntilEmpty, 10,outputStream,resolve);
+        setTimeout(waitUntilEmpty, 10,outputStream,outputStreamError,resolve);
       }   
     }
    
@@ -115,7 +109,7 @@ class DBReader extends Readable {
     return new Promise(async function(resolve,reject) {
       const outputStreamError = function(err){reject(err)}        
       outputStream.on('error',outputStreamError);
-      parser.on('finish',function() {outputStream.removeListener('error',outputStreamError);waitUntilEmpty(outputStream,resolve)})
+      parser.on('finish',function() {waitUntilEmpty(outputStream,outputStreamError,resolve)})
       parser.on('error',function(err){reject(err)});
       stream.on('error',function(err){reject(err)});
       stream.pipe(parser).pipe(outputStream,{end: false })

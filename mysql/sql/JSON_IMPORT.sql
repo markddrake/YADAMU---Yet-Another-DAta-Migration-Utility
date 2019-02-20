@@ -77,9 +77,9 @@ BEGIN
         when 'datetime' then
           return 'datetime(3)';
         when 'datetime2' then
-          return 'datatime';
+          return 'datetime';
         when 'datetimeoffset' then
-          return 'datatime';
+          return 'datetime';
         when 'geography' then
           return 'geometry';
         when 'geometry' then
@@ -115,7 +115,7 @@ BEGIN
         when 'rowversion' then
           return 'binary(8)';
         when 'smalldate' then
-          return 'datatime';
+          return 'datetime';
         when 'smallmoney' then
           return 'decimal(10,4)';
         when 'text' then
@@ -185,6 +185,9 @@ BEGIN
   DECLARE V_DML_STATEMENT      TEXT;
   DECLARE V_DDL_STATEMENT      TEXT;
   DECLARE V_TARGET_DATA_TYPES  TEXT;
+  DECLARE V_ACTUAL_DATA_TYPES  TEXT;
+
+  DECLARE V_COLUMN_COUNT      INT;
   
   with 
     "SOURCE_TABLE_DEFINITIONS" 
@@ -353,13 +356,10 @@ BEGIN
                     ) COLUMN_PATTERNS
       into V_COLUMNS_CLAUSE, V_TARGET_DATA_TYPES, V_INSERT_SELECT_LIST, V_COLUMN_PATTERNS
       from "TARGET_TABLE_DEFINITIONS";
-      
-     
-    SET V_DDL_STATEMENT = concat('create table if not exists "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',CHAR(32),V_COLUMNS_CLAUSE,')'); 
-    SET V_DML_STATEMENT = concat('insert into "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',P_COLUMN_LIST,')',CHAR(32),'select ',V_INSERT_SELECT_LIST,CHAR(32),'  from "JSON_STAGING" js,JSON_TABLE(js."DATA",''$.data."',P_TABLE_NAME,'"[*]'' COLUMNS (',CHAR(32),V_COLUMN_PATTERNS,')) data');
-    
-    SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',CAST(V_TARGET_DATA_TYPES as JSON));
-    -- SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',V_TARGET_DATA_TYPES);
+
+  SET V_DDL_STATEMENT = concat('create table if not exists "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',CHAR(32),V_COLUMNS_CLAUSE,')'); 
+  SET V_DML_STATEMENT = concat('insert into "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',P_COLUMN_LIST,')',CHAR(32),'select ',V_INSERT_SELECT_LIST,CHAR(32),'  from "JSON_STAGING" js,JSON_TABLE(js."DATA",''$.data."',P_TABLE_NAME,'"[*]'' COLUMNS (',CHAR(32),V_COLUMN_PATTERNS,')) data');     
+  SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',CAST(V_TARGET_DATA_TYPES as JSON));
     
 END;
 $$

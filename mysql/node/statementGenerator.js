@@ -17,22 +17,15 @@ class StatementGenerator {
   async executeDDL(ddlStatements) {
     await Promise.all(ddlStatements.map(async function(ddlStatement) {
                                           try {
-                                            return await MySQLCore.query(this.conn,this.status,ddlStatement) 
+                                            if (ddlStatement != null) {
+                                              return await MySQLCore.query(this.conn,this.status,ddlStatement) 
+                                            }
+                                            return null;
                                           } catch (e) {
-                                            this.logWriter.write(`${e}\n${statementCache[table].ddl}\n`)
+                                            this.logWriter.write(`${e}\n${ddlStatement}\n`)
                                           }
     },this))
   }  
-  
-  async executeDDL(ddlStatements) {
-    await Promise.all(ddlStatements.map(async function(ddlStatement) {
-                                          try {
-                                            return await MySQLCore.query(this.conn,this.status,ddlStatement) 
-                                          } catch (e) {
-                                            this.logWriter.write(`${e}\n${statementCache[table].ddl}\n`)
-                                          }
-    },this))
-  }
   
   async generateStatementCache(schema, systemInformation, metadata) {
       

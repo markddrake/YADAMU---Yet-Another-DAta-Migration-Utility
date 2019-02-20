@@ -170,7 +170,7 @@ as
                  when atc.DATA_TYPE in ('BINARY_DOUBLE','BINARY_FLOAT') then
                    'TO_NUMBER("' || atc.COLUMN_NAME || '")'
                  when atc.DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE' then
-                   'TO_CHAR(SYS_EXTRACT_UTC("' || atc.COLUMN_NAME || '"),''IYYY-MM-DD"T"HH24:MI:SS.FF9"Z"'')'
+                   'TO_CHAR(SYS_EXTRACT_UTC("' || atc.COLUMN_NAME || '"),''YYYY-MM-DD"T"HH24:MI:SS' || case when atc.DATA_SCALE > 0 then '.FF' || atc.DATA_SCALE else '' end || '"Z"'')'
                  when atc.DATA_TYPE like 'INTERVAL DAY% TO SECOND%' then
                    '''P''
                    || extract(DAY FROM "' || atc.COLUMN_NAME || '") || ''D''
@@ -245,6 +245,10 @@ as
                    '''P''
                    || extract(YEAR FROM "' || atc.COLUMN_NAME || '") || ''Y''
                    || case when extract(MONTH FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MONTH FROM  "' || atc.COLUMN_NAME || '") || ''M'' end "' || atc.COLUMN_NAME || '"'
+                 when ((atc.DATA_TYPE = 'TIMESTAMP') or (atc.DATA_TYPE like 'TIMESTAMP(%)')) then
+                   'TO_CHAR("' || atc.COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS' || case when atc.DATA_SCALE > 0 then '.FF' || atc.DATA_SCALE else '' end || '"Z"'')'
+                 when atc.DATA_TYPE like 'TIMESTAMP%TIME ZONE' then
+                   'TO_CHAR(SYS_EXTRACT_UTC("' || atc.COLUMN_NAME || '"),''YYYY-MM-DD"T"HH24:MI:SS' || case when atc.DATA_SCALE > 0 then '.FF' || atc.DATA_SCALE else '' end || '"Z"'')'
                  when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE  in ('SDO_GEOMETRY'))) then
                    'case when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'XMLTYPE' then  -- Can be owned by SYS or PUBLIC

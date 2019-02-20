@@ -11,7 +11,6 @@ as
   C_FATAL_ERROR      CONSTANT VARCHAR2(32) := 'FATAL';
   C_WARNING          CONSTANT VARCHAR2(32) := 'WARNING';
   C_IGNOREABLE       CONSTANT VARCHAR2(32) := 'IGNORE';
-  C_XLARGE_CONTENT   CONSTANT VARCHAR2(32) := 'CONTENT_TOO_LARGE';
 --
   $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
   C_RETURN_TYPE     CONSTANT VARCHAR2(32) := 'CLOB';
@@ -766,7 +765,279 @@ as
 --
    $END
 --
-
+  CURSOR generateFromDictionary
+  is
+--
+  $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+--
+  select SERIALIZE_TABLE(
+           cast(collect('"' || atc.COLUMN_NAME || '"' ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) 
+         ) COLUMN_LIST
+        ,SERIALIZE_TABLE(
+           cast(collect('"' ||
+                        case
+                          when jc.FORMAT is not NULL then
+                            'JSON'
+                          when ((atc.DATA_TYPE = 'RAW') and (DATA_LENGTH = 1)) then
+                            'BOOLEAN'
+                          when (atc.DATA_TYPE in ('XMLTYPE','ANYDATA','RAW')) then
+                            atc.DATA_TYPE
+                          when atc.DATA_TYPE_OWNER is not NULL then
+                            '\"' || atc.DATA_TYPE_OWNER || '\".\"' || atc.DATA_TYPE || '\"'
+                          else
+                            atc.DATA_TYPE
+                        end
+                        || '"'
+                        order by INTERNAL_COLUMN_ID
+                       )
+               ) as T_VC4000_TABLE
+         ) DATA_TYPE_LIST
+        ,SERIALIZE_TABLE(
+    	   cast(collect('"' ||  
+                        case
+           		 	      when atc.DATA_TYPE in ('VARCHAR2', 'CHAR') then
+                            case 
+                              when (CHAR_LENGTH < DATA_LENGTH) then
+                                CHAR_LENGTH
+                              else 
+                                DATA_LENGTH
+                            end
+           			      when atc.DATA_TYPE in ('TIMESTAMP') or atc.DATA_TYPE LIKE '%TIME ZONE' then
+                            DATA_SCALE
+                          when atc.DATA_TYPE in ('NVARCHAR2', 'NCHAR') then
+                            CHAR_LENGTH
+                          when atc.DATA_TYPE in ('UROWID', 'RAW') or  atc.DATA_TYPE LIKE 'INTERVAL%' then
+                            DATA_LENGTH
+                          when atc.DATA_TYPE = 'NUMBER' then
+                            case 
+                              when DATA_SCALE is NOT NULL and DATA_SCALE <> 0 then
+                                DATA_PRECISION || ',' || DATA_SCALE
+                              when DATA_PRECISION is NOT NULL then
+                                DATA_PRECISION
+                              else 
+           				        38
+                            end 
+                          when atc.DATA_TYPE = 'FLOAT' then
+                            DATA_PRECISION
+                          else
+                            ''
+                        end || '"'
+           	            ORDER BY INTERNAL_COLUMN_ID
+                       ) 
+                       as T_VC4000_TABLE
+               ) 
+         ) SIZE_CONSTRAINT_LIST
+        ,SERIALIZE_TABLE(
+           cast(collect(-- Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results
+                        case
+                          when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE = 'SDO_GEOMETRY')) then
+                            'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || atc.COLUMN_NAME || '") end'
+                          when atc.DATA_TYPE = 'XMLTYPE' then
+                            -- Cannot map directly to XMLTYPE constructor as we need to test for NULL. 
+                            'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || atc.COLUMN_NAME || '") end'
+                           when ((atc.DATA_TYPE_OWNER = 'SYS') and (atc.DATA_TYPE = 'ANYDATA')) then
+                             -- ### TODO - Better deserialization of ANYDATA.
+                             'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || atc.COLUMN_NAME || '") end' 
+                          when atc.DATA_TYPE = 'RAW' then
+                            '"' || atc.COLUMN_NAME || '"'
+                          when atc.DATA_TYPE_OWNER is not NULL then
+                            '"#' || atc.DATA_TYPE || '"("' || atc.COLUMN_NAME || '")'
+                          else
+                            case
+                              when atc.DATA_TYPE = 'BFILE' then
+                                'OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || atc.COLUMN_NAME || '")' 
+                              when atc.DATA_TYPE = 'BLOB' then
+                                $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                                'OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || atc.COLUMN_NAME || '")'
+                                $ELSE
+                                'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else HEXTORAW("' || atc.COLUMN_NAME || '") end'
+                                $END
+                              else
+                                '"' || atc.COLUMN_NAME || '"'
+                            end
+                        end
+                        || '"'
+                        order by INTERNAL_COLUMN_ID
+                       )
+                       as T_VC4000_TABLE
+                )
+           )
+         ) INSERT_SELECT_LIST    
+    from ALL_ALL_TABLES aat
+         inner join ALL_TAB_COLS atc
+                 on atc.OWNER = aat.OWNER
+                and atc.TABLE_NAME = aat.TABLE_NAME
+    left outer join ALL_JSON_COLUMNS jc
+                 on jc.COLUMN_NAME = atc.COLUMN_NAME
+                AND jc.TABLE_NAME = atc.TABLE_NAME
+                and jc.OWNER = atc.OWNER
+   where aat.DROPPED = 'NO'
+     and (
+           ((TABLE_TYPE is NULL) and (HIDDEN_COLUMN = 'NO'))
+         or 
+           ((TABLE_TYPE is not NULL) and (atc.COLUMN_NAME in ('SYS_NC_ROWINFO$','SYS_NC_OID$','ACLOID','OWNERID')))
+         )        
+     and aat.OWNER in P_TARGET_SCHEMA
+	 aat.TABLE_NAME = P_TABLE_NAME;
+     
+     RIALIZE_TABLE(
+           cast(collect(
+                        -- Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results
+                        case
+                          when atc.DATA_TYPE_OWNER is NULL then
+                            case 
+                              when atc.DATA_TYPE = 'BFILE' then
+                                'OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || atc.COLUMN_NAME || '")' 
+                              when atc.DATA_TYPE = 'BLOB' then
+                                $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                                'OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || atc.COLUMN_NAME || '")'
+                                $ELSE
+                                'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else HEXTORAW("' || atc.COLUMN_NAME || '") end'
+                                $END
+                              else
+                                '"' || atc.COLUMN_NAME || '"'
+                            end
+                          else
+                            case
+                              when atc.DATA_TYPE = 'RAW' then
+                                '"' || atc.COLUMN_NAME || '"'
+                              when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE = 'SDO_GEOMETRY')) then
+                                'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || atc.COLUMN_NAME || '") end'
+                              when ((atc.DATA_TYPE_OWNER in ('SYS','PUBLIC')) and (atc.DATA_TYPE = 'XMLTYPE')) then
+                                -- Cannot map directly to XMLTYPE constructor as we need to test for NULL. 
+                                'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || atc.COLUMN_NAME || '") end'
+                              when ((atc.DATA_TYPE_OWNER = 'SYS') and (atc.DATA_TYPE = 'ANYDATA')) then
+                                -- ### TODO - Better deserialization of ANYDATA.
+                                'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || atc.COLUMN_NAME || '") end' 
+                              else
+                                '"#' || atc.DATA_TYPE || '"("' || atc.COLUMN_NAME || '")'
+                            end
+                        end
+                        order by INTERNAL_COLUMN_ID
+               )
+               as T_VC4000_TABLE
+           )
+         ) INSERT_SELECT_LIST
+        ,cast(collect(case
+                        when atc.DATA_TYPE_OWNER is NULL then
+                          NULL
+                        when atc.DATA_TYPE = 'RAW' then
+                          NULL
+                        when ((atc.DATA_TYPE_OWNER in ('SYS','PUBLIC')) and (atc.DATA_TYPE = 'XMLTYPE')) then
+                          NULL
+                        when ((atc.DATA_TYPE_OWNER = 'SYS') and (atc.DATA_TYPE = 'ANYDATA')) then
+                          NULL
+                        when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE = 'SDO_GEOMETRY')) then
+                          NULL
+                        else
+                          OBJECT_SERIALIZATION.DESERIALIZE_TYPE(atc.DATA_TYPE_OWNER,atc.DATA_TYPE)
+                      end 
+                      order by INTERNAL_COLUMN_ID
+             )
+             as T_VC4000_TABLE
+         ) "DESERIALIZATION_FUNCTIONS"
+    from ALL_ALL_TABLES aat
+         inner join ALL_TAB_COLS atc
+                 on atc.OWNER = aat.OWNER
+                and atc.TABLE_NAME = aat.TABLE_NAME
+         left outer join ALL_JSON_COLUMNS jc    
+                 on jc.COLUMN_NAME = atc.COLUMN_NAME
+                AND jc.TABLE_NAME = atc.TABLE_NAME
+                and jc.OWNER = atc.OWNER  
+  where aat.TABLE_NAME = P_TABLE_NAME
+    and aat.OWNER = P_TARGET_SCHEMA
+    and (
+          ((TABLE_TYPE is NULL) and (HIDDEN_COLUMN = 'NO'))
+        or 
+          ((TABLE_TYPE is not NULL) and (atc.COLUMN_NAME in ('SYS_NC_ROWINFO$','SYS_NC_OID$','ACLOID','OWNERID')))
+        );
+--
+  $ELSE
+--
+  -- cast(collect(...) causes ORA-22814: attribute or element value is larger than specified in type in 12.2
+  select
+         -- Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results
+         case
+           when atc.DATA_TYPE_OWNER is NULL then
+             case 
+               when atc.DATA_TYPE = 'BFILE' then
+                 'OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || atc.COLUMN_NAME || '")' 
+               when atc.DATA_TYPE = 'BLOB' then
+                 $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                 'OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || atc.COLUMN_NAME || '")'
+                 $ELSE
+                 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else HEXTORAW("' || atc.COLUMN_NAME || '") end'
+                 $END
+               else
+                 '"' || atc.COLUMN_NAME || '"'
+             end
+           else
+             case
+               when atc.DATA_TYPE = 'RAW' then
+                 '"' || atc.COLUMN_NAME || '"'
+               when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE = 'SDO_GEOMETRY')) then
+                 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || atc.COLUMN_NAME || '") end'
+               when ((atc.DATA_TYPE_OWNER in ('SYS','PUBLIC')) and (atc.DATA_TYPE = 'XMLTYPE')) then
+                 -- Cannot map directly to XMLTYPE constructor as we need to test for NULL. 
+                 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || atc.COLUMN_NAME || '") end'
+               when ((atc.DATA_TYPE_OWNER = 'SYS') and (atc.DATA_TYPE = 'ANYDATA')) then
+                 -- ### TODO - Better deserialization of ANYDATA.
+                 'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || atc.COLUMN_NAME || '") end' 
+               else
+                 '"#' || atc.DATA_TYPE || '"("' || atc.COLUMN_NAME || '")'
+             end
+         end INSERT_SELECT_LIST
+        ,'"' ||
+         case
+           when jc.FORMAT is not NULL then
+             'JSON'
+           when ((atc.DATA_TYPE = 'RAW') and (DATA_LENGTH = 1)) then
+             'BOOLEAN'
+           when atc.DATA_TYPE_OWNER is NULL then
+             atc.DATA_TYPE
+           when atc.DATA_TYPE = 'RAW' then
+             atc.DATA_TYPE
+           when ((atc.DATA_TYPE_OWNER in ('SYS','PUBLIC')) and (atc.DATA_TYPE = 'XMLTYPE')) then
+             atc.DATA_TYPE
+           when ((atc.DATA_TYPE_OWNER = 'SYS') and (atc.DATA_TYPE = 'ANYDATA')) then
+             atc.DATA_TYPE
+           else
+             '\"' || atc.DATA_TYPE_OWNER || '\".\"' || atc.DATA_TYPE || '\"'
+         end 
+         || '"' TARGET_DATA_TYPES
+        ,case
+           when atc.DATA_TYPE_OWNER is NULL then
+             NULL
+           when atc.DATA_TYPE = 'RAW' then
+             NULL
+           when ((atc.DATA_TYPE_OWNER in ('SYS','PUBLIC')) and (atc.DATA_TYPE = 'XMLTYPE')) then
+             NULL
+           when ((atc.DATA_TYPE_OWNER = 'SYS') and (atc.DATA_TYPE = 'ANYDATA')) then
+             NULL
+           when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE = 'SDO_GEOMETRY')) then
+             NULL
+           else
+             OBJECT_SERIALIZATION.DESERIALIZE_TYPE(atc.DATA_TYPE_OWNER,atc.DATA_TYPE)
+         end "DESERIALIZATION_FUNCTIONS"
+    from ALL_ALL_TABLES aat
+         inner join ALL_TAB_COLS atc
+                 on atc.OWNER = aat.OWNER
+                and atc.TABLE_NAME = aat.TABLE_NAME
+       left outer join ALL_JSON_COLUMNS jc    
+                 on jc.COLUMN_NAME = atc.COLUMN_NAME
+                AND jc.TABLE_NAME = atc.TABLE_NAME
+                and jc.OWNER = atc.OWNER  
+    where aat.TABLE_NAME = P_TABLE_NAME
+    and aat.OWNER = P_TARGET_SCHEMA
+    and (
+          ((TABLE_TYPE is NULL) and (HIDDEN_COLUMN = 'NO'))
+        or 
+          ((TABLE_TYPE is not NULL) and (atc.COLUMN_NAME in ('SYS_NC_ROWINFO$','SYS_NC_OID$','ACLOID','OWNERID')))
+        )
+  order by INTERNAL_COLUMN_ID;
+--
+  $END
+--
   V_COLUMNS_CLAUSE            CLOB;
   V_INSERT_SELECT_LIST        CLOB;
   V_COLUMN_PATTERNS           CLOB;
@@ -801,43 +1072,6 @@ end;';
   V_EXISTING_TABLE    PLS_INTEGER := 0; 
 begin
 
-  DBMS_LOB.CREATETEMPORARY(V_DML_STATEMENT,TRUE,DBMS_LOB.SESSION);
---
-  $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
---
-   -- Cursor only generates one row (Aggregration Operation),
-  for o in generateStatementComponents loop
-    V_COLUMNS_CLAUSE         := o.COLUMNS_CLAUSE;
-    V_INSERT_SELECT_LIST     := o.INSERT_SELECT_LIST;
-    V_TARGET_DATA_TYPES      := o.TARGET_DATA_TYPES;
-    V_COLUMN_PATTERNS        := o.COLUMN_PATTERNS;
-    
-    select distinct COLUMN_VALUE 
-      bulk collect into V_DESERIALIZATIONS
-      from table(o.DESERIALIZATION_FUNCTIONS)
-     where COLUMN_VALUE is not null;
-    
-  end loop;
---
-  $ELSE
---
-  open generateStatementComponents;
-  fetch generateStatementComponents
-        bulk collect into V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_TARGET_DATA_TYPES_TABLE, V_COLUMN_PATTERNS_TABLE, V_DESERIALIZATION_FUNCTIONS;
-
-  V_COLUMNS_CLAUSE := SERIALIZE_TABLE(V_COLUMNS_CLAUSE_TABLE);
-  V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
-  V_TARGET_DATA_TYPES := SERIALIZE_TABLE(V_TARGET_DATA_TYPES_TABLE);
-  V_COLUMN_PATTERNS := SERIALIZE_TABLE(V_COLUMN_PATTERNS_TABLE);
-
-  select distinct COLUMN_VALUE
-    bulk collect into V_DESERIALIZATIONS
-    from table(V_DESERIALIZATION_FUNCTIONS)
-   where COLUMN_VALUE is not null;
-
---
-  $END
---
   begin 
     select 1
       into V_EXISTING_TABLE
@@ -851,7 +1085,44 @@ begin
       RAISE;
   end;
   
+  DBMS_LOB.CREATETEMPORARY(V_DML_STATEMENT,TRUE,DBMS_LOB.SESSION);
+
   if (V_EXISTING_TABLE = 0) then 
+--
+    $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+--
+    -- Cursor only generates one row (Aggregration Operation),
+    for o in generateStatementComponents loop
+      V_COLUMNS_CLAUSE         := o.COLUMNS_CLAUSE;
+      V_INSERT_SELECT_LIST     := o.INSERT_SELECT_LIST;
+      V_TARGET_DATA_TYPES      := o.TARGET_DATA_TYPES;
+      V_COLUMN_PATTERNS        := o.COLUMN_PATTERNS;
+    
+      select distinct COLUMN_VALUE 
+        bulk collect into V_DESERIALIZATIONS
+        from table(o.DESERIALIZATION_FUNCTIONS)
+       where COLUMN_VALUE is not null;
+     
+    end loop;
+--
+    $ELSE
+--
+    open generateStatementComponents;
+    fetch generateStatementComponents
+          bulk collect into V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_TARGET_DATA_TYPES_TABLE, V_COLUMN_PATTERNS_TABLE, V_DESERIALIZATION_FUNCTIONS;
+
+    V_COLUMNS_CLAUSE := SERIALIZE_TABLE(V_COLUMNS_CLAUSE_TABLE);
+    V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
+    V_TARGET_DATA_TYPES := SERIALIZE_TABLE(V_TARGET_DATA_TYPES_TABLE);
+    V_COLUMN_PATTERNS := SERIALIZE_TABLE(V_COLUMN_PATTERNS_TABLE);
+
+    select distinct COLUMN_VALUE
+      bulk collect into V_DESERIALIZATIONS
+      from table(V_DESERIALIZATION_FUNCTIONS)
+     where COLUMN_VALUE is not null;
+--
+   $END
+--
     -- Table does not exist: Generate DDL Statement
     DBMS_LOB.CREATETEMPORARY(V_DDL_STATEMENT,TRUE,DBMS_LOB.SESSION);
     V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK1 || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (' || C_NEWLINE || ' ';
@@ -859,6 +1130,39 @@ begin
     DBMS_LOB.APPEND(V_DDL_STATEMENT,V_COLUMNS_CLAUSE);
     V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK2;
     DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+  else
+    -- Update INSERT_SELECT_LIST, TARGET_DATA_TYPES and DESERIALIZATIONS based on existing table metadata.
+    --
+    $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+    --
+    -- Cursor only generates one row (Aggregration Operation),
+    for o in generateFromDictionary loop
+      V_INSERT_SELECT_LIST     := o.INSERT_SELECT_LIST;
+      V_TARGET_DATA_TYPES      := o.TARGET_DATA_TYPES;
+    
+      select distinct COLUMN_VALUE 
+        bulk collect into V_DESERIALIZATIONS
+        from table(o.DESERIALIZATION_FUNCTIONS)
+       where COLUMN_VALUE is not null;
+    
+    end loop;
+--
+    $ELSE
+-- 
+    open generateFromDictionary;
+    fetch generateFromDictionary
+        bulk collect into V_INSERT_SELECT_TABLE, V_TARGET_DATA_TYPES_TABLE, V_DESERIALIZATION_FUNCTIONS;
+
+    V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
+    V_TARGET_DATA_TYPES := SERIALIZE_TABLE(V_TARGET_DATA_TYPES_TABLE);
+
+    select distinct COLUMN_VALUE
+      bulk collect into V_DESERIALIZATIONS
+      from table(V_DESERIALIZATION_FUNCTIONS)
+     where COLUMN_VALUE is not null;
+--
+    $END
+--
   end if;
   
   if ( V_DESERIALIZATIONS.count > 0) then
@@ -1116,7 +1420,6 @@ procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHA
 as
   MUTATING_TABLE      EXCEPTION ; PRAGMA EXCEPTION_INIT( MUTATING_TABLE , -04091 );
   INVALID_IMPORT_FILE EXCEPTION ; PRAGMA EXCEPTION_INIT( INVALID_IMPORT_FILE , -40441 );
-  XLARGE_CONTENT      EXCEPTION ; PRAGMA EXCEPTION_INIT( XLARGE_CONTENT , -40478 );
 
   V_CURRENT_SCHEMA    CONSTANT VARCHAR2(128) := SYS_CONTEXT('USERENV','CURRENT_SCHEMA');
 
@@ -1220,8 +1523,6 @@ begin
               when others then
                 LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
              end;
-          when XLARGE_CONTENT then
-            LOG_ERROR(C_XLARGE_CONTENT,o.TABLE_NAME,V_STATEMENT,V_SQLCODE,V_SQLERRM,V_DETAILS);
           when others then
             LOG_ERROR(C_FATAL_ERROR,o.TABLE_NAME,V_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
         end;

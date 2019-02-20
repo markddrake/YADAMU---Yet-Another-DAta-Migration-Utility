@@ -1,11 +1,13 @@
 "use strict";
 const fs = require('fs');
 const path = require('path');
-const mariadb = require('mariadb');
 
 const Yadamu = require('../../common/yadamuCore.js');
 const FileWriter = require('../../common/fileWriter.js');
 const MariaCore = require('./mariaCore.js');const DBReader = require('./dbReader.js');
+
+const EXPORT_VERSION = 1.0;
+const DATABASE_VENDOR = 'MariaDB';
 
 function processFile(conn, schema, outputStream ,mode, status,logWriter) {
   
@@ -36,6 +38,7 @@ function closeFile(outStream) {
 async function main(){
 
   let pool;
+  let conn;
   let parameters;
   let logWriter = process.stdout;
   let status;
@@ -53,18 +56,8 @@ async function main(){
       logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
     }
     
-   const connectionDetails = {
-       
-            host        : parameters.HOSTNAME
-           ,user        : parameters.USERNAME
-           ,password    : parameters.PASSWORD
-           ,port        : parameters.PORT ? parameters.PORT : 3307
-           ,rowsAsArray : false
-    }
-    
-    pool = mariadb.createPool(connectionDetails);
-    const conn = await pool.getConnection();
-    MariaCore.configureSession(conn,status)
+    pool = await MariaCore.getConnectionPool(parameters,status,logWriter);
+    conn = await MariaCore.getConnectionFromPool(pool,status,logWriter);
     
     const exportFilePath = path.resolve(parameters.FILE);
     let exportFile = fs.createWriteStream(exportFilePath);
@@ -74,7 +67,7 @@ async function main(){
     await processFile(conn,parameters.OWNER,exportFile,'DATA_ONLY',status,logWriter);
     await closeFile(exportFile);
 	await conn.end();
- 	await pool.end();
+    conn = undefined;
     
     Yadamu.reportStatus(status,logWriter);
   } catch (e) {
@@ -87,9 +80,9 @@ async function main(){
         console.log('Export operation Failed.');
         console.log(e);
     }
-	if (pool !== undefined) {
-      await pool.end();
-	}
+    if (conn !== undefined) {
+      await conn.end();
+    }
   }
   
   if (logWriter !== process.stdout) {
@@ -100,6 +93,7 @@ async function main(){
     status.sqlTrace.close();
   }
   
+  setTimeout(function() { process.exit()},500)
 }
 
 main();

@@ -44,7 +44,7 @@ BEGIN
              when @DATA_TYPE like '"%"."%"'
                then 'nvarchar(max)'
              when @DATA_TYPE = 'JSON' 
-               then 'nvarchar(max)'
+               then 'json'
              else
                lower(@DATA_TYPE)
            end
@@ -63,7 +63,7 @@ BEGIN
              when @DATA_TYPE = 'year'
                then 'smallint'
              when @DATA_TYPE = 'json' 
-               then 'nvarchar(max)'
+               then 'json'
              when @DATA_TYPE = 'blob' and @DATA_TYPE_LENGTH > 8000  
                then 'varbinary(max)'
              when @DATA_TYPE = 'blob' 
@@ -85,7 +85,7 @@ BEGIN
   DECLARE @COLUMNS_CLAUSE     NVARCHAR(MAX);
   DECLARE @INSERT_SELECT_LIST NVARCHAR(MAX);
   DECLARE @WITH_CLAUSE        NVARCHAR(MAX);
-  DECLARE @TARGET_DATA_TYPES  NVARCHAR(MAX);
+  DECLARE @TARGET_DATA_TYPES  NVARCHAR(MAX)
   
   DECLARE @DDL_STATEMENT      NVARCHAR(MAX);
   DECLARE @DML_STATEMENT      NVARCHAR(MAX);
@@ -120,7 +120,9 @@ BEGIN
   SELECT @COLUMNS_CLAUSE =
          STRING_AGG(CONCAT('"',"COLUMN_NAME",'" ',
                            case
-                             when (CHARINDEX('(',"TARGET_DATA_TYPE") > 0) then  
+                             when "TARGET_DATA_TYPE" = 'json' then
+                               'nvarchar(max)'
+                             when TARGET_DATA_TYPE LIKE '%(%)%' then
                                "TARGET_DATA_TYPE"
                              when "TARGET_DATA_TYPE" in('xml','text','ntext','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney','geography','geometry','hierarchyid','uniqueidentifier')  then
                                "TARGET_DATA_TYPE"                
@@ -144,9 +146,9 @@ BEGIN
                 STRING_AGG(CONCAT(
                                   '"',
                                   case
-                                    when TARGET_DATA_TYPE LIKE '%(%}%' then
+                                    when "TARGET_DATA_TYPE" LIKE '%(%)%' then
                                       "TARGET_DATA_TYPE"
-                                    when "TARGET_DATA_TYPE" in('xml','text','ntext','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney') then
+                                    when "TARGET_DATA_TYPE" in('json','xml','text','ntext','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney') then
                                       "TARGET_DATA_TYPE"                 
                                     when "DATA_TYPE_SCALE" IS NOT NULL then
                                       CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
@@ -175,10 +177,14 @@ BEGIN
                       when "TARGET_DATA_TYPE" in ('binary','varbinary') then
                         case
                           when ((DATA_TYPE_LENGTH = -1) OR (DATA_TYPE = 'BLOB') or ((CHARINDEX('"."',DATA_TYPE) > 0))) then
-                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(max),data."',"COLUMN_NAME",'",2) "',COLUMN_NAME,'"')
+                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(max),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
                           else 
-                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",'),data."',"COLUMN_NAME",'",2) "',COLUMN_NAME,'"')
+                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",'),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
                         end
+                      when "TARGET_DATA_TYPE" = 'geometry' then
+                        CONCAT('GEOMETRY::STGeomFromText(data."',"COLUMN_NAME",'",0) "',"COLUMN_NAME",'"')
+                      when "TARGET_DATA_TYPE" = 'geography' then
+                        CONCAT('GEOGRAPHY::STGeomFromText(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
                       else
                         CONCAT('data."',"COLUMN_NAME",'"')
                     end 
@@ -187,6 +193,8 @@ BEGIN
        ,@WITH_CLAUSE =
         STRING_AGG(CONCAT('"',COLUMN_NAME,'" ',
                           case            
+                            when "TARGET_DATA_TYPE" = 'json' then
+                              'nvarchar(max)'                
                             when "TARGET_DATA_TYPE" = 'varbinary(max)' then
                               'varchar(max)'                
                             when (CHARINDEX('(',"TARGET_DATA_TYPE") > 0) then
@@ -229,8 +237,8 @@ BEGIN
                         ,','                    
                    )
       FROM "TARGET_TABLE_DEFINITION" tt;
-     
-   SET @DDL_STATEMENT = CONCAT('if object_id(''"',@SCHEMA,'"."',@TABLE_NAME,'"'',''U'') is NULL create table "',@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMNS_CLAUSE,')');
+      
+   SET @DDL_STATEMENT = CONCAT('if object_id(''"',@SCHEMA,'"."',@TABLE_NAME,'"'',''U'') is NULL create table "',@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMNS_CLAUSE,')');   
    SET @DML_STATEMENT = CONCAT('insert into "' ,@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMN_LIST,') select ',@INSERT_SELECT_LIST,'  from "#JSON_STAGING" s cross apply OPENJSON("DATA",''$.data."',@TABLE_NAME,'"'') with ( ',@WITH_CLAUSE,') data');
    RETURN JSON_MODIFY(JSON_MODIFY(JSON_MODIFY('{}','$.ddl',@DDL_STATEMENT),'$.dml',@DML_STATEMENT),'$.targetDataTypes',JSON_QUERY(@TARGET_DATA_TYPES))
 end;
@@ -245,7 +253,7 @@ BEGIN
   DECLARE @SQL_STATEMENT    NVARCHAR(MAX);
   
   DECLARE @START_TIME       DATETIME2;
-  DECLARE @end_TIME         DATETIME2;
+  DECLARE @END_TIME         DATETIME2;
   DECLARE @ELAPSED_TIME     BIGINT;  
   DECLARE @ROW_COUNT        BIGINT;
  
@@ -304,8 +312,8 @@ BEGIN
         SET @SQL_STATEMENT = JSON_VALUE(@STATEMENTS,'$.dml')
         EXEC(@SQL_STATEMENT)
         SET @ROW_COUNT = @@ROWCOUNT;
-        SET @end_TIME = SYSUTCDATETIME();
-        SET @ELAPSED_TIME = DATEDIFF(MILLISECOND,@START_TIME,@end_TIME);
+        SET @END_TIME = SYSUTCDATETIME();
+        SET @ELAPSED_TIME = DATEDIFF(MILLISECOND,@START_TIME,@END_TIME);
         SET @LOG_ENTRY = (
           select @TABLE_NAME as [dml.tableName], @ROW_COUNT as [dml.rowCount], @ELAPSED_TIME as [dml.elapsedTime], @SQL_STATEMENT  as [dml.sqlStatement]
              for JSON PATH, INCLUDE_NULL_VALUES

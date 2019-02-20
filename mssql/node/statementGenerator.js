@@ -5,12 +5,12 @@ const Yadamu = require('../../common/yadamuCore.js');
 
 class StatementGenerator {
   
-  constructor(conn, status, logWriter) {
+  constructor(pool, status, logWriter) {
     
     // super();
     const statementGenerator = this;
     
-    this.conn = conn;
+    this.pool = pool;
     this.status = status;
     this.logWriter = logWriter;
     
@@ -19,7 +19,7 @@ class StatementGenerator {
   decomposeDataType(targetDataType) {
     const dataType = Yadamu.decomposeDataType(targetDataType);
     if (dataType.length === -1) {
-      dataType.length =sql.MAX;
+      dataType.length = sql.MAX;
     }
     return dataType;
   }
@@ -121,6 +121,9 @@ class StatementGenerator {
         case 'nvarchar':
           table.columns.add(columns[idx],sql.NVarChar(dataType.length), {nullable: true});
           break;
+        case 'json':
+          table.columns.add(columns[idx],sql.NVarChar(sql.MAX), {nullable: true});
+          break;
         case 'xml':
           // Added to Unsupported
           // Invalid column data type for bulk load
@@ -208,9 +211,9 @@ class StatementGenerator {
     return table
   }
 
-  async createPreparedStatement(transaction, insertStatement, targetDataTypes) {
-
-    const ps = await new sql.PreparedStatement(transaction);
+  async createPreparedStatement(pool, insertStatement, targetDataTypes) {
+      
+    const ps = await new sql.PreparedStatement(pool);
     targetDataTypes.forEach(function (targetDataType,idx) {
       const dataType = this.decomposeDataType(targetDataType);
       const column = 'C' + idx;
@@ -270,6 +273,8 @@ class StatementGenerator {
         case 'nvarchar':
           ps.input(column,sql.NVarChar(dataType.length));
           break;
+        case 'json':
+          ps.input(column,NVarChar(sql.MAX));
         case 'xml':
           ps.input(column,sql.Xml);
           break;
@@ -333,7 +338,7 @@ class StatementGenerator {
           ps.input(column,sql.VarChar(4000));
           break;
         default:
-          console.log(`createPreparedStatement(): Unmapped data type [${targetDataType}].`);
+         this.logWriter.write(`${new Date().toISOString()}: statementGenerator.createPreparedStatement(): Unmapped data type [${targetDataType}].`);
       }
     },this)
     if (this.status.sqlTrace) {
@@ -347,8 +352,7 @@ class StatementGenerator {
     
 
     const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;					   
-    let request = await new sql.Request(this.conn);
-    let results = await request.input('TARGET_DATABASE',sql.VARCHAR,schema).input('METADATA',sql.NVARCHAR,JSON.stringify({systemInformation: systemInformation, metadata : metadata})).execute('GENERATE_SQL');
+    let results = await this.pool.request().input('TARGET_DATABASE',sql.VARCHAR,schema).input('METADATA',sql.NVARCHAR,JSON.stringify({systemInformation: systemInformation, metadata : metadata})).execute('GENERATE_SQL');
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
     const tables = Object.keys(metadata); 
@@ -360,7 +364,7 @@ class StatementGenerator {
                                            this.status.sqlTrace.write(`${tableInfo.ddl};\n--\n`);
                                          }
                                          try {
-                                           const results = await request.batch(statementCache[table].ddl)   
+                                           const results = await this.pool.request().batch(statementCache[table].ddl)   
                                          } catch (e) {
                                            this.logWriter.write(`${e}\n${tableInfo.ddl}\n`)
                                          } 
@@ -377,10 +381,10 @@ class StatementGenerator {
                                            else {
                                              // Just so we have somewhere to cache the data
                                              tableInfo.bulkOperation = new sql.Table();
-                                             tableInfo.preparedStatement = await this.createPreparedStatement(this.conn, tableInfo.dml, tableInfo.targetDataTypes) 
+                                             tableInfo.preparedStatement = await this.createPreparedStatement(this.pool, tableInfo.dml, tableInfo.targetDataTypes) 
                                            }
                                          } catch (e) {
-                                           this.logWriter.write(`${e}\n${tableInfo.ddl}\n`)
+                                           this.logWriter.write(`${new Date().toISOString()}:${e}\n${tableInfo.ddl}\n`)
                                          } 
     },this));
     return statementCache;

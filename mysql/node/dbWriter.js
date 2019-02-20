@@ -9,6 +9,10 @@ const MySQLCore = require('./mysqlCore.js');
 const EXPORT_VERSION = 1.0;
 const DATABASE_VENDOR = 'MySQL';
 
+let OPTIONS = {
+  IDENTIFIER_CASE : null
+}
+
 class DBWriter extends Writable {
   
   constructor(conn,schema,batchSize,commitSize,mode,status,logWriter,options) {
@@ -33,6 +37,7 @@ class DBWriter extends Writable {
     
     this.tableName = undefined;
     this.tableInfo = undefined;
+    this.insertMode = 'Empty';
     this.rowCount = undefined; 
     this.startTime = undefined;
     this.skipTable = true;
@@ -46,12 +51,15 @@ class DBWriter extends Writable {
   }      
   
   objectMode() {
-    
     return true;
-  
   }
- 
+    
+  setOptions(options) {
+    OPTIONS = options
+  }
+  
   async setSQLInterface() {
+      
     const sqlGetVersion = `SELECT @@version`
     const results = await MySQLCore.query(this.conn,this.status,sqlGetVersion);
     if (results[0]['@@version'] > '6.0') {
@@ -77,8 +85,18 @@ class DBWriter extends Writable {
 
   async setTable(tableName) {
        
-    this.tableName = tableName
-    this.tableInfo =  this.statementCache[tableName];
+    switch (OPTIONS.IDENTIFIER_CASE) {
+       case 'UPPER':
+         this.tableName = tableName.toUpperCase();
+         break;
+       case 'LOWER':
+         this.tableName = tableName.toLowerCase();
+         break;         
+      default: 
+        this.tableName = tableName;
+    } 
+    
+    this.tableInfo =  this.statementCache[this.tableName];
     this.rowCount = 0;
     this.batch.length = 0;
     this.startTime = new Date().getTime();
@@ -88,8 +106,10 @@ class DBWriter extends Writable {
   
    async writeBatch(status) {
     
+     this.insertMode = 'Batch';
      try {
       if (this.tableInfo.useSetClause) {
+        this.insertMode = 'Iterative';
         for (const i in this.batch) {
           try {
             const results = await MySQLCore.query(this.conn,this.status,this.tableInfo.dml,this.batch[i]);
@@ -130,7 +150,11 @@ class DBWriter extends Writable {
           this.systemInformation = obj.systemInformation;
           break;
         case 'metadata':
-          this.metadata = obj.metadata;
+          this.metadata = Yadamu.convertIdentifierCase(OPTIONS.IDENTIFIER_CASE,obj.metadata);
+          const targetTableInfo = await MySQLCore.getTableInfo(this.conn,this.schema,this.status);
+          if (targetTableInfo.length > 0) {
+             this.metadata = Yadamu.mergeMetadata(MySQLCore.generateMetadata(targetTableInfo,false),this.metadata);
+          }
           if (Object.keys(this.metadata).length > 0) {
             this.statementCache = await this.statementGenerator.generateStatementCache(this.schema, this.systemInformation, this.metadata);
           }
@@ -145,7 +169,7 @@ class DBWriter extends Writable {
             }  
             if (!this.skipTable) {
               const elapsedTime = this.endTime - this.startTime;
-              this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+              this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${this.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
             }
           }
           this.setTable(obj.table);
@@ -178,7 +202,9 @@ class DBWriter extends Writable {
                                                          obj.data[idx] = Buffer.from(obj.data[idx],'hex');
                                                          break;
                                                        case "json" :
-                                                         obj.data[idx] = JSON.stringify(obj.data[idx]);
+                                                         if (typeof obj.data[idx] === 'object') {
+                                                           obj.data[idx] = JSON.stringify(obj.data[idx]);
+                                                         }
                                                          break;
                                                        default :
                                                      }
@@ -203,7 +229,7 @@ class DBWriter extends Writable {
       }    
       callback();
     } catch (e) {
-      this.logWriter.write(`${e}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._write()() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     }
   }
@@ -217,7 +243,7 @@ class DBWriter extends Writable {
            this.endTime = await this.writeBatch();
           }  
           const elapsedTime = this.endTime - this.startTime;
-          this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+          this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${this.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
           await this.conn.commit();
         }
       }          
@@ -226,7 +252,7 @@ class DBWriter extends Writable {
       }
       callback();
     } catch (e) {
-      this.logWriter.write(`${e}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._final() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     } 
   } 
