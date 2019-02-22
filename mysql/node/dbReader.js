@@ -26,7 +26,7 @@ class DBReader extends Readable {
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
-    this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBReader ready. Mode: ${this.mode}.\n`)
+    this.logWriter.write(`${new Date().toISOString()}[DBReader ${DATABASE_VENDOR}]: Ready. Mode: ${this.mode}.\n`)
         
     this.tableInfo = [];
     
@@ -64,6 +64,7 @@ class DBReader extends Readable {
   }
 
   async getDDLOperations() {
+    return []
   }
      
   async getMetadata() {
@@ -100,9 +101,6 @@ class DBReader extends Readable {
       done();
     }
  
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlQuery};\n--\n`);
-    }
     const stream = this.conn.query(sqlQuery).stream();
 
     return new Promise(async function(resolve,reject) {
@@ -116,6 +114,10 @@ class DBReader extends Readable {
   }
     
   async getTableData(table) {
+      
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${table.SQL_STATEMENT};\n--\n`);
+    }
 
     const startTime = new Date().getTime()
     const rows = await this.pipeTableData(table.SQL_STATEMENT,this.outputStream) 
@@ -167,7 +169,8 @@ class DBReader extends Readable {
          default:
       }
     } catch (e) {
-      this.logWriter.write(`${e}\n${e.stack}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._read()]} ${e}\n`);
+      process.nextTick(() => this.emit('error',e));
     }
   }
 }

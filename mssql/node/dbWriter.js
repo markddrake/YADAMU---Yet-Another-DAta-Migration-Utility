@@ -29,7 +29,7 @@ class DBWriter extends Writable {
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
-    this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBWriter ready. Mode: ${this.mode}.\n`)
+    this.logWriter.write(`${new Date().toISOString()}[DBWriter ${DATABASE_VENDOR}]: Ready. Mode: ${this.mode}.\n`)
 
     this.metadata = undefined;
     this.statementCache = undefined;
@@ -76,8 +76,10 @@ class DBWriter extends Writable {
   }
   
   async writeBatch(status) {
+      
     if (this.tableInfo.bulkSupported) {
       try {
+        
         const results = await this.pool.request().bulk(this.tableInfo.bulkOperation);
         const endTime = new Date().getTime();
         // console.log(`Bulk(${this.tableName}). Batch size ${this.tableInfo.bulkOperation.rows.length}. Success`);
@@ -88,7 +90,6 @@ class DBWriter extends Writable {
           this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"]: Bulk Operation failed. Reason: ${e.message}\n`)
         }
         this.tableInfo.bulkSupported = false;
-        this.tableInfo.preparedStatement = await this.statementGenerator.createPreparedStatement(this.pool, this.tableInfo.dml, this.tableInfo.targetDataTypes) 
         // console.log(this.tableInfo.bulkOperation.columns);
         if (this.logDDLIssues) {
           this.logWriter.write(`${e.stack}\n`);
@@ -96,7 +97,13 @@ class DBWriter extends Writable {
         }      
       }
     }
-        
+    
+    // Cannot process table using BULK Mode. Prepare a statement use with record by record processing.
+
+    if (this.tableInfo.preparedStatement === undefined) {
+      this.tableInfo.preparedStatement = await this.statementGenerator.createPreparedStatement(this.pool, this.tableInfo.dml, this.tableInfo.targetDataTypes) 
+    }
+
     try {
       for (const r in this.tableInfo.bulkOperation.rows) {
         const args = {}
@@ -105,8 +112,7 @@ class DBWriter extends Writable {
         }
         const results = await this.tableInfo.preparedStatement.execute(args);
       }
-      
-      
+            
       const endTime = new Date().getTime();
       // console.log(`Conventional(${this.tableName}). Batch size ${this.tableInfo.bulkOperation.rows.length}. Success`);
       this.tableInfo.bulkOperation.rows.length = 0;
@@ -125,6 +131,7 @@ class DBWriter extends Writable {
   }
 
   async _write(obj, encoding, callback) {
+    
     try {
       switch (Object.keys(obj)[0]) {
         case 'systemInformation':
@@ -137,7 +144,7 @@ class DBWriter extends Writable {
              this.metadata = Yadamu.mergeMetadata(MsSQLCore.generateMetadata(targetTableInfo,false),this.metadata);
           }
           if (Object.keys(this.metadata).length > 0) {
-            this.statementCache = await this.statementGenerator.generateStatementCache(this.database, this.schema, this.systemInformation, obj.metadata, );
+            this.statementCache = await this.statementGenerator.generateStatementCache(this.database, this.schema, this.systemInformation, this.metadata, );
           }
           break;
         case 'table':
@@ -165,7 +172,6 @@ class DBWriter extends Writable {
             // await this.transaction.begin();
           }
           // Perform SQL Server specific data type conversions before pushing row to bulkOperation row cache
-
           this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
                                                    const dataType = Yadamu.decomposeDataType(targetDataType);
                                                    if (obj.data[idx] !== null) {
@@ -186,7 +192,13 @@ class DBWriter extends Writable {
                                                        case "datetime":
                                                        case "datetime2":
                                                        case "datetimeoffset":
-                                                         obj.data[idx] = obj.data[idx].endsWith('Z') ? obj.data[idx] : `${obj.data[idx]}Z`
+                                                         if (typeof obj.data[idx] === 'string') {
+                                                           obj.data[idx] = obj.data[idx].endsWith('Z') ? obj.data[idx] : `${obj.data[idx]}Z`
+                                                         }
+                                                         else {
+                                                           // Alternative is to rebuild the table with these data types mapped to date objects ....
+                                                           obj.data[idx] = obj.data[idx].toISOString();
+                                                         }
                                                          break;
                                                        default :
                                                      }
@@ -210,7 +222,7 @@ class DBWriter extends Writable {
       }    
       callback();
     } catch (e) {
-      this.logWriter.write(`${new Date().toISOString()}[DBWriter._write()() "${this.tableName}"]: ${e}\n${e.stack}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._write() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     }
   }

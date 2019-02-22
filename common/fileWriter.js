@@ -11,6 +11,7 @@ class FileWriter extends Writable {
    
     this.status = status;
     this.logWriter = logWriter;
+    this.logWriter.write(`${new Date().toISOString()}[FileWriter ${outputStream.path}]: Ready. Mode: ${this.mode}.\n`)
 
     this.outputStream = outputStream;
     this.outputStream.write('{');

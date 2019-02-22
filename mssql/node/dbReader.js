@@ -29,7 +29,7 @@ class DBReader extends Readable {
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
-    this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBReader ready. Mode: ${this.mode}.\n`)
+    this.logWriter.write(`${new Date().toISOString()}[DBReader ${DATABASE_VENDOR}]: Ready. Mode: ${this.mode}.\n`)
         
     this.tableInfo = [];
     
@@ -71,8 +71,9 @@ class DBReader extends Readable {
   }
    
   async getMetadata() {
-     this.tableInfo = await MsSQLCore.getTableInfo(this.pool.request(),this.schema,this.status)
-     return MsSQLCore.generateMetadata(this.tableInfo)
+
+    this.tableInfo = await MsSQLCore.getTableInfo(this.pool.request(),this.schema,this.status)
+    return MsSQLCore.generateMetadata(this.tableInfo)     
   }   
 
   async pipeTableData(request,tableInfo,outputStream) {
@@ -136,8 +137,12 @@ class DBReader extends Readable {
       readStream.pipe(outputStream,{end: false })
     })
   }
-    
+   
   async getTableData(tableInfo) {
+      
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${tableInfo.SQL_STATEMENT};\n--\n`);
+    }
 
     const startTime = new Date().getTime()
     const rows = await this.pipeTableData(this.pool.request(),tableInfo,this.outputStream) 
@@ -147,7 +152,6 @@ class DBReader extends Readable {
   }
   
   async _read() {
-      
     try {
       switch (this.nextPhase) {
          case 'systemInformation' :
@@ -163,12 +167,7 @@ class DBReader extends Readable {
          case 'ddl' :
            const ddl = await this.getDDLOperations();
            this.push({ddl: ddl});
-           if (this.mode === 'DDL_ONLY') {
-             this.push(null);
-           }
-           else {
-             this.nextPhase = 'metadata';
-           }
+           this.nextPhase = 'metadata';
            break;
          case 'metadata' :
            const metadata = await this.getMetadata();
@@ -183,24 +182,22 @@ class DBReader extends Readable {
                break;
              }
            }
-           if (this.tableInfo.length > 0) {
-             this.push({table : this.tableInfo[0].TABLE_NAME})
-             this.nextPhase = 'data'
-           }
+           this.nextPhase = 'complete'
            this.push(null);
            break;
          case 'data' :
-           const rows = await this.getTableData(this.tableInfo[0])
-           
-           
+           const rows = await this.getTableData(this.tableInfo[0]) 
            this.push({rowCount:rows});
            this.tableInfo.splice(0,1)
            this.nextPhase = 'table';
            break;
+         case 'complete':
+           break;
          default:
       }
     } catch (e) {
-      this.logWriter.write(`${e}\n${e.stack}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._read()]} ${e}\n`);
+      process.nextTick(() => this.emit('error',e));
     }
   }
 }

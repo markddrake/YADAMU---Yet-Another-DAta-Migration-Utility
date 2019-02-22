@@ -25,7 +25,7 @@ class DBReader extends Readable {
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
-    this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBReader ready. Mode: ${this.mode}.\n`)
+    this.logWriter.write(`${new Date().toISOString()}[DBReader ${DATABASE_VENDOR}]: Ready. Mode: ${this.mode}.\n`)
         
     this.sqlQueries = [];
     
@@ -62,6 +62,7 @@ class DBReader extends Readable {
   }
 
   async getDDLOperations() {
+    return []
   }
    
   async getMetadata() {
@@ -108,7 +109,6 @@ class DBReader extends Readable {
       }).on('end',
       function() {
         readStream.push(null);
-        outputStream.removeListener('error',outputStreamError)
         waitUntilEmpty(outputStream,outputStreamError,resolve)
       }).on('error',
       function(err) {
@@ -120,7 +120,11 @@ class DBReader extends Readable {
     
   async getTableData(tableInfo) {
 
-    const startTime = new Date().getTime()
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${tableInfo.SQL_STATEMENT}\n\/\n`)
+    }
+
+    const startTime = new Date().getTime()      
     const rows = await this.pipeTableData(this.conn,tableInfo.SQL_STATEMENT,this.outputStream) 
     const elapsedTime = new Date().getTime() - startTime
     this.logWriter.write(`${new Date().toISOString()}[DBReader "${tableInfo.TABLE_NAME}"]: Rows read: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
@@ -128,49 +132,56 @@ class DBReader extends Readable {
   }
   
   async _read() {
+    
+    try {
 
-    switch (this.nextPhase) {
-       case 'systemInformation' :
-         const sysInfo = await this.getSystemInformation();
-         this.push({systemInformation : sysInfo});
-         if (this.mode === 'DATA_ONLY') {
-           this.nextPhase = 'metadata';
-         }
-         else {
-           this.nextPhase = 'ddl';
-         }
-         break;
-       case 'ddl' :
-         const ddl = await this.getDDLOperations();
-         this.push({ddl: ddl});
-         if (this.mode === 'DDL_ONLY') {
-           this.push(null);
-         }
-         else {
-           this.nextPhase = 'metadata';
-         }
-         break;
-       case 'metadata' :
-         const metadata = await this.getMetadata();
-         this.push({metadata: metadata});
-         this.nextPhase = 'table';
-         break;
-       case 'table' :
-         if (this.tableInfo.length > 0) {
-           this.push({table : this.tableInfo[0].TABLE_NAME})
-           this.nextPhase = 'data'
-         }
-         else {
-           this.push(null);
-         }
-         break;
-       case 'data' :
-         const rows = await this.getTableData(this.tableInfo[0])
-         this.push({rowCount:rows});
-         this.tableInfo.splice(0,1)
-         this.nextPhase = 'table';
-         break;
-       default:
+      switch (this.nextPhase) {
+        case 'systemInformation' :
+          const sysInfo = await this.getSystemInformation();
+          this.push({systemInformation : sysInfo});
+          if (this.mode === 'DATA_ONLY') {
+            this.nextPhase = 'metadata';
+          }
+          else {
+            this.nextPhase = 'ddl';
+          }
+          break;
+        case 'ddl' :
+          const ddl = await this.getDDLOperations();
+          this.push({ddl: ddl});
+          if (this.mode === 'DDL_ONLY') {
+            this.push(null);
+          } 
+          else {
+            this.nextPhase = 'metadata';
+          }
+          break;
+        case 'metadata' :
+          const metadata = await this.getMetadata();
+          this.push({metadata: metadata});
+          this.nextPhase = 'table';
+          break;
+        case 'table' :
+            if (this.mode !== 'DDL_ONLY') {
+              if (this.tableInfo.length > 0) {
+                this.push({table : this.tableInfo[0].TABLE_NAME})
+                this.nextPhase = 'data'
+                break;
+              }
+            }
+            this.push(null);
+            break;
+        case 'data' :
+          const rows = await this.getTableData(this.tableInfo[0])
+          this.push({rowCount:rows});
+          this.tableInfo.splice(0,1)
+          this.nextPhase = 'table';
+          break;
+        default:
+      }
+    } catch (e) {
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._read()]} ${e}\n`);
+      process.nextTick(() => this.emit('error',e));        
     }
   }
 }

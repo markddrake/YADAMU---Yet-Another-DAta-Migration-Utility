@@ -15,10 +15,10 @@ function processFile(conn, schema, outputStream ,mode, status,logWriter) {
   return new Promise(function (resolve,reject) {
     try {
       const fileWriter = new FileWriter(outputStream,status,logWriter);
-      fileWriter.on('error',function(err){logWriter.write(`${err}\n${err.stack}\n`);})
       fileWriter.on('finish', function(){resolve()});
+      fileWriter.on('error',function(err){logWriter.write(`${new Date().toISOString()}[FileWriter.error()]}: ${err}\n`);reject(err)})
       const dbReader = new DBReader(conn,schema,fileWriter,mode,status,logWriter);
-      dbReader.on('error',function(err){logWriter.write(`${err}\n${err.stack}\n`);})
+      dbReader.on('error',function(err){logWriter.write(`${new Date().toISOString()}[DBReader.error()]}: ${err}\n`);reject(err)})
       dbReader.pipe(fileWriter);
     } catch (e) {
       logWriter.write(`${e}\n${e.stack}\n`);
@@ -60,8 +60,6 @@ async function main(){
     
     const exportFilePath = path.resolve(parameters.FILE);
     let exportFile = fs.createWriteStream(exportFilePath);
-    // exportFile.on('error',function(err) {console.log(err)})
-    logWriter.write(`${new Date().toISOString()}[Export]: Generating file "${exportFilePath}".\n`)
     
     await processFile(conn,parameters.OWNER,exportFile,parameters.MODE,status,logWriter);
     await closeFile(exportFile);

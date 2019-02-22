@@ -25,7 +25,7 @@ class DBReader extends Readable {
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
-    this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBReader ready. Mode: ${this.mode}.\n`)
+    this.logWriter.write(`${new Date().toISOString()}[DBReader ${DATABASE_VENDOR}]: Ready. Mode: ${this.mode}.\n`)
         
     this.tableInfo = [];
     
@@ -62,6 +62,7 @@ class DBReader extends Readable {
   }
 
   async getDDLOperations() {
+    return []
   }
    
   async getMetadata() {
@@ -98,10 +99,6 @@ class DBReader extends Readable {
       this.push({data : data.json})
       done();
     }
- 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
-    }
 
     const queryStream = new QueryStream(sqlStatement)
     const stream = await this.pgClient.query(queryStream)   
@@ -117,7 +114,11 @@ class DBReader extends Readable {
   }
     
   async getTableData(table) {
-
+      
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${table.SQL_STATEMENT};\n--\n`);
+    }
+    
     const startTime = new Date().getTime()
     const rows = await this.pipeTableData(table.SQL_STATEMENT,this.outputStream) 
     const elapsedTime = new Date().getTime() - startTime
@@ -140,8 +141,8 @@ class DBReader extends Readable {
            }
            break;
          case 'ddl' :
-           // const ddl = await this.getDDLOperations();
-           this.push({ddl: {}});
+           const ddl = await this.getDDLOperations();
+           this.push({ddl: ddl});
            if (this.mode === 'DDL_ONLY') {
              this.push(null);
            }
@@ -155,13 +156,14 @@ class DBReader extends Readable {
            this.nextPhase = 'table';
            break;
          case 'table' :
-           if (this.tableInfo.length > 0) {
-             this.push({table : this.tableInfo[0].TABLE_NAME})
-             this.nextPhase = 'data'
+           if (this.mode !== 'DDL_ONLY') {
+             if (this.tableInfo.length > 0) {
+               this.push({table : this.tableInfo[0].TABLE_NAME})
+               this.nextPhase = 'data'
+               break;
+             }
            }
-           else {
-             this.push(null);
-           }
+           this.push(null);
            break;
          case 'data' :
            const rows = await this.getTableData(this.tableInfo[0])
@@ -172,7 +174,8 @@ class DBReader extends Readable {
          default:
       }
     } catch (e) {
-      this.logWriter.write(`${e}\n${e.stack}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._read()]} ${e}\n`);
+      process.nextTick(() => this.emit('error',e));
     }
   }
 }

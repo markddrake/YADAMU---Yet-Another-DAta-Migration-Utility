@@ -1,4 +1,4 @@
-"use strict";
+"use st  ri  ct";
 const sql = require('mssql');
 
 const Yadamu = require('../../common/yadamuCore.js');
@@ -55,7 +55,7 @@ async function getTableInfo(request,schema,status) {
     status.sqlTrace.write(`${sqlTableInfo}\n\/\n`)
   }
     
-  const results = await request.input('SCHEMA',sql.VARCHAR,schema).batch(sqlTableInfo);
+  const results = await request.input('SCHEMA',sql.VARCHAR,schema).query(sqlTableInfo);
   return results.recordsets[0]
   
 }
@@ -177,14 +177,38 @@ async function getConnectionPool(parameters,status) {
           }
         }
         
-    const pool = new sql.ConnectionPool(config);
-    await pool.connect()
+    const pool = await new sql.ConnectionPool(config).connect();
+    pool.on('error',function(err){console.log('Pool Error:',err)});
     const statement = `SET QUOTED_IDENTIFIER ON`
     if (status.sqlTrace) {
       status.sqlTrace.write(`${statement}\n\/\n`)
     }
     await pool.query(statement);
     return pool;
+    
+}
+
+async function getConnection(parameters,status) {
+
+  const config = {
+          server          : parameters.HOSTNAME
+         ,user            : parameters.USERNAME
+         ,database        : parameters.DATABASE
+         ,password        : parameters.PASSWORD
+         ,port            : parameters.PORT
+         ,requestTimeout  : 2 * 60 * 60 * 10000
+         ,options   : {
+             encrypt: false // Use this if you're on Windows Azure
+          }
+        }
+        
+    const conn = await sql.connect(config);
+    const statement = `SET QUOTED_IDENTIFIER ON`
+    if (status.sqlTrace) {
+      status.sqlTrace.write(`${statement}\n\/\n`)
+    }
+    await conn.query(statement);
+    return conn;
     
 }
 
@@ -200,6 +224,8 @@ async function useDatabase(conn,databaseName,status) {
 
 module.exports.processArguments  = processArguments
 module.exports.getConnectionPool = getConnectionPool
+module.exports.getConnection     = getConnection    
 module.exports.useDatabase       = useDatabase
 module.exports.getTableInfo      = getTableInfo
 module.exports.generateMetadata  = generateMetadata
+module.exports.sql               = sql

@@ -33,7 +33,7 @@ class DBWriter extends Writable {
     this.ddlRequired = (mode !== 'DATA_ONLY');    
     this.status = status;
     this.logWriter = logWriter;
-    this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]: DBWriter ready. Mode: ${this.mode}.\n`)
+    this.logWriter.write(`${new Date().toISOString()}[DBWriter ${DATABASE_VENDOR}]: Ready. Mode: ${this.mode}.\n`)
     
     this.batch = [];
     this.lobList = [];

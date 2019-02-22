@@ -15,10 +15,10 @@ function processFile(conn, schema, importFilePath,batchSize,commitSize,lobCacheS
   return new Promise(function (resolve,reject) {
     try {
       const dbWriter = new DBWriter(conn,schema,batchSize,commitSize,lobCacheSize,mode,status,logWriter);
-      dbWriter.on('error',function(err){logWriter.write(`${err}\n${err.stack}\n`);})
       dbWriter.on('finish', function(){resolve(parser.checkState())});
+      dbWriter.on('error',function(err){logWriter.write(`${new Date().toISOString()}[DBWriter.error()]}: ${err}\n`);reject(err)})
       const parser = new RowParser(logWriter);
-      parser.on('error',function(err) {logWriter.write(`${err}\n${err.stack}\n`);})
+      parser.on('error',function(err){logWriter.write(`${new Date().toISOString()}[Parser.error()]}: ${err}\n`);reject(err)})
       const readStream = fs.createReadStream(importFilePath);    
       readStream.pipe(parser).pipe(dbWriter);
     } catch (e) {

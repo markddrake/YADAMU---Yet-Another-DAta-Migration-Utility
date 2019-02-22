@@ -1,4 +1,4 @@
-CREATE OR ALTER FUNCTION MAP_FOREIGN_DATATYPE(@SOURCE_VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH INT, @DATA_TYPE_SCALE INT) 
+CREATE OR ALTER FUNCTION MAP_FOREIGN_DATATYPE(@SOURCE_VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT) 
 RETURNS VARCHAR(128) 
 AS
 BEGIN
@@ -56,6 +56,8 @@ BEGIN
                then 'datetime2'
              when @DATA_TYPE = 'timestamp' 
                then 'datetime2'
+             when @DATA_TYPE = 'double' 
+               then 'float'
              when @DATA_TYPE = 'enum'
                then 'varchar(255)'
              when @DATA_TYPE = 'set'
@@ -68,9 +70,48 @@ BEGIN
                then 'varbinary(max)'
              when @DATA_TYPE = 'blob' 
                then 'varbinary'
+             when @DATA_TYPE = 'longtext' then
+               'nvarchar(max)'
+             when @DATA_TYPE = 'mediumtext' then
+               'nvarchar(max)'
+             when @DATA_TYPE = 'longblob' then
+               'varbinary(max)'
+             when @DATA_TYPE = 'mediumblob' then
+               'varbinary(max)'
              else
                lower(@DATA_TYPE)
            end
+    when @SOURCE_VENDOR in ('Postgres')   
+      then case 
+             when @DATA_TYPE = 'character varying' then
+               'nvarchar'
+             when @DATA_TYPE = 'character' then
+               'nchar'
+             when @DATA_TYPE = 'bytea' and @DATA_TYPE_LENGTH > 8000  then 
+               'varbinary(max)'
+             when @DATA_TYPE = 'bytea' then
+               'varbinary'
+             when @DATA_TYPE = 'boolean' then
+               'bit'
+             when @DATA_TYPE = 'timestamp' then
+               'datetime'
+             when @DATA_TYPE = 'timestamp without time zone' then
+               'datetime'
+             when @DATA_TYPE = 'time without time zone' then
+               'time'
+             when @DATA_TYPE = 'double precision' then
+               'float'
+             when @DATA_TYPE = 'real' then
+               'float'
+             when @DATA_TYPE = 'geometry' then
+               'geometry'
+             when @DATA_TYPE = 'geography'then
+               'geometry'
+             when @DATA_TYPE = 'integer' then
+               'int'
+             else
+               lower(@DATA_TYPE)
+           end          
     else 
       lower(@DATA_TYPE)
   end
@@ -94,14 +135,15 @@ BEGIN
           SELECT c."KEY" "INDEX"
                 ,c."VALUE" "COLUMN_NAME"
                 ,t."VALUE" "DATA_TYPE"
-                ,case
-                   when s.VALUE = '' then
-                     NULL
-                   when CHARINDEX(',',s."VALUE") > 0 then
-                     LEFT(s."VALUE",CHARINDEX(',',s."VALUE")-1)
-                   else
-                     s."VALUE"
-                 end "DATA_TYPE_LENGTH"
+                ,CAST(case
+                        when s.VALUE = '' then
+                          NULL
+                        when CHARINDEX(',',s."VALUE") > 0 then
+                          LEFT(s."VALUE",CHARINDEX(',',s."VALUE")-1)
+                        else
+                          s."VALUE"
+                      end 
+                      AS BIGINT) "DATA_TYPE_LENGTH"
                 ,case
                    when CHARINDEX(',',s."VALUE") > 0  then 
                      RIGHT(s."VALUE", CHARINDEX(',',REVERSE(s."VALUE"))-1)
@@ -498,7 +540,7 @@ BEGIN
 
   SELECT CAST(CONCAT( FORMAT(sysutcdatetime(),'yyyy-MM-dd"T"HH:mm:ss.fffff"Z"'),': "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'", "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'", ',@COMMENT) as NVARCHAR(132)) "Timestamp"
   
-  SELECT CAST(FORMATMESSAGE('%32s %32s %32s %32s %48s %12i %12i %12i %12i %64s', SOURCE_DATABASE, SOURCE_SCHEMA, TARGET_DATABASE, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSINGS_ROWS, EXTRA_ROWS, ERRORMSG) as NVARCHAR(256)) "Results"
+  SELECT CAST(FORMATMESSAGE('%32s %32s %32s %32s %48s %12i %12i %12i %12i %64s', SOURCE_DATABASE, SOURCE_SCHEMA, TARGET_DATABASE, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSINGS_ROWS, EXTRA_ROWS, ERRORMSG) as NVARCHAR(512)) "Results"
     FROM #SCHEMA_COMPARE_RESULTS
 end
 --

@@ -351,7 +351,11 @@ class StatementGenerator {
   async generateStatementCache (database, schema, systemInformation, metadata) {
     
 
-    const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;					   
+    const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;	
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement};\n--\n`)
+    }
     let results = await this.pool.request().input('TARGET_DATABASE',sql.VARCHAR,schema).input('METADATA',sql.NVARCHAR,JSON.stringify({systemInformation: systemInformation, metadata : metadata})).execute('GENERATE_SQL');
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
@@ -381,7 +385,8 @@ class StatementGenerator {
                                            else {
                                              // Just so we have somewhere to cache the data
                                              tableInfo.bulkOperation = new sql.Table();
-                                             tableInfo.preparedStatement = await this.createPreparedStatement(this.pool, tableInfo.dml, tableInfo.targetDataTypes) 
+                                             // Defer Creating Prepated Statements 
+                                             // tableInfo.preparedStatement = await this.createPreparedStatement(this.pool, tableInfo.dml, tableInfo.targetDataTypes) 
                                            }
                                          } catch (e) {
                                            this.logWriter.write(`${new Date().toISOString()}:${e}\n${tableInfo.ddl}\n`)
@@ -389,7 +394,6 @@ class StatementGenerator {
     },this));
     return statementCache;
   }
-
 }
 
 module.exports = StatementGenerator;
