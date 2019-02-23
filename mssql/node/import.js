@@ -1,93 +1,33 @@
-"use strict";
-const fs = require('fs');
-const sql = require('mssql');
-const path = require('path');
+"use strict"
 
 const Yadamu = require('../../common/yadamuCore.js');
-const RowParser = require('../../common/rowParser.js');
-const DBWriter = require('./dbWriter.js');
-const MsSQLCore = require('./mssqlCore.js');
 
-function processFile(conn, database, schema, importFilePath, batchSize, commitSize, mode, status, logWriter) {
+const MsSQLCore = require('./mssqlCore.js');
+const MsSQLWriter = require('./dbWriter.js');
   
-  return new Promise(function (resolve,reject) {
-    try {
-      const dbWriter = new DBWriter(conn,database,schema,batchSize,commitSize,mode,status,logWriter);
-      dbWriter.on('error',function(err){logWriter.write(`${err}\n${err.stack}\n`);})
-      dbWriter.on('finish', function(){resolve(parser.checkState())});
-      const parser = new RowParser(logWriter);
-      const readStream = fs.createReadStream(importFilePath);    
-      readStream.pipe(parser).pipe(dbWriter);
-    } catch (e) {
-      logWriter.write(`${e}\n${e.stack}\n`);
-      reject(e);
-    }
-  })
-}
-    
 async function main() {
 
-  let pool;	
-  let parameters;
-  let sqlTrace;
-  let logWriter = process.stdout;
-    
-  let results;
+  let pool;
   let status;
+  let parameters;
+  let logWriter = process.stdout;
   
-  try {
-      
-    process.on('unhandledRejection', function (err, p) {
-      logWriter.write(`Unhandled Rejection:\Error:`);
-      logWriter.write(`${err}\n${err.stack}\n`);
-      setTimeout((function() { console.log('Forced Exit'); return process.exit(); }), 5000);
-    })
-    
+  try {  
     parameters = MsSQLCore.processArguments(process.argv);
-    status = Yadamu.getStatus(parameters,'Import');
-
-	if (parameters.LOGFILE) {
- 	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
-    }
-
+    logWriter = Yadamu.getLogWriter(parameters);
+    status =  Yadamu.initialize(parameters,'Import',logWriter);
     pool = await MsSQLCore.getConnectionPool(parameters,status);
-    const request = pool.request();
-	results = await request.query(`SET QUOTED_IDENTIFIER ON`);
-    
-	const stats = fs.statSync(parameters.FILE)
-    const fileSizeInBytes = stats.size
-	logWriter.write(`${new Date().toISOString()}[Clarinet]: Processing file "${path.resolve(parameters.FILE)}". Size ${fileSizeInBytes} bytes.\n`)
-
-    status.warningsRaised = await processFile(pool, parameters.DATABASE, parameters.TOUSER, parameters.FILE, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);
-    
+    const dbWriter = new MsSQLWriter(pool, parameters.DATABASE, parameters.TOUSER, parameters.BATCHSIZE, parameters.COMMITSIZE, parameters.MODE, status, logWriter);  
+    status.warningsRaised = await Yadamu.importFile(parameters.FILE, dbWriter, logWriter);
     await pool.close();
-    
     Yadamu.reportStatus(status,logWriter)
   } catch (e) {
-    if (logWriter !== process.stdout) {
-      console.log(`Import operation failed: See "${parameters.LOGFILE}" for details.`);
-      logWriter.write('Import operation failed.\n');
-      logWriter.write(`${e}\n`);
-    }
-    else {
-      console.log(`Import operation Failed:`);
-      console.log(e);
-    }
+    Yadamu.reportError(e,parameters,status,logWriter);
     if (pool !== undefined) {
-	  await pool.close();
-	}
+      await pool.close();
+    }
   }
-  
-  if (logWriter !== process.stdout) {
-    logWriter.close();
-  }
-
-  if (status.sqlTrace) {
-    status.sqlTrace.close();
-  }
-  
-  // setTimeout((function() { console.log('Forced Exit'); return process.exit(); }), 5000);
-
+  Yadamu.finalize(status,logWriter);
 }
-    
+
 main()

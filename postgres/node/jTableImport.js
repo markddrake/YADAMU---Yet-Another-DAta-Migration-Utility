@@ -69,25 +69,18 @@ async function main(){
   
   try {
     parameters = PostgresCore.processArguments(process.argv);
-    status = Yadamu.getStatus(parameters,'Import');
-	
-	if (parameters.LOGFILE) {
-	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
-    }
+    logWriter = Yadamu.getLogWriter(parameters);
+    status = Yadamu.initialize(parameters,'Import');
+	pgClient = await PostgresCore.getClient(parameters,status,logWriter);
+    await createStagingTable(pgClient,useBinaryJSON,status);
 	
     const importFilePath = parameters.FILE;   
     const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
-    
-	pgClient = await PostgresCore.getClient(parameters,logWriter,status);
-
     let importFile = fs.createReadStream(importFilePath);
     importFile.on('error',function(err) {console.log(err)})
 	
-	const schema = parameters.TOUSER;
-    await createStagingTable(pgClient,useBinaryJSON,status);
     let elapsedTime;
-    
     try {
       elapsedTime = await loadStagingTable(pgClient,importFile,status)
     }
@@ -106,32 +99,17 @@ async function main(){
     importFile.close();
     logWriter.write(`${new Date().toISOString()}}[JSON_TABLE()]:  Processing Import Data file "${importFilePath}". Size ${fileSizeInBytes}. Processing Import Data file ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
-	const results = await processStagingTable(pgClient,schema,useBinaryJSON,status,logWriter);	
+	const results = await processStagingTable(pgClient,parameters.TOUSER,useBinaryJSON,status,logWriter);	
     Yadamu.processLog(results, status, logWriter)          
 	await pgClient.end();
     Yadamu.reportStatus(status,logWriter)    
   } catch (e) {
-    if (logWriter !== process.stdout) {
-	  console.log(`Import operation failed: See "${parameters.LOGFILE}" for details.`);
-  	  logWriter.write('Import operation failed.');
-	  logWriter.write(e.stack);
-    }
-	else {
-    	console.log('Import operation Failed.');
-        console.log(e);
-	}
+    Yadamu.reportError(e,parameters,status,logWriter);
 	if (pgClient !== undefined) {
 	  await pgClient.end();
 	}
   }
-  
-  if (logWriter !== process.stdout) {
-    logWriter.close();
-  }
-  if (status.sqlTrace) {
-    status.sqlTrace.close();
-  }
-  
+  Yadamu.finalize(status,logWriter);
 }
 
 main()

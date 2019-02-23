@@ -14,14 +14,13 @@ const sqlGetSystemInformation =
 
 class DBReader extends Readable {  
 
-  constructor(pgClient,schema,outputStream,mode,status,logWriter,options) {
+  constructor(pgClient,schema,mode,status,logWriter,options) {
 
     super({objectMode: true });  
     const self = this;
   
     this.pgClient = pgClient
     this.schema = schema;
-    this.outputStream = outputStream;
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
@@ -30,11 +29,14 @@ class DBReader extends Readable {
     this.tableInfo = [];
     
     this.nextPhase = 'systemInformation'
-    this.serverGeneration = undefined;
-    this.maxVarcharSize = undefined;
+    this.outputStream = undefined;
   
   }
- 
+
+  setOutputStream(outputStream) {
+    this.outputStream = outputStream;
+  }
+  
   async getSystemInformation() {     
   
     if (this.status.sqlTrace) {

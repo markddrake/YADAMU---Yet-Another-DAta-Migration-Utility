@@ -40,28 +40,13 @@ async function main(){
   let status;
 
   try {
-
     parameters = MySQLCore.processArguments(process.argv);
-    status = Yadamu.getStatus(parameters,'Import');
-  
-	if (parameters.LOGFILE) {
-	  logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
-    }
-
-    const connectionDetails = {
-            host      : parameters.HOSTNAME
-           ,user      : parameters.USERNAME
-           ,password  : parameters.PASSWORD
-		   ,database  : parameters.DATABASE
-		   ,multipleStatements: true
-    }
-
+    logWriter = Yadamu.getLogWriter(parameters);
+    status = Yadamu.initialize(parameters,'Import');
     conn = await MySQLCore.getConnection(parameters,status,logWriter);
-
     await MySQLCore.query(conn,status,`SET GLOBAL local_infile = 'ON'`);
     
     const importFilePath = path.resolve(parameters.FILE);
-    
 	const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
 	
@@ -81,27 +66,12 @@ async function main(){
 	await conn.end();
     Yadamu.reportStatus(status,logWriter)    
   } catch (e) {
-    if (logWriter !== process.stdout) {
-	  console.log(`Import operation failed: See "${parameters.LOGFILE}" for details.`);
-  	  logWriter.write('Import operation failed.\n');
-	  logWriter.write(e.stack);
-    }
-	else {
-    	console.log('Import operation Failed.');
-        console.log(e);
-	}
+    Yadamu.reportError(e,parameters,status,logWriter);
     if (conn !== undefined) {
 	  await conn.end();
 	}
   }
-  
-  if (logWriter !== process.stdout) {
-	logWriter.close();
-  }
-  
-  if (status.sqlTrace) {
-    status.sqlTrace.close();
-  }
+  Yadamu.finalize(status,logWriter);
 }
 
 main()

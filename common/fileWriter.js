@@ -11,7 +11,6 @@ class FileWriter extends Writable {
    
     this.status = status;
     this.logWriter = logWriter;
-    this.logWriter.write(`${new Date().toISOString()}[FileWriter ${outputStream.path}]: Ready. Mode: ${this.mode}.\n`)
 
     this.outputStream = outputStream;
     this.outputStream.write('{');
@@ -76,7 +75,7 @@ class FileWriter extends Writable {
       }    
       callback();
     } catch (e) {
-      this.logWriter.write(`${e}\n${e.stack}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[FileWriter._write()() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     }
   }
@@ -91,12 +90,12 @@ class FileWriter extends Writable {
       }
       else {
         this.outputStream.write(',"data":{}');
-        this.logWriter.write(`${new Date().toISOString()}[FileWriter] No tables found.\n`);
+        this.logWriter.write(`${new Date().toISOString()}[FileWriter]: No tables found.\n`);
       }
       this.outputStream.write('}');
       callback();
     } catch (e) {
-      logWriter.write(`${e}\n${e.stack}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[FileWriter._final() "${this.tableName}"]: ${e}\n${e.stack}\n`);
       callback(e);
     } 
   } 

@@ -37,17 +37,10 @@ async function main(){
 
     let results;
     parameters = MsSQLCore.processArguments(process.argv);
-    status = Yadamu.getStatus(parameters,'Import');
-
-    if (parameters.LOGFILE) {
-     logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
-    }
-        
+    logWriter = Yadamu.getLogWriter(parameters);
+    status = Yadamu.initialize(parameters,'Import');
     const pool = await MsSQLCore.getConnectionPool(parameters,status);
-    const request = pool.request();
 
-    const schema = parameters.TOUSER;
-    
     const importFilePath = path.resolve(parameters.FILE); 
     const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size;
@@ -56,35 +49,24 @@ async function main(){
     const tableSpec =  { tableName : '#JSON_STAGING', columnName : 'DATA'}
     const stagingTable = new StagingTable(pool,tableSpec,importFilePath,status); 
     results = await stagingTable.uploadFile()
+    
     const elapsedTime = new Date().getTime() - startTime;
     logWriter.write(`${new Date().toISOString()}[JSON_TABLE()]: Import Data file "${importFilePath}". Size ${fileSizeInBytes}. Elapsed Time ${elapsedTime}ms. Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
 
-    results = await verifyDataLoad(request,tableSpec,status,logWriter);
-    results = await processStagingTable(request,tableSpec,schema);
+    results = await verifyDataLoad(pool.request(),tableSpec,status,logWriter);
+    results = await processStagingTable(pool.request(),tableSpec,parameters.TOUSERexit);
     results = results[0][Object.keys(results[0])[0]]
     results = JSON.parse(results)
     Yadamu.processLog(results, status, logWriter) 
     await pool.close();
     Yadamu.reportStatus(status,logWriter) 
   } catch (e) {
-    if (logWriter !== process.stdout) {
-      console.log(`Import operation failed: See "${parameters.LOGFILE}" for details.`);
-      logWriter.write('Import operation failed.\n');
-      logWriter.write(e.stack);
-    }
-    else {
-      console.log('Import operation Failed.');
-      console.log(e);
-    }
+    Yadamu.reportError(e,parameters,status,logWriter);
     if (pool !== undefined) {
       await pool.close();
     }
   } 
- 
-  if (logWriter !== process.stdout) {
-    logWriter.close();
-  } 
-
+  Yadamu.finalize(status,logWriter);
 }
 
 main()

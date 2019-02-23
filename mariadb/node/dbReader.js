@@ -14,27 +14,27 @@ const sqlGetSystemInformation =
 
 class DBReader extends Readable {  
 
-  constructor(conn,schema,outputStream,mode,status,logWriter,options) {
+  constructor(conn,schema,mode,status,logWriter,options) {
 
     super({objectMode: true });  
     const self = this;
   
     this.conn = conn;
     this.schema = schema;
-    this.outputStream = outputStream;
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
     this.logWriter.write(`${new Date().toISOString()}[DBReader ${DATABASE_VENDOR}]: Ready. Mode: ${this.mode}.\n`)
         
-    this.sqlQueries = [];
-    
     this.nextPhase = 'systemInformation'
-    this.serverGeneration = undefined;
-    this.maxVarcharSize = undefined;
+    this.outputStream = undefined;
   
   }
- 
+
+  setOutputStream(outputStream) {
+    this.outputStream = outputStream;
+  }
+
   async getSystemInformation() {     
   
     if (this.status.sqlTrace) {
@@ -60,7 +60,7 @@ class DBReader extends Readable {
     }
     
   }
-
+  
   async getDDLOperations() {
     return []
   }

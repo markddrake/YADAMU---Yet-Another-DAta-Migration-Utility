@@ -11,18 +11,15 @@ const SPATIAL_FORMAT = "WKT";
 const sqlGetSystemInformation = 
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE"`;                     
 
-
-
 class DBReader extends Readable {  
 
-  constructor(conn,schema,outputStream,mode,status,logWriter,options) {
+  constructor(conn,schema,mode,status,logWriter,options) {
 
     super({objectMode: true });  
     const self = this;
   
     this.conn = conn;
     this.schema = schema;
-    this.outputStream = outputStream;
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
@@ -31,17 +28,14 @@ class DBReader extends Readable {
     this.tableInfo = [];
     
     this.nextPhase = 'systemInformation'
-    this.serverGeneration = undefined;
-    this.maxVarcharSize = undefined;
+    this.outputStream = undefined;
   
   }
   
-  getNativeDate() {
-     
-    return false;
-    
+  setOutputStream(outputStream) {
+    this.outputStream = outputStream;
   }
- 
+  
   async getSystemInformation() {     
 
     const results = await MySQLCore.query(this.conn,this.status,sqlGetSystemInformation); 

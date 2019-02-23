@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 
 const ImportErrorManager = require('./importErrorManager.js');
+const RowParser = require('./rowParser.js');
+const FileWriter = require('./FileWriter.js');
 
 function processLog(log,status,logWriter) {
 
@@ -129,7 +131,7 @@ function stringifyDuration(duration) {
 }
 
 
-function getStatus(parameters,operation) {
+function initialize(parameters,operation,logWriter) {
  
   const status = {
     operation     : operation
@@ -139,6 +141,11 @@ function getStatus(parameters,operation) {
    ,startTime     : new Date().getTime()
   }
   
+  process.on('unhandledRejection', function (err, p) {
+    logWriter.write(`${new Date().toISOString()}: ${status.operation} operation failed with unhandled rejection ${err.stack}\n`);
+    process.exit()
+  })
+      
   if (parameters.SQLTRACE) {
 	status.sqlTrace = fs.createWriteStream(parameters.SQLTRACE);
   }
@@ -155,11 +162,23 @@ function getStatus(parameters,operation) {
     status.loglevel = parameters.LOGLEVEL;
   }
     	
- if (parameters.DUMPFILE) {
+  if (parameters.DUMPFILE) {
      status.dumpFileName = parameters.DUMPFILE
   }
 
   return status;
+
+}
+
+function finalize(status,logWriter) {
+
+  if (logWriter !== process.stdout) {
+    logWriter.close();
+  }    
+  
+  if (status.sqlTrace) {
+    status.sqlTrace.close();
+  }
 
 }
 
@@ -173,6 +192,39 @@ function reportStatus(status,logWriter) {
   logWriter.write(`${status.operation} operation completed ${status.statusMsg}. Elapsed time: ${stringifyDuration(endTime - status.startTime)}.\n`);
   if (logWriter !== process.stdout) {
     console.log(`${status.operation} operation completed ${status.statusMsg}. Elapsed time: ${stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  }
+
+}
+
+function reportError(e,parameters,status,logWriter) {
+    
+  if (logWriter !== process.stdout) {
+    console.log(`${status.operation} operation failed: See "${parameters.LOGFILE}" for details.`);
+    logWriter.write(`${status.operation} operation failed.\n`);
+    logWriter.write(`${e}\n`);
+  }
+  else {
+    console.log(`${status.operation} operation Failed:`);
+    console.log(e);
+  }
+  
+}
+
+function getLogWriter(parameters) {
+
+  if (parameters.LOGFILE) {
+    return fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
+  }
+  return process.stdout;
+  
+}
+
+
+function closeOutputStream(outputStream) {
+        
+  return new Promise(function(resolve,reject) {
+    outputStream.on('finish',function() { resolve() });
+    outputStream.close();
+  })
 
 }
 
@@ -214,11 +266,60 @@ function mergeMetadata(targetMetadata, sourceMetadata) {
   return targetMetadata
 }
 
+async function importFile(pathToFile, dbWriter, logWriter){
+
+  const importFilePath = path.resolve(pathToFile);
+  const stats = fs.statSync(importFilePath)
+  const fileSizeInBytes = stats.size
+  logWriter.write(`${new Date().toISOString()}[FileReader]: Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.\n`)
+
+  return new Promise(function (resolve,reject) {
+    try {
+      dbWriter.on('finish', function(){resolve(parser.checkState())});
+      dbWriter.on('error',function(err){logWriter.write(`${new Date().toISOString()}[DBWriter.error()]}: ${err}\n`);reject(err)})
+      
+      const parser = new RowParser(logWriter);
+      const readStream = fs.createReadStream(importFilePath);    
+      readStream.pipe(parser).pipe(dbWriter);
+    } catch (e) {
+      logWriter.write(`${e}\n${e.stack}\n`);
+      reject(e);
+    }
+  })
+}
+
+async function exportFile(pathToFile, dbReader, status, logWriter){
+
+  const exportFilePath = path.resolve(pathToFile);
+  const exportFile = fs.createWriteStream(exportFilePath);
+  logWriter.write(`${new Date().toISOString()}[FileWriter]: Writing file "${exportFilePath}".\n`)
+  
+  return new Promise(function (resolve,reject) {
+    try {
+      const fileWriter = new FileWriter(exportFile,status,logWriter);
+      fileWriter.on('finish', function(){resolve(exportFile)});
+      fileWriter.on('error',function(err){logWriter.write(`${new Date().toISOString()}[FileWriter.error()]}: ${err}\n`);reject(err)})
+      dbReader.setOutputStream(fileWriter);
+      dbReader.on('error',function(err){logWriter.write(`${new Date().toISOString()}[DBReader.error()]}: ${err}\n`);reject(err)})
+      dbReader.pipe(fileWriter);
+    } catch (e) {
+      logWriter.write(`${e}\n${e.stack}\n`);
+      reject(e);
+    }
+  })
+}
+  
 module.exports.processLog             = processLog
 module.exports.decomposeDataType      = decomposeDataType
 module.exports.convertQuotedIdentifer = convertQuotedIdentifer
 module.exports.processValue           = processValue
-module.exports.getStatus              = getStatus
+module.exports.initialize             = initialize
+module.exports.getLogWriter           = getLogWriter
+module.exports.importFile             = importFile
+module.exports.exportFile             = exportFile
 module.exports.reportStatus           = reportStatus
+module.exports.reportError            = reportError
+module.exports.closeOutputStream      = closeOutputStream
+module.exports.finalize               = finalize
 module.exports.convertIdentifierCase  = convertIdentifierCase
 module.exports.mergeMetadata          = mergeMetadata

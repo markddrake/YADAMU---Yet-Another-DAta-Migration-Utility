@@ -172,7 +172,7 @@ function processArguments(args) {
 
    const parameters = {
 	                 FILE       : "export.json"
-                    ,MODE       : "DDL_AND_CONTENT"
+                    ,MODE       : "DDL_AND_DATA"
                     ,BATCHSIZE  : 100
                     ,COMMITROWS : 1000
    }

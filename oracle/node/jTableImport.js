@@ -38,14 +38,9 @@ async function main() {
   let status;
   
   try {
-    
     parameters = OracleCore.processArguments(process.argv);
-    status = Yadamu.getStatus(parameters,'Import');
-
-    if (parameters.LOGFILE) {
-      logWriter = fs.createWriteStream(parameters.LOGFILE,{flags : "a"});
-    }
-
+    logWriter = Yadamu.getLogWriter(parameters);
+    status = Yadamu.initialize(parameters,'Import');
     let conn = await OracleCore.getConnection(parameters.USERID,status);
 
     const importFilePath = path.resolve(parameters.FILE);
@@ -63,27 +58,12 @@ async function main() {
     await OracleCore.releaseConnection(conn);						   
     Yadamu.reportStatus(status,logWriter)    
   } catch (e) {
-    if (logWriter !== process.stdout) {
-      console.log(`Import operation failed: See "${parameters.LOGFILE}" for details.`);
-      logWriter.write('Import operation failed.\n');
-      logWriter.write(e.stack);
-    }
-    else {
-        console.log('Import operation Failed.');
-        console.log(e);
-    }
+    Yadamu.reportError(e,parameters,status,logWriter);
     if (conn !== undefined) {
       await OracleCore.releaseConnection(conn);
     }
   }
-  
-  if (logWriter !== process.stdout) {
-    logWriter.close();
-  }
-
-  if (parameters.SQLTRACE) {
-    sqlTrace.close();
-  }
+  Yadamu.finalize(status,logWriter);
 }
 
 main()
