@@ -9,12 +9,14 @@ const integerTypes   = ['tinyint','mediumint','smallint','int','bigint']
 
 class StatementGenerator {
   
-  constructor(dbWriter, status, logWriter, ) {
-      
-    this.dbWriter = dbWriter;
+  constructor(dbi ,ddlRequired, batchSize, commitSize, status, logWriter) {
+    
+    this.dbi = dbi;
+    this.ddlRequired = ddlRequired
+    this.batchSize = batchSize
+    this.commitSize = commitSize;
     this.status = status;
     this.logWriter = logWriter;
-    
   }
     
   mapForeignDataType(vendor, dataType, dataTypeLength, dataTypeSize) {
@@ -177,7 +179,7 @@ class StatementGenerator {
      return targetDataType;     
   }
       
-  generateStatements(vendor, schema, metadata) {
+  generateTableInfo(vendor, schema, metadata) {
       
      let useSetClause = false;
   
@@ -227,7 +229,7 @@ class StatementGenerator {
       else {
         insertStatement += `(${metadata.columns}) values ?`;
       }
-      return { ddl : createStatement, dml : insertStatement, targetDataTypes : targetDataTypes, useSetClause : useSetClause}
+      return { ddl : createStatement, dml : insertStatement, targetDataTypes : targetDataTypes, useSetClause : useSetClause, batchSize : this.batchSize, commitSize : this.commitSize}
   }
   
   async generateStatementCache( schema, systemInformation, metadata) {
@@ -238,11 +240,11 @@ class StatementGenerator {
 
     tables.forEach(async function(table,idx) {
                           const tableMetadata = metadata[table];
-                          const sql = this.generateStatements(systemInformation.vendor, schema,tableMetadata);
-                          statementCache[table] = sql;
-                          ddlStatements[idx] = sql.ddl;
+                          const tableInfo = this.generateTableInfo(systemInformation.vendor, schema,tableMetadata);
+                          statementCache[table] = tableInfo;
+                          ddlStatements[idx] = tableInfo.ddl;
     },this)
-    const results = await this.dbWriter.executeDDL(ddlStatements)
+    const results = await this.dbi.executeDDL(ddlStatements)
     return statementCache;
   }
 

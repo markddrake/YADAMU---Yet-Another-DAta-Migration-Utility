@@ -1,34 +1,26 @@
 "use strict";
+
 const sql = require('mssql');
 
-const Yadamu = require('../../common/yadamuCore.js');
+const Yadamu = require('../../common/yadamu.js');
 
 class StatementGenerator {
   
-  constructor(pool, status, logWriter) {
+  constructor(dbi ,ddlRequired, batchSize, commitSize, status, logWriter) {
     
-    // super();
-    const statementGenerator = this;
-    
-    this.pool = pool;
+    this.dbi = dbi;
+    this.ddlRequired = ddlRequired
+    this.batchSize = batchSize
+    this.commitSize = commitSize;
     this.status = status;
     this.logWriter = logWriter;
-    
-  }
-  
-  decomposeDataType(targetDataType) {
-    const dataType = Yadamu.decomposeDataType(targetDataType);
-    if (dataType.length === -1) {
-      dataType.length = sql.MAX;
-    }
-    return dataType;
   }
   
   bulkSupported(targetDataTypes) {
     
     let supported = true;
     targetDataTypes.forEach(function (targetDataType,idx) {
-      const dataType = this.decomposeDataType(targetDataType);
+      const dataType = this.dbi.decomposeDataType(targetDataType);
       switch (dataType.type) {
         /*
         case 'smallint':
@@ -64,7 +56,7 @@ class StatementGenerator {
     const columns = JSON.parse('[' +  columnList + ']')
   
     targetDataTypes.forEach(function (targetDataType,idx) {
-      const dataType = this.decomposeDataType(targetDataType);
+      const dataType = this.dbi.decomposeDataType(targetDataType);
       switch (dataType.type) {
         case 'bit':
           table.columns.add(columns[idx],sql.Bit);
@@ -211,164 +203,29 @@ class StatementGenerator {
     return table
   }
 
-  async createPreparedStatement(pool, insertStatement, targetDataTypes) {
-      
-    const ps = await new sql.PreparedStatement(pool);
-    targetDataTypes.forEach(function (targetDataType,idx) {
-      const dataType = this.decomposeDataType(targetDataType);
-      const column = 'C' + idx;
-      switch (dataType.type) {
-        case 'bit':
-          ps.input(column,sql.Bit);
-          break;
-        case 'bigint':
-          ps.input(column,sql.BigInt);
-          break;
-        case 'float':
-          ps.input(column,sql.Float);
-          break;
-        case 'int':
-          ps.input(column,sql.Int);
-          break;
-        case 'money':
-          // ps.input(column,sql.Money);
-          ps.input(column,sql.Decimal(19,4));
-          break
-        case 'decimal':
-          // sql.Decimal ([precision], [scale])
-          ps.input(column,sql.Decimal(dataType.length,dataType.scale));
-          break;
-        case 'smallint':
-          ps.input(column,sql.SmallInt);
-          break;
-        case 'smallmoney':
-          // ps.input(column,sql.SmallMoney);
-          ps.input(column,sql.Decimal(10,4));
-          break;
-        case 'real':
-          ps.input(column,sql.Real);
-          break;
-        case 'numeric':
-          // sql.Numeric ([precision], [scale])
-          ps.input(column,sql.Numeric(dataType.length,dataType.scale));
-          break;
-        case 'tinyint':
-          ps.input(column,sql.TinyInt);
-          break;
-        case 'char':
-          ps.input(column,sql.Char(dataType.length));
-          break;
-        case 'nchar':
-          ps.input(column,sql.NChar(dataType.length));
-          break;
-        case 'text':
-          ps.input(column,sql.Text);
-          break;
-        case 'ntext':
-          ps.input(column,sql.NText);
-          break;
-        case 'varchar':
-          ps.input(column,sql.VarChar(dataType.length));
-          break;
-        case 'nvarchar':
-          ps.input(column,sql.NVarChar(dataType.length));
-          break;
-        case 'json':
-          ps.input(column,NVarChar(sql.MAX));
-        case 'xml':
-          ps.input(column,sql.Xml);
-          break;
-        case 'time':
-          // sql.Time ([scale])
-          // ps.input(column,sql.Time(dataType.length));
-          ps.input(column,sql.VarChar(32));
-          break;
-        case 'date':
-          // ps.input(column,sql.Date);
-          ps.input(column,sql.VarChar(32));
-          break;
-        case 'datetime':
-          // ps.input(column,sql.DateTime);
-          ps.input(column,sql.VarChar(32));
-          break;
-        case 'datetime2':
-          // sql.DateTime2 ([scale]
-          // ps.input(column,sql.DateTime2());
-          ps.input(column,sql.VarChar(32));
-          break;
-        case 'datetimeoffset':
-          // sql.DateTimeOffset ([scale])
-          // ps.input(column,sql.DateTimeOffset(dataType.length));
-          ps.input(column,sql.VarChar(32));
-          break;
-        case 'smalldatetime':
-          // ps.input(column,sql.SmallDateTime);
-          ps.input(column,sql.VarChar(32));
-          break;
-        case 'uniqueidentifier':
-          // ps.input(column,sql.UniqueIdentifier);
-          // TypeError: parameter.type.validate is not a function
-          ps.input(column,sql.Char(36));
-          break;
-        case 'variant':
-          ps.input(column,sql.Variant);
-          break;
-        case 'binary':
-          ps.input(column,sql.Binary);
-          break;
-        case 'varbinary':
-          // sql.VarBinary ([length])
-           ps.input(column,sql.VarBinary(dataType.length));
-          break;
-        case 'image':
-          ps.input(column,sql.Image);
-          break;
-        case 'udt':
-          ps.input(column,sql.UDT);
-          break;
-        case 'geography':
-          // ps.input(column,sql.Geography);
-          ps.input(column,sql.NVarChar(sql.MAX));
-          break;
-        case 'geometry':
-          // ps.input(column,sql.Geometry);
-          ps.input(column,sql.NVarChar(sql.MAX));
-          break;
-        case 'hierarchyid':
-          ps.input(column,sql.VarChar(4000));
-          break;
-        default:
-         this.logWriter.write(`${new Date().toISOString()}: statementGenerator.createPreparedStatement(): Unmapped data type [${targetDataType}].`);
-      }
-    },this)
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${insertStatement};\n--\n`);
-    }
-    await ps.prepare(insertStatement);
-    return ps;
-  }
-
-  async generateStatementCache (database, schema, systemInformation, metadata) {
+  async generateStatementCache (schema, systemInformation, metadata, database) {
     
-
     const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;	
-
+    
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlStatement};\n--\n`)
     }
-    let results = await this.pool.request().input('TARGET_DATABASE',sql.VARCHAR,schema).input('METADATA',sql.NVARCHAR,JSON.stringify({systemInformation: systemInformation, metadata : metadata})).execute('GENERATE_SQL');
+    
+    let results = await this.dbi.getRequest().input('TARGET_DATABASE',sql.VARCHAR,schema).input('METADATA',sql.NVARCHAR,JSON.stringify({systemInformation: systemInformation, metadata : metadata})).execute('GENERATE_SQL');
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
     const tables = Object.keys(metadata); 
     await Promise.all(tables.map(async function(table,idx) {
                                          statementCache[table] = JSON.parse(statementCache[table] );
                                          const tableInfo = statementCache[table];
+                                         tableInfo.batchSize =  this.batchSize;
+                                         tableInfo.batchSize = this.commitSize;
                                          // Create table before attempting to Prepare Statement..
                                          if (this.status.sqlTrace) {
                                            this.status.sqlTrace.write(`${tableInfo.ddl};\n--\n`);
                                          }
                                          try {
-                                           const results = await this.pool.request().batch(statementCache[table].ddl)   
+                                           const results = await this.dbi.getRequest().batch(statementCache[table].ddl)   
                                          } catch (e) {
                                            this.logWriter.write(`${e}\n${tableInfo.ddl}\n`)
                                          } 
@@ -383,10 +240,8 @@ class StatementGenerator {
                                              tableInfo.bulkOperation = this.createBulkOperation(database,schema,table,metadata[table].columns,tableInfo.targetDataTypes);
                                            }
                                            else {
-                                             // Just so we have somewhere to cache the data
-                                             tableInfo.bulkOperation = new sql.Table();
-                                             // Defer Creating Prepated Statements 
-                                             // tableInfo.preparedStatement = await this.createPreparedStatement(this.pool, tableInfo.dml, tableInfo.targetDataTypes) 
+                                             // Place holder for caching rows.
+                                             tableInfo.bulkOperation = new sql.Table()                                            
                                            }
                                          } catch (e) {
                                            this.logWriter.write(`${new Date().toISOString()}:${e}\n${tableInfo.ddl}\n`)

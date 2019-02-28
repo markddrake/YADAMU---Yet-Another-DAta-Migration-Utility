@@ -5,8 +5,7 @@ const Readable = require('stream').Readable;
 // const clarinet = require('clarinet');
 const clarinet = require('../clarinet/clarinet.js');
 
-
-class RowParser extends Transform {
+class TextParser extends Transform {
   
   constructor(logWriter, options) {
 
@@ -30,10 +29,10 @@ class RowParser extends Transform {
       switch (self.jDepth){
         case 1:
           // Push the completed first level object/array downstream. Replace the current top level object with an empty object of the same type.
-          self.push(self.currentObject);
           if (self.currentObject.metadata) {
             self.tableList = new Set(Object.keys(self.currentObject.metadata));
           }
+          self.push(self.currentObject);
           if (Array.isArray(self.currentObject)) {
              self.currentObject = [];
           }
@@ -46,7 +45,7 @@ class RowParser extends Transform {
           break;
         case 2:
           if (self.dataPhase) {
-            self.tableList.delete(key);
+            self.currentTable = key;                
             self.push({ table : key});
           }
           break;
@@ -80,7 +79,7 @@ class RowParser extends Transform {
           break;
         case 1:
           if ((self.dataPhase) && (key != undefined)) {
-            self.tableList.delete(key);
+            self.currentTable = key;                
             self.push({ table : key});
           }
           break;
@@ -167,6 +166,10 @@ class RowParser extends Transform {
       // self.logWriter.write(`onclosearray(${self.jDepth}: ObjectStack:${self.objectStack}. CurrentObject:${self.currentObject}\n`);          
       let skipObject = false;
       
+      if ((self.dataPhase) && (self.jDepth === 3)) {
+        self.tableList.delete(self.currentTable);
+      }
+      
       if ((self.dataPhase) && (self.jDepth === 4)) {
         self.push({ data : self.currentObject});
         skipObject = true;
@@ -212,7 +215,7 @@ class RowParser extends Transform {
     }
     else {
       this.tableList.forEach(function(table) {
-        this.logWriter.write(`${new Date().toISOString()}[WARNING]: Table "${table}". No records found - Possible corrupt or truncated import file.\n`);
+        this.logWriter.write(`${new Date().toISOString()}[RowParser "${table}"]. Warning - No records found - Possible corrupt or truncated import file.\n`);
       },this)
       return true;
     }
@@ -224,4 +227,4 @@ class RowParser extends Transform {
   };
 }
 
-module.exports = RowParser;
+module.exports = TextParser;

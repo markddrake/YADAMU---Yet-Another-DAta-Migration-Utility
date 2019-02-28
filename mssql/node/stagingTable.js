@@ -5,8 +5,8 @@ const DBFileLoader = require('./dbFileLoader');
 
 class StagingTable {
 
-  constructor(dbConn,tableSpec,importFilePath,status) {   
-    this.request = new sql.Request(dbConn);    
+  constructor(pool,tableSpec,importFilePath,status) {   
+    this.pool = pool;    
     this.tableSpec = tableSpec;
     this.filePath = importFilePath;
     this.status = status;
@@ -18,7 +18,7 @@ class StagingTable {
       if (this.status.sqlTrace) {
         this.status.sqlTrace.write(`${statement}\n\/\n`)
       }
-      const results = await this.request.batch(statement)
+      const results = await this.pool.request().batch(statement)
       return results;
     } catch (e) {}
   }
@@ -28,7 +28,7 @@ class StagingTable {
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${statement}\n\/\n`)
     }
-    const results = await this.request.batch(statement)
+    const results = await this.pool.request().batch(statement)
     return results;
   } 
 
@@ -37,7 +37,7 @@ class StagingTable {
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${statement}\n\/\n`)
     }
-    const results = await this.request.batch(statement)
+    const results = await this.pool.request().batch(statement)
     return results;
   } 
   
@@ -50,7 +50,7 @@ class StagingTable {
 
     const statement = `update "${this.tableSpec.tableName}" set "${this.tableSpec.columnName}" .write(@data,null,null)`;     
     const inputStream = fs.createReadStream(this.filePath);
-    const loader = new DBFileLoader(this.request,statement,this.status);
+    const loader = new DBFileLoader(this.pool.request(),statement,this.status);
   
     let startTime;
     return new Promise(function(resolve, reject) {

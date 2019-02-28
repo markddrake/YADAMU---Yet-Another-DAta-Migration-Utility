@@ -1,43 +1,33 @@
 "use strict";
 
-const MySQLCore = require('./mysqlCore.js');
+const Yadamu = require('../../common/yadamu.js');
 
 class StatementGenerator {
   
-  constructor(conn, status, logWriter) {
+  constructor(dbi ,ddlRequired, batchSize, commitSize, status, logWriter) {
     
-    // super();
-    const statementGenerator = this;
-    
-    this.conn = conn;
+    this.dbi = dbi;
+    this.ddlRequired = ddlRequired
+    this.batchSize = batchSize
+    this.commitSize = commitSize;
     this.status = status;
-    this.logWriter = logWriter;    
+    this.logWriter = logWriter;
   }
   
-  async executeDDL(ddlStatements) {
-    await Promise.all(ddlStatements.map(async function(ddlStatement) {
-                                          try {
-                                            if (ddlStatement != null) {
-                                              return await MySQLCore.query(this.conn,this.status,ddlStatement) 
-                                            }
-                                            return null;
-                                          } catch (e) {
-                                            this.logWriter.write(`${e}\n${ddlStatement}\n`)
-                                          }
-    },this))
-  }  
-  
-  async generateStatementCache(schema, systemInformation, metadata) {
+
+  async generateStatementCache (schema, systemInformation, metadata) {    
       
     const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS"`;                       
    
-    let results = await MySQLCore.query(this.conn,this.status,sqlStatement,[JSON.stringify({systemInformation: systemInformation, metadata : metadata}),schema]);
+    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({systemInformation: systemInformation, metadata : metadata}),schema]);
     results = results.pop();
     const ddlStatements = [];  
     const statementCache = JSON.parse(results[0].SQL_STATEMENTS)
     const tables = Object.keys(metadata); 
     tables.forEach(async function(table,idx) {
                            const tableInfo = statementCache[table];
+                           tableInfo.batchSize = this.batchSize;
+                           tableInfo.commitSize = this.commitSize;
                            const columnNames = JSON.parse('[' + metadata[table].columns + ']');
                            tableInfo.useSetClause = false;
                                        
@@ -61,10 +51,10 @@ class StatementGenerator {
                             ddlStatements[idx] = tableInfo.ddl;
     },this);
     
-    await this.executeDDL(ddlStatements);
+    await this.dbi.executeDDL(ddlStatements);
     return statementCache;
   }
-    
+ 
 }
 
 module.exports = StatementGenerator;

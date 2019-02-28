@@ -1,10 +1,14 @@
 set echo on
-def LOGDIR = &1
+--
+select '' "1", '' "2", '' "3"  from dual where rownum = 0
+/
+def LOGDIR = "&1"
+--
 spool &LOGDIR/RECREATE_SCHEMA.log append
 --
-def ID = &2
+def ID = "&2"
 --
-def METHOD = &3
+def METHOD = "&3"
 --
 select to_char(SYS_EXTRACT_UTC(SYSTIMESTAMP),'YYYY-MM-DD"T"HH24:MI:SS"Z"') || ': "&METHOD"' "Timestamp"
   from DUAL

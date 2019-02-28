@@ -4,8 +4,8 @@ mkdir logs
 rmdir /s /q %LOGDIR%
 mkdir %LOGDIR%
 mkdir %LOGDIR%\install
-call windows\export_Master.bat 
 @set MODE=DATA_ONLY
+call windows\export_Master.bat 
 call windows\clone_JSON.bat
 call windows\clone_MYSQL.bat
 call windows\clone_Oracle.bat 

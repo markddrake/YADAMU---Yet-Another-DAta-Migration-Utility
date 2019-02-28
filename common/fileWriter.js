@@ -1,8 +1,6 @@
 "use strict";
 const Writable = require('stream').Writable
 
-const Yadamu = require('./yadamuCore.js');
-
 class FileWriter extends Writable {
   
   constructor(outputStream,status,logWriter,options) {
