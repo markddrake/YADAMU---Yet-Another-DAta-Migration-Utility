@@ -1,3 +1,3 @@
 export LOGDIR=logs/$DB_CONNECTION
-export IMPORTLOG=$LOGDIR/Operations.log
-export EXPORTLOG=$LOGDIR/Operations.log
+export IMPORTLOG=$LOGDIR/Oracle18c.log
+export EXPORTLOG=$LOGDIR/Oracle18c.log

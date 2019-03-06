@@ -1,3 +1,3 @@
 @set LOGDIR=logs\MySQL
-@set IMPORTLOG=%LOGDIR%\Operations.log
-@set EXPORTLOG=%LOGDIR%\Operations.log
+@set IMPORTLOG=%LOGDIR%\MySQL.log
+@set EXPORTLOG=%LOGDIR%\MySQL.log

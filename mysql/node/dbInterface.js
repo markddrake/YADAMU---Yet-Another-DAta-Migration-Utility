@@ -53,15 +53,9 @@ const sqlGetTableInfo =
           'select json_array('
           ,group_concat(
             case 
-              when data_type = 'date'
-                -- Force ISO 8601 rendering of value 
-                then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%TZ'')')
-              when data_type = 'timestamp'
+              when data_type in ('date','time','datetime','timestamp')
                 -- Force ISO 8601 rendering of value 
                 then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')')
-              when data_type = 'datetime'
-                -- Force ISO 8601 rendering of value 
-                then concat('DATE_FORMAT("', column_name, '", ''%Y-%m-%dT%T.%f'')')
               when data_type = 'year'
                 -- Prevent rendering of value as base64:type13: 
                 then concat('CAST("', column_name, '"as DECIMAL)')
@@ -245,12 +239,31 @@ class DBInterface {
     }
   }
   
+  isValidDDL() {
+    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
+  }
+  
+  objectMode() {
+    return true;
+  }
+  
+  setSystemInformation(systemInformation) {
+    this.systemInformation = systemInformation
+  }
+  
+  setMetadata(metadata) {
+    this.metadata = metadata
+  }
+  
   constructor(yadamu) {
     this.yadamu = yadamu;
-    this.parameters = yadamu.mergeDefaultParameters(defaultParameters);
+    this.parameters = yadamu.mergeParameters(defaultParameters);
     this.status = yadamu.getStatus()
     this.logWriter = yadamu.getLogWriter();
      
+    this.systemInformation = undefined;
+    this.metadata = undefined;
+    
     this.conn = undefined;;
     this.connectionProperties = this.getConnectionProperties()   
 
@@ -261,7 +274,6 @@ class DBInterface {
     this.insertMode = 'Empty';
     this.skipTable = true;
 
-
   }
 
   /*  
@@ -270,7 +282,7 @@ class DBInterface {
   **
   */
   
-  async initialize() {
+  async initialize(schema) {
     await this.getConnection();
   }
 
@@ -334,8 +346,7 @@ class DBInterface {
   **  Upload a JSON File to the server. Optionally return a handle that can be used to process the file
   **
   */
-  
-  	 
+ 
   async createStagingTable() {    	
 	const sqlStatement = `CREATE TEMPORARY TABLE IF NOT EXISTS "JSON_STAGING"("DATA" JSON)`;					   
 	const results = await this.executeSQL(sqlStatement);
@@ -436,9 +447,9 @@ class DBInterface {
       return sqlGetTableInfo + sqlInformationSchemaFix;
     }
   }
-
+  
   async getDDLOperations(schema) {
-    return []
+    return undefined
   }
     
   async getTableInfo(schema,status) {
@@ -484,31 +495,32 @@ class DBInterface {
   **
   */
   
-  async initializeDataLoad(databaseVendor) {
-    await this.createTargetDatabase(this.schema);
+  async initializeDataLoad(schema) {
+    await this.createTargetDatabase(schema);
   }
   
-  async executeDDL(ddl) {
+  async executeDDL(schema,ddl) {
     await Promise.all(ddl.map(function(ddlStatement) {
+      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
       return this.conn.query(ddlStatement) 
     },this))
   }
 
-  async generateStatementCache(schema,systemInformation,metadata,ddlRequired) {
+  async generateStatementCache(schema,executeDDL) {
     let statementGenerator = undefined;
     const sqlGetVersion = `SELECT @@version`
     const results = await this.executeSQL(sqlGetVersion);
     if (results[0]['@@version'] > '6.0') {
-       statementGenerator = new StatementGenerator80(this,ddlRequired,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.status,this.logWriter);
+       statementGenerator = new StatementGenerator80(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
     }
     else {
-       statementGenerator = new StatementGenerator57(this,ddlRequired,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.status,this.logWriter);
+       statementGenerator = new StatementGenerator57(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
     }
   
     // Uncomment the folloing statement Force 5.7 Code Path
     // statementGenerator = new StatementGenerator57(this,ddlRequired,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.status,this.logWriter);
     
-    this.statementCache = await statementGenerator.generateStatementCache(schema,systemInformation,metadata)
+    this.statementCache = await statementGenerator.generateStatementCache(schema, this.systemInformation, this.metadata, executeDDL)
   }
 
   getTableWriter(schema,tableName) {
@@ -521,3 +533,4 @@ class DBInterface {
 }
 
 module.exports = DBInterface
+11111111111111111

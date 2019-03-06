@@ -9,14 +9,12 @@ const integerTypes   = ['tinyint','mediumint','smallint','int','bigint']
 
 class StatementGenerator {
   
-  constructor(dbi ,ddlRequired, batchSize, commitSize, status, logWriter) {
+  constructor(dbi ,batchSize, commitSize) {
     
     this.dbi = dbi;
-    this.ddlRequired = ddlRequired
     this.batchSize = batchSize
     this.commitSize = commitSize;
-    this.status = status;
-    this.logWriter = logWriter;
+    
   }
     
   mapForeignDataType(vendor, dataType, dataTypeLength, dataTypeSize) {
@@ -181,70 +179,71 @@ class StatementGenerator {
       
   generateTableInfo(vendor, schema, metadata) {
       
-     let useSetClause = false;
+    let useSetClause = false;
   
-     const columnNames = metadata.columns.split(',');
-     const dataTypes = metadata.dataTypes
-     const sizeConstraints = metadata.sizeConstraints
-     const targetDataTypes = [];
-     const setOperators = []
+    const columnNames = metadata.columns.split(',');
+    const dataTypes = metadata.dataTypes
+    const sizeConstraints = metadata.sizeConstraints
+    const targetDataTypes = [];
+    const setOperators = []
   
-     const columnClauses = columnNames.map(function(columnName,idx) {    
-                                             
-                                             const dataType = {
-                                                      type : dataTypes[idx]
-                                                   }    
-                                             
-                                             const sizeConstraint = sizeConstraints[idx]
-                                             if (sizeConstraint.length > 0) {
-                                                const components = sizeConstraint.split(',');
-                                                dataType.length = parseInt(components[0])
-                                                if (components.length > 1) {
-                                                  dataType.scale = parseInt(components[1])
-                                                }
-                                             }
-                                          
-                                             let targetDataType = this.mapForeignDataType(vendor,dataType.type,dataType.length,dataType.scale);
-                                         
-                                             targetDataTypes.push(targetDataType);
-                                             let ensureNullable = false;
-                                             switch (targetDataType) {
-                                               case 'geometry':
-                                                  useSetClause = true;
-                                                  setOperators.push(' ' + columnName + ' = ST_GeomFromText(?)');
-                                                  break;                                                 
-                                               case 'timestamp':
-                                                  ensureNullable = true;
-                                               default:
-                                                 setOperators.push(' ' + columnName + ' = ?')
-                                             }
-                                             return `${columnName} ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)} ${ensureNullable === true ? 'null':''}`
-                                          },this)
-                                        
-      const createStatement = `create table if not exists "${schema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
-      let insertStatement = `insert into "${schema}"."${metadata.tableName}"`;
-      if (useSetClause) {
-        insertStatement += ` set` + setOperators.join(',');
-      }
-      else {
-        insertStatement += `(${metadata.columns}) values ?`;
-      }
-      return { ddl : createStatement, dml : insertStatement, targetDataTypes : targetDataTypes, useSetClause : useSetClause, batchSize : this.batchSize, commitSize : this.commitSize}
+    const columnClauses = columnNames.map(function(columnName,idx) {    
+        
+       const dataType = {
+                type : dataTypes[idx]
+             }    
+        
+       const sizeConstraint = sizeConstraints[idx]
+       if (sizeConstraint.length > 0) {
+          const components = sizeConstraint.split(',');
+          dataType.length = parseInt(components[0])
+          if (components.length > 1) {
+            dataType.scale = parseInt(components[1])
+          }
+       }
+    
+       let targetDataType = this.mapForeignDataType(vendor,dataType.type,dataType.length,dataType.scale);
+    
+       targetDataTypes.push(targetDataType);
+       let ensureNullable = false;
+       switch (targetDataType) {
+         case 'geometry':
+            useSetClause = true;
+            setOperators.push(' ' + columnName + ' = ST_GeomFromText(?)');
+            break;                                                 
+         case 'timestamp':
+            ensureNullable = true;
+         default:
+           setOperators.push(' ' + columnName + ' = ?')
+       }
+       return `${columnName} ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)} ${ensureNullable === true ? 'null':''}`
+    },this)
+                                       
+    const createStatement = `create table if not exists "${schema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
+    let insertStatement = `insert into "${schema}"."${metadata.tableName}"`;
+    if (useSetClause) {
+      insertStatement += ` set` + setOperators.join(',');
+    }
+    else {
+      insertStatement += `(${metadata.columns}) values ?`;
+    }
+    return { ddl : createStatement, dml : insertStatement, targetDataTypes : targetDataTypes, useSetClause : useSetClause, batchSize : this.batchSize, commitSize : this.commitSize}
   }
   
-  async generateStatementCache( schema, systemInformation, metadata) {
+  async generateStatementCache(schema, systemInformation, metadata, executeDDL) {
       
-    const ddlStatements = [];  
     const statementCache = {}
     const tables = Object.keys(metadata); 
 
-    tables.forEach(async function(table,idx) {
-                          const tableMetadata = metadata[table];
-                          const tableInfo = this.generateTableInfo(systemInformation.vendor, schema,tableMetadata);
-                          statementCache[table] = tableInfo;
-                          ddlStatements[idx] = tableInfo.ddl;
+    const ddlStatements = tables.map(function(table,idx) {
+      const tableMetadata = metadata[table];
+      const tableInfo = this.generateTableInfo(systemInformation.vendor, schema,tableMetadata);
+      statementCache[table] = tableInfo;
+      return tableInfo.ddl;
     },this)
-    const results = await this.dbi.executeDDL(ddlStatements)
+    if (executeDDL === true) {
+      await this.dbi.executeDDL(schema,ddlStatements)
+    }
     return statementCache;
   }
 

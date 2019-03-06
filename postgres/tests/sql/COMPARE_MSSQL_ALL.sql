@@ -1,4 +1,6 @@
 --
+\set ECHO errors
+--
 \set SCHEMA Northwind
 --
 \include sql/SCHEMA_COMPARE.sql

@@ -509,7 +509,7 @@ declare
   
   V_SOURCE_COUNT INT;
   V_TARGET_COUNT INT;
-  V_ERROR        TEXT;
+  V_SQLERRM        TEXT;
 begin
   create temporary table if not exists SCHEMA_COMPARE_RESULTS (
     SOURCE_SCHEMA    VARCHAR(128)
@@ -517,9 +517,9 @@ begin
    ,TABLE_NAME       VARCHAR(128)
    ,SOURCE_ROW_COUNT INT
    ,TARGET_ROW_COUNT INT
-   ,MISSINGS_ROWS    INT
+   ,MISSING_ROWS     INT
    ,EXTRA_ROWS       INT
-   ,ERROR            TEXT
+   ,SQLERRM          TEXT
   );
   
   for r in select t.table_name
@@ -555,7 +555,7 @@ begin
       EXECUTE V_SQL_STATEMENT;               
     exception  
       when others then
-        V_ERROR = SQLERRM;
+        V_SQLERRM = SQLERRM;
         V_SOURCE_COUNT = -1;
         V_TARGET_COUNT = -1;
 
@@ -573,7 +573,7 @@ begin
             null;
         end;
 		
-        insert into SCHEMA_COMPARE_RESULTS VALUES (P_SOURCE_SCHEMA, P_TARGET_SCHEMA, r.TABLE_NAME, V_SOURCE_COUNT, V_TARGET_COUNT, -1, -1, V_ERROR);            
+        insert into SCHEMA_COMPARE_RESULTS VALUES (P_SOURCE_SCHEMA, P_TARGET_SCHEMA, r.TABLE_NAME, V_SOURCE_COUNT, V_TARGET_COUNT, -1, -1, V_SQLERRM);            
     end;               
                     
   end loop;

@@ -3,7 +3,7 @@
 const { Transform } = require('stream');
 const Readable = require('stream').Readable;
 // const clarinet = require('clarinet');
-const clarinet = require('../clarinet/clarinet.js');
+const clarinet = require('../../clarinet/clarinet.js');
 
 class TextParser extends Transform {
   

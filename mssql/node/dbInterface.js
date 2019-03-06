@@ -98,9 +98,10 @@ class DBInterface {
   }
   
   async  getConnectionPool() {
- 
+  
+    const logWriter = this.logWriter;
     const pool = await new sql.ConnectionPool(this.connectionProperties).connect();
-    pool.on('error',function(err){console.log('Pool Error:',err)});
+    pool.on('error',function(err){logWriter.log('Pool Error:',err)});
     const statement = `SET QUOTED_IDENTIFIER ON`
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${statement}\n\/\n`)
@@ -169,15 +170,34 @@ class DBInterface {
     }
   }
   
+  isValidDDL() {
+    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
+  }
+
+  objectMode() {
+    return true;
+  }
+  
+  setSystemInformation(systemInformation) {
+    this.systemInformation = systemInformation
+  }
+  
+  setMetadata(metadata) {
+    this.metadata = metadata
+  }
+  
   constructor(yadamu) {
     this.yadamu = yadamu;
-    this.parameters = yadamu.mergeDefaultParameters(defaultParameters);
+    this.parameters = yadamu.mergeParameters(defaultParameters);
     this.status = yadamu.getStatus()
     this.logWriter = yadamu.getLogWriter();
 
+    this.systemInformation = undefined;
+    this.metadata = undefined;
+
     this.pool = undefined;
     this.conn = undefined;;
-    this.connectionProperties = this.getConnectionProperties()       
+    this.connectionProperties = this.getConnectionProperties()     
     
     this.statementCache = undefined;
     
@@ -194,7 +214,7 @@ class DBInterface {
   **
   */
   
-  async initialize() {
+  async initialize(schema) {
      this.pool = await this.getConnectionPool()
   }
 
@@ -215,7 +235,9 @@ class DBInterface {
   */
 
   async abort() {
-    await this.pool.close();
+    if (this.pool !== undefined) {
+      await this.pool.close();
+    }
   }
 
   /*
@@ -262,7 +284,7 @@ class DBInterface {
   */
 
   async processFile(mode,schema,hndl) {
-     let results = await this.pool.request().input('TARGET_DATABASE',sql.VARCHAR,schema).execute('IMPORT_JSON');
+     let results = await this.pool.request().input('TARGET_DATABASE',sql.VARCHAR,schema).execute('sp_IMPORT_JSON');
      results = results.recordset;
      return  JSON.parse(results[0][Object.keys(results[0])[0]])
   }
@@ -314,7 +336,7 @@ class DBInterface {
   */
 
   async getDDLOperations(schema) {
-    return []
+    return undefined
   }
   
   async getTableInfo(schema) {
@@ -369,15 +391,26 @@ class DBInterface {
   **
   */
   
-  async initializeDataLoad(databaseVendor) {
+  async initializeDataLoad(schema) {
   }
   
-  async executeDDL(schema, systemInformation, ddl) {
+  async executeDDL(schema, ddl) {
+    await Promise.all(ddl.map(async function(ddlStatement) {
+      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
+      try {
+        if (this.status.sqlTrace) {
+          this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
+        }
+        const results = await this.pool.request().batch(ddlStatement)   
+      } catch (e) {
+        this.logWriter.write(`${e}\n${ddlStatement}\n`)
+      } 
+    },this))
   }
 
-  async generateStatementCache(schema,systemInformation,metadata,ddlRequired) {
-    const statementGenerator = new StatementGenerator(this, ddlRequired, this.parameters.BATCHSIZE, this.parameters.COMMITSIZE, this.status, this.logWriter);
-    this.statementCache = await statementGenerator.generateStatementCache(schema,systemInformation,metadata,this.parameters.DATABASE)
+  async generateStatementCache(schema,executeDDL) {
+    const statementGenerator = new StatementGenerator(this, this.parameters.BATCHSIZE, this.parameters.COMMITSIZE, this.status, this.logWriter);
+    this.statementCache = await statementGenerator.generateStatementCache(schema,this.systemInformation,this.metadata,executeDDL, this.connectionProperties.database)
   }
 
   

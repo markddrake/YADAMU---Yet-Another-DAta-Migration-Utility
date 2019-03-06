@@ -1,3 +1,3 @@
 @set LOGDIR=logs\Postgres
-@set IMPORTLOG=%LOGDIR%\Operations.log
-@set EXPORTLOG=%LOGDIR%\Operations.log
+@set IMPORTLOG=%LOGDIR%\Postgres.log
+@set EXPORTLOG=%LOGDIR%\Postgres.log

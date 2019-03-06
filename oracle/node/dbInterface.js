@@ -27,7 +27,7 @@ const dateFormatMasks = {
         Oracle      : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
        ,MSSQLSERVER : 'YYYY-MM-DD"T"HH24:MI:SS.###"Z"'
        ,Postgres    : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
-       ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+       ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS.######"Z"'
        ,MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
 }
 
@@ -221,11 +221,13 @@ class DBInterface {
     return conn;
   }
   
-  static async releaseConnection(conn,logWriter) {
-    try {
-      await conn.close();
-    } catch (e) {
-      logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]: ${e}\n${e.stack}\n`);
+  async releaseConnection(conn,logWriter) {
+    if (conn !== undefined) {
+      try {
+        await conn.close();
+      } catch (e) {
+        this.logWriter.write(`${new Date().toISOString()}[${this.DATABASE_VENDOR}]: ${e}\n${e.stack}\n`);
+      }
     }
   };
 
@@ -273,12 +275,31 @@ class DBInterface {
     }
   }
 
+  isValidDDL() {
+    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
+  }
+  
+  objectMode() {
+    return true;
+  }
+  
+  setSystemInformation(systemInformation) {
+    this.systemInformation = systemInformation
+  }
+  
+  setMetadata(metadata) {
+    this.metadata = metadata
+  }
+  
   constructor(yadamu) {
     this.yadamu = yadamu;
-    this.parameters = yadamu.mergeDefaultParameters(defaultParameters);
+    this.parameters = yadamu.mergeParameters(defaultParameters);
     this.status = yadamu.getStatus()
     this.logWriter = yadamu.getLogWriter();
     
+    this.systemInformation = undefined;
+    this.metadata = undefined;
+
     this.connectionProperties = this.getConnectionProperties()   
     this.connection = undefined;
 
@@ -296,7 +317,7 @@ class DBInterface {
   **
   */
   
-  async initialize() {
+  async initialize(schema) {
     this.connection = await this.getConnection(this.connectionProperties,this.status)
   }
     
@@ -308,7 +329,7 @@ class DBInterface {
  
   async finalize() {
     await this.setCurrentSchema(this.connectionProperties.user);
-    await DBInterface.releaseConnection(this.connection, this.logWriter);
+    await this.releaseConnection(this.connection, this.logWriter);
   }
    
   /*
@@ -318,7 +339,7 @@ class DBInterface {
   */
 
   async abort() {
-    await DBInterface.releaseConnection(this.connection, this.logWriter);
+    await this.releaseConnection(this.connection, this.logWriter);
   }
   /*
   **
@@ -568,25 +589,25 @@ class DBInterface {
 
     }
 
-  async initializeDataLoad(databaseVendor) {
-    await this.setDateFormatMask(this.connection,this.status,databaseVendor);
+  async initializeDataLoad(schema) {
+    await this.disableConstraints();
+    await this.setDateFormatMask(this.connection,this.status,this.systemInformation.vendor);
     await this.setCurrentSchema(this.parameters.TOUSER)
   }
   
-  async executeDDL(schema, systemInformation, ddl) {
+  async executeDDL(schema, ddl) {
   
     const sqlStatement = `begin :log := JSON_EXPORT_DDL.APPLY_DDL_STATEMENTS(:ddl, :schema); end;`;
-    const ddlLob = await this.lobFromJSON({ systemInformation : systemInformation, ddl : ddl});  
+    const ddlLob = await this.lobFromJSON({ systemInformation : this.systemInformation, ddl : ddl});  
     const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , ddl:ddlLob, schema:schema};
     const results = await this.executeSQL(sqlStatement,args);
     await ddlLob.close();
     this.processLog(results)
-    await this.disableConstraints();
   }
   
-  async generateStatementCache(schema,systemInformation,metadata,ddlRequired) { 
-     const statementGenerator = new StatementGenerator(this,ddlRequired,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.parameters.LOBCACHESIZE);
-     this.statementCache = await statementGenerator.generateStatementCache(schema,systemInformation,metadata)
+  async generateStatementCache(schema,executeDDL) { 
+     const statementGenerator = new StatementGenerator(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.parameters.LOBCACHESIZE);
+     this.statementCache = await statementGenerator.generateStatementCache(schema, this.systemInformation, this.metadata, executeDDL)
   }
 
   getTableWriter(schema,tableName) {     

@@ -1,4 +1,6 @@
 --
+\set ECHO errors
+--
 \set SCHEMA HR
 --
 \include sql/SCHEMA_COMPARE.sql

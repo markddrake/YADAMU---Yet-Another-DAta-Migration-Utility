@@ -19,16 +19,13 @@ class DBWriter extends Writable {
     this.logWriter = logWriter;
     this.logWriter.write(`${new Date().toISOString()}[DBWriter ${dbi.DATABASE_VENDOR}]: Ready. Mode: ${this.mode}.\n`)
         
-    this.systemInformation = undefined;
-    this.metadata = undefined;
-
     this.currentTable = undefined;
     this.rowCount     = undefined;
     this.ddlComplete  = false;
   }      
   
   objectMode() {
-    return true; 
+    return this.dbi.objectMode(); 
   }
   
   setOptions(options) {
@@ -62,28 +59,29 @@ class DBWriter extends Writable {
     try {
       switch (Object.keys(obj)[0]) {
         case 'systemInformation':
-          this.systemInformation = obj.systemInformation;
+          this.dbi.setSystemInformation(obj.systemInformation)
           break;
         case 'ddl':
-          if ((this.ddlRequired) && (obj.ddl.length > 0) && (this.systemInformation.vendor === this.dbi.DATABASE_VENDOR)) {
-            await this.dbi.executeDDL(this.schema, this.systemInformation, obj.ddl);
+          if ((this.ddlRequired) && (obj.ddl.length > 0) && (this.dbi.isValidDDL())) { 
+            await this.dbi.executeDDL(this.schema,obj.ddl);
             this.ddlComplete = true;
           }
           break;
         case 'metadata':
-          this.metadata = Yadamu.convertIdentifierCase(this.dbi.parameters.IDENTIFIER_CASE,obj.metadata);
+          let metadata = Yadamu.convertIdentifierCase(this.dbi.parameters.IDENTIFIER_CASE,obj.metadata);
           const targetTableInfo = await this.dbi.getTableInfo(this.schema,this.status);
           if (targetTableInfo.length > 0) {
-             this.metadata = this.mergeMetadata(this.dbi.generateMetadata(targetTableInfo,false),this.metadata);
+             metadata = this.mergeMetadata(this.dbi.generateMetadata(targetTableInfo,false),metadata);
           }
-          // ### if a DDL section has been processed then we can skip DDL as part of statement generation.
-          if (Object.keys(this.metadata).length > 0) {   
-            await this.dbi.generateStatementCache(this.schema,this.systemInformation,this.metadata,!this.ddlComplete)
+          this.dbi.setMetadata(metadata)
+          if (Object.keys(metadata).length > 0) {   
+            // ### if the import already processed a DDL object do not execute DDL when generating statements.
+            await this.dbi.generateStatementCache(this.schema,!this.ddlComplete)
           } 
           break;
         case 'table':
           if (this.currentTable === undefined) {
-            await this.dbi.initializeDataLoad(this.systemInformation.vendor);
+            await this.dbi.initializeDataLoad(this.schema);
           }
           else {
             const results = await this.currentTable.finalize();
@@ -127,11 +125,11 @@ class DBWriter extends Writable {
           const elapsedTime = results.endTime - results.startTime;            
           this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${results.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
         }
+        await this.dbi.finalizeDataLoad();
       }
       else {
         this.logWriter.write(`${new Date().toISOString()}: No tables found.\n`);
       } 
-      await this.dbi.finalizeDataLoad();
       callback();
     } catch (e) {
       this.logWriter.write(`${new Date().toISOString()}[DBWriter._final() "${this.tableName}"]: ${e}\n${e.stack}\n`);

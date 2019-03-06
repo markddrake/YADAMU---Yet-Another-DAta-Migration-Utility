@@ -195,11 +195,30 @@ class DBInterface {
     }
   }
   
+  isValidDDL() {
+    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
+  }
+  
+  objectMode() {
+    return true;
+  }
+  
+  setSystemInformation(systemInformation) {
+    this.systemInformation = systemInformation
+  }
+  
+  setMetadata(metadata) {
+    this.metadata = metadata
+  }
+  
   constructor(yadamu) {
     this.yadamu = yadamu;
-    this.parameters = yadamu.mergeDefaultParameters(defaultParameters);
+    this.parameters = yadamu.mergeParameters(defaultParameters);
     this.status = yadamu.getStatus()
     this.logWriter = yadamu.getLogWriter();
+    
+    this.systemInformation = undefined;
+    this.metadata = undefined;
      
     this.pool = undefined;
     this.conn = undefined;
@@ -221,7 +240,7 @@ class DBInterface {
   **
   */
   
-  async initialize() {
+  async initialize(schema) {
     await this.getConnectionPool();
   }
 
@@ -345,7 +364,7 @@ class DBInterface {
   */
 
   async getDDLOperations(schema) {
-    return []
+    return undefined
   }
     
   async getTableInfo(schema,status) {
@@ -406,19 +425,22 @@ class DBInterface {
   **
   */
   
-  async initializeDataLoad(databaseVendor) {
-    await this.createTargetDatabase(this.schema);
+  async initializeDataLoad(schema) {
+    await this.createTargetDatabase(schema);
   }
   
-  async executeDDL(ddl) {
+  async executeDDL(schema, ddl) {
+    // console.log(ddl);
+
     await Promise.all(ddl.map(function(ddlStatement) {
-      return this.conn.query(ddlStatement) 
+      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
+      return this.executeSQL(ddlStatement) 
     },this))
   }
 
-  async generateStatementCache(schema,systemInformation,metadata,ddlRequired) {
-    const statementGenerator = new StatementGenerator(this,ddlRequired,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.status,this.logWriter);    
-    this.statementCache = await statementGenerator.generateStatementCache(schema,systemInformation,metadata)
+  async generateStatementCache(schema,executeDDL) {
+    const statementGenerator = new StatementGenerator(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);    
+    this.statementCache = await statementGenerator.generateStatementCache(schema,this.systemInformation,this.metadata,executeDDL)
   }
 
   getTableWriter(schema,tableName) {

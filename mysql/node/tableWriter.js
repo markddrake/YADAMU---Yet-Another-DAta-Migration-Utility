@@ -63,6 +63,15 @@ class TableWriter {
               row[idx] = JSON.stringify(row[idx]);
             }
             break;
+          case "date":
+          case "time":
+          case "datetime":
+            // If the the input is a string, assume 8601 Format with "T" seperating Date and Time and Timezone specified as 'Z' or +00:00
+            // Neeed to convert it into a format that avoiods use of convert_tz and str_to_date, since using these operators prevents the use of Bulk Insert.
+            // Session is already in UTC so we safely strip UTC markers from timestamps
+            if (typeof row[idx] === 'string') {
+               row[idx] = row[idx].substring(0,10) + ' '  + (row[idx].endsWith('Z') ? row[idx].substring(11).slice(0,-1) : (row[idx].instr('+') > 0 ? row[idx].substring(11).slice(0,-5) : row[idx].substring(11)))
+            }
           default :
         }
       }
@@ -75,10 +84,8 @@ class TableWriter {
   }
       
   async writeBatch() {
-     this.insertMode = 'Batch';
      try {
-      if (this.tableInfo.useSetClause) {
-        this.insertMode = 'Iterative';
+      if (this.tableInfo.insertMode === 'Iterative') {
         for (const i in this.batch) {
           try {
             const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[i]);
@@ -121,7 +128,7 @@ class TableWriter {
     return {
       startTime    : this.startTime
     , endTime      : this.endTime
-    , insertMode   : this.insertMode
+    , insertMode   : this.tableInfo.insertMode
     , skipTable    : this.skipTable
     }    
   }

@@ -1,3 +1,3 @@
 @set LOGDIR=logs\%DB_CONNECTION%
-@set IMPORTLOG=%LOGDIR%\Operations.log
-@set EXPORTLOG=%LOGDIR%\Operations.log
+@set IMPORTLOG=%LOGDIR%\Oracle18c.log
+@set EXPORTLOG=%LOGDIR%\Oracle18c.log

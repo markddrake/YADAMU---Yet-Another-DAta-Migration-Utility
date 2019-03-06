@@ -2,6 +2,30 @@
 /*
 ** De-serialize serialized data
 */
+declare
+  TABLE_NOT_FOUND EXCEPTION;
+  PRAGMA EXCEPTION_INIT( TABLE_NOT_FOUND , -00942 );
+begin
+  execute immediate 'drop table "SCHEMA_COMPARE_RESULTS"';
+exception
+  when TABLE_NOT_FOUND then
+    null;
+  when others then  
+    RAISE;
+end;
+/
+create global temporary table SCHEMA_COMPARE_RESULTS (
+  SOURCE_SCHEMA    VARCHAR2(128)
+ ,TARGET_SCHEMA    VARCHAR2(128)
+ ,TABLE_NAME       VARCHAR2(128)
+ ,SOURCE_ROW_COUNT NUMBER
+ ,TARGET_ROW_COUNT NUMBER
+ ,MISSING_ROWS     NUMBER
+ ,EXTRA_ROWS       NUMBER
+ ,SQLERRM          VARCHAR2(4000)
+) 
+ON COMMIT PRESERVE  ROWS
+/
 create or replace package JSON_IMPORT
 AUTHID CURRENT_USER
 as
@@ -22,20 +46,7 @@ as
   $ELSE
   C_RETURN_TYPE     CONSTANT VARCHAR2(32):= 'VARCHAR2(4000)';
   C_MAX_OUTPUT_SIZE CONSTANT NUMBER      := 4000;
-  $END
-  
-  C_SCHEMA_COMPARE_RESULTS CONSTANT VARCHAR2(4000) := 
-'create global temporary table SCHEMA_COMPARE_RESULTS (
-  SOURCE_SCHEMA    VARCHAR2(128)
- ,TARGET_SCHEMA    VARCHAR2(128)
- ,TABLE_NAME       VARCHAR2(128)
- ,SOURCE_ROW_COUNT NUMBER
- ,TARGET_ROW_COUNT NUMBER
- ,MISSINGS_ROWS    NUMBER
- ,EXTRA_ROWS       NUMBER
- ,SQLERRM          VARCHAR2(4000)
-) ON COMMIT PRESERVE  ROWS
-';
+  $END 
 --
   TYPE T_RESULTS_CACHE is VARRAY(2147483647) of CLOB;
   RESULTS_CACHE        T_RESULTS_CACHE := T_RESULTS_CACHE();
@@ -1375,8 +1386,8 @@ end;
 --
 procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2)
 as
-  TABLE_EXISTS EXCEPTION;
-  PRAGMA EXCEPTION_INIT( TABLE_EXISTS , -00955 );
+  TABLE_NOT_FOUND EXCEPTION;
+  PRAGMA EXCEPTION_INIT( TABLE_NOT_FOUND , -00942 );
 
   cursor getTableList
   is
@@ -1431,16 +1442,13 @@ as
 begin
   
   begin
-    execute immediate C_SCHEMA_COMPARE_RESULTS;
+    execute immediate 'truncate table "SCHEMA_COMPARE_RESULTS"';
   exception
-    when TABLE_EXISTS then
+    when TABLE_NOT_FOUND then
       null;
     when others then  
       RAISE;
   end;
-
-  execute immediate 'DELETE FROM SCHEMA_COMPARE_RESULTS';
-  COMMIT;
    
   for t in getTableList loop
     V_SQL_STATEMENT := 'insert /*+ WITH_PLSQL */ into SCHEMA_COMPARE_RESULTS ' || C_NEWLINE

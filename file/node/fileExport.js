@@ -1,5 +1,6 @@
 "use strict" 
 const fs = require('fs');
+const path = require('path');
 const Readable = require('stream').Readable;
 
 /* 
@@ -9,9 +10,7 @@ const Readable = require('stream').Readable;
 */
 
 const Yadamu = require('../../common/yadamu.js');
-const DBParser = require('../../common/dbParser.js');
 const TableWriter = require('./tableWriter.js');
-const StatementGenerator = require('./statementGenerator.js');
 
 const defaultParameters = {
   BATCHSIZE         : 10000
@@ -27,7 +26,7 @@ const defaultParameters = {
 
 class DBInterface {
     
-  get DATABASE_VENDOR() { return 'Vendor Short Name' };
+  get DATABASE_VENDOR() { return 'FILE' };
   get SOFTWARE_VENDOR() { return 'Vendor Long Name' };
   get SPATIAL_FORMAT()  { return 'WKT' };
   
@@ -40,20 +39,32 @@ class DBInterface {
     }
   }
   
-  isValidDDL() {
-    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
+  closeFile() {
+        
+     const outputStream = this.outputStream;
+        
+     return new Promise(function(resolve,reject) {
+      outputStream.on('finish',function() { resolve() });
+      outputStream.close();
+    })
+
   }
   
-  objectMode() {
+  isValidDDL() {
     return true;
   }
   
-  setSystemInformation(systemInformation) {
-    this.systemInformation = systemInformation
+  objectMode() {
+     return false;
   }
   
+  setSystemInformation(systemInformation) {
+    this.outputStream.write(`"systemInformation":${JSON.stringify(systemInformation)}`);
+  }
+
   setMetadata(metadata) {
-    this.metadata = metadata
+    this.outputStream.write(',');
+    this.outputStream.write(`"metadata":${JSON.stringify(metadata)}`);
   }
   
   constructor(yadamu) {
@@ -62,19 +73,8 @@ class DBInterface {
     this.status = yadamu.getStatus()
     this.logWriter = yadamu.getLogWriter();
      
-    this.systemInformation = undefined;
-    this.metadata = undefined;
-
-    this.conn = undefined;
-    this.connectionProperties = this.getConnectionProperties()       
-
-    this.statementCache = undefined;
-
-    this.tableName  = undefined;
-    this.tableInfo  = undefined;
-    this.insertMode = 'Empty';
-    this.skipTable = true;
-
+    this.outputStream = undefined;
+    this.firstTable = true;
   }
 
   /*  
@@ -83,7 +83,11 @@ class DBInterface {
   **
   */
   
-  async initialize(schema) {
+  async initialize() {
+    const exportFilePath = path.resolve(this.parameters.FILE);
+    this.outputStream = fs.createWriteStream(exportFilePath);
+    this.logWriter.write(`${new Date().toISOString()}[FileExport()]: Writing file "${exportFilePath}".\n`)
+    this.outputStream.write(`{`)
   }
 
   /*
@@ -93,6 +97,8 @@ class DBInterface {
   */
 
   async finalize() {
+  this.outputStream.write('}')    
+    await this.closeFile()
   }
 
   /*
@@ -102,6 +108,14 @@ class DBInterface {
   */
 
   async abort() {
+      
+    if (this.oututStream !== undefined) {
+      try {
+        await this.closeFile()
+      } catch (err) {
+        this.logWriter.write(`${new Date().toISOString()}[FileExprt()]: Fatal Error:${err.stack}.\n`)
+      }
+    }
   }
 
   /*
@@ -168,7 +182,7 @@ class DBInterface {
   */
 
   async getDDLOperations(schema) {
-    return undefined
+    return []
   }
   
   async getTableInfo(schema) {
@@ -176,7 +190,6 @@ class DBInterface {
   }
 
   generateMetadata(tableInfo,server) {    
-    return {}
   }
    
   generateSelectStatement(tableMetadata) {
@@ -196,33 +209,34 @@ class DBInterface {
   **
   */
   
-  async initializeDataLoad(schema) {
+  async initializeDataLoad(databaseVendor) {
+    this.outputStream.write(',');
+    this.outputStream.write('"data":{');
+      
   }
   
   async executeDDL(schema, ddl) {
-    await Promise.all(ddl.map(async function(ddlStatement) {
-      try {
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
-        }
-        this.executeSQL(ddlStatement);
-      } catch (e) {
-        this.logWriter.write(`${e}\n${tableInfo.ddl}\n`)
-      } 
-    },this)
+    this.outputStream.write(',');
+    this.outputStream.write(`"ddl":${JSON.stringify(ddl)}`);
   }
 
-  async generateStatementCache(schema,executeDDL) {
-    const statementGenerator = new StatementGenerator(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
-    this.statementCache = await statementGenerator.generateStatementCache(schema,this.systemInformation,this.metadata,executeDDL)
+  async generateStatementCache(schema,ddlRequired) {
   }
 
   getTableWriter(schema,tableName) {
-    return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);      
+
+  if (this.firstTable === true) {
+      this.firstTable = false
+    }
+    else {
+      this.outputStream.write(',');
+    }
+
+    return new TableWriter(tableName,this.outputStream);      
   }
   
   async finalizeDataLoad() {
+  this.outputStream.write('}');
   }  
 
 }

@@ -296,6 +296,7 @@ BEGIN
                                    then concat('case when data."',column_name, '" = ''null'' then NULL else data."',column_name,'" end')
                                 when TARGET_DATA_TYPE = 'geometry' 
                                   then concat('case when data."',column_name, '" = ''null'' then NULL else ST_GeomFromText(data."',COLUMN_NAME,'") end')
+                                  
                                 when TARGET_DATA_TYPE = 'point' 
                                   then concat('case when data."',column_name, '" = ''null'' then NULL else ST_PointFromText(data."',COLUMN_NAME,'") end')
                                 when TARGET_DATA_TYPE = 'linestring' 
@@ -560,7 +561,7 @@ BEGIN
   DECLARE TABLE_METADATA 
   CURSOR FOR 
   select c.table_name "TABLE_NAME"
-        ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "COLUMNS"
+        ,group_concat(case when data_type in ('blob', 'varbinary', 'binary') then concat('hex("',column_name,'")') else concat('"',column_name,'"') end order by ordinal_position separator ',')  "COLUMNS"
    from (
      select distinct c.table_catalog, c.table_schema, c.table_name,column_name,ordinal_position,data_type,column_type,character_maximum_length,numeric_precision,numeric_scale,datetime_precision
        from information_schema.columns c, information_schema.tables t
@@ -592,7 +593,7 @@ BEGIN
    ,TABLE_NAME       VARCHAR(128)
    ,SOURCE_ROW_COUNT INT
    ,TARGET_ROW_COUNT INT
-   ,MISSINGS_ROWS    INT
+   ,MISSING_ROWS     INT
    ,EXTRA_ROWS       INT
   );
   

@@ -90,19 +90,37 @@ class DBInterface {
     }
   }
   
+  isValidDDL() {
+    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
+  }
+  
+  objectMode() {
+    return true;
+  }
+  
+  setSystemInformation(systemInformation) {
+    this.systemInformation = systemInformation
+  }
+  
+  setMetadata(metadata) {
+    this.metadata = metadata
+  }
+  
   constructor(yadamu) {
     this.yadamu = yadamu;
-    this.parameters = yadamu.mergeDefaultParameters(defaultParameters);
+    this.parameters = yadamu.mergeParameters(defaultParameters);
     this.status = yadamu.getStatus()
     this.logWriter = yadamu.getLogWriter();
-     
+    
+    this.systemInformation = undefined;
+    this.metadata = undefined;
+        
     this.pgClient = undefined;
     this.connectionProperties = this.getConnectionProperties()   
     this.useBinaryJSON = false;
     
     this.statementCache = undefined;
-    this.metadata = undefined;
-
+    
     this.tableName  = undefined;
     this.tableInfo  = undefined;
     this.insertMode = 'Empty';
@@ -116,7 +134,7 @@ class DBInterface {
   **
   */
   
-  async initialize() {
+  async initialize(schema) {
     this.pgClient = await this.getClient()
   }
 
@@ -332,7 +350,7 @@ class DBInterface {
   */
 
   async getDDLOperations(schema) {
-    return []
+    return undefined
   }
   
   async fetchMetadata(schema) {
@@ -382,41 +400,50 @@ class DBInterface {
   **
   */
   
-  async initializeDataLoad(databaseVendor) {
+  async initializeDataLoad(schema) {
   }
   
-  async executeDDL(schema, systemInformation, ddl) {
-  }
-  
-  async generateStatementCache(schema,systemInformation,metadata,ddlRequired) {
-      
-    try {
-      const sqlStatement = `select GENERATE_SQL($1,$2)`
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
+  async executeDDL(schema, ddl) {
+    await Promise.all(ddl.map(async function(ddlStatement) {
+      try {
+        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
+        if (this.status.sqlTrace) {
+          this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
+        }
+        return await this.pgClient.query(ddlStatement);
+      } catch (e) {
+        this.logWriter.write(`${e}\n${ddlStatement}\n`)
       }
-      const results = await this.pgClient.query(sqlStatement,[{systemInformation : systemInformation, metadata : metadata},schema]);
-      this.statementCache = results.rows[0].generate_sql;
-      const tables = Object.keys(metadata); 
-      await Promise.all(tables.map(async function(table,idx) {
-                                           const tableInfo = this.statementCache[table];
-                                           tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('select ')-1) + '\nvalues ';
-                                           tableInfo.batchSize = Math.trunc(45000 / tableInfo.targetDataTypes.length)
-                                           tableInfo.commitSize = this.parameters.COMMIT_SIZE
-                                           const sqlStatement = tableInfo.ddl
-                                           try {
-                                             if (this.status.sqlTrace) {
-                                               this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
-                                             }
-                                             const results = await this.pgClient.query(sqlStatement);
-                                           } catch (e) {
-                                             this.logWriter.write(`${e}\n${sqlStatement}\n`)
-                                           }
-      },this));
-    
-    } catch (e) {
-      this.logWriter.write(`${e}\n${e.stack}\n`);
+    },this))
+  }
+  
+  async generateStatementCache(schema,executeDDL) {
+      
+    const sqlStatement = `select GENERATE_SQL($1,$2)`
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
     }
+    const results = await this.pgClient.query(sqlStatement,[{systemInformation : this.systemInformation, metadata : this.metadata},schema]);
+    this.statementCache = results.rows[0].generate_sql;
+    if (this.statementCache === null) {
+      this.statementCache = {}
+      return []
+    }
+    else {
+      const tables = Object.keys(this.metadata); 
+      const ddlStatements = tables.map(function(table,idx) {
+        const tableInfo = this.statementCache[table];
+       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('select ')-1) + '\nvalues ';
+       tableInfo.batchSize = Math.trunc(45000 / tableInfo.targetDataTypes.length)
+       tableInfo.commitSize = this.parameters.COMMIT_SIZE
+       return tableInfo.ddl
+      },this);
+    
+      if (executeDDL === true) {
+        await this.executeDDL(schema,ddlStatements);
+      }
+    }
+    return this.statementCache;
   }
 
   getTableWriter(schema,tableName) {

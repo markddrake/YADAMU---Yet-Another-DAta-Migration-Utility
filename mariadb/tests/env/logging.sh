@@ -1,3 +1,3 @@
 export LOGDIR=logs/MariaDB
-export IMPORTLOG=$LOGDIR/Operations.log
-export EXPORTLOG=$LOGDIR/Operations.log
+export IMPORTLOG=$LOGDIR/MariaDB.log
+export EXPORTLOG=$LOGDIR/MariaDB.log

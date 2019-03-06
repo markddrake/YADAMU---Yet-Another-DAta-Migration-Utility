@@ -26,13 +26,12 @@ const DATA_TYPE_STRING_LENGTH = {
 
 class StatementGenerator {
   
-  constructor(dbi, ddlRequired, batchSize, commitSize, lobCacheSize) {
+  constructor(dbi, batchSize, commitSize, lobCacheSize) {
     
     // super();
     const statementGenerator = this;
     
     this.dbi = dbi
-    this.ddlRequired = ddlRequired;
     this.batchSize = batchSize
     this.commitSize = commitSize;
     this.lobCacheSize = lobCacheSize
@@ -110,7 +109,7 @@ class StatementGenerator {
   
   }
   
-  async generateStatementCache(schema, systemInformation, metadata) {
+  async generateStatementCache(schema, systemInformation, metadata, executeDDL) {
    
     const sqlStatement = `begin :sql := JSON_IMPORT.GENERATE_STATEMENTS(:metadata, :schema);\nEND;`;
       
@@ -151,82 +150,83 @@ class StatementGenerator {
     const statementCache = JSON.parse(results.outBinds.sql);
     const tables = Object.keys(metadata); 
     tables.forEach(function(table,idx) {
-                     const tableInfo = statementCache[table];
-                     const tableMetadata = metadata[table];
-                     const columns = JSON.parse('[' + tableMetadata.columns + ']');
-                     if (tableInfo.ddl !== null) {
-                       ddlStatements.push(tableInfo.ddl);
-                     }
-                     let plsqlRequired = false;        
+      const tableInfo = statementCache[table];
+      const tableMetadata = metadata[table];
+      const columns = JSON.parse('[' + tableMetadata.columns + ']');
+      if (tableInfo.ddl !== null) {
+        ddlStatements.push(tableInfo.ddl);
+      }
+      let plsqlRequired = false;        
 
-                     const assignments = [];
-                     const operators = [];
-                     const variables = []
-                     const values = []
-                     
-                     const declarations = columns.map(function(column,idx) {
-                       variables.push(`"V_${column}"`);
-                       let targetDataType =  tableInfo.targetDataTypes[idx];
-                       const dataType = Yadamu.decomposeDataType(targetDataType);
-                       switch (dataType.type) {
-                         case "GEOMETRY":
-                         case "\"MDSYS\".\"SDO_GEOMETRY\"":
-                            values.push(`OBJECT_SERIALIZATION.DESERIALIZE_GEOMETRY(:${(idx+1)})`);
-                            break;
-                         case "XMLTYPE":
-                            values.push(`OBJECT_SERIALIZATION.DESERIALIZE_XML(:${(idx+1)})`);
-                            break
-                          case "BFILE":
-                            values.push(`OBJECT_SERIALIZATION.DESERIALIZE_BFILE(:${(idx+1)})`);
-                            break;
-                         case "ANYDATA":
-                           values.push(`ANYDATA.convertVARCHAR2(:${(idx+1)})`);
-                           break;
-                         case "BOOLEAN":
-                           values.push(`case when :${(idx+1)} = 'true' then HEXTORAW('01') else HEXTORAW('00') end`)
-                           break;
-                         default:
-                           if (targetDataType.indexOf('.') > -1) {
-                             plsqlRequired = true;
-                             values.push(`"#${targetDataType.slice(targetDataType.indexOf(".")+2,-1)}"(:${(idx+1)})`);
-                           }
-                           else {
-                             values.push(`:${(idx+1)}`);
-                           }
-                       } 
-                       // Append length to bounded datatypes if necessary
-                       targetDataType = (boundedTypes.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableMetadata.sizeConstraints[idx]})` : targetDataType;
-                       return `${variables[idx]} ${targetDataType}`;
-                     })
-                     if (plsqlRequired === true) {
-                       const assignments = values.map(function(value,idx) {
-                         if (value[1] === '#') {
-                           return `${setOracleDateMask}${setOracleTimeStampMask}${variables[idx]} := ${value}${setSourceDateMask}${setSourceTimeStampMask}`;
-                         }
-                         else {
-                           return `${variables[idx]} := ${value}`;
-                         }
-                       })
-                       let plsqlFunctions = tableInfo.dml.substring(tableInfo.dml.indexOf('\WITH\n')+5,tableInfo.dml.indexOf('\nselect'));
-                       tableInfo.dml = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n\n  insert into "${schema}"."${table}" (${tableMetadata.columns}) values (${variables.join(',')});\nend;`;      
-                     }
-                     else  {
-                       tableInfo.dml = `insert into "${schema}"."${table}" (${tableMetadata.columns}) values (${values.join(',')})`;
-                     }
-                     tableInfo.binds = this.generateBinds(tableInfo,metadata[table].sizeConstraints);
-                     tableInfo.batchSize = this.batchSize
-                     if (tableInfo.lobCount > 0) {
-                      // If some columns are bound as CLOB or BLOB restrict batchsize based on lobCacheSize
-                        const lobBatchSize = Math.floor(this.lobCacheSize/tableInfo.lobCount);
-                        tableInfo.batchSize = (lobBatchSize > this.batchSize) ? this.batchSize : lobBatchSize;
-                     }
-                     tableInfo.commitSize = this.commitSize;
+      const assignments = [];
+      const operators = [];
+      const variables = []
+      const values = []
+      
+      const declarations = columns.map(function(column,idx) {
+        variables.push(`"V_${column}"`);
+        let targetDataType =  tableInfo.targetDataTypes[idx];
+        const dataType = Yadamu.decomposeDataType(targetDataType);
+        switch (dataType.type) {
+          case "GEOMETRY":
+          case "\"MDSYS\".\"SDO_GEOMETRY\"":
+             values.push(`OBJECT_SERIALIZATION.DESERIALIZE_GEOMETRY(:${(idx+1)})`);
+             break;
+          case "XMLTYPE":
+             values.push(`OBJECT_SERIALIZATION.DESERIALIZE_XML(:${(idx+1)})`);
+             break
+           case "BFILE":
+             values.push(`OBJECT_SERIALIZATION.DESERIALIZE_BFILE(:${(idx+1)})`);
+             break;
+          case "ANYDATA":
+            values.push(`ANYDATA.convertVARCHAR2(:${(idx+1)})`);
+            break;
+          case "BOOLEAN":
+            values.push(`case when :${(idx+1)} = 'true' then HEXTORAW('01') else HEXTORAW('00') end`)
+            break;
+          default:
+            if (targetDataType.indexOf('.') > -1) {
+              plsqlRequired = true;
+              values.push(`"#${targetDataType.slice(targetDataType.indexOf(".")+2,-1)}"(:${(idx+1)})`);
+            }
+            else {
+              values.push(`:${(idx+1)}`);
+            }
+        } 
+        // Append length to bounded datatypes if necessary
+        targetDataType = (boundedTypes.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableMetadata.sizeConstraints[idx]})` : targetDataType;
+        return `${variables[idx]} ${targetDataType}`;
+      },this)
+      
+      if (plsqlRequired === true) {
+        const assignments = values.map(function(value,idx) {
+          if (value[1] === '#') {
+            return `${setOracleDateMask}${setOracleTimeStampMask}${variables[idx]} := ${value}${setSourceDateMask}${setSourceTimeStampMask}`;
+          }
+          else {
+            return `${variables[idx]} := ${value}`;
+          }
+        })
+        let plsqlFunctions = tableInfo.dml.substring(tableInfo.dml.indexOf('\WITH\n')+5,tableInfo.dml.indexOf('\nselect'));
+        tableInfo.dml = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n\n  insert into "${schema}"."${table}" (${tableMetadata.columns}) values (${variables.join(',')});\nend;`;      
+      }
+      else  {
+        tableInfo.dml = `insert into "${schema}"."${table}" (${tableMetadata.columns}) values (${values.join(',')})`;
+      }
+      
+      tableInfo.binds = this.generateBinds(tableInfo,metadata[table].sizeConstraints);
+      tableInfo.batchSize = this.batchSize
+      if (tableInfo.lobCount > 0) {
+       // If some columns are bound as CLOB or BLOB restrict batchsize based on lobCacheSize
+         const lobBatchSize = Math.floor(this.lobCacheSize/tableInfo.lobCount);
+         tableInfo.batchSize = (lobBatchSize > this.batchSize) ? this.batchSize : lobBatchSize;
+      }
+      tableInfo.commitSize = this.commitSize;
     },this);
     
-    if (this.ddlRequired) {
-      await this.dbi.executeDDL(schema, systemInformation, ddlStatements);
+    if (executeDDL === true) {
+      await this.dbi.executeDDL(schema, ddlStatements);
     }
-    
     return statementCache
   }  
 }

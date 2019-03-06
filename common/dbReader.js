@@ -19,6 +19,7 @@ class DBReader extends Readable {
     this.tableInfo = [];
     
     this.nextPhase = 'systemInformation'
+    this.ddlCompleted = false;
     this.outputStream = undefined;
   
   }
@@ -65,7 +66,7 @@ class DBReader extends Readable {
     const copyOperation = new Promise(function(resolve,reject) {  
       const outputStreamError = function(err){reject(err)}       
       outputStream.on('error',outputStreamError);
-      parser.on('finish',function() {waitUntilEmpty(outputStream,outputStreamError,resolve)})
+      parser.on('end',function() {waitUntilEmpty(outputStream,outputStreamError,resolve)})
       parser.on('error',function(err){reject(err)});
       inputStream.on('error',function(err){reject(err)});
       inputStream.pipe(parser).pipe(outputStream,{end: false })
@@ -74,7 +75,7 @@ class DBReader extends Readable {
     const startTime = new Date().getTime()
     const rows = await copyOperation;
     const elapsedTime = new Date().getTime() - startTime
-    this.logWriter.write(`${new Date().toISOString()}[DBReader "${tableMetadata.TABLE_NAME}"]: Rows read: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
+    this.logWriter.write(`${new Date().toISOString()}[DBReader.copyContent("${tableMetadata.TABLE_NAME}")]: Rows read: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
     return rows;
       
   }
@@ -84,9 +85,10 @@ class DBReader extends Readable {
     try {
       switch (this.nextPhase) {
          case 'systemInformation' :
-           // await db.setDateFormatMask(this.conn,this.status,'Oracle')
-           const sysInfo = await this.getSystemInformation(this.schema,Yadamu.EXPORT_VERSION);
-           this.push({systemInformation : sysInfo});
+           const systemInformatiom = await this.getSystemInformation(this.schema,Yadamu.EXPORT_VERSION);
+           // Needed in case we have to generate DDL from the system information and metadata.
+           this.dbi.setSystemInformation(systemInformatiom);
+           this.push({systemInformation : systemInformatiom});
            if (this.mode === 'DATA_ONLY') {
              this.nextPhase = 'metadata';
            }
@@ -95,14 +97,23 @@ class DBReader extends Readable {
            }
            break;
          case 'ddl' :
-           const ddl = await this.getDDLOperations(this.schema);
+           let ddl = await this.getDDLOperations(this.schema);
+           // Database does not provide retrieve DDL statements directly
+           if (ddl === undefined) {
+             // Reverse Engineer DDL from metadata.
+             const metadata = await this.getMetadata(this.schema);
+             this.dbi.setMetadata(metadata);
+             await this.dbi.generateStatementCache('%%SCHEMA%%',false);
+             ddl = Object.keys(this.dbi.statementCache).map(function(table) {
+               return this.dbi.statementCache[table].ddl
+             },this)
+           } 
            this.push({ddl: ddl});
            if (this.mode === 'DDL_ONLY') {
              this.push(null);
+             break;
            }
-           else {
-             this.nextPhase = 'metadata';
-           }
+           this.nextPhase = 'metadata';
            break;
          case 'metadata' :
            const metadata = await this.getMetadata(this.schema);
@@ -128,7 +139,7 @@ class DBReader extends Readable {
          default:
       }
     } catch (e) {
-      this.logWriter.write(`${new Date().toISOString()}[DBWriter._read()]} ${e}\n`);
+      this.logWriter.write(`${new Date().toISOString()}[DBReader._read()]} ${e.stack}\n`);
       process.nextTick(() => this.emit('error',e));
     }
   }
