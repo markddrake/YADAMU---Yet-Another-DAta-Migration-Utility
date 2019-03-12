@@ -493,9 +493,9 @@ BEGIN
            P_METADATA,
            '$'
            COLUMNS (
-             VENDOR                           VARCHAR(32) PATH '$.systemInformation.vendor',
              NESTED                                       PATH '$.metadata.*' 
                COLUMNS (
+                VENDOR                       VARCHAR(32)  PATH '$.vendor',
                 OWNER                        VARCHAR(128) PATH '$.owner'
                ,TABLE_NAME                   VARCHAR(128) PATH '$.tableName'
                ,COLUMN_LIST                          TEXT PATH '$.columns'

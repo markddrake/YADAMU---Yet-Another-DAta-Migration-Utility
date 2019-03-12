@@ -16,7 +16,7 @@ class DBReader extends Readable {
     this.logWriter = logWriter;
     this.logWriter.write(`${new Date().toISOString()}[DBReader ${dbi.DATABASE_VENDOR}]: Ready. Mode: ${this.mode}.\n`)
        
-    this.tableInfo = [];
+    this.schemaInfo = [];
     
     this.nextPhase = 'systemInformation'
     this.ddlCompleted = false;
@@ -38,9 +38,8 @@ class DBReader extends Readable {
   
   async getMetadata(schema) {
       
-
-     this.tableInfo = await this.dbi.getTableInfo(schema)
-     return this.dbi.generateMetadata(this.tableInfo)
+     this.schemaInfo = await this.dbi.getSchemaInfo(schema)
+     return this.dbi.generateMetadata(this.schemaInfo)
   }
       
   async copyContent(tableMetadata,outputStream) {
@@ -80,15 +79,26 @@ class DBReader extends Readable {
       
   }
   
+  async generateStatementCache(metadata) {
+    if (Object.keys(metadata).length > 0) {   
+      // ### if the import already processed a DDL object do not execute DDL when generating statements.
+      Object.keys(metadata).forEach(function(table) {
+         metadata[table].vendor = this.dbi.systemInformation.vendor;
+      },this)
+    }
+    this.dbi.setMetadata(metadata)      
+    await this.dbi.generateStatementCache('%%SCHEMA%%',false)
+  }
+  
   async _read() {
 
     try {
       switch (this.nextPhase) {
          case 'systemInformation' :
-           const systemInformatiom = await this.getSystemInformation(this.schema,Yadamu.EXPORT_VERSION);
+           const systemInformation = await this.getSystemInformation(this.schema,Yadamu.EXPORT_VERSION);
            // Needed in case we have to generate DDL from the system information and metadata.
-           this.dbi.setSystemInformation(systemInformatiom);
-           this.push({systemInformation : systemInformatiom});
+           this.dbi.setSystemInformation(systemInformation);
+           this.push({systemInformation : systemInformation});
            if (this.mode === 'DATA_ONLY') {
              this.nextPhase = 'metadata';
            }
@@ -102,8 +112,7 @@ class DBReader extends Readable {
            if (ddl === undefined) {
              // Reverse Engineer DDL from metadata.
              const metadata = await this.getMetadata(this.schema);
-             this.dbi.setMetadata(metadata);
-             await this.dbi.generateStatementCache('%%SCHEMA%%',false);
+             await this.generateStatementCache(metadata)
              ddl = Object.keys(this.dbi.statementCache).map(function(table) {
                return this.dbi.statementCache[table].ddl
              },this)
@@ -122,8 +131,8 @@ class DBReader extends Readable {
            break;
          case 'table' :
            if (this.mode !== 'DDL_ONLY') {
-             if (this.tableInfo.length > 0) {
-               this.push({table : this.tableInfo[0].TABLE_NAME})
+             if (this.schemaInfo.length > 0) {
+               this.push({table : this.schemaInfo[0].TABLE_NAME})
                this.nextPhase = 'data'
                break;
              }
@@ -131,9 +140,9 @@ class DBReader extends Readable {
            this.push(null);
            break;
          case 'data' :
-           const rows = await this.copyContent(this.tableInfo[0],this.outputStream)
+           const rows = await this.copyContent(this.schemaInfo[0],this.outputStream)
            this.push({rowCount:rows});
-           this.tableInfo.splice(0,1)
+           this.schemaInfo.splice(0,1)
            this.nextPhase = 'table';
            break;
          default:

@@ -69,9 +69,11 @@ class TableWriter {
             // If the the input is a string, assume 8601 Format with "T" seperating Date and Time and Timezone specified as 'Z' or +00:00
             // Neeed to convert it into a format that avoiods use of convert_tz and str_to_date, since using these operators prevents the use of Bulk Insert.
             // Session is already in UTC so we safely strip UTC markers from timestamps
-            if (typeof row[idx] === 'string') {
-               row[idx] = row[idx].substring(0,10) + ' '  + (row[idx].endsWith('Z') ? row[idx].substring(11).slice(0,-1) : (row[idx].instr('+') > 0 ? row[idx].substring(11).slice(0,-5) : row[idx].substring(11)))
-            }
+            if (typeof row[idx] !== 'string') {
+              row[idx] = row[idx].toISOString();
+            }             
+            row[idx] = row[idx].substring(0,10) + ' '  + (row[idx].endsWith('Z') ? row[idx].substring(11).slice(0,-1) : (row[idx].endsWith('+00:00') ? row[idx].substring(11).slice(0,-6) : row[idx].substring(11)))
+            break;
           default :
         }
       }
@@ -105,7 +107,7 @@ class TableWriter {
       }
       this.endTime = new Date().getTime();
       this.batch.length = 0;
-      return this.skipTable
+                            
     } catch (e) {
       this.status.warningRaised = true;
       this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping table. Reason: ${e.message}\n`)

@@ -21,11 +21,11 @@ const defaultParameters = {
 , IDENTIFIER_CASE   : null
 }
 
-const sqlGetSystemInformation = 
+const sqlSystemInformation = 
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE"`;                     
 
 // Cannot use JSON_ARRAYAGG for DATA_TYPES and SIZE_CONSTRAINTS beacuse MYSQL implementation of JSON_ARRAYAGG does not support ordering
-const sqlGetTableInfo = 
+const sqlSchemaInfo = 
 `select c.table_schema "TABLE_SCHEMA"
        ,c.table_name "TABLE_NAME"
        ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "COLUMN_LIST"
@@ -54,15 +54,9 @@ const sqlGetTableInfo =
           'select json_array('
           ,group_concat(
             case 
-              when data_type = 'date'
-                -- Force ISO 8601 rendering of value 
-                then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%TZ'')')
-              when data_type = 'timestamp'
+              when data_type in ('date','time','datetime','timestamp')
                 -- Force ISO 8601 rendering of value 
                 then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')')
-              when data_type = 'datetime'
-                -- Force ISO 8601 rendering of value 
-                then concat('DATE_FORMAT("', column_name, '", ''%Y-%m-%dT%T.%f'')')
               when data_type = 'year'
                 -- Prevent rendering of value as base64:type13: 
                 then concat('CAST("', column_name, '"as DECIMAL)')
@@ -231,6 +225,9 @@ class DBInterface {
     this.insertMode = 'Empty';
     this.skipTable = true;
 
+    if (!this.parameters.TABLE_MATCHING) {
+      this.parameters.TABLE_MATCHING = 'INSENSITIVE';
+    }
 
   }
 
@@ -337,7 +334,7 @@ class DBInterface {
   
   async getSystemInformation(schema,EXPORT_VERSION) {     
   
-    const results = await this.executeSQL(sqlGetSystemInformation); 
+    const results = await this.executeSQL(sqlSystemInformation); 
     const sysInfo = results[0];
     return {
       date               : new Date().toISOString()
@@ -367,9 +364,9 @@ class DBInterface {
     return undefined
   }
     
-  async getTableInfo(schema,status) {
+  async getSchemaInfo(schema,status) {
       
-    return await this.executeSQL(sqlGetTableInfo,[schema]);
+    return await this.executeSQL(sqlSchemaInfo,[schema]);
 
   }
 
@@ -401,12 +398,12 @@ class DBInterface {
   
   async getInputStream(query,parser) {
        
-    const readStream = new Readable({objectMode: true });
-    readStream._read = function() {};
-  
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${query.SQL_STATEMENT};\n--\n`);
     }
+
+    const readStream = new Readable({objectMode: true });
+    readStream._read = function() {};  
   
     this.conn.queryStream(query.SQL_STATEMENT).on('data',
     function(row) {
@@ -440,10 +437,11 @@ class DBInterface {
 
   async generateStatementCache(schema,executeDDL) {
     const statementGenerator = new StatementGenerator(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);    
-    this.statementCache = await statementGenerator.generateStatementCache(schema,this.systemInformation,this.metadata,executeDDL)
+    this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL)
   }
 
-  getTableWriter(schema,tableName) {
+  getTableWriter(schema,table) {
+    const tableName = this.metadata[table].tableName  
     return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);      
   }
   

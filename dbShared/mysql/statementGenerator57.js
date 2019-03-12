@@ -177,9 +177,9 @@ class StatementGenerator {
      return targetDataType;     
   }
       
-  generateTableInfo(vendor, schema, metadata) {
+  generateTableInfo(schema, metadata) {
       
-    let useSetClause = false;
+    let insertMode = 'Bulk';
   
     const columnNames = metadata.columns.split(',');
     const dataTypes = metadata.dataTypes
@@ -202,13 +202,13 @@ class StatementGenerator {
           }
        }
     
-       let targetDataType = this.mapForeignDataType(vendor,dataType.type,dataType.length,dataType.scale);
+       let targetDataType = this.mapForeignDataType(metadata.vendor,dataType.type,dataType.length,dataType.scale);
     
        targetDataTypes.push(targetDataType);
        let ensureNullable = false;
        switch (targetDataType) {
          case 'geometry':
-            useSetClause = true;
+            insertMode = 'Iterative';
             setOperators.push(' ' + columnName + ' = ST_GeomFromText(?)');
             break;                                                 
          case 'timestamp':
@@ -221,23 +221,30 @@ class StatementGenerator {
                                        
     const createStatement = `create table if not exists "${schema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
     let insertStatement = `insert into "${schema}"."${metadata.tableName}"`;
-    if (useSetClause) {
+    if (insertMode === 'Iterative') {
       insertStatement += ` set` + setOperators.join(',');
     }
     else {
       insertStatement += `(${metadata.columns}) values ?`;
     }
-    return { ddl : createStatement, dml : insertStatement, targetDataTypes : targetDataTypes, useSetClause : useSetClause, batchSize : this.batchSize, commitSize : this.commitSize}
+    return { 
+       ddl             : createStatement, 
+       dml             : insertStatement, 
+       targetDataTypes : targetDataTypes, 
+       insertMode      : insertMode,
+       batchSize       : this.batchSize, 
+       commitSize      : this.commitSize
+    }
   }
   
-  async generateStatementCache(schema, systemInformation, metadata, executeDDL) {
+  async generateStatementCache(schema, metadata, executeDDL) {
       
     const statementCache = {}
     const tables = Object.keys(metadata); 
 
     const ddlStatements = tables.map(function(table,idx) {
       const tableMetadata = metadata[table];
-      const tableInfo = this.generateTableInfo(systemInformation.vendor, schema,tableMetadata);
+      const tableInfo = this.generateTableInfo(schema, tableMetadata);
       statementCache[table] = tableInfo;
       return tableInfo.ddl;
     },this)

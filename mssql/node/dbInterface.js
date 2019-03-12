@@ -1,4 +1,4 @@
-"use s trict" 
+"use strict" 
 const fs = require('fs');
 const Readable = require('stream').Readable;
 
@@ -73,7 +73,7 @@ const sqlTableInfo =
     and t.table_schema = @SCHEMA
   group by t.table_schema, t.table_name`;    
 
-const sqlGetSystemInformation = 
+const sqlSystemInformation = 
 `select db_Name() "DATABASE_NAME", current_user "CURRENT_USER", session_user "SESSION_USER", CONVERT(NVARCHAR(20),SERVERPROPERTY('ProductVersion')) "DATABASE_VERSION",CONVERT(NVARCHAR(128),SERVERPROPERTY('MachineName')) "HOSTNAME"`;                     
 
   
@@ -104,7 +104,7 @@ class DBInterface {
     pool.on('error',function(err){logWriter.log('Pool Error:',err)});
     const statement = `SET QUOTED_IDENTIFIER ON`
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${statement}\n\/\n`)
+      this.status.sqlTrace.write(`${statement}\ngo\n`)
     }
     await pool.query(statement);
     return pool;      
@@ -116,7 +116,7 @@ class DBInterface {
     const conn = await sql.connect(this.connectionProperties);
     const statement = `SET QUOTED_IDENTIFIER ON`
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${statement}\n\/\n`)
+      this.status.sqlTrace.write(`${statement}\ngo\n`)
     }
     await conn.query(statement);
     return conn;     
@@ -127,7 +127,7 @@ class DBInterface {
       
     const statement = `use ${databaseName}`
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${statement}\n\/\n`)
+      this.status.sqlTrace.write(`${statement}\ngo\n`)
     }
     await pool.query(statement);
   }
@@ -137,7 +137,7 @@ class DBInterface {
     const statement = `select ISJSON("${tableSpec.columnName}") "VALID_JSON" from "${tableSpec.tableName}"`;
     const startTime = new Date().getTime();
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${statement}\n\/\n`)
+      this.status.sqlTrace.write(`${statement}\ngo\n`)
     }  
     const results = await request.query(statement);
     this.logWriter.write(`${new Date().toISOString()}: Upload succesful: ${results.recordsets[0][0].VALID_JSON === 1}. Elapsed time ${new Date().getTime() - startTime}ms.\n`);
@@ -304,10 +304,10 @@ class DBInterface {
   async getSystemInformation(schema,EXPORT_VERSION) {     
   
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
+      this.status.sqlTrace.write(`${sqlSystemInformation}\ngo\n`)
     }
     
-    const results = await this.pool.request().query(sqlGetSystemInformation);
+    const results = await this.pool.request().query(sqlSystemInformation);
     const sysInfo =  results.recordsets[0][0];
    
     return {
@@ -339,10 +339,10 @@ class DBInterface {
     return undefined
   }
   
-  async getTableInfo(schema) {
+  async getSchemaInfo(schema) {
       
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlTableInfo}\n\/\n`)
+      this.status.sqlTrace.write(`${sqlTableInfo}\ngo\n`)
     }
     
     const results = await this.pool.request().input('SCHEMA',sql.VARCHAR,schema).query(sqlTableInfo);
@@ -373,6 +373,11 @@ class DBInterface {
   }
   
   async getInputStream(query,parser) {
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${query.SQL_STATEMENT}\ngo\n`)
+    }
+    
        
     const readStream = new Readable({objectMode: true });
     readStream._read = function() {};
@@ -399,7 +404,7 @@ class DBInterface {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
       try {
         if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
+          this.status.sqlTrace.write(`${ddlStatement}\ngo\n`);
         }
         const results = await this.pool.request().batch(ddlStatement)   
       } catch (e) {
@@ -410,11 +415,12 @@ class DBInterface {
 
   async generateStatementCache(schema,executeDDL) {
     const statementGenerator = new StatementGenerator(this, this.parameters.BATCHSIZE, this.parameters.COMMITSIZE, this.status, this.logWriter);
-    this.statementCache = await statementGenerator.generateStatementCache(schema,this.systemInformation,this.metadata,executeDDL, this.connectionProperties.database)
+    this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL, this.connectionProperties.database)
   }
 
   
-  getTableWriter(schema,tableName) {
+  getTableWriter(schema,table) {
+    const tableName = this.metadata[table].tableName  
     return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);
   }
   

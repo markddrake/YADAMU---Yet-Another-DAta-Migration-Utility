@@ -37,9 +37,13 @@ begin
                                                               when data_type = 'xml' then
                                                                  '"' || column_name || '"' || '::text'
                                                               when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
-                                                                 'ST_asText("' || column_name || '")'
-                                                              when data_type = 'date' then
-                                                                 'TO_CHAR("' || column_name || '",''YYYY-MM-DD"T"HH24:MI:SS"Z"'')'
+                                                                 'ST_asText("' || column_name || '",18)'
+                                                              when data_type in ('date','timestamp without time zone') then
+                                                                 '"' || column_name || '"::timestamptz'
+                                                              when data_type in ('money') then
+                                                                /* Suppress printing Currency Symbols */
+                                                                /* then '("' || column_name || '"/1::money) */
+                                                                '("' || column_name || '"::numeric)'
                                                               else
                                                                 '"' || column_name || '"'
                                                             end
@@ -253,8 +257,11 @@ begin
           return 'bytea';
         when 'smalldatetime' then
           return'timestamp(0)';
+        -- Do not use Postgres Money Type due to precision issues. E.G. with Locale USD Postgres only provides 2 digit precison.
+        when 'money' then
+          return 'numeric(19,4)';
         when 'smallmoney' then
-          return'money';
+          return 'numeric(10,4)';
         when 'tinyint' then
           return 'smallint';
         when 'hierarchyid' then
@@ -381,11 +388,11 @@ begin
                  ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor',P_SCHEMA,"tableName","columns","dataTypes","sizeConstraints",TRUE) "TABLE_INFO"
              from JSONB_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
-                                                                 "owner" VARCHAR, 
-                                                                 "tableName" VARCHAR, 
-                                                                 "columns" TEXT, 
-                                                                 "dataTypes" JSONB, 
-                                                                 "sizeConstraints" JSONB
+                                                                 "owner"            VARCHAR, 
+                                                                 "tableName"        VARCHAR, 
+                                                                 "columns"          TEXT, 
+                                                                 "dataTypes"        JSONB, 
+                                                                 "sizeConstraints"  JSONB
                                                               ) 
   loop
                                                               
@@ -439,12 +446,12 @@ begin
                  ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor',P_SCHEMA,"tableName","columns","dataTypes","sizeConstraints",FALSE) "TABLE_INFO"
              from JSON_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSON_TO_RECORD(value) as METADATA(
-                                                                "owner" VARCHAR, 
-                                                                "tableName" VARCHAR, 
-                                                                "columns" TEXT, 
-                                                                "dataTypes" JSONB, 
-                                                                "sizeConstraints" JSONB
-                                                             ) 
+                                                                "owner"            VARCHAR, 
+                                                                 "tableName"        VARCHAR, 
+                                                                 "columns"          TEXT, 
+                                                                 "dataTypes"        JSONB, 
+                                                                 "sizeConstraints"  JSONB
+                                                              ) 
   loop
   
     begin
@@ -487,15 +494,16 @@ begin
   RETURN QUERY
   select jsonb_object_agg(
            "tableName",
-           GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor',P_SCHEMA,"tableName","columns","dataTypes","sizeConstraints",FALSE)
+           GENERATE_STATEMENTS("vendor",P_SCHEMA,"tableName","columns","dataTypes","sizeConstraints",FALSE)
          )
     from JSONB_EACH(P_JSON -> 'metadata')  
          CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
-                                                       "owner" VARCHAR, 
-                                                       "tableName" VARCHAR, 
-                                                       "columns" TEXT, 
-                                                       "dataTypes" JSONB, 
-                                                       "sizeConstraints" JSONB
+                                                       "vendor"           VARCHAR,
+                                                       "owner"            VARCHAR, 
+                                                       "tableName"        VARCHAR, 
+                                                       "columns"          TEXT, 
+                                                       "dataTypes"        JSONB, 
+                                                       "sizeConstraints"  JSONB
                                                      );
 end;
 $$ LANGUAGE plpgsql;
@@ -528,7 +536,7 @@ begin
                       when data_type in ('json','xml')  then
                         '"' || column_name || '"::text' 
                       when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
-                       'st_AsText("' || column_name || '")' 
+                       'st_AsText("' || column_name || '",18)' 
                       else 
                         '"' || column_name || '"' 
                     end

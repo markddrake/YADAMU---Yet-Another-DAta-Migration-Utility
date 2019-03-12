@@ -12,5 +12,5 @@ psql -U %DB_USER% -h %DB_HOST% -a -vID=%SCHEMAVER% -vMETHOD=JSON_TABLE -f sql\RE
 call windows\import_MSSQL_jTable.bat %DIR% %SCHEMAVER% 1
 psql -U %DB_USER% -h %DB_HOST% -q -vID1=1 -vID2=2 -vMETHOD=JSON_TABLE -f sql\COMPARE_MSSQL_ALL.sql >>%LOGDIR%\COMPARE_SCHEMA.log
 call windows\export_MSSQL %DIR% %SCHEMAVER% %SCHEMAVER%
-node ..\..\utilities\compareFileSizes %LOGDIR% %MDIR% %DIR%
-node ..\..\utilities\compareArrayContent %LOGDIR% %MDIR% %DIR% false
+node ..\..\utilities\node/compareFileSizes %LOGDIR% %MDIR% %DIR%
+node ..\..\utilities\node/compareArrayContent %LOGDIR% %MDIR% %DIR% false

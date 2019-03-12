@@ -202,21 +202,22 @@ class StatementGenerator {
     return table
   }
 
-  async generateStatementCache (schema, systemInformation, metadata, executeDDL, database) {
+  async generateStatementCache (schema, metadata, executeDDL, database) {
     
     const sqlStatement = `SET @RESULTS = '{}'; CALL master.dbo.sp_GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;	
     
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlStatement};\n--\n`)
     }
-    
-    let results = await this.dbi.getRequest().input('TARGET_DATABASE',sql.VARCHAR,schema).input('METADATA',sql.NVARCHAR,JSON.stringify({systemInformation: systemInformation, metadata : metadata})).execute('master.dbo.sp_GENERATE_SQL');
+
+    let results = await this.dbi.getRequest().input('TARGET_DATABASE',sql.VARCHAR,schema).input('METADATA',sql.NVARCHAR,JSON.stringify({metadata : metadata})).execute('master.dbo.sp_GENERATE_SQL');
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
     const tables = Object.keys(metadata); 
     const ddlStatements = tables.map(function(table,idx) {
-      statementCache[table] = JSON.parse(statementCache[table] );
-      const tableInfo = statementCache[table];
+      const tableName = metadata[table].tableName;
+      statementCache[tableName] = JSON.parse(statementCache[tableName] );
+      const tableInfo = statementCache[tableName];
       tableInfo.batchSize =  this.batchSize;
       tableInfo.batchSize = this.commitSize;
       // Create table before attempting to Prepare Statement..

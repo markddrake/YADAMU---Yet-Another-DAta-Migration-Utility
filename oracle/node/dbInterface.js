@@ -26,9 +26,9 @@ const defaultParameters = {
 const dateFormatMasks = {
         Oracle      : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
        ,MSSQLSERVER : 'YYYY-MM-DD"T"HH24:MI:SS.###"Z"'
-       ,Postgres    : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+       ,Postgres    : 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'
        ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS.######"Z"'
-       ,MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+       ,MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS.######"Z"'
 }
 
 const timestampFormatMasks = {
@@ -59,7 +59,7 @@ const DATA_TYPE_STRING_LENGTH = {
 , INTERVAL      : 16
 }  
 
-const sqlGetSystemInformation = 
+const sqlSystemInformation = 
 `select JSON_EXPORT.JSON_FEATURES() JSON_FEATURES, 
         JSON_EXPORT.DATABASE_RELEASE() DATABASE_RELEASE, 
         SYS_CONTEXT('USERENV','SESSION_USER') SESSION_USER, 
@@ -421,10 +421,10 @@ class DBInterface {
   async getSystemInformation(schema,EXPORT_VERSION) {     
 
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
+      this.status.sqlTrace.write(`${sqlSystemInformation}\n\/\n`)
     }
 
-    const results = await this.connection.execute(sqlGetSystemInformation,[],{outFormat: oracledb.OBJECT ,})
+    const results = await this.connection.execute(sqlSystemInformation,[],{outFormat: oracledb.OBJECT ,})
     const sysInfo = results.rows[0];
     return {
       date               : new Date().toISOString()
@@ -465,7 +465,7 @@ class DBInterface {
 
   }
 
-  async getTableInfo(schema) {
+  async getSchemaInfo(schema) {
     
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlTableInfo}\n\/\n`)
@@ -544,6 +544,7 @@ class DBInterface {
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${query.sqlStatement}\n\/\n`)
     }
+    
     const is = await this.connection.queryStream(query.sqlStatement,[],{extendedMetaData: true})
     is.on('metadata',function(metadata) {parser.setColumnMetadata(metadata)})
     return is;
@@ -607,10 +608,11 @@ class DBInterface {
   
   async generateStatementCache(schema,executeDDL) { 
      const statementGenerator = new StatementGenerator(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.parameters.LOBCACHESIZE);
-     this.statementCache = await statementGenerator.generateStatementCache(schema, this.systemInformation, this.metadata, executeDDL)
+     this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL, this.systemInformation.vendor)
   }
 
-  getTableWriter(schema,tableName) {     
+  getTableWriter(schema,table) {     
+      const tableName = this.metadata[table].tableName
       return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);
   }
   

@@ -185,8 +185,8 @@ class DBInterface {
     return []
   }
   
-  async getTableInfo(schema) {
-    return []
+  async getSchemaInfo(schema) {
+    return null
   }
 
   generateMetadata(tableInfo,server) {    

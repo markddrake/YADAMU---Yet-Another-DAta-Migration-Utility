@@ -40,35 +40,46 @@ class TableWriter {
 
   async appendRow(row) {
     this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
-       const dataType = Yadamu.decomposeDataType(targetDataType);
-       if (row[idx] !== null) {
-         switch (dataType.type) {
-           case "tinyblob" :
-             row[idx] = Buffer.from(row[idx],'hex');
-             break;
-           case "blob" :
-             row[idx] = Buffer.from(row[idx],'hex');
-             break;
-           case "mediumblob" :
-             row[idx] = Buffer.from(row[idx],'hex');
-             break;
-           case "longblob" :
-             row[idx] = Buffer.from(row[idx],'hex');
-             break;
-           case "varbinary" :
-             row[idx] = Buffer.from(row[idx],'hex');
-             break;
-           case "binary" :
-             row[idx] = Buffer.from(row[idx],'hex');
-             break;
-           case "json" :
-             row[idx] = JSON.stringify(row[idx]);
-             break;
-           default :
+      const dataType = Yadamu.decomposeDataType(targetDataType);
+      if (row[idx] !== null) {
+        switch (dataType.type) {
+          case "tinyblob" :
+            row[idx] = Buffer.from(row[idx],'hex');
+            break;
+          case "blob" :
+            row[idx] = Buffer.from(row[idx],'hex');
+            break;
+          case "mediumblob" :
+            row[idx] = Buffer.from(row[idx],'hex');
+            break;
+          case "longblob" :
+            row[idx] = Buffer.from(row[idx],'hex');
+            break;
+          case "varbinary" :
+            row[idx] = Buffer.from(row[idx],'hex');
+            break;
+          case "binary" :
+            row[idx] = Buffer.from(row[idx],'hex');
+            break;
+          case "json" :
+            row[idx] = JSON.stringify(row[idx]);
+            break;
+          case "date":
+          case "time":
+          case "datetime":
+            // If the the input is a string, assume 8601 Format with "T" seperating Date and Time and Timezone specified as 'Z' or +00:00
+            // Neeed to convert it into a format that avoiods use of convert_tz and str_to_date, since using these operators prevents the use of Bulk Insert.
+            // Session is already in UTC so we safely strip UTC markers from timestamps
+            if (typeof row[idx] !== 'string') {
+              row[idx] = row[idx].toISOString();
+            }             
+            row[idx] = row[idx].substring(0,10) + ' '  + (row[idx].endsWith('Z') ? row[idx].substring(11).slice(0,-1) : (row[idx].endsWith('+00:00') ? row[idx].substring(11).slice(0,-6) : row[idx].substring(11)))
+            break;           
+          default :
          }
       }
     },this)
-    if (this.tableInfo.useSetClause) {
+    if (this.tableInfo.insertMode === 'Iterative') {
       this.batch.push(row);
     }
     else {
@@ -83,7 +94,7 @@ class TableWriter {
       
   async writeBatch() {
     try {
-      if (this.tableInfo.useSetClause) {
+      if (this.tableInfo.insertMode === 'Iterative') {
         for (const i in this.batch) {
           try {
             const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[i]);
@@ -106,7 +117,6 @@ class TableWriter {
       this.endTime = new Date().getTime();
       this.batch.length = 0;
       this.batchRowCount = 0;
-      return this.skipTable
     } catch (e) {
       this.status.warningRaised = true;
       this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping table. Reason: ${e.message}\n`)
@@ -130,7 +140,7 @@ class TableWriter {
     return {
       startTime    : this.startTime
     , endTime      : this.endTime
-    , insertMode   : this.insertMode
+    , insertMode   : this.tableInfo.insertMode
     , skipTable    : this.skipTable
     }    
   }

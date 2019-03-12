@@ -1274,15 +1274,15 @@ as
   */
   select ROWNUM,
          TABLE_NAME,
-         GENERATE_SQL(SOURCE_VENDOR,P_TARGET_SCHEMA, OWNER, TABLE_NAME, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS) TABLE_INFO
+         GENERATE_SQL(VENDOR,P_TARGET_SCHEMA, OWNER, TABLE_NAME, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS) TABLE_INFO
     from JSON_TABLE(
            P_METADATA,
            '$'           
            COLUMNS(
-             SOURCE_VENDOR           VARCHAR2(128)                      PATH '$.systemInformation.vendor',
              NESTED                                                     PATH '$.metadata.*'
                COLUMNS (
-                 OWNER                        VARCHAR2(128)             PATH '$.owner'
+                 VENDOR                       VARCHAR2(128)             PATH '$.vendor'
+               , OWNER                        VARCHAR2(128)             PATH '$.owner'
                , TABLE_NAME                   VARCHAR2(128)             PATH '$.tableName'
                $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                ,  COLUMN_LIST                          CLOB             PATH '$.columns'

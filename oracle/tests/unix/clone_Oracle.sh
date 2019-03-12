@@ -13,5 +13,5 @@ sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @sql/RECREATE_ORACLE_ALL.sql $LOGDIR  $S
 sh unix/import_Oracle.sh $DIR $SCHVER 1 
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @sql/COMPARE_ORACLE_ALL.sql $LOGDIR  1 2 Clarinet $MODE
 sh unix/export_Oracle.sh $DIR $SCHVER $SCHVER $MODE 
-node ../../utilities/compareFileSizes $LOGDIR $MDIR $DIR
-node ../../utilities/compareArrayContent $LOGDIR $MDIR $DIR false
+node ../../utilities/node/compareFileSizes $LOGDIR $MDIR $DIR
+node ../../utilities/node/compareArrayContent $LOGDIR $MDIR $DIR false

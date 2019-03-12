@@ -1,4 +1,3 @@
-cls
 call env\setEnvironment.bat
 mkdir logs
 rmdir /s /q %LOGDIR%

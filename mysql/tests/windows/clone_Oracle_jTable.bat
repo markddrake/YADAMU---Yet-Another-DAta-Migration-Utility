@@ -12,5 +12,5 @@ mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-
 call windows\import_Oracle_jTable.bat %DIR% %SCHEMAVER% 1
 mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% --init-command="set @ID1=1; set @ID2=%SCHEMAVER%; set @METHOD='JSON_TABLE'" --table  <sql\COMPARE_ORACLE_ALL.sql >>%LOGDIR%/COMPARE_SCHEMA.log
 call windows\export_Oracle.bat %DIR% %SCHEMAVER% %SCHEMAVER% %MODE%
-node ..\..\utilities\compareFileSizes %LOGDIR% %MDIR% %DIR%
-node ..\..\utilities\compareArrayContent %LOGDIR% %MDIR% %DIR% false
+node ..\..\utilities\node/compareFileSizes %LOGDIR% %MDIR% %DIR%
+node ..\..\utilities\node/compareArrayContent %LOGDIR% %MDIR% %DIR% false

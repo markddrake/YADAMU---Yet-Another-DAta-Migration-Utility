@@ -29,7 +29,7 @@ const defaultParameters = {
 
 const sqlGenerateQueries = `select EXPORT_JSON($1)`;
 
-const sqlGetSystemInformation = `select current_database() database_name,current_user,session_user,current_setting('server_version_num') database_version`;					   
+const sqlSystemInformation = `select current_database() database_name,current_user,session_user,current_setting('server_version_num') database_version`;					   
 
 /*
 **
@@ -63,13 +63,19 @@ class DBInterface {
   
     const setTimezone = `set timezone to 'UTC'`
     if (this.status.sqlTrace) {
-       this.status.sqlTrace.write(`${setTimezone}\n\/\n`)
+       this.status.sqlTrace.write(`${setTimezone};\n\--\n`)
     }
     await pgClient.query(setTimezone);
   
+    const setFloatPrecision = `set extra_float_digits to 3`
+    if (this.status.sqlTrace) {
+       this.status.sqlTrace.write(`${setFloatPrecision};\n\--\n`)
+    }
+    await pgClient.query(setFloatPrecision);
+
     const setIntervalFormat =  `SET intervalstyle = 'iso_8601';`;
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${setIntervalFormat}\n\/\n`)
+      this.status.sqlTrace.write(`${setIntervalFormat};\n\--\n`)
     }
     await pgClient.query(setIntervalFormat);
 
@@ -223,12 +229,12 @@ class DBInterface {
   async createStagingTable() {
   	let sqlStatement = `drop table if exists "JSON_STAGING"`;		
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement}\n\/\n`)
+      this.status.sqlTrace.write(`${sqlStatement};\n\--\n`)
     }    
   	await this.pgClient.query(sqlStatement);
   	sqlStatement = `create temporary table if not exists "JSON_STAGING" (data ${this.useBinaryJSON === true ? 'jsonb' : 'json'}) on commit preserve rows`;					   
     if (this.status.sqlTrace) {
-      status.sqlTrace.write(`${sqlStatement}\n\/\n`)
+      status.sqlTrace.write(`${sqlStatement};\n\--\n`)
     }    
   	await this.pgClient.query(sqlStatement);
   }
@@ -237,7 +243,7 @@ class DBInterface {
 
     const copyStatement = `copy "JSON_STAGING" from STDIN csv quote e'\x01' delimiter e'\x02'`;
     if (this.status.sqlTrace) {
-      status.sqlTrace.write(`${copyStatement}\n\/\n`)
+      status.sqlTrace.write(`${copyStatement};\n\--\n`)
     }    
 
     let inputStream = fs.createReadStream(importFilePath);
@@ -284,11 +290,11 @@ class DBInterface {
  async processStagingTable(schema) {  	
   	const sqlStatement = `select ${this.useBinaryJSON ? 'import_jsonb' : 'import_json'}(data,$1) from "JSON_STAGING"`;
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement}\n\/\n`)
+      this.status.sqlTrace.write(`${sqlStatement};\n\--\n`)
     }    
   	var results = await this.pgClient.query(sqlStatement,[schema]);
     if (results.rows.length > 0) {
-      if (this.useBinaryJSON) {
+      if (this.useBinaryJSON  === true) {
 	    return results.rows[0].import_jsonb;  
       }
       else {
@@ -322,10 +328,10 @@ class DBInterface {
   async getSystemInformation(schema,EXPORT_VERSION) {     
   
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlGetSystemInformation}\n\/\n`)
+      this.status.sqlTrace.write(`${sqlSystemInformation};\n\--\n`)
     }
    
-	const results = await this.pgClient.query(sqlGetSystemInformation);
+	const results = await this.pgClient.query(sqlSystemInformation);
 	const sysInfo = results.rows[0];
 	
     return {
@@ -356,7 +362,7 @@ class DBInterface {
   async fetchMetadata(schema) {
 
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlGenerateQueries}\n\/\n`)
+      this.status.sqlTrace.write(`${sqlGenerateQueries};\n\--\n`)
     }  
     
     const results = await this.pgClient.query(sqlGenerateQueries,[schema]);
@@ -372,7 +378,7 @@ class DBInterface {
     
   }
   
-  async getTableInfo(schema) {
+  async getSchemaInfo(schema) {
     await this.fetchMetadata(schema);    
     return this.generateTableInfo();
   }
@@ -390,6 +396,11 @@ class DBInterface {
   }
   
   async getInputStream(query,parser) {
+        
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${query.SQL_STATEMENT};\n\--\n`)
+    }  
+    
     const queryStream = new QueryStream(query.SQL_STATEMENT)
     return await this.pgClient.query(queryStream)   
   }      
@@ -423,20 +434,19 @@ class DBInterface {
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
     }
-    const results = await this.pgClient.query(sqlStatement,[{systemInformation : this.systemInformation, metadata : this.metadata},schema]);
+    const results = await this.pgClient.query(sqlStatement,[{metadata : this.metadata},schema])
     this.statementCache = results.rows[0].generate_sql;
     if (this.statementCache === null) {
       this.statementCache = {}
-      return []
     }
     else {
       const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map(function(table,idx) {
         const tableInfo = this.statementCache[table];
-       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('select ')-1) + '\nvalues ';
-       tableInfo.batchSize = Math.trunc(45000 / tableInfo.targetDataTypes.length)
-       tableInfo.commitSize = this.parameters.COMMIT_SIZE
-       return tableInfo.ddl
+        tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('select ')-1) + '\nvalues ';
+         tableInfo.batchSize = Math.trunc(45000 / tableInfo.targetDataTypes.length)
+         tableInfo.commitSize = this.parameters.COMMIT_SIZE
+         return tableInfo.ddl
       },this);
     
       if (executeDDL === true) {
@@ -446,7 +456,8 @@ class DBInterface {
     return this.statementCache;
   }
 
-  getTableWriter(schema,tableName) {
+  getTableWriter(schema,table) {
+    const tableName = this.metadata[table].tableName
     return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);      
   }
   

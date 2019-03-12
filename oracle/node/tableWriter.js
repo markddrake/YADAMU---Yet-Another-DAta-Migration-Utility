@@ -63,7 +63,7 @@ class TableWriter {
   }
 
   async appendRow(row) {
-      
+           
     row = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
       if (row[idx] !== null) {
         const dataType = Yadamu.decomposeDataType(targetDataType);

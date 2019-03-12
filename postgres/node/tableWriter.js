@@ -53,13 +53,26 @@ class TableWriter {
               row[idx] = 0
             }  
             break;
-          case "time" :
-            let components = row[idx].split('T')
-            row[idx] = components.length === 1 ? components[0] : components[1]
-            row[idx] = row[idx].split('Z')[0]
-            break;
           case "bytea" :
             row[idx] = Buffer.from(row[idx],'hex');
+            break;
+          case "time" :
+            if (typeof row[idx] === 'string') {
+              let components = row[idx].split('T')
+              row[idx] = components.length === 1 ? components[0] : components[1]
+              row[idx] = row[idx].split('Z')[0]
+            }
+            else {
+              row[idx] = row[idx].getUTCHours() + ':' + row[idx].getUTCMinutes() + ':' + row[idx].getUTCSeconds() + '.' + row[idx].getUTCMilliseconds();  
+            }
+            break;
+          case 'date':
+          case 'datetime':
+          case 'timestamp':
+            if (typeof row[idx] !== 'string') {
+              // Avoid unexpected Time Zone Conversions when inserting from a Javascript Date object 
+              row[idx] = row[idx].toISOString();
+            }
             break;
           default :
         }

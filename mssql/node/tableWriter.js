@@ -195,11 +195,36 @@ class TableWriter {
            case "datetime2":
            case "datetimeoffset":
              if (typeof row[idx] === 'string') {
-               row[idx] = row[idx].endsWith('Z') ? row[idx] : `${row[idx]}Z`
+               row[idx] = row[idx].endsWith('Z') ? row[idx] : (row[idx].endsWith('+00:00') ? `${row[idx].slice(0,-6)}Z` : `${row[idx]}Z`)
              }
              else {
                // Alternative is to rebuild the table with these data types mapped to date objects ....
                row[idx] = row[idx].toISOString();
+             }
+             // console.log(dataType.type,typeof row[idx], row[idx])
+             switch (dataType.type) {
+               case 'datetime':
+                 if (row[idx].length > 23) {
+                   row[idx] = `${row[idx].substr(0,23)}Z`;
+                 }
+             }
+             break;
+           case 'bit':
+             if (typeof row[idx] === 'string') {
+               switch (row[idx].toLowerCase()) {
+                 case '00':
+                   row[idx] = false;
+                   break;
+                 case '01':
+                   row[idx] = true;
+                   break;
+                 case 'false':
+                   row[idx] = true;
+                   break;
+                 case 'true':
+                   row[idx] = true;
+                   break;
+               }
              }
              break;
            default :

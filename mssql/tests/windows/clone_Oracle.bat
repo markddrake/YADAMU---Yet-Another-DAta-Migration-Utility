@@ -12,5 +12,5 @@ sqlcmd -U%DB_USER% -P%DB_PWD% -S%DB_HOST% -d%DB_DBNAME% -I -e -vID=%SCHEMAVER% -
 call windows\import_Oracle.bat %DIR% %SCHEMAVER% 1 
 sqlcmd -U%DB_USER% -P%DB_PWD% -S%DB_HOST% -d%DB_DBNAME% -I -e -vDATABASE=%DB_DBNAME% -vID1=1 -vID2=%SCHEMAVER% -vMETHOD=Clarinet -i sql\COMPARE_ORACLE_ALL.sql >>%LOGDIR%\COMPARE_SCHEMA.log
 call windows\export_Oracle.bat %DIR% %SCHEMAVER% %SCHEMAVER% %MODE% 
-node ..\..\utilities\compareFileSizes %LOGDIR% %MDIR% %DIR%
-node ..\..\utilities\compareArrayContent %LOGDIR% %MDIR% %DIR% false
+node ..\..\utilities\node/compareFileSizes %LOGDIR% %MDIR% %DIR%
+node ..\..\utilities\node/compareArrayContent %LOGDIR% %MDIR% %DIR% false

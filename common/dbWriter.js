@@ -32,29 +32,99 @@ class DBWriter extends Writable {
     OPTIONS = options
   }
   
-  setTableName(tableName) {
-     switch (this.dbi.parameters.IDENTIFIER_CASE) {
-       case 'UPPER':
-         this.tableName = tableName.toUpperCase();
-         break;
-       case 'LOWER':
-         this.tableName = tableName.toLowerCase();
-         break;         
-      default: 
-        this.tableName = tableName;
-    }   
+  generateMetadata(schemaInfo) {
+    const metadata = this.dbi.generateMetadata(schemaInfo,false)
+    Object.keys(metadata).forEach(function(table) {
+       metadata[table].vendor = this.dbi.DATABASE_VENDOR;
+    },this)
+    return metadata
   }
   
-  mergeMetadata(targetMetadata, sourceMetadata) {
-            
-    for (let table of Object.keys(sourceMetadata)) {
-      if (!targetMetadata.hasOwnProperty(table)) {
-        Object.assign(targetMetadata, {[table] : sourceMetadata[table]})
-      }     
-    }            
-    return targetMetadata
-  }
+  async generateStatementCache(metadata,ddlRequired) {
+    if (Object.keys(metadata).length > 0) {   
+      // ### if the import already processed a DDL object do not execute DDL when generating statements.
+      Object.keys(metadata).forEach(function(table) {
+        if (!metadata[table].hasOwnProperty('vendor')) {
+           metadata[table].vendor = this.dbi.systemInformation.vendor;
+        }
+      },this)
+      this.dbi.setMetadata(metadata)      
+      await this.dbi.generateStatementCache(this.schema,!this.ddlComplete)
+    }
+  }   
   
+  async setMetadata(metadata) {
+    
+    /*
+    **
+    ** Match tables in target schema with the metadata from the export source
+    **
+    ** Determine which tables already exist in the target schema. Process incoming rows based on the metadata from the existing tables.
+    ** 
+    ** Tables which do not exist in the target schema need to be created.
+    **
+    */ 
+    
+    // Fetch metadata for tables that already exist in the target schema.
+    
+    const targetSchemaInfo = await this.dbi.getSchemaInfo(this.schema);
+    
+    if (targetSchemaInfo === null) {
+      this.dbi.setMetadata(metadata)      
+    }
+    else {    
+   
+      if (targetSchemaInfo.length > 0) {
+    
+        // Merge metadata for existing table with metadata from export source
+
+        const exportTableNames = Object.keys(metadata)
+        const targetMetadata = this.generateMetadata(targetSchemaInfo,false)
+      
+        // Transform tablenames based on TABLE_MATCHING parameter.    
+
+        let targetNamesTransformed = targetSchemaInfo.map(function(tableInfo) {
+          return tableInfo.TABLE_NAME;
+        },this)
+          
+        let exportNamesTransformed = exportTableNames.map(function(tableName) {
+          return tableName;
+        },this)
+
+        switch ( this.dbi.parameters.TABLE_MATCHING ) {
+          case 'UPPERCASE' :
+            exportNamesTransformed = exportNamesTransformed.map(function(tableName) {
+              return tableName.toUpperCase();
+            },this)
+            break;
+          case 'LOWERCASE' :
+            exportNamesTransformed = exportTableNames.map(function(tableName) {
+              return tableName.toLowerCase();
+            },this)
+            break;
+          case 'INSENSITIVE' :
+            exportNamesTransformed = exportTableNames.map(function(tableName) {
+              return tableName.toLowerCase();
+            },this)
+            targetNamesTransformed = targetNamesTransformed.map(function(tableName) {
+              return tableName.toLowerCase();
+            },this)
+            break;
+          default:
+        }
+    
+        targetNamesTransformed.forEach(function(targetName, idx){
+          const tableIdx = exportNamesTransformed.findIndex(function(member){return member === targetName})
+          if ( tableIdx > -1)    {
+            metadata[exportTableNames[tableIdx]] = targetMetadata[targetSchemaInfo[idx].TABLE_NAME]
+          }
+        },this)
+      }    
+
+      await this.generateStatementCache(metadata,!this.ddlComplete)
+    }
+  }      
+ 
   async _write(obj, encoding, callback) {
     try {
       switch (Object.keys(obj)[0]) {
@@ -68,20 +138,12 @@ class DBWriter extends Writable {
           }
           break;
         case 'metadata':
-          let metadata = Yadamu.convertIdentifierCase(this.dbi.parameters.IDENTIFIER_CASE,obj.metadata);
-          const targetTableInfo = await this.dbi.getTableInfo(this.schema,this.status);
-          if (targetTableInfo.length > 0) {
-             metadata = this.mergeMetadata(this.dbi.generateMetadata(targetTableInfo,false),metadata);
-          }
-          this.dbi.setMetadata(metadata)
-          if (Object.keys(metadata).length > 0) {   
-            // ### if the import already processed a DDL object do not execute DDL when generating statements.
-            await this.dbi.generateStatementCache(this.schema,!this.ddlComplete)
-          } 
+          await this.setMetadata(obj.metadata);
           break;
         case 'table':
           if (this.currentTable === undefined) {
             await this.dbi.initializeDataLoad(this.schema);
+          
           }
           else {
             const results = await this.currentTable.finalize();
@@ -90,7 +152,8 @@ class DBWriter extends Writable {
               this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${results.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
             }
           }
-          this.setTableName(obj.table)
+          // this.setTableName(obj.table)
+          this.tableName = obj.table;
           this.currentTable = this.dbi.getTableWriter(this.schema,this.tableName);
           await this.currentTable.initialize();
           this.rowCount = 0;

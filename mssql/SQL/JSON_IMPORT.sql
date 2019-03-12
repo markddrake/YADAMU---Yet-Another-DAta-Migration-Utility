@@ -1,12 +1,12 @@
 use master
 go
-CREATE OR ALTER FUNCTION sp_MAP_FOREIGN_DATATYPE(@SOURCE_VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT) 
+CREATE OR ALTER FUNCTION sp_MAP_FOREIGN_DATATYPE(@VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT) 
 RETURNS VARCHAR(128) 
 AS
 BEGIN
   RETURN 
   case
-    when @SOURCE_VENDOR = 'Oracle'
+    when @VENDOR = 'Oracle'
       then case 
              when @DATA_TYPE = 'VARCHAR2' 
                then 'varchar'
@@ -50,7 +50,7 @@ BEGIN
              else
                lower(@DATA_TYPE)
            end
-    when @SOURCE_VENDOR in ('MySQL','MariaDB')   
+    when @VENDOR in ('MySQL','MariaDB')   
       then case 
              when @DATA_TYPE = 'mediumint' 
                then 'int'
@@ -83,7 +83,7 @@ BEGIN
              else
                lower(@DATA_TYPE)
            end
-    when @SOURCE_VENDOR in ('Postgres')   
+    when @VENDOR in ('Postgres')   
       then case 
              when @DATA_TYPE = 'character varying' then
                'nvarchar'
@@ -124,7 +124,7 @@ GO
 EXECUTE sp_ms_marksystemobject 'sp_MAP_FOREIGN_DATATYPE'
 GO
 --
-CREATE OR ALTER FUNCTION sp_GENERATE_STATEMENTS(@SOURCE_VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @COLUMN_LIST NVARCHAR(MAX),@DATA_TYPE_LIST NVARCHAR(MAX),@DATA_SIZE_LIST NVARCHAR(MAX)) 
+CREATE OR ALTER FUNCTION sp_GENERATE_STATEMENTS(@VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @COLUMN_LIST NVARCHAR(MAX),@DATA_TYPE_LIST NVARCHAR(MAX),@DATA_SIZE_LIST NVARCHAR(MAX)) 
 RETURNS NVARCHAR(MAX)
 AS
 BEGIN
@@ -161,7 +161,7 @@ BEGIN
            WHERE c."KEY" = t."KEY" and c."KEY" = s."KEY"
   ),
   "TARGET_TABLE_DEFINITION" as (
-    select st.*, master.dbo.sp_MAP_FOREIGN_DATATYPE(@SOURCE_VENDOR, "DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
+    select st.*, master.dbo.sp_MAP_FOREIGN_DATATYPE(@VENDOR, "DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
       from "SOURCE_TABLE_DEFINITION" st
   )
   SELECT @COLUMNS_CLAUSE =
@@ -314,11 +314,11 @@ BEGIN
   DECLARE FETCH_METADATA 
   CURSOR FOR 
   select TABLE_NAME, 
-         master.dbo.sp_GENERATE_STATEMENTS(SOURCE_VENDOR, @TARGET_DATABASE, v.TABLE_NAME, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS) as STATEMENTS
+         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS) as STATEMENTS
    from "#JSON_STAGING"
          cross apply OPENJSON("DATA") 
          with (
-           SOURCE_VENDOR nvarchar(128) '$.systemInformation.vendor'
+           VENDOR        nvarchar(128) '$.systemInformation.vendor'
           ,METADATA      nvarchar(max) '$.metadata' as json
          ) x
          cross apply OPENJSON(X.METADATA) y
@@ -415,16 +415,16 @@ BEGIN
   DECLARE FETCH_METADATA 
   CURSOR FOR 
   select TABLE_NAME, 
-         master.dbo.sp_GENERATE_STATEMENTS(SOURCE_VENDOR, @TARGET_DATABASE, v.TABLE_NAME, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS) as STATEMENTS
+         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS) as STATEMENTS
   from  OPENJSON(@METADATA) 
          with (
-           SOURCE_VENDOR nvarchar(128) '$.systemInformation.vendor'
-          ,METADATA      nvarchar(max) '$.metadata' as json
+           METADATA      nvarchar(max) '$.metadata' as json
          ) x
          cross apply OPENJSON(X.METADATA) y
 		 cross apply OPENJSON(y.VALUE) 
 		             with(
-					   OWNER                        NVARCHAR(128)  '$.owner'
+					   VENDOR                       NVARCHAR(128)  '$.vendor'
+			          ,OWNER                        NVARCHAR(128)  '$.owner'
 			          ,TABLE_NAME                   NVARCHAR(128)  '$.tableName'
 			          ,COLUMN_LIST                  NVARCHAR(MAX)  '$.columns'
 			          ,DATA_TYPE_LIST               NVARCHAR(MAX)  '$.dataTypes' as json

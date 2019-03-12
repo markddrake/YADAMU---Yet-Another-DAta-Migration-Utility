@@ -109,7 +109,7 @@ class StatementGenerator {
   
   }
   
-  async generateStatementCache(schema, systemInformation, metadata, executeDDL) {
+  async generateStatementCache(schema, metadata, executeDDL, vendor) {
    
     const sqlStatement = `begin :sql := JSON_IMPORT.GENERATE_STATEMENTS(:metadata, :schema);\nEND;`;
       
@@ -119,8 +119,8 @@ class StatementGenerator {
      **
      */
      
-    const sourceDateFormatMask = this.dbi.getDateFormatMask(systemInformation.vendor);
-    const sourceTimeStampFormatMask = this.dbi.getTimeStampFormatMask(systemInformation.vendor);
+    const sourceDateFormatMask = this.dbi.getDateFormatMask(vendor);
+    const sourceTimeStampFormatMask = this.dbi.getTimeStampFormatMask(vendor);
     const oracleDateFormatMask = this.dbi.getDateFormatMask('Oracle');
     const oracleTimeStampFormatMask = this.dbi.getTimeStampFormatMask('Oracle');
     
@@ -143,15 +143,15 @@ class StatementGenerator {
     const boundedTypes = ['CHAR','NCHAR','VARCHAR2','NVARCHAR2','RAW']
     const ddlStatements = [];  
     
-    const metadataLob = await this.dbi.lobFromJSON({systemInformation : systemInformation, metadata: metadata});  
+    const metadataLob = await this.dbi.lobFromJSON({metadata: metadata});  
     const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:schema});
     await metadataLob.close();
 
     const statementCache = JSON.parse(results.outBinds.sql);
     const tables = Object.keys(metadata); 
     tables.forEach(function(table,idx) {
-      const tableInfo = statementCache[table];
       const tableMetadata = metadata[table];
+      const tableInfo = statementCache[tableMetadata.tableName];
       const columns = JSON.parse('[' + tableMetadata.columns + ']');
       if (tableInfo.ddl !== null) {
         ddlStatements.push(tableInfo.ddl);
@@ -208,10 +208,10 @@ class StatementGenerator {
           }
         })
         let plsqlFunctions = tableInfo.dml.substring(tableInfo.dml.indexOf('\WITH\n')+5,tableInfo.dml.indexOf('\nselect'));
-        tableInfo.dml = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n\n  insert into "${schema}"."${table}" (${tableMetadata.columns}) values (${variables.join(',')});\nend;`;      
+        tableInfo.dml = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n\n  insert into "${schema}"."${metadata[table].tableName}" (${tableMetadata.columns}) values (${variables.join(',')});\nend;`;      
       }
       else  {
-        tableInfo.dml = `insert into "${schema}"."${table}" (${tableMetadata.columns}) values (${values.join(',')})`;
+        tableInfo.dml = `insert into "${schema}"."${metadata[table].tableName}" (${tableMetadata.columns}) values (${values.join(',')})`;
       }
       
       tableInfo.binds = this.generateBinds(tableInfo,metadata[table].sizeConstraints);

@@ -21,10 +21,10 @@ const defaultParameters = {
 , IDENTIFIER_CASE   : null
 }
 
-const sqlGetSystemInformation = 
+const sqlSystemInformation = 
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE"`;                     
 
-const sqlGetTableInfo = 
+const sqlSchemaInfo = 
 `select c.table_schema "TABLE_SCHEMA"
        ,c.table_name "TABLE_NAME"
        ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "COLUMN_LIST"
@@ -273,7 +273,10 @@ class DBInterface {
     this.tableInfo  = undefined;
     this.insertMode = 'Empty';
     this.skipTable = true;
-
+    
+    if (!this.parameters.TABLE_MATCHING) {
+      this.parameters.TABLE_MATCHING = 'INSENSITIVE';
+    }
   }
 
   /*  
@@ -399,7 +402,7 @@ class DBInterface {
   
   async getSystemInformation(schema,EXPORT_VERSION) {     
   
-    const results = await this.executeSQL(sqlGetSystemInformation); 
+    const results = await this.executeSQL(sqlSystemInformation); 
     const sysInfo = results[0];
     return {
       date               : new Date().toISOString()
@@ -438,13 +441,13 @@ class DBInterface {
    
     const results = await this.executeSQL(sqlCheckInformationSchemaState,[schema]);
     if (results.length ===  0) {
-      return sqlGetTableInfo + sqlInformationSchemaClean;
+      return sqlSchemaInfo + sqlInformationSchemaClean;
     }
     else {
       for (const i in results) {
         this.logWriter.write(`${new Date().toISOString()}[WARNING]: Table: "${results[i].TABLE_SCHEMA}"."${results[i].TABLE_NAME}". Duplicate entires detected in INFORMATION_SCHEMA.COLUMNS.\n`)
       }
-      return sqlGetTableInfo + sqlInformationSchemaFix;
+      return sqlSchemaInfo + sqlInformationSchemaFix;
     }
   }
   
@@ -452,7 +455,7 @@ class DBInterface {
     return undefined
   }
     
-  async getTableInfo(schema,status) {
+  async getSchemaInfo(schema,status) {
       
     const tableInfo = await this.generateTableInfoQuery(schema);
     return await this.executeSQL(tableInfo,[schema]);
@@ -486,6 +489,11 @@ class DBInterface {
   }
   
   async getInputStream(query,parser) {
+      
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${query.SQL_STATEMENT}\n\/\n`)
+    }
+    
     return this.conn.query(query.SQL_STATEMENT).stream();
   }      
 
@@ -508,8 +516,8 @@ class DBInterface {
 
   async generateStatementCache(schema,executeDDL) {
     let statementGenerator = undefined;
-    const sqlGetVersion = `SELECT @@version`
-    const results = await this.executeSQL(sqlGetVersion);
+    const sqlVersion = `SELECT @@version`
+    const results = await this.executeSQL(sqlVersion);
     if (results[0]['@@version'] > '6.0') {
        statementGenerator = new StatementGenerator80(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
     }
@@ -520,10 +528,11 @@ class DBInterface {
     // Uncomment the folloing statement Force 5.7 Code Path
     // statementGenerator = new StatementGenerator57(this,ddlRequired,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.status,this.logWriter);
     
-    this.statementCache = await statementGenerator.generateStatementCache(schema, this.systemInformation, this.metadata, executeDDL)
+    this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL)
   }
 
-  getTableWriter(schema,tableName) {
+  getTableWriter(schema,table) {
+    const tableName = this.metadata[table].tableName
     return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);      
   }
   
@@ -533,4 +542,3 @@ class DBInterface {
 }
 
 module.exports = DBInterface
-11111111111111111

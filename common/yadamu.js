@@ -13,6 +13,33 @@ class Yadamu {
 
   get EXPORT_VERSION() { return '1.0' };
   
+  static nameMatch(source,target,rule) {
+      
+    switch (rule)  {
+    
+      case 'EXACT':
+        if (source === target) {
+          return true;
+        }
+        break;
+      case 'UPPER':
+        if (source.toUpperCase() === target) {
+           return true;
+        }
+        break;
+      case 'LOWER': 
+        if (source.toLowerCase() === target) {
+           return true;
+        }
+        break;
+      case 'INSENSITIVE':
+        if (source.toLowerCase() === target.toLowerCase()) {
+           return true;
+        }
+      default:
+    }
+  }
+ 
   static convertIdentifierCase(identifierCase, metadata) {
             
     switch (identifierCase) {
@@ -260,7 +287,7 @@ class Yadamu {
    
     const parameters = {
       FILE : "export.json"
-     ,MODE : "DDL_AND_CONTENT"
+     ,MODE : "DDL_AND_DATA"
     }
  
     process.argv.forEach(function (arg) {
@@ -299,6 +326,14 @@ class Yadamu {
           case 'FILE':
           case '--FILE':
             parameters.FILE = parameterValue;
+            break;
+          case 'IMPORT':
+          case '--IMPORT':
+            parameters.IMPORT = parameterValue;
+            break;
+          case 'EXPORT':
+          case '--EXPORT':
+            parameters.EXPORT = parameterValue;
             break;
           case 'OWNER':
           case '--OWNER':
@@ -424,6 +459,38 @@ class Yadamu {
     }
     Yadamu.finalize(this.status,this.logWriter);
   }  
+  
+  async cloneFile(pathToFile) {
+
+  const logWriter = this.logWriter;
+  
+    try {
+      const importFilePath = path.resolve(pathToFile);
+      const stats = fs.statSync(importFilePath)
+      const fileSizeInBytes = stats.size
+      this.logWriter.write(`${new Date().toISOString()}[Yadamu.doImport()]: Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.\n`)
+      
+      const fi = new FileWriter(this)
+      const readStream = fs.createReadStream(importFilePath);    
+      const parser = new FileParser(this.logWriter);
+      
+      const cloneOperation = new Promise(function (resolve,reject) {
+        try {
+          fi.on('finish', function(){resolve(parser.checkState())});
+          fi.on('error',function(err){dbi.logWriter.write(`${new Date().toISOString()}[DBWriter.error()]}: ${err.stacl}\n`);reject(err)})      
+          readStream.pipe(parser).pipe(fi);
+        } catch (err) {
+          logWriter.write(`${new Date().toISOString()}[Yadamu.doImport()]}: ${err.stack}\n`);
+          reject(err);
+        }
+      })
+      await cloneOperation;
+      Yadamu.reportStatus(this.status,this.logWriter)
+    } catch (e) {
+      Yadamu.reportError(e,this.parameters,this.status,this.logWriter);
+    }
+    Yadamu.finalize(this.status,this.logWriter);    
+  }
   
   async doExport(dbi) {
     const fi = new FileWriter(this)

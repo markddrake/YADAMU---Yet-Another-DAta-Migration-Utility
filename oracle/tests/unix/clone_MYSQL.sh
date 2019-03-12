@@ -15,5 +15,5 @@ sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @sql/RECREATE_SCHEMA.sql $LOGDIR  $SCHEM
 node ../node/import userid=$DB_USER/$DB_PWD@$DB_CONNECTION  file=$DIR/${FILENAME}1.json toUser=\"$SCHEMA$SCHVER\" mode=$MODE logfile=$IMPORTLOG
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @sql/COMPARE_SCHEMA.sql $LOGDIR  $SCHEMA 1 2 Clarinet $MODE
 node ../node/export userid=$DB_USER/$DB_PWD@$DB_CONNECTION  file=$DIR/$FILENAME$SCHVER.json owner=\"$SCHEMA$SCHVER\" mode=$MODE logfile=$EXPORTLOG
-node ../../utilities/compareFileSizes $LOGDIR $MDIR $DIR
-node ../../utilities/compareArrayContent $LOGDIR $MDIR $DIR false
+node ../../utilities/node/compareFileSizes $LOGDIR $MDIR $DIR
+node ../../utilities/node/compareArrayContent $LOGDIR $MDIR $DIR false

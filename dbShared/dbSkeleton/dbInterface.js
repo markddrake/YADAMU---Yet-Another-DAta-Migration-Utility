@@ -171,7 +171,7 @@ class DBInterface {
     return undefined
   }
   
-  async getTableInfo(schema) {
+  async getSchemaInfo(schema) {
     return []
   }
 
@@ -215,10 +215,11 @@ class DBInterface {
 
   async generateStatementCache(schema,executeDDL) {
     const statementGenerator = new StatementGenerator(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
-    this.statementCache = await statementGenerator.generateStatementCache(schema,this.systemInformation,this.metadata,executeDDL)
+    this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL)
   }
 
-  getTableWriter(schema,tableName) {
+  getTableWriter(schema,table) {
+    const tableName = this.metadata[table].tableName  
     return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);      
   }
   
