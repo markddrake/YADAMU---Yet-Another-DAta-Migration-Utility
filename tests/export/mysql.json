@@ -1,0 +1,4 @@
+[
+  [{"schema" : "sakila"},"JSON\\MySQL\\sakila.json"]
+ ,[{"schema" : "jtest"},"JSON\\MySQL\\jsonExample.json"]
+]

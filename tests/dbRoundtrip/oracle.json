@@ -1,0 +1,68 @@
+[
+    [
+        {
+            "schema": "HR"
+        },
+        {
+            "schema": "HR1"
+        },
+        {
+            "schema": "HR2"
+        }
+    ],
+    [
+        {
+            "schema": "SH"
+        },
+        {
+            "schema": "SH1"
+        },
+        {
+            "schema": "SH2"
+        }
+    ],
+    [
+        {
+            "schema": "OE"
+        },
+        {
+            "schema": "OE1"
+        },
+        {
+            "schema": "OE2"
+        }
+    ],
+    [
+        {
+            "schema": "PM"
+        },
+        {
+            "schema": "PM1"
+        },
+        {
+            "schema": "PM2"
+        }
+    ],
+    [
+        {
+            "schema": "IX"
+        },
+        {
+            "schema": "IX1"
+        },
+        {
+            "schema": "IX2"
+        }
+    ],
+    [
+        {
+            "schema": "BI"
+        },
+        {
+            "schema": "BI1"
+        },
+        {
+            "schema": "BI2"
+        }
+    ]
+]

@@ -1,0 +1,7 @@
+{
+    "connections": "tests\\configurations\\standardConnections.json",
+    "mode": "ExportRoundtrip",
+    "tests": [
+        "tests\\exportRoundTrip\\exportRoundTrip.json"
+    ]
+}

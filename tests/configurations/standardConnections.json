@@ -1,0 +1,55 @@
+{
+    "oracle" : {
+      "user"           : "SYSTEM"
+    , "password"       : "oracle"
+    , "connectString"  : "oracle18C"
+    },
+    "oracle12c" : {
+      "user"           : "SYSTEM"
+    , "password"       : "oracle"
+    , "connectString"  : "oracle12C"
+    },
+    "mssql" : {
+      "user"           : "sa"
+    , "server"         : "192.168.1.250"
+    , "database"       : "master"
+    , "password"       : "oracle"
+    , "requestTimeout" : 360000000
+    , "options"        : {
+        "encrypt"      : false 
+      }
+    },
+    "postgres" : {
+      "user"           : "postgres"
+    , "host"           : "192.168.1.250"
+    , "database"       : "postgres"
+    , "password"       : null
+    , "port"           : 5432
+    },
+    "mysql" : {
+      "user"               : "root"
+    , "host"               : "192.168.1.250"
+    , "database"           : "sys"
+    , "password"           : "oracle"
+    , "port"               : 3306
+    , "multipleStatements" : true
+    , "typeCast"           : true
+    , "supportBigNumbers"  : true
+    , "bigNumberStrings"   : true          
+    , "dateStrings"        : true
+  },
+  "mariadb" : {
+      "user"               : "root"
+    , "host"               : "192.168.1.250"
+    , "database"           : "mysql"
+    , "password"           : "oracle"
+    , "port"               : 3307
+    , "multipleStatements" : true
+    , "typeCast"           : true
+    , "supportBigNumbers"  : true
+    , "bigNumberStrings"   : true          
+    , "dateStrings"        : true 
+  },
+  "file" : {
+  }
+}

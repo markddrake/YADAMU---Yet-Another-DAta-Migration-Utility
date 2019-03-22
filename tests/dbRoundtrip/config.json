@@ -1,0 +1,8 @@
+{
+    "connections": "tests\\configurations\\standardConnections.json",
+    "mode": "dbRoundtrip",
+    "clone" : true,
+    "tests": [
+        "tests\\dbRoundTrip\\dbRoundTrip.json"
+    ]
+}

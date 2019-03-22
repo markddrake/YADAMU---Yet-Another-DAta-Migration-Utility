@@ -1,0 +1,8 @@
+[
+  [{"schema" : "HR"},"HR.json"]
+ ,[{"schema" : "SH"},"SH.json"]
+ ,[{"schema" : "OE"},"OE.json"]
+ ,[{"schema" : "PM"},"PM.json"]
+ ,[{"schema" : "IX"},"IX.json"]
+ ,[{"schema" : "BI"},"BI.json"]
+]

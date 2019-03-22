@@ -1,0 +1,4 @@
+DROP DATABASE $(SCHEMA)
+go
+create DATABASE $(SCHEMA)
+go

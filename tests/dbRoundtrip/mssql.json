@@ -1,0 +1,100 @@
+[
+    [
+        {
+            "schema": "Northwind",
+            "owner": "dbo"
+        },
+        {
+            "schema": "Northwind1",
+            "owner": "dbo"
+        },
+        {
+            "schema": "Northwind2",
+            "owner": "dbo"
+        }
+    ],
+    [
+        {
+            "schema": "AdventureWorks",
+            "owner": "Sales"
+        },
+        {
+            "schema": "Sales1",
+            "owner": "dbo"
+        },
+        {
+            "schema": "Sales2",
+            "owner": "dbo"
+        }
+    ],
+    [
+        {
+            "schema": "AdventureWorks",
+            "owner": "Person"
+        },
+        {
+            "schema": "Person1",
+            "owner": "dbo"
+        },
+        {
+            "schema": "Person1",
+            "owner": "dbo"
+        }
+    ],
+    [
+        {
+            "schema": "AdventureWorks",
+            "owner": "Production"
+        },
+        {
+            "schema": "Production1",
+            "owner": "dbo"
+        },
+        {
+            "schema": "Production1",
+            "owner": "dbo"
+        }
+    ],
+    [
+        {
+            "schema": "AdventureWorks",
+            "owner": "Purchasing"
+        },
+        {
+            "schema": "Purchasing1",
+            "owner": "dbo"
+        },
+        {
+            "schema": "Purchasing2",
+            "owner": "dbo"
+        }
+    ],
+    [
+        {
+            "schema": "AdventureWorks",
+            "owner": "HumanResources"
+        },
+        {
+            "schema": "HumanResources1",
+            "owner": "dbo"
+        },
+        {
+            "schema": "HumanResources2",
+            "owner": "dbo"
+        }
+    ],
+    [
+        {
+            "schema": "AdventureWorksDW",
+            "owner": "dbo"
+        },
+        {
+            "schema": "AdventureWorksDW1",
+            "owner": "dbo"
+        },
+        {
+            "schema": "AdventureWorksDW2",
+            "owner": "dbo"
+        }
+    ]
+]

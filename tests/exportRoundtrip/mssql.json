@@ -1,0 +1,93 @@
+[
+    [
+        "JSON\\MSSQL\\Northwind.json",
+        {
+            "schema": "Northwind1",
+            "owner": "dbo"
+        },
+        "JSON\\MsSQL\\Northwind1.json",
+        {
+            "schema": "Northwind2",
+            "owner": "dbo"
+        },
+        "JSON\\MsSQL\\Northwind2.json"
+    ],
+    [
+        "JSON\\MSSQL\\HumanResources.json",
+        {
+            "schema": "HumanResources1",
+            "owner": "HumanResources"
+        },
+        "JSON\\MsSQL\\HumanResources1.json",
+        {
+            "schema": "HumanResources2",
+            "owner": "HumanResources"
+        },
+        "JSON\\MsSQL\\HumanResources2.json"
+    ],
+    [
+        "JSON\\MSSQL\\Person.json",
+        {
+            "schema": "Person1",
+            "owner": "Person"
+        },
+        "JSON\\MsSQL\\Person1.json",
+        {
+            "schema": "Person2",
+            "owner": "Person"
+        },
+        "JSON\\MsSQL\\Person2.json"
+    ],
+    [
+        "JSON\\MSSQL\\Production.json",
+        {
+            "schema": "Production1",
+            "owner": "Production"
+        },
+        "JSON\\MsSQL\\Production1.json",
+        {
+            "schema": "Production2",
+            "owner": "Production"
+        },
+        "JSON\\MsSQL\\Production2.json"
+    ],
+    [
+        "JSON\\MSSQL\\Purchasing.json",
+        {
+            "schema": "Purchasing1",
+            "owner": "Purchasing"
+        },
+        "JSON\\MsSQL\\Purchasing1.json",
+        {
+            "schema": "Purchasing2",
+            "owner": "Purchasing"
+        },
+        "JSON\\MsSQL\\Purchasing2.json"
+    ],
+    [
+        "JSON\\MSSQL\\Sales.json",
+        {
+            "schema": "Sales1",
+            "owner": "Sales"
+        },
+        "JSON\\MsSQL\\Sales1.json",
+        {
+            "schema": "Sales2",
+            "owner": "Sales"
+        },
+        "JSON\\MsSQL\\Sales2.json"
+    ],
+    [
+        "JSON\\MSSQL\\AdventureWorksDW.json",
+        {
+            "schema": "DW1",
+            "owner": "dbo"
+        },
+        "JSON\\MsSQL\\AdventureWorksDW1.json",
+        {
+            "schema": "DW2",
+            "owner": "dbo"
+        },
+        "JSON\\MsSQL\\AdventureWorksDW2.json"
+    ]
+]

@@ -1,0 +1,24 @@
+[
+    [
+        {
+            "schema": "sakila"
+        },
+        {
+            "schema": "sakila1"
+        },
+        {
+            "schema": "sakila2"
+        }
+    ],
+    [
+        {
+            "schema": "jtest"
+        },
+        {
+            "schema": "jtest1"
+        },
+        {
+            "schema": "jtest2"
+        }
+    ]
+]

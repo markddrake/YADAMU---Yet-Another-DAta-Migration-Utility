@@ -1,0 +1,39 @@
+[
+    {
+        "source": "file",
+        "targets": [
+            "mssql","postgres","mysql","mariadb"
+        ],
+        "directory" : "JSON\\oracle18c\\DATA_ONLY",
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\export\\oracle.json"
+        ]
+    },
+    {
+        "source": "file",
+        "targets": [
+            "oracle","postgres","mysql","mariadb"
+        ],
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\export\\mssql.json"
+        ]
+    },    
+    {
+        "source": "file",
+        "targets": [
+            "mssql","oracle","postgres","mariadb"
+        ],
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\export\\mysql.json"
+        ]
+    }
+]

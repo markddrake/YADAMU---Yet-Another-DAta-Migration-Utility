@@ -1,0 +1,105 @@
+[
+    {
+        "source": "oracle",
+        "targets": [
+            "file"
+        ],
+        "directory": "JSON\\oracle18c\\DDL_ONLY",
+        "parameters": {
+            "MODE": "DDL_ONLY"
+        },
+        "operations": [
+            "tests\\export\\oracle.json"
+        ]
+    },
+    {
+        "source": "oracle",
+        "targets": [
+            "file"
+        ],
+        "directory": "JSON\\oracle18c\\DATA_ONLY",
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\export\\oracle.json"
+        ]
+    },
+    {
+        "source": "oracle",
+        "targets": [
+            "file"
+        ],
+        "directory": "JSON\\oracle18c\\DDL_AND_DATA",
+        "parameters": {
+            "MODE": "DDL_AND_DATA"
+        },
+        "operations": [
+            "tests\\export\\oracle.json"
+        ]
+    },
+    {
+        "source": "mssql",
+        "targets": [
+            "file"
+        ],
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\export\\mssql.json"
+        ]
+    },
+    {
+        "source": "mysql",
+        "targets": [
+            "file"
+        ],
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\export\\mysql.json"
+        ]
+    },
+    {
+        "source": "oracle12c",
+        "targets": [
+            "file"
+        ],
+        "directory": "JSON\\oracle12c\\DDL_ONLY",
+        "parameters": {
+            "MODE": "DDL_ONLY"
+        },
+        "operations": [
+            "tests\\export\\oracle.json"
+        ]
+    },
+    {
+        "source": "oracle12c",
+        "targets": [
+            "file"
+        ],
+        "directory": "JSON\\oracle12c\\DATA_ONLY",
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\export\\oracle.json"
+        ]
+    },
+    {
+        "source": "oracle12c",
+        "targets": [
+            "file"
+        ],
+        "directory": "JSON\\oracle12c\\DDL_AND_DATA",
+        "parameters": {
+            "MODE": "DDL_AND_DATA"
+        },
+        "operations": [
+            "tests\\export\\oracle.json"
+        ]
+
+        }
+]

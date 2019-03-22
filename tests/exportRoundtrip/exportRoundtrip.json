@@ -1,0 +1,41 @@
+[
+    {
+        "source": "file",
+        "targets": [
+            "oracle",
+            "mssql",
+            "postgres",
+            "mysql",
+            "mariadb",
+            "oracle12c"
+        ],
+        "parsingMethod": "CLARINET",
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\exportRoundtrip\\oracle.json",
+            "tests\\exportRoundtrip\\mysql.json",
+            "tests\\exportRoundtrip\\mssql.json"
+        ]
+    },
+    {
+        "source": "file",
+        "targets": [
+            "oracle",
+            "mssql",
+            "postgres",
+            "mysql",
+            "oracle12c"
+        ],
+        "parsingMethod": "RDBMS",
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\exportRoundtrip\\oracle.json",
+            "tests\\exportRoundtrip\\mysql.json",
+            "tests\\exportRoundtrip\\mssql.json"
+        ]
+    }
+]

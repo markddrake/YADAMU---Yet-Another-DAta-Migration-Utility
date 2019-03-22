@@ -1,3 +1,0 @@
-@set LOGDIR=logs\MSSQL
-@set IMPORTLOG=%LOGDIR%\MsSQL.log
-@set EXPORTLOG=%LOGDIR%\MsSQL.log
