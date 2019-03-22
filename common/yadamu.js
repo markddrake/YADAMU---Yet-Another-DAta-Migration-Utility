@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
   
 const FileParser = require('../file/node/fileParser.js');
-const FileWriter = require('../file/node/fileExport.js');
+const FileDBI = require('../file/node/fileDBI.js');
 const DBReader = require('./dbReader.js');
 const DBWriter = require('./dbWriter.js');
 const ImportErrorManager = require('./importErrorManager.js');
@@ -426,6 +426,7 @@ class Yadamu {
 
   async doImport(dbi,pathToFile) {
 
+    let timings = {}
     const logWriter = this.logWriter;
   
     try {
@@ -442,7 +443,7 @@ class Yadamu {
       const importOperation = new Promise(function (resolve,reject) {
         try {
           dbWriter.on('finish', function(){resolve(parser.checkState())});
-          dbWriter.on('error',function(err){dbi.logWriter.write(`${new Date().toISOString()}[DBWriter.error()]}: ${err.stacl}\n`);reject(err)})      
+          dbWriter.on('error',function(err){dbi.logWriter.write(`${new Date().toISOString()}[DBWriter.error()]}: ${err.stack}\n`);reject(err)})      
           readStream.pipe(parser).pipe(dbWriter);
         } catch (err) {
           logWriter.write(`${new Date().toISOString()}[Yadamu.doImport()]}: ${err.stack}\n`);
@@ -451,8 +452,10 @@ class Yadamu {
       })
     
       await importOperation;
+      timings = dbWriter.getTimings();
       await dbi.finalize();
       Yadamu.reportStatus(this.status,this.logWriter)
+      return timings;
     } catch (e) {
       Yadamu.reportError(e,this.parameters,this.status,this.logWriter);
       await dbi.abort()
@@ -464,20 +467,21 @@ class Yadamu {
 
   const logWriter = this.logWriter;
   
+    let timings = {}
     try {
       const importFilePath = path.resolve(pathToFile);
       const stats = fs.statSync(importFilePath)
       const fileSizeInBytes = stats.size
       this.logWriter.write(`${new Date().toISOString()}[Yadamu.doImport()]: Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.\n`)
       
-      const fi = new FileWriter(this)
+      const fi = new FileDBI(this)
       const readStream = fs.createReadStream(importFilePath);    
       const parser = new FileParser(this.logWriter);
       
       const cloneOperation = new Promise(function (resolve,reject) {
         try {
           fi.on('finish', function(){resolve(parser.checkState())});
-          fi.on('error',function(err){dbi.logWriter.write(`${new Date().toISOString()}[DBWriter.error()]}: ${err.stacl}\n`);reject(err)})      
+          fi.on('error',function(err){dbi.logWriter.write(`${new Date().toISOString()}[DBWriter.error()]}: ${err.stack}\n`);reject(err)})      
           readStream.pipe(parser).pipe(fi);
         } catch (err) {
           logWriter.write(`${new Date().toISOString()}[Yadamu.doImport()]}: ${err.stack}\n`);
@@ -485,6 +489,7 @@ class Yadamu {
         }
       })
       await cloneOperation;
+      timings = fi.getTimings();
       Yadamu.reportStatus(this.status,this.logWriter)
     } catch (e) {
       Yadamu.reportError(e,this.parameters,this.status,this.logWriter);
@@ -493,9 +498,11 @@ class Yadamu {
   }
   
   async doExport(dbi) {
-    const fi = new FileWriter(this)
-    await this.pumpData(dbi,fi);
+    let timings = {}
+    const fi = new FileDBI(this)
+    timings = await this.pumpData(dbi,fi);
     Yadamu.finalize(this.status,this.logWriter);
+    return timings
   }  
   
   async uploadFile(dbi,pathToFile) {
@@ -527,6 +534,7 @@ class Yadamu {
 
   async pumpData(source,target) {
 
+    let timings = {}
     const logWriter = this.logWriter;
 
     try {
@@ -537,7 +545,7 @@ class Yadamu {
       dbReader.setOutputStream(dbWriter);
       const copyOperation = new Promise(function (resolve,reject) {
         try {
-          dbWriter.on('finish', function(){resolve()});
+          dbWriter.on('finish', function(){resolve(dbWriter.getTimings())})
           dbWriter.on('error',function(err){logWriter.write(`${new Date().toISOString()}[DBWriter.error()]}: ${err.stack}\n`);reject(err)})
           dbReader.on('error',function(err){logWriter.write(`${new Date().toISOString()}[DBReader.error()]}: ${err.stack}\n`);reject(err)})
           dbReader.pipe(dbWriter);
@@ -547,10 +555,11 @@ class Yadamu {
         }
       })
       
-      await copyOperation;
+      timings = await copyOperation;
       await source.finalize();
       await target.finalize();
       Yadamu.reportStatus(this.status,this.logWriter)
+      return timings
     } catch (e) {
       Yadamu.reportError(e,this.parameters,this.status,this.logWriter);
       await source.abort();

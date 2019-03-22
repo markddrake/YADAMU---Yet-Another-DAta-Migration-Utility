@@ -52,6 +52,7 @@ BEGIN
    ,TARGET_ROW_COUNT INT
    ,MISSING_ROWS     INT
    ,EXTRA_ROWS       INT
+   ,SQLERRM          VARCHAR(512)
   );
   
   create temporary table if not exists SOURCE_HASH_TABLE (
@@ -100,7 +101,8 @@ BEGIN
                              '       ,(select count(*) from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
                              '       ,(select count(*) from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
                              '       ,(select count(*) from SOURCE_HASH_TABLE T1 LEFT JOIN TARGET_HASH_TABLE T2 USING (HASH,CNT) where T2.HASH is null)',C_NEWLINE,
-                             '       ,(select count(*) from TARGET_HASH_TABLE T1 LEFT JOIN SOURCE_HASH_TABLE T2 USING (HASH,CNT) where T2.HASH is null)');   
+                             '       ,(select count(*) from TARGET_HASH_TABLE T1 LEFT JOIN SOURCE_HASH_TABLE T2 USING (HASH,CNT) where T2.HASH is null)',
+                             '       ,NULL');   
     
     SET @STATEMENT = V_STATEMENT;
     PREPARE STATEMENT FROM @STATEMENT;

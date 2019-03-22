@@ -9,14 +9,10 @@ const Readable = require('stream').Readable;
 **
 */
 
-const Yadamu = require('../../common/yadamu.js');
+const YadamuDBI = require('../../common/yadamuDBI.js');
 const TableWriter = require('./tableWriter.js');
 
-const defaultParameters = {
-  BATCHSIZE         : 10000
-, COMMITSIZE        : 10000
-, IDENTIFIER_CASE   : null
-}
+const defaultParameters = {}
 
 /*
 **
@@ -24,15 +20,7 @@ const defaultParameters = {
 **
 */
 
-class DBInterface {
-    
-  get DATABASE_VENDOR() { return 'FILE' };
-  get SOFTWARE_VENDOR() { return 'Vendor Long Name' };
-  get SPATIAL_FORMAT()  { return 'WKT' };
-  
-  setConnectionProperties(connectionProperties) {
-    this.connectionProperties = connectionProperties
-  }
+class FileDBI extends YadamuDBI {
 
   getConnectionProperties() {
     return {
@@ -50,12 +38,23 @@ class DBInterface {
 
   }
   
-  isValidDDL() {
-    return true;
-  }
-  
   objectMode() {
      return false;
+  }
+  
+  get DATABASE_VENDOR() { return 'FILE' };
+  get SOFTWARE_VENDOR() { return 'Vendor Long Name' };
+  get SPATIAL_FORMAT()  { return 'WKT' };
+
+  constructor(yadamu) {
+    super(yadamu,defaultParameters)
+     
+    this.outputStream = undefined;
+    this.firstTable = true;
+  }
+
+  isValidDDL() {
+    return true;
   }
   
   setSystemInformation(systemInformation) {
@@ -66,15 +65,10 @@ class DBInterface {
     this.outputStream.write(',');
     this.outputStream.write(`"metadata":${JSON.stringify(metadata)}`);
   }
-  
-  constructor(yadamu) {
-    this.yadamu = yadamu;
-    this.parameters = yadamu.mergeParameters(defaultParameters);
-    this.status = yadamu.getStatus()
-    this.logWriter = yadamu.getLogWriter();
-     
-    this.outputStream = undefined;
-    this.firstTable = true;
+    
+  async executeDDL(schema, ddl) {
+    this.outputStream.write(',');
+    this.outputStream.write(`"ddl":${JSON.stringify(ddl)}`);
   }
 
   /*  
@@ -84,6 +78,7 @@ class DBInterface {
   */
   
   async initialize() {
+    super.initialize();
     const exportFilePath = path.resolve(this.parameters.FILE);
     this.outputStream = fs.createWriteStream(exportFilePath);
     this.logWriter.write(`${new Date().toISOString()}[FileExport()]: Writing file "${exportFilePath}".\n`)
@@ -189,20 +184,6 @@ class DBInterface {
     return null
   }
 
-  generateMetadata(tableInfo,server) {    
-  }
-   
-  generateSelectStatement(tableMetadata) {
-     return tableMetadata;
-  }   
-
-  createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.logWriter);      
-  }
-  
-  async getInputStream(query,parser) {
-  }      
-
   /*
   **
   ** The following methods are used by the YADAMU DBwriter class
@@ -214,18 +195,10 @@ class DBInterface {
     this.outputStream.write('"data":{');
       
   }
-  
-  async executeDDL(schema, ddl) {
-    this.outputStream.write(',');
-    this.outputStream.write(`"ddl":${JSON.stringify(ddl)}`);
-  }
-
-  async generateStatementCache(schema,ddlRequired) {
-  }
 
   getTableWriter(schema,tableName) {
 
-  if (this.firstTable === true) {
+    if (this.firstTable === true) {
       this.firstTable = false
     }
     else {
@@ -241,4 +214,4 @@ class DBInterface {
 
 }
 
-module.exports = DBInterface
+module.exports = FileDBI

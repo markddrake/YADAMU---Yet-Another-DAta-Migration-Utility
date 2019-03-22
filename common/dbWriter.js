@@ -22,6 +22,8 @@ class DBWriter extends Writable {
     this.currentTable = undefined;
     this.rowCount     = undefined;
     this.ddlComplete  = false;
+    
+    this.timings = {}
   }      
   
   objectMode() {
@@ -30,6 +32,10 @@ class DBWriter extends Writable {
   
   setOptions(options) {
     OPTIONS = options
+  }
+  
+  getTimings() {
+    return this.timings
   }
   
   generateMetadata(schemaInfo) {
@@ -143,13 +149,13 @@ class DBWriter extends Writable {
         case 'table':
           if (this.currentTable === undefined) {
             await this.dbi.initializeDataLoad(this.schema);
-          
           }
           else {
             const results = await this.currentTable.finalize();
             if (!this.skipTable) {
               const elapsedTime = results.endTime - results.startTime;            
               this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${results.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+              this.timings[this.tableName] = {rowCount : this.rowCount, insertMode : results.insertMode, elapsedTime : Math.round(elapsedTime).toString() + "ms", throughput: Math.round((this.rowCount/Math.round(elapsedTime)) * 1000).toString() + "/s"};
             }
           }
           // this.setTableName(obj.table)
@@ -187,6 +193,7 @@ class DBWriter extends Writable {
         if (!this.skipTable) {
           const elapsedTime = results.endTime - results.startTime;            
           this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${results.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
+          this.timings[this.tableName] = {rowCount : this.rowCount, insertMode : results.insertMode, elapsedTime : Math.round(elapsedTime).toString() + "ms", throughput: Math.round((this.rowCount/Math.round(elapsedTime)) * 1000).toString() + "/s"};
         }
         await this.dbi.finalizeDataLoad();
       }

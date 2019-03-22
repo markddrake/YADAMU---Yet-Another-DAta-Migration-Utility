@@ -7,24 +7,21 @@ const Readable = require('stream').Readable;
 ** Require Database Vendors API 
 **
 */
+const mysql = require('mysql');
 
-const mariadb = require('mariadb');
-
-const Yadamu = require('../../common/yadamu.js');
-const DBParser = require('../../common/dbParser.js');
+const YadamuDBI = require('../../common/yadamuDBI.js');
 const TableWriter = require('./tableWriter.js');
-const StatementGenerator = require('../../dbShared/mysql/statementGenerator57.js');
+const StatementGenerator80 = require('./statementGenerator.js');
+const StatementGenerator57 = require('../../dbShared/mysql/statementGenerator57.js');
 
 const defaultParameters = {
   BATCHSIZE         : 10000
 , COMMITSIZE        : 10000
-, IDENTIFIER_CASE   : null
 }
 
 const sqlSystemInformation = 
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE"`;                     
 
-// Cannot use JSON_ARRAYAGG for DATA_TYPES and SIZE_CONSTRAINTS beacuse MYSQL implementation of JSON_ARRAYAGG does not support ordering
 const sqlSchemaInfo = 
 `select c.table_schema "TABLE_SCHEMA"
        ,c.table_name "TABLE_NAME"
@@ -82,35 +79,83 @@ const sqlSchemaInfo =
           ,'"."'
           ,c.table_name
           ,'"'
-        ) "SQL_STATEMENT"
+        ) "SQL_STATEMENT"`;
+
+// Check for duplicate entries INFORMATION_SCHEMA.columns
+
+const sqlCheckInformationSchemaState =
+`select distinct c.table_schema, c.table_name
    from information_schema.columns c, information_schema.tables t
   where t.table_name = c.table_name 
-     and c.extra <> 'VIRTUAL GENERATED'
+    and c.extra <> 'VIRTUAL GENERATED'
     and t.table_schema = c.table_schema
     and t.table_type = 'BASE TABLE'
     and t.table_schema = ?
-	  group by t.table_schema, t.table_name`;
+  group by TABLE_SCHEMA,TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION
+  having count(*) > 1`
 
 
-/*
-**
-** YADAMU Database Inteface class skeleton
-**
-*/
-
-class DBInterface {
+const sqlInformationSchemaClean =
+`   from information_schema.columns c, information_schema.tables t
+  where t.table_name = c.table_name 
+    and c.extra <> 'VIRTUAL GENERATED'
+    and t.table_schema = c.table_schema
+    and t.table_type = 'BASE TABLE'
+    and t.table_schema = ?
+      group by t.table_schema, t.table_name`;
+      
     
-  get DATABASE_VENDOR() { return 'MariaDB' };
-  get SOFTWARE_VENDOR() { return ' MariaDB Corporation AB[' };
-  get SPATIAL_FORMAT()  { return 'WKT' };
+// Hack for Duplicate Entries in INFORMATION_SCHEMA.columns seen MSSQL 5.7
 
-  async executeSQL(sqlStatement,args) {
+const sqlInformationSchemaFix  = 
+`   from (
+     select distinct c.table_catalog, c.table_schema, c.table_name,column_name,ordinal_position,data_type,column_type,character_maximum_length,numeric_precision,numeric_scale,datetime_precision
+       from information_schema.columns c, information_schema.tables t
+       where t.table_name = c.table_name 
+         and c.extra <> 'VIRTUAL GENERATED'
+         and t.table_schema = c.table_schema
+         and t.table_type = 'BASE TABLE'
+         and t.table_schema = ?
+   ) c
+  group by c.table_schema, c.table_name`;
+
+class MySQLDBI extends YadamuDBI {
     
-   if (this.status.sqlTrace) {
-     this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
-   }
+  /*
+  **
+  ** Local methods 
+  **
+  */
+  
+  establishConnection() {
+   
+    const conn = this.conn;
+    return new Promise(function(resolve,reject) {
+                         conn.connect(function(err) {
+                                        if (err) {
+                                          reject(err);
+                                        }
+                                        resolve();
+                                      })
+                      })
+  } 
 
-   return await this.conn.query(sqlStatement,args)
+  executeSQL(sqlStatement,args) {
+    
+    const status = this.status;
+    const conn = this.conn;
+    
+    return new Promise(function(resolve,reject) {
+                         if (status.sqlTrace) {
+                           status.sqlTrace.write(`${sqlStatement};\n--\n`);
+                         }
+                         conn.query(sqlStatement,args,function(err,rows,fields) {
+                                                    if (err) {
+                                                      reject(err);
+                                                    }
+                                                    resolve(rows);
+                                                 })
+                       })
   }  
 
   async configureSession() {
@@ -142,27 +187,26 @@ class DBInterface {
       this.logWriter.write(`${new Date().toISOString()}: Increasing MAX_ALLOWED_PACKET to 1G.\n`);
       results = await this.executeSQL(sqlSetPacketSize);
       await this.conn.end();
-      await this.pool.end();
       return true;
     }    
     return false;
   }
   
-  async getConnectionPool(parameters,status,logWriter) {
-
-    this.pool = mariadb.createPool(this.connectionProperties);
-    this.conn = await this.pool.getConnection();
+  async getConnection() {
+ 
+    this.conn = mysql.createConnection(this.connectionProperties);
+    await this.establishConnection();
 
     if (await this.setMaxAllowedPacketSize()) {
-      this.pool = mariadb.createPool(this.connectionProperties);
-      this.conn = await this.pool.getConnection();
+      this.conn = mysql.createConnection(this.connectionProperties);
+      await this.establishConnection();
     }
-    
+
     await this.configureSession(); 	
 
   }    
   
-  async createTargetDatabase(schema) {    	
+  async createSchema(schema) {    	
   
 	const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;					   
 	const results = await this.executeSQL(sqlStatement,schema);
@@ -170,10 +214,51 @@ class DBInterface {
     
   }
   
-  setConnectionProperties(connectionProperties) {
-    this.connectionProperties = connectionProperties
+  async createStagingTable() {    	
+	const sqlStatement = `CREATE TEMPORARY TABLE IF NOT EXISTS "JSON_STAGING"("DATA" JSON)`;					   
+	const results = await this.executeSQL(sqlStatement);
+	return results;
+  }
+
+  async loadStagingTable(importFilePath) { 
+    importFilePath = importFilePath.replace(/\\/g, "\\\\");
+	const sqlStatement = `LOAD DATA LOCAL INFILE '${importFilePath}' INTO TABLE "JSON_STAGING" FIELDS ESCAPED BY ''`;					   
+	const results = await this.executeSQL(sqlStatement);
+	return results;
+  }
+
+  async verifyDataLoad() {    	
+	const sqlStatement = `SELECT COUNT(*) FROM "JSON_STAGING"`;				
+	const results = await  this.executeSQL(sqlStatement);
+	return results;
   }
   
+  /*
+  **
+  ** Overridden Methods
+  **
+  */
+    
+  async executeDDL(schema,ddl) {
+    await this.createSchema(schema);
+    await Promise.all(ddl.map(function(ddlStatement) {
+      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
+      return this.conn.query(ddlStatement) 
+    },this))
+  }
+
+  get DATABASE_VENDOR() { return 'MySQL' };
+  get SOFTWARE_VENDOR() { return 'Oracle Corporation (MySQL)' };
+  get SPATIAL_FORMAT()  { return 'WKT' };
+
+  constructor(yadamu) {
+    super(yadamu,defaultParameters)
+    
+    if (!this.parameters.TABLE_MATCHING) {
+      this.parameters.TABLE_MATCHING = 'INSENSITIVE';
+    }
+  }
+
   getConnectionProperties() {
     return {
       host              : this.parameters.HOSTNAME
@@ -182,55 +267,13 @@ class DBInterface {
     , database          : this.parameters.DATABASE
     , port              : this.parameters.PORT
     , multipleStatements: true
-    , typeCast          : false
+    , typeCast          : true
     , supportBigNumbers : true
     , bigNumberStrings  : true          
-    , dateStrings       : true    
+    , dateStrings       : true
     }
   }
   
-  isValidDDL() {
-    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
-  }
-  
-  objectMode() {
-    return true;
-  }
-  
-  setSystemInformation(systemInformation) {
-    this.systemInformation = systemInformation
-  }
-  
-  setMetadata(metadata) {
-    this.metadata = metadata
-  }
-  
-  constructor(yadamu) {
-    this.yadamu = yadamu;
-    this.parameters = yadamu.mergeParameters(defaultParameters);
-    this.status = yadamu.getStatus()
-    this.logWriter = yadamu.getLogWriter();
-    
-    this.systemInformation = undefined;
-    this.metadata = undefined;
-     
-    this.pool = undefined;
-    this.conn = undefined;
-    this.connectionProperties = this.getConnectionProperties()       
-
-    this.statementCache = undefined;
-
-    this.tableName  = undefined;
-    this.tableInfo  = undefined;
-    this.insertMode = 'Empty';
-    this.skipTable = true;
-
-    if (!this.parameters.TABLE_MATCHING) {
-      this.parameters.TABLE_MATCHING = 'INSENSITIVE';
-    }
-
-  }
-
   /*  
   **
   **  Connect to the database. Set global setttings
@@ -238,7 +281,8 @@ class DBInterface {
   */
   
   async initialize(schema) {
-    await this.getConnectionPool();
+    super.initialize();
+    await this.getConnection();
   }
 
   /*
@@ -249,7 +293,6 @@ class DBInterface {
 
   async finalize() {
     await this.conn.end();
-    await this.pool.end();
   }
 
   /*
@@ -260,7 +303,6 @@ class DBInterface {
 
   async abort() {
     await this.conn.end();
-    await this.pool.end();
   }
 
   /*
@@ -290,6 +332,7 @@ class DBInterface {
   */
   
   async rollbackTransaction() {
+    await this.conn.rollback();
   }
   
   /*
@@ -303,11 +346,11 @@ class DBInterface {
   **  Upload a JSON File to the server. Optionally return a handle that can be used to process the file
   **
   */
-  
-  	 
-
+ 
   async uploadFile(importFilePath) {
-      // Unsupported
+	let results = await this.createStagingTable();
+	results = await this.loadStagingTable(importFilePath);
+    return results;
   }
 
   /*
@@ -317,7 +360,10 @@ class DBInterface {
   */
 
   async processFile(mode,schema,hndl) {
-     // Unsupported
+    const sqlStatement = `SET @RESULTS = ''; CALL IMPORT_JSON(?,@RESULTS); SELECT @RESULTS "logRecords";`;					   
+	let results = await  this.executeSQL(sqlStatement,schema);
+    results = results.pop();
+	return JSON.parse(results[0].logRecords)
   }
   
   /*
@@ -349,7 +395,6 @@ class DBInterface {
      ,serverHostName     : sysInfo.SERVER_HOST
      ,databaseVersion    : sysInfo.DATABASE_VERSION
      ,serverVendor       : sysInfo.SERVER_VENDOR_ID
-     ,softwareVendor     : this.SOFTWARE_VENDOR
     }
     
   }
@@ -360,13 +405,38 @@ class DBInterface {
   **
   */
 
+  async generateTableInfoQuery(schema) { 
+
+  /*
+  **
+  ** During testing on 5.7 it appeared tha that is is possible for the Information Schema to get corrupted
+  ** In this state it contains duplicate entires for each column in the table.
+  ** 
+  ** This routine checks for this state and creates a query that will workaround the problem if the 
+  ** Information schema is corrupt.
+  ** 
+  */   
+   
+    const results = await this.executeSQL(sqlCheckInformationSchemaState,[schema]);
+    if (results.length ===  0) {
+      return sqlSchemaInfo + sqlInformationSchemaClean;
+    }
+    else {
+      for (const i in results) {
+        this.logWriter.write(`${new Date().toISOString()}[WARNING]: Table: "${results[i].TABLE_SCHEMA}"."${results[i].TABLE_NAME}". Duplicate entires detected in INFORMATION_SCHEMA.COLUMNS.\n`)
+      }
+      return sqlSchemaInfo + sqlInformationSchemaFix;
+    }
+  }
+  
   async getDDLOperations(schema) {
     return undefined
   }
     
   async getSchemaInfo(schema,status) {
       
-    return await this.executeSQL(sqlSchemaInfo,[schema]);
+    const tableInfo = await this.generateTableInfoQuery(schema);
+    return await this.executeSQL(tableInfo,[schema]);
 
   }
 
@@ -388,34 +458,15 @@ class DBInterface {
 
   }
    
-  generateSelectStatement(tableMetadata) {
-     return tableMetadata;
-  }   
-
-  createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.logWriter);      
-  }
-  
   async getInputStream(query,parser) {
-       
+      
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${query.SQL_STATEMENT};\n--\n`);
+      this.status.sqlTrace.write(`${query.SQL_STATEMENT}\n\/\n`)
     }
-
-    const readStream = new Readable({objectMode: true });
-    readStream._read = function() {};  
-  
-    this.conn.queryStream(query.SQL_STATEMENT).on('data',
-    function(row) {
-      readStream.push(row)
-    }).on('end',
-    function() {
-      readStream.push(null)
-    }) 
-  
-    return readStream;      
+    
+    return this.conn.query(query.SQL_STATEMENT).stream();
   }      
-  
+
   /*
   **
   ** The following methods are used by the YADAMU DBwriter class
@@ -423,31 +474,36 @@ class DBInterface {
   */
   
   async initializeDataLoad(schema) {
-    await this.createTargetDatabase(schema);
   }
   
-  async executeDDL(schema, ddl) {
-    // console.log(ddl);
-
-    await Promise.all(ddl.map(function(ddlStatement) {
-      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
-      return this.executeSQL(ddlStatement) 
-    },this))
-  }
-
   async generateStatementCache(schema,executeDDL) {
-    const statementGenerator = new StatementGenerator(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);    
-    this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL)
+    await super.generateStatementCache(StatementGenerator,schema,executeDDL)
   }
 
   getTableWriter(schema,table) {
-    const tableName = this.metadata[table].tableName  
-    return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);      
+    return super.getTableWriter(TableWriter,schema,table)
   }
+
+  async generateStatementCache(schema,executeDDL) {
+    let statementGenerator = undefined;
+    const sqlVersion = `SELECT @@version`
+    const results = await this.executeSQL(sqlVersion);
+    if (results[0]['@@version'] > '6.0') {
+       statementGenerator = new StatementGenerator80(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
+    }
+    else {
+       statementGenerator = new StatementGenerator57(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
+    }
   
+    // Uncomment the folloing statement Force 5.7 Code Path
+    // statementGenerator = new StatementGenerator57(this,ddlRequired,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.status,this.logWriter);
+    
+    this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL)
+  }
+
   async finalizeDataLoad() {
   }  
 
 }
 
-module.exports = DBInterface
+module.exports = MySQLDBI

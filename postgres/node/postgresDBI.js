@@ -11,14 +11,13 @@ const {Client} = require('pg')
 const CopyFrom = require('pg-copy-streams').from;
 const QueryStream = require('pg-query-stream')
 
-const Yadamu = require('../../common/yadamu.js');
+const YadamuDBI = require('../../common/yadamuDBI.js');
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 
 const defaultParameters = {
   BATCHSIZE         : 10000
 , COMMITSIZE        : 10000
-, IDENTIFIER_CASE   : null
 , USERNAME          : 'postgres'
 , PASSWORD          : null
 , HOSTNAME          : 'localhost'
@@ -31,20 +30,15 @@ const sqlGenerateQueries = `select EXPORT_JSON($1)`;
 
 const sqlSystemInformation = `select current_database() database_name,current_user,session_user,current_setting('server_version_num') database_version`;					   
 
-/*
-**
-** YADAMU Database Inteface class skeleton
-**
-*/
-
-class DBInterface {
+class PostgresDBI extends YadamuDBI {
     
-  get DATABASE_VENDOR() { return 'Postgres' };
-  get SOFTWARE_VENDOR() { return 'The PostgreSQL Global Development Group' };
-  get SPATIAL_FORMAT()  { return 'WKT' };
-
+  /*
+  **
+  ** Local methods 
+  **
+  */
+   
   async getClient() {
-
     const pgClient = new Client(this.connectionProperties);
     await pgClient.connect();
     const logWriter = this.logWriter;
@@ -82,10 +76,23 @@ class DBInterface {
     return pgClient;
   }
   
-  setConnectionProperties(connectionProperties) {
-    this.connectionProperties = connectionProperties
-  }
+  /*
+  **
+  ** Overridden Methods
+  **
+  */
   
+  get DATABASE_VENDOR() { return 'Postgres' };
+  get SOFTWARE_VENDOR() { return 'The PostgreSQL Global Development Group' };
+  get SPATIAL_FORMAT()  { return 'WKT' };
+
+  constructor(yadamu) {
+    super(yadamu,defaultParameters);
+       
+    this.pgClient = undefined;
+    this.useBinaryJSON = false
+  }
+
   getConnectionProperties() {
     return {
       user      : this.parameters.USERNAME
@@ -95,44 +102,6 @@ class DBInterface {
      ,port      : this.parameters.PORT
     }
   }
-  
-  isValidDDL() {
-    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
-  }
-  
-  objectMode() {
-    return true;
-  }
-  
-  setSystemInformation(systemInformation) {
-    this.systemInformation = systemInformation
-  }
-  
-  setMetadata(metadata) {
-    this.metadata = metadata
-  }
-  
-  constructor(yadamu) {
-    this.yadamu = yadamu;
-    this.parameters = yadamu.mergeParameters(defaultParameters);
-    this.status = yadamu.getStatus()
-    this.logWriter = yadamu.getLogWriter();
-    
-    this.systemInformation = undefined;
-    this.metadata = undefined;
-        
-    this.pgClient = undefined;
-    this.connectionProperties = this.getConnectionProperties()   
-    this.useBinaryJSON = false;
-    
-    this.statementCache = undefined;
-    
-    this.tableName  = undefined;
-    this.tableInfo  = undefined;
-    this.insertMode = 'Empty';
-    this.skipTable = true;
-
-  }
 
   /*  
   **
@@ -141,6 +110,7 @@ class DBInterface {
   */
   
   async initialize(schema) {
+    super.initialize(schema);
     this.pgClient = await this.getClient()
   }
 
@@ -161,7 +131,9 @@ class DBInterface {
   */
 
   async abort() {
-     await this.pgClient.end();
+     if (this.pgClient !== undefined) {
+       await this.pgClient.end();
+     }
   }
 
 
@@ -379,7 +351,7 @@ class DBInterface {
   }
   
   async getSchemaInfo(schema) {
-    await this.fetchMetadata(schema);    
+    await this.fetchMetadata(schema);
     return this.generateTableInfo();
   }
 
@@ -394,6 +366,10 @@ class DBInterface {
   createParser(query,objectMode) {
     return new DBParser(query,objectMode,this.logWriter);      
   }
+  
+  createParser(query,objectMode) {
+    return new DBParser(query,objectMode,this.logWriter);
+  }  
   
   async getInputStream(query,parser) {
         
@@ -414,7 +390,16 @@ class DBInterface {
   async initializeDataLoad(schema) {
   }
   
+  async createSchema(schema) {
+    const createSchema = `create schema if not exists "${schema}"`;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${createSchema};\n--\n`);
+    }
+    await this.pgClient.query(createSchema);   
+  }
+  
   async executeDDL(schema, ddl) {
+    await this.createSchema(schema);
     await Promise.all(ddl.map(async function(ddlStatement) {
       try {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
@@ -474,4 +459,4 @@ class DBInterface {
 
 }
 
-module.exports = DBInterface
+module.exports = PostgresDBI

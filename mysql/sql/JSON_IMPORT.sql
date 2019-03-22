@@ -595,6 +595,7 @@ BEGIN
    ,TARGET_ROW_COUNT INT
    ,MISSING_ROWS     INT
    ,EXTRA_ROWS       INT
+   ,SQLERRM          VARCHAR(128)
   );
   
   create temporary table if not exists SOURCE_HASH_TABLE (
@@ -657,7 +658,8 @@ BEGIN
                              '       ,(select count(*) from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
                              '       ,(select count(*) from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
                              '       ,',@MISSING_ROWS,C_NEWLINE,
-                             '       ,',@EXTRA_ROWS);   
+                             '       ,',@EXTRA_ROWS,
+                             '       ,NULL');   
     
     SET @STATEMENT = V_STATEMENT;
     PREPARE STATEMENT FROM @STATEMENT;

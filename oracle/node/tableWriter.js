@@ -63,63 +63,72 @@ class TableWriter {
   }
 
   async appendRow(row) {
-           
-    row = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
-      if (row[idx] !== null) {
-        const dataType = Yadamu.decomposeDataType(targetDataType);
-        if (dataType.type === 'JSON') {
-          // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
-          // row[idx] = Buffer.from(JSON.stringify(row[idx]))
-          // Default JSON Storage model is JSON store as CLOB.
-          // JSON must be shipped in Serialized Form
-          return JSON.stringify(row[idx])
-        } 
-        if (this.tableInfo.binds[idx].type === oracledb.CLOB) {
-          this.lobUsage++
-          // A promise...
-          return this.dbi.trackClobFromString(row[idx], this.lobList)                                                                    
+     
+    try {           
+      row = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
+        if (row[idx] !== null) {
+          const dataType = Yadamu.decomposeDataType(targetDataType);
+          if (dataType.type === 'JSON') {
+            // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
+            // row[idx] = Buffer.from(JSON.stringify(row[idx]))
+            // Default JSON Storage model is JSON store as CLOB.
+            // JSON must be shipped in Serialized Form
+            return JSON.stringify(row[idx])
+          } 
+          if (this.tableInfo.binds[idx].type === oracledb.CLOB) {
+            this.lobUsage++
+            // A promise...
+            return this.dbi.trackClobFromString(row[idx], this.lobList)                                                                    
+          }
+          switch (dataType.type) {
+            case "BLOB" :
+              return Buffer.from(row[idx],'hex');
+            case "RAW":
+              return Buffer.from(row[idx],'hex');
+            case "BOOLEAN":
+              switch (row[idx]) {
+                case true:
+                   return 'true';
+                   break;
+                case false:
+                   return 'false';
+                   break;
+                default:
+                  return row[idx]
+              }
+            case "DATE":
+              if (row[idx] instanceof Date) {
+                return row[idx].toISOString()
+              }
+              return row[idx]
+            case "TIMESTAMP":
+              // A Timestamp not explicitly marked as UTC should be coerced to UTC.
+              // Avoid Javascript dates due to lost of precsion.
+              // return new Date(Date.parse(row[idx].endsWith('Z') ? row[idx] : row[idx] + 'Z'));
+              if (typeof row[idx] === 'string') {
+                return (row[idx].endsWith('Z') || row[idx].endsWith('+00:00')) ? row[idx] : row[idx] + 'Z';
+              } 
+              if (row[idx] instanceof Date) {
+                return row[idx].toISOString()
+              }
+              return row[idx]
+            case "XMLTYPE" :
+              // Cannot passs XMLTYPE as BUFFER
+              // Reason: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
+              // row[idx] = Buffer.from(row[idx]);
+              return row[idx]
+            default :
+              return row[idx]
+          }
+          return row[idx]
         }
-        switch (dataType.type) {
-          case "BLOB" :
-            return Buffer.from(row[idx],'hex');
-          case "RAW":
-            return Buffer.from(row[idx],'hex');
-          case "BOOLEAN":
-            switch (row[idx]) {
-              case true:
-                 return 'true';
-                 break;
-              case false:
-                 return 'false';
-                 break;
-              default:
-                return row[idx]
-            }
-          case "DATE":
-            if (row[idx] instanceof Date) {
-              return row[idx].toISOString()
-            }
-          case "TIMESTAMP":
-            // A Timestamp not explicitly marked as UTC should be coerced to UTC.
-            // Avoid Javascript dates due to lost of precsion.
-            // return new Date(Date.parse(row[idx].endsWith('Z') ? row[idx] : row[idx] + 'Z'));
-            if (typeof row[idx] === 'string') {
-              return (row[idx].endsWith('Z') || row[idx].endsWith('+00:00')) ? row[idx] : row[idx] + 'Z';
-            }
-            if (row[idx] instanceof Date) {
-              return row[idx].toISOString()
-            }
-          case "XMLTYPE" :
-            // Cannot passs XMLTYPE as BUFFER
-            // Reason: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
-            // row[idx] = Buffer.from(row[idx]);
-          default :
-            return row[idx]
-        }
-      }
-    },this))
-    this.batch.push(row);
-    return this.batch.length;
+      },this))
+      this.batch.push(row);
+      return this.batch.length;
+    } catch (e) {
+      this.logWriter.write(`${new Date().toISOString()}[INFO]: TableWriter.appendRow("${this.tableName}",${this.batch.length}. Row conversion raised ${e}.Skipping Row. Row:\n`);
+      this.logWriter.write(`${row}\n`);
+    }
   }
 
   avoidMutatingTable(insertStatement) {
@@ -181,7 +190,7 @@ end;`
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
     // Infortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
     // So we have to free the current tempLob Cache and create a new one for each batch
-    
+       
     try {
       this.batchCount++;
       this.insertMode = 'Batch';

@@ -9,14 +9,13 @@ const Readable = require('stream').Readable;
 */
 
 const Yadamu = require('../../common/yadamu.js');
-const DBParser = require('../../common/dbParser.js');
+const YadamuDBI =  require('../../common/yadamuDBI.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 
 const defaultParameters = {
   BATCHSIZE         : 10000
 , COMMITSIZE        : 10000
-, IDENTIFIER_CASE   : null
 }
 
 /*
@@ -25,20 +24,8 @@ const defaultParameters = {
 **
 */
 
-class DBInterface {
+class DBInterface extends YadamuDBI {
     
-  get DATABASE_VENDOR() { return 'Vendor Short Name' };
-  get SOFTWARE_VENDOR() { return 'Vendor Long Name' };
-  get SPATIAL_FORMAT()  { return 'WKT' };
-  
-  setConnectionProperties(connectionProperties) {
-    this.connectionProperties = connectionProperties
-  }
-
-  getConnectionProperties() {
-    return {
-    }
-  }
   
   isValidDDL() {
     return (this.systemInformation.vendor === this.DATABASE_VENDOR)
@@ -57,24 +44,7 @@ class DBInterface {
   }
   
   constructor(yadamu) {
-    this.yadamu = yadamu;
-    this.parameters = yadamu.mergeParameters(defaultParameters);
-    this.status = yadamu.getStatus()
-    this.logWriter = yadamu.getLogWriter();
-     
-    this.systemInformation = undefined;
-    this.metadata = undefined;
-
-    this.conn = undefined;
-    this.connectionProperties = this.getConnectionProperties()       
-
-    this.statementCache = undefined;
-
-    this.tableName  = undefined;
-    this.tableInfo  = undefined;
-    this.insertMode = 'Empty';
-    this.skipTable = true;
-
+    super(yadamu,defaultParameters)
   }
 
   /*  
@@ -179,13 +149,6 @@ class DBInterface {
     return {}
   }
    
-  generateSelectStatement(tableMetadata) {
-     return tableMetadata;
-  }   
-
-  createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.logWriter);      
-  }
   
   async getInputStream(query,parser) {
   }      
@@ -197,30 +160,6 @@ class DBInterface {
   */
   
   async initializeDataLoad(schema) {
-  }
-  
-  async executeDDL(schema, ddl) {
-    await Promise.all(ddl.map(async function(ddlStatement) {
-      try {
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
-        }
-        this.executeSQL(ddlStatement);
-      } catch (e) {
-        this.logWriter.write(`${e}\n${tableInfo.ddl}\n`)
-      } 
-    },this)
-  }
-
-  async generateStatementCache(schema,executeDDL) {
-    const statementGenerator = new StatementGenerator(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
-    this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL)
-  }
-
-  getTableWriter(schema,table) {
-    const tableName = this.metadata[table].tableName  
-    return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);      
   }
   
   async finalizeDataLoad() {

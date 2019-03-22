@@ -12,6 +12,7 @@ const oracledb = require('oracledb');
 oracledb.fetchAsString = [ oracledb.DATE ]
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuDBI = require('../../common/yadamuDBI.js');
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
@@ -20,7 +21,6 @@ const defaultParameters = {
   BATCHSIZE         : 10000
 , COMMITSIZE        : 10000
 , LOBCACHESIZE      : 512
-, IDENTIFIER_CASE   : null
 }
 
 const dateFormatMasks = {
@@ -77,12 +77,14 @@ const sqlTableInfo =
 `select * 
    from table(JSON_EXPORT.GET_DML_STATEMENTS(:schema))`;
 
-class DBInterface {
-    
-  get DATABASE_VENDOR() { return 'Oracle' };
-  get SOFTWARE_VENDOR() { return 'Oracle Corporation' };
-  get SPATIAL_FORMAT()  { return 'WKT' };
-    
+class OracleDBI extends YadamuDBI {
+
+  /*
+  **
+  ** Local methods 
+  **
+  */
+  
   static parseConnectionString(connectionString) {
     
     const user = Yadamu.convertQuotedIdentifer(connectionString.substring(0,connectionString.indexOf('/')));
@@ -105,7 +107,7 @@ class DBInterface {
     s.push(JSON.stringify(json));
     s.push(null);
    
-    return DBInterface.lobFromStream(this.connection,s);
+    return OracleDBI.lobFromStream(this.connection,s);
   };
     
   static lobFromStream (conn,inStream) {
@@ -121,7 +123,7 @@ class DBInterface {
   
   lobFromFile (conn,filename) {
      const inStream = fs.createReadStream(filename);
-     return DBInterface.lobFromStream(conn,inStream);
+     return OracleDBI.lobFromStream(conn,inStream);
   };
   
   trackClobFromStringReader(conn,s,list) {
@@ -231,16 +233,6 @@ class DBInterface {
     }
   };
 
-  async executeSQL(sqlStatement,args) {
-
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement}\n/\n`);
-    }    
-
-    const results = await this.connection.execute(sqlStatement,args);
-    return results;
-  }
-
   processLog(results) {
     const log = JSON.parse(results.outBinds.log);
     if (log !== null) {
@@ -255,16 +247,75 @@ class DBInterface {
     this.processLog(await this.executeSQL(sqlStatement,args))
     
   }
+  
+  /*
+  **
+  ** The following methods are used by the YADAMU DBwriter class
+  **
+  */
 
-  setConnectionProperties(connectionProperties) {
-    this.connectionProperties = connectionProperties
+  async executeMany(sqlStatement,args,binds) {
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement}\n/\n`);
+    }
+    
+    const results = await this.connection.executeMany(sqlStatement,args,binds);
+    return results;
   }
 
+  async disableConstraints() {
   
+    const sqlStatement = `begin :log := JSON_IMPORT.DISABLE_CONSTRAINTS(:schema); end;`;
+    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER}
+    this.processLog(await this.executeSQL(sqlStatement,args))
+
+  }
+  
+  async enableConstraints() {
+  
+    const sqlStatement = `begin :log := JSON_IMPORT.ENABLE_CONSTRAINTS(:schema); end;`;
+    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER} 
+    this.processLog(await this.executeSQL(sqlStatement,args))
+    
+  }
+  
+  async refreshMaterializedViews() {
+  
+    const sqlStatement = `begin :log := JSON_IMPORT.REFRESH_MATERIALIZED_VIEWS(:schema); end;`;
+    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER}     
+    this.processLog(await this.executeSQL(sqlStatement,args))
+
+  }
+
+  async executeSQL(sqlStatement,args) {
+      
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement}\n/\n`);
+    }    
+
+    const results = await this.connection.execute(sqlStatement,args);
+    return results;
+  }
+
+  /*
+  **
+  ** Overridden Methods
+  **
+  */
+  
+  get DATABASE_VENDOR() { return 'Oracle' };
+  get SOFTWARE_VENDOR() { return 'Oracle Corporation' };
+  get SPATIAL_FORMAT()  { return 'WKT' };
+  
+  constructor(yadamu) {
+     super(yadamu,defaultParameters)
+  }
+
   getConnectionProperties() {
     
     if (this.parameters.USERID) {
-      return DBInterface.parseConnectionString(this.parameters.USERID)
+      return OracleDBI.parseConnectionString(this.parameters.USERID)
     }
     else {
      return{
@@ -275,40 +326,16 @@ class DBInterface {
     }
   }
 
-  isValidDDL() {
-    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
-  }
-  
-  objectMode() {
-    return true;
-  }
-  
-  setSystemInformation(systemInformation) {
-    this.systemInformation = systemInformation
-  }
-  
-  setMetadata(metadata) {
-    this.metadata = metadata
-  }
-  
-  constructor(yadamu) {
-    this.yadamu = yadamu;
-    this.parameters = yadamu.mergeParameters(defaultParameters);
-    this.status = yadamu.getStatus()
-    this.logWriter = yadamu.getLogWriter();
+  async executeDDL(schema, ddl) {
+      
+    /* ### OVERRIDE ### - Send DDL to server for execution ### */
     
-    this.systemInformation = undefined;
-    this.metadata = undefined;
-
-    this.connectionProperties = this.getConnectionProperties()   
-    this.connection = undefined;
-
-    this.statementCache = undefined;
- 
-    this.tableName  = undefined;
-    this.tableInfo  = undefined;
-    this.insertMode = 'Empty';
-    this.skipTable = true;
+    const sqlStatement = `begin :log := JSON_EXPORT_DDL.APPLY_DDL_STATEMENTS(:ddl, :schema); end;`;
+    const ddlLob = await this.lobFromJSON({ systemInformation : this.systemInformation, ddl : ddl});  
+    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , ddl:ddlLob, schema:schema};
+    const results = await this.executeSQL(sqlStatement,args);
+    await ddlLob.close();
+    this.processLog(results)
   }
   
   /*  
@@ -318,6 +345,7 @@ class DBInterface {
   */
   
   async initialize(schema) {
+    super.initialize(schema);
     this.connection = await this.getConnection(this.connectionProperties,this.status)
   }
     
@@ -452,7 +480,6 @@ class DBInterface {
   */
   
   async getDDLOperations(schema) {
-    
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlFetchDDL}\n\/\n`)
     }
@@ -466,7 +493,7 @@ class DBInterface {
   }
 
   async getSchemaInfo(schema) {
-    
+     
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlTableInfo}\n\/\n`)
     }
@@ -555,65 +582,19 @@ class DBInterface {
   ** The following methods are used by the YADAMU DBwriter class
   **
   */
-
-  async executeMany(sqlStatement,args,binds) {
-
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement}\n/\n`);
-    }
-    
-    const results = await this.connection.executeMany(sqlStatement,args,binds);
-    return results;
-  }
-
-  async disableConstraints() {
   
-    const sqlStatement = `begin :log := JSON_IMPORT.DISABLE_CONSTRAINTS(:schema); end;`;
-    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER}
-    this.processLog(await this.executeSQL(sqlStatement,args))
-
-  }
-  
-  async enableConstraints() {
-  
-    const sqlStatement = `begin :log := JSON_IMPORT.ENABLE_CONSTRAINTS(:schema); end;`;
-    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER} 
-    this.processLog(await this.executeSQL(sqlStatement,args))
-    
-  }
-  
-  async refreshMaterializedViews() {
-  
-    const sqlStatement = `begin :log := JSON_IMPORT.REFRESH_MATERIALIZED_VIEWS(:schema); end;`;
-    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER}     
-    this.processLog(await this.executeSQL(sqlStatement,args))
-
-    }
-
   async initializeDataLoad(schema) {
     await this.disableConstraints();
     await this.setDateFormatMask(this.connection,this.status,this.systemInformation.vendor);
     await this.setCurrentSchema(this.parameters.TOUSER)
   }
   
-  async executeDDL(schema, ddl) {
-  
-    const sqlStatement = `begin :log := JSON_EXPORT_DDL.APPLY_DDL_STATEMENTS(:ddl, :schema); end;`;
-    const ddlLob = await this.lobFromJSON({ systemInformation : this.systemInformation, ddl : ddl});  
-    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , ddl:ddlLob, schema:schema};
-    const results = await this.executeSQL(sqlStatement,args);
-    await ddlLob.close();
-    this.processLog(results)
-  }
-  
-  async generateStatementCache(schema,executeDDL) { 
-     const statementGenerator = new StatementGenerator(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.parameters.LOBCACHESIZE);
-     this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL, this.systemInformation.vendor)
+  async generateStatementCache(schema,executeDDL) {
+    await super.generateStatementCache(StatementGenerator,schema,executeDDL)
   }
 
-  getTableWriter(schema,table) {     
-      const tableName = this.metadata[table].tableName
-      return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);
+  getTableWriter(schema,table) {
+    return super.getTableWriter(TableWriter,schema,table)
   }
   
   async finalizeDataLoad() {
@@ -623,4 +604,4 @@ class DBInterface {
 
 }
 
-module.exports = DBInterface
+module.exports = OracleDBI
