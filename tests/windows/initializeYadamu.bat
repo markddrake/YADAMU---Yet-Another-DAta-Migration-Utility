@@ -1,6 +1,6 @@
 call tests\windows\yadamuTestEnv.bat
 call :INITLOGGING
-set SCHVER=1
+@set SCHVER=1
 call %YADAMU_HOME%\tests\oracle\env\dbConnection.bat
 sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_HOME%\oracle\sql\COMPILE_ALL.sql %YADAMU_LOG_PATH%
 sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_HOME%\tests\oracle\sql\RECREATE_MSSQL_ALL.sql %YADAMU_LOG_PATH% 1 Clarinet
@@ -36,12 +36,12 @@ exit /b
 
 :INITLOGGING
 call %YADAMU_HOME%\tests\windows\getUTCTime.bat
-set YADAMU_LOG=%YADAMU_HOME%\logs
+@set YADAMU_LOG=%YADAMU_HOME%\logs
 mkdir %YADAMU_LOG%
-set YADAMU_LOG=%YADAMU_LOG%\%UTC%
+@set YADAMU_LOG=%YADAMU_LOG%\%UTC%
 mkdir %YADAMU_LOG%
 rmdir /q /s %YADAMU_LOG%
 mkdir %YADAMU_LOG%
 mkdir %YADAMU_LOG%\install
-set LOGDIR=%YADAMU_LOG%
+@set LOGDIR=%YADAMU_LOG%
 exit /b

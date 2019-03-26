@@ -65,7 +65,15 @@ class FileCompare extends FileDBI {
       const nulLogger = fs.createWriteStream("\\\\.\\NUL");
       const logWriter = this.logWriter;
       const saxParser  = new FileParser(logWriter)
-      const readStream = fs.createReadStream(file);         
+      try {
+        const readStream = fs.createReadStream(file);         
+      } catch (e) {
+        if (err.code !== 'ENOENT') {
+          throw err;
+        } 
+        files[fidx].size = -1;
+      }
+          
       const writer = new DBWriter(this, null, null, null, nulLogger);
       
       const processMetadata = new Promise(function (resolve,reject) {
@@ -272,8 +280,26 @@ class FileCompare extends FileDBI {
     },this)
  
     const gStats = fs.statSync(path.resolve(grandparent));
-    const pStats = fs.statSync(path.resolve(parent));
-    const cStats = fs.statSync(path.resolve(child));
+    let pstats
+    let cstats
+    try {
+      pStats = fs.statSync(path.resolve(parent));
+    }
+    catch  {
+      if (err.code !== 'ENOENT') {
+          throw err;
+      }
+      pstats = {size : -1}
+    }
+    try {
+      const cStats = fs.statSync(path.resolve(child));
+    }
+    catch  {
+      if (err.code !== 'ENOENT') {
+          throw err;
+      }
+      cstats = {size : -1}
+    }
  
     this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
     this.logger.write(`| ${'GRANDPARENT FILE'.padEnd(colSizes[0])} |`

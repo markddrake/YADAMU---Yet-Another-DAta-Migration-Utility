@@ -1,0 +1,1 @@
+call ..\windows\runAllTests.bat %0

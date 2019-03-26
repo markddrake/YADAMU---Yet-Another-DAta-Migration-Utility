@@ -21,6 +21,7 @@ if not exist %YADAMU_OUTPUT_PATH%\ call %YADAMU_HOME%\tests\windows\createOutput
 if exist %YADAMU_OUTPUT_PATH%\ rmdir /s /q %YADAMU_OUTPUT_PATH%
 mkdir %YADAMU_OUTPUT_PATH%
 call env\dbConnection.bat
+SET Y
 exit /b
 
 :SETYADAMUDB

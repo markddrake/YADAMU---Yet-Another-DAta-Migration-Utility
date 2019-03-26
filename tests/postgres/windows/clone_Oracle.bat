@@ -1,4 +1,4 @@
-@set YADAMU_TARGET=Postgres
+@set YADAMU_TARGET=oracle18c\DATA_ONLY
 @set YADAMU_PARSER=CLARINET
 call ..\windows\initialize.bat %~dp0
 psql -U %DB_USER% -h %DB_HOST% -a -f %YADAMU_DB_ROOT%\sql\JSON_IMPORT.sql >> %YADAMU_LOG_PATH%\install\JSON_IMPORT.log

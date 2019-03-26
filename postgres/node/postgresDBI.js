@@ -243,8 +243,8 @@ class PostgresDBI extends YadamuDBI {
       if (e.code && (e.code === '54000')) {
         this.logWriter.write(`${new Date().toISOString()}}[uploadFile()]: Cannot process file using Binary JSON. Switching to textual JSON.\n`)
         this.useBinaryJSON = false;
-        await createStagingTable();
-        elapsedTime = await loadStagingTable(importFilePath);	
+        await this.createStagingTable();
+        elapsedTime = await this.loadStagingTable(importFilePath);	
         console.log(elapsedTime);
       }      
       else {

@@ -10,19 +10,26 @@ const targetDir = process.argv[4];
 
 function compareFiles(sourceFile,targetFile) {
    
-console.log(`${new Date().toISOString()}: Comparing "${sourceFile}" and "${targetFile}".`);
   assert(f.existsSync(sourceFile),'Source File Not Found');  
-  assert(f.existsSync(targetFile),'Source File Not Found');
+  assert(f.existsSync(targetFile),'Targe File Not Found');
   const source = require(path.resolve(sourceFile));
   const target = require(path.resolve(targetFile));
-}
+
+  }
 
 
 function printFileInfo(files) {
     
     const regExp =  new RegExp("\B(?=(\d{3})+(?!\d))","g");
     for (const fidx in files) {
-      files[fidx] = Object.assign(files[fidx], f.statSync(files[fidx].path))
+      try {
+        files[fidx] = Object.assign(files[fidx], f.statSync(files[fidx].path))
+      } catch (e) {
+        if (e.code !== 'ENOENT') {
+          throw e;
+        } 
+        files[fidx].size = -1;
+      }
     }
     
     const drift1 = files[0].size - files[1].size;

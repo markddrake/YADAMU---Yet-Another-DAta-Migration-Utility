@@ -1,6 +1,6 @@
 if not defined MODE set MODE=DATA_ONLY
 for %%I in (.) do set YADAMU_TARGET=%%~nxI
-set YADAMU_TARGET=%YADAMU_TARGET%\%MODE%
+@set YADAMU_TARGET=%YADAMU_TARGET%\%MODE%
 @set YADAMU_PARSER=CLARINET
 call ..\windows\initialize.bat %~dp0
 sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_DB_ROOT%\sql\COMPILE_ALL.sql %YADAMU_LOG_PATH%

@@ -1,4 +1,4 @@
-@set YADAMU_TARGET=MySQL
+@set YADAMU_TARGET=oracle18c\DATA_ONLY
 @set YADAMU_PARSER=CLARINET
 call ..\windows\initialize.bat %~dp0
 mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f <%YADAMU_DB_ROOT%\sql\JSON_IMPORT.sql >%YADAMU_LOG_PATH%\install\JSON_IMPORT.log

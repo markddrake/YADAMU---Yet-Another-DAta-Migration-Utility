@@ -1,4 +1,4 @@
-@set YADAMU_TARGET=Postgres\jTable
+@set YADAMU_TARGET=oracle18c\DATA_ONLY\jTable
 @set YADAMU_PARSER=RDBMS
 call ..\windows\initialize.bat %~dp0
 @set YADAMU_INPUT_PATH=%YADAMU_INPUT_PATH:~0,-7%
