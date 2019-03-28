@@ -1,16 +1,15 @@
-. env/setEnvironment.bat
-export DIR=JSON/$ORCL
-export MDIR=$TESTDATA$/$ORCL$/$MODE
-export SCHVER=1
-mkdir -p $DIR
-psql -U $DB_USER -h $DB_HOST -a -f ../sql/JSON_IMPORT.sql >> $LOGDIR$/install/JSON_IMPORT.log
-psql -U $DB_USER -h $DB_HOST -a -vID=$SCHVER -vMETHOD=Clarinet -f sql/RECREATE_ORACLE_ALL.sql >>$LOGDIR$/RECREATE_SCHEMA.log
-. windows/import_Oracle.bat $MDIR $SCHVER ""
-. windows/export_Oracle.bat $DIR $SCHVER $SCHVER $MODE
-export SCHVER=2
-psql -U $DB_USER -h $DB_HOST -a -vID=$SCHVER -vMETHOD=Clarinet -f sql/RECREATE_ORACLE_ALL.sql>>$LOGDIR$/RECREATE_SCHEMA.log
-. windows/import_Oracle.bat $DIR $SCHVER 1 
-psql -U $DB_USER -h $DB_HOST -q -vID1=1 -vID2=$SCHVER -vMETHOD=Clarinet -f sql/COMPARE_ORACLE_ALL.sql >>$LOGDIR$/COMPARE_SCHEMA.log
-. windows/export_Oracle.bat $DIR $SCHVER $SCHVER $MODE 
-node ../../utilities/node/compareFileSizes $LOGDIR $MDIR $DIR
-node ../../utilities/node/compareArrayContent $LOGDIR $MDIR $DIR false
+export YADAMU_TARGET=oracle18c/DATA_ONLY
+export YADAMU_PARSER=CLARINET
+. ../unix/initialize.sh $(readlink -f "$0")
+psql -U $DB_USER -h $DB_HOST -a -f $YADAMU_DB_ROOT/sql/JSON_IMPORT.sql >> $YADAMU_LOG_PATH/install/JSON_IMPORT.log
+export SCHEMAVER=1
+psql -U $DB_USER -h $DB_HOST -a -vID=$SCHEMAVER -vMETHOD=$YADAMU_PARSER -f $YADAMU_SCRIPT_ROOT/sql/RECREATE_ORACLE_ALL.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+sh $YADAMU_SCRIPT_ROOT/unix/import_Oracle.sh $YADAMU_INPUT_PATH $SCHEMAVER ""
+sh $YADAMU_SCRIPT_ROOT/unix/export_Oracle.sh $YADAMU_OUTPUT_PATH $SCHEMAVER $SCHEMAVER $MODE
+export SCHEMAVER=2
+psql -U $DB_USER -h $DB_HOST -a -vID=$SCHEMAVER -vMETHOD=$YADAMU_PARSER -f $YADAMU_SCRIPT_ROOT/sql/RECREATE_ORACLE_ALL.sql>>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+sh $YADAMU_SCRIPT_ROOT/unix/import_Oracle.sh $YADAMU_OUTPUT_PATH $SCHEMAVER 1 
+psql -U $DB_USER -h $DB_HOST -q -vID1=1 -vID2=$SCHEMAVER -vMETHOD=$YADAMU_PARSER -f $YADAMU_SCRIPT_ROOT/sql/COMPARE_ORACLE_ALL.sql >>$YADAMU_LOG_PATH/COMPARE_SCHEMA.log
+sh $YADAMU_SCRIPT_ROOT/unix/export_Oracle.sh $YADAMU_OUTPUT_PATH $SCHEMAVER $SCHEMAVER $MODE 
+node $YADAMU_HOME/utilities/node/compareFileSizes $YADAMU_LOG_PATH $YADAMU_INPUT_PATH $YADAMU_OUTPUT_PATH
+node $YADAMU_HOME/utilities/node/compareArrayContent $YADAMU_LOG_PATH $YADAMU_INPUT_PATH $YADAMU_OUTPUT_PATH false

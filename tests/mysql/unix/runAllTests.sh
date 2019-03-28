@@ -1,0 +1,1 @@
+. ../unix/runAllTests.sh $0

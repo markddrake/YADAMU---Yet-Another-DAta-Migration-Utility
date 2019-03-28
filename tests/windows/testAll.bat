@@ -2,7 +2,7 @@ cls
 @set YADAMU_HOME=%CD%
 @set YADAMU_LOG_ROOT=%YADAMU_HOME%\work\logs
 @set YADAMU_LOG_PATH=
-call %YADAMU_HOME%\tests\windows\initalizeLogging.bat
+call %YADAMU_HOME%\tests\windows\initializeLogging.bat
 @set MASTER_LOG_PATH=%YADAMU_LOG_PATH%
 call :EXPORT_NATIVE_SCHEMAS
 call :ORACLE18c

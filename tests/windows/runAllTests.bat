@@ -12,4 +12,4 @@ call %YADAMU_SCRIPT_ROOT%\windows\clone_Oracle.bat
 call %YADAMU_SCRIPT_ROOT%\windows\jTable_Oracle.bat 
 FOR /F "tokens=* USEBACKQ" %%F IN (`powershell -command "(New-TimeSpan -Start (Get-Date "01/01/1970") -End (Get-Date)).TotalSeconds"`)  do @set END_TIME=%%F
 @SET /A ELAPSED_TIME=END_TIME-START_TIME
-@ECHO "%YADAMU_DB%: Completed. Elapsed time: %ELAPSED_TIME%s. Log Files written to %YADAMU_LOG_PATH%."
+@ECHO "%YADAMU_WORK_ID%: Completed. Elapsed time: %ELAPSED_TIME%s. Log Files written to %YADAMU_LOG_PATH%."

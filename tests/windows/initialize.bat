@@ -14,7 +14,7 @@ call :SETYADAMUDB %YADAMU_SCRIPT_ROOT%
 @set YADAMU_WORK_ROOT=%YADAMU_HOME%\work\%YADAMU_WORK_ID%
 if not exist %YADAMU_WORK_ROOT%\ mkdir %YADAMU_WORK_ROOT%
 @set YADAMU_LOG_ROOT=%YADAMU_WORK_ROOT%\logs
-call %YADAMU_HOME%\tests\windows\initalizeLogging.bat
+call %YADAMU_HOME%\tests\windows\initializeLogging.bat
 @set YADAMU_OUTPUT_PATH=%YADAMU_WORK_ROOT%\JSON
 if not exist %YADAMU_OUTPUT_PATH%\ call %YADAMU_HOME%\tests\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%
 @set YADAMU_OUTPUT_PATH=%YADAMU_OUTPUT_PATH%\%YADAMU_TARGET%

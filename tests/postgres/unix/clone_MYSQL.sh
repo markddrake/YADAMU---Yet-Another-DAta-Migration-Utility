@@ -1,19 +1,28 @@
-. env/setEnvironment.bat
-export DIR=JSON/$MYSQL
-export MDIR=$TESTDATA/$MYSQL
-export SCHVER=1
-export SCHEMA=SAKILA
+export YADAMU_TARGET=MySQL
+export YADAMU_PARSER=CLARINET
+. ../unix/initialize.sh $(readlink -f "$0")
+psql -U $DB_USER -h $DB_HOST -a -f $YADAMU_DB_ROOT/sql/JSON_IMPORT.sql >> $YADAMU_LOG_PATH/install/JSON_IMPORT.log
 export FILENAME=sakila
-export SCHVER=1
-mkdir -p $DIR
-psql -U $DB_USER -h $DB_HOST -a -f ../sql/JSON_IMPORT.sql >> $LOGDIR/install/JSON_IMPORT.log
-psql -U $DB_USER -h $DB_HOST -a -vSCHEMA=$SCHEMA -vID=$SCHVER -vMETHOD=Clarinet -f sql/RECREATE_SCHEMA.sql >>$LOGDIR/RECREATE_SCHEMA.log
-node ../node/import --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$MDIR/$FILENAME.json toUser="$SCHEMA$SCHVER" logFile=$IMPORTLOG
-node ../node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$DIR/${FILENAME}$SCHVER.json owner="$SCHEMA$SCHVER" mode=$MODE logFile=$EXPORTLOG
-export SCHVER=2
-psql -U $DB_USER -h $DB_HOST -a -vSCHEMA=$SCHEMA -vID=$SCHVER -vMETHOD='JSON_TABLE' -f sql/RECREATE_SCHEMA.sql >>$LOGDIR/RECREATE_SCHEMA.log
-node ../node/import --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$DIR/${FILENAME}$1.json toUser="$SCHEMA$SCHVER" logFile=$IMPORTLOG
-psql -U $DB_USER -h $DB_HOST -q -vSCHEMA=$SCHEMA -vID1=1 -vID2=$SCHVER -vMETHOD=Clarinet -f sql/COMPARE_SCHEMA.sql >>$LOGDIR/COMPARE_SCHEMA.log
-node ../node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$DIR/${FILENAME}$SCHVER.json owner="$SCHEMA$SCHVER" mode=$MODE logFile=$EXPORTLOG
-node ../../utilities/node/compareFileSizes $LOGDIR $MDIR $DIR
-node ../../utilities/node/compareArrayContent $LOGDIR $MDIR $DIR false
+export SCHEMA=SAKILA
+export SCHEMAVER=1
+psql -U $DB_USER -h $DB_HOST -a -vSCHEMA=$SCHEMA -vID=$SCHEMAVER -vMETHOD=$YADAMU_PARSER/ -f $YADAMU_SCRIPT_ROOT/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+node $YADAMU_DB_ROOT/node/import --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$YADAMU_INPUT_PATH/$FILENAME.json toUser=\"$SCHEMA$SCHEMAVER\" logFile=$IMPORTLOG
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$YADAMU_OUTPUT_PATH/$FILENAME$SCHEMAVER.json owner=\"$SCHEMA$SCHEMAVER\" mode=$MODE logFile=$EXPORTLOG
+export SCHEMAVER=2
+psql -U $DB_USER -h $DB_HOST -a -vSCHEMA=$SCHEMA -vID=$SCHEMAVER -vMETHOD='JSON_TABLE' -f $YADAMU_SCRIPT_ROOT/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+node $YADAMU_DB_ROOT/node/import --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$YADAMU_OUTPUT_PATH/${FILENAME}1.json toUser=\"$SCHEMA$SCHEMAVER\" logFile=$IMPORTLOG
+psql -U $DB_USER -h $DB_HOST -q -vSCHEMA=$SCHEMA -vID1=1 -vID2=$SCHEMAVER -vMETHOD=$YADAMU_PARSER/ -f $YADAMU_SCRIPT_ROOT/sql/COMPARE_SCHEMA.sql >>$YADAMU_LOG_PATH/COMPARE_SCHEMA.log
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$YADAMU_OUTPUT_PATH/$FILENAME$SCHEMAVER.json owner=\"$SCHEMA$SCHEMAVER\" mode=$MODE logFile=$EXPORTLOG
+export FILENAME=jsonExample
+export SCHEMA=JTEST
+export SCHEMAVER=1
+psql -U $DB_USER -h $DB_HOST -a -vSCHEMA=$SCHEMA -vID=$SCHEMAVER -vMETHOD=$YADAMU_PARSER/ -f $YADAMU_SCRIPT_ROOT/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+node $YADAMU_DB_ROOT/node/import --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$YADAMU_INPUT_PATH/$FILENAME.json toUser=\"$SCHEMA$SCHEMAVER\" logFile=$IMPORTLOG
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$YADAMU_OUTPUT_PATH/$FILENAME$SCHEMAVER.json owner=\"$SCHEMA$SCHEMAVER\" mode=$MODE logFile=$EXPORTLOG
+export SCHEMAVER=2
+psql -U $DB_USER -h $DB_HOST -a -vSCHEMA=$SCHEMA -vID=$SCHEMAVER -vMETHOD='JSON_TABLE' -f $YADAMU_SCRIPT_ROOT/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+node $YADAMU_DB_ROOT/node/import --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$YADAMU_OUTPUT_PATH/${FILENAME}1.json toUser=\"$SCHEMA$SCHEMAVER\" logFile=$IMPORTLOG
+psql -U $DB_USER -h $DB_HOST -q -vSCHEMA=$SCHEMA -vID1=1 -vID2=$SCHEMAVER -vMETHOD=$YADAMU_PARSER/ -f $YADAMU_SCRIPT_ROOT/sql/COMPARE_SCHEMA.sql >>$YADAMU_LOG_PATH/COMPARE_SCHEMA.log
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$YADAMU_OUTPUT_PATH/$FILENAME$SCHEMAVER.json owner=\"$SCHEMA$SCHEMAVER\" mode=$MODE logFile=$EXPORTLOG
+node $YADAMU_HOME/utilities/node/compareFileSizes $YADAMU_LOG_PATH $YADAMU_INPUT_PATH $YADAMU_OUTPUT_PATH
+node $YADAMU_HOME/utilities/node/compareArrayContent $YADAMU_LOG_PATH $YADAMU_INPUT_PATH $YADAMU_OUTPUT_PATH false

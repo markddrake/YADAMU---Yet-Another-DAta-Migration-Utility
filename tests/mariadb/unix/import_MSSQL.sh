@@ -1,10 +1,10 @@
-export SRC=$~1
-export SCHVER=$~2
-export VER=$~3
-node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Northwind$VER.json        toUser="Northwind$SCHVER"      logFile=$IMPORTLOG  
-node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Sales$VER.json            toUser="Sales$SCHVER"          logFile=$IMPORTLOG
-node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Person$VER.json           toUser="Person$SCHVER"         logFile=$IMPORTLOG
-node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Production$VER.json       toUser="Production$SCHVER"     logFile=$IMPORTLOG
-node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Purchasing$VER.json       toUser="Purchasing$SCHVER"     logFile=$IMPORTLOG
-node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/HumanResources$VER.json   toUser="HumanResources$SCHVER" logFile=$IMPORTLOG
-node ../node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/AdventureWorksDW$VER.json toUser="DW$SCHVER"             logFile=$IMPORTLOG
+export SRC=$1
+export SCHEMAVER=$2
+export FILEVER=$3
+node $YADAMU_DB_ROOT/node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Northwind$FILEVER.json        toUser=\"Northwind$SCHEMAVER\"      logFile=$IMPORTLOG  
+node $YADAMU_DB_ROOT/node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Sales$FILEVER.json            toUser=\"Sales$SCHEMAVER\"          logFile=$IMPORTLOG
+node $YADAMU_DB_ROOT/node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Person$FILEVER.json           toUser=\"Person$SCHEMAVER\"         logFile=$IMPORTLOG
+node $YADAMU_DB_ROOT/node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Production$FILEVER.json       toUser=\"Production$SCHEMAVER\"     logFile=$IMPORTLOG
+node $YADAMU_DB_ROOT/node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/Purchasing$FILEVER.json       toUser=\"Purchasing$SCHEMAVER\"     logFile=$IMPORTLOG
+node $YADAMU_DB_ROOT/node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/HumanResources$FILEVER.json   toUser=\"HumanResources$SCHEMAVER\" logFile=$IMPORTLOG
+node $YADAMU_DB_ROOT/node/import   --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD  --port=$DB_PORT --database=$DB_DBNAME file=$SRC/AdventureWorksDW$FILEVER.json toUser=\"DW$SCHEMAVER\"             logFile=$IMPORTLOG

@@ -1,7 +1,7 @@
 "use strict"
 
 const Yadamu = require('../../common/yadamu.js').Yadamu;
-const DBInterface = require('./OracleDBI.js');
+const DBInterface = require('./oracleDBI.js');
   
 async function main() {
 

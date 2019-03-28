@@ -1,16 +1,15 @@
-. env/setEnvironment.sh
-export DIR=JSON/$ORCL
-export MDIR=$TESTDATA/$ORCL/$MODE
-export SCHVER=1
-mkdir -p $DIR
-mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f <../sql/SCHEMA_COMPARE.sql >$LOGDIR/install/SCHEMA_COMPARE.log
-mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @ID=$SCHVER; set @METHOD='Clarinet';"<sql/RECREATE_ORACLE_ALL.sql >>$LOGDIR/RECREATE_SCHEMA.log
-. windows/import_Oracle.sh $MDIR $SCHVER ""
-. windows/export_Oracle.sh $DIR $SCHVER $SCHVER $MODE
-export SCHVER=2
-mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @ID=$SCHVER; set @METHOD='Clarinet';"<sql/RECREATE_ORACLE_ALL.sql>>$LOGDIR/RECREATE_SCHEMA.log
-. windows/import_Oracle.sh $DIR $SCHVER 1 
-mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT --init-command="set @ID1=1; set @ID2=$SCHVER; set @METHOD='Clarinet'" --table  <sql/COMPARE_ORACLE_ALL.sql >>$LOGDIR/COMPARE_SCHEMA.log
-. windows/export_Oracle.sh $DIR $SCHVER $SCHVER $MODE 
-node ../../utilities/node/compareFileSizes $LOGDIR $MDIR $DIR
-node ../../utilities/node/compareArrayContent $LOGDIR $MDIR $DIR false
+export YADAMU_TARGET=oracle18c/DATA_ONLY
+export YADAMU_PARSER=CLARINET
+. ../unix/initialize.sh $(readlink -f "$0")
+mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f <$YADAMU_DB_ROOT/sql/JSON_IMPORT.sql >$YADAMU_LOG_PATH/install/JSON_IMPORT.log
+export SCHEMAVER=1
+mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="export @ID=$SCHEMAVER; then export @METHOD='$YADAMU_PARSER';" <$YADAMU_SCRIPT_ROOT/sql/RECREATE_ORACLE_ALL.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+sh $YADAMU_SCRIPT_ROOT/unix/import_Oracle.sh $YADAMU_INPUT_PATH $SCHEMAVER ""
+sh $YADAMU_SCRIPT_ROOT/unix/export_Oracle.sh $YADAMU_OUTPUT_PATH $SCHEMAVER $SCHEMAVER $MODE
+export SCHEMAVER=2
+mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="export @ID=$SCHEMAVER; then export @METHOD='$YADAMU_PARSER';" <$YADAMU_SCRIPT_ROOT/sql/RECREATE_ORACLE_ALL.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+sh $YADAMU_SCRIPT_ROOT/unix/import_Oracle.sh $YADAMU_OUTPUT_PATH $SCHEMAVER 1 
+mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT --init-command="export @ID1=1; then export @ID2=$SCHEMAVER; then export @METHOD='$YADAMU_PARSER'" --table <$YADAMU_SCRIPT_ROOT/sql/COMPARE_ORACLE_ALL.sql >>$YADAMU_LOG_PATH/COMPARE_SCHEMA.log
+sh $YADAMU_SCRIPT_ROOT/unix/export_Oracle.sh $YADAMU_OUTPUT_PATH $SCHEMAVER $SCHEMAVER $MODE 
+node $YADAMU_HOME/utilities/node/compareFileSizes $YADAMU_LOG_PATH $YADAMU_INPUT_PATH $YADAMU_OUTPUT_PATH
+node $YADAMU_HOME/utilities/node/compareArrayContent $YADAMU_LOG_PATH $YADAMU_INPUT_PATH $YADAMU_OUTPUT_PATH false

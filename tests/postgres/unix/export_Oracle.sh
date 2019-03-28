@@ -1,9 +1,9 @@
-export TGT=$~1
-export SCHVER=$~2
-export VER=$~3
-node ../node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT$/HR$VER.json owner="HR$SCHVER$" mode=$MODE logFile=$EXPORTLOG
-node ../node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT$/SH$VER.json owner="SH$SCHVER$" mode=$MODE logFile=$EXPORTLOG
-node ../node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT$/OE$VER.json owner="OE$SCHVER$" mode=$MODE logFile=$EXPORTLOG
-node ../node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT$/PM$VER.json owner="PM$SCHVER$" mode=$MODE logFile=$EXPORTLOG
-node ../node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT$/IX$VER.json owner="IX$SCHVER$" mode=$MODE logFile=$EXPORTLOG
-node ../node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT$/BI$VER.json owner="BI$SCHVER$" mode=$MODE logFile=$EXPORTLOG
+export TGT=$1
+export SCHEMAVER=$2
+export FILEVER=$3
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT/HR$FILEVER.json owner=\"HR$SCHEMAVER\" mode=$MODE logFile=$EXPORTLOG
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT/SH$FILEVER.json owner=\"SH$SCHEMAVER\" mode=$MODE logFile=$EXPORTLOG
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT/OE$FILEVER.json owner=\"OE$SCHEMAVER\" mode=$MODE logFile=$EXPORTLOG
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT/PM$FILEVER.json owner=\"PM$SCHEMAVER\" mode=$MODE logFile=$EXPORTLOG
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT/IX$FILEVER.json owner=\"IX$SCHEMAVER\" mode=$MODE logFile=$EXPORTLOG
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD file=$TGT/BI$FILEVER.json owner=\"BI$SCHEMAVER\" mode=$MODE logFile=$EXPORTLOG
