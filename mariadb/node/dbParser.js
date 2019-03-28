@@ -18,9 +18,17 @@ class DBParser extends Transform {
   }
   
   async _transform (data,encodoing,done) {
+    // typeof JSON appears to be different when target is MySQL rather than Maria ?
     this.counter++;
-    if (!this.objectMode) {
-      data.json = JSON.stringify(data.json);
+    if (this.objectMode) {
+      if (typeof data.json === "string") {
+        data.json = JSON.parse(data.json);
+      }
+    }
+    else {
+      if (typeof data.json !== "string") {
+        data.json = JSON.stringify(data.json);
+      }
     }
     this.push({data:data.json})
     done();

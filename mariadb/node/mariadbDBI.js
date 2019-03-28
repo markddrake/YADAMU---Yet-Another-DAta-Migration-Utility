@@ -11,6 +11,7 @@ const Readable = require('stream').Readable;
 const mariadb = require('mariadb');
 
 const YadamuDBI = require('../../common/yadamuDBI.js');
+const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('../../dbShared/mysql/statementGenerator57.js');
 
@@ -383,6 +384,10 @@ class MariadbDBI extends YadamuDBI {
   async generateStatementCache(schema,executeDDL) {
     await super.generateStatementCache(StatementGenerator,schema,executeDDL)
   }
+
+  createParser(query,objectMode) {
+    return new DBParser(query,objectMode,this.logWriter);
+  }  
 
   getTableWriter(schema,table) {
     return super.getTableWriter(TableWriter,schema,table)
