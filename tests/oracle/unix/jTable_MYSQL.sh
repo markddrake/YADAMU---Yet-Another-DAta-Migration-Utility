@@ -1,6 +1,6 @@
 export YADAMU_TARGET=MySQL/jTable
 export YADAMU_PARSER=RDBMS
-. ../unix/initialize.sh $(readlink -f "$0")
+. ../unix/initialize.sh $(readlink -f "$BASH_SOURCE")
 export YADAMU_INPUT_PATH=${YADAMU_INPUT_PATH:0:-7}
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_DB_ROOT/sql/COMPILE_ALL.sql $YADAMU_LOG_PATH
 export FILENAME=sakila

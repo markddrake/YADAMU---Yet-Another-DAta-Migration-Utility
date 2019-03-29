@@ -1,6 +1,6 @@
 if [ -z ${MODE+x} ]; then export MODE=DATA_ONLY; fi
 export YADAMU_TARGET=MySQL
-. ../unix/initialize.sh $(readlink -f "$0")
+. ../unix/initialize.sh $(readlink -f "$BASH_SOURCE")
 if [ ! -e $YADAMU_INPUT_PATH] mkdir $YADAMU_INPUT_PATH;fi
 export FILENAME=jsonExample
 export SCHEMA=jtest

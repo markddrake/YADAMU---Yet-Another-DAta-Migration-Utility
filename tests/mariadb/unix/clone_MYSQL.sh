@@ -1,6 +1,6 @@
 export YADAMU_TARGET=MySQL
 export YADAMU_PARSER=CLARINET
-. ../unix/initialize.sh $(readlink -f "$0")
+. ../unix/initialize.sh $(readlink -f "$BASH_SOURCE")
 mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f <$YADAMU_DB_ROOT/sql/JSON_IMPORT.sql >$YADAMU_LOG_PATH/install/JSON_IMPORT.log
 export FILENAME=sakila
 export SCHEMA=SAKILA

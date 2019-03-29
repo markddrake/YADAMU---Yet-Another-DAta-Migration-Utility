@@ -1,6 +1,6 @@
 export YADAMU_TARGET=MySQL/jTable
 export YADAMU_PARSER=RDBMS
-. ../unix/initialize.sh $(readlink -f "$0")
+. ../unix/initialize.sh $(readlink -f "$BASH_SOURCE")
 export YADAMU_INPUT_PATH=${YADAMU_INPUT_PATH:0:-7}
 psql -U $DB_USER -h $DB_HOST -a -f $YADAMU_DB_ROOT/sql/JSON_IMPORT.sql >> $YADAMU_LOG_PATH/install/JSON_IMPORT.log
 export FILENAME=sakila

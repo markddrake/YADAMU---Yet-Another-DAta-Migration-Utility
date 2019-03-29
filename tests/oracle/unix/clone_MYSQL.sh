@@ -1,6 +1,6 @@
 export YADAMU_TARGET=MySQL
 export YADAMU_PARSER=CLARINET
-. ../unix/initialize.sh $(readlink -f "$0")
+. ../unix/initialize.sh $(readlink -f "$BASH_SOURCE")
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_DB_ROOT/sql/COMPILE_ALL.sql $YADAMU_LOG_PATH
 export FILENAME=sakila
 export SCHEMA=SAKILA

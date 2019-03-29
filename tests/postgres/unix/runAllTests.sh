@@ -1,1 +1,1 @@
-. ../unix/runAllTests.sh $0
+. ../unix/runAllTests.sh $BASH_SOURCE
