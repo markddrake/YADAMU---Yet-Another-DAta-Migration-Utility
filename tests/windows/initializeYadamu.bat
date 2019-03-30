@@ -27,11 +27,11 @@ mysql.exe -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --i
 mysql.exe -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="set @SCHEMA='JTEST'; set @ID='1'; set @METHOD='Clarinet'" <%YADAMU_HOME%\tests\mariadb\sql\RECREATE_SCHEMA.sql >>%YADAMU_LOG_PATH%\RECREATE_SCHEMA.log
 mysql.exe -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f --init-command="set @SCHEMA='SAKILA'; set @ID='1'; set @METHOD='Clarinet'" <%YADAMU_HOME%\tests\mariadb\sql\RECREATE_SCHEMA.sql >>%YADAMU_LOG_PATH%\RECREATE_SCHEMA.log
 call %YADAMU_HOME%\tests\postgres\env\dbConnection.bat
-psql -U %DB_USER% -h %DB_HOST% -a -f %YADAMU_HOME%\postgres\sql\JSON_IMPORT.sql > %YADAMU_LOG_PATH%\JSON_IMPORT_POSTGRES.log
-psql -U %DB_USER% -h %DB_HOST% -a -vID=1 -vMETHOD=Clarinet -f %YADAMU_HOME%\tests\postgres\sql\RECREATE_MSSQL_ALL.sql >%YADAMU_LOG_PATH%\RECREATE_SCHEMA.log
-psql -U %DB_USER% -h %DB_HOST% -a -vID=1 -vMETHOD=Clarinet -f %YADAMU_HOME%\tests\postgres\sql\RECREATE_ORACLE_ALL.sql >>%YADAMU_LOG_PATH%\RECREATE_SCHEMA.log
-psql -U %DB_USER% -h %DB_HOST% -a -vSCHEMA=JTEST -vID=1 -vMETHOD=Clarinet -f %YADAMU_HOME%\tests\postgres\sql\RECREATE_SCHEMA.sql >> %YADAMU_LOG_PATH%\RECREATE_SCHEMA.log
-psql -U %DB_USER% -h %DB_HOST% -a -vSCHEMA=SAKILA -vID=1 -vMETHOD=Clarinet -f %YADAMU_HOME%\tests\postgres\sql\RECREATE_SCHEMA.sql >> %YADAMU_LOG_PATH%\RECREATE_SCHEMA.log
+psql -U %DB_USER% -d %DB_DBNAME% -h %DB_HOST% -a -f %YADAMU_HOME%\postgres\sql\JSON_IMPORT.sql > %YADAMU_LOG_PATH%\JSON_IMPORT_POSTGRES.log
+psql -U %DB_USER% -d %DB_DBNAME% -h %DB_HOST% -a -vID=1 -vMETHOD=Clarinet -f %YADAMU_HOME%\tests\postgres\sql\RECREATE_MSSQL_ALL.sql >%YADAMU_LOG_PATH%\RECREATE_SCHEMA.log
+psql -U %DB_USER% -d %DB_DBNAME% -h %DB_HOST% -a -vID=1 -vMETHOD=Clarinet -f %YADAMU_HOME%\tests\postgres\sql\RECREATE_ORACLE_ALL.sql >>%YADAMU_LOG_PATH%\RECREATE_SCHEMA.log
+psql -U %DB_USER% -d %DB_DBNAME% -h %DB_HOST% -a -vSCHEMA=JTEST -vID=1 -vMETHOD=Clarinet -f %YADAMU_HOME%\tests\postgres\sql\RECREATE_SCHEMA.sql >> %YADAMU_LOG_PATH%\RECREATE_SCHEMA.log
+psql -U %DB_USER% -d %DB_DBNAME% -h %DB_HOST% -a -vSCHEMA=SAKILA -vID=1 -vMETHOD=Clarinet -f %YADAMU_HOME%\tests\postgres\sql\RECREATE_SCHEMA.sql >> %YADAMU_LOG_PATH%\RECREATE_SCHEMA.log
 exit /b
 
 :INITLOGGING

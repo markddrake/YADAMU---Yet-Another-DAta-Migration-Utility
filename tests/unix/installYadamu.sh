@@ -7,4 +7,4 @@ mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f <$YADAMU
 . $YADAMU_HOME/tests/mariadb/env/dbConnection.sh
 mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f <$YADAMU_HOME/mariadb/sql/SCHEMA_COMPARE.sql >$YADAMU_LOG_PATH/SCHEMA_COMPARE_MARIADB.log
 . $YADAMU_HOME/tests/postgres/env/dbConnection.sh
-psql -U $DB_USER -h $DB_HOST -a -f $YADAMU_HOME/postgres/sql/JSON_IMPORT.sql > $YADAMU_LOG_PATH/JSON_IMPORT_POSTGRES.log
+psql -U $DB_USER -d $DB_DBNAME -h $DB_HOST -a -f $YADAMU_HOME/postgres/sql/JSON_IMPORT.sql > $YADAMU_LOG_PATH/JSON_IMPORT_POSTGRES.log

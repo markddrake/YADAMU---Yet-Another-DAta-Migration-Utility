@@ -1,3 +1,0 @@
-export LOGDIR=logs/MySQL
-export IMPORTLOG=$LOGDIR/MySQL.log
-export EXPORTLOG=$LOGDIR/MySQL.log
