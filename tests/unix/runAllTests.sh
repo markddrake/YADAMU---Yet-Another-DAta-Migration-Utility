@@ -1,4 +1,4 @@
-. ../unix/initialize.sh $(readlink -f "$BASH_SOURCE")
+. ../unix/initialize.sh $(readlink -f "$1")
 . $YADAMU_SCRIPT_ROOT/unix/clone_MYSQL.sh
 . $YADAMU_SCRIPT_ROOT/unix/clone_Oracle.sh
 . $YADAMU_SCRIPT_ROOT/unix/clone_MSSQL.sh
