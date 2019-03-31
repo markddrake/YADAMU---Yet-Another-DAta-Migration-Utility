@@ -16,16 +16,16 @@ sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -d$DB_DBNAME -I -e -vSCHEMA=SAKILA -vID=1
 export SCHEMA=JTEST
 . $YADAMU_HOME/tests/mysql/env/dbConnection.sh
 mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f <$YADAMU_HOME/mysql/sql/JSON_IMPORT.sql >$YADAMU_LOG_PATH/JSON_IMPORT_MYSQL.log
-mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="export @ID='1'; then export @METHOD='Clarinet'" <$YADAMU_HOME/tests/mysql/sql/RECREATE_MSSQL_ALL.sql >$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
-mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="export @ID='1'; then export @METHOD='Clarinet';"<$YADAMU_HOME/tests/mysql/sql/RECREATE_ORACLE_ALL.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
-mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="export @SCHEMA='JTEST'; then export @ID='1'; then export @METHOD='Clarinet'" <$YADAMU_HOME/tests/mariadb/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
-mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="export @SCHEMA='SAKILA'; then export @ID='1'; then export @METHOD='Clarinet'" <$YADAMU_HOME/tests/mariadb/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @ID='1'; set @METHOD='Clarinet'" <$YADAMU_HOME/tests/mysql/sql/RECREATE_MSSQL_ALL.sql >$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @ID='1'; set @METHOD='Clarinet';"<$YADAMU_HOME/tests/mysql/sql/RECREATE_ORACLE_ALL.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @SCHEMA='JTEST'; set @ID='1'; set @METHOD='Clarinet'" <$YADAMU_HOME/tests/mariadb/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @SCHEMA='SAKILA'; set @ID='1'; set @METHOD='Clarinet'" <$YADAMU_HOME/tests/mariadb/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
 . $YADAMU_HOME/tests/mariadb/env/dbConnection.sh
 mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f <$YADAMU_HOME/mariadb/sql/SCHEMA_COMPARE.sql >$YADAMU_LOG_PATH/SCHEMA_COMPARE_MARIADB.log
-mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="export @ID='1'; then export @METHOD='Clarinet'" <$YADAMU_HOME/tests/mysql/sql/RECREATE_MSSQL_ALL.sql >$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
-mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="export @ID='1'; then export @METHOD='Clarinet';"<$YADAMU_HOME/tests/mysql/sql/RECREATE_ORACLE_ALL.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
-mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="export @SCHEMA='JTEST'; then export @ID='1'; then export @METHOD='Clarinet'" <$YADAMU_HOME/tests/mariadb/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
-mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="export @SCHEMA='SAKILA'; then export @ID='1'; then export @METHOD='Clarinet'" <$YADAMU_HOME/tests/mariadb/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @ID='1'; set @METHOD='Clarinet'" <$YADAMU_HOME/tests/mysql/sql/RECREATE_MSSQL_ALL.sql >$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @ID='1'; set @METHOD='Clarinet';"<$YADAMU_HOME/tests/mysql/sql/RECREATE_ORACLE_ALL.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @SCHEMA='JTEST'; set @ID='1'; set @METHOD='Clarinet'" <$YADAMU_HOME/tests/mariadb/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+mysql.exe -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @SCHEMA='SAKILA'; set @ID='1'; set @METHOD='Clarinet'" <$YADAMU_HOME/tests/mariadb/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
 . $YADAMU_HOME/tests/postgres/env/dbConnection.sh
 psql -U $DB_USER -d $DB_DBNAME -h $DB_HOST -a -f $YADAMU_HOME/postgres/sql/JSON_IMPORT.sql > $YADAMU_LOG_PATH/JSON_IMPORT_POSTGRES.log
 psql -U $DB_USER -d $DB_DBNAME -h $DB_HOST -a -vID=1 -vMETHOD=Clarinet -f $YADAMU_HOME/tests/postgres/sql/RECREATE_MSSQL_ALL.sql >$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
