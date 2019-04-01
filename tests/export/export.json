@@ -100,6 +100,18 @@
         "operations": [
             "tests\\export\\oracle.json"
         ]
-
-        }
+    },
+    {
+        "source": "file",
+        "targets": [
+            "mssql"
+        ],
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\export\\combine.json"
+        ]
+    },
+        
 ]

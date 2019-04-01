@@ -6,6 +6,6 @@ sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -e -i$YADAMU_DB_ROOT/sql/JSON
 . $YADAMU_SCRIPT_ROOT/unix/export_MSSQL.sh $YADAMU_INPUT_PATH "" ""
 export FILENAME=AdventureWorksALL
 export SCHEMA=ADVWRK
-sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -d$DB_NAME -I -e -vSCHEMA=$SCHEMA -i$YADAMU_SCRIPT_ROOT/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
+sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -d$DB_DBNAME -I -e -i$YADAMU_SCRIPT_ROOT/sql/RECREATE_SCHEMA.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
 . $YADAMU_SCRIPT_ROOT/unix/import_MSSQL_ALL.sh $YADAMU_INPUT_PATH "" "" 
 node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --password=$DB_PWD --database=$SCHEMA file=$YADAMU_INPUT_PATH/$FILENAME.json owner=\"dbo\" mode=$MODE logFile=$EXPORTLOG
