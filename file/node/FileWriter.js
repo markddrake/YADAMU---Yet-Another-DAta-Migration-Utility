@@ -1,7 +1,6 @@
 "use strict" 
 const fs = require('fs');
 const path = require('path');
-const Readable = require('stream').Readable;
 
 /* 
 **
@@ -20,7 +19,7 @@ const defaultParameters = {}
 **
 */
 
-class FileDBI extends YadamuDBI {
+class FileWriter extends YadamuDBI {
 
   getConnectionProperties() {
     return {
@@ -81,7 +80,7 @@ class FileDBI extends YadamuDBI {
     super.initialize();
     const exportFilePath = path.resolve(this.parameters.FILE);
     this.outputStream = fs.createWriteStream(exportFilePath);
-    this.logWriter.write(`${new Date().toISOString()}[FileExport()]: Writing file "${exportFilePath}".\n`)
+    this.logWriter.write(`${new Date().toISOString()}[FileWriter()]: Writing file "${exportFilePath}".\n`)
     this.outputStream.write(`{`)
   }
 
@@ -108,7 +107,7 @@ class FileDBI extends YadamuDBI {
       try {
         await this.closeFile()
       } catch (err) {
-        this.logWriter.write(`${new Date().toISOString()}[FileExprt()]: Fatal Error:${err.stack}.\n`)
+        this.logWriter.write(`${new Date().toISOString()}[FileWriter()]: Fatal Error:${err.stack}.\n`)
       }
     }
   }
@@ -214,4 +213,4 @@ class FileDBI extends YadamuDBI {
 
 }
 
-module.exports = FileDBI
+module.exports = FileWriter

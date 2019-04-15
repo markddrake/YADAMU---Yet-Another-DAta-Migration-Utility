@@ -90,8 +90,20 @@ class DBReader extends Readable {
     await this.dbi.generateStatementCache('%%SCHEMA%%',false)
   }
   
+  
+  getReader() {
+    
+    if (this.dbi.isDatabase()) {
+      return this
+    }
+    else {
+      return this.dbi.getReader()
+    }
+    
+  }
+  
   async _read() {
-
+  
     try {
       switch (this.nextPhase) {
          case 'systemInformation' :

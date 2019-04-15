@@ -7,7 +7,7 @@ async function main() {
 
   const yadamu = new Yadamu('Import');
   const dbi = new DBInterface(yadamu);  
-  await yadamu.doImport(dbi,yadamu.getParameters().FILE);
+  await yadamu.doImport(dbi);
   
 }
 

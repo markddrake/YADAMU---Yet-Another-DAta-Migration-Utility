@@ -35,6 +35,10 @@ class YadamuDBI {
     return (this.systemInformation.vendor === this.DATABASE_VENDOR)
   }
   
+  isDatabase() {
+    return true;
+  }
+  
   objectMode() {
     return true;
   }
