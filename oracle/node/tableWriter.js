@@ -84,6 +84,9 @@ class TableWriter {
             case "BLOB" :
               return Buffer.from(row[idx],'hex');
             case "RAW":
+              if (typeof row[idx] === 'boolean') {
+                return (row[idx] === true ? '01' : '00')
+              }
               return Buffer.from(row[idx],'hex');
             case "BOOLEAN":
               switch (row[idx]) {

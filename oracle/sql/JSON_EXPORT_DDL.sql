@@ -47,6 +47,8 @@ as
   C_CARRIAGE_RETURN  CONSTANT CHAR(1) := CHR(13);
   C_SINGLE_QUOTE     CONSTANT CHAR(1) := CHR(39);
 --
+  G_ERROR_RAISED     BOOLEAN := FALSE;
+--
 function IMPORT_DDL_LOG
 return T_RESULTS_CACHE
 pipelined
@@ -82,6 +84,7 @@ PROCEDURE LOG_ERROR(P_SEVERITY VARCHAR2, P_SQL_STATEMENT CLOB, P_SQLCODE NUMBER,
 as
 begin
   RESULTS_CACHE.extend();
+  G_ERROR_RAISED := TRUE;
   select JSON_OBJECT('error' value JSON_OBJECT('severity' value P_SEVERITY, 'code' value P_SQLCODE, 'msg' value P_SQLERRM, 'sqlStatement' value P_SQL_STATEMENT, 'details' value P_STACK
                      $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB) returning CLOB)
@@ -460,9 +463,9 @@ as
          );
 begin
   SET_CURRENT_SCHEMA(P_TARGET_SCHEMA);
-
+   
   for s in getDDLStatements loop
-
+    exit when G_ERROR_RAISED;
     begin
       V_DDL_STATEMENT := s.DDL_STATEMENT;
       if (substr(V_DDL_STATEMENT,1,21) = '<?xml version="1.0"?>') then
@@ -479,11 +482,6 @@ begin
       when COMPILATION_ERROR then
         LOG_ERROR(C_RECOMPILATION,V_DDL_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
       when NO_TABLESPACE_PRIVILEGES then
-      
-      
-      
-      
-      
         if (upper(V_DDL_STATEMENT) LIKE '%USAGE QUEUE') then
           LOG_ERROR(C_AQ_ISSUE,V_DDL_STATEMENT,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
         else

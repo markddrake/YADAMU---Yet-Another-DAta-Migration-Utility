@@ -244,7 +244,8 @@ class OracleDBI extends YadamuDBI {
 
     const sqlStatement = `begin :log := JSON_IMPORT.SET_CURRENT_SCHEMA(:schema); end;`;
     const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 1024} , schema:schema}
-    this.processLog(await this.executeSQL(sqlStatement,args))
+    const results = await this.executeSQL(sqlStatement,args)
+    this.processLog(results)
     
   }
   
@@ -336,6 +337,9 @@ class OracleDBI extends YadamuDBI {
     const results = await this.executeSQL(sqlStatement,args);
     await ddlLob.close();
     this.processLog(results)
+    if (this.status.errorRaised === true) {
+      throw new Error(`Oracle DDL Execution Failure`);
+    }
   }
   
   /*  
