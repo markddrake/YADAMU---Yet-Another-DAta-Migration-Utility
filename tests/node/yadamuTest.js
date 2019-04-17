@@ -117,7 +117,7 @@ class YadamuTester {
       let dbi
       let dbUser
       
-      const testRoot = 'work' + path.sep + target + path.sep;
+      const testRoot = path.join('work',target);
       
       const timings = []
       const source = 'file';
@@ -140,7 +140,7 @@ class YadamuTester {
       let targetDescription = target === 'mssql' ? `${dbUser.schema}"."${dbUser.owner}` : dbUser      
       this.printResults(`"${source}"://"${sourceFile}"`,`"${target}"://"${targetDescription}"`,elapsedTime)
 
-      this.yadamu.parameters.FILE = testRoot + targetFile1
+      this.yadamu.parameters.FILE = path.join(testRoot,targetFile1)
       dbi = this.configureDatabaseInterface(target,'OWNER',dbUser,this.connections[target]);     
       startTime = new Date().getTime()
       timings[1] = await this.yadamu.doExport(dbi);
@@ -154,12 +154,12 @@ class YadamuTester {
       await this.recreateSchema(target,dbUser,this.connections[target]);
 
       startTime = new Date().getTime();
-      timings[2] = await this.doImport(dbi,testRoot + targetFile1);
+      timings[2] = await this.doImport(dbi,path.join(testRoot,targetFile1));
       elapsedTime = new Date().getTime() - startTime;
       targetDescription = target === 'mssql' ? `${dbUser.schema}"."${dbUser.owner}` : dbUser      
       this.printResults(`"${source}"://"${targetFile1}"`,`"${target}"://"${targetDescription}"`,elapsedTime)
 
-      this.yadamu.parameters.FILE = testRoot + targetFile2
+      this.yadamu.parameters.FILE = path.join(testRoot,targetFile2)
       dbi = this.configureDatabaseInterface(target,'OWNER',dbUser,this.connections[target]);     
       startTime = new Date().getTime()
       timings[3] = await this.yadamu.doExport(dbi);
@@ -169,7 +169,7 @@ class YadamuTester {
       this.printResults(`"${target}"://"${sourceDescription}"`,`"${source}"://"${targetFile2}"`,elapsedTime)
       
       await this.compareSchemas(dbi,db1,db2,timings[2]);
-      await this.fc.report(sourceFile, testRoot + targetFile1, testRoot + targetFile2,timings);    
+      await this.fc.report(sourceFile, path.join(testRoot,targetFile1), path.join(testRoot,targetFile2),timings);    
   }
 
   async databaseRoundtrip(source,target,clone,parameters,steps) {
@@ -329,7 +329,7 @@ class YadamuTester {
       const testParameters = parameters ? parameters : {}
       
       if (source === 'file') {
-        const file = directory ? directory + path.sep + sourceInfo : sourceInfo
+        const file = directory ? path.join(directory,sourceInfo) : sourceInfo
         testParameters.FILE = file
         sourceDescription = file;
         this.yadamu.overwriteParameters(testParameters);
@@ -344,7 +344,7 @@ class YadamuTester {
       const owner = this.getDatabaseUser(target,targetInfo)
 
       if (target === 'file') {
-        const file = directory ? directory + path.sep + targetInfo : targetInfo
+        const file = directory ? path.join(directory,targetInfo) : targetInfo
         testParameters.FILE = file
         targetDescription = file;
       }

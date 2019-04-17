@@ -2,25 +2,25 @@
     {
         "source": "file",
         "targets": ["mssql","postgres","mysql","mariadb"],
-        "directory" : "JSON\\oracle18c\\DATA_ONLY",
+        "directory" : "JSON/oracle18c/DATA_ONLY",
         "reverseDirection" : true,
         "parameters": {
             "MODE": "DATA_ONLY"
         },
         "operations": [
-            "tests\\export\\oracle.json"
+            "tests/export/oracle.json"
         ]
     },
     {
         "source": "file",
         "targets": ["oracle18c","postgres","mysql","mariadb"],
-        "directory" : "JSON\\MsSQL",
+        "directory" : "JSON/MsSQL",
         "reverseDirection" : true,
         "parameters": {
             "MODE": "DATA_ONLY"
         },
         "operations": [
-            "tests\\export\\mssql.json"
+            "tests/export/mssql.json"
         ]
     },    
     {
@@ -29,10 +29,10 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "directory" : "JSON\\MySQL",
+        "directory" : "JSON/MySQL",
         "reverseDirection" : true,
         "operations": [
-            "tests\\export\\mysql.json"
+            "tests/export/mysql.json"
         ]
     }
 ]

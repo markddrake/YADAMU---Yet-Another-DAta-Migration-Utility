@@ -4,12 +4,12 @@
         "targets": [
             "file"
         ],
-        "directory": "JSON\\oracle18c\\DDL_ONLY",
+        "directory": "JSON/oracle18c/DDL_ONLY",
         "parameters": {
             "MODE": "DDL_ONLY"
         },
         "operations": [
-            "tests\\export\\oracle.json"
+            "tests/export/oracle.json"
         ]
     },
     {
@@ -17,12 +17,12 @@
         "targets": [
             "file"
         ],
-        "directory": "JSON\\oracle18c\\DATA_ONLY",
+        "directory": "JSON/oracle18c/DATA_ONLY",
         "parameters": {
             "MODE": "DATA_ONLY"
         },
         "operations": [
-            "tests\\export\\oracle.json"
+            "tests/export/oracle.json"
         ]
     },
     {
@@ -30,12 +30,12 @@
         "targets": [
             "file"
         ],
-        "directory": "JSON\\oracle18c\\DDL_AND_DATA",
+        "directory": "JSON/oracle18c/DDL_AND_DATA",
         "parameters": {
             "MODE": "DDL_AND_DATA"
         },
         "operations": [
-            "tests\\export\\oracle.json"
+            "tests/export/oracle.json"
         ]
     },
     {
@@ -43,12 +43,12 @@
         "targets": [
             "file"
         ],
-        "directory": "JSON\\MsSQL",
+        "directory": "JSON/MsSQL",
         "parameters": {
             "MODE": "DATA_ONLY"
         },
         "operations": [
-            "tests\\export\\mssql.json"
+            "tests/export/mssql.json"
         ]
     },
     {
@@ -56,12 +56,12 @@
         "targets": [
             "mssql"
         ],
-        "directory": "JSON\\MsSQL",
+        "directory": "JSON/MsSQL",
         "parameters": {
             "MODE": "DATA_ONLY"
         },
         "operations": [
-            "tests\\import\\createAdventureWorksAll.json"
+            "tests/import/createAdventureWorksAll.json"
         ]
     },
     {
@@ -69,12 +69,12 @@
         "targets": [
             "file"
         ],
-        "directory": "JSON\\MsSQL",
+        "directory": "JSON/MsSQL",
         "parameters": {
             "MODE": "DATA_ONLY"
         },
         "operations": [
-            "tests\\export\\mssqlAdventureWorksAll.json"
+            "tests/export/mssqlAdventureWorksAll.json"
         ]
     },
     {
@@ -82,12 +82,12 @@
         "targets": [
             "file"
         ],
-        "directory": "JSON\\MySQL",
+        "directory": "JSON/MySQL",
         "parameters": {
             "MODE": "DATA_ONLY"
         },
         "operations": [
-            "tests\\export\\mysql.json"
+            "tests/export/mysql.json"
         ]
     },
     {
@@ -95,12 +95,12 @@
         "targets": [
             "file"
         ],
-        "directory": "JSON\\oracle12c\\DDL_ONLY",
+        "directory": "JSON/oracle12c/DDL_ONLY",
         "parameters": {
             "MODE": "DDL_ONLY"
         },
         "operations": [
-            "tests\\export\\oracle.json"
+            "tests/export/oracle.json"
         ]
     },
     {
@@ -108,12 +108,12 @@
         "targets": [
             "file"
         ],
-        "directory": "JSON\\oracle12c\\DATA_ONLY",
+        "directory": "JSON/oracle12c/DATA_ONLY",
         "parameters": {
             "MODE": "DATA_ONLY"
         },
         "operations": [
-            "tests\\export\\oracle.json"
+            "tests/export/oracle.json"
         ]
     },
     {
@@ -121,12 +121,12 @@
         "targets": [
             "file"
         ],
-        "directory": "JSON\\oracle12c\\DDL_AND_DATA",
+        "directory": "JSON/oracle12c/DDL_AND_DATA",
         "parameters": {
             "MODE": "DDL_AND_DATA"
         },
         "operations": [
-            "tests\\export\\oracle.json"
+            "tests/export/oracle.json"
         ]
     }
 ]

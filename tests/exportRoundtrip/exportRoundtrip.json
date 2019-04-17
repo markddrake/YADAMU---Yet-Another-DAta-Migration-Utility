@@ -14,9 +14,9 @@
             "MODE": "DATA_ONLY"
         },
         "operations": [
-            "tests\\exportRoundtrip\\oracle.json",
-            "tests\\exportRoundtrip\\mysql.json",
-            "tests\\exportRoundtrip\\mssql.json"
+            "tests/exportRoundtrip/oracle.json",
+            "tests/exportRoundtrip/mysql.json",
+            "tests/exportRoundtrip/mssql.json"
         ]
     },
     {
@@ -33,9 +33,9 @@
             "MODE": "DATA_ONLY"
         },
         "operations": [
-            "tests\\exportRoundtrip\\oracle.json",
-            "tests\\exportRoundtrip\\mysql.json",
-            "tests\\exportRoundtrip\\mssql.json"
+            "tests/exportRoundtrip/oracle.json",
+            "tests/exportRoundtrip/mysql.json",
+            "tests/exportRoundtrip/mssql.json"
         ]
     }
 ]

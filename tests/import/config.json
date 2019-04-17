@@ -1,7 +1,7 @@
 {
-    "connections": "tests\\connections\\standardConnections.json",
+    "connections": "tests/connections/standardConnections.json",
     "mode"       : "Import",
     "tests": [
-        "tests\\import\\import.json"
+        "tests/import/import.json"
     ]
 }
