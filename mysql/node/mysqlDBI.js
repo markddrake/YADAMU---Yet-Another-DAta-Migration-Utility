@@ -497,9 +497,9 @@ class MySQLDBI extends YadamuDBI {
   
     // Uncomment the folloing statement Force 5.7 Code Path
     // statementGenerator = new StatementGenerator57(this,ddlRequired,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.status,this.logWriter);
-    
     this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL)
   }
+  
 
   async finalizeDataLoad() {
   }  

@@ -245,7 +245,7 @@ class StatementGenerator {
     const ddlStatements = tables.map(function(table,idx) {
       const tableMetadata = metadata[table];
       const tableInfo = this.generateTableInfo(schema, tableMetadata);
-      statementCache[table] = tableInfo;
+      statementCache[metadata[table].tableName] = tableInfo;
       return tableInfo.ddl;
     },this)
     if (executeDDL === true) {

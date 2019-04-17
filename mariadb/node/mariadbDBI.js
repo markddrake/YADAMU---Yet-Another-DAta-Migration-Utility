@@ -382,7 +382,7 @@ class MariadbDBI extends YadamuDBI {
   }
   
   async generateStatementCache(schema,executeDDL) {
-    await super.generateStatementCache(StatementGenerator,schema,executeDDL)
+    await super.generateStatementCache(StatementGenerator,schema,executeDDL) 
   }
 
   createParser(query,objectMode) {

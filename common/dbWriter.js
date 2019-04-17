@@ -79,7 +79,6 @@ class DBWriter extends Writable {
       this.dbi.setMetadata(metadata)      
     }
     else {    
-   
       if (targetSchemaInfo.length > 0) {
     
         // Merge metadata for existing table with metadata from export source
@@ -118,7 +117,7 @@ class DBWriter extends Writable {
             break;
           default:
         }
-    
+           
         targetNamesTransformed.forEach(function(targetName, idx){
           const tableIdx = exportNamesTransformed.findIndex(function(member){return member === targetName})
           if ( tableIdx > -1)    {
@@ -126,7 +125,7 @@ class DBWriter extends Writable {
           }
         },this)
       }    
-
+      
       await this.generateStatementCache(metadata,!this.ddlComplete)
     }
   }      

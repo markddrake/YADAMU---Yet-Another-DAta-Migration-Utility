@@ -30,8 +30,7 @@ class StatementGenerator {
         tableInfo.commitSize = this.commitSize;
         tableInfo.insertMode = 'Bulk';
         const columnNames = JSON.parse('[' + metadata[table].columns + ']');
-
-                 
+        
         const setOperators = tableInfo.targetDataTypes.map(function(targetDataType,idx) {
            switch (targetDataType) {
              case 'geometry':

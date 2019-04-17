@@ -227,7 +227,7 @@ class YadamuDBI {
   }
 
   getTableWriter(TableWriter,schema,table) {
-    const tableName = this.metadata[table].tableName  
+    const tableName = this.metadata[table].tableName 
     return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);      
   }
  
