@@ -4,105 +4,106 @@ const path = require('path');
 
 const Yadamu = require('../../common/yadamu.js').Yadamu;
 const DBWriter = require('../../common/dbWriter.js');
-const FileDBI = require('../../file/node/fileDBI.js');
+const FileWriter = require('../../file/node/fileWriter.js');
 const FileParser = require('../../file/node/fileParser.js');
 
-class FileCompare extends FileDBI {
+class FileCompare extends FileWriter {
   
-    sortRows(array) {
-       
-      array.sort(function (a,b){
-        for (const i in array) {
-          if (a[i] < b[i]) return -1
-          if (a[i] > b[i]) return 1;
-        }
-      })
-      return array
-    }  
-
-    deepCompare(content) {
- 
-      if (this.sort === true) {
-        return crypto.createHash('sha256').update(JSON.stringify(sortRows(content))).digest('hex')
-      }
-      else {
-       return crypto.createHash('sha256').update(JSON.stringify(content)).digest('hex');
-      }
-    }
-
-    /* 
-    **
-    ** Do not use with large files
-    **
-
-    
-    getContentMetadata(file,sort) {
-        
-      const metadata = {}
-      
-      const content = require(path.resolve(file));
-      if (content.data) {
-        const tables = Object.keys(content.data);
+  sortRows(array) {
      
-        // Do not use .forEach or .Map - Memory usage is too high
-        
-        for (const table of tables) {
-          metadata[table] = {
-            rowCount : content.data[table].length
-          , byteCount: JSON.stringify(content.data[table]).length
-          , hash     : ( this.deepCompare === true ? deepCompare(content.data[table]) : null )
-          }
+    array.sort(function (a,b){
+      for (const i in array) {
+        if (a[i] < b[i]) return -1
+        if (a[i] > b[i]) return 1;
+      }
+    })
+    return array
+  }  
+
+  deepCompare(content) {
+
+    if (this.sort === true) {
+      return crypto.createHash('sha256').update(JSON.stringify(sortRows(content))).digest('hex')
+    }
+    else {
+     return crypto.createHash('sha256').update(JSON.stringify(content)).digest('hex');
+    }
+  }
+
+  /* 
+  **
+  ** Do not use with large files
+  **
+
+  
+  getContentMetadata(file,sort) {
+      
+    const metadata = {}
+    
+    const content = require(path.resolve(file));
+    if (content.data) {
+      const tables = Object.keys(content.data);
+   
+      // Do not use .forEach or .Map - Memory usage is too high
+      
+      for (const table of tables) {
+        metadata[table] = {
+          rowCount : content.data[table].length
+        , byteCount: JSON.stringify(content.data[table]).length
+        , hash     : ( this.deepCompare === true ? deepCompare(content.data[table]) : null )
         }
       }
-      return metadata;       
     }
-    
-    */
+    return metadata;       
+  }
+  
+  */
 
-    async getContentMetadata(file,sort) {
+  async getContentMetadata(file,sort) {
+      
+    this.tableInfo = {} 
+    const nulLogger = fs.createWriteStream("\\\\.\\NUL");
+    const logWriter = this.logWriter;
+    const saxParser  = new FileParser(logWriter)
+    let readStream
+    try {
+      readStream = fs.createReadStream(file);         
+    } catch (e) {
+      if (err.code !== 'ENOENT') {
+        throw err;
+      } 
+      files[fidx].size = -1;
+    }
         
-      this.tableInfo = {} 
-      const nulLogger = fs.createWriteStream("\\\\.\\NUL");
-      const logWriter = this.logWriter;
-      const saxParser  = new FileParser(logWriter)
+    const writer = new DBWriter(this, null, null, null, nulLogger);
+    
+    const processMetadata = new Promise(function (resolve,reject) {
       try {
-        const readStream = fs.createReadStream(file);         
-      } catch (e) {
-        if (err.code !== 'ENOENT') {
-          throw err;
-        } 
-        files[fidx].size = -1;
+        writer.on('finish',function() {resolve(saxParser.checkState())});
+        writer.on('error', function(err){logWriter.write(`${new Date().toISOString()}[FileCompare.error()]}: ${err.stack}\n`);reject(err)})      
+        readStream.pipe(saxParser).pipe(writer);
+      } catch (err) {
+        logWriter.write(`${new Date().toISOString()}[FileCompare.getConentMetadata()]}: ${err.stack}\n`);
+        reject(err);
       }
-          
-      const writer = new DBWriter(this, null, null, null, nulLogger);
-      
-      const processMetadata = new Promise(function (resolve,reject) {
-        try {
-          writer.on('finish',function() {resolve(saxParser.checkState())});
-          writer.on('error', function(err){logWriter.write(`${new Date().toISOString()}[FileCompare.error()]}: ${err.stack}\n`);reject(err)})      
-          readStream.pipe(saxParser).pipe(writer);
-        } catch (err) {
-          logWriter.write(`${new Date().toISOString()}[FileCompare.getConentMetadata()]}: ${err.stack}\n`);
-          reject(err);
-        }
-      })    
-      
-      await processMetadata;
-      return this.tableInfo
-    }
+    })    
+    
+    await processMetadata;
+    return this.tableInfo
+  }
 
-     
-    updateSettings(dbParameters,dbConnection,role,target) {
-      dbParameters.FILE = target
-    }
-      
-    constructor(yadamu,logger) {
-       super(yadamu)
-       this.logger = logger;
-       this.deepCompare = false;
-       this.sort = false;
-    }
-     
+   
+  updateSettings(dbParameters,dbConnection,role,target) {
+    dbParameters.FILE = target
+  }
+    
+  constructor(yadamu,logger) {
+     super(yadamu)
+     this.logger = logger;
+     this.deepCompare = false;
+     this.sort = false;
+  }
+  
   setSystemInformation(systemInformation) {
   }
 
@@ -259,7 +260,7 @@ class FileCompare extends FileDBI {
       this.tableInfo[this.tableName].byteCount += this.tableInfo[this.tableName].rowCount - 1;
     }
   }
-  
+    
   makeLowerCase(object) {
         
     Object.keys(object).forEach(function(key) {
@@ -280,25 +281,25 @@ class FileCompare extends FileDBI {
     },this)
  
     const gStats = fs.statSync(path.resolve(grandparent));
-    let pstats
-    let cstats
+    let pStats
+    let cStats
     try {
       pStats = fs.statSync(path.resolve(parent));
     }
-    catch  {
+    catch (err)  {
       if (err.code !== 'ENOENT') {
           throw err;
       }
       pstats = {size : -1}
     }
     try {
-      const cStats = fs.statSync(path.resolve(child));
+      cStats = fs.statSync(path.resolve(child));
     }
-    catch  {
+    catch (err) {
       if (err.code !== 'ENOENT') {
           throw err;
       }
-      cstats = {size : -1}
+      cStats = {size : -1}
     }
  
     this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 

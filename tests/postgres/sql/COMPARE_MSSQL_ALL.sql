@@ -25,7 +25,7 @@
 --
 \include sql/SCHEMA_COMPARE.sql
 --
-\set SCHEMA DW
+\set SCHEMA AdventureWorksDW
 --
 \include sql/SCHEMA_COMPARE.sql
 --

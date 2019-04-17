@@ -1,4 +1,4 @@
 [
-  [{"schema" : "sakila"},"JSON\\MySQL\\sakila.json"]
- ,[{"schema" : "jtest"},"JSON\\MySQL\\jsonExample.json"]
+  [{"schema" : "sakila"},"sakila.json"]
+ ,[{"schema" : "jtest"},"jsonExample.json"]
 ]

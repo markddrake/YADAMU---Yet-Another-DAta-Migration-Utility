@@ -23,7 +23,7 @@ SET @SCHEMA = 'HumanResources';
 --
 source sql/SCHEMA_COMPARE.sql
 --
-SET @SCHEMA = 'DW';
+SET @SCHEMA = 'AdventureWorksDW';
 --
 source sql/SCHEMA_COMPARE.sql
 --

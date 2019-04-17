@@ -1,0 +1,9 @@
+[
+  ["Northwind.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
+  ["HumanResources.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
+  ["Person.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
+  ["Production.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
+  ["Purchasing.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
+  ["Sales.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
+  ["AdventureWorksDW.json",{"schema": "AdventureWorksAll","owner": "dbo"}]
+]

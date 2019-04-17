@@ -1,5 +1,5 @@
 --
-\set SCHEMA  :SCHEMA:ID
+select  :SCHEMA || :ID "SCHEMA" \gset
 --
 \echo :SCHEMA
 --

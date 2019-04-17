@@ -1,51 +1,9 @@
 [
-    [
-        {
-            "schema": "Northwind",
-            "owner": "dbo"
-        },
-        "JSON\\MSSQL\\Northwind.json"
-    ],
-    [
-        {
-            "schema": "AdventureWorks",
-            "owner": "HumanResources"
-        },
-        "JSON\\MSSQL\\HumanResources.json"
-    ],
-    [
-        {
-            "schema": "AdventureWorks",
-            "owner": "Person"
-        },
-        "JSON\\MSSQL\\Person.json"
-    ],
-    [
-        {
-            "schema": "AdventureWorks",
-            "owner": "Production"
-        },
-        "JSON\\MSSQL\\Production.json"
-    ],
-    [
-        {
-            "schema": "AdventureWorks",
-            "owner": "Purchasing"
-        },
-        "JSON\\MSSQL\\Purchasing.json"
-    ],
-    [
-        {
-            "schema": "AdventureWorks",
-            "owner": "Sales"
-        },
-        "JSON\\MSSQL\\Sales.json"
-    ],
-    [
-        {
-            "schema": "AdventureWorksDW",
-            "owner": "dbo"
-        },
-        "JSON\\MSSQL\\AdventureWorksDW.json"
-    ]
+  [{"schema": "Northwind","owner": "dbo"},"Northwind.json"]
+ ,[{"schema": "AdventureWorks","owner": "HumanResources"},"HumanResources.json"]
+ ,[{"schema": "AdventureWorks","owner": "Person"},"Person.json"]
+ ,[{"schema": "AdventureWorks","owner": "Production"},"Production.json"]
+ ,[{"schema": "AdventureWorks","owner": "Purchasing"},"Purchasing.json"]
+ ,[{"schema": "AdventureWorks","owner": "Sales"},"Sales.json"]
+ ,[{"schema": "AdventureWorksDW","owner": "dbo"},"AdventureWorksDW.json"]
 ]

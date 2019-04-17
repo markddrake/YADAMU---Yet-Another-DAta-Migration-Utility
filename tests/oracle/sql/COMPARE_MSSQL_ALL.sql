@@ -43,7 +43,7 @@ def SCHEMA = HumanResources
 --
 @@SCHEMA_COMPARE.sql
 --
-def SCHEMA = DW
+def SCHEMA = AdventureWorksDW
 --
 @@SCHEMA_COMPARE.sql
 -- 

@@ -1,24 +1,4 @@
 [
-    [
-        "JSON\\MySQL\\jsonExample.json",
-        {
-            "schema": "JTEST1"
-        },
-        "JSON\\MySQL\\jsonExample1.json",
-        {
-            "schema": "JTEST2"
-        },
-        "JSON\\MySQL\\jsonExample2.json"
-    ],
-    [
-        "JSON\\MySQL\\Sakila.json",
-        {
-            "schema": "Sakila1"
-        },
-        "JSON\\MySQL\\Sakila1.json",
-        {
-            "schema": "Sakila2"
-        },
-        "JSON\\MySQL\\Sakila2.json"
-    ]
+    ["JSON\\MySQL\\jsonExample.json",{"schema": "JTEST1"},"JSON\\MySQL\\jsonExample1.json",{"schema": "JTEST2"},"JSON\\MySQL\\jsonExample2.json"],
+    ["JSON\\MySQL\\Sakila.json",{"schema": "Sakila1"},"JSON\\MySQL\\Sakila1.json",{"schema": "Sakila2"},"JSON\\MySQL\\Sakila2.json"]
 ]

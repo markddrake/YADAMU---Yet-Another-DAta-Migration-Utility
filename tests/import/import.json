@@ -1,10 +1,9 @@
 [
     {
         "source": "file",
-        "targets": [
-            "mssql","postgres","mysql","mariadb"
-        ],
+        "targets": ["mssql","postgres","mysql","mariadb"],
         "directory" : "JSON\\oracle18c\\DATA_ONLY",
+        "reverseDirection" : true,
         "parameters": {
             "MODE": "DATA_ONLY"
         },
@@ -14,9 +13,9 @@
     },
     {
         "source": "file",
-        "targets": [
-            "oracle","postgres","mysql","mariadb"
-        ],
+        "targets": ["oracle18c","postgres","mysql","mariadb"],
+        "directory" : "JSON\\MsSQL",
+        "reverseDirection" : true,
         "parameters": {
             "MODE": "DATA_ONLY"
         },
@@ -26,12 +25,12 @@
     },    
     {
         "source": "file",
-        "targets": [
-            "mssql","oracle","postgres","mariadb"
-        ],
+        "targets": ["mssql","oracle18c","postgres","mariadb"],
         "parameters": {
             "MODE": "DATA_ONLY"
         },
+        "directory" : "JSON\\MySQL",
+        "reverseDirection" : true,
         "operations": [
             "tests\\export\\mysql.json"
         ]

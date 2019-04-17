@@ -35,8 +35,8 @@ drop user "HumanResources&ID" cascade
 /
 grant connect, resource, unlimited tablespace to "HumanResources&ID" identified by oracle
 /
-drop user "DW&ID" cascade
+drop user "AdventureWorksDW&ID" cascade
 /
-grant connect, resource, unlimited tablespace to "DW&ID" identified by oracle
+grant connect, resource, unlimited tablespace to "AdventureWorksDW&ID" identified by oracle
 /
 quit

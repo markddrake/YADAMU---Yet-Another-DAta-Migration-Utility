@@ -1,6 +1,6 @@
 [
     {
-        "source": "oracle",
+        "source": "oracle18c",
         "targets": [
             "file"
         ],
@@ -13,7 +13,7 @@
         ]
     },
     {
-        "source": "oracle",
+        "source": "oracle18c",
         "targets": [
             "file"
         ],
@@ -26,7 +26,7 @@
         ]
     },
     {
-        "source": "oracle",
+        "source": "oracle18c",
         "targets": [
             "file"
         ],
@@ -43,6 +43,7 @@
         "targets": [
             "file"
         ],
+        "directory": "JSON\\MsSQL",
         "parameters": {
             "MODE": "DATA_ONLY"
         },
@@ -51,10 +52,37 @@
         ]
     },
     {
+        "source": "file",
+        "targets": [
+            "mssql"
+        ],
+        "directory": "JSON\\MsSQL",
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\import\\createAdventureWorksAll.json"
+        ]
+    },
+    {
+        "source": "mssql",
+        "targets": [
+            "file"
+        ],
+        "directory": "JSON\\MsSQL",
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests\\export\\mssqlAdventureWorksAll.json"
+        ]
+    },
+    {
         "source": "mysql",
         "targets": [
             "file"
         ],
+        "directory": "JSON\\MySQL",
         "parameters": {
             "MODE": "DATA_ONLY"
         },
@@ -100,18 +128,5 @@
         "operations": [
             "tests\\export\\oracle.json"
         ]
-    },
-    {
-        "source": "file",
-        "targets": [
-            "mssql"
-        ],
-        "parameters": {
-            "MODE": "DATA_ONLY"
-        },
-        "operations": [
-            "tests\\export\\combine.json"
-        ]
-    },
-        
+    }
 ]

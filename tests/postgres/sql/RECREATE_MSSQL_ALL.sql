@@ -48,7 +48,7 @@ drop schema :"SCHEMA" cascade;
 --
 create schema :"SCHEMA";
 --
-select 'DW' || :ID "SCHEMA" \gset
+select 'AdventureWorksDW' || :ID "SCHEMA" \gset
 --
 \echo :SCHEMA
 --

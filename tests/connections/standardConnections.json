@@ -1,13 +1,13 @@
 {
-    "oracle" : {
+    "oracle18c" : {
       "user"           : "SYSTEM"
     , "password"       : "oracle"
-    , "connectString"  : "oracle18C"
+    , "connectString"  : "ORCL18c"
     },
     "oracle12c" : {
       "user"           : "SYSTEM"
     , "password"       : "oracle"
-    , "connectString"  : "oracle12C"
+    , "connectString"  : "ORCL12c"
     },
     "mssql" : {
       "user"           : "sa"

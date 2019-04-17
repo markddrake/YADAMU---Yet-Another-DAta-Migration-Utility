@@ -2,7 +2,7 @@
     {
         "source": "file",
         "targets": [
-            "oracle",
+            "oracle18c",
             "mssql",
             "postgres",
             "mysql",
@@ -22,7 +22,7 @@
     {
         "source": "file",
         "targets": [
-            "oracle",
+            "oracle18c",
             "mssql",
             "postgres",
             "mysql",

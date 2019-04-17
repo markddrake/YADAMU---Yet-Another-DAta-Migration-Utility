@@ -1,6 +1,6 @@
 {
-    "connections": "tests\\configurations\\standardConnections.json",
-    "mode"       : "ImportUsingExport",
+    "connections": "tests\\connections\\standardConnections.json",
+    "mode"       : "Import",
     "tests": [
         "tests\\import\\import.json"
     ]

@@ -1,8 +1,8 @@
 [
     {
-        "source": "oracle",
+        "source": "oracle18c",
         "targets": [
-            "oracle",
+            "oracle18c",
             "mssql",
             "postgres",
             "mysql",
@@ -22,7 +22,7 @@
     {
         "source": "mssql",
         "targets": [
-            "oracle",
+            "oracle18c",
             "mssql",
             "postgres",
             "mysql",
@@ -41,7 +41,7 @@
     {
         "source": "postgres",
         "targets": [
-            "oracle",
+            "oracle18c",
             "mssql",
             "postgres",
             "mysql",
@@ -60,7 +60,7 @@
     {
         "source": "mysql",
         "targets": [
-            "oracle",
+            "oracle18c",
             "mssql",
             "postgres",
             "mysql",
@@ -79,7 +79,7 @@
     {
         "source": "mariadb",
         "targets": [
-            "oracle",
+            "oracle18c",
             "mssql",
             "postgres",
             "mysql",
@@ -98,7 +98,7 @@
     {
         "source": "oracle12c",
         "targets": [
-            "oracle",
+            "oracle18c",
             "mssql",
             "postgres",
             "mysql",
