@@ -37,6 +37,10 @@ class FileWriter extends YadamuDBI {
 
   }
   
+  isDatabase() {
+    return false;
+  }
+  
   objectMode() {
      return false;
   }

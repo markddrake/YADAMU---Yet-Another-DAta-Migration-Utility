@@ -491,10 +491,8 @@ BEGIN
   select VENDOR, TABLE_NAME, COLUMN_LIST, DATA_TYPE_LIST, SIZE_CONSTRAINTS
     from JSON_TABLE(
            P_METADATA,
-           '$'
+           '$.metadata.*' 
            COLUMNS (
-             NESTED                                       PATH '$.metadata.*' 
-               COLUMNS (
                 VENDOR                       VARCHAR(32)  PATH '$.vendor',
                 OWNER                        VARCHAR(128) PATH '$.owner'
                ,TABLE_NAME                   VARCHAR(128) PATH '$.tableName'
@@ -504,7 +502,7 @@ BEGIN
                ,INSERT_SELECT_LIST                   TEXT PATH '$.insertSelectList'
                ,COLUMN_PATTERNS                      TEXT PATH '$.columnPatterns'
              )
-          )) c;
+          ) c;
 
   DECLARE CONTINUE HANDLER FOR NOT FOUND SET NO_MORE_ROWS = TRUE;
   DECLARE CONTINUE HANDLER FOR SQLEXCEPTION

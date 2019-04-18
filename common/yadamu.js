@@ -425,10 +425,19 @@ class Yadamu {
   }
 
   async pumpData(source,target) {
+      
+    if ((source.isDatabase() === true) && (this.parameters.OWNER === undefined)) {
+      throw new Error('Missing mandatory parameter OWNER');
+    }
+
+    if ((target.isDatabase() === true) && (this.parameters.TOUSER === undefined)) {
+      throw new Error('Missing mandatory parameter TOUSER');
+    }
+    
 
     let timings = {}
     const logWriter = this.logWriter;
-
+ 
     try {
       await source.initialize();
       await target.initialize();
