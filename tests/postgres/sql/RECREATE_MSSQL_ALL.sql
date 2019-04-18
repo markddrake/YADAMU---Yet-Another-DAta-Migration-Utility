@@ -1,5 +1,5 @@
 --
-select 'Northwind' || :ID "SCHEMA" \gset
+select 'Northwind' || :'ID' "SCHEMA" \gset
 --
 \echo :SCHEMA
 --
@@ -7,7 +7,7 @@ drop schema :"SCHEMA" cascade;
 --
 create schema :"SCHEMA";
 --
-select 'Sales' || :ID "SCHEMA" \gset
+select 'Sales' || :'ID' "SCHEMA" \gset
 --
 \echo :SCHEMA
 --
@@ -16,7 +16,7 @@ drop schema :"SCHEMA" cascade;
 --
 create schema :"SCHEMA";
 --
-select 'Person' || :ID "SCHEMA" \gset
+select 'Person' || :'ID' "SCHEMA" \gset
 --
 \echo :SCHEMA
 --
@@ -24,7 +24,7 @@ drop schema :"SCHEMA" cascade;
 --
 create schema :"SCHEMA";
 --
-select 'Production' || :ID "SCHEMA" \gset
+select 'Production' || :'ID' "SCHEMA" \gset
 --
 \echo :SCHEMA
 --
@@ -32,7 +32,7 @@ drop schema :"SCHEMA" cascade;
 --
 create schema :"SCHEMA";
 --
-select 'Purchasing' || :ID "SCHEMA" \gset
+select 'Purchasing' || :'ID' "SCHEMA" \gset
 --
 \echo :SCHEMA
 --
@@ -40,7 +40,7 @@ drop schema :"SCHEMA" cascade;
 --
 create schema :"SCHEMA";
 --
-select 'HumanResources' || :ID "SCHEMA" \gset
+select 'HumanResources' || :'ID' "SCHEMA" \gset
 --
 \echo :SCHEMA
 --
@@ -48,7 +48,7 @@ drop schema :"SCHEMA" cascade;
 --
 create schema :"SCHEMA";
 --
-select 'AdventureWorksDW' || :ID "SCHEMA" \gset
+select 'AdventureWorksDW' || :'ID' "SCHEMA" \gset
 --
 \echo :SCHEMA
 --

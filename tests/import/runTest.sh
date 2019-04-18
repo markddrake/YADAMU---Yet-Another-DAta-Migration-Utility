@@ -1,5 +1,5 @@
 # Run from YADAMU_HOME
-export YADAMU_HOME`pwd`
+export YADAMU_HOME=`pwd`
 export YADAMU_TEST_HOME=$YADAMU_HOME/tests
 export YADAMU_WORK_ID=import
 export YADAMU_WORK_ROOT=$YADAMU_HOME/work/$YADAMU_WORK_ID
