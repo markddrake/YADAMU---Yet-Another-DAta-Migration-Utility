@@ -50,17 +50,17 @@ class FileReader extends YadamuDBI {
 
   constructor(yadamu) {
     super(yadamu,defaultParameters)
-     
-    this.importFilePath = path.resolve(this.parameters.FILE);
-    this.inputStream = fs.createReadStream(this.importFilePath);
+    this.inputStream = undefined;
     this.parser = new FileParser(yadamu.getLogWriter());
   }
 
   async initialize() {
     super.initialize();
-    const stats = fs.statSync(this.importFilePath)
+    const importFilePath = path.resolve(this.parameters.FILE);
+    const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
-    this.logWriter.write(`${new Date().toISOString()}[FileReader()]: : Processing file "${this.importFilePath}". Size ${fileSizeInBytes} bytes.\n`)
+    this.inputStream = fs.createReadStream(importFilePath);
+    this.logWriter.write(`${new Date().toISOString()}[FileReader()]: : Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.\n`)
   }
   
   /*

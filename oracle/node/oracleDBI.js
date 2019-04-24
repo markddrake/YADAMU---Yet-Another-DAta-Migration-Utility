@@ -308,9 +308,10 @@ class OracleDBI extends YadamuDBI {
   get DATABASE_VENDOR() { return 'Oracle' };
   get SOFTWARE_VENDOR() { return 'Oracle Corporation' };
   get SPATIAL_FORMAT()  { return 'WKT' };
-  
+  get DEFAULT_PARAMETERS() { return defaultParameters }
+
   constructor(yadamu) {
-     super(yadamu,defaultParameters)
+    super(yadamu,defaultParameters);
   }
 
   getConnectionProperties() {
@@ -417,7 +418,7 @@ class OracleDBI extends YadamuDBI {
   **
   */
   
-  async processFile(mode,schema,hndl) {
+  async processFile(hndl) {
 
     let sqlStatement = "BEGIN" + "\n";
     switch (mode) {
@@ -484,6 +485,7 @@ class OracleDBI extends YadamuDBI {
   */
   
   async getDDLOperations(schema) {
+
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlFetchDDL}\n\/\n`)
     }

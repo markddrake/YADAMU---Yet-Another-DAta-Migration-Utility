@@ -24,14 +24,31 @@ const sqlFailed =
 
 class PostgresCompare extends PostgresDBI {
     
-    constructor(yadamu,logger) {
-       super(yadamu)
-       this.logger = logger;
+    constructor(yadamu) {
+       super(yadamu);
+       this.logger = undefined;
     }
     
-    updateSettings(dbParameters,dbConnection,role,target) {
+    configureTest(logger,connectionProperties,testParameters,schema) {
+      this.logger = logger;
+      super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
     }
-    
+
+    async recreateSchema(schema,password) {
+        
+      try {
+        const dropSchema = `drop schema if exists "${schema}" cascade`;
+        await this.pgClient.query(dropSchema);      
+      } catch (e) {
+        if (e.errorNum && (e.errorNum === 1918)) {
+        }
+        else {
+          throw e;
+        }
+      }
+      await this.createSchema(schema);    
+    }      
+
     async report(source,target,timings) {
 
       if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
@@ -139,20 +156,6 @@ class PostgresCompare extends PostgresDBI {
       },this)
     }
     
-    async recreateSchema(schema,password) {
-        
-      try {
-        const dropSchema = `drop schema if exists "${schema}" cascade`;
-        await this.pgClient.query(dropSchema);      
-      } catch (e) {
-        if (e.errorNum && (e.errorNum === 1918)) {
-        }
-        else {
-          throw e;
-        }
-      }
-      await this.createSchema(schema);    
-    }      
 }
 
 module.exports = PostgresCompare

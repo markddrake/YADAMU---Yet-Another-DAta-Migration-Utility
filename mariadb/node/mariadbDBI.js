@@ -18,6 +18,7 @@ const StatementGenerator = require('../../dbShared/mysql/statementGenerator57.js
 const defaultParameters = {
   BATCHSIZE         : 10000
 , COMMITSIZE        : 10000
+, TABLE_MATCHING    : "INSENSITIVE"
 }
 
 const sqlSystemInformation = 
@@ -159,7 +160,6 @@ class MariadbDBI extends YadamuDBI {
   }  
 
   async executeDDL(schema, ddl) {
-    // console.log(ddl);
     await this.createSchema(schema);
     await Promise.all(ddl.map(function(ddlStatement) {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
@@ -176,18 +176,12 @@ class MariadbDBI extends YadamuDBI {
   get DATABASE_VENDOR() { return 'MariaDB' };
   get SOFTWARE_VENDOR() { return ' MariaDB Corporation AB[' };
   get SPATIAL_FORMAT()  { return 'WKT' };
+  get DEFAULT_PARAMETERS() { return defaultParameters }
 
   constructor(yadamu) {
     super(yadamu,defaultParameters);
-     
     this.pool = undefined;
-
-    if (!this.parameters.TABLE_MATCHING) {
-      this.parameters.TABLE_MATCHING = 'INSENSITIVE';
-    }
-
   }
-
   
   getConnectionProperties() {
     return {

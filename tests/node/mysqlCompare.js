@@ -2,8 +2,6 @@
 const Yadamu = require('../../common/yadamu.js').Yadamu;
 const MySQLDBI = require('../../mysql/node/mysqlDBI.js');
 
-const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
-
 const sqlSuccess =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL' "RESULTS", TARGET_ROW_COUNT
   from SCHEMA_COMPARE_RESULTS 
@@ -22,20 +20,37 @@ const sqlFailed =
     or SQLERRM is NOT NULL
  order by TABLE_NAME`;
 
+const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
+
 class MySQLCompare extends MySQLDBI {
-    
-    constructor(yadamu,logger) {
+       
+    constructor(yadamu) {
        super(yadamu)
-       this.logger = logger;
+       this.logger = undefined;
     }
-    
-    updateSettings(dbParameters,dbConnection,role,target) {
-       dbParameters.TABLE_MATCHING = "INSENSITIVE"
+
+    configureTest(logger,connectionProperties,testParameters,schema) {
+      this.logger = logger;
+      super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
     }
-    
-    
-    async report(source,target,timings) {
-      
+
+    async recreateSchema(schema,password) {
+        
+      try {
+        const dropUser = `drop schema if exists "${schema}"`;
+        await this.executeSQL(dropUser,{});      
+      } catch (e) {
+        if (e.errorNum && (e.errorNum === 1918)) {
+        }
+        else {
+          throw e;
+        }
+      }
+      const createUser = `create schema "${schema}"`;
+      await this.executeSQL(createUser,{});      
+    }   
+
+    async report(source,target,timings) {     
              
       Object.keys(timings).forEach(function(tableName) {
         if (tableName !== tableName.toLowerCase()) {
@@ -77,6 +92,7 @@ class MySQLCompare extends MySQLDBI {
                           + ` ${row.TARGET_SCHEMA.padStart(colSizes[2])} |`)
         }                       
         else  {
+            
           this.logger.write(`|`
                           + ` ${''.padEnd(colSizes[0])} |`
                           + ` ${''.padStart(colSizes[1])} |`
@@ -139,22 +155,7 @@ class MySQLCompare extends MySQLDBI {
         }
       },this)
     }
-    
-    async recreateSchema(schema,password) {
-        
-      try {
-        const dropUser = `drop schema if exists "${schema}"`;
-        await this.executeSQL(dropUser,{});      
-      } catch (e) {
-        if (e.errorNum && (e.errorNum === 1918)) {
-        }
-        else {
-          throw e;
-        }
-      }
-      const createUser = `create schema "${schema}"`;
-      await this.executeSQL(createUser,{});      
-    }      
+   
 }
 
 module.exports = MySQLCompare

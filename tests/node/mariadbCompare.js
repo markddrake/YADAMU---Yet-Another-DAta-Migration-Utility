@@ -24,18 +24,17 @@ const sqlFailed =
 
 class MariadbCompare extends MariadbDBI {
     
-    constructor(yadamu,logger) {
+    constructor(yadamu) {
        super(yadamu)
-       this.logger = logger;
+       this.logger = undefined;
     }
-    
-    updateSettings(dbParameters,dbConnection,role,target) {
-       dbParameters.TABLE_MATCHING = "INSENSITIVE"
+
+    configureTest(logger,connectionProperties,testParameters,schema) {
+      this.logger = logger;
+      super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
     }
-    
     
     async report(source,target,timings) {
-      
              
       Object.keys(timings).forEach(function(tableName) {
         if (tableName !== tableName.toLowerCase()) {

@@ -17,6 +17,7 @@ const StatementGenerator57 = require('../../dbShared/mysql/statementGenerator57.
 const defaultParameters = {
   BATCHSIZE         : 10000
 , COMMITSIZE        : 10000
+, TABLE_MATCHING    : "INSENSITIVE"
 }
 
 const sqlSystemInformation = 
@@ -250,13 +251,10 @@ class MySQLDBI extends YadamuDBI {
   get DATABASE_VENDOR() { return 'MySQL' };
   get SOFTWARE_VENDOR() { return 'Oracle Corporation (MySQL)' };
   get SPATIAL_FORMAT()  { return 'WKT' };
+  get DEFAULT_PARAMETERS() { return defaultParameters }
 
   constructor(yadamu) {
     super(yadamu,defaultParameters)
-    
-    if (!this.parameters.TABLE_MATCHING) {
-      this.parameters.TABLE_MATCHING = 'INSENSITIVE';
-    }
   }
 
   getConnectionProperties() {
@@ -359,9 +357,9 @@ class MySQLDBI extends YadamuDBI {
   **
   */
 
-  async processFile(mode,schema,hndl) {
+  async processFile(hndl) {
     const sqlStatement = `SET @RESULTS = ''; CALL IMPORT_JSON(?,@RESULTS); SELECT @RESULTS "logRecords";`;					   
-	let results = await  this.executeSQL(sqlStatement,schema);
+	let results = await  this.executeSQL(sqlStatement,this.parameters.TOUSER);
     results = results.pop();
 	return JSON.parse(results[0].logRecords)
   }
@@ -416,7 +414,6 @@ class MySQLDBI extends YadamuDBI {
   ** Information schema is corrupt.
   ** 
   */   
-   
     const results = await this.executeSQL(sqlCheckInformationSchemaState,[schema]);
     if (results.length ===  0) {
       return sqlSchemaInfo + sqlInformationSchemaClean;
@@ -433,7 +430,7 @@ class MySQLDBI extends YadamuDBI {
     return undefined
   }
     
-  async getSchemaInfo(schema,status) {
+  async getSchemaInfo(schema) {
       
     const tableInfo = await this.generateTableInfoQuery(schema);
     return await this.executeSQL(tableInfo,[schema]);
@@ -489,10 +486,10 @@ class MySQLDBI extends YadamuDBI {
     const sqlVersion = `SELECT @@version`
     const results = await this.executeSQL(sqlVersion);
     if (results[0]['@@version'] > '6.0') {
-       statementGenerator = new StatementGenerator80(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
+      statementGenerator = new StatementGenerator80(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
     }
     else {
-       statementGenerator = new StatementGenerator57(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
+      statementGenerator = new StatementGenerator57(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
     }
   
     // Uncomment the folloing statement Force 5.7 Code Path

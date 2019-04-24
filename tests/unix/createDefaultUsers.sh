@@ -1,9 +1,13 @@
-sh $YADAMU_HOME/tests/oracle/env/dbConnection.sh
+source $YADAMU_HOME/tests/oracle18c/env/dbConnection.sh
+sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_HOME/tests/oracle/sql/RECREATE_MSSQL_ALL.sql $YADAMU_LOG_PATH ""
+sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_HOME/tests/oracle/sql/RECREATE_SCHEMA.sql $YADAMU_LOG_PATH JTEST
+sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_HOME/tests/oracle/sql/RECREATE_SCHEMA.sql $YADAMU_LOG_PATH SAKILA
+source $YADAMU_HOME/tests/oracle12c/env/dbConnection.sh
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_HOME/tests/oracle/sql/RECREATE_MSSQL_ALL.sql $YADAMU_LOG_PATH ""
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_HOME/tests/oracle/sql/RECREATE_SCHEMA.sql $YADAMU_LOG_PATH JTEST
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_HOME/tests/oracle/sql/RECREATE_SCHEMA.sql $YADAMU_LOG_PATH SAKILA
 source $YADAMU_HOME/tests/mssql/env/dbConnection.sh
-echo ":setvar ID=\"\"" > setvars.sql
+echo ":setvar ID ''" > setvars.sql
 export SQLCMDINI=setvars.sql
 sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -d$DB_DBNAME -I -e -i$YADAMU_HOME/tests/mssql/sql/RECREATE_ORACLE_ALL.sql >$YADAMU_LOG_PATH/MSSQL_RECREATE_SCHEMA.log
 export MSSQL_SCHEMA=JTEST

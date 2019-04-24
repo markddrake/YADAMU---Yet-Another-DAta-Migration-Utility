@@ -113,7 +113,7 @@ class DBInterface extends YadamuDBI {
   **
   */
 
-  async processFile(mode,schema,hndl) {
+  async processFile(hndl) {
   }
   
   /*

@@ -40,7 +40,7 @@ BEGIN
                         then 'datetimeoffset'
                       else 
                        'datetime2' 
-               end
+               END
              when @DATA_TYPE = 'XMLTYPE'
                then 'xml'
              when @DATA_TYPE like '"%"."%"'
@@ -49,7 +49,7 @@ BEGIN
                then 'json'
              else
                lower(@DATA_TYPE)
-           end
+           END
     when @VENDOR in ('MySQL','MariaDB')   
       then case 
              when @DATA_TYPE = 'mediumint' 
@@ -82,7 +82,7 @@ BEGIN
                'varbinary(max)'
              else
                lower(@DATA_TYPE)
-           end
+           END
     when @VENDOR in ('Postgres')   
       then case 
              when @DATA_TYPE = 'character varying' then
@@ -113,11 +113,11 @@ BEGIN
                'int'
              else
                lower(@DATA_TYPE)
-           end          
+           END          
     else 
       lower(@DATA_TYPE)
-  end
-end
+  END
+END
 --
 GO
 --
@@ -147,14 +147,14 @@ BEGIN
                           LEFT(s."VALUE",CHARINDEX(',',s."VALUE")-1)
                         else
                           s."VALUE"
-                      end 
+                      END 
                       AS BIGINT) "DATA_TYPE_LENGTH"
                 ,case
                    when CHARINDEX(',',s."VALUE") > 0  then 
                      RIGHT(s."VALUE", CHARINDEX(',',REVERSE(s."VALUE"))-1)
                    else 
                      NULL
-                 end "DATA_TYPE_SCALE"
+                 END "DATA_TYPE_SCALE"
             FROM OPENJSON(CONCAT('[',@COLUMN_LIST,']')) c,
                  OPENJSON(@DATA_TYPE_LIST) t,
                  OPENJSON(@DATA_SIZE_LIST) s
@@ -181,10 +181,10 @@ BEGIN
                                    CONCAT("TARGET_DATA_TYPE",'(max)')
                                  else 
                                    CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
-                               end
+                               END
                              else 
                                "TARGET_DATA_TYPE"
-                           end
+                           END
                          ) 
                    ,','                 
                    )
@@ -205,10 +205,10 @@ BEGIN
                                           CONCAT("TARGET_DATA_TYPE",'(max)')
                                         else 
                                           CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
-                                      end
+                                      END
                                     else 
                                       "TARGET_DATA_TYPE"
-                                  end,
+                                  END,
                                   '"'
                                  )
                            ,','                 
@@ -227,14 +227,14 @@ BEGIN
                             CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(max),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
                           else 
                             CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",'),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
-                        end
+                        END
                       when "TARGET_DATA_TYPE" = 'geometry' then
                         CONCAT('GEOMETRY::STGeomFromText(data."',"COLUMN_NAME",'",0) "',"COLUMN_NAME",'"')
                       when "TARGET_DATA_TYPE" = 'geography' then
                         CONCAT('GEOGRAPHY::STGeomFromText(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
                       else
                         CONCAT('data."',"COLUMN_NAME",'"')
-                    end 
+                    END 
                    ,','                 
                    )
        ,@WITH_CLAUSE =
@@ -266,7 +266,7 @@ BEGIN
                                   'varchar(max)'
                                 else 
                                   CONCAT('varchar(',cast(("DATA_TYPE_LENGTH" * 2) as VARCHAR),')')
-                              end
+                              END
                             when "DATA_TYPE_SCALE" IS NOT NULL then
                               CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
                             when "DATA_TYPE_LENGTH" IS NOT NULL  then
@@ -275,10 +275,10 @@ BEGIN
                                   CONCAT("TARGET_DATA_TYPE",'(max)')
                                 else 
                                   CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
-                              end
+                              END
                             else 
                               "TARGET_DATA_TYPE"
-                          end,
+                          END,
                           ' ''$[',"INDEX",']'''
                         )
                         ,','                    
@@ -288,7 +288,7 @@ BEGIN
    SET @DDL_STATEMENT = CONCAT('if object_id(''"',@SCHEMA,'"."',@TABLE_NAME,'"'',''U'') is NULL create table "',@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMNS_CLAUSE,')');   
    SET @DML_STATEMENT = CONCAT('insert into "' ,@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMN_LIST,') select ',@INSERT_SELECT_LIST,'  from "#JSON_STAGING" s cross apply OPENJSON("DATA",''$.data."',@TABLE_NAME,'"'') with ( ',@WITH_CLAUSE,') data');
    RETURN JSON_MODIFY(JSON_MODIFY(JSON_MODIFY('{}','$.ddl',@DDL_STATEMENT),'$.dml',@DML_STATEMENT),'$.targetDataTypes',JSON_QUERY(@TARGET_DATA_TYPES))
-end;
+END;
 --
 GO
 --
@@ -332,6 +332,26 @@ BEGIN
 			          ,INSERT_SELECT_LIST           NVARCHAR(MAX)  '$.insertSelectList'
                       ,COLUMN_PATTERNS              NVARCHAR(MAX)  '$.columnPatterns'
                      ) v;
+
+
+  SET @SQL_STATEMENT = CONCAT('if not exists (select 1 from sys.schemas where name = N''',@TARGET_DATABASE,''') exec(''create schema "',@TARGET_DATABASE,'"'')')
+  BEGIN TRY 
+    EXEC(@SQL_STATEMENT)
+    SET @LOG_ENTRY = (
+      select @TARGET_DATABASE as [ddl.tableName], @SQL_STATEMENT as [ddl.sqlStatement] 
+        for JSON PATH, INCLUDE_NULL_VALUES
+    )
+    SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
+  END TRY
+  BEGIN CATCH  
+    SET @LOG_ENTRY = (
+      select 'FATAL' as 'error.severity', @TARGET_DATABASE as [error.tableName], @SQL_STATEMENT as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as [error.msg], CONCAT(ERROR_PROCEDURE(),'. Line: ', ERROR_LINE(),'. State',ERROR_STATE(),'. Severity:',ERROR_SEVERITY(),'.') as [error.details]
+        for JSON PATH, INCLUDE_NULL_VALUES
+    )
+    SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
+  END CATCH
+      
+
   
   SET QUOTED_IDENTIFIER ON; 
   BEGIN TRY
@@ -349,14 +369,14 @@ BEGIN
              for JSON PATH, INCLUDE_NULL_VALUES
         )
         SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-      end TRY
+      END TRY
       BEGIN CATCH  
         SET @LOG_ENTRY = (
           select 'FATAL' as 'error.severity', @TABLE_NAME as [error.tableName], @SQL_STATEMENT as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as [error.msg], CONCAT(ERROR_PROCEDURE(),'. Line: ', ERROR_LINE(),'. State',ERROR_STATE(),'. Severity:',ERROR_SEVERITY(),'.') as [error.details]
              for JSON PATH, INCLUDE_NULL_VALUES
         )
         SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-      end CATCH
+      END CATCH
       
       BEGIN TRY 
         SET @START_TIME = SYSUTCDATETIME();
@@ -370,32 +390,32 @@ BEGIN
              for JSON PATH, INCLUDE_NULL_VALUES
           )
         SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-      end TRY  
+      END TRY  
       BEGIN CATCH  
         SET @LOG_ENTRY = (
           select 'FATAL' as 'error.severity', @TABLE_NAME as [error.tableName],@SQL_STATEMENT  as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as [error.msg], CONCAT(ERROR_PROCEDURE(),'. Line: ', ERROR_LINE(),'. Severity:',ERROR_SEVERITY(),'.') as [error.details]
              for JSON PATH, INCLUDE_NULL_VALUES
         )
         SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-      end CATCH
+      END CATCH
 
       FETCH FETCH_METADATA INTO @TABLE_NAME, @STATEMENTS
-    end;
+    END;
    
     CLOSE FETCH_METADATA;
     DEALLOCATE FETCH_METADATA;
    
-  end TRY 
+  END TRY 
   BEGIN CATCH
     SET @LOG_ENTRY = (
       select 'FATAL' as 'error.severity', ERROR_PROCEDURE() as [error.tableName], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as [error.msg], CONCAT(ERROR_PROCEDURE(),'. Line: ', ERROR_LINE(),'. Severity:',ERROR_SEVERITY(),'.') as [error.details]
         for JSON PATH, INCLUDE_NULL_VALUES
     )
     SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-  end CATCH
+  END CATCH
 --
   SELECT @RESULTS;
-end
+END
 --
 GO
 --
@@ -441,13 +461,13 @@ BEGIN
   BEGIN 
     SET @RESULTS = JSON_MODIFY(@RESULTS,concat('lax $."',@TABLE_NAME,'"'),@STATEMENTS)
     FETCH FETCH_METADATA INTO @TABLE_NAME, @STATEMENTS
-  end;
+  END;
    
   CLOSE FETCH_METADATA;
   DEALLOCATE FETCH_METADATA;
     
   RETURN @RESULTS;
-end
+END
 --
 GO
 --
@@ -479,7 +499,7 @@ BEGIN
                         concat('HASHBYTES(''SHA2_256'',CAST("',c.column_name,'" as VARBINARY(MAX))) "',c.column_name,'"')
                       else  
                         concat('"',c.column_name,'"')
-                      end
+                      END
                    ,',') 
          within group (order by ordinal_position) "columns"
    from information_schema.columns c, information_schema.tables t
@@ -593,7 +613,7 @@ BEGIN
      order by TABLE_NAME;
   END
 --
-end
+END
 --
 GO
 --

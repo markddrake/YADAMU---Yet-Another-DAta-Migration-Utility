@@ -19,14 +19,38 @@ const DBParser = require('./dbParser.js');
 
 class YadamuDBI {
     
-  get DATABASE_VENDOR() { return undefined };
-  get SOFTWARE_VENDOR() { return undefined };
-  get SPATIAL_FORMAT()  { return undefined };
+  get DATABASE_VENDOR()    { return undefined };
+  get SOFTWARE_VENDOR()    { return undefined };
+  get SPATIAL_FORMAT()     { return undefined };
+  get DEFAULT_PARAMETERS() { return {} }
   
+  updateParameters(parameters,additionalParameters) {
+    Object.keys(additionalParameters).forEach(function(key) {
+      parameters[key] = additionalParameters[key]
+    },this)
+    return parameters
+  }
+
+  mergeParameters(parameters,additionalParameters) {
+    Object.keys(additionalParameters).forEach(function(key) {
+      if (!parameters.hasOwnProperty(key)) {
+        parameters[key] = additionalParameters[key]
+      }
+    },this)
+    return parameters
+  }
+
+  configureTest(connectionProperties,testParameters,defaultParameters,) {
+    this.connectionProperties = connectionProperties
+    this.parameters = this.yadamu.getParameters()
+    this.parameters = this.updateParameters(this.parameters,testParameters);
+    this.parameters = this.mergeParameters(this.parameters,defaultParameters);
+  }
+
   setConnectionProperties(connectionProperties) {
     this.connectionProperties = connectionProperties
   }
-
+  
   getConnectionProperties() {
     this.connectionProperties = {}
   }
@@ -66,8 +90,12 @@ class YadamuDBI {
   }
     
   constructor(yadamu,defaultParameters) {
+    
+    // In production mode the Databae default parameters are merged with the command Line Parameters loaded by YADAMU.
+        
     this.yadamu = yadamu;
-    this.parameters = yadamu.mergeParameters(defaultParameters);
+    this.parameters = yadamu.getParameters()
+    this.parameters = this.mergeParameters(this.parameters,defaultParameters);
     this.status = yadamu.getStatus()
     this.logWriter = yadamu.getLogWriter();
     
@@ -161,7 +189,7 @@ class YadamuDBI {
   **
   */
 
-  async processFile(mode,schema,hndl) {
+  async processFile(hndl) {
     throw new Error('Unimplemented Method')
   }
   

@@ -22,18 +22,13 @@ class YadamuTester {
 
   constructor() {
   
-    // super()
-    this.yadamu        =  new Yadamu('YADAMU Tester'); 
+    this.yadamu        = new Yadamu('YADAMU Tester'); 
     this.config        = require(path.resolve(this.yadamu.getParameters().CONFIG))
     this.connections   = require(path.resolve(this.config.connections))
     this.parsingMethod = CLARINET;
-    
-    
+       
     // Expand environemnt variables in path using regex.
     this.ros = this.config.outputFile ? fs.createWriteStream(path.resolve(this.config.outputFile.replace(/%([^%]+)%/g, (_,n) => process.env[n]))) : this.yadamu.getLogWriter();
-    this.fc = new FileCompare(this.yadamu,this.ros);
-    
-    
   }
     
   getDatabaseInterface(db) {
@@ -44,22 +39,22 @@ class YadamuTester {
       case "oracle18" :
       case "oracle12c" :
       case "oracleXE" :          
-        dbi = new OracleCompare(this.yadamu,this.ros)
+        dbi = new OracleCompare(this.yadamu)
         break;
       case "postgres" :
-        dbi = new PostgresCompare(this.yadamu,this.ros)
+        dbi = new PostgresCompare(this.yadamu)
         break;
       case "mssql" :
-        dbi = new MsSQLCompare(this.yadamu,this.ros)
+        dbi = new MsSQLCompare(this.yadamu)
         break;
       case "mysql" :
-        dbi = new MySQLCompare(this.yadamu,this.ros)
+        dbi = new MySQLCompare(this.yadamu)
         break;
       case "mariadb" :
-        dbi = new MariadbCompare(this.yadamu,this.ros)
+        dbi = new MariadbCompare(this.yadamu)
         break;
       case "file" :
-        dbi = new FileCompare(this.yadamu,this.ros)
+        dbi = new FileCompare(this.yadamu)
         break;
       default:   
         console.log('Invalid Database: ',db);  
@@ -67,109 +62,130 @@ class YadamuTester {
       return dbi;
   }
   
-  configureDatabaseInterface(db,role,target,connection) {
+  getTestInterface(db,role,schema,testParameters,testConnection) {
 
+    const parameters = testParameters ? Object.assign({},testParameters) : {}
+    const connection = Object.assign({},testConnection)
+
+    this.yadamu.reset();
     const dbi = this.getDatabaseInterface(db)
     
-    const schema = db === "mssql" ? target.schema : target
-    const dbParameters = {[role]:schema}
-  
-    const dbConnection = Object.assign({},connection )
-    dbi.updateSettings(dbParameters,dbConnection,role,target)
-    this.yadamu.overwriteParameters(dbParameters);
-    dbi.setConnectionProperties(dbConnection);
+    parameters[role] = (db === "mssql" ? schema.owner : schema)
+    dbi.configureTest(this.ros,connection,parameters,schema)
     return dbi;    
   }
   
-  async recreateSchema(db,schema,connection) {
+  async recreateSchema(db,connection,schema) {
 
+     this.yadamu.reset();
      const dbi = this.getDatabaseInterface(db);
-     dbi.setConnectionProperties(connection);
+     dbi.setConnectionProperties(connection)
      await dbi.initialize();
      await dbi.recreateSchema(schema,connection.PASSWORD);
      await dbi.finalize();
   
   }
-  
-  async compareSchemas(dbi,source,target,timings) {
+    
+  async doImport(dbi,file) {
+     
+    switch (this.parsingMethod)  {
+      case CLARINET :
+        return this.yadamu.testImport(dbi,file);
+      case RDBMS :
+        return this.yadamu.doServerImport(dbi);
+      default:
+        return this.yadamu.testImport(dbi,file);
+    }
+    
+  }
+       
+  getDatabaseSchema(db,schema) {
       
+    switch (db) {
+      case "mssql":
+        if (schema.owner === undefined) {
+          schema.owner = "dbo"
+        }
+        return schema;
+      default:
+        if ((schema.owner !== undefined) && (schema.owner !== 'dbo')) {
+          return schema.owner;
+        }
+        return schema.schema;
+    }
+  } 
+
+  async compareSchemas(dbi,source,target,timings) {
+
+     this.yadamu.reset();      
      await dbi.initialize();
      await dbi.report(source,target,timings);
      await dbi.finalize();
      
   }
-  
-  async doImport(dbi,file) {
-     
-    switch (this.parsingMethod)  {
-      case CLARINET :
-        return this.yadamu.doImport(dbi);
-      case RDBMS :
-        return this.yadamu.doServerImport(dbi,file);
-      default:
-        return this.yadamu.doImport(dbi);
-    }
-    
-  }
+
+  async fileRoundtrip(db,parameters,sourceFile,targetSchema1,targetFile1,targetSchema2,targetFile2) {
       
-  async fileRoundtrip(target,parameters,sourceFile,db1,targetFile1,db2,targetFile2) {
-      
-      let dbi
-      let dbUser
-      
-      const testRoot = path.join('work',target);
-      
-      const timings = []
       const source = 'file';
-      const testParameters = parameters ? parameters : {}
+      const timings = []
+      const testRoot = path.join('work',db);
 
-      this.yadamu.overwriteParameters(testParameters);    
-      
-      this.yadamu.getStatus().warningRaised = false;
-      this.yadamu.getStatus().errorRaised = false;
-      this.yadamu.getStatus().startTime = new Date().getTime()
+      let dbi
+      let dbSchema
+        
+      dbSchema = this.getDatabaseSchema(db,targetSchema1)     
+      await this.recreateSchema(db,this.connections[db],dbSchema);     
 
-      this.yadamu.parameters.FILE = sourceFile
-      dbUser = this.getDatabaseUser(target,db1)     
-      dbi = this.configureDatabaseInterface(target,'TOUSER',dbUser,this.connections[target]);     
-      await this.recreateSchema(target,dbUser,this.connections[target]);
+      let testParameters = parameters ? Object.assign({},parameters) : {}
+      dbi = this.getTestInterface(db,'TOUSER',dbSchema,testParameters,this.connections[db]);     
       
       let startTime = new Date().getTime();
       timings[0] = await this.doImport(dbi,sourceFile);
       let elapsedTime = new Date().getTime() - startTime;
-      let targetDescription = target === 'mssql' ? `${dbUser.schema}"."${dbUser.owner}` : dbUser      
-      this.printResults(`"${source}"://"${sourceFile}"`,`"${target}"://"${targetDescription}"`,elapsedTime)
 
-      this.yadamu.parameters.FILE = path.join(testRoot,targetFile1)
-      dbi = this.configureDatabaseInterface(target,'OWNER',dbUser,this.connections[target]);     
+      let targetDescription = db === 'mssql' ? `${dbSchema.schema}"."${dbSchema.owner}` : dbSchema      
+      this.printResults(`"${source}"://"${sourceFile}"`,`"${db}"://"${targetDescription}"`,elapsedTime)
+
+      testParameters = parameters ? Object.assign({},parameters) : {}
+      dbi = this.getTestInterface(db,'OWNER',dbSchema,testParameters,this.connections[db]);     
+
       startTime = new Date().getTime()
-      timings[1] = await this.yadamu.doExport(dbi);
+      timings[1] = await this.yadamu.testExport(dbi,path.join(testRoot,targetFile1));
       elapsedTime = new Date().getTime() - startTime;
 
       let sourceDescription = targetDescription;
-      this.printResults(`"${target}"://"${sourceDescription}"`,`"${source}"://"${targetFile1}"`,elapsedTime)
+      this.printResults(`"${db}"://"${sourceDescription}"`,`"${source}"://"${targetFile1}"`,elapsedTime)
 
-      dbUser = this.getDatabaseUser(target,db2)     
-      dbi = this.configureDatabaseInterface(target,'TOUSER',dbUser,this.connections[target]);     
-      await this.recreateSchema(target,dbUser,this.connections[target]);
+      testParameters = parameters ? Object.assign({},parameters) : {}
+      dbSchema = this.getDatabaseSchema(db,targetSchema2)     
+      await this.recreateSchema(db,this.connections[db],dbSchema);     
+
+      testParameters = parameters ? Object.assign({},parameters) : {}
+      dbi = this.getTestInterface(db,'TOUSER',dbSchema,testParameters,this.connections[db]);     
+
 
       startTime = new Date().getTime();
       timings[2] = await this.doImport(dbi,path.join(testRoot,targetFile1));
       elapsedTime = new Date().getTime() - startTime;
-      targetDescription = target === 'mssql' ? `${dbUser.schema}"."${dbUser.owner}` : dbUser      
-      this.printResults(`"${source}"://"${targetFile1}"`,`"${target}"://"${targetDescription}"`,elapsedTime)
-
-      this.yadamu.parameters.FILE = path.join(testRoot,targetFile2)
-      dbi = this.configureDatabaseInterface(target,'OWNER',dbUser,this.connections[target]);     
-      startTime = new Date().getTime()
-      timings[3] = await this.yadamu.doExport(dbi);
-      elapsedTime = new Date().getTime() - startTime;
-       
-      sourceDescription = targetDescription;
-      this.printResults(`"${target}"://"${sourceDescription}"`,`"${source}"://"${targetFile2}"`,elapsedTime)
       
-      await this.compareSchemas(dbi,db1,db2,timings[2]);
-      await this.fc.report(sourceFile, path.join(testRoot,targetFile1), path.join(testRoot,targetFile2),timings);    
+      targetDescription = db === 'mssql' ? `${dbSchema.schema}"."${dbSchema.owner}` : dbSchema      
+      this.printResults(`"${source}"://"${targetFile1}"`,`"${db}"://"${targetDescription}"`,elapsedTime)
+
+      testParameters = parameters ? Object.assign({},parameters) : {}
+      dbi = this.getTestInterface(db,'OWNER',dbSchema,testParameters,this.connections[db]);     
+
+      startTime = new Date().getTime()
+      timings[3] = await this.yadamu.testExport(dbi,path.join(testRoot,targetFile2));
+      elapsedTime = new Date().getTime() - startTime;
+ 
+      sourceDescription = targetDescription;
+      this.printResults(`"${db}"://"${sourceDescription}"`,`"${source}"://"${targetFile2}"`,elapsedTime)
+      
+      await this.compareSchemas(dbi,targetSchema1,targetSchema2,timings[2]);
+      
+      const fc = new FileCompare(this.yadamu,this.ros);
+      fc.configureTest(this.ros,{},(dbi.parameters.TABLE_MATCHING ? {TABLE_MATCHING : dbi.parameters.TABLE_MATCHING} : {}))
+      await fc.report(sourceFile, path.join(testRoot,targetFile1), path.join(testRoot,targetFile2),timings);    
   }
 
   async databaseRoundtrip(source,target,clone,parameters,steps) {
@@ -212,10 +228,10 @@ class YadamuTester {
       if ((clone === true) && (source !== target)) {
         const parameters = { "MODE" : "DDL_ONLY" }
         this.yadamu.overwriteParameters(parameters);
-        owner  = this.getDatabaseUser(source,steps[0])  
-        toUser = this.getDatabaseUser(source,steps[2])  
-        sourceDB = this.configureDatabaseInterface(source,'OWNER',owner,this.connections[source]);
-        targetDB = this.configureDatabaseInterface(source,'TOUSER',toUser,this.connections[source]);
+        owner  = this.getDatabaseSchema(source,steps[0])  
+        toUser = this.getDatabaseSchema(source,steps[2])  
+        sourceDB = this.getTestInterface(source,'OWNER',owner,this.connections[source]);
+        targetDB = this.getTestInterface(source,'TOUSER',toUser,this.connections[source]);
         timings = await this.yadamu.pumpData(sourceDB,targetDB);
       }
 
@@ -225,13 +241,13 @@ class YadamuTester {
       } 
       this.yadamu.overwriteParameters(tcParameters);
       
-      const sourceSchema = this.getDatabaseUser(source,steps[0])  
-      let targetSchema = this.getDatabaseUser(target,steps[1])  
-      await this.recreateSchema(target,targetSchema,this.connections[target]);
+      const sourceSchema = this.getDatabaseSchema(source,steps[0])  
+      let targetSchema = this.getDatabaseSchema(target,steps[1])  
+      await this.recreateSchema(target,this.connections[target],targetSchema);
       sourceDescription = source === 'mssql' ? `${sourceSchema.schema}"."${sourceSchema.owner}` : sourceSchema
       targetDescription = target === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
-      sourceDB = this.configureDatabaseInterface(source,'OWNER',sourceSchema,this.connections[source]);
-      targetDB = this.configureDatabaseInterface(target,'TOUSER',targetSchema,this.connections[target]);
+      sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,this.connections[source]);
+      targetDB = this.getTestInterface(target,'TOUSER',targetSchema,this.connections[target]);
       startTime = new Date().getTime();
       timings = await this.yadamu.pumpData(sourceDB,targetDB);
       elapsedTime = new Date().getTime() - startTime
@@ -244,19 +260,19 @@ class YadamuTester {
         } 
         this.yadamu.overwriteParameters(tcParameters);
         owner  = toUser  
-        targetSchema = this.getDatabaseUser(source,steps[2])  
-        await this.recreateSchema(source,targetSchema,this.connections[source]);
+        targetSchema = this.getDatabaseSchema(source,steps[2])  
+        await this.recreateSchema(source,this.connections[source],targetSchema);
         sourceDescription = target === 'mssql' ? `${owner.schema}"."${owner.owner}` : owner
         targetDescription = source === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
-        sourceDB = this.configureDatabaseInterface(target,'OWNER',owner,this.connections[target]);
-        targetDB = this.configureDatabaseInterface(source,'TOUSER',targetSchema,this.connections[source]);
+        sourceDB = this.getTestInterface(target,'OWNER',owner,this.connections[target]);
+        targetDB = this.getTestInterface(source,'TOUSER',targetSchema,this.connections[source]);
         startTime = new Date().getTime();
         timings = await this.yadamu.pumpData(sourceDB,targetDB);
         elapsedTime = new Date().getTime() - startTime
         this.printResults(`"${target}"://"${sourceDescription}"`,`"${source}"://"${targetDescription}"`,elapsedTime)
       }
        
-      sourceDB = this.configureDatabaseInterface(source,'OWNER',sourceSchema,this.connections[source]);
+      sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,this.connections[source]);
       await this.compareSchemas(sourceDB, sourceSchema, targetSchema, timings);
       
   }
@@ -292,21 +308,7 @@ class YadamuTester {
     }
   
   }
-    
-  getDatabaseUser(db,user) {
-    switch (db) {
-      case "mssql":
-        if (user.owner === undefined) {
-          user.owner = "dbo"
-        }
-        return user;
-      default:
-        if ((user.owner !== undefined) && (user.owner !== 'dbo')) {
-          return user.owner;
-        }
-        return user.schema;
-    }
-  } 
+
 
   async copyContent(source,target,parameters,directory,sourceInfo,targetInfo) {
  
@@ -321,39 +323,35 @@ class YadamuTester {
       let elapsedTime
   
       const timings = []
-      
-      this.yadamu.getStatus().warningRaised = false;
-      this.yadamu.getStatus().errorRaised = false;
-      this.yadamu.getStatus().startTime = new Date().getTime()     
 
+      this.yadamu.reset();      
       const testParameters = parameters ? parameters : {}
       
       if (source === 'file') {
         const file = directory ? path.join(directory,sourceInfo) : sourceInfo
-        testParameters.FILE = file
         sourceDescription = file;
-        this.yadamu.overwriteParameters(testParameters);
         sourceDB = new FileReader(this.yadamu);
+        sourceDB.configureTest({},{FILE : file},this.DEFAULT_PARAMETERS);
       }
       else {
-        const owner = this.getDatabaseUser(source,sourceInfo)
-        sourceDescription = source === 'mssql' ? `${owner.schema}"."${owner.owner}` : owner
-        sourceDB = this.configureDatabaseInterface(source,'OWNER',owner,this.connections[source]);
+        const dbSchema = this.getDatabaseSchema(source,sourceInfo)
+        sourceDescription = source === 'mssql' ? `${dbSchema.schema}"."${dbSchema.owner}` : dbSchema
+        sourceDB = this.getTestInterface(source,'OWNER',dbSchema,testParameters,this.connections[source]);
       }
 
-      const owner = this.getDatabaseUser(target,targetInfo)
+      const dbSchema = this.getDatabaseSchema(target,targetInfo)
 
       if (target === 'file') {
         const file = directory ? path.join(directory,targetInfo) : targetInfo
-        testParameters.FILE = file
         targetDescription = file;
+        testParameters.FILE = file
       }
       else {
-        targetDescription = target === 'mssql' ? `${owner.schema}"."${owner.owner}` : owner
+        targetDescription = target === 'mssql' ? `${dbSchema.schema}"."${dbSchema.owner}` : dbSchema
       }
       
-      targetDB = this.configureDatabaseInterface(target,'TOUSER',owner,this.connections[target]);
-      this.yadamu.overwriteParameters(testParameters);
+      targetDB = this.getTestInterface(target,'TOUSER',dbSchema,testParameters,this.connections[target]);
+      
       
       startTime = new Date().getTime()
       timings[0] = await this.yadamu.pumpData(sourceDB,targetDB);

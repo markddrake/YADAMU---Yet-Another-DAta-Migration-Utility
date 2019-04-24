@@ -24,14 +24,32 @@ const sqlFailed =
 
 class OracleCompare extends OracleDBI {
     
-    constructor(yadamu,logger) {
+    constructor(yadamu) {
        super(yadamu)
-       this.logger = logger;
+       this.logger = undefined;
     }
     
-    updateSettings(dbParameters,dbConnection,role,target) {
+    configureTest(logger,connectionProperties,testParameters,schema) {
+      this.logger = logger;
+      super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
     }
     
+    async recreateSchema(schema,password) {
+        
+      try {
+        const dropUser = `drop user "${schema}" cascade`;
+        await this.executeSQL(dropUser,{});      
+      } catch (e) {
+        if (e.errorNum && (e.errorNum === 1918)) {
+        }
+        else {
+          throw e;
+        }
+      }
+      const createUser = `grant connect, resource, unlimited tablespace to "${schema}" identified by ${password}`;
+      await this.executeSQL(createUser,{});      
+    }    
+
     async report(source,target,timings) {
 
       if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
@@ -139,22 +157,7 @@ class OracleCompare extends OracleDBI {
         }
       },this)
     }
-    
-    async recreateSchema(schema,password) {
-        
-      try {
-        const dropUser = `drop user "${schema}" cascade`;
-        await this.executeSQL(dropUser,{});      
-      } catch (e) {
-        if (e.errorNum && (e.errorNum === 1918)) {
-        }
-        else {
-          throw e;
-        }
-      }
-      const createUser = `grant connect, resource, unlimited tablespace to "${schema}" identified by ${password}`;
-      await this.executeSQL(createUser,{});      
-    }      
+      
 }
 
 module.exports = OracleCompare

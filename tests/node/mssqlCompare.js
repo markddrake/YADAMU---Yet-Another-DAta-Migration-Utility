@@ -7,18 +7,36 @@ const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
 
 class MsSQLCompare extends MsSQLDBI {
     
-    constructor(yadamu,logger) {
+    constructor(yadamu) {
        super(yadamu)
+       this.logger = undefined
+    }
+    
+    configureTest(logger,connectionProperties,testParameters,schema) {
        this.logger = logger;
+       connectionProperties.database = schema.schema;
+       super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
     }
     
-    updateSettings(dbParameters,dbConnection,role,target) {
-        dbConnection.database = target.schema;
-        dbParameters[role] = target.owner
-    }
-    
-    async report(source,target,timings) {
+    async recreateSchema(schema,password) {
+       
+      let results;       
+      const dropDatabase = `drop database if exists "${schema.schema}"`;
+      if (this.status.sqlTrace) {
+         this.status.sqlTrace.write(`${dropDatabase}\ngo\n`)
+      }
+      results =  await this.pool.request().batch(dropDatabase);      
       
+      const createDatabase = `create database "${schema.schema}"`;
+      if (this.status.sqlTrace) {
+         this.status.sqlTrace.write(`${createDatabase}\ngo\n`)
+      }
+      results = await this.pool.request().batch(createDatabase);      
+       
+   }
+
+   async report(source,target,timings) {
+       
       if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
         Object.keys(timings).forEach(function(tableName) {
           if (tableName !== tableName.toUpperCase()) {
@@ -27,11 +45,23 @@ class MsSQLCompare extends MsSQLDBI {
           }
         },this)
       }
-              
+      
+      this.useDatabase(this.pool,source.schema,this.status);
+
+      let args = 
+`--@FORMAT_RESULTS = false
+--@SOURCE_DATABASE = '${source.schema}'
+--@SOURCE_SCHEMA   = '${source.owner}'
+--@TARGET_DATABASE = '${target.schema}'
+--@TARGET_SCHEMA   = '${target.owner}'
+--@COMMENT         = ''
+--`;
+                 
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT)\ngo\n`)
+      }
+
       const request = this.pool.request();
-      const useDatabse = `use ${source.schema}`
-      await request.batch(useDatabse);             
-        
       let results = await request
                           .input('FORMAT_RESULTS',this.sql.Bit,false)
                           .input('SOURCE_DATABASE',this.sql.VarChar,source.schema)
@@ -100,7 +130,7 @@ class MsSQLCompare extends MsSQLDBI {
                           + ` ${'SOURCE SCHEMA'.padStart(colSizes[1])} |`
                           + ` ${'TARGET SCHEMA'.padStart(colSizes[2])} |` 
                           + ` ${'TABLE_NAME'.padStart(colSizes[3])} |`
-                          + ` ${'SOURCE ROWS'.padStart(colSize[5])} |`
+                          + ` ${'SOURCE ROWS'.padStart(colSizes[5])} |`
                           + ` ${'TARGET ROWS'.padStart(colSizes[6])} |`
                           + ` ${'MISSING ROWS'.padStart(colSizes[7])} |`
                           + ` ${'EXTRA ROWS'.padStart(colSizes[8])} |`
@@ -132,17 +162,7 @@ class MsSQLCompare extends MsSQLDBI {
         }
       },this)
     }
-    
-    async recreateSchema(schema,password) {
-       
-      let results;       
-      const dropDatabase = `drop database if exists "${schema.schema}"`;
-      results =  await this.pool.request().batch(dropDatabase);      
-      
-      const createDatabase = `create database "${schema.schema}"`;
-      results = await this.pool.request().batch(createDatabase);      
-       
-   }
+   
 }
 
 module.exports = MsSQLCompare

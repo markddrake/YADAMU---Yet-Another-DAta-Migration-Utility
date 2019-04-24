@@ -17,6 +17,7 @@ const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const StagingTable = require('./stagingTable.js');
 
+const STAGING_TABLE =  { tableName : '#JSON_STAGING', columnName : 'DATA'}
 
 const defaultParameters = {
   BATCHSIZE         : 10000
@@ -24,9 +25,7 @@ const defaultParameters = {
 , PORT              : 1433
 , OWNER             : 'dbo'
 , TOUSER            : 'dbo'
-, FROMUSER          : 'dbo'
 }
-const STAGING_TABLE =  { tableName : '#JSON_STAGING', columnName : 'DATA'}
 
 const sqlTableInfo =
 `select t.table_schema "TABLE_SCHEMA"
@@ -92,9 +91,14 @@ class MsSQLDBI extends YadamuDBI {
     return dataType;
   }
   
-  async  getConnectionPool() {
+  async getConnectionPool() {
   
     const logWriter = this.logWriter;
+    if (this.status.sqlTrace) {
+      const pwRedacted = Object.assign({},this.connectionProperties)
+      delete pwRedacted.password
+      this.status.sqlTrace.write(`-- Connection Properies: ${JSON.stringify(pwRedacted)}\ngo\n`)
+    }
     const pool = await new sql.ConnectionPool(this.connectionProperties).connect();
     pool.on('error',function(err){logWriter.log('Pool Error:',err)});
     const statement = `SET QUOTED_IDENTIFIER ON`
@@ -185,8 +189,10 @@ class MsSQLDBI extends YadamuDBI {
   get DATABASE_VENDOR() { return 'MSSQLSERVER' };
   get SOFTWARE_VENDOR() { return 'Microsoft Corporation' };
   get SPATIAL_FORMAT()  { return 'EWKT' };
- 
+  get DEFAULT_PARAMETERS() { return defaultParameters };
+
   constructor(yadamu) {
+    
     super(yadamu,defaultParameters);
     this.pool = undefined;
     this.sql = sql
@@ -282,7 +288,7 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
 
-  async processFile(mode,schema,hndl) {
+  async processFile(hndl) {
      let results = await this.pool.request().input('TARGET_DATABASE',sql.VarChar,schema).execute('sp_IMPORT_JSON');
      results = results.recordset;
      return  JSON.parse(results[0][Object.keys(results[0])[0]])

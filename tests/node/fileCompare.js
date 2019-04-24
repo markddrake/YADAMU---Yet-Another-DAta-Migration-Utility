@@ -92,15 +92,15 @@ class FileCompare extends FileWriter {
     await processMetadata;
     return fileStats.tableInfo
   }
-
-   
-  updateSettings(dbParameters,dbConnection,role,target) {
-    dbParameters.FILE = target
+  
+  configureTest(logger,connectionProperties,testParameters) {
+    this.logger = logger;
+    super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
   }
     
-  constructor(yadamu,logger) {
+  constructor(yadamu) {
      super(yadamu)
-     this.logger = logger;
+     this.logger = undefined
      this.deepCompare = false;
      this.sort = false;
   }
@@ -174,7 +174,7 @@ class FileCompare extends FileWriter {
     const gMetadata = await this.getContentMetadata(grandparent)
     const pMetadata = await this.getContentMetadata(parent)
     const cMetadata = await this.getContentMetadata(child);
-             
+    
     if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
       timings = timings.map(function (t) {
         this.makeLowerCase(t)

@@ -1,8 +1,7 @@
 "use strict" 
 
-const YadamuDBI = require('../../common/yadamuDBI.js')
 
-class FileStatistics extends YadamuDBI {
+class FileStatistics {
     
   constructor() {
      this.tableInfo = {}

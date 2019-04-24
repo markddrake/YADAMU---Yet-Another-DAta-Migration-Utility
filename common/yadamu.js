@@ -271,10 +271,20 @@ class Yadamu {
   
   }
   
-  getParameters() {
-    return this.parameters
+  reset() {
+    this.status.startTime = new Date().getTime()
+    this.status.warningRaised = false;
+    this.status.errorRaised = false;
+    
+    if (this.parameters.SQLTRACE) {
+	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQLTRACE,{flags : "a"});
+    }
   }
   
+  getParameters() {
+    return Object.assign({},this.parameters)
+  }
+
   getStatus() {
     return this.status
   }
@@ -379,22 +389,6 @@ class Yadamu {
     
     return parameters;
   }
-  
-  mergeParameters(newValues) {
-    Object.keys(newValues).forEach(function(key) {
-      if (!this.parameters.hasOwnProperty(key)) {
-        this.parameters[key] = newValues[key]
-      }
-    },this)
-    return this.parameters
-  }
-  
-  overwriteParameters(newValues) {
-    Object.keys(newValues).forEach(function(key) {
-      this.parameters[key] = newValues[key]
-    },this)
-    return this.parameters
-  }
 
   setLogWriter(parameters) {
 
@@ -415,22 +409,22 @@ class Yadamu {
   }
 
   getDBReader(dbi) {
-    const dbReader = new DBReader(dbi, this.parameters.OWNER, this.parameters.MODE, this.status, this.logWriter);
+    const dbReader = new DBReader(dbi, dbi.parameters.OWNER, dbi.parameters.MODE, this.status, this.logWriter);
     return dbReader;
   }
   
   getDBWriter(dbi) {
-    const dbWriter = new DBWriter(dbi, this.parameters.TOUSER, this.parameters.MODE, this.status, this.logWriter);
+    const dbWriter = new DBWriter(dbi, dbi.parameters.TOUSER, dbi.parameters.MODE, this.status, this.logWriter);
     return dbWriter;
   }
 
   async pumpData(source,target) {
       
-    if ((source.isDatabase() === true) && (this.parameters.OWNER === undefined)) {
+    if ((source.isDatabase() === true) && (source.parameters.OWNER === undefined)) {
       throw new Error('Missing mandatory parameter OWNER');
     }
 
-    if ((target.isDatabase() === true) && (this.parameters.TOUSER === undefined)) {
+    if ((target.isDatabase() === true) && (target.parameters.TOUSER === undefined)) {
       throw new Error('Missing mandatory parameter TOUSER');
     }
     
@@ -471,36 +465,41 @@ class Yadamu {
     // Yadamu.finalize(this.status,this.logWriter);
   }
   
+  async testImport(dbi,file) {
+    this.parameters.FILE = file
+    return this.doImport(dbi);
+  }
+
   async doImport(dbi) {
-    let timings = {}
     const fileReader = new FileReader(this)
-    timings = await this.pumpData(fileReader,dbi);
+    const timings = await this.pumpData(fileReader,dbi);
     Yadamu.finalize(this.status,this.logWriter);
     return timings
   }  
     
-  
+  async testExport(dbi,file) {
+    this.parameters.FILE = file
+    return this.doExport(dbi);
+  }
+ 
   async doExport(dbi) {
-    let timings = {}
     const fileWriter = new FileWriter(this)
-    timings = await this.pumpData(dbi,fileWriter);
+    const timings = await this.pumpData(dbi,fileWriter);
     Yadamu.finalize(this.status,this.logWriter);
     return timings
   }  
   
   async cloneFile(pathToFile) {
 
-    this.par
-    let timings = {}
     const fileReader = new FileReader(this)
     const fileWriter = new FileReader(this)
-    timings = await this.pumpData(fileReader,FileWriter);
+    const timings = await this.pumpData(fileReader,FileWriter);
     Yadamu.finalize(this.status,this.logWriter);
     return timings
   }
   
-  async uploadFile(dbi,pathToFile) {
-    const importFilePath = path.resolve(pathToFile);
+  async uploadFile(dbi) {
+    const importFilePath = path.resolve(dbi.parameters.FILE);
     const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
 
@@ -511,11 +510,24 @@ class Yadamu {
     return json;
   }
     
+  getTimings(log) {
+      
+     const timings = {}
+     log.forEach(function(entry) {
+       if (Object.keys(entry)[0] === 'dml') {
+         timings[entry.dml.tableName] = {rowCount : entry.dml.rowCount, insertMode : "SQL", elapsedTime : entry.dml.elapsedTime + "ms", throughput: Math.round((entry.dml.rowCount/Math.round(entry.dml.elapsedTime)) * 1000).toString() + "/s"}
+       }
+     },this)
+     return timings
+  }
+    
   async doServerImport(dbi,pathToFile) {
+    let timings = {}
     try {
       await dbi.initialize();
       const hndl = await this.uploadFile(dbi,pathToFile);
       const log = await dbi.processFile(this.parameters.MODE,this.parameters.TOUSER,hndl)
+      timings = this.getTimings(log);
       Yadamu.processLog(log,this.status,this.logWriter);
       await dbi.finalize();
       Yadamu.reportStatus(this.status,this.logWriter)
@@ -524,6 +536,7 @@ class Yadamu {
       await dbi.abort()
     }
     Yadamu.finalize(this.status,this.logWriter);
+    return timings;
   } 
 
    close() {

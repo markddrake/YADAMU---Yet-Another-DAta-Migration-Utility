@@ -18,8 +18,7 @@
             "tests/exportRoundtrip/mysql.json",
             "tests/exportRoundtrip/mssql.json"
         ]
-    },
-    {
+    },{
         "source": "file",
         "targets": [
             "oracle18c",
@@ -33,9 +32,9 @@
             "MODE": "DATA_ONLY"
         },
         "operations": [
+            "tests/exportRoundtrip/mssql.json",
             "tests/exportRoundtrip/oracle.json",
-            "tests/exportRoundtrip/mysql.json",
-            "tests/exportRoundtrip/mssql.json"
+            "tests/exportRoundtrip/mysql.json"
         ]
     }
 ]
