@@ -14,4 +14,4 @@ call %YADAMU_TEST_HOME%\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%\mssql
 call %YADAMU_TEST_HOME%\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%\postgres
 call %YADAMU_TEST_HOME%\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%\mysql
 call %YADAMU_TEST_HOME%\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%\mariadb
-node %YADAMU_TEST_HOME%\node\yadamuTest CONFIG=%YADAMU_TEST_HOME%\%YADAMU_WORK_ID%\config.json >%YADAMU_LOG_PATH%\%YADAMU_WORK_ID%.log
+node %YADAMU_TEST_HOME%\node\testHarness CONFIG=%YADAMU_TEST_HOME%\%YADAMU_WORK_ID%\config.json >%YADAMU_LOG_PATH%\%YADAMU_WORK_ID%.log
