@@ -282,7 +282,7 @@ class PostgresDBI extends YadamuDBI {
   }
 
   async processFile(hndl) {
-     return await this.processStagingTable(this.parameters.TOUSER)
+     return await this.processStagingTable(schema)
   }
   
   /*

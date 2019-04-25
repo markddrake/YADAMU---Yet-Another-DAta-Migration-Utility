@@ -289,7 +289,7 @@ class MsSQLDBI extends YadamuDBI {
   */
 
   async processFile(hndl) {
-     let results = await this.pool.request().input('TARGET_DATABASE',sql.VarChar,this.parameters.TOUSER).execute('sp_IMPORT_JSON');
+     let results = await this.pool.request().input('TARGET_DATABASE',sql.VarChar,schema).execute('sp_IMPORT_JSON');
      results = results.recordset;
      return  JSON.parse(results[0][Object.keys(results[0])[0]])
   }
