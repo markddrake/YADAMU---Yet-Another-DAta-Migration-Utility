@@ -209,8 +209,8 @@ class Yadamu {
 
     const endTime = new Date().getTime();
       
-    status.statusMsg = status.warningRaised ? 'with warnings' : status.statusMsg;
-    status.statusMsg = status.errorRaised ? 'with errors'  : status.statusMsg;  
+    status.statusMsg = status.warningRaised === true ? 'with warnings' : status.statusMsg;
+    status.statusMsg = status.errorRaised === true ? 'with errors'  : status.statusMsg;  
   
     logWriter.write(`${status.operation} operation completed ${status.statusMsg}. Elapsed time: ${Yadamu.stringifyDuration(endTime - status.startTime)}.\n`);
     if (logWriter !== process.stdout) {
@@ -270,17 +270,7 @@ class Yadamu {
     }
   
   }
-  
-  reset() {
-    this.status.startTime = new Date().getTime()
-    this.status.warningRaised = false;
-    this.status.errorRaised = false;
     
-    if (this.parameters.SQLTRACE) {
-	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQLTRACE,{flags : "a"});
-    }
-  }
-  
   getParameters() {
     return Object.assign({},this.parameters)
   }
@@ -465,22 +455,12 @@ class Yadamu {
     // Yadamu.finalize(this.status,this.logWriter);
   }
   
-  async testImport(dbi,file) {
-    this.parameters.FILE = file
-    return this.doImport(dbi);
-  }
-
   async doImport(dbi) {
     const fileReader = new FileReader(this)
     const timings = await this.pumpData(fileReader,dbi);
     Yadamu.finalize(this.status,this.logWriter);
     return timings
   }  
-    
-  async testExport(dbi,file) {
-    this.parameters.FILE = file
-    return this.doExport(dbi);
-  }
  
   async doExport(dbi) {
     const fileWriter = new FileWriter(this)
@@ -498,8 +478,7 @@ class Yadamu {
     return timings
   }
   
-  async uploadFile(dbi) {
-    const importFilePath = path.resolve(dbi.parameters.FILE);
+  async uploadFile(dbi,importFilePath) {
     const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
 
@@ -514,19 +493,26 @@ class Yadamu {
       
      const timings = {}
      log.forEach(function(entry) {
-       if (Object.keys(entry)[0] === 'dml') {
-         timings[entry.dml.tableName] = {rowCount : entry.dml.rowCount, insertMode : "SQL", elapsedTime : entry.dml.elapsedTime + "ms", throughput: Math.round((entry.dml.rowCount/Math.round(entry.dml.elapsedTime)) * 1000).toString() + "/s"}
+       switch (Object.keys(entry)[0]) {
+         case 'dml' :
+           timings[entry.dml.tableName] = {rowCount : entry.dml.rowCount, insertMode : "SQL", elapsedTime : entry.dml.elapsedTime + "ms", throughput: Math.round((entry.dml.rowCount/Math.round(entry.dml.elapsedTime)) * 1000).toString() + "/s"}
+           break;
+         case 'error' :
+           timings[entry.error.tableName] = {rowCount : -1, insertMode : "SQL", elapsedTime : "NaN", throughput: "NaN"}
+           break;
+         default:
        }
      },this)
      return timings
   }
-    
-  async doServerImport(dbi,pathToFile) {
+
+  async doServerImport(dbi) {
     let timings = {}
+    const pathToFile = dbi.parameters.FILE;
     try {
       await dbi.initialize();
       const hndl = await this.uploadFile(dbi,pathToFile);
-      const log = await dbi.processFile(this.parameters.MODE,this.parameters.TOUSER,hndl)
+      const log = await dbi.processFile(hndl)
       timings = this.getTimings(log);
       Yadamu.processLog(log,this.status,this.logWriter);
       await dbi.finalize();

@@ -421,7 +421,7 @@ class OracleDBI extends YadamuDBI {
   async processFile(hndl) {
 
     let sqlStatement = "BEGIN" + "\n";
-    switch (mode) {
+    switch (this.parameters.MODE) {
 	   case 'DDL_AND_DATA':
          sqlStatement = `${sqlStatement}  JSON_IMPORT.DATA_ONLY_MODE(FALSE);\n  JSON_IMPORT.DDL_ONLY_MODE(FALSE);\n`;
 	     break;	   break
@@ -435,7 +435,7 @@ class OracleDBI extends YadamuDBI {
 	 
     sqlStatement = `${sqlStatement}    :log := JSON_IMPORT.IMPORT_JSON(:json, :schema);\nEND;`;
 
-    const results = await this.connection.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024}, json:hndl, schema:schema});
+    const results = await this.connection.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024}, json:hndl, schema:this.parameters.TOUSER});
     return JSON.parse(results.outBinds.log);
   }
   

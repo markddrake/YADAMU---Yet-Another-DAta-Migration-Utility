@@ -8,4 +8,4 @@ if not exist %YADAMU_WORK_ROOT%\ mkdir %YADAMU_WORK_ROOT%
 call %YADAMU_TEST_HOME%\windows\initializeLogging.bat
 call %YADAMU_TEST_HOME%\windows\installYadamu.bat
 call %YADAMU_TEST_HOME%\windows\createDefaultUsers.bat
-node %YADAMU_TEST_HOME%\node\yadamuTest CONFIG=%YADAMU_TEST_HOME%\%YADAMU_WORK_ID%\config.json >%YADAMU_LOG_PATH%\%YADAMU_WORK_ID%.log
+node %YADAMU_TEST_HOME%\node\testHarness CONFIG=%YADAMU_TEST_HOME%\%YADAMU_WORK_ID%\config.json >%YADAMU_LOG_PATH%\%YADAMU_WORK_ID%.log
