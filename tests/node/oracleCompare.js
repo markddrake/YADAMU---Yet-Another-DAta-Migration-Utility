@@ -36,7 +36,6 @@ class OracleCompare extends OracleDBI {
     
     async recreateSchema(schema,password) {
         
-        
       try {
         const dropUser = `drop user "${schema}" cascade`;
         await this.executeSQL(dropUser,{});      
@@ -51,9 +50,7 @@ class OracleCompare extends OracleDBI {
       await this.executeSQL(createUser,{});      
     }    
 
-    async report(source,target,timingsArray) {
-
-      const timings = timingsArray[timingsArray.length - 1];
+    async report(source,target,timings) {
 
       if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
         Object.keys(timings).forEach(function(tableName) {
@@ -65,15 +62,16 @@ class OracleCompare extends OracleDBI {
       }
       
       const sqlStatement = `begin JSON_IMPORT.COMPARE_SCHEMAS(:source,:target); end;`;
-      const args = {source:source,target:target}
+      const args = {source:source.schema,target:target.schema}
       await this.executeSQL(sqlStatement,args)      
       const successful = await this.executeSQL(sqlSuccess,{})
+      
       const failed = await this.executeSQL(sqlFailed,{})
             
       let seperatorSize = (colSizes.slice(0,7).length *3) - 1
       colSizes.slice(0,7).forEach(function(size) {
         seperatorSize += size;
-      },this);     
+      },this);
        
       successful.rows.forEach(function(row,idx) {          
         const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row[2].toUpperCase() : row[2];

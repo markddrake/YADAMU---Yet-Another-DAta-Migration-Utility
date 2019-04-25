@@ -49,9 +49,7 @@ class PostgresCompare extends PostgresDBI {
       await this.createSchema(schema);    
     }      
 
-    async report(source,target,timingsArray) {
-
-      const timings = timingsArray[timingsArray.length - 1];
+    async report(source,target,timings) {
 
       if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
         Object.keys(timings).forEach(function(tableName) {
@@ -63,7 +61,7 @@ class PostgresCompare extends PostgresDBI {
       }
       
       const sqlStatement = `call COMPARE_SCHEMA($1,$2)`;
-      await this.pgClient.query(sqlStatement,[source,target])      
+      await this.pgClient.query(sqlStatement,[source.schema,target.schema])      
       
       const successful = await this.pgClient.query(sqlSuccess)
       const failed = await this.pgClient.query(sqlFailed)
