@@ -34,9 +34,7 @@ class MariadbCompare extends MariadbDBI {
       super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
     }
     
-    async report(source,target,timingsArray) {
-
-      const timings = timingsArray[timingsArray.length - 1];
+    async report(source,target,timings) {
              
       Object.keys(timings).forEach(function(tableName) {
         if (tableName !== tableName.toLowerCase()) {
@@ -46,7 +44,7 @@ class MariadbCompare extends MariadbDBI {
       },this)
       
       const sqlStatement = `CALL COMPARE_SCHEMAS(?,?);`;					   
-      let results = await this.executeSQL(sqlStatement,[source,target]);
+      let results = await this.executeSQL(sqlStatement,[source.schema,target.schema]);
 
       const successful = await this.executeSQL(sqlSuccess,{})
       const failed = await this.executeSQL(sqlFailed,{})
