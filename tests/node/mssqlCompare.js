@@ -35,7 +35,9 @@ class MsSQLCompare extends MsSQLDBI {
        
    }
 
-   async report(source,target,timings) {
+    async report(source,target,timingsArray) {
+
+      const timings = timingsArray[timingsArray.length - 1];
        
       if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
         Object.keys(timings).forEach(function(tableName) {
