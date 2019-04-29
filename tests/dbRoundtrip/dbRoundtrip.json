@@ -13,7 +13,6 @@
             "MODE": "DATA_ONLY"
         },
         "operations": [
-            "tests/dbRoundtrip/mssql.json",
             "tests/dbRoundtrip/oracle.json",
             "tests/dbRoundtrip/mysql.json",
             "tests/dbRoundtrip/mssql.json"

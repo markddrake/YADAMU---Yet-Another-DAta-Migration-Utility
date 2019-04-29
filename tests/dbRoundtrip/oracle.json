@@ -7,7 +7,7 @@
             "schema": "HR1"
         },
         {
-            "schema": "HR2"
+            "schema": "HR1"
         }
     ],
     [
@@ -18,7 +18,7 @@
             "schema": "SH1"
         },
         {
-            "schema": "SH2"
+            "schema": "SH1"
         }
     ],
     [
@@ -29,7 +29,7 @@
             "schema": "OE1"
         },
         {
-            "schema": "OE2"
+            "schema": "OE1"
         }
     ],
     [
@@ -40,7 +40,7 @@
             "schema": "PM1"
         },
         {
-            "schema": "PM2"
+            "schema": "PM1"
         }
     ],
     [
@@ -51,7 +51,7 @@
             "schema": "IX1"
         },
         {
-            "schema": "IX2"
+            "schema": "IX1"
         }
     ],
     [
@@ -62,7 +62,7 @@
             "schema": "BI1"
         },
         {
-            "schema": "BI2"
+            "schema": "BI1"
         }
     ]
 ]
