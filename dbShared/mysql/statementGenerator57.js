@@ -24,6 +24,8 @@ class StatementGenerator {
            case 'VARCHAR2':                return 'varchar';
            case 'NVARCHAR2':               return 'varchar';
            case 'NUMBER':                  return 'decimal';
+           case 'BINARY_FLOAT':            return 'float';
+           case 'BINARY_DOUBLE':           return 'double';
            case 'CLOB':                    return 'longtext';
            case 'BLOB':                    return 'longblob';
            case 'NCLOB':                   return 'longtext';
@@ -68,7 +70,11 @@ class StatementGenerator {
                 default:                           return 'char';
              }
            case 'datetime':                        return 'datetime(3)';
-           case 'datetime2':                       return 'datetime';
+           case 'datetime2':
+             switch (true) {
+                case (dataTypeLength > 6):         return 'datetime(6)';
+                default:                           return 'datetime';
+             }
            case 'datetimeoffset':                  return 'datetime';
            case 'geography':                       return 'geometry';
            case 'geometry':                        return 'geometry';
@@ -177,7 +183,7 @@ class StatementGenerator {
      return targetDataType;     
   }
       
-  generateTableInfo(schema, metadata) {
+  generateTableInfo(metadata) {
       
     let insertMode = 'Bulk';
   
@@ -219,8 +225,8 @@ class StatementGenerator {
        return `${columnName} ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)} ${ensureNullable === true ? 'null':''}`
     },this)
                                        
-    const createStatement = `create table if not exists "${schema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
-    let insertStatement = `insert into "${schema}"."${metadata.tableName}"`;
+    const createStatement = `create table if not exists "${this.dbi.parameters.TOUSER}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
+    let insertStatement = `insert into "${this.dbi.parameters.TOUSER}"."${metadata.tableName}"`;
     if (insertMode === 'Iterative') {
       insertStatement += ` set` + setOperators.join(',');
     }
@@ -237,19 +243,19 @@ class StatementGenerator {
     }
   }
   
-  async generateStatementCache(schema, metadata, executeDDL) {
+  async generateStatementCache(metadata, executeDDL) {
       
     const statementCache = {}
     const tables = Object.keys(metadata); 
 
     const ddlStatements = tables.map(function(table,idx) {
       const tableMetadata = metadata[table];
-      const tableInfo = this.generateTableInfo(schema, tableMetadata);
+      const tableInfo = this.generateTableInfo(tableMetadata);
       statementCache[metadata[table].tableName] = tableInfo;
       return tableInfo.ddl;
     },this)
     if (executeDDL === true) {
-      await this.dbi.executeDDL(schema,ddlStatements)
+      await this.dbi.executeDDL(ddlStatements)
     }
     return statementCache;
   }

@@ -1,5 +1,23 @@
 [
-    {
+{
+        "source": "file",
+        "targets": [
+            "oracle18c",
+            "mssql",
+            "postgres",
+            "mysql",
+            "oracle12c"
+        ],
+        "parsingMethod": "RDBMS",
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests/exportRoundtrip/mssql.json",
+            "tests/exportRoundtrip/oracle.json",
+            "tests/exportRoundtrip/mysql.json"
+        ]
+    },{
         "source": "file",
         "targets": [
             "oracle18c",
@@ -17,24 +35,6 @@
             "tests/exportRoundtrip/oracle.json",
             "tests/exportRoundtrip/mysql.json",
             "tests/exportRoundtrip/mssql.json"
-        ]
-    },{
-        "source": "file",
-        "targets": [
-            "oracle18c",
-            "mssql",
-            "postgres",
-            "mysql",
-            "oracle12c"
-        ],
-        "parsingMethod": "RDBMS",
-        "parameters": {
-            "MODE": "DATA_ONLY"
-        },
-        "operations": [
-            "tests/exportRoundtrip/mssql.json",
-            "tests/exportRoundtrip/oracle.json",
-            "tests/exportRoundtrip/mysql.json"
         ]
     }
 ]

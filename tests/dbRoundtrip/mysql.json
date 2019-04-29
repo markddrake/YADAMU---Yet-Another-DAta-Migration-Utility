@@ -7,7 +7,7 @@
             "schema": "sakila1"
         },
         {
-            "schema": "sakila2"
+            "schema": "sakila1"
         }
     ],
     [
@@ -18,7 +18,7 @@
             "schema": "jtest1"
         },
         {
-            "schema": "jtest2"
+            "schema": "jtest1"
         }
     ]
 ]

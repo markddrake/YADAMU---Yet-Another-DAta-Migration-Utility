@@ -7,7 +7,6 @@ if [ ! -e $YADAMU_WORK_ROOT ]; then mkdir $YADAMU_WORK_ROOT; fi
 export YADAMU_LOG_ROOT=$YADAMU_WORK_ROOT/logs
 source $YADAMU_TEST_HOME/unix/initializeLogging.sh
 source $YADAMU_TEST_HOME/unix/installYadamu.sh
-# source $YADAMU_TEST_HOME/unix/createDefaultUsers.sh
 source $YADAMU_TEST_HOME/unix/createOutputFolders.sh $YADAMU_WORK_ROOT/oracle18c
 source $YADAMU_TEST_HOME/unix/createOutputFolders.sh $YADAMU_WORK_ROOT/oracle12c
 source $YADAMU_TEST_HOME/unix/createOutputFolders.sh $YADAMU_WORK_ROOT/mssql

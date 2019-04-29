@@ -133,6 +133,10 @@ begin
           return 'varchar';
         when 'NUMBER' then
            return 'numeric';
+        when 'BINARY_FLOAT' then
+           return 'float4';
+        when 'BINARY_DOUBLE' then
+           return 'float8';
         when 'NVARCHAR2' then
            return 'varchar';
         when 'RAW' then

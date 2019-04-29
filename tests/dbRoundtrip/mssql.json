@@ -9,7 +9,7 @@
             "owner": "dbo"
         },
         {
-            "schema": "Northwind2",
+            "schema": "Northwind1",
             "owner": "dbo"
         }
     ],
@@ -23,7 +23,7 @@
             "owner": "dbo"
         },
         {
-            "schema": "Sales2",
+            "schema": "Sales1",
             "owner": "dbo"
         }
     ],
@@ -65,7 +65,7 @@
             "owner": "dbo"
         },
         {
-            "schema": "Purchasing2",
+            "schema": "Purchasing1",
             "owner": "dbo"
         }
     ],
@@ -79,7 +79,7 @@
             "owner": "dbo"
         },
         {
-            "schema": "HumanResources2",
+            "schema": "HumanResources1",
             "owner": "dbo"
         }
     ],
@@ -93,7 +93,7 @@
             "owner": "dbo"
         },
         {
-            "schema": "AdventureWorksDW2",
+            "schema": "AdventureWorksDW1",
             "owner": "dbo"
         }
     ]

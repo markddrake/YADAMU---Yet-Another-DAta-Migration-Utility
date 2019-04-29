@@ -120,64 +120,6 @@ class Yadamu {
       return Yadamu.convertQuotedIdentifer(parameterValue);
     }
   }
-    
-  static processLog(log,status,logWriter) {
-
-    const logDML         = (status.loglevel && (status.loglevel > 0));
-    const logDDL         = (status.loglevel && (status.loglevel > 1));
-    const logDDLIssues   = (status.loglevel && (status.loglevel > 2));
-    const logTrace       = (status.loglevel && (status.loglevel > 3));
-   
-    if (status.dumpFileName) {
-      fs.writeFileSync(status.dumpFileName,JSON.stringify(log));
-    }
-    
-    log.forEach(function(result) {
-                  const logEntryType = Object.keys(result)[0];
-                  const logEntry = result[logEntryType];
-                  switch (true) {
-                    case (logEntryType === "message") : 
-                      logWriter.write(`${new Date().toISOString()}: ${logEntry}.\n`)
-                      break;
-                    case (logEntryType === "dml") : 
-                      logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.\n`)
-                      break;
-                    case (logEntryType === "info") :
-                      logWriter.write(`${new Date().toISOString()}[INFO]: "${JSON.stringify(logEntry)}".\n`);
-                      break;
-                    case (logDML && (logEntryType === "dml")) :
-                      logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}.\n`)
-                      break;
-                    case (logDDL && (logEntryType === "ddl")) :
-                      logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}.\n`) 
-                      break;
-                    case (logTrace && (logEntryType === "trace")) :
-                      logWriter.write(`${new Date().toISOString()} [TRACE]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".\n' : '\n'}${logEntry.sqlStatement}.\n`)
-                      break;
-                    case (logEntryType === "error"):
-   	                switch (true) {
-   		              case (logEntry.severity === 'FATAL') :
-                          status.errorRaised = true;
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}\n`)
-   				        break
-   					  case (logEntry.severity === 'WARNING') :
-                          status.warningRaised = true;
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
-                          break;
-   					  case (logEntry.severity === 'CONTENT_TOO_LARGE') :
-                          status.errorRaised = true;
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: Cannot import columns larger than 32k in 12c.\n`)
-                          break;
-                        case (logDDLIssues) :
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
-                      } 	
-                  } 
-   				if ((status.sqlTrace) && (logEntry.sqlStatement)) {
-   				  status.sqlTrace.write(`${logEntry.sqlStatement}\n\/\n`)
-   		        }
-    }) 
-  }    
-    
 
   static finalize(status,logWriter) {
 
@@ -399,12 +341,12 @@ class Yadamu {
   }
 
   getDBReader(dbi) {
-    const dbReader = new DBReader(dbi, dbi.parameters.OWNER, dbi.parameters.MODE, this.status, this.logWriter);
+    const dbReader = new DBReader(dbi, dbi.parameters.MODE, this.status, this.logWriter);
     return dbReader;
   }
   
   getDBWriter(dbi) {
-    const dbWriter = new DBWriter(dbi, dbi.parameters.TOUSER, dbi.parameters.MODE, this.status, this.logWriter);
+    const dbWriter = new DBWriter(dbi, dbi.parameters.MODE, this.status, this.logWriter);
     return dbWriter;
   }
 
@@ -514,7 +456,6 @@ class Yadamu {
       const hndl = await this.uploadFile(dbi,pathToFile);
       const log = await dbi.processFile(hndl)
       timings = this.getTimings(log);
-      Yadamu.processLog(log,this.status,this.logWriter);
       await dbi.finalize();
       Yadamu.reportStatus(this.status,this.logWriter)
     } catch (e) {
@@ -531,7 +472,5 @@ class Yadamu {
 }  
      
 module.exports.Yadamu = Yadamu;
-module.exports.processLog             = Yadamu.processLog
 module.exports.decomposeDataType      = Yadamu.decomposeDataType
 module.exports.convertIdentifierCase  = Yadamu.convertIdentifierCase
-module.exports.convertQuotedIdentifer = Yadamu.convertQuotedIdentifer

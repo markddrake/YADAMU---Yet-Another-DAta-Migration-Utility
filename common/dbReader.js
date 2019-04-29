@@ -4,13 +4,12 @@ const Yadamu = require('./yadamu.js');
 
 class DBReader extends Readable {  
 
-  constructor(dbi,schema,mode,status,logWriter,options) {
+  constructor(dbi,mode,status,logWriter,options) {
 
     super({objectMode: true });  
     const self = this;
-  
+ 
     this.dbi = dbi;
-    this.schema = schema;
     this.mode = mode;
     this.status = status;
     this.logWriter = logWriter;
@@ -28,17 +27,17 @@ class DBReader extends Readable {
     this.outputStream = outputStream;
   }
 
-  async getSystemInformation(schema,version) {
-    return this.dbi.getSystemInformation(schema,version)
+  async getSystemInformation(version) {
+    return this.dbi.getSystemInformation(version)
   }
   
-  async getDDLOperations(schema) {
-    return this.dbi.getDDLOperations(schema)
+  async getDDLOperations() {
+    return this.dbi.getDDLOperations()
   }
   
-  async getMetadata(schema) {
+  async getMetadata() {
       
-     this.schemaInfo = await this.dbi.getSchemaInfo(schema)
+     this.schemaInfo = await this.dbi.getSchemaInfo('OWNER')
      return this.dbi.generateMetadata(this.schemaInfo)
   }
       
@@ -107,7 +106,7 @@ class DBReader extends Readable {
     try {
       switch (this.nextPhase) {
          case 'systemInformation' :
-           const systemInformation = await this.getSystemInformation(this.schema,Yadamu.EXPORT_VERSION);
+           const systemInformation = await this.getSystemInformation(Yadamu.EXPORT_VERSION);
            // Needed in case we have to generate DDL from the system information and metadata.
            this.dbi.setSystemInformation(systemInformation);
            this.push({systemInformation : systemInformation});
@@ -119,11 +118,11 @@ class DBReader extends Readable {
            }
            break;
          case 'ddl' :
-           let ddl = await this.getDDLOperations(this.schema);
-           // Database does not provide retrieve DDL statements directly
+           let ddl = await this.getDDLOperations();
            if (ddl === undefined) {
+             // Database does not provide mechansim to retrieve DDL statements used to create a schema (eg Oracle's DBMS_METADATA package)
              // Reverse Engineer DDL from metadata.
-             const metadata = await this.getMetadata(this.schema);
+             const metadata = await this.getMetadata();
              await this.generateStatementCache(metadata)
              ddl = Object.keys(this.dbi.statementCache).map(function(table) {
                return this.dbi.statementCache[table].ddl
@@ -137,7 +136,7 @@ class DBReader extends Readable {
            this.nextPhase = 'metadata';
            break;
          case 'metadata' :
-           const metadata = await this.getMetadata(this.schema);
+           const metadata = await this.getMetadata();
            this.push({metadata: metadata});
            this.nextPhase = 'table';
            break;

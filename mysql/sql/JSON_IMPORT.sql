@@ -21,6 +21,10 @@ BEGIN
          return 'varchar';
        when 'NUMBER' then
          return 'decimal';
+       when 'BINARY_FLOAT' then
+         return 'float';
+       when 'BINARY_DOUBLE' then
+         return 'double';
        when 'CLOB' then
          return 'longtext';
        when 'BLOB' then
@@ -77,7 +81,10 @@ BEGIN
         when 'datetime' then
           return 'datetime(3)';
         when 'datetime2' then
-          return 'datetime';
+          case
+            when P_DATA_TYPE_LENGTH > 6 then return 'datetime(6)';
+            else return 'datetime';
+          end case;
         when 'datetimeoffset' then
           return 'datetime';
         when 'geography' then
@@ -231,7 +238,8 @@ BEGIN
                                  when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection')
                                    then '' 
                                  when DATA_TYPE in ('nchar','nvarchar')
-                                   then concat('(',DATA_TYPE_LENGTH,')',' CHARACTER SET UTF8MB4 ')
+                                   -- then concat('(',DATA_TYPE_LENGTH,')',' CHARACTER SET UTF8MB4 ')
+                                   then concat('(',DATA_TYPE_LENGTH,')')
                                  when DATA_TYPE_SCALE is not NULL
                                    then case 
                                           when DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 

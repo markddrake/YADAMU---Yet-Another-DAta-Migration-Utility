@@ -24,6 +24,63 @@ class YadamuDBI {
   get SPATIAL_FORMAT()     { return undefined };
   get DEFAULT_PARAMETERS() { return {} }
   
+  processLog(log,status,logWriter) {
+
+    const logDML         = (status.loglevel && (status.loglevel > 0));
+    const logDDL         = (status.loglevel && (status.loglevel > 1));
+    const logDDLIssues   = (status.loglevel && (status.loglevel > 2));
+    const logTrace       = (status.loglevel && (status.loglevel > 3));
+   
+    if (status.dumpFileName) {
+      fs.writeFileSync(status.dumpFileName,JSON.stringify(log));
+    }
+    
+    log.forEach(function(result) {
+                  const logEntryType = Object.keys(result)[0];
+                  const logEntry = result[logEntryType];
+                  switch (true) {
+                    case (logEntryType === "message") : 
+                      logWriter.write(`${new Date().toISOString()}: ${logEntry}.\n`)
+                      break;
+                    case (logEntryType === "dml") : 
+                      logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.\n`)
+                      break;
+                    case (logEntryType === "info") :
+                      logWriter.write(`${new Date().toISOString()}[INFO]: "${JSON.stringify(logEntry)}".\n`);
+                      break;
+                    case (logDML && (logEntryType === "dml")) :
+                      logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}.\n`)
+                      break;
+                    case (logDDL && (logEntryType === "ddl")) :
+                      logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}.\n`) 
+                      break;
+                    case (logTrace && (logEntryType === "trace")) :
+                      logWriter.write(`${new Date().toISOString()} [TRACE]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".\n' : '\n'}${logEntry.sqlStatement}.\n`)
+                      break;
+                    case (logEntryType === "error"):
+   	                switch (true) {
+   		              case (logEntry.severity === 'FATAL') :
+                          status.errorRaised = true;
+                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}\n`)
+   				        break
+   					  case (logEntry.severity === 'WARNING') :
+                          status.warningRaised = true;
+                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
+                          break;
+   					  case (logEntry.severity === 'CONTENT_TOO_LARGE') :
+                          status.errorRaised = true;
+                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: Cannot import columns larger than 32k in 12c.\n`)
+                          break;
+                        case (logDDLIssues) :
+                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
+                      } 	
+                  } 
+   				if ((status.sqlTrace) && (logEntry.sqlStatement)) {
+   				  status.sqlTrace.write(`${logEntry.sqlStatement}\n\/\n`)
+   		        }
+    }) 
+  }    
+    
   updateParameters(parameters,additionalParameters) {
     Object.keys(additionalParameters).forEach(function(key) {
       parameters[key] = additionalParameters[key]
@@ -75,10 +132,10 @@ class YadamuDBI {
     this.metadata = metadata
   }
   
-  async executeDDL(schema, ddl) {
+  async executeDDL(ddl) {
     await Promise.all(ddl.map(async function(ddlStatement) {
       try {
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
+        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TOUSER);
         if (this.status.sqlTrace) {
           this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
         }
@@ -119,7 +176,7 @@ class YadamuDBI {
   **
   */
   
-  async initialize(schema) {
+  async initialize() {
     if (this.status.sqlTrace) {
        if (this.status.sqlTrace._writableState.ended === true) {
          this.status.sqlTrace = fs.createWriteStream(this.status.sqlTrace.path,{"flags":"a"})
@@ -205,7 +262,7 @@ class YadamuDBI {
   **
   */
   
-  async getSystemInformation(schema,EXPORT_VERSION) {     
+  async getSystemInformation(EXPORT_VERSION) {     
     throw new Error('Unimplemented Method')
   }
 
@@ -215,11 +272,11 @@ class YadamuDBI {
   **
   */
 
-  async getDDLOperations(schema) {
+  async getDDLOperations() {
     return undefined
   }
   
-  async getSchemaInfo(schema) {
+  async getSchemaInfo() {
     return []
   }
 
@@ -245,18 +302,18 @@ class YadamuDBI {
   **
   */
   
-  async initializeDataLoad(schema) {
+  async initializeDataLoad() {
     throw new Error('Unimplemented Method')
   }
   
-  async generateStatementCache(StatementGenerator,schema,executeDDL) {
+  async generateStatementCache(StatementGenerator,executeDDL) {
     const statementGenerator = new StatementGenerator(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
-    this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL,this.systemInformation.vendor)
+    this.statementCache = await statementGenerator.generateStatementCache(this.metadata, executeDDL, this.systemInformation.vendor)
   }
 
-  getTableWriter(TableWriter,schema,table) {
+  getTableWriter(TableWriter,table) {
     const tableName = this.metadata[table].tableName 
-    return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);      
+    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.logWriter);      
   }
  
   async finalizeDataLoad() {

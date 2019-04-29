@@ -47,9 +47,9 @@ class StatementGenerator {
    
   }
   
-  createBulkOperation(database, schema, tableName, columnList, targetDataTypes) {
+  createBulkOperation(database, tableName, columnList, targetDataTypes) {
 
-    const table = new sql.Table(database + '.' + schema + '.' + tableName);
+    const table = new sql.Table(database + '.' + this.dbi.parameters.TOUSER + '.' + tableName);
     table.create = false
     
     const columns = JSON.parse('[' +  columnList + ']')
@@ -202,7 +202,7 @@ class StatementGenerator {
     return table
   }
 
-  async generateStatementCache (schema, metadata, executeDDL, database) {
+  async generateStatementCache (metadata, executeDDL, database) {
     
     const sqlStatement = `SET @RESULTS = '{}'; CALL master.dbo.sp_GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;	
     
@@ -210,7 +210,7 @@ class StatementGenerator {
       this.status.sqlTrace.write(`${sqlStatement};\n--\n`)
     }
 
-    let results = await this.dbi.getRequest().input('TARGET_DATABASE',sql.VARCHAR,schema).input('METADATA',sql.NVARCHAR,JSON.stringify({metadata : metadata})).execute('master.dbo.sp_GENERATE_SQL');
+    let results = await this.dbi.getRequest().input('TARGET_DATABASE',sql.VARCHAR,this.dbi.parameters.TOUSER).input('METADATA',sql.NVARCHAR,JSON.stringify({metadata : metadata})).execute('master.dbo.sp_GENERATE_SQL');
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
     const tables = Object.keys(metadata); 
@@ -229,7 +229,7 @@ class StatementGenerator {
       tableInfo.bulkSupported = this.bulkSupported(tableInfo.targetDataTypes);
       try {
         if (tableInfo.bulkSupported) {
-          tableInfo.bulkOperation = this.createBulkOperation(database,schema,table,metadata[table].columns,tableInfo.targetDataTypes);
+          tableInfo.bulkOperation = this.createBulkOperation(database,table,metadata[table].columns,tableInfo.targetDataTypes);
         }
         else {
           // Place holder for caching rows.
@@ -242,7 +242,7 @@ class StatementGenerator {
     },this);
     
     if (executeDDL === true) {
-      await this.dbi.executeDDL(schema,ddlStatements);
+      await this.dbi.executeDDL(ddlStatements);
     }
     return statementCache;
   }

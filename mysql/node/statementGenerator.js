@@ -12,11 +12,11 @@ class StatementGenerator {
   }
   
 
-  async generateStatementCache (schema, metadata, executeDDL) {    
-      
+  async generateStatementCache (metadata, executeDDL) {    
+  
     const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS"`;                       
    
-    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : metadata}),schema]);
+    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : metadata}),this.dbi.parameters.TOUSER]);
     results = results.pop();
     let statementCache = JSON.parse(results[0].SQL_STATEMENTS)
     if (statementCache === null) {
@@ -59,9 +59,8 @@ class StatementGenerator {
         } 
         return tableInfo.ddl;
       },this);
-   
       if (executeDDL === true) {
-        await this.dbi.executeDDL(schema,ddlStatements);
+        await this.dbi.executeDDL(ddlStatements);
       }
     }
     return statementCache;

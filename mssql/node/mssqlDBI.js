@@ -165,10 +165,10 @@ class MsSQLDBI extends YadamuDBI {
     }     
   }
   
-  async executeDDL(schema, ddl) {
-    await this.createSchema(schema);
+  async executeDDL(ddl) {
+    await this.createSchema(this.parameters.TOUSER);
     await Promise.all(ddl.map(async function(ddlStatement) {
-      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
+      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TOUSER);
       try {
         if (this.status.sqlTrace) {
           this.status.sqlTrace.write(`${ddlStatement}\ngo\n`);
@@ -204,7 +204,7 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
   
-  async initialize(schema) {
+  async initialize() {
      this.pool = await this.getConnectionPool()
   }
 
@@ -306,7 +306,7 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
   
-  async getSystemInformation(schema,EXPORT_VERSION) {     
+  async getSystemInformation(EXPORT_VERSION) {     
   
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlSystemInformation}\ngo\n`)
@@ -321,7 +321,7 @@ class MsSQLDBI extends YadamuDBI {
      ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : this.schema
+     ,schema             : this.parameters.OWNER
      ,exportVersion      : EXPORT_VERSION
 	 ,sessionUser        : sysInfo.SESSION_USER
 	 ,currentUser        : sysInfo.CURRENT_USER
@@ -340,7 +340,7 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
 
-  async getDDLOperations(schema) {
+  async getDDLOperations() {
     return undefined
   }
   
@@ -350,7 +350,7 @@ class MsSQLDBI extends YadamuDBI {
       this.status.sqlTrace.write(`${sqlTableInfo}\ngo\n`)
     }
     
-    const results = await this.pool.request().input('SCHEMA',sql.VarChar,schema).query(sqlTableInfo);
+    const results = await this.pool.request().input('SCHEMA',sql.VarChar,this.parameters[schema]).query(sqlTableInfo);
     return results.recordsets[0]
   
   }
@@ -397,17 +397,17 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
   
-  async initializeDataLoad(schema) {
+  async initializeDataLoad() {
   }
   
-  async generateStatementCache(schema,executeDDL) {
+  async generateStatementCache(executeDDL) {
     /* ### OVERRIDE ### Pass additional parameter Database Name */
     const statementGenerator = new StatementGenerator(this, this.parameters.BATCHSIZE, this.parameters.COMMITSIZE, this.status, this.logWriter);
-    this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL, this.connectionProperties.database)
+    this.statementCache = await statementGenerator.generateStatementCache(this.metadata, executeDDL, this.connectionProperties.database)
   }
   
-  getTableWriter(schema,table) {
-    return super.getTableWriter(TableWriter,schema,table)
+  getTableWriter(table) {
+    return super.getTableWriter(TableWriter,table)
   }
 
   async finalizeDataLoad() {

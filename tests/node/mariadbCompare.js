@@ -34,6 +34,22 @@ class MariadbCompare extends MariadbDBI {
       super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
     }
     
+    async recreateSchema(schema,password) {
+        
+      try {
+        const dropUser = `drop schema if exists "${schema}"`;
+        await this.executeSQL(dropUser,{});      
+      } catch (e) {
+        if (e.errorNum && (e.errorNum === 1918)) {
+        }
+        else {
+          throw e;
+        }
+      }
+      const createUser = `create schema "${schema}"`;
+      await this.executeSQL(createUser,{});      
+    }    
+
     async report(source,target,timingsArray) {
 
       const timings = timingsArray[timingsArray.length - 1];
@@ -140,22 +156,7 @@ class MariadbCompare extends MariadbDBI {
         }
       },this)
     }
-    
-    async recreateSchema(schema,password) {
-        
-      try {
-        const dropUser = `drop schema if exists "${schema}"`;
-        await this.executeSQL(dropUser,{});      
-      } catch (e) {
-        if (e.errorNum && (e.errorNum === 1918)) {
-        }
-        else {
-          throw e;
-        }
-      }
-      const createUser = `create schema "${schema}"`;
-      await this.executeSQL(createUser,{});      
-    }      
+      
 }
 
 module.exports = MariadbCompare

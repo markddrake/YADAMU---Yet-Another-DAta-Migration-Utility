@@ -4,7 +4,7 @@ const Yadamu = require('../../common/yadamu.js');
 
 class StatementGenerator {
   
-  constructor(dbi ,ddlRequired, batchSize, commitSize) {
+  constructor(dbi, ddlRequired, batchSize, commitSize) {
     
     this.dbi = dbi;
     this.ddlRequired = ddlRequired
@@ -13,10 +13,10 @@ class StatementGenerator {
   }
   
 
-  async generateStatementCache (schema, systemInformation, metadata, executeDDL) {    
+  async generateStatementCache (systemInformation, metadata, executeDDL) {    
   
     if (executeDDL) {
-      this.executeDDL(schema,ddl);
+      this.dbi.executeDDL(ddl);
     }
   
     return statementCache;

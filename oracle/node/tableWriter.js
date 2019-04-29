@@ -11,9 +11,9 @@ const sqlRollbackSavePoint =
 
 class TableWriter {
 
-  constructor(dbi,schema,tableName,tableInfo,status,logWriter) {
+  constructor(dbi,tableName,tableInfo,status,logWriter) {
     this.dbi = dbi;
-    this.schema = schema;
+    this.schema = this.dbi.parameters.TOUSER;
     this.tableName = tableName
     this.tableInfo = tableInfo;
     this.status = status;
@@ -36,15 +36,15 @@ class TableWriter {
     this.logDDLIssues   = true;
   }
 
-  async disableTriggers(schema,tableName) {
+  async disableTriggers() {
   
-    const sqlStatement = `ALTER TABLE "${schema}"."${tableName}" DISABLE ALL TRIGGERS`;
+    const sqlStatement = `ALTER TABLE "${this.schema}"."${this.tableName}" DISABLE ALL TRIGGERS`;
     return this.dbi.executeSQL(sqlStatement,[]);
     
   }
 
   async initialize() {
-    await this.disableTriggers(this.schema,this.tableName);
+    await this.disableTriggers();
   }
 
   batchComplete() {
@@ -55,9 +55,9 @@ class TableWriter {
     return (rowCount % this.tableInfo.commitSize) === 0;
   }
   
-  async enableTriggers(schema,tableName) {
+  async enableTriggers() {
   
-    const sqlStatement = `ALTER TABLE "${schema}"."${tableName}" ENABLE ALL TRIGGERS`;
+    const sqlStatement = `ALTER TABLE "${this.schema}"."${this.tableName}" ENABLE ALL TRIGGERS`;
     return this.dbi.executeSQL(sqlStatement,[]);
     
   }
@@ -73,7 +73,12 @@ class TableWriter {
             // row[idx] = Buffer.from(JSON.stringify(row[idx]))
             // Default JSON Storage model is JSON store as CLOB.
             // JSON must be shipped in Serialized Form
-            return JSON.stringify(row[idx])
+            if (typeof row[idx] === 'object') {
+              return JSON.stringify(row[idx])
+            }
+            else {
+              return row[idx]
+            }
           } 
           if (this.tableInfo.binds[idx].type === oracledb.CLOB) {
             this.lobUsage++
@@ -283,7 +288,7 @@ end;`
       this.skipTable = await this.writeBatch();   
     }
     await this.dbi.commitTransaction();
-    await this.enableTriggers(this.schema,this.tableName);
+    await this.enableTriggers();
     return {
       startTime    : this.startTime
     , endTime      : this.endTime

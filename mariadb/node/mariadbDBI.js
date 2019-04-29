@@ -151,7 +151,7 @@ class MariadbDBI extends YadamuDBI {
   }
   
   async executeSQL(sqlStatement,args) {
-    
+      
    if (this.status.sqlTrace) {
      this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
    }
@@ -159,10 +159,10 @@ class MariadbDBI extends YadamuDBI {
    return await this.conn.query(sqlStatement,args)
   }  
 
-  async executeDDL(schema, ddl) {
-    await this.createSchema(schema);
+  async executeDDL(ddl) {
+    await this.createSchema(this.parameters.TOUSER);
     await Promise.all(ddl.map(function(ddlStatement) {
-      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
+      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TOUSER);
       return this.executeSQL(ddlStatement) 
     },this))
   }
@@ -204,8 +204,8 @@ class MariadbDBI extends YadamuDBI {
   **
   */
   
-  async initialize(schema) {
-    super.initialize(schema);
+  async initialize() {
+    super.initialize();
     await this.getConnectionPool();
   }
 
@@ -290,7 +290,7 @@ class MariadbDBI extends YadamuDBI {
   **
   */
   
-  async getSystemInformation(schema,EXPORT_VERSION) {     
+  async getSystemInformation(EXPORT_VERSION) {     
   
     const results = await this.executeSQL(sqlSystemInformation); 
     const sysInfo = results[0];
@@ -300,7 +300,7 @@ class MariadbDBI extends YadamuDBI {
      ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : schema
+     ,schema             : this.parameters.OWNER
      ,exportVersion      : EXPORT_VERSION
      ,sessionUser        : sysInfo.SESSION_USER
      ,dbName             : sysInfo.DATABASE_NAME
@@ -318,13 +318,13 @@ class MariadbDBI extends YadamuDBI {
   **
   */
 
-  async getDDLOperations(schema) {
+  async getDDLOperations() {
     return undefined
   }
     
-  async getSchemaInfo(schema,status) {
+  async getSchemaInfo(schema) {
       
-    return await this.executeSQL(sqlSchemaInfo,[schema]);
+    return await this.executeSQL(sqlSchemaInfo,[this.parameters[schema]]);
 
   }
 
@@ -372,19 +372,19 @@ class MariadbDBI extends YadamuDBI {
   **
   */
   
-  async initializeDataLoad(schema) {
+  async initializeDataLoad() {
   }
   
-  async generateStatementCache(schema,executeDDL) {
-    await super.generateStatementCache(StatementGenerator,schema,executeDDL) 
+  async generateStatementCache(executeDDL) {
+    await super.generateStatementCache(StatementGenerator,executeDDL) 
   }
 
   createParser(query,objectMode) {
     return new DBParser(query,objectMode,this.logWriter);
   }  
 
-  getTableWriter(schema,table) {
-    return super.getTableWriter(TableWriter,schema,table)
+  getTableWriter(table) {
+    return super.getTableWriter(TableWriter,table)
   }
 
   async finalizeDataLoad() {

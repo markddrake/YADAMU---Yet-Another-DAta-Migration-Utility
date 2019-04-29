@@ -180,8 +180,7 @@ class MySQLDBI extends YadamuDBI {
     const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
     const sqlQueryPacketSize = `SELECT @@max_allowed_packet`;
     const sqlSetPacketSize = `SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`
-    
-    
+      
     let results = await this.executeSQL(sqlQueryPacketSize);
     
     if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
@@ -240,10 +239,13 @@ class MySQLDBI extends YadamuDBI {
   **
   */
     
-  async executeDDL(schema,ddl) {
-    await this.createSchema(schema);
+  async executeDDL(ddl) {
+    await this.createSchema(this.parameters.TOUSER);
     await Promise.all(ddl.map(function(ddlStatement) {
-      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
+      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TOUSER);
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
+      }
       return this.conn.query(ddlStatement) 
     },this))
   }
@@ -278,7 +280,7 @@ class MySQLDBI extends YadamuDBI {
   **
   */
   
-  async initialize(schema) {
+  async initialize() {
     super.initialize();
     await this.getConnection();
   }
@@ -376,7 +378,7 @@ class MySQLDBI extends YadamuDBI {
   **
   */
   
-  async getSystemInformation(schema,EXPORT_VERSION) {     
+  async getSystemInformation(EXPORT_VERSION) {     
   
     const results = await this.executeSQL(sqlSystemInformation); 
     const sysInfo = results[0];
@@ -386,7 +388,7 @@ class MySQLDBI extends YadamuDBI {
      ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : schema
+     ,schema             : this.parameters.OWNER
      ,exportVersion      : EXPORT_VERSION
      ,sessionUser        : sysInfo.SESSION_USER
      ,dbName             : sysInfo.DATABASE_NAME
@@ -426,14 +428,14 @@ class MySQLDBI extends YadamuDBI {
     }
   }
   
-  async getDDLOperations(schema) {
+  async getDDLOperations() {
     return undefined
   }
     
   async getSchemaInfo(schema) {
       
-    const tableInfo = await this.generateTableInfoQuery(schema);
-    return await this.executeSQL(tableInfo,[schema]);
+    const tableInfo = await this.generateTableInfoQuery();
+    return await this.executeSQL(tableInfo,[this.parameters[schema]]);
 
   }
 
@@ -470,18 +472,10 @@ class MySQLDBI extends YadamuDBI {
   **
   */
   
-  async initializeDataLoad(schema) {
+  async initializeDataLoad() {
   }
   
-  async generateStatementCache(schema,executeDDL) {
-    await super.generateStatementCache(StatementGenerator,schema,executeDDL)
-  }
-
-  getTableWriter(schema,table) {
-    return super.getTableWriter(TableWriter,schema,table)
-  }
-
-  async generateStatementCache(schema,executeDDL) {
+  async generateStatementCache(executeDDL) {
     let statementGenerator = undefined;
     const sqlVersion = `SELECT @@version`
     const results = await this.executeSQL(sqlVersion);
@@ -494,9 +488,12 @@ class MySQLDBI extends YadamuDBI {
   
     // Uncomment the folloing statement Force 5.7 Code Path
     // statementGenerator = new StatementGenerator57(this,ddlRequired,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.status,this.logWriter);
-    this.statementCache = await statementGenerator.generateStatementCache(schema, this.metadata, executeDDL)
+    this.statementCache = await statementGenerator.generateStatementCache(this.metadata, executeDDL)
   }
   
+  getTableWriter(table) {
+    return super.getTableWriter(TableWriter,table)
+  }
 
   async finalizeDataLoad() {
   }  

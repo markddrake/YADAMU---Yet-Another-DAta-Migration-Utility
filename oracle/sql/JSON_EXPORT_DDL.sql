@@ -47,7 +47,7 @@ as
   C_CARRIAGE_RETURN  CONSTANT CHAR(1) := CHR(13);
   C_SINGLE_QUOTE     CONSTANT CHAR(1) := CHR(39);
 --
-  G_ERROR_RAISED     BOOLEAN := FALSE;
+  G_ABORT_PROCESSING BOOLEAN := FALSE;
 --
 function IMPORT_DDL_LOG
 return T_RESULTS_CACHE
@@ -84,7 +84,7 @@ PROCEDURE LOG_ERROR(P_SEVERITY VARCHAR2, P_SQL_STATEMENT CLOB, P_SQLCODE NUMBER,
 as
 begin
   RESULTS_CACHE.extend();
-  G_ERROR_RAISED := TRUE;
+  G_ABORT_PROCESSING := P_SEVERITY = C_FATAL_ERROR;
   select JSON_OBJECT('error' value JSON_OBJECT('severity' value P_SEVERITY, 'code' value P_SQLCODE, 'msg' value P_SQLERRM, 'sqlStatement' value P_SQL_STATEMENT, 'details' value P_STACK
                      $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB) returning CLOB)
@@ -465,7 +465,7 @@ begin
   SET_CURRENT_SCHEMA(P_TARGET_SCHEMA);
    
   for s in getDDLStatements loop
-    exit when G_ERROR_RAISED;
+    exit when G_ABORT_PROCESSING;
     begin
       V_DDL_STATEMENT := s.DDL_STATEMENT;
       if (substr(V_DDL_STATEMENT,1,21) = '<?xml version="1.0"?>') then

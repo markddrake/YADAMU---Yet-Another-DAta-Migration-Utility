@@ -170,7 +170,7 @@ class FileWriter extends YadamuDBI {
   **
   */
   
-  async getSystemInformation(schema,EXPORT_VERSION) {     
+  async getSystemInformation(EXPORT_VERSION) {     
   }
 
   /*
@@ -179,7 +179,7 @@ class FileWriter extends YadamuDBI {
   **
   */
 
-  async getDDLOperations(schema) {
+  async getDDLOperations() {
     return []
   }
   
@@ -199,7 +199,7 @@ class FileWriter extends YadamuDBI {
       
   }
 
-  getTableWriter(schema,tableName) {
+  getTableWriter(tableName) {
 
     if (this.firstTable === true) {
       this.firstTable = false

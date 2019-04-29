@@ -8,8 +8,8 @@ def SCHEMA = "&2"
 select to_char(SYS_EXTRACT_UTC(SYSTIMESTAMP),'YYYY-MM-DD"T"HH24:MI:SS"Z"') || ': "&SCHEMA"' "Timestamp"
   from DUAL
 /
-drop user &SCHEMA cascade
+drop user "&SCHEMA" cascade
 /
-grant connect, resource, unlimited tablespace to &SCHEMA identified by oracle
+grant connect, resource, unlimited tablespace to "&SCHEMA" identified by oracle
 /
 quit

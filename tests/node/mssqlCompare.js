@@ -14,7 +14,9 @@ class MsSQLCompare extends MsSQLDBI {
     
     configureTest(logger,connectionProperties,testParameters,schema) {
        this.logger = logger;
-       connectionProperties.database = schema.schema;
+       if (schema !== undefined) {
+         connectionProperties.database = schema.schema;
+       }
        super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
     }
     

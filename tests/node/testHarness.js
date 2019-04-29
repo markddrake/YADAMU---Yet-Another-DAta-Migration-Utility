@@ -19,7 +19,6 @@ const RDBMS    = 2;
 
 class TestHarness {
 
-
   constructor() {
   
     this.yadamu        = new YadamuTest(); 
@@ -116,15 +115,45 @@ class TestHarness {
   }
   
   async compareSchemas(db,sourceSchema,targetSchema,timings) {
-     
-     console.log(sourceSchema,targetSchema)
-     
+
      const dbi = this.getDatabaseInterface(db);
      dbi.configureTest(this.ros,this.connections[db],{})
      await dbi.initialize();
      await dbi.report(sourceSchema,targetSchema,timings);
      await dbi.finalize();
      
+  }
+  
+  printResults(sourceDescription,targetDescription,elapsedTime) {
+  
+    if (this.ros !== process.stdout) {
+      
+      const colSizes = [24,128,12]
+      let seperatorSize = (colSizes.length * 3) - 1;
+      colSizes.forEach(function(size) {
+        seperatorSize += size;
+      },this);
+    
+      this.ros.write('\n+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+     
+      this.ros.write(`| ${'TIMESTAMP'.padEnd(colSizes[0])} |`
+                 + ` ${'OPERATION'.padEnd(colSizes[1])} |`
+                 + ` ${'ELASPED TIME'.padStart(colSizes[2])} |` 
+                 
+                 + '\n');
+      this.ros.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+      
+      this.ros.write(`| ${new Date().toISOString().padEnd(colSizes[0])} |`
+                 + ` ${(sourceDescription + ' --> ' + targetDescription).padEnd(colSizes[1])} |`
+                 + ` ${(elapsedTime.toString()+"ms").padStart(colSizes[2])} |` 
+                 + '\n');
+                 
+      this.ros.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+    }
+    else {
+      this.ros.write(`${new Date().toISOString()}[PUMP: Operation complete] SOURCE:[${sourceDescription}]. TARGET:[${targetDescription}]. Elapsed Time: ${elapsedTime}ms.\n`);
+    }
+  
   }
 
   async fileRoundtrip(db,parameters,sourceFile,targetSchema1,targetFile1,targetSchema2,targetFile2) {
@@ -186,23 +215,38 @@ class TestHarness {
       fc.configureTest(this.ros,{},(dbi.parameters.TABLE_MATCHING ? {TABLE_MATCHING : dbi.parameters.TABLE_MATCHING} : {}))
       await fc.report(sourceFile, path.join(testRoot,targetFile1), path.join(testRoot,targetFile2),timings);    
   }
+  
+  propogateTableMatching(sourceDB,targetDB) {
+    if (sourceDB.parameters.TABLE_MATCHING && !targetDB.parameters.TABLE_MATCHING) {
+      targetDB.parameters.TABLE_MATCHING = sourceDB.parameters.TABLE_MATCHING
+    }
+    else {
+      if (targetDB.parameters.TABLE_MATCING && !sourceDB.parameters.TABLE_MATCHING) {
+        sourceDB.parameters.TABLE_MATCHING = targetDB.parameters.TABLE_MATCHING
+      }
+    }
+  }
 
   async databaseRoundtrip(source,target,clone,parameters,steps) {
       
-      let sourceDB
-      let targetDB
-      let sourceDescription
-      let targetDescription     
       
       let startTime
       let elapsedTime
   
       const timings = []
-      
+            
       /*
       **
-      ** Clone Mode :
-      *
+      ** If source vendor and target vendor are the same test consists of a single operation. The operation does a DDL_AND_DATA mode copy of the data from the source schema to the target schema.
+      **
+      **
+      ** If source vendor and target vendor are difference the test consists of two, or possiblly three operations.
+      **
+      ** If clone mode = true 
+      ** 
+      */
+            
+      /*
       **    Ensure that the table structure of the target is a direct clone of the source.
       **
       **    If source = target then both database are managed by the same vendor. The test consists of a single operation. The operation is a direct clone of the source schema into the target schema. MODE is DDL_AND_DLL. 
@@ -214,88 +258,77 @@ class TestHarness {
       **       The third operation is a copy from the target vendor back to the source vendor using the schema created in the first operation. 
       **
       */
-      
-      
-      if ((clone === true) && (source !== target)) {
-        const testParameters = { "MODE" : "DDL_ONLY" }
-        const owner  = this.getDatabaseSchema(source,steps[0])  
-        const toUser = this.getDatabaseSchema(source,steps[2])  
-        sourceDB = this.getTestInterface(source,'OWNER',owner,testParameters,this.connections[source]);
-        targetDB = this.getTestInterface(source,'TOUSER',toUser,testParameters,this.connections[source]);
-        timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
-      }
 
-      let testParameters = parameters ? Object.assign({},parameters) : {}
-      if (clone === true) {
-        testParameters.MODE = 'DDL_AND_DATA';
-      } 
+      let targetSchema  = undefined;
+      let sourceDescription = undefined;
+      const originalSchema = this.getDatabaseSchema(source,steps[0])  
       
-      const sourceSchema = this.getDatabaseSchema(source,steps[0])  
-      let targetSchema = this.getDatabaseSchema(target,steps[1])  
-      await this.recreateSchema(target,this.connections[target],targetSchema);
-      sourceDescription = source === 'mssql' ? `${sourceSchema.schema}"."${sourceSchema.owner}` : sourceSchema
-      targetDescription = target === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
-      sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,testParameters,this.connections[source]);
-      targetDB = this.getTestInterface(target,'TOUSER',targetSchema,testParameters,this.connections[target]);
-      startTime = new Date().getTime();
-      timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
-      elapsedTime = new Date().getTime() - startTime
-      this.printResults(`"${source}"://"${sourceDescription}"`,`"${target}"://"${targetDescription}"`,elapsedTime)
-     
-      if (source !== target) {
-        testParameters = parameters ? Object.assign({},parameters) : {}
-        if (clone === true) {
-          testParameters.MODE = 'DATA_ONLY';
-        } 
-        owner = toUser  
-        targetSchema = this.getDatabaseSchema(source,steps[2])  
-        await this.recreateSchema(source,this.connections[source],targetSchema);
-        sourceDescription = target === 'mssql' ? `${owner.schema}"."${owner.owner}` : owner
-        targetDescription = source === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
-        sourceDB = this.getTestInterface(target,'OWNER',owner,testParameters,this.connections[target]);
-        targetDB = this.getTestInterface(source,'TOUSER',targetSchema,testParameters,this.connections[source]);
+      let testParameters = parameters ? Object.assign({},parameters) : {}
+
+      if (source === target) {
+        // Only one operation
+        testParameters.MODE = 'DDL_AND_DATA';
+        targetSchema = this.getDatabaseSchema(target,steps[1])  
+        const targetDescription = target === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
+        const sourceSchema = originalSchema
+        sourceDescription = source === 'mssql' ? `${sourceSchema.schema}"."${sourceSchema.owner}` : sourceSchema
+        targetSchema = this.getDatabaseSchema(source,steps[1])  
+        await this.recreateSchema(source,this.connections[target],targetSchema);
+        const sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,testParameters,this.connections[source]);
+        const targetDB = this.getTestInterface(source,'TOUSER',targetSchema,testParameters,this.connections[source]);
         startTime = new Date().getTime();
         timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
         elapsedTime = new Date().getTime() - startTime
         this.printResults(`"${target}"://"${sourceDescription}"`,`"${source}"://"${targetDescription}"`,elapsedTime)
       }
-
-      await this.compareSchemas(source, sourceSchema, targetSchema, timings);
+      else {
+        // Two or more operations
+        if (clone === true) {
+          // Copy Source to Source DDL_ONLY
+          testParameters.MODE = 'DDL_ONLY';
+          const sourceSchema = originalSchema
+          const sourceDescription = source === 'mssql' ? `${sourceSchema.schema}"."${sourceSchema.owner}` : sourceSchema
+          const targetSchema = this.getDatabaseSchema(source,steps[2])  
+          const targetDescription = source === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
+          await this.recreateSchema(source,this.connections[source],targetSchema);
+          const sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,testParameters,this.connections[source]);
+          const targetDB = this.getTestInterface(source,'TOUSER',targetSchema,testParameters,this.connections[source]);
+          startTime = new Date().getTime();
+          timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
+          elapsedTime = new Date().getTime() - startTime
+          this.printResults(`"${source}"://"${sourceDescription}" [Clone]`,`"${source}"://"${targetDescription}" [Clone]`,elapsedTime)
+        }
+        // Copy Source to Target
+        testParameters = parameters ? Object.assign({},parameters) : {}
+        let sourceSchema = originalSchema
+        sourceDescription = source === 'mssql' ? `${sourceSchema.schema}"."${sourceSchema.owner}` : sourceSchema
+        targetSchema = this.getDatabaseSchema(target,steps[1])  
+        await this.recreateSchema(target,this.connections[target],targetSchema);
+        let targetDescription = target === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
+        let sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,testParameters,this.connections[source]);
+        let targetDB = this.getTestInterface(target,'TOUSER',targetSchema,testParameters,this.connections[target]);
+        this.propogateTableMatching(sourceDB,targetDB);
+        startTime = new Date().getTime();
+        timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
+        elapsedTime = new Date().getTime() - startTime
+        this.printResults(`"${source}"://"${sourceDescription}"`,`"${target}"://"${targetDescription}"`,elapsedTime)
+        // Copy Target to Source
+        sourceSchema = targetSchema
+        sourceDescription = target === 'mssql' ? `${sourceSchema.schema}"."${sourceSchema.owner}` : sourceSchema
+        targetSchema = this.getDatabaseSchema(source,steps[2])  
+        targetDescription = source === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
+        sourceDB = this.getTestInterface(target,'OWNER',sourceSchema,testParameters,this.connections[target]);
+        targetDB = this.getTestInterface(source,'TOUSER',targetSchema,testParameters,this.connections[source]);
+        this.propogateTableMatching(sourceDB,targetDB);
+        startTime = new Date().getTime();
+        timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
+        elapsedTime = new Date().getTime() - startTime
+        this.printResults(`"${target}"://"${sourceDescription}"`,`"${source}"://"${targetDescription}"`,elapsedTime)
+      }        
+          
+      await this.compareSchemas(source, originalSchema, targetSchema, timings);
       
   }
-  
-  printResults(sourceDescription,targetDescription,elapsedTime) {
-  
-    if (this.ros !== process.stdout) {
-      
-      const colSizes = [24,128,12]
-      let seperatorSize = (colSizes.length * 3) - 1;
-      colSizes.forEach(function(size) {
-        seperatorSize += size;
-      },this);
-    
-      this.ros.write('\n+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-     
-      this.ros.write(`| ${'TIMESTAMP'.padEnd(colSizes[0])} |`
-                 + ` ${'OPERATION'.padEnd(colSizes[1])} |`
-                 + ` ${'ELASPED TIME'.padStart(colSizes[2])} |` 
-                 
-                 + '\n');
-      this.ros.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-      
-      this.ros.write(`| ${new Date().toISOString().padEnd(colSizes[0])} |`
-                 + ` ${(sourceDescription + ' --> ' + targetDescription).padEnd(colSizes[1])} |`
-                 + ` ${(elapsedTime.toString()+"ms").padStart(colSizes[2])} |` 
-                 + '\n');
-                 
-      this.ros.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
-    }
-    else {
-      this.ros.write(`${new Date().toISOString()}[PUMP: Operation complete] SOURCE:[${sourceDescription}]. TARGET:[${targetDescription}]. Elapsed Time: ${elapsedTime}ms.\n`);
-    }
-  
-  }
-
 
   async copyContent(source,target,parameters,directory,sourceInfo,targetInfo) {
  
@@ -311,14 +344,13 @@ class TestHarness {
   
       const timings = []
 
-      this.yadamu.reset();      
       const testParameters = parameters ? parameters : {}
       
       if (source === 'file') {
         const file = directory ? path.join(directory,sourceInfo) : sourceInfo
         sourceDescription = file;
         sourceDB = new FileReader(this.yadamu);
-        sourceDB.configureTest({},{FILE : file},this.DEFAULT_PARAMETERS);
+        sourceDB.configureTest({},{FILE : file},{});
       }
       else {
         const dbSchema = this.getDatabaseSchema(source,sourceInfo)

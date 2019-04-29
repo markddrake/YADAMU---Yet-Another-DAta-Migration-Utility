@@ -53,7 +53,7 @@ class DBInterface extends YadamuDBI {
   **
   */
   
-  async initialize(schema) {
+  async initialize() {
   }
 
   /*
@@ -128,7 +128,7 @@ class DBInterface extends YadamuDBI {
   **
   */
   
-  async getSystemInformation(schema,EXPORT_VERSION) {     
+  async getSystemInformation(EXPORT_VERSION) {     
   }
 
   /*
@@ -137,7 +137,7 @@ class DBInterface extends YadamuDBI {
   **
   */
 
-  async getDDLOperations(schema) {
+  async getDDLOperations() {
     return undefined
   }
   
@@ -159,7 +159,7 @@ class DBInterface extends YadamuDBI {
   **
   */
   
-  async initializeDataLoad(schema) {
+  async initializeDataLoad() {
   }
   
   async finalizeDataLoad() {

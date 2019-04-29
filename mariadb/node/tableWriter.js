@@ -4,9 +4,8 @@ const Yadamu = require('../../common/yadamu.js');
 
 class TableWriter {
 
-  constructor(dbi,schema,tableName,tableInfo,status,logWriter) {
+  constructor(dbi,tableName,tableInfo,status,logWriter) {
     this.dbi = dbi;
-    this.schema = schema;
     this.tableName = tableName
     this.tableInfo = tableInfo;
     this.tableInfo.args =  '(' + Array(this.tableInfo.targetDataTypes.length).fill('?').join(',')  + '),';

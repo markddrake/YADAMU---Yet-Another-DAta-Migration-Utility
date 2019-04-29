@@ -6,13 +6,12 @@ const Yadamu = require('./yadamu.js');
 
 class DBWriter extends Writable {
   
-  constructor(dbi,schema,mode,status,logWriter,options) {
+  constructor(dbi,mode,status,logWriter,options) {
 
     super({objectMode: true });
     const self = this;
     
     this.dbi = dbi;
-    this.schema = schema;
     this.mode = mode;
     this.ddlRequired = (mode !== 'DATA_ONLY');    
     this.status = status;
@@ -55,7 +54,7 @@ class DBWriter extends Writable {
         }
       },this)
       this.dbi.setMetadata(metadata)      
-      await this.dbi.generateStatementCache(this.schema,!this.ddlComplete)
+      await this.dbi.generateStatementCache(!this.ddlComplete)
     }
   }   
   
@@ -73,7 +72,7 @@ class DBWriter extends Writable {
     
     // Fetch metadata for tables that already exist in the target schema.
     
-    const targetSchemaInfo = await this.dbi.getSchemaInfo(this.schema);
+    const targetSchemaInfo = await this.dbi.getSchemaInfo('TOUSER');
     
     if (targetSchemaInfo === null) {
       this.dbi.setMetadata(metadata)      
@@ -138,7 +137,7 @@ class DBWriter extends Writable {
           break;
         case 'ddl':
           if ((this.ddlRequired) && (obj.ddl.length > 0) && (this.dbi.isValidDDL())) { 
-            await this.dbi.executeDDL(this.schema,obj.ddl);
+            await this.dbi.executeDDL(obj.ddl);
             this.ddlComplete = true;
           }
           break;
@@ -147,7 +146,7 @@ class DBWriter extends Writable {
           break;
         case 'table':
           if (this.currentTable === undefined) {
-            await this.dbi.initializeDataLoad(this.schema);
+            await this.dbi.initializeDataLoad();
           }
           else {
             const results = await this.currentTable.finalize();
@@ -159,7 +158,7 @@ class DBWriter extends Writable {
           }
           // this.setTableName(obj.table)
           this.tableName = obj.table;
-          this.currentTable = this.dbi.getTableWriter(this.schema,this.tableName);
+          this.currentTable = this.dbi.getTableWriter(this.tableName);
           await this.currentTable.initialize();
           this.rowCount = 0;
           break;

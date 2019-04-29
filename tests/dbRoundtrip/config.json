@@ -3,6 +3,6 @@
     "mode": "dbRoundtrip",
     "clone" : true,
     "tests": [
-        "tests/dbRoundTrip/dbRoundTrip.json"
+        "tests/dbRoundtrip/dbRoundtrip.json"
     ]
 }

@@ -13,7 +13,7 @@
     },
     {
         "source": "file",
-        "targets": ["oracle18c","postgres","mysql","mariadb"],
+        "targets": ["oracle18c","postgres","mysql","mariadb","oracle12c"],
         "directory" : "JSON/MsSQL",
         "reverseDirection" : true,
         "parameters": {
@@ -25,7 +25,7 @@
     },    
     {
         "source": "file",
-        "targets": ["mssql","oracle18c","postgres","mariadb"],
+        "targets": ["oracle18c","mssql","postgres","mariadb","oracle12c"],
         "parameters": {
             "MODE": "DATA_ONLY"
         },

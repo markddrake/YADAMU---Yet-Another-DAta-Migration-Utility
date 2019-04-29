@@ -33,7 +33,7 @@ const dateFormatMasks = {
 
 const timestampFormatMasks = {
         Oracle      : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
-       ,MSSQLSERVER : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
+       ,MSSQLSERVER : 'YYYY-MM-DD"T"HH24:MI:SS.FF7"Z"'
        ,Postgres    : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"+00:00"'
        ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
        ,MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
@@ -236,8 +236,9 @@ class OracleDBI extends YadamuDBI {
   processLog(results) {
     const log = JSON.parse(results.outBinds.log);
     if (log !== null) {
-      Yadamu.processLog(log, this.status, this.logWriter)
+      super.processLog(log, this.status, this.logWriter)
     }
+    return log
   }
 
   async setCurrentSchema(schema) {
@@ -269,7 +270,8 @@ class OracleDBI extends YadamuDBI {
   
     const sqlStatement = `begin :log := JSON_IMPORT.DISABLE_CONSTRAINTS(:schema); end;`;
     const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER}
-    this.processLog(await this.executeSQL(sqlStatement,args))
+    const results = await this.executeSQL(sqlStatement,args)
+    this.processLog(results)
 
   }
   
@@ -277,7 +279,8 @@ class OracleDBI extends YadamuDBI {
   
     const sqlStatement = `begin :log := JSON_IMPORT.ENABLE_CONSTRAINTS(:schema); end;`;
     const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER} 
-    this.processLog(await this.executeSQL(sqlStatement,args))
+    const results = await this.executeSQL(sqlStatement,args)
+    this.processLog(results)
     
   }
   
@@ -285,7 +288,8 @@ class OracleDBI extends YadamuDBI {
   
     const sqlStatement = `begin :log := JSON_IMPORT.REFRESH_MATERIALIZED_VIEWS(:schema); end;`;
     const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER}     
-    this.processLog(await this.executeSQL(sqlStatement,args))
+    const results = await this.executeSQL(sqlStatement,args)
+    this.processLog(results)
 
   }
 
@@ -328,16 +332,17 @@ class OracleDBI extends YadamuDBI {
     }
   }
 
-  async executeDDL(schema, ddl) {
+  async executeDDL(ddl) {
       
     /* ### OVERRIDE ### - Send DDL to server for execution ### */
     
     const sqlStatement = `begin :log := JSON_EXPORT_DDL.APPLY_DDL_STATEMENTS(:ddl, :schema); end;`;
     const ddlLob = await this.lobFromJSON({ systemInformation : this.systemInformation, ddl : ddl});  
-    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , ddl:ddlLob, schema:schema};
+    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , ddl:ddlLob, schema:this.parameters.TOUSER};
     const results = await this.executeSQL(sqlStatement,args);
     await ddlLob.close();
-    this.processLog(results)
+    const log = this.processLog(results)
+    // console.log(JSON.stringify(log,null,2))
     if (this.status.errorRaised === true) {
       throw new Error(`Oracle DDL Execution Failure`);
     }
@@ -349,8 +354,8 @@ class OracleDBI extends YadamuDBI {
   **
   */
   
-  async initialize(schema) {
-    super.initialize(schema);
+  async initialize() {
+    super.initialize();
     this.connection = await this.getConnection(this.connectionProperties,this.status)
   }
     
@@ -436,7 +441,7 @@ class OracleDBI extends YadamuDBI {
     sqlStatement = `${sqlStatement}    :log := JSON_IMPORT.IMPORT_JSON(:json, :schema);\nEND;`;
 
     const results = await this.connection.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024}, json:hndl, schema:this.parameters.TOUSER});
-    return JSON.parse(results.outBinds.log);
+    this.processLog(results);
   }
   
   /*
@@ -451,7 +456,7 @@ class OracleDBI extends YadamuDBI {
   **
   */
 
-  async getSystemInformation(schema,EXPORT_VERSION) {     
+  async getSystemInformation(EXPORT_VERSION) {     
 
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlSystemInformation}\n\/\n`)
@@ -465,7 +470,7 @@ class OracleDBI extends YadamuDBI {
      ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT 
-     ,schema             : schema
+     ,schema             : this.parameters.OWNER
      ,exportVersion      : EXPORT_VERSION
      ,sessionUser        : sysInfo.SESSION_USER
      ,dbName             : sysInfo.DATABASE_NAME
@@ -484,13 +489,13 @@ class OracleDBI extends YadamuDBI {
   **
   */
   
-  async getDDLOperations(schema) {
+  async getDDLOperations() {
 
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlFetchDDL}\n\/\n`)
     }
 
-    const results = await this.connection.execute(sqlFetchDDL,{schema: schema},{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
+    const results = await this.connection.execute(sqlFetchDDL,{schema: this.parameters.OWNER},{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
     const ddl = results.rows.map(function(row) {
       return row.JSON;
     })
@@ -504,7 +509,7 @@ class OracleDBI extends YadamuDBI {
       this.status.sqlTrace.write(`${sqlTableInfo}\n\/\n`)
     }
 
-    const results = await this.connection.execute(sqlTableInfo,{schema: schema},{outFormat: oracledb.OBJECT , fetchInfo:{
+    const results = await this.connection.execute(sqlTableInfo,{schema: this.parameters[schema]},{outFormat: oracledb.OBJECT , fetchInfo:{
                                                                                                      COLUMN_LIST:          {type: oracledb.STRING}
                                                                                                     ,DATA_TYPE_LIST:       {type: oracledb.STRING}
                                                                                                     ,SIZE_CONSTRAINTS:     {type: oracledb.STRING}
@@ -514,7 +519,6 @@ class OracleDBI extends YadamuDBI {
                                                                                                     ,SQL_STATEMENT:        {type: oracledb.STRING}
                                                                                                   }
     });
-  
     return results.rows;
   }
 
@@ -589,18 +593,18 @@ class OracleDBI extends YadamuDBI {
   **
   */
   
-  async initializeDataLoad(schema) {
+  async initializeDataLoad() {
     await this.disableConstraints();
     await this.setDateFormatMask(this.connection,this.status,this.systemInformation.vendor);
     await this.setCurrentSchema(this.parameters.TOUSER)
   }
   
-  async generateStatementCache(schema,executeDDL) {
-    await super.generateStatementCache(StatementGenerator,schema,executeDDL)
+  async generateStatementCache(executeDDL) {
+    await super.generateStatementCache(StatementGenerator,executeDDL)
   }
 
-  getTableWriter(schema,table) {
-    return super.getTableWriter(TableWriter,schema,table)
+  getTableWriter(table) {
+    return super.getTableWriter(TableWriter,table)
   }
   
   async finalizeDataLoad() {

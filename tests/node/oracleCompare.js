@@ -36,7 +36,6 @@ class OracleCompare extends OracleDBI {
     
     async recreateSchema(schema,password) {
         
-        
       try {
         const dropUser = `drop user "${schema}" cascade`;
         await this.executeSQL(dropUser,{});      

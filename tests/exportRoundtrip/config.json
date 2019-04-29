@@ -2,6 +2,6 @@
     "connections": "tests/connections/standardConnections.json",
     "mode": "ExportRoundtrip",
     "tests": [
-        "tests/exportRoundTrip/exportRoundTrip.json"
+        "tests/exportRoundtrip/exportRoundtrip.json"
     ]
 }

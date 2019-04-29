@@ -142,9 +142,8 @@ class TableWriter {
     return ps;
   }
 
-  constructor(dbi,schema,tableName,tableInfo,status,logWriter) {
+  constructor(dbi,tableName,tableInfo,status,logWriter) {
     this.dbi = dbi;
-    this.schema = schema;
     this.tableName = tableName
     this.tableInfo = tableInfo;
     this.status = status;

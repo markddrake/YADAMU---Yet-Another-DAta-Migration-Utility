@@ -109,8 +109,8 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
-  async initialize(schema) {
-    super.initialize(schema);
+  async initialize() {
+    super.initialize();
     this.pgClient = await this.getClient()
   }
 
@@ -297,7 +297,7 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
-  async getSystemInformation(schema,EXPORT_VERSION) {     
+  async getSystemInformation(EXPORT_VERSION) {     
   
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlSystemInformation};\n\--\n`)
@@ -312,7 +312,7 @@ class PostgresDBI extends YadamuDBI {
      ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : this.schema
+     ,schema             : this.parameters.OWNER
      ,exportVersion      : EXPORT_VERSION
 	 ,sessionUser        : sysInfo.session_user
      ,dbName             : sysInfo.database_name
@@ -327,7 +327,7 @@ class PostgresDBI extends YadamuDBI {
   **
   */
 
-  async getDDLOperations(schema) {
+  async getDDLOperations() {
     return undefined
   }
   
@@ -351,7 +351,7 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async getSchemaInfo(schema) {
-    await this.fetchMetadata(schema);
+    await this.fetchMetadata(this.parameters[schema]);
     return this.generateTableInfo();
   }
 
@@ -387,7 +387,7 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
-  async initializeDataLoad(schema) {
+  async initializeDataLoad() {
   }
   
   async createSchema(schema) {
@@ -398,11 +398,11 @@ class PostgresDBI extends YadamuDBI {
     await this.pgClient.query(createSchema);   
   }
   
-  async executeDDL(schema, ddl) {
-    await this.createSchema(schema);
+  async executeDDL(ddl) {
+    await this.createSchema(this.parameters.TOUSER);
     await Promise.all(ddl.map(async function(ddlStatement) {
       try {
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,schema);
+        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TOUSER);
         if (this.status.sqlTrace) {
           this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
         }
@@ -413,13 +413,13 @@ class PostgresDBI extends YadamuDBI {
     },this))
   }
   
-  async generateStatementCache(schema,executeDDL) {
+  async generateStatementCache(executeDDL) {
       
     const sqlStatement = `select GENERATE_SQL($1,$2)`
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
     }
-    const results = await this.pgClient.query(sqlStatement,[{metadata : this.metadata},schema])
+    const results = await this.pgClient.query(sqlStatement,[{metadata : this.metadata},this.parameters.TOUSER])
     this.statementCache = results.rows[0].generate_sql;
     if (this.statementCache === null) {
       this.statementCache = {}
@@ -435,15 +435,15 @@ class PostgresDBI extends YadamuDBI {
       },this);
     
       if (executeDDL === true) {
-        await this.executeDDL(schema,ddlStatements);
+        await this.executeDDL(ddlStatements);
       }
     }
     return this.statementCache;
   }
 
-  getTableWriter(schema,table) {
+  getTableWriter(table) {
     const tableName = this.metadata[table].tableName
-    return new TableWriter(this,schema,tableName,this.statementCache[tableName],this.status,this.logWriter);      
+    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.logWriter);      
   }
   
   async insertBatch(sqlStatement,batch) {

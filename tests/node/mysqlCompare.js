@@ -33,6 +33,22 @@ class MySQLCompare extends MySQLDBI {
       this.logger = logger;
       super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
     }
+    
+    async recreateSchema(schema,password) {
+        
+      try {
+        const dropUser = `drop schema if exists "${schema}"`;
+        await this.executeSQL(dropUser,{});      
+      } catch (e) {
+        if (e.errorNum && (e.errorNum === 1918)) {
+        }
+        else {
+          throw e;
+        }
+      }
+      const createUser = `create schema "${schema}"`;
+      await this.executeSQL(createUser,{});      
+    }    
 
     async report(source,target,timingsArray) {
 
