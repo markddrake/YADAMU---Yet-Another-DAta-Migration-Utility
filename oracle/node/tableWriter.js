@@ -90,7 +90,7 @@ class TableWriter {
               return Buffer.from(row[idx],'hex');
             case "RAW":
               if (typeof row[idx] === 'boolean') {
-                return (row[idx] === true ? '01' : '00')
+                row[idx] = (row[idx] === true ? '01' : '00')
               }
               return Buffer.from(row[idx],'hex');
             case "BOOLEAN":
@@ -198,7 +198,7 @@ end;`
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
     // Infortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
     // So we have to free the current tempLob Cache and create a new one for each batch
-       
+
     try {
       this.batchCount++;
       this.insertMode = 'Batch';
@@ -214,7 +214,7 @@ end;`
       if (e.errorNum && (e.errorNum === 4091)) {
         // Mutating Table - Convert to Cursor based PL/SQL Block
         status.warningRaised = true;
-        this.logWriter.write(`${new Date().toISOString()}[INFO]: TableWriter.writeBatch("${this.tableName}",${this.batch.length}. executeMany() operation raised ${e}. Retrying using PL/SQL Block.\n`);
+        this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.length}]. executeMany() operation raised ${e}. Retrying using PL/SQL Block.\n`);
         this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
         if (this.status.sqlTrace) {
           this.status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
@@ -227,21 +227,21 @@ end;`
         } catch (e) {
           await this.connection.rollback();
           if (this.logDDLIssues) {
-            this.logWriter.write(`${new Date().toISOString()}[INFO]: TableWriter.writeBatch("${this.tableName}",${this.batch.length}). executeMany() operation with PL/SQL block raised ${e}. Retrying using execute() loop.\n`);
+            this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.rows.length}]. executeMany() operation with PL/SQL block raised ${e}. Retrying using execute() loop.\n`);
             this.logWriter.write(`${this.tableInfo.dml}\n`);
             this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
             this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
-            this.logWriter.write(`${JSON.stringify(this.batch[0])}\n`);
+            this.logWriter.write(`${this.batch[0]}\n...${this.batch[this.batch.length-1]}\n`);
           }
         }
       } 
       else {  
         if (this.logDDLIssues) {
-          this.logWriter.write(`${new Date().toISOString()}[INFO]: TableWriter.writeBatch("${this.tableName}",${this.batch.length}). executeMany() operation raised ${e}. Retrying using execute() loop.\n`);
+          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.length}]. executeMany() operation raised ${e}. Retrying using execute() loop.\n`);
           this.logWriter.write(`${this.tableInfo.dml}\n`);
           this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
           this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
-          this.logWriter.write(`${JSON.stringify(this.batch[0])}\n`);
+          this.logWriter.write(`${this.batch[0]}\n...${this.batch[this.batch.length-1]}\n`);
         }
       }
     }
@@ -252,12 +252,12 @@ end;`
       try {
         let results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row])
       } catch (e) {
-        this.logWriter.write(`${new Date().toISOString()}[ERROR]: TableWriter.writeBatch("${this.tableName}",${row}). insert() operation raised ${e}.\n`);
+        this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][ERROR]: Batch size [${this.batch.length}]. Row [${row}]. insert() operation raised ${e}.\n`);
         this.status.warningRaised = true;
         if (this.logDDLIssues) {
           this.logWriter.write(`${this.tableInfo.dml}\n`);
           this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
-          this.logWriter.write(`${JSON.stringify(this.batch[row])}\n`);
+          this.logWriter.write(`${this.batch[0]}\n...${this.batch[this.batch.length-1]}\n`);
         } 
         // Write Record to 'bad' file.
         try {
@@ -265,13 +265,13 @@ end;`
             this.status.importErrorMgr.logError(this.tableName,this.batch[row]);
           }
           else {
-            this.logWriter.write(`${new Date().toISOString()} [ERROR]: Data [${this.batch[row]}].\n`)               
+            this.logWriter.write(`${this.batch[row]}\n`)               
           }
         } catch (e) {
         //  Catch Max Errors Exceeded Assertion
           await this.connection.rollback();
           this.skipTable = true;
-          this.logWriter.write(`${new Date().toISOString()}[ERROR]: TableWriter.writeBatch("${this.tableName}",${row}). Skipping table. Reason: ${e.message}.\n`);
+          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][ERROR]: Batch size [${this.batch.length}]. Row [${row}]. Skipping table. Reason: ${e.message}.\n`);
         }
       }
     } 

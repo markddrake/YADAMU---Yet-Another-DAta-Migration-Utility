@@ -58,7 +58,7 @@ as
 
   procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'));
   function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
-  function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB) return CLOB;
+  function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB') return CLOB;
   function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
   
   function SET_CURRENT_SCHEMA(P_TARGET_SCHEMA VARCHAR2) return CLOB;
@@ -284,7 +284,12 @@ begin
         when P_DATA_TYPE = 'date' then
            return 'DATE';
         when P_DATA_TYPE = 'time' then
-           return 'DATE';
+           case 
+             when P_DATA_TYPE_LENGTH = 0 then
+               return 'DATETIME';
+             else  
+               return 'TIMESTAMP';
+            end case;
         when P_DATA_TYPE = 'datetime' then
            return 'TIMESTAMP(3)';
         when P_DATA_TYPE = 'datetime2' then
@@ -340,11 +345,39 @@ begin
         when P_DATA_TYPE = 'character' then
            return 'VARCHAR2';
         when P_DATA_TYPE = 'character varying' then
-           return 'VARCHAR2';
+          case 
+            when P_DATA_TYPE_LENGTH is NULL then
+              return 'CLOB';
+            when P_DATA_TYPE_LENGTH < 2001 then
+              return 'VARCHAR2';
+            else
+              return 'CLOB';
+          end case;
+        when P_DATA_TYPE = 'smallint' then
+          return 'NUMBER(5,0)';
+        when P_DATA_TYPE = 'integer' then
+          return 'NUMBER(10,0)';
+        when P_DATA_TYPE = 'bigint' then
+          return 'NUMBER(19,0)';
+        when P_DATA_TYPE = 'real' then
+           return 'BINARY_FLOAT';
+        when P_DATA_TYPE = 'double precision' then
+           return 'BINARY_DOUBLE';
+        when P_DATA_TYPE = 'timestamp without time zone' then
+           return 'TIMESTAMP(6)';
+        when P_DATA_TYPE = 'time without time zone' then
+           return 'TIMESTAMP(6)';
+        when P_DATA_TYPE = 'interval' then
+           return 'INTERVAL DAY TO SECOND';
         when P_DATA_TYPE = 'text' then
            return 'CLOB';
         when P_DATA_TYPE = 'bytea' then
-           return 'RAW';
+          case 
+            when P_DATA_TYPE_LENGTH < 2001 then
+              return 'RAW';
+            else
+              return 'BLOB';
+          end case;
         when P_DATA_TYPE = 'xml' then
            return 'XMLTYPE';
         when P_DATA_TYPE = 'geometry' then
@@ -440,7 +473,7 @@ begin
   end if;
 end;
 --
-function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB)
+function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB')
 return CLOB
 as
   CURSOR generateStatementComponents
@@ -603,6 +636,19 @@ as
            )
          ) TARGET_DATA_TYPES
         ,SERIALIZE_TABLE(
+           cast(collect(case
+                          when (TARGET_DATA_TYPE = 'XMLTYPE') then
+                            'XMLTYPE "' || COLUMN_NAME || '" STORE AS CLOB'
+                          else
+                            NULL
+                        end
+                        order by IDX
+               )
+               as T_VC4000_TABLE
+           )
+           ,C_NEWLINE
+         ) XMLTYPE_STORAGE_CLAUSES
+        ,SERIALIZE_TABLE(
            cast(collect(
                         '"' || COLUMN_NAME || '" ' ||
                         case
@@ -665,7 +711,7 @@ as
            when TARGET_DATA_TYPE = 'GEOMETRY' then
              '"MDSYS"."SDO_GEOMETRY"'
            when TARGET_DATA_TYPE = 'JSON' then 
-             -- BLOB results in Error: ORA-40479: internal JSON serializer error during export operations.
+             -- BLOB results in Error: ORA-40479: internaly JSON serializer error during export operations.
              'CLOB CHECK ("' || COLUMN_NAME || '" IS JSON)'
            when TARGET_DATA_TYPE = 'BOOLEAN' then 
              'RAW(1)'
@@ -711,16 +757,23 @@ as
          end 
          INSERT_SELECT_LIST
         ,'"' ||
-           case
-             when TYPE_EXISTS = 1 then 
-               '\"' || TYPE_OWNER || '\".\"' || TYPE_NAME || '\"'
-             when TYPE_NAME is not NULL then
-               'CLOB'
-            -- Type Exist is NULL.
-             else
-               TARGET_DATA_TYPE
-             end || '"' 
+         case
+           when TYPE_EXISTS = 1 then 
+             '\"' || TYPE_OWNER || '\".\"' || TYPE_NAME || '\"'
+           when TYPE_NAME is not NULL then
+             'CLOB'
+           -- Type Exist is NULL.
+           else
+             TARGET_DATA_TYPE
+         end || '"' 
          TARGET_DATA_TYPES
+        ,case 
+           when TARGET_DATA_TYPE = 'XMLTYPE' then
+             'XMLTYPE "' || COLUMN_NAME || '" STORE AS CLOB'
+           else
+             NULL
+         end                
+         XMLTYPE_STORAGE_CLAUSES
         ,'"' || COLUMN_NAME || '" ' ||
          case
            when TYPE_EXISTS = 1 then 
@@ -774,6 +827,8 @@ as
    V_COLUMN_PATTERNS_TABLE     T_VC4000_TABLE;
    V_TARGET_DATA_TYPES_TABLE   T_VC4000_TABLE;
    V_DESERIALIZATION_FUNCTIONS T_VC4000_TABLE;
+   V_XML_STORAGE_TEMP          T_VC4000_TABLE;
+   V_XML_STORAGE_TABLE         T_VC4000_TABLE;
 --
    $END
 --
@@ -781,6 +836,7 @@ as
   V_COLUMNS_CLAUSE            CLOB;
   V_INSERT_SELECT_LIST        CLOB;
   V_COLUMN_PATTERNS           CLOB;
+  V_XML_STORAGE_CLAUSE        CLOB;
    
   V_DESERIALIZATIONS          T_VC4000_TABLE;
 
@@ -793,8 +849,7 @@ as
   PRAGMA EXCEPTION_INIT( TABLE_EXISTS , -00955 );
   V_STATEMENT CLOB := ''create table "';
 
-   C_CREATE_TABLE_BLOCK2 CONSTANT VARCHAR2(2048) :=
-')'';
+   C_CREATE_TABLE_BLOCK2 CONSTANT VARCHAR2(2048) := ''';
 begin
   execute immediate V_STATEMENT;
 exception
@@ -822,6 +877,7 @@ begin
     V_INSERT_SELECT_LIST     := o.INSERT_SELECT_LIST;
     V_TARGET_DATA_TYPES      := o.TARGET_DATA_TYPES;
     V_COLUMN_PATTERNS        := o.COLUMN_PATTERNS;
+    V_XML_STORAGE_CLAUSE     := o.XMLTYPE_STORAGE_CLAUSES;
     
     select distinct COLUMN_VALUE 
       bulk collect into V_DESERIALIZATIONS
@@ -834,13 +890,20 @@ begin
 --
   open generateStatementComponents;
   fetch generateStatementComponents
-        bulk collect into V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_TARGET_DATA_TYPES_TABLE, V_COLUMN_PATTERNS_TABLE, V_DESERIALIZATION_FUNCTIONS;
+        bulk collect into V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_TARGET_DATA_TYPES_TABLE, V_XML_STORAGE_TEMP, V_COLUMN_PATTERNS_TABLE, V_DESERIALIZATION_FUNCTIONS;
 
   V_COLUMNS_CLAUSE := SERIALIZE_TABLE(V_COLUMNS_CLAUSE_TABLE);
   V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
   V_TARGET_DATA_TYPES := SERIALIZE_TABLE(V_TARGET_DATA_TYPES_TABLE);
   V_COLUMN_PATTERNS := SERIALIZE_TABLE(V_COLUMN_PATTERNS_TABLE);
+  
+  select COLUMN_VALUE
+    bulk collect into V_XML_STORAGE_TABLE
+    from table (V_XML_STORAGE_TEMP)
+   where COLUMN_VALUE is not NULL;
 
+  V_XML_STORAGE_CLAUSE := SERIALIZE_TABLE(V_XML_STORAGE_TABLE,C_NEWLINE);
+  
   select distinct COLUMN_VALUE
     bulk collect into V_DESERIALIZATIONS
     from table(V_DESERIALIZATION_FUNCTIONS)
@@ -868,6 +931,13 @@ begin
     V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK1 || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (' || C_NEWLINE || ' ';
     DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
     DBMS_LOB.APPEND(V_DDL_STATEMENT,V_COLUMNS_CLAUSE);
+    V_SQL_FRAGMENT := ')';
+    DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+    if (P_XMLTYPE_STORAGE_MODEL = 'CLOB') then      
+    V_SQL_FRAGMENT := ')';
+      DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(C_NEWLINE),C_NEWLINE);
+      DBMS_LOB.APPEND(V_DDL_STATEMENT,V_XML_STORAGE_CLAUSE);
+    end if;
     V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK2;
     DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   end if;

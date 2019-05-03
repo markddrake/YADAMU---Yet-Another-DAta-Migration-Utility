@@ -2,8 +2,6 @@
 const Yadamu = require('../../common/yadamu.js').Yadamu;
 const PostgresDBI = require('../../postgres/node/postgresDBI.js');
 
-const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
-
 const sqlSuccess =
 `select SOURCE_SCHEMA "SOURCE_SCHEMA", TARGET_SCHEMA "TARGET_SCHEMA", TABLE_NAME "TABLE_NAME", 'SUCCESSFUL' "RESULTS", TARGET_ROW_COUNT "TARGET_ROW_COUNT"
    from SCHEMA_COMPARE_RESULTS 
@@ -21,6 +19,9 @@ const sqlFailed =
       or EXTRA_ROWS <> 0
     or SQLERRM is NOT NULL
   order by TABLE_NAME`;
+
+
+const sqlSchemaTableRows = `select relname "TABLE_NAME", n_live_tup "ROW_COUNT" from pg_stat_user_tables where schemaname = $1`;
 
 class PostgresCompare extends PostgresDBI {
     
@@ -49,8 +50,53 @@ class PostgresCompare extends PostgresDBI {
       await this.createSchema(schema);    
     }      
 
+    async importResults(target,timings) {
+        
+      const colSizes = [32, 48, 14, 14]
+      
+      let seperatorSize = (colSizes.length * 3) - 1;
+      colSizes.forEach(function(size) {
+        seperatorSize += size;
+      },this);
+
+      const results = await this.pgClient.query(sqlSchemaTableRows,[target]);
+      results.rows.forEach(function(row,idx) {          
+        const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row.TABLE_NAME.toUpperCase() : row.TABLE_NAME;
+        const tableTimings = (timings[0][tableName] === undefined) ? { rowCount : -1 } : timings[0][tableName]
+        if (idx === 0) {
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+          this.logger.write(`|`
+                          + ` ${'TARGET SCHEMA'.padStart(colSizes[0])} |` 
+                          + ` ${'TABLE_NAME'.padStart(colSizes[1])} |`
+                          + ` ${'ROWS'.padStart(colSizes[2])} |`
+                          + ` ${'ROWS IMPORTED'.padStart(colSizes[3])} |`
+                          + '\n');
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+          this.logger.write(`|`
+                          + ` ${target.padStart(colSizes[0])} |`
+                          + ` ${row.TABLE_NAME.padStart(colSizes[1])} |`
+                          + ` ${row.ROW_COUNT.toString().padStart(colSizes[2])} |` 
+                          + ` ${tableTimings.rowCount.toString().padStart(colSizes[3])} |` 
+                          + '\n');
+        }
+        else {
+          this.logger.write(`|`
+                          + ` ${''.padStart(colSizes[0])} |`
+                          + ` ${row.TABLE_NAME.padStart(colSizes[1])} |`
+                          + ` ${row.ROW_COUNT.toString().padStart(colSizes[2])} |` 
+                          + ` ${tableTimings.rowCount.toString().padStart(colSizes[3])} |` 
+                          + '\n');
+          
+        }
+        if (idx+1 === results.rows.length) {
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+        }
+      },this)
+    }
+    
     async report(source,target,timingsArray) {
 
+      const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
       const timings = timingsArray[timingsArray.length - 1];
 
       if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
@@ -145,11 +191,11 @@ class PostgresCompare extends PostgresDBI {
 
 
         this.logger.write(` ${row.TABLE_NAME.padStart(colSizes[3])} |` 
-                        + ` ${row.SOURCE_ROW_COUNT.toString().padStart(colSizes[5])} |` 
-                        + ` ${row.TARGET_ROW_COUNT.toString().padStart(colSizes[6])} |` 
-                        + ` ${row.MISSING_ROWS.toString().padStart(colSizes[7])} |` 
-                        + ` ${row.EXTRA_ROWS.toString().padStart(colSizes[8])} |` 
-                        + ` ${(row.SQLERRM !== null ? row.SQLERRM : '').padEnd(colSizes[9])} |`
+                        + ` ${row.SOURCE_ROW_COUNT.toString().padStart(colSizes[4])} |` 
+                        + ` ${row.TARGET_ROW_COUNT.toString().padStart(colSizes[5])} |` 
+                        + ` ${row.MISSING_ROWS.toString().padStart(colSizes[6])} |` 
+                        + ` ${row.EXTRA_ROWS.toString().padStart(colSizes[7])} |` 
+                        + ` ${(row.SQLERRM !== null ? row.SQLERRM : '').padEnd(colSizes[8])} |`
                         + '\n');
 
                         if (idx+1 === failed.rows.length) {

@@ -2,7 +2,7 @@
 const Yadamu = require('../../common/yadamu.js').Yadamu;
 const OracleDBI = require('../../oracle/node/oracleDBI.js');
 
-const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
+
 
 const sqlSuccess =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL' "RESULTS", TARGET_ROW_COUNT
@@ -21,6 +21,14 @@ const sqlFailed =
     or EXTRA_ROWS <> 0
     or SQLERRM is NOT NULL
  order by TABLE_NAME`;
+
+
+const sqlGatherSchemaStats = `begin dbms_stats.gather_schema_stats(ownname => :target); end;`;
+
+const sqlSchemaTableRows = `select TABLE_NAME, NUM_ROWS from ALL_TABLES where OWNER = :target`;
+
+const sqlCompareSchemas = `begin JSON_IMPORT.COMPARE_SCHEMAS(:source,:target); end;`;
+
 
 class OracleCompare extends OracleDBI {
     
@@ -49,9 +57,61 @@ class OracleCompare extends OracleDBI {
       const createUser = `grant connect, resource, unlimited tablespace to "${schema}" identified by ${password}`;
       await this.executeSQL(createUser,{});      
     }    
+    
+    
+    async importResults(target,timings) {
+        
+      const colSizes = [32, 48, 14, 14]
+      
+      let seperatorSize = (colSizes.length * 3) - 1;
+      colSizes.forEach(function(size) {
+        seperatorSize += size;
+      },this);
+
+      let args = {target:`"${target}"`}
+      await this.executeSQL(sqlGatherSchemaStats,args)
+      
+      args = {target:target}
+      const results = await this.executeSQL(sqlSchemaTableRows,args)
+      
+      results.rows.forEach(function(row,idx) {          
+        const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row[0].toUpperCase() : row[0];
+        const tableTimings = (timings[0][tableName] === undefined) ? { rowCount : -1 } : timings[0][tableName]
+        if (idx === 0) {
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+          this.logger.write(`|`
+                          + ` ${'TARGET SCHEMA'.padStart(colSizes[0])} |` 
+                          + ` ${'TABLE_NAME'.padStart(colSizes[1])} |`
+                          + ` ${'ROWS'.padStart(colSizes[2])} |`
+                          + ` ${'ROWS IMPORTED'.padStart(colSizes[3])} |`
+                          + '\n');
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+          this.logger.write(`|`
+                          + ` ${target.padStart(colSizes[0])} |`
+                          + ` ${row[0].padStart(colSizes[1])} |`
+                          + ` ${row[1].toString().padStart(colSizes[2])} |` 
+                          + ` ${tableTimings.rowCount.toString().padStart(colSizes[3])} |` 
+                          + '\n');
+        }
+        else {
+          this.logger.write(`|`
+                          + ` ${''.padStart(colSizes[0])} |`
+                          + ` ${row[0].padStart(colSizes[1])} |`
+                          + ` ${row[1].toString().padStart(colSizes[2])} |` 
+                          + ` ${tableTimings.rowCount.toString().padStart(colSizes[3])} |` 
+                          + '\n');
+          
+        }
+        if (idx+1 === results.rows.length) {
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+        }
+      },this)
+    }
 
     async report(source,target,timingsArray) {
 
+      const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
+      
       const timings = timingsArray[timingsArray.length - 1];
 
       if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
@@ -63,9 +123,8 @@ class OracleCompare extends OracleDBI {
         },this)
       }
       
-      const sqlStatement = `begin JSON_IMPORT.COMPARE_SCHEMAS(:source,:target); end;`;
       const args = {source:source,target:target}
-      await this.executeSQL(sqlStatement,args)      
+      await this.executeSQL(sqlCompareSchemas,args)      
       const successful = await this.executeSQL(sqlSuccess,{})
       const failed = await this.executeSQL(sqlFailed,{})
             
@@ -108,7 +167,7 @@ class OracleCompare extends OracleDBI {
                         + ` ${tableTimings.throughput.padStart(colSizes[6])} |` 
                         + '\n');
 
-                        if (idx+1 === successful.rows.length) {
+        if (idx+1 === successful.rows.length) {
           this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
         }
       },this)

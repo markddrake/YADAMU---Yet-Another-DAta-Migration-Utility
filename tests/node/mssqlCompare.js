@@ -3,7 +3,16 @@
 const Yadamu = require('../../common/yadamu.js').Yadamu;
 const MsSQLDBI = require('../../mssql/node/mssqlDBI.js');
 
-const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
+const sqlSchemaTableRows = `SELECT sOBJ.name AS [TableName], SUM(sPTN.Rows) AS [RowCount] 
+   FROM sys.objects AS sOBJ 
+  INNER JOIN sys.partitions AS sPTN ON sOBJ.object_id = sPTN.object_id 
+  WHERE sOBJ.type = 'U' 
+    AND sOBJ.schema_id = SCHEMA_ID(@SCHEMA) 
+    AND sOBJ.is_ms_shipped = 0x0
+    AND index_id < 2
+ GROUP BY sOBJ.schema_id, sOBJ.name`;
+
+const sqlCompareSchema = `sp_COMPARE_SCHEMA`
 
 class MsSQLCompare extends MsSQLDBI {
     
@@ -37,8 +46,56 @@ class MsSQLCompare extends MsSQLDBI {
        
    }
 
+    async importResults(target,timings) {
+        
+      const colSizes = [32, 48, 14, 14]
+      
+      let seperatorSize = (colSizes.length * 3) - 1;
+      colSizes.forEach(function(size) {
+        seperatorSize += size;
+      },this);
+
+      await this.useDatabase(this.pool,target.schema,this.status);
+      const results = await this.pool.request().input('SCHEMA',this.sql.VarChar,target.owner).query(sqlSchemaTableRows);
+
+      results.recordset.forEach(function(row,idx) {          
+        const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row.TableName.toUpperCase() : row.TableName;
+        const tableTimings = (timings[0][tableName] === undefined) ? { rowCount : -1 } : timings[0][tableName]
+        if (idx === 0) {
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+          this.logger.write(`|`
+                          + ` ${'TARGET SCHEMA'.padStart(colSizes[0])} |` 
+                          + ` ${'TABLE_NAME'.padStart(colSizes[1])} |`
+                          + ` ${'ROWS'.padStart(colSizes[2])} |`
+                          + ` ${'ROWS IMPORTED'.padStart(colSizes[3])} |`
+                          + '\n');
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+          this.logger.write(`|`
+                          + ` ${target.schema.padStart(colSizes[0])} |`
+                          + ` ${row.TableName.padStart(colSizes[1])} |`
+                          + ` ${row.RowCount.toString().padStart(colSizes[2])} |` 
+                          + ` ${tableTimings.rowCount.toString().padStart(colSizes[3])} |` 
+                          + '\n');
+        }
+        else {
+          this.logger.write(`|`
+                          + ` ${''.padStart(colSizes[0])} |`
+                          + ` ${row.TableName.padStart(colSizes[1])} |`
+                          + ` ${row.RowCount.toString().padStart(colSizes[2])} |` 
+                          + ` ${tableTimings.rowCount.toString().padStart(colSizes[3])} |` 
+                          + '\n');
+          
+        }
+        if (idx+1 === results.recordset.length) {
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+        }
+      },this)
+    }
+    
+    
     async report(source,target,timingsArray) {
 
+      const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
       const timings = timingsArray[timingsArray.length - 1];
        
       if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
@@ -50,7 +107,7 @@ class MsSQLCompare extends MsSQLDBI {
         },this)
       }
       
-      this.useDatabase(this.pool,source.schema,this.status);
+      await this.useDatabase(this.pool,source.schema,this.status);
 
       let args = 
 `--@FORMAT_RESULTS = false
@@ -73,7 +130,7 @@ class MsSQLCompare extends MsSQLDBI {
                           .input('TARGET_DATABASE',this.sql.VarChar,target.schema)
                           .input('TARGET_SCHEMA',this.sql.VarChar,target.owner)
                           .input('COMMENT',this.sql.VarChar,'')
-                          .execute('sp_COMPARE_SCHEMA',{},{resultSet: true});
+                          .execute(sqlCompareSchema,{},{resultSet: true});
 
       const successful = results.recordsets[0]
       const failed = results.recordsets[1]
@@ -134,11 +191,11 @@ class MsSQLCompare extends MsSQLDBI {
                           + ` ${'SOURCE SCHEMA'.padStart(colSizes[1])} |`
                           + ` ${'TARGET SCHEMA'.padStart(colSizes[2])} |` 
                           + ` ${'TABLE_NAME'.padStart(colSizes[3])} |`
-                          + ` ${'SOURCE ROWS'.padStart(colSizes[5])} |`
-                          + ` ${'TARGET ROWS'.padStart(colSizes[6])} |`
-                          + ` ${'MISSING ROWS'.padStart(colSizes[7])} |`
-                          + ` ${'EXTRA ROWS'.padStart(colSizes[8])} |`
-                          + ` ${'NOTES'.padEnd(colSizes[9])} |`
+                          + ` ${'SOURCE ROWS'.padStart(colSizes[4])} |`
+                          + ` ${'TARGET ROWS'.padStart(colSizes[5])} |`
+                          + ` ${'MISSING ROWS'.padStart(colSizes[6])} |`
+                          + ` ${'EXTRA ROWS'.padStart(colSizes[7])} |`
+                          + ` ${'NOTES'.padEnd(colSizes[8])} |`
                           + '\n');
           this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
           this.logger.write(`|`
@@ -154,11 +211,11 @@ class MsSQLCompare extends MsSQLDBI {
         }
 
         this.logger.write(` ${row.TABLE_NAME.padStart(colSizes[3])} |` 
-                        + ` ${row.SOURCE_ROW_COUNT.toString().padStart(colSizes[5])} |` 
-                        + ` ${row.TARGET_ROW_COUNT.toString().padStart(colSizes[6])} |` 
-                        + ` ${row.MISSING_ROWS.toString().padStart(colSizes[7])} |` 
-                        + ` ${row.EXTRA_ROWS.toString().padStart(colSizes[8])} |` 
-                        + ` ${(row.SQLERRM !== null ? row.SQLERRM : '').padEnd(colSizes[9])} |` 
+                        + ` ${row.SOURCE_ROW_COUNT.toString().padStart(colSizes[4])} |` 
+                        + ` ${row.TARGET_ROW_COUNT.toString().padStart(colSizes[5])} |` 
+                        + ` ${row.MISSING_ROWS.toString().padStart(colSizes[6])} |` 
+                        + ` ${row.EXTRA_ROWS.toString().padStart(colSizes[7])} |` 
+                        + ` ${(row.SQLERRM !== null ? row.SQLERRM : '').padEnd(colSizes[8])} |` 
                         + '\n');
 
         if (idx+1 === failed.length) {

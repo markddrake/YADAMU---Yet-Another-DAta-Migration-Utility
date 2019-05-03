@@ -26,16 +26,14 @@ const DATA_TYPE_STRING_LENGTH = {
 
 class StatementGenerator {
   
-  constructor(dbi, batchSize, commitSize, lobCacheSize) {
-    
-    // super();
-    const statementGenerator = this;
-    
-    this.dbi = dbi
+  constructor(dbi, targetSchema, metadata, batchSize, commitSize, lobCacheSize) {
+    this.dbi = dbi;
+    this.targetSchema = targetSchema
+    this.metadata = metadata
     this.batchSize = batchSize
     this.commitSize = commitSize;
-    this.lobCacheSize = lobCacheSize
     
+    this.lobCacheSize = lobCacheSize
   }
  
   generateBinds(tableInfo, dataTypeSizes) {
@@ -109,7 +107,7 @@ class StatementGenerator {
   
   }
   
-  async generateStatementCache(metadata, executeDDL, vendor) {
+  async generateStatementCache(executeDDL, vendor) {
    
     const sqlStatement = `begin :sql := JSON_IMPORT.GENERATE_STATEMENTS(:metadata, :schema);\nEND;`;
       
@@ -143,14 +141,14 @@ class StatementGenerator {
     const boundedTypes = ['CHAR','NCHAR','VARCHAR2','NVARCHAR2','RAW']
     const ddlStatements = [];  
     
-    const metadataLob = await this.dbi.lobFromJSON({metadata: metadata});  
-    const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:this.dbi.parameters.TOUSER});
+    const metadataLob = await this.dbi.lobFromJSON({metadata: this.metadata});  
+    const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema: this.targetSchema});
     await metadataLob.close();
 
     const statementCache = JSON.parse(results.outBinds.sql);
-    const tables = Object.keys(metadata); 
+    const tables = Object.keys(this.metadata); 
     tables.forEach(function(table,idx) {
-      const tableMetadata = metadata[table];
+      const tableMetadata = this.metadata[table];
       const tableInfo = statementCache[tableMetadata.tableName];
       const columns = JSON.parse('[' + tableMetadata.columns + ']');
       if (tableInfo.ddl !== null) {
@@ -208,13 +206,13 @@ class StatementGenerator {
           }
         })
         let plsqlFunctions = tableInfo.dml.substring(tableInfo.dml.indexOf('\WITH\n')+5,tableInfo.dml.indexOf('\nselect'));
-        tableInfo.dml = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n\n  insert into "${this.dbi.parameters.TOUSER}"."${metadata[table].tableName}" (${tableMetadata.columns}) values (${variables.join(',')});\nend;`;      
+        tableInfo.dml = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n\n  insert into "${this.targetSchema}"."${this.metadata[table].tableName}" (${tableMetadata.columns}) values (${variables.join(',')});\nend;`;      
       }
       else  {
-        tableInfo.dml = `insert into "${this.dbi.parameters.TOUSER}"."${metadata[table].tableName}" (${tableMetadata.columns}) values (${values.join(',')})`;
+        tableInfo.dml = `insert into "${this.targetSchema}"."${this.metadata[table].tableName}" (${tableMetadata.columns}) values (${values.join(',')})`;
       }
       
-      tableInfo.binds = this.generateBinds(tableInfo,metadata[table].sizeConstraints);
+      tableInfo.binds = this.generateBinds(tableInfo,this.metadata[table].sizeConstraints);
       tableInfo.batchSize = this.batchSize
       if (tableInfo.lobCount > 0) {
        // If some columns are bound as CLOB or BLOB restrict batchsize based on lobCacheSize

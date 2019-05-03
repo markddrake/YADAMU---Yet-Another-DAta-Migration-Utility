@@ -54,7 +54,7 @@ class DBWriter extends Writable {
         }
       },this)
       this.dbi.setMetadata(metadata)      
-      await this.dbi.generateStatementCache(!this.ddlComplete)
+      await this.dbi.generateStatementCache(this.dbi.parameters.TOUSER,!this.ddlComplete)
     }
   }   
   
@@ -150,6 +150,7 @@ class DBWriter extends Writable {
           }
           else {
             const results = await this.currentTable.finalize();
+            this.skipTable = results.skipTable;
             if (!this.skipTable) {
               const elapsedTime = results.endTime - results.startTime;            
               this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${results.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
@@ -188,6 +189,7 @@ class DBWriter extends Writable {
     try {
       if (this.currentTable !== undefined) {
         const results = await this.currentTable.finalize();
+        this.skipTable = results.skipTable;
         if (!this.skipTable) {
           const elapsedTime = results.endTime - results.startTime;            
           this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${results.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);

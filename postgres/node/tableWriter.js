@@ -52,6 +52,17 @@ class TableWriter {
               row[idx] = 0
             }  
             break;
+          case "boolean" :
+            switch (row[idx]) {
+              case "00" :
+                row[idx] = false;
+                break;
+              case "01" :
+                row[idx] = true;
+                break;
+              default:
+            }
+            break;
           case "bytea" :
             row[idx] = Buffer.from(row[idx],'hex');
             break;
@@ -97,16 +108,16 @@ class TableWriter {
       this.batchRowCount = 0;
     } catch (e) {
       await this.dbi.rollbackTransaction();
-      this.batch.length = 0;
       this.batchRowCount = 0;
       this.skipTable = true;
       this.status.warningRaised = true;
-      this.logWriter.write(`${new Date().toISOString()}DBWriter "${this.tableName}"]: Skipping table. Reason: ${e.message}\n`)
+      this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Skipping table. Batch size [${this.batch.length}]. Reason: ${e.message}\n`)
       if (this.logDDLIssues) {
         this.logWriter.write(`${this.tableInfo.dml}\n`);
         this.logWriter.write(`${JSON.stringify(this.args)}\n`);
-        this.logWriter.write(`${this.batch}\n`);
+        this.logWriter.write(`${this.batch[0]}\n...${this.batch[this.batch.length-1]}\n`)
       }      
+      this.batch.length = 0;
     }
     return this.skipTable   
   }

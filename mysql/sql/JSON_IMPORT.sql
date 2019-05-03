@@ -19,6 +19,8 @@ BEGIN
       case P_DATA_TYPE
        when 'VARCHAR2'  then
          return 'varchar';
+       when 'NVARCHAR2' then
+         return 'varchar';
        when 'NUMBER' then
          return 'decimal';
        when 'BINARY_FLOAT' then
@@ -31,16 +33,19 @@ BEGIN
          return 'longblob';
        when 'NCLOB' then
          return 'longtext';
+       when 'XMLTYPE' then
+         return 'longtext';
+       when 'TIMESTAMP' then
+          case
+            when P_DATA_TYPE_LENGTH > 6 then return 'datetime(6)';
+            else return 'datetime';
+          end case;
        when 'BFILE' then
          return 'varchar(2048)';
        when 'ROWID' then
          return 'varchar(32)';
-       when 'XMLTYPE' then
-         return 'longtext';
        when 'RAW' then
          return 'varbinary';
-       when 'NVARCHAR2' then
-         return 'varchar';
        when 'ANYDATA' then
          return 'longtext';
        when '"MDSYS"."SDO_GEOMETRY"' then
@@ -48,10 +53,13 @@ BEGIN
        else
          -- Oracle Special Cases
          if (instr(P_DATA_TYPE,'TIME ZONE') > 0) then
-           return 'timestamp'; 
+           return 'datetime'; 
          end if;
          if ((instr(P_DATA_TYPE,'INTERVAL') = 1)) then
            return 'varchar(16)';
+         end if;
+         if (instr(P_DATA_TYPE,'XMLTYPE') > 0) then
+           return 'longtext';
          end if;
          if (INSTR(P_DATA_TYPE,'"."') > 0) then 
            return 'longtext ';
@@ -296,7 +304,7 @@ BEGIN
                      order by "IDX" separator '  ,'
                     ),']') TARGET_DATA_TYPES
           ,group_concat(concat(case
-                                when TARGET_DATA_TYPE = 'timestamp' 
+                                when TARGET_DATA_TYPE in ('timestamp','datetime')
                                   then concat('convert_tz(data."',COLUMN_NAME,'",''+00:00'',@@session.time_zone)')
                                 when TARGET_DATA_TYPE IN ('varchar','text') or TARGET_DATA_TYPE like 'varchar(%)%'
                                   -- Bug #93498: JSON_TABLE does not handle JSON NULL correctly with VARCHAR

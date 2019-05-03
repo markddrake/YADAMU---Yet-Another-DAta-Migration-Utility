@@ -72,6 +72,10 @@ const sqlSchemaInfo =
               when data_type = 'geometry'
                 -- Force WKT rendering of value
                 then concat('ST_asText("', column_name, '")')
+              when data_type = 'float'
+                -- Render Floats with greatest possible precision 
+                -- Risk of Overflow ????
+                then concat('(floor(1e15*"',column_name,'")/1e15)')
               else
                 concat('"',column_name,'"')
             end
@@ -95,9 +99,8 @@ class MariadbDBI extends YadamuDBI {
     
   async configureSession() {
 
-    const sqlAnsiQuotes = `SET SESSION SQL_MODE=ANSI_QUOTES`;
-    
-    await this.executeSQL(sqlAnsiQuotes);
+    const sqlSetSqlMode = `SET SESSION SQL_MODE='ANSI_QUOTES,PAD_CHAR_TO_FULL_LENGTH'`;
+    await this.executeSQL(sqlSetSqlMode);
     
     const sqlTimeZone = `SET TIME_ZONE = '+00:00'`;
     await this.executeSQL(sqlTimeZone);
@@ -107,6 +110,7 @@ class MariadbDBI extends YadamuDBI {
 
     const enableFileUpload = `SET GLOBAL local_infile = 'ON'`
     await this.executeSQL(enableFileUpload);
+
   }
 
   async setMaxAllowedPacketSize() {
@@ -375,8 +379,8 @@ class MariadbDBI extends YadamuDBI {
   async initializeDataLoad() {
   }
   
-  async generateStatementCache(executeDDL) {
-    await super.generateStatementCache(StatementGenerator,executeDDL) 
+  async generateStatementCache(schema,executeDDL) {
+    await super.generateStatementCache(StatementGenerator,schema,executeDDL) 
   }
 
   createParser(query,objectMode) {

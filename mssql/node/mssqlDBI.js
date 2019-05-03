@@ -400,10 +400,10 @@ class MsSQLDBI extends YadamuDBI {
   async initializeDataLoad() {
   }
   
-  async generateStatementCache(executeDDL) {
+  async generateStatementCache(schema, executeDDL) {
     /* ### OVERRIDE ### Pass additional parameter Database Name */
-    const statementGenerator = new StatementGenerator(this, this.parameters.BATCHSIZE, this.parameters.COMMITSIZE, this.status, this.logWriter);
-    this.statementCache = await statementGenerator.generateStatementCache(this.metadata, executeDDL, this.connectionProperties.database)
+    const statementGenerator = new StatementGenerator(this, schema, this.metadata, this.parameters.BATCHSIZE, this.parameters.COMMITSIZE, this.status, this.logWriter);
+    this.statementCache = await statementGenerator.generateStatementCache(executeDDL, this.systemInformation.vendor, this.connectionProperties.database)
   }
   
   getTableWriter(table) {

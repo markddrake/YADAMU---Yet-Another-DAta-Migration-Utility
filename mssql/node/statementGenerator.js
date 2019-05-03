@@ -6,11 +6,13 @@ const Yadamu = require('../../common/yadamu.js');
 
 class StatementGenerator {
   
-  constructor(dbi, batchSize, commitSize, status, logWriter) {
-    
+  constructor(dbi , targetSchema, metadata,  batchSize, commitSize, status, logWriter) {
     this.dbi = dbi;
+    this.targetSchema = targetSchema
+    this.metadata = metadata
     this.batchSize = batchSize
     this.commitSize = commitSize;
+    
     this.status = status;
     this.logWriter = logWriter;
   }
@@ -202,7 +204,7 @@ class StatementGenerator {
     return table
   }
 
-  async generateStatementCache (metadata, executeDDL, database) {
+  async generateStatementCache (executeDDL, vendor, database) {
     
     const sqlStatement = `SET @RESULTS = '{}'; CALL master.dbo.sp_GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;	
     
@@ -210,26 +212,26 @@ class StatementGenerator {
       this.status.sqlTrace.write(`${sqlStatement};\n--\n`)
     }
 
-    let results = await this.dbi.getRequest().input('TARGET_DATABASE',sql.VARCHAR,this.dbi.parameters.TOUSER).input('METADATA',sql.NVARCHAR,JSON.stringify({metadata : metadata})).execute('master.dbo.sp_GENERATE_SQL');
+    let results = await this.dbi.getRequest().input('TARGET_DATABASE',sql.VARCHAR,this.targetSchema).input('METADATA',sql.NVARCHAR,JSON.stringify({metadata : this.metadata})).execute('master.dbo.sp_GENERATE_SQL');
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
-    const tables = Object.keys(metadata); 
+    const tables = Object.keys(this.metadata); 
     const ddlStatements = tables.map(function(table,idx) {
-      const tableName = metadata[table].tableName;
+      const tableName = this.metadata[table].tableName;
       statementCache[tableName] = JSON.parse(statementCache[tableName] );
       const tableInfo = statementCache[tableName];
       tableInfo.batchSize =  this.batchSize;
       tableInfo.batchSize = this.commitSize;
       // Create table before attempting to Prepare Statement..
       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + "\nVALUES (";
-      metadata[table].columns.split(',').forEach(function(column,idx) {
+      this.metadata[table].columns.split(',').forEach(function(column,idx) {
         tableInfo.dml = tableInfo.dml + '@C' + idx + ','
       })
       tableInfo.dml = tableInfo.dml.slice(0,-1) + ")";
       tableInfo.bulkSupported = this.bulkSupported(tableInfo.targetDataTypes);
       try {
         if (tableInfo.bulkSupported) {
-          tableInfo.bulkOperation = this.createBulkOperation(database,table,metadata[table].columns,tableInfo.targetDataTypes);
+          tableInfo.bulkOperation = this.createBulkOperation(database, table,this.metadata[table].columns,tableInfo.targetDataTypes);
         }
         else {
           // Place holder for caching rows.

@@ -20,7 +20,7 @@ const sqlFailed =
     or SQLERRM is NOT NULL
  order by TABLE_NAME`;
 
-const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
+const sqlSchemaTableRows = `select TABLE_NAME, TABLE_ROWS from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = ?`;
 
 class MySQLCompare extends MySQLDBI {
        
@@ -50,26 +50,63 @@ class MySQLCompare extends MySQLDBI {
       await this.executeSQL(createUser,{});      
     }    
 
-    async report(source,target,timingsArray) {
-
-      const timings = timingsArray[timingsArray.length - 1];
+    async importResults(target,timings) {
         
-      try {
-        const dropUser = `drop schema if exists "${schema}"`;
-        await this.executeSQL(dropUser,{});      
-      } catch (e) {
-        if (e.errorNum && (e.errorNum === 1918)) {
+      const colSizes = [32, 48, 14, 14]
+      
+      let seperatorSize = (colSizes.length * 3) - 1;
+      colSizes.forEach(function(size) {
+        seperatorSize += size;
+      },this);
+
+      const results = await this.executeSQL(sqlSchemaTableRows,[target]);
+      
+      Object.keys(timings).forEach(function(tableName) {
+        if (tableName !== tableName.toLowerCase()) {
+          timings[tableName.toLowerCase()] = Object.assign({}, timings[tableName])
+          delete timings[tableName]
+        }
+      },this)
+
+      results.forEach(function(row,idx) {          
+        const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row.TABLE_NAME.toLowerCase() : row.TABLE_NAME;
+        const tableTimings = (timings[0][tableName] === undefined) ? { rowCount : -1 } : timings[0][tableName]
+        if (idx === 0) {
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+          this.logger.write(`|`
+                          + ` ${'TARGET SCHEMA'.padStart(colSizes[0])} |` 
+                          + ` ${'TABLE_NAME'.padStart(colSizes[1])} |`
+                          + ` ${'ROWS'.padStart(colSizes[2])} |`
+                          + ` ${'ROWS IMPORTED'.padStart(colSizes[3])} |`
+                          + '\n');
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+          this.logger.write(`|`
+                          + ` ${target.padStart(colSizes[0])} |`
+                          + ` ${row.TABLE_NAME.padStart(colSizes[1])} |`
+                          + ` ${row.TABLE_ROWS.toString().padStart(colSizes[2])} |` 
+                          + ` ${tableTimings.rowCount.toString().padStart(colSizes[3])} |` 
+                          + '\n');
         }
         else {
-          throw e;
+          this.logger.write(`|`
+                          + ` ${''.padStart(colSizes[0])} |`
+                          + ` ${row.TABLE_NAME.padStart(colSizes[1])} |`
+                          + ` ${row.TABLE_ROWS.toString().padStart(colSizes[2])} |` 
+                          + ` ${tableTimings.rowCount.toString().padStart(colSizes[3])} |` 
+                          + '\n');
+          
         }
-      }
-      const createUser = `create schema "${schema}"`;
-      await this.executeSQL(createUser,{});      
-    }   
-
+        if (idx+1 === results.length) {
+          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+        }
+      },this)
+    }
+    
     async report(source,target,timings) {     
-             
+
+      const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
+      const timings = timingsArray[timingsArray.length - 1];
+                     
       Object.keys(timings).forEach(function(tableName) {
         if (tableName !== tableName.toLowerCase()) {
           timings[tableName.toLowerCase()] = Object.assign({}, timings[tableName])

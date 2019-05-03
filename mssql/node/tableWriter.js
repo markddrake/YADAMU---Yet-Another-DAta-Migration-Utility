@@ -248,14 +248,14 @@ class TableWriter {
         return this.skipTable
       } catch (e) {
         if (this.logDDLIssues) {
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter "${this.tableName}"]: Bulk Operation failed. Reason: ${e.message}\n`)
+          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Bulk Operation failed. Batch size [${this.tableInfo.bulkOperation.rows.length}]. Reason: ${e.message}\n`)
         }
         this.tableInfo.bulkSupported = false;
         // console.log(this.tableInfo.bulkOperation.columns);
         if (this.logDDLIssues) {
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter "${this.tableName}"]: ${e.stack}\n`);
+          this.logWriter.write(`${this.tableInfo.dml}\n`);
           this.logWriter.write(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}`);
-        }      
+          this.logWriter.write(`${this.tableInfo.bulkOperation.rows[0]}\n...${this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1]}\n`)        }      
       }
     }
     
@@ -280,14 +280,15 @@ class TableWriter {
       return this.skipTable
     } catch (e) {
       // console.log(`Conventional(${this.tableName}). Batch size ${this.tableInfo.bulkOperation.rows.length}. Failed`);
-      this.tableInfo.bulkOperation.rows.length = 0;
       this.skipTable = true;
       this.status.warningRaised = true;
-      this.logWriter.write(`${new Date().toISOString()}[TableWriter "${this.tableName}"]: Skipping table. Reason: ${e.message}\n${e.stack}\n`)
+      this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Skipping table. Batch size [${this.tableInfo.bulkOperation.rows.length}]. Reason: ${e.message}\n`)
       if (this.logDDLIssues) {
-        this.logWriter.write(`${this.tableInfo.bulkOperation.columns}\n`);
-        this.logWriter.write(`${this.tableInfo.bulkOperation.rows}\n`);
+        this.logWriter.write(`${this.tableInfo.dml}\n`);
+        this.logWriter.write(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}`);
+        this.logWriter.write(`${this.tableInfo.bulkOperation.rows[0]}\n...${this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1]}\n`)
       }      
+      this.tableInfo.bulkOperation.rows.length = 0;
     }
     return this.skipTable
   }

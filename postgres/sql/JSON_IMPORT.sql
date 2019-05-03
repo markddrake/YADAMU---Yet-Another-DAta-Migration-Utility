@@ -496,7 +496,7 @@ as $$
 declare
 begin
   RETURN QUERY
-  select jsonb_object_agg(
+    select jsonb_object_agg(
            "tableName",
            GENERATE_STATEMENTS("vendor",P_SCHEMA,"tableName","columns","dataTypes","sizeConstraints",FALSE)
          )

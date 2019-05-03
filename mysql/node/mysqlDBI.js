@@ -161,9 +161,8 @@ class MySQLDBI extends YadamuDBI {
 
   async configureSession() {
 
-    const sqlAnsiQuotes = `SET SESSION SQL_MODE=ANSI_QUOTES`;
-    
-    await this.executeSQL(sqlAnsiQuotes);
+    const sqlSetSqlMode = `SET SESSION SQL_MODE='ANSI_QUOTES,PAD_CHAR_TO_FULL_LENGTH'`;
+    await this.executeSQL(sqlSetSqlMode);
     
     const sqlTimeZone = `SET TIME_ZONE = '+00:00'`;
     await this.executeSQL(sqlTimeZone);
@@ -173,6 +172,7 @@ class MySQLDBI extends YadamuDBI {
 
     const enableFileUpload = `SET GLOBAL local_infile = 'ON'`
     await this.executeSQL(enableFileUpload);
+
   }
 
   async setMaxAllowedPacketSize() {
@@ -475,20 +475,16 @@ class MySQLDBI extends YadamuDBI {
   async initializeDataLoad() {
   }
   
-  async generateStatementCache(executeDDL) {
+  async generateStatementCache(schema,executeDDL) {
     let statementGenerator = undefined;
     const sqlVersion = `SELECT @@version`
     const results = await this.executeSQL(sqlVersion);
     if (results[0]['@@version'] > '6.0') {
-      statementGenerator = new StatementGenerator80(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
+      await super.generateStatementCache(StatementGenerator80, schema, executeDDL)
     }
     else {
-      statementGenerator = new StatementGenerator57(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
+      await super.generateStatementCache(StatementGenerator57, schema, executeDDL)
     }
-  
-    // Uncomment the folloing statement Force 5.7 Code Path
-    // statementGenerator = new StatementGenerator57(this,ddlRequired,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE,this.status,this.logWriter);
-    this.statementCache = await statementGenerator.generateStatementCache(this.metadata, executeDDL)
   }
   
   getTableWriter(table) {

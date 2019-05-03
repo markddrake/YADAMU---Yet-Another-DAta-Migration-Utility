@@ -65,6 +65,7 @@ class TableWriter {
           case "date":
           case "time":
           case "datetime":
+          case "timestamp":
             // If the the input is a string, assume 8601 Format with "T" seperating Date and Time and Timezone specified as 'Z' or +00:00
             // Neeed to convert it into a format that avoiods use of convert_tz and str_to_date, since using these operators prevents the use of Bulk Insert.
             // Session is already in UTC so we safely strip UTC markers from timestamps
@@ -83,16 +84,32 @@ class TableWriter {
   hasPendingRows() {
     return this.batch.length > 0;
   }
-      
-  async writeBatch() {
+  
+  async processWarnings(results) {
+    if (results.warningCount >  0) {
+      const warnings = await this.dbi.executeSQL('show warnings');
+      warnings.forEach(function(warning,idx) {
+        if (warning.Level === 'Warning') {
+          this.status.warningRaised = true;
+          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][WARNING]: Warnings reported by bulk insert operation. Details: ${JSON.stringify(warning)}\n`)
+          this.logWriter.write(`${this.batch[idx]}\n`)
+        }
+      },this)
+    }
+  }
+  
+  async writeBatch() {     
      try {
       if (this.tableInfo.insertMode === 'Iterative') {
+        // const args = Array(this.batch[0].length).fill('?').join(',');
+        // const insertOperation = this.tableInfo.dml.slice(0,-1) + "(" + args + ")";
         for (const i in this.batch) {
           try {
             const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[i]);
+            await this.processWarnings(results);
           } catch(e) {
             if (e.errno && ((e.errno === 3616) || (e.errno === 3617))) {
-              this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping Row Reason: ${e.message}\n`)
+              this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Skipping Row Reason: ${e.message}\n`)
               this.rowCount--;
             }
             else {
@@ -103,20 +120,19 @@ class TableWriter {
       }
       else {  
         const results = await this.dbi.executeSQL(this.tableInfo.dml,[this.batch]);
+        await this.processWarnings(results);
       }
       this.endTime = new Date().getTime();
-      this.batch.length = 0;
-                            
+      this.batch.length = 0;                     
     } catch (e) {
-      this.status.warningRaised = true;
-      this.logWriter.write(`${new Date().toISOString()}: Table ${this.tableName}. Skipping table. Reason: ${e.message}\n`)
-      this.logWriter.write(`${this.tableInfo.dml}[${this.batch.length}]...\n`);
-      this.batch.length = 0;
       this.skipTable = true;
+      this.status.warningRaised = true;
+      this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Skipping table. Batch size [${this.batch.length}]. Reason: ${e.message}\n`)
       if (this.logDDLIssues) {
         this.logWriter.write(`${this.tableInfo.dml}\n`);
-        this.logWriter.write(`${this.batch}\n`);
+        this.logWriter.write(`${this.batch[0]}\n...${this.batch[this.batch.length-1]}\n`)
       }      
+      this.batch.length = 0;
     }
     return this.skipTable
   }

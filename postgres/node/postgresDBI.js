@@ -413,13 +413,13 @@ class PostgresDBI extends YadamuDBI {
     },this))
   }
   
-  async generateStatementCache(executeDDL) {
+  async generateStatementCache(schema,executeDDL) {
       
     const sqlStatement = `select GENERATE_SQL($1,$2)`
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
     }
-    const results = await this.pgClient.query(sqlStatement,[{metadata : this.metadata},this.parameters.TOUSER])
+    const results = await this.pgClient.query(sqlStatement,[{metadata : this.metadata}, schema])
     this.statementCache = results.rows[0].generate_sql;
     if (this.statementCache === null) {
       this.statementCache = {}

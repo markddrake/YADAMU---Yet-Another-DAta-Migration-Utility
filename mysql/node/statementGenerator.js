@@ -4,32 +4,33 @@ const Yadamu = require('../../common/yadamu.js');
 
 class StatementGenerator {
   
-  constructor(dbi, batchSize, commitSize) {
-    
+  constructor(dbi, targetSchema, metadata, batchSize, commitSize) {    
     this.dbi = dbi;
+    this.targetSchema = targetSchema
+    this.metadata = metadata
     this.batchSize = batchSize
     this.commitSize = commitSize;
   }
   
 
-  async generateStatementCache (metadata, executeDDL) {    
-  
+  async generateStatementCache(executeDDL, vendor) {    
+   
     const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS"`;                       
    
-    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : metadata}),this.dbi.parameters.TOUSER]);
+    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),this.targetSchema]);
     results = results.pop();
     let statementCache = JSON.parse(results[0].SQL_STATEMENTS)
     if (statementCache === null) {
       statementCache = {}      
     }
     else {
-      const tables = Object.keys(metadata); 
+      const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map(function(table,idx) {
-        const tableInfo = statementCache[metadata[table].tableName];
+        const tableInfo = statementCache[this.metadata[table].tableName];
         tableInfo.batchSize = this.batchSize;
         tableInfo.commitSize = this.commitSize;
         tableInfo.insertMode = 'Bulk';
-        const columnNames = JSON.parse('[' + metadata[table].columns + ']');
+        const columnNames = JSON.parse('[' + this.metadata[table].columns + ']');
         
         const setOperators = tableInfo.targetDataTypes.map(function(targetDataType,idx) {
            switch (targetDataType) {

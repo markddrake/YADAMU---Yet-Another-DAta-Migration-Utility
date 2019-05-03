@@ -599,8 +599,8 @@ class OracleDBI extends YadamuDBI {
     await this.setCurrentSchema(this.parameters.TOUSER)
   }
   
-  async generateStatementCache(executeDDL) {
-    await super.generateStatementCache(StatementGenerator,executeDDL)
+  async generateStatementCache(schema,executeDDL) {
+    await super.generateStatementCache(StatementGenerator,schema,executeDDL)
   }
 
   getTableWriter(table) {

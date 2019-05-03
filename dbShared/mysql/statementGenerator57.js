@@ -9,12 +9,12 @@ const integerTypes   = ['tinyint','mediumint','smallint','int','bigint']
 
 class StatementGenerator {
   
-  constructor(dbi ,batchSize, commitSize) {
-    
+  constructor(dbi, targetSchema, metadata, batchSize, commitSize) {
     this.dbi = dbi;
+    this.targetSchema = targetSchema
+    this.metadata = metadata
     this.batchSize = batchSize
-    this.commitSize = commitSize;
-    
+    this.commitSize = commitSize;    
   }
     
   mapForeignDataType(vendor, dataType, dataTypeLength, dataTypeSize) {
@@ -30,6 +30,11 @@ class StatementGenerator {
            case 'BLOB':                    return 'longblob';
            case 'NCLOB':                   return 'longtext';
            case 'XMLTYPE':                 return 'longtext';
+           case 'TIMESTAMP':
+             switch (true) {
+               case (dataTypeLength > 6):  return 'datetime(6)';
+               default:                    return 'datetime';
+             }
            case 'BFILE':                   return 'varchar(2048)';
            case 'ROWID':                   return 'varchar(32)';
            case 'RAW':                     return 'varbinary';
@@ -38,13 +43,13 @@ class StatementGenerator {
            case '"MDSYS"."SDO_GEOMETRY"':  return 'geometry';
            default :
              if (dataType.indexOf('TIME ZONE') > -1) {
-               return 'timestamp'; 
+               return 'datetime'; 
              }
              if (dataType.indexOf('INTERVAL') === 0) {
                return 'varchar(16)'; 
              }
              if (dataType.indexOf('XMLTYPE') > -1) { 
-               return 'varchar(16)';
+               return 'longtext';
              }
              if (dataType.indexOf('.') > -1) { 
                return 'longtext';
@@ -162,7 +167,7 @@ class StatementGenerator {
      }
   
      if (nationalTypes.includes(targetDataType)) {
-       return targetDataType
+       return targetDataType + '(' + length + ')'
      }
   
      if (scale) {
@@ -225,8 +230,8 @@ class StatementGenerator {
        return `${columnName} ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)} ${ensureNullable === true ? 'null':''}`
     },this)
                                        
-    const createStatement = `create table if not exists "${this.dbi.parameters.TOUSER}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
-    let insertStatement = `insert into "${this.dbi.parameters.TOUSER}"."${metadata.tableName}"`;
+    const createStatement = `create table if not exists "${this.targetSchema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
+    let insertStatement = `insert into "${this.targetSchema}"."${metadata.tableName}"`;
     if (insertMode === 'Iterative') {
       insertStatement += ` set` + setOperators.join(',');
     }
@@ -243,15 +248,15 @@ class StatementGenerator {
     }
   }
   
-  async generateStatementCache(metadata, executeDDL) {
+  async generateStatementCache(executeDDL,vendor) {
       
     const statementCache = {}
-    const tables = Object.keys(metadata); 
+    const tables = Object.keys(this.metadata); 
 
     const ddlStatements = tables.map(function(table,idx) {
-      const tableMetadata = metadata[table];
+      const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);
-      statementCache[metadata[table].tableName] = tableInfo;
+      statementCache[this.metadata[table].tableName] = tableInfo;
       return tableInfo.ddl;
     },this)
     if (executeDDL === true) {

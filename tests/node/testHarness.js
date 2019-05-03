@@ -111,13 +111,14 @@ class TestHarness {
       default:
         return this.yadamu.doImport(dbi,file);
     }
-    
   }
   
-  async compareSchemas(db,sourceSchema,targetSchema,timings) {
+  async compareSchemas(db,sourceSchema,targetSchema,timings,tableMatchingStrategy) {
+
+     const compareParameters = tableMatchingStrategy ? {TABLE_MATCHING : tableMatchingStrategy} : {} 
 
      const dbi = this.getDatabaseInterface(db);
-     dbi.configureTest(this.ros,this.connections[db],{})
+     dbi.configureTest(this.ros,this.connections[db],compareParameters)
      await dbi.initialize();
      await dbi.report(sourceSchema,targetSchema,timings);
      await dbi.finalize();
@@ -209,7 +210,7 @@ class TestHarness {
       sourceDescription = targetDescription;
       this.printResults(`"${db}"://"${sourceDescription}"`,`"${source}"://"${targetFile2}"`,elapsedTime)
       
-      await this.compareSchemas(db,dbSchema1,dbSchema2,timings);
+      await this.compareSchemas(db,dbSchema1,dbSchema2,timings,{});
       
       const fc = new FileCompare(this.yadamu,this.ros);
       fc.configureTest(this.ros,{},(dbi.parameters.TABLE_MATCHING ? {TABLE_MATCHING : dbi.parameters.TABLE_MATCHING} : {}))
@@ -225,13 +226,62 @@ class TestHarness {
         sourceDB.parameters.TABLE_MATCHING = targetDB.parameters.TABLE_MATCHING
       }
     }
+    return sourceDB.parameters.TABLE_MATCHING
+  }
+
+  
+  printdbRoundtripResults(operationsList,elapsedTime) {
+  
+    if (this.ros !== process.stdout) {
+      
+      const colSizes = [24,128,12]
+      let seperatorSize = (colSizes.length * 3) - 1;
+      colSizes.forEach(function(size) {
+        seperatorSize += size;
+      },this);
+    
+      this.ros.write('\n+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+     
+      this.ros.write(`| ${'TIMESTAMP'.padEnd(colSizes[0])} |`
+                 + ` ${'OPERATION'.padEnd(colSizes[1])} |`
+                 + ` ${'ELASPED TIME'.padStart(colSizes[2])} |` 
+                 
+                 + '\n');
+      this.ros.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+      
+      this.ros.write(`| ${new Date().toISOString().padEnd(colSizes[0])} |`
+                 + ` ${(sourceDescription + ' --> ' + targetDescription).padEnd(colSizes[1])} |`
+                 + ` ${(elapsedTime.toString()+"ms").padStart(colSizes[2])} |` 
+                 + '\n');
+                 
+      this.ros.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+    }
+    else {
+      this.ros.write(`${new Date().toISOString()}[ROUNDTRIP: Operation complete] `);
+      this.ros.write(`SOURCE:[${operationsList[0]}] --> `);
+      if (operationsList.length === 3) {
+        this.ros.write(`VIA:[${operationsList[1]}] --> `);
+      }
+      this.ros.write(`TARGET:[${operationsList[operationsList.length-1]}]. Elapsed Time: ${elapsedTime}ms.\n`);
+    }
+  
+  }
+
+  async importResults(db,target,timings) {
+
+     const dbi = this.getDatabaseInterface(db);
+     dbi.configureTest(this.ros,this.connections[db],{})
+     await dbi.initialize();
+     await dbi.importResults(target,timings);
+     await dbi.finalize();
+     
   }
 
   async databaseRoundtrip(source,target,clone,parameters,steps) {
-      
-      
+       
       let startTime
       let elapsedTime
+      let tableMatchingStrategy = undefined;
   
       const timings = []
             
@@ -259,8 +309,13 @@ class TestHarness {
       **
       */
 
+
       let targetSchema  = undefined;
       let sourceDescription = undefined;
+
+      const operationsList = []
+      const dbStartTime = new Date().getTime();
+
       const originalSchema = this.getDatabaseSchema(source,steps[0])  
       
       let testParameters = parameters ? Object.assign({},parameters) : {}
@@ -279,6 +334,8 @@ class TestHarness {
         startTime = new Date().getTime();
         timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
         elapsedTime = new Date().getTime() - startTime
+        operationsList.push(`"${target}"://"${sourceDescription}"`)
+        operationsList.push(`"${source}"://"${targetDescription}"`)
         this.printResults(`"${target}"://"${sourceDescription}"`,`"${source}"://"${targetDescription}"`,elapsedTime)
       }
       else {
@@ -307,10 +364,11 @@ class TestHarness {
         let targetDescription = target === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
         let sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,testParameters,this.connections[source]);
         let targetDB = this.getTestInterface(target,'TOUSER',targetSchema,testParameters,this.connections[target]);
-        this.propogateTableMatching(sourceDB,targetDB);
+        tableMatchingStrategy  = this.propogateTableMatching(sourceDB,targetDB);
         startTime = new Date().getTime();
         timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
         elapsedTime = new Date().getTime() - startTime
+        operationsList.push(`"${source}"://"${sourceDescription}"`)
         this.printResults(`"${source}"://"${sourceDescription}"`,`"${target}"://"${targetDescription}"`,elapsedTime)
         // Copy Target to Source
         sourceSchema = targetSchema
@@ -319,14 +377,19 @@ class TestHarness {
         targetDescription = source === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
         sourceDB = this.getTestInterface(target,'OWNER',sourceSchema,testParameters,this.connections[target]);
         targetDB = this.getTestInterface(source,'TOUSER',targetSchema,testParameters,this.connections[source]);
-        this.propogateTableMatching(sourceDB,targetDB);
+        tableMatchingStrategy = this.propogateTableMatching(sourceDB,targetDB);
         startTime = new Date().getTime();
         timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
         elapsedTime = new Date().getTime() - startTime
+        operationsList.push(`"${target}"://"${sourceDescription}"`)
+        operationsList.push(`"${source}"://"${targetDescription}"`)
         this.printResults(`"${target}"://"${sourceDescription}"`,`"${source}"://"${targetDescription}"`,elapsedTime)
       }        
+
+      const dbElapsedTime =  new Date().getTime() - dbStartTime
           
-      await this.compareSchemas(source, originalSchema, targetSchema, timings);
+      await this.compareSchemas(source, originalSchema, targetSchema, timings, tableMatchingStrategy);
+      this.printdbRoundtripResults(operationsList,dbElapsedTime)
       
   }
 
@@ -371,11 +434,17 @@ class TestHarness {
       
       targetDB = this.getTestInterface(target,'TOUSER',dbSchema,testParameters,this.connections[target]);
       
-      
       startTime = new Date().getTime()
       timings[0] = await this.yadamu.pumpData(sourceDB,targetDB);
       elapsedTime = new Date().getTime() - startTime;
       this.printResults(`"${source}"://"${sourceDescription}"`,`"${target}"://"${targetDescription}"`,elapsedTime)
+      
+      if (target === 'file') {
+      }
+      else {
+        await this.importResults(target,dbSchema,timings);
+      }
+
       
   }
     
@@ -390,7 +459,6 @@ class TestHarness {
         else {
           await this.copyContent(tc.source,target,tc.parameters,tc.directory,steps[0],steps[1])
         }
-        break
         break
       case "EXPORTROUNDTRIP":
         await this.fileRoundtrip(target,tc.parameters,steps[0],steps[1],steps[2],steps[3],steps[4]);

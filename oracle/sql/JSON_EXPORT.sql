@@ -120,6 +120,8 @@ as
                    -- If storage model fidelity is required then set specify MODE=DDL_AND_DATA on the export command line to include DDL statements to the file.
                    -- If DDL is not included in the file import operations will default to CLOB storage in Oracle 12.1 thru 18c.
                    '"JSON"'
+                 when (atc.DATA_TYPE like 'TIMESTAMP(%)') then
+                   '"TIMESTAMP"'
                  when (DATA_TYPE_OWNER is null) then
                    '"' || atc.DATA_TYPE || '"' 
                  when (atc.DATA_TYPE in ('XMLTYPE','ANYDATA','RAW')) then
@@ -137,7 +139,7 @@ as
                      else 
                        '"' || DATA_LENGTH || '"'
                    end
-			     when atc.DATA_TYPE in ('TIMESTAMP') or atc.DATA_TYPE LIKE '%TIME ZONE' then
+			     when (atc.DATA_TYPE = 'TIMESTAMP') or (atc.DATA_TYPE LIKE  'TIMESTAMP(%)') or (atc.DATA_TYPE LIKE '%TIME ZONE')  then
                    '"' || DATA_SCALE || '"'
                  when atc.DATA_TYPE in ('NVARCHAR2', 'NCHAR') then
                    '"' || CHAR_LENGTH || '"'

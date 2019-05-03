@@ -4,16 +4,17 @@ const Yadamu = require('../../common/yadamu.js');
 
 class StatementGenerator {
   
-  constructor(dbi, ddlRequired, batchSize, commitSize) {
+  constructor(dbi, targetSchema, metadata, batchSize, commitSize) {
     
     this.dbi = dbi;
-    this.ddlRequired = ddlRequired
+    this.targetSchema = targetSchema
+    this.metadata = metadata
     this.batchSize = batchSize
     this.commitSize = commitSize;
   }
   
 
-  async generateStatementCache (systemInformation, metadata, executeDDL) {    
+  async generateStatementCache (executeDDL, vendor) {    
   
     if (executeDDL) {
       this.dbi.executeDDL(ddl);

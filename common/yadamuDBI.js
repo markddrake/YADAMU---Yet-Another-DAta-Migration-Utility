@@ -306,9 +306,9 @@ class YadamuDBI {
     throw new Error('Unimplemented Method')
   }
   
-  async generateStatementCache(StatementGenerator,executeDDL) {
-    const statementGenerator = new StatementGenerator(this,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
-    this.statementCache = await statementGenerator.generateStatementCache(this.metadata, executeDDL, this.systemInformation.vendor)
+  async generateStatementCache(StatementGenerator,schema,executeDDL) {
+    const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
+    this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }
 
   getTableWriter(TableWriter,table) {
