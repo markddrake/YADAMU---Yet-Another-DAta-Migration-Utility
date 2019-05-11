@@ -1,5 +1,5 @@
 "use strict" 
-const Yadamu = require('../../common/yadamu.js').Yadamu;
+
 const MySQLDBI = require('../../mysql/node/mysqlDBI.js');
 
 const sqlSuccess =
@@ -50,14 +50,15 @@ class MySQLCompare extends MySQLDBI {
       await this.executeSQL(createUser,{});      
     }    
 
-    async importResults(target,timings) {
-        
+    async importResults(target,timingsArray) {
       const colSizes = [32, 48, 14, 14]
       
       let seperatorSize = (colSizes.length * 3) - 1;
       colSizes.forEach(function(size) {
         seperatorSize += size;
       },this);
+
+      const timings = timingsArray[timingsArray.length - 1];
 
       const results = await this.executeSQL(sqlSchemaTableRows,[target]);
       
@@ -67,10 +68,9 @@ class MySQLCompare extends MySQLDBI {
           delete timings[tableName]
         }
       },this)
-
       results.forEach(function(row,idx) {          
         const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row.TABLE_NAME.toLowerCase() : row.TABLE_NAME;
-        const tableTimings = (timings[0][tableName] === undefined) ? { rowCount : -1 } : timings[0][tableName]
+        const tableTimings = (timings[tableName] === undefined) ? { rowCount : -1 } : timings[tableName]
         if (idx === 0) {
           this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
           this.logger.write(`|`
@@ -96,13 +96,14 @@ class MySQLCompare extends MySQLDBI {
                           + '\n');
           
         }
-        if (idx+1 === results.length) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
-        }
       },this)
+
+      if (results.length >0) {
+        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+      }
     }
     
-    async report(source,target,timings) {     
+    async report(source,target,timingsArray) {     
 
       const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
       const timings = timingsArray[timingsArray.length - 1];
@@ -114,8 +115,8 @@ class MySQLCompare extends MySQLDBI {
         }
       },this)
       
-      const sqlStatement = `CALL COMPARE_SCHEMAS(?,?);`;					   
-      let results = await this.executeSQL(sqlStatement,[source,target]);
+      const sqlStatement = `CALL COMPARE_SCHEMAS(?,?,?);`;					   
+      let results = await this.executeSQL(sqlStatement,[source,target,this.parameters.EMPTY_STRING_IS_NULL === true]);
 
       const successful = await this.executeSQL(sqlSuccess,{})
       const failed = await this.executeSQL(sqlFailed,{})
@@ -147,7 +148,6 @@ class MySQLCompare extends MySQLDBI {
                           + ` ${row.TARGET_SCHEMA.padStart(colSizes[2])} |`)
         }                       
         else  {
-            
           this.logger.write(`|`
                           + ` ${''.padEnd(colSizes[0])} |`
                           + ` ${''.padStart(colSizes[1])} |`
@@ -160,10 +160,11 @@ class MySQLCompare extends MySQLDBI {
                         + ` ${tableTimings.throughput.padStart(colSizes[6])} |` 
                         + '\n');
 
-        if (idx+1 === successful.length) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-        }
       },this)
+
+      if (successful.length > 0) {
+        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+      }
         
       seperatorSize = (colSizes.length * 3) - 1;
       colSizes.forEach(function(size) {
@@ -192,9 +193,9 @@ class MySQLCompare extends MySQLDBI {
         }
         else {
           this.logger.write(`|`
-                          + ` ${'FAILED'.padEnd(colSizes[0])} |`
-                          + ` ${row.SOURCE_SCHEMA.padStart(colSizes[1])} |`
-                          + ` ${row.TARGET_SCHEMA.padStart(colSizes[2])} |`)
+                          + ` ${''.padEnd(colSizes[0])} |`
+                          + ` ${''.padStart(colSizes[1])} |`
+                          + ` ${''.padStart(colSizes[2])} |`)
         }
                           
         this.logger.write(` ${row.TABLE_NAME.padStart(colSizes[3])} |` 
@@ -204,11 +205,11 @@ class MySQLCompare extends MySQLDBI {
                         + ` ${row.EXTRA_ROWS.toString().padStart(colSizes[7])} |` 
                         + ` ${(row.SQLEERM !== undefined ? row.SQLERRM : '').padEnd(colSizes[8])} |` 
                         + '\n');
-
-        if (idx+1 === failed.length) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
-        }
       },this)
+
+      if (failed.length > 0) {
+        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+      }
     }
    
 }

@@ -13,6 +13,7 @@ const QueryStream = require('pg-query-stream')
 
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const DBParser = require('./dbParser.js');
+const StatementGenerator = require('./statementGenerator.js');
 const TableWriter = require('./tableWriter.js');
 
 const defaultParameters = {
@@ -82,15 +83,17 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
-  get DATABASE_VENDOR() { return 'Postgres' };
-  get SOFTWARE_VENDOR() { return 'The PostgreSQL Global Development Group' };
-  get SPATIAL_FORMAT()  { return 'WKT' };
+  get DATABASE_VENDOR()    { return 'Postgres' };
+  get SOFTWARE_VENDOR()    { return 'The PostgreSQL Global Development Group' };
+  get SPATIAL_FORMAT()     { return 'WKT' };
+  get DEFAULT_PARAMETERS() { return defaultParameters };
 
   constructor(yadamu) {
     super(yadamu,defaultParameters);
        
     this.pgClient = undefined;
     this.useBinaryJSON = false
+    this.activeTransaction = false;
   }
 
   getConnectionProperties() {
@@ -144,13 +147,17 @@ class PostgresDBI extends YadamuDBI {
   */
   
   async beginTransaction() {
+
      const sqlStatement =  `begin transaction`
 
-     if (this.status.sqlTrace) {
-       this.status.sqlTrace.write(`${sqlStatement};\n\n`);
-     }
+     if (this.activeTransaction === false) {
+       if (this.status.sqlTrace) {
+         this.status.sqlTrace.write(`${sqlStatement};\n\n`);
+       }
 
-     await this.pgClient.query(sqlStatement);
+       this.activeTransaction = true;
+       await this.pgClient.query(sqlStatement);
+     }
   }
 
   /*
@@ -162,11 +169,15 @@ class PostgresDBI extends YadamuDBI {
   async commitTransaction() {
      const sqlStatement =  `commit transaction`
 
-     if (this.status.sqlTrace) {
-       this.status.sqlTrace.write(`${sqlStatement};\n\n`);
-     }
 
-     await this.pgClient.query(sqlStatement);
+     if (this.activeTransaction === true) {
+       if (this.status.sqlTrace) {
+          this.status.sqlTrace.write(`${sqlStatement};\n\n`);
+       }
+       this.activeTransaction = false;
+       await this.pgClient.query(sqlStatement);
+       await this.beginTransaction();
+     }
   }
 
   /*
@@ -178,12 +189,14 @@ class PostgresDBI extends YadamuDBI {
   async rollbackTransaction() {
      const sqlStatement =  `rollback transaction`
 
-     if (this.status.sqlTrace) {
-       this.status.sqlTrace.write(`${sqlStatement};\n\n`);
+     if (this.activeTransaction === true) {
+       if (this.status.sqlTrace) {
+          this.status.sqlTrace.write(`${sqlStatement};\n\n`);
+       }
+       this.activeTransaction = false;
+       await this.pgClient.query(sqlStatement);
+       await this.beginTransaction();
      }
-
-     await this.pgClient.query(sqlStatement);
-
   }
   
   /*
@@ -414,31 +427,7 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async generateStatementCache(schema,executeDDL) {
-      
-    const sqlStatement = `select GENERATE_SQL($1,$2)`
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
-    }
-    const results = await this.pgClient.query(sqlStatement,[{metadata : this.metadata}, schema])
-    this.statementCache = results.rows[0].generate_sql;
-    if (this.statementCache === null) {
-      this.statementCache = {}
-    }
-    else {
-      const tables = Object.keys(this.metadata); 
-      const ddlStatements = tables.map(function(table,idx) {
-        const tableInfo = this.statementCache[table];
-        tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('select ')-1) + '\nvalues ';
-         tableInfo.batchSize = Math.trunc(45000 / tableInfo.targetDataTypes.length)
-         tableInfo.commitSize = this.parameters.COMMIT_SIZE
-         return tableInfo.ddl
-      },this);
-    
-      if (executeDDL === true) {
-        await this.executeDDL(ddlStatements);
-      }
-    }
-    return this.statementCache;
+    await super.generateStatementCache(StatementGenerator, schema, executeDDL)
   }
 
   getTableWriter(table) {

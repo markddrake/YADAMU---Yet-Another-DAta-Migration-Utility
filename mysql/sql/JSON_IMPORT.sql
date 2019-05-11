@@ -12,43 +12,42 @@ DELIMITER $$
 CREATE FUNCTION MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR VARCHAR(128), P_DATA_TYPE VARCHAR(128), P_DATA_TYPE_LENGTH INT, P_DATA_TYPE_SIZE INT) 
 RETURNS VARCHAR(128) DETERMINISTIC
 BEGIN
-
-  case P_SOURCE_VENDOR
-    when 'Oracle' then
+  case 
+    when P_SOURCE_VENDOR = 'Oracle' then
       -- Oracle Mappings
-      case P_DATA_TYPE
-       when 'VARCHAR2'  then
+      case 
+       when P_DATA_TYPE = 'VARCHAR2'  then
          return 'varchar';
-       when 'NVARCHAR2' then
+       when P_DATA_TYPE = 'NVARCHAR2' then
          return 'varchar';
-       when 'NUMBER' then
+       when P_DATA_TYPE = 'NUMBER' then
          return 'decimal';
-       when 'BINARY_FLOAT' then
+       when P_DATA_TYPE = 'BINARY_FLOAT' then
          return 'float';
-       when 'BINARY_DOUBLE' then
+       when P_DATA_TYPE = 'BINARY_DOUBLE' then
          return 'double';
-       when 'CLOB' then
+       when P_DATA_TYPE = 'CLOB' then
          return 'longtext';
-       when 'BLOB' then
+       when P_DATA_TYPE = 'BLOB' then
          return 'longblob';
-       when 'NCLOB' then
+       when P_DATA_TYPE = 'NCLOB' then
          return 'longtext';
-       when 'XMLTYPE' then
+       when P_DATA_TYPE = 'XMLTYPE' then
          return 'longtext';
-       when 'TIMESTAMP' then
+       when P_DATA_TYPE = 'TIMESTAMP' then
           case
             when P_DATA_TYPE_LENGTH > 6 then return 'datetime(6)';
             else return 'datetime';
           end case;
-       when 'BFILE' then
+       when P_DATA_TYPE = 'BFILE' then
          return 'varchar(2048)';
-       when 'ROWID' then
+       when P_DATA_TYPE = 'ROWID' then
          return 'varchar(32)';
-       when 'RAW' then
+       when P_DATA_TYPE = 'RAW' then
          return 'varbinary';
-       when 'ANYDATA' then
+       when P_DATA_TYPE = 'ANYDATA' then
          return 'longtext';
-       when '"MDSYS"."SDO_GEOMETRY"' then
+       when P_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"' then
          return 'geometry';
        else
          -- Oracle Special Cases
@@ -66,19 +65,19 @@ BEGIN
          end if;
          return lower(P_DATA_TYPE);
      end case;
-    when 'MSSQLSERVER' then
-      case P_DATA_TYPE
+    when P_SOURCE_VENDOR = 'MSSQLSERVER' then
+      case 
         -- SQLServer Mapppings
-        when 'binary' then
+        when P_DATA_TYPE = 'binary' then
           case 
             when P_DATA_TYPE_LENGTH > 16777215 then return 'longblob';
             when P_DATA_TYPE_LENGTH > 65535  then return 'mediumblob';
             when P_DATA_TYPE_LENGTH > 255  then return 'blob';
             else return 'tinyblob';
           end case;
-        when 'bit' then
-          return 'tinyint(1)';
-        when 'char' then
+        when P_DATA_TYPE = 'bit' then
+          return 'boolean';
+        when P_DATA_TYPE = 'char' then
           case 
             when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
             when P_DATA_TYPE_LENGTH > 16777215 then return 'longtext';
@@ -86,28 +85,28 @@ BEGIN
             when P_DATA_TYPE_LENGTH > 255  then return 'text';
             else return 'char';
           end case;
-        when 'datetime' then
+        when P_DATA_TYPE = 'datetime' then
           return 'datetime(3)';
-        when 'datetime2' then
+        when P_DATA_TYPE = 'datetime2' then
           case
             when P_DATA_TYPE_LENGTH > 6 then return 'datetime(6)';
             else return 'datetime';
           end case;
-        when 'datetimeoffset' then
+        when P_DATA_TYPE = 'datetimeoffset' then
           return 'datetime';
-        when 'geography' then
+        when P_DATA_TYPE = 'geography' then
           return 'geometry';
-        when 'geometry' then
+        when P_DATA_TYPE = 'geometry' then
           return 'geometry';
-        when 'hierarchyid' then
+        when P_DATA_TYPE = 'hierarchyid' then
           return 'varchar(4000)';
-        when 'image' then
+        when P_DATA_TYPE = 'image' then
           return 'longblob';
-        when 'mediumint' then
+        when P_DATA_TYPE = 'mediumint' then
           return 'int';
-        when 'money' then
+        when P_DATA_TYPE = 'money' then
           return 'decimal(19,4)';
-        when 'nchar' then
+        when P_DATA_TYPE = 'nchar' then
           case 
             when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
             when P_DATA_TYPE_LENGTH > 16777215  then return 'longtext';
@@ -115,67 +114,123 @@ BEGIN
             when P_DATA_TYPE_LENGTH > 255  then return 'text';
             else return 'char';
           end case;
-        when 'ntext' then
+        when P_DATA_TYPE = 'ntext' then
           return 'longtext';
-        when 'nvarchar' then
+        when P_DATA_TYPE = 'nvarchar' then
           case
             when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
             when P_DATA_TYPE_LENGTH > 16777215  then return 'longtext';
             when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
-            when P_DATA_TYPE_LENGTH > 255  then return 'text';
             else return 'varchar';
           end case;
-        when 'real' then
+        when P_DATA_TYPE = 'real' then
           return 'float';
-        when 'rowversion' then
+        when P_DATA_TYPE = 'rowversion' then
           return 'binary(8)';
-        when 'smalldate' then
+        when P_DATA_TYPE = 'smalldate' then
           return 'datetime';
-        when 'smallmoney' then
+        when P_DATA_TYPE = 'smallmoney' then
           return 'decimal(10,4)';
-        when 'text' then
+        when P_DATA_TYPE = 'text' then
           return 'longtext';
-        when 'tinyint' then
+        when P_DATA_TYPE = 'tinyint' then
           return 'smallint';
-        when 'uniqueidentifier' then
+        when P_DATA_TYPE = 'uniqueidentifier' then
           return 'varchar(64)';
-        when 'varbinary' then
+        when P_DATA_TYPE = 'varbinary' then
           case
             when P_DATA_TYPE_LENGTH = -1 then return 'longblob';
             when P_DATA_TYPE_LENGTH > 16777215  then return 'longblob';
             when P_DATA_TYPE_LENGTH > 65535  then return 'mediumblob';
             else return 'varbinary';
           end case;
-        when 'varchar' then
+        when P_DATA_TYPE = 'varchar' then
           case
             when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
             when P_DATA_TYPE_LENGTH > 16777215  then return 'longtext';
             when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
             else return 'varchar';
           end case;
-        when 'xml' then
+        when P_DATA_TYPE = 'xml' then
           return 'longtext';
         else
           return lower(P_DATA_TYPE);
       end case;
-    when 'Postges' then
-      return lower(P_DATA_TYPE);
-    when 'MySQL' then
-      case P_DATA_TYPE
+    when P_SOURCE_VENDOR = 'Postgres' then
+      case 
+        when P_DATA_TYPE = 'character varying' then
+          case  
+            when P_DATA_TYPE_LENGTH is null then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 16777215  then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
+            else return 'varchar';            
+          end case;
+        when P_DATA_TYPE = 'character' then
+          return 'nchar';
+        when P_DATA_TYPE = 'bytea' then
+          case
+            when P_DATA_TYPE_LENGTH is null then return 'varbinary(4096)';
+            when P_DATA_TYPE_LENGTH > 16777215  then return 'longblob';
+            when P_DATA_TYPE_LENGTH > 65535  then return 'mediumblob';
+            else return 'varbinary';
+         end case;
+       when P_DATA_TYPE = 'boolean' then
+         return 'boolean';
+       when P_DATA_TYPE = 'timestamp' then
+         case
+           when P_DATA_TYPE_LENGTH is NULL then
+             return 'datetime(6)';   
+           else
+             return 'datetime';   
+         end case;
+       when P_DATA_TYPE = 'timestamp with time zone' then
+         case
+           when P_DATA_TYPE_LENGTH is NULL then
+             return 'datetime(6)';   
+           else
+             return 'datetime';   
+         end case;
+       when P_DATA_TYPE = 'timestamp without time zone' then
+         case
+           when P_DATA_TYPE_LENGTH is NULL then
+             return 'datetime(6)';   
+           else
+             return 'datetime';   
+         end case;
+       when P_DATA_TYPE = 'time without time zone' then
+         case
+           when P_DATA_TYPE_LENGTH is NULL then
+             return 'datetime(6)';   
+           else
+             return 'datetime';   
+         end case;
+       when P_DATA_TYPE like 'interval%' then
+         return 'varchar(16)';
+       when P_DATA_TYPE = 'numeric' then
+         return 'decimal';
+       when P_DATA_TYPE = 'double precision' then
+         return 'double';
+       when P_DATA_TYPE = 'real' then
+         return'float';
+       when P_DATA_TYPE = 'geometry' then
+         return 'geometry';
+       when P_DATA_TYPE = 'geography'then
+         return 'geometry';
+       when P_DATA_TYPE = 'integer' then
+         return 'int';
+       when P_DATA_TYPE = 'text' then
+         return 'longtext';
+       when P_DATA_TYPE = 'xml' then
+         return 'longtext';
+       else
+         return lower(P_DATA_TYPE);
+     end case;
+    when P_SOURCE_VENDOR in ('MySQL','MariaDB') then
+      case 
         -- Metadata does not contain sufficinet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM and SET to TEXT.
-        when 'set' then
+        when P_DATA_TYPE = 'set' then
           return 'varchar(512)';
-        when 'enum' then
-          return 'varchar(512)';
-        else
-          return lower(P_DATA_TYPE);
-      end case;       
-    when 'MariaDB' then
-      case P_DATA_TYPE
-        -- Metadata does not contain sufficnet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM and SET to TEXT.
-        when 'set'  then
-          return 'varchar(512)';
-        when 'enum'  then
+        when P_DATA_TYPE = 'enum' then
           return 'varchar(512)';
         else
           return lower(P_DATA_TYPE);
@@ -211,7 +266,7 @@ BEGIN
             ,c.VALUE "COLUMN_NAME"
             ,t.VALUE "DATA_TYPE"
             ,case
-               when s.VALUE = ''
+               when s.VALUE in ('','null')
                  then NULL
                when INSTR(s.VALUE,',') > 0
                  then SUBSTR(s.VALUE,1,INSTR(s.VALUE,',')-1)
@@ -245,17 +300,17 @@ BEGIN
                                    then ''
                                  when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection')
                                    then '' 
-                                 when DATA_TYPE in ('nchar','nvarchar')
+                                 when TARGET_DATA_TYPE in ('nchar','nvarchar')
                                    -- then concat('(',DATA_TYPE_LENGTH,')',' CHARACTER SET UTF8MB4 ')
                                    then concat('(',DATA_TYPE_LENGTH,')')
                                  when DATA_TYPE_SCALE is not NULL
                                    then case 
-                                          when DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
+                                          when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
                                             then concat('(',DATA_TYPE_LENGTH,')')
                                           else
                                             concat('(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
                                         end
-                                 when DATA_TYPE_LENGTH is not NULL
+                                 when DATA_TYPE_LENGTH is not NULL and DATA_TYPE_LENGTH != 'null'
                                    then case 
                                           when TARGET_DATA_TYPE in ('double')
                                             -- Do not add length restriction when scale is not specified
@@ -265,8 +320,7 @@ BEGIN
                                         end
                                  else
                                    ''
-                               end,
-                               CHAR(32)
+                               end
                               )
                      order by "IDX" separator '  ,'
                     ) COLUMNS_CLAUSE
@@ -280,11 +334,11 @@ BEGIN
                                    then TARGET_DATA_TYPE
                                  when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection')
                                    then TARGET_DATA_TYPE
-                                 when DATA_TYPE in ('nchar','nvarchar')
+                                 when TARGET_DATA_TYPE in ('nchar','nvarchar')
                                    then concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')',' CHARACTER SET UTF8MB4 ')
-                                 when DATA_TYPE_SCALE is not NULL
+                                 when DATA_TYPE_SCALE is not NULL 
                                    then case 
-                                          when DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
+                                          when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
                                             then concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')')
                                           else
                                             concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
@@ -556,7 +610,7 @@ DROP PROCEDURE IF EXISTS COMPARE_SCHEMAS;
 --
 DELIMITER $$
 --
-CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128))
+CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_MAP_EMPTY_STRING_TO_NULL BOOLEAN)
 BEGIN
   DECLARE C_NEWLINE          VARCHAR(1) DEFAULT CHAR(13);
  
@@ -575,7 +629,19 @@ BEGIN
   DECLARE TABLE_METADATA 
   CURSOR FOR 
   select c.table_name "TABLE_NAME"
-        ,group_concat(case when data_type in ('blob', 'varbinary', 'binary') then concat('hex("',column_name,'")') else concat('"',column_name,'"') end order by ordinal_position separator ',')  "COLUMNS"
+        ,group_concat(case 
+                        when data_type in ('blob', 'varbinary', 'binary') then
+                          concat('hex("',column_name,'")') 
+                        when data_type in ('varchar','text','mediumtext','longtext') then
+                          case
+                            when P_MAP_EMPTY_STRING_TO_NULL then
+                              concat('case when "',column_name,'" = '''' then NULL else "',column_name,'" end') 
+                            else 
+                              concat('"',column_name,'"') 
+                          end 
+                        else concat('"',column_name,'"') 
+                      end 
+                      order by ordinal_position separator ',')  "COLUMNS"
    from (
      select distinct c.table_catalog, c.table_schema, c.table_name,column_name,ordinal_position,data_type,column_type,character_maximum_length,numeric_precision,numeric_scale,datetime_precision
        from information_schema.columns c, information_schema.tables t

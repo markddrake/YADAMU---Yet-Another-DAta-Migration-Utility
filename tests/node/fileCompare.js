@@ -2,7 +2,6 @@
 const fs = require('fs');
 const path = require('path');
 
-const Yadamu = require('../../common/yadamu.js').Yadamu;
 const DBWriter = require('../../common/dbWriter.js');
 const FileWriter = require('../../file/node/fileWriter.js');
 const FileParser = require('../../file/node/fileParser.js');
@@ -76,7 +75,7 @@ class FileCompare extends FileWriter {
     }
      
     const fileStats = new FileStatistics()    
-    const writer = new DBWriter(fileStats , null, null, null, nulLogger);
+    const writer = new DBWriter(fileStats , null, null, nulLogger);
     
     const processMetadata = new Promise(function (resolve,reject) {
       try {
@@ -184,7 +183,7 @@ class FileCompare extends FileWriter {
       this.makeLowerCase(pMetadata);
       this.makeLowerCase(cMetadata);
     }
-    
+
     const tables = Object.keys(gMetadata).sort();     
     tables.forEach(function (table,idx) {
       const tableTimings = timings[0][table].elapsedTime.padStart(10) 

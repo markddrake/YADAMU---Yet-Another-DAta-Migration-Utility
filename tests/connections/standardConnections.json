@@ -1,4 +1,9 @@
 {
+    "oracle19c" : {
+      "user"           : "SYSTEM"
+    , "password"       : "oracle"
+    , "connectString"  : "ORCL19c"
+    },
     "oracle18c" : {
       "user"           : "SYSTEM"
     , "password"       : "oracle"
@@ -8,6 +13,11 @@
       "user"           : "SYSTEM"
     , "password"       : "oracle"
     , "connectString"  : "ORCL12c"
+    },
+    "oracle11g" : {
+      "user"           : "SYSTEM"
+    , "password"       : "oracle"
+    , "connectString"  : "ORCL11g"
     },
     "mssql" : {
       "user"           : "sa"

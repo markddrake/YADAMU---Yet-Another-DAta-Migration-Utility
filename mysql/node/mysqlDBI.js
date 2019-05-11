@@ -152,6 +152,7 @@ class MySQLDBI extends YadamuDBI {
                          }
                          conn.query(sqlStatement,args,function(err,rows,fields) {
                                                     if (err) {
+                                                      conn.end();
                                                       reject(err);
                                                     }
                                                     resolve(rows);
@@ -187,6 +188,7 @@ class MySQLDBI extends YadamuDBI {
       this.logWriter.write(`${new Date().toISOString()}: Increasing MAX_ALLOWED_PACKET to 1G.\n`);
       results = await this.executeSQL(sqlSetPacketSize);
       await this.conn.end();
+      this.connectionOpen = false;
       return true;
     }    
     return false;
@@ -196,10 +198,13 @@ class MySQLDBI extends YadamuDBI {
  
     this.conn = mysql.createConnection(this.connectionProperties);
     await this.establishConnection();
+    this.connectionOpen = true;
+    
 
     if (await this.setMaxAllowedPacketSize()) {
       this.conn = mysql.createConnection(this.connectionProperties);
       await this.establishConnection();
+      this.connectionOpen = true;
     }
 
     await this.configureSession(); 	
@@ -257,6 +262,7 @@ class MySQLDBI extends YadamuDBI {
 
   constructor(yadamu) {
     super(yadamu,defaultParameters)
+    this.connectionOpen = false
   }
 
   getConnectionProperties() {
@@ -293,6 +299,7 @@ class MySQLDBI extends YadamuDBI {
 
   async finalize() {
     await this.conn.end();
+    this.connectionOpen = false;
   }
 
   /*
@@ -303,6 +310,7 @@ class MySQLDBI extends YadamuDBI {
 
   async abort() {
     await this.conn.end();
+    this.connectionOpen = false;
   }
 
   /*

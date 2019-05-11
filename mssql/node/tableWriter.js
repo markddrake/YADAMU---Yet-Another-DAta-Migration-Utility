@@ -2,8 +2,6 @@
 
 const sql = require('mssql');
 
-const Yadamu = require('../../common/yadamu.js');
-
 class TableWriter {
     
   async createPreparedStatement(insertStatement, targetDataTypes) {
@@ -68,9 +66,10 @@ class TableWriter {
           ps.input(column,sql.NVarChar(dataType.length));
           break;
         case 'json':
-          ps.input(column,NVarChar(sql.MAX));
+          ps.input(column,sql.NVarChar(sql.MAX));
         case 'xml':
-          ps.input(column,sql.Xml);
+          // ps.input(column,sql.Xml);
+          ps.input(column,sql.NVarChar(sql.MAX));
           break;
         case 'time':
           // sql.Time ([scale])
@@ -132,7 +131,7 @@ class TableWriter {
           ps.input(column,sql.VarChar(4000));
           break;
         default:
-         this.logWriter.write(`${new Date().toISOString()}[tableWriter.createPreparedStatement()]: Unmapped data type [${targetDataType}].`);
+         this.logWriter.write(`${new Date().toISOString()}[tableWriter.createPreparedStatement()]: Unmapped data type [${targetDataType}].\n`);
       }
     },this)
     if (this.status.sqlTrace) {
@@ -174,7 +173,7 @@ class TableWriter {
   async appendRow(row) {
       
     this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
-       const dataType = Yadamu.decomposeDataType(targetDataType);
+       const dataType = this.dbi.decomposeDataType(targetDataType);
        if (row[idx] !== null) {
          switch (dataType.type) {
            case "image" :
@@ -200,7 +199,6 @@ class TableWriter {
                // Alternative is to rebuild the table with these data types mapped to date objects ....
                row[idx] = row[idx].toISOString();
              }
-             // console.log(dataType.type,typeof row[idx], row[idx])
              switch (dataType.type) {
                case 'datetime':
                  if (row[idx].length > 23) {
@@ -238,12 +236,12 @@ class TableWriter {
   }
       
   async writeBatch() {
+    
     if (this.tableInfo.bulkSupported) {
       try {
         
         const results = await this.dbi.getRequest().bulk(this.tableInfo.bulkOperation);
         this.endTime = new Date().getTime();
-        // console.log(`Bulk(${this.tableName}). Batch size ${this.tableInfo.bulkOperation.rows.length}. Success`);
         this.tableInfo.bulkOperation.rows.length = 0;
         return this.skipTable
       } catch (e) {
@@ -251,7 +249,6 @@ class TableWriter {
           this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Bulk Operation failed. Batch size [${this.tableInfo.bulkOperation.rows.length}]. Reason: ${e.message}\n`)
         }
         this.tableInfo.bulkSupported = false;
-        // console.log(this.tableInfo.bulkOperation.columns);
         if (this.logDDLIssues) {
           this.logWriter.write(`${this.tableInfo.dml}\n`);
           this.logWriter.write(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}`);
@@ -275,11 +272,9 @@ class TableWriter {
       }
             
       this.endTime = new Date().getTime();
-      // console.log(`Conventional(${this.tableName}). Batch size ${this.tableInfo.bulkOperation.rows.length}. Success`);
       this.tableInfo.bulkOperation.rows.length = 0;
       return this.skipTable
     } catch (e) {
-      // console.log(`Conventional(${this.tableName}). Batch size ${this.tableInfo.bulkOperation.rows.length}. Failed`);
       this.skipTable = true;
       this.status.warningRaised = true;
       this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Skipping table. Batch size [${this.tableInfo.bulkOperation.rows.length}]. Reason: ${e.message}\n`)

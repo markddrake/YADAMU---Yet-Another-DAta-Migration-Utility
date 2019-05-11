@@ -212,7 +212,7 @@ class FileWriter extends YadamuDBI {
   }
   
   async finalizeDataLoad() {
-  this.outputStream.write('}');
+    this.outputStream.write('}');
   }  
 
 }

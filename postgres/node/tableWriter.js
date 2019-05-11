@@ -41,7 +41,7 @@ class TableWriter {
 
   async appendRow(row) {
     this.tableInfo.targetDataTypes.forEach(async function(targetDataType,idx) {
-      const dataType = Yadamu.decomposeDataType(targetDataType);
+      const dataType = this.dbi.decomposeDataType(targetDataType);
       if (row[idx] !== null) {
         switch (dataType.type) {
           case "bit" :
@@ -108,13 +108,13 @@ class TableWriter {
       this.batchRowCount = 0;
     } catch (e) {
       await this.dbi.rollbackTransaction();
+      console.log(e);
       this.batchRowCount = 0;
       this.skipTable = true;
       this.status.warningRaised = true;
       this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Skipping table. Batch size [${this.batch.length}]. Reason: ${e.message}\n`)
       if (this.logDDLIssues) {
         this.logWriter.write(`${this.tableInfo.dml}\n`);
-        this.logWriter.write(`${JSON.stringify(this.args)}\n`);
         this.logWriter.write(`${this.batch[0]}\n...${this.batch[this.batch.length-1]}\n`)
       }      
       this.batch.length = 0;

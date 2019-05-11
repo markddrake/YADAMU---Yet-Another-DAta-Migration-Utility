@@ -125,7 +125,7 @@ class FileStatistics {
     this.tableInfo = {}
   }
 
-  getTableWriter(schema,tableName) {
+  getTableWriter(tableName) {
 
     this.tableInfo[tableName] = {
       rowCount  : 0

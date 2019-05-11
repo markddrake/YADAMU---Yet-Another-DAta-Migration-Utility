@@ -1,7 +1,5 @@
 "use strict";
 
-const Yadamu = require('../../common/yadamu.js');
-
 class StatementGenerator {
   
   constructor(dbi, targetSchema, metadata, batchSize, commitSize) {    
@@ -51,6 +49,11 @@ class StatementGenerator {
                return ' "' + columnNames[idx] + '" = ?'
            }
         },this) 
+        
+        
+        
+        
+        
                    
         if (tableInfo.insertMode === 'Iterative') {
           tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('(')) + ` set ` + setOperators.join(',');

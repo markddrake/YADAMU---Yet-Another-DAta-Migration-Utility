@@ -367,8 +367,10 @@ begin
            return 'TIMESTAMP(6)';
         when P_DATA_TYPE = 'time without time zone' then
            return 'TIMESTAMP(6)';
-        when P_DATA_TYPE = 'interval' then
+        when P_DATA_TYPE like 'interval%day%' then
            return 'INTERVAL DAY TO SECOND';
+        when P_DATA_TYPE like 'interval%YEAR%' then
+           return 'INTERVAL YEAR TO MONTH';
         when P_DATA_TYPE = 'text' then
            return 'CLOB';
         when P_DATA_TYPE = 'bytea' then
@@ -381,7 +383,7 @@ begin
         when P_DATA_TYPE = 'xml' then
            return 'XMLTYPE';
         when P_DATA_TYPE = 'geometry' then
-           return '"MDSYS"."SDO_GEOMETRY"';
+           return 'GEOMETRY';
         when P_DATA_TYPE = 'numeric' then
            return 'NUMBER';
         else
@@ -405,8 +407,10 @@ begin
         when P_DATA_TYPE = 'numeric' then
           return 'NUMBER';
         -- Binary Numbers
+        when P_DATA_TYPE = 'float' then
+          return 'BINARY_FLOAT';
         when P_DATA_TYPE = 'double' then
-          return 'BINARY DOUBLE';
+          return 'BINARY_DOUBLE';
         -- Text Data Types           
         when P_DATA_TYPE = 'varchar' then
           return 'VARCHAR2';
@@ -761,8 +765,8 @@ as
            when TYPE_EXISTS = 1 then 
              '\"' || TYPE_OWNER || '\".\"' || TYPE_NAME || '\"'
            when TYPE_NAME is not NULL then
+             -- Type Exist is NULL.
              'CLOB'
-           -- Type Exist is NULL.
            else
              TARGET_DATA_TYPE
          end || '"' 
@@ -973,7 +977,7 @@ begin
                      value JSON_QUERY(V_TARGET_DATA_TYPES,'$' returning  VARCHAR2(32767))
                      returning  VARCHAR2(32767))
                      $ELSE
-                     value JSON_QUERY(V_TARGET_DATA_TYPES,'$' returning  VARCHAR2(4000))
+                     value JSON_QUERY(V_TARGET_DATA_TYPES,'$' returning  VARCHAR2(4000) ERROR ON ERROR)
                      returning  VARCHAR2(4000))
                      $END
     into V_RESULTS

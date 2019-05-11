@@ -21,6 +21,7 @@ class DBWriter extends Writable {
     this.currentTable = undefined;
     this.rowCount     = undefined;
     this.ddlComplete  = false;
+    this.skipTable    = false;
     
     this.timings = {}
   }      
@@ -151,7 +152,7 @@ class DBWriter extends Writable {
           else {
             const results = await this.currentTable.finalize();
             this.skipTable = results.skipTable;
-            if (!this.skipTable) {
+            if (this.skipTable === false) {
               const elapsedTime = results.endTime - results.startTime;            
               this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${results.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
               this.timings[this.tableName] = {rowCount : this.rowCount, insertMode : results.insertMode, elapsedTime : Math.round(elapsedTime).toString() + "ms", throughput: Math.round((this.rowCount/Math.round(elapsedTime)) * 1000).toString() + "/s"};
@@ -160,11 +161,13 @@ class DBWriter extends Writable {
           // this.setTableName(obj.table)
           this.tableName = obj.table;
           this.currentTable = this.dbi.getTableWriter(this.tableName);
+          // await this.dbi.beginTransaction();
           await this.currentTable.initialize();
           this.rowCount = 0;
+          this.skipTable = false;
           break;
         case 'data': 
-          if (this.skipTable) {
+          if (this.skipTable === true) {
             break;
           }
           await this.currentTable.appendRow(obj.data);

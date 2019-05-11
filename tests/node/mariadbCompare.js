@@ -1,5 +1,4 @@
 "use strict" 
-const Yadamu = require('../../common/yadamu.js').Yadamu;
 const MariadbDBI = require('../../mariadb/node/mariadbDBI.js');
 
 const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
@@ -52,7 +51,7 @@ class MariadbCompare extends MariadbDBI {
       await this.executeSQL(createUser,{});      
     }    
 
-    async importResults(target,timings) {
+    async importResults(target,timingsArray) {
         
       const colSizes = [32, 48, 14, 14]
       
@@ -60,6 +59,8 @@ class MariadbCompare extends MariadbDBI {
       colSizes.forEach(function(size) {
         seperatorSize += size;
       },this);
+      
+      const timings = timingsArray[timingsArray.length - 1];
 
       Object.keys(timings).forEach(function(tableName) {
         if (tableName !== tableName.toLowerCase()) {
@@ -72,7 +73,7 @@ class MariadbCompare extends MariadbDBI {
       
       results.forEach(function(row,idx) {          
         const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row.TABLE_NAME.toLowerCase() : row.TABLE_NAME;
-        const tableTimings = (timings[0][tableName] === undefined) ? { rowCount : -1 } : timings[0][tableName]
+        const tableTimings = (timings[tableName] === undefined) ? { rowCount : -1 } : timings[tableName]
         if (idx === 0) {
           this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
           this.logger.write(`|`
@@ -98,10 +99,10 @@ class MariadbCompare extends MariadbDBI {
                           + '\n');
           
         }
-        if (idx+1 === results.length) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
-        }
       },this)
+      if (results.length > 0) {
+        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+      }
     }
     
     async report(source,target,timingsArray) {
@@ -115,8 +116,8 @@ class MariadbCompare extends MariadbDBI {
         }
       },this)
       
-      const sqlStatement = `CALL COMPARE_SCHEMAS(?,?);`;					   
-      let results = await this.executeSQL(sqlStatement,[source,target]);
+      const sqlStatement = `CALL COMPARE_SCHEMAS(?,?,?);`;					   
+      let results = await this.executeSQL(sqlStatement,[source,target,this.parameters.EMPTY_STRING_IS_NULL === true]);
 
       const successful = await this.executeSQL(sqlSuccess,{})
       const failed = await this.executeSQL(sqlFailed,{})
@@ -160,10 +161,11 @@ class MariadbCompare extends MariadbDBI {
                         + ` ${tableTimings.throughput.padStart(colSizes[6])} |` 
                         + '\n');
 
-        if (idx+1 === successful.length) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-        }
       },this)
+
+      if (successful.length > 0) {
+        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+      }
         
       seperatorSize = (colSizes.length * 3) - 1;
       colSizes.forEach(function(size) {
@@ -192,9 +194,9 @@ class MariadbCompare extends MariadbDBI {
         }
         else {
           this.logger.write(`|`
-                          + ` ${'FAILED'.padEnd(colSizes[0])} |`
-                          + ` ${row.SOURCE_SCHEMA.padStart(colSizes[1])} |`
-                          + ` ${row.TARGET_SCHEMA.padStart(colSizes[2])} |`)
+                          + ` ${''.padEnd(colSizes[0])} |`
+                          + ` ${''.padStart(colSizes[1])} |`
+                          + ` ${''.padStart(colSizes[2])} |`)
         }
                           
         this.logger.write(` ${row.TABLE_NAME.padStart(colSizes[3])} |` 
@@ -204,11 +206,11 @@ class MariadbCompare extends MariadbDBI {
                         + ` ${row.EXTRA_ROWS.toString().padStart(colSizes[7])} |` 
                         + ` ${(row.SQLEERM !== undefined ? row.SQLERRM : '').padEnd(colSizes[8])} |` 
                         + '\n');
-
-        if (idx+1 === failed.length) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
-        }
       },this)
+
+      if (failed.length > 0) {
+        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+      }
     }
       
 }

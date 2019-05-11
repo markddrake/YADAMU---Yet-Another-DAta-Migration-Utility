@@ -1,5 +1,5 @@
 "use strict" 
-const Yadamu = require('../../common/yadamu.js').Yadamu;
+
 const OracleDBI = require('../../oracle/node/oracleDBI.js');
 
 
@@ -75,7 +75,7 @@ class OracleCompare extends OracleDBI {
       const results = await this.executeSQL(sqlSchemaTableRows,args)
       
       results.rows.forEach(function(row,idx) {          
-        const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row[0].toUpperCase() : row[0];
+        const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row[0].toLowerCase() : row[0];
         const tableTimings = (timings[0][tableName] === undefined) ? { rowCount : -1 } : timings[0][tableName]
         if (idx === 0) {
           this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
@@ -102,10 +102,11 @@ class OracleCompare extends OracleDBI {
                           + '\n');
           
         }
-        if (idx+1 === results.rows.length) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
-        }
       },this)
+
+      if (results.rows.length > 0) {
+        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+      }
     }
 
     async report(source,target,timingsArray) {
@@ -116,8 +117,8 @@ class OracleCompare extends OracleDBI {
 
       if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
         Object.keys(timings).forEach(function(tableName) {
-          if (tableName !== tableName.toUpperCase()) {
-            timings[tableName.toUpperCase()] = Object.assign({}, timings[tableName])
+          if (tableName !== tableName.toLowerCase()) {
+            timings[tableName.toLowerCase()] = Object.assign({}, timings[tableName])
             delete timings[tableName]
           }
         },this)
@@ -134,7 +135,7 @@ class OracleCompare extends OracleDBI {
       },this);     
        
       successful.rows.forEach(function(row,idx) {          
-        const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row[2].toUpperCase() : row[2];
+        const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row[2].toLowerCase() : row[2];
         const tableTimings = (timings[tableName] === undefined) ? { elapsedTime : 'N/A', throughput : "-1ms" } : timings[tableName]
         if (idx === 0) {
           this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
@@ -166,12 +167,12 @@ class OracleCompare extends OracleDBI {
                         + ` ${tableTimings.elapsedTime.padStart(colSizes[5])} |` 
                         + ` ${tableTimings.throughput.padStart(colSizes[6])} |` 
                         + '\n');
-
-        if (idx+1 === successful.rows.length) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
-        }
       },this)
         
+      if (successful.rows.length > 0) {
+        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+      }
+      
       seperatorSize = (colSizes.length * 3) - 1;
       colSizes.forEach(function(size) {
         seperatorSize += size;
@@ -216,6 +217,10 @@ class OracleCompare extends OracleDBI {
           this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
         }
       },this)
+      
+      if (failed.rows.lngth > 0) {
+        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+      }
     }
       
 }

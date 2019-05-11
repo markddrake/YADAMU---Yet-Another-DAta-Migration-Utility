@@ -40,7 +40,7 @@ class StatementGenerator {
      
      tableInfo.lobCount = 0;
      return tableInfo.targetDataTypes.map(function (targetDataType,idx) {
-       const dataType = Yadamu.decomposeDataType(targetDataType)
+       const dataType = this.dbi.decomposeDataType(targetDataType)
        if (!dataType.length) {
           dataType.length = parseInt(dataTypeSizes[idx]);
        }
@@ -108,7 +108,7 @@ class StatementGenerator {
   }
   
   async generateStatementCache(executeDDL, vendor) {
-   
+      
     const sqlStatement = `begin :sql := JSON_IMPORT.GENERATE_STATEMENTS(:metadata, :schema);\nEND;`;
       
      /*
@@ -146,6 +146,7 @@ class StatementGenerator {
     await metadataLob.close();
 
     const statementCache = JSON.parse(results.outBinds.sql);
+    
     const tables = Object.keys(this.metadata); 
     tables.forEach(function(table,idx) {
       const tableMetadata = this.metadata[table];
@@ -164,7 +165,7 @@ class StatementGenerator {
       const declarations = columns.map(function(column,idx) {
         variables.push(`"V_${column}"`);
         let targetDataType =  tableInfo.targetDataTypes[idx];
-        const dataType = Yadamu.decomposeDataType(targetDataType);
+        const dataType = this.dbi.decomposeDataType(targetDataType);
         switch (dataType.type) {
           case "GEOMETRY":
           case "\"MDSYS\".\"SDO_GEOMETRY\"":

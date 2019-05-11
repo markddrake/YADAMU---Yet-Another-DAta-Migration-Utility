@@ -1,7 +1,5 @@
 "use strict"
 
-const Yadamu = require('../../common/yadamu.js');
-
 class TableWriter {
 
   constructor(dbi,tableName,tableInfo,status,logWriter) {
@@ -36,7 +34,7 @@ class TableWriter {
 
   async appendRow(row) {
     this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
-      const dataType = Yadamu.decomposeDataType(targetDataType);
+      const dataType = this.dbi.decomposeDataType(targetDataType);
       if (row[idx] !== null) {
         switch (dataType.type) {
           case "tinyblob" :
@@ -99,7 +97,8 @@ class TableWriter {
   }
   
   async writeBatch() {     
-     try {
+
+    try {
       if (this.tableInfo.insertMode === 'Iterative') {
         // const args = Array(this.batch[0].length).fill('?').join(',');
         // const insertOperation = this.tableInfo.dml.slice(0,-1) + "(" + args + ")";

@@ -10,7 +10,6 @@ const Readable = require('stream').Readable;
 
 const sql = require('mssql');
 
-const Yadamu = require('../../common/yadamu.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
@@ -58,6 +57,8 @@ const sqlTableInfo =
                                         concat('convert(VARCHAR(33),"',column_name,'",127) "',column_name,'"') 
                                       when data_type = 'datetimeoffset' then
                                         concat('convert(VARCHAR(33),"',column_name,'",127) "',column_name,'"') 
+                                      when data_type = 'xml' then
+                                        concat('replace(replace(convert(NVARCHAR(MAX),"',column_name,'"),''&#x0A;'',''\n''),''&#x20;'','' '') "',column_name,'"') 
                                       else 
                                         concat('"',column_name,'"') 
                                     end
@@ -84,7 +85,7 @@ class MsSQLDBI extends YadamuDBI {
   */
   
   decomposeDataType(targetDataType) {
-    const dataType = Yadamu.decomposeDataType(targetDataType);
+    const dataType = super.decomposeDataType(targetDataType);
     if (dataType.length === -1) {
       dataType.length = sql.MAX;
     }
@@ -378,7 +379,6 @@ class MsSQLDBI extends YadamuDBI {
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${query.SQL_STATEMENT}\ngo\n`)
     }
-    
        
     const readStream = new Readable({objectMode: true });
     readStream._read = function() {};

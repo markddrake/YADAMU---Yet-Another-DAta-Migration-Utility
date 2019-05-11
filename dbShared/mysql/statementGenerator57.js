@@ -65,7 +65,7 @@ class StatementGenerator {
                case (dataTypeLength > 65535):      return 'mediumblob';
                default:                            return 'binary';
              }
-           case 'bit':                             return 'tinyint(1)';
+           case 'bit':                             return 'boolean';
            case 'char':
              switch (true) {
                case (dataTypeLength === -1):       return 'longtext';
@@ -128,23 +128,56 @@ class StatementGenerator {
            default:                                return dataType.toLowerCase();
          }
          break;
-       case 'Postgres':                            return dataType.toLowerCase();
+       case 'Postgres':                            
+         switch (dataType) {
+           case 'character varying':       
+             switch (true) {
+               case (dataTypeLength === undefined): return 'longtext';
+               case (dataTypeLength > 16777215):    return 'longtext';
+               case (dataTypeLength > 65535):       return 'mediumtext';
+               default:                             return 'varchar';
+             }
+           case 'character':                        return 'nchar';
+           case 'bytea':
+             switch (true) {
+               case (dataTypeLength === undefined): return 'varbinary(4096)';
+               case (dataTypeLength > 16777215):    return 'longblob';
+               case (dataTypeLength > 65535):       return 'mediumblob';
+               default:                             return 'varbinary';
+             }
+           case 'timestamp': 
+           case 'timestamp with time zone': 
+           case 'timestamp without time zone': 
+           case 'time without time zone': 
+             switch (true) {
+               case (dataTypeLength === undefined): return 'datetime(6)';
+               default:                             return 'datetime';
+             }
+           case 'numeric':                          return 'decimal';
+           case 'double precision':                 return 'double';
+           case 'real':                             return 'float';
+           case 'integer':                          return 'int';
+           case 'xml':                              return 'longtext';     
+           case 'text':                             return 'longtext';     
+           case 'geography':       
+           case 'geography':                        return 'geometry';     
+           default:
+             if (dataType.indexOf('interval') === 0) {
+               return 'varchar(16)'; 
+             }
+             return dataType.toLowerCase();
+         }
          break
        case 'MySQL':
-         switch (dataType) {
-           case 'set':                             return 'varchar(512)';
-           case 'enum':                            return 'varchar(512)';
-           default:                                return dataType.toLowerCase();
-         }
-         break;
        case 'MariaDB':
          switch (dataType) {
-           case 'set':                             return 'varchar(512)';
-           case 'enum':                            return 'varchar(512)';
-           default:                                return dataType.toLowerCase();
+           case 'set':                            return 'varchar(512)';
+           case 'enum':                           return 'varchar(512)';
+           default:                               return dataType.toLowerCase();
          }
          break;
-       default:                                    return dataType.toLowerCase();
+       default: 
+         return dataType.toLowerCase();
     }  
   }
   
@@ -205,7 +238,7 @@ class StatementGenerator {
              }    
         
        const sizeConstraint = sizeConstraints[idx]
-       if (sizeConstraint.length > 0) {
+       if ((sizeConstraint !== null) && (sizeConstraint.length > 0)) {
           const components = sizeConstraint.split(',');
           dataType.length = parseInt(components[0])
           if (components.length > 1) {

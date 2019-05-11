@@ -23,11 +23,9 @@ class StatementGenerator {
     targetDataTypes.forEach(function (targetDataType,idx) {
       const dataType = this.dbi.decomposeDataType(targetDataType);
       switch (dataType.type) {
-        /*
-        case 'smallint':
-          supported = false;
-          break;
-       */
+          
+          
+          
        case 'geography':
           // TypeError: parameter.type.validate is not a function
           supported = false;
@@ -198,7 +196,7 @@ class StatementGenerator {
           table.columns.add(columns[idx],sql.VarChar(4000),{nullable: true});
           break;
         default:
-          console.log(`createBulkOperation(): Unmapped data type [${targetDataType}].`);
+          this.logWriter.write(`${new Date().toISOString()}[StatementGenerator.createBulkOperation("${tableName}"): Unmapped data type [${targetDataType}].\n`);
       }
     },this)
     return table
@@ -225,7 +223,7 @@ class StatementGenerator {
       // Create table before attempting to Prepare Statement..
       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + "\nVALUES (";
       this.metadata[table].columns.split(',').forEach(function(column,idx) {
-        tableInfo.dml = tableInfo.dml + '@C' + idx + ','
+        tableInfo.dml = tableInfo.dml + (tableInfo.targetDataTypes[idx] === 'xml' ? 'convert(XML,@C' + idx + ',1)' : '@C' + idx) + ','
       })
       tableInfo.dml = tableInfo.dml.slice(0,-1) + ")";
       tableInfo.bulkSupported = this.bulkSupported(tableInfo.targetDataTypes);

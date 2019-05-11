@@ -11,7 +11,6 @@ const Readable = require('stream').Readable;
 const oracledb = require('oracledb');
 oracledb.fetchAsString = [ oracledb.DATE ]
 
-const Yadamu = require('../../common/yadamu.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
@@ -32,7 +31,7 @@ const dateFormatMasks = {
 }
 
 const timestampFormatMasks = {
-        Oracle      : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
+        Oracle      : 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"'
        ,MSSQLSERVER : 'YYYY-MM-DD"T"HH24:MI:SS.FF7"Z"'
        ,Postgres    : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"+00:00"'
        ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
@@ -379,6 +378,7 @@ class OracleDBI extends YadamuDBI {
   async abort() {
     await this.releaseConnection(this.connection, this.logWriter);
   }
+
   /*
   **
   ** Commit the current transaction
@@ -441,7 +441,8 @@ class OracleDBI extends YadamuDBI {
     sqlStatement = `${sqlStatement}    :log := JSON_IMPORT.IMPORT_JSON(:json, :schema);\nEND;`;
 
     const results = await this.connection.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024}, json:hndl, schema:this.parameters.TOUSER});
-    this.processLog(results);
+    return this.processLog(results);
+  
   }
   
   /*

@@ -1,6 +1,5 @@
 "use strict"
 
-const Yadamu = require('../../common/yadamu.js').Yadamu;
 const DBInterface = require('./postgresDBI.js');
 
 async function main() {

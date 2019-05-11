@@ -2,7 +2,7 @@ DROP PROCEDURE IF EXISTS COMPARE_SCHEMAS;
 --
 DELIMITER $$
 --
-CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128))
+CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_MAP_EMPTY_STRING_TO_NULL BOOLEAN)
 BEGIN
   DECLARE C_NEWLINE          VARCHAR(1) DEFAULT CHAR(13);
   
@@ -18,7 +18,19 @@ BEGIN
   DECLARE TABLE_METADATA 
   CURSOR FOR 
   select c.table_name "TABLE_NAME"
-        ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "COLUMNS"
+        ,group_concat(case 
+                        when data_type in ('blob', 'varbinary', 'binary') then
+                          concat('hex("',column_name,'")') 
+                        when data_type in ('varchar','text','mediumtext','longtext') then
+                          case
+                            when P_MAP_EMPTY_STRING_TO_NULL then
+                              concat('case when "',column_name,'" = '''' then NULL else "',column_name,'" end') 
+                            else 
+                              concat('"',column_name,'"') 
+                          end 
+                        else concat('"',column_name,'"') 
+                      end 
+                      order by ordinal_position separator ',')  "COLUMNS"
    from (
      select distinct c.table_catalog, c.table_schema, c.table_name,column_name,ordinal_position,data_type,column_type,character_maximum_length,numeric_precision,numeric_scale,datetime_precision
        from information_schema.columns c, information_schema.tables t

@@ -20,7 +20,16 @@ begin
                  ,t.table_name "TABLE_NAME"
 	             ,string_agg('"' || column_name || '"',',' order by ordinal_position) "COLUMN_LIST" 
                  ,jsonb_agg(column_name order by ordinal_position) "COLUMN_NAME_ARRAY"
-	             ,jsonb_agg(case when data_type = 'USER-DEFINED' then udt_name else data_type end order by ordinal_position) "DATA_TYPES"
+	             ,jsonb_agg(case 
+                              when data_type = 'USER-DEFINED' then
+                                udt_name 
+                              when data_type = 'interval' then
+                                data_type || ' ' || lower(interval_type) 
+                              else 
+                                data_type 
+                            end 
+                            order by ordinal_position
+                           ) "DATA_TYPES"
                  ,jsonb_agg(case
                               when (numeric_precision is not null) and (numeric_scale is not null) then
                                 cast(numeric_precision as varchar) || ',' || cast(numeric_scale as varchar)
@@ -44,6 +53,8 @@ begin
                                                                 /* Suppress printing Currency Symbols */
                                                                 /* then '("' || column_name || '"/1::money) */
                                                                 '("' || column_name || '"::numeric)'
+                                                              when data_type in ('time', 'time with time zone','time without time zone') then 
+                                                                '(''1970-01-01 ''|| "' || column_name || '")::timestamptz' 
                                                               else
                                                                 '"' || column_name || '"'
                                                             end
@@ -118,7 +129,7 @@ $$ LANGUAGE plpgsql;
 **
 */
 --
-create or replace function MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH INT, P_DATA_TYPE_SCALE INT) 
+create or replace function MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH BIGINT, P_DATA_TYPE_SCALE INT) 
 returns VARCHAR
 as $$
 declare
@@ -147,6 +158,13 @@ begin
            return 'text';
         when 'NCLOB' then
            return 'text';
+        when 'TIMESTAMP' then
+          case
+            when P_DATA_TYPE_LENGTH > 6 
+              then return 'timestamp(6)';
+            else 
+              return 'timestamp';
+          end case;
         when 'BFILE' then
            return 'varchar';
         when 'ROWID' then
@@ -165,6 +183,9 @@ begin
           if ((strpos(V_DATA_TYPE,'INTERVAL') = 1) and (strpos(V_DATA_TYPE,'YEAR') > 0) and (strpos(V_DATA_TYPE,'TO MONTH') > 0)) then
             return 'interval year to month';
           end if;
+          if ((strpos(V_DATA_TYPE,'INTERVAL') = 1) and (strpos(V_DATA_TYPE,'DAY') > 0) and (strpos(V_DATA_TYPE,'TO SECOND') > 0)) then
+            return 'interval day to second';
+          end if;
           if (strpos(V_DATA_TYPE,'"."XMLTYPE"') > 0) then 
             return 'xml';
           end if;
@@ -175,8 +196,57 @@ begin
           end if;
           return lower(V_DATA_TYPE);
       end case;
-    when 'MySQL' then
-      -- Also MariaDB ????
+    when  'MySQL' then
+      case V_DATA_TYPE
+        -- MySQL Direct Mappings
+        when 'binary' then
+           return 'bytea';
+        when 'bit' then
+           return 'boolean';
+        when 'datetime' then
+           return 'timestamp';
+        when 'double' then
+           return 'double precision';
+        when  'enum' then
+           return 'varchar(255)';   
+        when 'float' then
+           return 'real';
+        when 'geometry' then
+           return 'geometry';
+        when 'geography' then
+           return 'geometry';
+        when 'tinyint' then
+           return 'smallint';
+        when 'mediumint' then
+           return 'integer';
+        when 'tinyblob' then
+           return 'bytea';
+        when 'blob' then
+           return 'bytea';
+        when 'mediumblob' then
+           return 'bytea';
+        when 'longblob' then
+           return 'bytea';
+        when 'set' then
+           return 'varchar(255)';   
+        when 'tinyint' then
+           return 'smallint';
+        when 'tinytext' then
+           return 'text';
+        when 'text' then
+           return 'text';
+         when 'mediumtext' then
+           return 'text';
+        when 'longtext' then
+           return 'text';
+        when 'varbinary' then
+           return 'bytea';
+        when 'year' then
+           return 'smallint';
+        else
+          return lower(V_DATA_TYPE);
+      end case;
+    when  'MariaDB' then
       case V_DATA_TYPE
         -- MySQL Direct Mappings
         when 'binary' then
@@ -232,11 +302,26 @@ begin
         when 'bit' then
            return 'boolean';
         when 'datetime' then
-          return 'timestamp';
+          case
+            when P_DATA_TYPE_LENGTH > 6 
+              then return 'timestamp(6)';
+            else 
+              return 'timestamp';
+          end case;
         when 'datetime2' then
-          return 'timestamp';
+          case
+            when P_DATA_TYPE_LENGTH > 6 
+              then return 'timestamp(6)';
+            else 
+              return 'timestamp';
+          end case;
         when 'datetimeoffset' then 
-          return 'timestamp with time zone';
+          case
+            when P_DATA_TYPE_LENGTH > 6 
+              then return 'timestamp(6) with time zone';
+            else 
+              return 'timestamp with time zone';
+          end case;
         when 'image'then 
           return 'bytea';
         when 'nchar'then
@@ -327,7 +412,7 @@ begin
   TARGET_TABLE_DEFINITIONS
   as (
     select st.*,
-           MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR,DATA_TYPE,DATA_TYPE_LENGTH::INT,DATA_TYPE_SCALE::INT) TARGET_DATA_TYPE
+           MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR,DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT) TARGET_DATA_TYPE
       from SOURCE_TABLE_DEFINITIONS st
   ) 
   select STRING_AGG('"' || COLUMN_NAME || '" ' || TARGET_DATA_TYPE || 
@@ -512,7 +597,7 @@ begin
 end;
 $$ LANGUAGE plpgsql;
 --
-create or replace procedure COMPARE_SCHEMA(P_SOURCE_SCHEMA VARCHAR,P_TARGET_SCHEMA VARCHAR)
+create or replace procedure COMPARE_SCHEMA(P_SOURCE_SCHEMA VARCHAR,P_TARGET_SCHEMA VARCHAR,P_EMPTY_STRING_IS_NULL BOOLEAN,P_STRIP_XML_DECLARATION BOOLEAN)
 as $$
 declare
   R RECORD;
@@ -537,8 +622,22 @@ begin
   for r in select t.table_name
 	             ,string_agg(
                     case 
-                      when data_type in ('json','xml')  then
+                      when data_type in ('character varying') then
+                        case 
+                          when P_EMPTY_STRING_IS_NULL then
+                            'case when"' || column_name || '" = '''' then NULL else "' || column_name || '" end "' || column_name || '"' 
+                          else 
+                            '"' || column_name || '"' 
+                        end
+                      when data_type = 'json'  then
                         '"' || column_name || '"::text' 
+                      when data_type = 'xml'  then
+                        case  
+                          when P_STRIP_XML_DECLARATION then
+                           'regexp_replace(regexp_replace("' || column_name || '"::text,''<\?xml.*?\?>'',''''),''&apos;'','''''''',''g'')'
+                          else
+                            '"' || column_name || '"::text' 
+                        end
                       when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
                        'st_AsText("' || column_name || '",18)' 
                       else 

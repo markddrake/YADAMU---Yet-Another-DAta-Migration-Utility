@@ -24,6 +24,34 @@ class YadamuDBI {
   get SPATIAL_FORMAT()     { return undefined };
   get DEFAULT_PARAMETERS() { return {} }
   
+  
+  decomposeDataType(targetDataType) {
+    
+    const results = {};
+    let components = targetDataType.split('(');
+    results.type = components[0].split(' ')[0];
+    if (components.length > 1 ) {
+      components = components[1].split(')');
+      if (components.length > 1 ) {
+        results.qualifier = components[1]
+      }
+      components = components[0].split(',');
+      if (components.length > 1 ) {
+        results.length = parseInt(components[0]);
+        results.scale = parseInt(components[1]);
+      }
+      else {
+        if (components[0] === 'max') {
+          results.length = -1;
+        }
+        else {
+          results.length = parseInt(components[0])
+        }
+      }
+    }           
+    return results;      
+    
+  } 
   processLog(log,status,logWriter) {
 
     const logDML         = (status.loglevel && (status.loglevel > 0));
@@ -307,7 +335,7 @@ class YadamuDBI {
   }
   
   async generateStatementCache(StatementGenerator,schema,executeDDL) {
-    const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE);
+    const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE, this.status, this.logWriter);
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }
 

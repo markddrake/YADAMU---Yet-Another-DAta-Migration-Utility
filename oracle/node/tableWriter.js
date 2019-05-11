@@ -1,6 +1,5 @@
 "use strict"
 
-const Yadamu = require('../../common/yadamu.js');
 const oracledb = require('oracledb');
 
 const sqlSetSavePoint = 
@@ -67,7 +66,7 @@ class TableWriter {
     try {           
       row = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
         if (row[idx] !== null) {
-          const dataType = Yadamu.decomposeDataType(targetDataType);
+          const dataType = this.dbi.decomposeDataType(targetDataType);
           if (dataType.type === 'JSON') {
             // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
             // row[idx] = Buffer.from(JSON.stringify(row[idx]))

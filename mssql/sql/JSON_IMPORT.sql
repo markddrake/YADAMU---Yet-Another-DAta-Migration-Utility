@@ -19,7 +19,7 @@ BEGIN
              when @DATA_TYPE = 'NUMBER'
                then 'decimal'
              when @DATA_TYPE = 'BINARY_DOUBLE'
-               then 'float'
+               then 'float(53)'
              when @DATA_TYPE = 'BINARY_FLOAT'
                then 'real'
              when @DATA_TYPE = 'RAW'
@@ -33,7 +33,7 @@ BEGIN
              when @DATA_TYPE in ('ANYDATA') 
                then 'nvarchar(max)'                
              when (CHARINDEX('INTERVAL',@DATA_TYPE) = 1)
-               then 'varchar(64)'                  
+               then 'varchar(16)'                  
              when (CHARINDEX('TIMESTAMP',@DATA_TYPE) = 1) 
                then case
                       when (CHARINDEX('TIME ZONE',@DATA_TYPE) > 0) 
@@ -58,8 +58,10 @@ BEGIN
                then 'datetime2'
              when @DATA_TYPE = 'timestamp' 
                then 'datetime2'
+             when @DATA_TYPE = 'float' 
+               then 'real'
              when @DATA_TYPE = 'double' 
-               then 'float'
+               then 'float(53)'
              when @DATA_TYPE = 'enum'
                then 'varchar(255)'
              when @DATA_TYPE = 'set'
@@ -72,9 +74,15 @@ BEGIN
                then 'varbinary(max)'
              when @DATA_TYPE = 'blob' 
                then 'varbinary'
-             when @DATA_TYPE = 'longtext' then
+             when @DATA_TYPE = 'varchar' then
+               -- For MySQL may need to add column character set to the table metadata object in order to accutately determine varchar Vs nvarchar ? 
+               -- Alternatively the character set could be used when generating metadata from the MySQL dictionaly that distinguishes varchar from nvarchar even thought the dictionaly does not.
+               'nvarchar'
+             when @DATA_TYPE = 'text' then
                'nvarchar(max)'
              when @DATA_TYPE = 'mediumtext' then
+               'nvarchar(max)'
+             when @DATA_TYPE = 'longtext' then
                'nvarchar(max)'
              when @DATA_TYPE = 'longblob' then
                'varbinary(max)'
@@ -83,12 +91,16 @@ BEGIN
              else
                lower(@DATA_TYPE)
            END
-    when @VENDOR in ('Postgres')   
+    when @VENDOR = 'Postgres'
       then case 
+             when @DATA_TYPE = 'character varying' and @DATA_TYPE_LENGTH is null then
+               'nvarchar(max)'
              when @DATA_TYPE = 'character varying' then
                'nvarchar'
              when @DATA_TYPE = 'character' then
                'nchar'
+             when @DATA_TYPE = 'text' then
+               'nvarchar(max)'
              when @DATA_TYPE = 'bytea' and @DATA_TYPE_LENGTH > 8000  then 
                'varbinary(max)'
              when @DATA_TYPE = 'bytea' then
@@ -97,14 +109,18 @@ BEGIN
                'bit'
              when @DATA_TYPE = 'timestamp' then
                'datetime'
+             when @DATA_TYPE = 'timestamp with time zone' then
+               'datetimeoffset'
              when @DATA_TYPE = 'timestamp without time zone' then
-               'datetime'
+               'datetime2'
              when @DATA_TYPE = 'time without time zone' then
                'time'
+             when (CHARINDEX('interval',@DATA_TYPE) = 1) then
+               'varchar(64)'
              when @DATA_TYPE = 'double precision' then
-               'float'
+               'float(53)'
              when @DATA_TYPE = 'real' then
-               'float'
+               'real'
              when @DATA_TYPE = 'geometry' then
                'geometry'
              when @DATA_TYPE = 'geography'then
@@ -474,7 +490,7 @@ GO
 EXECUTE sp_ms_marksystemobject 'sp_GENERATE_SQL'
 GO
 --
-CREATE OR ALTER PROCEDURE sp_COMPARE_SCHEMA(@FORMAT_RESULTS BIT,@SOURCE_DATABASE NVARCHAR(128), @SOURCE_SCHEMA NVARCHAR(128), @TARGET_DATABASE NVARCHAR(128), @TARGET_SCHEMA NVARCHAR(128), @COMMENT NVARCHAR(2048)) 
+CREATE OR ALTER PROCEDURE sp_COMPARE_SCHEMA(@FORMAT_RESULTS BIT,@SOURCE_DATABASE NVARCHAR(128), @SOURCE_SCHEMA NVARCHAR(128), @TARGET_DATABASE NVARCHAR(128), @TARGET_SCHEMA NVARCHAR(128), @COMMENT NVARCHAR(2048), @EMPTY_STRING_IS_NULL BIT, @SPATIAL_PRECISION int) 
 AS
 BEGIN
   DECLARE @OWNER            VARCHAR(128);
@@ -491,15 +507,32 @@ BEGIN
   CURSOR FOR 
   select t.table_name
         ,string_agg(case 
+                      when c.data_type in ('varchar','nvarchar') then
+                        case 
+                          when @EMPTY_STRING_IS_NULL = 1 then
+                            concat('case when "',c.column_name,'" = '''' then NULL else "',c.column_name,'" end "',c.column_name,'"')
+                          else
+                            concat('"',c.column_name,'"')
+                        end
                       when c.data_type in ('geography','geometry') then
-                        concat('HASHBYTES(''SHA2_256'',"',c.column_name,'".ToString()) "',c.column_name,'"')
+                        case 
+                           when @SPATIAL_PRECISION is NULL then
+                             concat('"',c.column_name,'".ToString()',c.column_name,'"')
+                           else
+                             case 
+                               when c.data_type = 'geography' then
+                                 concat('case when "',c.column_name,'".InstanceOf(''POINT'') = 1 then concat(str("',c.column_name,'".Long,18,',@SPATIAL_PRECISION,'),'','',str("',c.column_name,'".Lat,18,',@SPATIAL_PRECISION,')) else "',c.column_name,'".ToString() end "',c.column_name,'"')
+                               else
+                                 concat('case when "',c.column_name,'".InstanceOf(''POINT'') = 1 then concat(str("',c.column_name,'".STX,18,',@SPATIAL_PRECISION,'),'','',str("',c.column_name,'".STY,18,',@SPATIAL_PRECISION,')) else "',c.column_name,'".ToString() end "',c.column_name,'"')
+                               end
+                        end
                       when c.data_type in ('xml','text','ntext') then
                         concat('HASHBYTES(''SHA2_256'',CAST("',c.column_name,'" as NVARCHAR(MAX))) "',c.column_name,'"')
                       when c.data_type in ('image') then
                         concat('HASHBYTES(''SHA2_256'',CAST("',c.column_name,'" as VARBINARY(MAX))) "',c.column_name,'"')
                       else  
                         concat('"',c.column_name,'"')
-                      END
+                      end
                    ,',') 
          within group (order by ordinal_position) "columns"
    from information_schema.columns c, information_schema.tables t
@@ -543,7 +576,8 @@ BEGIN
                              '       ,(select count(*) from (SELECT ',@COLUMN_LIST,' FROM "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'" EXCEPT SELECT ',@COLUMN_LIST,' FROM "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'") T1)',@C_NEWLINE,
                              '       ,(select count(*) from (SELECT ',@COLUMN_LIST,' FROM "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'" EXCEPT SELECT ',@COLUMN_LIST,' FROM "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'") T2)',@C_NEWLINE,
                              '       ,NULL');
-    
+          
+
     BEGIN TRY 
       EXEC(@SQL_STATEMENT)
     END TRY
