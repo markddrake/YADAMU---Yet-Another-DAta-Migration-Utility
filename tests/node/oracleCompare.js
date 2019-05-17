@@ -27,7 +27,7 @@ const sqlGatherSchemaStats = `begin dbms_stats.gather_schema_stats(ownname => :t
 
 const sqlSchemaTableRows = `select TABLE_NAME, NUM_ROWS from ALL_TABLES where OWNER = :target`;
 
-const sqlCompareSchemas = `begin JSON_IMPORT.COMPARE_SCHEMAS(:source,:target); end;`;
+const sqlCompareSchemas = `begin YADAMU_IMPORT.COMPARE_SCHEMAS(:source,:target); end;`;
 
 
 class OracleCompare extends OracleDBI {

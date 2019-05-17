@@ -14,7 +14,7 @@ set heading off
 select to_char(SYS_EXTRACT_UTC(SYSTIMESTAMP),'YYYY-MM-DD"T"HH24:MI:SS"Z"') || ': "&SCHEMA&ID1", "&SCHEMA&ID2", "&METHOD", "&MODE"' || CHR(13) "Timestamp"
   from DUAL
 /
-call JSON_IMPORT.COMPARE_SCHEMAS('&SCHEMA&ID1','&SCHEMA&ID2');
+call YADAMU_IMPORT.COMPARE_SCHEMAS('&SCHEMA&ID1','&SCHEMA&ID2');
 --
 set heading on
 set feedback on

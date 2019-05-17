@@ -26,7 +26,7 @@ create global temporary table SCHEMA_COMPARE_RESULTS (
 ) 
 ON COMMIT PRESERVE  ROWS
 /
-create or replace package JSON_IMPORT
+create or replace package YADAMU_IMPORT
 AUTHID CURRENT_USER
 as
   C_VERSION_NUMBER constant NUMBER(4,2) := 1.0;
@@ -36,29 +36,34 @@ as
   C_WARNING          CONSTANT VARCHAR2(32) := 'WARNING';
   C_IGNOREABLE       CONSTANT VARCHAR2(32) := 'IGNORE';
   C_XLARGE_CONTENT   CONSTANT VARCHAR2(32) := 'CONTENT_TOO_LARGE';
---
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  C_RETURN_TYPE     CONSTANT VARCHAR2(32) := 'CLOB';
-  C_MAX_OUTPUT_SIZE CONSTANT NUMBER       := DBMS_LOB.LOBMAXSIZE;
-  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-  C_RETURN_TYPE     CONSTANT VARCHAR2(32):= 'VARCHAR2(32767)';
-  C_MAX_OUTPUT_SIZE CONSTANT NUMBER      := 32767;
-  $ELSE
-  C_RETURN_TYPE     CONSTANT VARCHAR2(32):= 'VARCHAR2(4000)';
-  C_MAX_OUTPUT_SIZE CONSTANT NUMBER      := 4000;
-  $END 
---
+
   TYPE T_RESULTS_CACHE is VARRAY(2147483647) of CLOB;
   RESULTS_CACHE        T_RESULTS_CACHE := T_RESULTS_CACHE();
+  
+  TYPE TABLE_INFO_RECORD is RECORD (
+    DDL                CLOB
+   ,DML                CLOB
+   ,TARGET_DATA_TYPES  CLOB
+  );
+  
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  $ELSE
+  TYPE KVP_RECORD is RECORD (
+    KEY                VARCHAR2(4000)
+   ,VALUE              CLOB
+  );
+  
+  TYPE KEY_VALUE_PAIR_TABLE is TABLE of KVP_RECORD;
+  $END  
 
   procedure DATA_ONLY_MODE(P_DATA_ONLY_MODE BOOLEAN);
   procedure DDL_ONLY_MODE(P_DDL_ONLY_MODE BOOLEAN);
 
   function IMPORT_VERSION return NUMBER deterministic;
-
   procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'));
+
   function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
-  function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB') return CLOB;
+  function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB') return TABLE_INFO_RECORD;
   function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
   
   function SET_CURRENT_SCHEMA(P_TARGET_SCHEMA VARCHAR2) return CLOB;
@@ -81,15 +86,12 @@ show errors
 --
 @@SET_TERMOUT
 --
-create or replace package body JSON_IMPORT
+create or replace package body YADAMU_IMPORT
 as
 --
-  C_NEWLINE         CONSTANT CHAR(1) := CHR(10);
-  C_SINGLE_QUOTE    CONSTANT CHAR(1) := CHR(39);
-
   G_INCLUDE_DATA    BOOLEAN := TRUE;
   G_INCLUDE_DDL     BOOLEAN := FALSE;
---
+
 function GET_MILLISECONDS(P_START_TIME TIMESTAMP, P_END_TIME TIMESTAMP)
 return NUMBER
 as
@@ -165,8 +167,26 @@ begin
                      returning  VARCHAR2(4000)) returning  VARCHAR2(4000))
                      $END
     into RESULTS_CACHE(RESULTS_CACHE.count)
-    
     from DUAL;
+exception
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  $ELSE
+  when YADAMU_UTILITIES.JSON_OVERFLOW then
+    RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                            YADAMU_UTILITIES.KVP_TABLE(
+                                              YADAMU_UTILITIES.KVJ(
+                                                'trace',
+                                                YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                                   YADAMU_UTILITIES.KVP_TABLE(
+                                                     YADAMU_UTILITIES.KVC('sqlStatement',P_SQL_STATEMENT)
+                                                   )
+                                                )
+                                              )
+                                            )
+                                          );
+  $END
+  when others then
+    RAISE;
 end;
 --
 procedure LOG_DDL_OPERATION(P_TABLE_NAME VARCHAR2, P_DDL_OPERATION CLOB)
@@ -183,6 +203,26 @@ begin
                      $END
     into RESULTS_CACHE(RESULTS_CACHE.count)
     from DUAL;
+exception
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  $ELSE
+  when YADAMU_UTILITIES.JSON_OVERFLOW then
+    RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                            YADAMU_UTILITIES.KVP_TABLE(
+                                              YADAMU_UTILITIES.KVJ(
+                                                'dll',
+                                                YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                                  YADAMU_UTILITIES.KVP_TABLE(
+                                                    YADAMU_UTILITIES.KVC('sqlStatement',P_DDL_OPERATION),
+                                                    YADAMU_UTILITIES.KVS('tableName',P_TABLE_NAME)
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          );
+  $END
+  when others then
+    RAISE;
 end;
 --
 procedure LOG_DML_OPERATION(P_TABLE_NAME VARCHAR2, P_DML_OPERATION CLOB, P_ROW_COUNT NUMBER, P_ELAPSED_TIME NUMBER)
@@ -197,7 +237,28 @@ begin
                $ELSE
                returning  VARCHAR2(4000)) returning  VARCHAR2(4000))
                $END
-          into RESULTS_CACHE(RESULTS_CACHE.count) from DUAL;
+          into RESULTS_CACHE(RESULTS_CACHE.count)
+          from DUAL;
+exception
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  $ELSE
+  when YADAMU_UTILITIES.JSON_OVERFLOW then
+    RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                            YADAMU_UTILITIES.KVP_TABLE(
+                                              YADAMU_UTILITIES.KVJ(
+                                                'dml',
+                                                YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                                  YADAMU_UTILITIES.KVP_TABLE(
+                                                    YADAMU_UTILITIES.KVC('sqlStatement',P_DML_OPERATION),
+                                                    YADAMU_UTILITIES.KVS('tableName',P_TABLE_NAME)
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          );
+  $END
+  when others then
+    RAISE;
 end;
 --
 procedure LOG_ERROR(P_SEVERITY VARCHAR2, P_TABLE_NAME VARCHAR2,P_SQL_STATEMENT CLOB,P_SQLCODE NUMBER, P_SQLERRM VARCHAR2, P_STACK CLOB)
@@ -214,10 +275,37 @@ begin
                      $END
      into RESULTS_CACHE(RESULTS_CACHE.count)
      from DUAL;
+exception
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  $ELSE
+  when YADAMU_UTILITIES.JSON_OVERFLOW then
+    RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                            YADAMU_UTILITIES.KVP_TABLE(
+                                              YADAMU_UTILITIES.KVJ(
+                                                'error',
+                                                YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                                  YADAMU_UTILITIES.KVP_TABLE(
+                                                    YADAMU_UTILITIES.KVC('sqlStatement',P_SQL_STATEMENT),
+                                                    YADAMU_UTILITIES.KVS('severity',P_SEVERITY),
+                                                    YADAMU_UTILITIES.KVS('tableName',P_TABLE_NAME),
+                                                    YADAMU_UTILITIES.KVN('code',P_SQLCODE),
+                                                    YADAMU_UTILITIES.KVS('msg',P_SQLERRM),
+                                                    YADAMU_UTILITIES.KVS('details',P_STACK)
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          );
+  $END
+  when others then
+    RAISE;
 end;
 --
 procedure LOG_INFO(P_PAYLOAD CLOB)
 as
+--
+-- ### Issue with Large Payloads (>32k or >4k)
+--
 begin
   RESULTS_CACHE.extend;
   $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
@@ -227,15 +315,30 @@ begin
   $ELSE
   select JSON_OBJECT('info' value JSON_QUERY(P_PAYLOAD,'$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
   $END
-     into RESULTS_CACHE(RESULTS_CACHE.count)
-     from DUAL;
+    into RESULTS_CACHE(RESULTS_CACHE.count)
+    from DUAL;
+exception
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  $ELSE
+  when YADAMU_UTILITIES.JSON_OVERFLOW then
+    RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                            YADAMU_UTILITIES.KVP_TABLE(
+                                              YADAMU_UTILITIES.KVJ(
+                                                'info',
+                                                P_PAYLOAD
+                                              )
+                                            )
+                                          );
+  $END
+  when others then
+    RAISE;
 end;
 --
-procedure LOG_MESSAGE(V_PAYLOAD CLOB)
+procedure LOG_MESSAGE(P_PAYLOAD CLOB)
 as
 begin
   RESULTS_CACHE.extend;
-  select JSON_OBJECT('message' value V_PAYLOAD
+  select JSON_OBJECT('message' value P_PAYLOAD
                      $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB)
                      $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
@@ -245,6 +348,21 @@ begin
                      $END
      into RESULTS_CACHE(RESULTS_CACHE.count)
      from DUAL;
+exception
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  $ELSE
+  when YADAMU_UTILITIES.JSON_OVERFLOW then
+    RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                            YADAMU_UTILITIES.KVP_TABLE(
+                                              YADAMU_UTILITIES.KVJ(
+                                                'message',
+                                                P_PAYLOAD
+                                              )
+                                            )
+                                          );
+  $END
+  when others then
+    RAISE;
 end;
 --
 function MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR VARCHAR2, P_DATA_TYPE VARCHAR2, P_DATA_TYPE_LENGTH NUMBER, P_DATA_TYPE_SCALE NUMBER)
@@ -470,7 +588,7 @@ as
   V_IDX   PLS_INTEGER;
 begin
   if (P_DESERIALIZATION_FUNCTIONS.count > 0) then
-    DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB('WITH' || C_NEWLINE));
+    DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB('WITH' || YADAMU_UTILITIES.C_NEWLINE));
     for V_IDX in 1.. P_DESERIALIZATION_FUNCTIONS.count loop
       DBMS_LOB.APPEND(P_SQL_STATEMENT,TO_CLOB(P_DESERIALIZATION_FUNCTIONS(V_IDX)));
     end loop;
@@ -478,7 +596,7 @@ begin
 end;
 --
 function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB')
-return CLOB
+return TABLE_INFO_RECORD
 as
   CURSOR generateStatementComponents
   is
@@ -584,7 +702,7 @@ as
                             TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH|| ')'
                           else
                             TARGET_DATA_TYPE
-                        end || C_NEWLINE
+                        end || YADAMU_UTILITIES.C_NEWLINE
                         order by IDX
                 )
                 as T_VC4000_TABLE
@@ -650,7 +768,7 @@ as
                )
                as T_VC4000_TABLE
            )
-           ,C_NEWLINE
+           ,YADAMU_UTILITIES.C_NEWLINE
          ) XMLTYPE_STORAGE_CLAUSES
         ,SERIALIZE_TABLE(
            cast(collect(
@@ -663,7 +781,7 @@ as
                           when TARGET_DATA_TYPE  = 'BOOLEAN' then
                             'VARCHAR2(5)'
                           when TARGET_DATA_TYPE = 'JSON' then
-                            C_RETURN_TYPE || ' FORMAT JSON'
+                            JSON_FEATURE_DETECTION.C_RETURN_TYPE || ' FORMAT JSON'
                           when TARGET_DATA_TYPE  = 'FLOAT' then
                             'NUMBER'
                           when TARGET_DATA_TYPE = 'BINARY_FLOAT' then
@@ -677,7 +795,7 @@ as
                           when TARGET_DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (TARGET_DATA_TYPE like 'INTERVAL%') then
                             'VARCHAR2'
                           when TARGET_DATA_TYPE in ('XMLTYPE','ANYDATA','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (TYPE_NAME is not NULL) then
-                            C_RETURN_TYPE
+                            JSON_FEATURE_DETECTION.C_RETURN_TYPE
                           when "TARGET_DATA_TYPE" in ('DATE','DATETIME') then
                             "TARGET_DATA_TYPE"
                           when "TARGET_DATA_TYPE" like 'TIMESTAMP%TIME ZONE' then
@@ -691,7 +809,7 @@ as
                           else
                             "TARGET_DATA_TYPE"
                         end
-                        || ' PATH ''$[' || (IDX - 1) || ']'' ERROR ON ERROR' || C_NEWLINE
+                        || ' PATH ''$[' || (IDX - 1) || ']'' ERROR ON ERROR' || YADAMU_UTILITIES.C_NEWLINE
                         order by IDX
                 )
                 as T_VC4000_TABLE
@@ -727,7 +845,7 @@ as
              TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH|| ')'
            else
              TARGET_DATA_TYPE
-         end || C_NEWLINE 
+         end || YADAMU_UTILITIES.C_NEWLINE 
          COLUMNS_CLAUSE
          /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
         ,case
@@ -781,13 +899,13 @@ as
         ,'"' || COLUMN_NAME || '" ' ||
          case
            when TYPE_EXISTS = 1 then 
-             C_RETURN_TYPE
+             JSON_FEATURE_DETECTION.C_RETURN_TYPE
            when TARGET_DATA_TYPE  = 'BOOLEAN' then
              'VARCHAR2(5)'
            when TARGET_DATA_TYPE  = 'GEOMETRY' then
-             C_RETURN_TYPE
+             JSON_FEATURE_DETECTION.C_RETURN_TYPE
            when TARGET_DATA_TYPE = 'JSON' then 
-             C_RETURN_TYPE || ' FORMAT JSON'
+             JSON_FEATURE_DETECTION.C_RETURN_TYPE || ' FORMAT JSON'
            when TARGET_DATA_TYPE  = 'FLOAT' then 
              'NUMBER'
            when TARGET_DATA_TYPE = 'BINARY_FLOAT' then 
@@ -807,7 +925,7 @@ as
            when TARGET_DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (TARGET_DATA_TYPE like 'INTERVAL%') then 
              'VARCHAR2'
            when TARGET_DATA_TYPE in ('XMLTYPE','ANYDATA','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (TYPE_NAME is not NULL) then 
-             C_RETURN_TYPE
+             JSON_FEATURE_DETECTION.C_RETURN_TYPE
            when "TARGET_DATA_TYPE" in ('DATE','DATETIME') then 
              "TARGET_DATA_TYPE"
            when "TARGET_DATA_TYPE" like 'TIMESTAMP%TIME ZONE' then
@@ -820,7 +938,7 @@ as
              "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ')'
            else
              "TARGET_DATA_TYPE"
-         end  || ' PATH ''$[' || (IDX - 1) || ']'' ERROR ON ERROR' || C_NEWLINE 
+         end  || ' PATH ''$[' || (IDX - 1) || ']'' ERROR ON ERROR' || YADAMU_UTILITIES.C_NEWLINE 
          COLUMN_PATTERNS
         ,DESERIALIZATION_FUNCTION
     from "EXTENDED_TABLE_DEFINITIONS"
@@ -866,7 +984,7 @@ end;';
   V_DDL_STATEMENT     CLOB := NULL;
   V_DML_STATEMENT     CLOB;
   V_TARGET_DATA_TYPES CLOB;
-  V_RESULTS           CLOB;
+  V_RESULTS           TABLE_INFO_RECORD;
   
   V_EXISTING_TABLE    PLS_INTEGER := 0; 
 begin
@@ -906,7 +1024,7 @@ begin
     from table (V_XML_STORAGE_TEMP)
    where COLUMN_VALUE is not NULL;
 
-  V_XML_STORAGE_CLAUSE := SERIALIZE_TABLE(V_XML_STORAGE_TABLE,C_NEWLINE);
+  V_XML_STORAGE_CLAUSE := SERIALIZE_TABLE(V_XML_STORAGE_TABLE,YADAMU_UTILITIES.C_NEWLINE);
   
   select distinct COLUMN_VALUE
     bulk collect into V_DESERIALIZATIONS
@@ -932,14 +1050,14 @@ begin
   if (V_EXISTING_TABLE = 0) then 
     -- Table does not exist: Generate DDL Statement
     DBMS_LOB.CREATETEMPORARY(V_DDL_STATEMENT,TRUE,DBMS_LOB.SESSION);
-    V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK1 || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (' || C_NEWLINE || ' ';
+    V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK1 || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (' || YADAMU_UTILITIES.C_NEWLINE || ' ';
     DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
     DBMS_LOB.APPEND(V_DDL_STATEMENT,V_COLUMNS_CLAUSE);
     V_SQL_FRAGMENT := ')';
     DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
     if (P_XMLTYPE_STORAGE_MODEL = 'CLOB') then      
     V_SQL_FRAGMENT := ')';
-      DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(C_NEWLINE),C_NEWLINE);
+      DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(YADAMU_UTILITIES.C_NEWLINE),YADAMU_UTILITIES.C_NEWLINE);
       DBMS_LOB.APPEND(V_DDL_STATEMENT,V_XML_STORAGE_CLAUSE);
     end if;
     V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK2;
@@ -953,7 +1071,7 @@ begin
   V_SQL_FRAGMENT := 'insert' || V_INSERT_HINT || ' into "' || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (';
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   DBMS_LOB.APPEND(V_DML_STATEMENT,P_COLUMN_LIST);
-  V_SQL_FRAGMENT :=  ')' || C_NEWLINE;
+  V_SQL_FRAGMENT :=  ')' || YADAMU_UTILITIES.C_NEWLINE;
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   
   APPEND_DESERIALIZATION_FUNCTIONS(V_DESERIALIZATIONS,V_DML_STATEMENT);
@@ -961,28 +1079,17 @@ begin
   V_SQL_FRAGMENT := 'select ';
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   DBMS_LOB.APPEND(V_DML_STATEMENT,V_INSERT_SELECT_LIST );
-  V_SQL_FRAGMENT := C_NEWLINE || '  from JSON_TABLE(:JSON,''$.data."' || P_TABLE_NAME || '"[*]''' || C_NEWLINE || '         COLUMNS(' || C_NEWLINE || ' ';
+  V_SQL_FRAGMENT := YADAMU_UTILITIES.C_NEWLINE || '  from JSON_TABLE(:JSON,''$.data."' || P_TABLE_NAME || '"[*]''' || YADAMU_UTILITIES.C_NEWLINE || '         COLUMNS(' || YADAMU_UTILITIES.C_NEWLINE || ' ';
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   DBMS_LOB.APPEND(V_DML_STATEMENT,V_COLUMN_PATTERNS);
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,7,')) data');
   
   V_TARGET_DATA_TYPES := '[' || V_TARGET_DATA_TYPES || ']';
-  select JSON_OBJECT('ddl' value V_DDL_STATEMENT, 
-                     'dml' value V_DML_STATEMENT,
-                     'targetDataTypes'
-                     $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-                     value TREAT(V_TARGET_DATA_TYPES AS JSON)
-                     returning CLOB)
-                     $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-                     value JSON_QUERY(V_TARGET_DATA_TYPES,'$' returning  VARCHAR2(32767))
-                     returning  VARCHAR2(32767))
-                     $ELSE
-                     value JSON_QUERY(V_TARGET_DATA_TYPES,'$' returning  VARCHAR2(4000) ERROR ON ERROR)
-                     returning  VARCHAR2(4000))
-                     $END
-    into V_RESULTS
-    from DUAL;    
-
+  
+  V_RESULTS.DML := V_DML_STATEMENT;
+  V_RESULTS.DDL := V_DDL_STATEMENT;
+  V_RESULTS.TARGET_DATA_TYPES := V_TARGET_DATA_TYPES;
+  
   return V_RESULTS;
   
 exception
@@ -990,7 +1097,7 @@ exception
     LOG_INFO('[' || P_COLUMN_LIST || ']');
     LOG_INFO('[' || REPLACE(P_DATA_TYPE_ARRAY,'"."','"."') || ']');
     LOG_INFO('[' || P_SIZE_CONSTRAINTS || ']');
-    LOG_ERROR(C_FATAL_ERROR,'JSON_IMPORT.GENERATE_STATEMENTS()',NULL,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
+    LOG_ERROR(C_FATAL_ERROR,'YADAMU_IMPORT.GENERATE_STATEMENTS()',NULL,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
     raise;
 end;
 --
@@ -1161,10 +1268,10 @@ as
   V_END_TIME     TIMESTAMP(6);
   V_ROW_COUNT    NUMBER;
 begin
-   V_SQL_FRAGMENT := 'declare' || C_NEWLINE
-                  || '  cursor JSON_TO_RELATIONAL' || C_NEWLINE
-                  || '  is' || C_NEWLINE
-                  || '  select *' || C_NEWLINE
+   V_SQL_FRAGMENT := 'declare' || YADAMU_UTILITIES.C_NEWLINE
+                  || '  cursor JSON_TO_RELATIONAL' || YADAMU_UTILITIES.C_NEWLINE
+                  || '  is' || YADAMU_UTILITIES.C_NEWLINE
+                  || '  select *' || YADAMU_UTILITIES.C_NEWLINE
                   || '    from ';
 
    DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENT,TRUE,DBMS_LOB.CALL);
@@ -1172,25 +1279,25 @@ begin
    V_JSON_TABLE_OFFSET := DBMS_LOB.INSTR(P_DML_STATEMENT,' JSON_TABLE(');
    DBMS_LOB.COPY(V_SQL_STATEMENT,P_DML_STATEMENT,((DBMS_LOB.GETLENGTH(P_DML_STATEMENT)-V_JSON_TABLE_OFFSET)+1),DBMS_LOB.GETLENGTH(V_SQL_STATEMENT)+1,V_JSON_TABLE_OFFSET);
 
-   V_SQL_FRAGMENT := ';' || C_NEWLINE
-                  || '  type T_JSON_TABLE_ROW_TAB is TABLE of JSON_TO_RELATIONAL%ROWTYPE index by PLS_INTEGER;' || C_NEWLINE
-                  || '  V_ROW_BUFFER T_JSON_TABLE_ROW_TAB;' || C_NEWLINE
-                  || '  V_ROW_COUNT PLS_INTEGER := 0;' || C_NEWLINE
-                  || 'begin' || C_NEWLINE
-                  || '  open JSON_TO_RELATIONAL;' || C_NEWLINE
-                  || '  loop' || C_NEWLINE
-                  || '    fetch JSON_TO_RELATIONAL' || C_NEWLINE
-                  || '    bulk collect into V_ROW_BUFFER LIMIT 25000;' || C_NEWLINE
-                  || '    exit when V_ROW_BUFFER.count = 0;' || C_NEWLINE
-                  || '    V_ROW_COUNT := V_ROW_COUNT + V_ROW_BUFFER.count;' || C_NEWLINE
-                  -- || '    forall i in 1 .. V_ROW_BUFFER.count' || C_NEWLINE
-                  || '    for i in 1 .. V_ROW_BUFFER.count loop' || C_NEWLINE
-                  || '      insert into "' || P_TABLE_NAME || '"' || C_NEWLINE
-                  || '      values V_ROW_BUFFER(i);'|| C_NEWLINE
-                  || '    end loop;'|| C_NEWLINE
-                  || '    commit;' || C_NEWLINE
-                  || '  end loop;' || C_NEWLINE
-                  || '  :2 := V_ROW_COUNT;' || C_NEWLINE
+   V_SQL_FRAGMENT := ';' || YADAMU_UTILITIES.C_NEWLINE
+                  || '  type T_JSON_TABLE_ROW_TAB is TABLE of JSON_TO_RELATIONAL%ROWTYPE index by PLS_INTEGER;' || YADAMU_UTILITIES.C_NEWLINE
+                  || '  V_ROW_BUFFER T_JSON_TABLE_ROW_TAB;' || YADAMU_UTILITIES.C_NEWLINE
+                  || '  V_ROW_COUNT PLS_INTEGER := 0;' || YADAMU_UTILITIES.C_NEWLINE
+                  || 'begin' || YADAMU_UTILITIES.C_NEWLINE
+                  || '  open JSON_TO_RELATIONAL;' || YADAMU_UTILITIES.C_NEWLINE
+                  || '  loop' || YADAMU_UTILITIES.C_NEWLINE
+                  || '    fetch JSON_TO_RELATIONAL' || YADAMU_UTILITIES.C_NEWLINE
+                  || '    bulk collect into V_ROW_BUFFER LIMIT 25000;' || YADAMU_UTILITIES.C_NEWLINE
+                  || '    exit when V_ROW_BUFFER.count = 0;' || YADAMU_UTILITIES.C_NEWLINE
+                  || '    V_ROW_COUNT := V_ROW_COUNT + V_ROW_BUFFER.count;' || YADAMU_UTILITIES.C_NEWLINE
+                  -- || '    forall i in 1 .. V_ROW_BUFFER.count' || YADAMU_UTILITIES.C_NEWLINE
+                  || '    for i in 1 .. V_ROW_BUFFER.count loop' || YADAMU_UTILITIES.C_NEWLINE
+                  || '      insert into "' || P_TABLE_NAME || '"' || YADAMU_UTILITIES.C_NEWLINE
+                  || '      values V_ROW_BUFFER(i);'|| YADAMU_UTILITIES.C_NEWLINE
+                  || '    end loop;'|| YADAMU_UTILITIES.C_NEWLINE
+                  || '    commit;' || YADAMU_UTILITIES.C_NEWLINE
+                  || '  end loop;' || YADAMU_UTILITIES.C_NEWLINE
+                  || '  :2 := V_ROW_COUNT;' || YADAMU_UTILITIES.C_NEWLINE
                   || 'end;';
 
    DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
@@ -1217,12 +1324,12 @@ as
   V_SQLERRM           VARCHAR2(4000);
   V_DETAILS           VARCHAR2(4000);
 
+  V_TABLE_INFO      TABLE_INFO_RECORD;
+
   CURSOR operationsList
   is
-  select SOURCE_VENDOR
-        ,TABLE_NAME
-        ,GENERATE_SQL(SOURCE_VENDOR,P_TARGET_SCHEMA, OWNER, TABLE_NAME, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS) TABLE_INFO 
-    from JSON_TABLE(
+  select ROWNUM, TABLE_NAME, SOURCE_VENDOR, OWNER, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS
+      from JSON_TABLE(
            P_JSON_DUMP_FILE,
            '$'           
            COLUMNS(
@@ -1252,10 +1359,11 @@ as
    V_NOTHING_DONE BOOLEAN := TRUE;
 begin
   -- LOG_INFO(JSON_OBJECT('startTime' value SYSTIMESTAMP, 'includeData' value G_INCLUDE_DATA, 'includeDDL' value G_INCLUDE_DDL));
+  
   SET_CURRENT_SCHEMA(P_TARGET_SCHEMA);
 
   if (G_INCLUDE_DDL) then
-    JSON_EXPORT_DDL.APPLY_DDL_STATEMENTS(P_JSON_DUMP_FILE,P_TARGET_SCHEMA);
+    YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS(P_JSON_DUMP_FILE,P_TARGET_SCHEMA);
   end if;
 
 
@@ -1265,7 +1373,8 @@ begin
 
     for o in operationsList loop
       V_NOTHING_DONE := FALSE;
-      V_STATEMENT := JSON_VALUE(o.TABLE_INFO,'$.ddl');
+      V_TABLE_INFO := GENERATE_SQL(o.SOURCE_VENDOR,P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.COLUMN_LIST, o.DATA_TYPE_ARRAY, o.SIZE_CONSTRAINTS); 
+      V_STATEMENT := V_TABLE_INFO.DDL;
       if (V_STATEMENT is not NULL) then
         begin
           execute immediate V_STATEMENT;
@@ -1277,7 +1386,7 @@ begin
       end if;
       if (V_VALID_JSON) then
         begin
-          V_STATEMENT := JSON_VALUE(o.TABLE_INFO,'$.dml');
+          V_STATEMENT := V_TABLE_INFO.DML;
           V_START_TIME := SYSTIMESTAMP;
           execute immediate V_STATEMENT using P_JSON_DUMP_FILE;
           V_ROWCOUNT := SQL%ROWCOUNT;
@@ -1333,7 +1442,11 @@ end;
 function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
 return CLOB
 as
-  V_RESULTS CLOB;
+  V_RESULTS         CLOB;
+
+  V_TABLE_INFO      TABLE_INFO_RECORD;
+  V_TABLE_INFO_JSON CLOB;
+
   V_FRAGMENT VARCHAR2(4000);
   
   cursor getStatements
@@ -1346,9 +1459,7 @@ as
          )
     into V_RESULTS
   */
-  select ROWNUM,
-         TABLE_NAME,
-         GENERATE_SQL(VENDOR,P_TARGET_SCHEMA, OWNER, TABLE_NAME, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS) TABLE_INFO
+  select ROWNUM, TABLE_NAME, VENDOR, OWNER, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS
     from JSON_TABLE(
            P_METADATA,
            '$'           
@@ -1384,9 +1495,41 @@ begin
     if (x.ROWNUM > 1) then
       DBMS_LOB.WRITEAPPEND(V_RESULTS,1,',');
     end if;
+    V_TABLE_INFO := GENERATE_SQL(x.VENDOR,P_TARGET_SCHEMA, x.OWNER, x.TABLE_NAME, x.COLUMN_LIST, x.DATA_TYPE_ARRAY, x.SIZE_CONSTRAINTS);
     V_FRAGMENT := '"' || x.TABLE_NAME || '" : ';
     DBMS_LOB.WRITEAPPEND(V_RESULTS,LENGTH(V_FRAGMENT),V_FRAGMENT);
-    DBMS_LOB.APPEND(V_RESULTS,x.TABLE_INFO);
+    $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+       select JSON_OBJECT('ddl' value V_TABLE_INFO.DDL,
+                          'dml' value V_TABLE_INFO.DML,
+                          'targetDataTypes' value TREAT(V_TABLE_INFO.TARGET_DATA_TYPES AS JSON)
+                          returning CLOB)
+         into V_TABLE_INFO_JSON
+         from DUAL;    
+    $ELSE
+    if (LENGTH(V_TABLE_INFO.DDL) + LENGTH(V_TABLE_INFO.DML) + LENGTH(V_TABLE_INFO.TARGET_DATA_TYPES) + 512 < JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE) then
+      select JSON_OBJECT('ddl' value V_TABLE_INFO.DDL, 
+                         'dml' value V_TABLE_INFO.DML,
+                         'targetDataTypes'
+                          $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                          value JSON_QUERY(V_TABLE_INFO.TARGET_DATA_TYPES,'$' returning  VARCHAR2(32767))
+                          returning  VARCHAR2(32767))
+                          $ELSE
+                          value JSON_QUERY(V_TABLE_INFO.TARGET_DATA_TYPES,'$' returning  VARCHAR2(4000) ERROR ON ERROR)
+                          returning  VARCHAR2(4000))
+                          $END
+        into V_TABLE_INFO_JSON
+        from DUAL;    
+    else
+      V_TABLE_INFO_JSON := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                             YADAMU_UTILITIES.KVP_TABLE(
+                               YADAMU_UTILITIES.KVC('ddl',V_TABLE_INFO.DDL),
+                               YADAMU_UTILITIES.KVC('dml',V_TABLE_INFO.DML),
+                               YADAMU_UTILITIES.KVJ('targetDataTypes',V_TABLE_INFO.TARGET_DATA_TYPES)
+                             )
+                           );
+    end if;      
+    $END    
+    DBMS_LOB.APPEND(V_RESULTS,V_TABLE_INFO_JSON);
    end loop;
    DBMS_LOB.WRITEAPPEND(V_RESULTS,1,'}');
    return V_RESULTS;  
@@ -1403,7 +1546,7 @@ begin
     into V_IMPORT_LOG
     from (
            select COLUMN_VALUE LOGENTRY
-             from table(JSON_EXPORT_DDL.RESULTS_CACHE)
+             from table(YADAMU_EXPORT_DDL.RESULTS_CACHE)
             union all
            select COLUMN_VALUE LOGENTRY
              from table(RESULTS_CACHE)
@@ -1422,7 +1565,7 @@ as
   cursor getLogRecords
   is
   select COLUMN_VALUE LOGENTRY
-    from table(JSON_EXPORT_DDL.RESULTS_CACHE)
+    from table(YADAMU_EXPORT_DDL.RESULTS_CACHE)
    union all
   select COLUMN_VALUE LOGENTRY
         from table(RESULTS_CACHE);
@@ -1474,8 +1617,10 @@ as
 			   'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || COLUMN_NAME || '") end' 
 		     when DATA_TYPE = 'XMLTYPE' then
 		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT "' || COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),getCyptoHash) end' 
-			 when DATA_TYPE in ('CLOB','BLOB','NCLOB')  then
+			 when DATA_TYPE in ('BLOB')  then
 		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH("' || COLUMN_NAME || '",getCyptoHash) end'
+			 when DATA_TYPE in ('CLOB','NCLOB')  then
+		       'case when "' || COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH("' || COLUMN_NAME || '",getCyptoHash) end'
              else
 			   '"' || COLUMN_NAME || '"'
 		   end,
@@ -1525,17 +1670,17 @@ begin
   end;
    
   for t in getTableList loop
-    V_SQL_STATEMENT := 'insert /*+ WITH_PLSQL */ into SCHEMA_COMPARE_RESULTS ' || C_NEWLINE
-                    || 'with'|| C_NEWLINE
-					|| 'function getCyptoHash return number as begin return DBMS_CRYPTO.hash_sh256; end;'|| C_NEWLINE
-                    || ' select ''' || P_SOURCE_SCHEMA  || ''' ' || C_NEWLINE
-                    || '       ,''' || P_TARGET_SCHEMA  || ''' ' || C_NEWLINE
-                    || '       ,'''  || t.TABLE_NAME || ''' ' || C_NEWLINE
-                    || '       ,(select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || C_NEWLINE
-                    || '       ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || C_NEWLINE
-                    || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || C_NEWLINE
-                    || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || C_NEWLINE
-                    || '       ,null' || C_NEWLINE
+    V_SQL_STATEMENT := 'insert /*+ WITH_PLSQL */ into SCHEMA_COMPARE_RESULTS ' || YADAMU_UTILITIES.C_NEWLINE
+                    || 'with'|| YADAMU_UTILITIES.C_NEWLINE
+					|| 'function getCyptoHash return number as begin return DBMS_CRYPTO.hash_sh256; end;'|| YADAMU_UTILITIES.C_NEWLINE
+                    || ' select ''' || P_SOURCE_SCHEMA  || ''' ' || YADAMU_UTILITIES.C_NEWLINE
+                    || '       ,''' || P_TARGET_SCHEMA  || ''' ' || YADAMU_UTILITIES.C_NEWLINE
+                    || '       ,'''  || t.TABLE_NAME || ''' ' || YADAMU_UTILITIES.C_NEWLINE
+                    || '       ,(select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || YADAMU_UTILITIES.C_NEWLINE
+                    || '       ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || YADAMU_UTILITIES.C_NEWLINE
+                    || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || YADAMU_UTILITIES.C_NEWLINE
+                    || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || YADAMU_UTILITIES.C_NEWLINE
+                    || '       ,null' || YADAMU_UTILITIES.C_NEWLINE
 					|| '  from dual';
 	begin
 	  EXECUTE IMMEDIATE V_SQL_STATEMENT;

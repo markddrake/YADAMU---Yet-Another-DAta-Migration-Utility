@@ -26,41 +26,47 @@ spool &LOGDIR/install/JSON_FEATURE_DETECTION.log
 --
 create or replace public synonym JSON_FEATURE_DETECTION for JSON_FEATURE_DETECTION
 /
+spool &LOGDIR/install/YADAMU_UTILITIES.log
+--
+@@YADAMU_UTILITIES.sql
+--
+create or replace public synonym YADAMU_UTILITIES for YADAMU_UTILITIES
+/
 spool &LOGDIR/install/OBJECT_SERIALIZATION.log
 --
 @@OBJECT_SERIALIZATION.sql
 --
 create or replace public synonym OBJECT_SERIALIZATION for OBJECT_SERIALIZATION
 /
-spool &LOGDIR/install/JSON_EXPORT_DDL.log
+spool &LOGDIR/install/YADAMU_EXPORT_DDL.log
 --
-@@JSON_EXPORT_DDL.sql
+@@YADAMU_EXPORT_DDL.sql
 --
-create or replace public synonym JSON_EXPORT_DDL for JSON_EXPORT_DDL
+create or replace public synonym YADAMU_EXPORT_DDL for YADAMU_EXPORT_DDL
 /
-spool &LOGDIR/install/JSON_IMPORT.log
+spool &LOGDIR/install/YADAMU_IMPORT.log
 --
-@@JSON_IMPORT.sql
+@@YADAMU_IMPORT.sql
 --
-create or replace public synonym JSON_IMPORT for JSON_IMPORT
+create or replace public synonym YADAMU_IMPORT for YADAMU_IMPORT
 /
-spool &LOGDIR/install/JSON_EXPORT.log
+spool &LOGDIR/install/YADAMU_EXPORT.log
 --
-@@JSON_EXPORT.sql
+@@YADAMU_EXPORT.sql
 --
-create or replace public synonym JSON_EXPORT for JSON_EXPORT
+create or replace public synonym YADAMU_EXPORT for YADAMU_EXPORT
 /
 spool &LOGDIR/install/COMPILE_ALL.log APPEND
 --
 desc OBJECT_SERIALIZATION
 --
-desc JSON_EXPORT_DDL
+desc YADAMU_EXPORT_DDL
 --
-desc JSON_IMPORT
+desc YADAMU_IMPORT
 --
-desc JSON_EXPORT_PLSQL
+desc YADAMU_EXPORT_PLSQL
 --
-desc JSON_EXPORT
+desc YADAMU_EXPORT
 --
 set TERMOUT ON
 set serveroutput on

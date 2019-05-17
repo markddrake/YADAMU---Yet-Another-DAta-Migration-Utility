@@ -1,17 +1,7 @@
 --
-create or replace package JSON_EXPORT_DDL
+create or replace package YADAMU_EXPORT_DDL
 AUTHID CURRENT_USER
 as
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  C_RETURN_TYPE     CONSTANT VARCHAR2(32) := 'CLOB';
-  C_MAX_OUTPUT_SIZE CONSTANT NUMBER       := DBMS_LOB.LOBMAXSIZE;
-  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-  C_RETURN_TYPE     CONSTANT VARCHAR2(32):= 'VARCHAR2(32767)';
-  C_MAX_OUTPUT_SIZE CONSTANT NUMBER      := 32767;
-  $ELSE
-  C_RETURN_TYPE     CONSTANT VARCHAR2(32):= 'VARCHAR2(4000)';
-  C_MAX_OUTPUT_SIZE CONSTANT NUMBER      := 4000;
-  $END
 
   TYPE T_DDL_STATEMENTS is TABLE of CLOB;
 
@@ -41,11 +31,8 @@ show errors
 --
 @@SET_TERMOUT
 --
-create or replace package body JSON_EXPORT_DDL
+create or replace package body YADAMU_EXPORT_DDL
 as
-  C_NEWLINE          CONSTANT CHAR(1) := CHR(10);
-  C_CARRIAGE_RETURN  CONSTANT CHAR(1) := CHR(13);
-  C_SINGLE_QUOTE     CONSTANT CHAR(1) := CHR(39);
 --
   G_ABORT_PROCESSING BOOLEAN := FALSE;
 --
@@ -76,16 +63,33 @@ begin
                      returning  VARCHAR2(4000)) returning  VARCHAR2(4000))
                      $END
     into RESULTS_CACHE(RESULTS_CACHE.count)
-    
     from DUAL;
+exception
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  $ELSE
+  when YADAMU_UTILITIES.JSON_OVERFLOW then
+    RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                            YADAMU_UTILITIES.KVP_TABLE(
+                                              YADAMU_UTILITIES.KVJ(
+                                                'trace',
+                                                YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                                   YADAMU_UTILITIES.KVP_TABLE(
+                                                     YADAMU_UTILITIES.KVC('sqlStatement',P_SQL_STATEMENT)
+                                                   )
+                                                )
+                                              )
+                                            )
+                                          );
+  $END
+  when others then
+    RAISE;
 end;
 --
-PROCEDURE LOG_ERROR(P_SEVERITY VARCHAR2, P_SQL_STATEMENT CLOB, P_SQLCODE NUMBER, P_SQLERRM VARCHAR2, P_STACK CLOB)
+procedure LOG_ERROR(P_SEVERITY VARCHAR2, P_SQL_STATEMENT CLOB,P_SQLCODE NUMBER, P_SQLERRM VARCHAR2, P_STACK CLOB)
 as
 begin
-  RESULTS_CACHE.extend();
-  G_ABORT_PROCESSING := P_SEVERITY = C_FATAL_ERROR;
-  select JSON_OBJECT('error' value JSON_OBJECT('severity' value P_SEVERITY, 'code' value P_SQLCODE, 'msg' value P_SQLERRM, 'sqlStatement' value P_SQL_STATEMENT, 'details' value P_STACK
+  RESULTS_CACHE.extend;
+  select JSON_OBJECT('error' value JSON_OBJECT('severity' value P_SEVERITY, 'sqlStatement' value P_SQL_STATEMENT, 'code' value P_SQLCODE, 'msg' value P_SQLERRM, 'details' value P_STACK
                      $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB) returning CLOB)
                      $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
@@ -93,8 +97,31 @@ begin
                      $ELSE
                      returning  VARCHAR2(4000)) returning  VARCHAR2(4000))
                      $END
-    into RESULTS_CACHE(RESULTS_CACHE.count)
-    from DUAL;
+     into RESULTS_CACHE(RESULTS_CACHE.count)
+     from DUAL;
+exception
+  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  $ELSE
+  when YADAMU_UTILITIES.JSON_OVERFLOW then
+    RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                            YADAMU_UTILITIES.KVP_TABLE(
+                                              YADAMU_UTILITIES.KVJ(
+                                                'error',
+                                                YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                                  YADAMU_UTILITIES.KVP_TABLE(
+                                                    YADAMU_UTILITIES.KVC('sqlStatement',P_SQL_STATEMENT),
+                                                    YADAMU_UTILITIES.KVS('severity',P_SEVERITY),
+                                                    YADAMU_UTILITIES.KVN('code',P_SQLCODE),
+                                                    YADAMU_UTILITIES.KVS('msg',P_SQLERRM),
+                                                    YADAMU_UTILITIES.KVS('details',P_STACK)
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          );
+  $END
+  when others then
+    RAISE;
 end;
 --
 function FETCH_DDL_STATEMENTS(P_SCHEMA VARCHAR2)
@@ -148,8 +175,8 @@ begin
       V_DDL_STATEMENT := DBMS_METADATA.FETCH_CLOB(V_HDL_OPEN);
       EXIT WHEN V_DDL_STATEMENT IS NULL;
       -- Strip leading and trailing white space from DDL statement
-      V_DDL_STATEMENT := TRIM(BOTH C_NEWLINE FROM V_DDL_STATEMENT);
-      V_DDL_STATEMENT := TRIM(BOTH C_CARRIAGE_RETURN FROM V_DDL_STATEMENT);
+      V_DDL_STATEMENT := TRIM(BOTH YADAMU_UTILITIES.C_NEWLINE FROM V_DDL_STATEMENT);
+      V_DDL_STATEMENT := TRIM(BOTH YADAMU_UTILITIES.C_CARRIAGE_RETURN FROM V_DDL_STATEMENT);
       V_DDL_STATEMENT := TRIM(V_DDL_STATEMENT);
       if (TRIM(V_DDL_STATEMENT) <> '10 10') then
         PIPE ROW (V_DDL_STATEMENT);
@@ -197,10 +224,8 @@ begin
         V_DDL_STATEMENT := V_DDL_STATEMENTS(i).DDLTEXT;
 
         -- Strip leading and trailing white space from DDL statement
-        V_DDL_STATEMENT := TRIM(BOTH C_NEWLINE FROM V_DDL_STATEMENT);
-        V_DDL_STATEMENT := TRIM(BOTH C_CARRIAGE_RETURN FROM V_DDL_STATEMENT);
-        V_DDL_STATEMENT := TRIM(V_DDL_STATEMENT);
-
+        V_DDL_STATEMENT := TRIM(BOTH YADAMU_UTILITIES.C_NEWLINE FROM V_DDL_STATEMENT);
+        V_DDL_STATEMENT := TRIM(BOTH YADAMU_UTILITIES.C_CARRIAGE_RETURN FROM V_DDL_STATEMENT);
         PIPE ROW (TRIM(V_DDL_STATEMENT));
       end loop;
     end loop;
@@ -221,7 +246,7 @@ begin
   end loop;
 
   for i in indexedColumnList(P_SCHEMA) loop
-    pipe row ('BEGIN JSON_EXPORT_DDL.RENAME_INDEX(''' || i.TABLE_NAME  || ''',''' || i.INDEXED_EXPORT_SELECT_LIST || ''',''' || i.INDEX_NAME || '''); END;');
+    pipe row ('BEGIN YADAMU_EXPORT_DDL.RENAME_INDEX(''' || i.TABLE_NAME  || ''',''' || i.INDEXED_EXPORT_SELECT_LIST || ''',''' || i.INDEX_NAME || '''); END;');
   end loop;
 
 end;
@@ -265,16 +290,16 @@ procedure TRY_MATERIALIZED_VIEW_HACK(P_CREATE_MATERIALIZED_VIEW CLOB)
 as
   DUPLICATE_MVIEW            EXCEPTION; PRAGMA EXCEPTION_INIT( DUPLICATE_MVIEW,            -12006 );
 
-  FUNCTION_GRANT_PERMSISSIONS CONSTANT VARCHAR2(512) := 'create or replace procedure FIX_MV_PERMSISSIONS_ISSUE(P_BASE_TABLE VARCHAR2)' || C_NEWLINE
-                                                     || 'as' || C_NEWLINE
-                                                     || 'begin' || C_NEWLINE
-                                                     || '  execute immediate ''GRANT ALL ON "'' || P_BASE_TABLE ||  ''" to "' || SYS_CONTEXT('USERENV','SESSION_USER')  || '" WITH GRANT OPTION''; ' || C_NEWLINE
+  FUNCTION_GRANT_PERMSISSIONS CONSTANT VARCHAR2(512) := 'create or replace procedure FIX_MV_PERMSISSIONS_ISSUE(P_BASE_TABLE VARCHAR2)' || YADAMU_UTILITIES.C_NEWLINE
+                                                     || 'as' || YADAMU_UTILITIES.C_NEWLINE
+                                                     || 'begin' || YADAMU_UTILITIES.C_NEWLINE
+                                                     || '  execute immediate ''GRANT ALL ON "'' || P_BASE_TABLE ||  ''" to "' || SYS_CONTEXT('USERENV','SESSION_USER')  || '" WITH GRANT OPTION''; ' || YADAMU_UTILITIES.C_NEWLINE
                                                      || 'end;';
 
-  FUNCTION_REVOKE_PERMISSIONS CONSTANT VARCHAR2(512) := 'create or replace procedure FIX_MV_PERMSISSIONS_ISSUE(P_BASE_TABLE VARCHAR2)' || C_NEWLINE
-                                                     || 'as' || C_NEWLINE   
-                                                     || 'begin' || C_NEWLINE
-                                                     || '  execute immediate ''REVOKE ALL ON "'' || P_BASE_TABLE ||  ''" FROM "' || SYS_CONTEXT('USERENV','SESSION_USER') || '"'';' || C_NEWLINE
+  FUNCTION_REVOKE_PERMISSIONS CONSTANT VARCHAR2(512) := 'create or replace procedure FIX_MV_PERMSISSIONS_ISSUE(P_BASE_TABLE VARCHAR2)' || YADAMU_UTILITIES.C_NEWLINE
+                                                     || 'as' || YADAMU_UTILITIES.C_NEWLINE   
+                                                     || 'begin' || YADAMU_UTILITIES.C_NEWLINE
+                                                     || '  execute immediate ''REVOKE ALL ON "'' || P_BASE_TABLE ||  ''" FROM "' || SYS_CONTEXT('USERENV','SESSION_USER') || '"'';' || YADAMU_UTILITIES.C_NEWLINE
                                                      || 'end;';
   V_SQL_STATEMENT CLOB;
   V_BASE_TABLE_NAME VARCHAR2(129);
@@ -554,7 +579,7 @@ begin
   RESULTS_CACHE := T_RESULTS_CACHE();
   APPLY_DDL_STATEMENTS(P_EXPORT_CONTENTS,P_TARGET_SCHEMA);
   open  V_CURSOR for V_STATEMENT using RESULTS_CACHE;
-  V_RESULTS := JSON_EXPORT.JSON_ARRAYAGG(V_CURSOR);
+  V_RESULTS := YADAMU_UTILITIES.JSON_ARRAYAGG_CLOB(V_CURSOR);
   return V_RESULTS;
 end;
 --

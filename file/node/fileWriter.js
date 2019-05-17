@@ -69,7 +69,7 @@ class FileWriter extends YadamuDBI {
     this.outputStream.write(`"metadata":${JSON.stringify(metadata)}`);
   }
     
-  async executeDDL(schema, ddl) {
+  async executeDDL(ddl) {
     this.outputStream.write(',');
     this.outputStream.write(`"ddl":${JSON.stringify(ddl)}`);
   }

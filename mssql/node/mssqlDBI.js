@@ -16,7 +16,7 @@ const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const StagingTable = require('./stagingTable.js');
 
-const STAGING_TABLE =  { tableName : '#JSON_STAGING', columnName : 'DATA'}
+const STAGING_TABLE =  { tableName : '#YADAMU_STAGING', columnName : 'DATA'}
 
 const defaultParameters = {
   BATCHSIZE         : 10000

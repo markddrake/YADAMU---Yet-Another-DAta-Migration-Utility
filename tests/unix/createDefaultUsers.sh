@@ -1,3 +1,7 @@
+source $YADAMU_HOME/tests/oracle1                       c/env/dbConnection.sh
+sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_HOME/tests/oracle/sql/RECREATE_MSSQL_ALL.sql $YADAMU_LOG_PATH ""
+sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_HOME/tests/oracle/sql/RECREATE_SCHEMA.sql $YADAMU_LOG_PATH jtest
+sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_HOME/tests/oracle/sql/RECREATE_SCHEMA.sql $YADAMU_LOG_PATH sakila
 source $YADAMU_HOME/tests/oracle18c/env/dbConnection.sh
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_HOME/tests/oracle/sql/RECREATE_MSSQL_ALL.sql $YADAMU_LOG_PATH ""
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_HOME/tests/oracle/sql/RECREATE_SCHEMA.sql $YADAMU_LOG_PATH jtest

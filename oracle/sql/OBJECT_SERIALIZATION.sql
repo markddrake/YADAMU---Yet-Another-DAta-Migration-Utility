@@ -56,17 +56,6 @@ show errors
 create or replace package body OBJECT_SERIALIZATION
 as
 --
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := DBMS_LOB.LOBMAXSIZE;
-  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := 32767;
-  $ELSE
-  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := 4000;
-  $END
---
-  C_NEWLINE       CONSTANT CHAR(1) := CHR(10);
-  C_SINGLE_QUOTE  CONSTANT CHAR(1) := CHR(39);
---
   C_SERIALIZE_OBJECT_PART1 VARCHAR2(32767) := 
 --
 'procedure SERIALIZE_OBJECT(P_TABLE_OWNER VARCHAR2,P_ANYDATA ANYDATA, P_SERIALIZATION IN OUT NOCOPY CLOB)
@@ -123,7 +112,7 @@ begin
 'function SERIALIZE_OBJECT(P_TABLE_OWNER VARCHAR2,P_ANYDATA ANYDATA)
 return CLOB
 as
-  C_MAX_SUPPORTED_SIZE CONSTANT NUMBER := ' || (C_MAX_SUPPORTED_SIZE - 4) || ';
+  C_MAX_STRING_SIZE CONSTANT NUMBER := ' || (JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE - 4) || ';
   V_SERIALIZATION    CLOB;
 begin
   DBMS_LOB.CREATETEMPORARY(V_SERIALIZATION,TRUE,DBMS_LOB.CALL);
@@ -188,7 +177,6 @@ end;
 function BLOB2CHUNKS(P_BLOB BLOB)
 return CLOB
 is
-  C_SINGLE_QUOTE   CONSTANT CHAR(1)  := CHR(39);
   C_CHUNK_SIZE     CONSTANT NUMBER := 2000;
   V_CLOB           CLOB;
   V_BLOB_LENGTH    NUMBER := DBMS_LOB.GETLENGTH(P_BLOB);
@@ -204,7 +192,7 @@ begin
     V_AMOUNT := C_CHUNK_SIZE;
     DBMS_LOB.READ(P_BLOB,V_AMOUNT,V_OFFSET,V_RAW_DATA);
 	V_OFFSET := V_OFFSET + V_AMOUNT;
-    V_CHUNK := C_SINGLE_QUOTE || RAWTOHEX(V_RAW_DATA) || C_SINGLE_QUOTE; 
+    V_CHUNK := YADAMU_UTILITIES.C_SINGLE_QUOTE || RAWTOHEX(V_RAW_DATA) || YADAMU_UTILITIES.C_SINGLE_QUOTE; 
     if (V_OFFSET < V_BLOB_LENGTH) then 
       V_CHUNK := V_CHUNK || ','; 
     end if; 
@@ -232,7 +220,6 @@ end;
 function CLOB2CHUNKS(P_CLOB CLOB)
 return CLOB 
 as 
-  C_SINGLE_QUOTE CONSTANT CHAR(1)  := CHR(39);
   C_CHUNK_SIZE   CONSTANT NUMBER := 4000;
   V_CLOB         CLOB; 
   V_CLOB_LENGTH  NUMBER := DBMS_LOB.GETLENGTH(P_CLOB); 
@@ -247,7 +234,7 @@ begin
     V_AMOUNT := C_CHUNK_SIZE - 3; 
     DBMS_LOB.READ(P_CLOB,V_AMOUNT,V_OFFSET,V_CHUNK); 
     V_OFFSET := V_OFFSET + V_AMOUNT; 
-    V_CHUNK := C_SINGLE_QUOTE || V_CHUNK || C_SINGLE_QUOTE; 
+    V_CHUNK := YADAMU_UTILITIES.C_SINGLE_QUOTE || V_CHUNK || YADAMU_UTILITIES.C_SINGLE_QUOTE; 
     if (V_OFFSET < V_CLOB_LENGTH) then 
       V_CHUNK := V_CHUNK || ','; 
     end if; 
@@ -529,132 +516,132 @@ as
   V_PLSQL VARCHAR2(32767);
   V_TYPECODE VARCHAR2(32);
 begin
-  V_PLSQL := '        if (' || P_ATTR_NAME || ' is NULL) then' || C_NEWLINE
-          || '          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,4,''NULL'');' || C_NEWLINE
-          || '        else' || C_NEWLINE;
+  V_PLSQL := '        if (' || P_ATTR_NAME || ' is NULL) then' || YADAMU_UTILITIES.C_NEWLINE
+          || '          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,4,''NULL'');' || YADAMU_UTILITIES.C_NEWLINE
+          || '        else' || YADAMU_UTILITIES.C_NEWLINE;
 
   case
     when P_ATTR_TYPE_OWNER is NULL then
       case
         when P_ATTR_TYPE_NAME = 'BINARY DOUBLE' then
           V_PLSQL := V_PLSQL
-                  || '         V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  || '         DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  || '         V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+                  || '         DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'BFILE' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := SERIALIZE_BFILE(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := SERIALIZE_BFILE(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'BINARY FLOAT' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'BLOB' then
           V_PLSQL := V_PLSQL
-                  ||'          DBMS_LOB.APPEND(P_SERIALIZATION,OBJECT_SERIALIZATION.BLOB2CHUNKS(' || P_ATTR_NAME || '));' || C_NEWLINE;
+                  ||'          DBMS_LOB.APPEND(P_SERIALIZATION,OBJECT_SERIALIZATION.BLOB2CHUNKS(' || P_ATTR_NAME || '));' || YADAMU_UTILITIES.C_NEWLINE;
         --  when P_ATTR_TYPE_NAME = CFILE then
         when P_ATTR_TYPE_NAME = 'CHAR' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || ' || P_ATTR_NAME || ' || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || ' || P_ATTR_NAME || ' || V_SINGLE_QUOTE;' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'CLOB' then
           V_PLSQL := V_PLSQL
-                  ||'          DBMS_LOB.APPEND(P_SERIALIZATION,OBJECT_SERIALIZATION.CLOB2CHUNKS(' || P_ATTR_NAME || '));' || C_NEWLINE;
+                  ||'          DBMS_LOB.APPEND(P_SERIALIZATION,OBJECT_SERIALIZATION.CLOB2CHUNKS(' || P_ATTR_NAME || '));' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'DATE' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'INTERVAL DAY TO SECOND' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'INTEGER' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'INTERVAL YEAR TO MONTH' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         --  when P_ATTR_TYPE_NAME = MLSLABEL then
         when P_ATTR_TYPE_NAME = 'NCHAR' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'NCLOB' then
           V_PLSQL := V_PLSQL
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE
-                  ||'          DBMS_LOB.APPEND(P_SERIALIZATION,TO_CLOB(' || P_ATTR_NAME || '));' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.APPEND(P_SERIALIZATION,TO_CLOB(' || P_ATTR_NAME || '));' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'NUMBER' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'NVARCHAR2' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || YADAMU_UTILITIES.C_NEWLINE;
         --  when P_ATTR_TYPE_NAME = OPAQUE then
         when P_ATTR_TYPE_NAME = 'RAW' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         --  when P_ATTR_TYPE_NAME = REF then
         when P_ATTR_TYPE_NAME = 'TIMESTAMP' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'TIMESTAMP WITH LOCAL TIME ZONE' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'TIMESTAMP WITH TIME ZONE' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'UROWID' then
           V_PLSQL := V_PLSQL
-                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+                  ||'          V_SERIALIZED_VALUE := TO_CHAR(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'VARCHAR2' then
           V_PLSQL := V_PLSQL
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(' || P_ATTR_NAME || '),' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(' || P_ATTR_NAME || '),' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || YADAMU_UTILITIES.C_NEWLINE;
         when P_ATTR_TYPE_NAME = 'VARCHAR'  then
           V_PLSQL := V_PLSQL
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(' || P_ATTR_NAME || '),' || P_ATTR_NAME || ');' || C_NEWLINE
-                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || C_NEWLINE;
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(' || P_ATTR_NAME || '),' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+                  ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,V_SINGLE_QUOTE);' || YADAMU_UTILITIES.C_NEWLINE;
         else
           DBMS_OUTPUT.PUT_LINE('Unsupported Type: "' || P_ATTR_TYPE_NAME || '".');
       end case;
     when P_ATTR_TYPE_MOD = 'REF' then
 	  -- The serialzied form needs to include the decode function eg "HEXTOREF(' || REF_VALUE || ')" to that it will be correctly deserialized 
 	  V_PLSQL := V_PLSQL
-              ||'          -- V_SERIALIZED_VALUE := REFTOHEX(' || P_ATTR_NAME || ');' || C_NEWLINE
-		      ||'          select ''HEXTOREF('' || V_SINGLE_QUOTE || REFTOHEX(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE || '')'' into V_SERIALIZED_VALUE from dual;' || C_NEWLINE
-              ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+              ||'          -- V_SERIALIZED_VALUE := REFTOHEX(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
+		      ||'          select ''HEXTOREF('' || V_SINGLE_QUOTE || REFTOHEX(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE || '')'' into V_SERIALIZED_VALUE from dual;' || YADAMU_UTILITIES.C_NEWLINE
+              ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
     when P_ATTR_TYPE_OWNER is not NULL then
       V_TYPECODE := extendTypeList(P_TYPE_LIST, P_ATTR_TYPE_OWNER, P_ATTR_TYPE_NAME);
       $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('Adding "' || P_ATTR_TYPE_OWNER || '"."' || P_ATTR_TYPE_NAME || '": Type = "' || V_TYPECODE || '". Type count = ' || P_TYPE_LIST.count); $end
       case
         when V_TYPECODE = 'COLLECTION' then
           V_PLSQL := V_PLSQL
-                  ||'          V_ANYDATA := ANYDATA.convertCollection(' || P_ATTR_NAME || ');' || C_NEWLINE;
+                  ||'          V_ANYDATA := ANYDATA.convertCollection(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE;
         when V_TYPECODE = 'OBJECT' then
           V_PLSQL := V_PLSQL
-                  ||'          V_ANYDATA := ANYDATA.convertObject(' || P_ATTR_NAME || ');' || C_NEWLINE;
+                  ||'          V_ANYDATA := ANYDATA.convertObject(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE;
       end case;
       V_PLSQL := V_PLSQL
-              || '          serialize_Object(P_TABLE_OWNER,V_ANYDATA,P_SERIALIZATION);' || C_NEWLINE;
+              || '          serialize_Object(P_TABLE_OWNER,V_ANYDATA,P_SERIALIZATION);' || YADAMU_UTILITIES.C_NEWLINE;
     else
       V_PLSQL := V_PLSQL
-              ||'           V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || C_NEWLINE
-              ||'           DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || C_NEWLINE;
+              ||'           V_SERIALIZED_VALUE := V_SINGLE_QUOTE || TO_CHAR(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE;' || YADAMU_UTILITIES.C_NEWLINE
+              ||'           DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
   end case;
 
   return V_PLSQL;
@@ -695,33 +682,33 @@ begin
   DBMS_LOB.CREATETEMPORARY(V_PLSQL_BLOCK,TRUE,DBMS_LOB.CALL);
 
 
-  V_PLSQL := '    when V_TYPE_INFO.OWNER = ''' || P_TYPE_RECORD.OWNER || ''' and V_TYPE_INFO.TYPE_NAME = ''' || P_TYPE_RECORD.TYPE_NAME || ''' then' || C_NEWLINE
-          || '      declare' || C_NEWLINE
-          || '        V_OBJECT           "' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '";' || C_NEWLINE
-          || '      begin' || C_NEWLINE;
+  V_PLSQL := '    when V_TYPE_INFO.OWNER = ''' || P_TYPE_RECORD.OWNER || ''' and V_TYPE_INFO.TYPE_NAME = ''' || P_TYPE_RECORD.TYPE_NAME || ''' then' || YADAMU_UTILITIES.C_NEWLINE
+          || '      declare' || YADAMU_UTILITIES.C_NEWLINE
+          || '        V_OBJECT           "' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '";' || YADAMU_UTILITIES.C_NEWLINE
+          || '      begin' || YADAMU_UTILITIES.C_NEWLINE;
 
   if (P_TYPE_RECORD.TYPECODE = 'OBJECT') then
     V_PLSQL := V_PLSQL
-            || '        V_RESULT := P_ANYDATA.getObject(V_OBJECT);' || C_NEWLINE;
+            || '        V_RESULT := P_ANYDATA.getObject(V_OBJECT);' || YADAMU_UTILITIES.C_NEWLINE;
   else
     V_PLSQL := V_PLSQL
-            || '        V_RESULT := P_ANYDATA.getCollection(V_OBJECT);' || C_NEWLINE;
+            || '        V_RESULT := P_ANYDATA.getCollection(V_OBJECT);' || YADAMU_UTILITIES.C_NEWLINE;
   end if;
 
   V_PLSQL := V_PLSQL
-          || '        if (V_OBJECT is NULL) then' || C_NEWLINE
-          || '          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,4,''NULL'');' || C_NEWLINE
-          || '          return;' || C_NEWLINE
-          || '        end if; ' || C_NEWLINE
-		  || '        if (P_TABLE_OWNER = ''' || P_TYPE_RECORD.OWNER || ''') then ' || C_NEWLINE
-		  || '   	    V_OBJECT_CONSTRUCTOR := ''"'|| P_TYPE_RECORD.TYPE_NAME || '"('';' || C_NEWLINE
-		  || '        else' || C_NEWLINE
-		  || '   	    V_OBJECT_CONSTRUCTOR := ''"' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '"('';' || C_NEWLINE
-		  || '        end if;' ||C_NEWLINE;
+          || '        if (V_OBJECT is NULL) then' || YADAMU_UTILITIES.C_NEWLINE
+          || '          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,4,''NULL'');' || YADAMU_UTILITIES.C_NEWLINE
+          || '          return;' || YADAMU_UTILITIES.C_NEWLINE
+          || '        end if; ' || YADAMU_UTILITIES.C_NEWLINE
+		  || '        if (P_TABLE_OWNER = ''' || P_TYPE_RECORD.OWNER || ''') then ' || YADAMU_UTILITIES.C_NEWLINE
+		  || '   	    V_OBJECT_CONSTRUCTOR := ''"'|| P_TYPE_RECORD.TYPE_NAME || '"('';' || YADAMU_UTILITIES.C_NEWLINE
+		  || '        else' || YADAMU_UTILITIES.C_NEWLINE
+		  || '   	    V_OBJECT_CONSTRUCTOR := ''"' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '"('';' || YADAMU_UTILITIES.C_NEWLINE
+		  || '        end if;' ||YADAMU_UTILITIES.C_NEWLINE;
 		  
   V_PLSQL := V_PLSQL
 
-  || '        DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_OBJECT_CONSTRUCTOR),V_OBJECT_CONSTRUCTOR);' || C_NEWLINE;
+  || '        DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_OBJECT_CONSTRUCTOR),V_OBJECT_CONSTRUCTOR);' || YADAMU_UTILITIES.C_NEWLINE;
 
   DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(V_PLSQL),V_PLSQL);
 
@@ -734,14 +721,14 @@ begin
       V_PLSQL := serializeAttr('V_OBJECT."' || a.ATTR_NAME || '"', a.ATTR_TYPE_OWNER, a.ATTR_TYPE_NAME, a.ATTR_TYPE_MOD, P_TYPE_LIST);
 
       V_PLSQL := V_PLSQL
-              || '        end if;' || C_NEWLINE;
+              || '        end if;' || YADAMU_UTILITIES.C_NEWLINE;
 
       if (a.ATTR_NO <  P_TYPE_RECORD.ATTR_COUNT) then
         V_PLSQL := V_PLSQL
-                ||'         DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'','');' || C_NEWLINE;
+                ||'         DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'','');' || YADAMU_UTILITIES.C_NEWLINE;
       else
         V_PLSQL := V_PLSQL
-                || '        DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'')'');' || C_NEWLINE;
+                || '        DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'')'');' || YADAMU_UTILITIES.C_NEWLINE;
       end if;
 
       DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(V_PLSQL),V_PLSQL);
@@ -749,19 +736,19 @@ begin
     end loop;
   else
     for c in getCollectionTypeInfo loop
-      V_PLSQL := '        for IDX in 1..V_OBJECT.count loop' || C_NEWLINE
-              || serializeAttr('V_OBJECT(IDX)',c.ELEM_TYPE_OWNER,c.ELEM_TYPE_NAME,c.ELEM_TYPE_MOD,P_TYPE_LIST) || C_NEWLINE
-              || '        end if;' || C_NEWLINE
-              || '        if (IDX < V_OBJECT.count) then ' || C_NEWLINE
-              || '          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'','');' || C_NEWLINE
-              || '        end if;' || C_NEWLINE
-              || '        end loop;' || C_NEWLINE
-              || '        DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'')'');' || C_NEWLINE;
+      V_PLSQL := '        for IDX in 1..V_OBJECT.count loop' || YADAMU_UTILITIES.C_NEWLINE
+              || serializeAttr('V_OBJECT(IDX)',c.ELEM_TYPE_OWNER,c.ELEM_TYPE_NAME,c.ELEM_TYPE_MOD,P_TYPE_LIST) || YADAMU_UTILITIES.C_NEWLINE
+              || '        end if;' || YADAMU_UTILITIES.C_NEWLINE
+              || '        if (IDX < V_OBJECT.count) then ' || YADAMU_UTILITIES.C_NEWLINE
+              || '          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'','');' || YADAMU_UTILITIES.C_NEWLINE
+              || '        end if;' || YADAMU_UTILITIES.C_NEWLINE
+              || '        end loop;' || YADAMU_UTILITIES.C_NEWLINE
+              || '        DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,'')'');' || YADAMU_UTILITIES.C_NEWLINE;
     end loop;
     DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(V_PLSQL),V_PLSQL);
   end if;
 
-  V_PLSQL := '      end;' || C_NEWLINE;
+  V_PLSQL := '      end;' || YADAMU_UTILITIES.C_NEWLINE;
   DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(V_PLSQL),V_PLSQL);
 
   return V_PLSQL_BLOCK;
@@ -797,8 +784,8 @@ begin
     V_IDX := V_IDX + 1;
   end loop;
 
-  V_SQL_FRAGMENT := '  end case;' || C_NEWLINE
-                 || 'end;' || C_NEWLINE;
+  V_SQL_FRAGMENT := '  end case;' || YADAMU_UTILITIES.C_NEWLINE
+                 || 'end;' || YADAMU_UTILITIES.C_NEWLINE;
 
   DBMS_LOB.writeAppend(V_PLSQL_BLOCK,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
 
@@ -880,16 +867,16 @@ as
 begin
     V_TYPE_REFERENCE := '"' || P_TYPE_OWNER || '"."' || P_TYPE_NAME || '"';
 
-	V_SQL_FRAGMENT := 'function "#' || P_TYPE_NAME || '"(P_SERIALIZATION CLOB)' || C_NEWLINE
-	               || 'return ' ||  V_TYPE_REFERENCE || C_NEWLINE
-				   || 'as' || C_NEWLINE
-				   || '   V_OBJECT ' || V_TYPE_REFERENCE ||';' || C_NEWLINE
-				   || 'begin' || C_NEWLINE
-				   || '  if (P_SERIALIZATION is NULL) then return NULL; end if;' || C_NEWLINE  
-                   || '  if (DBMS_LOB.SUBSTR(P_SERIALIZATION,17,1) = ''SERIALIZE_OBJECT:'') then return NULL; end if;	'|| C_NEWLINE			   
-				   || '  EXECUTE IMMEDIATE ''SELECT '' || P_SERIALIZATION || '' FROM DUAL'' into V_OBJECT;' || C_NEWLINE
-				   || '  return V_OBJECT;' || C_NEWLINE
-				   || 'end;' || C_NEWLINE;
+	V_SQL_FRAGMENT := 'function "#' || P_TYPE_NAME || '"(P_SERIALIZATION CLOB)' || YADAMU_UTILITIES.C_NEWLINE
+	               || 'return ' ||  V_TYPE_REFERENCE || YADAMU_UTILITIES.C_NEWLINE
+				   || 'as' || YADAMU_UTILITIES.C_NEWLINE
+				   || '   V_OBJECT ' || V_TYPE_REFERENCE ||';' || YADAMU_UTILITIES.C_NEWLINE
+				   || 'begin' || YADAMU_UTILITIES.C_NEWLINE
+				   || '  if (P_SERIALIZATION is NULL) then return NULL; end if;' || YADAMU_UTILITIES.C_NEWLINE  
+                   || '  if (DBMS_LOB.SUBSTR(P_SERIALIZATION,17,1) = ''SERIALIZE_OBJECT:'') then return NULL; end if;	'|| YADAMU_UTILITIES.C_NEWLINE			   
+				   || '  EXECUTE IMMEDIATE ''SELECT '' || P_SERIALIZATION || '' FROM DUAL'' into V_OBJECT;' || YADAMU_UTILITIES.C_NEWLINE
+				   || '  return V_OBJECT;' || YADAMU_UTILITIES.C_NEWLINE
+				   || 'end;' || YADAMU_UTILITIES.C_NEWLINE;
                    
   return V_SQL_FRAGMENT;
 end;

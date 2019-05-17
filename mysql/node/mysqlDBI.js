@@ -220,20 +220,20 @@ class MySQLDBI extends YadamuDBI {
   }
   
   async createStagingTable() {    	
-	const sqlStatement = `CREATE TEMPORARY TABLE IF NOT EXISTS "JSON_STAGING"("DATA" JSON)`;					   
+	const sqlStatement = `CREATE TEMPORARY TABLE IF NOT EXISTS "YADAMU_STAGING"("DATA" JSON)`;					   
 	const results = await this.executeSQL(sqlStatement);
 	return results;
   }
 
   async loadStagingTable(importFilePath) { 
     importFilePath = importFilePath.replace(/\\/g, "\\\\");
-	const sqlStatement = `LOAD DATA LOCAL INFILE '${importFilePath}' INTO TABLE "JSON_STAGING" FIELDS ESCAPED BY ''`;					   
+	const sqlStatement = `LOAD DATA LOCAL INFILE '${importFilePath}' INTO TABLE "YADAMU_STAGING" FIELDS ESCAPED BY ''`;					   
 	const results = await this.executeSQL(sqlStatement);
 	return results;
   }
 
   async verifyDataLoad() {    	
-	const sqlStatement = `SELECT COUNT(*) FROM "JSON_STAGING"`;				
+	const sqlStatement = `SELECT COUNT(*) FROM "YADAMU_STAGING"`;				
 	const results = await  this.executeSQL(sqlStatement);
 	return results;
   }

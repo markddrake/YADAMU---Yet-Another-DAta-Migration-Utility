@@ -17,40 +17,49 @@ declare
   PRAGMA EXCEPTION_INIT( CLOB_UNSUPPORTED , -40449);
 
   EXTENDED_STRING_UNSUPPORTED EXCEPTION;
-  PRAGMA EXCEPTION_INIT( EXTENDED_STRING_UNSUPPORTED , -910);
+  PRAGMA EXCEPTION_INIT( EXTENDED_STRING_UNSUPPORTED , -1489);
 
   TREAT_AS_JSON_UNSUPPORTED EXCEPTION;
   PRAGMA EXCEPTION_INIT( TREAT_AS_JSON_UNSUPPORTED , -902);
 
   V_PACKAGE_DEFINITION VARCHAR2(32767);
+  
+  V_DUMMY NUMBER;
 begin
   V_PACKAGE_DEFINITION := 'CREATE OR REPLACE PACKAGE JSON_FEATURE_DETECTION AS' || C_NEWLINE;
 
   begin
     execute immediate 'select JSON_ARRAY(DUMMY returning CLOB) from DUAL';
     V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                     ||  '  CLOB_SUPPORTED CONSTANT BOOLEAN := TRUE;';
+	                     ||  '  CLOB_SUPPORTED         CONSTANT BOOLEAN      := TRUE;' || CHR(13) 
+                         ||  '  C_RETURN_TYPE          CONSTANT VARCHAR2(32) := ''CLOB'';' || CHR(13)
+                         ||  '  C_MAX_STRING_SIZE      CONSTANT NUMBER       := DBMS_LOB.LOBMAXSIZE;';
   exception
     WHEN CLOB_UNSUPPORTED THEN
 	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                       || '  CLOB_SUPPORTED CONSTANT BOOLEAN := FALSE;';
+	                       || '  CLOB_SUPPORTED          CONSTANT BOOLEAN      := FALSE;';
     WHEN OTHERS THEN
 	  RAISE;
   end;
 
   begin
-    execute immediate 'select * from json_table(''[]'',''$'' columns X VARCHAR2(32767) PATH ''$'')';
+    select length('X' || RPAD('X',4001)) into V_DUMMY from dual;
     V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                     || '  EXTENDED_STRING_SUPPORTED CONSTANT BOOLEAN := TRUE;';
+	                     || '  EXTENDED_STRING_SUPPORTED CONSTANT BOOLEAN      := TRUE;' || CHR(13) 
+                         || '  C_RETURN_TYPE             CONSTANT VARCHAR2(32) := ''VARCHAR2(32767)'';' || CHR(13)
+                         || '  C_MAX_STRING_SIZE         CONSTANT NUMBER       := 32767;';
   exception
     WHEN EXTENDED_STRING_UNSUPPORTED THEN
 	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                       || '  EXTENDED_STRING_SUPPORTED CONSTANT BOOLEAN := FALSE;';
+	                       || '  EXTENDED_STRING_SUPPORTED CONSTANT BOOLEAN      := FALSE;' || CHR(13) 
+                           || '  C_RETURN_TYPE             CONSTANT VARCHAR2(32) := ''VARCHAR2(4000)'';' || CHR(13)
+                           || '  C_MAX_STRING_SIZE         CONSTANT NUMBER       := 4000;';
     WHEN OTHERS THEN
 	  RAISE;
   end;
 
   begin
+  
     execute immediate 'select TREAT(DUMMY AS JSON) from DUAL';
     V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                     || '  TREAT_AS_JSON_SUPPORTED CONSTANT BOOLEAN := TRUE;';
@@ -64,7 +73,7 @@ begin
 
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
                        || 'END;';
-
+                       
   execute immediate V_PACKAGE_DEFINITION;
 end;
 /

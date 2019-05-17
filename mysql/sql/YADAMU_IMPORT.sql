@@ -1,6 +1,6 @@
 /*
 **
-** MySQL JSON_IMPORT Function.
+** MySQL YADAMU_IMPORT Function.
 **
 */
 SET SESSION SQL_MODE=ANSI_QUOTES;
@@ -429,7 +429,7 @@ BEGIN
       from "TARGET_TABLE_DEFINITIONS";
 
   SET V_DDL_STATEMENT = concat('create table if not exists "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',CHAR(32),V_COLUMNS_CLAUSE,')'); 
-  SET V_DML_STATEMENT = concat('insert into "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',P_COLUMN_LIST,')',CHAR(32),'select ',V_INSERT_SELECT_LIST,CHAR(32),'  from "JSON_STAGING" js,JSON_TABLE(js."DATA",''$.data."',P_TABLE_NAME,'"[*]'' COLUMNS (',CHAR(32),V_COLUMN_PATTERNS,')) data');     
+  SET V_DML_STATEMENT = concat('insert into "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',P_COLUMN_LIST,')',CHAR(32),'select ',V_INSERT_SELECT_LIST,CHAR(32),'  from "YADAMU_STAGING" js,JSON_TABLE(js."DATA",''$.data."',P_TABLE_NAME,'"[*]'' COLUMNS (',CHAR(32),V_COLUMN_PATTERNS,')) data');     
   SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',CAST(V_TARGET_DATA_TYPES as JSON));
     
 END;
@@ -464,7 +464,7 @@ DECLARE V_COLUMN_LIST      TEXT;
   DECLARE TABLE_METADATA 
   CURSOR FOR 
   select VENDOR, TABLE_NAME, COLUMN_LIST, DATA_TYPE_LIST, SIZE_CONSTRAINTS
-    from JSON_STAGING js,
+    from YADAMU_STAGING js,
          JSON_TABLE(
            js.DATA,
            '$'

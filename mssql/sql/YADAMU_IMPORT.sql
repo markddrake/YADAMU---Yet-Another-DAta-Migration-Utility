@@ -302,7 +302,7 @@ BEGIN
       FROM "TARGET_TABLE_DEFINITION" tt;
       
    SET @DDL_STATEMENT = CONCAT('if object_id(''"',@SCHEMA,'"."',@TABLE_NAME,'"'',''U'') is NULL create table "',@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMNS_CLAUSE,')');   
-   SET @DML_STATEMENT = CONCAT('insert into "' ,@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMN_LIST,') select ',@INSERT_SELECT_LIST,'  from "#JSON_STAGING" s cross apply OPENJSON("DATA",''$.data."',@TABLE_NAME,'"'') with ( ',@WITH_CLAUSE,') data');
+   SET @DML_STATEMENT = CONCAT('insert into "' ,@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMN_LIST,') select ',@INSERT_SELECT_LIST,'  from "#YADAMU_STAGING" s cross apply OPENJSON("DATA",''$.data."',@TABLE_NAME,'"'') with ( ',@WITH_CLAUSE,') data');
    RETURN JSON_MODIFY(JSON_MODIFY(JSON_MODIFY('{}','$.ddl',@DDL_STATEMENT),'$.dml',@DML_STATEMENT),'$.targetDataTypes',JSON_QUERY(@TARGET_DATA_TYPES))
 END;
 --
@@ -331,7 +331,7 @@ BEGIN
   CURSOR FOR 
   select TABLE_NAME, 
          master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS) as STATEMENTS
-   from "#JSON_STAGING"
+   from "#YADAMU_STAGING"
          cross apply OPENJSON("DATA") 
          with (
            VENDOR        nvarchar(128) '$.systemInformation.vendor'
@@ -366,9 +366,7 @@ BEGIN
     )
     SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
   END CATCH
-      
-
-  
+        
   SET QUOTED_IDENTIFIER ON; 
   BEGIN TRY
     OPEN FETCH_METADATA;
@@ -559,11 +557,12 @@ BEGIN
    ,SQLERRM          NVARCHAR(2000)
   );
 
+  SET NOCOUNT ON;
+
   OPEN FETCH_METADATA;
   FETCH FETCH_METADATA INTO @TABLE_NAME, @COLUMN_LIST
   WHILE @@FETCH_STATUS = 0 
   BEGIN    
-  
   
     SET @SQL_STATEMENT = CONCAT('insert into #SCHEMA_COMPARE_RESULTS ',@C_NEWLINE,
                              ' select ''',@SOURCE_DATABASE,''' ',@C_NEWLINE,
@@ -607,12 +606,22 @@ BEGIN
   CLOSE FETCH_METADATA;
   DEALLOCATE FETCH_METADATA;
   
+  SELECT @SOURCE_COUNT = COUNT(*) 
+    FROM #SCHEMA_COMPARE_RESULTS
+   where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
+      or MISSING_ROWS <> 0
+      or EXTRA_ROWS <> 0
+      or SQLERRM is not NULL
+ 
+  
   IF (@FORMAT_RESULTS = 1) 
   BEGIN
 
-    SELECT CAST(CONCAT( FORMAT(sysutcdatetime(),'yyyy-MM-dd"T"HH:mm:ss.fffff"Z"'),': "',@SOURCE_DATABASE,'","',@TARGET_DATABASE,'", ',@COMMENT) as NVARCHAR(256)) "Timestamp"
+    SELECT CAST(CONCAT( FORMAT(sysutcdatetime(),'yyyy-MM-dd"T"HH:mm:ss.fffff"Z"'),': "',@SOURCE_DATABASE,'","',@TARGET_DATABASE,'", ',@COMMENT) as NVARCHAR(256)) " "
   
-    SELECT CAST(FORMATMESSAGE('%32s %32s %48s SUCCESSFUL %12i', SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT) as NVARCHAR(256)) "Successs"
+    SET NOCOUNT OFF;
+
+    SELECT CAST(FORMATMESSAGE('%32s %32s %48s %12i', SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT) as NVARCHAR(256)) "SUCCESS          Source Schenma                    Target Schema                                            Table          Rows"
       FROM #SCHEMA_COMPARE_RESULTS
      where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
        and MISSING_ROWS = 0
@@ -620,13 +629,16 @@ BEGIN
        and SQLERRM is NULL
     order by TABLE_NAME;
 --
-    SELECT CAST(FORMATMESSAGE('%32s %32s %48s FAILED     %12i %12i %12i %12i %64s', SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, SQLERRM) as NVARCHAR(256)) "Failed"
-      FROM #SCHEMA_COMPARE_RESULTS
-     where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
-        or MISSING_ROWS <> 0
-       or EXTRA_ROWS <> 0
-        or SQLERRM is not NULL
-     order by TABLE_NAME;
+    IF (@SOURCE_COUNT > 0) 
+    BEGIN
+      SELECT CAST(FORMATMESSAGE('%32s %32s %48s   %12i %12i %12i %12i %64s', SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, SQLERRM) as NVARCHAR(256)) "FAILED           Source Schenma                    Target Schema                                            Table Details..."
+        FROM #SCHEMA_COMPARE_RESULTS
+       where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
+          or MISSING_ROWS <> 0
+         or EXTRA_ROWS <> 0
+         or SQLERRM is not NULL
+      order by TABLE_NAME;
+    END;
   END
   ELSE 
   BEGIN

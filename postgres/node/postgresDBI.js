@@ -13,8 +13,8 @@ const QueryStream = require('pg-query-stream')
 
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const DBParser = require('./dbParser.js');
-const StatementGenerator = require('./statementGenerator.js');
 const TableWriter = require('./tableWriter.js');
+const StatementGenerator = require('./statementGenerator.js');
 
 const defaultParameters = {
   BATCHSIZE         : 10000
@@ -212,12 +212,12 @@ class PostgresDBI extends YadamuDBI {
   */
 
   async createStagingTable() {
-  	let sqlStatement = `drop table if exists "JSON_STAGING"`;		
+  	let sqlStatement = `drop table if exists "YADAMU_STAGING"`;		
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlStatement};\n\--\n`)
     }    
   	await this.pgClient.query(sqlStatement);
-  	sqlStatement = `create temporary table if not exists "JSON_STAGING" (data ${this.useBinaryJSON === true ? 'jsonb' : 'json'}) on commit preserve rows`;					   
+  	sqlStatement = `create temporary table if not exists "YADAMU_STAGING" (data ${this.useBinaryJSON === true ? 'jsonb' : 'json'}) on commit preserve rows`;					   
     if (this.status.sqlTrace) {
       status.sqlTrace.write(`${sqlStatement};\n\--\n`)
     }    
@@ -226,7 +226,7 @@ class PostgresDBI extends YadamuDBI {
   
   async loadStagingTable(importFilePath) {
 
-    const copyStatement = `copy "JSON_STAGING" from STDIN csv quote e'\x01' delimiter e'\x02'`;
+    const copyStatement = `copy "YADAMU_STAGING" from STDIN csv quote e'\x01' delimiter e'\x02'`;
     if (this.status.sqlTrace) {
       status.sqlTrace.write(`${copyStatement};\n\--\n`)
     }    
@@ -273,7 +273,7 @@ class PostgresDBI extends YadamuDBI {
   */
 
  async processStagingTable(schema) {  	
-  	const sqlStatement = `select ${this.useBinaryJSON ? 'import_jsonb' : 'import_json'}(data,$1) from "JSON_STAGING"`;
+  	const sqlStatement = `select ${this.useBinaryJSON ? 'import_jsonb' : 'import_json'}(data,$1) from "YADAMU_STAGING"`;
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlStatement};\n\--\n`)
     }    

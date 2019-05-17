@@ -7,4 +7,4 @@ node $YADAMU_DB_ROOT/node/import  userid=$DB_USER/$DB_PWD@$DB_CONNECTION file=$S
 node $YADAMU_DB_ROOT/node/import  userid=$DB_USER/$DB_PWD@$DB_CONNECTION file=$SRC/Production$VER.json       toUser=\"Production$SCHEMAVER\"     mode=$MODE logFile=$IMPORTLOG
 node $YADAMU_DB_ROOT/node/import  userid=$DB_USER/$DB_PWD@$DB_CONNECTION file=$SRC/Purchasing$VER.json       toUser=\"Purchasing$SCHEMAVER\"     mode=$MODE logFile=$IMPORTLOG
 node $YADAMU_DB_ROOT/node/import  userid=$DB_USER/$DB_PWD@$DB_CONNECTION file=$SRC/HumanResources$VER.json   toUser=\"HumanResources$SCHEMAVER\" mode=$MODE logFile=$IMPORTLOG
-node $YADAMU_DB_ROOT/node/import  userid=$DB_USER/$DB_PWD@$DB_CONNECTION file=$SRC/AdventureWorksDW$VER.json toUser=\"DW$SCHEMAVER\"             mode=$MODE logFile=$IMPORTLOG
+node $YADAMU_DB_ROOT/node/import  userid=$DB_USER/$DB_PWD@$DB_CONNECTION file=$SRC/AdventureWorksDW$VER.json toUser=\"AdventureWorksDW$SCHEMAVER\"             mode=$MODE logFile=$IMPORTLOG

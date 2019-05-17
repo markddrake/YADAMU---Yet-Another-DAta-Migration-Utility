@@ -19,10 +19,11 @@ const DBParser = require('./dbParser.js');
 
 class YadamuDBI {
     
-  get DATABASE_VENDOR()    { return undefined };
-  get SOFTWARE_VENDOR()    { return undefined };
-  get SPATIAL_FORMAT()     { return undefined };
-  get DEFAULT_PARAMETERS() { return {} }
+  get DATABASE_VENDOR()     { return undefined };
+  get SOFTWARE_VENDOR()     { return undefined };
+  get SPATIAL_FORMAT()      { return undefined };
+  get DEFAULT_PARAMETERS()  { return {} }
+  get STATEMENT_SEPERATOR() { return '' }
   
   
   decomposeDataType(targetDataType) {
@@ -104,9 +105,9 @@ class YadamuDBI {
                       } 	
                   } 
    				if ((status.sqlTrace) && (logEntry.sqlStatement)) {
-   				  status.sqlTrace.write(`${logEntry.sqlStatement}\n\/\n`)
+   				  status.sqlTrace.write(`${logEntry.sqlStatement}\n${this.STATEMENT_SEPERATOR}\n`)
    		        }
-    }) 
+    },this) 
   }    
     
   updateParameters(parameters,additionalParameters) {

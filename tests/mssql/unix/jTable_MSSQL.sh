@@ -2,7 +2,7 @@ export YADAMU_TARGET=MsSQL/jTable
 export YADAMU_PARSER=RDBMS
 . ../unix/initialize.sh $(readlink -f "$BASH_SOURCE")
 export YADAMU_INPUT_PATH=${YADAMU_INPUT_PATH:0:-7}
-sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -e -i$YADAMU_DB_ROOT/sql/JSON_IMPORT.sql > $YADAMU_LOG_PATH/install/JSON_IMPORT.log
+sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -dmaster -I -e -i$YADAMU_DB_ROOT/sql/YADAMU_IMPORT.sql > $YADAMU_LOG_PATH/install/YADAMU_IMPORT.log
 export SCHEMAVER=1
 export ID=$SCHEMAVER
 sqlcmd -U$DB_USER -P$DB_PWD -S$DB_HOST -d$DB_DBNAME -I -e -i$YADAMU_SCRIPT_ROOT/sql/RECREATE_MSSQL_ALL.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log

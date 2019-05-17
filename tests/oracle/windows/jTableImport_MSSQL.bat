@@ -7,4 +7,4 @@ node %YADAMU_DB_ROOT%\node\jTableImport  userid=%DB_USER%/%DB_PWD%@%DB_CONNECTIO
 node %YADAMU_DB_ROOT%\node\jTableImport  userid=%DB_USER%/%DB_PWD%@%DB_CONNECTION% file=%SRC%\Production%FILEVER%.json       toUser=\"Production%SCHEMAVER%\"      mode=%MODE% logFile=%IMPORTLOG% 
 node %YADAMU_DB_ROOT%\node\jTableImport  userid=%DB_USER%/%DB_PWD%@%DB_CONNECTION% file=%SRC%\Purchasing%FILEVER%.json       toUser=\"Purchasing%SCHEMAVER%\"      mode=%MODE% logFile=%IMPORTLOG% 
 node %YADAMU_DB_ROOT%\node\jTableImport  userid=%DB_USER%/%DB_PWD%@%DB_CONNECTION% file=%SRC%\HumanResources%FILEVER%.json   toUser=\"HumanResources%SCHEMAVER%\"  mode=%MODE% logFile=%IMPORTLOG% 
-node %YADAMU_DB_ROOT%\node\jTableImport  userid=%DB_USER%/%DB_PWD%@%DB_CONNECTION% file=%SRC%\AdventureWorksDW%FILEVER%.json toUser=\"DW%SCHEMAVER%\"              mode=%MODE% logFile=%IMPORTLOG% 
+node %YADAMU_DB_ROOT%\node\jTableImport  userid=%DB_USER%/%DB_PWD%@%DB_CONNECTION% file=%SRC%\AdventureWorksDW%FILEVER%.json toUser=\"AdventureWorksDW%SCHEMAVER%\"              mode=%MODE% logFile=%IMPORTLOG% 
