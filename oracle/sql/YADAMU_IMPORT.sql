@@ -60,12 +60,16 @@ as
   procedure DDL_ONLY_MODE(P_DDL_ONLY_MODE BOOLEAN);
 
   function IMPORT_VERSION return NUMBER deterministic;
+--
+$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN 
+--
   procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'));
-
   function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
   function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB') return TABLE_INFO_RECORD;
   function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
-  
+--
+$END
+--
   function SET_CURRENT_SCHEMA(P_TARGET_SCHEMA VARCHAR2) return CLOB;
   
   function DISABLE_CONSTRAINTS(P_TARGET_SCHEMA VARCHAR2) return CLOB;
@@ -158,6 +162,9 @@ PROCEDURE TRACE_OPERATION(P_SQL_STATEMENT CLOB)
 as
 begin
   RESULTS_CACHE.extend();
+--  
+$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+--
   select JSON_OBJECT('trace' value JSON_OBJECT('sqlStatement' value P_SQL_STATEMENT
                      $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB) returning CLOB)
@@ -168,10 +175,11 @@ begin
                      $END
     into RESULTS_CACHE(RESULTS_CACHE.count)
     from DUAL;
+--
+$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
 exception
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  $ELSE
-  when YADAMU_UTILITIES.JSON_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
@@ -184,15 +192,36 @@ exception
                                               )
                                             )
                                           );
-  $END
   when others then
     RAISE;
+--
+$END
+--
+$ELSE
+--
+  RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                          YADAMU_UTILITIES.KVP_TABLE(
+                                            YADAMU_UTILITIES.KVJ(                                               'trace',
+                                              YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                                YADAMU_UTILITIES.KVP_TABLE(
+                                                  YADAMU_UTILITIES.KVC('sqlStatement',P_SQL_STATEMENT)
+                                                )
+                                              )
+                                            )
+                                          )
+                                        );
+--                                     
+$END
+--
 end;
 --
 procedure LOG_DDL_OPERATION(P_TABLE_NAME VARCHAR2, P_DDL_OPERATION CLOB)
 as
 begin
   RESULTS_CACHE.extend;
+--  
+$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+--
   select JSON_OBJECT('ddl' value JSON_OBJECT('tableName' value P_TABLE_NAME, 'sqlStatement' value P_DDL_OPERATION
                      $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB) returning CLOB)
@@ -203,10 +232,11 @@ begin
                      $END
     into RESULTS_CACHE(RESULTS_CACHE.count)
     from DUAL;
+--
+$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
 exception
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  $ELSE
-  when YADAMU_UTILITIES.JSON_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
@@ -220,15 +250,40 @@ exception
                                               )
                                             )
                                           );
-  $END
   when others then
     RAISE;
+--
+$END
+--
+$ELSE
+--
+  RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                          YADAMU_UTILITIES.KVP_TABLE(
+                                             YADAMU_UTILITIES.KVJ(
+                                              'dml',
+                                              YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                                YADAMU_UTILITIES.KVP_TABLE(
+                                                  YADAMU_UTILITIES.KVC('sqlStatement',P_DDL_OPERATION),
+                                                  YADAMU_UTILITIES.KVS('tableName',P_TABLE_NAME),
+                                                  YADAMU_UTILITIES.KVN('rowCount',P_ROW_COUNT),
+                                                  YADAMU_UTILITIES.KVN('tableName',P_ELAPSED_TIME)
+                                                )
+                                              )
+                                            )
+                                          )
+                                        );
+--                                      
+$END
+--
 end;
 --
 procedure LOG_DML_OPERATION(P_TABLE_NAME VARCHAR2, P_DML_OPERATION CLOB, P_ROW_COUNT NUMBER, P_ELAPSED_TIME NUMBER)
 as
 begin
   RESULTS_CACHE.extend;
+--  
+$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+--
   select JSON_OBJECT('dml' value JSON_OBJECT('tableName' value P_TABLE_NAME, 'sqlStatement' value P_DML_OPERATION, 'rowCount' value P_ROW_COUNT, 'elapsedTime' value P_ELAPSED_TIME
                $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                returning CLOB) returning CLOB)
@@ -239,10 +294,11 @@ begin
                $END
           into RESULTS_CACHE(RESULTS_CACHE.count)
           from DUAL;
+--
+$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
 exception
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  $ELSE
-  when YADAMU_UTILITIES.JSON_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
@@ -250,21 +306,48 @@ exception
                                                 YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                                   YADAMU_UTILITIES.KVP_TABLE(
                                                     YADAMU_UTILITIES.KVC('sqlStatement',P_DML_OPERATION),
-                                                    YADAMU_UTILITIES.KVS('tableName',P_TABLE_NAME)
+                                                    YADAMU_UTILITIES.KVS('tableName',P_TABLE_NAME),
+                                                    YADAMU_UTILITIES.KVN('rowCount',P_ROW_COUNT),
+                                                    YADAMU_UTILITIES.KVN('tableName',P_ELAPSED_TIME)
                                                   )
                                                 )
                                               )
                                             )
                                           );
-  $END
   when others then
     RAISE;
+--
+$END
+--
+$ELSE
+--
+    RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                            YADAMU_UTILITIES.KVP_TABLE(
+                                              YADAMU_UTILITIES.KVJ(
+                                                'dml',
+                                                YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                                  YADAMU_UTILITIES.KVP_TABLE(
+                                                    YADAMU_UTILITIES.KVC('sqlStatement',P_DML_OPERATION),
+                                                    YADAMU_UTILITIES.KVS('tableName',P_TABLE_NAME),
+                                                    YADAMU_UTILITIES.KVN('rowCount',P_ROW_COUNT),
+                                                    YADAMU_UTILITIES.KVN('tableName',P_ELAPSED_TIME)
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          );
+--
+$END
+--
 end;
 --
 procedure LOG_ERROR(P_SEVERITY VARCHAR2, P_TABLE_NAME VARCHAR2,P_SQL_STATEMENT CLOB,P_SQLCODE NUMBER, P_SQLERRM VARCHAR2, P_STACK CLOB)
 as
 begin
   RESULTS_CACHE.extend;
+--  
+$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+--
   select JSON_OBJECT('error' value JSON_OBJECT('severity' value P_SEVERITY, 'tableName' value P_TABLE_NAME, 'sqlStatement' value P_SQL_STATEMENT, 'code' value P_SQLCODE, 'msg' value P_SQLERRM, 'details' value P_STACK
                      $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB) returning CLOB)
@@ -275,10 +358,11 @@ begin
                      $END
      into RESULTS_CACHE(RESULTS_CACHE.count)
      from DUAL;
+--
+$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
 exception
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  $ELSE
-  when YADAMU_UTILITIES.JSON_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
@@ -296,9 +380,33 @@ exception
                                               )
                                             )
                                           );
-  $END
   when others then
     RAISE;
+--
+$END
+--
+$ELSE
+--
+  RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                          YADAMU_UTILITIES.KVP_TABLE(
+                                            YADAMU_UTILITIES.KVJ(
+                                              'error',
+                                              YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                                YADAMU_UTILITIES.KVP_TABLE(
+                                                  YADAMU_UTILITIES.KVC('sqlStatement',P_SQL_STATEMENT),
+                                                  YADAMU_UTILITIES.KVS('severity',P_SEVERITY),
+                                                  YADAMU_UTILITIES.KVS('tableName',P_TABLE_NAME),
+                                                  YADAMU_UTILITIES.KVN('code',P_SQLCODE),
+                                                  YADAMU_UTILITIES.KVS('msg',P_SQLERRM),
+                                                  YADAMU_UTILITIES.KVS('details',P_STACK)
+                                                )
+                                              )
+                                            )
+                                          )
+                                        );
+--                                        
+$END
+--
 end;
 --
 procedure LOG_INFO(P_PAYLOAD CLOB)
@@ -308,6 +416,9 @@ as
 --
 begin
   RESULTS_CACHE.extend;
+--
+$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+--
   $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
   select JSON_OBJECT('info' value TREAT(P_PAYLOAD as JSON) returning CLOB)
   $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
@@ -317,10 +428,11 @@ begin
   $END
     into RESULTS_CACHE(RESULTS_CACHE.count)
     from DUAL;
+--
+$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
 exception
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  $ELSE
-  when YADAMU_UTILITIES.JSON_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
@@ -329,15 +441,33 @@ exception
                                               )
                                             )
                                           );
-  $END
   when others then
     RAISE;
+--
+$END
+--
+$ELSE
+--
+  RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                          YADAMU_UTILITIES.KVP_TABLE(
+                                            YADAMU_UTILITIES.KVJ(
+                                              'info',
+                                              P_PAYLOAD
+                                            )
+                                          )
+                                        );
+--
+$END
+--
 end;
 --
 procedure LOG_MESSAGE(P_PAYLOAD CLOB)
 as
 begin
   RESULTS_CACHE.extend;
+--
+$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+--
   select JSON_OBJECT('message' value P_PAYLOAD
                      $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB)
@@ -348,10 +478,11 @@ begin
                      $END
      into RESULTS_CACHE(RESULTS_CACHE.count)
      from DUAL;
+--
+$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
 exception
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  $ELSE
-  when YADAMU_UTILITIES.JSON_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
@@ -360,9 +491,73 @@ exception
                                               )
                                             )
                                           );
-  $END
   when others then
     RAISE;
+--
+$END
+--
+$ELSE
+--
+  RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                                            YADAMU_UTILITIES.KVP_TABLE(
+                                              YADAMU_UTILITIES.KVJ(
+                                                'message',
+                                                P_PAYLOAD
+                                              )
+                                            )
+                                          );
+--
+$END
+--
+end;
+--
+function GENERATE_LOG_RECORDS
+return CLOB
+as
+  V_RESULTS CLOB;
+begin
+--
+$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+--
+  select JSON_ARRAYAGG(
+           $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+           TREAT (COLUMN_VALUE as JSON) returning CLOB)
+           $ELSIF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+           JSON_QUERY (COLUMN_VALUE, '$' returning CLOB) returning CLOB)
+           $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+           JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(32767)) returning VARCHAR2(32767))
+           $ELSE   
+           JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
+           $END
+      into V_RESULTS
+      from table(RESULTS_CACHE);
+  RESULTS_CACHE := T_RESULTS_CACHE();
+  return V_RESULTS;
+$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
+exception
+  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+    declare
+      V_CURSOR SYS_REFCURSOR;
+    begin
+      OPEN V_CURSOR for 'select * from table(:1)' using RESULTS_CACHE;
+      V_RESULTS := YADAMU_UTILITIES.JSON_ARRAYAGG_CLOB(V_CURSOR);
+      RESULTS_CACHE := T_RESULTS_CACHE();
+      return V_RESULTS;
+    end;
+  when others then
+    RAISE;
+--
+$END
+--
+$ELSE
+--
+  V_RESULTS := YADAMU_UTILITIES.JSON_ARRAYAGG_CLOB();
+  RESULTS_CACHE := T_RESULTS_CACHE();
+  return V_RESULTS;
+--
+$END
+--
 end;
 --
 function MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR VARCHAR2, P_DATA_TYPE VARCHAR2, P_DATA_TYPE_LENGTH NUMBER, P_DATA_TYPE_SCALE NUMBER)
@@ -583,7 +778,7 @@ begin
   end case;
 end;
 --
-procedure APPEND_DESERIALIZATION_FUNCTIONS(P_DESERIALIZATION_FUNCTIONS T_VC4000_TABLE, P_SQL_STATEMENT IN OUT CLOB)
+procedure APPEND_DESERIALIZATIONS(P_DESERIALIZATION_FUNCTIONS T_VC4000_TABLE, P_SQL_STATEMENT IN OUT CLOB)
 as
   V_IDX   PLS_INTEGER;
 begin
@@ -594,6 +789,8 @@ begin
     end loop;
   end if;
 end;
+--
+$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN 
 --
 function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB')
 return TABLE_INFO_RECORD
@@ -1074,7 +1271,7 @@ begin
   V_SQL_FRAGMENT :=  ')' || YADAMU_UTILITIES.C_NEWLINE;
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   
-  APPEND_DESERIALIZATION_FUNCTIONS(V_DESERIALIZATIONS,V_DML_STATEMENT);
+  APPEND_DESERIALIZATIONS(V_DESERIALIZATIONS,V_DML_STATEMENT);
    
   V_SQL_FRAGMENT := 'select ';
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
@@ -1101,6 +1298,8 @@ exception
     raise;
 end;
 --
+$END
+--
 procedure SET_CURRENT_SCHEMA(P_TARGET_SCHEMA VARCHAR2)
 as
   USER_NOT_FOUND EXCEPTION ; PRAGMA EXCEPTION_INIT( USER_NOT_FOUND , -01435 );
@@ -1122,17 +1321,7 @@ as
 begin
   RESULTS_CACHE := T_RESULTS_CACHE();
   SET_CURRENT_SCHEMA(P_TARGET_SCHEMA);
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  select JSON_ARRAYAGG(TREAT (COLUMN_VALUE as JSON) returning CLOB)
-  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(32767)) returning VARCHAR2(32767))
-  $ELSE
-  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
-  $END
-    into V_RESULTS
-    from table(RESULTS_CACHE);
-  RESULTS_CACHE := T_RESULTS_CACHE();
-  return V_RESULTS;
+  return GENERATE_LOG_RECORDS();
 end;
 --
 procedure DISABLE_CONSTRAINTS(P_TARGET_SCHEMA VARCHAR2)
@@ -1163,17 +1352,7 @@ as
 begin
   RESULTS_CACHE := T_RESULTS_CACHE();
   DISABLE_CONSTRAINTS(P_TARGET_SCHEMA);
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  select JSON_ARRAYAGG(TREAT (COLUMN_VALUE as JSON) returning CLOB)
-  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(32767)) returning VARCHAR2(32767))
-  $ELSE
-  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
-  $END
-    into V_RESULTS
-    from table(RESULTS_CACHE);
-  RESULTS_CACHE := T_RESULTS_CACHE();
-  return V_RESULTS;
+  return GENERATE_LOG_RECORDS();
 end;
 --
 procedure ENABLE_CONSTRAINTS(P_TARGET_SCHEMA VARCHAR2)
@@ -1204,17 +1383,7 @@ as
 begin
   RESULTS_CACHE := T_RESULTS_CACHE();
   ENABLE_CONSTRAINTS(P_TARGET_SCHEMA);
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  select JSON_ARRAYAGG(TREAT (COLUMN_VALUE as JSON) returning CLOB)
-  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(32767)) returning VARCHAR2(32767))
-  $ELSE
-  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
-  $END
-    into V_RESULTS
-    from table(RESULTS_CACHE);
-  RESULTS_CACHE := T_RESULTS_CACHE();
-  return V_RESULTS;
+  return GENERATE_LOG_RECORDS();
 end;
 --
 procedure REFRESH_MATERIALIZED_VIEWS(P_TARGET_SCHEMA VARCHAR2)
@@ -1245,17 +1414,7 @@ as
 begin
   RESULTS_CACHE := T_RESULTS_CACHE();
   REFRESH_MATERIALIZED_VIEWS(P_TARGET_SCHEMA);
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-  select JSON_ARRAYAGG(TREAT (COLUMN_VALUE as JSON) returning CLOB)
-  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(32767)) returning VARCHAR2(32767))
-  $ELSE
-  select JSON_ARRAYAGG(JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
-  $END
-    into V_RESULTS
-    from table(RESULTS_CACHE);
-  RESULTS_CACHE := T_RESULTS_CACHE();
-  return V_RESULTS;
+  return GENERATE_LOG_RECORDS();
 end;
 --
 procedure MANAGE_MUTATING_TABLE(P_TABLE_NAME VARCHAR2, P_DML_STATEMENT IN OUT NOCOPY CLOB)
@@ -1303,6 +1462,8 @@ begin
    DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
    P_DML_STATEMENT := V_SQL_STATEMENT;
 end;
+--
+$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
 --
 procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
 as
@@ -1495,45 +1656,59 @@ begin
     if (x.ROWNUM > 1) then
       DBMS_LOB.WRITEAPPEND(V_RESULTS,1,',');
     end if;
+    
     V_TABLE_INFO := GENERATE_SQL(x.VENDOR,P_TARGET_SCHEMA, x.OWNER, x.TABLE_NAME, x.COLUMN_LIST, x.DATA_TYPE_ARRAY, x.SIZE_CONSTRAINTS);
     V_FRAGMENT := '"' || x.TABLE_NAME || '" : ';
     DBMS_LOB.WRITEAPPEND(V_RESULTS,LENGTH(V_FRAGMENT),V_FRAGMENT);
-    $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-       select JSON_OBJECT('ddl' value V_TABLE_INFO.DDL,
-                          'dml' value V_TABLE_INFO.DML,
-                          'targetDataTypes' value TREAT(V_TABLE_INFO.TARGET_DATA_TYPES AS JSON)
-                          returning CLOB)
-         into V_TABLE_INFO_JSON
-         from DUAL;    
-    $ELSE
-    if (LENGTH(V_TABLE_INFO.DDL) + LENGTH(V_TABLE_INFO.DML) + LENGTH(V_TABLE_INFO.TARGET_DATA_TYPES) + 512 < JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE) then
-      select JSON_OBJECT('ddl' value V_TABLE_INFO.DDL, 
+    $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+    begin 
+      select JSON_OBJECT('ddl' value V_TABLE_INFO.DDL,
                          'dml' value V_TABLE_INFO.DML,
-                         'targetDataTypes'
-                          $IF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-                          value JSON_QUERY(V_TABLE_INFO.TARGET_DATA_TYPES,'$' returning  VARCHAR2(32767))
-                          returning  VARCHAR2(32767))
-                          $ELSE
-                          value JSON_QUERY(V_TABLE_INFO.TARGET_DATA_TYPES,'$' returning  VARCHAR2(4000) ERROR ON ERROR)
-                          returning  VARCHAR2(4000))
-                          $END
+                         'targetDataTypes' 
+                         $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+                         value TREAT(V_TABLE_INFO.TARGET_DATA_TYPES AS JSON) returning CLOB
+                         $ELSIF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                         value JSON_QUERY(V_TABLE_INFO.TARGET_DATA_TYPES,'$' returning  CLOB ERROR ON ERROR) returning  CLOB 
+                         $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                         value JSON_QUERY(V_TABLE_INFO.TARGET_DATA_TYPES,'$' returning  VARCHAR2(32767) ERROR ON ERROR) returning  VARCHAR2(32767) 
+                         $ELSE
+                         value JSON_QUERY(V_TABLE_INFO.TARGET_DATA_TYPES,'$' returning  VARCHAR2(4000) ERROR ON ERROR) returning VARCHAR2(4000)
+                         $END
+                         
+             )
         into V_TABLE_INFO_JSON
         from DUAL;    
-    else
-      V_TABLE_INFO_JSON := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
-                             YADAMU_UTILITIES.KVP_TABLE(
-                               YADAMU_UTILITIES.KVC('ddl',V_TABLE_INFO.DDL),
-                               YADAMU_UTILITIES.KVC('dml',V_TABLE_INFO.DML),
-                               YADAMU_UTILITIES.KVJ('targetDataTypes',V_TABLE_INFO.TARGET_DATA_TYPES)
-                             )
-                           );
-    end if;      
+    $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+    --   
+    exception
+      when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+        V_TABLE_INFO_JSON := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                               YADAMU_UTILITIES.KVP_TABLE(
+                                 YADAMU_UTILITIES.KVC('ddl',V_TABLE_INFO.DDL),
+                                 YADAMU_UTILITIES.KVC('dml',V_TABLE_INFO.DML),
+                                 YADAMU_UTILITIES.KVJ('targetDataTypes',V_TABLE_INFO.TARGET_DATA_TYPES)
+                               )
+                             );
+      when OTHERS then
+        RAISE;
+    $END
+    end;    
+    $ELSE
+    V_TABLE_INFO_JSON := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+                           YADAMU_UTILITIES.KVP_TABLE(
+                             YADAMU_UTILITIES.KVC('ddl',V_TABLE_INFO.DDL),
+                             YADAMU_UTILITIES.KVC('dml',V_TABLE_INFO.DML),
+                             YADAMU_UTILITIES.KVJ('targetDataTypes',V_TABLE_INFO.TARGET_DATA_TYPES)
+                           )
+                         );     
     $END    
     DBMS_LOB.APPEND(V_RESULTS,V_TABLE_INFO_JSON);
    end loop;
    DBMS_LOB.WRITEAPPEND(V_RESULTS,1,'}');
    return V_RESULTS;  
 end;
+--
+$END
 --
 $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
@@ -1589,6 +1764,7 @@ end;
 --
 $END
 --
+$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
 function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
 return CLOB
 as
@@ -1600,6 +1776,8 @@ exception
     LOG_ERROR(C_FATAL_ERROR,'PROCEUDRE IMPORT_JSON',NULL,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
     return GENERATE_IMPORT_LOG();
 end;
+--
+$END
 --
 procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2)
 as
@@ -1639,7 +1817,9 @@ as
  where aat.STATUS = 'VALID'
    and aat.DROPPED = 'NO'
    and aat.TEMPORARY = 'N'
+$IF NOT DBMS_DB_VERSION.VER_LE_11_2 $THEN
    and aat.EXTERNAL = 'NO'
+$END
    and aat.NESTED = 'NO'
    and aat.SECONDARY = 'N'
    and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = 'IOT')

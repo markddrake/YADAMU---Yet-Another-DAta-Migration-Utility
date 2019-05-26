@@ -1,6 +1,8 @@
 "use strict" 
 const fs = require('fs');
 const Readable = require('stream').Readable;
+const Writable = require('stream').Writable;
+const Transform = require('stream').Transform;
 
 /* 
 **
@@ -13,6 +15,7 @@ oracledb.fetchAsString = [ oracledb.DATE ]
 
 const Yadamu = require('../../common/yadamu.js').Yadamu;
 const YadamuDBI = require('../../common/yadamuDBI.js');
+const FileParser = require('../../file/node/fileParser.js');
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
@@ -59,19 +62,155 @@ const DATA_TYPE_STRING_LENGTH = {
 , INTERVAL      : 16
 }  
 
-const sqlSystemInformation = 
-`select YADAMU_EXPORT.JSON_FEATURES() JSON_FEATURES, 
-        YADAMU_EXPORT.DATABASE_RELEASE() DATABASE_RELEASE, 
-        SYS_CONTEXT('USERENV','SESSION_USER') SESSION_USER, 
-        SYS_CONTEXT('USERENV','DB_NAME') DATABASE_NAME, 
-        SYS_CONTEXT('USERENV','SERVER_HOST') SERVER_HOST,
-        SESSIONTIMEZONE SESSION_TIME_ZONE,
-        JSON_OBJECTAGG(parameter, value) NLS_PARAMETERS
-        from NLS_DATABASE_PARAMETERS`;
+const sqlSystemInformation = `begin :sysInfo := YADAMU_EXPORT.GET_SYSTEM_INFORMATION(); end;`;
 
 const sqlFetchDDL = 
 `select COLUMN_VALUE JSON 
-   from TABLE(YADAMU_EXPORT_DDL.FETCH_DDL_STATEMENTS(:schema))`;;
+   from TABLE(YADAMU_EXPORT_DDL.FETCH_DDL_STATEMENTS(:schema))`;
+
+const sqlFetchDDL11g = `declare
+  JOB_NOT_ATTACHED EXCEPTION;
+  PRAGMA EXCEPTION_INIT( JOB_NOT_ATTACHED , -31623 );
+  
+  V_RESULT YADAMU_UTILITIES.KVP_TABLE := YADAMU_UTILITIES.KVP_TABLE();
+  
+  V_SCHEMA           VARCHAR2(128) := :V1;
+
+  V_HDL_OPEN         NUMBER;
+  V_HDL_TRANSFORM    NUMBER;
+
+  V_DDL_STATEMENTS SYS.KU$_DDLS;
+  V_DDL_STATEMENT  CLOB;
+  
+  C_NEWLINE          CONSTANT CHAR(1) := CHR(10);
+  C_CARRIAGE_RETURN  CONSTANT CHAR(1) := CHR(13);
+  C_SINGLE_QUOTE     CONSTANT CHAR(1) := CHR(39);
+   
+  cursor indexedColumnList(C_SCHEMA VARCHAR2)
+  is
+   select aic.TABLE_NAME, aic.INDEX_NAME, LISTAGG(COLUMN_NAME,',') WITHIN GROUP (ORDER BY COLUMN_POSITION) INDEXED_EXPORT_SELECT_LIST
+     from ALL_IND_COLUMNS aic
+     join ALL_ALL_TABLES aat
+       on aic.TABLE_NAME = aat.TABLE_NAME and aic.TABLE_OWNER = aat.OWNER
+    where aic.TABLE_OWNER = C_SCHEMA
+    group by aic.TABLE_NAME, aic.INDEX_NAME;
+
+  CURSOR heirachicalTableList(C_SCHEMA VARCHAR2)
+  is
+  select distinct TABLE_NAME
+    from ALL_XML_TABLES axt
+   where exists(
+           select 1
+             from ALL_TAB_COLS atc
+            where axt.TABLE_NAME = atc.TABLE_NAME and axt.OWNER = atc.OWNER and atc.COLUMN_NAME = 'ACLOID' and atc.HIDDEN_COLUMN = 'YES'
+         )
+     and exists(
+           select 1
+             from ALL_TAB_COLS atc
+            where axt.TABLE_NAME = atc.TABLE_NAME and axt.OWNER = atc.OWNER and atc.COLUMN_NAME = 'OWNERID' and atc.HIDDEN_COLUMN = 'YES'
+        )
+    and OWNER = C_SCHEMA;
+
+begin
+
+  -- Use DBMS_METADATA package to access the XMLSchemas registered in the target database schema
+
+  DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM,'PRETTY',false);
+
+  begin
+    V_HDL_OPEN := DBMS_METADATA.OPEN('XMLSCHEMA');
+    DBMS_METADATA.SET_FILTER(V_HDL_OPEN,'SCHEMA',V_SCHEMA);
+    loop
+      -- TO DO Switch to FETCH_DDL and process table of statements..
+      V_DDL_STATEMENT := DBMS_METADATA.FETCH_CLOB(V_HDL_OPEN);
+      EXIT WHEN V_DDL_STATEMENT IS NULL;
+      -- Strip leading and trailing white space from DDL statement
+      V_DDL_STATEMENT := TRIM(BOTH C_NEWLINE FROM V_DDL_STATEMENT);
+      V_DDL_STATEMENT := TRIM(BOTH C_CARRIAGE_RETURN FROM V_DDL_STATEMENT);
+      V_DDL_STATEMENT := TRIM(V_DDL_STATEMENT);
+      if (TRIM(V_DDL_STATEMENT) <> '10 10') then
+        V_RESULT.extend(1);
+        V_RESULT(V_RESULT.COUNT) := YADAMU_UTILITIES.KVC(NULL,V_DDL_STATEMENT);
+      end if;
+    end loop;
+
+    DBMS_METADATA.CLOSE(V_HDL_OPEN);
+  exception
+    when JOB_NOT_ATTACHED then
+      DBMS_METADATA.CLOSE(V_HDL_OPEN);
+    when others then
+      RAISE;
+  end;
+
+  -- Use DBMS_METADATA package to access the DDL statements used to create the database schema
+
+  begin
+    V_HDL_OPEN := DBMS_METADATA.OPEN('SCHEMA_EXPORT');
+    DBMS_METADATA.SET_FILTER(V_HDL_OPEN,'SCHEMA',V_SCHEMA);
+
+    V_HDL_TRANSFORM := DBMS_METADATA.ADD_TRANSFORM(V_HDL_OPEN,'DDL');
+
+    -- Suppress Segement information for TABLES, INDEXES and CONSTRAINTS
+
+    DBMS_METADATA.SET_TRANSFORM_PARAM(V_HDL_TRANSFORM,'SEGMENT_ATTRIBUTES',false,'TABLE');
+    DBMS_METADATA.SET_TRANSFORM_PARAM(V_HDL_TRANSFORM,'SEGMENT_ATTRIBUTES',false,'INDEX');
+    DBMS_METADATA.SET_TRANSFORM_PARAM(V_HDL_TRANSFORM,'SEGMENT_ATTRIBUTES',false,'CONSTRAINT');
+
+    -- Return constraints as 'ALTER TABLE' operations
+
+    DBMS_METADATA.SET_TRANSFORM_PARAM(V_HDL_TRANSFORM,'CONSTRAINTS_AS_ALTER',true,'TABLE');
+    DBMS_METADATA.SET_TRANSFORM_PARAM(V_HDL_TRANSFORM,'REF_CONSTRAINTS',false,'TABLE');
+
+    -- Exclude XML Schema Info. XML Schemas need to come first and are handled in the previous section
+
+    DBMS_METADATA.SET_FILTER(V_HDL_OPEN,'EXCLUDE_PATH_EXPR','=''XMLSCHEMA''');
+
+    loop
+      -- Get the next batch of DDL_STATEMENTS. Each batch may contain zero or more spaces.
+      V_DDL_STATEMENTS := DBMS_METADATA.FETCH_DDL(V_HDL_OPEN);
+      EXIT WHEN V_DDL_STATEMENTS IS NULL;
+      for i in 1 .. V_DDL_STATEMENTS.count loop
+
+        V_DDL_STATEMENT := V_DDL_STATEMENTS(i).DDLTEXT;
+
+        -- Strip leading and trailing white space from DDL statement
+        V_DDL_STATEMENT := TRIM(BOTH C_NEWLINE FROM V_DDL_STATEMENT);
+        V_DDL_STATEMENT := TRIM(BOTH C_CARRIAGE_RETURN FROM V_DDL_STATEMENT);
+        V_DDL_STATEMENT := TRIM(V_DDL_STATEMENT);
+        if (DBMS_LOB.getLength(V_DDL_STATEMENT) > 0) then
+          V_RESULT.extend(1);
+          V_RESULT(V_RESULT.COUNT) := YADAMU_UTILITIES.KVC(NULL,V_DDL_STATEMENT);
+        end if;
+      end loop;
+    end loop;
+
+    DBMS_METADATA.CLOSE(V_HDL_OPEN);
+
+/*
+  exception
+    when JOB_NOT_ATTACHED then
+      DBMS_METADATA.CLOSE(V_HDL_OPEN);
+    when others then
+      RAISE;
+*/
+  end;
+
+  -- Renable the heirarchy for any heirachically enabled tables in the export file
+
+  for t in heirachicalTableList(V_SCHEMA) loop
+    V_RESULT.extend(1);
+    V_RESULT(V_RESULT.COUNT) := YADAMU_UTILITIES.KVC(NULL,'begin DBMS_XDBZ.ENABLE_HIERARCHY(SYS_CONTEXT(''USERENV'',''CURRENT_SCHEMA''),''' || t.TABLE_NAME  || '''); END;');
+  end loop;
+
+  for i in indexedColumnList(V_SCHEMA) loop
+    V_RESULT.extend(1);
+    V_RESULT(V_RESULT.COUNT) := YADAMU_UTILITIES.KVC(NULL,'BEGIN YADAMU_EXPORT_DDL.RENAME_INDEX(''' || i.TABLE_NAME  || ''',''' || i.INDEXED_EXPORT_SELECT_LIST || ''',''' || i.INDEX_NAME || '''); END;');
+  end loop;
+
+  :V2 := YADAMU_UTILITIES.JSON_ARRAY_CLOB(V_RESULT);
+  
+end;`;
+
 
 const sqlFetchDDL19c = `declare
   JOB_NOT_ATTACHED EXCEPTION;
@@ -210,7 +349,10 @@ begin
   
 end;`;
 
-const sqlTableInfo =
+const sqlTableInfo = 
+`select * 
+   from table(YADAMU_EXPORT.GET_DML_STATEMENTS(:schema))`;
+
 `select * 
    from table(YADAMU_EXPORT.GET_DML_STATEMENTS(:schema))`;
 
@@ -299,6 +441,13 @@ class OracleDBI extends YadamuDBI {
     
     return timestampFormatMasks[vendor]
  
+  }
+  
+  statementTooLarge(sql) {
+
+    return sql.some(function(sqlStatement) {
+      return sqlStatement.length > this.maxStringSize
+    },this)      
   }
   
   async setDateFormatMask(conn,status,vendor) {
@@ -401,7 +550,7 @@ class OracleDBI extends YadamuDBI {
   }
   
   /*
-  **
+  ** 
   ** The following methods are used by the YADAMU DBwriter class
   **
   */
@@ -419,16 +568,16 @@ class OracleDBI extends YadamuDBI {
   async disableConstraints() {
   
     const sqlStatement = `begin :log := YADAMU_IMPORT.DISABLE_CONSTRAINTS(:schema); end;`;
-    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER}
+    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH} , schema:this.parameters.TOUSER}
     const results = await this.executeSQL(sqlStatement,args)
     this.processLog(results)
 
   }
-  
+    
   async enableConstraints() {
   
     const sqlStatement = `begin :log := YADAMU_IMPORT.ENABLE_CONSTRAINTS(:schema); end;`;
-    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER} 
+    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH} , schema:this.parameters.TOUSER} 
     const results = await this.executeSQL(sqlStatement,args)
     this.processLog(results)
     
@@ -437,7 +586,7 @@ class OracleDBI extends YadamuDBI {
   async refreshMaterializedViews() {
   
     const sqlStatement = `begin :log := YADAMU_IMPORT.REFRESH_MATERIALIZED_VIEWS(:schema); end;`;
-    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , schema:this.parameters.TOUSER}     
+    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH} , schema:this.parameters.TOUSER}     
     const results = await this.executeSQL(sqlStatement,args)
     this.processLog(results)
 
@@ -467,6 +616,8 @@ class OracleDBI extends YadamuDBI {
 
   constructor(yadamu) {
     super(yadamu,defaultParameters);
+    this.ddl = [];
+    this.systemInformation = undefined;
   }
 
   getConnectionProperties() {
@@ -482,20 +633,48 @@ class OracleDBI extends YadamuDBI {
      }
     }
   }
+  
+  async applyDDL(ddl,targetSchema) {
+     
+     await this.setCurrentSchema(this.parameters.TOUSER);
+     
+     let sqlStatement = `declare V_ABORT BOOLEAN;begin V_ABORT := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENT(:statement,:sourceSchema,:targetSchema); :abort := case when V_ABORT then 1 else 0 end; end;`; 
+     let args = {abort:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER} , statement:{type: oracledb.CLOB, maxSize: LOB_STRING_MAX_LENGTH, val:''}, sourceSchema: this.systemInformation.schema, targetSchema:this.parameters.TOUSER};
+     
+     for (const ddlStatement of ddl) {
+        args.statement.val = ddlStatement
+        const results = await this.executeSQL(sqlStatement,args);
+        if (results.outBinds.abort === 1) {
+          break;
+        }
+     }
+     
+     sqlStatement = `begin :log := YADAMU_EXPORT_DDL.FETCH_DLL_RESULTS(); end;`; 
+     args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}};
+     const results = await this.executeSQL(sqlStatement,args);   
+     await this.setCurrentSchema(this.connectionProperties.user);
+     return this.processLog(results);
+  }
+
 
   async executeDDL(ddl) {
-      
-    /* ### OVERRIDE ### - Send DDL to server for execution ### */
-    
-    const sqlStatement = `begin :log := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS(:ddl, :schema); end;`;
-    const ddlLob = await this.lobFromJSON({ systemInformation : this.systemInformation, ddl : ddl});  
-    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , ddl:ddlLob, schema:this.parameters.TOUSER};
-    const results = await this.executeSQL(sqlStatement,args);
-    await ddlLob.close();
-    const log = this.processLog(results)
-    // console.log(JSON.stringify(log,null,2))
-    if (this.status.errorRaised === true) {
-      throw new Error(`Oracle DDL Execution Failure`);
+
+    if ((this.maxStringSize < 32768) && (this.statementTooLarge(ddl))) {
+      // DDL statements are too large send for server based execution (JSON Extraction will fail)
+      await this.applyDDL(ddl);
+    }
+    else {
+      // ### OVERRIDE ### - Send Set of DDL operations to the server for execution   
+      const sqlStatement = `begin :log := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS(:ddl, :schema); end;`;
+      const ddlLob = await this.lobFromJSON({ systemInformation : this.systemInformation, ddl : ddl});  
+      const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH} , ddl:ddlLob, schema:this.parameters.TOUSER};
+      const results = await this.executeSQL(sqlStatement,args);
+      await ddlLob.close();
+      const log = this.processLog(results)
+      // console.log(JSON.stringify(log,null,2))
+      if (this.status.errorRaised === true) {
+        throw new Error(`Oracle DDL Execution Failure`);
+      }
     }
   }
   
@@ -565,8 +744,31 @@ class OracleDBI extends YadamuDBI {
   */
 
   async uploadFile(importFilePath) {
-     const json = await this.lobFromFile(this.connection,importFilePath);
-     return json;
+      
+     if (this.maxStringSize > 32767) {
+       const json = await this.lobFromFile(this.connection,importFilePath);
+       return json;
+     }
+     else {
+         
+       // Need to cature the SystemInformation and DLL objects of the export file to make sure the DLL can be processed on the RDBMS.
+       // If any DDL statement exceeds maxStringSize then DDL will have to executed statement by statement from the client
+       // 'Tee' the input stream used to create the temporary lob that contains the export file and pass it through the Sax Parser.
+       // If any of the DDL operations exceed the maxium string size supported by server side JSON operations cache the dll statements on the client
+       
+       const saxParser  = new FileParser(this.logWriter)  
+       const ddlCache = new DDLCache();
+       saxParser.pipe(ddlCache);
+       const inputStream = fs.createReadStream(importFilePath);         
+       const multiplexor = new Multiplexor(saxParser,ddlCache)
+       const jsonTempLob = await OracleDBI.lobFromStream(this.connection,inputStream.pipe(multiplexor))
+       const ddl = ddlCache.getDDL();
+       if ((ddl.length > 0) && this.statementTooLarge(ddl)) {
+         this.ddl = ddl
+         this.systemInformation = ddlCache.getSystemInformation();
+       }
+       return jsonTempLob
+     }
   }
 
   /*
@@ -577,40 +779,45 @@ class OracleDBI extends YadamuDBI {
   
   async processFile(hndl) {
 
-    let sqlStatement = "BEGIN" + "\n";
-    
-    if (this.maxStringSize < 32768) {
-      console.log(hndl.ddl);
-      let serverDDL = true
-      if (hndl.ddl) {
-        hndl.ddl.forEach(function (ddlOperation) {
-           console.log(ddlOPeration, ddlOperation.length);
-           if (ddlOperation.length > this.maxtringSize) {
-             serverDDL = false;
-           }
-        },this);
-      }
-      console.log(serverDDL);
-    }
-           
-    
+    /*
+    **
+    ** If the ddl array is populdated DDL operations have to be executed from the client.
+    **
+    */
+
+    let settings = '';
     switch (this.parameters.MODE) {
 	   case 'DDL_AND_DATA':
-         sqlStatement = `${sqlStatement}  YADAMU_IMPORT.DATA_ONLY_MODE(FALSE);\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);\n`;
-	     break;	   break
+         if (this.ddl.length > 0) {
+           // Execute the DDL statement by statement.
+           await this.applyDDL(this.ddl);
+           settings = `YADAMU_IMPORT.DATA_ONLY_MODE(TRUE);\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
+         }
+         else {
+           settings = `YADAMU_IMPORT.DATA_ONLY_MODE(FALSE);\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
+         }
+	     break;
 	   case 'DATA_ONLY':
-         sqlStatement = `${sqlStatement}  YADAMU_IMPORT.DATA_ONLY_MODE(TRUE);\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);\n`;
+         settings = `YADAMU_IMPORT.DATA_ONLY_MODE(TRUE);\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
          break;
 	   case 'DDL_ONLY':
-         sqlStatement = `${sqlStatement}  YADAMU_IMPORT.DDL_ONLY_MODE(TRUE);\n  YADAMU_IMPORT.DATA_ONLY_MODE(FALSE);\n`;
+         if (this.ddl.length > 0) {
+           // Execute the DDL statement by statement
+          await his.applyDDL(this.ddl);
+           settings = `YADAMU_IMPORT.DDL_ONLY_MODE(TRUE);\n  YADAMU_IMPORT.DATA_ONLY_MODE(TRUE);`;
+         }
+         else {
+           settings = `YADAMU_IMPORT.DDL_ONLY_MODE(TRUE);\n  YADAMU_IMPORT.DATA_ONLY_MODE(FALSE);`;
+         }
 	     break;
     }	 
 	 
-    sqlStatement = `${sqlStatement}    :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema);\nEND;`;
-
-    const results = await this.connection.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024}, json:hndl, schema:this.parameters.TOUSER});
-    return this.processLog(results);
-  
+    const sqlStatement = `BEGIN\n  ${settings}\n  :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema);\nEND;`;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement}\n\/\n`)
+    }
+    const results = await this.connection.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}, json:hndl, schema:this.parameters.TOUSER});
+    return this.processLog(results);  
   }
   
   /*
@@ -631,24 +838,16 @@ class OracleDBI extends YadamuDBI {
       this.status.sqlTrace.write(`${sqlSystemInformation}\n\/\n`)
     }
 
-    const results = await this.connection.execute(sqlSystemInformation,[],{outFormat: oracledb.OBJECT ,})
-    const sysInfo = results.rows[0];
-    return {
-      date               : new Date().toISOString()
-     ,timeZoneOffset     : new Date().getTimezoneOffset()
-     ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
-     ,vendor             : this.DATABASE_VENDOR
-     ,spatialFormat      : this.SPATIAL_FORMAT 
-     ,schema             : this.parameters.OWNER
-     ,exportVersion      : EXPORT_VERSION
-     ,sessionUser        : sysInfo.SESSION_USER
-     ,dbName             : sysInfo.DATABASE_NAME
-     ,databaseVersion    : sysInfo.DATABASE_RELEASE
-     ,softwareVendor     : this.SOFTWARE_VENDOR
-     ,hostname           : sysInfo.SERVER_HOST
-     ,jsonFeatures       : JSON.parse(sysInfo.JSON_FEATURES)
-     ,nlsParameters      : JSON.parse(sysInfo.NLS_PARAMETERS)
-    }
+    const results = await this.connection.execute(sqlSystemInformation,{sysInfo:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}})
+    return Object.assign({
+                           date               : new Date().toISOString()
+                          ,timeZoneOffset     : new Date().getTimezoneOffset()
+                          ,vendor             : this.DATABASE_VENDOR
+                          ,spatialFormat      : this.SPATIAL_FORMAT 
+                          ,schema             : this.parameters.OWNER
+                          ,softwareVendor     : this.SOFTWARE_VENDOR
+                          ,exportVersion      : EXPORT_VERSION
+                        }, JSON.parse(results.outBinds.sysInfo));
     
   }
 
@@ -665,31 +864,46 @@ class OracleDBI extends YadamuDBI {
     }
 
     let ddl;
+    let results;
+    let bindVars
         
-    if (this.systemInformation.databaseVersion < 19) {
-      const results = await this.connection.execute(sqlFetchDDL,{schema: this.parameters.OWNER},{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
-      ddl = results.rows.map(function(row) {
-        return row.JSON;
-      },this);
-    }
-    else {
-
-      /*
-      **
-      ** The pipelined table approach used by YADAMU_EXPORT_DDL appears to fail starting with release 19c. 
-      ** Using Dynamic SQL appears to work correctly.
-      **
-      */
+    switch (true) {
+      case this.systemInformation.databaseVersion < 12.2:
+        /*
+        **
+        ** The pipelined table approach used by YADAMU_EXPORT_DDL appears to fail starting with release 19c. 
+        ** Using Dynamic SQL appears to work correctly.
+        ** 
+        */
       
-      const bindVars = {v1 : this.parameters.OWNER, v2 : {dir : oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 *1024 *1024}};
-      const results = await this.connection.execute(sqlFetchDDL19c,bindVars)
-      ddl = JSON.parse(results.outBinds.v2);
+        bindVars = {v1 : this.parameters.OWNER, v2 : {dir : oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}};
+        results = await this.connection.execute(sqlFetchDDL11g,bindVars)
+        ddl = JSON.parse(results.outBinds.v2);
+        break;
+      case this.systemInformation.databaseVersion < 19:
+        results = await this.connection.execute(sqlFetchDDL,{schema: this.parameters.OWNER},{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
+        ddl = results.rows.map(function(row) {
+          return row.JSON;
+        },this);
+        break;
+      default:
+        /*
+        **
+        ** The pipelined table approach used by YADAMU_EXPORT_DDL appears to fail starting with release 19c. 
+        ** Using Dynamic SQL appears to work correctly.
+        **  
+        */
+      
+        bindVars = {v1 : this.parameters.OWNER, v2 : {dir : oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}};
+        results = await this.connection.execute(sqlFetchDDL19c,bindVars)
+        ddl = JSON.parse(results.outBinds.v2);
     }
     return ddl;    
 
   }
 
   async getSchemaInfo(schema) {
+     
      
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlTableInfo}\n\/\n`)
@@ -797,7 +1011,67 @@ class OracleDBI extends YadamuDBI {
     await this.enableConstraints();
     await this.refreshMaterializedViews();
   }  
+  
+}
 
+class DDLCache extends Writable {
+  
+  constructor() {
+    super({objectMode: true });
+    this.systemInformation = undefined;
+    this.ddl = undefined 
+  }
+
+  async _write(obj, encoding, callback) {
+    try {
+      switch (Object.keys(obj)[0]) {
+        case 'systemInformation':
+          this.systemInformation = obj.systemInformation
+          break;
+        case 'ddl':
+          this.ddl = obj.ddl;
+          break;
+        case 'metadata':
+          this.ddl = []
+          break;
+      }
+      callback();
+    } catch (e) {
+      this.logWriter.write(`${new Date().toISOString()}[DBWriter._write() "${this.tableName}"]: ${e}\n${e.stack}\n`);
+      callback(e);
+    }
+  }
+  
+  getDDL() {
+    return this.ddl;
+  }
+  
+  getSystemInformation() {
+    return this.systemInformation
+  }
+}
+ 
+
+class Multiplexor extends Transform {
+  
+  constructor(saxParser,ddlWriter) {
+    super();   
+    this.saxParser = saxParser;
+    this.ddlWriter = ddlWriter;  
+  }
+
+  // Push Data to saxParser to find ddl object.
+  
+  async _transform (data,encodoing,done) {
+    this.push(data)
+    if (this.ddlWriter.getDDL() === undefined) {
+      // ### Shouldn't be calling transform directly ?????
+      this.saxParser._transform(data,encodoing,done)
+    }
+    else {
+      done();
+    }
+  }
 }
 
 module.exports = OracleDBI

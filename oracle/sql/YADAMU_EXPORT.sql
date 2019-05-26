@@ -17,6 +17,7 @@ as
   
   TYPE EXPORT_METADATA_TABLE IS TABLE OF EXPORT_METADATA_RECORD;
   
+  function GET_SYSTEM_INFORMATION return CLOB;
   function GET_DML_STATEMENTS(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL) return EXPORT_METADATA_TABLE PIPELINED;
   function JSON_FEATURES return VARCHAR2 deterministic;
   function DATABASE_RELEASE return NUMBER deterministic;
@@ -59,14 +60,85 @@ end;
 function JSON_FEATURES return VARCHAR2 deterministic
 as
 begin
+  $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
   return JSON_OBJECT(
-          'treatAsJSON'    value JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED
-	 	 ,'CLOB'           value JSON_FEATURE_DETECTION.CLOB_SUPPORTED
-		 ,'extendedString' value JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED
-         ,'maxStringSize'  value JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE
+          'parsing'         value JSON_FEATURE_DETECTION.PARSING_SUPPORTED
+          ,'generation'     value JSON_FEATURE_DETECTION.GENERATION_SUPPORTED
+          ,'treatAsJSON'    value JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED
+	  	  ,'CLOB'           value JSON_FEATURE_DETECTION.CLOB_SUPPORTED
+		  ,'extendedString' value JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED
+          ,'maxStringSize'  value JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE
 		 );
+  $ELSE
+  return YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+           YADAMU_UTILITIES.KVP_TABLE(
+             YADAMU_UTILITIES.KVB('parsing',        JSON_FEATURE_DETECTION.PARSING_SUPPORTED),
+             YADAMU_UTILITIES.KVB('generation',     JSON_FEATURE_DETECTION.GENERATION_SUPPORTED),
+             YADAMU_UTILITIES.KVB('treatAsJSON',    JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED),
+             YADAMU_UTILITIES.KVB('CLOB',           JSON_FEATURE_DETECTION.CLOB_SUPPORTED),
+             YADAMU_UTILITIES.KVB('extendedString', JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED),
+             YADAMU_UTILITIES.KVN('maxStringSize',  JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE)
+           )
+         );
+  $END
 end;
 --
+function GET_SYSTEM_INFORMATION
+return CLOB
+as
+   V_RESULTS CLOB;
+begin
+$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+--
+  select JSON_OBJECT(
+           'jsonFeatures'     value JSON_FEATURES(),
+           'databaseVersion'  value DATABASE_RELEASE(),
+           'sessionUser'      value SYS_CONTEXT('USERENV','SESSION_USER'),
+           'dbName'           value SYS_CONTEXT('USERENV','DB_NAME'),
+           'hostname'         value SYS_CONTEXT('USERENV','SERVER_HOST'),
+           'sessionTimeZone'  value SESSIONTIMEZONE,
+           'nlsParameters'    value JSON_OBJECTAGG(parameter, value)
+         )
+    into V_RESULTS
+    from NLS_DATABASE_PARAMETERS;
+    return V_RESULTS;
+--
+$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+exception
+  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+    return YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+             YADAMU_UTILITIES.KVP_TABLE(
+               YADAMU_UTILITIES.KVJ('jsonFeatures',    YADAMU_EXPORT.JSON_FEATURES),
+               YADAMU_UTILITIES.KVN('databaseVersion', YADAMU_EXPORT.DATABASE_RELEASE),
+               YADAMU_UTILITIES.KVS('sessionUser',     SYS_CONTEXT('USERENV','SESSION_USER')),
+               YADAMU_UTILITIES.KVS('dbName',          SYS_CONTEXT('USERENV','DB_NAME')),
+               YADAMU_UTILITIES.KVS('hostname',        SYS_CONTEXT('USERENV','SERVER_HOST')),
+               YADAMU_UTILITIES.KVS('sessionTimeZone', SESSIONTIMEZONE),
+               YADAMU_UTILITIES.KVJ('nlsParameters',   YADAMU_UTILITIES.JSON_OBJECTAGG_CLOB('select PARAMETER "KEY", 3 DATA_TYPE, NULL "NUMERIC_VALUE", VALUE "STRING_VALUE", NULL "CLOB_VALUE" from  NLS_DATABASE_PARAMETERS'))
+             )   
+           );
+  when others then
+    RAISE;
+--
+$END
+--
+$ELSE
+--
+  return YADAMU_UTILITIES.JSON_OBJECT_CLOB(
+           YADAMU_UTILITIES.KVP_TABLE(
+             YADAMU_UTILITIES.KVJ('jsonFeatures',    YADAMU_EXPORT.JSON_FEATURES),
+             YADAMU_UTILITIES.KVN('databaseVersion', YADAMU_EXPORT.DATABASE_RELEASE),
+             YADAMU_UTILITIES.KVS('sessionUser',     SYS_CONTEXT('USERENV','SESSION_USER')),
+             YADAMU_UTILITIES.KVS('dbName',          SYS_CONTEXT('USERENV','DB_NAME')),
+             YADAMU_UTILITIES.KVS('hostname',        SYS_CONTEXT('USERENV','SERVER_HOST')),
+             YADAMU_UTILITIES.KVS('sessionTimeZone', SESSIONTIMEZONE),
+             YADAMU_UTILITIES.KVJ('nlsParameters',   YADAMU_UTILITIES.JSON_OBJECTAGG_CLOB('select PARAMETER "KEY", 3 DATA_TYPE, NULL "NUMERIC_VALUE", VALUE "STRING_VALUE", NULL "CLOB_VALUE" from  NLS_DATABASE_PARAMETERS'))
+           )   
+         );
+$END
+--
+end;
+--   
 procedure APPEND_SERIALIZATION_FUNCTIONS(P_OBJECT_SERAIALIZATION CLOB,P_SQL_STATEMENT IN OUT CLOB)
 as
 begin
@@ -97,11 +169,13 @@ as
         ,cast(collect('"' || atc.COLUMN_NAME || '"' ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST
 		,cast(collect(
                case 
+$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN               
                  when (jc.FORMAT is not NULL) then
                    -- Does not attempt to preserve json storage details
                    -- If storage model fidelity is required then set specify MODE=DDL_AND_DATA on the export command line to include DDL statements to the file.
                    -- If DDL is not included in the file import operations will default to CLOB storage in Oracle 12.1 thru 18c.
                    '"JSON"'
+$END                   
                  when (atc.DATA_TYPE like 'TIMESTAMP(%)') then
                    '"TIMESTAMP"'
                  when (DATA_TYPE_OWNER is null) then
@@ -169,8 +243,10 @@ as
                    'TO_CHAR("' || atc.COLUMN_NAME || '")'
                  when atc.DATA_TYPE = 'NCLOB' then
                    'TO_CLOB("' || atc.COLUMN_NAME || '")'
+                 $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN               
                  when jc.FORMAT is not NULL then
                    'JSON_QUERY("' ||  atc.COLUMN_NAME || '",''$'' returning ' || JSON_FEATURE_DETECTION.C_RETURN_TYPE || ')'
+                 $END
                  /*
                  ** 18.1 compatible handling of BLOB
                  */
@@ -259,17 +335,22 @@ as
     left outer join ALL_TYPES at
                  on at.TYPE_NAME = atc.DATA_TYPE
                 and at.OWNER = atc.DATA_TYPE_OWNER
+    $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN               
     left outer join ALL_JSON_COLUMNS jc
                  on jc.COLUMN_NAME = atc.COLUMN_NAME
                 AND jc.TABLE_NAME = atc.TABLE_NAME
                 and jc.OWNER = atc.OWNER
+    $END
     left outer join ALL_MVIEWS amv
 		         on amv.OWNER = aat.OWNER
 		        and amv.MVIEW_NAME = aat.TABLE_NAME
    where aat.STATUS = 'VALID'
      and aat.DROPPED = 'NO'
      and aat.TEMPORARY = 'N'
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN               
+$ELSE
      and aat.EXTERNAL = 'NO'
+$END
      and aat.NESTED = 'NO'
      and aat.SECONDARY = 'N'
      and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = 'IOT')
@@ -293,10 +374,12 @@ as
 
 begin
 --
+$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
    select SCHEMA
      bulk collect into V_SCHEMA_LIST
 	 from JSON_TABLE( P_OWNER_LIST,'$[*]' columns (SCHEMA VARCHAR(128) PATH '$'));
-
+$END 
+--
    if ((V_SCHEMA_LIST is NULL) or (V_SCHEMA_LIST.count = 0)) then 
      V_SCHEMA_LIST := T_VC4000_TABLE(P_OWNER_LIST);
 	end if;

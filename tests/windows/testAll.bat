@@ -16,7 +16,7 @@ cd %YADAMU_HOME%
 exit /b
 
 :EXPORT_NATIVE_SCHEMAS
-@set YADAMU_LOG_ROOT=%YADAMU_HOME%\work\logs\export
+@set YADAMU_LOG_ROOT=%YADAMU_HOME%\work\export
 call %YADAMU_HOME%\tests\windows\initializeLogging.bat
 cd %YADAMU_HOME%\tests\oracle19c
 call windows\export_Native_Schemas.bat 1> %MASTER_LOG_PATH%\Export.log  2>&1
