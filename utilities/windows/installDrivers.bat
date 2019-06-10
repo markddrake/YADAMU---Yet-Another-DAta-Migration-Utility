@@ -2,6 +2,7 @@ set YADAMU_HOME=%CD%
 cd oracle\node
 rmdir /s node_modules
 call npm install oracledb
+call npm install uuid
 cd %YADAMU_HOME%
 cd mssql/node
 rmdir /s node_modules
@@ -20,4 +21,4 @@ cd %YADAMU_HOME%
 cd mariadb/node
 rmdir /s node_modules
 call npm install mariadb
-cd $YADAMU_HOME
+cd %YADAMU_HOME%

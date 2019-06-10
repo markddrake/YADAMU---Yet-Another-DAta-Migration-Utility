@@ -139,7 +139,7 @@ class DBReader extends Readable {
            const metadata = await this.getMetadata();
            this.push({metadata: metadata});
            this.nextPhase = 'table';
-           break;
+           break;   
          case 'table' :
            if (this.mode !== 'DDL_ONLY') {
              if (this.schemaInfo.length > 0) {
@@ -148,6 +148,7 @@ class DBReader extends Readable {
                break;
              }
            }
+           await this.dbi.exportComplete();
            this.push(null);
            break;
          case 'data' :

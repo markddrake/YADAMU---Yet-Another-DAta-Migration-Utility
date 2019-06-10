@@ -157,6 +157,27 @@ class YadamuDBI {
     this.systemInformation = systemInformation
   }
   
+  patchMetadata() {
+    
+    const tables = Object.keys(this.metadata)
+    tables.forEach(function(table) {
+      const tableMappings = this.tableMappings[table]
+      if (tableMappings) {
+        this.metadata[table].tableName = tableMappings.tableName
+        if (tableMappings.columns) {
+          const columns = JSON.parse('[' + this.metadata[table].columns + ']');
+          Object.keys(tableMappings.columns).forEach(function(columnName) {
+            const idx = columns.indexOf(columnName);
+            if (idx > -1) {
+              columns[idx] = tableMappings.columns[columnName]                
+            }
+          },this);
+          this.metadata[table].columns = '"' + columns.join('","') + '"';
+        }
+      }   
+    },this);   
+  }
+  
   setMetadata(metadata) {
     this.metadata = metadata
   }
@@ -197,6 +218,20 @@ class YadamuDBI {
     this.tableInfo  = undefined;
     this.insertMode = 'Empty';
     this.skipTable = true;
+
+    this.tableMappings = {
+      "ProductModelProductDescriptionCulture" : {
+        "tableName" : "ProductModelPDC"
+      },
+      "FactAdditionalInternationalProductDescription" : {
+        "tableName" : "FactAdditionalIPD"
+      },
+      "DimEmployee" : {
+        "tableName" : "DimEmployee",
+        "columns" : { "ParentEmployeeNationalIDAlternateKey" : "ParentEmployeeNationalID" }
+      }
+    }    
+   
   }
   
   /*  
@@ -348,7 +383,12 @@ class YadamuDBI {
   async finalizeDataLoad() {
     throw new Error('Unimplemented Method')
   }  
+  
+  async exportComplete() {
+  }
 
+  async importComplete() {
+  }
 }
 
 module.exports = YadamuDBI

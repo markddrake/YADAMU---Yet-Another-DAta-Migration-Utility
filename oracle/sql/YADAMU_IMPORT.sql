@@ -37,7 +37,7 @@ as
   C_IGNOREABLE       CONSTANT VARCHAR2(32) := 'IGNORE';
   C_XLARGE_CONTENT   CONSTANT VARCHAR2(32) := 'CONTENT_TOO_LARGE';
 
-  TYPE T_RESULTS_CACHE is VARRAY(2147483647) of CLOB;
+  TYPE T_RESULTS_CACHE is TABLE of CLOB;
   RESULTS_CACHE        T_RESULTS_CACHE := T_RESULTS_CACHE();
   
   TYPE TABLE_INFO_RECORD is RECORD (
@@ -66,10 +66,14 @@ $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
   procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'));
   function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
   function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB') return TABLE_INFO_RECORD;
+--
+$ELSE
+--
+  function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMNS_XML XMLTYPE, P_DATA_TYPES_XML XMLTYPE, P_SIZE_CONSTRAINTS_XML XMLTYPE, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB') return TABLE_INFO_RECORD;
+--
+$END  
+--
   function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
---
-$END
---
   function SET_CURRENT_SCHEMA(P_TARGET_SCHEMA VARCHAR2) return CLOB;
   
   function DISABLE_CONSTRAINTS(P_TARGET_SCHEMA VARCHAR2) return CLOB;
@@ -87,6 +91,8 @@ end;
 set TERMOUT on
 --
 show errors
+--
+set define off
 --
 @@SET_TERMOUT
 --
@@ -179,7 +185,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
 $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
-  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
@@ -236,11 +242,11 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
 $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
-  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
-                                                'dll',
+                                                'ddl',
                                                 YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                                   YADAMU_UTILITIES.KVP_TABLE(
                                                     YADAMU_UTILITIES.KVC('sqlStatement',P_DDL_OPERATION),
@@ -260,13 +266,11 @@ $ELSE
   RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                           YADAMU_UTILITIES.KVP_TABLE(
                                              YADAMU_UTILITIES.KVJ(
-                                              'dml',
+                                              'ddl',
                                               YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                                 YADAMU_UTILITIES.KVP_TABLE(
                                                   YADAMU_UTILITIES.KVC('sqlStatement',P_DDL_OPERATION),
-                                                  YADAMU_UTILITIES.KVS('tableName',P_TABLE_NAME),
-                                                  YADAMU_UTILITIES.KVN('rowCount',P_ROW_COUNT),
-                                                  YADAMU_UTILITIES.KVN('tableName',P_ELAPSED_TIME)
+                                                  YADAMU_UTILITIES.KVS('tableName',P_TABLE_NAME)
                                                 )
                                               )
                                             )
@@ -298,7 +302,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
 $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
-  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
@@ -362,7 +366,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
 $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
-  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
@@ -432,7 +436,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
 $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
-  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
@@ -482,7 +486,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
 $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
-  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     RESULTS_CACHE(RESULTS_CACHE.count) := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                             YADAMU_UTILITIES.KVP_TABLE(
                                               YADAMU_UTILITIES.KVJ(
@@ -536,7 +540,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
 $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
-  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     declare
       V_CURSOR SYS_REFCURSOR;
     begin
@@ -551,10 +555,27 @@ exception
 $END
 --
 $ELSE
---
-  V_RESULTS := YADAMU_UTILITIES.JSON_ARRAYAGG_CLOB();
-  RESULTS_CACHE := T_RESULTS_CACHE();
-  return V_RESULTS;
+-- 
+   declare
+     V_JSON_ARRAY_TABLE YADAMU_UTILITIES.JSON_ARRAY_TABLE;
+   begin
+     /*
+     ### ORA-21700: object does not exist or is marked for delete 
+     select * 
+       bulk collect into V_JSON_ARRAY_TABLE
+       from table(RESULTS_CACHE);  
+     */
+     V_JSON_ARRAY_TABLE := YADAMU_UTILITIES.JSON_ARRAY_TABLE();
+     if (RESULTS_CACHE.count > 0) then
+       V_JSON_ARRAY_TABLE.extend(RESULTS_CACHE.count);
+       for i in RESULTS_CACHE.first .. RESULTS_CACHE.last loop
+         V_JSON_ARRAY_TABLE(i) := RESULTS_CACHE(i);
+       end loop;
+     end if;
+     V_RESULTS := YADAMU_UTILITIES.JSON_ARRAYAGG_CLOB(V_JSON_ARRAY_TABLE);
+     RESULTS_CACHE := T_RESULTS_CACHE();
+     return V_RESULTS;
+   end;
 --
 $END
 --
@@ -590,7 +611,7 @@ begin
            return 'NUMBER(10,4)';
         -- binary numbers
         when P_DATA_TYPE = 'real' then
-           return 'BINARY_FLOAT';
+           return 'BINARY_FLOAT';       
         when P_DATA_TYPE = 'float' then
            return 'BINARY_DOUBLE';
         -- date /time data types
@@ -793,6 +814,13 @@ end;
 $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN 
 --
 function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB')
+--
+$ELSE
+--
+function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMNS_XML XMLTYPE, P_DATA_TYPES_XML XMLTYPE, P_SIZE_CONSTRAINTS_XML XMLTYPE, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB')
+--            
+$END       
+--
 return TABLE_INFO_RECORD
 as
   CURSOR generateStatementComponents
@@ -836,15 +864,28 @@ as
              else 
                NULL 
            end "TYPE_NAME"
+$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN 
+--
          from JSON_TABLE('[' || P_COLUMN_LIST || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') c
              ,JSON_TABLE(P_DATA_TYPE_ARRAY,'$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') t
              ,JSON_TABLE(P_SIZE_CONSTRAINTS,'$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') s
+--
+$ELSE
+--
+         from XMLTABLE('/columns/column'     passing  P_COLUMNS_XML COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') c
+             ,XMLTABLE('/dataTypes/dataType' passing P_DATA_TYPES_XML COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') t
+             ,XMLTABLE('/sizeConstraints/sizeConstraint' passing P_SIZE_CONSTRAINTS_XML COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') s
+---            
+$END       
+--
         where (c."KEY" = t."KEY") and (c."KEY" = s."KEY")
   ),
   "TARGET_TABLE_DEFINITIONS" 
   as (
     select st.*
-          ,MAP_FOREIGN_DATATYPE(P_SOURCE_VENROR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
+          ,MAP_FOREIGN_DATATYPE(P_SOURCE_VENROR,"DATA_TYPE",
+"DATA_TYPE_LENGTH",
+"DATA_TYPE_SCALE") TARGET_DATA_TYPE
           ,case
              -- Probe rather than Join since most rows are not objects.
              when (TYPE_NAME is not null) then
@@ -1029,9 +1070,19 @@ as
            -- Type Exist is NULL.
            when TARGET_DATA_TYPE = 'GEOMETRY' then
              '"MDSYS"."SDO_GEOMETRY"'
+           --
            when TARGET_DATA_TYPE = 'JSON' then 
              -- BLOB results in Error: ORA-40479: internaly JSON serializer error during export operations.
+             $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
+             --
              'CLOB CHECK ("' || COLUMN_NAME || '" IS JSON)'
+             --
+             $ELSE
+             --
+             'CLOB'
+             --
+             $END
+             --
            when TARGET_DATA_TYPE = 'BOOLEAN' then 
              'RAW(1)'
            when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID','BINARY_FLOAT','BINARY_DOUBLE') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE like '% TIME ZONE') or (TARGET_DATA_TYPE LIKE '%(%)') then 
@@ -1184,9 +1235,36 @@ end;';
   V_RESULTS           TABLE_INFO_RECORD;
   
   V_EXISTING_TABLE    PLS_INTEGER := 0; 
+
+-- In 12.1 and later P_COLUMN_LIST is a parameter. In 11.2 it is replaced by P_COLUMNS an XMLTYPE collection that needs to converted into a quoted, comma seperated list using QUERY
+
+$IF NOT JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN 
+--
+  P_COLUMN_LIST CLOB;
+  P_DATA_TYPE_ARRAY CLOB;
+  P_SIZE_CONSTRAINTS CLOB;
 begin
 
-  DBMS_LOB.CREATETEMPORARY(V_DML_STATEMENT,TRUE,DBMS_LOB.SESSION);
+select XMLCAST(XMLQUERY('fn:string-join(for $c in /columns/column return concat("&quot;",$c/text(),"&quot;"),",
+")' passing P_COLUMNS_XML returning CONTENT) as CLOB)
+    into P_COLUMN_LIST
+    from dual;
+select XMLCAST(XMLQUERY('concat("[",fn:string-join(for $c in /columns/column return concat("&quot;",$c/text(),"&quot;"),",
+"),"]")' passing P_DATA_TYPES_XML returning CONTENT) as CLOB)
+    into P_DATA_TYPE_ARRAY
+    from dual;
+select XMLCAST(XMLQUERY('concat("[",fn:string-join(for $c in /columns/column return concat("&quot;",$c/text(),"&quot;"),",
+"),"]")' passing P_SIZE_CONSTRAINTS_XML returning CONTENT) as CLOB)
+    into P_SIZE_CONSTRAINTS
+    from dual;
+---
+$ELSE
+--
+begin
+--
+$END
+--
+  DBMS_LOB.CREATETEMPORARY(V_DML_STATEMENT,TRUE,DBMS_LOB.SESSION);  
 --
   $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
 --
@@ -1252,11 +1330,16 @@ begin
     DBMS_LOB.APPEND(V_DDL_STATEMENT,V_COLUMNS_CLAUSE);
     V_SQL_FRAGMENT := ')';
     DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
+    -- 
+    $IF (NOT DBMS_DB_VERSION.VER_LE_11_2) $THEN
+    --
     if (P_XMLTYPE_STORAGE_MODEL = 'CLOB') then      
-    V_SQL_FRAGMENT := ')';
       DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(YADAMU_UTILITIES.C_NEWLINE),YADAMU_UTILITIES.C_NEWLINE);
       DBMS_LOB.APPEND(V_DDL_STATEMENT,V_XML_STORAGE_CLAUSE);
     end if;
+    --
+    $END
+    --
     V_SQL_FRAGMENT := C_CREATE_TABLE_BLOCK2;
     DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   end if;
@@ -1297,8 +1380,6 @@ exception
     LOG_ERROR(C_FATAL_ERROR,'YADAMU_IMPORT.GENERATE_STATEMENTS()',NULL,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
     raise;
 end;
---
-$END
 --
 procedure SET_CURRENT_SCHEMA(P_TARGET_SCHEMA VARCHAR2)
 as
@@ -1518,19 +1599,19 @@ as
    where TABLE_NAME is not NULL;
    
    V_NOTHING_DONE BOOLEAN := TRUE;
+   V_ABORT_DATALOAD  BOOLEAN := FALSE;
 begin
   -- LOG_INFO(JSON_OBJECT('startTime' value SYSTIMESTAMP, 'includeData' value G_INCLUDE_DATA, 'includeDDL' value G_INCLUDE_DDL));
   
   SET_CURRENT_SCHEMA(P_TARGET_SCHEMA);
 
   if (G_INCLUDE_DDL) then
-    YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS(P_JSON_DUMP_FILE,P_TARGET_SCHEMA);
+    V_ABORT_DATALOAD := YADAMU_EXPORT_DDL.IMPORT_DDL_STATEMENTS(P_JSON_DUMP_FILE,JSON_VALUE(P_JSON_DUMP_FILE, '$.systemInformation.schema' returning VARCHAR2),P_TARGET_SCHEMA);
   end if;
 
+  if ((NOT V_ABORT_DATALOAD) and G_INCLUDE_DATA) then
 
-  if (G_INCLUDE_DATA) then
-
-  DISABLE_CONSTRAINTS(P_TARGET_SCHEMA) ;
+    DISABLE_CONSTRAINTS(P_TARGET_SCHEMA) ;
 
     for o in operationsList loop
       V_NOTHING_DONE := FALSE;
@@ -1592,13 +1673,15 @@ begin
     ENABLE_CONSTRAINTS(P_TARGET_SCHEMA);
     REFRESH_MATERIALIZED_VIEWS(P_TARGET_SCHEMA);
 
-    end if;
+  end if;
   SET_CURRENT_SCHEMA(V_CURRENT_SCHEMA);
 exception
   when OTHERS then
     SET_CURRENT_SCHEMA(V_CURRENT_SCHEMA);
     RAISE;
 end;
+--
+$END
 --
 function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
 return CLOB
@@ -1621,6 +1704,8 @@ as
     into V_RESULTS
   */
   select ROWNUM, TABLE_NAME, VENDOR, OWNER, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS
+$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
+--
     from JSON_TABLE(
            P_METADATA,
            '$'           
@@ -1646,6 +1731,23 @@ as
              )
            )
          )
+--         
+$ELSE
+--
+  from XMLTABLE(
+          '/metadata/table'
+          passing XMLTYPE(P_METADATA,nls_charset_id('AL32UTF8'))
+          COLUMNS
+            VENDOR                       VARCHAR2(128)             PATH '/table/vendor'
+          , OWNER                        VARCHAR2(128)             PATH '/table/owner'
+          , TABLE_NAME                   VARCHAR2(128)             PATH '/table/tableName'
+          , COLUMN_LIST                        XMLTYPE             PATH '/table/columns'
+          , DATA_TYPE_ARRAY                    XMLTYPE             PATH '/table/dataTypes' 
+          , SIZE_CONSTRAINTS                   XMLTYPE             PATH '/table/sizeConstraints'
+       )             
+--
+$END
+--
    where TABLE_NAME is not NULL;
 
 begin
@@ -1681,7 +1783,7 @@ begin
     $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
     --   
     exception
-      when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+      when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
         V_TABLE_INFO_JSON := YADAMU_UTILITIES.JSON_OBJECT_CLOB(
                                YADAMU_UTILITIES.KVP_TABLE(
                                  YADAMU_UTILITIES.KVC('ddl',V_TABLE_INFO.DDL),
@@ -1707,8 +1809,6 @@ begin
    DBMS_LOB.WRITEAPPEND(V_RESULTS,1,'}');
    return V_RESULTS;  
 end;
---
-$END
 --
 $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
@@ -1784,40 +1884,62 @@ as
   TABLE_NOT_FOUND EXCEPTION;
   PRAGMA EXCEPTION_INIT( TABLE_NOT_FOUND , -00942 );
 
+  V_HASH_METHOD NUMBER := 0;
+  
   cursor getTableList
   is
   select aat.TABLE_NAME
         ,LISTAGG(
-		   case 
-             when (DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"') then
-               'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.FROMWKTGEOMETRY("' || COLUMN_NAME || '"),getCyptoHash) end'
-		     when DATA_TYPE = 'BFILE' then
-			   'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || COLUMN_NAME || '") end' 
-		     when DATA_TYPE = 'XMLTYPE' then
-		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT "' || COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),getCyptoHash) end' 
-			 when DATA_TYPE in ('BLOB')  then
-		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH("' || COLUMN_NAME || '",getCyptoHash) end'
+           case 
+             when ((V_HASH_METHOD < 0) and DATA_TYPE in ('SDO_GEOMETRY','XMLTYPE','ANYDATA','BLOB','CLOB','NCLOB')) then
+    		   NULL
+             when DATA_TYPE = 'BFILE' then
+	           'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || COLUMN_NAME || '") end' 
+		     when (DATA_TYPE = 'SDO_GEOMETRY') then
+               'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.FROMWKTGEOMETRY("' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end'
+             when DATA_TYPE = 'XMLTYPE' then
+		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT "' || COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end' 
+		     when DATA_TYPE = 'ANYDATA' then
+		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end' 
+		     when DATA_TYPE in ('BLOB')  then
+   		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH("' || COLUMN_NAME || '",' || V_HASH_METHOD || ') end'
 			 when DATA_TYPE in ('CLOB','NCLOB')  then
-		       'case when "' || COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH("' || COLUMN_NAME || '",getCyptoHash) end'
+		        'case when "' || COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH("' || COLUMN_NAME || '",' || V_HASH_METHOD || ') end'
              else
-			   '"' || COLUMN_NAME || '"'
+	     	   '"' || COLUMN_NAME || '"'
 		   end,
 		',') 
 		 WITHIN GROUP (ORDER BY INTERNAL_COLUMN_ID, COLUMN_NAME) COLUMN_LIST
+        ,LISTAGG(
+           case 
+             when ((V_HASH_METHOD < 0) and DATA_TYPE in ('"MDSYS"."SDO_GEOMETRY"','XMLTYPE','BLOB','CLOB','NCLOB')) then
+    		   '"' || COLUMN_NAME || '"'
+             else 
+               NULL
+		   end,
+		',') 
+		 WITHIN GROUP (ORDER BY INTERNAL_COLUMN_ID, COLUMN_NAME) LOB_COLUMN_LIST
   from ALL_ALL_TABLES aat
        inner join ALL_TAB_COLS atc
-	         on atc.OWNER = aat.OWNER
-	        and atc.TABLE_NAME = aat.TABLE_NAME
+	           on atc.OWNER = aat.OWNER
+	          and atc.TABLE_NAME = aat.TABLE_NAME
        left outer join ALL_TYPES at
 	                on at.TYPE_NAME = atc.DATA_TYPE
                    and at.OWNER = atc.DATA_TYPE_OWNER
 	   left outer join ALL_MVIEWS amv
 		            on amv.OWNER = aat.OWNER
 		           and amv.MVIEW_NAME = aat.TABLE_NAME    
+       $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+       left outer join ALL_EXTERNAL_TABLES axt
+	                on axt.OWNER = aat.OWNER
+	               and axt.TABLE_NAME = aat.TABLE_NAME
+       $END
  where aat.STATUS = 'VALID'
    and aat.DROPPED = 'NO'
    and aat.TEMPORARY = 'N'
-$IF NOT DBMS_DB_VERSION.VER_LE_11_2 $THEN
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+   and axt.TYPE_NAME is NULL
+$ELSE
    and aat.EXTERNAL = 'NO'
 $END
    and aat.NESTED = 'NO'
@@ -1831,7 +1953,7 @@ $END
 		((aat.TABLE_TYPE = 'XMLTYPE') and (COLUMN_NAME in ('ACLOID', 'OWNERID')))
        )
 	and aat.OWNER = P_SOURCE_SCHEMA
-    and ((TYPECODE is NULL) or (TYPE_NAME = 'XMLTYPE'))
+    and ((TYPECODE is NULL) or (at.TYPE_NAME = 'XMLTYPE'))
   group by aat.TABLE_NAME;
   
   V_SQL_STATEMENT     CLOB;
@@ -1840,6 +1962,25 @@ $END
   V_SQLERRM           VARCHAR2(4000);
 begin
   
+  -- Use EXECUTE IMMEDIATE to get the HASH Method Code so we do not get a compile error if accesss has not been granted to DBMS_CRYPTO
+
+  begin
+    --
+    $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
+    --
+    execute immediate 'begin :1 := DBMS_CRYPTO.HASH_SH256; end;'  using OUT V_HASH_METHOD;
+    --
+    $ELSE
+    --
+    execute immediate 'begin :1 := DBMS_CRYPTO.HASH_MD5; end;'  using OUT  V_HASH_METHOD;
+    --
+    $END
+    --
+  exception
+    when OTHERS then
+      V_HASH_METHOD := -1;
+  end;
+
   begin
     execute immediate 'truncate table "SCHEMA_COMPARE_RESULTS"';
   exception
@@ -1848,11 +1989,18 @@ begin
     when others then  
       RAISE;
   end;
+
    
   for t in getTableList loop
-    V_SQL_STATEMENT := 'insert /*+ WITH_PLSQL */ into SCHEMA_COMPARE_RESULTS ' || YADAMU_UTILITIES.C_NEWLINE
-                    || 'with'|| YADAMU_UTILITIES.C_NEWLINE
-					|| 'function getCyptoHash return number as begin return DBMS_CRYPTO.hash_sh256; end;'|| YADAMU_UTILITIES.C_NEWLINE
+
+    if ((V_HASH_METHOD < 0) and (t.LOB_COLUMN_LIST is not NULL)) then
+      V_SQLERRM := '''Warning : Package DBMS_CRYPTO is required to compare the following columns: ' || t.LOB_COLUMN_LIST || '.''';
+    else
+      -- Not a TYPO: NULL is a string in this case.
+      V_SQLERRM := 'NULL';
+    end if;
+
+    V_SQL_STATEMENT := 'insert into SCHEMA_COMPARE_RESULTS ' || YADAMU_UTILITIES.C_NEWLINE
                     || ' select ''' || P_SOURCE_SCHEMA  || ''' ' || YADAMU_UTILITIES.C_NEWLINE
                     || '       ,''' || P_TARGET_SCHEMA  || ''' ' || YADAMU_UTILITIES.C_NEWLINE
                     || '       ,'''  || t.TABLE_NAME || ''' ' || YADAMU_UTILITIES.C_NEWLINE
@@ -1860,8 +2008,9 @@ begin
                     || '       ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || YADAMU_UTILITIES.C_NEWLINE
                     || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || YADAMU_UTILITIES.C_NEWLINE
                     || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,null' || YADAMU_UTILITIES.C_NEWLINE
+                    || '       ,' || V_SQLERRM  || YADAMU_UTILITIES.C_NEWLINE
 					|| '  from dual';
+                    
 	begin
 	  EXECUTE IMMEDIATE V_SQL_STATEMENT;
     exception 
@@ -1895,6 +2044,8 @@ end;
 end;
 /
 set TERMOUT on
+--
+set define on
 --
 show errors
 --

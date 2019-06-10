@@ -487,27 +487,41 @@ as
   V_COUNT     NUMBER;
   V_TYPECODE  VARCHAR2(32);
 begin
-  select TYPECODE
-    into V_TYPECODE
-    from TABLE(P_TYPE_LIST)
-   where OWNER = P_OWNER and TYPE_NAME = P_TYPE_NAME;
-   return V_TYPECODE;
-exception
-  when NO_DATA_FOUND then
-    select ATTRIBUTES, TYPECODE
-      into V_COUNT, V_TYPECODE
-      from ALL_TYPES
-     where OWNER = P_OWNER
-       and TYPE_NAME = P_TYPE_NAME;
-
-    P_TYPE_LIST.extend();
-    P_TYPE_LIST(P_TYPE_LIST.count).OWNER := P_OWNER;
-    P_TYPE_LIST(P_TYPE_LIST.count).TYPE_NAME := P_TYPE_NAME;
-    P_TYPE_LIST(P_TYPE_LIST.count).ATTR_COUNT := V_COUNT;
-    P_TYPE_LIST(P_TYPE_LIST.count).TYPECODE := V_TYPECODE;
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  -- ### AVOID ORA-21700 with TABLE operator and Lin 11.2
+  if (P_TYPE_LIST.count > 0) then
+    for i in P_TYPE_LIST.first .. P_TYPE_LIST.last loop
+      if ((P_TYPE_LIST(i).OWNER = P_OWNER) and (P_TYPE_LIST(i).TYPE_NAME = P_TYPE_NAME)) then
+        return P_TYPE_LIST(i).TYPECODE;
+      end if;
+    end loop;
+  end if;
+$ELSE
+  begin
+    select TYPECODE
+      into V_TYPECODE
+      from TABLE(P_TYPE_LIST)
+     where OWNER = P_OWNER and TYPE_NAME = P_TYPE_NAME;
     return V_TYPECODE;
- when OTHERS then
-   RAISE;
+  exception
+    when NO_DATA_FOUND then
+      NULL;
+    when OTHERS then
+      RAISE;
+  end;
+$END
+  select ATTRIBUTES, TYPECODE
+    into V_COUNT, V_TYPECODE
+    from ALL_TYPES
+   where OWNER = P_OWNER
+     and TYPE_NAME = P_TYPE_NAME;
+
+  P_TYPE_LIST.extend();
+  P_TYPE_LIST(P_TYPE_LIST.count).OWNER := P_OWNER;
+  P_TYPE_LIST(P_TYPE_LIST.count).TYPE_NAME := P_TYPE_NAME;
+  P_TYPE_LIST(P_TYPE_LIST.count).ATTR_COUNT := V_COUNT;
+  P_TYPE_LIST(P_TYPE_LIST.count).TYPECODE := V_TYPECODE;
+  return V_TYPECODE;
 end;
 --
 function serializeAttr(P_ATTR_NAME VARCHAR2, P_ATTR_TYPE_OWNER VARCHAR2, P_ATTR_TYPE_NAME VARCHAR2, P_ATTR_TYPE_MOD VARCHAR2, P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)

@@ -3,7 +3,7 @@ const fs = require('fs');
 const Readable = require('stream').Readable;
 const Writable = require('stream').Writable;
 const Transform = require('stream').Transform;
-
+const uuidv1 = require('uuid/v1');
 /* 
 **
 ** Require Database Vendors API 
@@ -19,6 +19,7 @@ const FileParser = require('../../file/node/fileParser.js');
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
+const StatementGenerator11 = require('./statementGenerator11.js');
 
 const defaultParameters = {
   BATCHSIZE         : 10000
@@ -162,8 +163,10 @@ begin
     DBMS_METADATA.SET_TRANSFORM_PARAM(V_HDL_TRANSFORM,'REF_CONSTRAINTS',false,'TABLE');
 
     -- Exclude XML Schema Info. XML Schemas need to come first and are handled in the previous section
-
     DBMS_METADATA.SET_FILTER(V_HDL_OPEN,'EXCLUDE_PATH_EXPR','=''XMLSCHEMA''');
+
+    -- Exclude Statisticstype
+    DBMS_METADATA.SET_FILTER(V_HDL_OPEN,'EXCLUDE_PATH_EXPR','=''STATISTICS''');
 
     loop
       -- Get the next batch of DDL_STATEMENTS. Each batch may contain zero or more spaces.
@@ -353,9 +356,19 @@ const sqlTableInfo =
 `select * 
    from table(YADAMU_EXPORT.GET_DML_STATEMENTS(:schema))`;
 
-`select * 
-   from table(YADAMU_EXPORT.GET_DML_STATEMENTS(:schema))`;
+const sqlDropWrapper = `declare
+  OBJECT_NOT_FOUND EXCEPTION;
+  PRAGMA EXCEPTION_INIT( OBJECT_NOT_FOUND , -4043 );
+begin
+  execute immediate 'DROP FUNCTION ":1:".":2:"';
+exception
+  when OBJECT_NOT_FOUND then
+    NULL;
+  when others then
+    RAISE;
+end;`
 
+  
 class OracleDBI extends YadamuDBI {
 
   /*
@@ -380,33 +393,39 @@ class OracleDBI extends YadamuDBI {
     }
   }     
 
-  lobFromJSON(json) {
-  
-    const s = new Readable();
-    s.push(JSON.stringify(json));
-    s.push(null);
-   
-    return OracleDBI.lobFromStream(this.connection,s);
-  };
+  lobFromStream (stream) {
     
-  static lobFromStream (conn,inStream) {
+    const conn = this.connection;
 
     return new Promise(async function(resolve,reject) {
       const tempLob =  await conn.createLob(oracledb.BLOB);
       tempLob.on('error',function(err) {reject(err);});
       tempLob.on('finish', function() {resolve(tempLob);});
-      inStream.on('error', function(err) {reject(err);});
-      inStream.pipe(tempLob);  // copies the text to the temporary LOB
+      stream.on('error', function(err) {reject(err);});
+      stream.pipe(tempLob);  // copies the text to the temporary LOB
     });  
   };
-  
-  lobFromFile (conn,filename) {
-     const inStream = fs.createReadStream(filename);
-     return OracleDBI.lobFromStream(conn,inStream);
+
+  lobFromFile (filename) {
+     const stream = fs.createReadStream(filename);
+     return this.lobFromStream(stream);
   };
   
-  trackClobFromStringReader(conn,s,list) {
+  lobFromString(string) {
+    const stream = new Readable();
+    stream.push(string);
+    stream.push(null);
+    return this.lobFromStream(stream);
+  };
+
+  async lobFromJSON(json) { 
+    return this.lobFromString(JSON.stringify(json))
+  };
       
+  trackClobFromStringReader(s,list) {
+      
+    const conn = this.connection;
+    
     return new Promise(async function(resolve,reject) {
       try {
         const tempLob = await conn.createLob(oracledb.CLOB);
@@ -427,7 +446,7 @@ class OracleDBI extends YadamuDBI {
     s.push(str);
     s.push(null);
 
-    return this.trackClobFromStringReader(this.connection,s,list);
+    return this.trackClobFromStringReader(s,list);
     
   }
      
@@ -487,12 +506,19 @@ class OracleDBI extends YadamuDBI {
     }
     result = await conn.execute(sqlStatement);
     
-    sqlStatement = `BEGIN :size := JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE; END;`;
-    const args = {size:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER}}
+    sqlStatement = `BEGIN :version := YADAMU_EXPORT.DATABASE_RELEASE(); END;`;
+    let args = {version:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER}}
     if (status.sqlTrace) {
        status.sqlTrace.write(`${sqlStatement}\n/\n`);
     }
-    
+    result = await conn.execute(sqlStatement,args);
+    this.dbVersion = result.outBinds.version;
+
+    sqlStatement = `BEGIN :size := JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE; END;`;
+    args = {size:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER}}
+    if (status.sqlTrace) {
+       status.sqlTrace.write(`${sqlStatement}\n/\n`);
+    }
     result = await conn.execute(sqlStatement,args);
     this.maxStringSize = result.outBinds.size;
     
@@ -533,11 +559,14 @@ class OracleDBI extends YadamuDBI {
   };
 
   processLog(results) {
-    const log = JSON.parse(results.outBinds.log);
-    if (log !== null) {
+    if (results.outBinds.log !== null) {
+      const log = JSON.parse(results.outBinds.log.replace(/\\r/g,'\\n'));
       super.processLog(log, this.status, this.logWriter)
+      return log
     }
-    return log
+    else {
+      return null
+    }
   }
 
   async setCurrentSchema(schema) {
@@ -618,6 +647,12 @@ class OracleDBI extends YadamuDBI {
     super(yadamu,defaultParameters);
     this.ddl = [];
     this.systemInformation = undefined;
+    this.dbVersion = undefined;
+    this.maxStringSize = undefined;
+    const sqlUUID = Buffer.alloc(16);
+    uuidv1({},sqlUUID,0);
+    this.exportWrapper = `YEXP_${sqlUUID.toString('base64')}`;
+    this.importWrapper = `YIMP_${sqlUUID.toString('base64')}`;
   }
 
   getConnectionProperties() {
@@ -634,12 +669,12 @@ class OracleDBI extends YadamuDBI {
     }
   }
   
-  async applyDDL(ddl,targetSchema) {
-     
+  async applyDDL(ddl,sourceSchema,targetSchema) {
+      
      await this.setCurrentSchema(this.parameters.TOUSER);
      
      let sqlStatement = `declare V_ABORT BOOLEAN;begin V_ABORT := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENT(:statement,:sourceSchema,:targetSchema); :abort := case when V_ABORT then 1 else 0 end; end;`; 
-     let args = {abort:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER} , statement:{type: oracledb.CLOB, maxSize: LOB_STRING_MAX_LENGTH, val:''}, sourceSchema: this.systemInformation.schema, targetSchema:this.parameters.TOUSER};
+     let args = {abort:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER} , statement:{type: oracledb.CLOB, maxSize: LOB_STRING_MAX_LENGTH, val:null}, sourceSchema:sourceSchema, targetSchema:this.parameters.TOUSER};
      
      for (const ddlStatement of ddl) {
         args.statement.val = ddlStatement
@@ -649,25 +684,31 @@ class OracleDBI extends YadamuDBI {
         }
      }
      
-     sqlStatement = `begin :log := YADAMU_EXPORT_DDL.FETCH_DLL_RESULTS(); end;`; 
+     sqlStatement = `begin :log := YADAMU_EXPORT_DDL.GENERATE_LOG(); end;`; 
      args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}};
      const results = await this.executeSQL(sqlStatement,args);   
      await this.setCurrentSchema(this.connectionProperties.user);
      return this.processLog(results);
   }
 
+  async convertDDL2XML(ddlStatements) {
+    const ddl = ddlStatements.map(function(ddlStatement){ return `<ddl>${ddlStatement.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\r/g,'\n')}</ddl>`},this).join('\n')
+    return this.lobFromString(`<ddlStatements>\n${ddl}\n</ddlStatements>`);
+  }
 
+  
   async executeDDL(ddl) {
-
+      
     if ((this.maxStringSize < 32768) && (this.statementTooLarge(ddl))) {
       // DDL statements are too large send for server based execution (JSON Extraction will fail)
-      await this.applyDDL(ddl);
+      await this.applyDDL(ddl,this.systemInformation.schema,this.parameters.TOUSER);
     }
     else {
       // ### OVERRIDE ### - Send Set of DDL operations to the server for execution   
-      const sqlStatement = `begin :log := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS(:ddl, :schema); end;`;
-      const ddlLob = await this.lobFromJSON({ systemInformation : this.systemInformation, ddl : ddl});  
-      const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH} , ddl:ddlLob, schema:this.parameters.TOUSER};
+      const sqlStatement = `begin :log := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS(:ddl,:sourceSchema,:targetSchema); end;`;
+      const ddlLob = await (this.dbVersion < 12 ? this.convertDDL2XML(ddl) : this.lobFromJSON({ddl : ddl}))
+     
+      const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH} , ddl:ddlLob, sourceSchema:this.systemInformation.schema, targetSchema:this.parameters.TOUSER};
       const results = await this.executeSQL(sqlStatement,args);
       await ddlLob.close();
       const log = this.processLog(results)
@@ -746,22 +787,22 @@ class OracleDBI extends YadamuDBI {
   async uploadFile(importFilePath) {
       
      if (this.maxStringSize > 32767) {
-       const json = await this.lobFromFile(this.connection,importFilePath);
+       const json = await this.lobFromFile(importFilePath);
        return json;
      }
      else {
          
-       // Need to cature the SystemInformation and DLL objects of the export file to make sure the DLL can be processed on the RDBMS.
+       // Need to cature the SystemInformation and DDL objects of the export file to make sure the DDL can be processed on the RDBMS.
        // If any DDL statement exceeds maxStringSize then DDL will have to executed statement by statement from the client
        // 'Tee' the input stream used to create the temporary lob that contains the export file and pass it through the Sax Parser.
-       // If any of the DDL operations exceed the maxium string size supported by server side JSON operations cache the dll statements on the client
+       // If any of the DDL operations exceed the maxium string size supported by server side JSON operations cache the ddl statements on the client
        
        const saxParser  = new FileParser(this.logWriter)  
        const ddlCache = new DDLCache();
        saxParser.pipe(ddlCache);
        const inputStream = fs.createReadStream(importFilePath);         
        const multiplexor = new Multiplexor(saxParser,ddlCache)
-       const jsonTempLob = await OracleDBI.lobFromStream(this.connection,inputStream.pipe(multiplexor))
+       const jsonTempLob = await this.lobFromStream(inputStream.pipe(multiplexor))
        const ddl = ddlCache.getDDL();
        if ((ddl.length > 0) && this.statementTooLarge(ddl)) {
          this.ddl = ddl
@@ -859,16 +900,12 @@ class OracleDBI extends YadamuDBI {
   
   async getDDLOperations() {
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlFetchDDL}\n\/\n`)
-    }
-
     let ddl;
     let results;
     let bindVars
-        
+    
     switch (true) {
-      case this.systemInformation.databaseVersion < 12.2:
+      case this.dbVersion < 12.2:
         /*
         **
         ** The pipelined table approach used by YADAMU_EXPORT_DDL appears to fail starting with release 19c. 
@@ -877,10 +914,16 @@ class OracleDBI extends YadamuDBI {
         */
       
         bindVars = {v1 : this.parameters.OWNER, v2 : {dir : oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}};
+        if (this.status.sqlTrace) {
+           this.status.sqlTrace.write(`${sqlFetchDDL11g}\n\/\n`)
+        }     
         results = await this.connection.execute(sqlFetchDDL11g,bindVars)
         ddl = JSON.parse(results.outBinds.v2);
         break;
-      case this.systemInformation.databaseVersion < 19:
+      case this.dbVersion < 19:
+        if (this.status.sqlTrace) {
+          this.status.sqlTrace.write(`${sqlFetchDDL}\n\/\n`)
+        }
         results = await this.connection.execute(sqlFetchDDL,{schema: this.parameters.OWNER},{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
         ddl = results.rows.map(function(row) {
           return row.JSON;
@@ -895,6 +938,9 @@ class OracleDBI extends YadamuDBI {
         */
       
         bindVars = {v1 : this.parameters.OWNER, v2 : {dir : oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}};
+        if (this.status.sqlTrace) {
+           this.status.sqlTrace.write(`${sqlFetchDDL19c}\n\/\n`)
+        }     
         results = await this.connection.execute(sqlFetchDDL19c,bindVars)
         ddl = JSON.parse(results.outBinds.v2);
     }
@@ -937,6 +983,12 @@ class OracleDBI extends YadamuDBI {
     return metadata;    
   }  
   
+  createWrapper(withClause) {
+    
+    return `create or replace function "${this.parameters.OWNER}"."${this.exportWrapper}"(P_TABLE_OWNER VARCHAR2,P_ANYDATA ANYDATA)\nreturn CLOB\nas\n${withClause}begin\nreturn SERIALIZE_OBJECT(P_TABLE_OWNER, P_ANYDATA);\nend;`;
+
+  }
+  
   generateSelectStatement(tableMetadata) {
      
     // Generate a conventional relational select statement for this table
@@ -966,7 +1018,16 @@ class OracleDBI extends YadamuDBI {
     query.sqlStatement = `select ${tableMetadata.NODE_SELECT_LIST} from "${tableMetadata.OWNER}"."${tableMetadata.TABLE_NAME}" t`; 
     
     if (tableMetadata.WITH_CLAUSE !== null) {
-       query.sqlStatement = `with\n${tableMetadata.WITH_CLAUSE}\n${query.sqlStatement}`;
+        
+       if (this.dbVersion < 12) {
+         // Cannot use PL/SQL functions in With Clause
+         // Need to wrap them in actual PL/SQL function
+         query.plsqlWrapper = this.createWrapper(tableMetadata.WITH_CLAUSE);
+         query.sqlStatement =  query.sqlStatement.replace(/SERIALIZE_OBJECT\(/g,`"${this.parameters.OWNER}"."${this.exportWrapper}"(`)
+       }
+       else {
+         query.sqlStatement = `with\n${tableMetadata.WITH_CLAUSE}\n${query.sqlStatement}`;
+       }
     }
     
     return query
@@ -980,6 +1041,13 @@ class OracleDBI extends YadamuDBI {
 
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${query.sqlStatement}\n\/\n`)
+    }
+    
+    if ((this.dbVersion < 12) && (query.plsqlWrapper)) {
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(`${query.plsqlWrapper}\n\/\n`)
+      }
+      await this.connection.execute(query.plsqlWrapper)
     }
     
     const is = await this.connection.queryStream(query.sqlStatement,[],{extendedMetaData: true})
@@ -1000,7 +1068,15 @@ class OracleDBI extends YadamuDBI {
   }
   
   async generateStatementCache(schema,executeDDL) {
-    await super.generateStatementCache(StatementGenerator,schema,executeDDL)
+   // Override for LOBCACHESIZE and Import Wrapper
+    let statementGenerator 
+    if (this.dbVersion < 12) {
+      statementGenerator = new StatementGenerator11(this,schema,this.metadata,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE, this.parameters.LOBCACHESIZE, this.importWrapper)
+    }
+    else {
+      statementGenerator = new StatementGenerator(this,schema,this.metadata,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE, this.parameters.LOBCACHESIZE)
+    }
+    this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }
 
   getTableWriter(table) {
@@ -1012,6 +1088,27 @@ class OracleDBI extends YadamuDBI {
     await this.refreshMaterializedViews();
   }  
   
+  async dropWrappers() {
+
+    let sqlStatment = sqlDropWrapper.replace(':1:',this.parameters.OWNER).replace(':2:',this.exportWrapper);
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatment}\n\/\n`)
+    }
+    await this.connection.execute(sqlStatment)
+
+    sqlStatment = sqlDropWrapper.replace(':1:',this.parameters.OWNER).replace(':2:',this.importWrapper);
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatment}\n\/\n`)
+    }
+    await this.connection.execute(sqlStatment)
+  }    
+  
+  async exportComplete() {
+    if (this.dbVersion < 12) {
+      await this.dropWrappers();
+    }      
+  }
+
 }
 
 class DDLCache extends Writable {
@@ -1072,6 +1169,7 @@ class Multiplexor extends Transform {
       done();
     }
   }
+
 }
 
 module.exports = OracleDBI

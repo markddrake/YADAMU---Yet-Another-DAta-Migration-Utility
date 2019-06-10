@@ -1,7 +1,25 @@
 call tests\windows\yadamuTestEnv.bat
 call :INITLOGGING
 @set SCHVER=1
-call %YADAMU_TEST_HOME%\oracle\env\dbConnection.bat
+call %YADAMU_TEST_HOME%\oracle19c\env\dbConnection.bat
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_HOME%\oracle\sql\COMPILE_ALL.sql %YADAMU_LOG_PATH%
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\\oracle\sql\RECREATE_MSSQL_ALL.sql %YADAMU_LOG_PATH% 1 Clarinet
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\oracle\sql\RECREATE_ORACLE_ALL.sql %YADAMU_LOG_PATH% 1 Clarinet DDL_AND_DATA
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\oracle\sql\RECREATE_SCHEMA.sql %YADAMU_LOG_PATH% jtest1 Clarinet
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\oracle\sql\RECREATE_SCHEMA.sql %YADAMU_LOG_PATH% sakila1 Clarinet
+call %YADAMU_TEST_HOME%\oracle18c\env\dbConnection.bat
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_HOME%\oracle\sql\COMPILE_ALL.sql %YADAMU_LOG_PATH%
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\\oracle\sql\RECREATE_MSSQL_ALL.sql %YADAMU_LOG_PATH% 1 Clarinet
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\oracle\sql\RECREATE_ORACLE_ALL.sql %YADAMU_LOG_PATH% 1 Clarinet DDL_AND_DATA
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\oracle\sql\RECREATE_SCHEMA.sql %YADAMU_LOG_PATH% jtest1 Clarinet
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\oracle\sql\RECREATE_SCHEMA.sql %YADAMU_LOG_PATH% sakila1 Clarinet
+call %YADAMU_TEST_HOME%\oracle12c\env\dbConnection.bat
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_HOME%\oracle\sql\COMPILE_ALL.sql %YADAMU_LOG_PATH%
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\\oracle\sql\RECREATE_MSSQL_ALL.sql %YADAMU_LOG_PATH% 1 Clarinet
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\oracle\sql\RECREATE_ORACLE_ALL.sql %YADAMU_LOG_PATH% 1 Clarinet DDL_AND_DATA
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\oracle\sql\RECREATE_SCHEMA.sql %YADAMU_LOG_PATH% jtest1 Clarinet
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\oracle\sql\RECREATE_SCHEMA.sql %YADAMU_LOG_PATH% sakila1 Clarinet
+call %YADAMU_TEST_HOME%\oracle11g\env\dbConnection.bat
 sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_HOME%\oracle\sql\COMPILE_ALL.sql %YADAMU_LOG_PATH%
 sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\\oracle\sql\RECREATE_MSSQL_ALL.sql %YADAMU_LOG_PATH% 1 Clarinet
 sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_TEST_HOME%\oracle\sql\RECREATE_ORACLE_ALL.sql %YADAMU_LOG_PATH% 1 Clarinet DDL_AND_DATA

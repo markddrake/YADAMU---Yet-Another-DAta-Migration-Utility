@@ -36,9 +36,9 @@ function printFileInfo(files) {
     const drift2 = files[1].size - files[2].size;
     
     logFile.write(`| ${files[0].name.padEnd(32)} |`
-                + ` ${drift1 === 0 ? 'SUCCESSFUL'.padStart(12) : 'FAILED'.padStart(12)} |`
+                + ` ${drift1 === 0 ? 'MATCH'.padStart(12) : 'MISMATCH'.padStart(12)} |`
                 + ` ${drift1.toString().replace(regExp, ",").padStart(12)} |`
-                + ` ${drift2 === 0 ? 'SUCCESSFUL'.padStart(12) : 'FAILED'.padStart(12)} |`
+                + ` ${drift2 === 0 ? 'MATCH'.padStart(12) : 'MISMATCH'.padStart(12)} |`
                 + ` ${drift2.toString().replace(regExp, ",").padStart(12)} |`
                 + ` ${files[0].size.toString().replace(regExp, ",").padStart(12)} |`
                 + ` ${files[1].size.toString().replace(regExp, ",").padStart(12)} |`

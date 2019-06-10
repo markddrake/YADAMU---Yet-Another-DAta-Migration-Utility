@@ -22,6 +22,8 @@ spool &LOGDIR/install/JSON_FEATURE_DETECTION.log
 --
 create or replace public synonym JSON_FEATURE_DETECTION for JSON_FEATURE_DETECTION
 /
+grant execute on JSON_FEATURE_DETECTION to public
+/
 spool &LOGDIR/install/YADAMU_UTILITIES.log
 --
 @@YADAMU_UTILITIES.sql
@@ -30,9 +32,13 @@ create or replace public synonym YADAMU_UTILITIES for YADAMU_UTILITIES
 /
 spool &LOGDIR/install/OBJECT_SERIALIZATION.log
 --
+grant execute on YADAMU_UTILITIES to public
+/
 @@OBJECT_SERIALIZATION.sql
 --
 create or replace public synonym OBJECT_SERIALIZATION for OBJECT_SERIALIZATION
+/
+grant execute on OBJECT_SERIALIZATION to public
 /
 spool &LOGDIR/install/YADAMU_EXPORT_DDL.log
 --

@@ -12,3 +12,5 @@ call %YADAMU_HOME%\tests\postgres\env\dbConnection.bat
 psql -U %DB_USER% -d %DB_DBNAME% -h %DB_HOST% -a -f %YADAMU_HOME%\postgres\sql\YADAMU_IMPORT.sql > %YADAMU_LOG_PATH%\POSTGRES_YADAMU_IMPORT.log
 call %YADAMU_HOME%\tests\oracle12c\env\dbConnection.bat
 sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_HOME%\oracle\sql\COMPILE_ALL.sql %YADAMU_LOG_PATH%
+call %YADAMU_HOME%\tests\oracle11g\env\dbConnection.bat
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_HOME%\oracle\sql\COMPILE_ALL.sql %YADAMU_LOG_PATH%

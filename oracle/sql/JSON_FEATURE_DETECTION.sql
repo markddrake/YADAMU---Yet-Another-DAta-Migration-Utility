@@ -39,7 +39,7 @@ begin
                          || '  EXTENDED_STRING_SUPPORTED CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
                          || '  TREAT_AS_JSON_SUPPORTED   CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
                          || '  C_RETURN_TYPE             CONSTANT VARCHAR2(32) := ''VARCHAR2(4000)'';' || C_NEWLINE
-                         || '  C_MAX_STRING_SIZE         CONSTANT NUMBER       := 4000;';
+                         || '  C_MAX_STRING_SIZE         CONSTANT NUMBER       := DBMS_LOB.LOBMAXSIZE;';
 --                       
   $ELSIF DBMS_DB_VERSION.VER_LE_12_1 $THEN
 --

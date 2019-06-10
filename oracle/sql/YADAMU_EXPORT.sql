@@ -105,7 +105,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
 --
 $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 exception
-  when YADAMU_UTILITIES.JSON_OVERFLOW or YADAMU_UTILITIES.BUFFER_OVERFLOW then
+  when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     return YADAMU_UTILITIES.JSON_OBJECT_CLOB(
              YADAMU_UTILITIES.KVP_TABLE(
                YADAMU_UTILITIES.KVJ('jsonFeatures',    YADAMU_EXPORT.JSON_FEATURES),
@@ -169,13 +169,13 @@ as
         ,cast(collect('"' || atc.COLUMN_NAME || '"' ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST
 		,cast(collect(
                case 
-$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN               
+                 $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN               
                  when (jc.FORMAT is not NULL) then
                    -- Does not attempt to preserve json storage details
                    -- If storage model fidelity is required then set specify MODE=DDL_AND_DATA on the export command line to include DDL statements to the file.
                    -- If DDL is not included in the file import operations will default to CLOB storage in Oracle 12.1 thru 18c.
                    '"JSON"'
-$END                   
+                 $END                   
                  when (atc.DATA_TYPE like 'TIMESTAMP(%)') then
                    '"TIMESTAMP"'
                  when (DATA_TYPE_OWNER is null) then
@@ -335,19 +335,25 @@ $END
     left outer join ALL_TYPES at
                  on at.TYPE_NAME = atc.DATA_TYPE
                 and at.OWNER = atc.DATA_TYPE_OWNER
+    left outer join ALL_MVIEWS amv
+		         on amv.OWNER = aat.OWNER
+		        and amv.MVIEW_NAME = aat.TABLE_NAME
     $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN               
     left outer join ALL_JSON_COLUMNS jc
                  on jc.COLUMN_NAME = atc.COLUMN_NAME
                 AND jc.TABLE_NAME = atc.TABLE_NAME
                 and jc.OWNER = atc.OWNER
     $END
-    left outer join ALL_MVIEWS amv
-		         on amv.OWNER = aat.OWNER
-		        and amv.MVIEW_NAME = aat.TABLE_NAME
+    $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+    left outer join ALL_EXTERNAL_TABLES axt
+                 on axt.OWNER = aat.OWNER
+	           and axt.TABLE_NAME = aat.TABLE_NAME
+    $END
    where aat.STATUS = 'VALID'
      and aat.DROPPED = 'NO'
      and aat.TEMPORARY = 'N'
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN               
+    and axt.TYPE_NAME is NULL
 $ELSE
      and aat.EXTERNAL = 'NO'
 $END
@@ -374,11 +380,13 @@ $END
 
 begin
 --
-$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
-   select SCHEMA
-     bulk collect into V_SCHEMA_LIST
-	 from JSON_TABLE( P_OWNER_LIST,'$[*]' columns (SCHEMA VARCHAR(128) PATH '$'));
-$END 
+  $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
+--  
+  select SCHEMA
+    bulk collect into V_SCHEMA_LIST
+	from JSON_TABLE( P_OWNER_LIST,'$[*]' columns (SCHEMA VARCHAR(128) PATH '$'));
+--    
+  $END 
 --
    if ((V_SCHEMA_LIST is NULL) or (V_SCHEMA_LIST.count = 0)) then 
      V_SCHEMA_LIST := T_VC4000_TABLE(P_OWNER_LIST);
