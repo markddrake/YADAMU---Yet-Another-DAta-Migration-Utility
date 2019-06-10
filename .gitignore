@@ -1,0 +1,14 @@
+mariadb/node/node_modules
+oracle/node/node_modules
+postgres/node/node_modules
+mysql/node/node_modules
+mssql/node/node_modules
+work
+JSON
+deploy.bat
+tests/WiP
+mariadb/node/package-lock.json
+mssql/node/package-lock.json
+mysql/node/package-lock.json
+oracle/node/package-lock.json
+postgres/node/package-lock.json
