@@ -37,10 +37,10 @@ as
   function SERIALIZE_ANYDATA(P_ANYDATA ANYDATA) return CLOB;
 
   function BLOB2CHUNKS(P_BLOB BLOB) return CLOB;
-  function CHUNKS2BLOB(P_CHUNKED_CLOB CHUNKED_CLOB_T)  return BLOB;
+  function CHUNKS2BLOB(P_CHUNKED_CLOB T_VC4000_TABLE)  return BLOB;
   
   function CLOB2CHUNKS(P_CLOB CLOB) return CLOB ;
-  function CHUNKS2CLOB(P_CHUNKED_CLOB CHUNKED_CLOB_T)  return CLOB;
+  function CHUNKS2CLOB(P_CHUNKED_CLOB T_VC4000_TABLE)  return CLOB;
   
   function SERIALIZE_BLOB_HEX(P_BLOB BLOB) return CLOB;
   function DESERIALIZE_HEX_BLOB(P_SERIALIZATION CLOB) return BLOB;
@@ -186,7 +186,7 @@ is
   V_RAW_DATA       RAW(2000);
 begin
   DBMS_LOB.createTemporary(V_CLOB,TRUE,DBMS_LOB.CALL); 
-  V_CHUNK := 'OBJECT_SERIALIZATION.CHUNKS2BLOB(CHUNKED_CLOB_T(';
+  V_CHUNK := 'OBJECT_SERIALIZATION.CHUNKS2BLOB(T_VC4000_TABLE(';
   DBMS_LOB.WRITEAPPEND(V_CLOB,length(V_CHUNK),V_CHUNK); 
   while (V_OFFSET <= V_BLOB_LENGTH) loop
     V_AMOUNT := C_CHUNK_SIZE;
@@ -202,7 +202,7 @@ begin
   return V_CLOB;
 end;
 --
-function CHUNKS2BLOB(P_CHUNKED_CLOB CHUNKED_CLOB_T)  
+function CHUNKS2BLOB(P_CHUNKED_CLOB T_VC4000_TABLE)  
 return BLOB 
 as 
   V_BLOB BLOB; 
@@ -228,7 +228,7 @@ as
   V_CHUNK        VARCHAR2(4000); 
 begin 
   DBMS_LOB.createTemporary(V_CLOB,TRUE,DBMS_LOB.CALL); 
-  V_CHUNK := 'OBJECT_SERIALIZATION.CHUNKS2CLOB(CHUNKED_CLOB_T(';
+  V_CHUNK := 'OBJECT_SERIALIZATION.CHUNKS2CLOB(T_VC4000_TABLE(';
   DBMS_LOB.WRITEAPPEND(V_CLOB,length(V_CHUNK),V_CHUNK); 
   while (V_OFFSET < V_CLOB_LENGTH) loop 
     V_AMOUNT := C_CHUNK_SIZE - 3; 
@@ -254,7 +254,7 @@ begin
   end if; 
 end;
 --
-function CHUNKS2CLOB(P_CHUNKED_CLOB CHUNKED_CLOB_T)  
+function CHUNKS2CLOB(P_CHUNKED_CLOB T_VC4000_TABLE)  
 return CLOB 
 as 
   V_CLOB CLOB; 
@@ -487,27 +487,41 @@ as
   V_COUNT     NUMBER;
   V_TYPECODE  VARCHAR2(32);
 begin
-  select TYPECODE
-    into V_TYPECODE
-    from TABLE(P_TYPE_LIST)
-   where OWNER = P_OWNER and TYPE_NAME = P_TYPE_NAME;
-   return V_TYPECODE;
-exception
-  when NO_DATA_FOUND then
-    select ATTRIBUTES, TYPECODE
-      into V_COUNT, V_TYPECODE
-      from ALL_TYPES
-     where OWNER = P_OWNER
-       and TYPE_NAME = P_TYPE_NAME;
-
-    P_TYPE_LIST.extend();
-    P_TYPE_LIST(P_TYPE_LIST.count).OWNER := P_OWNER;
-    P_TYPE_LIST(P_TYPE_LIST.count).TYPE_NAME := P_TYPE_NAME;
-    P_TYPE_LIST(P_TYPE_LIST.count).ATTR_COUNT := V_COUNT;
-    P_TYPE_LIST(P_TYPE_LIST.count).TYPECODE := V_TYPECODE;
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  -- ### AVOID ORA-21700 with TABLE operator and Lin 11.2
+  if (P_TYPE_LIST.count > 0) then
+    for i in P_TYPE_LIST.first .. P_TYPE_LIST.last loop
+      if ((P_TYPE_LIST(i).OWNER = P_OWNER) and (P_TYPE_LIST(i).TYPE_NAME = P_TYPE_NAME)) then
+        return P_TYPE_LIST(i).TYPECODE;
+      end if;
+    end loop;
+  end if;
+$ELSE
+  begin
+    select TYPECODE
+      into V_TYPECODE
+      from TABLE(P_TYPE_LIST)
+     where OWNER = P_OWNER and TYPE_NAME = P_TYPE_NAME;
     return V_TYPECODE;
- when OTHERS then
-   RAISE;
+  exception
+    when NO_DATA_FOUND then
+      NULL;
+    when OTHERS then
+      RAISE;
+  end;
+$END
+  select ATTRIBUTES, TYPECODE
+    into V_COUNT, V_TYPECODE
+    from ALL_TYPES
+   where OWNER = P_OWNER
+     and TYPE_NAME = P_TYPE_NAME;
+
+  P_TYPE_LIST.extend();
+  P_TYPE_LIST(P_TYPE_LIST.count).OWNER := P_OWNER;
+  P_TYPE_LIST(P_TYPE_LIST.count).TYPE_NAME := P_TYPE_NAME;
+  P_TYPE_LIST(P_TYPE_LIST.count).ATTR_COUNT := V_COUNT;
+  P_TYPE_LIST(P_TYPE_LIST.count).TYPECODE := V_TYPECODE;
+  return V_TYPECODE;
 end;
 --
 function serializeAttr(P_ATTR_NAME VARCHAR2, P_ATTR_TYPE_OWNER VARCHAR2, P_ATTR_TYPE_NAME VARCHAR2, P_ATTR_TYPE_MOD VARCHAR2, P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)

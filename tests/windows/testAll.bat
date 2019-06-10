@@ -8,6 +8,7 @@ call :EXPORT_NATIVE_SCHEMAS
 call :ORACLE19c
 call :ORACLE18c
 call :ORACLE12c
+call :ORACLE11g
 call :MSSQL
 call :POSTGRES
 call :MySQL
@@ -16,13 +17,15 @@ cd %YADAMU_HOME%
 exit /b
 
 :EXPORT_NATIVE_SCHEMAS
-@set YADAMU_LOG_ROOT=%YADAMU_HOME%\work\logs\export
+@set YADAMU_LOG_ROOT=%YADAMU_HOME%\work\export
 call %YADAMU_HOME%\tests\windows\initializeLogging.bat
 cd %YADAMU_HOME%\tests\oracle19c
 call windows\export_Native_Schemas.bat 1> %MASTER_LOG_PATH%\Export.log  2>&1
 cd %YADAMU_HOME%\tests\oracle18c
 call windows\export_Native_Schemas.bat 1> %MASTER_LOG_PATH%\Export.log  2>&1
 cd %YADAMU_HOME%\tests\oracle12c
+call windows\export_Native_Schemas.bat 1>> %MASTER_LOG_PATH%\Export.log  2>&1
+cd %YADAMU_HOME%\tests\oracle11g
 call windows\export_Native_Schemas.bat 1>> %MASTER_LOG_PATH%\Export.log  2>&1
 @set mode=DATA_ONLY
 cd %YADAMU_HOME%\tests\mssql
@@ -47,6 +50,12 @@ exit /b
 cd %YADAMU_HOME%\tests\oracle12c
 @set YADAMU_LOG_PATH=
 call windows\runAllTests.bat 1> %MASTER_LOG_PATH%\Oracle12c.log  2>&1
+exit /b
+
+:ORACLE11g
+cd %YADAMU_HOME%\tests\oracle11g
+@set YADAMU_LOG_PATH=
+call windows\runAllTests.bat 1> %MASTER_LOG_PATH%\Oracle11g.log  2>&1
 exit /b
 
 :MSSQL

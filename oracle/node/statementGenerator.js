@@ -107,10 +107,27 @@ class StatementGenerator {
   
   }
   
+  async getMetadataLob() {
+
+    return await this.dbi.lobFromJSON({metadata: this.metadata});  
+      
+  }
+ 
+  getPLSQL(dml) {
+    
+    return dml.substring(dml.indexOf('\nWITH\n')+5,dml.indexOf('\nselect'));
+  }
+ 
+  generatePLSQL(targetSchema,tableName,dml,columns,declarations,assignments,variables) {
+
+   const plsqlFunctions = this.getPLSQL(dml);
+   const dmlBlock = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n\n  insert into "${targetSchema}"."${tableName}" (${columns}) values (${variables.join(',')});\nend;`;      
+   return dmlBlock;
+     
+  }
+
   async generateStatementCache(executeDDL, vendor) {
-      
-    const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :schema);\nEND;`;
-      
+            
      /*
      **
      ** Turn the generated DDL Statements into an array and execute them as single batch via YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS()
@@ -137,15 +154,15 @@ class StatementGenerator {
       setOracleTimeStampMask = `execute immediate 'ALTER SESSION SET NLS_TIMESTAMP_FORMAT = ''${oracleTimeStampFormatMask}''';\n  `; 
       setSourceTimeStampMask = `;\n  execute immediate 'ALTER SESSION SET NLS_TIMESTAMP_FORMAT = ''${sourceTimeStampFormatMask}'''`; 
     }
-    
-    const boundedTypes = ['CHAR','NCHAR','VARCHAR2','NVARCHAR2','RAW']
-    const ddlStatements = [];  
-    
-    const metadataLob = await this.dbi.lobFromJSON({metadata: this.metadata});  
+   
+    const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :schema);\nEND;`;
+    const metadataLob = await this.getMetadataLob()
+   
     const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema: this.targetSchema});
     await metadataLob.close();
-
     const statementCache = JSON.parse(results.outBinds.sql);
+    const boundedTypes = ['CHAR','NCHAR','VARCHAR2','NVARCHAR2','RAW']
+    const ddlStatements = [];  
     
     const tables = Object.keys(this.metadata); 
     tables.forEach(function(table,idx) {
@@ -205,9 +222,8 @@ class StatementGenerator {
           else {
             return `${variables[idx]} := ${value}`;
           }
-        })
-        let plsqlFunctions = tableInfo.dml.substring(tableInfo.dml.indexOf('\WITH\n')+5,tableInfo.dml.indexOf('\nselect'));
-        tableInfo.dml = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n\n  insert into "${this.targetSchema}"."${this.metadata[table].tableName}" (${tableMetadata.columns}) values (${variables.join(',')});\nend;`;      
+        },this)
+        tableInfo.dml = this.generatePLSQL(this.targetSchema,this.metadata[table].tableName,tableInfo.dml,tableMetadata.columns,declarations,assignments,variables);
       }
       else  {
         tableInfo.dml = `insert into "${this.targetSchema}"."${this.metadata[table].tableName}" (${tableMetadata.columns}) values (${values.join(',')})`;

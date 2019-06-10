@@ -224,7 +224,7 @@ end;`
           this.batch.length = 0;
           return this.skipTable
         } catch (e) {
-          await this.connection.rollback();
+          await this.dbi.rollbackTransaction();
           if (this.logDDLIssues) {
             this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.rows.length}]. executeMany() operation with PL/SQL block raised ${e}. Retrying using execute() loop.\n`);
             this.logWriter.write(`${this.tableInfo.dml}\n`);
@@ -268,7 +268,7 @@ end;`
           }
         } catch (e) {
         //  Catch Max Errors Exceeded Assertion
-          await this.connection.rollback();
+          await this.dbi.rollbackTransaction();
           this.skipTable = true;
           this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][ERROR]: Batch size [${this.batch.length}]. Row [${row}]. Skipping table. Reason: ${e.message}.\n`);
         }

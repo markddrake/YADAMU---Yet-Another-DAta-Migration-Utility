@@ -293,7 +293,7 @@ class TableWriter {
       this.skipTable = await this.writeBatch();   
     }
     await this.dbi.commitTransaction();
-    if (!this.tableInfo.bulkSupported) {
+    if (this.tableInfo.preparedStatement !== undefined){
       await this.tableInfo.preparedStatement.unprepare();
     }
     return {

@@ -7,6 +7,8 @@ cd $YADAMU_HOME/tests/oracle18c
 . unix/export_Native_Schemas.sh 1> $MASTER_LOG_PATH/Export.log  2>&1
 cd $YADAMU_HOME/tests/oracle12c
 . unix/export_Native_Schemas.sh 1>> $MASTER_LOG_PATH/Export.log  2>&1
+cd $YADAMU_HOME/tests/oracle11g
+. unix/export_Native_Schemas.sh 1>> $MASTER_LOG_PATH/Export.log  2>&1
 export mode=DATA_ONLY
 cd $YADAMU_HOME/tests/mysql
 . unix/export_Native_Schemas.sh 1>> $MASTER_LOG_PATH/Export.log  2>&1
@@ -33,6 +35,13 @@ ORACLE12c()
 cd $YADAMU_HOME/tests/oracle12c
 unset YADAMU_LOG_PATH
 . unix/runAllTests.sh 1> $MASTER_LOG_PATH/Oracle12c.log  2>&1
+}
+
+ORACLE11g()
+{
+cd $YADAMU_HOME/tests/oracle11g
+unset YADAMU_LOG_PATH
+. unix/runAllTests.sh 1> $MASTER_LOG_PATH/Oracle11g.log  2>&1
 }
 
 MSSQL() 
@@ -72,6 +81,7 @@ EXPORT_NATIVE_SCHEMAS
 ORACLE19c
 ORACLE18c
 ORACLE12c
+ORACLE11g
 MSSQL
 POSTGRES
 MYSQL

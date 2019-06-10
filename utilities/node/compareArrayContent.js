@@ -147,16 +147,16 @@ function compareArrayMetadata(files){
                             + ` ${files[0].metadata[table].rowCount.toString().replace(regExp, ",").padStart(10)} | `
                             + ` ${files[1].metadata[table].rowCount.toString().replace(regExp, ",").padStart(10)} | `
                             + ` ${files[2].metadata[table].rowCount.toString().replace(regExp, ",").padStart(10)} | ` 
-                            + ` ${((files[0].metadata[table].rowCount === files[1].metadata[table].rowCount) && (files[1].metadata[table].rowCount=== files[2].metadata[table].rowCount)) ? 'SUCCESSFUL'.padStart(12) : ' FAILED'.padStart(12)} | `
+                            + ` ${((files[0].metadata[table].rowCount === files[1].metadata[table].rowCount) && (files[1].metadata[table].rowCount=== files[2].metadata[table].rowCount)) ? 'MATCH'.padStart(12) : ' MISMATCH'.padStart(12)} | `
                             + ` ${files[0].metadata[table].byteCount.toString().replace(regExp, ",").padStart(10)} | `
                             + ` ${files[1].metadata[table].byteCount.toString().replace(regExp, ",").padStart(10)} | `
                             + ` ${files[2].metadata[table].byteCount.toString().replace(regExp, ",").padStart(10)} |` 
-                            + ` ${((files[0].metadata[table].byteCount === files[1].metadata[table].byteCount) && (files[1].metadata[table].byteCount === files[2].metadata[table].byteCount)) ? 'SUCCESSFUL'.padStart(12) : 'FAILED'.padStart(12)} |`);
+                            + ` ${((files[0].metadata[table].byteCount === files[1].metadata[table].byteCount) && (files[1].metadata[table].byteCount === files[2].metadata[table].byteCount)) ? 'MATCH'.padStart(12) : 'MISMATCH'.padStart(12)} |`);
                 if (deepCompare) {
                   logFile.write(` ${files[0].metadata[table].hashValue.padStart(25)} | `
                               + ` ${files[1].metadata[table].hashValue.padStart(25)} | `
                               + ` ${files[2].metadata[table].hashValue.padStart(25)} |` 
-                              + ` ${((files[0].metadata.hashValue === files[1].metadata[table].hashValue) && (files[1].metadata[table].hashValue === files[2].metadata[table].hashValue)) ? 'SUCCESSFUL'.padStart(12) : ' FAILED'.padStart(12)} |`)
+                              + ` ${((files[0].metadata.hashValue === files[1].metadata[table].hashValue) && (files[1].metadata[table].hashValue === files[2].metadata[table].hashValue)) ? 'MATCH'.padStart(12) : ' MISMATCH'.padStart(12)} |`)
                 }
                 logFile.write(`\n`)                            
   })
