@@ -187,9 +187,9 @@ class FileCompare extends FileWriter {
     const tables = Object.keys(gMetadata).sort();     
     tables.forEach(function (table,idx) {
       const tableTimings = timings[0][table].elapsedTime.padStart(10) 
-                         + timings[1][table].elapsedTime.padStart(10) 
-                         + timings[2][table].elapsedTime.padStart(10) 
-                         + timings[3][table].elapsedTime.padStart(10);
+                         + (timings[1][table] ? timings[1][table].elapsedTime : "-1").padStart(10)
+                         + (timings[2][table] ? timings[2][table].elapsedTime : "-1").padStart(10) 
+                         + (timings[3][table] ? timings[3][table].elapsedTime : "-1").padStart(10);
  
       if (idx === 0) {                            
         this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 

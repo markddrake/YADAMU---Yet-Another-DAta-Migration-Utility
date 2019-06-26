@@ -21,9 +21,9 @@
     },
     "mssql" : {
       "user"           : "sa"
-    , "server"         : "192.168.1.250"
+    , "server"         : "yadamu-db1"
     , "database"       : "master"
-    , "password"       : "oracle"
+    , "password"       : "oracle#1"
     , "requestTimeout" : 360000000
     , "options"        : {
         "encrypt"      : false 
@@ -31,16 +31,16 @@
     },
     "postgres" : {
       "user"           : "postgres"
-    , "host"           : "192.168.1.250"
-    , "database"       : "postgres"
+    , "host"           : "yadamu-db1"
+    , "database"       : "yadamu"
     , "password"       : null
     , "port"           : 5432
     },
     "mysql" : {
       "user"               : "root"
-    , "host"               : "192.168.1.250"
+    , "host"               : "yadamu-db1"
     , "database"           : "sys"
-    , "password"           : "oracle"
+    , "password"           : "Oracle#1"
     , "port"               : 3306
     , "multipleStatements" : true
     , "typeCast"           : true
@@ -50,9 +50,9 @@
   },
   "mariadb" : {
       "user"               : "root"
-    , "host"               : "192.168.1.250"
+    , "host"               : "yadamu-db1"
     , "database"           : "mysql"
-    , "password"           : "oracle"
+    , "password"           : "Oracle#1"
     , "port"               : 3307
     , "multipleStatements" : true
     , "typeCast"           : true

@@ -1,8 +1,8 @@
 [
-    ["JSON/oracle18c/DATA_ONLY/HR.json",{"schema": "HR1"},"JSON/oracle18c/DATA_ONLY/HR1.json",{"schema": "HR2"},"JSON/oracle18c/DATA_ONLY/HR2.json"],
-    ["JSON/oracle18c/DATA_ONLY/SH.json",{"schema": "SH1"},"JSON/oracle18c/DATA_ONLY/SH1.json",{"schema": "SH2"},"JSON/oracle18c/DATA_ONLY/SH2.json"],
-    ["JSON/oracle18c/DATA_ONLY/OE.json",{"schema": "OE1"},"JSON/oracle18c/DATA_ONLY/OE1.json",{"schema": "OE2"},"JSON/oracle18c/DATA_ONLY/OE2.json"],
-    ["JSON/oracle18c/DATA_ONLY/PM.json",{"schema": "PM1"},"JSON/oracle18c/DATA_ONLY/PM1.json",{"schema": "PM2"},"JSON/oracle18c/DATA_ONLY/PM2.json"],
-    ["JSON/oracle18c/DATA_ONLY/IX.json",{"schema": "IX1"},"JSON/oracle18c/DATA_ONLY/IX1.json",{"schema": "IX2"},"JSON/oracle18c/DATA_ONLY/IX2.json"],
-    ["JSON/oracle18c/DATA_ONLY/BI.json",{"schema": "BI1"},"JSON/oracle18c/DATA_ONLY/BI1.json",{"schema": "BI2"},"JSON/oracle18c/DATA_ONLY/BI2.json"]
+    ["JSON/oracle19c/DATA_ONLY/HR.json",{"schema": "HR1"},"JSON/oracle19c/DATA_ONLY/HR1.json",{"schema": "HR2"},"JSON/oracle19c/DATA_ONLY/HR2.json"],
+    ["JSON/oracle19c/DATA_ONLY/SH.json",{"schema": "SH1"},"JSON/oracle19c/DATA_ONLY/SH1.json",{"schema": "SH2"},"JSON/oracle19c/DATA_ONLY/SH2.json"],
+    ["JSON/oracle19c/DATA_ONLY/OE.json",{"schema": "OE1"},"JSON/oracle19c/DATA_ONLY/OE1.json",{"schema": "OE2"},"JSON/oracle19c/DATA_ONLY/OE2.json"],
+    ["JSON/oracle19c/DATA_ONLY/PM.json",{"schema": "PM1"},"JSON/oracle19c/DATA_ONLY/PM1.json",{"schema": "PM2"},"JSON/oracle19c/DATA_ONLY/PM2.json"],
+    ["JSON/oracle19c/DATA_ONLY/IX.json",{"schema": "IX1"},"JSON/oracle19c/DATA_ONLY/IX1.json",{"schema": "IX2"},"JSON/oracle19c/DATA_ONLY/IX2.json"],
+    ["JSON/oracle19c/DATA_ONLY/BI.json",{"schema": "BI1"},"JSON/oracle19c/DATA_ONLY/BI1.json",{"schema": "BI2"},"JSON/oracle19c/DATA_ONLY/BI2.json"]
 ]

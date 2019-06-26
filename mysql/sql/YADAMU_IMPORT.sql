@@ -10,7 +10,7 @@ DROP FUNCTION IF EXISTS MAP_FOREIGN_DATATYPE;
 DELIMITER $$
 --
 CREATE FUNCTION MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR VARCHAR(128), P_DATA_TYPE VARCHAR(128), P_DATA_TYPE_LENGTH INT, P_DATA_TYPE_SIZE INT) 
-RETURNS VARCHAR(128) DETERMINISTIC
+RETURNS CHAR(128) DETERMINISTIC
 BEGIN
   case 
     when P_SOURCE_VENDOR = 'Oracle' then
@@ -258,7 +258,30 @@ BEGIN
   DECLARE V_ACTUAL_DATA_TYPES  TEXT;
 
   DECLARE V_COLUMN_COUNT      INT;
+  DECLARE V_SQLSTATE          INT;
+  DECLARE V_SQLERRM           TEXT;
   
+  DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+  BEGIN 
+    GET DIAGNOSTICS CONDITION 1
+        V_SQLSTATE = RETURNED_SQLSTATE, 
+        V_SQLERRM = MESSAGE_TEXT;
+        
+        SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',CAST(V_TARGET_DATA_TYPES as JSON),
+                                       'error', JSON_OBJECT(
+                                                  'severity','FATAL',
+                                                  'tableName', P_TABLE_NAME,
+                                                  'columns', P_COLUMN_LIST, 
+                                                  'dataTypes', P_DATA_TYPE_LIST,
+                                                  'sizeConstraints',P_SIZE_CONSTRAINTS,
+                                                  'code', V_SQLSTATE, 
+                                                  'msg', V_SQLERRM, 
+                                                  'details', 'GENERATE_SQL' 
+                                                )
+                                      );
+
+  END;  
+
   with 
     "SOURCE_TABLE_DEFINITIONS" 
     as ( 
@@ -287,7 +310,8 @@ BEGIN
     "TARGET_TABLE_DEFINITIONS" 
     as (
       select st.*
-            , MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
+             -- AVOID ERROR 1271 (HY000) at line 37: Illegal mix of collations for operation 'concat'
+            ,CAST(MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") as CHAR) TARGET_DATA_TYPE
         from "SOURCE_TABLE_DEFINITIONS" st
     )
     select group_concat(concat('"',COLUMN_NAME,'" ',TARGET_DATA_TYPE,
@@ -302,13 +326,13 @@ BEGIN
                                    then '' 
                                  when TARGET_DATA_TYPE in ('nchar','nvarchar')
                                    -- then concat('(',DATA_TYPE_LENGTH,')',' CHARACTER SET UTF8MB4 ')
-                                   then concat('(',DATA_TYPE_LENGTH,')')
+                                   then concat('(',CAST(DATA_TYPE_LENGTH as CHAR),')')
                                  when DATA_TYPE_SCALE is not NULL
                                    then case 
                                           when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
-                                            then concat('(',DATA_TYPE_LENGTH,')')
+                                            then concat('(',CAST(DATA_TYPE_LENGTH as CHAR),')')
                                           else
-                                            concat('(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
+                                            concat('(',CAST(DATA_TYPE_LENGTH as CHAR),',',CAST(DATA_TYPE_SCALE as CHAR),')')
                                         end
                                  when DATA_TYPE_LENGTH is not NULL and DATA_TYPE_LENGTH != 'null'
                                    then case 
@@ -316,7 +340,7 @@ BEGIN
                                             -- Do not add length restriction when scale is not specified
                                             then ''                                            
                                           else
-                                            concat('(',DATA_TYPE_LENGTH,')')
+                                            concat('(',CAST(DATA_TYPE_LENGTH as CHAR),')')
                                         end
                                  else
                                    ''
@@ -335,13 +359,13 @@ BEGIN
                                  when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection')
                                    then TARGET_DATA_TYPE
                                  when TARGET_DATA_TYPE in ('nchar','nvarchar')
-                                   then concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')',' CHARACTER SET UTF8MB4 ')
+                                   then concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),')',' CHARACTER SET UTF8MB4 ')
                                  when DATA_TYPE_SCALE is not NULL 
                                    then case 
                                           when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
-                                            then concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')')
+                                            then concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),')')
                                           else
-                                            concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
+                                            concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),',',CAST(DATA_TYPE_SCALE AS CHAR),')')
                                         end
                                  when DATA_TYPE_LENGTH is not NULL and DATA_TYPE_LENGTH <> 0
                                    then case 
@@ -349,7 +373,7 @@ BEGIN
                                             -- Do not add length restriction when scale is not specified
                                             then TARGET_DATA_TYPE                                        
                                           else
-                                            concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')')
+                                            concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),')')
                                         end
                                  else
                                    TARGET_DATA_TYPE
@@ -428,7 +452,7 @@ BEGIN
       into V_COLUMNS_CLAUSE, V_TARGET_DATA_TYPES, V_INSERT_SELECT_LIST, V_COLUMN_PATTERNS
       from "TARGET_TABLE_DEFINITIONS";
 
-  SET V_DDL_STATEMENT = concat('create table if not exists "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',CHAR(32),V_COLUMNS_CLAUSE,')'); 
+  SET V_DDL_STATEMENT = concat('create table if not exists "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',V_COLUMNS_CLAUSE,')'); 
   SET V_DML_STATEMENT = concat('insert into "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',P_COLUMN_LIST,')',CHAR(32),'select ',V_INSERT_SELECT_LIST,CHAR(32),'  from "YADAMU_STAGING" js,JSON_TABLE(js."DATA",''$.data."',P_TABLE_NAME,'"[*]'' COLUMNS (',CHAR(32),V_COLUMN_PATTERNS,')) data');     
   SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',CAST(V_TARGET_DATA_TYPES as JSON));
     
@@ -447,7 +471,7 @@ BEGIN
   
   DECLARE V_VENDOR           VARCHAR(32);
   DECLARE V_TABLE_NAME       VARCHAR(128);
-DECLARE V_COLUMN_LIST      TEXT;
+  DECLARE V_COLUMN_LIST      TEXT;
   DECLARE V_DATA_TYPE_LIST   JSON;
   DECLARE V_SIZE_CONSTRAINTS JSON;
   DECLARE V_TABLE_INFO       JSON;
@@ -487,7 +511,7 @@ DECLARE V_COLUMN_LIST      TEXT;
   BEGIN 
     GET DIAGNOSTICS CONDITION 1
         V_SQLSTATE = RETURNED_SQLSTATE, V_SQLERRM = MESSAGE_TEXT;
-    SET P_RESULTS = JSON_ARRAY_APPEND(P_RESULTS,'$',JSON_OBJECT('error',JSON_OBJECT('severity','FATAL','tableName', V_TABLE_NAME,'sqlStatement', V_STATEMENT, 'code', V_SQLSTATE, 'msg', V_SQLERRM, 'details', 'unavailable' )));
+    SET P_RESULTS = JSON_ARRAY_APPEND(P_RESULTS,'$',JSON_OBJECT('error',JSON_OBJECT('severity','FATAL','tableName', V_TABLE_NAME,'sqlStatement', V_STATEMENT, 'code', V_SQLSTATE, 'msg', V_SQLERRM, 'details', 'IMPORT_JSON' )));
   END;  
 
   SET SESSION SQL_MODE=ANSI_QUOTES;
@@ -579,7 +603,23 @@ BEGIN
   BEGIN 
     GET DIAGNOSTICS CONDITION 1
         V_SQLSTATE = RETURNED_SQLSTATE, V_SQLERRM = MESSAGE_TEXT;
-    SET P_RESULTS = JSON_OBJECT('error',JSON_OBJECT('severity','FATAL','tableName', V_TABLE_NAME,'code', V_SQLSTATE, 'msg', V_SQLERRM, 'results', P_RESULTS ));
+        SET P_RESULTS = JSON_ARRAY_APPEND(
+                          P_RESULTS,
+                          '$',
+                          JSON_OBJECT('error',
+                            JSON_OBJECT(
+                              'severity','FATAL',
+                              'tableName', V_TABLE_NAME,
+                              'columns', V_COLUMN_LIST, 
+                              'dataTypes', V_DATA_TYPE_LIST,
+                              'sizeConstraints',V_SIZE_CONSTRAINTS,
+                              'code', V_SQLSTATE, 
+                              'msg', V_SQLERRM, 
+                              'details', 'GENERATE_STATEMENTS' 
+                            )
+                          )
+                        );
+
   END;  
 
   SET SESSION SQL_MODE=ANSI_QUOTES;
@@ -654,15 +694,7 @@ BEGIN
   group by c.table_schema, c.table_name;
 
   DECLARE CONTINUE HANDLER FOR NOT FOUND SET NO_MORE_ROWS = TRUE;
-  
-  /*
-  DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
-  BEGIN 
-    GET DIAGNOSTICS CONDITION 1
-        V_SQLSTATE = RETURNED_SQLSTATE, V_SQLERRM = MESSAGE_TEXT;
-    SET P_RESULTS = JSON_OBJECT('error',JSON_OBJECT('severity','FATAL','tableName', V_TABLE_NAME,'code', V_SQLSTATE, 'msg', V_SQLERRM, 'results', P_RESULTS ));
-  END;  
-  */
+ 
   
   SET SESSION SQL_MODE=ANSI_QUOTES;
   SET SESSION group_concat_max_len = 131072;

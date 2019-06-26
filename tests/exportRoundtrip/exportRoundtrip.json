@@ -2,13 +2,14 @@
     {
         "source": "file",
         "targets": [
+            "oracle19c",
             "oracle18c",
+            "oracle12c",
+            "oracle11g",
             "mssql",
             "postgres",
             "mysql",
-            "mariadb",
-            "oracle12c",
-            "oracle11g"
+            "mariadb"
         ],
         "parsingMethod": "CLARINET",
         "parameters": {
@@ -22,11 +23,12 @@
     },{
         "source": "file",
         "targets": [
+            "oracle19c",
             "oracle18c",
+            "oracle12c",
             "mssql",
             "postgres",
-            "mysql",
-            "oracle12c"
+            "mysql"
         ],
         "parsingMethod": "RDBMS",
         "parameters": {

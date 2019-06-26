@@ -1,94 +1,36 @@
 [
     {
+        "source": "oracle19c",
+        "targets": [
+            "oracle19c",
+            "oracle18c",
+            "oracle12c",
+            "oracle11g",
+            "mssql",
+            "postgres",
+            "mysql",
+            "mariadb"
+        ],
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests/dbRoundtrip/oracle.json",
+            "tests/dbRoundtrip/mysql.json",
+            "tests/dbRoundtrip/mssql.json"
+        ]
+    },
+    {
         "source": "oracle18c",
         "targets": [
+            "oracle19c",
             "oracle18c",
+            "oracle12c",
+            "oracle11g",
             "mssql",
             "postgres",
             "mysql",
-            "mariadb",
-            "oracle12c",
-            "oracle11g"
-        ],
-        "parameters": {
-            "MODE": "DATA_ONLY"
-        },
-        "operations": [
-            "tests/dbRoundtrip/oracle.json",
-            "tests/dbRoundtrip/mysql.json",
-            "tests/dbRoundtrip/mssql.json"
-        ]
-    },
-    {
-        "source": "mssql",
-        "targets": [
-            "oracle18c",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb",
-            "oracle12c",
-            "oracle11g"
-        ],
-        "parameters": {
-            "MODE": "DATA_ONLY"
-        },
-        "operations": [
-            "tests/dbRoundtrip/oracle.json",
-            "tests/dbRoundtrip/mysql.json",
-            "tests/dbRoundtrip/mssql.json"
-        ]
-    },
-    {
-        "source": "postgres",
-        "targets": [
-            "oracle18c",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb",
-            "oracle12c",
-            "oracle11g"
-        ],
-        "parameters": {
-            "MODE": "DATA_ONLY"
-        },
-        "operations": [
-            "tests/dbRoundtrip/oracle.json",
-            "tests/dbRoundtrip/mysql.json",
-            "tests/dbRoundtrip/mssql.json"
-        ]
-    },
-    {
-        "source": "mysql",
-        "targets": [
-            "oracle18c",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb",
-            "oracle12c",
-            "oracle11g"
-        ],
-        "parameters": {
-            "MODE": "DATA_ONLY"
-        },
-        "operations": [
-            "tests/dbRoundtrip/oracle.json",
-            "tests/dbRoundtrip/mysql.json",
-            "tests/dbRoundtrip/mssql.json"
-        ]
-    },
-    {
-        "source": "mariadb",
-        "targets": [
-            "oracle18c",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb",
-            "oracle12c",
-            "oracle11g"
+            "mariadb"
         ],
         "parameters": {
             "MODE": "DATA_ONLY"
@@ -102,13 +44,119 @@
     {
         "source": "oracle12c",
         "targets": [
+            "oracle19c",
             "oracle18c",
+            "oracle12c",
+            "oracle11g",
             "mssql",
             "postgres",
             "mysql",
-            "mariadb",
+            "mariadb"
+        ],
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests/dbRoundtrip/oracle.json",
+            "tests/dbRoundtrip/mysql.json",
+            "tests/dbRoundtrip/mssql.json"
+        ]
+    },
+    {
+        "source": "oracle11g",
+        "targets": [
+            "oracle19c",
+            "oracle18c",
             "oracle12c",
-            "oracle11g"
+            "oracle11g",
+            "mssql",
+            "postgres",
+            "mysql",
+            "mariadb"
+        ],
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests/dbRoundtrip/oracle.json",
+            "tests/dbRoundtrip/mysql.json",
+            "tests/dbRoundtrip/mssql.json"
+        ]
+    },
+    {
+        "source": "mssql",
+        "targets": [
+            "oracle19c",
+            "oracle18c",
+            "oracle12c",
+            "oracle11g",
+            "mssql",
+            "postgres",
+            "mysql",
+            "mariadb"
+        ],
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests/dbRoundtrip/oracle.json",
+            "tests/dbRoundtrip/mysql.json",
+            "tests/dbRoundtrip/mssql.json"
+        ]
+    },
+    {
+        "source": "postgres",
+        "targets": [
+            "oracle19c",
+            "oracle18c",
+            "oracle12c",
+            "oracle11g",
+            "mssql",
+            "postgres",
+            "mysql",
+            "mariadb"
+        ],
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests/dbRoundtrip/oracle.json",
+            "tests/dbRoundtrip/mysql.json",
+            "tests/dbRoundtrip/mssql.json"
+        ]
+    },
+    {
+        "source": "mysql",
+        "targets": [
+            "oracle19c",
+            "oracle18c",
+            "oracle12c",
+            "oracle11g",
+            "mssql",
+            "postgres",
+            "mysql",
+            "mariadb"
+        ],
+        "parameters": {
+            "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests/dbRoundtrip/oracle.json",
+            "tests/dbRoundtrip/mysql.json",
+            "tests/dbRoundtrip/mssql.json"
+        ]
+    },
+    {
+        "source": "mariadb",
+        "targets": [
+            "oracle19c",
+            "oracle18c",
+            "oracle12c",
+            "oracle11g",
+            "mssql",
+            "postgres",
+            "mysql",
+            "mariadb"
         ],
         "parameters": {
             "MODE": "DATA_ONLY"

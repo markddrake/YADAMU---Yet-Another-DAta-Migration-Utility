@@ -34,10 +34,11 @@ class TestHarness {
   
     let dbi = undefined
     switch (db) {
+      case "oracle19c" :
       case "oracle18c" :
-      case "oracle18" :
       case "oracle12c" :
-      case "oracleXE" :          
+      case "oracle11g" :
+      case "oracleXE"  : 
         dbi = new OracleCompare(this.yadamu)
         break;
       case "postgres" :
@@ -122,10 +123,11 @@ class TestHarness {
     
     dbList.forEach(function(db) {    
       switch (db) {
+        case "oracle19c" :
         case "oracle18c" :
-        case "oracle18" :
         case "oracle12c" :
-        case "oracleXE" :          
+        case "oracle11g" :
+        case "oracleXE"  : 
           compareParameters.EMPTY_STRING_IS_NULL = true;
           compareParameters.SPATIAL_PRECISION = 13;
           break;

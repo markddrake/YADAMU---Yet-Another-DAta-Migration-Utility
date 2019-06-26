@@ -7,8 +7,10 @@ if not exist %YADAMU_WORK_ROOT%\ mkdir %YADAMU_WORK_ROOT%
 @set YADAMU_LOG_ROOT=%YADAMU_WORK_ROOT%\logs
 call %YADAMU_TEST_HOME%\windows\initializeLogging.bat
 call %YADAMU_TEST_HOME%\windows\installYadamu.bat
+call %YADAMU_TEST_HOME%\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%\oracle19c
 call %YADAMU_TEST_HOME%\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%\oracle18c
 call %YADAMU_TEST_HOME%\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%\oracle12c
+call %YADAMU_TEST_HOME%\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%\oracle11g
 call %YADAMU_TEST_HOME%\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%\mssql
 call %YADAMU_TEST_HOME%\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%\postgres
 call %YADAMU_TEST_HOME%\windows\createOutputFolders.bat %YADAMU_WORK_ROOT%\mysql

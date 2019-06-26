@@ -129,7 +129,7 @@ $$ LANGUAGE plpgsql;
 **
 */
 --
-create or replace function MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH BIGINT, P_DATA_TYPE_SCALE INT) 
+create or replace function MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH BIGINT, P_DATA_TYPE_SCALE INT, P_GEOMETRY_TYPE VARCHAR) 
 returns VARCHAR
 as $$
 declare
@@ -141,7 +141,7 @@ begin
     when 'Oracle' then
       case V_DATA_TYPE
         when 'VARCHAR2' then
-          return 'varchar';
+          return 'character varying';
         when 'NUMBER' then
            return 'numeric';
         when 'BINARY_FLOAT' then
@@ -149,7 +149,7 @@ begin
         when 'BINARY_DOUBLE' then
            return 'float8';
         when 'NVARCHAR2' then
-           return 'varchar';
+           return 'character varying';
         when 'RAW' then
            return 'bytea';
         when 'BLOB' then
@@ -166,15 +166,15 @@ begin
               return 'timestamp';
           end case;
         when 'BFILE' then
-           return 'varchar';
+           return 'character varying';
         when 'ROWID' then
-           return 'varchar';
+           return 'character varying';
         when 'ANYDATA' then
            return 'text';
         when 'XMLTYPE'then
            return 'xml';
         when '"MDSYS"."SDO_GEOMETRY"' then
-           return 'geometry';
+           return P_GEOMETRY_TYPE;
         else
           -- Oracle complex mappings
           if (strpos(V_DATA_TYPE,'LOCAL TIME ZONE') > 0) then
@@ -212,9 +212,9 @@ begin
         when 'float' then
            return 'real';
         when 'geometry' then
-           return 'geometry';
+           return P_GEOMETRY_TYPE;
         when 'geography' then
-           return 'geometry';
+           return P_GEOMETRY_TYPE;
         when 'tinyint' then
            return 'smallint';
         when 'mediumint' then
@@ -262,9 +262,9 @@ begin
         when 'float' then
            return 'real';
         when 'geometry' then
-           return 'geometry';
+           return P_GEOMETRY_TYPE;
         when 'geography' then
-           return 'geometry';
+           return P_GEOMETRY_TYPE;
         when 'tinyint' then
            return 'smallint';
         when 'mediumint' then
@@ -333,14 +333,14 @@ begin
              when -1 
                then return 'text';
              else
-               return 'varchar'; 
+               return 'character varying'; 
           end case;
         when 'varchar' then
           case P_DATA_TYPE_LENGTH 
             when -1 
               then return 'text';
             else
-              return 'varchar';
+              return 'character varying';
           end case;
         when 'rowversion' then
           return 'bytea';
@@ -360,10 +360,10 @@ begin
         when 'varbinary' then
           return 'bytea';
         when 'geometry' then
-           return 'geometry';
+           return P_GEOMETRY_TYPE;
            -- return 'jsonb';
         when 'geography' then
-           return 'geometry';
+           return P_GEOMETRY_TYPE;
            -- return 'jsonb';
         else
           return lower(V_DATA_TYPE);
@@ -382,7 +382,18 @@ declare
   V_INSERT_SELECT_LIST TEXT;
   V_COLUMN_COUNT       TEXT;
   V_TARGET_DATA_TYPES  JSONB;
+  V_GEOMETRY_TYPE      VARCHAR(32);
 begin
+
+  begin
+    SELECT PostGIS_full_version();
+    V_GEOMETRY_TYPE := 'geometry';
+  exception
+    when undefined_function then
+      V_GEOMETRY_TYPE := 'text';
+    when others then
+      RAISE;
+  end;
 
   with
   SOURCE_TABLE_DEFINITIONS
@@ -412,7 +423,7 @@ begin
   TARGET_TABLE_DEFINITIONS
   as (
     select st.*,
-           MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR,DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT) TARGET_DATA_TYPE
+           MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR,DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT, V_GEOMETRY_TYPE) TARGET_DATA_TYPE
       from SOURCE_TABLE_DEFINITIONS st
   ) 
   select STRING_AGG('"' || COLUMN_NAME || '" ' || TARGET_DATA_TYPE || 

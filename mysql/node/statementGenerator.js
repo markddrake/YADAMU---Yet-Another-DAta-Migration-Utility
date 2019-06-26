@@ -14,7 +14,7 @@ class StatementGenerator {
   async generateStatementCache(executeDDL, vendor) {    
    
     const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS"`;                       
-   
+    
     let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),this.targetSchema]);
     results = results.pop();
     let statementCache = JSON.parse(results[0].SQL_STATEMENTS)
@@ -22,6 +22,7 @@ class StatementGenerator {
       statementCache = {}      
     }
     else {
+
       const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map(function(table,idx) {
         const tableInfo = statementCache[this.metadata[table].tableName];
@@ -50,11 +51,6 @@ class StatementGenerator {
            }
         },this) 
         
-        
-        
-        
-        
-                   
         if (tableInfo.insertMode === 'Iterative') {
           tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('(')) + ` set ` + setOperators.join(',');
         }

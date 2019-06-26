@@ -25,7 +25,6 @@ class YadamuDBI {
   get DEFAULT_PARAMETERS()  { return {} }
   get STATEMENT_SEPERATOR() { return '' }
   
-  
   decomposeDataType(targetDataType) {
     
     const results = {};
@@ -96,9 +95,12 @@ class YadamuDBI {
                           status.warningRaised = true;
                           logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
                           break;
-   					  case (logEntry.severity === 'CONTENT_TOO_LARGE') :
+  					  case (logEntry.severity === 'CONTENT_TOO_LARGE') :
                           status.errorRaised = true;
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: Cannot import columns larger than 32k in 12c.\n`)
+                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database is not configured for values larger than ${this.maxStringSize}.\n`)
+    			      case (logEntry.severity === 'SQL_TOO_LARGE') :
+                          status.errorRaised = true;
+                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database is not configured for  DLL statements larger than ${this.maxStringSize}.\n`)
                           break;
                         case (logDDLIssues) :
                           logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
@@ -229,8 +231,12 @@ class YadamuDBI {
       "DimEmployee" : {
         "tableName" : "DimEmployee",
         "columns" : { "ParentEmployeeNationalIDAlternateKey" : "ParentEmployeeNationalID" }
-      }
-    }    
+      },
+      "Production" : {
+        "tableName" : "Production",
+        "columns" : { "productmodelproductdescriptionculture" : "productmodelpdc" }
+      }   
+   }    
    
   }
   
