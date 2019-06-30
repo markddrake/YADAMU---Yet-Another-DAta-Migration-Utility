@@ -5,7 +5,6 @@
             "oracle19c",
             "oracle18c",
             "oracle12c",
-            "oracle11g",
             "mssql",
             "postgres",
             "mysql",
@@ -14,6 +13,21 @@
         "parsingMethod": "CLARINET",
         "parameters": {
             "MODE": "DATA_ONLY"
+        },
+        "operations": [
+            "tests/exportRoundtrip/oracle.json",
+            "tests/exportRoundtrip/mysql.json",
+            "tests/exportRoundtrip/mssql.json"
+        ]
+    },{
+        "source": "file",
+        "targets": [
+            "oracle11g"
+        ],
+        "parsingMethod": "CLARINET",
+        "parameters": {
+            "MODE"     : "DATA_ONLY",
+            "MAPPINGS" : "tests/exportRoundtrip/mappingsOracle11g.json"
         },
         "operations": [
             "tests/exportRoundtrip/oracle.json",

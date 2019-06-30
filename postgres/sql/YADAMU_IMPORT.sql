@@ -480,7 +480,7 @@ declare
   V_ROW_COUNT        INTEGER;
   V_START_TIME       TIMESTAMPTZ;
   V_END_TIME         TIMESTAMPTZ;
-  V_ELAPSED_TIME     DOUBLE PRECISION;
+  V_ELAPSED_TIME     NUMERIC;
 
   PLPGSQL_CTX        TEXT;
 begin
@@ -510,7 +510,7 @@ begin
       EXECUTE r."TABLE_INFO" ->> 'dml'  using  P_JSON;
       V_END_TIME := clock_timestamp();
       GET DIAGNOSTICS V_ROW_COUNT := ROW_COUNT;
-      V_ELAPSED_TIME := 1000 * ( extract(epoch from V_END_TIME) - extract(epoch from V_START_TIME) );
+      V_ELAPSED_TIME :=  round(((extract(epoch from V_END_TIME) - extract(epoch from V_START_TIME)) * 1000)::NUMERIC,4);
       V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS)  || '}' as TEXT[]), jsonb_build_object('dml', jsonb_build_object('tableName',r."tableName",'rowCount',V_ROW_COUNT,'elapsedTime',V_ELAPSED_TIME,'sqlStatement',r."TABLE_INFO"->>'dml')), true);
     exception
       when others then
@@ -537,7 +537,7 @@ declare
   V_ROW_COUNT        INTEGER;
   V_START_TIME       TIMESTAMPTZ;
   V_END_TIME         TIMESTAMPTZ;
-  V_ELAPSED_TIME     DOUBLE PRECISION;
+  V_ELAPSED_TIME     NUMERIC;
 
   PLPGSQL_CTX        TEXT;
 begin
@@ -568,7 +568,7 @@ begin
       EXECUTE r."TABLE_INFO" ->> 'dml'  using  P_JSON;
       V_END_TIME := clock_timestamp();
       GET DIAGNOSTICS V_ROW_COUNT := ROW_COUNT;
-      V_ELAPSED_TIME := 1000 * ( extract(epoch from V_END_TIME) - extract(epoch from V_START_TIME) );
+      V_ELAPSED_TIME :=  round(((extract(epoch from V_END_TIME) - extract(epoch from V_START_TIME)) * 1000)::NUMERIC,4);
       V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS)  || '}' as TEXT[]),  jsonb_build_object('dml', jsonb_build_object('tableName',r."tableName",'rowCount',V_ROW_COUNT,'elapsedTime',V_ELAPSED_TIME,'sqlStatement',r."TABLE_INFO" ->> 'dml' )), true);
     exception
       when others then

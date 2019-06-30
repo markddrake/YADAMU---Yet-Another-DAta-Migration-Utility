@@ -1,0 +1,1 @@
+/opt/mariadb/bin/mysqld_safe  --defaults-file=/var/opt/mariadb/my.cnf &

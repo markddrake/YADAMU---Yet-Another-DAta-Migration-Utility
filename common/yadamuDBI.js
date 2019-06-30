@@ -1,5 +1,6 @@
 "use strict" 
 const fs = require('fs');
+const path = require('path');
 const Readable = require('stream').Readable;
 
 /* 
@@ -97,10 +98,11 @@ class YadamuDBI {
                           break;
   					  case (logEntry.severity === 'CONTENT_TOO_LARGE') :
                           status.errorRaised = true;
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database is not configured for values larger than ${this.maxStringSize}.\n`)
+                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database does not support VARCHAR2 values longer than ${this.maxStringSize} bytes.\n`)
+                          break;
     			      case (logEntry.severity === 'SQL_TOO_LARGE') :
                           status.errorRaised = true;
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database is not configured for  DLL statements larger than ${this.maxStringSize}.\n`)
+                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database is not configured for DLL statements longer than ${this.maxStringSize} bytes.\n`)
                           break;
                         case (logDDLIssues) :
                           logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
@@ -133,6 +135,10 @@ class YadamuDBI {
     this.parameters = this.yadamu.getParameters()
     this.parameters = this.updateParameters(this.parameters,testParameters);
     this.parameters = this.mergeParameters(this.parameters,defaultParameters);
+    if (this.parameters.MAPPINGS) {
+      this.loadTableMappings(this.parameters.MAPPINGS);
+      this.reverseTableMappings()
+    }  
   }
 
   setConnectionProperties(connectionProperties) {
@@ -159,7 +165,31 @@ class YadamuDBI {
     this.systemInformation = systemInformation
   }
   
-  patchMetadata() {
+  loadTableMappings(mappingFile) {
+    this.tableMappings = require(path.resolve(mappingFile));
+    // this.reversedTableMappings = reverseTableMappings(this.tableMappings);
+  }
+  
+  reverseTableMappings() {
+
+    const reverseMappings = {}
+    Object.keys(this.tableMappings).forEach(function(table) {
+      const newKey = this.tableMappings[table].tableName
+      reverseMappings[newKey] = { "tableName" : table};
+      if (this.tableMappings[table].columns) {
+        const columns = {};
+        Object.keys(this.tableMappings[table].columns).forEach(function(column) {
+          const newKey = this.tableMappings[table].columns[column]
+          columns[newKey] = column;
+        },this);
+        reverseMappings[newKey].columns = columns
+      }
+    },this)
+    return reverseMappings;
+
+  }
+    
+  applyTableMappings() {
     
     const tables = Object.keys(this.metadata)
     tables.forEach(function(table) {
@@ -182,6 +212,9 @@ class YadamuDBI {
   
   setMetadata(metadata) {
     this.metadata = metadata
+    if (this.tableMappings) {
+      this.applyTableMappings()
+    }
   }
   
   async executeDDL(ddl) {
@@ -221,23 +254,10 @@ class YadamuDBI {
     this.insertMode = 'Empty';
     this.skipTable = true;
 
-    this.tableMappings = {
-      "ProductModelProductDescriptionCulture" : {
-        "tableName" : "ProductModelPDC"
-      },
-      "FactAdditionalInternationalProductDescription" : {
-        "tableName" : "FactAdditionalIPD"
-      },
-      "DimEmployee" : {
-        "tableName" : "DimEmployee",
-        "columns" : { "ParentEmployeeNationalIDAlternateKey" : "ParentEmployeeNationalID" }
-      },
-      "Production" : {
-        "tableName" : "Production",
-        "columns" : { "productmodelproductdescriptionculture" : "productmodelpdc" }
-      }   
-   }    
-   
+    this.tableMappings = undefined;
+    if (this.parameters.MAPPINGS) {
+      this.loadTableMappings(this.parameters.MAPPINGS);
+    }   
   }
   
   /*  

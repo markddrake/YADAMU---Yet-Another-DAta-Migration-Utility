@@ -515,7 +515,7 @@ BEGIN
                       when c.data_type in ('geography','geometry') then
                         case 
                            when @SPATIAL_PRECISION is NULL then
-                             concat('"',c.column_name,'".ToString()',c.column_name,'"')
+                             concat('"',c.column_name,'".ToString() "',c.column_name,'"')
                            else
                              case 
                                when c.data_type = 'geography' then

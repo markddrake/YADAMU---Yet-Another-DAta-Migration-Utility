@@ -57,6 +57,8 @@ class FileCompare extends FileWriter {
     return metadata;       
   }
   
+  **
+  **
   */
 
   async getContentMetadata(file,sort) {
@@ -113,7 +115,17 @@ class FileCompare extends FileWriter {
       }
     },this)
   }
-      
+   
+  reverseTableNames(timings,mappings) {
+        
+    Object.keys(mappings).forEach(function(table) {
+      if (timings[table] && (mappings[table].tableName != table)) {
+        timings[mappings[table].tableName] =  Object.assign({}, timings[table])
+        delete timings[table]
+      }
+    },this)
+  }
+  
   async report(grandparent,parent,child,timings) {
         
     let colSizes = [48, 18, 12, 12, 12, 12]
@@ -122,7 +134,7 @@ class FileCompare extends FileWriter {
     colSizes.forEach(function(size) {
       seperatorSize += size;
     },this)
- 
+    
     const gStats = fs.statSync(path.resolve(grandparent));
     let pStats
     let cStats
@@ -144,7 +156,7 @@ class FileCompare extends FileWriter {
       }
       cStats = {size : -1}
     }
- 
+     
     this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
     this.logger.write(`| ${'GRANDPARENT FILE'.padEnd(colSizes[0])} |`
                     + ` ${'GRANDPARENT SIZE'.padStart(colSizes[1])} |`
@@ -169,16 +181,28 @@ class FileCompare extends FileWriter {
       seperatorSize += size;
     },this)
     
-    
     const gMetadata = await this.getContentMetadata(grandparent)
     const pMetadata = await this.getContentMetadata(parent)
     const cMetadata = await this.getContentMetadata(child);
+    
+
+    if (this.tableMappings) {
+      // If source table names were mapped reverse the mappings
+      const reversedTableMappings = this.reverseTableMappings();
+      timings = timings.map(function (t) {
+        this.reverseTableNames(t,reversedTableMappings)
+        return t
+      },this);
+      this.reverseTableNames(pMetadata,reversedTableMappings)
+      this.reverseTableNames(cMetadata,reversedTableMappings)
+    }
     
     if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
       timings = timings.map(function (t) {
         this.makeLowerCase(t)
         return t
       },this);
+     
       this.makeLowerCase(gMetadata)
       this.makeLowerCase(pMetadata);
       this.makeLowerCase(cMetadata);

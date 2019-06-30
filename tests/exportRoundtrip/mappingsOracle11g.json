@@ -1,0 +1,16 @@
+ {
+    "ProductModelProductDescriptionCulture" : {
+      "tableName" : "ProductModelPDC"
+    },
+    "FactAdditionalInternationalProductDescription" : {
+      "tableName" : "FactAdditionalIPD"
+    },
+    "DimEmployee" : {
+      "tableName" : "DimEmployee",
+      "columns" : { "ParentEmployeeNationalIDAlternateKey" : "ParentEmployeeNationalID" }
+    },
+    "Production" : {
+      "tableName" : "Production",
+      "columns" : { "productmodelproductdescriptionculture" : "productmodelpdc" }
+    }   
+}    

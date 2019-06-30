@@ -93,7 +93,7 @@ class MsSQLCompare extends MsSQLDBI {
     
     
     async report(source,target,timingsArray) {
-
+        
       const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
       const timings = timingsArray[timingsArray.length - 1];
        
@@ -134,7 +134,6 @@ class MsSQLCompare extends MsSQLDBI {
                           .input('EMPTY_STRING_IS_NULL',this.sql.Bit,(this.parameters.EMPTY_STRING_IS_NULL === true ? 1 : 0))
                           .input('SPATIAL_PRECISION',this.sql.Int,(this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : null))
                           .execute(sqlCompareSchema,{},{resultSet: true});
-
       const successful = results.recordsets[0]
       const failed = results.recordsets[1]
 

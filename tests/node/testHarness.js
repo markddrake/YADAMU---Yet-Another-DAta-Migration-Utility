@@ -268,8 +268,9 @@ class TestHarness {
 
       await this.compareSchemas(db,dbSchema1,dbSchema2,timings,{});
     
-      const fc = new FileCompare(this.yadamu);
+      const fc = new FileCompare(this.yadamu);      
       testParameters = dbi.parameters.TABLE_MATCHING ? {TABLE_MATCHING : dbi.parameters.TABLE_MATCHING} : {}
+      Object.assign(testParameters,parameters);
       fc.configureTest(this.ros,{},testParameters)
       await fc.report(sourceFile, path.join(testRoot,targetFile1), path.join(testRoot,targetFile2), timings);    
 
@@ -557,7 +558,7 @@ class TestHarness {
               this.parsingMethod = RDBMS;
               break;
             default:
-              this.parsingMethod = RDBMS;
+              this.parsingMethod = CLARINET;
           }
         }
         for (const target of tc.targets) {
@@ -575,6 +576,7 @@ class TestHarness {
     this.yadamu.close()
   }
 }  
+
 async function main() {
     
   try {
