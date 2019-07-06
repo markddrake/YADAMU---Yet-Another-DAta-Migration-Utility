@@ -129,6 +129,16 @@ class DBWriter extends Writable {
       await this.generateStatementCache(metadata,!this.ddlComplete)
     }
   }      
+  
+  reportTableStatistics(elapsedTime,results) {
+      
+    const skipCount = this.dbi.skipCount;
+    const rowsRead = this.rowCount;
+    const rowsWritten = rowsRead - skipCount;
+    const throughput = (rowsWritten/Math.round(elapsedTime)) * 1000
+    this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${results.insertMode}]: Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round(throughput)} rows/s.\n`);
+    this.timings[this.tableName] = {rowCount: this.rowCount, insertMode: results.insertMode,  rowsSkipped: skipCount, elapsedTime: Math.round(elapsedTime).toString() + "ms", throughput: Math.round(throughput).toString() + "/s"};
+  }
  
   async _write(obj, encoding, callback) {
     try {
@@ -153,9 +163,8 @@ class DBWriter extends Writable {
             const results = await this.currentTable.finalize();
             this.skipTable = results.skipTable;
             if (this.skipTable === false) {
-              const elapsedTime = results.endTime - results.startTime;            
-              this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${results.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
-              this.timings[this.tableName] = {rowCount : this.rowCount, insertMode : results.insertMode, elapsedTime : Math.round(elapsedTime).toString() + "ms", throughput: Math.round((this.rowCount/Math.round(elapsedTime)) * 1000).toString() + "/s"};
+              const elapsedTime = results.endTime - results.startTime;
+              this.reportTableStatistics(elapsedTime,results);
             }
           }
           // this.setTableName(obj.table)
@@ -195,14 +204,14 @@ class DBWriter extends Writable {
         this.skipTable = results.skipTable;
         if (!this.skipTable) {
           const elapsedTime = results.endTime - results.startTime;            
-          this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${results.insertMode}]: Rows written ${this.rowCount}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round((this.rowCount/Math.round(elapsedTime)) * 1000)} rows/s.\n`);
-          this.timings[this.tableName] = {rowCount : this.rowCount, insertMode : results.insertMode, elapsedTime : Math.round(elapsedTime).toString() + "ms", throughput: Math.round((this.rowCount/Math.round(elapsedTime)) * 1000).toString() + "/s"};
+          this.reportTableStatistics(elapsedTime,results);
         }
         await this.dbi.finalizeDataLoad();
       }
       else {
         this.logWriter.write(`${new Date().toISOString()}: No tables found.\n`);
-      } 
+      }
+      await this.dbi.importComplete();
       callback();
     } catch (e) {
       this.logWriter.write(`${new Date().toISOString()}[DBWriter._final() "${this.tableName}"]: ${e}\n${e.stack}\n`);

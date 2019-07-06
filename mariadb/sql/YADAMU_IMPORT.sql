@@ -124,6 +124,9 @@ BEGIN
   END LOOP;
  
   CLOSE TABLE_METADATA;
+
+  -- Avoid Running out of OS Memory
+  FLUSH TABLES;
 end;
 $$
 --

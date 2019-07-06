@@ -94,9 +94,9 @@ class FileCompare extends FileWriter {
     return fileStats.tableInfo
   }
   
-  configureTest(logger,connectionProperties,testParameters) {
+  configureTest(logger,connectionProperties,testParameters,tableMappings) {
     this.logger = logger;
-    super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
+    super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS,tableMappings);
   }
     
   constructor(yadamu) {

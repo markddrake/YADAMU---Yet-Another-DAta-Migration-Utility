@@ -7,7 +7,6 @@ const FileReader = require('../file/node/fileReader.js');
 const FileWriter = require('../file/node/fileWriter.js');
 const DBReader = require('./dbReader.js');
 const DBWriter = require('./dbWriter.js');
-const ImportErrorManager = require('./importErrorManager.js');
 
 class Yadamu {
 
@@ -167,10 +166,6 @@ class Yadamu {
 	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQLTRACE);
     }
 
-    if (operation === 'Import') {
-       this.status.importErrorMgr = new ImportErrorManager(this.parameters.FILE,1000);
-    }
-  
     if (this.parameters.LOGFILE) {
       this.status.logFileName = this.parameters.LOGFILE;
     }
@@ -182,7 +177,8 @@ class Yadamu {
     if (this.parameters.DUMPFILE) {
       this.status.dumpFileName = this.parameters.DUMPFILE
     }
-  
+    
+    this.status.showInfoMsgs = (this.status.loglevel && (this.status.loglevel > 2));  
   }
     
   getParameters() {

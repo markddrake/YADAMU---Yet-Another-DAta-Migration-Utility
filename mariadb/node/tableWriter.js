@@ -16,12 +16,8 @@ class TableWriter {
     
     this.startTime = new Date().getTime();
     this.endTime = undefined;
-    this.insertMode = 'Batch';
 
     this.skipTable = false;
-
-    this.logDDLIssues   = (this.status.loglevel && (this.status.loglevel > 2));
-    this.logDDLIssues   = true;
   }
 
   async initialize() {
@@ -103,44 +99,53 @@ class TableWriter {
     }
   }
   
-  async writeBatch() {
-    try {
-      if (this.tableInfo.insertMode === 'Iterative') {
-        for (const i in this.batch) {
-          try {
-            const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[i]);
-            await this.processWarnings(results);
-          } catch(e) {
-            if (e.errno && ((e.errno === 3616) || (e.errno === 3617))) {
-              this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Batch size [${this.tableInfo.bulkOperation.rows.length}].  Skipping Row Reason: ${e.message}\n`)
-              this.rowCount--;
-            }
-            else {
-              throw e;
-            }
-          }    
-        }
-      }
-      else {  
+  async writeBatch() {     
+
+    this.batchCount++;
+
+    if (this.tableInfo.insertMode === 'Batch') {
+      try {
         // Slice removes the unwanted last comma from the replicated args list.
         const args = this.tableInfo.args.repeat(this.batchRowCount).slice(0,-1);
         const results = await this.dbi.executeSQL(this.tableInfo.dml.slice(0,-1) + args, this.batch);
         await this.processWarnings(results);
+        this.endTime = new Date().getTime();
+        this.batch.length = 0;
+        this.batchRowCount = 0;
+        return this.skipTable
+      } catch (e) {
+        if (this.status.showInfoMsgs) {
+          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batchRowCount}].  Batch Insert raised:\n${e}.\n`);
+          this.logWriter.write(`${this.tableInfo.dml}\n`);
+          // Need to fix this to print first and last row, rather than first and last value.
+          this.logWriter.write(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
+          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Switching to Iterative operations.\n`);          
+        }
+        // await this.dbi.rollbackTransaction();
+        this.tableInfo.insertMode = 'Iterative'   
       }
-      this.endTime = new Date().getTime();
-      this.batch.length = 0;
-      this.batchRowCount = 0;
-    } catch (e) {
-      this.skipTable = true;
-      this.status.warningRaised = true;
-      this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Skipping table. Batch size [${this.batch.length}]. Reason: ${e.message}\n`)
-      if (this.logDDLIssues) {
-        this.logWriter.write(`${this.tableInfo.dml}\n`);
-        this.logWriter.write(`${this.batch[0]}\n...${this.batch[this.batch.length-1]}\n`)
-      }      
-      this.batch.length = 0;
     }
+
+    for (const row in this.batch) {
+      try {
+        const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row]);
+        await this.processWarnings(results);
+      } catch (e) {
+        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []
+        const abort = this.dbi.handleInsertError(this.tableName,this.batch[row],e,this.batch.length,row,errInfo);
+        if (abort) {
+          await this.dbi.rollbackTransaction();
+          this.skipTable = true;
+          break;
+        }
+      }
+    }     
+    
+    this.endTime = new Date().getTime();
+    this.batch.length = 0;
+    this.batchRowCount = 0;
     return this.skipTable
+          
   }
 
   async finalize() {
@@ -153,6 +158,7 @@ class TableWriter {
     , endTime      : this.endTime
     , insertMode   : this.tableInfo.insertMode
     , skipTable    : this.skipTable
+    , batchCount   : this.batchCount
     }    
   }
 

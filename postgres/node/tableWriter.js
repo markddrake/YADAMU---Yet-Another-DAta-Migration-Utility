@@ -19,12 +19,9 @@ class TableWriter {
     
     this.startTime = new Date().getTime();
     this.endTime = undefined;
-    this.insertMode = 'Insert';
+    this.insertMode = 'Batch';
 
     this.skipTable = false;
-
-    this.logDDLIssues   = (this.status.loglevel && (this.status.loglevel > 2));
-    this.logDDLIssues   = true;
   }
 
   async initialize() {
@@ -97,28 +94,53 @@ class TableWriter {
   }
       
   async writeBatch() {
-    try {
-      // Slice removes the unwanted last comma from the replicated args list.
-      let argNumber = 1;
-      const args = Array(this.batchRowCount).fill(0).map(function() {return `(${Array(this.tableInfo.targetDataTypes.length).fill(0).map(function(){return `$${argNumber++}`}).join(',')})`},this).join(',');
-      const sqlStatement = this.tableInfo.dml + args
-      const results = await this.dbi.insertBatch(sqlStatement,this.batch);
-      this.endTime = new Date().getTime();
-      this.batch.length = 0;
-      this.batchRowCount = 0;
-    } catch (e) {
-      await this.dbi.rollbackTransaction();
-      console.log(e);
-      this.batchRowCount = 0;
-      this.skipTable = true;
-      this.status.warningRaised = true;
-      this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Skipping table. Batch size [${this.batch.length}]. Reason: ${e.message}\n`)
-      if (this.logDDLIssues) {
-        this.logWriter.write(`${this.tableInfo.dml}\n`);
-        this.logWriter.write(`${this.batch[0]}\n...${this.batch[this.batch.length-1]}\n`)
-      }      
-      this.batch.length = 0;
+
+    this.batchCount++;
+
+    if (this.insertMode === 'Batch') {
+      try {
+        // Slice removes the unwanted last comma from the replicated args list.
+        let argNumber = 1;
+        const args = Array(this.batchRowCount).fill(0).map(function() {return `(${Array(this.tableInfo.targetDataTypes.length).fill(0).map(function(){return `$${argNumber++}`}).join(',')})`},this).join(',');
+        const sqlStatement = this.tableInfo.dml + args
+        const results = await this.dbi.insertBatch(sqlStatement,this.batch);
+        this.endTime = new Date().getTime();
+        this.batch.length = 0;
+        this.batchRowCount = 0;
+        return this.skipTable
+      } catch (e) {
+        if (this.status.showInfoMsgs) {
+          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.tableInfo.bulkOperation.rows.length}].  Bulk Operation raised:\n${e.message}\n`);
+          this.logWriter.write(`${this.tableInfo.dml}\n`);
+          this.logWriter.write(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}`);
+          this.logWriter.write(`${this.tableInfo.bulkOperation.rows[0]}\n...\n${this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1]}\n`)
+          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Switching to Iterative operations.\n`);          
+        }
+        await this.dbi.rollbackTransaction();
+        this.insertMode = 'Iterative';
+      }
+    } 
+     
+    let argNumber = 1;
+    const args = Array(1).fill(0).map(function() {return `(${Array(this.tableInfo.targetDataTypes.length).fill(0).map(function(){return `$${argNumber++}`}).join(',')})`},this).join(',');
+    const sqlStatement = this.tableInfo.dml + args
+    for (const row in this.batch) {
+      try {
+        const results = await this.dbi.insertBatch(sqlStatement,this.batch[row]);
+      } catch(e) {
+        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []
+        const abort = this.dbi.handleInsertError(this.tableName,this.batch[row],e,this.batch.length,row,errInfo);
+        if (abort) {
+          await this.dbi.rollbackTransaction();
+          this.skipTable = true;
+          break;
+        }
+      }
     }
+
+    this.endTime = new Date().getTime();
+    this.batchRowCount = 0;
+    this.batch.length = 0;
     return this.skipTable   
   }
 
@@ -132,6 +154,7 @@ class TableWriter {
     , endTime      : this.endTime
     , insertMode   : this.insertMode
     , skipTable    : this.skipTable
+    , batchCount   : this.batchCount
     }    
   }
 

@@ -21,7 +21,7 @@ class TestHarness {
 
   constructor() {
   
-    this.yadamu        = new YadamuTest(); 
+    this.yadamu        = new YadamuTest();     
     this.config        = require(path.resolve(this.yadamu.getParameters().CONFIG))
     this.connections   = require(path.resolve(this.config.connections))
     this.parsingMethod = CLARINET;
@@ -62,7 +62,7 @@ class TestHarness {
       return dbi;
   }
   
-  getTestInterface(db,role,schema,testParameters,testConnection) {
+  getTestInterface(db,role,schema,testParameters,testConnection,tableMappings) {
 
     const parameters = testParameters ? Object.assign({},testParameters) : {}
     const connection = Object.assign({},testConnection)
@@ -71,7 +71,7 @@ class TestHarness {
     const dbi = this.getDatabaseInterface(db)
     
     parameters[role] = (db === "mssql" ? schema.owner : schema)
-    dbi.configureTest(this.ros,connection,parameters,schema)
+    dbi.configureTest(this.ros,connection,parameters,schema,tableMappings)
     return dbi;    
   }
   
@@ -154,6 +154,15 @@ class TestHarness {
       return compareParameters;
   }
   
+  checkTimingsForErrors(timings) {
+    // If operations failed timings may be undefined. If so replace with empty object to prevent errors when reporting
+    timings.forEach(function (t,i) {
+      if ((t === undefined) || (t === null)) {
+        timings[i] = {}
+      }
+    },this)
+  }
+  
   async compareSchemas(db,sourceSchema,targetSchema,timings,compareParameters) {
 
      const dbi = this.getDatabaseInterface(db);
@@ -228,10 +237,11 @@ class TestHarness {
       this.printResults(`"${source}"://"${sourceFile}"`,`"${db}"://"${targetDescription}"`,elapsedTime)
 
       testParameters = parameters ? Object.assign({},parameters) : {}
-      dbi = this.getTestInterface(db,'OWNER',dbSchema1,testParameters,this.connections[db]);     
+      dbi = this.getTestInterface(db,'OWNER',dbSchema1,testParameters,this.connections[db],undefined);     
       startTime = new Date().getTime()
       timings[1] = await this.yadamu.doExport(dbi,path.join(testRoot,targetFile1));
       elapsedTime = new Date().getTime() - startTime;
+      const tableMappings = dbi.reverseTableMappings();
 
       let sourceDescription = targetDescription;
       operationsList.push(`"${source}"://"${targetFile1}"`)
@@ -242,9 +252,8 @@ class TestHarness {
       await this.recreateSchema(db,this.connections[db],dbSchema2);     
 
       testParameters = parameters ? Object.assign({},parameters) : {}
-      dbi = this.getTestInterface(db,'TOUSER',dbSchema2,testParameters,this.connections[db]);     
-
-
+      dbi = this.getTestInterface(db,'TOUSER',dbSchema2,testParameters,this.connections[db],tableMappings);     
+      
       startTime = new Date().getTime();
       timings[2] = await this.doImport(dbi,path.join(testRoot,targetFile1));
       elapsedTime = new Date().getTime() - startTime;
@@ -265,7 +274,8 @@ class TestHarness {
       this.printResults(`"${db}"://"${sourceDescription}"`,`"${source}"://"${targetFile2}"`,elapsedTime)
       
       const opElapsedTime =  new Date().getTime() - opStartTime
-
+     
+      this.checkTimingsForErrors(timings);
       await this.compareSchemas(db,dbSchema1,dbSchema2,timings,{});
     
       const fc = new FileCompare(this.yadamu);      
@@ -390,8 +400,8 @@ class TestHarness {
         sourceDescription = source === 'mssql' ? `${sourceSchema.schema}"."${sourceSchema.owner}` : sourceSchema
         targetSchema = this.getDatabaseSchema(source,steps[1])  
         await this.recreateSchema(source,this.connections[target],targetSchema);
-        const sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,testParameters,this.connections[source]);
-        const targetDB = this.getTestInterface(source,'TOUSER',targetSchema,testParameters,this.connections[source]);
+        const sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,testParameters,this.connections[source],undefined);
+        const targetDB = this.getTestInterface(source,'TOUSER',targetSchema,testParameters,this.connections[source],undefined);
         startTime = new Date().getTime();
         timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
         elapsedTime = new Date().getTime() - startTime
@@ -409,8 +419,8 @@ class TestHarness {
           const targetSchema = this.getDatabaseSchema(source,steps[2])  
           const targetDescription = source === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
           await this.recreateSchema(source,this.connections[source],targetSchema);
-          const sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,testParameters,this.connections[source]);
-          const targetDB = this.getTestInterface(source,'TOUSER',targetSchema,testParameters,this.connections[source]);
+          const sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,testParameters,this.connections[source],undefined);
+          const targetDB = this.getTestInterface(source,'TOUSER',targetSchema,testParameters,this.connections[source],undefined);
           startTime = new Date().getTime();
           timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
           elapsedTime = new Date().getTime() - startTime
@@ -423,12 +433,13 @@ class TestHarness {
         targetSchema = this.getDatabaseSchema(target,steps[1])  
         await this.recreateSchema(target,this.connections[target],targetSchema);
         let targetDescription = target === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
-        let sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,testParameters,this.connections[source]);
-        let targetDB = this.getTestInterface(target,'TOUSER',targetSchema,testParameters,this.connections[target]);
+        let sourceDB = this.getTestInterface(source,'OWNER',sourceSchema,testParameters,this.connections[source],undefined);
+        let targetDB = this.getTestInterface(target,'TOUSER',targetSchema,testParameters,this.connections[target],undefined);
         this.propogateTableMatching(sourceDB,targetDB);
         startTime = new Date().getTime();
         timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
         elapsedTime = new Date().getTime() - startTime
+        const tableMappings = targetDB.reverseTableMappings();
         operationsList.push(`"${source}"://"${sourceDescription}"`)
         this.printResults(`"${source}"://"${sourceDescription}"`,`"${target}"://"${targetDescription}"`,elapsedTime)
         // Copy Target to Source
@@ -436,8 +447,8 @@ class TestHarness {
         sourceDescription = target === 'mssql' ? `${sourceSchema.schema}"."${sourceSchema.owner}` : sourceSchema
         targetSchema = this.getDatabaseSchema(source,steps[2])  
         targetDescription = source === 'mssql' ? `${targetSchema.schema}"."${targetSchema.owner}` : targetSchema
-        sourceDB = this.getTestInterface(target,'OWNER',sourceSchema,testParameters,this.connections[target]);
-        targetDB = this.getTestInterface(source,'TOUSER',targetSchema,testParameters,this.connections[source]);
+        sourceDB = this.getTestInterface(target,'OWNER',sourceSchema,testParameters,this.connections[target],undefined);
+        targetDB = this.getTestInterface(source,'TOUSER',targetSchema,testParameters,this.connections[source],tableMappings);
         this.propogateTableMatching(sourceDB,targetDB);
         startTime = new Date().getTime();
         timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
@@ -448,7 +459,8 @@ class TestHarness {
       }        
 
       const dbElapsedTime =  new Date().getTime() - dbStartTime
-         
+      
+      this.checkTimingsForErrors(timings);   
       await this.compareSchemas(source, originalSchema, targetSchema, timings, this.getCompareParameters(source,target,testParameters))
       this.dbRoundtripResults(operationsList,dbElapsedTime)
       

@@ -154,9 +154,6 @@ class TableWriter {
     this.insertMode = 'Batch';
 
     this.skipTable = false;
-
-    this.logDDLIssues   = (this.status.loglevel && (this.status.loglevel > 2));
-    // this.logDDLIssues   = true
   }
 
   async initialize() {
@@ -237,6 +234,8 @@ class TableWriter {
       
   async writeBatch() {
     
+    this.batchCount++;
+
     if (this.tableInfo.bulkSupported) {
       try {
         
@@ -245,14 +244,15 @@ class TableWriter {
         this.tableInfo.bulkOperation.rows.length = 0;
         return this.skipTable
       } catch (e) {
-        if (this.logDDLIssues) {
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Bulk Operation failed. Batch size [${this.tableInfo.bulkOperation.rows.length}]. Reason: ${e.message}\n`)
-        }
-        this.tableInfo.bulkSupported = false;
-        if (this.logDDLIssues) {
+        if (this.status.showInfoMsgs) {
+          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.tableInfo.bulkOperation.rows.length}].  Bulk Operation raised:\n${e.message}.\n`);
           this.logWriter.write(`${this.tableInfo.dml}\n`);
           this.logWriter.write(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}`);
-          this.logWriter.write(`${this.tableInfo.bulkOperation.rows[0]}\n...${this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1]}\n`)        }      
+          this.logWriter.write(`${this.tableInfo.bulkOperation.rows[0]}\n...\n${this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1]}\n`)
+          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Switching to Iterative operations.\n`);          
+        }
+        // await this.dbi.rollbackTransaction();
+        this.tableInfo.bulkSupported = false;
       }
     }
     
@@ -262,30 +262,28 @@ class TableWriter {
       this.tableInfo.preparedStatement = await this.createPreparedStatement(this.tableInfo.dml, this.tableInfo.targetDataTypes) 
     }
 
-    try {
-      for (const r in this.tableInfo.bulkOperation.rows) {
+    for (const row in this.tableInfo.bulkOperation.rows) {
+      try {
         const args = {}
-        for (const c in this.tableInfo.bulkOperation.rows[0]){
-          args['C'+c] = this.tableInfo.bulkOperation.rows[r][c]
+        for (const col in this.tableInfo.bulkOperation.rows[0]){
+           args['C'+col] = this.tableInfo.bulkOperation.rows[row][col]
         }
         const results = await this.tableInfo.preparedStatement.execute(args);
+      } catch (e) {
+        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.columns),] : []
+        const abort = this.dbi.handleInsertError(this.tableName,this.tableInfo.bulkOperation.rows[row],e,this.tableInfo.bulkOperation.length,row,errInfo);
+        if (abort) {
+          await this.dbi.rollbackTransaction();
+          this.skipTable = true;
+          break;
+        }
       }
-            
-      this.endTime = new Date().getTime();
-      this.tableInfo.bulkOperation.rows.length = 0;
-      return this.skipTable
-    } catch (e) {
-      this.skipTable = true;
-      this.status.warningRaised = true;
-      this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Skipping table. Batch size [${this.tableInfo.bulkOperation.rows.length}]. Reason: ${e.message}\n`)
-      if (this.logDDLIssues) {
-        this.logWriter.write(`${this.tableInfo.dml}\n`);
-        this.logWriter.write(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}`);
-        this.logWriter.write(`${this.tableInfo.bulkOperation.rows[0]}\n...${this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1]}\n`)
-      }      
-      this.tableInfo.bulkOperation.rows.length = 0;
-    }
+    }       
+    
+    this.endTime = new Date().getTime();
+    this.tableInfo.bulkOperation.rows.length = 0;
     return this.skipTable
+   
   }
 
   async finalize() {
@@ -301,6 +299,7 @@ class TableWriter {
     , endTime      : this.endTime
     , insertMode   : this.tableInfo.bulkSupported === true ? 'Bulk' : 'Iterative'
     , skipTable    : this.skipTable
+    , batchCount   : this.batchCount
     }    
   }
 

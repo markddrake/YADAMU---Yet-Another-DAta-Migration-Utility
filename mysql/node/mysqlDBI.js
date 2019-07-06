@@ -502,6 +502,18 @@ class MySQLDBI extends YadamuDBI {
   async finalizeDataLoad() {
   }  
 
+  /* 
+  
+  async handleInsertError(tableName,record,err,length,row,info) {
+ 
+    // Invalid Lat/Long Values....
+    if (e.errno && ((e.errno === 3616) || (e.errno === 3617))) {
+      this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Skipping Row Reason: ${e.message}\n`)
+    }
+    super.handleInsertError((tableName,record,err,length,row,info);
+  }
+  */
+
 }
 
 module.exports = MySQLDBI

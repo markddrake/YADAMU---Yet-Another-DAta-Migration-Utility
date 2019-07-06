@@ -9,6 +9,7 @@ class YadamuTest extends Yadamu {
   
   constructor() {
     super('YADAMU Tester')
+    this.status.showInfoMsgs = true;
   }
   
   reset() {

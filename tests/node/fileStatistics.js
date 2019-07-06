@@ -157,7 +157,14 @@ class FileStatistics {
     if  (this.tableInfo[this.tableName].rowCount > 1) {
       this.tableInfo[this.tableName].byteCount += this.tableInfo[this.tableName].rowCount - 1;
     }
-  }      
+  }    
+
+  async exportComplete() {
+  }
+
+  async importComplete() {
+  }
+   
 }
 
 module.exports = FileStatistics

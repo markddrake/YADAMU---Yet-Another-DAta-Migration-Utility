@@ -28,7 +28,7 @@ class StatementGenerator {
         const tableInfo = statementCache[this.metadata[table].tableName];
         tableInfo.batchSize = this.batchSize;
         tableInfo.commitSize = this.commitSize;
-        tableInfo.insertMode = 'Bulk';
+        tableInfo.insertMode = 'Batch';
         const columnNames = JSON.parse('[' + this.metadata[table].columns + ']');
         
         const setOperators = tableInfo.targetDataTypes.map(function(targetDataType,idx) {

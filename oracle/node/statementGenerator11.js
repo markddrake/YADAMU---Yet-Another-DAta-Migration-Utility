@@ -15,6 +15,7 @@ class StatementGenerator11 extends StatementGenerator {
   constructor(dbi, targetSchema, metadata, batchSize, commitSize, lobCacheSize, importWrapper) {
     super(dbi, targetSchema, metadata, batchSize, commitSize, lobCacheSize)
     this.importWapper = importWrapper
+    this.mappinhgs = {}
   }
     
   generateDDL(targetSchema,tableName,dml,columns,declararions,assignments,variables){
@@ -23,7 +24,6 @@ class StatementGenerator11 extends StatementGenerator {
   }
 
   getPLSQL(dml) {
-    
     return dml.substring(dml.indexOf('\rWITH\r')+5,dml.indexOf('\rselect'));
   }
 
@@ -39,15 +39,12 @@ class StatementGenerator11 extends StatementGenerator {
     return `<metadata>${tablesXML}</metadata>`
     
   }
-
   
   async getMetadataLob() {
     
     const metadataXML = this.metadataToXML();    
     return await this.dbi.lobFromString(metadataXML);
   }
-      
-
       
 }
 

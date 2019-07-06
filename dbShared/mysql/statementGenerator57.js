@@ -223,7 +223,7 @@ class StatementGenerator {
       
   generateTableInfo(metadata) {
       
-    let insertMode = 'Bulk';
+    let insertMode = 'Batch';
   
     const columnNames = metadata.columns.split(',');
     const dataTypes = metadata.dataTypes

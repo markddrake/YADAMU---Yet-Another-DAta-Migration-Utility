@@ -20,6 +20,7 @@ const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const StatementGenerator11 = require('./statementGenerator11.js');
+const StringWriter = require('./stringWriter.js');
 
 const defaultParameters = {
   BATCHSIZE         : 10000
@@ -393,6 +394,42 @@ class OracleDBI extends YadamuDBI {
     }
   }     
 
+  stringFromClob(clob) {
+     
+    return new Promise(async function(resolve,reject) {
+      try {
+        const stringWriter = new  StringWriter();
+        clob.setEncoding('utf8');  // set the encoding so we get a 'string' not a 'buffer'
+        
+        clob.on('error',
+        async function(err) {
+           await clob.close();
+           reject(err);
+        });
+        
+        stringWriter.on('finish', 
+        async function() {
+          await clob.close(); 
+          resolve(stringWriter.toString());
+        });
+       
+        clob.pipe(stringWriter);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  };
+
+  async stringFromLocalClob(clob) {
+      
+     // ### Ugly workaround due to the fact it does not appear possible to directly re-read a local CLOB 
+     
+     const sql = `select :tempClob "newClob" from dual`;
+     const results = await this.executeSQL(sql,{tempClob:clob});
+     return await this.stringFromClob(results.rows[0][0])
+     
+  }
+
   lobFromStream (stream) {
     
     const conn = this.connection;
@@ -653,6 +690,7 @@ class OracleDBI extends YadamuDBI {
     uuidv1({},sqlUUID,0);
     this.exportWrapper = `YEXP_${sqlUUID.toString('base64')}`;
     this.importWrapper = `YIMP_${sqlUUID.toString('base64')}`;
+        
   }
 
   getConnectionProperties() {
@@ -795,7 +833,7 @@ class OracleDBI extends YadamuDBI {
        // Need to cature the SystemInformation and DDL objects of the export file to make sure the DDL can be processed on the RDBMS.
        // If any DDL statement exceeds maxStringSize then DDL will have to executed statement by statement from the client
        // 'Tee' the input stream used to create the temporary lob that contains the export file and pass it through the Sax Parser.
-       // If any of the DDL operations exceed the maxium string size supported by server side JSON operations cache the ddl statements on the client
+       // If any of the DDL operations exceed the maximum string size supported by server side JSON operations cache the ddl statements on the client
        
        const saxParser  = new FileParser(this.logWriter)  
        const ddlCache = new DDLCache();
@@ -949,8 +987,7 @@ class OracleDBI extends YadamuDBI {
   }
 
   async getSchemaInfo(schema) {
-     
-     
+
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlTableInfo}\n\/\n`)
     }
@@ -987,6 +1024,57 @@ class OracleDBI extends YadamuDBI {
     
     return `create or replace function "${this.parameters.OWNER}"."${this.exportWrapper}"(P_TABLE_OWNER VARCHAR2,P_ANYDATA ANYDATA)\nreturn CLOB\nas\n${withClause}begin\nreturn SERIALIZE_OBJECT(P_TABLE_OWNER, P_ANYDATA);\nend;`;
 
+  }
+  
+  renameLongIdentifers() {
+        
+    // ### Todo Add better algorthim than simple tuncation. Check for Duplicates and use counter when duplicates are detected.
+
+    const tableMappings = {}
+    let mapTables = false;
+    const tables = Object.keys(this.metadata)    
+    tables.forEach(function(table,idx){
+      const tableName = this.metadata[table].tableName
+      if (tableName.length > 30) {
+        mapTables = true;
+        const newTableName = tableName.substring(0,29);
+        tableMappings[table] = {tableName : newTableName}
+        this.metadata[table].tableName = newTableName;
+      }
+      const columnNames = JSON.parse('[' + this.metadata[table].columns + ']')
+      let mapColumns = false;
+      let columnMappings = {}
+      columnNames.forEach(function(columnName,idx) {
+        if (columnName.length > 30) {
+          mapTables = true;
+          mapColumns = true;
+          const newColumnName = columnName.substring(0,29);
+          columnMappings[columnName] = newColumnName
+          columnNames[idx] = newColumnName
+        }
+      },this);
+      if (mapColumns) {
+        this.metadata[table].columns = '"' + columnNames.join('","')  + '"'
+        if (tableMappings[table]) {
+          tableMappings[table].columns = columnMappings;
+        }
+        else {
+          tableMappings[table] = {tableName : tableName, columns : columnMappings}
+        }
+      }
+    },this)        
+    
+    if (mapTables) {
+      this.tableMappings = tableMappings;
+    }
+
+  }    
+
+  validateIdentifiers() {
+      
+     if (this.dbVersion < 12) {
+       this.renameLongIdentifers();
+     }
   }
   
   generateSelectStatement(tableMetadata) {

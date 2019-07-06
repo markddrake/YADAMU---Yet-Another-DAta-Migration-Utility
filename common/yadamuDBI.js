@@ -10,6 +10,7 @@ const Readable = require('stream').Readable;
 */
 
 const Yadamu = require('./yadamu.js');
+const YadamuErrorLogger = require('./yadamuErrorLogger.js');
 const DBParser = require('./dbParser.js');
 
 /*
@@ -53,13 +54,14 @@ class YadamuDBI {
     return results;      
     
   } 
+  
   processLog(log,status,logWriter) {
 
     const logDML         = (status.loglevel && (status.loglevel > 0));
     const logDDL         = (status.loglevel && (status.loglevel > 1));
-    const logDDLIssues   = (status.loglevel && (status.loglevel > 2));
+    const logDDLMsgs     = (status.loglevel && (status.loglevel > 2));
     const logTrace       = (status.loglevel && (status.loglevel > 3));
-   
+
     if (status.dumpFileName) {
       fs.writeFileSync(status.dumpFileName,JSON.stringify(log));
     }
@@ -89,24 +91,25 @@ class YadamuDBI {
                     case (logEntryType === "error"):
    	                switch (true) {
    		              case (logEntry.severity === 'FATAL') :
-                          status.errorRaised = true;
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}\n`)
+                        status.errorRaised = true;
+                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}\n`)
    				        break
    					  case (logEntry.severity === 'WARNING') :
-                          status.warningRaised = true;
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
-                          break;
+                        status.warningRaised = true;
+                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
+                        break;
   					  case (logEntry.severity === 'CONTENT_TOO_LARGE') :
-                          status.errorRaised = true;
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database does not support VARCHAR2 values longer than ${this.maxStringSize} bytes.\n`)
-                          break;
+                        status.errorRaised = true;
+                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database does not support VARCHAR2 values longer than ${this.maxStringSize} bytes.\n`)
+                        break;
     			      case (logEntry.severity === 'SQL_TOO_LARGE') :
-                          status.errorRaised = true;
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database is not configured for DLL statements longer than ${this.maxStringSize} bytes.\n`)
-                          break;
-                        case (logDDLIssues) :
-                          logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
-                      } 	
+                        status.errorRaised = true;
+                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database is not configured for DLL statements longer than ${this.maxStringSize} bytes.\n`)
+                        break;
+                      case (logDDLMsgs) :
+                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
+                        break;
+                    } 	
                   } 
    				if ((status.sqlTrace) && (logEntry.sqlStatement)) {
    				  status.sqlTrace.write(`${logEntry.sqlStatement}\n${this.STATEMENT_SEPERATOR}\n`)
@@ -130,15 +133,17 @@ class YadamuDBI {
     return parameters
   }
 
-  configureTest(connectionProperties,testParameters,defaultParameters,) {
+  configureTest(connectionProperties,testParameters,defaultParameters,tableMappings) {
     this.connectionProperties = connectionProperties
     this.parameters = this.yadamu.getParameters()
     this.parameters = this.updateParameters(this.parameters,testParameters);
     this.parameters = this.mergeParameters(this.parameters,defaultParameters);
     if (this.parameters.MAPPINGS) {
       this.loadTableMappings(this.parameters.MAPPINGS);
-      this.reverseTableMappings()
     }  
+    else {
+      this.tableMappings = tableMappings
+    }
   }
 
   setConnectionProperties(connectionProperties) {
@@ -167,26 +172,27 @@ class YadamuDBI {
   
   loadTableMappings(mappingFile) {
     this.tableMappings = require(path.resolve(mappingFile));
-    // this.reversedTableMappings = reverseTableMappings(this.tableMappings);
   }
-  
+
   reverseTableMappings() {
 
-    const reverseMappings = {}
-    Object.keys(this.tableMappings).forEach(function(table) {
-      const newKey = this.tableMappings[table].tableName
-      reverseMappings[newKey] = { "tableName" : table};
-      if (this.tableMappings[table].columns) {
-        const columns = {};
-        Object.keys(this.tableMappings[table].columns).forEach(function(column) {
-          const newKey = this.tableMappings[table].columns[column]
-          columns[newKey] = column;
-        },this);
-        reverseMappings[newKey].columns = columns
-      }
-    },this)
-    return reverseMappings;
-
+    if (this.tableMappings !== undefined) {
+      const reverseMappings = {}
+      Object.keys(this.tableMappings).forEach(function(table) {
+        const newKey = this.tableMappings[table].tableName
+        reverseMappings[newKey] = { "tableName" : table};
+        if (this.tableMappings[table].columns) {
+          const columns = {};
+          Object.keys(this.tableMappings[table].columns).forEach(function(column) {
+            const newKey = this.tableMappings[table].columns[column]
+            columns[newKey] = column;
+          },this);
+          reverseMappings[newKey].columns = columns
+        }
+      },this)
+      return reverseMappings;
+    }
+    return this.tableMappings;
   }
     
   applyTableMappings() {
@@ -210,10 +216,16 @@ class YadamuDBI {
     },this);   
   }
   
+  validateIdentifiers() {
+  }
+  
   setMetadata(metadata) {
     this.metadata = metadata
     if (this.tableMappings) {
       this.applyTableMappings()
+    }
+    else {
+      this.validateIdentifiers()
     }
   }
   
@@ -229,6 +241,12 @@ class YadamuDBI {
         this.logWriter.write(`${e}\n${tableInfo.ddl}\n`)
       } 
     },this))
+  }
+  
+  createErrorLogger() {
+    const errorFolderPath = this.parameters.ERROR_FOLDER ? this.parameters.ERROR_FOLDER : 'work/errors';
+    this.errorLogFilename = path.resolve(errorFolderPath +  path.sep + 'yadamuImportErrors_' + new Date().toISOString().split(':').join('') + ".json");
+    return new YadamuErrorLogger(this.errorLogFilename,this.logWriter);
   }
     
   constructor(yadamu,defaultParameters) {
@@ -253,11 +271,15 @@ class YadamuDBI {
     this.tableInfo  = undefined;
     this.insertMode = 'Empty';
     this.skipTable = true;
+    this.skipCount = 0;
 
     this.tableMappings = undefined;
     if (this.parameters.MAPPINGS) {
       this.loadTableMappings(this.parameters.MAPPINGS);
     }   
+ 
+    this.errorLogger = this.createErrorLogger()
+
   }
   
   /*  
@@ -402,8 +424,9 @@ class YadamuDBI {
   }
 
   getTableWriter(TableWriter,table) {
+    this.skipCount = 0;    
     const tableName = this.metadata[table].tableName 
-    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.logWriter);      
+    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.logWriter);
   }
  
   async finalizeDataLoad() {
@@ -414,6 +437,29 @@ class YadamuDBI {
   }
 
   async importComplete() {
+    this.errorLogger.close();
+  }
+  
+  writeErrorLog(tableName,row) {
+    this.errorLogger.logError(tableName,row);
+  }
+  
+  handleInsertError(tableName,record,err,batchSize,row,info) {
+     this.skipCount++;
+     this.status.warningRaised = true;
+     this.logWriter.write(`${new Date().toISOString()}[YadamuDBI.handleInsertError("${tableName}")][DATA_CONVERSION_FAILURE]: Batch size [${batchSize}]. Row [${row}]. Insert operation raised:\n${err}.\n`);
+     this.writeErrorLog(tableName,record);
+     info.forEach(function (info) {
+       this.logWriter.write(`${info}\n`);
+     },this)
+
+     const abort = (this.skipCount === ( this.parameters.MAX_ERRORS ? this.parameters.MAX_ERRORS : 10)) 
+     this.errorRaised = (this.errorRaised && abort);
+     if (abort) {
+       this.logWriter.write(`${new Date().toISOString()}[YadamuDBI.handleInsertError("${tableName}")][ABORT]: Skipping Table.\n`);
+     }
+     return abort;
+     
   }
 }
 

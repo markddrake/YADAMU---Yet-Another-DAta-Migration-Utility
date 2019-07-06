@@ -30,9 +30,6 @@ class TableWriter {
     this.insertMode = 'Batch';
 
     this.skipTable = false;
-
-    this.logDDLIssues   = (this.status.loglevel && (this.status.loglevel > 2));
-    this.logDDLIssues   = true;
   }
 
   async disableTriggers() {
@@ -192,90 +189,105 @@ end;`
     return this.batch.length > 0;
   }
       
+      
+  async serializeLobs(record) {
+    const newRecord = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
+      if (record[idx] !== null) {
+        if (this.tableInfo.binds[idx].type === oracledb.CLOB) {
+          // ### Cannot reac contact of local clob...
+          // return this.dbi.stringFromClob(record[idx])
+          return this.dbi.stringFromLocalClob(record[idx])
+        }
+      }
+      return record[idx];
+    },this))
+    return newRecord;
+  }   
+      
   async writeBatch() {
       
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
     // Infortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
     // So we have to free the current tempLob Cache and create a new one for each batch
 
-    try {
-      this.batchCount++;
-      this.insertMode = 'Batch';
-      await this.dbi.executeSQL(sqlSetSavePoint,[])
-      const results = await this.dbi.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
-      this.endTime = new Date().getTime();
-      // console.log(`Batch:${this.batchCount}. ${this.batch.length} rows inserted`)
-      this.batch.length = 0;
-      this.freeLobList();
-      return this.skipTable
-    } catch (e) {
-      await this.dbi.executeSQL(sqlRollbackSavePoint,[])
-      if (e.errorNum && (e.errorNum === 4091)) {
-        // Mutating Table - Convert to Cursor based PL/SQL Block
-        status.warningRaised = true;
-        this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.length}]. executeMany() operation raised ${e}. Retrying using PL/SQL Block.\n`);
-        this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
-        }
-        try {
-          const results = await this.dbi.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds}); 
-          this.endTime = new Date().getTime();
-          this.batch.length = 0;
-          return this.skipTable
-        } catch (e) {
-          await this.dbi.rollbackTransaction();
-          if (this.logDDLIssues) {
-            this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.rows.length}]. executeMany() operation with PL/SQL block raised ${e}. Retrying using execute() loop.\n`);
+    this.batchCount++;
+    
+    if (this.insertMode === 'Batch') {
+
+      try {
+        await this.dbi.executeSQL(sqlSetSavePoint,[])
+        const results = await this.dbi.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
+        this.endTime = new Date().getTime();
+        // console.log(`Batch:${this.batchCount}. ${this.batch.length} rows inserted`)
+        this.batch.length = 0;
+        this.freeLobList();
+        return this.skipTable
+      } catch (e) {
+        await this.dbi.executeSQL(sqlRollbackSavePoint,[])
+        if (e.errorNum && (e.errorNum === 4091)) {
+          await this.dbi.executeSQL(sqlSetSavePoint,[])
+          // Mutating Table - Convert to Cursor based PL/SQL Block
+          if (this.status.showInfoMsgs) {
+            logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.length}]. executeMany() operation raised:\n${e}\n`);
             this.logWriter.write(`${this.tableInfo.dml}\n`);
             this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
             this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
-            this.logWriter.write(`${this.batch[0]}\n...${this.batch[this.batch.length-1]}\n`);
+            this.logWriter.write(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
+            this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: . Switching to PL/SQL Block.\n`);          
           }
-        }
-      } 
-      else {  
-        if (this.logDDLIssues) {
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.length}]. executeMany() operation raised ${e}. Retrying using execute() loop.\n`);
-          this.logWriter.write(`${this.tableInfo.dml}\n`);
-          this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
-          this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
-          this.logWriter.write(`${this.batch[0]}\n...${this.batch[this.batch.length-1]}\n`);
+          this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
+          if (this.status.sqlTrace) {
+            this.status.sqlTrace.write(`${this.tableInfo.dml}\n/\n`);
+          }
+          try {
+            const results = await this.dbi.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds}); 
+            this.endTime = new Date().getTime();
+            this.batch.length = 0;
+            return this.skipTable
+          } catch (e) {
+            await this.dbi.executeSQL(sqlRollbackSavePoint,[])
+            if (this.status.showInfoMsgs) {
+              this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.rows.length}]. executeMany() with PL/SQL block raised:\n${e}\n`);
+              this.logWriter.write(`${this.tableInfo.dml}\n`);
+              this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
+              this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
+              this.logWriter.write(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
+              this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Switching to Iterative operations.\n`);          
+            }
+            this.insertMode = 'Iterative';
+          }
+        } 
+        else {  
+          if (this.status.showInfoMsgs) {
+            this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.length}]. executeMany() operation raised:\n${e}.\n`);
+            this.logWriter.write(`${this.tableInfo.dml}\n`);
+            this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
+            this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
+            this.logWriter.write(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
+            this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Switching to Iterative operations.\n`);          
+          }
+          this.insertMode = 'Iterative';
         }
       }
     }
 
-    let row = undefined;
-    this.insertMode = 'Iterative';
-    for (row in this.batch) {
+
+    for (const row in this.batch) {
       try {
-        let results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row])
+        const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row])
       } catch (e) {
-        this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][ERROR]: Batch size [${this.batch.length}]. Row [${row}]. insert() operation raised ${e}.\n`);
-        this.status.warningRaised = true;
-        if (this.logDDLIssues) {
-          this.logWriter.write(`${this.tableInfo.dml}\n`);
-          this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
-          this.logWriter.write(`${this.batch[0]}\n...${this.batch[this.batch.length-1]}\n`);
-        } 
-        // Write Record to 'bad' file.
-        try {
-          if ( this.status.importErrorMgr ) {
-            this.status.importErrorMgr.logError(this.tableName,this.batch[row]);
-          }
-          else {
-            this.logWriter.write(`${this.batch[row]}\n`)               
-          }
-        } catch (e) {
-        //  Catch Max Errors Exceeded Assertion
+        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,this.tableInfo.targetDataTypes,JSON.stringify(this.tableInfo.binds)] : []
+        const record = await this.serializeLobs(this.batch[row])
+        const abort = this.dbi.handleInsertError(this.tableName,record,e,this.batch.length,row,errInfo);
+        if (abort) {
           await this.dbi.rollbackTransaction();
           this.skipTable = true;
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][ERROR]: Batch size [${this.batch.length}]. Row [${row}]. Skipping table. Reason: ${e.message}.\n`);
+          break;
         }
       }
     } 
     // console.log(`Iterative:${this.batchCount}. ${this.batch.length} rows inserted`)
-    // Iterative must commit to allow a subsequent batch to rollback.
+    // ### Iterative must commit to allow a subsequent batch to rollback.
     this.endTime = new Date().getTime();
     this.batch.length = 0;
     this.freeLobList();
@@ -293,6 +305,7 @@ end;`
     , endTime      : this.endTime
     , insertMode   : this.insertMode
     , skipTable    : this.skipTable
+    , batchCount   : this.batchCount
     }    
   }
 

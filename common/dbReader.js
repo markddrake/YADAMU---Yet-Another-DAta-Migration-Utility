@@ -20,7 +20,7 @@ class DBReader extends Readable {
     this.nextPhase = 'systemInformation'
     this.ddlCompleted = false;
     this.outputStream = undefined;
-      
+
   }
   
   setOutputStream(outputStream) {

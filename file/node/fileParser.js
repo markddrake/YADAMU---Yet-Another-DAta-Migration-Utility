@@ -28,17 +28,6 @@ class TextParser extends Transform {
       
       switch (self.jDepth){
         case 1:
-          // Push the completed first level object/array downstream. Replace the current top level object with an empty object of the same type.
-          if (self.currentObject.metadata) {
-            self.tableList = new Set(Object.keys(self.currentObject.metadata));
-          }
-          self.push(self.currentObject);
-          if (Array.isArray(self.currentObject)) {
-             self.currentObject = [];
-          }
-          else {
-             self.currentObject = {};
-          }
           if (key === 'data') {
             self.dataPhase = true;
           }
@@ -73,9 +62,6 @@ class TextParser extends Transform {
             }
             self.push(self.currentObject);
           }  
-          if (key === 'data') {
-            self.dataPhase = true;
-          }
           break;
         case 1:
           if ((self.dataPhase) && (key != undefined)) {
@@ -118,13 +104,6 @@ class TextParser extends Transform {
         v = self.chunks.join('');
         self.chunks = []
       }
- 
-      /*
-      // What was I thinking off.....
-      if (typeof v === 'boolean') {
-        v = new Boolean(v).toString();
-      }
-      */
       
       if (Array.isArray(self.currentObject)) {
           // currentObject is an ARRAY. We got a value so add it to the Array
@@ -140,42 +119,69 @@ class TextParser extends Transform {
       
     this.parser.on('closeobject',
     async function () {
-      // self.logWriter.write(`onCloseObject(${self.jDepth}):\nObjectStack:${self.objectStack})\nCurrentObject:${self.currentObject}\n`);           
+      // self.logWriter.write(`onCloseObject(${self.jDepth}):\nObjectStack:${self.objectStack}\nCurrentObject:${self.currentObject}\n`);           
       self.jDepth--;
 
-      // An object can belong to an Array or a Key
-      if (self.objectStack.length > 0) {
-        let owner = self.objectStack.pop()
-        let parentObject = undefined;
-        if (Array.isArray(owner)) {   
-          parentObject = owner;
-          parentObject.push(self.currentObject);
-        }    
-        else {
-          parentObject = self.objectStack.pop()
-          if (!this.emptyObject) {
-            parentObject[owner] = self.currentObject;
+      switch (self.jDepth){
+        case 1:
+          // Push the completed first level object/array downstream. Replace the current top level object with an empty object of the same type.
+          if (self.currentObject.metadata) {
+            self.tableList = new Set(Object.keys(self.currentObject.metadata));
           }
-        }   
-        self.currentObject = parentObject;
+          const key = self.objectStack.pop()
+          self.objectStack.pop()
+          if (self.dataPhase) {
+            self.dataPhase = false;
+          }
+          else {
+            self.push({[key]: self.currentObject});
+          }
+          self.currentObject = {};
+          break;
+        default:
+          // An object can belong to an Array or a Key
+          if (self.objectStack.length > 0) {
+            let owner = self.objectStack.pop()
+            let parentObject = undefined;
+            if (Array.isArray(owner)) {   
+              parentObject = owner;
+              parentObject.push(self.currentObject);
+            }    
+            else {
+              parentObject = self.objectStack.pop()
+              if (!this.emptyObject) {
+                parentObject[owner] = self.currentObject;
+              }
+            }   
+            self.currentObject = parentObject;
+          }
       }
     });
    
     this.parser.on('closearray',
     function () {
       // self.logWriter.write(`onclosearray(${self.jDepth}: ObjectStack:${self.objectStack}. CurrentObject:${self.currentObject}\n`);          
-      let skipObject = false;
-      
-      if ((self.dataPhase) && (self.jDepth === 3)) {
-        self.tableList.delete(self.currentTable);
-      }
-      
-      if ((self.dataPhase) && (self.jDepth === 4)) {
-        self.push({ data : self.currentObject});
-        skipObject = true;
-      }
-
       self.jDepth--;
+
+      let skipObject = false;
+
+      switch (self.jDepth){
+        case 1:
+          // Push the completed first level object/array downstream. Replace the current top level object with an empty object of the same type.
+          self.push(self.currentObject);
+          self.currentObject = [];
+          break;
+        case 2:
+          if (self.dataPhase) {
+            self.tableList.delete(self.currentTable);
+          }
+          break;
+        case 3:
+          if (self.dataPhase) {
+            self.push({ data : self.currentObject});
+            skipObject = true;
+          }
+      }
 
       // An Array can belong to an Array or a Key
       if (self.objectStack.length > 0) {

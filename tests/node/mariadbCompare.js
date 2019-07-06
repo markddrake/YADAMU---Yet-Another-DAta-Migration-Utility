@@ -30,9 +30,9 @@ class MariadbCompare extends MariadbDBI {
        this.logger = undefined;
     }
 
-    configureTest(logger,connectionProperties,testParameters,schema) {
+    configureTest(logger,connectionProperties,testParameters,schema,tableMappings) {
       this.logger = logger;
-      super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS);
+      super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS,tableMappings);
     }
     
     async recreateSchema(schema,password) {

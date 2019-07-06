@@ -383,10 +383,11 @@ declare
   V_COLUMN_COUNT       TEXT;
   V_TARGET_DATA_TYPES  JSONB;
   V_GEOMETRY_TYPE      VARCHAR(32);
+  V_POSTGIS_VERSION    VARCHAR(512);
 begin
 
   begin
-    SELECT PostGIS_full_version();
+    SELECT PostGIS_full_version() into V_POSTGIS_VERSION;
     V_GEOMETRY_TYPE := 'geometry';
   exception
     when undefined_function then
