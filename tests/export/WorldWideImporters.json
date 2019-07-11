@@ -1,0 +1,11 @@
+[
+  [{"schema": "WorldWideImporters","owner": "Application"},"WWI_Application.json"],
+  [{"schema": "WorldWideImporters","owner": "Integration"},"WWI_Integration.json"],
+  [{"schema": "WorldWideImporters","owner": "PowerBI"},"WWI_PowerBI.json"],
+  [{"schema": "WorldWideImporters","owner": "Purchasing"},"WWI_Purchasing.json"],
+  [{"schema": "WorldWideImporters","owner": "Reports"},"WWI_Reports.json"],
+  [{"schema": "WorldWideImporters","owner": "Sales"},"WWI_Sales.json"],
+  [{"schema": "WorldWideImporters","owner": "Sequences"},"WWI_Sequences.json"],
+  [{"schema": "WorldWideImporters","owner": "Warehouse"},"WWI_Warehouse.json"],
+  [{"schema": "WorldWideImporters","owner": "Website"},"WWI_Website.json"]
+]

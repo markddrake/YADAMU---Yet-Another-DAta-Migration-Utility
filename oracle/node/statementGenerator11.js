@@ -33,7 +33,7 @@ class StatementGenerator11 extends StatementGenerator {
       const table = this.metadata[tableID]
       const columnsXML = JSON.parse(`[${table.columns}]`).map(function(columnName){return `<column>${columnName}</column>`},this).join('');
       const dataTypesXML = table.dataTypes.map(function(dataType){return `<dataType>${dataType}</dataType>`},this).join('');
-      const sizeConstraintsXML = table.sizeConstraints.map(function(sizeConstraint){return `<sizeConstraint>${sizeConstraint}</sizeConstraint>`},this).join('');
+      const sizeConstraintsXML = table.sizeConstraints.map(function(sizeConstraint){return `<sizeConstraint>${sizeConstraint === null ? '' : sizeConstraint}</sizeConstraint>`},this).join('');
       return `<table><vendor>${table.vendor}</vendor><owner>${table.owner}</owner><tableName>${table.tableName}</tableName><columns>${columnsXML}</columns><dataTypes>${dataTypesXML}</dataTypes><sizeConstraints>${sizeConstraintsXML}</sizeConstraints></table>`
     },this).join('');
     return `<metadata>${tablesXML}</metadata>`

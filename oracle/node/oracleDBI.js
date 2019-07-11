@@ -21,6 +21,7 @@ const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const StatementGenerator11 = require('./statementGenerator11.js');
 const StringWriter = require('./stringWriter.js');
+const HexBinToBinary = require('./hexBinToBinary.js');
 
 const defaultParameters = {
   BATCHSIZE         : 10000
@@ -430,6 +431,41 @@ class OracleDBI extends YadamuDBI {
      
   }
 
+  hexBinaryFromBlob(blob) {
+  
+    return new Promise(async function(resolve,reject) {
+      try {
+        const bufferWriter = new  BufferWriter();
+          
+        blob.on('error',
+          async function(err) {
+            await blob.close();
+            reject(err);
+        });
+          
+        bufferWriter.on('finish', 
+          async function() {
+            await blob.close(); 
+            resolve(bufferWriter.toHexBinary());
+        });
+        
+        blob.pipe(bufferWriter);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  };
+  
+  async hexBinaryFromLocalBlob(blob) {
+      
+     // ### Ugly workaround due to the fact it does not appear possible to directly re-read a local CLOB 
+     
+     const sql = `select :tempblob "newClob" from dual`;
+     const results = await this.executeSQL(sql,{tempblob:blob});
+     return await this.hexBinaryFromBlob(results.rows[0][0])
+     
+  }
+
   lobFromStream (stream) {
     
     const conn = this.connection;
@@ -482,8 +518,37 @@ class OracleDBI extends YadamuDBI {
     const s = new Readable();
     s.push(str);
     s.push(null);
-
     return this.trackClobFromStringReader(s,list);
+    
+  }
+
+  trackBlobFromStringReader(r,list) {
+      
+    const conn = this.connection;
+    const hexBinToBinary = new HexBinToBinary()
+        
+    return new Promise(async function(resolve,reject) {
+      try {
+        const tempLob = await conn.createLob(oracledb.BLOB);
+        list.push(tempLob)
+        tempLob.on('error',function(err) {reject(err);});
+        tempLob.on('finish', function() {resolve(tempLob)});
+        r.on('error', function(err) {reject(err);});
+        r.pipe(hexBinToBinary).pipe(tempLob);  // copies the text to the temporary LOB
+      }
+      catch (e) {
+        reject(e);
+      }
+    });  
+  }
+
+     
+  trackBlobFromHexBinary(str,list) {  
+ 
+    const r = new Readable({encoding : 'utf8'});
+    r.push(str);
+    r.push(null);    
+    return this.trackBlobFromStringReader(r,list);
     
   }
      
@@ -1251,6 +1316,7 @@ class Multiplexor extends Transform {
     this.push(data)
     if (this.ddlWriter.getDDL() === undefined) {
       // ### Shouldn't be calling transform directly ?????
+      // Rely on done() being invoked by the saxParser..
       this.saxParser._transform(data,encodoing,done)
     }
     else {

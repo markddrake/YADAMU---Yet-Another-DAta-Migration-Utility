@@ -22,7 +22,7 @@ const defaultParameters = {
 }
 
 const sqlSystemInformation = 
-`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE"`;                     
+`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
 
 // Cannot use JSON_ARRAYAGG for DATA_TYPES and SIZE_CONSTRAINTS beacuse MYSQL implementation of JSON_ARRAYAGG does not support ordering
 const sqlSchemaInfo = 
@@ -195,7 +195,7 @@ class MariadbDBI extends YadamuDBI {
     , database          : this.parameters.DATABASE
     , port              : this.parameters.PORT
     , multipleStatements: true
-    , typeCast          : false
+    , typeCast          : true
     , supportBigNumbers : true
     , bigNumberStrings  : true          
     , dateStrings       : true    
@@ -312,8 +312,11 @@ class MariadbDBI extends YadamuDBI {
      ,databaseVersion    : sysInfo.DATABASE_VERSION
      ,serverVendor       : sysInfo.SERVER_VENDOR_ID
      ,softwareVendor     : this.SOFTWARE_VENDOR
-    }
-    
+     ,nls_parameters     : {
+        serverCharacterSet   : sysInfo.SERVER_CHARACTER_SET,
+        databaseCharacterSet : sysInfo.DATABASE_CHARACTER_SET
+      }                                                           
+                                                                 } 
   }
 
   /*

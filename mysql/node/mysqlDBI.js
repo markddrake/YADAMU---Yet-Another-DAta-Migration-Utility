@@ -21,7 +21,7 @@ const defaultParameters = {
 }
 
 const sqlSystemInformation = 
-`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE"`;                     
+`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
 
 const sqlSchemaInfo = 
 `select c.table_schema "TABLE_SCHEMA"
@@ -70,6 +70,10 @@ const sqlSchemaInfo =
               when data_type = 'geometry'
                 -- Force WKT rendering of value
                 then concat('ST_asText("', column_name, '")')
+              when data_type = 'float'
+                -- Render Floats with greatest possible precision 
+                -- Risk of Overflow ????
+                then concat('(floor(1e15*"',column_name,'")/1e15)')                                      
               else
                 concat('"',column_name,'"')
             end
@@ -403,6 +407,10 @@ class MySQLDBI extends YadamuDBI {
      ,serverHostName     : sysInfo.SERVER_HOST
      ,databaseVersion    : sysInfo.DATABASE_VERSION
      ,serverVendor       : sysInfo.SERVER_VENDOR_ID
+     ,nls_parameters     : {
+        serverCharacterSet   : sysInfo.SERVER_CHARACTER_SET,
+        databaseCharacterSet : sysInfo.DATABASE_CHARACTER_SET
+      }
     }
     
   }

@@ -84,9 +84,11 @@ class StatementGenerator {
          case 'BLOB':
            tableInfo.lobCount++;
            // return {type : oracledb.BUFFER}
-           return {type : oracledb.BUFFER, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
+           // return {type : oracledb.BUFFER, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
+           return {type : oracledb.BLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
          case 'RAW':
-           return { type :oracledb.STRING, maxSize : parseInt(dataTypeSizes[idx])*2}
+           // return { type :oracledb.STRING, maxSize : parseInt(dataTypeSizes[idx])*2}
+           return { type :oracledb.BUFFER, maxSize : parseInt(dataTypeSizes[idx])}
          case 'BFILE':
            return { type :oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
          case 'BOOLEAN':

@@ -81,9 +81,15 @@ class TableWriter {
             // A promise...
             return this.dbi.trackClobFromString(row[idx], this.lobList)                                                                    
           }
+          if (this.tableInfo.binds[idx].type === oracledb.BLOB) {
+            this.lobUsage++
+            // A promise...
+            return this.dbi.trackBlobFromHexBinary(row[idx], this.lobList)                                                                    
+          }
           switch (dataType.type) {
             case "BLOB" :
               return Buffer.from(row[idx],'hex');
+              // return this.dbi.trackBlobFromBuffer(row[idx], this.lobList);
             case "RAW":
               if (typeof row[idx] === 'boolean') {
                 row[idx] = (row[idx] === true ? '01' : '00')
@@ -131,6 +137,7 @@ class TableWriter {
       return this.batch.length;
     } catch (e) {
       this.logWriter.write(`${new Date().toISOString()}[INFO]: TableWriter.appendRow("${this.tableName}",${this.batch.length}. Row conversion raised ${e}.Skipping Row. Row:\n`);
+      console.log(e.stack);
       this.logWriter.write(`${row}\n`);
     }
   }
@@ -197,6 +204,11 @@ end;`
           // ### Cannot reac contact of local clob...
           // return this.dbi.stringFromClob(record[idx])
           return this.dbi.stringFromLocalClob(record[idx])
+        }
+        if (this.tableInfo.binds[idx].type === oracledb.BLOB) {
+          // ### Cannot reac contact of local clob...
+          // return this.dbi.stringFromClob(record[idx])
+          return this.dbi.hexBinaryFromLocalBlob(record[idx])
         }
       }
       return record[idx];
