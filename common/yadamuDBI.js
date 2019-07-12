@@ -318,12 +318,20 @@ class YadamuDBI {
 
   /*
   **
+  ** Begin the current transaction
+  **
+  */
+  
+  async beginTransaction() {
+  }
+
+ /*
+  **
   ** Commit the current transaction
   **
   */
   
   async commitTransaction() {
-    throw new Error('Unimplemented Method')
   }
 
   /*
@@ -333,7 +341,6 @@ class YadamuDBI {
   */
   
   async rollbackTransaction() {
-    throw new Error('Unimplemented Method')
   }
   
   /*

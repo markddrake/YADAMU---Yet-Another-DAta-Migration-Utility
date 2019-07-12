@@ -6,7 +6,8 @@ class TableWriter {
     this.dbi = dbi;
     this.tableName = tableName
     this.tableInfo = tableInfo;
-    this.tableInfo.args =  '(' + Array(this.tableInfo.targetDataTypes.length).fill('?').join(',')  + '),';
+    this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
+    this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + '),';
 
     this.status = status;
     this.logWriter = logWriter;    
@@ -32,6 +33,9 @@ class TableWriter {
   }
 
   async appendRow(row) {
+      
+    // Batch Mode : Create one large array. Iterative Mode : Create an Array of Arrays.    
+      
     this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
       const dataType = this.dbi.decomposeDataType(targetDataType);
       if (row[idx] !== null) {
@@ -101,10 +105,11 @@ class TableWriter {
   
   async writeBatch() {     
 
-    this.batchCount++;
-
+    this.batchCount++; 
+    let repackBatch = false;
+    
     if (this.tableInfo.insertMode === 'Batch') {
-      try {
+      try {    
         // Slice removes the unwanted last comma from the replicated args list.
         const args = this.tableInfo.args.repeat(this.batchRowCount).slice(0,-1);
         const results = await this.dbi.executeSQL(this.tableInfo.dml.slice(0,-1) + args, this.batch);
@@ -117,22 +122,25 @@ class TableWriter {
         if (this.status.showInfoMsgs) {
           this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batchRowCount}].  Batch Insert raised:\n${e}.\n`);
           this.logWriter.write(`${this.tableInfo.dml}\n`);
-          // Need to fix this to print first and last row, rather than first and last value.
-          this.logWriter.write(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
+          // Use Slice to print first and last row, rather than first and last value.
+          this.logWriter.write(`${this.batch.slice(0,this.tableInfo.columnCount)}\n...\n${this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length)}\n`);
           this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Switching to Iterative operations.\n`);          
         }
         // await this.dbi.rollbackTransaction();
         this.tableInfo.insertMode = 'Iterative'   
+        repackBatch = true;
+        this
       }
     }
 
     for (const row in this.batch) {
+      const nextRow = repackBatch ?  this.batch.splice(0,this.tableInfo.columnCount) : batch[row]
       try {
-        const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row]);
+        const results = await this.dbi.executeSQL(this.tableInfo.dml.slice(0,-1) + this.tableInfo.args.slice(0,-1),nextRow);
         await this.processWarnings(results);
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []
-        const abort = this.dbi.handleInsertError(this.tableName,this.batch[row],e,this.batch.length,row,errInfo);
+        const abort = this.dbi.handleInsertError(this.tableName,nextRow,e,this.batch.length,row,errInfo);
         if (abort) {
           await this.dbi.rollbackTransaction();
           this.skipTable = true;

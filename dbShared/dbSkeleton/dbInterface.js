@@ -36,14 +36,6 @@ class DBInterface extends YadamuDBI {
     return true;
   }
   
-  setSystemInformation(systemInformation) {
-    this.systemInformation = systemInformation
-  }
-  
-  setMetadata(metadata) {
-    this.metadata = metadata
-  }
-  
   constructor(yadamu) {
     super(yadamu,defaultParameters)
   }
@@ -75,24 +67,6 @@ class DBInterface extends YadamuDBI {
   async abort() {
   }
 
-  /*
-  **
-  ** Commit the current transaction
-  **
-  */
-  
-  async commitTransaction() {
-  }
-
-  /*
-  **
-  ** Abort the current transaction
-  **
-  */
-  
-  async rollbackTransaction() {
-  }
-  
   /*
   **
   ** The following methods are used by JSON_TABLE() style import operations  
@@ -153,7 +127,14 @@ class DBInterface extends YadamuDBI {
   
   async getInputStream(query,parser) {
   }      
-
+  
+  async generateStatementCache(schema,executeDDL) {
+    await super.generateStatementCache(StatementGenerator,schema,executeDDL) 
+  }
+  
+  getTableWriter(table) {
+    return super.getTableWriter(TableWriter,table)
+  }
   /*
   **
   ** The following methods are used by the YADAMU DBwriter class

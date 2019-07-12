@@ -6,6 +6,9 @@ class TableWriter {
     this.dbi = dbi;
     this.tableName = tableName
     this.tableInfo = tableInfo;
+    this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
+    this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + ')';
+
     this.status = status;
     this.logWriter = logWriter;    
 
@@ -95,7 +98,7 @@ class TableWriter {
   async writeBatch() {     
 
     this.batchCount++;
-
+    
     if (this.tableInfo.insertMode === 'Batch') {
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,[this.batch]);
@@ -117,7 +120,7 @@ class TableWriter {
           
     for (const row in this.batch) {
       try {
-        const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row]);
+        const results = await this.dbi.executeSQL(this.tableInfo.dml.slice(0,-1) + this.tableInfo.args,this.batch[row]);
         await this.processWarnings(results);
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []

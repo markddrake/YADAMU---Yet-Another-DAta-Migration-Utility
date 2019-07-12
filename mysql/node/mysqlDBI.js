@@ -145,22 +145,35 @@ class MySQLDBI extends YadamuDBI {
                       })
   } 
 
-  executeSQL(sqlStatement,args) {
+  executeSQL(sqlStatement,args,attemptReconnect) {
     
-    const status = this.status;
-    const conn = this.conn;
+    attemptReconnect = attemptReconnect === undefined ? true : attemptReconnect
+    const self = this
     
     return new Promise(function(resolve,reject) {
-                         if (status.sqlTrace) {
-                           status.sqlTrace.write(`${sqlStatement};\n--\n`);
+                         if (self.status.sqlTrace) {
+                           self.status.sqlTrace.write(`${sqlStatement};\n--\n`);
                          }
-                         conn.query(sqlStatement,args,function(err,rows,fields) {
-                                                    if (err) {
-                                                      conn.end();
-                                                      reject(err);
-                                                    }
-                                                    resolve(rows);
-                                                 })
+                         self.conn.query(sqlStatement,args,async function(err,results,fields) {
+                                                                   if (err) {
+                                                                     // console.log('conn.query(err):',err);
+                                                                     if (attemptReconnect && ((err.fatal) && (err.code && (err.code === 'PROTOCOL_CONNECTION_LOST') || (err.code === 'ECONNRESET')))){
+                                                                       self.logWriter.write(`${new Date().toISOString()}[MySQLDBI.executeSQL()][WARNING]: SQL Operation raised\n${err}\n`);
+                                                                       self.logWriter.write(`${new Date().toISOString()}[MySQLDBI.executeSQL()][INFO]: Attemping reconnection.\n`);
+                                                                       await self.reconnect()
+                                                                       self.logWriter.write(`${new Date().toISOString()}[MySQLDBI.executeSQL()][INFO]: New connection availabe.\n`);
+                                                                       results = await self.executeSQL(sqlStatement,args,false);
+                                                                       resolve(results);
+              1                                                      }
+                                                                     else {
+                                                                       self.conn.end();
+                                                                       reject(err);
+                                                                     }
+                                                                   }
+                                                                   if (!attemptReconnect) { console.log('Attempt 2',results)}
+                                                                   resolve(results);
+                                                                 })
+
                        })
   }  
 
@@ -198,15 +211,25 @@ class MySQLDBI extends YadamuDBI {
     return false;
   }
   
+  newConnection() {
+     
+     const conn = mysql.createConnection(this.connectionProperties); 
+     conn.on('error',function(err) {
+       console.log('connection.onError()',err);
+     },this);
+     return conn;
+  }
+  
+  
   async getConnection() {
  
-    this.conn = mysql.createConnection(this.connectionProperties);
+    this.conn = this.newConnection();
     await this.establishConnection();
     this.connectionOpen = true;
     
 
     if (await this.setMaxAllowedPacketSize()) {
-      this.conn = mysql.createConnection(this.connectionProperties);
+      this.conn = this.newConnection();
       await this.establishConnection();
       this.connectionOpen = true;
     }
@@ -215,6 +238,45 @@ class MySQLDBI extends YadamuDBI {
 
   }    
   
+  waitForRestart(delayms) {
+    return new Promise(function (resolve, reject) {
+        setTimeout(resolve, delayms);
+    });
+  }
+   
+  async reconnect() {
+      
+    let retryCount = 0;
+    
+    if (this.conn) {
+      try { 
+        this.logWriter.write(`${new Date().toISOString()}[MySQLDBI.reconnect()]: Closing Connection\n`);
+        await this.conn.end();
+        this.logWriter.write(`${new Date().toISOString()}[MySQLDBI.reconnect()]: Connection Closed\n`);
+      } catch (e) {
+        this.logWriter.write(`${new Date().toISOString()}[MySQLDBI.reconnect()]: this.conn.close() raised\n${e}\n`);
+      }
+    }
+    
+    this.connectionOpen = false;
+    
+    while (retryCount < 10) {
+      try {
+        await this.getConnection()
+        break;
+      } catch (e) {
+        if (e.fatal && (e.code && (e.code === 'ECONNREFUSED'))) {
+          this.logWriter.write(`${new Date().toISOString()}[MySQLDBI.reconnect()][INFO]: Waiting for MySQL server restart.\n`)
+          this.waitForRestart(500);
+          retryCount++;
+        }
+        else {
+          throw e;
+        }
+      }
+    }
+  }
+      
   async createSchema(schema) {    	
   
 	const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;					   

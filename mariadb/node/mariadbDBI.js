@@ -123,7 +123,7 @@ class MariadbDBI extends YadamuDBI {
     let results = await this.executeSQL(sqlQueryPacketSize);
     
     if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
-      this.logWriter.write(`${new Date().toISOString()}: Increasing MAX_ALLOWED_PACKET to 1G.\n`);
+      this.logWriter.write(`${new Date().toISOString()}[MariaDBI.setMaxAllowedPacketSize][INFO]: Increasing MAX_ALLOWED_PACKET to 1G.\n`);
       results = await this.executeSQL(sqlSetPacketSize);
       await this.conn.end();
       await this.pool.end();
@@ -132,7 +132,7 @@ class MariadbDBI extends YadamuDBI {
     return false;
   }
   
-  async getConnectionPool(parameters,status,logWriter) {
+  async getConnectionPool() {
 
     this.pool = mariadb.createPool(this.connectionProperties);
     this.conn = await this.pool.getConnection();
@@ -145,7 +145,54 @@ class MariadbDBI extends YadamuDBI {
     await this.configureSession(); 	
 
   }    
-  
+
+  waitForRestart(delayms) {
+    return new Promise(function (resolve, reject) {
+        setTimeout(resolve, delayms);
+    });
+  }
+   
+  async reconnect() {
+      
+    let retryCount = 0;
+    
+    if (this.conn) {
+      try { 
+        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: Closing Connection.\n`);
+        await this.conn.end();
+        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: Connection Closed.\n`);
+      } catch (e) {
+        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: this.conn.end() raised\n${e}\n`);
+      }
+    }
+
+    if (this.pool) {    
+      try { 
+        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: Closing Pool.\n`);
+        await this.pool.end();
+        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: Pool Closed.\n`);
+      } catch (e) {
+        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: this.pool.end() raised\n${e}\n`);
+      }
+    }
+    
+    while (retryCount < 10) {
+      try {
+        await this.getConnectionPool()
+        break;
+      } catch (e) {
+        if (e.fatal && (e.code && (e.code === 'ECONNREFUSED'))) {
+          this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()][INFO]: Waiting for MariaDB server restart.\n`)
+          this.waitForRestart(100);
+          retryCount++;
+        }
+        else {
+          throw e;
+        }
+      }
+    }
+  }
+         
   async createSchema(schema) {    	
   
 	const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;					   
@@ -155,12 +202,30 @@ class MariadbDBI extends YadamuDBI {
   }
   
   async executeSQL(sqlStatement,args) {
-      
-   if (this.status.sqlTrace) {
-     this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
-   }
-
-   return await this.conn.query(sqlStatement,args)
+     
+    let attemptReconnect = true;
+    
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
+    }
+   
+    while (true) {
+      // Will exit with result or exception.  
+      try {
+        return await this.conn.query(sqlStatement,args)
+      } catch (e) {
+        // console.log(e);
+        if (attemptReconnect && ((e.fatal) && (e.code && (e.code === 'ER_CMD_CONNECTION_CLOSED') || (e.code === 'ECONNABORTED') || (e.code === 'ER_SOCKET_UNEXPECTED_CLOSE') || (err.code === 'ECONNRESET')))){
+          attemptReconnect = false;
+          this.logWriter.write(`${new Date().toISOString()}[MariaDBI.executeSQL()][WARNING]: SQL Operation raised\n${e}\n`);
+          this.logWriter.write(`${new Date().toISOString()}[MariaDBI.executeSQL()][INFO]: Attemping reconnection.\n`);
+          await this.reconnect()
+          this.logWriter.write(`${new Date().toISOString()}[MariaDBI.executeSQL()][INFO]: New connection availabe.\n`);
+          continue;
+        }
+        throw (e)
+      }      
+    } 
   }  
 
   async executeDDL(ddl) {
