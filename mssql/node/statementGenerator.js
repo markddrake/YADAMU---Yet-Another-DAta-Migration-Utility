@@ -6,7 +6,7 @@ const Yadamu = require('../../common/yadamu.js');
 
 class StatementGenerator {
   
-  constructor(dbi , targetSchema, metadata,  batchSize, commitSize, status, logWriter) {
+  constructor(dbi , targetSchema, metadata,  batchSize, commitSize, status, yadamuLogger) {
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
@@ -14,7 +14,7 @@ class StatementGenerator {
     this.commitSize = commitSize;
     
     this.status = status;
-    this.logWriter = logWriter;
+    this.yadamuLogger = yadamuLogger;
   }
   
   bulkSupported(targetDataTypes) {
@@ -196,7 +196,7 @@ class StatementGenerator {
           table.columns.add(columns[idx],sql.VarChar(4000),{nullable: true});
           break;
         default:
-          this.logWriter.write(`${new Date().toISOString()}[StatementGenerator.createBulkOperation("${tableName}"): Unmapped data type [${targetDataType}].\n`);
+          this.yadamuLogger.log([`${this.constructor.name}.createBulkOperation()`,`"${tableName}"`],`Unmapped data type [${targetDataType}].`);
       }
     },this)
     return table
@@ -237,7 +237,8 @@ class StatementGenerator {
         }
         return tableInfo.ddl;
       } catch (e) {
-        this.logWriter.write(`${new Date().toISOString()}:${e}\n${tableInfo.ddl}\n`)
+        this.yadamuLogger.logException([`${this.constructor.name}`],e)
+        this.yadamuLogger.writeDirect(`${tableInfo.ddl}`)
       } 
     },this);
     

@@ -7,24 +7,24 @@ const clarinet = require('../../clarinet/clarinet.js');
 
 class TextParser extends Transform {
   
-  constructor(logWriter, options) {
+  constructor(yadamuLogger, options) {
 
     super({objectMode: true });  
   
     const self = this;
     
-    this.logWriter = logWriter;
+    this.yadamuLogger = yadamuLogger;
 
     this.parser = clarinet.createStream();
     
     this.parser.on('error',
     function(err) {
-      self.logWriter.write(`${err}\n`);
+      this.yadamuLogger.logException([`${this.constructor.name}.onError()`],err)
     })
     
     this.parser.on('key',
     function (key) {
-      // self.logWriter.write(`onKey(${self.jDepth},${key})\n`);
+      // self.yadamuLogger.trace([`${self.constructor.this}.onKey()`,`${self.jDepth}`,`"${key}"`],``);
       
       switch (self.jDepth){
         case 1:
@@ -47,7 +47,7 @@ class TextParser extends Transform {
 
     this.parser.on('openobject',
     function (key) {
-      // self.logWriter.write(`onOpenObject(${self.jDepth}:, Key:"${key}". ObjectStack:${self.objectStack}\n`);      
+      // self.yadamuLogger.trace([`${self.constructor.this}.onOpenObject()`,`${self.jDepth}`,`"${key}"`],`ObjectStack:${self.objectStack}\n`);      
       
       if (self.jDepth > 0) {
         self.objectStack.push(self.currentObject);
@@ -82,7 +82,7 @@ class TextParser extends Transform {
 
     this.parser.on('openarray',
     function () {
-      // self.logWriter.write(`onOpenArray(${self.jDepth}): ObjectStack:${self.objectStack}\n`);
+      // self.yadamuLogger.trace([`${self.constructor.this}.onOpenArray()`,`${self.jDepth}`],'ObjectStack: ${self.objectStack}`);
       if (self.jDepth > 0) {
         self.objectStack.push(self.currentObject);
       }
@@ -98,7 +98,7 @@ class TextParser extends Transform {
        
     this.parser.on('value',
     function (v) {
-      // self.logWriter.write(`onvalue(${self.jDepth}: ObjectStack:${self.objectStack}\n`);        
+      // self.yadamuLogger.trace([`${self.constructor.this}.onvalue()`,`${self.jDepth}`],`ObjectStack: ${self.objectStack}\n`);        
       if (self.chunks.length > 0) {
         self.chunks.push(v);
         v = self.chunks.join('');
@@ -119,7 +119,7 @@ class TextParser extends Transform {
       
     this.parser.on('closeobject',
     async function () {
-      // self.logWriter.write(`onCloseObject(${self.jDepth}):\nObjectStack:${self.objectStack}\nCurrentObject:${self.currentObject}\n`);           
+      // self.yadamuLogger.trace([`${self.constructor.this}.onCloseObject()`,`${self.jDepth}`],`\nObjectStack: ${self.objectStack}\nCurrentObject: ${self.currentObject}`);           
       self.jDepth--;
 
       switch (self.jDepth){
@@ -160,7 +160,7 @@ class TextParser extends Transform {
    
     this.parser.on('closearray',
     function () {
-      // self.logWriter.write(`onclosearray(${self.jDepth}: ObjectStack:${self.objectStack}. CurrentObject:${self.currentObject}\n`);          
+      // self.yadamuLogger.trace([`${self.constructor.this}.onclosearray()`,`${self.jDepth}`],\nObjectStack: ${self.objectStack}.\nCurrentObject:${self.currentObject}`);          
       self.jDepth--;
 
       let skipObject = false;
@@ -221,7 +221,7 @@ class TextParser extends Transform {
     }
     else {
       this.tableList.forEach(function(table) {
-        this.logWriter.write(`${new Date().toISOString()}[RowParser "${table}"]. Warning - No records found - Possible corrupt or truncated import file.\n`);
+        this.yadamuLogger.warning([`${this.constructor.name}`,`"${table}"`],`No records found - Possible corrupt or truncated import file.\n`);
       },this)
       return true;
     }

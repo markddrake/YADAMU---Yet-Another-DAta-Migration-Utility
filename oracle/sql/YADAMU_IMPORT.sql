@@ -84,7 +84,7 @@ $END
   function MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR VARCHAR2,P_DATA_TYPE VARCHAR2, P_DATA_TYPE_LENGTH NUMBER, P_DATA_TYPE_SCALE NUMBER) return VARCHAR2;
   function GET_MILLISECONDS(P_START_TIME TIMESTAMP, P_END_TIME TIMESTAMP) return NUMBER;
   function SERIALIZE_TABLE(P_TABLE T_VC4000_TABLE,P_DELIMITER VARCHAR2 DEFAULT ',')  return CLOB;
-  procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2);
+  procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9);
 
 end;
 /
@@ -1880,12 +1880,13 @@ end;
 --
 $END
 --
-procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2)
+procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9)
 as
   TABLE_NOT_FOUND EXCEPTION;
   PRAGMA EXCEPTION_INIT( TABLE_NOT_FOUND , -00942 );
-
-  V_HASH_METHOD NUMBER := 0;
+    
+  V_HASH_METHOD      NUMBER := 0;
+  V_TIMESTAMP_LENGTH NUMBER  := 20 + P_TIMESTAMP_PRECISION;
   
   cursor getTableList
   is
@@ -1894,6 +1895,8 @@ as
            case 
              when ((V_HASH_METHOD < 0) and DATA_TYPE in ('SDO_GEOMETRY','XMLTYPE','ANYDATA','BLOB','CLOB','NCLOB')) then
     		   NULL
+             when ((DATA_TYPE like 'TIMESTAMP(%)') and (DATA_SCALE > P_TIMESTAMP_PRECISION)) then
+               'substr(to_char("' || COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FF9''),1,' || V_TIMESTAMP_LENGTH || ') "' || COLUMN_NAME || '"'
              when DATA_TYPE = 'BFILE' then
 	           'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || COLUMN_NAME || '") end' 
 		     when (DATA_TYPE = 'SDO_GEOMETRY') then
@@ -2030,7 +2033,13 @@ begin
           execute immediate V_SQL_STATEMENT into P_TARGET_COUNT;
         exception
           when others then
-            V_SQLERRM := SQLERRM;					  
+            V_SQLERRM := SQLERRM;            
+            $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+            -- Check if the ORA-xxxxx message appears twice in SQLERRM.
+            if (INSTR(SUBSTR(V_SQLERRM,11),SUBSTR(V_SQLERRM,1,10)) > 0) then
+              V_SQLERRM := SUBSTR(V_SQLERRM,1,INSTR(SUBSTR(V_SQLERRM,11),SUBSTR(V_SQLERRM,1,10))+8);         
+            end if;
+            $END
             P_TARGET_COUNT := -1;
         end;
         V_SQL_STATEMENT := 'insert into SCHEMA_COMPARE_RESULTS values (:1,:2,:3,:4,:5,:6,:7,:8)';

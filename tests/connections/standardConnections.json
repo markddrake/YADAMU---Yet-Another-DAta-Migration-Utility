@@ -34,7 +34,7 @@
       "user"           : "postgres"
     , "host"           : "yadamu-db1"
     , "database"       : "yadamu"
-    , "password"       : null
+    , "password"       : "oracle"
     , "port"           : 5432
     },
     "mysql" : {

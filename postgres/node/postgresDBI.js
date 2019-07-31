@@ -42,7 +42,7 @@ class PostgresDBI extends YadamuDBI {
   async getClient() {
     const pgClient = new Client(this.connectionProperties);
     await pgClient.connect();
-    const logWriter = this.logWriter;
+    const yadamuLogger = this.yadamuLogger;
 
     pgClient.on('notice',function(n){ 
 	                       const notice = JSON.parse(JSON.stringify(n));
@@ -52,8 +52,13 @@ class PostgresDBI extends YadamuDBI {
                              case '00000': // Table not found on Drop Table if exists
 		                       break;
                              default:
-                               logWriter.write(`${new Date().toISOString()}[Notice]:${n}\n`);
+                               yadamuLogger.info([`${this.constructor.name}.onNotice()`],`${n}`);
                            }
+    })
+  
+    pgClient.on('error',(err, p) => {
+      this.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`Client.onError()`],err);
+      throw err
     })
   
     const setTimezone = `set timezone to 'UTC'`
@@ -254,11 +259,10 @@ class PostgresDBI extends YadamuDBI {
     }
     catch (e) {
       if (e.code && (e.code === '54000')) {
-        this.logWriter.write(`${new Date().toISOString()}}[uploadFile()]: Cannot process file using Binary JSON. Switching to textual JSON.\n`)
+        this.yadamuLogger.log([`${this.constructor.name}.uploadFile()`],`Cannot process file using Binary JSON. Switching to textual JSON.`)
         this.useBinaryJSON = false;
         await this.createStagingTable();
         elapsedTime = await this.loadStagingTable(importFilePath);	
-        console.log(elapsedTime);
       }      
       else {
         throw e
@@ -287,8 +291,7 @@ class PostgresDBI extends YadamuDBI {
       }
     }
     else {
-      this.logWriter.write(`${new Date().toISOString()}}[processStagingTable()]: Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL IMPORT_JSONB()' : 'CALL_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.\n`);
-      this.status.errorRaised = true;
+      this.yadamuLogger.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL IMPORT_JSONB()' : 'CALL_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`);
       // Return value will be parsed....
       return [];
     }
@@ -331,6 +334,11 @@ class PostgresDBI extends YadamuDBI {
      ,dbName             : sysInfo.database_name
      ,databaseVersion    : sysInfo.database_version
      ,softwareVendor     : this.SOFTWARE_VENDOR
+     ,nodeClient         : {
+        version          : process.version
+       ,architecture     : process.arch
+       ,platform         : process.platform
+      }      
     }
   }
 
@@ -377,11 +385,7 @@ class PostgresDBI extends YadamuDBI {
   }   
 
   createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.logWriter);      
-  }
-  
-  createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.logWriter);
+    return new DBParser(query,objectMode,this.yadamuLogger);
   }  
   
   async getInputStream(query,parser) {
@@ -421,7 +425,8 @@ class PostgresDBI extends YadamuDBI {
         }
         return await this.pgClient.query(ddlStatement);
       } catch (e) {
-        this.logWriter.write(`${e}\n${ddlStatement}\n`)
+        this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
+        this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
       }
     },this))
   }
@@ -432,7 +437,7 @@ class PostgresDBI extends YadamuDBI {
 
   getTableWriter(table) {
     const tableName = this.metadata[table].tableName
-    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.logWriter);      
+    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger);      
   }
   
   async insertBatch(sqlStatement,batch) {

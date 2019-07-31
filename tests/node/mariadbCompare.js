@@ -27,18 +27,16 @@ class MariadbCompare extends MariadbDBI {
     
     constructor(yadamu) {
        super(yadamu)
-       this.logger = undefined;
     }
 
-    configureTest(logger,connectionProperties,testParameters,schema,tableMappings) {
-      this.logger = logger;
+    configureTest(connectionProperties,testParameters,schema,tableMappings) {
       super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS,tableMappings);
     }
     
     async recreateSchema(schema,password) {
         
       try {
-        const dropUser = `drop schema if exists "${schema}"`;
+        const dropUser = `drop schema if exists "${schema.schema}"`;
         await this.executeSQL(dropUser,{});      
       } catch (e) {
         if (e.errorNum && (e.errorNum === 1918)) {
@@ -47,19 +45,12 @@ class MariadbCompare extends MariadbDBI {
           throw e;
         }
       }
-      const createUser = `create schema "${schema}"`;
+      const createUser = `create schema "${schema.schema}"`;
       await this.executeSQL(createUser,{});      
     }    
 
     async importResults(target,timingsArray) {
-        
-      const colSizes = [32, 48, 14, 14]
-      
-      let seperatorSize = (colSizes.length * 3) - 1;
-      colSizes.forEach(function(size) {
-        seperatorSize += size;
-      },this);
-      
+
       const timings = timingsArray[timingsArray.length - 1];
 
       Object.keys(timings).forEach(function(tableName) {
@@ -69,44 +60,24 @@ class MariadbCompare extends MariadbDBI {
         }
       },this)
 
-      const results = await this.executeSQL(sqlSchemaTableRows,[target]);
+      const results = await this.executeSQL(sqlSchemaTableRows,[target.schema]);
       
-      results.forEach(function(row,idx) {          
+      return results.map(function(row,idx) {          
         const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row.TABLE_NAME.toLowerCase() : row.TABLE_NAME;
         const tableTimings = (timings[tableName] === undefined) ? { rowCount : -1 } : timings[tableName]
-        if (idx === 0) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-          this.logger.write(`|`
-                          + ` ${'TARGET SCHEMA'.padStart(colSizes[0])} |` 
-                          + ` ${'TABLE_NAME'.padStart(colSizes[1])} |`
-                          + ` ${'ROWS'.padStart(colSizes[2])} |`
-                          + ` ${'ROWS IMPORTED'.padStart(colSizes[3])} |`
-                          + '\n');
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-          this.logger.write(`|`
-                          + ` ${target.padStart(colSizes[0])} |`
-                          + ` ${row.TABLE_NAME.padStart(colSizes[1])} |`
-                          + ` ${row.TABLE_ROWS.toString().padStart(colSizes[2])} |` 
-                          + ` ${tableTimings.rowCount.toString().padStart(colSizes[3])} |` 
-                          + '\n');
-        }
-        else {
-          this.logger.write(`|`
-                          + ` ${''.padStart(colSizes[0])} |`
-                          + ` ${row.TABLE_NAME.padStart(colSizes[1])} |`
-                          + ` ${row.TABLE_ROWS.toString().padStart(colSizes[2])} |` 
-                          + ` ${tableTimings.rowCount.toString().padStart(colSizes[3])} |` 
-                          + '\n');
-          
-        }
+        return [target.schema,row.TABLE_NAME,row.TABLE_ROWS,tableTimings.rowCount]
       },this)
-      if (results.length > 0) {
-        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
-      }
+      
     }
     
     async report(source,target,timingsArray) {
 
+      const report = {
+        successful : []
+       ,failed     : []
+      }
+
+ 
       const timings = timingsArray[timingsArray.length - 1];
              
       Object.keys(timings).forEach(function(tableName) {
@@ -117,100 +88,23 @@ class MariadbCompare extends MariadbDBI {
       },this)
       
       const sqlStatement = `CALL COMPARE_SCHEMAS(?,?,?);`;					   
-      let results = await this.executeSQL(sqlStatement,[source,target,this.parameters.EMPTY_STRING_IS_NULL === true]);
+      let results = await this.executeSQL(sqlStatement,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true]);
 
       const successful = await this.executeSQL(sqlSuccess,{})
-      const failed = await this.executeSQL(sqlFailed,{})
-      
-      
-      let seperatorSize = (colSizes.slice(0,7).length *3) - 1
-      colSizes.slice(0,7).forEach(function(size) {
-        seperatorSize += size;
-      },this);
 
-      successful.forEach(function(row,idx) {
+      report.successful = successful.map(function(row,idx) {          
         const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row.TABLE_NAME.toLowerCase() : row.TABLE_NAME;
         const tableTimings = (timings[tableName] === undefined) ? { elapsedTime : 'N/A', throughput : "-1ms" } : timings[tableName]
-        if (idx === 0) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-          this.logger.write(`|`
-                          + ` ${'RESULT'.padEnd(colSizes[0])} |`
-                          + ` ${'SOURCE SCHEMA'.padStart(colSizes[1])} |`
-                          + ` ${'TARGET SCHEMA'.padStart(colSizes[2])} |` 
-                          + ` ${'TABLE_NAME'.padStart(colSizes[3])} |`
-                          + ` ${'ROWS'.padStart(colSizes[4])} |`
-                          + ` ${'ELAPSED TIME'.padStart(colSizes[5])} |`
-                          + ` ${'THROUGHPUT'.padStart(colSizes[6])} |`
-                          + '\n');
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-          this.logger.write(`|`
-                          + ` ${'SUCCESSFUL'.padEnd(colSizes[0])} |`
-                          + ` ${row.SOURCE_SCHEMA.padStart(colSizes[1])} |`
-                          + ` ${row.TARGET_SCHEMA.padStart(colSizes[2])} |`)
-        }                       
-        else  {
-          this.logger.write(`|`
-                          + ` ${''.padEnd(colSizes[0])} |`
-                          + ` ${''.padStart(colSizes[1])} |`
-                          + ` ${''.padStart(colSizes[2])} |`)
-        }  
-        
-        this.logger.write(` ${row.TABLE_NAME.padStart(colSizes[3])} |` 
-                        + ` ${row.TARGET_ROW_COUNT.toString().padStart(colSizes[4])} |` 
-                        + ` ${tableTimings.elapsedTime.padStart(colSizes[5])} |` 
-                        + ` ${tableTimings.throughput.padStart(colSizes[6])} |` 
-                        + '\n');
-
+        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT,tableTimings.elapsedTime,tableTimings.throughput]
       },this)
-
-      if (successful.length > 0) {
-        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-      }
-        
-      seperatorSize = (colSizes.length * 3) - 1;
-      colSizes.forEach(function(size) {
-        seperatorSize += size;
-      },this);
       
-      failed.forEach(function(row,idx) {
-        if (idx === 0) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-          this.logger.write(`|`
-                          + ` ${'RESULT'.padEnd(colSizes[0])} |`
-                          + ` ${'SOURCE SCHEMA'.padStart(colSizes[1])} |`
-                          + ` ${'TARGET SCHEMA'.padStart(colSizes[2])} |` 
-                          + ` ${'TABLE_NAME'.padStart(colSizes[3])} |`
-                          + ` ${'SOURCE ROWS'.padStart(colSizes[4])} |`
-                          + ` ${'TARGET ROWS'.padStart(colSizes[5])} |`
-                          + ` ${'MISSING ROWS'.padStart(colSizes[6])} |`
-                          + ` ${'EXTRA ROWS'.padStart(colSizes[7])} |`
-                          + ` ${'NOTES'.padEnd(colSizes[8])} |`
-                          + '\n');
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-          this.logger.write(`|`
-                          + ` ${'FAILED'.padEnd(colSizes[0])} |`
-                          + ` ${row.SOURCE_SCHEMA.padStart(colSizes[1])} |`
-                          + ` ${row.TARGET_SCHEMA.padStart(colSizes[2])} |`)
-        }
-        else {
-          this.logger.write(`|`
-                          + ` ${''.padEnd(colSizes[0])} |`
-                          + ` ${''.padStart(colSizes[1])} |`
-                          + ` ${''.padStart(colSizes[2])} |`)
-        }
-                          
-        this.logger.write(` ${row.TABLE_NAME.padStart(colSizes[3])} |` 
-                        + ` ${row.SOURCE_ROW_COUNT.toString().padStart(colSizes[4])} |` 
-                        + ` ${row.TARGET_ROW_COUNT.toString().padStart(colSizes[5])} |` 
-                        + ` ${row.MISSING_ROWS.toString().padStart(colSizes[6])} |` 
-                        + ` ${row.EXTRA_ROWS.toString().padStart(colSizes[7])} |` 
-                        + ` ${(row.SQLEERM !== undefined ? row.SQLERRM : '').padEnd(colSizes[8])} |` 
-                        + '\n');
+      const failed = await this.executeSQL(sqlFailed,{})
+
+      report.failed = failed.map(function(row,idx) {
+        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.SQLEERM !== undefined ? row.SQLERRM : '')]
       },this)
 
-      if (failed.length > 0) {
-        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
-      }
+      return report
     }
       
 }

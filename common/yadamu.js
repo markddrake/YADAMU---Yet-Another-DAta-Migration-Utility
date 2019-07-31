@@ -7,6 +7,7 @@ const FileReader = require('../file/node/fileReader.js');
 const FileWriter = require('../file/node/fileWriter.js');
 const DBReader = require('./dbReader.js');
 const DBWriter = require('./dbWriter.js');
+const YadamuLogger = require('./yadamuLogger.js');
 
 class Yadamu {
 
@@ -92,13 +93,10 @@ class Yadamu {
     }
   }
 
-  static finalize(status,logWriter) {
+  static async finalize(status,yadamuLogger) {
 
-    if (logWriter !== process.stdout) {
-      logWriter.close();
-      logWriter = process.stdout
-    }    
-  
+    await yadamuLogger.close();
+
     if (status.sqlTrace) {
       status.sqlTrace.close();
     }
@@ -118,36 +116,34 @@ class Yadamu {
     return `${hours}:${minutes}:${seconds}.${(milliseconds + '').padStart(3,'0')}`;
   }
   
-  static reportStatus(status,logWriter) {
+  static reportStatus(status,yadamuLogger) {
 
     const endTime = new Date().getTime();
       
     status.statusMsg = status.warningRaised === true ? 'with warnings' : status.statusMsg;
     status.statusMsg = status.errorRaised === true ? 'with errors'  : status.statusMsg;  
   
-    logWriter.write(`${status.operation} operation completed ${status.statusMsg}. Elapsed time: ${Yadamu.stringifyDuration(endTime - status.startTime)}.\n`);
-    if (logWriter !== process.stdout) {
-      console.log(`${status.operation} operation completed ${status.statusMsg}. Elapsed time: ${Yadamu.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
+    yadamuLogger.log([`${this.name}`,`"${status.operation}"`],`Operation completed ${status.statusMsg}. Elapsed time: ${Yadamu.stringifyDuration(endTime - status.startTime)}.`);
+    if (!yadamuLogger.loggingToConsole()) {
+      console.log(`[${this.name}][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${Yadamu.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
     }
   }
 
-  static reportError(e,parameters,status,logWriter) {
+  static reportError(e,parameters,status,yadamuLogger) {
     
-    if (logWriter !== process.stdout) {
-      console.log(`${status.operation} operation failed: See "${parameters.LOGFILE}" for details.`);
-      logWriter.write(`${status.operation} operation failed.\n`);
-      logWriter.write(`${e}\n`);
+    if (!yadamuLogger.loggingToConsole()) {
+      yadamuLogger.logException([`${this.name}`,`"${status.operation}"`],e);
+      console.log(`[ERROR][${this.name}][${status.operation}]: Operation failed: See "${parameters.LOGFILE ? parameters.LOGFILE  : 'above'}" for details.`);
     }
     else {
-      console.log(`${status.operation} operation Failed:`);
+      console.log(`[ERROR][${this.name}][${status.operation}]: Operation Failed:`);
       console.log(e);
     }
   }
   
   constructor(operation) {
-    this.logWriter = process.stdout;
+    this.yadamuLogger = process.stdout;
     this.parameters = this.processArguments();
-    this.logWriter = this.setLogWriter();
     
     this.status = {
       operation     : operation
@@ -157,8 +153,11 @@ class Yadamu {
      ,startTime     : new Date().getTime()
     }
   
+    this.yadamuLogger = this.setYadamuLogger(this.parameters,this.status);
+
     process.on('unhandledRejection', (err, p) => {
-      this.logWriter.write(`${new Date().toISOString()}: ${this.status.operation} operation failed with unhandled rejection ${err.stack}\n`);
+      this.yadamuLogger.logException([`${this.constructor.name}.onUnhandledRejection()`,`"${this.status.operation}"`],err);
+      Yadamu.reportStatus(this.status,this.yadamuLogger)
       process.exit()
     })
       
@@ -189,8 +188,8 @@ class Yadamu {
     return this.status
   }
 
-  getLogWriter() {
-    return this.logWriter
+  getYadamuLogger() {
+    return this.yadamuLogger
   }
     
   processArguments() {
@@ -290,12 +289,12 @@ class Yadamu {
     return parameters;
   }
 
-  setLogWriter(parameters) {
+  setYadamuLogger(parameters) {
 
     if (this.parameters.LOGFILE) {
-      return fs.createWriteStream(this.parameters.LOGFILE,{flags : "a"});
+      return new YadamuLogger(fs.createWriteStream(this.parameters.LOGFILE,{flags : "a"}),this.status);
     }
-    return this.logWriter;
+    return new YadamuLogger(process.stdout,this.status);
   
   }
   
@@ -309,12 +308,12 @@ class Yadamu {
   }
 
   getDBReader(dbi) {
-    const dbReader = new DBReader(dbi, dbi.parameters.MODE, this.status, this.logWriter);
+    const dbReader = new DBReader(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
     return dbReader;
   }
   
   getDBWriter(dbi) {
-    const dbWriter = new DBWriter(dbi, dbi.parameters.MODE, this.status, this.logWriter);
+    const dbWriter = new DBWriter(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
     return dbWriter;
   }
 
@@ -330,7 +329,7 @@ class Yadamu {
     
 
     let timings = {}
-    const logWriter = this.logWriter;
+    const self = this
  
     try {
       await source.initialize();
@@ -342,11 +341,11 @@ class Yadamu {
         try {
           const reader = dbReader.getReader();
           dbWriter.on('finish', function(){resolve()})
-          dbWriter.on('error',function(err){logWriter.write(`${new Date().toISOString()}[DBWriter.error()]}: ${err.stack}\n`);reject(err)})
-          reader.on('error',function(err){logWriter.write(`${new Date().toISOString()}[DBReader.error()]}: ${err.stack}\n`);reject(err)})
+          dbWriter.on('error',function(err){self.yadamuLogger.logException([`${dbWriter.constructor.name}.onError()`],err);reject(err)})
+          reader.on('error',function(err){self.yadamuLogger.logException([`${reader.constructor.name}.onError()`],err);reject(err)})
           reader.pipe(dbWriter);
         } catch (err) {
-          logWriter.write(`${new Date().toISOString()}[Yadamu.doExport()]}: ${err}\n`);
+          self.yadamuLogger.logException([`${self.constructor.name}.onError()`],err)
           reject(err);
         }
       })
@@ -355,27 +354,27 @@ class Yadamu {
       timings = dbWriter.getTimings();
       await source.finalize();
       await target.finalize();
-      Yadamu.reportStatus(this.status,this.logWriter)
+      Yadamu.reportStatus(this.status,this.yadamuLogger)
       return timings
     } catch (e) {
-      Yadamu.reportError(e,this.parameters,this.status,this.logWriter);
+      Yadamu.reportError(e,this.parameters,this.status,this.yadamuLogger);
       await source.abort();
       await target.abort();
     }
-    // Yadamu.finalize(this.status,this.logWriter);
+    // Yadamu.finalize(this.status,this.yadamuLogger);
   }
   
   async doImport(dbi) {
     const fileReader = new FileReader(this)
     const timings = await this.pumpData(fileReader,dbi);
-    Yadamu.finalize(this.status,this.logWriter);
+    Yadamu.finalize(this.status,this.yadamuLogger);
     return timings
   }  
  
   async doExport(dbi) {
     const fileWriter = new FileWriter(this)
     const timings = await this.pumpData(dbi,fileWriter);
-    Yadamu.finalize(this.status,this.logWriter);
+    Yadamu.finalize(this.status,this.yadamuLogger);
     return timings
   }  
   
@@ -384,7 +383,7 @@ class Yadamu {
     const fileReader = new FileReader(this)
     const fileWriter = new FileReader(this)
     const timings = await this.pumpData(fileReader,FileWriter);
-    Yadamu.finalize(this.status,this.logWriter);
+    Yadamu.finalize(this.status,this.yadamuLogger);
     return timings
   }
   
@@ -395,7 +394,7 @@ class Yadamu {
     const startTime = new Date().getTime();
     const json = await dbi.uploadFile(importFilePath);
     const elapsedTime = new Date().getTime() - startTime;
-    this.logWriter.write(`${new Date().toISOString()}[Yadamu.uploadFile()]: Processing file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.\n`)
+    this.yadamuLogger.log([`${this.constructor.name}.uploadFile()`],`Processing file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
     return json;
   }
     
@@ -425,17 +424,17 @@ class Yadamu {
       const log = await dbi.processFile(hndl)
       timings = this.getTimings(log);
       await dbi.finalize();
-      Yadamu.reportStatus(this.status,this.logWriter)
+      Yadamu.reportStatus(this.status,this.yadamuLogger)
     } catch (e) {
-      Yadamu.reportError(e,this.parameters,this.status,this.logWriter);
+      Yadamu.reportError(e,this.parameters,this.status,this.yadamuLogger);
       await dbi.abort()
     }
-    Yadamu.finalize(this.status,this.logWriter);
+    Yadamu.finalize(this.status,this.yadamuLogger);
     return timings;
   } 
 
    close() {
-     Yadamu.finalize(this.status,this.logWriter);
+     Yadamu.finalize(this.status,this.yadamuLogger);
    }
 }  
      

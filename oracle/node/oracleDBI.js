@@ -21,6 +21,7 @@ const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const StatementGenerator11 = require('./statementGenerator11.js');
 const StringWriter = require('./stringWriter.js');
+const BufferWriter = require('./bufferWriter.js');
 const HexBinToBinary = require('./hexBinToBinary.js');
 
 const defaultParameters = {
@@ -459,9 +460,8 @@ class OracleDBI extends YadamuDBI {
   async hexBinaryFromLocalBlob(blob) {
       
      // ### Ugly workaround due to the fact it does not appear possible to directly re-read a local CLOB 
-     
-     const sql = `select :tempblob "newClob" from dual`;
-     const results = await this.executeSQL(sql,{tempblob:blob});
+     const sql = `select :tempBlob "newBlob" from dual`;
+     const results = await this.executeSQL(sql,{tempBlob:blob});
      return await this.hexBinaryFromBlob(results.rows[0][0])
      
   }
@@ -625,7 +625,7 @@ class OracleDBI extends YadamuDBI {
     this.maxStringSize = result.outBinds.size;
     
     if (this.maxStringSize < 32768) {
-      this.logWriter.write(`${new Date().toISOString()}[OracleDBI.configureConnection()]: Maximum VARCHAR2 size is ${this.maxStringSize}.\n`)
+      this.yadamuLogger.info([`${this.constructor.name}.configureConnection()`],`Maximum VARCHAR2 size is ${this.maxStringSize}.`)
     }    
   }    
   
@@ -650,12 +650,12 @@ class OracleDBI extends YadamuDBI {
    return conn;
   }
   
-  async releaseConnection(conn,logWriter) {
+  async releaseConnection(conn,yadamuLogger) {
     if (conn !== undefined) {
       try {
         await conn.close();
       } catch (e) {
-        this.logWriter.write(`${new Date().toISOString()}[OracleDBI.releaseConnection()]: ${e}\n${e.stack}\n`);
+        this.yadamuLogger.logException([`${this.constructor.name}.releaseConnection()`],e);
       }
     }
   };
@@ -663,7 +663,7 @@ class OracleDBI extends YadamuDBI {
   processLog(results) {
     if (results.outBinds.log !== null) {
       const log = JSON.parse(results.outBinds.log.replace(/\\r/g,'\\n'));
-      super.processLog(log, this.status, this.logWriter)
+      super.processLog(log, this.status, this.yadamuLogger)
       return log
     }
     else {
@@ -815,7 +815,6 @@ class OracleDBI extends YadamuDBI {
       const results = await this.executeSQL(sqlStatement,args);
       await ddlLob.close();
       const log = this.processLog(results)
-      // console.log(JSON.stringify(log,null,2))
       if (this.status.errorRaised === true) {
         throw new Error(`Oracle DDL Execution Failure`);
       }
@@ -841,7 +840,7 @@ class OracleDBI extends YadamuDBI {
  
   async finalize() {
     await this.setCurrentSchema(this.connectionProperties.user);
-    await this.releaseConnection(this.connection, this.logWriter);
+    await this.releaseConnection(this.connection, this.yadamuLogger);
   }
    
   /*
@@ -851,7 +850,7 @@ class OracleDBI extends YadamuDBI {
   */
 
   async abort() {
-    await this.releaseConnection(this.connection, this.logWriter);
+    await this.releaseConnection(this.connection, this.yadamuLogger);
   }
 
   /*
@@ -900,7 +899,7 @@ class OracleDBI extends YadamuDBI {
        // 'Tee' the input stream used to create the temporary lob that contains the export file and pass it through the Sax Parser.
        // If any of the DDL operations exceed the maximum string size supported by server side JSON operations cache the ddl statements on the client
        
-       const saxParser  = new FileParser(this.logWriter)  
+       const saxParser  = new FileParser(this.yadamuLogger)  
        const ddlCache = new DDLCache();
        saxParser.pipe(ddlCache);
        const inputStream = fs.createReadStream(importFilePath);         
@@ -984,14 +983,24 @@ class OracleDBI extends YadamuDBI {
 
     const results = await this.connection.execute(sqlSystemInformation,{sysInfo:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}})
     return Object.assign({
-                           date               : new Date().toISOString()
-                          ,timeZoneOffset     : new Date().getTimezoneOffset()
-                          ,vendor             : this.DATABASE_VENDOR
-                          ,spatialFormat      : this.SPATIAL_FORMAT 
-                          ,schema             : this.parameters.OWNER
-                          ,softwareVendor     : this.SOFTWARE_VENDOR
-                          ,exportVersion      : EXPORT_VERSION
-                        }, JSON.parse(results.outBinds.sysInfo));
+      date               : new Date().toISOString()
+     ,timeZoneOffset     : new Date().getTimezoneOffset()
+     ,vendor             : this.DATABASE_VENDOR
+     ,spatialFormat      : this.SPATIAL_FORMAT 
+     ,schema             : this.parameters.OWNER
+     ,softwareVendor     : this.SOFTWARE_VENDOR
+     ,exportVersion      : EXPORT_VERSION
+     ,nodeClient         : {
+        version          : process.version
+       ,architecture     : process.arch
+       ,platform         : process.platform
+      }
+     ,oracleDriver       : {
+        oracledbVersion  : oracledb.versionString
+       ,clientVersion    : oracledb.oracleClientVersionString
+       ,serverVersion    : this.connection.oracleServerVersionString
+      }
+    },JSON.parse(results.outBinds.sysInfo));
     
   }
 
@@ -1187,7 +1196,7 @@ class OracleDBI extends YadamuDBI {
   }
       
   createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.logWriter);
+    return new DBParser(query,objectMode,this.yadamuLogger);
   }  
 
   async getInputStream(query,parser) {
@@ -1287,7 +1296,7 @@ class DDLCache extends Writable {
       }
       callback();
     } catch (e) {
-      this.logWriter.write(`${new Date().toISOString()}[DBWriter._write() "${this.tableName}"]: ${e}\n${e.stack}\n`);
+      this.yadamuLogger.logException([`${this.constructor.name}._write()`,`"${this.tableName}"`],e);
       callback(e);
     }
   }

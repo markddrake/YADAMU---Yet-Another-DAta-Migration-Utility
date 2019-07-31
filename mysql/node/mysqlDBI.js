@@ -156,21 +156,18 @@ class MySQLDBI extends YadamuDBI {
                          }
                          self.conn.query(sqlStatement,args,async function(err,results,fields) {
                                                                    if (err) {
-                                                                     // console.log('conn.query(err):',err);
                                                                      if (attemptReconnect && ((err.fatal) && (err.code && (err.code === 'PROTOCOL_CONNECTION_LOST') || (err.code === 'ECONNRESET')))){
-                                                                       self.logWriter.write(`${new Date().toISOString()}[MySQLDBI.executeSQL()][WARNING]: SQL Operation raised\n${err}\n`);
-                                                                       self.logWriter.write(`${new Date().toISOString()}[MySQLDBI.executeSQL()][INFO]: Attemping reconnection.\n`);
+                                                                       self.yadamuLogger.warning([`${self.constructor.name}.executeSQL()`],`SQL Operation raised\n${e}`);
+                                                                       self.yadamuLogger.info([`${self.constructor.name}.executeSQL()`],`Attemping reconnection.`);
                                                                        await self.reconnect()
-                                                                       self.logWriter.write(`${new Date().toISOString()}[MySQLDBI.executeSQL()][INFO]: New connection availabe.\n`);
+                                                                       self.yadamuLogger.info([`${self.constructor.name}.executeSQL()`],`New connection availabe.`);
                                                                        results = await self.executeSQL(sqlStatement,args,false);
                                                                        resolve(results);
               1                                                      }
                                                                      else {
-                                                                       self.conn.end();
                                                                        reject(err);
                                                                      }
                                                                    }
-                                                                   if (!attemptReconnect) { console.log('Attempt 2',results)}
                                                                    resolve(results);
                                                                  })
 
@@ -202,7 +199,7 @@ class MySQLDBI extends YadamuDBI {
     let results = await this.executeSQL(sqlQueryPacketSize);
     
     if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
-      this.logWriter.write(`${new Date().toISOString()}: Increasing MAX_ALLOWED_PACKET to 1G.\n`);
+      this.yadamuLogger.info([`${this.constructor.name}.setMaxAllowedPacketSize()`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
       results = await this.executeSQL(sqlSetPacketSize);
       await this.conn.end();
       this.connectionOpen = false;
@@ -213,10 +210,12 @@ class MySQLDBI extends YadamuDBI {
   
   newConnection() {
      
+     const self = this;
+     
      const conn = mysql.createConnection(this.connectionProperties); 
      conn.on('error',function(err) {
-       console.log('connection.onError()',err);
-     },this);
+       self.yadamuLogger.logException([`${this.constructor.name}.newConnection()`,`connection.onError()`],e);
+     });
      return conn;
   }
   
@@ -250,11 +249,11 @@ class MySQLDBI extends YadamuDBI {
     
     if (this.conn) {
       try { 
-        this.logWriter.write(`${new Date().toISOString()}[MySQLDBI.reconnect()]: Closing Connection\n`);
+        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Closing Connection`);
         await this.conn.end();
-        this.logWriter.write(`${new Date().toISOString()}[MySQLDBI.reconnect()]: Connection Closed\n`);
+        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Connection Closed`);
       } catch (e) {
-        this.logWriter.write(`${new Date().toISOString()}[MySQLDBI.reconnect()]: this.conn.close() raised\n${e}\n`);
+        this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`this.conn.close() raised\n${e}`);
       }
     }
     
@@ -266,7 +265,7 @@ class MySQLDBI extends YadamuDBI {
         break;
       } catch (e) {
         if (e.fatal && (e.code && (e.code === 'ECONNREFUSED'))) {
-          this.logWriter.write(`${new Date().toISOString()}[MySQLDBI.reconnect()][INFO]: Waiting for MySQL server restart.\n`)
+          this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Waiting for MySQL server restart.`)
           this.waitForRestart(500);
           retryCount++;
         }
@@ -375,7 +374,10 @@ class MySQLDBI extends YadamuDBI {
   */
 
   async abort() {
-    await this.conn.end();
+    try {
+      await this.conn.end();
+    } catch (e) {
+    }
     this.connectionOpen = false;
   }
 
@@ -473,8 +475,12 @@ class MySQLDBI extends YadamuDBI {
         serverCharacterSet   : sysInfo.SERVER_CHARACTER_SET,
         databaseCharacterSet : sysInfo.DATABASE_CHARACTER_SET
       }
+     ,nodeClient         : {
+        version          : process.version
+       ,architecture     : process.arch
+       ,platform         : process.platform
+      }                                                                    
     }
-    
   }
 
   /*
@@ -500,7 +506,7 @@ class MySQLDBI extends YadamuDBI {
     }
     else {
       for (const i in results) {
-        this.logWriter.write(`${new Date().toISOString()}[WARNING]: Table: "${results[i].TABLE_SCHEMA}"."${results[i].TABLE_NAME}". Duplicate entires detected in INFORMATION_SCHEMA.COLUMNS.\n`)
+        this.yadamuLogger.warning([`${this.constructor.name}`,`"${results[i].TABLE_SCHEMA}"."${results[i].TABLE_NAME}"`],`Duplicate entires detected in INFORMATION_SCHEMA.COLUMNS.`)
       }
       return sqlSchemaInfo + sqlInformationSchemaFix;
     }
@@ -571,18 +577,6 @@ class MySQLDBI extends YadamuDBI {
 
   async finalizeDataLoad() {
   }  
-
-  /* 
-  
-  async handleInsertError(tableName,record,err,length,row,info) {
- 
-    // Invalid Lat/Long Values....
-    if (e.errno && ((e.errno === 3616) || (e.errno === 3617))) {
-      this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")]: Skipping Row Reason: ${e.message}\n`)
-    }
-    super.handleInsertError((tableName,record,err,length,row,info);
-  }
-  */
 
 }
 

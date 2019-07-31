@@ -51,7 +51,7 @@ class FileReader extends YadamuDBI {
   constructor(yadamu) {
     super(yadamu,defaultParameters)
     this.inputStream = undefined;
-    this.parser = new FileParser(yadamu.getLogWriter());
+    this.parser = new FileParser(yadamu.getYadamuLogger());
   }
 
   async initialize() {
@@ -60,7 +60,7 @@ class FileReader extends YadamuDBI {
     const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
     this.inputStream = fs.createReadStream(importFilePath);
-    this.logWriter.write(`${new Date().toISOString()}[FileReader()]: : Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.\n`)
+    this.yadamuLogger.log([`${this.constructor.name}`],`Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.`)
   }
   
   /*
@@ -85,7 +85,7 @@ class FileReader extends YadamuDBI {
       try {
         await this.closeFile()
       } catch (err) {
-        this.logWriter.write(`${new Date().toISOString()}[FileReader()]: Fatal Error:${err.stack}.\n`)
+        this.yadamuLogger.logException([`${this.constructor.name}`],err)
       }
     }
   }

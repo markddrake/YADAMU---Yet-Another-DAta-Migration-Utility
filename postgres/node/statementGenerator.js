@@ -4,7 +4,7 @@ const Yadamu = require('../../common/yadamu.js');
 
 class StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, batchSize, commitSize, status, logWriter) {
+  constructor(dbi, targetSchema, metadata, batchSize, commitSize, status, yadamuLogger) {
     
     this.dbi = dbi;
     this.targetSchema = targetSchema
@@ -12,7 +12,7 @@ class StatementGenerator {
     this.batchSize = batchSize
     this.commitSize = commitSize;
     this.status = status,
-    this.logWriter = logWriter
+    this.yadamuLogger = yadamuLogger
   }
   
 

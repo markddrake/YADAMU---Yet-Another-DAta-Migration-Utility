@@ -131,7 +131,7 @@ class TableWriter {
           ps.input(column,sql.VarChar(4000));
           break;
         default:
-         this.logWriter.write(`${new Date().toISOString()}[tableWriter.createPreparedStatement()]: Unmapped data type [${targetDataType}].\n`);
+         this.yadamuLogger.log([`${this.constructor.name}.createPreparedStatement()`],`Unmapped data type [${targetDataType}].`);
       }
     },this)
     if (this.status.sqlTrace) {
@@ -141,13 +141,14 @@ class TableWriter {
     return ps;
   }
 
-  constructor(dbi,tableName,tableInfo,status,logWriter) {
+  constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     this.dbi = dbi;
     this.tableName = tableName
     this.tableInfo = tableInfo;
     this.status = status;
-    this.logWriter = logWriter;    
+    this.yadamuLogger = yadamuLogger;    
 
+    this.batchCount = 0;
     
     this.startTime = new Date().getTime();
     this.endTime = undefined;
@@ -160,7 +161,7 @@ class TableWriter {
   }
 
   batchComplete() {
-     return (this.tableInfo.bulkOperation.rows.length  === this.batchSize)
+     return (this.tableInfo.bulkOperation.rows.length  === this.tableInfo.batchSize)
   }
   
   commitWork(rowCount) {
@@ -245,11 +246,11 @@ class TableWriter {
         return this.skipTable
       } catch (e) {
         if (this.status.showInfoMsgs) {
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.tableInfo.bulkOperation.rows.length}].  Bulk Operation raised:\n${e.message}.\n`);
-          this.logWriter.write(`${this.tableInfo.dml}\n`);
-          this.logWriter.write(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}`);
-          this.logWriter.write(`${this.tableInfo.bulkOperation.rows[0]}\n...\n${this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1]}\n`)
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Switching to Iterative operations.\n`);          
+          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.tableInfo.bulkOperation.rows.length}].  Bulk Operation raised:\n${e.message}.`);
+          this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
+          this.yadamuLogger.writeDirect(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}`);
+          this.yadamuLogger.writeDirect(`${this.tableInfo.bulkOperation.rows[0]}\n...\n${this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1]}\n`)
+          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
         }
         // await this.dbi.rollbackTransaction();
         this.tableInfo.bulkSupported = false;
@@ -271,7 +272,7 @@ class TableWriter {
         const results = await this.tableInfo.preparedStatement.execute(args);
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.columns),] : []
-        const abort = this.dbi.handleInsertError(this.tableName,this.tableInfo.bulkOperation.rows[row],e,this.tableInfo.bulkOperation.length,row,errInfo);
+        const abort = this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.tableInfo.bulkOperation.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
         if (abort) {
           await this.dbi.rollbackTransaction();
           this.skipTable = true;

@@ -10,26 +10,27 @@ const sqlRollbackSavePoint =
 
 class TableWriter {
 
-  constructor(dbi,tableName,tableInfo,status,logWriter) {
+  constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     this.dbi = dbi;
     this.schema = this.dbi.parameters.TOUSER;
     this.tableName = tableName
     this.tableInfo = tableInfo;
     this.status = status;
-    this.logWriter = logWriter;    
+    this.yadamuLogger = yadamuLogger;    
 
     this.batch = [];
     this.lobList = [];
 
     this.lobUsage = 0;
     this.batchCount = 0;
-    this.batchLength = 0;
 
     this.startTime = new Date().getTime();
     this.endTime = undefined;
     this.insertMode = 'Batch';
 
     this.skipTable = false;
+    this.dumpOracleTestcase = false;
+    
   }
 
   async disableTriggers() {
@@ -59,7 +60,6 @@ class TableWriter {
   }
 
   async appendRow(row) {
-     
     try {           
       row = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
         if (row[idx] !== null) {
@@ -87,9 +87,6 @@ class TableWriter {
             return this.dbi.trackBlobFromHexBinary(row[idx], this.lobList)                                                                    
           }
           switch (dataType.type) {
-            case "BLOB" :
-              return Buffer.from(row[idx],'hex');
-              // return this.dbi.trackBlobFromBuffer(row[idx], this.lobList);
             case "RAW":
               if (typeof row[idx] === 'boolean') {
                 row[idx] = (row[idx] === true ? '01' : '00')
@@ -132,13 +129,13 @@ class TableWriter {
           }
           return row[idx]
         }
+        return null;
       },this))
       this.batch.push(row);
       return this.batch.length;
     } catch (e) {
-      this.logWriter.write(`${new Date().toISOString()}[INFO]: TableWriter.appendRow("${this.tableName}",${this.batch.length}. Row conversion raised ${e}.Skipping Row. Row:\n`);
-      console.log(e.stack);
-      this.logWriter.write(`${row}\n`);
+      const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,this.tableInfo.targetDataTypes,JSON.stringify(this.tableInfo.binds)] : []     
+      this.dbi.handleInsertError(`${this.constructor.name}.apppendRow()`,this.tableName,this.batch.length,-1,row,e,errInfo);
     }
   }
 
@@ -187,7 +184,7 @@ end;`
       try {
         await lob.close();
       } catch(e) {
-        this.logWriter.write(`LobList[${idx}]: Error ${e}\n`);
+        this.yadamuLogger.logException([`${this.constructor.name}.freeLobList()`,`${idx}`],e);
       }   
     },this)
   }
@@ -200,15 +197,19 @@ end;`
   async serializeLobs(record) {
     const newRecord = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
       if (record[idx] !== null) {
-        if (this.tableInfo.binds[idx].type === oracledb.CLOB) {
-          // ### Cannot reac contact of local clob...
-          // return this.dbi.stringFromClob(record[idx])
-          return this.dbi.stringFromLocalClob(record[idx])
-        }
-        if (this.tableInfo.binds[idx].type === oracledb.BLOB) {
-          // ### Cannot reac contact of local clob...
-          // return this.dbi.stringFromClob(record[idx])
-          return this.dbi.hexBinaryFromLocalBlob(record[idx])
+        switch (this.tableInfo.binds[idx].type) {
+          case oracledb.CLOB:
+            // console.log(record[idx])
+            // ### Cannot re-read content that has been written to local clob
+            // return this.dbi.stringFromClob(record[idx])
+            return this.dbi.stringFromLocalClob(record[idx])
+          case oracledb.BLOB:
+            // console.log(record[idx])
+            // ### Cannot re-read content that has been written to local blob
+            // return this.dbi.hexBinaryFromBlob(record[idx])
+            return this.dbi.hexBinaryFromLocalBlob(record[idx])
+          default:
+            return record[idx];
         }
       }
       return record[idx];
@@ -230,7 +231,6 @@ end;`
         await this.dbi.executeSQL(sqlSetSavePoint,[])
         const results = await this.dbi.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
         this.endTime = new Date().getTime();
-        // console.log(`Batch:${this.batchCount}. ${this.batch.length} rows inserted`)
         this.batch.length = 0;
         this.freeLobList();
         return this.skipTable
@@ -240,12 +240,12 @@ end;`
           await this.dbi.executeSQL(sqlSetSavePoint,[])
           // Mutating Table - Convert to Cursor based PL/SQL Block
           if (this.status.showInfoMsgs) {
-            logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.length}]. executeMany() operation raised:\n${e}\n`);
-            this.logWriter.write(`${this.tableInfo.dml}\n`);
-            this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
-            this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
-            this.logWriter.write(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
-            this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: . Switching to PL/SQL Block.\n`);          
+            yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`,`${this.batch.length}`],`executeMany() operation raised:\n${e}`);
+            this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
+            this.yadamuLogger.writeDirect(`${this.tableInfo.targetDataTypes}\n`);
+            this.yadamuLogger.writeDirect(`${JSON.stringify(this.tableInfo.binds)}\n`);
+            this.yadamuLogger.writeDirect(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
+            this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to PL/SQL Block.`);          
           }
           this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
           if (this.status.sqlTrace) {
@@ -259,24 +259,34 @@ end;`
           } catch (e) {
             await this.dbi.executeSQL(sqlRollbackSavePoint,[])
             if (this.status.showInfoMsgs) {
-              this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.rows.length}]. executeMany() with PL/SQL block raised:\n${e}\n`);
-              this.logWriter.write(`${this.tableInfo.dml}\n`);
-              this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
-              this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
-              this.logWriter.write(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
-              this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Switching to Iterative operations.\n`);          
+              this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`,`${this.batch.length}`],`executeMany() with PL/SQL block raised:\n${e}`);
+              this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
+              this.yadamuLogger.writeDirect(`${this.tableInfo.targetDataTypes}\n`);
+              this.yadamuLogger.writeDirect(`${JSON.stringify(this.tableInfo.binds)}\n`);
+              this.yadamuLogger.writeDirect(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
+              this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
             }
             this.insertMode = 'Iterative';
           }
         } 
         else {  
           if (this.status.showInfoMsgs) {
-            this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batch.length}]. executeMany() operation raised:\n${e}.\n`);
-            this.logWriter.write(`${this.tableInfo.dml}\n`);
-            this.logWriter.write(`${this.tableInfo.targetDataTypes}\n`);
-            this.logWriter.write(`${JSON.stringify(this.tableInfo.binds)}\n`);
-            this.logWriter.write(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
-            this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Switching to Iterative operations.\n`);          
+            this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`,`${this.batch.length}`],`executeMany() operation raised:\n${e}`);
+            this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
+            this.yadamuLogger.writeDirect(`${this.tableInfo.targetDataTypes}\n`);
+            this.yadamuLogger.writeDirect(`${JSON.stringify(this.tableInfo.binds)}\n`);
+            this.yadamuLogger.writeDirect(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
+            this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
+            if (this.dumpOracleTestcase) {
+              console.log('DDL:')
+              console.log(this.tableInfo.ddl)
+              console.log('DML:')
+              console.log(this.tableInfo.dml)
+              console.log('BINDS:')
+              console.log(JSON.stringify(this.tableInfo.binds));
+              console.log('DATA:');
+              console.log(JSON.stringify(this.batch.slice(0,9)));
+            }
           }
           this.insertMode = 'Iterative';
         }
@@ -290,7 +300,7 @@ end;`
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,this.tableInfo.targetDataTypes,JSON.stringify(this.tableInfo.binds)] : []
         const record = await this.serializeLobs(this.batch[row])
-        const abort = this.dbi.handleInsertError(this.tableName,record,e,this.batch.length,row,errInfo);
+        const abort = this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,record,e,errInfo);
         if (abort) {
           await this.dbi.rollbackTransaction();
           this.skipTable = true;
@@ -298,7 +308,6 @@ end;`
         }
       }
     } 
-    // console.log(`Iterative:${this.batchCount}. ${this.batch.length} rows inserted`)
     // ### Iterative must commit to allow a subsequent batch to rollback.
     this.endTime = new Date().getTime();
     this.batch.length = 0;

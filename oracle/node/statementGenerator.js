@@ -36,16 +36,19 @@ class StatementGenerator {
     this.lobCacheSize = lobCacheSize
   }
  
-  generateBinds(tableInfo, dataTypeSizes) {
-     
+  generateBinds(tableInfo, metadata) {
+
      tableInfo.lobCount = 0;
      return tableInfo.targetDataTypes.map(function (targetDataType,idx) {
        const dataType = this.dbi.decomposeDataType(targetDataType)
        if (!dataType.length) {
-          dataType.length = parseInt(dataTypeSizes[idx]);
+          dataType.length = parseInt(metadata.sizeConstraints[idx]);
        }
        switch (dataType.type) {
          case 'NUMBER':
+           if (metadata.source.vendor === 'MSSQLSERVER' && metadata.source.dataTypes[idx] === 'bigint') {
+             return { type: oracledb.STRING, maxSize : 19}
+           }
          case 'FLOAT':
          case 'BINARY_FLOAT':
          case 'BINARY_DOUBLE':
@@ -61,7 +64,7 @@ class StatementGenerator {
            return { type: oracledb.STRING, maxSize : dataType.length * 2}
          case 'DATE':
          case 'TIMESTAMP':
-           return { type: oracledb.STRING, maxSize : 48}
+           return { type: oracledb.STRING, maxSize : 33}
          case 'INTERVAL':
             return { type: oracledb.STRING, maxSize : 12}
          case 'CLOB':
@@ -87,8 +90,8 @@ class StatementGenerator {
            // return {type : oracledb.BUFFER, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
            return {type : oracledb.BLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
          case 'RAW':
-           // return { type :oracledb.STRING, maxSize : parseInt(dataTypeSizes[idx])*2}
-           return { type :oracledb.BUFFER, maxSize : parseInt(dataTypeSizes[idx])}
+           // return { type :oracledb.STRING, maxSize : parseInt(metadata.sizeConstraints[idx])*2}
+           return { type :oracledb.BUFFER, maxSize : parseInt(metadata.sizeConstraints[idx])}
          case 'BFILE':
            return { type :oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
          case 'BOOLEAN':
@@ -231,7 +234,7 @@ class StatementGenerator {
         tableInfo.dml = `insert into "${this.targetSchema}"."${this.metadata[table].tableName}" (${tableMetadata.columns}) values (${values.join(',')})`;
       }
       
-      tableInfo.binds = this.generateBinds(tableInfo,this.metadata[table].sizeConstraints);
+      tableInfo.binds = this.generateBinds(tableInfo,this.metadata[table]);
       tableInfo.batchSize = this.batchSize
       if (tableInfo.lobCount > 0) {
        // If some columns are bound as CLOB or BLOB restrict batchsize based on lobCacheSize

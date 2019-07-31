@@ -1,9 +1,9 @@
 [
-  ["Northwind.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
-  ["HumanResources.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
-  ["Person.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
-  ["Production.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
-  ["Purchasing.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
-  ["Sales.json",{"schema": "AdventureWorksAll","owner": "dbo"}],
-  ["AdventureWorksDW.json",{"schema": "AdventureWorksAll","owner": "dbo"}]
+  ["Northwind.json",{"database": "AdventureWorksAll","owner": "dbo"}],
+  ["HumanResources.json",{"database": "AdventureWorksAll","owner": "dbo"}],
+  ["Person.json",{"database": "AdventureWorksAll","owner": "dbo"}],
+  ["Production.json",{"database": "AdventureWorksAll","owner": "dbo"}],
+  ["Purchasing.json",{"database": "AdventureWorksAll","owner": "dbo"}],
+  ["Sales.json",{"database": "AdventureWorksAll","owner": "dbo"}],
+  ["AdventureWorksDW.json",{"database": "AdventureWorksAll","owner": "dbo"}]
 ]

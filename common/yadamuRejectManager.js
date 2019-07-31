@@ -4,11 +4,11 @@ const fsp = require('fs').promises;
 const path = require('path')
 const assert = require('assert')
 
-class YadamuErrorLogger {
+class YadamuRejectManager {
 
-  constructor(filename,logWriter) {
+  constructor(filename,yadamuLogger) {
     this.filename = filename;
-    this.logWriter  = logWriter;
+    this.yadamuLogger  = yadamuLogger;
     this.tableName = undefined;
     this.ws = undefined;
     this.seperator = undefined;
@@ -34,7 +34,7 @@ class YadamuErrorLogger {
     }
   }    
    
-  logError(tableName,data) {
+  rejectRow(tableName,data) {
 
   
     if (this.ws === undefined) {
@@ -51,13 +51,13 @@ class YadamuErrorLogger {
   
   close() {
     if (this.tableName !== undefined) {
-      this.logWriter.write(`${new Date().toISOString()}["YadauErrorLogger"]: ${this.recordCount} records written to "${this.ws.path}"\n`)
-      this.ws.write(`]}}`);
+      this.yadamuLogger.info([`${this.constructor.name}`],`${this.recordCount} records written to "${this.ws.path}"`)
+      this.ws.write(`]}}`);0
       this.ws.close();
     }
   }
 }
     
-module.exports = YadamuErrorLogger;
+module.exports = YadamuRejectManager;
 
 

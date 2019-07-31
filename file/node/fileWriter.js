@@ -84,7 +84,7 @@ class FileWriter extends YadamuDBI {
     super.initialize();
     const exportFilePath = path.resolve(this.parameters.FILE);
     this.outputStream = fs.createWriteStream(exportFilePath);
-    this.logWriter.write(`${new Date().toISOString()}[FileWriter()]: Writing file "${exportFilePath}".\n`)
+    this.yadamuLogger.log([`${this.constructor.name}`],`Writing file "${exportFilePath}".`)
     this.outputStream.write(`{`)
   }
 
@@ -111,7 +111,7 @@ class FileWriter extends YadamuDBI {
       try {
         await this.closeFile()
       } catch (err) {
-        this.logWriter.write(`${new Date().toISOString()}[FileWriter()]: Fatal Error:${err.stack}.\n`)
+        this.yadamuLogger.logException([`${this.constructor.name}`],e)
       }
     }
   }

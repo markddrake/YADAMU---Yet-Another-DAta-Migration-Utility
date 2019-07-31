@@ -4,17 +4,14 @@ const Yadamu = require('../../common/yadamu.js');
 
 class TableWriter {
 
-  constructor(dbi,tableName,tableInfo,status,logWriter) {
+  constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     this.dbi = dbi;
     this.tableName = tableName
     this.tableInfo = tableInfo;
     this.status = status;
-    this.logWriter = logWriter;    
+    this.yadamuLogger = yadamuLogger;    
 
     this.batch = [];
-    this.lobList = [];
-
-    this.lobUsage = 0;
     this.batchRowCount = 0;
     
     this.startTime = new Date().getTime();
@@ -76,7 +73,19 @@ class TableWriter {
           case 'date':
           case 'datetime':
           case 'timestamp':
-            if (typeof row[idx] !== 'string') {
+            if (typeof row[idx] === 'string') {
+              if (row[idx].endsWith('Z') && row[idx].length === 28) {
+                row[idx] = row[idx].slice(0,-2) + 'Z'
+              }
+              else {
+                if (!row[idx].endsWith('+00:00')) {
+                  if (row[idx].length === 27) {                                
+                    row[idx] = row[idx].slice(0,-1) 
+                  }
+                }
+              }               
+            }
+            else {
               // Avoid unexpected Time Zone Conversions when inserting from a Javascript Date object 
               row[idx] = row[idx].toISOString();
             }
@@ -95,6 +104,7 @@ class TableWriter {
       
   async writeBatch() {
 
+    this.repackBatch = false;
     this.batchCount++;
 
     if (this.insertMode === 'Batch') {
@@ -110,26 +120,28 @@ class TableWriter {
         return this.skipTable
       } catch (e) {
         if (this.status.showInfoMsgs) {
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.tableInfo.bulkOperation.rows.length}].  Bulk Operation raised:\n${e.message}\n`);
-          this.logWriter.write(`${this.tableInfo.dml}\n`);
-          this.logWriter.write(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}`);
-          this.logWriter.write(`${this.tableInfo.bulkOperation.rows[0]}\n...\n${this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1]}\n`)
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Switching to Iterative operations.\n`);          
+          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"}`,`Batch size: ${this.tableInfo.bulkOperation.rows.length}`],`Bulk Operation raised:\n${e.message}`);
+          this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
+          this.yadamuLogger.writeDirect(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}`);
+          this.yadamuLogger.writeDirect(`${this.tableInfo.bulkOperation.rows[0]}\n...\n${this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1]}\n`)
+          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"}`],`Switching to Iterative operations.`);          
         }
         await this.dbi.rollbackTransaction();
-        this.insertMode = 'Iterative';
+        this.tableInfo.insertMode = 'Iterative' 
+        repackBatch = true;
       }
     } 
      
     let argNumber = 1;
     const args = Array(1).fill(0).map(function() {return `(${Array(this.tableInfo.targetDataTypes.length).fill(0).map(function(){return `$${argNumber++}`}).join(',')})`},this).join(',');
     const sqlStatement = this.tableInfo.dml + args
-    for (const row in this.batch) {
+    for (let row =0; row < this.batchRowCount; row++) {
+      const nextRow = repackBatch ?  this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
       try {
-        const results = await this.dbi.insertBatch(sqlStatement,this.batch[row]);
+        const results = await this.dbi.insertBatch(sqlStatement,nextRow);
       } catch(e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []
-        const abort = this.dbi.handleInsertError(this.tableName,this.batch[row],e,this.batch.length,row,errInfo);
+        const abort = this.dbi.handleInsertError('writeBatch()',this.tableName,this.batchRowCount,nextRow,e,errInfo);
         if (abort) {
           await this.dbi.rollbackTransaction();
           this.skipTable = true;

@@ -4,11 +4,11 @@ const Transform = require('stream').Transform;
 
 class DBParser extends Transform {
   
-  constructor(query,objectMode,logWriter) {
+  constructor(query,objectMode,yadamuLogger) {
     super({objectMode: true });   
     this.query = query;
     this.objectMode = objectMode
-    this.logWriter = logWriter;
+    this.yadamuLogger = yadamuLogger;
     this.counter = 0
     
   }

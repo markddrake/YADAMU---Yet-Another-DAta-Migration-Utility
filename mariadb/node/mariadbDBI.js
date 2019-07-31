@@ -123,7 +123,7 @@ class MariadbDBI extends YadamuDBI {
     let results = await this.executeSQL(sqlQueryPacketSize);
     
     if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
-      this.logWriter.write(`${new Date().toISOString()}[MariaDBI.setMaxAllowedPacketSize][INFO]: Increasing MAX_ALLOWED_PACKET to 1G.\n`);
+      this.yadamuLogger.info([`${this.constructor.name}.setMaxAllowedPacketSize()`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
       results = await this.executeSQL(sqlSetPacketSize);
       await this.conn.end();
       await this.pool.end();
@@ -158,21 +158,21 @@ class MariadbDBI extends YadamuDBI {
     
     if (this.conn) {
       try { 
-        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: Closing Connection.\n`);
+        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Closing Connection.`);
         await this.conn.end();
-        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: Connection Closed.\n`);
+        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Connection Closed.`);
       } catch (e) {
-        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: this.conn.end() raised\n${e}\n`);
+        this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`this.conn.end() raised\n${e}`);
       }
     }
 
     if (this.pool) {    
       try { 
-        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: Closing Pool.\n`);
+        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Closing Pool.`);
         await this.pool.end();
-        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: Pool Closed.\n`);
+        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Pool Closed.`);
       } catch (e) {
-        this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()]: this.pool.end() raised\n${e}\n`);
+        this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`this.pool.end() raised\n${e}`);
       }
     }
     
@@ -182,7 +182,7 @@ class MariadbDBI extends YadamuDBI {
         break;
       } catch (e) {
         if (e.fatal && (e.code && (e.code === 'ECONNREFUSED'))) {
-          this.logWriter.write(`${new Date().toISOString()}[MariaDBI.reconnect()][INFO]: Waiting for MariaDB server restart.\n`)
+          this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Waiting for MariaDB server restart.`)
           this.waitForRestart(100);
           retryCount++;
         }
@@ -214,13 +214,12 @@ class MariadbDBI extends YadamuDBI {
       try {
         return await this.conn.query(sqlStatement,args)
       } catch (e) {
-        // console.log(e);
         if (attemptReconnect && ((e.fatal) && (e.code && (e.code === 'ER_CMD_CONNECTION_CLOSED') || (e.code === 'ECONNABORTED') || (e.code === 'ER_SOCKET_UNEXPECTED_CLOSE') || (err.code === 'ECONNRESET')))){
           attemptReconnect = false;
-          this.logWriter.write(`${new Date().toISOString()}[MariaDBI.executeSQL()][WARNING]: SQL Operation raised\n${e}\n`);
-          this.logWriter.write(`${new Date().toISOString()}[MariaDBI.executeSQL()][INFO]: Attemping reconnection.\n`);
+          this.yadamuLogger.warning([`${this.constructor.name}.executeSQL()`],`SQL Operation raised\n${e}`);
+          this.yadamuLogger.info([`${this.constructor.name}.executeSQL()`],`Attemping reconnection.`);
           await this.reconnect()
-          this.logWriter.write(`${new Date().toISOString()}[MariaDBI.executeSQL()][INFO]: New connection availabe.\n`);
+          this.yadamuLogger.info([`${this.constructor.name}.executeSQL()`],`New connection availabe.`);
           continue;
         }
         throw (e)
@@ -380,8 +379,13 @@ class MariadbDBI extends YadamuDBI {
      ,nls_parameters     : {
         serverCharacterSet   : sysInfo.SERVER_CHARACTER_SET,
         databaseCharacterSet : sysInfo.DATABASE_CHARACTER_SET
-      }                                                           
-                                                                 } 
+      }
+     ,nodeClient         : {
+        version          : process.version
+       ,architecture     : process.arch
+       ,platform         : process.platform
+      }                                                                     
+    } 
   }
 
   /*
@@ -452,7 +456,7 @@ class MariadbDBI extends YadamuDBI {
   }
 
   createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.logWriter);
+    return new DBParser(query,objectMode,this.yadamuLogger);
   }  
 
   getTableWriter(table) {

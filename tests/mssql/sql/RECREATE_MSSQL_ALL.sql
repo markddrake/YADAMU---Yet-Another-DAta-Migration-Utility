@@ -46,3 +46,57 @@ go
 --
 CREATE SCHEMA $(SCHEMA)
 go
+--
+:setvar DATABASE WorldWideImporters  
+--
+DROP DATABASE $(DATABASE)$(ID)
+go
+create DATABASE $(DATABASE)$(ID)
+go
+--
+use $(DATABASE)$(ID)
+go
+:setvar SCHEMA Application
+--
+CREATE SCHEMA $(SCHEMA)
+go
+--
+:setvar SCHEMA Purchasing
+--
+CREATE SCHEMA $(SCHEMA)
+go
+--
+:setvar SCHEMA Sales
+--
+CREATE SCHEMA $(SCHEMA)
+go
+--
+:setvar SCHEMA Warehouses
+--
+CREATE SCHEMA $(SCHEMA)
+go
+--
+:setvar DATABASE WorldWideImportersDW  
+--
+DROP DATABASE $(DATABASE)$(ID)
+go
+create DATABASE $(DATABASE)$(ID)
+go
+--
+use $(DATABASE)$(ID)
+go
+:setvar SCHEMA Dimension
+--
+CREATE SCHEMA $(SCHEMA)
+go
+--
+:setvar SCHEMA Fact
+--
+CREATE SCHEMA $(SCHEMA)
+go
+--
+:setvar SCHEMA Integration
+--
+CREATE SCHEMA $(SCHEMA)
+go
+--

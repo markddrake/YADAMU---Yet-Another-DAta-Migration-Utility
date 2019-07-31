@@ -1,0 +1,9 @@
+[
+    ["JSON/MsSQL/Northwind.json",{"database": "Northwind1","owner": "dbo"},"JSON/MsSQL/Northwind1.json",{"database": "Northwind2","owner": "dbo"},"JSON/MsSQL/Northwind2.json"],
+    ["JSON/MsSQL/HumanResources.json",{"database": "HumanResources1","owner": "HumanResources"},"JSON/MsSQL/HumanResources1.json",{"database": "HumanResources2","owner": "HumanResources"},"JSON/MsSQL/HumanResources2.json"],
+    ["JSON/MsSQL/Person.json",{"database": "Person1","owner": "Person"},"JSON/MsSQL/Person1.json",{"database": "Person2","owner": "Person"},"JSON/MsSQL/Person2.json"],
+    ["JSON/MsSQL/Production.json",{"database": "Production1","owner": "Production"},"JSON/MsSQL/Production1.json",{"database": "Production2","owner": "Production"},"JSON/MsSQL/Production2.json"],
+    ["JSON/MsSQL/Purchasing.json",{"database": "Purchasing1","owner": "Purchasing"},"JSON/MsSQL/Purchasing1.json",{"database": "Purchasing2","owner": "Purchasing"},"JSON/MsSQL/Purchasing2.json"],
+    ["JSON/MsSQL/Sales.json",{"database": "Sales1","owner": "Sales"},"JSON/MsSQL/Sales1.json",{"database": "Sales2","owner": "Sales"},"JSON/MsSQL/Sales2.json"],
+    ["JSON/MsSQL/AdventureWorksDW.json",{"database": "AdventureWorksDW1","owner": "dbo"},"JSON/MsSQL/AdventureWorksDW1.json",{"database": "AdventureWorksDW2","owner": "dbo"},"JSON/MsSQL/AdventureWorksDW2.json"]
+]

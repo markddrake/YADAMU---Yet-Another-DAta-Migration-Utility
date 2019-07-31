@@ -1,7 +1,7 @@
 REM Run from YADAMU_HOME
 @set YADAMU_HOME=%CD%
 @set YADAMU_TEST_HOME=%YADAMU_HOME%\tests
-@set YADAMU_WORK_ID=exportRoundtrip
+@set YADAMU_WORK_ID=fileRoundtrip
 @set YADAMU_WORK_ROOT=%YADAMU_HOME%\work
 if not exist %YADAMU_WORK_ROOT%\ mkdir %YADAMU_WORK_ROOT%
 @set YADAMU_LOG_ROOT=%YADAMU_WORK_ROOT%\logs

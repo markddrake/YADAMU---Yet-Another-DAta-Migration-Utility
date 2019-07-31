@@ -4,22 +4,20 @@ const Yadamu = require('../../common/yadamu.js');
 
 class TableWriter {
 
-  constructor(dbi,tableName,tableInfo,status,logWriter) {
+  constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     this.dbi = dbi;
     this.tableName = tableName
     this.tableInfo = tableInfo;
     this.status = status;
-    this.logWriter = logWriter;    
+    this.yadamuLogger = yadamuLogger;    
 
     this.batch = [];
+    this.batchCount = 0;
 
     this.startTime = new Date().getTime();
     this.endTime = undefined;
 
     this.skipTable = false;
-
-    this.logDDLIssues   = (this.status.loglevel && (this.status.loglevel > 2));
-    // this.logDDLIssues   = true;
   }
 
   async initialize() {
@@ -43,6 +41,7 @@ class TableWriter {
   }
       
   async writeBatch() {
+    this.batchCount++;
     return this.skipTable
   }
 
@@ -56,6 +55,7 @@ class TableWriter {
     , endTime      : this.endTime
     , insertMode   : this.insertMode
     , skipTable    : this.skipTable
+    ,batchCount    : this.batchCount;
     }    
   }
 

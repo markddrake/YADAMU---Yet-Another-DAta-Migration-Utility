@@ -39,4 +39,33 @@ drop user "AdventureWorksDW&ID" cascade
 /
 grant connect, resource, unlimited tablespace to "AdventureWorksDW&ID" identified by oracle
 /
+drop user "WWI_Application&ID" cascade
+/
+grant connect, resource, unlimited tablespace to "WWI_Application&ID" identified by oracle
+/
+drop user "WWI_Purchasing&ID" cascade
+/
+grant connect, resource, unlimited tablespace to "WWI_Purchasing&ID" identified by oracle
+/
+drop user "WWI_Sales&ID" cascade
+/
+grant connect, resource, unlimited tablespace to "WWI_Sales&ID" identified by oracle
+/
+drop user "WWI_Warehouse&ID" cascade
+/
+grant connect, resource, unlimited tablespace to "WWI_Warehouse&ID" identified by oracle
+/
+drop user "WWI_DW_Dimension&ID" cascade
+/
+grant connect, resource, unlimited tablespace to "WWI_DW_Dimension&ID" identified by oracle
+/
+drop user "WWI_DW_Fact&ID" cascade
+/
+grant connect, resource, unlimited tablespace to "WWI_DW_Fact&ID" identified by oracle
+/
+drop user "WWI_DW_Integration&ID" cascade
+/
+grant connect, resource, unlimited tablespace to "WWI_DW_Integration&ID" identified by oracle
+/
+
 quit

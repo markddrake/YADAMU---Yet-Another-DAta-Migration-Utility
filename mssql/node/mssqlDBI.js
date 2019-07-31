@@ -94,14 +94,18 @@ class MsSQLDBI extends YadamuDBI {
   
   async getConnectionPool() {
   
-    const logWriter = this.logWriter;
+    const yadamuLogger = this.yadamuLogger;
     if (this.status.sqlTrace) {
       const pwRedacted = Object.assign({},this.connectionProperties)
       delete pwRedacted.password
       this.status.sqlTrace.write(`-- Connection Properies: ${JSON.stringify(pwRedacted)}\ngo\n`)
     }
     const pool = await new sql.ConnectionPool(this.connectionProperties).connect();
-    pool.on('error',function(err){logWriter.log('Pool Error:',err)});
+    pool.on('error',(err, p) => {
+      this.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`Pool.onError()`],err);
+      throw err
+    })
+    
     const statement = `SET QUOTED_IDENTIFIER ON`
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${statement}\ngo\n`)
@@ -139,7 +143,7 @@ class MsSQLDBI extends YadamuDBI {
       this.status.sqlTrace.write(`${statement}\ngo\n`)
     }  
     const results = await request.query(statement);
-    this.logWriter.write(`${new Date().toISOString()}: Upload succesful: ${results.recordsets[0][0].VALID_JSON === 1}. Elapsed time ${new Date().getTime() - startTime}ms.\n`);
+    this.yadamuLogger.log([`${this.constructor.name}.verifyDataLoad()`],`: Upload succesful: ${results.recordsets[0][0].VALID_JSON === 1}. Elapsed time ${new Date().getTime() - startTime}ms.`);
     return results;
   }
   
@@ -161,7 +165,7 @@ class MsSQLDBI extends YadamuDBI {
       try {
         const results = await this.pool.request().batch(createSchema);
       } catch (e) {
-        console.log(e);
+        this.yadamuLogger.logException([`${this.constructor.name}.createSchema()`],e)
       }
     }     
   }
@@ -176,7 +180,8 @@ class MsSQLDBI extends YadamuDBI {
         }
         const results = await this.pool.request().batch(ddlStatement)   
       } catch (e) {
-        this.logWriter.write(`${e}\n${ddlStatement}\n`)
+        this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
+        this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
       } 
     },this))
   }
@@ -197,6 +202,12 @@ class MsSQLDBI extends YadamuDBI {
     super(yadamu,defaultParameters);
     this.pool = undefined;
     this.sql = sql
+
+    sql.on('error',(err, p) => {
+      this.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`mssql.onError()`],err);
+      throw err
+    })
+    
   }
 
   /*  
@@ -293,7 +304,7 @@ class MsSQLDBI extends YadamuDBI {
      let results = await this.pool.request().input('TARGET_DATABASE',sql.VarChar,this.parameters.TOUSER).execute('sp_IMPORT_JSON');
      results = results.recordset;
      const log = JSON.parse(results[0][Object.keys(results[0])[0]])
-     super.processLog(log, this.status, this.logWriter)
+     super.processLog(log, this.status, this.yadamuLogger)
      return log
   }
   
@@ -333,8 +344,12 @@ class MsSQLDBI extends YadamuDBI {
      ,databaseVersion    : sysInfo.DATABASE_VERSION
      ,softwareVendor     : this.SOFTWARE_VENDOR
      ,hostname           : sysInfo.HOSTNAME
+     ,nodeClient         : {
+        version          : process.version
+       ,architecture     : process.arch
+       ,platform         : process.platform
+      } 
     }
-    
   }
 
   /*
@@ -373,7 +388,7 @@ class MsSQLDBI extends YadamuDBI {
   }
 
   createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.logWriter);
+    return new DBParser(query,objectMode,this.yadamuLogger);
   }  
   
   async getInputStream(query,parser) {
@@ -404,7 +419,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async generateStatementCache(schema, executeDDL) {
     /* ### OVERRIDE ### Pass additional parameter Database Name */
-    const statementGenerator = new StatementGenerator(this, schema, this.metadata, this.parameters.BATCHSIZE, this.parameters.COMMITSIZE, this.status, this.logWriter);
+    const statementGenerator = new StatementGenerator(this, schema, this.metadata, this.parameters.BATCHSIZE, this.parameters.COMMITSIZE, this.status, this.yadamuLogger);
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL, this.systemInformation.vendor, this.connectionProperties.database)
   }
   

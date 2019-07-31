@@ -4,7 +4,7 @@ const Yadamu = require('./yadamu.js');
 
 class DBReader extends Readable {  
 
-  constructor(dbi,mode,status,logWriter,options) {
+  constructor(dbi,mode,status,yadamuLogger,options) {
 
     super({objectMode: true });  
     const self = this;
@@ -12,8 +12,8 @@ class DBReader extends Readable {
     this.dbi = dbi;
     this.mode = mode;
     this.status = status;
-    this.logWriter = logWriter;
-    this.logWriter.write(`${new Date().toISOString()}[DBReader ${dbi.DATABASE_VENDOR}]: Ready. Mode: ${this.mode}.\n`)
+    this.yadamuLogger = yadamuLogger;
+    this.yadamuLogger.log([`${this.constructor.name}`,`${dbi.DATABASE_VENDOR}`],`Ready. Mode: ${this.mode}.`)
        
     this.schemaInfo = [];
     
@@ -73,7 +73,7 @@ class DBReader extends Readable {
     const startTime = new Date().getTime()
     const rows = await copyOperation;
     const elapsedTime = new Date().getTime() - startTime
-    this.logWriter.write(`${new Date().toISOString()}[DBReader.copyContent("${tableMetadata.TABLE_NAME}")]: Rows read: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.\n`)
+    this.yadamuLogger.log([`${this.constructor.name}`,`"${tableMetadata.TABLE_NAME}"`],`Rows read: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`)
     return rows;
       
   }
@@ -160,7 +160,7 @@ class DBReader extends Readable {
          default:
       }
     } catch (e) {
-      this.logWriter.write(`${new Date().toISOString()}[DBReader._read()]} ${e.stack}\n`);
+      this.yadamuLogger.logException([`${this.constructor.name}._read()`],e);
       process.nextTick(() => this.emit('error',e));
     }
   }

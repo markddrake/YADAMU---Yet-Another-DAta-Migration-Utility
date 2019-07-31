@@ -8,7 +8,7 @@ const Yadamu = require('../../common/yadamu.js').Yadamu;
 class YadamuTest extends Yadamu {
   
   constructor() {
-    super('YADAMU Tester')
+    super('Test')
     this.status.showInfoMsgs = true;
   }
   

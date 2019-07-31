@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DBWriter = require('../../common/dbWriter.js');
+const YadamuLogger = require('../../common/yadamuLogger.js');
 const FileWriter = require('../../file/node/fileWriter.js');
 const FileParser = require('../../file/node/fileParser.js');
 const FileStatistics = require('./fileStatistics.js');
@@ -63,9 +64,9 @@ class FileCompare extends FileWriter {
 
   async getContentMetadata(file,sort) {
       
-    const nulLogger = fs.createWriteStream("\\\\.\\NUL");
-    const logWriter = this.logWriter;
-    const saxParser  = new FileParser(logWriter)
+    const nulLogger = new YadamuLogger(fs.createWriteStream("\\\\.\\NUL"),{});
+    const self = this
+    const saxParser  = new FileParser(this.yadamuLogger)
     let readStream
     try {
       readStream = fs.createReadStream(file);         
@@ -82,26 +83,25 @@ class FileCompare extends FileWriter {
     const processMetadata = new Promise(function (resolve,reject) {
       try {
         writer.on('finish',function() {resolve(saxParser.checkState())});
-        writer.on('error', function(err){logWriter.write(`${new Date().toISOString()}[FileCompare.error()]}: ${err.stack}\n`);reject(err)})      
+        writer.on('error', function(err){self.yadamuLogger.logException([`${writer.constructor.name}.onError()}`],err);reject(err)})      
         readStream.pipe(saxParser).pipe(writer);
       } catch (err) {
-        logWriter.write(`${new Date().toISOString()}[FileCompare.getConentMetadata()]}: ${err.stack}\n`);
+        self.yadamuLogger.logException([`${this.constructor.name}.getConentMetadata()`],err);
         reject(err);
       }
     })    
     
     await processMetadata;
+    nulLogger.close();
     return fileStats.tableInfo
   }
   
-  configureTest(logger,connectionProperties,testParameters,tableMappings) {
-    this.logger = logger;
+  configureTest(connectionProperties,testParameters,tableMappings) {
     super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS,tableMappings);
   }
     
   constructor(yadamu) {
      super(yadamu)
-     this.logger = undefined
      this.deepCompare = false;
      this.sort = false;
   }
@@ -126,8 +126,8 @@ class FileCompare extends FileWriter {
     },this)
   }
   
-  async report(grandparent,parent,child,timings) {
-        
+  async report(yadamuLogger,grandparent,parent,child,timings) {
+      
     let colSizes = [48, 18, 12, 12, 12, 12]
  
     let seperatorSize = (colSizes.length * 3) - 1;
@@ -157,23 +157,23 @@ class FileCompare extends FileWriter {
       cStats = {size : -1}
     }
      
-    this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-    this.logger.write(`| ${'GRANDPARENT FILE'.padEnd(colSizes[0])} |`
-                    + ` ${'GRANDPARENT SIZE'.padStart(colSizes[1])} |`
-                    + ` ${'PARENT_SIZE'.padStart(colSizes[2])} |` 
-                    + ` ${'DELTA'.padStart(colSizes[3])} |`
-                    + ` ${'CHILD SIZE'.padStart(colSizes[4])} |` 
-                    + ` ${'DELTA'.padStart(colSizes[5])} |`
-                    + '\n');
-    this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-    this.logger.write(`| ${grandparent.padEnd(colSizes[0])} |`
-                    + ` ${gStats.size.toString().padStart(colSizes[1])} |`
-                    + ` ${pStats.size.toString().padStart(colSizes[2])} |` 
-                    + ` ${(gStats.size - pStats.size).toString().padStart(colSizes[3])} |` 
-                    + ` ${cStats.size.toString().padStart(colSizes[4])} |` 
-                    + ` ${(pStats.size - cStats.size).toString().padStart(colSizes[5])} |` 
-                    + '\n');
-    this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+    this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+    this.yadamuLogger.writeDirect(`| ${'GRANDPARENT FILE'.padEnd(colSizes[0])} |`
+                                + ` ${'GRANDPARENT SIZE'.padStart(colSizes[1])} |`
+                                + ` ${'PARENT_SIZE'.padStart(colSizes[2])} |` 
+                                + ` ${'DELTA'.padStart(colSizes[3])} |`
+                                + ` ${'CHILD SIZE'.padStart(colSizes[4])} |` 
+                                + ` ${'DELTA'.padStart(colSizes[5])} |`
+                          + '\n');
+    this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+    this.yadamuLogger.writeDirect(`| ${grandparent.padEnd(colSizes[0])} |`
+                                + ` ${gStats.size.toString().padStart(colSizes[1])} |`
+                                + ` ${pStats.size.toString().padStart(colSizes[2])} |` 
+                                + ` ${(gStats.size - pStats.size).toString().padStart(colSizes[3])} |` 
+                                + ` ${cStats.size.toString().padStart(colSizes[4])} |` 
+                                + ` ${(pStats.size - cStats.size).toString().padStart(colSizes[5])} |` 
+                          + '\n');
+    this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
  
     colSizes = [48, 18, 12, 12, 12, 12, 18, 12, 12, 12, 12, 48]
     seperatorSize = (colSizes.length * 3) - 1;
@@ -216,37 +216,37 @@ class FileCompare extends FileWriter {
                          + (timings[3][table] ? timings[3][table].elapsedTime : "-1").padStart(10);
  
       if (idx === 0) {                            
-        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
-        this.logger.write(`| ${'TABLE NAME'.padStart(colSizes[0])} |`
-                        + ` ${'GRANDPARENT ROWS'.padStart(colSizes[1])} |`
-                        + ` ${'PARENT_ROWS'.padStart(colSizes[2])} |` 
-                        + ` ${'DELTA'.padStart(colSizes[3])} |`
-                        + ` ${'CHILD ROWS'.padStart(colSizes[4])} |` 
-                        + ` ${'DELTA'.padStart(colSizes[5])} |`
-                        + ` ${'GRANDPARENT BYTES'.padStart(colSizes[6])} |`
-                        + ` ${'PARENT_BYTES'.padStart(colSizes[7])} |` 
-                        + ` ${'DELTA'.padStart(colSizes[8])} |`
-                        + ` ${'CHILD BYTES'.padStart(colSizes[9])} |` 
-                        + ` ${'DELTA'.padStart(colSizes[10])} |`
-                        + ` ${'TIMINGS'.padStart(colSizes[11])} |`
-                        + '\n');
-        this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+        this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+        this.yadamuLogger.writeDirect(`| ${'TABLE NAME'.padStart(colSizes[0])} |`
+                                    + ` ${'GRANDPARENT ROWS'.padStart(colSizes[1])} |`
+                                    + ` ${'PARENT_ROWS'.padStart(colSizes[2])} |` 
+                                    + ` ${'DELTA'.padStart(colSizes[3])} |`
+                                    + ` ${'CHILD ROWS'.padStart(colSizes[4])} |` 
+                                    + ` ${'DELTA'.padStart(colSizes[5])} |`
+                                    + ` ${'GRANDPARENT BYTES'.padStart(colSizes[6])} |`
+                                    + ` ${'PARENT_BYTES'.padStart(colSizes[7])} |` 
+                                    + ` ${'DELTA'.padStart(colSizes[8])} |`
+                                    + ` ${'CHILD BYTES'.padStart(colSizes[9])} |` 
+                                    + ` ${'DELTA'.padStart(colSizes[10])} |`
+                                    + ` ${'TIMINGS'.padStart(colSizes[11])} |`
+                              + '\n');
+        this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
       }
-        this.logger.write(`| ${table.padStart(colSizes[0])} |`
-                        + ` ${gMetadata[table].rowCount.toString().padStart(colSizes[1])} |`
-                        + ` ${pMetadata[table].rowCount.toString().padStart(colSizes[2])} |`
-                        + ` ${(gMetadata[table].rowCount - pMetadata[table].rowCount).toString().padStart(colSizes[3])} |`
-                        + ` ${cMetadata[table].rowCount.toString().padStart(colSizes[4])} |`
-                        + ` ${(pMetadata[table].rowCount - cMetadata[table].rowCount).toString().padStart(colSizes[5])} |`
-                        + ` ${gMetadata[table].byteCount.toString().padStart(colSizes[6])} |`
-                        + ` ${pMetadata[table].byteCount.toString().padStart(colSizes[7])} |`
-                        + ` ${(gMetadata[table].byteCount - pMetadata[table].byteCount).toString().padStart(colSizes[8])} |`
-                        + ` ${cMetadata[table].byteCount.toString().padStart(colSizes[9])} |`
-                        + ` ${(pMetadata[table].byteCount - cMetadata[table].byteCount).toString().padStart(colSizes[10])} |`
-                        + ` ${tableTimings.padStart(colSizes[11])} |`
-                        + '\n')
+        this.yadamuLogger.writeDirect(`| ${table.padStart(colSizes[0])} |`
+                                    + ` ${gMetadata[table].rowCount.toString().padStart(colSizes[1])} |`
+                                    + ` ${pMetadata[table].rowCount.toString().padStart(colSizes[2])} |`
+                                    + ` ${(gMetadata[table].rowCount - pMetadata[table].rowCount).toString().padStart(colSizes[3])} |`
+                                    + ` ${cMetadata[table].rowCount.toString().padStart(colSizes[4])} |`
+                                    + ` ${(pMetadata[table].rowCount - cMetadata[table].rowCount).toString().padStart(colSizes[5])} |`
+                                    + ` ${gMetadata[table].byteCount.toString().padStart(colSizes[6])} |`
+                                    + ` ${pMetadata[table].byteCount.toString().padStart(colSizes[7])} |`
+                                    + ` ${(gMetadata[table].byteCount - pMetadata[table].byteCount).toString().padStart(colSizes[8])} |`
+                                    + ` ${cMetadata[table].byteCount.toString().padStart(colSizes[9])} |`
+                                    + ` ${(pMetadata[table].byteCount - cMetadata[table].byteCount).toString().padStart(colSizes[10])} |`
+                                    + ` ${tableTimings.padStart(colSizes[11])} |`
+                              + '\n')
       if (idx+1 === tables.length) {
-          this.logger.write('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+          this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
       }
     },this)
   }

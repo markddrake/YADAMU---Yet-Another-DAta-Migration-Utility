@@ -8,11 +8,11 @@ const BufferWriter = require('./bufferWriter.js');
 
 class DBParser extends Transform {
   
-  constructor(query,objectMode,logWriter) {
+  constructor(query,objectMode,yadamuLogger) {
     super({objectMode: true });  
     this.query = query;
     this.objectMode = objectMode
-    this.logWriter = logWriter
+    this.yadamuLogger = yadamuLogger
     this.counter = 0
     
     this.columnMetadata = undefined;
@@ -104,8 +104,8 @@ class DBParser extends Transform {
         try {
           data[idx] = JSON.parse(data[idx]) 
         } catch (e) {
-          this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]:${counter}:${e}\n`);
-          this.logWriter.write(`${new Date().toISOString()}[${DATABASE_VENDOR}]:${data[idx]}\n`);
+          this.yadamuLogger.logException([`${this.constructor.name}._transform()`,`${DATABASE_VENDOR}`,`${counter}`],e);
+          this.yadamuLogger.writeDirect(`${data[idx]}\n`);
         } 
       }
     },this)

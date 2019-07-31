@@ -1,100 +1,205 @@
 [
     [
         {
-            "schema": "Northwind",
+            "database": "Northwind",
             "owner": "dbo"
         },
         {
-            "schema": "Northwind1",
+            "database": "Northwind1",
             "owner": "dbo"
         },
         {
-            "schema": "Northwind1",
+            "database": "Northwind1",
             "owner": "dbo"
         }
     ],
     [
         {
-            "schema": "AdventureWorks",
+            "database": "AdventureWorks",
             "owner": "Sales"
         },
         {
-            "schema": "Sales1",
+            "database": "Sales1",
             "owner": "dbo"
         },
         {
-            "schema": "Sales1",
+            "database": "Sales1",
             "owner": "dbo"
         }
     ],
     [
         {
-            "schema": "AdventureWorks",
+            "database": "AdventureWorks",
             "owner": "Person"
         },
         {
-            "schema": "Person1",
+            "database": "Person1",
             "owner": "dbo"
         },
         {
-            "schema": "Person1",
+            "database": "Person1",
             "owner": "dbo"
         }
     ],
     [
         {
-            "schema": "AdventureWorks",
+            "database": "AdventureWorks",
             "owner": "Production"
         },
         {
-            "schema": "Production1",
+            "database": "Production1",
             "owner": "dbo"
         },
         {
-            "schema": "Production1",
+            "database": "Production1",
             "owner": "dbo"
         }
     ],
     [
         {
-            "schema": "AdventureWorks",
+            "database": "AdventureWorks",
             "owner": "Purchasing"
         },
         {
-            "schema": "Purchasing1",
+            "database": "Purchasing1",
             "owner": "dbo"
         },
         {
-            "schema": "Purchasing1",
+            "database": "Purchasing1",
             "owner": "dbo"
         }
     ],
     [
         {
-            "schema": "AdventureWorks",
+            "database": "AdventureWorks",
             "owner": "HumanResources"
         },
         {
-            "schema": "HumanResources1",
+            "database": "HumanResources1",
             "owner": "dbo"
         },
         {
-            "schema": "HumanResources1",
+            "database": "HumanResources1",
             "owner": "dbo"
         }
     ],
     [
         {
-            "schema": "AdventureWorksDW",
+            "database": "AdventureWorksDW",
             "owner": "dbo"
         },
         {
-            "schema": "AdventureWorksDW1",
+            "database": "AdventureWorksDW1",
             "owner": "dbo"
         },
         {
-            "schema": "AdventureWorksDW1",
+            "database": "AdventureWorksDW1",
             "owner": "dbo"
+        }
+    ],
+    [
+        {
+            "database": "WorldWideImporters",
+            "owner": "Application", 
+			"dbPrefix": "WWI" 
+        },
+        {
+            "database": "WWI_Application1",
+            "owner": "dbo"
+        },
+        {
+            "database": "WWI_Application1",
+            "owner": "dbo"
+        }
+    ],
+    [
+        {
+            "database": "WorldWideImporters",
+            "owner": "Purchasing", 
+			"dbPrefix": "WWI" 
+        },
+        {
+            "database": "WWI_Purchasing1",
+            "owner": "dbo"
+        },
+        {
+            "database": "WWI_Purchasing1",
+            "owner": "dbo" 
+        }
+    ],
+    [
+        {
+            "database": "WorldWideImporters",
+            "owner": "Sales", 
+			"dbPrefix": "WWI"  
+        },
+        {
+            "database": "WWI_Sales1",
+            "owner": "dbo" 
+        },
+        {
+            "database": "WWI_Sales1",
+            "owner": "dbo" 
+        }
+    ],
+    [
+        {
+            "database": "WorldWideImporters",
+            "owner": "Warehouse", 
+			"dbPrefix": "WWI" 
+        },
+        {
+            "database": "WWI_Warehouse1",
+            "owner": "dbo"
+        },
+        {
+            "database": "WWI_Warehouse1",
+            "owner": "dbo"
+        }
+    ],
+    [
+        {
+            "database": "WorldWideImportersDW",
+            "owner": "Dimension", 
+			"dbPrefix": "WWI_DW"  
+        },
+        {
+            "database": "WWI_DW_Dimension1",
+            "owner": "dbo" 
+        },
+        {
+            "database": "WWI_DW_Dimension1",
+            "owner": "dbo" 
+        }
+    ],
+    [
+        {
+            "database": "WorldWideImportersDW",
+            "owner": "Fact", 
+			"dbPrefix": "WWI_DW"
+        },
+        {
+            "database": "WWI_DW_Fact1",
+            "owner": "dbo" 
+        },
+        {
+            "database": "WWI_DW_Fact1",
+            "owner": "dbo" 
+        }
+    ],
+    [
+        {
+            "database": "WorldWideImportersDW",
+            "owner": "Integration", 
+			"dbPrefix": "WWI_DW"
+        },
+        {
+            "database": "WWI_DW_Integration1",
+            "owner": "dbo"
+        },
+        {
+            "database": "WWI_DW_Integration1",
+            "owner": "dbo" 
         }
     ]
 ]

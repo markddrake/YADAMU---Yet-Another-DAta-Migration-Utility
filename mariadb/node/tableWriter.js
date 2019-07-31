@@ -2,17 +2,17 @@
 
 class TableWriter {
 
-  constructor(dbi,tableName,tableInfo,status,logWriter) {
+  constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     this.dbi = dbi;
     this.tableName = tableName
     this.tableInfo = tableInfo;
     this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
     this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + '),';
-
     this.status = status;
-    this.logWriter = logWriter;    
+    this.yadamuLogger = yadamuLogger;    
 
     this.batch = [];
+    this.batchCount = 0;
     this.batchRowCount = 0;
     
     this.startTime = new Date().getTime();
@@ -25,7 +25,7 @@ class TableWriter {
   }
 
   batchComplete() {
-    return (this.batch.length === this.tableInfo.batchSize)
+    return (this.batchRowCount === this.tableInfo.batchSize)
   }
   
   commitWork(rowCount) {
@@ -72,6 +72,9 @@ class TableWriter {
               row[idx] = row[idx].toISOString();
             }             
             row[idx] = row[idx].substring(0,10) + ' '  + (row[idx].endsWith('Z') ? row[idx].substring(11).slice(0,-1) : (row[idx].endsWith('+00:00') ? row[idx].substring(11).slice(0,-6) : row[idx].substring(11)))
+            // Truncate fractional values to 6 digit precision
+            // ### Consider rounding, but what happens at '9999-12-31 23:59:59.999999
+            row[idx] = row[idx].substring(0,26);
             break;           
           default :
          }
@@ -91,13 +94,13 @@ class TableWriter {
   }
  
   async processWarnings(results) {
-    if (results.warningCount >  0) {
+   // ### Output Records that generate warnings
+   if (results.warningCount >  0) {
       const warnings = await this.dbi.executeSQL('show warnings');
       warnings.forEach(function(warning,idx) {
         if (warning.Level === 'Warning') {
-          this.status.warningRaised = true;
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][WARNING]: Warnings reported by bulk insert operation. Details: ${JSON.stringify(warning)}\n`)
-          this.logWriter.write(`${this.batch[idx]}\n`)
+          this.yadamuLogger.warning([`${this.constructor.name}.writeBatch()`],`Warnings reported by bulk insert operation. Details: ${JSON.stringify(warning)}`)
+          this.yadamuLogger.writeDirect(`${this.batch[idx]}\n`)
         }
       },this)
     }
@@ -120,27 +123,27 @@ class TableWriter {
         return this.skipTable
       } catch (e) {
         if (this.status.showInfoMsgs) {
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Batch size [${this.batchRowCount}].  Batch Insert raised:\n${e}.\n`);
-          this.logWriter.write(`${this.tableInfo.dml}\n`);
+          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.batchRowCount}].  Batch Insert raised:\n${e}.`);
+          this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
           // Use Slice to print first and last row, rather than first and last value.
-          this.logWriter.write(`${this.batch.slice(0,this.tableInfo.columnCount)}\n...\n${this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length)}\n`);
-          this.logWriter.write(`${new Date().toISOString()}[TableWriter.writeBatch("${this.tableName}")][INFO]: Switching to Iterative operations.\n`);          
+          this.yadamuLogger.writeDirect(`${this.batch.slice(0,this.tableInfo.columnCount)}\n...\n${this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length)}\n`);
+          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
         }
         // await this.dbi.rollbackTransaction();
-        this.tableInfo.insertMode = 'Iterative'   
+        this.tableInfo.insertMode = 'Iterative' 
+        this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args.slice(0,-1)
         repackBatch = true;
-        this
       }
     }
 
-    for (const row in this.batch) {
-      const nextRow = repackBatch ?  this.batch.splice(0,this.tableInfo.columnCount) : batch[row]
+    for (let row =0; row < this.batchRowCount; row++) {
+      const nextRow = repackBatch ?  this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
       try {
-        const results = await this.dbi.executeSQL(this.tableInfo.dml.slice(0,-1) + this.tableInfo.args.slice(0,-1),nextRow);
+        const results = await this.dbi.executeSQL(this.tableInfo.dml,nextRow);
         await this.processWarnings(results);
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []
-        const abort = this.dbi.handleInsertError(this.tableName,nextRow,e,this.batch.length,row,errInfo);
+        const abort = this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batchRowCount,row,nextRow,e,errInfo);
         if (abort) {
           await this.dbi.rollbackTransaction();
           this.skipTable = true;

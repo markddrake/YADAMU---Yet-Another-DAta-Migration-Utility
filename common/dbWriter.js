@@ -6,7 +6,7 @@ const Yadamu = require('./yadamu.js');
 
 class DBWriter extends Writable {
   
-  constructor(dbi,mode,status,logWriter,options) {
+  constructor(dbi,mode,status,yadamuLogger,options) {
 
     super({objectMode: true });
     const self = this;
@@ -15,8 +15,8 @@ class DBWriter extends Writable {
     this.mode = mode;
     this.ddlRequired = (mode !== 'DATA_ONLY');    
     this.status = status;
-    this.logWriter = logWriter;
-    this.logWriter.write(`${new Date().toISOString()}[DBWriter ${dbi.DATABASE_VENDOR}]: Ready. Mode: ${this.mode}.\n`)
+    this.yadamuLogger = yadamuLogger;
+    this.yadamuLogger.log([`${this.constructor.name}`,`${dbi.DATABASE_VENDOR}`],`Ready. Mode: ${this.mode}.`)
         
     this.currentTable = undefined;
     this.rowCount     = undefined;
@@ -47,16 +47,8 @@ class DBWriter extends Writable {
   }
   
   async generateStatementCache(metadata,ddlRequired) {
-    if (Object.keys(metadata).length > 0) {   
-      // ### if the import already processed a DDL object do not execute DDL when generating statements.
-      Object.keys(metadata).forEach(function(table) {
-        if (!metadata[table].hasOwnProperty('vendor')) {
-           metadata[table].vendor = this.dbi.systemInformation.vendor;
-        }
-      },this)
-      this.dbi.setMetadata(metadata)      
-      await this.dbi.generateStatementCache(this.dbi.parameters.TOUSER,!this.ddlComplete)
-    }
+    this.dbi.setMetadata(metadata)      
+    await this.dbi.generateStatementCache(this.dbi.parameters.TOUSER,!this.ddlComplete)
   }   
   
   async setMetadata(metadata) {
@@ -70,15 +62,31 @@ class DBWriter extends Writable {
     ** Tables which do not exist in the target schema need to be created.
     **
     */ 
+
+
     
     // Fetch metadata for tables that already exist in the target schema.
-    
+       
     const targetSchemaInfo = await this.dbi.getSchemaInfo('TOUSER');
     
     if (targetSchemaInfo === null) {
       this.dbi.setMetadata(metadata)      
     }
     else {    
+    
+       // Copy the source metadata 
+    
+      Object.keys(metadata).forEach(function(table) {
+        if (!metadata[table].hasOwnProperty('vendor')) {
+           metadata[table].vendor = this.dbi.systemInformation.vendor;   
+        }
+        metadata[table].source = {
+          vendor          : metadata[table].vendor
+         ,dataTypes       : metadata[table].dataTypes
+         ,sizeConstraints : metadata[table].sizeConstraints
+        }
+      },this)
+    
       if (targetSchemaInfo.length > 0) {
     
         // Merge metadata for existing table with metadata from export source
@@ -121,6 +129,8 @@ class DBWriter extends Writable {
         targetNamesTransformed.forEach(function(targetName, idx){
           const tableIdx = exportNamesTransformed.findIndex(function(member){return member === targetName})
           if ( tableIdx > -1)    {
+            // Overwrite metadata from source with metadata from target.
+            targetMetadata[targetSchemaInfo[idx].TABLE_NAME].source = metadata[exportTableNames[tableIdx]].source
             metadata[exportTableNames[tableIdx]] = targetMetadata[targetSchemaInfo[idx].TABLE_NAME]
           }
         },this)
@@ -136,7 +146,7 @@ class DBWriter extends Writable {
     const rowsRead = this.rowCount;
     const rowsWritten = rowsRead - skipCount;
     const throughput = (rowsWritten/Math.round(elapsedTime)) * 1000
-    this.logWriter.write(`${new Date().toISOString()}[DBWriter "${this.tableName}"][${results.insertMode}]: Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round(throughput)} rows/s.\n`);
+    this.yadamuLogger.log([`${this.constructor.name}`,`${this.tableName}`,`${results.insertMode}`],`Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round(throughput)} rows/s.`);
     this.timings[this.tableName] = {rowCount: this.rowCount, insertMode: results.insertMode,  rowsSkipped: skipCount, elapsedTime: Math.round(elapsedTime).toString() + "ms", throughput: Math.round(throughput).toString() + "/s"};
   }
  
@@ -192,7 +202,8 @@ class DBWriter extends Writable {
       }    
       callback();
     } catch (e) {
-      this.logWriter.write(`${new Date().toISOString()}[DBWriter._write() "${this.tableName}"]: ${e}\n${e.stack}\n`);
+      this.yadamuLogger.logException([`${this.constructor.name}._write()`,`"${this.tableName}"`],e);
+      process.nextTick(() => this.emit('error',e));
       callback(e);
     }
   }
@@ -209,12 +220,13 @@ class DBWriter extends Writable {
         await this.dbi.finalizeDataLoad();
       }
       else {
-        this.logWriter.write(`${new Date().toISOString()}: No tables found.\n`);
+        this.yadamuLogger.info([`${this.constructor.name}`],`No tables found.`);
       }
       await this.dbi.importComplete();
       callback();
     } catch (e) {
-      this.logWriter.write(`${new Date().toISOString()}[DBWriter._final() "${this.tableName}"]: ${e}\n${e.stack}\n`);
+      this.yadamuLogger.logException([`${this.constructor.name}._final()`,`"${this.currentTable}"`],e);
+      process.nextTick(() => this.emit('error',e));
       callback(e);
     } 
   } 

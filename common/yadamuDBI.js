@@ -10,7 +10,7 @@ const Readable = require('stream').Readable;
 */
 
 const Yadamu = require('./yadamu.js');
-const YadamuErrorLogger = require('./yadamuErrorLogger.js');
+const YadamuRejectManager = require('./yadamuRejectManager.js');
 const DBParser = require('./dbParser.js');
 
 /*
@@ -55,7 +55,7 @@ class YadamuDBI {
     
   } 
   
-  processLog(log,status,logWriter) {
+  processLog(log,status,yadamuLogger) {
 
     const logDML         = (status.loglevel && (status.loglevel > 0));
     const logDDL         = (status.loglevel && (status.loglevel > 1));
@@ -71,43 +71,39 @@ class YadamuDBI {
                   const logEntry = result[logEntryType];
                   switch (true) {
                     case (logEntryType === "message") : 
-                      logWriter.write(`${new Date().toISOString()}: ${logEntry}.\n`)
+                      yadamuLogger.log([`${this.constructor.name}`],`: ${logEntry}.`)
                       break;
                     case (logEntryType === "dml") : 
-                      logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.\n`)
+                      yadamuLogger.log([`${this.constructor.name}`],`: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.`)
                       break;
                     case (logEntryType === "info") :
-                      logWriter.write(`${new Date().toISOString()}[INFO]: "${JSON.stringify(logEntry)}".\n`);
+                      yadamuLogger.info([`${this.constructor.name}`],`"${JSON.stringify(logEntry)}".`);
                       break;
                     case (logDML && (logEntryType === "dml")) :
-                      logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}.\n`)
+                      yadamuLogger.log([`${this.constructor.name}`],`: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}.`)
                       break;
                     case (logDDL && (logEntryType === "ddl")) :
-                      logWriter.write(`${new Date().toISOString()}: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}.\n`) 
+                      yadamuLogger.log([`${this.constructor.name}`],`: Table "${logEntry.tableName}".\n${logEntry.sqlStatement}.`) 
                       break;
                     case (logTrace && (logEntryType === "trace")) :
-                      logWriter.write(`${new Date().toISOString()} [TRACE]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".\n' : '\n'}${logEntry.sqlStatement}.\n`)
+                      yadamuLogger.trace([`${this.constructor.name}`],`${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".\n' : '\n'}${logEntry.sqlStatement}.`)
                       break;
                     case (logEntryType === "error"):
    	                switch (true) {
    		              case (logEntry.severity === 'FATAL') :
-                        status.errorRaised = true;
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}\n`)
+                        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`],`${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}`)
    				        break
    					  case (logEntry.severity === 'WARNING') :
-                        status.warningRaised = true;
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
+                        yadamuLogger.warning([`${this.constructor.name}`,`${logEntry.severity}`],`${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
                         break;
   					  case (logEntry.severity === 'CONTENT_TOO_LARGE') :
-                        status.errorRaised = true;
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database does not support VARCHAR2 values longer than ${this.maxStringSize} bytes.\n`)
+                        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`],`${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database does not support VARCHAR2 values longer than ${this.maxStringSize} bytes.`)
                         break;
     			      case (logEntry.severity === 'SQL_TOO_LARGE') :
-                        status.errorRaised = true;
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database is not configured for DLL statements longer than ${this.maxStringSize} bytes.\n`)
+                        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`],`${logEntry.tableName ? 'Table: "' + logEntry.tableName + '".' : ''} This database is not configured for DLL statements longer than ${this.maxStringSize} bytes.`)
                         break;
                       case (logDDLMsgs) :
-                        logWriter.write(`${new Date().toISOString()} [${logEntry.severity}]: ${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}\n`)
+                        yadamuLogger.log([`${this.constructor.name}`,`${logEntry.severity}`],`${logEntry.tableName ? 'Table: "' + logEntry.tableName  + '".' : ''} Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
                         break;
                     } 	
                   } 
@@ -143,6 +139,9 @@ class YadamuDBI {
     }  
     else {
       this.tableMappings = tableMappings
+    }
+    if (this.parameters.SQLTRACE) {
+	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQLTRACE,{flags : "a"});
     }
   }
 
@@ -238,15 +237,16 @@ class YadamuDBI {
         }
         this.executeSQL(ddlStatement,{});
       } catch (e) {
-        this.logWriter.write(`${e}\n${tableInfo.ddl}\n`)
+        this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
+        this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
       } 
     },this))
   }
   
-  createErrorLogger() {
-    const errorFolderPath = this.parameters.ERROR_FOLDER ? this.parameters.ERROR_FOLDER : 'work/errors';
-    this.errorLogFilename = path.resolve(errorFolderPath +  path.sep + 'yadamuImportErrors_' + new Date().toISOString().split(':').join('') + ".json");
-    return new YadamuErrorLogger(this.errorLogFilename,this.logWriter);
+  createRejectManager() {
+    const rejectFolderPath = this.parameters.REJECT_FOLDER ? this.parameters.REJECT_FOLDER : 'work/rejected';
+    this.rejectFilename = path.resolve(rejectFolderPath +  path.sep + 'yadamuRejected_' + new Date().toISOString().split(':').join('') + ".json");
+    return new YadamuRejectManager(this.rejectFilename,this.yadamuLogger);
   }
     
   constructor(yadamu,defaultParameters) {
@@ -257,7 +257,7 @@ class YadamuDBI {
     this.parameters = yadamu.getParameters()
     this.parameters = this.mergeParameters(this.parameters,defaultParameters);
     this.status = yadamu.getStatus()
-    this.logWriter = yadamu.getLogWriter();
+    this.yadamuLogger = yadamu.getYadamuLogger();
     
     this.systemInformation = undefined;
     this.metadata = undefined;
@@ -278,7 +278,7 @@ class YadamuDBI {
       this.loadTableMappings(this.parameters.MAPPINGS);
     }   
  
-    this.errorLogger = this.createErrorLogger()
+    this.rejectManager = this.createRejectManager()
 
   }
   
@@ -408,7 +408,7 @@ class YadamuDBI {
   }   
 
   createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.logWriter);      
+    return new DBParser(query,objectMode,this.yadamuLogger);      
   }
   
   async getInputStream(query,parser) {
@@ -426,14 +426,14 @@ class YadamuDBI {
   }
   
   async generateStatementCache(StatementGenerator,schema,executeDDL) {
-    const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE, this.status, this.logWriter);
+    const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE, this.status, this.yadamuLogger);
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }
 
   getTableWriter(TableWriter,table) {
     this.skipCount = 0;    
     const tableName = this.metadata[table].tableName 
-    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.logWriter);
+    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger);
   }
  
   async finalizeDataLoad() {
@@ -444,26 +444,26 @@ class YadamuDBI {
   }
 
   async importComplete() {
-    this.errorLogger.close();
+    this.rejectManager.close();
   }
   
-  writeErrorLog(tableName,row) {
-    this.errorLogger.logError(tableName,row);
+  rejectRow(tableName,row) {
+    // Allows the rejection process to be overridden by a particular driver.
+    this.rejectManager.rejectRow(tableName,row);
   }
   
-  handleInsertError(tableName,record,err,batchSize,row,info) {
+  handleInsertError(operation,tableName,batchSize,row,record,err,info) {
      this.skipCount++;
      this.status.warningRaised = true;
-     this.logWriter.write(`${new Date().toISOString()}[YadamuDBI.handleInsertError("${tableName}")][DATA_CONVERSION_FAILURE]: Batch size [${batchSize}]. Row [${row}]. Insert operation raised:\n${err}.\n`);
-     this.writeErrorLog(tableName,record);
+     this.yadamuLogger.logRejected([`${operation}`,`"${tableName}"`,`${batchSize}`,`${row}`],err);
+     this.rejectRow(tableName,record);
      info.forEach(function (info) {
-       this.logWriter.write(`${info}\n`);
+       this.yadamuLogger.writeDirect(`${info}\n`);
      },this)
 
      const abort = (this.skipCount === ( this.parameters.MAX_ERRORS ? this.parameters.MAX_ERRORS : 10)) 
-     this.errorRaised = (this.errorRaised && abort);
      if (abort) {
-       this.logWriter.write(`${new Date().toISOString()}[YadamuDBI.handleInsertError("${tableName}")][ABORT]: Skipping Table.\n`);
+       this.yadamuLogger.error([`${operation}`,`"${tableName}"`],`Maximum Error Count exceeded. Skipping Table.`);
      }
      return abort;
      

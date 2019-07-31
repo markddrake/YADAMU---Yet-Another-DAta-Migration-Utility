@@ -24,7 +24,7 @@ class TableWriter {
   }
 
   async appendRow(row) {
-    
+      
     if (this.firstRow === true) {
       this.firstRow = false
     }
@@ -43,7 +43,7 @@ class TableWriter {
     return {
       startTime    : this.startTime
     , endTime      : new Date().getTime()
-    , insertMode   : 'text'
+    , insertMode   : 'JSON'
     , skipTable    : false
     }    
   }
