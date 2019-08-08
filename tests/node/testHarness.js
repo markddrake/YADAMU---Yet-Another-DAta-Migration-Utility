@@ -14,6 +14,7 @@ const MsSQLCompare = require('./mssqlCompare.js');
 const MySQLCompare = require('./mysqlCompare.js');
 const MariadbCompare = require('./mariadbCompare.js');
 const PostgresCompare = require('./postgresCompare.js');
+// const MongoCompare = require('./mongoCompare.js');
 const FileCompare = require('./fileCompare.js');
 
 
@@ -24,13 +25,12 @@ class TestHarness {
 
   constructor() {
   
-    this.yadamu        = new YadamuTest();     
-    this.config        = require(path.resolve(this.yadamu.getParameters().CONFIG))
-    this.connections   = require(path.resolve(this.config.connections))
-    this.parsingMethod = CLARINET;
-       
+    this.yadamu            = new YadamuTest();     
+    this.testConfiguration = require(path.resolve(this.yadamu.getParameters().CONFIG))
+    this.connections       = require(path.resolve(this.testConfiguration.connections))
+
     // Expand environemnt variables in path using regex.
-    this.yadamuLogger = this.config.outputFile ? new YadamuLogger(fs.createWriteStream(path.resolve(this.config.outputFile.replace(/%([^%]+)%/g, (_,n) => process.env[n]))),{}) : this.yadamu.getYadamuLogger();
+    this.yadamuLogger = this.testConfiguration.outputFile ? new YadamuLogger(fs.createWriteStream(path.resolve(this.testConfiguration.outputFile.replace(/%([^%]+)%/g, (_,n) => process.env[n]))),{}) : this.yadamu.getYadamuLogger();
   }
   
   getDescription(db,schemaInfo) {
@@ -60,6 +60,11 @@ class TestHarness {
       case "mariadb" :
         dbi = new MariadbCompare(this.yadamu)
         break;
+      /*
+      case "mongodb" :
+        dbi = new MongoCompare(this.yadamu)
+        break;
+      */
       case "file" :
         dbi = new FileCompare(this.yadamu)
         break;
@@ -121,7 +126,6 @@ class TestHarness {
     }
   }
 
-  
   getCompareParameters(source,target,testParameters) {
       
     const compareParameters = Object.assign({}, testParameters)
@@ -157,6 +161,8 @@ class TestHarness {
           compareParameters.SPATIAL_PRECISION = 13;
           compareParameters.MAX_TIMESTAMP_PRECISION = 6;
           break;
+        case "mongodb" :
+          break;
         case "file" :
           break;
         default:   
@@ -189,7 +195,8 @@ class TestHarness {
     colSizes.slice(0,7).forEach(function(size) {
       seperatorSize += size;
     },this);
-
+    
+    
     report.successful.sort().forEach(function(row,idx) {
       if (idx === 0) {
         this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
@@ -217,8 +224,8 @@ class TestHarness {
 
       this.yadamuLogger.writeDirect(` ${row[2].padStart(colSizes[3])} |` 
                                   + ` ${row[3].toString().padStart(colSizes[4])} |` 
-                                  + ` ${row[4].padStart(colSizes[5])} |` 
-                                  + ` ${row[5].padStart(colSizes[6])} |` 
+                                  + ` ${YadamuTest.stringifyDuration(row[4]).padStart(colSizes[5])} |` 
+                                  + ` ${(row[5] === 'NaN/s' ? '' : row[5]).padStart(colSizes[6])} |` 
                          + '\n');
     },this)
         
@@ -230,8 +237,50 @@ class TestHarness {
     colSizes.forEach(function(size) {
       seperatorSize += size;
     },this);
-      
+   
+    const notesIdx = colSizes.length-2
+    const lineSize = colSizes[notesIdx+1]
+   
     report.failed.forEach(function(row,idx) {
+
+      const lines = []
+      if ((row[notesIdx] !== null) && ((row[notesIdx].length > lineSize) || (row[notesIdx].indexOf('\r\n') > -1))) {
+        const blocks = row[7].split('\r\n')
+        for (const block of blocks) {
+          const words = block.split(' ')
+          let line = ''
+          for (let word of words) {
+            if (line.length > 0) {
+              word = ' ' + word
+            }
+            if (line.length + word.length < lineSize) {
+              line = line + word
+            }
+            else {
+              if (line.length > 0) {
+                // Push Line and start new line
+                lines.push(line)
+                word = word.substring(1)
+              }
+              while (word.length > lineSize) {
+                if (word[lineSize-1] === '-') {
+                  lines.push(word.substring(0,lineSize))
+                  word = word.substring(lineSize)
+                }  
+                else {
+                  lines.push(word.substring(0,lineSize-1) + "-")
+                  word = word.substring(lineSize-1)
+                }
+              }
+              line = word
+            }
+          }
+          if (line.length > 0) {
+             lines.push(line)
+          }
+        }
+        row[7] = lines.shift()
+      } 
       if (idx === 0) {
         this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
         this.yadamuLogger.writeDirect(`|`
@@ -257,7 +306,7 @@ class TestHarness {
                                     + ` ${''.padStart(colSizes[1])} |`
                                     + ` ${''.padStart(colSizes[2])} |`)
       }
-
+                
       this.yadamuLogger.writeDirect(` ${row[2].padStart(colSizes[3])} |` 
                                   + ` ${row[3].toString().padStart(colSizes[4])} |` 
                                   + ` ${row[4].toString().padStart(colSizes[5])} |` 
@@ -265,6 +314,21 @@ class TestHarness {
                                   + ` ${row[6].toString().padStart(colSizes[7])} |` 
                                   + ` ${(row[7] !== null ? row[7] :  '').padEnd(colSizes[8])} |` 
                          + '\n');
+
+                               
+      lines.forEach(function(line) {
+        this.yadamuLogger.writeDirect(`|`
+                                    + ` ${''.padEnd(colSizes[0])} |`
+                                    + ` ${''.padStart(colSizes[1])} |`
+                                    + ` ${''.padStart(colSizes[2])} |`
+                                    + ` ${''.padStart(colSizes[3])} |` 
+                                    + ` ${''.padStart(colSizes[4])} |` 
+                                    + ` ${''.padStart(colSizes[5])} |` 
+                                    + ` ${''.padStart(colSizes[6])} |` 
+                                    + ` ${''.padStart(colSizes[7])} |` 
+                                    + ` ${line.padEnd(colSizes[8])} |`
+                                    + '\n');
+      },this)          
 
     },this)
       
@@ -300,7 +364,7 @@ class TestHarness {
       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }
     else {
-      this.yadamuLogger.log([`${this.constructor.name}`,'COPY'],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}]. Elapsed Time: ${elapsedTime}ms.`);
+      this.yadamuLogger.log([`${this.constructor.name}`,'COPY'],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}]. Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
     }
   
   }
@@ -398,7 +462,7 @@ class TestHarness {
       fc.configureTest({},testParameters)
       await fc.report(this.yadamuLoggger,sourceFile, path.join(testRoot,targetFile1), path.join(testRoot,targetFile2), timings);    
 
-      this.yadamuLogger.log([`${this.constructor.name}`,'FILECOPY'],`Operation complete: [${operationsList[0]}] -->  [${operationsList[1]}] --> [${operationsList[2]}] --> [${operationsList[3]}]  --> [${operationsList[4]}]. Elapsed Time: ${opElapsedTime}ms.`);
+      this.yadamuLogger.log([`${this.constructor.name}`,'FILECOPY'],`Operation complete: [${operationsList[0]}] -->  [${operationsList[1]}] --> [${operationsList[2]}] --> [${operationsList[3]}]  --> [${operationsList[4]}]. Elapsed Time: ${YadamuTest.stringifyDuration(opEelapsedTime)}s.`);
 
   }
   
@@ -440,7 +504,7 @@ class TestHarness {
       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }
     else {
-      this.yadamuLogger.log([`${this.constructor.name}`,'DBCOPY'],`Operation complete: Source:[${operationsList[0]}] -->  ${(operationsList.length === 3 ? '[' + operationsList[1] + '] --> ' : '')}Target:${operationsList[operationsList.length-1]}]. Elapsed Time: ${elapsedTime}ms.`);
+      this.yadamuLogger.log([`${this.constructor.name}`,'DBCOPY'],`Operation complete: Source:[${operationsList[0]}] -->  ${(operationsList.length === 3 ? '[' + operationsList[1] + '] --> ' : '')}Target:${operationsList[operationsList.length-1]}]. Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
     }
   
   }
@@ -679,49 +743,79 @@ class TestHarness {
     }
   }
   
-  async doOperation(target,tc,steps) {
+  async doOperation(jobConfiguration,target,steps) {
       
-    switch (this.config.mode.toUpperCase()) {
+    switch (this.testConfiguration.mode.toUpperCase()) {
       case "EXPORT":
       case "IMPORT":
-        await this.doCopy(tc.source,target,tc.parameters,tc.directory,steps)
+        await this.doCopy(jobConfiguration.source,target,jobConfiguration.parameters,jobConfiguration.directory,steps)
         break
       case "FILEROUNDTRIP":
-        await this.fileRoundtrip(target,tc.parameters,steps[0],steps[1],steps[2],steps[3],steps[4]);
-        // await this.fileRoundtrip(target,tc,steps);
+        await this.fileRoundtrip(target,jobConfiguration.parameters,steps[0],steps[1],steps[2],steps[3],steps[4]);
+        // await this.fileRoundtrip(target,jobConfiguration,steps);
         break;
       case "DBROUNDTRIP":
-        const clone = (this.config.clone && (this.config.clone === true)) 
-        await this.databaseRoundtrip(tc.source,target,clone,tc.parameters,steps)
+        const clone = (this.testConfiguration.clone && (this.testConfiguration.clone === true)) 
+        await this.databaseRoundtrip(jobConfiguration.source,target,clone,jobConfiguration.parameters,steps)
      default:
     }
        
   }
   
-  async doOperations(target,tc,operationPath) {
+  async runTask(jobConfiguration,target,taskConfigurationPath) {
       
-    const operations = JSON.parse(await fsPromises.readFile(path.resolve(operationPath)))
+    const operations = JSON.parse(await fsPromises.readFile(path.resolve(taskConfigurationPath)))
     for (const steps of operations) {
-      if (tc.reverseDirection) {
+      if (jobConfiguration.reverseDirection) {
         if (steps.length % 2 > 0) {
           // ### If Reversing with an odd number of steps remove the last step since it is a verification step.
           steps.pop();
         }
         steps.reverse()
       }
-      await this.doOperation(target,tc,steps)
+      await this.doOperation(jobConfiguration,target,steps)
     }
   }
   
-  async runTests() {
+    async runJobs() {
  
-    const testConfigurationList = this.config.tests
-    
-    for (const testConfigurationPath of testConfigurationList) {
-      const testConfigurations = require(path.resolve(testConfigurationPath));
-      for (const tc of testConfigurations) {
-        if (tc.parsingMethod) {
-          switch (tc.parsingMethod) {
+    /*
+    **
+    ** A test configuration defines test. A test consists of one or more jobs
+    **
+    ** A test configuration file contains the following information
+    **
+    **   connections: The path to the file containing the connection information for the databases involved
+    **
+    **   mode: one of export/import/fileRoundtrip/dbRoundtrip
+    **  
+    **   clone: true/false  - If true then a DDL_ONLY copy will be used to clone the target schema from the source schema 
+    **
+    **   outputFile: path to file used to write log information, defautls to standard out.
+    **
+    **   jobs: The set of job configuration files to be processed as part of the test.
+    **
+    **  A job configuration file deffines one or more jobs. Each Job specifices
+    **
+    **    source: The locaton of the source data
+    **
+    **    targets: The target for the copy operation. There can be more than one target, in which case the tasks will be repeated for each target. 
+    **
+    **    parser: CLARINET/RDBMS. RDBMS uses the databases json parsing capabilities, such as JSON_TABLE() to process a JSON export file.
+    ** 
+    **    parameters: The parameters to be supplied to each task.
+    **
+    **    tasks: A set of tasks (copy operations) to be performed. 
+    **
+    */
+ 
+    const startTime = new Date().getTime();
+    for (const jobConfigurationPath of this.testConfiguration.jobs) {
+      const jobConfiguration = require(path.resolve(jobConfigurationPath));
+      const startTime = new Date().getTime();
+      for (const job of jobConfiguration) {
+        if (job.parsingMethod) {
+          switch (job.parsingMethod) {
             case "CLARINET" :
               this.parsingMethod = CLARINET;
               break;
@@ -732,13 +826,26 @@ class TestHarness {
               this.parsingMethod = CLARINET;
           }
         }
-        for (const target of tc.targets) {
-          for (const operationPath of tc.operations) {
-            await this.doOperations(target,tc,operationPath)
+        const startTime = new Date().getTime();
+        for (const target of job.targets) {
+          const startTime = new Date().getTime();
+          for (const taskConfigurationPath of job.tasks) {
+            const startTime = new Date().getTime();
+            await this.runTask(job,target,taskConfigurationPath)
+            const elapsedTime = new Date().getTime() - startTime;
+            this.yadamuLogger.log([`${this.constructor.name}`,'TASK'],`Operation complete: Source:"${job.source}". Target:"${target}". Task:"${taskConfigurationPath}". Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
           }
+          const elapsedTime = new Date().getTime() - startTime;
+          this.yadamuLogger.log([`${this.constructor.name}`,'TARGET'],`Operation complete: Source:"${job.source}". Target:"${target}". Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
         }
+        const elapsedTime = new Date().getTime() - startTime;
+        this.yadamuLogger.log([`${this.constructor.name}`,'JOB'],`Operation complete: Source:"${job.source}". Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}ms.`);
       }
+      const elapsedTime = new Date().getTime() - startTime;
+      this.yadamuLogger.log([`${this.constructor.name}`,'JOBS'],`Operation complete: Configuration:"${jobConfigurationPath}".  Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
     }
+    const elapsedTime = new Date().getTime() - startTime;
+    this.yadamuLogger.log([`${this.constructor.name}`,'TEST'],`Operation complete: Configuration:"${this.yadamu.getParameters().CONFIG}". Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
   
     this.yadamuLogger.close(); 
     this.yadamu.close()
@@ -756,7 +863,7 @@ async function main() {
     
   try {
     const harness = new TestHarness();
-    await harness.runTests();
+    await harness.runJobs();
   } catch (e) {
     console.log(`[ERROR][TestHarness.main()]: Unexpected Terminal Exception`);
     console.log(`${(e.stack ? e.stack : e)}`)

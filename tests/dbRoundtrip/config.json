@@ -2,7 +2,7 @@
     "connections": "tests/connections/standardConnections.json",
     "mode": "dbRoundtrip",
     "clone" : true,
-    "tests": [
+    "jobs": [
         "tests/dbRoundtrip/dbRoundtrip.json"
     ]
 }

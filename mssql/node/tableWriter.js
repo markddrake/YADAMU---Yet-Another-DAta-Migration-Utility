@@ -2,8 +2,36 @@
 
 const sql = require('mssql');
 
-class TableWriter {
+const YadamuWriter = require('../../common/yadamuWriter.js');
+
+class TableWriter extends YadamuWriter {
     
+  constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
+    super(dbi,tableName,tableInfo,status,yadamuLogger)
+  }
+
+  batchComplete() {
+     return (this.tableInfo.bulkOperation.rows.length  === this.tableInfo.batchSize)
+  }
+  
+  batchRowCount() {
+    return this.tableInfo.bulkOperation.rows.length
+  }
+  
+  hasPendingRows() {
+    return this.tableInfo.bulkOperation.rows.length > 0;
+  }
+      
+  async finalize() {
+    const results = await super.finalize()
+    results.insertMode = this.tableInfo.bulkSupported === true ? 'Bulk' : 'Iterative'
+    if (this.tableInfo.preparedStatement !== undefined){
+      await this.tableInfo.preparedStatement.unprepare();
+    }
+    return results;
+  }
+
+
   async createPreparedStatement(insertStatement, targetDataTypes) {
     const ps = await this.dbi.getPreparedStatement();
     targetDataTypes.forEach(function (targetDataType,idx) {
@@ -141,33 +169,6 @@ class TableWriter {
     return ps;
   }
 
-  constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
-    this.dbi = dbi;
-    this.tableName = tableName
-    this.tableInfo = tableInfo;
-    this.status = status;
-    this.yadamuLogger = yadamuLogger;    
-
-    this.batchCount = 0;
-    
-    this.startTime = new Date().getTime();
-    this.endTime = undefined;
-    this.insertMode = 'Batch';
-
-    this.skipTable = false;
-  }
-
-  async initialize() {
-  }
-
-  batchComplete() {
-     return (this.tableInfo.bulkOperation.rows.length  === this.tableInfo.batchSize)
-  }
-  
-  commitWork(rowCount) {
-    return (rowCount % this.tableInfo.commitSize) === 0;
-  }
-
   async appendRow(row) {
       
     this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
@@ -229,10 +230,6 @@ class TableWriter {
     this.tableInfo.bulkOperation.rows.add(...row);
   }
 
-  hasPendingRows() {
-    return this.tableInfo.bulkOperation.rows.length > 0;
-  }
-      
   async writeBatch() {
     
     this.batchCount++;
@@ -272,7 +269,7 @@ class TableWriter {
         const results = await this.tableInfo.preparedStatement.execute(args);
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.columns),] : []
-        const abort = this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.tableInfo.bulkOperation.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
+        const abort = this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.tableInfo.bulkOperation.rows.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
         if (abort) {
           await this.dbi.rollbackTransaction();
           this.skipTable = true;
@@ -284,26 +281,7 @@ class TableWriter {
     this.endTime = new Date().getTime();
     this.tableInfo.bulkOperation.rows.length = 0;
     return this.skipTable
-   
   }
-
-  async finalize() {
-    if (this.hasPendingRows()) {
-      this.skipTable = await this.writeBatch();   
-    }
-    await this.dbi.commitTransaction();
-    if (this.tableInfo.preparedStatement !== undefined){
-      await this.tableInfo.preparedStatement.unprepare();
-    }
-    return {
-      startTime    : this.startTime
-    , endTime      : this.endTime
-    , insertMode   : this.tableInfo.bulkSupported === true ? 'Bulk' : 'Iterative'
-    , skipTable    : this.skipTable
-    , batchCount   : this.batchCount
-    }    
-  }
-
 }
 
 module.exports = TableWriter;

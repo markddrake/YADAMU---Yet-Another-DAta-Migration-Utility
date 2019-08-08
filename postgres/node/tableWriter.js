@@ -1,24 +1,13 @@
 "use strict"
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuWriter = require('../../common/yadamuWriter.js');
 
-class TableWriter {
+class TableWriter extends YadamuWriter {
 
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
-    this.dbi = dbi;
-    this.tableName = tableName
-    this.tableInfo = tableInfo;
-    this.status = status;
-    this.yadamuLogger = yadamuLogger;    
-
-    this.batch = [];
+    super(dbi,tableName,tableInfo,status,yadamuLogger)
     this.batchRowCount = 0;
-    
-    this.startTime = new Date().getTime();
-    this.endTime = undefined;
-    this.insertMode = 'Batch';
-
-    this.skipTable = false;
   }
 
   async initialize() {
@@ -29,10 +18,10 @@ class TableWriter {
     return (this.batchRowCount  === this.tableInfo.batchSize)
   }
   
-  commitWork(rowCount) {
-    return (rowCount % this.tableInfo.commitSize) === 0;
+  batchRowCount() {
+    return this.batchRowCount
   }
-
+  
   async appendRow(row) {
     this.tableInfo.targetDataTypes.forEach(async function(targetDataType,idx) {
       const dataType = this.dbi.decomposeDataType(targetDataType);
@@ -155,21 +144,6 @@ class TableWriter {
     this.batch.length = 0;
     return this.skipTable   
   }
-
-  async finalize() {
-    if (this.hasPendingRows()) {
-      this.skipTable = await this.writeBatch();   
-    }
-    await this.dbi.commitTransaction();
-    return {
-      startTime    : this.startTime
-    , endTime      : this.endTime
-    , insertMode   : this.insertMode
-    , skipTable    : this.skipTable
-    , batchCount   : this.batchCount
-    }    
-  }
-
 }
 
 module.exports = TableWriter;

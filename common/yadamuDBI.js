@@ -74,7 +74,7 @@ class YadamuDBI {
                       yadamuLogger.log([`${this.constructor.name}`],`: ${logEntry}.`)
                       break;
                     case (logEntryType === "dml") : 
-                      yadamuLogger.log([`${this.constructor.name}`],`: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${Math.round(logEntry.elapsedTime)}ms. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.`)
+                      yadamuLogger.log([`${this.constructor.name}`],`: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${Yadamu.stringifyDuration(Math.round(logEntry.elapsedTime))}s. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.`)
                       break;
                     case (logEntryType === "info") :
                       yadamuLogger.info([`${this.constructor.name}`],`"${JSON.stringify(logEntry)}".`);
@@ -325,12 +325,12 @@ class YadamuDBI {
   async beginTransaction() {
   }
 
- /*
+  /*
   **
   ** Commit the current transaction
   **
   */
-  
+    
   async commitTransaction() {
   }
 

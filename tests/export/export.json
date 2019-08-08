@@ -8,7 +8,7 @@
         "parameters": {
             "MODE": "DDL_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -21,7 +21,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -34,7 +34,7 @@
         "parameters": {
             "MODE": "DDL_AND_DATA"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -47,7 +47,7 @@
         "parameters": {
             "MODE": "DDL_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -60,7 +60,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -73,7 +73,7 @@
         "parameters": {
             "MODE": "DDL_AND_DATA"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -86,7 +86,7 @@
         "parameters": {
             "MODE": "DDL_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -99,7 +99,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -112,7 +112,7 @@
         "parameters": {
             "MODE": "DDL_AND_DATA"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -125,7 +125,7 @@
         "parameters": {
             "MODE": "DDL_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -138,7 +138,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -151,7 +151,7 @@
         "parameters": {
             "MODE": "DDL_AND_DATA"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -164,7 +164,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/mssql.json"
         ]
     },
@@ -177,7 +177,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/import/createAdventureWorksAll.json"
         ]
     },
@@ -190,7 +190,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/mssqlAdventureWorksAll.json"
         ]
     },
@@ -203,7 +203,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/mysql.json"
         ]
     }

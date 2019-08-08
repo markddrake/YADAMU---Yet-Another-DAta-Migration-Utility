@@ -22,9 +22,38 @@ class DBWriter extends Writable {
     this.rowCount     = undefined;
     this.ddlComplete  = false;
     this.skipTable    = false;
+
+    this.configureFeedback(this.dbi.parameters.FEEDBACK);
     
     this.timings = {}
   }      
+  
+  configureFeedback(feedbackModel) {
+        
+    this.reportCommits      = false;
+    this.reportBatchWrites  = false;
+    this.feedbackCounter    = 0;
+    
+    if (feedbackModel !== undefined) {
+        
+      if (feedbackModel === 'COMMIT') {
+        this.reportCommits = true;
+        return;
+      }
+  
+      if (feedbackModel === 'BATCH') {
+        this.reportCommits = true;
+        this.reportBatchWrites = true;
+        return;
+      }
+    
+      if (!isNaN(feedbackModel)) {
+        this.reportCommits = true;
+        this.reportBatchWrites = true;
+        this.feedbackInterval = parseInt(feedbackModel)
+      }
+    }      
+  }
   
   objectMode() {
     return this.dbi.objectMode(); 
@@ -63,8 +92,6 @@ class DBWriter extends Writable {
     **
     */ 
 
-
-    
     // Fetch metadata for tables that already exist in the target schema.
        
     const targetSchemaInfo = await this.dbi.getSchemaInfo('TOUSER');
@@ -77,13 +104,15 @@ class DBWriter extends Writable {
        // Copy the source metadata 
     
       Object.keys(metadata).forEach(function(table) {
-        if (!metadata[table].hasOwnProperty('vendor')) {
-           metadata[table].vendor = this.dbi.systemInformation.vendor;   
+        const tableMetadata = metadata[table]
+        if (!tableMetadata.hasOwnProperty('vendor')) {
+           tableMetadata.vendor = this.dbi.systemInformation.vendor;   
         }
-        metadata[table].source = {
-          vendor          : metadata[table].vendor
-         ,dataTypes       : metadata[table].dataTypes
-         ,sizeConstraints : metadata[table].sizeConstraints
+        tableMetadata.source = {
+          vendor          : tableMetadata.vendor
+         ,columns         : tableMetadata.columns
+         ,dataTypes       : tableMetadata.dataTypes
+         ,sizeConstraints : tableMetadata.sizeConstraints
         }
       },this)
     
@@ -145,8 +174,9 @@ class DBWriter extends Writable {
     const skipCount = this.dbi.skipCount;
     const rowsRead = this.rowCount;
     const rowsWritten = rowsRead - skipCount;
-    const throughput = (rowsWritten/Math.round(elapsedTime)) * 1000
-    this.yadamuLogger.log([`${this.constructor.name}`,`${this.tableName}`,`${results.insertMode}`],`Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. Elaspsed Time ${Math.round(elapsedTime)}ms. Throughput ${Math.round(throughput)} rows/s.`);
+    const throughput = isNaN(elapsedTime) ? 'N/A' : Math.round((rowsWritten/elapsedTime) * 1000)
+    
+    this.yadamuLogger.log([`${this.constructor.name}`,`${this.tableName}`,`${results.insertMode}`],`Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. Elaspsed Time ${Yadamu.stringifyDuration(Math.round(elapsedTime))}s. Throughput ${throughput} rows/s.`);
     this.timings[this.tableName] = {rowCount: this.rowCount, insertMode: results.insertMode,  rowsSkipped: skipCount, elapsedTime: Math.round(elapsedTime).toString() + "ms", throughput: Math.round(throughput).toString() + "/s"};
   }
  
@@ -191,11 +221,20 @@ class DBWriter extends Writable {
           }
           await this.currentTable.appendRow(obj.data);
           this.rowCount++;
+          if ((this.rowCount % this.feedbackInterval === 0) & !this.currentTable.batchComplete()) {
+            this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows buffered: ${this.currentTable.batchRowCount()}.`);
+          }
           if (this.currentTable.batchComplete()) {
             this.skipTable = await this.currentTable.writeBatch(this.status);
+            if (this.reportBatchWrites && this.currentTable.reportBatchWrites() && !this.currentTable.commitWork(this.rowCount)) {
+              this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows written:  ${this.rowCount}.`);
+            }                    
           }  
           if (this.currentTable.commitWork(this.rowCount)) {
-             await this.dbi.commitTransaction()
+            await this.dbi.commitTransaction(this.rowCount)
+            if (this.reportCommits) {
+              this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows commited: ${this.rowCount}.`);
+            }                    
           }
           break;
         default:

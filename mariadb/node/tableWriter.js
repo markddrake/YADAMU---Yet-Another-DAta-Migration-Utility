@@ -1,24 +1,15 @@
 "use strict"
 
-class TableWriter {
+const YadamuWriter = require('../../common/yadamuWriter.js');
+
+class TableWriter extends YadamuWriter {
 
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
-    this.dbi = dbi;
-    this.tableName = tableName
-    this.tableInfo = tableInfo;
+    super(dbi,tableName,tableInfo,status,yadamuLogger)
     this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
     this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + '),';
-    this.status = status;
-    this.yadamuLogger = yadamuLogger;    
-
-    this.batch = [];
-    this.batchCount = 0;
-    this.batchRowCount = 0;
     
-    this.startTime = new Date().getTime();
-    this.endTime = undefined;
-
-    this.skipTable = false;
+    this.batchRowCount = 0;
   }
 
   async initialize() {
@@ -28,8 +19,14 @@ class TableWriter {
     return (this.batchRowCount === this.tableInfo.batchSize)
   }
   
-  commitWork(rowCount) {
-    return (rowCount % this.tableInfo.commitSize) === 0;
+  batchRowCount() {
+    return this.batchRowCount 
+  }
+  
+  async finalize() {
+    const results = await super.finalize()
+    results.insertMode = this.tableInfo.insertMode
+    return results;
   }
 
   async appendRow(row) {
@@ -89,10 +86,6 @@ class TableWriter {
     this.batchRowCount++
   }
 
-  hasPendingRows() {
-    return this.batch.length > 0;
-  }
- 
   async processWarnings(results) {
    // ### Output Records that generate warnings
    if (results.warningCount >  0) {
@@ -155,8 +148,7 @@ class TableWriter {
     this.endTime = new Date().getTime();
     this.batch.length = 0;
     this.batchRowCount = 0;
-    return this.skipTable
-          
+    return this.skipTable          
   }
 
   async finalize() {

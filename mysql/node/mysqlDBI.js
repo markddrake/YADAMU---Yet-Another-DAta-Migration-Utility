@@ -157,7 +157,7 @@ class MySQLDBI extends YadamuDBI {
                          self.conn.query(sqlStatement,args,async function(err,results,fields) {
                                                                    if (err) {
                                                                      if (attemptReconnect && ((err.fatal) && (err.code && (err.code === 'PROTOCOL_CONNECTION_LOST') || (err.code === 'ECONNRESET')))){
-                                                                       self.yadamuLogger.warning([`${self.constructor.name}.executeSQL()`],`SQL Operation raised\n${e}`);
+                                                                       self.yadamuLogger.warning([`${self.constructor.name}.executeSQL()`],`SQL Operation raised\n${err}`);
                                                                        self.yadamuLogger.info([`${self.constructor.name}.executeSQL()`],`Attemping reconnection.`);
                                                                        await self.reconnect()
                                                                        self.yadamuLogger.info([`${self.constructor.name}.executeSQL()`],`New connection availabe.`);

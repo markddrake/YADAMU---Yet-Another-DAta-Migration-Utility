@@ -7,7 +7,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/oracle.json"
         ]
     },
@@ -19,7 +19,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/export/mssql.json"
         ]
     },    
@@ -31,7 +31,7 @@
         },
         "directory" : "JSON/MySQL",
         "reverseDirection" : true,
-        "operations": [
+        "tasks": [
             "tests/export/mysql.json"
         ]
     }

@@ -524,9 +524,9 @@ BEGIN
                            else
                              case 
                                when c.DATA_TYPE = 'geography' then
-                                 concat('case when "',c.COLUMN_NAME,'".InstanceOf(''POINT'') = 1 then concat(str("',c.COLUMN_NAME,'".Long,18,',@SPATIAL_PRECISION,'),'','',str("',c.COLUMN_NAME,'".Lat,18,',@SPATIAL_PRECISION,')) else "',c.COLUMN_NAME,'".ToString() end collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
+                                 concat('case when "',c.COLUMN_NAME,'".MakeValid().InstanceOf(''POINT'') = 1 then concat(str("',c.COLUMN_NAME,'".Long,18,',@SPATIAL_PRECISION,'),'','',str("',c.COLUMN_NAME,'".Lat,18,',@SPATIAL_PRECISION,')) else "',c.COLUMN_NAME,'".ToString() end collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
                                else
-                                 concat('case when "',c.COLUMN_NAME,'".InstanceOf(''POINT'') = 1 then concat(str("',c.COLUMN_NAME,'".STX,18,',@SPATIAL_PRECISION,'),'','',str("',c.COLUMN_NAME,'".STY,18,',@SPATIAL_PRECISION,')) else "',c.COLUMN_NAME,'".ToString() end collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
+                                 concat('case when "',c.COLUMN_NAME,'".MakeValid().InstanceOf(''POINT'') = 1 then concat(str("',c.COLUMN_NAME,'".STX,18,',@SPATIAL_PRECISION,'),'','',str("',c.COLUMN_NAME,'".STY,18,',@SPATIAL_PRECISION,')) else "',c.COLUMN_NAME,'".ToString() end collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
                                end
                         end
                       when c.DATA_TYPE in ('xml','text','ntext') then

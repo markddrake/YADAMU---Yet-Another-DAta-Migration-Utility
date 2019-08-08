@@ -14,7 +14,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/fileRoundtrip/oracle.json",
             "tests/fileRoundtrip/mysql.json",
             "tests/fileRoundtrip/mssql.json"
@@ -29,7 +29,7 @@
             "MODE"     : "DATA_ONLY",
             "MAPPINGS" : "tests/fileRoundtrip/mappingsOracle11g.json"
         },
-        "operations": [
+        "tasks": [
             "tests/fileRoundtrip/oracle.json",
             "tests/fileRoundtrip/mysql.json",
             "tests/fileRoundtrip/mssql.json"
@@ -48,7 +48,7 @@
         "parameters": {
             "MODE": "DATA_ONLY"
         },
-        "operations": [
+        "tasks": [
             "tests/fileRoundtrip/mssql.json",
             "tests/fileRoundtrip/oracle.json",
             "tests/fileRoundtrip/mysql.json"

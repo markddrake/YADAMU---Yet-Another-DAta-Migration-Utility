@@ -2,35 +2,32 @@
 
 const oracledb = require('oracledb');
 
+const YadamuWriter = require('../../common/yadamuWriter.js');
+
 const sqlSetSavePoint = 
 `SAVEPOINT BATCH_INSERT`;
 
 const sqlRollbackSavePoint = 
 `ROLLBACK TO BATCH_INSERT`;
 
-class TableWriter {
+class TableWriter extends YadamuWriter {
 
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
-    this.dbi = dbi;
-    this.schema = this.dbi.parameters.TOUSER;
-    this.tableName = tableName
-    this.tableInfo = tableInfo;
-    this.status = status;
-    this.yadamuLogger = yadamuLogger;    
-
-    this.batch = [];
-    this.lobList = [];
-
-    this.lobUsage = 0;
-    this.batchCount = 0;
-
-    this.startTime = new Date().getTime();
-    this.endTime = undefined;
-    this.insertMode = 'Batch';
-
-    this.skipTable = false;
-    this.dumpOracleTestcase = false;
+    super(dbi,tableName,tableInfo,status,yadamuLogger)
     
+    this.lobUsage = 0;
+    this.lobList = [];
+    this.dumpOracleTestcase = false;
+  }
+
+  async initialize() {
+    await this.disableTriggers();
+  }
+
+  async finalize() {
+    const results = await super.finalize()
+    await this.enableTriggers();
+    return results;
   }
 
   async disableTriggers() {
@@ -40,18 +37,6 @@ class TableWriter {
     
   }
 
-  async initialize() {
-    await this.disableTriggers();
-  }
-
-  batchComplete() {
-    return this.batch.length === this.tableInfo.batchSize;
-  }
-  
-  commitWork(rowCount) {
-    return (rowCount % this.tableInfo.commitSize) === 0;
-  }
-  
   async enableTriggers() {
   
     const sqlStatement = `ALTER TABLE "${this.schema}"."${this.tableName}" ENABLE ALL TRIGGERS`;
@@ -189,11 +174,6 @@ end;`
     },this)
   }
   
-  hasPendingRows() {
-    return this.batch.length > 0;
-  }
-      
-      
   async serializeLobs(record) {
     const newRecord = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
       if (record[idx] !== null) {
@@ -314,22 +294,6 @@ end;`
     this.freeLobList();
     return this.skipTable     
   }
-
-  async finalize() {
-    if (this.hasPendingRows()) {
-      this.skipTable = await this.writeBatch();   
-    }
-    await this.dbi.commitTransaction();
-    await this.enableTriggers();
-    return {
-      startTime    : this.startTime
-    , endTime      : this.endTime
-    , insertMode   : this.insertMode
-    , skipTable    : this.skipTable
-    , batchCount   : this.batchCount
-    }    
-  }
-
 }
 
 module.exports = TableWriter;

@@ -1,35 +1,19 @@
 "use strict"
 
-class TableWriter {
+const YadamuWriter = require('../../common/yadamuWriter.js');
+
+class TableWriter extends YadamuWriter {
 
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
-    this.dbi = dbi;
-    this.tableName = tableName
-    this.tableInfo = tableInfo;
+    super(dbi,tableName,tableInfo,status,yadamuLogger)
     this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
-    this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + ')';
-
-    this.status = status;
-    this.yadamuLogger = yadamuLogger;    
-
-    this.batch = [];
-    this.batchCount = 0;
-    
-    this.startTime = new Date().getTime();
-    this.endTime = undefined;
-
-    this.skipTable = false
+    this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + ')';    
   }
 
-  async initialize() {
-  }
-
-  batchComplete() {
-    return (this.batch.length === this.tableInfo.batchSize)
-  }
-  
-  commitWork(rowCount) {
-    return (rowCount % this.tableInfo.commitSize) === 0;
+  async finalize() {
+    const results = await super.finalize()
+    results.insertMode = this.tableInfo.insertMode
+    return results;
   }
 
   async appendRow(row) {
@@ -81,10 +65,6 @@ class TableWriter {
     this.batch.push(row);
   }
 
-  hasPendingRows() {
-    return this.batch.length > 0;
-  }
-  
   async processWarnings(results) {
     // ### Output Records that generate warnings
     if (results.warningCount >  0) {
@@ -139,24 +119,8 @@ class TableWriter {
     
     this.endTime = new Date().getTime();
     this.batch.length = 0;  
-    return this.skipTable
-    
+    return this.skipTable 
   }
-
-  async finalize() {
-    if (this.hasPendingRows()) {
-      this.skipTable = await this.writeBatch();   
-    }
-    await this.dbi.commitTransaction();
-    return {
-      startTime    : this.startTime
-    , endTime      : this.endTime
-    , insertMode   : this.tableInfo.insertMode
-    , skipTable    : this.skipTable
-    , batchCount   : this.batchCount
-    }    
-  }
-
 }
 
 module.exports = TableWriter;

@@ -27,7 +27,7 @@ const HexBinToBinary = require('./hexBinToBinary.js');
 const defaultParameters = {
   BATCHSIZE         : 10000
 , COMMITSIZE        : 10000
-, LOBCACHESIZE      : 512
+, LOBCACHESIZE      : 1000
 }
 
 const dateFormatMasks = {
@@ -36,6 +36,7 @@ const dateFormatMasks = {
        ,Postgres    : 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'
        ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS.######"Z"'
        ,MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS.######"Z"'
+       ,MongoDB     : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
 }
 
 const timestampFormatMasks = {
@@ -44,6 +45,7 @@ const timestampFormatMasks = {
        ,Postgres    : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"+00:00"'
        ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
        ,MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
+       ,MongoDB     : 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"'
 }
 
   

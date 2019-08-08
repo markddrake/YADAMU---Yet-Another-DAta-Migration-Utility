@@ -93,6 +93,17 @@ class Yadamu {
     }
   }
 
+  static ensureNumeric(parameters,parameterName,parameterValue) {
+     
+     if (isNaN(parameterValue)) {
+       console.log(`${new Date().toISOString()}[Yadamu]: Invalud Numeric value for parameter: "${parameterName}".`)         
+     }
+     else {
+       parameters[parameterName] = parseInt(parameterValue);
+     }
+
+  }
+
   static async finalize(status,yadamuLogger) {
 
     await yadamuLogger.close();
@@ -103,17 +114,27 @@ class Yadamu {
   }
 
   static stringifyDuration(duration) {
-        
-    let milliseconds = parseInt(duration%1000)
-    let seconds = parseInt((duration/1000)%60)
-    let minutes = parseInt((duration/(1000*60))%60)
-    let hours = parseInt((duration/(1000*60*60))%24);
 
+
+   let milliseconds = 0
+   let seconds = 0
+   let minutes = 0
+   let hours = 0
+   let days = 0
+
+   if (duration > 0) {
+     milliseconds = Math.trunc(duration%1000)
+     seconds = Math.trunc((duration/1000)%60)
+     minutes = Math.trunc((duration/(1000*60))%60)
+     hours = Math.trunc((duration/(1000*60*60))%24);
+     days = Math.trunc(duration/(1000*60*60*24));
+   }
+  
     hours = (hours < 10) ? "0" + hours : hours;
     minutes = (minutes < 10) ? "0" + minutes : minutes;
     seconds = (seconds < 10) ? "0" + seconds : seconds;
 
-    return `${hours}:${minutes}:${seconds}.${(milliseconds + '').padStart(3,'0')}`;
+    return (days > 0 ? `${days} days ` : '' ) + `${hours}:${minutes}:${seconds}.${(milliseconds + '').padStart(3,'0')}`;
   }
   
   static reportStatus(status,yadamuLogger) {
@@ -272,6 +293,10 @@ class Yadamu {
           case '--DUMPFILE':
             parameters.DUMPFILE = parameterValue.toUpperCase();
             break;
+          case 'FEEDBACK':
+          case '--FEEDBACK':
+            parameters.FEEDBACK = parameterValue.toUpperCase();
+            break;
           case 'MODE':
           case '--MODE':
             parameters.MODE = parameterValue.toUpperCase();
@@ -279,6 +304,18 @@ class Yadamu {
           case 'CONFIG':
           case '--CONFIG':
             parameters.CONFIG = parameterValue;
+            break;
+          case 'COMMITSIZE':
+          case '--COMMITSIZE':
+            Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
+            break;
+          case 'BATCHSIZE':
+          case '--BATCHSIZE':
+            Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
+            break;
+          case 'LOBCACHESIZE':
+          case '--LOBCACHESIZE':
+            Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           default:
             console.log(`${new Date().toISOString()}[Yadamu]: Unknown parameter: "${parameterName}".`)          
@@ -394,7 +431,7 @@ class Yadamu {
     const startTime = new Date().getTime();
     const json = await dbi.uploadFile(importFilePath);
     const elapsedTime = new Date().getTime() - startTime;
-    this.yadamuLogger.log([`${this.constructor.name}.uploadFile()`],`Processing file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${elapsedTime}ms.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
+    this.yadamuLogger.log([`${this.constructor.name}.uploadFile()`],`Processing file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${Yadamu.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
     return json;
   }
     
@@ -440,3 +477,4 @@ class Yadamu {
      
 module.exports.Yadamu = Yadamu;
 module.exports.convertIdentifierCase  = Yadamu.convertIdentifierCase
+module.exports.stringifyDuration  = Yadamu.stringifyDuration

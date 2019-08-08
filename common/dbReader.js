@@ -1,6 +1,6 @@
 "use strict";
 const Readable = require('stream').Readable;
-const Yadamu = require('./yadamu.js');
+const Yadamu = require('./yadamu.js')
 
 class DBReader extends Readable {  
 
@@ -73,7 +73,7 @@ class DBReader extends Readable {
     const startTime = new Date().getTime()
     const rows = await copyOperation;
     const elapsedTime = new Date().getTime() - startTime
-    this.yadamuLogger.log([`${this.constructor.name}`,`"${tableMetadata.TABLE_NAME}"`],`Rows read: ${rows}. Elaspsed Time: ${elapsedTime}ms. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`)
+    this.yadamuLogger.log([`${this.constructor.name}`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${rows}. Elaspsed Time: ${Yadamu.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`)
     return rows;
       
   }
@@ -89,16 +89,13 @@ class DBReader extends Readable {
     await this.dbi.generateStatementCache('%%SCHEMA%%',false)
   }
   
-  
   getReader() {
-    
     if (this.dbi.isDatabase()) {
       return this
     }
     else {
       return this.dbi.getReader()
     }
-    
   }
   
   async _read() {
