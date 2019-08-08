@@ -246,7 +246,7 @@ class TableWriter extends YadamuWriter {
           this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.tableInfo.bulkOperation.rows.length}].  Bulk Operation raised:\n${e.message}.`);
           this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
           this.yadamuLogger.writeDirect(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}`);
-          this.yadamuLogger.writeDirect(`${this.tableInfo.bulkOperation.rows[0]}\n...\n${this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1]}\n`)
+          this.yadamuLogger.writeDirect(`${JSON.stringify(this.tableInfo.bulkOperation.rows[0])}\n...\n${JSON.stringify(this.tableInfo.bulkOperation.rows[this.batch.length-1])}\n`)
           this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
         }
         // await this.dbi.rollbackTransaction();

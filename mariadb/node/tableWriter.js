@@ -119,7 +119,7 @@ class TableWriter extends YadamuWriter {
           this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.batchRowCount}].  Batch Insert raised:\n${e}.`);
           this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
           // Use Slice to print first and last row, rather than first and last value.
-          this.yadamuLogger.writeDirect(`${this.batch.slice(0,this.tableInfo.columnCount)}\n...\n${this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length)}\n`);
+          this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch.slice(0,this.tableInfo.columnCount))}\n...\n${JSON.stringify(this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))}\n`);
           this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
         }
         // await this.dbi.rollbackTransaction();

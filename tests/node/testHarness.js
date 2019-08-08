@@ -14,7 +14,7 @@ const MsSQLCompare = require('./mssqlCompare.js');
 const MySQLCompare = require('./mysqlCompare.js');
 const MariadbCompare = require('./mariadbCompare.js');
 const PostgresCompare = require('./postgresCompare.js');
-// const MongoCompare = require('./mongoCompare.js');
+const MongoCompare = require('./mongoCompare.js');
 const FileCompare = require('./fileCompare.js');
 
 
@@ -60,11 +60,9 @@ class TestHarness {
       case "mariadb" :
         dbi = new MariadbCompare(this.yadamu)
         break;
-      /*
       case "mongodb" :
         dbi = new MongoCompare(this.yadamu)
         break;
-      */
       case "file" :
         dbi = new FileCompare(this.yadamu)
         break;
@@ -224,7 +222,7 @@ class TestHarness {
 
       this.yadamuLogger.writeDirect(` ${row[2].padStart(colSizes[3])} |` 
                                   + ` ${row[3].toString().padStart(colSizes[4])} |` 
-                                  + ` ${YadamuTest.stringifyDuration(row[4]).padStart(colSizes[5])} |` 
+                                  + ` ${YadamuTest.stringifyDuration(parseInt(row[4])).padStart(colSizes[5])} |` 
                                   + ` ${(row[5] === 'NaN/s' ? '' : row[5]).padStart(colSizes[6])} |` 
                          + '\n');
     },this)

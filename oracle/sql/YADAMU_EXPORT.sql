@@ -314,7 +314,9 @@ as
                  when atc.DATA_TYPE like 'TIMESTAMP%TIME ZONE' then
                    'TO_CHAR(SYS_EXTRACT_UTC("' || atc.COLUMN_NAME || '"),''YYYY-MM-DD"T"HH24:MI:SS' || case when atc.DATA_SCALE > 0 then '.FF' || atc.DATA_SCALE else '' end || '"Z"'')'
                  when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE  in ('SDO_GEOMETRY'))) then
-                   'case when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
+                   -- 'case when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
+                   -- 'case when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
+                  't."' ||  atc.COLUMN_NAME || '".get_WKT() "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'XMLTYPE' then  -- Can be owned by SYS or PUBLIC
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'BFILE' then

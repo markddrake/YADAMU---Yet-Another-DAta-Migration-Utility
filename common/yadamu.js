@@ -96,7 +96,7 @@ class Yadamu {
   static ensureNumeric(parameters,parameterName,parameterValue) {
      
      if (isNaN(parameterValue)) {
-       console.log(`${new Date().toISOString()}[Yadamu]: Invalud Numeric value for parameter: "${parameterName}".`)         
+       console.log(`${new Date().toISOString()}[Yadamu]: Invalid Numeric value for parameter: "${parameterName}".`)         
      }
      else {
        parameters[parameterName] = parseInt(parameterValue);

@@ -224,7 +224,7 @@ end;`
             this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
             this.yadamuLogger.writeDirect(`${this.tableInfo.targetDataTypes}\n`);
             this.yadamuLogger.writeDirect(`${JSON.stringify(this.tableInfo.binds)}\n`);
-            this.yadamuLogger.writeDirect(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
+            this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch[0])}\n...\n${JSON.stringify(this.batch[this.batch.length-1])}\n`);
             this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to PL/SQL Block.`);          
           }
           this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
@@ -243,7 +243,7 @@ end;`
               this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
               this.yadamuLogger.writeDirect(`${this.tableInfo.targetDataTypes}\n`);
               this.yadamuLogger.writeDirect(`${JSON.stringify(this.tableInfo.binds)}\n`);
-              this.yadamuLogger.writeDirect(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
+              this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch[0])}\n...\n${JSON.stringify(this.batch[this.batch.length-1])}\n`);
               this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
             }
             this.insertMode = 'Iterative';
@@ -255,7 +255,7 @@ end;`
             this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
             this.yadamuLogger.writeDirect(`${this.tableInfo.targetDataTypes}\n`);
             this.yadamuLogger.writeDirect(`${JSON.stringify(this.tableInfo.binds)}\n`);
-            this.yadamuLogger.writeDirect(`${this.batch[0]}\n...\n${this.batch[this.batch.length-1]}\n`);
+            this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch[0])}\n...\n${JSON.stringify(this.batch[this.batch.length-1])}\n`);
             this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
             if (this.dumpOracleTestcase) {
               console.log('DDL:')
