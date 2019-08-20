@@ -28,10 +28,6 @@ class MySQLCompare extends MySQLDBI {
        super(yadamu)
     }
 
-    configureTest(connectionProperties,testParameters,schema,tableMappings) {
-      super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS,tableMappings);
-    }
-    
     async recreateSchema(schema,password) {
         
       try {

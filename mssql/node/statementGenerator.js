@@ -6,10 +6,11 @@ const Yadamu = require('../../common/yadamu.js');
 
 class StatementGenerator {
   
-  constructor(dbi , targetSchema, metadata,  batchSize, commitSize, status, yadamuLogger) {
+  constructor(dbi, targetSchema, metadata,  spatialFormat, batchSize, commitSize, status, yadamuLogger) {
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
+    this.spatialFormat = spatialFormat
     this.batchSize = batchSize
     this.commitSize = commitSize;
     
@@ -23,9 +24,6 @@ class StatementGenerator {
     targetDataTypes.forEach(function (targetDataType,idx) {
       const dataType = this.dbi.decomposeDataType(targetDataType);
       switch (dataType.type) {
-          
-          
-          
        case 'geography':
           // TypeError: parameter.type.validate is not a function
           supported = false;
@@ -203,14 +201,17 @@ class StatementGenerator {
   }
 
   async generateStatementCache (executeDDL, vendor, database) {
-    
-    const sqlStatement = `SET @RESULTS = '{}'; CALL master.dbo.sp_GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;	
+
+    const sqlStatement = `SET @RESULTS = '{}'; CALL master.dbo.sp_GENERATE_SQL(?,?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;	
     
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlStatement};\n--\n`)
     }
-
-    let results = await this.dbi.getRequest().input('TARGET_DATABASE',sql.VARCHAR,this.targetSchema).input('METADATA',sql.NVARCHAR,JSON.stringify({metadata : this.metadata})).execute('master.dbo.sp_GENERATE_SQL');
+    let results = await this.dbi.getRequest()
+                            .input('TARGET_DATABASE',sql.VARCHAR,this.targetSchema)
+                            .input('SPATIAL_FORMAT',sql.NVARCHAR,this.spatialFormat)
+                            .input('METADATA',sql.NVARCHAR,JSON.stringify({metadata : this.metadata}))
+                            .execute('master.dbo.sp_GENERATE_SQL');
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
     const tables = Object.keys(this.metadata); 
@@ -219,12 +220,66 @@ class StatementGenerator {
       statementCache[tableName] = JSON.parse(statementCache[tableName] );
       const tableInfo = statementCache[tableName];
       tableInfo.batchSize =  this.batchSize;
-      tableInfo.batchSize = this.commitSize;
+      tableInfo.commitSize = this.commitSize;
       // Create table before attempting to Prepare Statement..
       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + "\nVALUES (";
       this.metadata[table].columns.split(',').forEach(function(column,idx) {
-        tableInfo.dml = tableInfo.dml + (tableInfo.targetDataTypes[idx] === 'xml' ? 'convert(XML,@C' + idx + ',1)' : '@C' + idx) + ','
-      })
+        switch(tableInfo.targetDataTypes[idx]) {
+          case 'image':
+            tableInfo.dml = tableInfo.dml + 'convert(image,convert(varbinary(max),@C' + idx + ',2))' + ','
+            break;
+          /*
+          case 'varbinary(max)':
+            tableInfo.dml = tableInfo.dml + 'convert(varbinary(max),@C' + idx + ',2)' + ','
+            break;
+          */
+          /*
+          case 'binary':
+          case 'varbinary':
+                        case
+                          when ((DATA_TYPE_LENGTH = -1) OR (DATA_TYPE = 'BLOB') or ((CHARINDEX('"."',DATA_TYPE) > 0))) then
+                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(max),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
+                          else 
+                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",'),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
+                        END
+            tableInfo.dml = tableInfo.dml + '@C' + idx + ','
+            break;
+          */
+          case "xml":
+            tableInfo.dml = tableInfo.dml + 'convert(XML,@C' + idx + ',1)' + ','
+            break;
+          case "geography":
+            switch (this.spatialFormat) {
+               case "WKT":
+               case "EWKT":
+                 tableInfo.dml = tableInfo.dml + 'GEOGRAPHY::STGeomFromText(@C' + idx + ',4326)' + ','
+                 break
+               case "WKB":
+               case "EWKB":
+                 tableInfo.dml = tableInfo.dml + 'GEOGRAPHY::STGeomFromWKB(convert(varbinary(max),@C' + idx + ',2),4326)' + ','
+                 break
+               default:
+                 tableInfo.dml = tableInfo.dml + 'GEOGRAPHY::STGeomFromWKB(convert(varbinary(max),@C' + idx + ',2),4326)' + ','
+            }    
+            break;          
+          case "geometry":
+            switch (this.spatialFormat) {
+               case "WKT":
+               case "EWKT":
+                 tableInfo.dml = tableInfo.dml + 'GEOMETRY::STGeomFromText(@C' + idx + ',4326)' + ','
+                 break
+               case "WKB":
+               case "EWKB":
+                 tableInfo.dml = tableInfo.dml + 'GEOMETRY::STGeomFromWKB(convert(varbinary(max),@C' + idx + ',2),4326)' + ','
+                 break
+               default:
+                 tableInfo.dml = tableInfo.dml + 'GEOMETRY::STGeomFromWKB(convert(varbinary(max),@C' + idx + ',2),4326)' + ','
+            }      
+            break;            
+          default: 
+             tableInfo.dml = tableInfo.dml + '@C' + idx+ ','
+        }
+      },this)
       tableInfo.dml = tableInfo.dml.slice(0,-1) + ")";
       tableInfo.bulkSupported = this.bulkSupported(tableInfo.targetDataTypes);
       try {

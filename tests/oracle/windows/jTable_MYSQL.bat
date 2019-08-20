@@ -3,6 +3,7 @@
 call ..\windows\initialize.bat %~dp0
 @set YADAMU_INPUT_PATH=%YADAMU_INPUT_PATH:~0,-7%
 sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_DB_ROOT%\sql\COMPILE_ALL.sql %YADAMU_LOG_PATH%
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_SCRIPT_ROOT%\sql\YADAMU_TEST.sql %YADAMU_LOG_PATH% OFF
 @set FILENAME=sakila
 @set SCHEMA=sakila
 @set SCHEMAVER=1

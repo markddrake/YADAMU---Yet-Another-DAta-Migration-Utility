@@ -24,17 +24,13 @@ const sqlGatherSchemaStats = `begin dbms_stats.gather_schema_stats(ownname => :t
 
 const sqlSchemaTableRows = `select TABLE_NAME, NUM_ROWS from ALL_TABLES where OWNER = :target`;
 
-const sqlCompareSchemas = `begin YADAMU_IMPORT.COMPARE_SCHEMAS(:source,:target,:maxTimestampPrecision); end;`;
+const sqlCompareSchemas = `begin YADAMU_TEST.COMPARE_SCHEMAS(:source,:target,:maxTimestampPrecision); end;`;
 
 
 class OracleCompare extends OracleDBI {
     
     constructor(yadamu) {
        super(yadamu)
-    }
-    
-    configureTest(connectionProperties,testParameters,schema,tableMappings) {
-      super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS,tableMappings);
     }
     
     async recreateSchema(schema,password) {

@@ -9,82 +9,18 @@ const Readable = require('stream').Readable;
 */
 const mysql = require('mysql');
 
+const Yadamu = require('../../common/yadamu.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator80 = require('./statementGenerator.js');
 const StatementGenerator57 = require('../../dbShared/mysql/statementGenerator57.js');
 
 const defaultParameters = {
-  BATCHSIZE         : 10000
-, COMMITSIZE        : 10000
-, TABLE_MATCHING    : "INSENSITIVE"
+  TABLE_MATCHING    : "INSENSITIVE"
 }
 
 const sqlSystemInformation = 
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
-
-const sqlSchemaInfo = 
-`select c.table_schema "TABLE_SCHEMA"
-       ,c.table_name "TABLE_NAME"
-       ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "COLUMN_LIST"
-       ,concat('[',group_concat(json_quote(data_type) order by ordinal_position separator ','),']')  "DATA_TYPES"
-       ,concat('[',group_concat(json_quote(
-                            case when (numeric_precision is not null) and (numeric_scale is not null)
-                                   then concat(numeric_precision,',',numeric_scale) 
-                                 when (numeric_precision is not null)
-                                   then case
-                                          when column_type like '%unsigned' 
-                                            then numeric_precision
-                                          else
-                                            numeric_precision + 1
-                                        end
-                                 when (datetime_precision is not null)
-                                   then datetime_precision
-                                 when (character_maximum_length is not null)
-                                   then character_maximum_length
-                                 else   
-                                   ''   
-                            end
-                           ) 
-                           order by ordinal_position separator ','
-                    ),']') "SIZE_CONSTRAINTS"
-       ,concat(
-          'select json_array('
-          ,group_concat(
-            case 
-              when data_type in ('date','time','datetime','timestamp')
-                -- Force ISO 8601 rendering of value 
-                then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')')
-              when data_type = 'year'
-                -- Prevent rendering of value as base64:type13: 
-                then concat('CAST("', column_name, '"as DECIMAL)')
-              when data_type like '%blob'
-                -- Force HEXBINARY rendering of value
-                then concat('HEX("', column_name, '")')
-              when data_type = 'varbinary'
-                -- Force HEXBINARY rendering of value
-                then concat('HEX("', column_name, '")')
-              when data_type = 'binary'
-                -- Force HEXBINARY rendering of value
-                then concat('HEX("', column_name, '")')
-              when data_type = 'geometry'
-                -- Force WKT rendering of value
-                then concat('ST_asText("', column_name, '")')
-              when data_type = 'float'
-                -- Render Floats with greatest possible precision 
-                -- Risk of Overflow ????
-                then concat('(floor(1e15*"',column_name,'")/1e15)')                                      
-              else
-                concat('"',column_name,'"')
-            end
-            order by ordinal_position separator ','
-          )
-          ,') "json" from "'
-          ,c.table_schema
-          ,'"."'
-          ,c.table_name
-          ,'"'
-        ) "SQL_STATEMENT"`;
 
 // Check for duplicate entries INFORMATION_SCHEMA.columns
 
@@ -99,7 +35,6 @@ const sqlCheckInformationSchemaState =
   group by TABLE_SCHEMA,TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION
   having count(*) > 1`
 
-
 const sqlInformationSchemaClean =
 `   from information_schema.columns c, information_schema.tables t
   where t.table_name = c.table_name 
@@ -109,10 +44,10 @@ const sqlInformationSchemaClean =
     and t.table_schema = ?
       group by t.table_schema, t.table_name`;
       
-    
+   
 // Hack for Duplicate Entries in INFORMATION_SCHEMA.columns seen MSSQL 5.7
 
-const sqlInformationSchemaFix  = 
+const sqlInformationSchemaDirty  = 
 `   from (
      select distinct c.table_catalog, c.table_schema, c.table_name,column_name,ordinal_position,data_type,column_type,character_maximum_length,numeric_precision,numeric_scale,datetime_precision
        from information_schema.columns c, information_schema.tables t
@@ -124,6 +59,12 @@ const sqlInformationSchemaFix  =
    ) c
   group by c.table_schema, c.table_name`;
 
+const sqlCreateSavePoint = `SAVEPOINT YadamuInsert`;
+
+const sqlRestoreSavePoint = `ROLLBACK TO SAVEPOINT YadamuInsert`;
+
+const sqlReleaseSavePoint = `RELEASE SAVEPOINT YadamuInsert`;
+
 class MySQLDBI extends YadamuDBI {
     
   /*
@@ -132,11 +73,102 @@ class MySQLDBI extends YadamuDBI {
   **
   */
   
+  async sqlTableInfo(schema) {
+
+    /*
+    **
+    ** During testing on 5.7 it appeared tha that is is possible for the Information Schema to get corrupted
+    ** In the corrupt state some table contains duplicate entires for each column in the table.
+    ** 
+    ** This routine checks for this state and creates a query that will workaround the problem if the 
+    ** Information schema is corrupt.
+    ** 
+    */   
+    
+    const selectSchemaInfo = 
+      `select c.table_schema "TABLE_SCHEMA"
+             ,c.table_name "TABLE_NAME"
+             ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "COLUMN_LIST"
+             ,concat('[',group_concat(json_quote(data_type) order by ordinal_position separator ','),']')  "DATA_TYPES"
+             ,concat('[',group_concat(json_quote(
+                                  case when (numeric_precision is not null) and (numeric_scale is not null)
+                                         then concat(numeric_precision,',',numeric_scale) 
+                                       when (numeric_precision is not null)
+                                         then case
+                                                when column_type like '%unsigned' 
+                                                  then numeric_precision
+                                                else
+                                                  numeric_precision + 1
+                                              end
+                                       when (datetime_precision is not null)
+                                         then datetime_precision
+                                       when (character_maximum_length is not null)
+                                         then character_maximum_length
+                                       else   
+                                         ''   
+                                  end
+                                 ) 
+                                 order by ordinal_position separator ','
+                          ),']') "SIZE_CONSTRAINTS"
+             ,concat(
+                'select json_array('
+                  ,group_concat(
+                   case 
+                     when data_type in ('date','time','datetime','timestamp') then
+                       -- Force ISO 8601 rendering of value 
+                       concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')')
+                     when data_type = 'year' then
+                       -- Prevent rendering of value as base64:type13: 
+                       concat('CAST("', column_name, '"as DECIMAL)')
+                     when data_type like '%blob' then
+                       -- Force HEXBINARY rendering of value
+                       concat('HEX("', column_name, '")')
+                     when data_type = 'varbinary' then
+                       -- Force HEXBINARY rendering of value
+                       concat('HEX("', column_name, '")')
+                     when data_type = 'binary' then
+                       -- Force HEXBINARY rendering of value
+                       concat('HEX("', column_name, '")')
+                     when data_type = 'geometry' then
+                       -- Force ${this.spatialFormat} rendering of value
+                       concat('${this.spatialSerializer}"', column_name, '"))')
+                     when data_type = 'float' then
+                       -- Render Floats with greatest possible precision 
+                       -- Risk of Overflow ????
+                       concat('(floor(1e15*"',column_name,'")/1e15)')                                      
+                     else
+                       concat('"',column_name,'"')
+                   end
+                   order by ordinal_position separator ','
+                 )
+                 ,') "json" from "'
+                 ,c.table_schema
+                 ,'"."'
+                 ,c.table_name
+                 ,'"'
+               ) "SQL_STATEMENT"`;
+       
+  
+    const results = await this.executeSQL(sqlCheckInformationSchemaState,[schema]);
+    if (results.length ===  0) {
+      return `${selectSchemaInfo} ${sqlInformationSchemaClean}`
+    }
+    else {
+      for (const i in results) {
+        this.yadamuLogger.warning([`${this.constructor.name}`,`"${results[i].TABLE_SCHEMA}"."${results[i].TABLE_NAME}"`],`Duplicate entires detected in INFORMATION_SCHEMA.COLUMNS.`)
+      }
+      return `${selectSchemaInfo} ${sqlInformationSchemaDirty}`
+    }
+  }
+  
   establishConnection() {
+   
+    const self = this
    
     const conn = this.conn;
     return new Promise(function(resolve,reject) {
                          conn.connect(function(err) {
+                                        self.lastUsedTime = new Date().getTime();
                                         if (err) {
                                           reject(err);
                                         }
@@ -150,28 +182,32 @@ class MySQLDBI extends YadamuDBI {
     attemptReconnect = attemptReconnect === undefined ? true : attemptReconnect
     const self = this
     
-    return new Promise(function(resolve,reject) {
-                         if (self.status.sqlTrace) {
-                           self.status.sqlTrace.write(`${sqlStatement};\n--\n`);
+    return new Promise(
+                 function(resolve,reject) {
+                   if (self.status.sqlTrace) {
+                     self.status.sqlTrace.write(`${sqlStatement};\n--\n`);
+                   }
+                   self.conn.query(
+                     sqlStatement,
+                     args,
+                     async function(err,results,fields) {
+                       self.lastUsedTime = new Date().getTime();
+                       if (err) {
+                         if (attemptReconnect && ((err.fatal) && (err.code && (err.code === 'PROTOCOL_CONNECTION_LOST') || (err.code === 'ECONNRESET')))){
+                           self.yadamuLogger.warning([`${self.constructor.name}.executeSQL()`],`SQL Operation raised\n${err}`);
+                           self.yadamuLogger.info([`${self.constructor.name}.executeSQL()`],`Attemping reconnection.`);
+                           await self.reconnect()
+                           self.yadamuLogger.info([`${self.constructor.name}.executeSQL()`],`New connection availabe.`);
+                           results = await self.executeSQL(sqlStatement,args,false);
+                           resolve(results);
+              1          }
+                         else {
+                           reject(err);
                          }
-                         self.conn.query(sqlStatement,args,async function(err,results,fields) {
-                                                                   if (err) {
-                                                                     if (attemptReconnect && ((err.fatal) && (err.code && (err.code === 'PROTOCOL_CONNECTION_LOST') || (err.code === 'ECONNRESET')))){
-                                                                       self.yadamuLogger.warning([`${self.constructor.name}.executeSQL()`],`SQL Operation raised\n${err}`);
-                                                                       self.yadamuLogger.info([`${self.constructor.name}.executeSQL()`],`Attemping reconnection.`);
-                                                                       await self.reconnect()
-                                                                       self.yadamuLogger.info([`${self.constructor.name}.executeSQL()`],`New connection availabe.`);
-                                                                       results = await self.executeSQL(sqlStatement,args,false);
-                                                                       resolve(results);
-              1                                                      }
-                                                                     else {
-                                                                       reject(err);
-                                                                     }
-                                                                   }
-                                                                   resolve(results);
-                                                                 })
-
-                       })
+                       }
+                       resolve(results);
+                   })
+               })
   }  
 
   async configureSession() {
@@ -188,6 +224,8 @@ class MySQLDBI extends YadamuDBI {
     const enableFileUpload = `SET GLOBAL local_infile = 'ON'`
     await this.executeSQL(enableFileUpload);
 
+    const disableAutoCommit = 'set autocommit = 0';
+    await this.executeSQL(disableAutoCommit);
   }
 
   async setMaxAllowedPacketSize() {
@@ -226,7 +264,6 @@ class MySQLDBI extends YadamuDBI {
     await this.establishConnection();
     this.connectionOpen = true;
     
-
     if (await this.setMaxAllowedPacketSize()) {
       this.conn = this.newConnection();
       await this.establishConnection();
@@ -253,7 +290,7 @@ class MySQLDBI extends YadamuDBI {
         await this.conn.end();
         this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Connection Closed`);
       } catch (e) {
-        this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`this.conn.close() raised\n${e}`);
+        this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`this.conn.end() raised\n${e}`);
       }
     }
     
@@ -322,11 +359,12 @@ class MySQLDBI extends YadamuDBI {
 
   get DATABASE_VENDOR() { return 'MySQL' };
   get SOFTWARE_VENDOR() { return 'Oracle Corporation (MySQL)' };
-  get SPATIAL_FORMAT()  { return 'WKT' };
-  get DEFAULT_PARAMETERS() { return defaultParameters }
+  get SPATIAL_FORMAT()  { return this.spatialFormat };
+  get DEFAULT_PARAMETERS() { return defaultParameters };
 
   constructor(yadamu) {
     super(yadamu,defaultParameters)
+    this.lastUsedTime = undefined
     this.connectionOpen = false
   }
 
@@ -350,9 +388,30 @@ class MySQLDBI extends YadamuDBI {
   **  Connect to the database. Set global setttings
   **
   */
+
+  setSpatialSerializer(spatialFormat) {      
+    switch (spatialFormat) {
+      case "WKB":
+        this.spatialSerializer = "HEX(ST_AsBinary(";
+        break;
+      case "EWKB":
+        this.spatialSerializer = "HEX(ST_AsBinary(";
+        break;
+      case "WKT":
+        this.spatialSerializer = "(ST_AsText(";
+        break;
+      case "EWKT":
+        this.spatialSerializer = "(ST_AsText(";
+        break;
+     default:
+        this.spatialSerializer = "HEX(ST_AsBinary(";
+    }  
+  }    
   
   async initialize() {
-    super.initialize();
+    super.initialize();      
+    this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
+    this.setSpatialSerializer(this.spatialFormat);
     await this.getConnection();
   }
 
@@ -411,6 +470,18 @@ class MySQLDBI extends YadamuDBI {
     await this.conn.rollback();
   }
   
+  async createSavePoint() {
+    await this.executeSQL(sqlCreateSavePoint);
+  }
+  
+  async restoreSavePoint() {
+    await this.executeSQL(sqlRestoreSavePoint);
+  }  
+
+  async releaseSavePoint() {
+    await this.executeSQL(sqlReleaseSavePoint);    
+  } 
+
   /*
   **
   ** The following methods are used by JSON_TABLE() style import operations  
@@ -489,36 +560,13 @@ class MySQLDBI extends YadamuDBI {
   **
   */
 
-  async generateTableInfoQuery(schema) { 
-
-  /*
-  **
-  ** During testing on 5.7 it appeared tha that is is possible for the Information Schema to get corrupted
-  ** In this state it contains duplicate entires for each column in the table.
-  ** 
-  ** This routine checks for this state and creates a query that will workaround the problem if the 
-  ** Information schema is corrupt.
-  ** 
-  */   
-    const results = await this.executeSQL(sqlCheckInformationSchemaState,[schema]);
-    if (results.length ===  0) {
-      return sqlSchemaInfo + sqlInformationSchemaClean;
-    }
-    else {
-      for (const i in results) {
-        this.yadamuLogger.warning([`${this.constructor.name}`,`"${results[i].TABLE_SCHEMA}"."${results[i].TABLE_NAME}"`],`Duplicate entires detected in INFORMATION_SCHEMA.COLUMNS.`)
-      }
-      return sqlSchemaInfo + sqlInformationSchemaFix;
-    }
-  }
-  
   async getDDLOperations() {
     return undefined
   }
     
   async getSchemaInfo(schema) {
       
-    const tableInfo = await this.generateTableInfoQuery();
+    const tableInfo = await this.sqlTableInfo();
     return await this.executeSQL(tableInfo,[this.parameters[schema]]);
 
   }
@@ -540,25 +588,48 @@ class MySQLDBI extends YadamuDBI {
     return metadata;    
 
   }
-   
+  
+  pingConnection() {
+      
+    const self = this
+    return new Promise(
+      function(resolve,reject) {
+        self.conn.ping(
+          async function(err) {
+            if (err) {
+              self.yadamuLogger.info([`${this.constructor.name}.pingConnection()`,`${err.code}`],`Connection Idle Time: ${Yadamu.stringifyDuration(new Date().getTime() - this.lastUsedTime)}.`); 
+              if ((err.fatal) && (err.code && (err.code === 'PROTOCOL_CONNECTION_LOST') || (err.code === 'ECONNRESET'))){
+                self.yadamuLogger.warning([`${self.constructor.name}.pingConnection()`],`SQL Operation raised\n${err}`);
+                self.yadamuLogger.info([`${self.constructor.name}.pingConnection()`],`Attemping reconnection.`);
+                await self.reconnect()
+                self.yadamuLogger.info([`${self.constructor.name}.pingConnection()`],`New connection availabe.`);
+                resolve()
+              }
+              else { 
+                reject(err)
+              }
+            }
+            resolve()
+        })
+    }) 
+  }  
+ 
   async getInputStream(query,parser) {
       
+
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${query.SQL_STATEMENT}\n\/\n`)
     }
-    
-    return this.conn.query(query.SQL_STATEMENT).stream();
+   
+    // await this.pingConnection()
+        
+    this.lastUsedTime = new Date().getTime();
+    const is = this.conn.query(query.SQL_STATEMENT).stream();
+    const self = this;
+    is.on('end',async function() {await self.executeSQL(`FLUSH TABLES "${query.tableName}"`)})
+    return is
   }      
 
-  /*
-  **
-  ** The following methods are used by the YADAMU DBwriter class
-  **
-  */
-  
-  async initializeDataLoad() {
-  }
-  
   async generateStatementCache(schema,executeDDL) {
     let statementGenerator = undefined;
     const sqlVersion = `SELECT @@version`
@@ -574,9 +645,6 @@ class MySQLDBI extends YadamuDBI {
   getTableWriter(table) {
     return super.getTableWriter(TableWriter,table)
   }
-
-  async finalizeDataLoad() {
-  }  
 
 }
 

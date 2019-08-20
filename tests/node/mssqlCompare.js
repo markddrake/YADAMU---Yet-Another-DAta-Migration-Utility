@@ -23,7 +23,7 @@ class MsSQLCompare extends MsSQLDBI {
        if (connectInfo !== undefined) {
 		 connectionProperties.database = connectInfo.database ? connectInfo.database : connectInfo.schema
        }
-       super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS,tableMappings);
+       super.configureTest(connectionProperties,testParameters,tableMappings);
     }
     
     async recreateSchema(connectInfo,password) {
@@ -45,7 +45,7 @@ class MsSQLCompare extends MsSQLDBI {
 
     async importResults(connectInfo,timings) {
         
-      await this.useDatabase(this.pool,connectInfo.database,this.status);
+      await this.useDatabase(connectInfo.database);
       const results = await this.pool.request().input('SCHEMA',this.sql.VarChar,connectInfo.owner).query(sqlSchemaTableRows);
       
       return results.recordset.map(function(row,idx) {          
@@ -73,10 +73,11 @@ class MsSQLCompare extends MsSQLDBI {
         },this)
       }
       
-      await this.useDatabase(this.pool,sourceInfo.database,this.status);
+      await this.useDatabase(sourceInfo.database);
 
       let args = 
-`--@FORMAT_RESULTS        = false
+`--
+--@FORMAT_RESULTS         = false
 --@SOURCE_DATABASE        = '${sourceInfo.database}'
 --@SOURCE_SCHEMA          = '${sourceInfo.owner}'
 --@TARGET_DATABASE        = '${targetInfo.database}'
@@ -84,7 +85,7 @@ class MsSQLCompare extends MsSQLDBI {
 --@COMMENT                = ''
 --@EMPTY_STRING_IS_NULL   = ${this.parameters.EMPTY_STRING_IS_NULL === true}
 --@SPATIAL_PRECISION      = ${this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : null}
---@DATE_TIME_PRECISION      = ${this.parameters.MAX_TIMESTAMP_PRECISION}
+--@DATE_TIME_PRECISION    = ${this.parameters.MAX_TIMESTAMP_PRECISION}
 --`;
             
       if (this.status.sqlTrace) {

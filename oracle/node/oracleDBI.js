@@ -25,9 +25,7 @@ const BufferWriter = require('./bufferWriter.js');
 const HexBinToBinary = require('./hexBinToBinary.js');
 
 const defaultParameters = {
-  BATCHSIZE         : 10000
-, COMMITSIZE        : 10000
-, LOBCACHESIZE      : 1000
+  LOBCACHESIZE      : 1024
 }
 
 const dateFormatMasks = {
@@ -373,6 +371,12 @@ exception
     RAISE;
 end;`
 
+const sqlCreateSavePoint = 
+`SAVEPOINT BATCH_INSERT`;
+
+const sqlRestoreSavePoint = 
+`ROLLBACK TO BATCH_INSERT`;
+
   
 class OracleDBI extends YadamuDBI {
 
@@ -574,7 +578,7 @@ class OracleDBI extends YadamuDBI {
   }
   
   async setDateFormatMask(conn,status,vendor) {
-   
+
     let sqlStatement = `ALTER SESSION SET NLS_DATE_FORMAT = '${dateFormatMasks[vendor]}'`
     if (status.sqlTrace) {
       status.sqlTrace.write(`${sqlStatement}\n/\n`);
@@ -743,8 +747,8 @@ class OracleDBI extends YadamuDBI {
   
   get DATABASE_VENDOR()     { return 'Oracle' };
   get SOFTWARE_VENDOR()     { return 'Oracle Corporation' };
-  get SPATIAL_FORMAT()      { return 'WKT' };
-  get DEFAULT_PARAMETERS()  { return defaultParameters }
+  get SPATIAL_FORMAT()      { return this.spatialFormat };
+  get DEFAULT_PARAMETERS()  { return defaultParameters };
   get STATEMENT_SEPERATOR() { return '/' }
 
   constructor(yadamu) {
@@ -831,6 +835,7 @@ class OracleDBI extends YadamuDBI {
   
   async initialize() {
     super.initialize();
+    this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
     this.connection = await this.getConnection(this.connectionProperties,this.status)
   }
     
@@ -876,6 +881,20 @@ class OracleDBI extends YadamuDBI {
 
   }
   
+  async createSavePoint() {
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlCreateSavePoint}\n\/\n`)
+    }
+    await this.executeSQL(sqlCreateSavePoint,[]);
+  }
+
+  async restoreSavePoint() {
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlRestoreSavePoint}\n\/\n`)
+    }
+    await this.executeSQL(sqlRestoreSavePoint,[]);
+  }
+
   /*
   **
   ** The following methods are used by JSON_TABLE() style import operations  
@@ -1218,14 +1237,14 @@ class OracleDBI extends YadamuDBI {
     is.on('metadata',function(metadata) {parser.setColumnMetadata(metadata)})
     return is;
   }
-  
+    
   /*
   **
-  ** The following methods are used by the YADAMU DBwriter class
+  ** The following methods are used by the YADAMU DBWriter class
   **
   */
   
-  async initializeDataLoad() {
+  async initializeImport() {
     await this.disableConstraints();
     await this.setDateFormatMask(this.connection,this.status,this.systemInformation.vendor);
     await this.setCurrentSchema(this.parameters.TOUSER)
@@ -1235,10 +1254,10 @@ class OracleDBI extends YadamuDBI {
    // Override for LOBCACHESIZE and Import Wrapper
     let statementGenerator 
     if (this.dbVersion < 12) {
-      statementGenerator = new StatementGenerator11(this,schema,this.metadata,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE, this.parameters.LOBCACHESIZE, this.importWrapper)
+      statementGenerator = new StatementGenerator11(this,schema,this.metadata,this.spatialFormat,this.batchSize,this.commitSize, this.parameters.LOBCACHESIZE, this.importWrapper)
     }
     else {
-      statementGenerator = new StatementGenerator(this,schema,this.metadata,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE, this.parameters.LOBCACHESIZE)
+      statementGenerator = new StatementGenerator(this,schema,this.metadata,this.spatialFormat,this.batchSize,this.commitSize, this.parameters.LOBCACHESIZE)
     }
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }

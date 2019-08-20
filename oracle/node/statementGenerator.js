@@ -26,10 +26,11 @@ const DATA_TYPE_STRING_LENGTH = {
 
 class StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, batchSize, commitSize, lobCacheSize) {
+  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize, lobCacheSize) {
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
+    this.spatialFormat = spatialFormat
     this.batchSize = batchSize
     this.commitSize = commitSize;
     
@@ -44,6 +45,7 @@ class StatementGenerator {
        if (!dataType.length) {
           dataType.length = parseInt(metadata.sizeConstraints[idx]);
        }
+       
        switch (dataType.type) {
          case 'NUMBER':
            if (metadata.source.vendor === 'MSSQLSERVER' && metadata.source.dataTypes[idx] === 'bigint') {
@@ -97,9 +99,21 @@ class StatementGenerator {
          case 'BOOLEAN':
             return { type: oracledb.STRING, maxSize : 5}         
          case 'GEOMETRY':
+          case "\"MDSYS\".\"SDO_GEOMETRY\"":
            tableInfo.lobCount++;
            // return {type : oracledb.CLOB}
-           return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
+           switch (this.spatialFormat) { 
+             case "WKB":
+             case "EWKB":
+               return {type : oracledb.BLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
+               break;
+             case "WKT":
+             case "EWKT":
+               return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
+               break;
+             default:
+           }
+           break;   
          default:
            if (dataType.type.indexOf('.') > -1) {
              tableInfo.lobCount++;
@@ -160,10 +174,10 @@ class StatementGenerator {
       setSourceTimeStampMask = `;\n  execute immediate 'ALTER SESSION SET NLS_TIMESTAMP_FORMAT = ''${sourceTimeStampFormatMask}'''`; 
     }
    
-    const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :schema);\nEND;`;
+    const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :schema, :spatialFormat);\nEND;`;
     const metadataLob = await this.getMetadataLob()
    
-    const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema: this.targetSchema});
+    const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:this.targetSchema, spatialFormat:this.spatialFormat});
     await metadataLob.close();
     const statementCache = JSON.parse(results.outBinds.sql);
     const boundedTypes = ['CHAR','NCHAR','VARCHAR2','NVARCHAR2','RAW']
@@ -191,8 +205,18 @@ class StatementGenerator {
         switch (dataType.type) {
           case "GEOMETRY":
           case "\"MDSYS\".\"SDO_GEOMETRY\"":
-             values.push(`OBJECT_SERIALIZATION.DESERIALIZE_GEOMETRY(:${(idx+1)})`);
-             break;
+             switch (this.spatialFormat) {
+               case "WKB":
+               case "EWKB":
+                 values.push(`OBJECT_SERIALIZATION.DESERIALIZE_WKBGEOMETRY(:${(idx+1)})`);
+                 break;
+               case "WKT":
+               case "EWKT":
+                 values.push(`OBJECT_SERIALIZATION.DESERIALIZE_WKTGEOMETRY(:${(idx+1)})`);
+                 break;
+               default:
+            }
+            break
           case "XMLTYPE":
              values.push(`OBJECT_SERIALIZATION.DESERIALIZE_XML(:${(idx+1)})`);
              break

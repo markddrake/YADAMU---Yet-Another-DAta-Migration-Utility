@@ -1,33 +1,36 @@
 [
     {
-        "source": "file",
-        "targets": ["mssql","postgres","mysql","mariadb"],
+        "source": "file#1",
+        "targets": ["mssql#1","postgres#1","mysql#1","mariadb#1"],
         "directory" : "JSON/oracle19c/DATA_ONLY",
         "reverseDirection" : true,
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
         ]
     },
     {
-        "source": "file",
-        "targets": ["oracle19c","oracle18c","oracle12c","oracle11g","postgres","mysql","mariadb"],
+        "source": "file#1",
+        "targets": ["oracle19c","oracle18c","oracle12c","oracle11g","postgres#1","mysql#1","mariadb#1"],
         "directory" : "JSON/MsSQL",
         "reverseDirection" : true,
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/mssql.json"
         ]
     },    
     {
-        "source": "file",
-        "targets": ["oracle19c","oracle18c","oracle12c","oracle11g","mssql","postgres","mariadb"],
+        "source": "file#1",
+        "targets": ["oracle19c","oracle18c","oracle12c","oracle11g","mssql#1","postgres#1","mariadb#1"],
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "directory" : "JSON/MySQL",
         "reverseDirection" : true,

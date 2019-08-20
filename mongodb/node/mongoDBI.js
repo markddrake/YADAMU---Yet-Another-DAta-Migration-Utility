@@ -412,12 +412,6 @@ class MongoDBI extends YadamuDBI {
   getTableWriter(table) {
     return super.getTableWriter(TableWriter,table)
   }
-  
-  async initializeDataLoad() {
-  }
-  
-  async finalizeDataLoad() {
-  }  
 
   async insertMany(collection,array) {
     const results = await this.db.collection(collection).insertMany(array);

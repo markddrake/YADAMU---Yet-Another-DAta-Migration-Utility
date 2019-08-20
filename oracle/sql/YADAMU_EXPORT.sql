@@ -18,7 +18,7 @@ as
   TYPE EXPORT_METADATA_TABLE IS TABLE OF EXPORT_METADATA_RECORD;
   
   function GET_SYSTEM_INFORMATION return CLOB;
-  function GET_DML_STATEMENTS(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL) return EXPORT_METADATA_TABLE PIPELINED;
+  function GET_DML_STATEMENTS(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB') return EXPORT_METADATA_TABLE PIPELINED;
   function JSON_FEATURES return VARCHAR2 deterministic;
   function DATABASE_RELEASE return NUMBER deterministic;
 --
@@ -152,7 +152,7 @@ begin
   end if;
 end;
 --
-function GET_DML_STATEMENTS(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL) 
+function GET_DML_STATEMENTS(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL,P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB') 
 return EXPORT_METADATA_TABLE 
 PIPELINED
 /*
@@ -261,7 +261,28 @@ as
                  ** Quick Fixes for datatypes not natively supported
                  */
                  when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE  in ('SDO_GEOMETRY'))) then
-                   'case when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT(() else NULL end "' || atc.COLUMN_NAME || '"'
+                   -- 'case when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
+                   -- 'case when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
+                   -- 't."' ||  atc.COLUMN_NAME || '".get_WKT() "' || atc.COLUMN_NAME || '"'
+                   -- 'case when t."' ||  atc.COLUMN_NAME || '" is NOT NULL then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
+                   case 
+                     when P_SPATIAL_FORMAT in ('WKB','EWKB') then
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB()' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''NULL'' then NULL ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) <> ''13032'' then t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
+                            'else NULL ' ||
+                       'end "' || atc.COLUMN_NAME || '"'
+                     when P_SPATIAL_FORMAT in ('WKT','EWKT') then                   
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT()' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''NULL'' then NULL ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) <> ''13032'' then t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
+                           'else NULL ' ||
+                       'end "' || atc.COLUMN_NAME || '"'
+                   end
                  when atc.DATA_TYPE = 'XMLTYPE' then -- Can be owned by SYS or PUBLIC
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'ROWID' or atc.DATA_TYPE = 'UROWID' then
@@ -316,7 +337,26 @@ as
                  when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE  in ('SDO_GEOMETRY'))) then
                    -- 'case when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
                    -- 'case when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
-                  't."' ||  atc.COLUMN_NAME || '".get_WKT() "' || atc.COLUMN_NAME || '"'
+                   -- 't."' ||  atc.COLUMN_NAME || '".get_WKT() "' || atc.COLUMN_NAME || '"'
+                   -- 'case when t."' ||  atc.COLUMN_NAME || '" is NOT NULL then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
+                   case 
+                     when P_SPATIAL_FORMAT in ('WKB','EWKB') then
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB()' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''NULL'' then NULL ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) <> ''13032'' then t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
+                            'else NULL ' ||
+                       'end "' || atc.COLUMN_NAME || '"'
+                     when P_SPATIAL_FORMAT in ('WKT','EWKB') then                   
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT()' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''NULL'' then NULL ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) <> ''13032'' then t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
+                           'else NULL ' ||
+                       'end "' || atc.COLUMN_NAME || '"'
+                   end
                  when atc.DATA_TYPE = 'XMLTYPE' then  -- Can be owned by SYS or PUBLIC
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'BFILE' then

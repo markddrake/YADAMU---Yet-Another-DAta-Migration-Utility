@@ -2,10 +2,11 @@
 
 class StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, batchSize, commitSize) {    
+  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize) {    
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
+    this.spatialFormat = spatialFormat
     this.batchSize = batchSize
     this.commitSize = commitSize;
   }
@@ -13,9 +14,9 @@ class StatementGenerator {
 
   async generateStatementCache(executeDDL, vendor) {    
    
-    const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS"`;                       
+    const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS"`;                       
     
-    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),this.targetSchema]);
+    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),this.targetSchema,this.spatialFormat]);
     results = results.pop();
     let statementCache = JSON.parse(results[0].SQL_STATEMENTS)
     if (statementCache === null) {
@@ -35,7 +36,18 @@ class StatementGenerator {
            switch (targetDataType) {
              case 'geometry':
                tableInfo.insertMode = 'Iterative';
-               return ' "' + columnNames[idx] + '"' + " = ST_GeomFromText(?)";
+               switch (this.spatialFormat) {
+                 case "WKB":
+                 case "EWKB":
+                   return ' "' + columnNames[idx] + '"' + " = ST_GeomFromWKB(UNHEX(?))";
+                   break;
+                 case "WKT":
+                 case "EWRT":
+                   return ' "' + columnNames[idx] + '"' + " = ST_GeomFromText(?)";
+                   break;
+                 default:
+                   return ' "' + columnNames[idx] + '"' + " = ST_GeomFromWKB(UNHEX(?))";
+               }              
              /*
              **
              ** Avoid use of Iterative Mode where possible due to significant performance impact.

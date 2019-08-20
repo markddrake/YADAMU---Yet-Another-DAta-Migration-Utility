@@ -2,6 +2,7 @@ if not defined MODE set MODE=DATA_ONLY
 for %%I in (.) do set YADAMU_TARGET=%%~nxI
 call ..\windows\initialize.bat %~dp0
 sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_DB_ROOT%\sql\COMPILE_ALL.sql %YADAMU_LOG_PATH%
+sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_SCRIPT_ROOT%\sql\YADAMU_TEST.sql %YADAMU_LOG_PATH% OFF
 @set MODE=DDL_ONLY
 @set  YADAMU_OUTPUT_PATH=%YADAMU_INPUT_PATH%\%MODE%
 if not exist %YADAMU_OUTPUT_PATH%\ mkdir %YADAMU_OUTPUT_PATH%

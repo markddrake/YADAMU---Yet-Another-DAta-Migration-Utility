@@ -2,11 +2,12 @@
     {
         "source": "oracle19c",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle19c/DDL_ONLY",
         "parameters": {
-            "MODE": "DDL_ONLY"
+            "MODE": "DDL_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
@@ -15,11 +16,12 @@
     {
         "source": "oracle19c",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle19c/DATA_ONLY",
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
@@ -28,11 +30,12 @@
     {
         "source": "oracle19c",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle19c/DDL_AND_DATA",
         "parameters": {
-            "MODE": "DDL_AND_DATA"
+            "MODE": "DDL_AND_DATA",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
@@ -41,11 +44,12 @@
     {
         "source": "oracle18c",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle18c/DDL_ONLY",
         "parameters": {
-            "MODE": "DDL_ONLY"
+            "MODE": "DDL_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
@@ -54,11 +58,12 @@
     {
         "source": "oracle18c",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle18c/DATA_ONLY",
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
@@ -67,11 +72,12 @@
     {
         "source": "oracle18c",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle18c/DDL_AND_DATA",
         "parameters": {
-            "MODE": "DDL_AND_DATA"
+            "MODE": "DDL_AND_DATA",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
@@ -80,11 +86,12 @@
     {
         "source": "oracle12c",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle12c/DDL_ONLY",
         "parameters": {
-            "MODE": "DDL_ONLY"
+            "MODE": "DDL_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
@@ -93,11 +100,12 @@
     {
         "source": "oracle12c",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle12c/DATA_ONLY",
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
@@ -106,11 +114,12 @@
     {
         "source": "oracle12c",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle12c/DDL_AND_DATA",
         "parameters": {
-            "MODE": "DDL_AND_DATA"
+            "MODE": "DDL_AND_DATA",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
@@ -119,11 +128,12 @@
     {
         "source": "oracle11g",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle11g/DDL_ONLY",
         "parameters": {
-            "MODE": "DDL_ONLY"
+            "MODE": "DDL_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
@@ -132,11 +142,12 @@
     {
         "source": "oracle11g",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle11g/DATA_ONLY",
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
@@ -145,63 +156,68 @@
     {
         "source": "oracle11g",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/oracle11g/DDL_AND_DATA",
         "parameters": {
-            "MODE": "DDL_AND_DATA"
+            "MODE": "DDL_AND_DATA",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/oracle.json"
         ]
     },
     {
-        "source": "mssql",
+        "source": "mssql#1",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/MsSQL",
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/mssql.json"
         ]
     },
     {
-        "source": "file",
+        "source": "file#1",
         "targets": [
-            "mssql"
+            "mssql#1"
         ],
         "directory": "JSON/MsSQL",
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/import/createAdventureWorksAll.json"
         ]
     },
     {
-        "source": "mssql",
+        "source": "mssql#1",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/MsSQL",
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/mssqlAdventureWorksAll.json"
         ]
     },
     {
-        "source": "mysql",
+        "source": "mysql#1",
         "targets": [
-            "file"
+            "file#1"
         ],
         "directory": "JSON/MySQL",
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/export/mysql.json"

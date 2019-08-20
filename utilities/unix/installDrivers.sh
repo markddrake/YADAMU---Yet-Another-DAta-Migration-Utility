@@ -21,3 +21,7 @@ cd mariadb/node
 rm -rf node_modules
 npm install mariadb
 cd $YADAMU_HOME
+cd mongodb/node
+rm -rf node_modules
+npm install mongodb
+cd $YADAMU_HOME

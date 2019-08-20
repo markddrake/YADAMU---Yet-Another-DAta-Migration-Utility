@@ -21,6 +21,7 @@ class YadamuWriter {
   }
 
   async initialize() {
+     await this.dbi.beginTransaction()
   }
 
   batchComplete() {
@@ -53,8 +54,13 @@ class YadamuWriter {
   async finalize() {
     if (this.hasPendingRows()) {
       this.skipTable = await this.writeBatch();   
+      if (this.skipTable) {
+        await this.dbi.rollbackTransaction()
+      }
     }
-    await this.dbi.commitTransaction();
+    if (!this.skipTable) {
+      await this.dbi.commitTransaction()
+    }   
     return {
       startTime    : this.startTime
     , endTime      : this.endTime

@@ -16,20 +16,18 @@ const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 
-const defaultParameters = {
-  BATCHSIZE         : 10000
-, COMMITSIZE        : 10000
-, USERNAME          : 'postgres'
-, PASSWORD          : null
-, HOSTNAME          : 'localhost'
-, DATABASE          : 'postgres'
-, PORT              : 5432
+const defaultParameters = {}
 
-}
-
-const sqlGenerateQueries = `select EXPORT_JSON($1)`;
+const sqlGenerateQueries = `select EXPORT_JSON($1,$2)`;
 
 const sqlSystemInformation = `select current_database() database_name,current_user,session_user,current_setting('server_version_num') database_version`;					   
+
+const sqlCreateSavePoint = `SAVEPOINT YadamuInsert`;
+
+const sqlRestoreSavePoint = `ROLLBACK TO SAVEPOINT YadamuInsert`;
+
+const sqlReleaseSavePoint = `RELEASE SAVEPOINT YadamuInsert`;
+
 
 class PostgresDBI extends YadamuDBI {
     
@@ -90,8 +88,8 @@ class PostgresDBI extends YadamuDBI {
   
   get DATABASE_VENDOR()    { return 'Postgres' };
   get SOFTWARE_VENDOR()    { return 'The PostgreSQL Global Development Group' };
-  get SPATIAL_FORMAT()     { return 'WKT' };
-  get DEFAULT_PARAMETERS() { return defaultParameters };
+  get SPATIAL_FORMAT()      { return this.spatialFormat };
+  get DEFAULT_PARAMETERS()  { return defaultParameters };
 
   constructor(yadamu) {
     super(yadamu,defaultParameters);
@@ -116,9 +114,10 @@ class PostgresDBI extends YadamuDBI {
   **  Connect to the database. Set global setttings
   **
   */
-  
+   
   async initialize() {
     super.initialize();
+    this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
     this.pgClient = await this.getClient()
   }
 
@@ -181,7 +180,6 @@ class PostgresDBI extends YadamuDBI {
        }
        this.activeTransaction = false;
        await this.pgClient.query(sqlStatement);
-       await this.beginTransaction();
      }
   }
 
@@ -200,9 +198,35 @@ class PostgresDBI extends YadamuDBI {
        }
        this.activeTransaction = false;
        await this.pgClient.query(sqlStatement);
-       await this.beginTransaction();
      }
   }
+
+  async createSavePoint() {
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlCreateSavePoint};\n--\n`)
+    }
+    
+    await this.pgClient.query(sqlCreateSavePoint);
+  }
+  
+  async restoreSavePoint() {
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlRestoreSavePoint};\n--\n`)
+    }
+
+    await this.pgClient.query(sqlRestoreSavePoint);
+  }  
+
+  async releaseSavePoint() {
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlReleaseSavePoint};\n--\n`)
+    }
+
+    await this.pgClient.query(sqlReleaseSavePoint);    
+  } 
   
   /*
   **
@@ -358,7 +382,7 @@ class PostgresDBI extends YadamuDBI {
       this.status.sqlTrace.write(`${sqlGenerateQueries};\n\--\n`)
     }  
     
-    const results = await this.pgClient.query(sqlGenerateQueries,[schema]);
+    const results = await this.pgClient.query(sqlGenerateQueries,[schema,this.spatialFormat]);
     this.metadata = results.rows[0].export_json;
   }
   

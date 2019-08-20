@@ -78,7 +78,7 @@ class FileCompare extends FileWriter {
     }
      
     const fileStats = new FileStatistics()    
-    const writer = new DBWriter(fileStats , null, null, nulLogger);
+    const writer = new DBWriter(fileStats, null, null, nulLogger);
     
     const processMetadata = new Promise(function (resolve,reject) {
       try {

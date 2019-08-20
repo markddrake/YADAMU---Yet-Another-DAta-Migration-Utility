@@ -84,9 +84,11 @@ class TableWriter extends YadamuWriter {
    
     if (this.tableInfo.insertMode === 'Batch') {
       try {
+        await this.dbi.createSavePoint();
         const results = await this.dbi.executeSQL(this.tableInfo.dml,[this.batch]);
         await this.processWarnings(results);
         this.endTime = new Date().getTime();
+        await this.dbi.releaseSavePoint();
         this.batch.length = 0;  
         return this.skipTable
       } catch (e) {
@@ -96,7 +98,7 @@ class TableWriter extends YadamuWriter {
           this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch[0])}\n...\n${JSON.stringify(this.batch[this.batch.length-1])}\n`);
           this.yadamuLogger.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative mode.`);          
         }
-        // await this.dbi.rollbackTransaction();
+        await this.dbi.restoreSavePoint();
         this.tableInfo.insertMode = 'Iterative'   
         this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args
       }
@@ -108,10 +110,8 @@ class TableWriter extends YadamuWriter {
         await this.processWarnings(results);
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []
-        const abort = this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,this.batch[row],e,errInfo);
-        if (abort) {
-          await this.dbi.rollbackTransaction();
-          this.skipTable = true;
+        this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,this.batch[row],e,errInfo);
+        if (this.skipTable) {
           break;
         }
       }

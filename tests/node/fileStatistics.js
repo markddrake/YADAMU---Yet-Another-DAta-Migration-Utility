@@ -6,6 +6,7 @@ class FileStatistics {
   constructor() {
      this.tableInfo = {}
      this.tableName = undefined;
+     this.parameters = {}
   }
   
   setSystemInformation(systemInformation) {
@@ -159,12 +160,17 @@ class FileStatistics {
     }
   }    
 
-  async exportComplete() {
+  async initializeExport() {
   }
 
-  async importComplete() {
+  async finalizeExport() {
   }
-   
+
+  async initializeImport() {
+  }
+
+  async finalizeImport() {
+  }
 }
 
 module.exports = FileStatistics

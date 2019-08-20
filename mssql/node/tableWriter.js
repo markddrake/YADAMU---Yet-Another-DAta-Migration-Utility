@@ -9,7 +9,7 @@ class TableWriter extends YadamuWriter {
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
   }
-
+  
   batchComplete() {
      return (this.tableInfo.bulkOperation.rows.length  === this.tableInfo.batchSize)
   }
@@ -30,7 +30,6 @@ class TableWriter extends YadamuWriter {
     }
     return results;
   }
-
 
   async createPreparedStatement(insertStatement, targetDataTypes) {
     const ps = await this.dbi.getPreparedStatement();
@@ -231,12 +230,14 @@ class TableWriter extends YadamuWriter {
   }
 
   async writeBatch() {
-    
+      
     this.batchCount++;
+      
+    // ### Savepoint Support ?
 
     if (this.tableInfo.bulkSupported) {
-      try {
-        
+      try {        
+        await this.dbi.createSavePoint();
         const results = await this.dbi.getRequest().bulk(this.tableInfo.bulkOperation);
         this.endTime = new Date().getTime();
         this.tableInfo.bulkOperation.rows.length = 0;
@@ -249,7 +250,7 @@ class TableWriter extends YadamuWriter {
           this.yadamuLogger.writeDirect(`${JSON.stringify(this.tableInfo.bulkOperation.rows[0])}\n...\n${JSON.stringify(this.tableInfo.bulkOperation.rows[this.batch.length-1])}\n`)
           this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
         }
-        // await this.dbi.rollbackTransaction();
+        await this.dbi.restoreSavePoint();
         this.tableInfo.bulkSupported = false;
       }
     }
@@ -269,10 +270,8 @@ class TableWriter extends YadamuWriter {
         const results = await this.tableInfo.preparedStatement.execute(args);
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.columns),] : []
-        const abort = this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.tableInfo.bulkOperation.rows.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
-        if (abort) {
-          await this.dbi.rollbackTransaction();
-          this.skipTable = true;
+        this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.tableInfo.bulkOperation.rows.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
+        if (this.skipTable) {
           break;
         }
       }

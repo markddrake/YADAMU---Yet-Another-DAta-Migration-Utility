@@ -145,7 +145,7 @@ class DBReader extends Readable {
                break;
              }
            }
-           await this.dbi.exportComplete();
+           await this.dbi.finalizeExport();
            this.push(null);
            break;
          case 'data' :

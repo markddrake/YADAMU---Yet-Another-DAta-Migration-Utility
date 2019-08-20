@@ -1,18 +1,19 @@
 [
     {
-        "source": "file",
+        "source": "file#1",
         "targets": [
             "oracle19c",
             "oracle18c",
             "oracle12c",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb"
+            "mssql#1",
+            "postgres#1",
+            "mysql#1",
+            "mariadb#1"
         ],
         "parsingMethod": "CLARINET",
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/fileRoundtrip/oracle.json",
@@ -20,13 +21,14 @@
             "tests/fileRoundtrip/mssql.json"
         ]
     },{
-        "source": "file",
+        "source": "file#1",
         "targets": [
             "oracle11g"
         ],
         "parsingMethod": "CLARINET",
         "parameters": {
             "MODE"     : "DATA_ONLY",
+            "FEEDBACK": "COMMIT",
             "MAPPINGS" : "tests/fileRoundtrip/mappingsOracle11g.json"
         },
         "tasks": [
@@ -35,18 +37,19 @@
             "tests/fileRoundtrip/mssql.json"
         ]
     },{
-        "source": "file",
+        "source": "file#1",
         "targets": [
             "oracle19c",
             "oracle18c",
             "oracle12c",
-            "mssql",
-            "postgres",
-            "mysql"
+            "mssql#1",
+            "postgres#1",
+            "mysql#1"
         ],
         "parsingMethod": "RDBMS",
         "parameters": {
-            "MODE": "DATA_ONLY"
+            "MODE": "DATA_ONLY",
+            "FEEDBACK": "COMMIT"
         },
         "tasks": [
             "tests/fileRoundtrip/mssql.json",

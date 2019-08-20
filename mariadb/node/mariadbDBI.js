@@ -16,88 +16,93 @@ const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('../../dbShared/mysql/statementGenerator57.js');
 
 const defaultParameters = {
-  BATCHSIZE         : 10000
-, COMMITSIZE        : 10000
-, TABLE_MATCHING    : "INSENSITIVE"
+  TABLE_MATCHING    : "INSENSITIVE"
 }
 
 const sqlSystemInformation = 
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
 
-// Cannot use JSON_ARRAYAGG for DATA_TYPES and SIZE_CONSTRAINTS beacuse MYSQL implementation of JSON_ARRAYAGG does not support ordering
-const sqlSchemaInfo = 
-`select c.table_schema "TABLE_SCHEMA"
-       ,c.table_name "TABLE_NAME"
-       ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "COLUMN_LIST"
-       ,concat('[',group_concat(json_quote(data_type) order by ordinal_position separator ','),']')  "DATA_TYPES"
-       ,concat('[',group_concat(json_quote(
-                            case when (numeric_precision is not null) and (numeric_scale is not null)
-                                   then concat(numeric_precision,',',numeric_scale) 
-                                 when (numeric_precision is not null)
-                                   then case
-                                          when column_type like '%unsigned' 
-                                            then numeric_precision
-                                          else
-                                            numeric_precision + 1
-                                        end
-                                 when (datetime_precision is not null)
-                                   then datetime_precision
-                                 when (character_maximum_length is not null)
-                                   then character_maximum_length
-                                 else   
-                                   ''   
-                            end
-                           ) 
-                           order by ordinal_position separator ','
-                    ),']') "SIZE_CONSTRAINTS"
-       ,concat(
-          'select json_array('
-          ,group_concat(
-            case 
-              when data_type in ('date','time','datetime','timestamp')
-                -- Force ISO 8601 rendering of value 
-                then concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')')
-              when data_type = 'year'
-                -- Prevent rendering of value as base64:type13: 
-                then concat('CAST("', column_name, '"as DECIMAL)')
-              when data_type like '%blob'
-                -- Force HEXBINARY rendering of value
-                then concat('HEX("', column_name, '")')
-              when data_type = 'varbinary'
-                -- Force HEXBINARY rendering of value
-                then concat('HEX("', column_name, '")')
-              when data_type = 'binary'
-                -- Force HEXBINARY rendering of value
-                then concat('HEX("', column_name, '")')
-              when data_type = 'geometry'
-                -- Force WKT rendering of value
-                then concat('ST_asText("', column_name, '")')
-              when data_type = 'float'
-                -- Render Floats with greatest possible precision 
-                -- Risk of Overflow ????
-                then concat('(floor(1e15*"',column_name,'")/1e15)')
-              else
-                concat('"',column_name,'"')
-            end
-            order by ordinal_position separator ','
-          )
-          ,') "json" from "'
-          ,c.table_schema
-          ,'"."'
-          ,c.table_name
-          ,'"'
-        ) "SQL_STATEMENT"
-   from information_schema.columns c, information_schema.tables t
-  where t.table_name = c.table_name 
-     and c.extra <> 'VIRTUAL GENERATED'
-    and t.table_schema = c.table_schema
-    and t.table_type = 'BASE TABLE'
-    and t.table_schema = ?
-	  group by t.table_schema, t.table_name`;
+const sqlCreateSavePoint = `SAVEPOINT YadamuInsert`;
+
+const sqlRestoreSavePoint = `ROLLBACK TO SAVEPOINT YadamuInsert`;
+
+const sqlReleaseSavePoint = `RELEASE SAVEPOINT YadamuInsert`;
 
 class MariadbDBI extends YadamuDBI {
     
-  async configureSession() {
+  // Cannot use JSON_ARRAYAGG for DATA_TYPES and SIZE_CONSTRAINTS beacuse MYSQL implementation of JSON_ARRAYAGG does not support ordering
+  sqlSchemaInfo() {
+     return `select c.table_schema "TABLE_SCHEMA"
+                   ,c.table_name "TABLE_NAME"
+                   ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "COLUMN_LIST"
+                   ,concat('[',group_concat(json_quote(data_type) order by ordinal_position separator ','),']')  "DATA_TYPES"
+                   ,concat('[',group_concat(json_quote(
+                                        case when (numeric_precision is not null) and (numeric_scale is not null)
+                                               then concat(numeric_precision,',',numeric_scale) 
+                                             when (numeric_precision is not null)
+                                               then case
+                                                      when column_type like '%unsigned' 
+                                                        then numeric_precision
+                                                      else
+                                                        numeric_precision + 1
+                                                    end
+                                             when (datetime_precision is not null)
+                                               then datetime_precision
+                                             when (character_maximum_length is not null)
+                                               then character_maximum_length
+                                             else   
+                                               ''   
+                                        end
+                                       ) 
+                                       order by ordinal_position separator ','
+                                ),']') "SIZE_CONSTRAINTS"
+                   ,concat(
+                      'select json_array('
+                      ,group_concat(
+                        case 
+                          when data_type in ('date','time','datetime','timestamp') then
+                            -- Force ISO 8601 rendering of value 
+                            concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')')
+                          when data_type = 'year' then
+                            -- Prevent rendering of value as base64:type13: 
+                            concat('CAST("', column_name, '"as DECIMAL)')
+                          when data_type like '%blob' then
+                            -- Force HEXBINARY rendering of value
+                            concat('HEX("', column_name, '")')
+                          when data_type = 'varbinary' then
+                            -- Force HEXBINARY rendering of value
+                            concat('HEX("', column_name, '")')
+                          when data_type = 'binary' then
+                            -- Force HEXBINARY rendering of value
+                            concat('HEX("', column_name, '")')
+                            when data_type = 'geometry' then
+                              -- Force ${this.spatialFormat} rendering of value
+                              concat('${this.spatialSerializer}"', column_name, '"))')
+                            when data_type = 'float' then
+                            -- Render Floats with greatest possible precision 
+                            -- Risk of Overflow ????
+                            concat('(floor(1e15*"',column_name,'")/1e15)')
+                          else
+                            concat('"',column_name,'"')
+                        end
+                        order by ordinal_position separator ','
+                      )
+                      ,') "json" from "'
+                      ,c.table_schema
+                      ,'"."'
+                      ,c.table_name
+                      ,'"'
+                    ) "SQL_STATEMENT"
+               from information_schema.columns c, information_schema.tables t
+              where t.table_name = c.table_name 
+                 and c.extra <> 'VIRTUAL GENERATED'
+                and t.table_schema = c.table_schema
+                and t.table_type = 'BASE TABLE'
+                and t.table_schema = ?
+          	  group by t.table_schema, t.table_name`;
+  }
+     
+  async configureSession() {  
 
     const sqlSetSqlMode = `SET SESSION SQL_MODE='ANSI_QUOTES,PAD_CHAR_TO_FULL_LENGTH'`;
     await this.executeSQL(sqlSetSqlMode);
@@ -110,7 +115,9 @@ class MariadbDBI extends YadamuDBI {
 
     const enableFileUpload = `SET GLOBAL local_infile = 'ON'`
     await this.executeSQL(enableFileUpload);
-
+    
+    const disableAutoCommit = 'set autocommit = 0';
+    await this.executeSQL(disableAutoCommit);   
   }
 
   async setMaxAllowedPacketSize() {
@@ -243,8 +250,8 @@ class MariadbDBI extends YadamuDBI {
   
   get DATABASE_VENDOR() { return 'MariaDB' };
   get SOFTWARE_VENDOR() { return ' MariaDB Corporation AB[' };
-  get SPATIAL_FORMAT()  { return 'WKT' };
-  get DEFAULT_PARAMETERS() { return defaultParameters }
+  get SPATIAL_FORMAT()  { return this.spatialFormat };
+  get DEFAULT_PARAMETERS() { return defaultParameters };
 
   constructor(yadamu) {
     super(yadamu,defaultParameters);
@@ -272,8 +279,29 @@ class MariadbDBI extends YadamuDBI {
   **
   */
   
+  setSpatialSerializer(spatialFormat) {      
+    switch (spatialFormat) {
+      case "WKB":
+        this.spatialSerializer = "HEX(ST_AsBinary(";
+        break;
+      case "EWKB":
+        this.spatialSerializer = "HEX(ST_AsBinary(";
+        break;
+      case "WKT":
+        this.spatialSerializer = "(ST_AsText(";
+        break;
+      case "EWKT":
+        this.spatialSerializer = "(ST_AsText(";
+        break;
+     default:
+        this.spatialSerializer = "HEX(ST_AsBinary(";
+    }  
+  }  
+  
   async initialize() {
     super.initialize();
+    this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
+    this.setSpatialSerializer(this.spatialFormat);
     await this.getConnectionPool();
   }
 
@@ -326,8 +354,21 @@ class MariadbDBI extends YadamuDBI {
   */
   
   async rollbackTransaction() {
+    await this.conn.rollback();
   }
   
+  async createSavePoint() {
+    await this.executeSQL(sqlCreateSavePoint);
+  }
+  
+  async restoreSavePoint() {
+    await this.executeSQL(sqlRestoreSavePoint);
+  }  
+
+  async releaseSavePoint() {
+    await this.executeSQL(sqlReleaseSavePoint);    
+  } 
+
   /*
   **
   ** The following methods are used by JSON_TABLE() style import operations  
@@ -400,7 +441,7 @@ class MariadbDBI extends YadamuDBI {
     
   async getSchemaInfo(schema) {
       
-    return await this.executeSQL(sqlSchemaInfo,[this.parameters[schema]]);
+    return await this.executeSQL(this.sqlSchemaInfo(),[this.parameters[schema]]);
 
   }
 
@@ -441,15 +482,6 @@ class MariadbDBI extends YadamuDBI {
   
     return readStream;      
   }      
-  
-  /*
-  **
-  ** The following methods are used by the YADAMU DBwriter class
-  **
-  */
-  
-  async initializeDataLoad() {
-  }
   
   async generateStatementCache(schema,executeDDL) {
     await super.generateStatementCache(StatementGenerator,schema,executeDDL) 

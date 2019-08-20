@@ -108,9 +108,11 @@ class TableWriter extends YadamuWriter {
       try {    
         // Slice removes the unwanted last comma from the replicated args list.
         const args = this.tableInfo.args.repeat(this.batchRowCount).slice(0,-1);
+        await this.dbi.createSavePoint();
         const results = await this.dbi.executeSQL(this.tableInfo.dml.slice(0,-1) + args, this.batch);
         await this.processWarnings(results);
         this.endTime = new Date().getTime();
+        await this.dbi.releaseSavePoint();
         this.batch.length = 0;
         this.batchRowCount = 0;
         return this.skipTable
@@ -122,7 +124,7 @@ class TableWriter extends YadamuWriter {
           this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch.slice(0,this.tableInfo.columnCount))}\n...\n${JSON.stringify(this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))}\n`);
           this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
         }
-        // await this.dbi.rollbackTransaction();
+        await this.dbi.restoreSavePoint();
         this.tableInfo.insertMode = 'Iterative' 
         this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args.slice(0,-1)
         repackBatch = true;
@@ -136,10 +138,8 @@ class TableWriter extends YadamuWriter {
         await this.processWarnings(results);
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []
-        const abort = this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batchRowCount,row,nextRow,e,errInfo);
-        if (abort) {
-          await this.dbi.rollbackTransaction();
-          this.skipTable = true;
+        this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batchRowCount,row,nextRow,e,errInfo);
+        if (this.skipTable) {
           break;
         }
       }
@@ -152,19 +152,10 @@ class TableWriter extends YadamuWriter {
   }
 
   async finalize() {
-    if (this.hasPendingRows()) {
-      this.skipTable = await this.writeBatch();   
-    }
-    await this.dbi.commitTransaction();
-    return {
-      startTime    : this.startTime
-    , endTime      : this.endTime
-    , insertMode   : this.tableInfo.insertMode
-    , skipTable    : this.skipTable
-    , batchCount   : this.batchCount
-    }    
+    const results = await super.finalize()
+    results.insertMode = this.tableInfo.insertMode
+    return results;
   }
-
 }
 
 module.exports = TableWriter;

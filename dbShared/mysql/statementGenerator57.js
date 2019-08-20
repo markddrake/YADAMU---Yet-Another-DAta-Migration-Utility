@@ -9,10 +9,11 @@ const integerTypes   = ['tinyint','mediumint','smallint','int','bigint']
 
 class StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, batchSize, commitSize) {
+  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize) {
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
+    this.spatialFormat = spatialFormat
     this.batchSize = batchSize
     this.commitSize = commitSize;    
   }
@@ -253,7 +254,18 @@ class StatementGenerator {
        switch (targetDataType) {
          case 'geometry':
             insertMode = 'Iterative';
-            setOperators.push(' ' + columnName + ' = ST_GeomFromText(?)');
+            switch (this.spatialFormat) {
+              case "WKB":
+              case "EWKB":
+                setOperators.push(' ' + columnName + ' = ST_GeomFromWKB(UNHEX(?))');
+                break
+              case "WKT":
+              case "EWRT":
+                setOperators.push(' ' + columnName + ' =  ST_GeomFromText(?)');
+                break;
+              default:
+                setOperators.push(' ' + columnName + ' = ST_GeomFromWKB(UNHEX(?))');
+            }              
             break;                                                 
          case 'timestamp':
             ensureNullable = true;

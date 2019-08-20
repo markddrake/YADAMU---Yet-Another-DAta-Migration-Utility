@@ -22,3 +22,7 @@ cd mariadb/node
 rmdir /s node_modules
 call npm install mariadb
 cd %YADAMU_HOME%
+cd mongodb/node
+rmdir /s node_modules
+call npm install mongodb
+cd %YADAMU_HOME%

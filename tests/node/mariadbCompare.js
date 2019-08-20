@@ -1,8 +1,6 @@
 "use strict" 
 const MariadbDBI = require('../../mariadb/node/mariadbDBI.js');
 
-const colSizes = [12, 32, 32, 48, 14, 14, 14, 14, 72]
-
 const sqlSuccess =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL' "RESULTS", TARGET_ROW_COUNT
   from SCHEMA_COMPARE_RESULTS 
@@ -29,10 +27,6 @@ class MariadbCompare extends MariadbDBI {
        super(yadamu)
     }
 
-    configureTest(connectionProperties,testParameters,schema,tableMappings) {
-      super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS,tableMappings);
-    }
-    
     async recreateSchema(schema,password) {
         
       try {

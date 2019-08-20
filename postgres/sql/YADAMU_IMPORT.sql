@@ -4,7 +4,7 @@
 **
 */
 --
-create or replace function EXPORT_JSON(P_SCHEMA VARCHAR) 
+create or replace function EXPORT_JSON(P_SCHEMA VARCHAR, P_SPATIAL_FORMAT VARCHAR) 
 returns JSONB
 as $$
 declare
@@ -46,7 +46,18 @@ begin
                                                               when data_type = 'xml' then
                                                                  '"' || column_name || '"' || '::text'
                                                               when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
-                                                                 'ST_asText("' || column_name || '",18)'
+                                                                 case 
+                                                                   when P_SPATIAL_FORMAT = 'WKB' then
+                                                                     'encode(ST_AsBinary("' || column_name || '"),''hex'')'
+                                                                   when P_SPATIAL_FORMAT = 'WKT' then
+                                                                     'ST_asText("' || column_name || '",18)'
+                                                                   when P_SPATIAL_FORMAT = 'EWKB' then
+                                                                     'encode(ST_AsEWKB("' || column_name || '"),''hex'')'
+                                                                   when P_SPATIAL_FORMAT = 'EWKT' then
+                                                                     'encode(ST_AsEWKT("' || column_name || '")'
+                                                                   else
+                                                                     'ST_AsEWKB("' || column_name || '"),''hex'')'
+                                                                 end
                                                               when data_type in ('date','timestamp without time zone') then
                                                                  '"' || column_name || '"::timestamptz'
                                                               when data_type in ('money') then
@@ -374,7 +385,7 @@ begin
 end;
 $$ LANGUAGE plpgsql;
 --
-create or replace function GENERATE_STATEMENTS(P_SOURCE_VENDOR VARCHAR, P_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_COLUMNS TEXT, P_DATA_TYPES JSONB, P_SIZE_CONSTRAINTS JSONB,P_BINARY_JSON BOOLEAN)
+create or replace function GENERATE_STATEMENTS(P_SOURCE_VENDOR VARCHAR, P_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_SPATIAL_FORMAT VARCHAR, P_COLUMNS TEXT, P_DATA_TYPES JSONB, P_SIZE_CONSTRAINTS JSONB,P_BINARY_JSON BOOLEAN)
 returns JSONB
 as $$
 declare
@@ -451,6 +462,17 @@ begin
         ,STRING_AGG(case 
                       when TARGET_DATA_TYPE = 'bytea' then  
                        'decode( value ->> ' || IDX-1 || ',''hex'')'
+                      when TARGET_DATA_TYPE in ('geometry','geography') then 
+                        case 
+                          when P_SPATIAL_FORMAT = 'WKB' then
+                            'ST_GeomFromWKB(decode( value ->> ' || IDX-1 || ',''hex''))'
+                          when P_SPATIAL_FORMAT = 'EWKB' then
+                            'ST_GeomFromEWKB(decode( value ->> ' || IDX-1 || ',''hex''))'
+                          when P_SPATIAL_FORMAT = 'WKT' then
+                            'ST_GeomFromText( value ->> ' || IDX-1 || ')'
+                          when P_SPATIAL_FORMAT = 'EWKT' then
+                            'ST_GeomFromEWKT( value ->> ' || IDX-1 || ')'
+                          end
                       when TARGET_DATA_TYPE = 'time' then  
                        'cast( value ->> ' || IDX-1 || ' as timestamp)::' || TARGET_DATA_TYPE
                       when TARGET_DATA_TYPE = 'bit' then  
@@ -486,7 +508,7 @@ declare
   PLPGSQL_CTX        TEXT;
 begin
   for r in select "tableName"
-                 ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor',P_SCHEMA,"tableName","columns","dataTypes","sizeConstraints",TRUE) "TABLE_INFO"
+                 ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor', P_SCHEMA,"tableName", P_JSON #> '{systemInformation}' ->> 'spatialFormat', "columns","dataTypes","sizeConstraints",TRUE) "TABLE_INFO"
              from JSONB_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
                                                                  "owner"            VARCHAR, 
@@ -544,7 +566,7 @@ declare
 begin
 
   for r in select "tableName"
-                 ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor',P_SCHEMA,"tableName","columns","dataTypes","sizeConstraints",FALSE) "TABLE_INFO"
+                 ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor',P_SCHEMA,"tableName", P_JSON #> '{systemInformation}' ->> 'spatialFormat',"columns","dataTypes","sizeConstraints",FALSE) "TABLE_INFO"
              from JSON_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSON_TO_RECORD(value) as METADATA(
                                                                 "owner"            VARCHAR, 
@@ -587,7 +609,7 @@ exception
 end;  
 $$ LANGUAGE plpgsql;
 ---
-create or replace function GENERATE_SQL(P_JSON jsonb, P_SCHEMA VARCHAR)
+create or replace function GENERATE_SQL(P_JSON jsonb, P_SCHEMA VARCHAR, P_SPATIAL_FORMAT VARCHAR)
 returns SETOF jsonb
 as $$
 declare
@@ -595,7 +617,7 @@ begin
   RETURN QUERY
     select jsonb_object_agg(
            "tableName",
-           GENERATE_STATEMENTS("vendor",P_SCHEMA,"tableName","columns","dataTypes","sizeConstraints",FALSE)
+           GENERATE_STATEMENTS("vendor",P_SCHEMA,"tableName",P_SPATIAL_FORMAT,"columns","dataTypes","sizeConstraints",FALSE)
          )
     from JSONB_EACH(P_JSON -> 'metadata')  
          CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
@@ -606,100 +628,6 @@ begin
                                                        "dataTypes"        JSONB, 
                                                        "sizeConstraints"  JSONB
                                                      );
-end;
-$$ LANGUAGE plpgsql;
---
-create or replace procedure COMPARE_SCHEMA(P_SOURCE_SCHEMA VARCHAR,P_TARGET_SCHEMA VARCHAR,P_EMPTY_STRING_IS_NULL BOOLEAN,P_STRIP_XML_DECLARATION BOOLEAN)
-as $$
-declare
-  R RECORD;
-  V_SQL_STATEMENT TEXT;
-  C_NEWLINE CHAR(1) = CHR(10);
-  
-  V_SOURCE_COUNT INT;
-  V_TARGET_COUNT INT;
-  V_SQLERRM        TEXT;
-begin
-  create temporary table if not exists SCHEMA_COMPARE_RESULTS (
-    SOURCE_SCHEMA    VARCHAR(128)
-   ,TARGET_SCHEMA    VARCHAR(128)
-   ,TABLE_NAME       VARCHAR(128)
-   ,SOURCE_ROW_COUNT INT
-   ,TARGET_ROW_COUNT INT
-   ,MISSING_ROWS     INT
-   ,EXTRA_ROWS       INT
-   ,SQLERRM          TEXT
-  );
-  
-  for r in select t.table_name
-	             ,string_agg(
-                    case 
-                      when data_type in ('character varying') then
-                        case 
-                          when P_EMPTY_STRING_IS_NULL then
-                            'case when"' || column_name || '" = '''' then NULL else "' || column_name || '" end "' || column_name || '"' 
-                          else 
-                            '"' || column_name || '"' 
-                        end
-                      when data_type = 'json'  then
-                        '"' || column_name || '"::text' 
-                      when data_type = 'xml'  then
-                        case  
-                          when P_STRIP_XML_DECLARATION then
-                           'regexp_replace(regexp_replace("' || column_name || '"::text,''<\?xml.*?\?>'',''''),''&apos;'','''''''',''g'')'
-                          else
-                            '"' || column_name || '"::text' 
-                        end
-                      when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
-                       'st_AsText("' || column_name || '",18)' 
-                      else 
-                        '"' || column_name || '"' 
-                    end
-                   ,',' 
-                   order by ordinal_position
-                  ) COLUMN_LIST
-             from information_schema.columns c, information_schema.tables t
-            where t.table_name = c.table_name 
-              and t.table_schema = c.table_schema
-	          and t.table_type = 'BASE TABLE'
-              and t.table_schema = P_SOURCE_SCHEMA
-            group by t.table_schema, t.table_name 
-  loop
-    begin
-      V_SQL_STATEMENT = 'insert into SCHEMA_COMPARE_RESULTS ' || C_NEWLINE
-                      || ' select ''' || P_SOURCE_SCHEMA  || ''' ' || C_NEWLINE
-                      || '       ,''' || P_TARGET_SCHEMA  || ''' ' || C_NEWLINE
-                      || '       ,'''  || r.TABLE_NAME || ''' ' || C_NEWLINE
-                      || '       ,(select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '")'  || C_NEWLINE
-                      || '       ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '")'  || C_NEWLINE
-                      || '       ,(select count(*) from (SELECT ' || r.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '" EXCEPT SELECT ' || r.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '") T1) '  || C_NEWLINE
-                      || '       ,(select count(*) from (SELECT ' || r.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '" EXCEPT SELECT ' || r.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '") T1) '  || C_NEWLINE
-                      || '       ,NULL';
-      EXECUTE V_SQL_STATEMENT;               
-    exception  
-      when others then
-        V_SQLERRM = SQLERRM;
-        V_SOURCE_COUNT = -1;
-        V_TARGET_COUNT = -1;
-
-        begin 
-          EXECUTE 'select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '"' into V_SOURCE_COUNT;
-        exception 
-          when others then
-            null;
-        end;
-         
-        begin 
-          EXECUTE 'select count(*) from "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '"' into V_TARGET_COUNT;
-        exception 
-          when others then
-            null;
-        end;
-		
-        insert into SCHEMA_COMPARE_RESULTS VALUES (P_SOURCE_SCHEMA, P_TARGET_SCHEMA, r.TABLE_NAME, V_SOURCE_COUNT, V_TARGET_COUNT, -1, -1, V_SQLERRM);            
-    end;               
-                    
-  end loop;
 end;
 $$ LANGUAGE plpgsql;
 --

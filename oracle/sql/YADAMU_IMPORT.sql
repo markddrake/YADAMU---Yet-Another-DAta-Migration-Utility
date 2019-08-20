@@ -66,15 +66,15 @@ $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
 --
   procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'));
   function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
-  function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB') return TABLE_INFO_RECORD;
+  function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB') return TABLE_INFO_RECORD;
 --
 $ELSE
 --
-  function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMNS_XML XMLTYPE, P_DATA_TYPES_XML XMLTYPE, P_SIZE_CONSTRAINTS_XML XMLTYPE, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB') return TABLE_INFO_RECORD;
+  function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_COLUMNS_XML XMLTYPE, P_DATA_TYPES_XML XMLTYPE, P_SIZE_CONSTRAINTS_XML XMLTYPE, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB') return TABLE_INFO_RECORD;
 --
 $END  
 --
-  function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
+  function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'), P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB') return CLOB;
   function SET_CURRENT_SCHEMA(P_TARGET_SCHEMA VARCHAR2) return CLOB;
   
   function DISABLE_CONSTRAINTS(P_TARGET_SCHEMA VARCHAR2) return CLOB;
@@ -84,7 +84,6 @@ $END
   function MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR VARCHAR2,P_DATA_TYPE VARCHAR2, P_DATA_TYPE_LENGTH NUMBER, P_DATA_TYPE_SCALE NUMBER) return VARCHAR2;
   function GET_MILLISECONDS(P_START_TIME TIMESTAMP, P_END_TIME TIMESTAMP) return NUMBER;
   function SERIALIZE_TABLE(P_TABLE T_VC4000_TABLE,P_DELIMITER VARCHAR2 DEFAULT ',')  return CLOB;
-  procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9);
 
 end;
 /
@@ -814,11 +813,11 @@ end;
 --
 $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN 
 --
-function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB')
+function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB')
 --
 $ELSE
 --
-function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_COLUMNS_XML XMLTYPE, P_DATA_TYPES_XML XMLTYPE, P_SIZE_CONSTRAINTS_XML XMLTYPE, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB')
+function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_COLUMNS_XML XMLTYPE, P_DATA_TYPES_XML XMLTYPE, P_SIZE_CONSTRAINTS_XML XMLTYPE, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB')
 --            
 $END       
 --
@@ -952,7 +951,12 @@ $END
                         -- Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results
                         case
                           when ((TARGET_DATA_TYPE = 'GEOMETRY') or (TARGET_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"')) then
-                            'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || COLUMN_NAME || '") end'
+                            case 
+                              when P_SPATIAL_FORMAT in ('WKB','EWKB') then
+                                'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKBGEOMETRY("' || COLUMN_NAME || '") end'
+                              when P_SPATIAL_FORMAT in ('WKT','EWKT') then
+                                'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || COLUMN_NAME || '") end'
+                            end
                           when TYPE_EXISTS = 1 then
                             '"#' || TYPE_NAME || '"("' || COLUMN_NAME || '")'
                           when TARGET_DATA_TYPE = 'BOOLEAN' then
@@ -1099,7 +1103,12 @@ $END
          /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
         ,case
            when ((TARGET_DATA_TYPE = 'GEOMETRY') or TARGET_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"')then
-             'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || COLUMN_NAME || '") end'
+             case 
+               when P_SPATIAL_FORMAT in ('WKB','EWKB') then
+                 'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKBGEOMETRY("' || COLUMN_NAME || '") end'
+               when P_SPATIAL_FORMAT in ('WKT','EWKT') then
+                 'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || COLUMN_NAME || '") end'
+             end
            when TYPE_EXISTS = 1 then 
              '"#' || TYPE_NAME || '"("' || COLUMN_NAME || '")'
            when TARGET_DATA_TYPE = 'BOOLEAN' then 
@@ -1571,12 +1580,13 @@ as
 
   CURSOR operationsList
   is
-  select ROWNUM, TABLE_NAME, SOURCE_VENDOR, OWNER, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS
+  select ROWNUM, TABLE_NAME, SOURCE_VENDOR, SPATIAL_FORMAT, OWNER, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS
       from JSON_TABLE(
            P_JSON_DUMP_FILE,
            '$'           
            COLUMNS(
              SOURCE_VENDOR           VARCHAR2(128)                      PATH '$.systemInformation.vendor',
+             SPATIAL_FORMAT          VARCHAR2(128)                      PATH '$.systemInformation.spatialFormat',   
              NESTED                                                     PATH '$.metadata.*'
                COLUMNS (
                  OWNER                        VARCHAR2(128)             PATH '$.owner'
@@ -1616,7 +1626,7 @@ begin
 
     for o in operationsList loop
       V_NOTHING_DONE := FALSE;
-      V_TABLE_INFO := GENERATE_SQL(o.SOURCE_VENDOR,P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.COLUMN_LIST, o.DATA_TYPE_ARRAY, o.SIZE_CONSTRAINTS); 
+      V_TABLE_INFO := GENERATE_SQL(o.SOURCE_VENDOR,P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.SPATIAL_FORMAT, o.COLUMN_LIST, o.DATA_TYPE_ARRAY, o.SIZE_CONSTRAINTS); 
       V_STATEMENT := V_TABLE_INFO.DDL;
       if (V_STATEMENT is not NULL) then
         begin
@@ -1684,7 +1694,7 @@ end;
 --
 $END
 --
-function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
+function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'), P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB')
 return CLOB
 as
   V_RESULTS         CLOB;
@@ -1760,7 +1770,7 @@ begin
       DBMS_LOB.WRITEAPPEND(V_RESULTS,1,',');
     end if;
     
-    V_TABLE_INFO := GENERATE_SQL(x.VENDOR,P_TARGET_SCHEMA, x.OWNER, x.TABLE_NAME, x.COLUMN_LIST, x.DATA_TYPE_ARRAY, x.SIZE_CONSTRAINTS);
+    V_TABLE_INFO := GENERATE_SQL(x.VENDOR,P_TARGET_SCHEMA, x.OWNER, x.TABLE_NAME, P_SPATIAL_FORMAT, x.COLUMN_LIST, x.DATA_TYPE_ARRAY, x.SIZE_CONSTRAINTS);
     V_FRAGMENT := '"' || x.TABLE_NAME || '" : ';
     DBMS_LOB.WRITEAPPEND(V_RESULTS,LENGTH(V_FRAGMENT),V_FRAGMENT);
     $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
@@ -1879,177 +1889,6 @@ exception
 end;
 --
 $END
---
-procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9)
-as
-  TABLE_NOT_FOUND EXCEPTION;
-  PRAGMA EXCEPTION_INIT( TABLE_NOT_FOUND , -00942 );
-    
-  V_HASH_METHOD      NUMBER := 0;
-  V_TIMESTAMP_LENGTH NUMBER  := 20 + P_TIMESTAMP_PRECISION;
-  
-  cursor getTableList
-  is
-  select aat.TABLE_NAME
-        ,LISTAGG(
-           case 
-             when ((V_HASH_METHOD < 0) and DATA_TYPE in ('SDO_GEOMETRY','XMLTYPE','ANYDATA','BLOB','CLOB','NCLOB')) then
-    		   NULL
-             when ((DATA_TYPE like 'TIMESTAMP(%)') and (DATA_SCALE > P_TIMESTAMP_PRECISION)) then
-               'substr(to_char("' || COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FF9''),1,' || V_TIMESTAMP_LENGTH || ') "' || COLUMN_NAME || '"'
-             when DATA_TYPE = 'BFILE' then
-	           'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || COLUMN_NAME || '") end' 
-		     when (DATA_TYPE = 'SDO_GEOMETRY') then
-               'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.FROMWKTGEOMETRY("' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end'
-             when DATA_TYPE = 'XMLTYPE' then
-		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT "' || COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end' 
-		     when DATA_TYPE = 'ANYDATA' then
-		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end' 
-		     when DATA_TYPE in ('BLOB')  then
-   		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH("' || COLUMN_NAME || '",' || V_HASH_METHOD || ') end'
-			 when DATA_TYPE in ('CLOB','NCLOB')  then
-		        'case when "' || COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH("' || COLUMN_NAME || '",' || V_HASH_METHOD || ') end'
-             else
-	     	   '"' || COLUMN_NAME || '"'
-		   end,
-		',') 
-		 WITHIN GROUP (ORDER BY INTERNAL_COLUMN_ID, COLUMN_NAME) COLUMN_LIST
-        ,LISTAGG(
-           case 
-             when ((V_HASH_METHOD < 0) and DATA_TYPE in ('"MDSYS"."SDO_GEOMETRY"','XMLTYPE','BLOB','CLOB','NCLOB')) then
-    		   '"' || COLUMN_NAME || '"'
-             else 
-               NULL
-		   end,
-		',') 
-		 WITHIN GROUP (ORDER BY INTERNAL_COLUMN_ID, COLUMN_NAME) LOB_COLUMN_LIST
-  from ALL_ALL_TABLES aat
-       inner join ALL_TAB_COLS atc
-	           on atc.OWNER = aat.OWNER
-	          and atc.TABLE_NAME = aat.TABLE_NAME
-       left outer join ALL_TYPES at
-	                on at.TYPE_NAME = atc.DATA_TYPE
-                   and at.OWNER = atc.DATA_TYPE_OWNER
-	   left outer join ALL_MVIEWS amv
-		            on amv.OWNER = aat.OWNER
-		           and amv.MVIEW_NAME = aat.TABLE_NAME    
-       $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
-       left outer join ALL_EXTERNAL_TABLES axt
-	                on axt.OWNER = aat.OWNER
-	               and axt.TABLE_NAME = aat.TABLE_NAME
-       $END
- where aat.STATUS = 'VALID'
-   and aat.DROPPED = 'NO'
-   and aat.TEMPORARY = 'N'
-$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
-   and axt.TYPE_NAME is NULL
-$ELSE
-   and aat.EXTERNAL = 'NO'
-$END
-   and aat.NESTED = 'NO'
-   and aat.SECONDARY = 'N'
-   and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = 'IOT')
-   and (
-	    ((aat.TABLE_TYPE is NULL) and ((atc.HIDDEN_COLUMN = 'NO') and ((atc.VIRTUAL_COLUMN = 'NO') or ((atc.VIRTUAL_COLUMN = 'YES') and (atc.DATA_TYPE = 'XMLTYPE')))))
-        or
-	    ((aat.TABLE_TYPE is not NULL) and (COLUMN_NAME in ('SYS_NC_OID$','SYS_NC_ROWINFO$')))
-	    or
-		((aat.TABLE_TYPE = 'XMLTYPE') and (COLUMN_NAME in ('ACLOID', 'OWNERID')))
-       )
-	and aat.OWNER = P_SOURCE_SCHEMA
-    and ((TYPECODE is NULL) or (at.TYPE_NAME = 'XMLTYPE'))
-  group by aat.TABLE_NAME;
-  
-  V_SQL_STATEMENT     CLOB;
-  P_SOURCE_COUNT      NUMBER := 0;
-  P_TARGET_COUNT      NUMBER := 0;
-  V_SQLERRM           VARCHAR2(4000);
-begin
-  
-  -- Use EXECUTE IMMEDIATE to get the HASH Method Code so we do not get a compile error if accesss has not been granted to DBMS_CRYPTO
-
-  begin
-    --
-    $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
-    --
-    execute immediate 'begin :1 := DBMS_CRYPTO.HASH_SH256; end;'  using OUT V_HASH_METHOD;
-    --
-    $ELSE
-    --
-    execute immediate 'begin :1 := DBMS_CRYPTO.HASH_MD5; end;'  using OUT  V_HASH_METHOD;
-    --
-    $END
-    --
-  exception
-    when OTHERS then
-      V_HASH_METHOD := -1;
-  end;
-
-  begin
-    execute immediate 'truncate table "SCHEMA_COMPARE_RESULTS"';
-  exception
-    when TABLE_NOT_FOUND then
-      null;
-    when others then  
-      RAISE;
-  end;
-
-   
-  for t in getTableList loop
-
-    if ((V_HASH_METHOD < 0) and (t.LOB_COLUMN_LIST is not NULL)) then
-      V_SQLERRM := '''Warning : Package DBMS_CRYPTO is required to compare the following columns: ' || t.LOB_COLUMN_LIST || '.''';
-    else
-      -- Not a TYPO: NULL is a string in this case.
-      V_SQLERRM := 'NULL';
-    end if;
-
-    V_SQL_STATEMENT := 'insert into SCHEMA_COMPARE_RESULTS ' || YADAMU_UTILITIES.C_NEWLINE
-                    || ' select ''' || P_SOURCE_SCHEMA  || ''' ' || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,''' || P_TARGET_SCHEMA  || ''' ' || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,'''  || t.TABLE_NAME || ''' ' || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,(select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,' || V_SQLERRM  || YADAMU_UTILITIES.C_NEWLINE
-					|| '  from dual';
-                    
-	begin
-	  EXECUTE IMMEDIATE V_SQL_STATEMENT;
-    exception 
-      when OTHERS then
-        V_SQLERRM := SQLERRM;					  
-        begin 
-          V_SQL_STATEMENT := 'select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '"';
-          execute immediate V_SQL_STATEMENT into P_SOURCE_COUNT;
-        exception
-          when others then
-            V_SQLERRM := SQLERRM;					  
-            P_SOURCE_COUNT := -1;
-        end;
-        begin 
-          V_SQL_STATEMENT := 'select count(*) from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '"';
-          execute immediate V_SQL_STATEMENT into P_TARGET_COUNT;
-        exception
-          when others then
-            V_SQLERRM := SQLERRM;            
-            $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
-            -- Check if the ORA-xxxxx message appears twice in SQLERRM.
-            if (INSTR(SUBSTR(V_SQLERRM,11),SUBSTR(V_SQLERRM,1,10)) > 0) then
-              V_SQLERRM := SUBSTR(V_SQLERRM,1,INSTR(SUBSTR(V_SQLERRM,11),SUBSTR(V_SQLERRM,1,10))+8);         
-            end if;
-            $END
-            P_TARGET_COUNT := -1;
-        end;
-        V_SQL_STATEMENT := 'insert into SCHEMA_COMPARE_RESULTS values (:1,:2,:3,:4,:5,:6,:7,:8)';
-        execute immediate V_SQL_STATEMENT using P_SOURCE_SCHEMA, P_TARGET_SCHEMA, t.TABLE_NAME, P_SOURCE_COUNT, P_TARGET_COUNT, -1, -1, V_SQLERRM;
-    end;
-  end loop;
-exception
-  when OTHERS then 
-	RAISE;
-end;
 --
 end;
 /

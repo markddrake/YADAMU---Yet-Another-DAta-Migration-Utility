@@ -51,7 +51,6 @@ class FileWriter extends YadamuDBI {
 
   constructor(yadamu) {
     super(yadamu,defaultParameters)
-     
     this.outputStream = undefined;
     this.firstTable = true;
   }
@@ -193,7 +192,7 @@ class FileWriter extends YadamuDBI {
   **
   */
   
-  async initializeDataLoad(databaseVendor) {
+  async initializeImport(databaseVendor) {
     this.outputStream.write(',');
     this.outputStream.write('"data":{');
       

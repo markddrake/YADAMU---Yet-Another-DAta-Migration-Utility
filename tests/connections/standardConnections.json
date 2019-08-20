@@ -1,71 +1,91 @@
-
 {
-    "oracle19c" : {
-      "user"           : "SYSTEM"
-    , "password"       : "oracle"
-    , "connectString"  : "ORCL19c"
-    },
-    "oracle18c" : {
-      "user"           : "SYSTEM"
-    , "password"       : "oracle"
-    , "connectString"  : "ORCL18c"
-    },
-    "oracle12c" : {
-      "user"           : "SYSTEM"
-    , "password"       : "oracle"
-    , "connectString"  : "ORCL12c"
-    },
-    "oracle11g" : {
-      "user"           : "SYSTEM"
-    , "password"       : "oracle"
-    , "connectString"  : "ORCL11g"
-    },
-    "mssql" : {
-      "user"           : "sa"
-    , "server"         : "yadamu-db1"
-    , "database"       : "master"
-    , "password"       : "oracle#1"
-    , "requestTimeout" : 360000000
-    , "options"        : {
-        "encrypt"      : false 
+    "oracle19c"                         : {
+      "oracle"                          : {
+        "user"                          : "SYSTEM"
+      , "password"                      : "oracle"
+      , "connectString"                 : "ORCL19c"
       }
     },
-    "postgres" : {
-      "user"           : "postgres"
-    , "host"           : "yadamu-db1"
-    , "database"       : "yadamu"
-    , "password"       : "oracle"
-    , "port"           : 5432
+    "oracle18c"                         : {
+      "oracle"                          : {
+        "user"                          : "SYSTEM"
+      , "password"                      : "oracle"
+      , "connectString"                 : "ORCL18c"
+      }
     },
-    "mysql" : {
-      "user"               : "root"
-    , "host"               : "yadamu-db1"
-    , "database"           : "sys"
-    , "password"           : "Oracle#1"
-    , "port"               : 3306
-    , "multipleStatements" : true
-    , "typeCast"           : true
-    , "supportBigNumbers"  : true
-    , "bigNumberStrings"   : true          
-    , "dateStrings"        : true
-  },
-  "mariadb" : {
-      "user"               : "root"
-    , "host"               : "yadamu-db1"
-    , "database"           : "mysql"
-    , "password"           : "Oracle#1"
-    , "port"               : 3307
-    , "multipleStatements" : true
-    , "typeCast"           : true
-    , "supportBigNumbers"  : true
-    , "bigNumberStrings"   : true          
-    , "dateStrings"        : true 
-  },
-  "mongodb" : {
-     "host"               : "192.168.1.250"
-    ,"database"           : "yadamu"
-    ,"port"               : 27017
-  },
-  "file" : {
-  }
+    "oracle12c"           : {
+      "oracle"                          : {
+        "user"                          : "SYSTEM"
+      , "password"                      : "oracle"
+      , "connectString"                 : "ORCL12c"
+      }
+    },
+    "oracle11g"           : {
+      "oracle"                          : {
+        "user"                          : "SYSTEM"
+      , "password"                      : "oracle"
+      , "connectString"                 : "ORCL11g"
+      }
+    },
+    "mssql#1"                           : {
+      "mssql"                           : {  
+        "user"                          : "sa"
+      , "server"                        : "yadamu-db1"
+      , "database"                      : "master"
+      , "password"                      : "oracle#1"
+      , "requestTimeout"                : 360000000
+      , "options"                       : {
+          "encrypt"                     : false 
+        , "abortTransactionOnError"     : false
+        }
+      }
+    },
+    "postgres#1"                        : {
+      "postgres"                        : {
+        "user"                          : "postgres"
+      , "host"                          : "yadamu-db1"
+      , "database"                      : "yadamu"
+      , "password"                      : "oracle"
+      , "port"                          : 5432
+      }
+    },
+    "mysql#1"                           : {
+      "mysql"                           : {          
+        "user"                          : "root"
+      , "host"                          : "yadamu-db1"
+      , "database"                      : "sys"
+      , "password"                      : "Oracle#1"
+      , "port"                          : 3306
+      , "multipleStatements"            : true
+      , "typeCast"                      : true
+      , "supportBigNumbers"             : true
+      , "bigNumberStrings"              : true          
+      , "dateStrings"                   : true
+      }
+    },
+    "mariadb#1"                         : {
+      "mariadb"                         : {
+        "user"                          : "root"
+      , "host"                          : "yadamu-db1"
+      , "database"                      : "mysql"
+      , "password"                      : "Oracle#1"
+      , "port"                          : 3307
+      , "multipleStatements"            : true
+      , "typeCast"                      : true
+      , "supportBigNumbers"             : true
+      , "bigNumberStrings"              : true          
+      , "dateStrings"                   : true 
+      }
+    },
+    "mongodb#1"                         : {
+      "mongodb"                         : {
+        "host"                          : "192#168#1.250"
+      , "database"                      : "yadamu"
+      , "port"                          : 27017
+      }
+    },
+    "file#1"                            : {
+      "file"                            : {
+      }
+    }
 }

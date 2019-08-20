@@ -13,6 +13,12 @@ const Yadamu = require('./yadamu.js');
 const YadamuRejectManager = require('./yadamuRejectManager.js');
 const DBParser = require('./dbParser.js');
 
+const spatialFormat = 'WKB'
+const DEFAULT_BATCH_SIZE = 10000;
+const DEFAULT_COMMIT_COUNT = 5;
+
+const defaultParameters = {}
+
 /*
 **
 ** YADAMU Database Inteface class 
@@ -23,10 +29,25 @@ class YadamuDBI {
     
   get DATABASE_VENDOR()     { return undefined };
   get SOFTWARE_VENDOR()     { return undefined };
-  get SPATIAL_FORMAT()      { return undefined };
-  get DEFAULT_PARAMETERS()  { return {} }
+  get SPATIAL_FORMAT()      { return spatialFormat };
+  get DEFAULT_PARAMETERS()  { return defaultParameters }
   get STATEMENT_SEPERATOR() { return '' }
   
+  doTimeout(milliseconds) {
+    
+     const self = this
+
+     return new Promise(function (resolve,reject) {
+        self.yadamuLogger.info([`${this.constructor.name}.doTimeout()`],`Sleeping for ${Yadamu.stringifyDuration(milliseconds)}ms.`);
+        setTimeout(
+          function() {
+           self.yadamuLogger.info([`${this.constructor.name}.doTimeout()`],`Awake.`);
+          },
+          milliseconds
+       )
+     })  
+  }
+ 
   decomposeDataType(targetDataType) {
     
     const results = {};
@@ -112,28 +133,19 @@ class YadamuDBI {
    		        }
     },this) 
   }    
-    
-  updateParameters(parameters,additionalParameters) {
-    Object.keys(additionalParameters).forEach(function(key) {
-      parameters[key] = additionalParameters[key]
-    },this)
-    return parameters
-  }
 
-  mergeParameters(parameters,additionalParameters) {
-    Object.keys(additionalParameters).forEach(function(key) {
-      if (!parameters.hasOwnProperty(key)) {
-        parameters[key] = additionalParameters[key]
-      }
-    },this)
-    return parameters
-  }
-
-  configureTest(connectionProperties,testParameters,defaultParameters,tableMappings) {
+  configureTest(connectionProperties,testParameters,tableMappings) {
     this.connectionProperties = connectionProperties
-    this.parameters = this.yadamu.getParameters()
-    this.parameters = this.updateParameters(this.parameters,testParameters);
-    this.parameters = this.mergeParameters(this.parameters,defaultParameters);
+
+    // Start with DEFAULT_PARAMETERS
+    this.parameters = Object.assign({}, this.DEFAULT_PARAMETERS);
+
+    // Merge parameters obtained from YADAMU instance - Includes configuration file parameters and command line parameters
+    Object.assign(this.parameters, this.yadamu.getParameters());
+
+    // Merge parameters provided via to configureTEst
+    Object.assign(this.parameters, testParameters ? testParameters : {})
+
     if (this.parameters.MAPPINGS) {
       this.loadTableMappings(this.parameters.MAPPINGS);
     }  
@@ -248,17 +260,28 @@ class YadamuDBI {
     this.rejectFilename = path.resolve(rejectFolderPath +  path.sep + 'yadamuRejected_' + new Date().toISOString().split(':').join('') + ".json");
     return new YadamuRejectManager(this.rejectFilename,this.yadamuLogger);
   }
+  
+  getDefaultParameters() {
+    return defaultParameters
+  }
+      
+  constructor(yadamu,parameters) {
     
-  constructor(yadamu,defaultParameters) {
+    this.spatialFormat = this.SPATIAL_FORMAT 
+    this.yadamu = yadamu;
     
     // In production mode the Databae default parameters are merged with the command Line Parameters loaded by YADAMU.
-        
-    this.yadamu = yadamu;
-    this.parameters = yadamu.getParameters()
-    this.parameters = this.mergeParameters(this.parameters,defaultParameters);
+
+    // Start my MERGING YadamuDBI DEFAULT_PARAMETERS with subclass DEFAULT_PARAMETERS
+    this.defaultParameters = defaultParameters;
+    this.parameters = { ...this.defaultParameters, ...this.parameters};
+
+    // Merge parameters obtained from YADAMU instance - Includes configuration file parameters and command line parameters
+    Object.assign(this.parameters, yadamu.getParameters());
+    
     this.status = yadamu.getStatus()
     this.yadamuLogger = yadamu.getYadamuLogger();
-    
+        
     this.systemInformation = undefined;
     this.metadata = undefined;
 
@@ -279,7 +302,7 @@ class YadamuDBI {
     }   
  
     this.rejectManager = this.createRejectManager()
-
+    
   }
   
   /*  
@@ -294,6 +317,25 @@ class YadamuDBI {
          this.status.sqlTrace = fs.createWriteStream(this.status.sqlTrace.path,{"flags":"a"})
        }
     }
+    
+    /*
+    **
+    ** Calculate CommitSize
+    **
+    */
+    
+    let batchSize = this.parameters.BATCHSIZE ? Number(this.parameters.BATCHSIZE) : DEFAULT_BATCH_SIZE
+    batchSize = isNaN(batchSize) ? DEFAULT_BATCH_SIZE : batchSize
+    batchSize = batchSize < 0 ? DEFAULT_BATCH_SIZE : batchSize
+    batchSize = !Number.isInteger(batchSize) ? DEFAULT_BATCH_SIZE : batchSize
+    this.batchSize = batchSize
+    
+    let commitCount = this.parameters.BATCHCOMMIT ? Number(this.parameters.BATCHCOMMIT) : DEFAULT_COMMIT_COUNT
+    commitCount = isNaN(commitCount) ? DEFAULT_COMMIT_COUNT : commitCount
+    commitCount = commitCount < 0 ? DEFAULT_COMMIT_COUNT : commitCount
+    commitCount = !Number.isInteger(commitCount) ? DEFAULT_COMMIT_COUNT : commitCount
+    this.commitSize = this.batchSize * commitCount
+    
   }
 
   /*
@@ -421,12 +463,27 @@ class YadamuDBI {
   **
   */
   
-  async initializeDataLoad() {
-    throw new Error('Unimplemented Method')
+  async initializeExport() {
   }
   
+  async finalizeExport() {
+  }
+  
+  /*
+  **
+  ** The following methods are used by the YADAMU DBWriter class
+  **
+  */
+  
+  async initializeImport() {
+  }
+  
+  async finalizeImport() {
+    this.rejectManager.close();
+  }
+    
   async generateStatementCache(StatementGenerator,schema,executeDDL) {
-    const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.parameters.BATCHSIZE,this.parameters.COMMITSIZE, this.status, this.yadamuLogger);
+    const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.spatialFormat,this.batchSize, this.commitSize, this.status, this.yadamuLogger);
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }
 
@@ -436,23 +493,12 @@ class YadamuDBI {
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger);
   }
  
-  async finalizeDataLoad() {
-    throw new Error('Unimplemented Method')
-  }  
-  
-  async exportComplete() {
-  }
-
-  async importComplete() {
-    this.rejectManager.close();
-  }
-  
   rejectRow(tableName,row) {
     // Allows the rejection process to be overridden by a particular driver.
     this.rejectManager.rejectRow(tableName,row);
   }
   
-  handleInsertError(operation,tableName,batchSize,row,record,err,info) {
+  async handleInsertError(operation,tableName,batchSize,row,record,err,info) {
      this.skipCount++;
      this.status.warningRaised = true;
      this.yadamuLogger.logRejected([`${operation}`,`"${tableName}"`,`${batchSize}`,`${row}`],err);
@@ -465,8 +511,7 @@ class YadamuDBI {
      if (abort) {
        this.yadamuLogger.error([`${operation}`,`"${tableName}"`],`Maximum Error Count exceeded. Skipping Table.`);
      }
-     return abort;
-     
+     return abort;     
   }
 }
 

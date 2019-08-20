@@ -12,7 +12,13 @@ const YadamuLogger = require('./yadamuLogger.js');
 class Yadamu {
 
   get EXPORT_VERSION() { return '1.0' };
-  
+  get DEFAULT_PARAMETERS() { 
+     return { 
+       "MODE"       : "DATA_ONLY"
+     , "FILE"       : "export.json"
+     }
+  }
+     
   static nameMatch(source,target,rule) {
       
     switch (rule)  {
@@ -144,7 +150,7 @@ class Yadamu {
     status.statusMsg = status.warningRaised === true ? 'with warnings' : status.statusMsg;
     status.statusMsg = status.errorRaised === true ? 'with errors'  : status.statusMsg;  
   
-    yadamuLogger.log([`${this.name}`,`"${status.operation}"`],`Operation completed ${status.statusMsg}. Elapsed time: ${Yadamu.stringifyDuration(endTime - status.startTime)}.`);
+    yadamuLogger.log([`${this.name}`,`${status.operation}`],`Operation completed ${status.statusMsg}. Elapsed time: ${Yadamu.stringifyDuration(endTime - status.startTime)}.`);
     if (!yadamuLogger.loggingToConsole()) {
       console.log(`[${this.name}][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${Yadamu.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
     }
@@ -162,9 +168,16 @@ class Yadamu {
     }
   }
   
-  constructor(operation) {
-    this.yadamuLogger = process.stdout;
-    this.parameters = this.processArguments();
+  constructor(operation,parameters) {
+        
+    this.yadamuLogger = new YadamuLogger(process.stdout)
+    
+    // Start with DEFAULT_PARAMETERS
+    this.parameters = Object.assign({}, this.DEFAULT_PARAMETERS);
+    // Merge parameters provided via the constructor
+    Object.assign(this.parameters, parameters ? parameters : {});
+    // Merge parameters provided via command line arguments
+    Object.assign(this.parameters,this.getCommandLineParameters())
     
     this.status = {
       operation     : operation
@@ -213,12 +226,9 @@ class Yadamu {
     return this.yadamuLogger
   }
     
-  processArguments() {
+  getCommandLineParameters() {
    
-    const parameters = {
-      FILE : "export.json"
-     ,MODE : "DDL_AND_DATA"
-    }
+    const parameters = {}
  
     process.argv.forEach(function (arg) {
      
@@ -285,13 +295,17 @@ class Yadamu {
           case '--SQLTRACE':
             parameters.SQLTRACE = parameterValue;
             break;
+          case 'SPATIAL_FORMAT':
+          case '--SPATIAL_FORMAT':
+            parameters.SPATIAL_FORMAT = parameterValue.toUpperCase()
+            break;
           case 'LOGLEVEL':
           case '--LOGLEVEL':
             parameters.LOGLEVEL = parameterValue;
             break;
           case 'DUMPFILE':
           case '--DUMPFILE':
-            parameters.DUMPFILE = parameterValue.toUpperCase();
+            parameters.DUMPFILE = parameterValue.SPATIAL_FORMAT();
             break;
           case 'FEEDBACK':
           case '--FEEDBACK':
@@ -305,12 +319,12 @@ class Yadamu {
           case '--CONFIG':
             parameters.CONFIG = parameterValue;
             break;
-          case 'COMMITSIZE':
-          case '--COMMITSIZE':
-            Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
-            break;
           case 'BATCHSIZE':
           case '--BATCHSIZE':
+            Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
+            break;
+          case 'BATCHCOMMIT':
+          case '--BATCHCOMMIT':
             Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           case 'LOBCACHESIZE':
@@ -363,8 +377,7 @@ class Yadamu {
     if ((target.isDatabase() === true) && (target.parameters.TOUSER === undefined)) {
       throw new Error('Missing mandatory parameter TOUSER');
     }
-    
-
+   
     let timings = {}
     const self = this
  
@@ -411,6 +424,12 @@ class Yadamu {
   async doExport(dbi) {
     const fileWriter = new FileWriter(this)
     const timings = await this.pumpData(dbi,fileWriter);
+    Yadamu.finalize(this.status,this.yadamuLogger);
+    return timings
+  }  
+  
+  async doCopy(source,target) {
+    const timings = await this.pumpData(source,target);
     Yadamu.finalize(this.status,this.yadamuLogger);
     return timings
   }  

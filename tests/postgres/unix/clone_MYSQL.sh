@@ -2,6 +2,7 @@ export YADAMU_TARGET=MySQL
 export YADAMU_PARSER=CLARINET
 . ../unix/initialize.sh $(readlink -f "$BASH_SOURCE")
 psql -U $DB_USER -d $DB_DBNAME -h $DB_HOST -a -f $YADAMU_DB_ROOT/sql/YADAMU_IMPORT.sql >> $YADAMU_LOG_PATH/install/YADAMU_IMPORT.log
+psql -U $DB_USER -d $DB_DBNAME -h $DB_HOST -a -f $YADAMU_SCRIPT_ROOT/sql/YADAMU_TEST.sql >> $YADAMU_LOG_PATH/install/YADAMU_TEST.log
 export FILENAME=sakila
 export SCHEMA=sakila
 export SCHEMAVER=1

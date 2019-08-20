@@ -2,6 +2,7 @@
 @set YADAMU_PARSER=CLARINET
 call ..\windows\initialize.bat %~dp0
 mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f <%YADAMU_DB_ROOT%\sql\YADAMU_IMPORT.sql >%YADAMU_LOG_PATH%\install\YADAMU_IMPORT.log
+mysql -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f <%YADAMU_SCRIPT_ROOT%\sql\YADAMU_TEST.sql >%YADAMU_LOG_PATH%\install\YADAMU_TEST.log
 @set FILENAME=sakila
 @set SCHEMA=sakila
 @set SCHEMAVER=1

@@ -6,10 +6,10 @@
             "oracle18c",
             "oracle12c",
             "oracle11g",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb"
+            "mssql#1",
+            "postgres#1",
+            "mysql#1",
+            "mariadb#1"
         ],
         "parameters": {
             "MODE": "DATA_ONLY"
@@ -28,10 +28,10 @@
             "oracle18c",
             "oracle12c",
             "oracle11g",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb"
+            "mssql#1",
+            "postgres#1",
+            "mysql#1",
+            "mariadb#1"
         ],
         "parameters": {
             "MODE": "DATA_ONLY"
@@ -50,10 +50,10 @@
             "oracle18c",
             "oracle12c",
             "oracle11g",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb"
+            "mssql#1",
+            "postgres#1",
+            "mysql#1",
+            "mariadb#1"
         ],
         "parameters": {
             "MODE": "DATA_ONLY"
@@ -72,10 +72,10 @@
             "oracle18c",
             "oracle12c",
             "oracle11g",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb"
+            "mssql#1",
+            "postgres#1",
+            "mysql#1",
+            "mariadb#1"
         ],
         "parameters": {
             "MODE": "DATA_ONLY"
@@ -88,16 +88,16 @@
         ]
     },
     {
-        "source": "mssql",
+        "source": "mssql#1",
         "targets": [
             "oracle19c",
             "oracle18c",
             "oracle12c",
             "oracle11g",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb"
+            "mssql#1",
+            "postgres#1",
+            "mysql#1",
+            "mariadb#1"
         ],
         "parameters": {
             "MODE": "DATA_ONLY"
@@ -110,16 +110,16 @@
         ]
     },
     {
-        "source": "postgres",
+        "source": "postgres#1",
         "targets": [
             "oracle19c",
             "oracle18c",
             "oracle12c",
             "oracle11g",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb"
+            "mssql#1",
+            "postgres#1",
+            "mysql#1",
+            "mariadb#1"
         ],
         "parameters": {
             "MODE": "DATA_ONLY"
@@ -132,16 +132,16 @@
         ]
     },
     {
-        "source": "mysql",
+        "source": "mysql#1",
         "targets": [
             "oracle19c",
             "oracle18c",
             "oracle12c",
             "oracle11g",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb"
+            "mssql#1",
+            "postgres#1",
+            "mysql#1",
+            "mariadb#1"
         ],
         "parameters": {
             "MODE": "DATA_ONLY"
@@ -154,16 +154,16 @@
         ]
     },
     {
-        "source": "mariadb",
+        "source": "mariadb#1",
         "targets": [
             "oracle19c",
             "oracle18c",
             "oracle12c",
             "oracle11g",
-            "mssql",
-            "postgres",
-            "mysql",
-            "mariadb"
+            "mssql#1",
+            "postgres#1",
+            "mysql#1",
+            "mariadb#1"
         ],
         "parameters": {
             "MODE": "DATA_ONLY"

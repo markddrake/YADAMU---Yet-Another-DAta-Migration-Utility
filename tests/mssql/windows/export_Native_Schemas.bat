@@ -3,6 +3,7 @@ if not defined MODE set MODE=DATA_ONLY
 call ..\windows\initialize.bat %~dp0
 if not exist %YADAMU_INPUT_PATH%\ mkdir %YADAMU_INPUT_PATH%
 sqlcmd -U%DB_USER% -P%DB_PWD% -S%DB_HOST% -dmaster -I -e -i%YADAMU_DB_ROOT%\sql\YADAMU_IMPORT.sql > %YADAMU_LOG_PATH%\install\YADAMU_IMPORT.log
+sqlcmd -U%DB_USER% -P%DB_PWD% -S%DB_HOST% -dmaster -I -e -i%YADAMU_SCRIPT_ROOT%\sql\YADAMU_TEST.sql > %YADAMU_LOG_PATH%\install\YADAMU_TEST.log
 call %YADAMU_SCRIPT_ROOT%\windows\export_MSSQL.bat %YADAMU_INPUT_PATH% "" ""
 @set FILENAME=AdventureWorksALL
 @set SCHEMA=ADVWRK

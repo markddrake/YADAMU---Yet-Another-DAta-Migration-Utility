@@ -4,17 +4,10 @@ const oracledb = require('oracledb');
 
 const YadamuWriter = require('../../common/yadamuWriter.js');
 
-const sqlSetSavePoint = 
-`SAVEPOINT BATCH_INSERT`;
-
-const sqlRollbackSavePoint = 
-`ROLLBACK TO BATCH_INSERT`;
-
 class TableWriter extends YadamuWriter {
 
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
-    
     this.lobUsage = 0;
     this.lobList = [];
     this.dumpOracleTestcase = false;
@@ -208,16 +201,16 @@ end;`
     if (this.insertMode === 'Batch') {
 
       try {
-        await this.dbi.executeSQL(sqlSetSavePoint,[])
+        await this.dbi.createSavePoint()
         const results = await this.dbi.executeMany(this.tableInfo.dml,this.batch,{bindDefs : this.tableInfo.binds});
         this.endTime = new Date().getTime();
         this.batch.length = 0;
         this.freeLobList();
         return this.skipTable
       } catch (e) {
-        await this.dbi.executeSQL(sqlRollbackSavePoint,[])
+        await this.dbi.restoreSavePoint();
         if (e.errorNum && (e.errorNum === 4091)) {
-          await this.dbi.executeSQL(sqlSetSavePoint,[])
+          await this.dbi.createSavePoint()
           // Mutating Table - Convert to Cursor based PL/SQL Block
           if (this.status.showInfoMsgs) {
             yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`,`${this.batch.length}`],`executeMany() operation raised:\n${e}`);
@@ -237,7 +230,7 @@ end;`
             this.batch.length = 0;
             return this.skipTable
           } catch (e) {
-            await this.dbi.executeSQL(sqlRollbackSavePoint,[])
+            await this.dbi.restoreSavePoint();
             if (this.status.showInfoMsgs) {
               this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`,`${this.batch.length}`],`executeMany() with PL/SQL block raised:\n${e}`);
               this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
@@ -280,10 +273,8 @@ end;`
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,this.tableInfo.targetDataTypes,JSON.stringify(this.tableInfo.binds)] : []
         const record = await this.serializeLobs(this.batch[row])
-        const abort = this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,record,e,errInfo);
-        if (abort) {
-          await this.dbi.rollbackTransaction();
-          this.skipTable = true;
+        this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,record,e,errInfo);
+        if (this.skipTable) {
           break;
         }
       }

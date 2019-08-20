@@ -29,7 +29,7 @@ class DBWriter extends Writable {
   }      
   
   configureFeedback(feedbackModel) {
-        
+      
     this.reportCommits      = false;
     this.reportBatchWrites  = false;
     this.feedbackCounter    = 0;
@@ -182,6 +182,9 @@ class DBWriter extends Writable {
  
   async _write(obj, encoding, callback) {
     try {
+      if (this.rowCount === 0) {  
+        // await this.dbi.initializeImport();
+      }
       switch (Object.keys(obj)[0]) {
         case 'systemInformation':
           this.dbi.setSystemInformation(obj.systemInformation)
@@ -197,9 +200,10 @@ class DBWriter extends Writable {
           break;
         case 'table':
           if (this.currentTable === undefined) {
-            await this.dbi.initializeDataLoad();
+            await this.dbi.initializeImport();
           }
           else {
+          // if (this.currentTable) {
             const results = await this.currentTable.finalize();
             this.skipTable = results.skipTable;
             if (this.skipTable === false) {
@@ -207,10 +211,8 @@ class DBWriter extends Writable {
               this.reportTableStatistics(elapsedTime,results);
             }
           }
-          // this.setTableName(obj.table)
           this.tableName = obj.table;
           this.currentTable = this.dbi.getTableWriter(this.tableName);
-          // await this.dbi.beginTransaction();
           await this.currentTable.initialize();
           this.rowCount = 0;
           this.skipTable = false;
@@ -226,6 +228,9 @@ class DBWriter extends Writable {
           }
           if (this.currentTable.batchComplete()) {
             this.skipTable = await this.currentTable.writeBatch(this.status);
+            if (this.skipTable) {
+               this.dbi.rollbackTransaction();
+            }
             if (this.reportBatchWrites && this.currentTable.reportBatchWrites() && !this.currentTable.commitWork(this.rowCount)) {
               this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows written:  ${this.rowCount}.`);
             }                    
@@ -234,7 +239,8 @@ class DBWriter extends Writable {
             await this.dbi.commitTransaction(this.rowCount)
             if (this.reportCommits) {
               this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows commited: ${this.rowCount}.`);
-            }                    
+            }          
+            await this.dbi.beginTransaction();            
           }
           break;
         default:
@@ -256,12 +262,11 @@ class DBWriter extends Writable {
           const elapsedTime = results.endTime - results.startTime;            
           this.reportTableStatistics(elapsedTime,results);
         }
-        await this.dbi.finalizeDataLoad();
       }
       else {
         this.yadamuLogger.info([`${this.constructor.name}`],`No tables found.`);
       }
-      await this.dbi.importComplete();
+      await this.dbi.finalizeImport();
       callback();
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._final()`,`"${this.currentTable}"`],e);

@@ -30,14 +30,12 @@ class PostgresCompare extends PostgresDBI {
        super(yadamu);
     }
     
-    configureTest(connectionProperties,testParameters,schema,tableMappings) {
-      super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS,tableMappings);
-    }
-
     async recreateSchema(schema,password) {
-        
       try {
         const dropSchema = `drop schema if exists "${schema.schema}" cascade`;
+        if (this.status.sqlTrace) {
+          this.status.sqlTrace.write(`${dropSchema};\n--\n`)
+        }
         await this.pgClient.query(dropSchema);      
       } catch (e) {
         if (e.errorNum && (e.errorNum === 1918)) {
@@ -77,6 +75,10 @@ class PostgresCompare extends PostgresDBI {
             delete timings[tableName]
           }
         },this)
+      }
+      
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(`${sqlCompareSchema};\n--\n`)
       }
       
       await this.pgClient.query(sqlCompareSchema,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.STRIP_XML_DECLARATION === true])      

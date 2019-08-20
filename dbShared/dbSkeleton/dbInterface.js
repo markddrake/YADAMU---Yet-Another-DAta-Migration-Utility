@@ -134,17 +134,6 @@ class DBInterface extends YadamuDBI {
   
   getTableWriter(table) {
     return super.getTableWriter(TableWriter,table)
-  }
-  /*
-  **
-  ** The following methods are used by the YADAMU DBwriter class
-  **
-  */
-  
-  async initializeDataLoad() {
-  }
-  
-  async finalizeDataLoad() {
   }  
 
 }
