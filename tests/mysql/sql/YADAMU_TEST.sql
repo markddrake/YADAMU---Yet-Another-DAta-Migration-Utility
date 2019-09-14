@@ -5,11 +5,35 @@
 */
 SET SESSION SQL_MODE=ANSI_QUOTES;
 --
+DROP FUNCTION IF EXISTS SET_GEOMETRY_PRECISION;
+--
+DELIMITER $$
+--
+CREATE FUNCTION SET_GEOMETRY_PRECISION(P_GEOMETRY GEOMETRY,P_SPATIAL_PRECISION int)
+RETURNS GEOMETRY DETERMINISTIC
+BEGIN
+  DECLARE POINT       GEOMETRY;
+  DECLARE X           DOUBLE;
+  DECLARE Y           DOUBLE;
+  if ST_GeometryType(P_GEOMETRY) = 'POINT' then
+      
+    SET X = ROUND(ST_X(P_GEOMETRY),P_SPATIAL_PRECISION);
+    SET Y = ROUND(ST_Y(P_GEOMETRY),P_SPATIAL_PRECISION);
+    SET POINT = ST_GeomFromText(concat('POINT(',X,' ',Y,')'));      
+    return POINT;
+  end if;
+  -- Iterative the component geometry and points
+  return P_GEOMETRY;
+END
+$$
+--
+DELIMITER ;
+--
 DROP PROCEDURE IF EXISTS COMPARE_SCHEMAS;
 --
 DELIMITER $$
 --
-CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_MAP_EMPTY_STRING_TO_NULL BOOLEAN)
+CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_MAP_EMPTY_STRING_TO_NULL BOOLEAN, P_SPATIAL_PRECISION INT)
 BEGIN
   DECLARE C_NEWLINE          VARCHAR(1) DEFAULT CHAR(13);
  
@@ -29,6 +53,13 @@ BEGIN
   CURSOR FOR 
   select c.table_name "TABLE_NAME"
         ,group_concat(case 
+                        when data_type in ('geometry') then
+                          case
+                            when P_SPATIAL_PRECISION = 18 then
+                              concat('"',column_name,'"') 
+                            else                            
+                              concat('SET_GEOMETRY_PRECISION(',column_name,',',P_SPATIAL_PRECISION,')')
+                          end
                         when data_type in ('blob', 'varbinary', 'binary') then
                           concat('hex("',column_name,'")') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
@@ -53,7 +84,6 @@ BEGIN
   group by c.table_schema, c.table_name;
 
   DECLARE CONTINUE HANDLER FOR NOT FOUND SET NO_MORE_ROWS = TRUE;
- 
   
   SET SESSION SQL_MODE=ANSI_QUOTES;
   SET SESSION group_concat_max_len = 131072;
@@ -66,7 +96,7 @@ BEGIN
    ,TARGET_ROW_COUNT INT
    ,MISSING_ROWS     INT
    ,EXTRA_ROWS       INT
-   ,SQLERRM          VARCHAR(128)
+   ,SQLERRM          VARCHAR(512)
   );
   
   create temporary table if not exists SOURCE_HASH_TABLE (

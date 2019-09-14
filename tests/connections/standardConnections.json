@@ -5,6 +5,7 @@
       , "password"                      : "oracle"
       , "connectString"                 : "ORCL19c"
       }
+    , "pathPrefix"                      : "JSON/oracle19c/%MODE%"
     },
     "oracle18c"                         : {
       "oracle"                          : {
@@ -12,6 +13,7 @@
       , "password"                      : "oracle"
       , "connectString"                 : "ORCL18c"
       }
+    , "pathPrefix"                      : "JSON/oracle18c/%MODE%"
     },
     "oracle12c"           : {
       "oracle"                          : {
@@ -19,6 +21,7 @@
       , "password"                      : "oracle"
       , "connectString"                 : "ORCL12c"
       }
+    , "pathPrefix"                      : "oracle12c/%MODE%"
     },
     "oracle11g"           : {
       "oracle"                          : {
@@ -26,6 +29,7 @@
       , "password"                      : "oracle"
       , "connectString"                 : "ORCL11g"
       }
+    , "pathPrefix"                      : "JSON/oracle11g/%MODE%"
     },
     "mssql#1"                           : {
       "mssql"                           : {  
@@ -39,6 +43,7 @@
         , "abortTransactionOnError"     : false
         }
       }
+    , "pathPrefix"                      : "JSON/MsSQL"
     },
     "postgres#1"                        : {
       "postgres"                        : {
@@ -48,6 +53,7 @@
       , "password"                      : "oracle"
       , "port"                          : 5432
       }
+    , "pathPrefix"                      : "JSON/postgres"
     },
     "mysql#1"                           : {
       "mysql"                           : {          
@@ -62,6 +68,7 @@
       , "bigNumberStrings"              : true          
       , "dateStrings"                   : true
       }
+    , "pathPrefix"                      : "JSON/MySQL"
     },
     "mariadb#1"                         : {
       "mariadb"                         : {
@@ -76,10 +83,11 @@
       , "bigNumberStrings"              : true          
       , "dateStrings"                   : true 
       }
+    , "pathPrefix"                      : "JSON/mariaDB"
     },
     "mongodb#1"                         : {
       "mongodb"                         : {
-        "host"                          : "192#168#1.250"
+        "host"                          : "192.168.1.250"
       , "database"                      : "yadamu"
       , "port"                          : 27017
       }
@@ -87,5 +95,5 @@
     "file#1"                            : {
       "file"                            : {
       }
-    }
+  }
 }

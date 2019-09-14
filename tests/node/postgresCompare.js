@@ -22,7 +22,7 @@ const sqlFailed =
 
 const sqlSchemaTableRows = `select relname "TABLE_NAME", n_live_tup "ROW_COUNT" from pg_stat_user_tables where schemaname = $1`;
 
-const sqlCompareSchema = `call COMPARE_SCHEMA($1,$2,$3,$4)`
+const sqlCompareSchema = `call COMPARE_SCHEMA($1,$2,$3,$4,$5)`
 
 class PostgresCompare extends PostgresDBI {
     
@@ -81,7 +81,9 @@ class PostgresCompare extends PostgresDBI {
         this.status.sqlTrace.write(`${sqlCompareSchema};\n--\n`)
       }
       
-      await this.pgClient.query(sqlCompareSchema,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.STRIP_XML_DECLARATION === true])      
+      // TODO: Oracle12c, Oracle11c:  use TEXT Compare with 15 Digit Precision for Spatial Values
+      
+      await this.pgClient.query(sqlCompareSchema,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.STRIP_XML_DECLARATION === true, this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18])      
       
       const successful = await this.pgClient.query(sqlSuccess)
             

@@ -84,7 +84,7 @@ class OracleCompare extends OracleDBI {
         },this)
       }
       
-      const args = {source:source.schema,target:target.schema,maxTimestampPrecision:this.parameters.MAX_TIMESTAMP_PRECISION}
+      const args = {source:source.schema,target:target.schema,maxTimestampPrecision:this.parameters.TIMESTAMP_PRECISION}
       await this.executeSQL(sqlCompareSchemas,args)      
 
       const successful = await this.executeSQL(sqlSuccess,{})

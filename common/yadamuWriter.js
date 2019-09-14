@@ -4,7 +4,7 @@ class YadamuWriter {
 
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     this.dbi = dbi;
-    this.schema = this.dbi.parameters.TOUSER;
+    this.schema = this.dbi.parameters.TO_USER;
     this.tableName = tableName
     this.tableInfo = tableInfo;
     this.status = status;

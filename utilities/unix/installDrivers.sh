@@ -16,6 +16,7 @@ cd $YADAMU_HOME
 cd mysql/node
 rm -rf node_modules
 npm install mysql
+npm install wkx
 cd $YADAMU_HOME
 cd mariadb/node
 rm -rf node_modules

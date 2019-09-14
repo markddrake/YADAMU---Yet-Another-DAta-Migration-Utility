@@ -50,11 +50,11 @@ begin
                                                                    when P_SPATIAL_FORMAT = 'WKB' then
                                                                      'encode(ST_AsBinary("' || column_name || '"),''hex'')'
                                                                    when P_SPATIAL_FORMAT = 'WKT' then
-                                                                     'ST_asText("' || column_name || '",18)'
+                                                                     'ST_AsText("' || column_name || '",18)'
                                                                    when P_SPATIAL_FORMAT = 'EWKB' then
                                                                      'encode(ST_AsEWKB("' || column_name || '"),''hex'')'
                                                                    when P_SPATIAL_FORMAT = 'EWKT' then
-                                                                     'encode(ST_AsEWKT("' || column_name || '")'
+                                                                     'ST_AsEWKT("' || column_name || '")'
                                                                    else
                                                                      'ST_AsEWKB("' || column_name || '"),''hex'')'
                                                                  end
@@ -399,7 +399,7 @@ begin
 
   begin
     SELECT PostGIS_full_version() into V_POSTGIS_VERSION;
-    V_GEOMETRY_TYPE := 'geometry';
+    V_GEOMETRY_TYPE := 'geography';
   exception
     when undefined_function then
       V_GEOMETRY_TYPE := 'text';

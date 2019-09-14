@@ -16,8 +16,6 @@ const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 
-const defaultParameters = {}
-
 const sqlGenerateQueries = `select EXPORT_JSON($1,$2)`;
 
 const sqlSystemInformation = `select current_database() database_name,current_user,session_user,current_setting('server_version_num') database_version`;					   
@@ -89,10 +87,10 @@ class PostgresDBI extends YadamuDBI {
   get DATABASE_VENDOR()    { return 'Postgres' };
   get SOFTWARE_VENDOR()    { return 'The PostgreSQL Global Development Group' };
   get SPATIAL_FORMAT()      { return this.spatialFormat };
-  get DEFAULT_PARAMETERS()  { return defaultParameters };
+  get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().postgres }
 
   constructor(yadamu) {
-    super(yadamu,defaultParameters);
+    super(yadamu,yadamu.getYadamuDefaults().postgres);
        
     this.pgClient = undefined;
     this.useBinaryJSON = false
@@ -322,7 +320,7 @@ class PostgresDBI extends YadamuDBI {
   }
 
   async processFile(hndl) {
-     return await this.processStagingTable(this.parameters.TOUSER)
+     return await this.processStagingTable(this.parameters.TO_USER)
   }
   
   /*
@@ -352,7 +350,7 @@ class PostgresDBI extends YadamuDBI {
      ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : this.parameters.OWNER
+     ,schema             : this.parameters.FROM_USER
      ,exportVersion      : EXPORT_VERSION
 	 ,sessionUser        : sysInfo.session_user
      ,dbName             : sysInfo.database_name
@@ -440,10 +438,10 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async executeDDL(ddl) {
-    await this.createSchema(this.parameters.TOUSER);
+    await this.createSchema(this.parameters.TO_USER);
     await Promise.all(ddl.map(async function(ddlStatement) {
       try {
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TOUSER);
+        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
         if (this.status.sqlTrace) {
           this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
         }

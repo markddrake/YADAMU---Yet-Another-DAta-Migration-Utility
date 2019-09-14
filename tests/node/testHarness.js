@@ -8,6 +8,7 @@ const YadamuTest = require('./yadamuTest.js')
 
 const YadamuLogger = require('../../common/yadamuLogger.js');
 const FileReader = require('../../file/node/fileReader.js');
+const FileWriter = require('../../file/node/fileWriter.js');
 
 const OracleCompare = require('./oracleCompare.js');
 const MsSQLCompare = require('./mssqlCompare.js');
@@ -26,7 +27,7 @@ class TestHarness {
   constructor() {
   
     this.yadamu            = new YadamuTest();     
-    this.testConfiguration = require(path.resolve(this.yadamu.getParameters().CONFIG))
+    this.testConfiguration = require(path.resolve(this.yadamu.getConfigFilePath()))
     this.connections       = require(path.resolve(this.testConfiguration.connections))
 
     // Expand environemnt variables in path using regex.
@@ -117,56 +118,75 @@ class TestHarness {
     
   async doImport(dbi,file) {
      
+    let fileReader = undefined; 
+     
     switch (this.parsingMethod)  {
       case CLARINET :
-        return this.yadamu.doImport(dbi,file);
+        fileReader = new FileReader(this.yadamu);
+        fileReader.configureTest({},{FILE : file},{});
+        return this.yadamu.doCopy(fileReader,dbi);
       case RDBMS :
         return this.yadamu.doServerImport(dbi,file);
       default:
-        return this.yadamu.doImport(dbi,file);
+        fileReader = new FileReader(this.yadamu);
+        fileReader.configureTest({},{FILE : file},{});
+        return this.yadamu.doCopy(fileReader,dbi);
     }
   }
 
-  getCompareParameters(sourceVendor,targetVendor,testParameters) {
-      
+  async doExport(dbi,file) {
+    const fileWriter = new FileWriter(this.yadamu)
+    fileWriter.configureTest({},{FILE : file},{});
+    return this.yadamu.doCopy(dbi,fileWriter)  
+  }  
+ 
+
+  getDefaultValue(parameter,defaults,sourceVendor, sourceVersion, targetVendor, targetVersion) {
+     
+    const parameterDefaults = defaults[parameter]
+    const sourceVersionKey = sourceVendor + "#" + sourceVersion;
+    const targetVersionKey = targetVendor + "#" + targetVersion;
+    try {
+      return {[parameter] : parametersDefaults[sourceVersionKey][targetVersionKey]}
+    } catch (e) {
+      try {
+        return {[parameter] : parametersDefaults[sourceVersionKey][targetVersion]}  
+      } catch (e) {
+        try {
+          return {[parameter] : parametersDefaults[sourceVersion][targetVersionKey]}    
+        } catch (e) {
+          try { 
+            return {[parameter] : parametersDefaults[sourceVersion][targetVersiony]}
+          } catch (e) {
+            try {
+              return {[parameter] : parametersDefaults.default}
+            }
+            catch (e) {
+              return {}
+            }
+          }
+        }
+      }
+    }
+  }          
+        
+  getCompareParameters(sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters) {
+        
+    const testDefaults = this.yadamu.getYadamuTestDefaults()
     const compareParameters = Object.assign({}, testParameters)
     
-    const vendorList = new Array(sourceVendor,targetVendor)
-    vendorList.forEach(function(vendor) {    
-      
-      switch (vendor) {
-        case "oracle"  : 
-          compareParameters.EMPTY_STRING_IS_NULL = true;
-          compareParameters.SPATIAL_PRECISION = 13;
-          compareParameters.MAX_TIMESTAMP_PRECISION = 9;
-          break;
-        case "postgres" :
-          compareParameters.MAX_TIMESTAMP_PRECISION = 6;
-          break;
-        case "mssql" :
-          compareParameters.SPATIAL_PRECISION = 13;
-          compareParameters.STRIP_XML_DECLARATION = true;
-          compareParameters.MAX_TIMESTAMP_PRECISION = 9;
-          break;
-        case "mysql" :
-          compareParameters.TABLE_MATCHING = 'INSENSITIVE'
-          compareParameters.SPATIAL_PRECISION = 13;
-          compareParameters.MAX_TIMESTAMP_PRECISION = 6;
-          break;
-        case "mariadb" :
-          compareParameters.TABLE_MATCHING = 'INSENSITIVE'
-          compareParameters.SPATIAL_PRECISION = 13;
-          compareParameters.MAX_TIMESTAMP_PRECISION = 6;
-          break;
-        case "mongodb" :
-          break;
-        case "file" :
-          break;
-        default:   
-          this.yadamuLogger.log([`${this.constructor.name}.getCompareParameters()`,`${vendor}`],`Unknown Database.`);  
-        }
-      },this)
-      return compareParameters;
+    Object.assign(compareParameters, this.getDefaultValue('SPATIAL_PRECISION',testDefaults,sourceVersion,targetVendor,targetVersion,testParameters))
+   
+    let versionSpecificKey = sourceVendor + "#" + sourceVersion;
+    Object.assign(compareParameters, testDefaults[sourceVendor])
+    Object.assign(compareParameters, testDefaults[versionSpecificKey] ? testDefaults[versionSpecificKey] : {})
+
+    versionSpecificKey = targetVendor + "#" + targetVersion;
+   
+    Object.assign(compareParameters, testDefaults[targetVendor])
+    Object.assign(compareParameters, testDefaults[versionSpecificKey] ? testDefaults[versionSpecificKey] : {})
+    
+    return compareParameters;
   }
   
   checkTimingsForErrors(timings) {
@@ -179,7 +199,7 @@ class TestHarness {
   }
   
   async compareSchemas(source,sourceSchema,targetSchema,timings,compareParameters) {
-
+      
     const sourceVendor = Object.keys(this.connections[source])[0]
     const sourceConnectionProperties = this.connections[source][sourceVendor]
       
@@ -369,16 +389,27 @@ class TestHarness {
   
   }
   
-  async fileRoundtrip(target,parameters,sourceFile,targetSchema1,targetFile1,targetSchema2,targetFile2) {
+  makePath(directory,filename,mode) {
+    let filePath = path.join(directory,filename)
+    filePath = filePath.replace(/%MODE%/g,mode)
+    return filePath
+  }
+  
+  async fileRoundtrip(source,target,parameters,sourceFileName,targetSchema1,targetFileName1,targetSchema2,targetFileName2) {
             
+      const timings = []
+      const opStartTime = new Date().getTime();
+      const sourceFile = this.makePath(this.inputPathPrefix,sourceFileName,parameters.MODE)
+
+      // ### Hack to preserve existing Folder Structure
+      const outputPrefix = path.join(this.outputPathPrefix,path.dirname(sourceFileName).replace(/\/%MODE%/g,''),this.connections[target].pathPrefix)
+
+      const targetFile1 = this.makePath(outputPrefix,targetFileName1,parameters.MODE) 
+      const targetFile2 = this.makePath(outputPrefix,targetFileName2,parameters.MODE)     
+
       const targetVendor = Object.keys(this.connections[target])[0]
       const targetConnectionProperties = this.connections[target][targetVendor]
       
-      const source = 'file';
-      const timings = []
-      const testRoot = path.join('work',target);
-
-      const opStartTime = new Date().getTime();
       const operationsList = [sourceFile]
       
       let dbSchema1 = targetSchema1
@@ -408,7 +439,7 @@ class TestHarness {
       await this.recreateSchema(targetVendor,targetConnectionProperties,dbSchema1);     
 
       let testParameters = parameters ? Object.assign({},parameters) : {}
-      let dbi = this.getTestInterface(targetVendor,'TOUSER',dbSchema1,testParameters,targetConnectionProperties);     
+      let dbi = this.getTestInterface(targetVendor,'TO_USER',dbSchema1,testParameters,targetConnectionProperties);     
       
       let startTime = new Date().getTime();
       timings[0] = await this.doImport(dbi,sourceFile);
@@ -419,9 +450,10 @@ class TestHarness {
       this.printResults(`"${source}"://"${sourceFile}"`,`"${target}"://"${targetDescription}"`,elapsedTime)
 
       testParameters = parameters ? Object.assign({},parameters) : {}
-      dbi = this.getTestInterface(targetVendor,'OWNER',dbSchema1,testParameters,targetConnectionProperties);     
+      dbi = this.getTestInterface(targetVendor,'FROM_USER',dbSchema1,testParameters,targetConnectionProperties);     
       startTime = new Date().getTime()
-      timings[1] = await this.yadamu.doExport(dbi,path.join(testRoot,targetFile1));
+      
+      timings[1] = await this.doExport(dbi,targetFile1);
       elapsedTime = new Date().getTime() - startTime;
       const tableMappings = dbi.reverseTableMappings();
 
@@ -433,10 +465,10 @@ class TestHarness {
       await this.recreateSchema(targetVendor,targetConnectionProperties,dbSchema2);     
 
       testParameters = parameters ? Object.assign({},parameters) : {}
-      dbi = this.getTestInterface(targetVendor,'TOUSER',dbSchema2,testParameters,targetConnectionProperties,tableMappings);     
+      dbi = this.getTestInterface(targetVendor,'TO_USER',dbSchema2,testParameters,targetConnectionProperties,tableMappings);     
       
       startTime = new Date().getTime();
-      timings[2] = await this.doImport(dbi,path.join(testRoot,targetFile1));
+      timings[2] = await this.doImport(dbi,targetFile1);
       elapsedTime = new Date().getTime() - startTime;
       
       targetDescription = this.getDescription(targetVendor,dbSchema2)
@@ -444,10 +476,10 @@ class TestHarness {
       this.printResults(`"${source}"://"${targetFile1}"`,`"${target}"://"${targetDescription}"`,elapsedTime)
 
       testParameters = parameters ? Object.assign({},parameters) : {}
-      dbi = this.getTestInterface(targetVendor,'OWNER',dbSchema2,testParameters,targetConnectionProperties);     
+      dbi = this.getTestInterface(targetVendor,'FROM_USER',dbSchema2,testParameters,targetConnectionProperties);     
 
       startTime = new Date().getTime()
-      timings[3] = await this.yadamu.doExport(dbi,path.join(testRoot,targetFile2));
+      timings[3] = await this.doExport(dbi,targetFile2);
       elapsedTime = new Date().getTime() - startTime;
       
       sourceDescription = targetDescription;
@@ -463,7 +495,7 @@ class TestHarness {
       testParameters = dbi.parameters.TABLE_MATCHING ? {TABLE_MATCHING : dbi.parameters.TABLE_MATCHING} : {}
       Object.assign(testParameters,parameters);
       fc.configureTest({},testParameters)
-      await fc.report(this.yadamuLoggger,sourceFile, path.join(testRoot,targetFile1), path.join(testRoot,targetFile2), timings);    
+      await fc.report(this.yadamuLoggger,sourceFile,targetFile1, targetFile2, timings);    
 
       this.yadamuLogger.log([`${this.constructor.name}`,'FILECOPY'],`Operation complete: [${operationsList[0]}] -->  [${operationsList[1]}] --> [${operationsList[2]}] --> [${operationsList[3]}]  --> [${operationsList[4]}]. Elapsed Time: ${YadamuTest.stringifyDuration(opElapsedTime)}s.`);
 
@@ -599,6 +631,8 @@ class TestHarness {
       **
       */
       
+      let sourceVersion = undefined
+      let targetVersion = undefined
       
       const sourceVendor = Object.keys(this.connections[source])[0]
       const sourceConnectionProperties = this.connections[source][sourceVendor]
@@ -623,8 +657,8 @@ class TestHarness {
         targetSchema = this.getDatabaseSchema(targetVendor,steps[1])  
         const targetDescription = this.getDescription(targetVendor,targetSchema)
         await this.recreateSchema(sourceVendor,sourceConnectionProperties,targetSchema);
-        const sourceDB = this.getTestInterface(sourceVendor,'OWNER',sourceSchema,testParameters,sourceConnectionProperties,undefined);
-        const targetDB = this.getTestInterface(sourceVendor,'TOUSER',targetSchema,testParameters,targetConnectionProperties,undefined);
+        const sourceDB = this.getTestInterface(sourceVendor,'FROM_USER',sourceSchema,testParameters,sourceConnectionProperties,undefined);
+        const targetDB = this.getTestInterface(sourceVendor,'TO_USER',targetSchema,testParameters,targetConnectionProperties,undefined);
         startTime = new Date().getTime();
         timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
         elapsedTime = new Date().getTime() - startTime
@@ -642,8 +676,8 @@ class TestHarness {
           const targetSchema = this.getDatabaseSchema(sourceVendor,steps[2])  
           const targetDescription = this.getDescription(sourceVendor,targetSchema)
           await this.recreateSchema(sourceVendor,sourceConnectionProperties,targetSchema);
-          const sourceDB = this.getTestInterface(sourceVendor,'OWNER',sourceSchema,testParameters,sourceConnectionProperties,undefined);
-          const targetDB = this.getTestInterface(sourceVendor,'TOUSER',targetSchema,testParameters,sourceConnectionProperties,undefined);
+          const sourceDB = this.getTestInterface(sourceVendor,'FROM_USER',sourceSchema,testParameters,sourceConnectionProperties,undefined);
+          const targetDB = this.getTestInterface(sourceVendor,'TO_USER',targetSchema,testParameters,sourceConnectionProperties,undefined);
           startTime = new Date().getTime();
           timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
           elapsedTime = new Date().getTime() - startTime
@@ -656,11 +690,13 @@ class TestHarness {
         targetSchema = this.getDatabaseSchema(targetVendor,steps[1])  
         await this.recreateSchema(targetVendor,targetConnectionProperties,targetSchema);
         let targetDescription = this.getDescription(targetVendor,targetSchema)
-        let sourceDB = this.getTestInterface(sourceVendor,'OWNER',sourceSchema,testParameters,sourceConnectionProperties,undefined);
-        let targetDB = this.getTestInterface(targetVendor,'TOUSER',targetSchema,testParameters,targetConnectionProperties,undefined);
+        let sourceDB = this.getTestInterface(sourceVendor,'FROM_USER',sourceSchema,testParameters,sourceConnectionProperties,undefined);
+        let targetDB = this.getTestInterface(targetVendor,'TO_USER',targetSchema,testParameters,targetConnectionProperties,undefined);
         this.propogateTableMatching(sourceDB,targetDB);
         startTime = new Date().getTime();
         timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
+        sourceVersion = sourceDB.dbVersion;
+        targetVersion = targetDB.dbVersion;
         elapsedTime = new Date().getTime() - startTime
         const tableMappings = targetDB.reverseTableMappings();
         operationsList.push(`"${source}"://"${sourceDescription}"`)
@@ -670,8 +706,8 @@ class TestHarness {
         sourceDescription = this.getDescription(targetVendor,sourceSchema) 
         targetSchema = this.getDatabaseSchema(sourceVendor,steps[2])  
         targetDescription =  this.getDescription(sourceVendor,targetSchema) 
-        sourceDB = this.getTestInterface(targetVendor,'OWNER',sourceSchema,testParameters,targetConnectionProperties,undefined);
-        targetDB = this.getTestInterface(sourceVendor,'TOUSER',targetSchema,testParameters,sourceConnectionProperties,tableMappings);
+        sourceDB = this.getTestInterface(targetVendor,'FROM_USER',sourceSchema,testParameters,targetConnectionProperties,undefined);
+        targetDB = this.getTestInterface(sourceVendor,'TO_USER',targetSchema,testParameters,sourceConnectionProperties,tableMappings);
         this.propogateTableMatching(sourceDB,targetDB);
         startTime = new Date().getTime();
         timings.push(await this.yadamu.pumpData(sourceDB,targetDB));
@@ -684,7 +720,7 @@ class TestHarness {
       const dbElapsedTime =  new Date().getTime() - dbStartTime
       
       this.checkTimingsForErrors(timings);   
-      await this.compareSchemas(source, originalSchema, targetSchema, timings, this.getCompareParameters(sourceVendor,targetVendor,testParameters))
+      await this.compareSchemas(source, originalSchema, targetSchema, timings, this.getCompareParameters(sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
       this.dbRoundtripResults(operationsList,dbElapsedTime)
       
   }
@@ -719,7 +755,7 @@ class TestHarness {
       else {
         const dbSchema = this.getDatabaseSchema(sourceVendor,sourceInfo)
         sourceDescription = this.getDescription(sourceVendor,dbSchema)
-        sourceDB = this.getTestInterface(sourceVendor,'OWNER',dbSchema,testParameters,sourceConnectionProperties);
+        sourceDB = this.getTestInterface(sourceVendor,'FROM_USER',dbSchema,testParameters,sourceConnectionProperties);
       }
 
       const dbSchema = this.getDatabaseSchema(targetVendor,targetInfo)
@@ -733,7 +769,7 @@ class TestHarness {
         targetDescription = this.getDescription(targetVendor,dbSchema)
       }
       
-      targetDB = this.getTestInterface(targetVendor,'TOUSER',dbSchema,testParameters,targetConnectionProperties);
+      targetDB = this.getTestInterface(targetVendor,'TO_USER',dbSchema,testParameters,targetConnectionProperties);
       
       startTime = new Date().getTime()
       timings[0] = await this.yadamu.pumpData(sourceDB,targetDB);
@@ -769,8 +805,7 @@ class TestHarness {
         await this.doCopy(jobConfiguration.source,target,jobConfiguration.parameters,jobConfiguration.directory,steps)
         break
       case "FILEROUNDTRIP":
-        await this.fileRoundtrip(target,jobConfiguration.parameters,steps[0],steps[1],steps[2],steps[3],steps[4]);
-        // await this.fileRoundtrip(target,jobConfiguration,steps);
+        await this.fileRoundtrip(jobConfiguration.source,target,jobConfiguration.parameters,steps[0],steps[1],steps[2],steps[3],steps[4]);
         break;
       case "DBROUNDTRIP":
         const clone = (this.testConfiguration.clone && (this.testConfiguration.clone === true)) 
@@ -813,7 +848,7 @@ class TestHarness {
     **
     **   jobs: The set of job configuration files to be processed as part of the test.
     **
-    **  A job configuration file deffines one or more jobs. Each Job specifices
+    **  A job configuration file defines one or more jobs. Each Job specifices
     **
     **    source: The locaton of the source data
     **
@@ -832,6 +867,8 @@ class TestHarness {
       const jobConfiguration = require(path.resolve(jobConfigurationPath));
       const startTime = new Date().getTime();
       for (const job of jobConfiguration) {
+        this.inputPathPrefix = job.inputPathPrefix ? job.inputPathPrefix : ""
+        this.outputPathPrefix = job.outputPathPrefix ? job.outputPathPrefix : ""        
         if (job.parsingMethod) {
           switch (job.parsingMethod) {
             case "CLARINET" :
@@ -863,7 +900,7 @@ class TestHarness {
       this.yadamuLogger.log([`${this.constructor.name}`,'JOBS'],`Operation complete: Configuration:"${jobConfigurationPath}".  Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
     }
     const elapsedTime = new Date().getTime() - startTime;
-    this.yadamuLogger.log([`${this.constructor.name}`,'TEST'],`Operation complete: Configuration:"${this.yadamu.getParameters().CONFIG}". Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.log([`${this.constructor.name}`,'TEST'],`Operation complete: Configuration:"${this.yadamu.getConfigFilePath()}". Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
   
     this.yadamuLogger.close(); 
     this.yadamu.close()

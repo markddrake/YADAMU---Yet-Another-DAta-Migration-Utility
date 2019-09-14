@@ -1,0 +1,3 @@
+[
+    ["MsSQL/AdventureWorksDW.json",{"database": "AdventureWorksDW1","owner": "dbo"},"AdventureWorksDW1.json",{"database": "AdventureWorksDW2","owner": "dbo"},"AdventureWorksDW2.json"]
+]

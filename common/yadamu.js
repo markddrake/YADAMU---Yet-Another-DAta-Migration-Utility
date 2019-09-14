@@ -8,16 +8,12 @@ const FileWriter = require('../file/node/fileWriter.js');
 const DBReader = require('./dbReader.js');
 const DBWriter = require('./dbWriter.js');
 const YadamuLogger = require('./yadamuLogger.js');
+const YadamuDefaults = require('./yadamuDefaults.json');
 
 class Yadamu {
 
   get EXPORT_VERSION() { return '1.0' };
-  get DEFAULT_PARAMETERS() { 
-     return { 
-       "MODE"       : "DATA_ONLY"
-     , "FILE"       : "export.json"
-     }
-  }
+  get YADAMU_DEFAULT_PARAMETERS() { return YadamuDefaults.yadamu }
      
   static nameMatch(source,target,rule) {
       
@@ -160,7 +156,7 @@ class Yadamu {
     
     if (!yadamuLogger.loggingToConsole()) {
       yadamuLogger.logException([`${this.name}`,`"${status.operation}"`],e);
-      console.log(`[ERROR][${this.name}][${status.operation}]: Operation failed: See "${parameters.LOGFILE ? parameters.LOGFILE  : 'above'}" for details.`);
+      console.log(`[ERROR][${this.name}][${status.operation}]: Operation failed: See "${parameters.LOG_FILE ? parameters.LOG_FILE  : 'above'}" for details.`);
     }
     else {
       console.log(`[ERROR][${this.name}][${status.operation}]: Operation Failed:`);
@@ -169,12 +165,13 @@ class Yadamu {
   }
   
   constructor(operation,parameters) {
-        
+       
+    this.commandLineParameters = this.readCommandLineParameters();
     this.yadamuLogger = new YadamuLogger(process.stdout)
     
-    // Start with DEFAULT_PARAMETERS
-    this.parameters = Object.assign({}, this.DEFAULT_PARAMETERS);
-    // Merge parameters provided via the constructor
+    // Start with Yadamu Defaults
+    this.parameters = Object.assign({}, YadamuDefaults.yadamu);
+    // Merge parameters read from configuration files
     Object.assign(this.parameters, parameters ? parameters : {});
     // Merge parameters provided via command line arguments
     Object.assign(this.parameters,this.getCommandLineParameters())
@@ -195,38 +192,52 @@ class Yadamu {
       process.exit()
     })
       
-    if (this.parameters.SQLTRACE) {
-	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQLTRACE);
+    if (this.parameters.SQL_TRACE) {
+	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQL_TRACE);
     }
 
-    if (this.parameters.LOGFILE) {
-      this.status.logFileName = this.parameters.LOGFILE;
+    if (this.parameters.LOG_FILE) {
+      this.status.logFileName = this.parameters.LOG_FILE;
     }
 
-    if (this.parameters.LOGLEVEL) {
-      this.status.loglevel = this.parameters.LOGLEVEL;
+    if (this.parameters.LOG_LEVEL) {
+      this.status.loglevel = this.parameters.LOG_LEVEL;
     }
     	
-    if (this.parameters.DUMPFILE) {
-      this.status.dumpFileName = this.parameters.DUMPFILE
+    if (this.parameters.DUMP_FILE) {
+      this.status.dumpFileName = this.parameters.DUMP_FILE
     }
     
     this.status.showInfoMsgs = (this.status.loglevel && (this.status.loglevel > 2));  
   }
     
-  getParameters() {
-    return Object.assign({},this.parameters)
+  cloneDefaultParameters() {
+     const parameters = Object.assign({},YadamuDefaults.yadamu)
+     Object.assign(parameters, YadamuDefaults.yadamuDBI)
+     return parameters
   }
 
   getStatus() {
     return this.status
   }
+  
+  getYadamuDefaults() {
+    return YadamuDefaults
+  }
 
   getYadamuLogger() {
     return this.yadamuLogger
   }
-    
+  
+  getConfigFilePath() {
+    return this.commandLineParameters.CONFIG
+  }
+
   getCommandLineParameters() {
+    return this.commandLineParameters
+  }
+    
+  readCommandLineParameters() {
    
     const parameters = {}
  
@@ -277,35 +288,39 @@ class Yadamu {
             break;
           case 'OWNER':
           case '--OWNER':
-            parameters.OWNER = Yadamu.processValue(parameterValue);
-            break;
-          case 'FROMUSER':
-          case '--FROMUSER':
-            parameters.FROMUSER = Yadamu.processValue(parameterValue);
+          case 'FROM_USER':
+          case '--FROM_USER':
+            parameters.FROM_USER = Yadamu.processValue(parameterValue);
             break;
           case 'TOUSER':
           case '--TOUSER':
-            parameters.TOUSER = Yadamu.processValue(parameterValue);
+          case 'TO_USER':
+          case '--TO_USER':
+            parameters.TO_USER = Yadamu.processValue(parameterValue);
             break;
-          case 'LOGFILE':
-          case '--LOGFILE':
-            parameters.LOGFILE = parameterValue;
+          case 'LOG_FILE':
+          case '--LOG_FILE':
+            parameters.LOG_FILE = parameterValue;
             break;
-          case 'SQLTRACE':
-          case '--SQLTRACE':
-            parameters.SQLTRACE = parameterValue;
+          case 'SQL_TRACE':
+          case '--SQL_TRACE':
+            parameters.SQL_TRACE = parameterValue;
+            break;
+          case 'PARAMETER_TRACE':
+          case '--PARAMETER_TRACE':
+            parameters.PARAMETER_TRACE = (parameterValue.toLowerCase() === 'true');
             break;
           case 'SPATIAL_FORMAT':
           case '--SPATIAL_FORMAT':
             parameters.SPATIAL_FORMAT = parameterValue.toUpperCase()
             break;
-          case 'LOGLEVEL':
-          case '--LOGLEVEL':
-            parameters.LOGLEVEL = parameterValue;
+          case 'LOG_LEVEL':
+          case '--LOG_LEVEL':
+            parameters.LOG_LEVEL = parameterValue;
             break;
-          case 'DUMPFILE':
-          case '--DUMPFILE':
-            parameters.DUMPFILE = parameterValue.SPATIAL_FORMAT();
+          case 'DUMP_FILE':
+          case '--DUMP_FILE':
+            parameters.DUMP_FILE = parameterValue.SPATIAL_FORMAT();
             break;
           case 'FEEDBACK':
           case '--FEEDBACK':
@@ -319,16 +334,16 @@ class Yadamu {
           case '--CONFIG':
             parameters.CONFIG = parameterValue;
             break;
-          case 'BATCHSIZE':
-          case '--BATCHSIZE':
+          case 'BATCH_SIZE':
+          case '--BATCH_SIZE':
             Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
-          case 'BATCHCOMMIT':
-          case '--BATCHCOMMIT':
+          case 'BATCH_COMMIT':
+          case '--BATCH_COMMIT':
             Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
-          case 'LOBCACHESIZE':
-          case '--LOBCACHESIZE':
+          case 'LOB_CACHE_SIZE':
+          case '--LOB_CACHE_SIZE':
             Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           default:
@@ -342,8 +357,8 @@ class Yadamu {
 
   setYadamuLogger(parameters) {
 
-    if (this.parameters.LOGFILE) {
-      return new YadamuLogger(fs.createWriteStream(this.parameters.LOGFILE,{flags : "a"}),this.status);
+    if (this.parameters.LOG_FILE) {
+      return new YadamuLogger(fs.createWriteStream(this.parameters.LOG_FILE,{flags : "a"}),this.status);
     }
     return new YadamuLogger(process.stdout,this.status);
   
@@ -370,12 +385,12 @@ class Yadamu {
 
   async pumpData(source,target) {
       
-    if ((source.isDatabase() === true) && (source.parameters.OWNER === undefined)) {
-      throw new Error('Missing mandatory parameter OWNER');
+    if ((source.isDatabase() === true) && (source.parameters.FROM_USER === undefined)) {
+      throw new Error('Missing mandatory parameter FROM_USER');
     }
 
-    if ((target.isDatabase() === true) && (target.parameters.TOUSER === undefined)) {
-      throw new Error('Missing mandatory parameter TOUSER');
+    if ((target.isDatabase() === true) && (target.parameters.TO_USER === undefined)) {
+      throw new Error('Missing mandatory parameter TO_USER');
     }
    
     let timings = {}

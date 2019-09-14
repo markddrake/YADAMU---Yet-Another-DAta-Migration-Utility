@@ -1,4 +1,4 @@
-create or replace procedure COMPARE_SCHEMA(P_SOURCE_SCHEMA VARCHAR,P_TARGET_SCHEMA VARCHAR,P_EMPTY_STRING_IS_NULL BOOLEAN,P_STRIP_XML_DECLARATION BOOLEAN)
+create or replace procedure COMPARE_SCHEMA(P_SOURCE_SCHEMA VARCHAR,P_TARGET_SCHEMA VARCHAR,P_EMPTY_STRING_IS_NULL BOOLEAN,P_STRIP_XML_DECLARATION BOOLEAN, P_SPATIAL_PRECISION INT)
 as $$
 declare
   R RECORD;
@@ -40,7 +40,12 @@ begin
                             '"' || column_name || '"::text' 
                         end
                       when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
-                       'st_AsText("' || column_name || '",18)' 
+                       case 
+                         when P_SPATIAL_PRECISION < 18 then
+                           'ST_AsText("' || column_name || '",' || P_SPATIAL_PRECISION || ')' 
+                         else
+                           'ST_AsEWKB("' || column_name || '")' 
+                        end
                       else 
                         '"' || column_name || '"' 
                     end
@@ -64,6 +69,7 @@ begin
                       || '       ,(select count(*) from (SELECT ' || r.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '" EXCEPT SELECT ' || r.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '") T1) '  || C_NEWLINE
                       || '       ,(select count(*) from (SELECT ' || r.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || r.TABLE_NAME || '" EXCEPT SELECT ' || r.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || r.TABLE_NAME || '") T1) '  || C_NEWLINE
                       || '       ,NULL';
+      -- RAISE INFO 'SQL: %', V_SQL_STATEMENT;
       EXECUTE V_SQL_STATEMENT;               
     exception  
       when others then

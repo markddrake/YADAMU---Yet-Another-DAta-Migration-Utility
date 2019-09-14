@@ -47,7 +47,7 @@ class StatementGenerator {
   
   createBulkOperation(database, tableName, columnList, targetDataTypes) {
 
-    const table = new sql.Table(database + '.' + this.dbi.parameters.TOUSER + '.' + tableName);
+    const table = new sql.Table(database + '.' + this.dbi.parameters.TO_USER + '.' + tableName);
     table.create = false
     
     const columns = JSON.parse('[' +  columnList + ']')

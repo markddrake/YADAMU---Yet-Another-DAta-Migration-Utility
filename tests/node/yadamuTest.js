@@ -4,8 +4,13 @@ const fs = require('fs');
 const path = require('path');
   
 const Yadamu = require('../../common/yadamu.js').Yadamu;
+const YadamuTestDefaults = require('./yadamuDefaults.json')
 
 class YadamuTest extends Yadamu {
+    
+  getYadamuTestDefaults() {
+    return YadamuTestDefaults
+  }
   
   constructor() {
     super('Test')
@@ -18,8 +23,8 @@ class YadamuTest extends Yadamu {
     this.status.errorRaised   = false;
     this.status.statusMsg     = 'successfully'
     
-    if (this.parameters.SQLTRACE) {
-	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQLTRACE,{flags : "a"});
+    if (this.parameters.SQL_TRACE) {
+	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQL_TRACE,{flags : "a"});
     }
   }
   

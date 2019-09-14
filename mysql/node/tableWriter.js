@@ -1,5 +1,7 @@
 "use strict"
 
+const WKX = require('wkx');
+
 const YadamuWriter = require('../../common/yadamuWriter.js');
 
 class TableWriter extends YadamuWriter {
@@ -7,7 +9,7 @@ class TableWriter extends YadamuWriter {
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
     this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
-    this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + ')';    
+    this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + ')'; 
   }
 
   async finalize() {
@@ -78,6 +80,48 @@ class TableWriter extends YadamuWriter {
     }
   }
   
+  async recodeSpatialData(row,rowNumber) {  
+
+    // Convert spatial data in current row from WKB to WKT and retry Insert...
+    // Update current insert statement to reflect change in spatial data format.
+    // 
+    // ### TODO: Convert all remaining rows in current batch ? Convert all remaining batches 
+    
+    if ((this.tableInfo.spatialFormat === 'WKT') || (this.tableInfo.spatialFormat === 'EWKT')) {
+      return false;
+    }
+      
+    const newRow = this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
+      const dataType = this.dbi.decomposeDataType(targetDataType);
+      switch (dataType.type) {
+        case "geography":
+        case "geometry": 
+          if (row[idx] !== null) {
+            return WKX.Geometry.parse(Buffer.from(row[idx],'hex')).toWkt()
+          }
+          else {
+            return row[idx]
+          }
+          break;
+        default:  
+          return row[idx]
+      }
+    },this)
+
+    const dml = this.tableInfo.dml.replace(/ST_GeomFromWKB\(UNHEX\(\?\)\)/g,'ST_GeomFromText(?)')
+     
+    try {
+      const results = await this.dbi.executeSQL(dml,newRow)
+      await this.processWarnings(results);
+      return true;
+    } catch (e) {
+      const errInfo = this.status.showInfoMsgs === true ? [dml,newRow] : []
+      this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.recodeSpatialData()`,this.tableName,this.batch.length,rowNumber,newRow,e,errInfo);
+    }
+    
+    return false;
+  }
+ 
   async writeBatch() {     
 
     this.batchCount++;
@@ -109,10 +153,16 @@ class TableWriter extends YadamuWriter {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row])
         await this.processWarnings(results);
       } catch (e) {
-        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []
-        this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,this.batch[row],e,errInfo);
-        if (this.skipTable) {
-          break;
+        if ((e.errno && e.errno === 3037) && (e.code && e.code === 'ER_GIS_INVALID_DATA') && (e.sqlState &&  e.sqlState === '22023')) {
+          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.batch.length}], row ${row}. Spatial Insert ("${this.tableInfo.spatialFormat}") raised: "${e.code}". Converting to "WKT".`);
+          this.recodeSpatialData(this.batch[row],row);
+        }
+        else {
+          const errInfo = this.status.showInfoMsgs === true ? [this.tableInfo.dml,this.batch[row]] : []
+          this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,this.batch[row],e,errInfo);
+          if (this.skipTable) {
+            break;
+          }
         }
       }
     }     

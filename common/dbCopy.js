@@ -57,6 +57,10 @@ class DBCopy {
         const MongoDBI = require('../mongob/node/mongoDBI.js');
         dbi = new MongoDBI(yadamu)
         break;
+      case "snowflake" :
+        const SnowflakeDBI = require('../snowflake/node/snowflakeDBI.js');
+        dbi = new SnowflakeDBI(yadamu)
+        break;
       case "file" :
         dbi = new FileCompare(yadamu)
         break;
@@ -82,9 +86,9 @@ class DBCopy {
     const startTime = new Date().getTime();
     for (const job of this.configuration.jobs) {
       // Initialize constructor parameters with values from configuration file
-      const jobParameters = Object.assign({} : this.configuration.parameters ? this.configuation.parameters : {})
+      const jobParameters = Object.assign({} , this.configuration.parameters ? this.configuation.parameters : {})
       // Merge job specific parameters
-      Object.assign(jobParameters,job.parameters ? job.parameters : {}))
+      Object.assign(jobParameters,job.parameters ? job.parameters : {})
     
       const sourceSchema = this.configuration.schemas[job.source.schema]
       const sourceConnection = this.configuration.connections[job.source.connection]
@@ -96,19 +100,19 @@ class DBCopy {
       const targetDatabase =  Object.keys(targetConnection)[0];
       const targetDescription = this.getDescription(targetDatabase,job.target.connection,targetSchema)
 
-      jobParameters.OWNER = this.getOwner(sourceSchema);
-      jobParameters.TOUSER = this.getOwner(targetSchema);
+      jobParameters.FROM_USER = this.getOwner(sourceSchema);
+      jobParameters.TO_USER = this.getOwner(targetSchema);
       
       switch (sourceDatabase) {
          case 'mssql':
-           jobParameters.MSSQL_OWNER_DB = sourceSchema.database
+           jobParameters.MSSQL_FROM_USER_DB = sourceSchema.database
            break;
          default:
       }
 
       switch (targetDatabase) {
          case 'mssql':
-           jobParameters.MSSQL_TOUSER_DB = targetSchema.database
+           jobParameters.MSSQL_TO_USER_DB = targetSchema.database
            break;
          default:
       }

@@ -4,7 +4,7 @@ export YADAMU_TARGET=MySQL
 if [ ! -e $YADAMU_INPUT_PATH ]; then mkdir $YADAMU_INPUT_PATH;fi
 export FILENAME=jsonExample
 export SCHEMA=jtest
-node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --port=$DB_PORT --password=$DB_PWD --database=$DB_DBNAME --file=$YADAMU_INPUT_PATH/$FILENAME.json owner=\"$SCHEMA\" mode=$MODE logFile=$EXPORTLOG
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --port=$DB_PORT --password=$DB_PWD --database=$DB_DBNAME --file=$YADAMU_INPUT_PATH/$FILENAME.json owner=\"$SCHEMA\" mode=$MODE log_file=$EXPORTLOG
 export FILENAME=sakila
 export SCHEMA=sakila
-node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --port=$DB_PORT --password=$DB_PWD --database=$DB_DBNAME --file=$YADAMU_INPUT_PATH/$FILENAME.json owner=\"$SCHEMA\" mode=$MODE logFile=$EXPORTLOG
+node $YADAMU_DB_ROOT/node/export --username=$DB_USER --hostname=$DB_HOST --port=$DB_PORT --password=$DB_PWD --database=$DB_DBNAME --file=$YADAMU_INPUT_PATH/$FILENAME.json owner=\"$SCHEMA\" mode=$MODE log_file=$EXPORTLOG

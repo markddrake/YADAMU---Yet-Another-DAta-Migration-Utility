@@ -77,7 +77,7 @@ class DBWriter extends Writable {
   
   async generateStatementCache(metadata,ddlRequired) {
     this.dbi.setMetadata(metadata)      
-    await this.dbi.generateStatementCache(this.dbi.parameters.TOUSER,!this.ddlComplete)
+    await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER,!this.ddlComplete)
   }   
   
   async setMetadata(metadata) {
@@ -94,7 +94,7 @@ class DBWriter extends Writable {
 
     // Fetch metadata for tables that already exist in the target schema.
        
-    const targetSchemaInfo = await this.dbi.getSchemaInfo('TOUSER');
+    const targetSchemaInfo = await this.dbi.getSchemaInfo('TO_USER');
     
     if (targetSchemaInfo === null) {
       this.dbi.setMetadata(metadata)      
@@ -266,7 +266,9 @@ class DBWriter extends Writable {
       else {
         this.yadamuLogger.info([`${this.constructor.name}`],`No tables found.`);
       }
-      await this.dbi.finalizeImport();
+      if (this.currentTable !== undefined) {
+        await this.dbi.finalizeImport();
+      }
       callback();
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._final()`,`"${this.currentTable}"`],e);

@@ -11,6 +11,8 @@
             "mariadb#1"
         ],
         "parsingMethod": "CLARINET",
+        "inputPathPrefix"  : "JSON",
+        "outputPathPrefix" : "work",
         "parameters": {
             "MODE": "DATA_ONLY",
             "FEEDBACK": "COMMIT"
@@ -26,6 +28,8 @@
             "oracle11g"
         ],
         "parsingMethod": "CLARINET",
+        "inputPathPrefix"  : "JSON",
+        "outputPathPrefix" : "work",
         "parameters": {
             "MODE"     : "DATA_ONLY",
             "FEEDBACK": "COMMIT",
@@ -47,6 +51,8 @@
             "mysql#1"
         ],
         "parsingMethod": "RDBMS",
+        "inputPathPrefix"  : "JSON",
+        "outputPathPrefix" : "work",
         "parameters": {
             "MODE": "DATA_ONLY",
             "FEEDBACK": "COMMIT"

@@ -15,7 +15,7 @@ const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 
 const defaultParameters = {
-  BATCHSIZE         : 10000
+  BATCH_SIZE         : 10000
 , COMMITSIZE        : 10000
 }
 

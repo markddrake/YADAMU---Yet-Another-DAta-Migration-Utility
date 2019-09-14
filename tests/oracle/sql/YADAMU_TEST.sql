@@ -78,7 +78,7 @@ as
              when DATA_TYPE = 'BFILE' then
 	           'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || COLUMN_NAME || '") end' 
 		     when (DATA_TYPE = 'SDO_GEOMETRY') then
-               'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.FROMWKTGEOMETRY("' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end'
+               'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.TO_WKBGEOMETRY("' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end'
              when DATA_TYPE = 'XMLTYPE' then
 		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT "' || COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end' 
 		     when DATA_TYPE = 'ANYDATA' then
@@ -107,10 +107,7 @@ as
 	          and atc.TABLE_NAME = aat.TABLE_NAME
        left outer join ALL_TYPES at
 	                on at.TYPE_NAME = atc.DATA_TYPE
-                   and at.OWNER = atc.DATA_TYPE_OWNER
-	   left outer join ALL_MVIEWS amv
-		            on amv.OWNER = aat.OWNER
-		           and amv.MVIEW_NAME = aat.TABLE_NAME    
+                   and at.OWNER = atc.DATA_TYPE_OWNER   
        $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
        left outer join ALL_EXTERNAL_TABLES axt
 	                on axt.OWNER = aat.OWNER
@@ -194,6 +191,7 @@ begin
 					|| '  from dual';
                     
 	begin
+      DBMS_OUTPUT.PUT_LINE(V_SQL_STATEMENT);
 	  EXECUTE IMMEDIATE V_SQL_STATEMENT;
     exception 
       when OTHERS then

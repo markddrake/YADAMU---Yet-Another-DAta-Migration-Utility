@@ -1,0 +1,27 @@
+{
+  "mariadb"                   : {
+    "TIMESTAMP_PRECISION"     : 6
+  }
+, "mongodb"                   : {
+  }
+, "mssql"                     : {
+    "STRIP_XML_DECLARATION"   : true
+  , "TIMESTAMP_PRECISION"     : 9
+  }
+, "mysql"                     : {
+    "TIMESTAMP_PRECISION"     : 6
+  }
+, "oracle"                    : {
+    "EMPTY_STRING_IS_NULL"    : true
+  , "TIMESTAMP_PRECISION"     : 9
+  }
+, "postgres"                  : {
+    "TIMESTAMP_PRECISION"     : 6
+  }
+, "snowflake"                 : {
+  }
+, "SPATIAL_PRECISION"         : {
+    "default"                 : 15
+  , "mssql"                   : { "oracle": 9}
+  }
+}

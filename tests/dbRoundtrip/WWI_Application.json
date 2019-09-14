@@ -1,0 +1,17 @@
+[
+    [
+        {
+            "database": "WorldWideImporters",
+            "owner": "Application", 
+			"dbPrefix": "WWI" 
+        },
+        {
+            "database": "WWI_Application1",
+            "owner": "dbo"
+        },
+        {
+            "database": "WWI_Application1",
+            "owner": "dbo"
+        }
+    ]
+]

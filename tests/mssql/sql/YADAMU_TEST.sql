@@ -1,5 +1,278 @@
 use master
 go
+CREATE OR ALTER FUNCTION pointsFromGeography(@GEOGRAPHY GEOGRAPHY)
+returns @POINTS_TABLE TABLE (
+    ID  INT,
+    LAT FLOAT,
+    LONG FLOAT
+  )
+as
+BEGIN
+
+  DECLARE @POINT_NUMBER      INT;
+  DECLARE @POINT_COUNT       INT;
+  
+  DECLARE @RING_NUMBER       INT;
+  DECLARE @RING_COUNT        INT;
+  
+  DECLARE @POLYGON_NUMBER    INT;
+  DECLARE @POLYGON_COUNT     INT;
+
+  DECLARE @RING              GEOGRAPHY;
+  DECLARE @POINT             GEOGRAPHY;
+  DECLARE @POLYGON           GEOGRAPHY;
+  DECLARE @MULTIPOLYGON      GEOGRAPHY;
+  DECLARE @POINT_ID          INT = 1;
+  
+  if (@GEOGRAPHY.STIsValid() = 0) begin
+    SET @GEOGRAPHY = @GEOGRAPHY.MakeValid();
+  end;
+  
+  if @GEOGRAPHY.InstanceOf('POINT') = 1 begin    
+    insert into @POINTS_TABLE (ID, LAT, LONG) values (1,@GEOGRAPHY.Lat,@GEOGRAPHY.Long)
+  end;
+  
+  -- Iterative the component geograpjys and points for LINE, POLYGON, MULTIPOLYGON etc
+  if @GEOGRAPHY.InstanceOf('POLYGON') = 1 begin   
+    SET @RING_NUMBER = 0;
+    SET @RING_COUNT = @GEOGRAPHY.NumRings();
+    while (@RING_NUMBER  < @RING_COUNT) begin
+      SET @RING_NUMBER = @RING_NUMBER + 1;
+      SET @RING = @GEOGRAPHY.RingN(@RING_NUMBER);
+      SET @POINT_NUMBER = 0;
+      SET @POINT_COUNT = @RING.STNumPoints();
+      while (@POINT_NUMBER < @POINT_COUNT) begin
+        SET @POINT_NUMBER = @POINT_NUMBER + 1;
+        SET @POINT = @RING.STPointN(@POINT_NUMBER);
+        insert into @POINTS_TABLE (ID, LAT, LONG) values (@POINT_ID,@POINT.Lat,@POINT.Long)
+        SET @POINT_ID = @POINT_ID + 1;
+      end;
+    end
+  end;
+
+  if @GEOGRAPHY.InstanceOf('MULTIPOLYGON') = 1 begin   
+    SET @POLYGON_NUMBER = 0;
+    SET @POLYGON_COUNT = @GEOGRAPHY.STNumGeometries();
+    while (@POLYGON_NUMBER  < @POLYGON_COUNT) begin
+      SET @POLYGON_NUMBER = @POLYGON_NUMBER + 1;
+      SET @POLYGON = @GEOGRAPHY.STGeometryN(@POLYGON_NUMBER);
+      SET @RING_NUMBER = 0;
+      SET @RING_COUNT = @POLYGON.NumRings();
+      while (@RING_NUMBER  < @RING_COUNT) begin
+        SET @RING_NUMBER = @RING_NUMBER + 1;
+        SET @RING = @POLYGON.RingN(@RING_NUMBER);
+        SET @POINT_NUMBER = 0;
+        SET @POINT_COUNT = @RING.STNumPoints();
+        while (@POINT_NUMBER < @POINT_COUNT) begin
+          SET @POINT_NUMBER = @POINT_NUMBER + 1;
+          SET @POINT = @RING.STPointN(@POINT_NUMBER);
+          insert into @POINTS_TABLE (ID, LAT, LONG) values (@POINT_ID,@POINT.Lat,@POINT.Long)
+          SET @POINT_ID = @POINT_ID + 1;
+        end;
+      end;
+    end;
+  end;     
+  return 
+end
+--
+go
+--
+CREATE OR ALTER FUNCTION sp_RoundGeography(@GEOGRAPHY GEOGRAPHY,@SPATIAL_PRECISION int)
+returns VARCHAR(MAX)
+as
+begin
+  DECLARE @POINT_SEPERATOR   CHAR(1);
+  DECLARE @POINT_NUMBER      INT;
+  DECLARE @POINT_COUNT       INT;
+  
+  DECLARE @RING_SEPERATOR    CHAR(1);
+  DECLARE @RING_NUMBER       INT;
+  DECLARE @RING_COUNT        INT;
+  
+  DECLARE @POLYGON_SEPERATOR CHAR(1);
+  DECLARE @POLYGON_NUMBER    INT;
+  DECLARE @POLYGON_COUNT     INT;
+
+  DECLARE @LAT               VARCHAR(32);
+  DECLARE @LONG              VARCHAR(32);
+  DECLARE @Z                 VARCHAR(32);
+  DECLARE @M                 VARCHAR(32);
+
+  DECLARE @RING              GEOGRAPHY;
+  DECLARE @POINT             GEOGRAPHY;
+  DECLARE @POLYGON           GEOGRAPHY;
+  DECLARE @MULTIPOLYGON      GEOGRAPHY;
+  
+  DECLARE @SPATIAL_LENGTH    INT = @SPATIAL_PRECISION + 1;
+  DECLARE @WKT               VARCHAR(MAX);
+
+  if (@GEOGRAPHY.STIsValid() = 0) begin
+    SET @GEOGRAPHY = @GEOGRAPHY.MakeValid();
+  end;
+  
+  if @GEOGRAPHY.InstanceOf('POINT') = 1 begin    
+    -- SET @LAT = STR(ROUND(@GEOGRAPHY.Lat,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+    -- SET @LONG = STR(ROUND(@GEOGRAPHY.Long,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+    -- SET @Z = STR(ROUND(@GEOGRAPHY.Z,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+    -- SET @M = STR(ROUND(@GEOGRAPHY.M,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+    SET @LAT  = round(round(cast(@GEOGRAPHY.Lat as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1)
+    SET @LONG = round(round(cast(@GEOGRAPHY.Long as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+    SET @Z    = round(round(cast(@GEOGRAPHY.Z as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+    SET @M    = round(round(cast(@GEOGRAPHY.M as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+    SET @WKT = concat('POINT(',@LONG,' ',@LAT,' ',@Z,' ',@M,')')
+    return @WKT   
+  end;
+  -- Iterative the component geograpjys and points for LINE, POLYGON, MULTIPOLYGON etc
+  if @GEOGRAPHY.InstanceOf('POLYGON') = 1 begin   
+    SET @WKT = 'POLYGON(';
+    SET @RING_NUMBER = 0;
+    SET @RING_SEPERATOR = ' ';
+    SET @RING_COUNT = @GEOGRAPHY.NumRings();
+    while (@RING_NUMBER  < @RING_COUNT) begin
+      SET @WKT = concat(@WKT,@RING_SEPERATOR,'(')
+      SET @RING_SEPERATOR = ',';
+      SET @RING_NUMBER = @RING_NUMBER + 1;
+      SET @RING = @GEOGRAPHY.RingN(@RING_NUMBER);
+      SET @POINT_NUMBER = 0;
+      SET @POINT_SEPERATOR = ' ';
+      SET @POINT_COUNT = @RING.STNumPoints();
+      while (@POINT_NUMBER < @POINT_COUNT) begin
+        SET @POINT_NUMBER = @POINT_NUMBER + 1;
+        SET @POINT = @RING.STPointN(@POINT_NUMBER);
+        -- SET @LAT = STR(ROUND(@POINT.Lat,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+        -- SET @LONG = STR(ROUND(@POINT.Long,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+        -- SET @Z = STR(ROUND(@POINT.Z,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+        -- SET @M = STR(ROUND(@POINT.M,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+        SET @LAT  = round(round(cast(@POINT.Lat as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1)
+        SET @LONG = round(round(cast(@POINT.Long as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+        SET @Z    = round(round(cast(@POINT.Z as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+        SET @M    = round(round(cast(@POINT.M as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+        SET @WKT = concat(@WKT,@POINT_SEPERATOR,@LONG,' ',@LAT,' ',@Z,' ',@M)
+        SET @POINT_SEPERATOR = ',';
+      end;
+      SET @WKT = concat(@WKT,')')      
+    end
+    SET @WKT = concat(@WKT,')')   
+    return @WKT   
+  end;
+
+  if @GEOGRAPHY.InstanceOf('MULTIPOLYGON') = 1 begin   
+    SET @WKT = 'MULTIPOLYGON(';
+    SET @POLYGON_NUMBER = 0;
+    SET @POLYGON_SEPERATOR = ' ';
+    SET @POLYGON_COUNT = @GEOGRAPHY.STNumGeometries();
+    while (@POLYGON_NUMBER  < @POLYGON_COUNT) begin
+      SET @WKT = concat(@WKT,@POLYGON_SEPERATOR,'(')
+      SET @POLYGON_SEPERATOR = ',';
+      SET @POLYGON_NUMBER = @POLYGON_NUMBER + 1;
+      SET @POLYGON = @GEOGRAPHY.STGeometryN(@POLYGON_NUMBER);
+      SET @RING_NUMBER = 0;
+      SET @RING_SEPERATOR = ' ';
+      SET @RING_COUNT = @POLYGON.NumRings();
+      while (@RING_NUMBER  < @RING_COUNT) begin
+        SET @WKT = concat(@WKT,@RING_SEPERATOR,'(')
+        SET @RING_SEPERATOR = ',';
+        SET @RING_NUMBER = @RING_NUMBER + 1;
+        SET @RING = @POLYGON.RingN(@RING_NUMBER);
+        SET @POINT_NUMBER = 0;
+        SET @POINT_SEPERATOR = ' ';
+        SET @POINT_COUNT = @RING.STNumPoints();
+        while (@POINT_NUMBER < @POINT_COUNT) begin
+          SET @POINT_NUMBER = @POINT_NUMBER + 1;
+          SET @POINT = @RING.STPointN(@POINT_NUMBER);
+          -- SET @LAT = STR(ROUND(@POINT.Lat,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+          -- SET @LONG = STR(ROUND(@POINT.Long,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+          -- SET @Z = STR(ROUND(@POINT.Z,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+          -- SET @M = STR(ROUND(@POINT.M,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+          SET @LAT  = round(round(cast(@POINT.Lat as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1)
+          SET @LONG = round(round(cast(@POINT.Long as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+          SET @Z    = round(round(cast(@POINT.Z as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+          SET @M    = round(round(cast(@POINT.M as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+          SET @WKT = concat(@WKT,@POINT_SEPERATOR,@LONG,' ',@LAT,' ',@Z,' ',@M)
+          SET @POINT_SEPERATOR = ',';
+        end;
+        SET @WKT = concat(@WKT,')')      
+      end;
+      SET @WKT = concat(@WKT,')')      
+    end;
+    SET @WKT = concat(@WKT,')')      
+    return @WKT       
+  end;     
+  return @GEOGRAPHY.AsTextZM();
+end
+--
+GO
+EXECUTE sp_ms_marksystemobject 'sp_TRUNCGeography'
+GO
+--
+CREATE OR ALTER FUNCTION sp_geometryAsBinaryZM(@GEOMETRY GEOMETRY,@SPATIAL_PRECISION int)
+returns VARBINARY(MAX)
+as
+begin
+  DECLARE @SPATIAL_LENGTH    INT = @SPATIAL_PRECISION + 1;
+
+  if @GEOMETRY.MakeValid().InstanceOf('POINT') = 1 
+  begin
+    DECLARE @POINT      GEOMETRY
+    DECLARE @X          VARCHAR(32);
+    DECLARE @Y          VARCHAR(32);
+    DECLARE @Z          VARCHAR(32);
+    DECLARE @M          VARCHAR(32);
+      
+    -- SET @X = STR(ROUND(@GEOMETRY.STX,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+    -- SET @Y = STR(ROUND(@GEOMETRY.STY,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+    -- SET @Z = STR(ROUND(@GEOMETRY.Z,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+    -- SET @M = STR(ROUND(@GEOMETRY.M,@SPATIAL_TRUNC,1),@SPATIAL_LENGTH,@SPATIAL_PRECISION);
+    SET @X    = round(round(cast(@GEOMETRY.STX as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1)
+    SET @Y    = round(round(cast(@GEOMETRY.STY as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+    SET @Z    = round(round(cast(@GEOMETRY.Z as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+    SET @M    = round(round(cast(@GEOMETRY.M as NUMERIC(18,12)),@SPATIAL_LENGTH,0),@SPATIAL_PRECISION,1) 
+    SET @POINT = geometry::STGeomFromText(concat('POINT(',@X,' ',@Y,' ',@Z,' ',@M,')'),0);      
+    return @POINT.AsBinaryZM();
+  end;
+  -- Iterative the component geometry and points
+  return @GEOMETRY.AsBinaryZM();
+end
+--
+GO
+--
+EXECUTE sp_ms_marksystemobject 'sp_geometryAsBinaryZM'
+GO
+--
+CREATE OR ALTER FUNCTION sp_geographyAsTextZM(@GEOGRAPHY GEOGRAPHY,@SPATIAL_PRECISION int)
+returns VARCHAR(MAX)
+as
+begin
+  return case
+    when @GEOGRAPHY is NULL then
+      NULL
+    else
+      GEOGRAPHY::STGeomFromText(master.dbo.sp_RoundGeography(@GEOGRAPHY,@SPATIAL_PRECISION),@GEOGRAPHY.STSrid).AsTextZM()
+  end
+end
+--
+GO
+--
+EXECUTE sp_ms_marksystemobject 'sp_geographyAsTextZM'
+GO
+--
+CREATE OR ALTER FUNCTION sp_geographyAsBinaryZM(@GEOGRAPHY GEOGRAPHY,@SPATIAL_PRECISION int)
+returns VARBINARY(MAX)
+as
+begin
+  return case
+    when @GEOGRAPHY is NULL then
+      NULL
+    else
+      GEOGRAPHY::STGeomFromText(master.dbo.sp_RoundGeography(@GEOGRAPHY,@SPATIAL_PRECISION),@GEOGRAPHY.STSrid).AsBinaryZM()
+  end;
+end
+--
+GO
+--
+EXECUTE sp_ms_marksystemobject 'sp_geographyAsBinaryZM'
+GO
+--
 CREATE OR ALTER PROCEDURE sp_COMPARE_SCHEMA(@FORMAT_RESULTS BIT,@SOURCE_DATABASE NVARCHAR(128), @SOURCE_SCHEMA NVARCHAR(128), @TARGET_DATABASE NVARCHAR(128), @TARGET_SCHEMA NVARCHAR(128), @COMMENT NVARCHAR(2048), @EMPTY_STRING_IS_NULL BIT, @SPATIAL_PRECISION int, @DATE_TIME_PRECISION int) 
 AS
 BEGIN
@@ -19,7 +292,8 @@ BEGIN
   select t.TABLE_NAME
         ,string_agg(case 
                       when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @DATE_TIME_PRECISION)) then
-                        concat('cast("',c.COLUMN_NAME,'" as datetime2(',@DATE_TIME_PRECISION,')) "',c.COLUMN_NAME,'"')
+                        -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@DATE_TIME_PRECISION,')) "',c.COLUMN_NAME,'"')
+                        concat('convert(datetime2(',@DATE_TIME_PRECISION,'),convert(varchar(',@DATE_TIME_PRECISION+20,'),"',c.COLUMN_NAME,'"),126) "',c.COLUMN_NAME,'"')
                       when c.DATA_TYPE in ('varchar','nvarchar') then
                         case 
                           when @EMPTY_STRING_IS_NULL = 1 then
@@ -29,17 +303,20 @@ BEGIN
                         end
                       when c.DATA_TYPE in ('char','nchar') then
                         concat('"',c.COLUMN_NAME,'" collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')					  
-                      when c.DATA_TYPE in ('geography','geometry') then
+                      when c.DATA_TYPE in ('geography') then
                         case 
-                           when @SPATIAL_PRECISION is NULL then
-                             concat('"',c.COLUMN_NAME,'".ToString() collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
-                           else
-                             case 
-                               when c.DATA_TYPE = 'geography' then
-                                 concat('case when "',c.COLUMN_NAME,'".MakeValid().InstanceOf(''POINT'') = 1 then concat(str("',c.COLUMN_NAME,'".Long,18,',@SPATIAL_PRECISION,'),'','',str("',c.COLUMN_NAME,'".Lat,18,',@SPATIAL_PRECISION,')) else "',c.COLUMN_NAME,'".ToString() end collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
-                               else
-                                 concat('case when "',c.COLUMN_NAME,'".MakeValid().InstanceOf(''POINT'') = 1 then concat(str("',c.COLUMN_NAME,'".STX,18,',@SPATIAL_PRECISION,'),'','',str("',c.COLUMN_NAME,'".STY,18,',@SPATIAL_PRECISION,')) else "',c.COLUMN_NAME,'".ToString() end collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
-                               end
+                          when @SPATIAL_PRECISION = 18 then
+                            concat('"',c.COLUMN_NAME,'".AsBinaryZM() "',c.COLUMN_NAME,'"')
+                          else
+                            concat('master.dbo.sp_geographyAsBinaryZM("',c.COLUMN_NAME,'",',@SPATIAL_PRECISION,') "',c.COLUMN_NAME,'"')
+                        end
+                      when c.DATA_TYPE in ('geometry') then
+                        -- concat('CONVERT(varchar(max), "',c.COLUMN_NAME,'".AsBinaryZM(),2) "',c.COLUMN_NAME,'"')
+                        case 
+                          when @SPATIAL_PRECISION = 18 then
+                            concat('"',c.COLUMN_NAME,'".AsBinaryZM() "',c.COLUMN_NAME,'"')
+                          else
+                            concat('master.dbo.sp_geometryAsBinaryZM("',c.COLUMN_NAME,'",',@SPATIAL_PRECISION,') "',c.COLUMN_NAME,'"')
                         end
                       when c.DATA_TYPE in ('xml','text','ntext') then
                         concat('HASHBYTES(''SHA2_256'',CAST("',c.COLUMN_NAME,'" as NVARCHAR(MAX))) "',c.COLUMN_NAME,'"')
@@ -95,6 +372,7 @@ BEGIN
                                 '       ,NULL,NULL');
 							 
     BEGIN TRY 
+      -- SELECT @SQL_STATEMENT;
       EXEC(@SQL_STATEMENT)
     END TRY
     BEGIN CATCH
@@ -164,6 +442,7 @@ BEGIN
         SET @TARGET_COUNT = -1
       END CATCH
       INSERT INTO #SCHEMA_COMPARE_RESULTS VALUES (@SOURCE_DATABASE, @SOURCE_SCHEMA, @TARGET_DATABASE, @TARGET_SCHEMA, @TABLE_NAME, @SOURCE_COUNT, @TARGET_COUNT, -1, -1,@SQLERRM,@BAD_STATEMENT)
+      SET @SQLERRM = NULL
     END
     FETCH FETCH_METADATA INTO @TABLE_NAME, @COLUMN_LIST
   END
@@ -185,7 +464,7 @@ BEGIN
   
     SET NOCOUNT OFF;
 
-    SELECT CAST(FORMATMESSAGE('%32s %32s %48s %12i', SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT) as NVARCHAR(256)) "SUCCESS          Source Schenma                    Target Schema                                            Table          Rows"
+    SELECT CAST(FORMATMESSAGE('%32s %32s %48s %16s', SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, cast(TARGET_ROW_COUNT as VARCHAR(16))) as NVARCHAR(256)) "SUCCESS          Source Schenma                    Target Schema                                            Table          Rows"
       FROM #SCHEMA_COMPARE_RESULTS
      where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
        and MISSING_ROWS = 0
@@ -195,7 +474,7 @@ BEGIN
 --
     IF (@SOURCE_COUNT > 0) 
     BEGIN
-      SELECT CAST(FORMATMESSAGE('%32s %32s %48s   %12i %12i %12i %12i %64s', SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, SQLERRM) as NVARCHAR(256)) "FAILED           Source Schenma                    Target Schema                                            Table Details..."
+      SELECT CAST(FORMATMESSAGE('%32s %32s %48s %16s %16s %16s %16s %64s', SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, cast(SOURCE_ROW_COUNT as VARCHAR(16)), cast(TARGET_ROW_COUNT as VARCHAR(16)), cast(MISSING_ROWS as VARCHAR(16)), cast(EXTRA_ROWS as VARCHAR(16)), SQLERRM) as NVARCHAR(256)) "FAILED           Source Schenma                    Target Schema                                            Table Details..."
         FROM #SCHEMA_COMPARE_RESULTS
        where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
           or MISSING_ROWS <> 0
@@ -222,8 +501,6 @@ BEGIN
         or SQLERRM is not NULL
      order by TABLE_NAME;
   END
-  -- SELECT SQL_STATEMENT from #SCHEMA_COMPARE_RESULTS
-  -- SELECT @BAD_STATEMENT
 --
 END
 --

@@ -1,0 +1,16 @@
+[
+    [
+        {
+            "database": "AdventureWorks",
+            "owner": "Sales"
+        },
+        {
+            "database": "Sales1",
+            "owner": "dbo"
+        },
+        {
+            "database": "Sales1",
+            "owner": "dbo"
+        }
+    ]
+]

@@ -84,8 +84,8 @@ class MsSQLCompare extends MsSQLDBI {
 --@TARGET_SCHEMA          = '${targetInfo.owner}'
 --@COMMENT                = ''
 --@EMPTY_STRING_IS_NULL   = ${this.parameters.EMPTY_STRING_IS_NULL === true}
---@SPATIAL_PRECISION      = ${this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : null}
---@DATE_TIME_PRECISION    = ${this.parameters.MAX_TIMESTAMP_PRECISION}
+--@SPATIAL_PRECISION      = ${this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18}
+--@DATE_TIME_PRECISION    = ${this.parameters.TIMESTAMP_PRECISION}
 --`;
             
       if (this.status.sqlTrace) {
@@ -101,11 +101,13 @@ class MsSQLCompare extends MsSQLDBI {
                           .input('TARGET_SCHEMA',this.sql.VarChar,targetInfo.owner)
                           .input('COMMENT',this.sql.VarChar,'')
                           .input('EMPTY_STRING_IS_NULL',this.sql.Bit,(this.parameters.EMPTY_STRING_IS_NULL === true ? 1 : 0))
-                          .input('SPATIAL_PRECISION',this.sql.Int,(this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : null))
-                          .input('DATE_TIME_PRECISION',this.sql.Int,this.parameters.MAX_TIMESTAMP_PRECISION)
+                          .input('SPATIAL_PRECISION',this.sql.Int,(this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18))
+                          .input('DATE_TIME_PRECISION',this.sql.Int,this.parameters.TIMESTAMP_PRECISION)
                           .execute(sqlCompareSchema,{},{resultSet: true});
 
-      const successful = results.recordsets[0]
+      // Use length-2 and length-1 to allow Debugging info to be included in the output
+      
+      const successful = results.recordsets[results.recordsets.length-2]
       
       report.successful = successful.map(function(row,idx) {          
         const tableName = (this.parameters.TABLE_MATCHING === 'INSENSITIVE') ? row.TABLE_NAME.toLowerCase() : row.TABLE_NAME;
@@ -113,7 +115,7 @@ class MsSQLCompare extends MsSQLDBI {
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT,tableTimings.elapsedTime,tableTimings.throughput]
       },this)
         
-      const failed = results.recordsets[1]
+      const failed = results.recordsets[results.recordsets.length-1]
 
       report.failed = failed.map(function(row,idx) {
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.SQLERRM !== null ? row.SQLERRM : '')]

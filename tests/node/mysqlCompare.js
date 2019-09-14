@@ -80,8 +80,8 @@ class MySQLCompare extends MySQLDBI {
         }
       },this)
       
-      const sqlStatement = `CALL COMPARE_SCHEMAS(?,?,?);`;					   
-      let results = await this.executeSQL(sqlStatement,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true]);
+      const sqlStatement = `CALL COMPARE_SCHEMAS(?,?,?, ?);`;					   
+      let results = await this.executeSQL(sqlStatement,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18]);
 
       const successful = await this.executeSQL(sqlSuccess,{})
           

@@ -1,0 +1,16 @@
+[
+    [
+        {
+            "database": "Northwind",
+            "owner": "dbo"
+        },
+        {
+            "database": "Northwind1",
+            "owner": "dbo"
+        },
+        {
+            "database": "Northwind1",
+            "owner": "dbo"
+        }
+    ]
+]

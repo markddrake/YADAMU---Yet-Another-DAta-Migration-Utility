@@ -1,4 +1,4 @@
 [
-    ["JSON/MySQL/jsonExample.json",{"schema": "jtest1"},"JSON/MySQL/jsonExample1.json",{"schema": "jtest2"},"JSON/MySQL/jsonExample2.json"],
-    ["JSON/MySQL/sakila.json",{"schema": "sakila1"},"JSON/MySQL/sakila1.json",{"schema": "sakila2"},"JSON/MySQL/sakila2.json"]
+    ["MySQL/jsonExample.json",{"schema": "jtest1"},"jsonExample1.json",{"schema": "jtest2"},"jsonExample2.json"],
+    ["MySQL/sakila.json",{"schema": "sakila1"},"sakila1.json",{"schema": "sakila2"},"sakila2.json"]
 ]

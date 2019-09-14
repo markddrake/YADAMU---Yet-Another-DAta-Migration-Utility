@@ -11,8 +11,6 @@ const path = require('path');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const TableWriter = require('./tableWriter.js');
 
-const defaultParameters = {}
-
 /*
 **
 ** YADAMU Database Inteface class skeleton
@@ -45,12 +43,13 @@ class FileWriter extends YadamuDBI {
      return false;
   }
   
-  get DATABASE_VENDOR() { return 'FILE' };
-  get SOFTWARE_VENDOR() { return 'Vendor Long Name' };
-  get SPATIAL_FORMAT()  { return 'WKT' };
-
+  get DATABASE_VENDOR()    { return 'FILE' };
+  get SOFTWARE_VENDOR()    { return 'N/A' };
+  get SPATIAL_FORMAT()     { return this.spatialFormat };
+  get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().file }
+  
   constructor(yadamu) {
-    super(yadamu,defaultParameters)
+    super(yadamu,yadamu.getYadamuDefaults().file )
     this.outputStream = undefined;
     this.firstTable = true;
   }
@@ -81,6 +80,7 @@ class FileWriter extends YadamuDBI {
   
   async initialize() {
     super.initialize();
+    this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
     const exportFilePath = path.resolve(this.parameters.FILE);
     this.outputStream = fs.createWriteStream(exportFilePath);
     this.yadamuLogger.log([`${this.constructor.name}`],`Writing file "${exportFilePath}".`)
@@ -210,7 +210,7 @@ class FileWriter extends YadamuDBI {
     return new TableWriter(tableName,this.outputStream);      
   }
   
-  async finalizeDataLoad() {
+  async finalizeImport() {
     this.outputStream.write('}');
   }  
 

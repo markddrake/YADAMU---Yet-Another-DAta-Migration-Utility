@@ -1,5 +1,7 @@
 "use strict"
 
+// const WKX = require('wkx');
+
 const oracledb = require('oracledb');
 
 const YadamuWriter = require('../../common/yadamuWriter.js');
@@ -39,9 +41,19 @@ class TableWriter extends YadamuWriter {
 
   async appendRow(row) {
     try {           
-      row = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
-        if (row[idx] !== null) {
-          const dataType = this.dbi.decomposeDataType(targetDataType);
+      row = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {          
+        if (
+        row[idx] !== null) {
+          const dataType = this.dbi.decomposeDataType(targetDataType);   
+          
+          /*
+          switch (dataType.type) {
+            case "GEOMETRY":
+              console.log(WKX.Geometry.parse(Buffer.from(row[idx],'hex')).toWkt())
+              break;
+            default:
+          }      
+          */
           if (dataType.type === 'JSON') {
             // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
             // row[idx] = Buffer.from(JSON.stringify(row[idx]))
@@ -109,6 +121,7 @@ class TableWriter extends YadamuWriter {
         }
         return null;
       },this))
+
       this.batch.push(row);
       return this.batch.length;
     } catch (e) {

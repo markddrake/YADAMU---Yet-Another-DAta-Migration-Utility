@@ -37,7 +37,7 @@ class DBReader extends Readable {
   
   async getMetadata() {
       
-     this.schemaInfo = await this.dbi.getSchemaInfo('OWNER')
+     this.schemaInfo = await this.dbi.getSchemaInfo('FROM_USER')
      return this.dbi.generateMetadata(this.schemaInfo)
   }
       

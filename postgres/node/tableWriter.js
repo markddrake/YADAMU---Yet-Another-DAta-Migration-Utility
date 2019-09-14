@@ -11,10 +11,6 @@ class TableWriter extends YadamuWriter {
     this.batchRowCount = 0;
   }
 
-  async initialize() {
-    this.dbi.beginTransaction();
-  }
-
   batchComplete() {
     return (this.batchRowCount  === this.tableInfo.batchSize)
   }
@@ -86,10 +82,6 @@ class TableWriter extends YadamuWriter {
     },this)
     this.batch.push(...row);
     this.batchRowCount++
-  }
-
-  hasPendingRows() {
-    return this.batch.length > 0;
   }
       
   async writeBatch() {

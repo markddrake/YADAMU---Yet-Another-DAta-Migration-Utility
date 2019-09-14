@@ -15,10 +15,6 @@ const TableWriter = require('./tableWriter.js');
 const StatementGenerator80 = require('./statementGenerator.js');
 const StatementGenerator57 = require('../../dbShared/mysql/statementGenerator57.js');
 
-const defaultParameters = {
-  TABLE_MATCHING    : "INSENSITIVE"
-}
-
 const sqlSystemInformation = 
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
 
@@ -347,9 +343,9 @@ class MySQLDBI extends YadamuDBI {
   */
     
   async executeDDL(ddl) {
-    await this.createSchema(this.parameters.TOUSER);
+    await this.createSchema(this.parameters.TO_USER);
     await Promise.all(ddl.map(function(ddlStatement) {
-      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TOUSER);
+      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
       if (this.status.sqlTrace) {
         this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
       }
@@ -360,10 +356,10 @@ class MySQLDBI extends YadamuDBI {
   get DATABASE_VENDOR() { return 'MySQL' };
   get SOFTWARE_VENDOR() { return 'Oracle Corporation (MySQL)' };
   get SPATIAL_FORMAT()  { return this.spatialFormat };
-  get DEFAULT_PARAMETERS() { return defaultParameters };
-
+  get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().mysql }
+  
   constructor(yadamu) {
-    super(yadamu,defaultParameters)
+    super(yadamu,yadamu.getYadamuDefaults().mysql)
     this.lastUsedTime = undefined
     this.connectionOpen = false
   }
@@ -508,7 +504,7 @@ class MySQLDBI extends YadamuDBI {
 
   async processFile(hndl) {
     const sqlStatement = `SET @RESULTS = ''; CALL IMPORT_JSON(?,@RESULTS); SELECT @RESULTS "logRecords";`;					   
-	let results = await  this.executeSQL(sqlStatement,this.parameters.TOUSER);
+	let results = await  this.executeSQL(sqlStatement,this.parameters.TO_USER);
     results = results.pop();
 	return JSON.parse(results[0].logRecords)
   }
@@ -535,7 +531,7 @@ class MySQLDBI extends YadamuDBI {
      ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : this.parameters.OWNER
+     ,schema             : this.parameters.FROM_USER
      ,exportVersion      : EXPORT_VERSION
      ,sessionUser        : sysInfo.SESSION_USER
      ,dbName             : sysInfo.DATABASE_NAME

@@ -19,7 +19,7 @@ class TextParser extends Transform {
     
     this.parser.on('error',
     function(err) {
-      this.yadamuLogger.logException([`${this.constructor.name}.onError()`],err)
+      yadamuLogger.logException([`${this.constructor.name}.onError()`],err)
     })
     
     this.parser.on('key',

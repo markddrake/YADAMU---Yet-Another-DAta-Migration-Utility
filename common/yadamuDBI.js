@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const Readable = require('stream').Readable;
+const Util = require('util')
 
 /* 
 **
@@ -13,11 +14,8 @@ const Yadamu = require('./yadamu.js');
 const YadamuRejectManager = require('./yadamuRejectManager.js');
 const DBParser = require('./dbParser.js');
 
-const spatialFormat = 'WKB'
-const DEFAULT_BATCH_SIZE = 10000;
+const DEFAULT_BATCH_SIZE   = 10000;
 const DEFAULT_COMMIT_COUNT = 5;
-
-const defaultParameters = {}
 
 /*
 **
@@ -30,7 +28,7 @@ class YadamuDBI {
   get DATABASE_VENDOR()     { return undefined };
   get SOFTWARE_VENDOR()     { return undefined };
   get SPATIAL_FORMAT()      { return spatialFormat };
-  get DEFAULT_PARAMETERS()  { return defaultParameters }
+  get DEFAULT_PARAMETERS()  { return this.yadamu.getYadamuDefaults().yadmuDBI }
   get STATEMENT_SEPERATOR() { return '' }
   
   doTimeout(milliseconds) {
@@ -136,27 +134,28 @@ class YadamuDBI {
 
   configureTest(connectionProperties,testParameters,tableMappings) {
     this.connectionProperties = connectionProperties
-
-    // Start with DEFAULT_PARAMETERS
-    this.parameters = Object.assign({}, this.DEFAULT_PARAMETERS);
-
-    // Merge parameters obtained from YADAMU instance - Includes configuration file parameters and command line parameters
-    Object.assign(this.parameters, this.yadamu.getParameters());
-
-    // Merge parameters provided via to configureTEst
+    // this.initializeParameters();
+    // Merge parameters provided via to configureTest
     Object.assign(this.parameters, testParameters ? testParameters : {})
-
     if (this.parameters.MAPPINGS) {
       this.loadTableMappings(this.parameters.MAPPINGS);
     }  
     else {
       this.tableMappings = tableMappings
     }
-    if (this.parameters.SQLTRACE) {
-	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQLTRACE,{flags : "a"});
+    if (this.parameters.SQL_TRACE) {
+	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQL_TRACE,{flags : "a"});
     }
   }
 
+  logConnectionProperties() {    
+    if (this.status.sqlTrace) {
+      const pwRedacted = Object.assign({},this.connectionProperties)
+      delete pwRedacted.password
+      this.status.sqlTrace.write(`--\n-- Connection Properies: ${JSON.stringify(pwRedacted)}\n--\n`)
+    }
+  }
+     
   setConnectionProperties(connectionProperties) {
     this.connectionProperties = connectionProperties
   }
@@ -243,7 +242,7 @@ class YadamuDBI {
   async executeDDL(ddl) {
     await Promise.all(ddl.map(async function(ddlStatement) {
       try {
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TOUSER);
+        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
         if (this.status.sqlTrace) {
           this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
         }
@@ -261,27 +260,27 @@ class YadamuDBI {
     return new YadamuRejectManager(this.rejectFilename,this.yadamuLogger);
   }
   
-  getDefaultParameters() {
-    return defaultParameters
+  initializeParameters(parameters) {
+
+    // In production mode the Databae default parameters are merged with the command Line Parameters loaded by YADAMU.
+
+    this.parameters = this.yadamu.cloneDefaultParameters();
+    
+    // Merge parameters from configuration files
+    Object.assign(this.parameters, parameters ? parameters : {})
+
+    // Merge Command line arguments
+    Object.assign(this.parameters, this.yadamu.getCommandLineParameters());
+    
   }
-      
+  
   constructor(yadamu,parameters) {
     
     this.spatialFormat = this.SPATIAL_FORMAT 
     this.yadamu = yadamu;
-    
-    // In production mode the Databae default parameters are merged with the command Line Parameters loaded by YADAMU.
-
-    // Start my MERGING YadamuDBI DEFAULT_PARAMETERS with subclass DEFAULT_PARAMETERS
-    this.defaultParameters = defaultParameters;
-    this.parameters = { ...this.defaultParameters, ...this.parameters};
-
-    // Merge parameters obtained from YADAMU instance - Includes configuration file parameters and command line parameters
-    Object.assign(this.parameters, yadamu.getParameters());
-    
     this.status = yadamu.getStatus()
     this.yadamuLogger = yadamu.getYadamuLogger();
-        
+    this.initializeParameters(parameters);
     this.systemInformation = undefined;
     this.metadata = undefined;
 
@@ -324,17 +323,21 @@ class YadamuDBI {
     **
     */
     
-    let batchSize = this.parameters.BATCHSIZE ? Number(this.parameters.BATCHSIZE) : DEFAULT_BATCH_SIZE
+    let batchSize = this.parameters.BATCH_SIZE ? Number(this.parameters.BATCH_SIZE) : DEFAULT_BATCH_SIZE
     batchSize = isNaN(batchSize) ? DEFAULT_BATCH_SIZE : batchSize
     batchSize = batchSize < 0 ? DEFAULT_BATCH_SIZE : batchSize
     batchSize = !Number.isInteger(batchSize) ? DEFAULT_BATCH_SIZE : batchSize
     this.batchSize = batchSize
     
-    let commitCount = this.parameters.BATCHCOMMIT ? Number(this.parameters.BATCHCOMMIT) : DEFAULT_COMMIT_COUNT
+    let commitCount = this.parameters.BATCH_COMMIT ? Number(this.parameters.BATCH_COMMIT) : DEFAULT_COMMIT_COUNT
     commitCount = isNaN(commitCount) ? DEFAULT_COMMIT_COUNT : commitCount
     commitCount = commitCount < 0 ? DEFAULT_COMMIT_COUNT : commitCount
     commitCount = !Number.isInteger(commitCount) ? DEFAULT_COMMIT_COUNT : commitCount
     this.commitSize = this.batchSize * commitCount
+    
+    if (this.parameters.PARAMETER_TRACE === true) {
+      this.yadamuLogger.writeDirect(`${Util.inspect(this.parameters,{colors:true})}\n`);
+    }
     
   }
 

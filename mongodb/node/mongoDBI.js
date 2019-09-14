@@ -17,14 +17,6 @@ const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const DBParser = require('./dbParser.js');
 
-const defaultParameters = {
-  BATCHSIZE         : 10000
-, COMMITSIZE        : 10000
-, PORT              : 27017
-, MONGO_MODE        : 'DOCUMENT'
-, MONGO_REMOVE_ID   : false
-}
-
 /*
 **
 **  IMPORT : Implemented in TableWriter.js. 
@@ -68,8 +60,8 @@ class MongoDBI extends YadamuDBI {
   get DATABASE_VENDOR() { return 'MongoDB' };
   get SOFTWARE_VENDOR() { return 'MongoDB Corporation' };
   get SPATIAL_FORMAT()  { return 'GeoJSON' };
-  get DEFAULT_PARAMETERS() { return defaultParameters }
-  
+  get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().mongodb }
+
   getCollection(tableName) {
     
     const self = this;  
@@ -130,7 +122,7 @@ class MongoDBI extends YadamuDBI {
   }
   
   constructor(yadamu) {
-    super(yadamu,defaultParameters)
+    super(yadamu,yadamu.getYadamuDefaults().mongoDB)
   }
 
   /*  
@@ -243,7 +235,7 @@ class MongoDBI extends YadamuDBI {
      ,timeZoneOffset     : new Date().getTimezoneOffset()
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT 
-     ,schema             : this.parameters.OWNER
+     ,schema             : this.parameters.FROM_USER
      ,softwareVendor     : this.SOFTWARE_VENDOR
      ,exportVersion      : EXPORT_VERSION
      ,nodeClient         : {

@@ -1,6 +1,7 @@
 "use strict"
 
 const sql = require('mssql');
+// const WKX = require('wkx');
 
 const YadamuWriter = require('../../common/yadamuWriter.js');
 
@@ -173,6 +174,15 @@ class TableWriter extends YadamuWriter {
     this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
        const dataType = this.dbi.decomposeDataType(targetDataType);
        if (row[idx] !== null) {
+         /*
+         switch (dataType.type) {
+          case "geometry":
+          case "geography":
+            console.log(WKX.Geometry.parse(Buffer.from(row[idx],'hex')).toWkt())
+            break;
+          default:
+         }
+         */
          switch (dataType.type) {
            case "image" :
              row[idx] = Buffer.from(row[idx],'hex');

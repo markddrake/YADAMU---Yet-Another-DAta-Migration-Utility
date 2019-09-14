@@ -18,11 +18,6 @@ const StagingTable = require('./stagingTable.js');
 
 const STAGING_TABLE =  { tableName : '#YADAMU_STAGING', columnName : 'DATA'}
 
-const defaultParameters = {
-  OWNER             : 'dbo'
-, TOUSER            : 'dbo'
-}
-
 const sqlSystemInformation = 
 `select db_Name() "DATABASE_NAME", current_user "CURRENT_USER", session_user "SESSION_USER", CONVERT(NVARCHAR(20),SERVERPROPERTY('ProductVersion')) "DATABASE_VERSION",CONVERT(NVARCHAR(128),SERVERPROPERTY('MachineName')) "HOSTNAME"`;                     
 
@@ -39,6 +34,13 @@ class MSSQLDBI extends YadamuDBI {
   */
   
   sqlTableInfo() {
+     
+   let spatialClause = `concat('"',column_name,'".${this.spatialSerializer} "',column_name,'"')`
+   
+   if (this.parameters.SPATIAL_MAKE_VALID === true) {
+     spatialClause = `concat('case when "',column_name,'".STIsValid = 0 then "',column_name,'".makeValid().${this.spatialSerializer} else "',column_name,'".${this.spatialSerializer} "',column_name,'"')`
+   }
+      
    return `select t.table_schema "TABLE_SCHEMA"
          ,t.table_name   "TABLE_NAME"
          ,string_agg(concat('"',c.column_name,'"'),',') within group (order by ordinal_position) "COLUMN_LIST"
@@ -61,10 +63,8 @@ class MSSQLDBI extends YadamuDBI {
          ,concat('select ',string_agg(case 
                                         when data_type = 'hierarchyid' then
                                           concat('cast("',column_name,'" as NVARCHAR(4000)) "',column_name,'"') 
-                                        when data_type = 'geography' then
-                                          concat('"',column_name,'".${this.spatialSerializer} "',column_name,'"') 
-                                        when data_type = 'geometry' then
-                                          concat('"',column_name,'".${this.spatialSerializer} "',column_name,'"') 
+                                        when data_type in ('geography','geometry') then
+                                          ${spatialClause}
                                         when data_type = 'datetime2' then
                                           concat('convert(VARCHAR(33),"',column_name,'",127) "',column_name,'"') 
                                         when data_type = 'datetimeoffset' then
@@ -128,17 +128,9 @@ class MSSQLDBI extends YadamuDBI {
     const results = await this.getRequest().batch(statement)
   }
 
-  logConnectionParameters() {    
-    if (this.status.sqlTrace) {
-      const pwRedacted = Object.assign({},this.connectionProperties)
-      delete pwRedacted.password
-      this.status.sqlTrace.write(`--\n-- Connection Properies: ${JSON.stringify(pwRedacted)}\n--\n`)
-    }
-  }
-  
   async getConnectionPool() {
     this.setTargetDatabase();
-    this.logConnectionParameters();
+    this.logConnectionProperties();
     this.requestSource = await new sql.ConnectionPool(this.connectionProperties).connect();
     const yadamuLogger = this.yadamuLogger;
     this.requestSource .on('error',(err, p) => {
@@ -200,10 +192,10 @@ class MSSQLDBI extends YadamuDBI {
     
     await this.beginTransaction()     
 
-    await this.createSchema(this.parameters.TOUSER);
+    await this.createSchema(this.parameters.TO_USER);
     // Cannot use Promise.all with mssql Transaction class
     for (let ddlStatement of ddl) {
-      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TOUSER);
+      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
       try {
         if (this.status.sqlTrace) {
           this.status.sqlTrace.write(`${ddlStatement}\ngo\n`);
@@ -228,11 +220,11 @@ class MSSQLDBI extends YadamuDBI {
   get DATABASE_VENDOR() { return 'MSSQLSERVER' };
   get SOFTWARE_VENDOR() { return 'Microsoft Corporation' };
   get SPATIAL_FORMAT()  { return this.spatialFormat };
-  get DEFAULT_PARAMETERS() { return defaultParameters };
+  get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().mssql }
 
   constructor(yadamu) {
     
-    super(yadamu,defaultParameters);
+    super(yadamu,yadamu.getYadamuDefaults().mssql);
 
     this.pool = undefined;
     this.transaction = undefined;
@@ -269,6 +261,7 @@ class MSSQLDBI extends YadamuDBI {
      default:
         this.spatialSerializer = "AsBinaryZM()";
     }  
+    
   }   
   
   async initialize() {
@@ -394,7 +387,7 @@ class MSSQLDBI extends YadamuDBI {
   */
 
   async processFile(hndl) {
-     let results = await this.getRequest().input('TARGET_DATABASE',sql.VarChar,this.parameters.TOUSER).execute('sp_IMPORT_JSON');
+     let results = await this.getRequest().input('TARGET_DATABASE',sql.VarChar,this.parameters.TO_USER).execute('sp_IMPORT_JSON');
      results = results.recordset;
      const log = JSON.parse(results[0][Object.keys(results[0])[0]])
      super.processLog(log, this.status, this.yadamuLogger)
@@ -428,12 +421,11 @@ class MSSQLDBI extends YadamuDBI {
      ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : this.parameters.OWNER
+     ,schema             : this.parameters.FROM_USER
      ,exportVersion      : EXPORT_VERSION
 	 ,sessionUser        : sysInfo.SESSION_USER
 	 ,currentUser        : sysInfo.CURRENT_USER
      ,dbName             : sysInfo.DATABASE_NAME
-     ,databaseVersion    : sysInfo.DATABASE_VERSION
      ,databaseVersion    : sysInfo.DATABASE_VERSION
      ,softwareVendor     : this.SOFTWARE_VENDOR
      ,hostname           : sysInfo.HOSTNAME

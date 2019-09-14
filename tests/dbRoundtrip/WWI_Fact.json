@@ -1,0 +1,17 @@
+[
+    [
+        {
+            "database": "WorldWideImportersDW",
+            "owner": "Fact", 
+			"dbPrefix": "WWI_DW"
+        },
+        {
+            "database": "WWI_DW_Fact1",
+            "owner": "dbo" 
+        },
+        {
+            "database": "WWI_DW_Fact1",
+            "owner": "dbo" 
+        }
+    ]
+]
