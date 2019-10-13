@@ -78,6 +78,9 @@ class MongoDBI extends YadamuDBI {
   async executeDDL(collectionList) {
            
     const results = await Promise.all(collectionList.map(function(collectionName) {
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(`db.createCollection(${collectionName})\n`)      
+      }      
       return this.db.createCollection(collectionName);
     },this));
 
@@ -122,7 +125,7 @@ class MongoDBI extends YadamuDBI {
   }
   
   constructor(yadamu) {
-    super(yadamu,yadamu.getYadamuDefaults().mongoDB)
+    super(yadamu,yadamu.getYadamuDefaults().mongodb)
   }
 
   /*  
@@ -133,9 +136,16 @@ class MongoDBI extends YadamuDBI {
   
   async initialize() {
       
-     this.client = new MongoClient(this.getMongoURL());
+     super.initialize();   
+     if (this.status.sqlTrace) {
+       this.status.sqlTrace.write(`mongoURL ${this.getMongoURL()}\n`)      
+     }
+     this.client = new MongoClient(this.getMongoURL(),typeof this.connectionProperties.options === 'object' ? this.connectionProperties.options : {});
      await this.client.connect();
-     this.db = this.client.db(this.parameters.DATABASE);
+     if (this.status.sqlTrace) {
+       this.status.sqlTrace.write(`use ${this.connectionProperties.database}\n`)      
+     }
+     this.db = this.client.db(this.connectionProperties.database);
      
   }
 
@@ -259,7 +269,7 @@ class MongoDBI extends YadamuDBI {
   
   async getSchemaInfo(schema) {
     const schemaInfo = await this.db.listCollections().toArray();  
-    if (this.parameters.MONGO_MODE === 'ARRAY') {
+    if (this.parameters.MONGO_MODEL === 'ARRAY') {
       const promises =  schemaInfo.map(function(collection) {     
         return this.db.collection(collection.name).mapReduce(
           function() {
@@ -346,7 +356,7 @@ class MongoDBI extends YadamuDBI {
         schemaInfo[idx].dataTypes =  ["JSON"];
         schemaInfo[idx].sizeConstraints = [""] ;
       },this)
-    }     
+    } 
     return schemaInfo
   }
 
@@ -354,7 +364,7 @@ class MongoDBI extends YadamuDBI {
   
     const metadata = {}
     collections.forEach(function(collection) {
-      if (this.parameters.MONGO_REMOVE_ID === true) {
+      if (this.parameters.MONGO_STRIP_ID === true) {
         const idx = collection.columns.indexOf('_id');
         if (idx > -1) {
           collection.columns.splice(idx,1);
@@ -371,11 +381,12 @@ class MongoDBI extends YadamuDBI {
       metadata[collection.name] = tableMetadata
     },this) 
     return metadata
+    
   }
 
   createParser(query,objectMode) {
-    query.outputMode = this.parameters.MONGO_MODE ? this.parameters.MONGO_MODE : 'DOCUMENT'
-    query.removeID = this.parameters.MONGO_REMOVE_ID ? this.parameters.MONGO_REMOVE_ID : false
+    query.outputMode = this.parameters.MONGO_MODEL ? this.parameters.MONGO_MODEL : 'DOCUMENT'
+    query.stripID = this.parameters.MONGO_STRIP_ID ? this.parameters.MONGO_STRIP_ID : false
     return new DBParser(query,objectMode,this.yadamuLogger);
   }  
   
@@ -390,7 +401,6 @@ class MongoDBI extends YadamuDBI {
     return readStream;      
   }      
    
-
   /*
   **
   ** The following methods are used by the YADAMU DBwriter class

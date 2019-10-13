@@ -39,12 +39,19 @@ begin
                           else
                             '"' || column_name || '"::text' 
                         end
-                      when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
+                      when ((data_type = 'USER-DEFINED') and (udt_name = 'geometry')) then
                        case 
                          when P_SPATIAL_PRECISION < 18 then
                            'ST_AsText("' || column_name || '",' || P_SPATIAL_PRECISION || ')' 
                          else
                            'ST_AsEWKB("' || column_name || '")' 
+                        end
+                      when ((data_type = 'USER-DEFINED') and (udt_name = 'geography')) then
+                       case 
+                         when P_SPATIAL_PRECISION < 18 then
+                           'ST_AsText("' || column_name || '",' || P_SPATIAL_PRECISION || ')' 
+                         else
+                           'ST_AsBinary("' || column_name || '")' 
                         end
                       else 
                         '"' || column_name || '"' 

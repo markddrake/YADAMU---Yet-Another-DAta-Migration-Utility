@@ -6,9 +6,8 @@ class DBParser extends Transform {
   
   constructor(query,objectMode,yadamuLogger) {
     super({objectMode: true });   
-    this.query = query;
     this.objectMode = objectMode
-    this.yadamuLogger = yadamuLogger;
+    this.columnList = JSON.parse("[" + query.COLUMN_LIST + "]");
     this.counter = 0
   }
 
@@ -17,22 +16,22 @@ class DBParser extends Transform {
   }
   
   async _transform (data,encodoing,done) {
+    let output = []
     this.counter++;
-    if (this.query.stripID === true) {
-      delete data._id
+    
+
+    output = this.columnList.map(function(key) {
+      return data[key] !== 'NULL' ? data[key] : null
+      return data[key]
+    },this)
+
+    if (!this.objectMode) {
+      output = JSON.stringify(output)
     }
 
-    if (this.query.outputMode === 'ARRAY') {
-      data = this.query.columns.map(function(key) {
-        return data[key]
-      },this)
-    }
-        
-    if (!this.objectMode) {
-      data = JSON.stringify(data);
-    }
-        
-    this.push({data:data})
+    // if (this.counter === 1) { console.log(data,output)}
+
+    this.push({data : output})
     done();
   }
 }

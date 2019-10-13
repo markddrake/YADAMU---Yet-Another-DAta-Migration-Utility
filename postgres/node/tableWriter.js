@@ -127,7 +127,7 @@ class TableWriter extends YadamuWriter {
         this.dbi.releaseSavePoint();
       } catch(e) {
         this.dbi.restoreSavePoint();
-        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []
+        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,JSON.stringify(nextRow)] : []
         this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batchRowCount,row,nextRow,e,errInfo);
         if (this.skipTable) {
           break;

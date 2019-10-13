@@ -19,13 +19,6 @@ class MsSQLCompare extends MsSQLDBI {
        super(yadamu)
     }
     
-    configureTest(connectionProperties,testParameters,connectInfo,tableMappings) {
-       if (connectInfo !== undefined) {
-		 connectionProperties.database = connectInfo.database ? connectInfo.database : connectInfo.schema
-       }
-       super.configureTest(connectionProperties,testParameters,tableMappings);
-    }
-    
     async recreateSchema(connectInfo,password) {
              
       let results;       
@@ -35,7 +28,7 @@ class MsSQLCompare extends MsSQLDBI {
       }
       results =  await this.pool.request().batch(dropDatabase);      
       
-      const createDatabase = `create database "${connectInfo.database}"`;
+      const createDatabase = `create database "${connectInfo.database}" COLLATE Latin1_General_100_CS_AS_SC`;
       if (this.status.sqlTrace) {
          this.status.sqlTrace.write(`${createDatabase}\ngo\n`)
       }

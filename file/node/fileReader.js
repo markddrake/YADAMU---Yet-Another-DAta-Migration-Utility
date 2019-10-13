@@ -10,7 +10,6 @@ const path = require('path');
 
 const FileParser = require('./fileParser.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
-const TableWriter = require('./tableWriter.js');
 
 /*
 **

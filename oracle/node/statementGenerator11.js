@@ -42,7 +42,7 @@ class StatementGenerator11 extends StatementGenerator {
   
   async getMetadataLob() {
     const metadataXML = this.metadataToXML();    
-    return await this.dbi.lobFromString(metadataXML);
+    return await this.dbi.blobFromString(metadataXML);
   }
       
 }

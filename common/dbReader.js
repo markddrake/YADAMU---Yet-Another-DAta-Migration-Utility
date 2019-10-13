@@ -1,6 +1,7 @@
 "use strict";
 const Readable = require('stream').Readable;
 const Yadamu = require('./yadamu.js')
+const YadamuLibrary = require('./yadamuLibrary.js')
 
 class DBReader extends Readable {  
 
@@ -47,6 +48,9 @@ class DBReader extends Readable {
     const parser = this.dbi.createParser(query,outputStream.objectMode())
     const inputStream = await this.dbi.getInputStream(query,parser)
 
+
+    // End Method does not fire on outputStream.... Need to ensure until all outstanding rows have been written before starting next table, otherwise rows can we written out of order...
+
     function waitUntilEmpty(outputStream,outputStreamError,resolve) {
         
       const recordsRemaining = outputStream.writableLength;
@@ -60,20 +64,31 @@ class DBReader extends Readable {
         setTimeout(waitUntilEmpty, 10,outputStream,outputStreamError,resolve);
       }   
     }
+
+    const self = this
     
     const copyOperation = new Promise(function(resolve,reject) {  
       const outputStreamError = function(err){reject(err)}       
       outputStream.on('error',outputStreamError);
       parser.on('end',function() {waitUntilEmpty(outputStream,outputStreamError,resolve)})
       parser.on('error',function(err){reject(err)});
-      inputStream.on('error',function(err){reject(err)});
+      inputStream.on('error',
+	    function(err) { 
+		  if (err.yadamuHandled === true) {
+	        self.yadamuLogger.log([`${self.constructor.name}.copyOperation()`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${parser.getCounter()}. Read Pipe Closed`)
+    		// inputStream.pipe(parser).pipe(outputStream,{end: false})
+	      } 
+		  else {
+			reject(err)
+	      }
+	  });
       inputStream.pipe(parser).pipe(outputStream,{end: false })
     })
     
     const startTime = new Date().getTime()
     const rows = await copyOperation;
     const elapsedTime = new Date().getTime() - startTime
-    this.yadamuLogger.log([`${this.constructor.name}`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${rows}. Elaspsed Time: ${Yadamu.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`)
+    this.yadamuLogger.log([`${this.constructor.name}`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${rows}. Elaspsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`)
     return rows;
       
   }
@@ -99,7 +114,7 @@ class DBReader extends Readable {
   }
   
   async _read() {
-  
+    // console.log(new Date().toISOString(),`${this.constructor.name}.read`,this.nextPhase); 
     try {
       switch (this.nextPhase) {
          case 'systemInformation' :

@@ -6,21 +6,27 @@ class MongoCompare extends MongoDBI {
     constructor(yadamu) {
        super(yadamu)
     }
-
-    configureTest(connectionProperties,testParameters,target,tableMappings) {
-      testParameters.HOSTNAME = connectionProperties.host
-      testParameters.DATABASE = target.schema
-      super.configureTest(connectionProperties,testParameters,this.DEFAULT_PARAMETERS,tableMappings);
-    }
     
     async recreateSchema(target,password) {
+
+      const database = target.schema ? target.schema : ( target.owner === 'dbo' ? target.database : target.owner)
+
       try {
-        this.db = await this.client.db(target.schema)
+        if (this.status.sqlTrace) {
+           this.status.sqlTrace.write(`use ${database}\n`)      
+        }
+        this.db = await this.client.db(database)
+        if (this.status.sqlTrace) {
+          this.status.sqlTrace.write(`db.dropDatabase()\n`)      
+        }
         await this.db.dropDatabase()
       } catch (e) {
         throw e;
       }
-      this.db = await this.client.db(target.schema)
+      if (this.status.sqlTrace) {
+         this.status.sqlTrace.write(`use ${database}\n`)      
+      }
+      this.db = await this.client.db(database)
     }
 
     async importResults(target,timingsArray) {

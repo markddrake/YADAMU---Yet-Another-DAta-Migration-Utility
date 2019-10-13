@@ -3,6 +3,7 @@ cd oracle\node
 rmdir /s node_modules
 call npm install oracledb
 call npm install uuid
+call npm install wkx
 cd %YADAMU_HOME%
 cd mssql/node
 rmdir /s node_modules
@@ -26,4 +27,10 @@ cd %YADAMU_HOME%
 cd mongodb/node
 rmdir /s node_modules
 call npm install mongodb
+call npm install wkx
+cd %YADAMU_HOME%
+cd snowflake/node
+rmdir /s node_modules
+call npm install snowflake-sdk
+call npm install wkx
 cd %YADAMU_HOME%

@@ -21,7 +21,78 @@
 , "snowflake"                 : {
   }
 , "SPATIAL_PRECISION"         : {
-    "default"                 : 15
-  , "mssql"                   : { "oracle": 9}
+    "default"                 : 18
+  , "mssql"                   : { "oracle": 10}
+  , "postgres"                : { "oracle" : 12}
+  , "mysql"                   : { "oracle" : 10}
+  , "mariadb"                 : { "oracle" : 10}
+  }
+, "SCHEMA_MAPPINGS"           : {
+    "snowflake"               : {
+      "HR"                    : {
+        "database"            : "ORACLE"
+      , "schema"              : "HR"
+      }
+    , "HR1"                   : {
+        "database"            : "ORACLE"
+      , "schema"              : "HR1"
+      }
+    , "SH"                    : {
+        "database"            : "ORACLE"
+      , "schema"              : "SH"
+      }
+    , "SH1"                   : {
+        "database"            : "ORACLE"
+      , "schema"              : "SH1"
+      }
+    , "OE"                    : {
+        "database"            : "ORACLE"
+      , "schema"              : "OE"
+      }
+    , "OE1"                   : {
+        "database"            : "ORACLE"
+      , "schema"              : "OE1"
+      }
+    , "PM"                    : {
+        "database"            : "ORACLE"
+      , "schema"              : "PM"
+      }
+    , "PM1"                   : {
+        "database"            : "ORACLE"
+      , "schema"              : "PM1"
+      }
+    , "IX"                   : {
+        "database"            : "ORACLE"
+      , "schema"              : "IX"
+      }
+    , "IX1"                   : {
+        "database"            : "ORACLE"
+      , "schema"              : "IX1"
+      }
+    , "BI"                    : {
+        "database"            : "ORACLE"
+      , "schema"              : "BI"
+      }
+    , "BI1"                    : {
+        "database"            : "ORACLE"
+      , "schema"              : "BI1"
+      }
+    , "jtest"                 : {
+        "database"            : "MYSQL"
+      , "schema"              : "jtest"
+      }
+    , "sakila"                : {
+        "database"            : "MYSQL"
+      , "schema"              : "sakila"
+      }
+    , "Northwind"            : {
+        "database"            : "MSSQL"
+      , "schema"              : "Northwind"
+      }
+    , "Person"                : {
+        "database"            : "MSSQL"
+      , "schema"              : "Person"
+      }
+    }
   }
 }

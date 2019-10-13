@@ -1,6 +1,6 @@
 use master
 go
-CREATE OR ALTER FUNCTION sp_MAP_FOREIGN_DATATYPE(@VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT) 
+create OR ALTER FUNCTION sp_MAP_FOREIGN_DATATYPE(@VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT) 
 RETURNS VARCHAR(128) 
 AS
 BEGIN
@@ -124,7 +124,7 @@ BEGIN
              when @DATA_TYPE = 'geometry' then
                'geometry'
              when @DATA_TYPE = 'geography'then
-               'geometry'
+               'geography'
              when @DATA_TYPE = 'integer' then
                'int'
              else
@@ -135,12 +135,12 @@ BEGIN
   END
 END
 --
-GO
+go
 --
 EXECUTE sp_ms_marksystemobject 'sp_MAP_FOREIGN_DATATYPE'
-GO
+go
 --
-CREATE OR ALTER FUNCTION sp_GENERATE_STATEMENTS(@VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @COLUMN_LIST NVARCHAR(MAX),@DATA_TYPE_LIST NVARCHAR(MAX),@DATA_SIZE_LIST NVARCHAR(MAX)) 
+create OR ALTER FUNCTION sp_GENERATE_STATEMENTS(@VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @COLUMN_LIST NVARCHAR(MAX),@DATA_TYPE_LIST NVARCHAR(MAX),@DATA_SIZE_LIST NVARCHAR(MAX)) 
 RETURNS NVARCHAR(MAX)
 AS
 BEGIN
@@ -151,6 +151,13 @@ BEGIN
   
   DECLARE @DDL_STATEMENT      NVARCHAR(MAX);
   DECLARE @DML_STATEMENT      NVARCHAR(MAX);
+  DECLARE @DB_COLLATION       VARCHAR(256);
+  
+  SELECT @DB_COLLATION = CONVERT (varchar(256), DATABASEPROPERTYEX('Northwind1','collation'));
+  
+  if (@DB_COLLATION like '%_SC') begin
+    SET @DB_COLLATION = LEFT(@DB_COLLATION, LEN(@DB_COLLATION)-3);
+  end;
   
   WITH "SOURCE_TABLE_DEFINITION" as (
           SELECT c."KEY" "INDEX"
@@ -187,6 +194,8 @@ BEGIN
                                'nvarchar(max)'
                              when TARGET_DATA_TYPE LIKE '%(%)%' then
                                "TARGET_DATA_TYPE"
+                             when "TARGET_DATA_TYPE" in('text','ntext')  then
+                               CONCAT("TARGET_DATA_TYPE",' collate ',@DB_COLLATION)
                              when "TARGET_DATA_TYPE" in('xml','text','ntext','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney','geography','geometry','hierarchyid','uniqueidentifier')  then
                                "TARGET_DATA_TYPE"                
                              when "DATA_TYPE_SCALE" IS NOT NULL then
@@ -320,12 +329,12 @@ BEGIN
    RETURN JSON_MODIFY(JSON_MODIFY(JSON_MODIFY('{}','$.ddl',@DDL_STATEMENT),'$.dml',@DML_STATEMENT),'$.targetDataTypes',JSON_QUERY(@TARGET_DATA_TYPES))
 END;
 --
-GO
+go
 --
 EXECUTE sp_ms_marksystemobject 'sp_GENERATE_STATEMENTS'
-GO
+go
 --
-CREATE OR ALTER PROCEDURE sp_IMPORT_JSON(@TARGET_DATABASE VARCHAR(128)) 
+create OR ALTER PROCEDURE sp_IMPORT_JSON(@TARGET_DATABASE VARCHAR(128)) 
 AS
 BEGIN
   DECLARE @OWNER            VARCHAR(128);
@@ -446,12 +455,12 @@ BEGIN
   SELECT @RESULTS;
 END
 --
-GO
+go
 --
 EXECUTE sp_ms_marksystemobject 'sp_IMPORT_JSON'
-GO
+go
 --
-CREATE OR ALTER FUNCTION sp_GENERATE_SQL(@TARGET_DATABASE VARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @METADATA NVARCHAR(MAX)) 
+create OR ALTER FUNCTION sp_GENERATE_SQL(@TARGET_DATABASE VARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @METADATA NVARCHAR(MAX)) 
 returns NVARCHAR(MAX)
 AS
 BEGIN
@@ -498,9 +507,9 @@ BEGIN
   RETURN @RESULTS;
 END
 --
-GO
+go
 --
 EXECUTE sp_ms_marksystemobject 'sp_GENERATE_SQL'
-GO
+go
 --
 EXIT

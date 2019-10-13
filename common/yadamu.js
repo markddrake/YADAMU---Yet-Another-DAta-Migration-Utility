@@ -3,11 +3,12 @@
 const fs = require('fs');
 const path = require('path');
   
-const FileReader = require('../file/node/fileReader.js');
 const FileWriter = require('../file/node/fileWriter.js');
+const FileReader = require('../file/node/fileReader.js');
 const DBReader = require('./dbReader.js');
 const DBWriter = require('./dbWriter.js');
 const YadamuLogger = require('./yadamuLogger.js');
+const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuDefaults = require('./yadamuDefaults.json');
 
 class Yadamu {
@@ -41,57 +42,32 @@ class Yadamu {
       default:
     }
   }
- 
-  static convertIdentifierCase(identifierCase, metadata) {
-            
-    switch (identifierCase) {
-      case 'UPPER':
-        for (let table of Object.keys(metadata)) {
-          metadata[table].columns = metadata[table].columns.toUpperCase();
-          if (table !== table.toUpperCase()){
-            metadata[table].tableName = metadata[table].tableName.toUpperCase();
-            Object.assign(metadata, {[table.toUpperCase()]: metadata[table]});
-            delete metadata[table];
-          }
-        }           
-        break;
-      case 'LOWER':
-        for (let table of Object.keys(metadata)) {
-          metadata[table].columns = metadata[table].columns.toLowerCase();
-          if (table !== table.toLowerCase()) {
-            metadata[table].tableName = metadata[table].tableName.toLowerCase();
-            Object.assign(metadata, {[table.toLowerCase()]: metadata[table]});
-            delete metadata[table];
-          } 
-        }     
-        break;         
-      default: 
-    }             
-    return metadata
-  }
-    
-  static convertQuotedIdentifer(parameterValue) {
 
-    if (parameterValue.startsWith('"') && parameterValue.endsWith('"')) {
-      return parameterValue.slice(1,-1);
+  static reportStatus(status,yadamuLogger) {
+
+    const endTime = new Date().getTime();
+      
+    status.statusMsg = status.warningRaised === true ? 'with warnings' : status.statusMsg;
+    status.statusMsg = status.errorRaised === true ? 'with errors'  : status.statusMsg;  
+  
+    yadamuLogger.log([`${this.name}`,`${status.operation}`],`Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}.`);
+    if (!yadamuLogger.loggingToConsole()) {
+      console.log(`[${this.name}][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
     }
-    else {
-      return parameterValue.toUpperCase()
-    }	
   }
-
+  
   static processValue(parameterValue) {
 
     if ((parameterValue.startsWith('"') && parameterValue.endsWith('"')) && (parameterValue.indexOf('","') > 0 )) {
       // List of Values
 	  let parameterValues = parameterValue.substring(1,parameterValue.length-1).split(',');
 	  parameterValues = parameterValues.map(function(value) {
-        return Yadamu.convertQutotedIdentifer(value);
+        return YadamuLibrary.convertQutotedIdentifer(value);
 	  })
 	  return parameterValues
     }
     else {
-      return Yadamu.convertQuotedIdentifer(parameterValue);
+      return YadamuLibrary.convertQuotedIdentifer(parameterValue);
     }
   }
 
@@ -115,43 +91,6 @@ class Yadamu {
     }
   }
 
-  static stringifyDuration(duration) {
-
-
-   let milliseconds = 0
-   let seconds = 0
-   let minutes = 0
-   let hours = 0
-   let days = 0
-
-   if (duration > 0) {
-     milliseconds = Math.trunc(duration%1000)
-     seconds = Math.trunc((duration/1000)%60)
-     minutes = Math.trunc((duration/(1000*60))%60)
-     hours = Math.trunc((duration/(1000*60*60))%24);
-     days = Math.trunc(duration/(1000*60*60*24));
-   }
-  
-    hours = (hours < 10) ? "0" + hours : hours;
-    minutes = (minutes < 10) ? "0" + minutes : minutes;
-    seconds = (seconds < 10) ? "0" + seconds : seconds;
-
-    return (days > 0 ? `${days} days ` : '' ) + `${hours}:${minutes}:${seconds}.${(milliseconds + '').padStart(3,'0')}`;
-  }
-  
-  static reportStatus(status,yadamuLogger) {
-
-    const endTime = new Date().getTime();
-      
-    status.statusMsg = status.warningRaised === true ? 'with warnings' : status.statusMsg;
-    status.statusMsg = status.errorRaised === true ? 'with errors'  : status.statusMsg;  
-  
-    yadamuLogger.log([`${this.name}`,`${status.operation}`],`Operation completed ${status.statusMsg}. Elapsed time: ${Yadamu.stringifyDuration(endTime - status.startTime)}.`);
-    if (!yadamuLogger.loggingToConsole()) {
-      console.log(`[${this.name}][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${Yadamu.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
-    }
-  }
-
   static reportError(e,parameters,status,yadamuLogger) {
     
     if (!yadamuLogger.loggingToConsole()) {
@@ -165,7 +104,6 @@ class Yadamu {
   }
   
   constructor(operation,parameters) {
-       
     this.commandLineParameters = this.readCommandLineParameters();
     this.yadamuLogger = new YadamuLogger(process.stdout)
     
@@ -378,8 +316,9 @@ class Yadamu {
     return dbReader;
   }
   
-  getDBWriter(dbi) {
+  async getDBWriter(dbi) {
     const dbWriter = new DBWriter(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
+	await dbWriter.initialize();
     return dbWriter;
   }
 
@@ -465,7 +404,7 @@ class Yadamu {
     const startTime = new Date().getTime();
     const json = await dbi.uploadFile(importFilePath);
     const elapsedTime = new Date().getTime() - startTime;
-    this.yadamuLogger.log([`${this.constructor.name}.uploadFile()`],`Processing file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${Yadamu.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
+    this.yadamuLogger.log([`${this.constructor.name}.uploadFile()`],`Processing file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
     return json;
   }
     
@@ -509,6 +448,4 @@ class Yadamu {
    }
 }  
      
-module.exports.Yadamu = Yadamu;
-module.exports.convertIdentifierCase  = Yadamu.convertIdentifierCase
-module.exports.stringifyDuration  = Yadamu.stringifyDuration
+module.exports = Yadamu;

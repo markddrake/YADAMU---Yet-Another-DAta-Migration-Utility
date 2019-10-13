@@ -24,21 +24,24 @@ class StatementGenerator {
     targetDataTypes.forEach(function (targetDataType,idx) {
       const dataType = this.dbi.decomposeDataType(targetDataType);
       switch (dataType.type) {
-       case 'geography':
-          // TypeError: parameter.type.validate is not a function
-          supported = false;
-          break;
-       case 'geometry':
-          // TypeError: parameter.type.validate is not a function
+        case 'geography':
+         // TypeError: parameter.type.validate is not a function
          supported = false;
-          break;
-       case 'xml':
-          // Unsupported Data Type for Bulk Load
-          supported = false;
-          break;
+         break;
+	   case 'geometry':
+         // TypeError: parameter.type.validate is not a function
+         supported = false;
+         break;
+	   case 'xml':
+         // Unsupported Data Type for Bulk Load
+         supported = false;
+         break;
+        // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
+		/*
         case 'image':
           supported = false;
           break;
+        */
       }
      },this)
     return supported;
@@ -173,9 +176,9 @@ class StatementGenerator {
            table.columns.add(columns[idx],sql.VarBinary(dataType.length), {nullable: true});
           break;
         case 'image':
-          // Added to Unsupported
-          // Invalid column data type for bulk load
-          table.columns.add(columns[idx],sql.Image, {nullable: true});
+  	      // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
+          // table.columns.add(columns[idx],sql.Image, {nullable: true});
+          table.columns.add(columns[idx],sql.VarBinary(sql.MAX), {nullable: true});
           break;
         case 'udt':
           table.columns.add(columns[idx],sql.UDT, {nullable: true});
@@ -183,12 +186,30 @@ class StatementGenerator {
         case 'geography':
           // Added to Unsupported
           // TypeError: parameter.type.validate is not a function
-          table.columns.add(columns[idx],sql.Geography, {nullable: true});
+          // table.columns.add(columns[idx],sql.Geography, {nullable: true});
+  	      // Upload geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables bulk upload.
+		  switch (this.spatialFormat) {
+			case "WKB":
+            case "EWKB":
+              table.columns.add(columns[idx],sql.VarBinary(sql.MAX), {nullable: true});
+			  break;
+			default:
+		      table.columns.add(columns[idx],sql.VarChar(sql.MAX), {nullable: true});
+		  }
           break;
         case 'geometry':
           // Added to Unsupported
           // TypeError: parameter.type.validate is not a function
-          table.columns.add(columns[idx],sql.Geometry, {nullable: true});
+          // table.columns.add(columns[idx],sql.Geometry, {nullable: true});
+  	      // Upload geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables bulk upload.
+		  switch (this.spatialFormat) {
+			case "WKB":
+            case "EWKB":
+              table.columns.add(columns[idx],sql.VarBinary(sql.MAX), {nullable: true});
+			  break;
+			default:
+		      table.columns.add(columns[idx],sql.VarChar(sql.MAX), {nullable: true});
+		  }
           break;
         case 'hierarchyid':
           table.columns.add(columns[idx],sql.VarChar(4000),{nullable: true});
@@ -221,30 +242,15 @@ class StatementGenerator {
       const tableInfo = statementCache[tableName];
       tableInfo.batchSize =  this.batchSize;
       tableInfo.commitSize = this.commitSize;
+	  tableInfo.spatialFormat = this.spatialFormat
       // Create table before attempting to Prepare Statement..
       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + "\nVALUES (";
       this.metadata[table].columns.split(',').forEach(function(column,idx) {
         switch(tableInfo.targetDataTypes[idx]) {
           case 'image':
-            tableInfo.dml = tableInfo.dml + 'convert(image,convert(varbinary(max),@C' + idx + ',2))' + ','
+		    // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
+            tableInfo.dml = tableInfo.dml + 'convert(image,@C' + idx + ')' + ','
             break;
-          /*
-          case 'varbinary(max)':
-            tableInfo.dml = tableInfo.dml + 'convert(varbinary(max),@C' + idx + ',2)' + ','
-            break;
-          */
-          /*
-          case 'binary':
-          case 'varbinary':
-                        case
-                          when ((DATA_TYPE_LENGTH = -1) OR (DATA_TYPE = 'BLOB') or ((CHARINDEX('"."',DATA_TYPE) > 0))) then
-                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(max),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
-                          else 
-                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",'),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
-                        END
-            tableInfo.dml = tableInfo.dml + '@C' + idx + ','
-            break;
-          */
           case "xml":
             tableInfo.dml = tableInfo.dml + 'convert(XML,@C' + idx + ',1)' + ','
             break;
@@ -252,28 +258,28 @@ class StatementGenerator {
             switch (this.spatialFormat) {
                case "WKT":
                case "EWKT":
-                 tableInfo.dml = tableInfo.dml + 'GEOGRAPHY::STGeomFromText(@C' + idx + ',4326)' + ','
+                 tableInfo.dml = tableInfo.dml + 'geography::STGeomFromText(@C' + idx + ',4326)' + ','
                  break
                case "WKB":
                case "EWKB":
-                 tableInfo.dml = tableInfo.dml + 'GEOGRAPHY::STGeomFromWKB(convert(varbinary(max),@C' + idx + ',2),4326)' + ','
+                 tableInfo.dml = tableInfo.dml + 'geography::STGeomFromWKB(@C' + idx + ',4326)' + ','
                  break
                default:
-                 tableInfo.dml = tableInfo.dml + 'GEOGRAPHY::STGeomFromWKB(convert(varbinary(max),@C' + idx + ',2),4326)' + ','
+                 tableInfo.dml = tableInfo.dml + 'geography::STGeomFromWKB(@C' + idx + ',4326)' + ','
             }    
             break;          
           case "geometry":
             switch (this.spatialFormat) {
                case "WKT":
                case "EWKT":
-                 tableInfo.dml = tableInfo.dml + 'GEOMETRY::STGeomFromText(@C' + idx + ',4326)' + ','
+                 tableInfo.dml = tableInfo.dml + 'geometry::STGeomFromText(@C' + idx + ',4326)' + ','
                  break
                case "WKB":
                case "EWKB":
-                 tableInfo.dml = tableInfo.dml + 'GEOMETRY::STGeomFromWKB(convert(varbinary(max),@C' + idx + ',2),4326)' + ','
+                 tableInfo.dml = tableInfo.dml + 'geometry::STGeomFromWKB(@C' + idx + ',4326)' + ','
                  break
                default:
-                 tableInfo.dml = tableInfo.dml + 'GEOMETRY::STGeomFromWKB(convert(varbinary(max),@C' + idx + ',2),4326)' + ','
+                 tableInfo.dml = tableInfo.dml + 'geometry::STGeomFromWKB(@C' + idx + ',4326)' + ','
             }      
             break;            
           default: 
@@ -284,7 +290,7 @@ class StatementGenerator {
       tableInfo.bulkSupported = this.bulkSupported(tableInfo.targetDataTypes);
       try {
         if (tableInfo.bulkSupported) {
-          tableInfo.bulkOperation = this.createBulkOperation(database, table,this.metadata[table].columns,tableInfo.targetDataTypes);
+          tableInfo.bulkOperation = this.createBulkOperation(database, tableName, this.metadata[table].columns, tableInfo.targetDataTypes);
         }
         else {
           // Place holder for caching rows.

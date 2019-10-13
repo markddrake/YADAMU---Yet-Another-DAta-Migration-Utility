@@ -6,6 +6,7 @@ cd $YADAMU_HOME
 cd mssql/node
 rm -rf node_modules
 npm install mssql
+npm install wkx
 cd $YADAMU_HOME
 cd postgres/node
 rm -rf node_modules
@@ -25,4 +26,10 @@ cd $YADAMU_HOME
 cd mongodb/node
 rm -rf node_modules
 npm install mongodb
+npm install wkx
+cd $YADAMU_HOME
+cd snowlake/node
+rm -rf node_modules
+npm install snowflake-sdk
+npm install wkx
 cd $YADAMU_HOME

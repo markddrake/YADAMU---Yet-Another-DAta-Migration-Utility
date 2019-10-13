@@ -1,5 +1,7 @@
 "use strict"
 
+const WKX = require('wkx');
+
 const Yadamu = require('../../common/yadamu.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 
@@ -49,6 +51,34 @@ class TableWriter extends YadamuWriter {
   }
 
   async appendRow(row) {
+      
+    // Convert to GeoJSON
+    
+    this.tableInfo.dataTypes.forEach(function(sourceDataType,idx) {
+      const dataType = this.dbi.decomposeDataType(sourceDataType);
+      if (row[idx] !== null) {
+        switch (dataType.type) {
+          case '"MDSYS"."SDO_GEOMETRY"':
+          case 'geography':
+          case 'geometry':
+            switch (this.dbi.systemInformation.spatialFormat) {
+              case "WKB":
+                row[idx]  = JSON.stringify(WKX.Geometry.parse(Buffer.from(row[idx],'hex')).toGeoJSON())
+                break;
+              case "EWKB":
+                break;
+              case "WKT":
+                break;
+              case "EWKT":
+                break;
+              default:
+            }
+            break;
+          default:
+        }
+      }
+    },this)
+
     switch (this.insertMode) {
       case 'DOCUMENT_MODE' :
         if (Array.isArray(row[0])) {
@@ -72,6 +102,8 @@ class TableWriter extends YadamuWriter {
       default:
         // ### Exception - Unknown Mode
     }
+    return this.batch.length;
+
   }
 
   async writeBatch() {

@@ -34,6 +34,20 @@ class PostgresDBI extends YadamuDBI {
   ** Local methods 
   **
   */
+  
+  async testConnection(connectionProperties,parameters) {   
+    super.setConnectionProperties(connectionProperties);
+	try {
+      const pgClient = new Client(this.connectionProperties);
+      await pgClient.connect();
+      await pgClient.end();     
+	  super.setParameters(parameters)
+	} catch (e) {
+      throw e;
+	}
+	
+  }
+  
    
   async getClient() {
     const pgClient = new Client(this.connectionProperties);
@@ -335,20 +349,46 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
+  async getPostgisInfo() {
+
+    const sqlStatement  =  `SELECT PostGIS_full_version() "POSTGIS"`;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement};\n\--\n`)
+    }
+    
+    let postgis = undefined
+    
+    try {
+      const results = await this.pgClient.query(sqlStatement)
+      return results.rows[0].POSTGIS;
+	} catch (e) {
+      if (e.code && (e.code === '42883')) {
+        // ### What to do about SystemInfo.SPATIAL_FORMAT There can be no Geography or Geometry columns without POSTGIS
+        return "Not Installed"
+      }
+      else {
+        throw e;
+      }
+    }
+  }
+
   async getSystemInformation(EXPORT_VERSION) {     
   
+    const postgisInfo = await this.getPostgisInfo();
+   
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlSystemInformation};\n\--\n`)
     }
-   
-	const results = await this.pgClient.query(sqlSystemInformation);
-	const sysInfo = results.rows[0];
+    
+    const results = await this.pgClient.query(sqlSystemInformation)
+    const sysInfo = results.rows[0];
 	
     return {
       date               : new Date().toISOString()
      ,timeZoneOffset     : new Date().getTimezoneOffset()                      
      ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
      ,vendor             : this.DATABASE_VENDOR
+     ,postgisInfo        : postgisInfo
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
      ,exportVersion      : EXPORT_VERSION

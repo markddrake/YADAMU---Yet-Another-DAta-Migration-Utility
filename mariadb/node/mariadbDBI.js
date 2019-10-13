@@ -11,6 +11,7 @@ const Readable = require('stream').Readable;
 const mariadb = require('mariadb');
 
 const YadamuDBI = require('../../common/yadamuDBI.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('../../dbShared/mysql/statementGenerator57.js');
@@ -26,6 +27,17 @@ const sqlReleaseSavePoint = `RELEASE SAVEPOINT YadamuInsert`;
 
 class MariadbDBI extends YadamuDBI {
     
+  async testConnection(connectionProperties) {   
+    try {
+	  this.setConnectionProperties(connectionProperties);
+      this.conn = await mariadb.createConnection(this.connectionProperties);
+	  await this.conn.end();
+	  super.setParameters(parameters)
+	} catch (e) {
+	  throw (e)
+	} 
+  }	
+	
   // Cannot use JSON_ARRAYAGG for DATA_TYPES and SIZE_CONSTRAINTS beacuse MYSQL implementation of JSON_ARRAYAGG does not support ordering
   sqlSchemaInfo() {
      return `select c.table_schema "TABLE_SCHEMA"
@@ -100,6 +112,12 @@ class MariadbDBI extends YadamuDBI {
      
   async configureSession() {  
 
+    const sqlSetITimeout  = `SET SESSION interactive_timeout = 600000`;
+    await this.executeSQL(sqlSetITimeout);
+
+    const sqlSetWTimeout  = `SET SESSION wait_timeout = 600000`;
+    await this.executeSQL(sqlSetWTimeout);
+
     const sqlSetSqlMode = `SET SESSION SQL_MODE='ANSI_QUOTES,PAD_CHAR_TO_FULL_LENGTH'`;
     await this.executeSQL(sqlSetSqlMode);
     
@@ -136,6 +154,8 @@ class MariadbDBI extends YadamuDBI {
   }
   
   async getConnectionPool() {
+
+    this.logConnectionProperties();
 
     this.pool = mariadb.createPool(this.connectionProperties);
     this.conn = await this.pool.getConnection();
@@ -465,18 +485,29 @@ class MariadbDBI extends YadamuDBI {
       this.status.sqlTrace.write(`${query.SQL_STATEMENT};\n--\n`);
     }
 
-    const readStream = new Readable({objectMode: true });
-    readStream._read = function() {};  
+	const self = this
+    const is = new Readable({objectMode: true });
+    is._read = function() {};  
   
     this.conn.queryStream(query.SQL_STATEMENT).on('data',
     function(row) {
-      readStream.push(row)
+      is.push(row)
     }).on('end',
     function() {
-      readStream.push(null)
-    }) 
-  
-    return readStream;      
+      is.push(null)
+    }).on('error',
+    async function(err) {
+      self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`,`${err.code}`],`Connection Idle Time: ${YadamuLibrary.stringifyDuration(new Date().getTime() - self.lastUsedTime)}.`); 
+	  if ((err.fatal) && (err.code && (err.code === 'PROTOCOL_CONNECTION_LOST') || (err.code === 'ECONNRESET'))){
+	    err.yadamuHandled = true;
+        self.yadamuLogger.warning([`${self.constructor.name}.getInputStream()`],`SQL Operation raised\n${err}`);
+        self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`],`Attemping reconnection.`);
+        await self.reconnect()
+        this.lastUsedTime = new Date().getTime();
+        self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`],`New connection availabe.`);
+	  }      
+    })
+    return is;      
   }      
   
   async generateStatementCache(schema,executeDDL) {

@@ -1,7 +1,7 @@
 "use strict"
 
 const Yadamu = require('../../common/yadamu.js');
-const DBInterface = require('./mysqlDBI.js');
+const DBInterface = require('./snowflakeDBI.js');
 
 async function main() {
 

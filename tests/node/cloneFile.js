@@ -1,6 +1,6 @@
 "use strict"
 
-const Yadamu = require('../../common/yadamu.js').Yadamu;
+const Yadamu = require('../../common/yadamu.js');
   
 async function main() {
 

@@ -33,11 +33,12 @@ class StatementGenerator {
     this.spatialFormat = spatialFormat
     this.batchSize = batchSize
     this.commitSize = commitSize;
-    
     this.lobCacheSize = lobCacheSize
   }
  
   generateBinds(tableInfo, metadata) {
+      
+     // Binds describe the format that will be used to supply the data. Eg with SQLServer BIGINT values will be presented as String
 
      tableInfo.lobCount = 0;
      return tableInfo.targetDataTypes.map(function (targetDataType,idx) {
@@ -45,15 +46,17 @@ class StatementGenerator {
        if (!dataType.length) {
           dataType.length = parseInt(metadata.sizeConstraints[idx]);
        }
-       
        switch (dataType.type) {
          case 'NUMBER':
-           if (metadata.source.vendor === 'MSSQLSERVER' && metadata.source.dataTypes[idx] === 'bigint') {
+           if ((metadata.source.vendor === 'MSSQLSERVER') && (metadata.source.dataTypes[idx] === 'bigint')) {
              return { type: oracledb.STRING, maxSize : 19}
            }
          case 'FLOAT':
          case 'BINARY_FLOAT':
          case 'BINARY_DOUBLE':
+           if ((metadata.source.vendor === 'SNOWFLAKE') && ['NUMBER','DECIMAL','NUMERIC','FLOAT', 'FLOAT4', 'FLOAT8', 'DOUBLE','DOUBLE PRECISION', 'REAL'].includes(metadata.source.dataTypes[idx])) {
+             return { type: oracledb.STRING, maxSize : dataType.length + 3}
+           }
            return { type: oracledb.NUMBER }
          case 'RAW':
            return { type: oracledb.BUFFER, maxSize : dataType.length}
@@ -66,7 +69,7 @@ class StatementGenerator {
            return { type: oracledb.STRING, maxSize : dataType.length * 2}
          case 'DATE':
          case 'TIMESTAMP':
-           return { type: oracledb.STRING, maxSize : 33}
+           return { type: oracledb.STRING, maxSize : 35}
          case 'INTERVAL':
             return { type: oracledb.STRING, maxSize : 12}
          case 'CLOB':
@@ -109,6 +112,7 @@ class StatementGenerator {
                break;
              case "WKT":
              case "EWKT":
+             case "GeoJSON":
                return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
                break;
              default:
@@ -128,7 +132,7 @@ class StatementGenerator {
   
   async getMetadataLob() {
 
-    return await this.dbi.lobFromJSON({metadata: this.metadata});  
+    return await this.dbi.blobFromJSON({metadata: this.metadata});  
       
   }
  
@@ -213,6 +217,9 @@ class StatementGenerator {
                case "WKT":
                case "EWKT":
                  values.push(`OBJECT_SERIALIZATION.DESERIALIZE_WKTGEOMETRY(:${(idx+1)})`);
+                 break;
+               case "GeoJSON":
+                 values.push(`OBJECT_SERIALIZATION.DESERIALIZE_GEOJSON(:${(idx+1)})`);
                  break;
                default:
             }

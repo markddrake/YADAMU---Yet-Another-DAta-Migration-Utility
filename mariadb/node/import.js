@@ -1,6 +1,6 @@
 "use strict"
 
-const Yadamu = require('../../common/yadamu.js').Yadamu;
+const Yadamu = require('../../common/yadamu.js');
 const DBInterface = require('./mariadbDBI.js');
   
 async function main() {

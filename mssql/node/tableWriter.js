@@ -138,22 +138,40 @@ class TableWriter extends YadamuWriter {
           ps.input(column,sql.Binary);
           break;
         case 'varbinary':
+  	      // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
           // sql.VarBinary ([length])
            ps.input(column,sql.VarBinary(dataType.length));
           break;
         case 'image':
-          ps.input(column,sql.Image);
+          // ps.input(column,sql.Image);
+          ps.input(column,sql.VarBinary(sql.MAX));
           break;
         case 'udt':
           ps.input(column,sql.UDT);
           break;
         case 'geography':
-          // ps.input(column,sql.Geography);
-          ps.input(column,sql.NVarChar(sql.MAX));
+          // ps.input(column,sql.Geography)
+		  // Upload Geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
+		  switch (this.tableInfo.spatialFormat) {
+			case "WKB":
+            case "EWKB":
+              ps.input(column,sql.VarBinary(sql.MAX));
+			  break;
+			default:
+		      ps.input(column,sql.VarChar(sql.MAX));
+		  }
           break;
         case 'geometry':
           // ps.input(column,sql.Geometry);
-          ps.input(column,sql.NVarChar(sql.MAX));
+		  // Upload Geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
+		  switch (this.tableInfo.spatialFormat) {
+			case "WKB":
+            case "EWKB":
+              ps.input(column,sql.VarBinary(sql.MAX));
+			  break;
+			default:
+		      ps.input(column,sql.VarChar(sql.MAX));
+		  }
           break;
         case 'hierarchyid':
           ps.input(column,sql.VarChar(4000));
@@ -185,10 +203,31 @@ class TableWriter extends YadamuWriter {
          */
          switch (dataType.type) {
            case "image" :
+    	     // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
              row[idx] = Buffer.from(row[idx],'hex');
              break;
            case "varbinary":
              row[idx] = Buffer.from(row[idx],'hex');
+             break;
+           case "geography":
+		     // Upload geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
+	     	 switch (this.tableInfo.spatialFormat) {
+			   case "WKB":
+               case "EWKB":
+                 row[idx] = Buffer.from(row[idx],'hex');
+			     break;
+			   default:
+		     }		   
+             break;
+           case "geometry":
+		     // Upload geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
+	     	 switch (this.tableInfo.spatialFormat) {
+			   case "WKB":
+               case "EWKB":
+                 row[idx] = Buffer.from(row[idx],'hex');
+			     break;
+			   default:
+		     }		   
              break;
            case "json":
              if (typeof row[idx] === 'object') {
@@ -240,7 +279,7 @@ class TableWriter extends YadamuWriter {
   }
 
   async writeBatch() {
-      
+
     this.batchCount++;
       
     // ### Savepoint Support ?
@@ -279,7 +318,7 @@ class TableWriter extends YadamuWriter {
         }
         const results = await this.tableInfo.preparedStatement.execute(args);
       } catch (e) {
-        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.columns),] : []
+        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.rows[row])] : []
         this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.tableInfo.bulkOperation.rows.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
         if (this.skipTable) {
           break;

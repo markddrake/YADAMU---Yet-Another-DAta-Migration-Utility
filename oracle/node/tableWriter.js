@@ -13,6 +13,10 @@ class TableWriter extends YadamuWriter {
     this.lobUsage = 0;
     this.lobList = [];
     this.dumpOracleTestcase = false;
+    
+    if (this.dbi.dbVersion < 12) {
+      this.WKX = require('wkx') 
+    }
   }
 
   async initialize() {
@@ -40,41 +44,50 @@ class TableWriter extends YadamuWriter {
   }
 
   async appendRow(row) {
+    // if ( this.batch.length === 0 ) {console.log(row)}
     try {           
       row = await Promise.all(this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {          
-        if (
-        row[idx] !== null) {
+        if (row[idx] !== null) {
           const dataType = this.dbi.decomposeDataType(targetDataType);   
           
-          /*
           switch (dataType.type) {
             case "GEOMETRY":
-              console.log(WKX.Geometry.parse(Buffer.from(row[idx],'hex')).toWkt())
+              if ((this.dbi.dbVersion < 12) && (this.tableInfo.spatialFormat === 'GeoJSON')) {
+                // GeoJSON not supported by SDO_UTIL in 11.x database
+                row[idx] = this.WKX.Geometry.parseGeoJSON(row[idx]).toWKT();
+              }
+              break;
+            case "JSON":
+              // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
+              // row[idx] = Buffer.from(JSON.stringify(row[idx]))
+              // Default JSON Storage model is JSON store as CLOB.
+              // JSON must be shipped in Serialized Form
+              if (typeof row[idx] === 'object') {
+                row[idx] = JSON.stringify(row[idx])
+              }  
               break;
             default:
           }      
-          */
-          if (dataType.type === 'JSON') {
-            // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
-            // row[idx] = Buffer.from(JSON.stringify(row[idx]))
-            // Default JSON Storage model is JSON store as CLOB.
-            // JSON must be shipped in Serialized Form
-            if (typeof row[idx] === 'object') {
-              return JSON.stringify(row[idx])
-            }
-            else {
-              return row[idx]
-            }
-          } 
+          
           if (this.tableInfo.binds[idx].type === oracledb.CLOB) {
             this.lobUsage++
             // A promise...
-            return this.dbi.trackClobFromString(row[idx], this.lobList)                                                                    
+            if (typeof row[idx] === "string") {
+              return this.dbi.trackClobFromString(row[idx], this.lobList)                                                                    
+            }
+            else {
+              return this.dbi.trackClobFromJSON(row[idx], this.lobList)                                                                     
+            }
           }
           if (this.tableInfo.binds[idx].type === oracledb.BLOB) {
             this.lobUsage++
             // A promise...
-            return this.dbi.trackBlobFromHexBinary(row[idx], this.lobList)                                                                    
+            if (typeof row[idx] === "string") {
+              return this.dbi.trackBlobFromHexBinary(row[idx], this.lobList)                                                                    
+            }
+            else {
+              return this.dbi.trackBlobFromBuffer(row[idx], this.lobList)
+            }
           }
           switch (dataType.type) {
             case "RAW":
@@ -284,8 +297,8 @@ end;`
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row])
       } catch (e) {
-        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,this.tableInfo.targetDataTypes,JSON.stringify(this.tableInfo.binds)] : []
         const record = await this.serializeLobs(this.batch[row])
+        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,this.tableInfo.targetDataTypes,JSON.stringify(this.tableInfo.binds),JSON.stringify(record)] : []
         this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,record,e,errInfo);
         if (this.skipTable) {
           break;

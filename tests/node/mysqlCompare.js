@@ -31,8 +31,8 @@ class MySQLCompare extends MySQLDBI {
     async recreateSchema(schema,password) {
         
       try {
-        const dropUser = `drop schema if exists "${schema.schema}"`;
-        await this.executeSQL(dropUser,{});      
+        const dropSchema = `drop schema if exists "${schema.schema}"`;
+        await this.executeSQL(dropSchema,{});      
       } catch (e) {
         if (e.errorNum && (e.errorNum === 1918)) {
         }
@@ -40,8 +40,8 @@ class MySQLCompare extends MySQLDBI {
           throw e;
         }
       }
-      const createUser = `create schema "${schema.schema}"`;
-      await this.executeSQL(createUser,{});      
+      const createSchema = `create schema "${schema.schema}"`;
+      await this.executeSQL(createSchema,{});      
     }    
 
     async importResults(target,timingsArray) {

@@ -667,9 +667,7 @@ begin
            return 'VARCHAR2(4000)';
         when P_DATA_TYPE = 'uniqueidentifier' then
            return 'VARCHAR2(36)';
-        when P_DATA_TYPE = 'geography' then
-           return 'GEOMETRY';
-        when P_DATA_TYPE = 'geometry' then
+        when P_DATA_TYPE in ('geography','geometry') then
            return 'GEOMETRY';
         else
           return UPPER(P_DATA_TYPE);
@@ -716,7 +714,7 @@ begin
           end case;
         when P_DATA_TYPE = 'xml' then
            return 'XMLTYPE';
-        when P_DATA_TYPE = 'geometry' then
+        when P_DATA_TYPE in ('geography','geometry') then
            return 'GEOMETRY';
         when P_DATA_TYPE = 'numeric' then
            return 'NUMBER';
@@ -780,9 +778,7 @@ begin
         -- Special Data Types   
         when P_DATA_TYPE = 'enum' then
            return 'VARCHAR2(512)';
-        when P_DATA_TYPE = 'geography' then
-           return 'GEOMETRY';
-        when P_DATA_TYPE = 'geometry' then
+        when P_DATA_TYPE in ('geography','geometry')  then
            return 'GEOMETRY';
         when P_DATA_TYPE = 'set' then
            return 'VARCHAR2(512)';
@@ -794,6 +790,34 @@ begin
     when P_SOURCE_VENDOR = 'MariaDB' then
       -- MariaDB and MySQL currentyl share the same mappings
       return UPPER(P_DATA_TYPE);
+    when P_SOURCE_VENDOR = 'MongoDB' then
+      -- MongoDB typing based on JSON Typing and the Javascript TypeOf Operator
+      -- ### Todo MongoDB typing based on BSON ?
+      case
+        when P_DATA_TYPE in ('undefined','object','function','symbol') then 
+          return 'JSON';
+        when P_DATA_TYPE = 'boolean' then
+           return 'BOOLEAN';
+        when P_DATA_TYPE = 'number' then
+           return 'NUMBER';
+        when P_DATA_TYPE = 'string' then
+          case
+            when JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH is NULL then
+              return 'VARCHAR2(32768)';
+            when P_DATA_TYPE_LENGTH is NULL then
+              return 'VARCHAR2(4000)';
+            when JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH < 32769 then
+              return 'VARCHAR2';
+            when P_DATA_TYPE_LENGTH < 4001 then
+              return 'VARCHAR2';
+            else
+              return 'CLOB';
+          end case;
+        when P_DATA_TYPE = 'bigint' then
+           return 'NUMBER(19,0)';
+        else 
+           return UPPER(P_DATA_TYPE);
+      end case;
     else
       return UPPER(P_DATA_TYPE);
   end case;

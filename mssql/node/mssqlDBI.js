@@ -33,57 +33,72 @@ class MSSQLDBI extends YadamuDBI {
   **
   */
   
+  async testConnection(connectionProperties,parameters) {   
+    try {
+      this.setConnectionProperties(connectionProperties);
+      this.setTargetDatabase();
+	  // super.logConnectionParameters();
+      const connection = await sql.connect(this.connectionProperties);
+      await sql.close();
+	  super.setParameters(parameters)
+	} catch (e) {
+      await sql.close();
+	  throw (e)
+	} 
+  }
+
   sqlTableInfo() {
      
-   let spatialClause = `concat('"',column_name,'".${this.spatialSerializer} "',column_name,'"')`
+   let spatialClause = `concat('"',"COLUMN_NAME",'".${this.spatialSerializer} "',"COLUMN_NAME",'"')`
    
    if (this.parameters.SPATIAL_MAKE_VALID === true) {
-     spatialClause = `concat('case when "',column_name,'".STIsValid = 0 then "',column_name,'".makeValid().${this.spatialSerializer} else "',column_name,'".${this.spatialSerializer} "',column_name,'"')`
+     spatialClause = `concat('case when "',"COLUMN_NAME",'".STIsValid = 0 then "',"COLUMN_NAME",'".makeValid().${this.spatialSerializer} else "',"COLUMN_NAME",'".${this.spatialSerializer} "',"COLUMN_NAME",'"')`
    }
       
-   return `select t.table_schema "TABLE_SCHEMA"
-         ,t.table_name   "TABLE_NAME"
-         ,string_agg(concat('"',c.column_name,'"'),',') within group (order by ordinal_position) "COLUMN_LIST"
-         ,string_agg(concat('"',data_type,'"'),',') within group (order by ordinal_position) "DATA_TYPES"
+   return `select t."TABLE_SCHEMA" "TABLE_SCHEMA"
+         ,t."TABLE_NAME"   "TABLE_NAME"
+         ,string_agg(concat('"',c."COLUMN_NAME",'"'),',') within group (order by "ORDINAL_POSITION") "COLUMN_LIST"
+         ,string_agg(concat('"',"DATA_TYPE",'"'),',') within group (order by "ORDINAL_POSITION") "DATA_TYPES"
+         ,string_agg(concat('"',"COLLATION_NAME",'"'),',') within group (order by "ORDINAL_POSITION") "COLLATION_NAMES"
          ,string_agg(case
-                       when (numeric_precision is not null) and (numeric_scale is not null) 
-                         then concat('"',numeric_precision,',',numeric_scale,'"')
-                       when (numeric_precision is not null) 
-                         then concat('"',numeric_precision,'"')
-                       when (datetime_precision is not null)
-                         then concat('"',datetime_precision,'"')
-                       when (character_maximum_length is not null)
-                         then concat('"',character_maximum_length,'"')
+                       when ("NUMERIC_PRECISION" is not null) and ("NUMERIC_SCALE" is not null) 
+                         then concat('"',"NUMERIC_PRECISION",',',"NUMERIC_SCALE",'"')
+                       when ("NUMERIC_PRECISION" is not null) 
+                         then concat('"',"NUMERIC_PRECISION",'"')
+                       when ("DATETIME_PRECISION" is not null)
+                         then concat('"',"DATETIME_PRECISION",'"')
+                       when ("CHARACTER_MAXIMUM_LENGTH" is not null)
+                         then concat('"',"CHARACTER_MAXIMUM_LENGTH",'"')
                        else
                          '""'
                      end
                     ,','
                    )
-                   within group (order by ordinal_position) "SIZE_CONSTRAINTS"
+                   within group (order by "ORDINAL_POSITION") "SIZE_CONSTRAINTS"
          ,concat('select ',string_agg(case 
-                                        when data_type = 'hierarchyid' then
-                                          concat('cast("',column_name,'" as NVARCHAR(4000)) "',column_name,'"') 
-                                        when data_type in ('geography','geometry') then
+                                        when "DATA_TYPE" = 'hierarchyid' then
+                                          concat('cast("',"COLUMN_NAME",'" as NVARCHAR(4000)) "',"COLUMN_NAME",'"') 
+                                        when "DATA_TYPE" in ('geography','geometry') then
                                           ${spatialClause}
-                                        when data_type = 'datetime2' then
-                                          concat('convert(VARCHAR(33),"',column_name,'",127) "',column_name,'"') 
-                                        when data_type = 'datetimeoffset' then
-                                          concat('convert(VARCHAR(33),"',column_name,'",127) "',column_name,'"') 
-                                        when data_type = 'xml' then
-                                          concat('replace(replace(convert(NVARCHAR(MAX),"',column_name,'"),''&#x0A;'',''\n''),''&#x20;'','' '') "',column_name,'"') 
+                                        when "DATA_TYPE" = 'datetime2' then
+                                          concat('convert(VARCHAR(33),"',"COLUMN_NAME",'",127) "',"COLUMN_NAME",'"') 
+                                        when "DATA_TYPE" = 'datetimeoffset' then
+                                          concat('convert(VARCHAR(33),"',"COLUMN_NAME",'",127) "',"COLUMN_NAME",'"') 
+                                        when "DATA_TYPE" = 'xml' then
+                                          concat('replace(replace(convert(NVARCHAR(MAX),"',"COLUMN_NAME",'"),''&#x0A;'',''\n''),''&#x20;'','' '') "',"COLUMN_NAME",'"') 
                                         else 
-                                          concat('"',column_name,'"') 
+                                          concat('"',"COLUMN_NAME",'"') 
                                       end
                                      ,','
                                     ) 
-                                    within group (order by ordinal_position)
-                          ,' from "',t.table_schema,'"."',t.table_name,'"') "SQL_STATEMENT"
-     from information_schema.columns c, information_schema.tables t
-    where t.table_name = c.table_name
-      and t.table_schema = c.table_schema
-      and t.table_type = 'BASE TABLE'
-      and t.table_schema = @SCHEMA
-    group by t.table_schema, t.table_name`;  
+                                    within group (order by "ORDINAL_POSITION")
+                          ,' from "',t."TABLE_SCHEMA",'"."',t."TABLE_NAME",'"') "SQL_STATEMENT"
+     from "INFORMATION_SCHEMA"."COLUMNS" c, "INFORMATION_SCHEMA"."TABLES" t
+    where t."TABLE_NAME" = c."TABLE_NAME"
+      and t."TABLE_SCHEMA" = c."TABLE_SCHEMA"
+      and t."TABLE_TYPE" = 'BASE TABLE'
+      and t."TABLE_SCHEMA" = @SCHEMA
+    group by t."TABLE_SCHEMA", t."TABLE_NAME"`;  
   }    
 
   decomposeDataType(targetDataType) {
@@ -217,9 +232,9 @@ class MSSQLDBI extends YadamuDBI {
   **
   */
    
-  get DATABASE_VENDOR() { return 'MSSQLSERVER' };
-  get SOFTWARE_VENDOR() { return 'Microsoft Corporation' };
-  get SPATIAL_FORMAT()  { return this.spatialFormat };
+  get DATABASE_VENDOR()    { return 'MSSQLSERVER' };
+  get SOFTWARE_VENDOR()    { return 'Microsoft Corporation' };
+  get SPATIAL_FORMAT()     { return this.spatialFormat };
   get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().mssql }
 
   constructor(yadamu) {
@@ -470,6 +485,7 @@ class MSSQLDBI extends YadamuDBI {
        ,columns                  : table.COLUMN_LIST
        ,dataTypes                : JSON.parse('[' + table.DATA_TYPES + ']')
        ,sizeConstraints          : JSON.parse('[' + table.SIZE_CONSTRAINTS + ']')
+	   ,collations               : JSON.parse('[' + table.COLLATION_NAMES + ']')
       }
     }
     return metadata;   

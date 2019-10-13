@@ -23,6 +23,7 @@
   }
 , "mysql"                     : {
     "TABLE_MATCHING"          : "INSENSITIVE"
+   ,"READ_KEEP_ALIVE"         : 15000
   }
 , "oracle"                    : {
     "LOB_CACHE_SIZE"          : 1024

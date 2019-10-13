@@ -13,7 +13,7 @@ const uuidv1 = require('uuid/v1');
 const oracledb = require('oracledb');
 oracledb.fetchAsString = [ oracledb.DATE ]
 
-const Yadamu = require('../../common/yadamu.js').Yadamu;
+const YadamuLibrary = require('../../common/yadamuLibrary.js')
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const FileParser = require('../../file/node/fileParser.js');
 const DBParser = require('./dbParser.js');
@@ -31,6 +31,7 @@ const dateFormatMasks = {
        ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS.######"Z"'
        ,MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS.######"Z"'
        ,MongoDB     : 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+       
 }
 
 const timestampFormatMasks = {
@@ -40,6 +41,8 @@ const timestampFormatMasks = {
        ,MySQL       : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
        ,MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
        ,MongoDB     : 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"'
+       ,SNOWFLAKE   : 'YYYY-MM-DD"T"HH24:MI:SS.FF9"+00:00"'
+       
 }
 
   
@@ -384,7 +387,7 @@ class OracleDBI extends YadamuDBI {
   
   static parseConnectionString(connectionString) {
     
-    const user = Yadamu.convertQuotedIdentifer(connectionString.substring(0,connectionString.indexOf('/')));
+    const user = YadamuLibrary.convertQuotedIdentifer(connectionString.substring(0,connectionString.indexOf('/')));
     let password = connectionString.substring(connectionString.indexOf('/')+1);
     let connectString = '';
     if (password.indexOf('@') > -1) {
@@ -468,7 +471,7 @@ class OracleDBI extends YadamuDBI {
      
   }
 
-  lobFromStream (stream) {
+  blobFromStream (stream) {
     
     const conn = this.connection;
 
@@ -481,20 +484,20 @@ class OracleDBI extends YadamuDBI {
     });  
   };
 
-  lobFromFile (filename) {
+  blobFromFile (filename) {
      const stream = fs.createReadStream(filename);
-     return this.lobFromStream(stream);
+     return this.blobFromStream(stream);
   };
   
-  lobFromString(string) {
+  blobFromString(string) {
     const stream = new Readable();
     stream.push(string);
     stream.push(null);
-    return this.lobFromStream(stream);
+    return this.blobFromStream(stream);
   };
 
-  async lobFromJSON(json) { 
-    return this.lobFromString(JSON.stringify(json))
+  async blobFromJSON(json) { 
+    return this.blobFromString(JSON.stringify(json))
   };
       
   trackClobFromStringReader(s,list) {
@@ -522,6 +525,36 @@ class OracleDBI extends YadamuDBI {
     s.push(null);
     return this.trackClobFromStringReader(s,list);
     
+  }
+
+  trackClobFromJSON(json,list) {  
+    const s = new Readable();
+    s.push(JSON.stringify(json));
+    s.push(null);
+    return this.trackClobFromStringReader(s,list);
+    
+  }
+  
+  trackBlobFromStream (stream, list) {
+    
+    const conn = this.connection;
+
+    return new Promise(async function(resolve,reject) {
+      const tempLob =  await conn.createLob(oracledb.BLOB);
+      list.push(tempLob)
+      tempLob.on('error',function(err) {reject(err);});
+      tempLob.on('finish', function() {resolve(tempLob);});
+      stream.on('error', function(err) {reject(err);});
+      stream.pipe(tempLob);  // copies the stream  to the temporary LOB
+    });  
+  };
+  
+  trackBlobFromBuffer(buffer,list) {
+      
+     let stream = new Readable ();
+     stream.push(buffer);
+     stream.push(null);
+     return this.trackBlobFromStream(stream,list);
   }
 
   trackBlobFromStringReader(r,list) {
@@ -556,13 +589,13 @@ class OracleDBI extends YadamuDBI {
      
   getDateFormatMask(vendor) {
     
-    return dateFormatMasks[vendor]
+    return dateFormatMasks[vendor] ? dateFormatMasks[vendor] : dateFormatMasks.Oracle
  
   }
   
   getTimeStampFormatMask(vendor) {
     
-    return timestampFormatMasks[vendor]
+    return timestampFormatMasks[vendor] ? timestampFormatMasks[vendor] : timestampFormatMasks.Oracle
  
   }
   
@@ -575,13 +608,13 @@ class OracleDBI extends YadamuDBI {
   
   async setDateFormatMask(conn,status,vendor) {
 
-    let sqlStatement = `ALTER SESSION SET NLS_DATE_FORMAT = '${dateFormatMasks[vendor]}'`
+    let sqlStatement = `ALTER SESSION SET NLS_DATE_FORMAT = '${this.getDateFormatMask(vendor)}'`
     if (status.sqlTrace) {
       status.sqlTrace.write(`${sqlStatement}\n/\n`);
     }
     let result = await conn.execute(sqlStatement);
   
-    sqlStatement = `ALTER SESSION SET NLS_TIMESTAMP_FORMAT = '${timestampFormatMasks[vendor]}'`
+    sqlStatement = `ALTER SESSION SET NLS_TIMESTAMP_FORMAT = '${this.getTimeStampFormatMask(vendor)}'`
     if (status.sqlTrace) {
       status.sqlTrace.write(`${sqlStatement}\n/\n`);
     }
@@ -800,7 +833,7 @@ class OracleDBI extends YadamuDBI {
 
   async convertDDL2XML(ddlStatements) {
     const ddl = ddlStatements.map(function(ddlStatement){ return `<ddl>${ddlStatement.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\r/g,'\n')}</ddl>`},this).join('\n')
-    return this.lobFromString(`<ddlStatements>\n${ddl}\n</ddlStatements>`);
+    return this.blobFromString(`<ddlStatements>\n${ddl}\n</ddlStatements>`);
   }
 
   
@@ -813,7 +846,7 @@ class OracleDBI extends YadamuDBI {
     else {
       // ### OVERRIDE ### - Send Set of DDL operations to the server for execution   
       const sqlStatement = `begin :log := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS(:ddl,:sourceSchema,:targetSchema); end;`;
-      const ddlLob = await (this.dbVersion < 12 ? this.convertDDL2XML(ddl) : this.lobFromJSON({ddl : ddl}))
+      const ddlLob = await (this.dbVersion < 12 ? this.convertDDL2XML(ddl) : this.blobFromJSON({ddl : ddl}))
      
       const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH} , ddl:ddlLob, sourceSchema:this.systemInformation.schema, targetSchema:this.parameters.TO_USER};
       const results = await this.executeSQL(sqlStatement,args);
@@ -880,16 +913,10 @@ class OracleDBI extends YadamuDBI {
   }
   
   async createSavePoint() {
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlCreateSavePoint}\n\/\n`)
-    }
     await this.executeSQL(sqlCreateSavePoint,[]);
   }
 
   async restoreSavePoint() {
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlRestoreSavePoint}\n\/\n`)
-    }
     await this.executeSQL(sqlRestoreSavePoint,[]);
   }
 
@@ -908,7 +935,7 @@ class OracleDBI extends YadamuDBI {
   async uploadFile(importFilePath) {
       
      if (this.maxStringSize > 32767) {
-       const json = await this.lobFromFile(importFilePath);
+       const json = await this.blobFromFile(importFilePath);
        return json;
      }
      else {
@@ -923,7 +950,7 @@ class OracleDBI extends YadamuDBI {
        saxParser.pipe(ddlCache);
        const inputStream = fs.createReadStream(importFilePath);         
        const multiplexor = new Multiplexor(saxParser,ddlCache)
-       const jsonTempLob = await this.lobFromStream(inputStream.pipe(multiplexor))
+       const jsonTempLob = await this.blobFromStream(inputStream.pipe(multiplexor))
        const ddl = ddlCache.getDDL();
        if ((ddl.length > 0) && this.statementTooLarge(ddl)) {
          this.ddl = ddl
@@ -1252,10 +1279,10 @@ class OracleDBI extends YadamuDBI {
    // Override for LOB_CACHE_SIZE and Import Wrapper
     let statementGenerator 
     if (this.dbVersion < 12) {
-      statementGenerator = new StatementGenerator11(this,schema,this.metadata,this.spatialFormat,this.batchSize,this.commitSize, this.parameters.LOB_CACHE_SIZE, this.importWrapper)
+      statementGenerator = new StatementGenerator11(this,schema,this.metadata,this.systemInformation.spatialFormat,this.batchSize,this.commitSize, this.parameters.LOB_CACHE_SIZE, this.importWrapper)
     }
     else {
-      statementGenerator = new StatementGenerator(this,schema,this.metadata,this.spatialFormat,this.batchSize,this.commitSize, this.parameters.LOB_CACHE_SIZE)
+      statementGenerator = new StatementGenerator(this,schema,this.metadata,this.systemInformation.spatialFormat,this.batchSize,this.commitSize, this.parameters.LOB_CACHE_SIZE)
     }
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }
@@ -1267,6 +1294,7 @@ class OracleDBI extends YadamuDBI {
   async finalizeImport() {
     await this.enableConstraints();
     await this.refreshMaterializedViews();
+    super.finalizeImport()
   }  
   
   async dropWrappers() {

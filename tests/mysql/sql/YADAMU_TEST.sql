@@ -5,25 +5,179 @@
 */
 SET SESSION SQL_MODE=ANSI_QUOTES;
 --
-DROP FUNCTION IF EXISTS SET_GEOMETRY_PRECISION;
+DROP FUNCTION IF EXISTS FUDGE_COORDINATE;
 --
 DELIMITER $$
 --
-CREATE FUNCTION SET_GEOMETRY_PRECISION(P_GEOMETRY GEOMETRY,P_SPATIAL_PRECISION int)
+CREATE FUNCTION FUDGE_COORDINATE(P_COORDINATE DOUBLE PRECISION,P_SPATIAL_PRECISION int)
+RETURNS DOUBLE PRECISION DETERMINISTIC
+BEGIN
+  DECLARE DRIFT           DOUBLE PRECISION;
+  DECLARE RESULT          DOUBLE PRECISION;
+  DECLARE FUDGE_FACTOR    DOUBLE PRECISION DEFAULT 5e-12;
+  
+  SET DRIFT = round((P_COORDINATE-truncate(P_COORDINATE,10))*1e10);
+  case
+    when (DRIFT = -1) then
+      SET RESULT = P_COORDINATE - FUDGE_FACTOR;
+    when (DRIFT = 1) then
+      SET RESULT = P_COORDINATE + FUDGE_FACTOR;
+    else
+      SET RESULT = P_COORDINATE;
+   end case;
+   SET RESULT = truncate(RESULT,10);
+   SET RESULT = truncate(RESULT,P_SPATIAL_PRECISION);
+   return RESULT;
+END
+$$
+--
+DELIMITER ;
+--
+DROP FUNCTION IF EXISTS ROUND_GEOMETRY_WKT;
+--
+DELIMITER $$
+--
+CREATE FUNCTION ROUND_GEOMETRY_WKT(P_GEOMETRY GEOMETRY,P_SPATIAL_PRECISION int)
+RETURNS MEDIUMTEXT DETERMINISTIC
+BEGIN
+  DECLARE POINT_SEPERATOR   CHAR(1);
+  DECLARE POINT_NUMBER      INT;
+  DECLARE POINT_COUNT       INT;
+  
+  DECLARE RING_SEPERATOR    CHAR(1);
+  DECLARE RING_NUMBER       INT;
+  DECLARE RING_COUNT        INT;
+  
+  DECLARE POLYGON_SEPERATOR CHAR(1);
+  DECLARE POLYGON_NUMBER    INT;
+  DECLARE POLYGON_COUNT     INT;
+
+  DECLARE X                 DOUBLE PRECISION;
+  DECLARE Y                 DOUBLE PRECISION;
+
+  DECLARE RING              GEOMETRY;
+  DECLARE POINT             GEOMETRY;
+  DECLARE POLYGON           GEOMETRY;
+  DECLARE MULTIPOLYGON      GEOMETRY;
+  
+  DECLARE WKT               MEDIUMTEXT;
+  
+  SET WKT = ST_GeometryType(P_GEOMETRY) ;
+
+  if (ST_GeometryType(P_GEOMETRY) = 'POINT') then    
+    SET X = FUDGE_COORDINATE(ST_X(P_GEOMETRY),P_SPATIAL_PRECISION);
+    SET Y = FUDGE_COORDINATE(ST_Y(P_GEOMETRY),P_SPATIAL_PRECISION);
+    SET WKT = concat(WKT,'(',X,' ',Y,')');
+    return WKT;
+  end if;
+  
+  -- Iterative the component geograpjys and points for LINE, POLYGON, MULTIPOLYGON etc
+
+  if (ST_GeometryType(P_GEOMETRY) = 'POLYGON') then   
+    SET WKT = concat(WKT,'(');
+    SET RING = ST_ExteriorRing(P_GEOMETRY);
+    SET POINT_NUMBER = 0;
+    SET POINT_SEPERATOR = '';
+    SET POINT_COUNT = ST_NumPoints(RING);
+    SET WKT = concat(WKT,'(');
+    while (POINT_NUMBER < POINT_COUNT) do
+      SET POINT_NUMBER = POINT_NUMBER + 1;
+      SET POINT = ST_PointN(RING,POINT_NUMBER);
+      SET X = FUDGE_COORDINATE(ST_X(POINT),P_SPATIAL_PRECISION);
+      SET Y = FUDGE_COORDINATE(ST_Y(POINT),P_SPATIAL_PRECISION);
+      SET WKT = concat(WKT,POINT_SEPERATOR,X,' ',Y);
+      SET POINT_SEPERATOR = ',';
+    end while;
+    SET WKT = concat(WKT,')');
+
+    SET RING_SEPERATOR = ',';
+    SET RING_NUMBER = 0;
+    SET RING_COUNT =  ST_NumInteriorRings(P_GEOMETRY);
+    while (RING_NUMBER  < RING_COUNT) do
+      SET WKT = concat(WKT,RING_SEPERATOR,'(');
+      SET RING_NUMBER = RING_NUMBER + 1;
+      SET RING = ST_InteriorRingN(P_GEOMETRY,RING_NUMBER);
+      SET POINT_NUMBER = 0;
+      SET POINT_SEPERATOR = '';
+      SET POINT_COUNT = ST_NumPoints(RING);
+      while (POINT_NUMBER < POINT_COUNT) do
+        SET POINT_NUMBER = POINT_NUMBER + 1;
+        SET POINT = ST_PointN(RING,POINT_NUMBER);
+        SET X = FUDGE_COORDINATE(ST_X(POINT),P_SPATIAL_PRECISION);
+        SET Y = FUDGE_COORDINATE(ST_Y(POINT),P_SPATIAL_PRECISION);
+        SET WKT = concat(WKT,POINT_SEPERATOR,X,' ',Y);
+        SET POINT_SEPERATOR = ',';
+      end while;
+      SET WKT = concat(WKT,')');  
+    end while;
+    SET WKT = concat(WKT,')');  
+    return WKT;   
+  end if;
+
+  if (ST_GeometryType(P_GEOMETRY) = 'MULTIPOLYGON') then   
+    SET WKT = concat(WKT,'(');
+    SET POLYGON_NUMBER = 0;
+    SET POLYGON_SEPERATOR = '';
+    SET POLYGON_COUNT = ST_NumGeometries(P_GEOMETRY);
+    while (POLYGON_NUMBER  < POLYGON_COUNT) do
+      SET WKT = concat(WKT,POLYGON_SEPERATOR,'(');
+      set POLYGON_SEPERATOR = ',';
+      SET POLYGON_NUMBER = POLYGON_NUMBER + 1;
+      SET POLYGON = ST_GeometryN(P_GEOMETRY,POLYGON_NUMBER);
+      SET RING = ST_ExteriorRing(POLYGON);
+      SET POINT_NUMBER = 0;
+      SET POINT_SEPERATOR = '';
+      SET POINT_COUNT = ST_NumPoints(RING);
+      SET WKT = concat(WKT,'(');
+      while (POINT_NUMBER < POINT_COUNT) do
+        SET POINT_NUMBER = POINT_NUMBER + 1;
+        SET POINT = ST_PointN(RING,POINT_NUMBER);
+        SET X = FUDGE_COORDINATE(ST_X(POINT),P_SPATIAL_PRECISION);
+        SET Y = FUDGE_COORDINATE(ST_Y(POINT),P_SPATIAL_PRECISION);
+        SET WKT = concat(WKT,POINT_SEPERATOR,X,' ',Y);
+        SET POINT_SEPERATOR = ',';
+      end while;
+      SET WKT = concat(WKT,')');
+      SET RING_SEPERATOR = ',';
+      SET RING_NUMBER = 0;
+      SET RING_COUNT =  ST_NumInteriorRings(POLYGON);
+      while (RING_NUMBER  < RING_COUNT) do
+        SET WKT = concat(WKT,RING_SEPERATOR,'(');
+        SET RING_NUMBER = RING_NUMBER + 1;
+        SET RING = ST_InteriorRingN(POLYGON,RING_NUMBER);
+        SET POINT_NUMBER = 0;
+        SET POINT_SEPERATOR = '';
+        SET POINT_COUNT = ST_NumPoints(RING);
+        while (POINT_NUMBER < POINT_COUNT) do
+          SET POINT_NUMBER = POINT_NUMBER + 1;
+          SET POINT = ST_PointN(RING,POINT_NUMBER);
+          SET X = FUDGE_COORDINATE(ST_X(POINT),P_SPATIAL_PRECISION);
+          SET Y = FUDGE_COORDINATE(ST_Y(POINT),P_SPATIAL_PRECISION);
+          SET WKT = concat(WKT,POINT_SEPERATOR,X,' ',Y);
+          SET POINT_SEPERATOR = ',';
+        end while;
+        SET WKT = concat(WKT,')');
+      end while;
+      SET WKT = concat(WKT,')');      
+    end while;
+    SET WKT = concat(WKT,')');      
+    return WKT;      
+  end if;     
+
+  return ST_AsText(P_GEOMETRY);
+END
+$$
+--
+DELIMITER ;
+--
+DROP FUNCTION IF EXISTS ROUND_GEOMETRY;
+--
+DELIMITER $$
+--
+CREATE FUNCTION ROUND_GEOMETRY(P_GEOMETRY GEOMETRY,P_SPATIAL_PRECISION int)
 RETURNS GEOMETRY DETERMINISTIC
 BEGIN
-  DECLARE POINT       GEOMETRY;
-  DECLARE X           DOUBLE;
-  DECLARE Y           DOUBLE;
-  if ST_GeometryType(P_GEOMETRY) = 'POINT' then
-      
-    SET X = ROUND(ST_X(P_GEOMETRY),P_SPATIAL_PRECISION);
-    SET Y = ROUND(ST_Y(P_GEOMETRY),P_SPATIAL_PRECISION);
-    SET POINT = ST_GeomFromText(concat('POINT(',X,' ',Y,')'));      
-    return POINT;
-  end if;
-  -- Iterative the component geometry and points
-  return P_GEOMETRY;
+  return ST_GeomFromText(ROUND_GEOMETRY_WKT(P_GEOMETRY,P_SPATIAL_PRECISION));      
 END
 $$
 --
@@ -58,7 +212,7 @@ BEGIN
                             when P_SPATIAL_PRECISION = 18 then
                               concat('"',column_name,'"') 
                             else                            
-                              concat('SET_GEOMETRY_PRECISION(',column_name,',',P_SPATIAL_PRECISION,')')
+                              concat('ROUND_GEOMETRY(',column_name,',',P_SPATIAL_PRECISION,')')
                           end
                         when data_type in ('blob', 'varbinary', 'binary') then
                           concat('hex("',column_name,'")') 
@@ -177,4 +331,6 @@ end;
 $$
 --
 DELIMITER ;
+--
+SET SESSION SQL_MODE=ANSI_QUOTES;
 --

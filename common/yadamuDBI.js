@@ -10,7 +10,7 @@ const Util = require('util')
 **
 */
 
-const Yadamu = require('./yadamu.js');
+const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuRejectManager = require('./yadamuRejectManager.js');
 const DBParser = require('./dbParser.js');
 
@@ -36,7 +36,7 @@ class YadamuDBI {
      const self = this
 
      return new Promise(function (resolve,reject) {
-        self.yadamuLogger.info([`${this.constructor.name}.doTimeout()`],`Sleeping for ${Yadamu.stringifyDuration(milliseconds)}ms.`);
+        self.yadamuLogger.info([`${this.constructor.name}.doTimeout()`],`Sleeping for ${YadamuLibrary.stringifyDuration(milliseconds)}ms.`);
         setTimeout(
           function() {
            self.yadamuLogger.info([`${this.constructor.name}.doTimeout()`],`Awake.`);
@@ -93,7 +93,7 @@ class YadamuDBI {
                       yadamuLogger.log([`${this.constructor.name}`],`: ${logEntry}.`)
                       break;
                     case (logEntryType === "dml") : 
-                      yadamuLogger.log([`${this.constructor.name}`],`: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${Yadamu.stringifyDuration(Math.round(logEntry.elapsedTime))}s. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.`)
+                      yadamuLogger.log([`${this.constructor.name}`],`: Table "${logEntry.tableName}". Rows ${logEntry.rowCount}. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(logEntry.elapsedTime))}s. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.`)
                       break;
                     case (logEntryType === "info") :
                       yadamuLogger.info([`${this.constructor.name}`],`"${JSON.stringify(logEntry)}".`);
@@ -132,17 +132,24 @@ class YadamuDBI {
     },this) 
   }    
 
+
+  setParameters(parameters) {
+	 Object.assign(this.parameters, parameters ? parameters : {})
+  }
+
   configureTest(connectionProperties,testParameters,tableMappings) {
     this.connectionProperties = connectionProperties
     // this.initializeParameters();
     // Merge parameters provided via to configureTest
     Object.assign(this.parameters, testParameters ? testParameters : {})
-    if (this.parameters.MAPPINGS) {
-      this.loadTableMappings(this.parameters.MAPPINGS);
-    }  
-    else {
+    if (tableMappings) {
       this.tableMappings = tableMappings
     }
+	else {
+      if (this.parameters.MAPPINGS) {
+        this.loadTableMappings(this.parameters.MAPPINGS);
+      }  
+	}
     if (this.parameters.SQL_TRACE) {
 	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQL_TRACE,{flags : "a"});
     }
@@ -261,7 +268,7 @@ class YadamuDBI {
   }
   
   initializeParameters(parameters) {
-
+    
     // In production mode the Databae default parameters are merged with the command Line Parameters loaded by YADAMU.
 
     this.parameters = this.yadamu.cloneDefaultParameters();
@@ -486,7 +493,7 @@ class YadamuDBI {
   }
     
   async generateStatementCache(StatementGenerator,schema,executeDDL) {
-    const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.spatialFormat,this.batchSize, this.commitSize, this.status, this.yadamuLogger);
+    const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.systemInformation.spatialFormat,this.batchSize, this.commitSize, this.status, this.yadamuLogger);
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }
 
@@ -515,6 +522,9 @@ class YadamuDBI {
        this.yadamuLogger.error([`${operation}`,`"${tableName}"`],`Maximum Error Count exceeded. Skipping Table.`);
      }
      return abort;     
+  }
+  
+  keepAlive(rowCount) {
   }
 }
 

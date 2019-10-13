@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
   
-const Yadamu = require('../../common/yadamu.js').Yadamu;
+const Yadamu = require('../../common/yadamu.js');
 const YadamuTestDefaults = require('./yadamuDefaults.json')
 
 class YadamuTest extends Yadamu {

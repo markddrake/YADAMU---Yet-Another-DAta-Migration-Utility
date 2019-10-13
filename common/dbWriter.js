@@ -2,7 +2,7 @@
 const Writable = require('stream').Writable
 const Readable = require('stream').Readable;
 
-const Yadamu = require('./yadamu.js');
+const YadamuLibrary = require('./yadamuLibrary.js');
 
 class DBWriter extends Writable {
   
@@ -26,6 +26,7 @@ class DBWriter extends Writable {
     this.configureFeedback(this.dbi.parameters.FEEDBACK);
     
     this.timings = {}
+	
   }      
   
   configureFeedback(feedbackModel) {
@@ -79,6 +80,16 @@ class DBWriter extends Writable {
     this.dbi.setMetadata(metadata)      
     await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER,!this.ddlComplete)
   }   
+
+
+  async getTargetSchemaInfo() {
+	  
+    // Fetch metadata for tables that already exist in the target schema.
+       
+    const schemaInfo = await this.dbi.getSchemaInfo('TO_USER');
+	return schemaInfo
+
+  }
   
   async setMetadata(metadata) {
     
@@ -91,12 +102,8 @@ class DBWriter extends Writable {
     ** Tables which do not exist in the target schema need to be created.
     **
     */ 
-
-    // Fetch metadata for tables that already exist in the target schema.
-       
-    const targetSchemaInfo = await this.dbi.getSchemaInfo('TO_USER');
-    
-    if (targetSchemaInfo === null) {
+	
+    if (this.targetSchemaInfo === null) {
       this.dbi.setMetadata(metadata)      
     }
     else {    
@@ -115,17 +122,18 @@ class DBWriter extends Writable {
          ,sizeConstraints : tableMetadata.sizeConstraints
         }
       },this)
-    
-      if (targetSchemaInfo.length > 0) {
+      	  
+	
+      if (this.targetSchemaInfo.length > 0) {
     
         // Merge metadata for existing table with metadata from export source
 
         const exportTableNames = Object.keys(metadata)
-        const targetMetadata = this.generateMetadata(targetSchemaInfo,false)
+        const targetMetadata = this.generateMetadata(this.targetSchemaInfo,false)
       
         // Transform tablenames based on TABLE_MATCHING parameter.    
 
-        let targetNamesTransformed = targetSchemaInfo.map(function(tableInfo) {
+        let targetNamesTransformed = this.targetSchemaInfo.map(function(tableInfo) {
           return tableInfo.TABLE_NAME;
         },this)
           
@@ -159,8 +167,8 @@ class DBWriter extends Writable {
           const tableIdx = exportNamesTransformed.findIndex(function(member){return member === targetName})
           if ( tableIdx > -1)    {
             // Overwrite metadata from source with metadata from target.
-            targetMetadata[targetSchemaInfo[idx].TABLE_NAME].source = metadata[exportTableNames[tableIdx]].source
-            metadata[exportTableNames[tableIdx]] = targetMetadata[targetSchemaInfo[idx].TABLE_NAME]
+            targetMetadata[this.targetSchemaInfo[idx].TABLE_NAME].source = metadata[exportTableNames[tableIdx]].source
+            metadata[exportTableNames[tableIdx]] = targetMetadata[this.targetSchemaInfo[idx].TABLE_NAME]
           }
         },this)
       }    
@@ -176,15 +184,17 @@ class DBWriter extends Writable {
     const rowsWritten = rowsRead - skipCount;
     const throughput = isNaN(elapsedTime) ? 'N/A' : Math.round((rowsWritten/elapsedTime) * 1000)
     
-    this.yadamuLogger.log([`${this.constructor.name}`,`${this.tableName}`,`${results.insertMode}`],`Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. Elaspsed Time ${Yadamu.stringifyDuration(Math.round(elapsedTime))}s. Throughput ${throughput} rows/s.`);
+    this.yadamuLogger.log([`${this.constructor.name}`,`${this.tableName}`,`${results.insertMode}`],`Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(elapsedTime))}s. Throughput ${throughput} rows/s.`);
     this.timings[this.tableName] = {rowCount: this.rowCount, insertMode: results.insertMode,  rowsSkipped: skipCount, elapsedTime: Math.round(elapsedTime).toString() + "ms", throughput: Math.round(throughput).toString() + "/s"};
+  }
+  
+  async initialize() {
+	this.targetSchemaInfo = await this.getTargetSchemaInfo()
   }
  
   async _write(obj, encoding, callback) {
+    // console.log(new Date().toISOString(),`${this.constructor.name}._write`,Object.keys(obj)[0]);
     try {
-      if (this.rowCount === 0) {  
-        // await this.dbi.initializeImport();
-      }
       switch (Object.keys(obj)[0]) {
         case 'systemInformation':
           this.dbi.setSystemInformation(obj.systemInformation)

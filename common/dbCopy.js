@@ -1,7 +1,8 @@
 "use strict" 
 const path = require('path');
 
-const Yadamu = require('./yadamu.js').Yadamu;
+const Yadamu = require('./yadamu.js');
+const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuLogger = require('./yadamuLogger.js');
 
 class DBCopy {
@@ -70,14 +71,14 @@ class DBCopy {
       return dbi;
   }
   
-  getOwner(schema) {
-      
-      return schema.schema ? schema.schema : schema.owner
+  getOwner(vendor,schema) {
     
+     return vendor === 'mssql' ? schema.mssql.owner : (vendor === 'snowflake' ? schema.snowflake.schema : schema.schema)
+     
   }
   
   getDescription(db,connectionName,schemaInfo) {
-    return `"${connectionName}"://"${db === 'mssql' ? `${schemaInfo.database}"."${schemaInfo.owner}` : schemaInfo.schema}"`
+    return `"${connectionName}"://"${db === 'mssql' ? `${schemaInfo.mssql.database}"."${schemaInfo.mssql.owner}` : schemaInfo.schema}"`
   }
   
     
@@ -86,7 +87,7 @@ class DBCopy {
     const startTime = new Date().getTime();
     for (const job of this.configuration.jobs) {
       // Initialize constructor parameters with values from configuration file
-      const jobParameters = Object.assign({} , this.configuration.parameters ? this.configuation.parameters : {})
+      const jobParameters = Object.assign({} , this.configuration.parameters ? this.configuration.parameters : {})
       // Merge job specific parameters
       Object.assign(jobParameters,job.parameters ? job.parameters : {})
     
@@ -99,37 +100,34 @@ class DBCopy {
       const targetConnection = this.configuration.connections[job.target.connection]
       const targetDatabase =  Object.keys(targetConnection)[0];
       const targetDescription = this.getDescription(targetDatabase,job.target.connection,targetSchema)
-
-      jobParameters.FROM_USER = this.getOwner(sourceSchema);
-      jobParameters.TO_USER = this.getOwner(targetSchema);
-      
-      switch (sourceDatabase) {
-         case 'mssql':
-           jobParameters.MSSQL_FROM_USER_DB = sourceSchema.database
-           break;
-         default:
-      }
-
-      switch (targetDatabase) {
-         case 'mssql':
-           jobParameters.MSSQL_TO_USER_DB = targetSchema.database
-           break;
-         default:
-      }
-
+  
       const yadamu = new Yadamu('DBCopy',jobParameters);
       
       const sourceDBI = this.getDatabaseInterface(sourceDatabase,yadamu)
       sourceDBI.setConnectionProperties(sourceConnection[sourceDatabase]);
-      
+      sourceDBI.parameters.FROM_USER = this.getOwner(sourceDatabase,sourceSchema);
+      switch (sourceDatabase) {
+         case 'mssql':
+           sourceDBI.parameters.MSSQL_SCHEMA_DB = sourceSchema.mssql.database
+           break;
+         default:
+      }
 
       const targetDBI = this.getDatabaseInterface(targetDatabase,yadamu)    
       targetDBI.setConnectionProperties(targetConnection[targetDatabase]);
+      targetDBI.parameters.TO_USER = this.getOwner(targetDatabase,targetSchema);
+      switch (targetDatabase) {
+         case 'mssql':
+           targetDBI.parameters.MSSQL_SCHEMA_DB = targetSchema.mssql.database
+           break;
+         default:
+      }
+      
       await yadamu.doCopy(sourceDBI,targetDBI);      
       this.yadamuLogger.log([`${this.constructor.name}`,'doCopy'],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`);
     }
     const elapsedTime = new Date().getTime() - startTime;
-    this.yadamuLogger.log([`${this.constructor.name}`,'TEST'],`Operation complete: Configuration:"${this.configFilePath}". Elapsed Time: ${Yadamu.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.log([`${this.constructor.name}`,'TEST'],`Operation complete: Configuration:"${this.configFilePath}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
 
   validateConfiguration() {
@@ -137,17 +135,17 @@ class DBCopy {
 
   loadConfiguration() {
       
-    if (this.configuration.connections.file) {
-      this.connections.connections = require(path.resolve(this.configuration.connections.file))
+    if (typeof this.configuration.connections === "string") {
+      this.configuration.connections = require(path.resolve(this.configuration.connections))
     }
-    if (this.configuration.schemas.file) {
-      this.configuration.schemas = require(path.resolve(this.configuration.schemas.file))
+    if (typeof this.configuration.schemas === "string") {
+      this.configuration.schemas = require(path.resolve(this.configuration.schemas))
     }
-    if (this.configuration.parameters.file) {
-      this.configuration.parameters = require(path.resolve(this.configuration.parameters.file))
+    if (typeof this.configuration.parameters === "string") {
+      this.configuration.parameters = require(path.resolve(this.configuration.parameters))
     }
-    if (this.configuration.jobs.file) {
-      this.configuration.jobs = require(path.resolve(this.configuration.jobs.file))
+    if (typeof this.configuration.jobs === "string") {
+      this.configuration.jobs = require(path.resolve(this.configuration.jobs))
     }
     
     this.validateConfiguration()

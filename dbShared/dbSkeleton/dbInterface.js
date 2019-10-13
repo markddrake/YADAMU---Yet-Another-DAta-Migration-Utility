@@ -14,11 +14,6 @@ const YadamuDBI =  require('../../common/yadamuDBI.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 
-const defaultParameters = {
-  BATCH_SIZE         : 10000
-, COMMITSIZE        : 10000
-}
-
 /*
 **
 ** YADAMU Database Inteface class skeleton
@@ -35,9 +30,15 @@ class DBInterface extends YadamuDBI {
   objectMode() {
     return true;
   }
+
+  get DATABASE_VENDOR()    { return 'Please Provide' };
+  get SOFTWARE_VENDOR()    { return 'Please Provide' };
+  get SPATIAL_FORMAT()     { return this.spatialFormat };
+  get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().databaseId }
   
   constructor(yadamu) {
-    super(yadamu,defaultParameters)
+    super(yadamu,yadamu.getYadamuDefaults().databaseId)
+    this.connection = undefined;
   }
 
   /*  
@@ -47,6 +48,8 @@ class DBInterface extends YadamuDBI {
   */
   
   async initialize() {
+    super.initialize();      
+    this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
   }
 
   /*

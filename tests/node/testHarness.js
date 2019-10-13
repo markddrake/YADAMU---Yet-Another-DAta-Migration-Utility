@@ -6,6 +6,7 @@ const Transform = require('stream').Transform;
 
 const YadamuTest = require('./yadamuTest.js')
 
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuLogger = require('../../common/yadamuLogger.js');
 const FileReader = require('../../file/node/fileReader.js');
 const FileWriter = require('../../file/node/fileWriter.js');
@@ -16,6 +17,7 @@ const MySQLCompare = require('./mysqlCompare.js');
 const MariadbCompare = require('./mariadbCompare.js');
 const PostgresCompare = require('./postgresCompare.js');
 const MongoCompare = require('./mongoCompare.js');
+const SnowflakeCompare = require('./snowflakeCompare.js');
 const FileCompare = require('./fileCompare.js');
 
 
@@ -60,6 +62,9 @@ class TestHarness {
       case "mongodb" :
         dbi = new MongoCompare(this.yadamu)
         break;
+      case "snowflake" :
+        dbi = new SnowflakeCompare(this.yadamu)
+        break;
       case "file" :
         dbi = new FileCompare(this.yadamu)
         break;
@@ -72,19 +77,27 @@ class TestHarness {
   getTestInterface(db,role,schemaInfo,testParameters,testConnection,tableMappings) {
       
     this.yadamu.reset();
+    const testDefaults = this.yadamu.getYadamuTestDefaults()
     const dbi = this.getDatabaseInterface(db)
     
     const connectionProperties = Object.assign({},testConnection)
     const parameters = testParameters ? Object.assign({},testParameters) : {}
-    parameters[role] = (schemaInfo.schema ? schemaInfo.schema : schemaInfo.owner)
+    // parameters[role] = schemaInfo.schema ? schemaInfo.schema :  ( schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner)
+    parameters[role] = schemaInfo.schema ? schemaInfo.schema : schemaInfo.owner
    
     switch (db) {
       case "mssql" : 
         parameters.MSSQL_SCHEMA_DB = schemaInfo.database;
         break;
+      case "mongodb" : 
+        connectionProperties.database = schemaInfo.schema ? schemaInfo.schema : ( schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner)
+        break;
+      case "snowflake":
+        connectionProperties.database = schemaInfo.database
+        parameters.FROM_USER = schemaInfo.schema
+        break;
       default:
     }
-      
     dbi.configureTest(connectionProperties,parameters,tableMappings)
     return dbi;    
   }
@@ -93,9 +106,14 @@ class TestHarness {
       
     switch (vendor) {
       case "mssql":
+        // Map each schema to it's own database since it is not possible to drop a populated schema in MsSQL
         if (connectionInfo.schema) {
           return {database : connectionInfo.schema, owner : "dbo" }
         }
+        break;
+      case "snowflake":
+        const testDefaults = this.yadamu.getYadamuTestDefaults()
+        return testDefaults.SCHEMA_MAPPINGS.snowflake[connectionInfo.schema]
         break;
       default:
         if (connectionInfo.database) {
@@ -105,14 +123,22 @@ class TestHarness {
     return connectionInfo;
   }
  
-  async recreateSchema(db,connection,schema) {
+  async recreateSchema(db,connectionProperties,connectionInfo) {
 
-     this.yadamu.reset();
-     const dbi = this.getDatabaseInterface(db);
-     dbi.setConnectionProperties(connection)
-     await dbi.initialize();
-     await dbi.recreateSchema(schema,connection.PASSWORD);
-     await dbi.finalize();  
+    this.yadamu.reset();
+    const dbi = this.getDatabaseInterface(db);
+    switch (db) {
+      case "snowflake":
+        const testDefaults = this.yadamu.getYadamuTestDefaults()
+        connectionProperties.database = testDefaults.SCHEMA_MAPPINGS.snowflake[connectionInfo.schema].database
+        break;
+      default:
+    }
+    
+    dbi.setConnectionProperties(connectionProperties)
+    await dbi.initialize();
+    await dbi.recreateSchema(connectionInfo,connectionProperties.password);
+    await dbi.finalize();  
   
   }
     
@@ -142,31 +168,24 @@ class TestHarness {
  
 
   getDefaultValue(parameter,defaults,sourceVendor, sourceVersion, targetVendor, targetVersion) {
-     
+      
     const parameterDefaults = defaults[parameter]
     const sourceVersionKey = sourceVendor + "#" + sourceVersion;
     const targetVersionKey = targetVendor + "#" + targetVersion;
-    try {
-      return {[parameter] : parametersDefaults[sourceVersionKey][targetVersionKey]}
-    } catch (e) {
-      try {
-        return {[parameter] : parametersDefaults[sourceVersionKey][targetVersion]}  
-      } catch (e) {
-        try {
-          return {[parameter] : parametersDefaults[sourceVersion][targetVersionKey]}    
-        } catch (e) {
-          try { 
-            return {[parameter] : parametersDefaults[sourceVersion][targetVersiony]}
-          } catch (e) {
-            try {
-              return {[parameter] : parametersDefaults.default}
-            }
-            catch (e) {
-              return {}
-            }
-          }
-        }
-      }
+  
+    switch (true) {
+      case ((parameterDefaults[sourceVersionKey] !== undefined) && (parameterDefaults[sourceVersionKey][targetVersionKey] !== undefined)):
+        return { [parameter] : parameterDefaults[sourceVersionKey][targetVersionKey]}
+      case ((parameterDefaults[sourceVersionKey] !== undefined) && (parameterDefaults[sourceVersionKey][targetVendor] !== undefined)):
+        return { [parameter] : parameterDefaults[sourceVersionKey][targetVendor]}
+      case ((parameterDefaults[sourceVendor] !== undefined) && (parameterDefaults[sourceVendor][targetVersionKey] !== undefined)):
+        return { [parameter] : parameterDefaults[sourceVendor][targetVersionKey]}
+      case ((parameterDefaults[sourceVendor] !== undefined) && (parameterDefaults[sourceVendor][targetVendor] !== undefined)):
+        return { [parameter] : parameterDefaults[sourceVendor][targetVendor]}
+      case ((parameterDefaults[sourceVendor] !== undefined) && (parameterDefaults[sourceVendor].default !== undefined)):
+        return { [parameter] : parameterDefaults[sourceVendor].default}
+      default:
+        return { [parameter] : parameterDefaults.default}
     }
   }          
         
@@ -175,7 +194,7 @@ class TestHarness {
     const testDefaults = this.yadamu.getYadamuTestDefaults()
     const compareParameters = Object.assign({}, testParameters)
     
-    Object.assign(compareParameters, this.getDefaultValue('SPATIAL_PRECISION',testDefaults,sourceVersion,targetVendor,targetVersion,testParameters))
+    Object.assign(compareParameters, this.getDefaultValue('SPATIAL_PRECISION',testDefaults,sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
    
     let versionSpecificKey = sourceVendor + "#" + sourceVersion;
     Object.assign(compareParameters, testDefaults[sourceVendor])
@@ -198,13 +217,26 @@ class TestHarness {
     },this)
   }
   
-  async compareSchemas(source,sourceSchema,targetSchema,timings,compareParameters) {
+  async compareSchemas(source,sourceSchema,target,targetSchema,timings,compareParameters) {
       
     const sourceVendor = Object.keys(this.connections[source])[0]
+    const targetVendor = Object.keys(this.connections[target])[0]
     const sourceConnectionProperties = this.connections[source][sourceVendor]
       
     const dbi = this.getDatabaseInterface(sourceVendor);
     dbi.configureTest(sourceConnectionProperties,compareParameters)
+    if (dbi.parameters.SPATIAL_PRECISION !== 18) {
+      this.yadamuLogger.warning([`${this.constructor.name}.compareSchemas`,`${sourceVendor}`,`${targetVendor}`],`Spatial precision limited to ${dbi.parameters.SPATIAL_PRECISION} digits`);
+    }
+    if (dbi.parameters.EMPTY_STRING_IS_NULL === true) {
+      this.yadamuLogger.warning([`${this.constructor.name}.compareSchemas`,`${sourceVendor}`,`${targetVendor}`],`Empty Strings treated as NULL`);
+    }
+    if (dbi.parameters.STRIP_XML_DECLARATION === true) {
+      this.yadamuLogger.warning([`${this.constructor.name}.compareSchemas`,`${sourceVendor}`,`${targetVendor}`],`XML Declartion ignored when comparing XML content`);
+    }
+    if (dbi.parameters.TIMESTAMP_PRECISION && (dbi.parameters.TIMESTAMP_PRECISION < 9)){
+      this.yadamuLogger.warning([`${this.constructor.name}.compareSchemas`,`${sourceVendor}`,`${targetVendor}`],`Timestamp precision limited to ${dbi.parameters.TIMESTAMP_PRECISION} digits`);
+    }
     await dbi.initialize();
     const report = await dbi.report(sourceSchema,targetSchema,timings);
     await dbi.finalize();
@@ -244,7 +276,7 @@ class TestHarness {
 
       this.yadamuLogger.writeDirect(` ${row[2].padStart(colSizes[3])} |` 
                                   + ` ${row[3].toString().padStart(colSizes[4])} |` 
-                                  + ` ${YadamuTest.stringifyDuration(parseInt(row[4])).padStart(colSizes[5])} |` 
+                                  + ` ${YadamuLibrary.stringifyDuration(parseInt(row[4])).padStart(colSizes[5])} |` 
                                   + ` ${(row[5] === 'NaN/s' ? '' : row[5]).padStart(colSizes[6])} |` 
                          + '\n');
     },this)
@@ -384,7 +416,7 @@ class TestHarness {
       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }
     else {
-      this.yadamuLogger.log([`${this.constructor.name}`,'COPY'],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}]. Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
+      this.yadamuLogger.log([`${this.constructor.name}`,'COPY'],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
     }
   
   }
@@ -415,25 +447,35 @@ class TestHarness {
       let dbSchema1 = targetSchema1
       let dbSchema2 = targetSchema2
       
-      if (targetVendor === 'mssql') {
-		if (dbSchema1.schema) {
-        // Map non MsSQL Connection Information to a MsSQL database
-	      dbSchema1 = {database : dbSchema1.schema, owner : 'dbo'}
-	      dbSchema2 = {database : dbSchema2.schema, owner : 'dbo'}
-		} 
-      }
-	  else {
-        if (dbSchema1.database) {
-          // Map MsSQL Connection Information to a non MsSQL database
-          if (targetSchema1.owner = targetSchema2.owner) {
-            dbSchema1 = { schema : dbSchema1.database }
-            dbSchema2 = { schema : dbSchema2.database }
+      switch (targetVendor ) {
+        case "mssql":
+		  if (dbSchema1.schema) {
+            // Map non MsSQL Connection Information to a MsSQL database
+            dbSchema1 = {database : dbSchema1.schema, owner : 'dbo'}
+	        dbSchema2 = {database : dbSchema2.schema, owner : 'dbo'}
+		  }   
+          break;
+        case "snowflake":
+           const testDefaults = this.yadamu.getYadamuTestDefaults()
+           dbSchema1 = testDefaults.SCHEMA_MAPPINGS.snowflake[dbSchema1.schema]
+           dbSchema2 = testDefaults.SCHEMA_MAPPINGS.snowflake[dbSchema2.schema]
+          break;
+        default:
+          switch (sourceVendor) {
+            case "mssql":
+	          if (targetSchema1.owner = targetSchema2.owner) {
+                dbSchema1 = { schema : dbSchema1.database }
+                dbSchema2 = { schema : dbSchema2.database }
+              }
+              else {
+                dbSchema1 = { schema : dbSchema1.owner }
+                dbSchema2 = { schema : dbSchema2.owner }
+              }
+              break;
+            case "snowflake":
+              break;
+            default:
           }
-          else {
-            dbSchema1 = { schema : dbSchema1.owner }
-            dbSchema2 = { schema : dbSchema2.owner }
-          }
-        }
       }
       
       await this.recreateSchema(targetVendor,targetConnectionProperties,dbSchema1);     
@@ -489,7 +531,7 @@ class TestHarness {
       const opElapsedTime =  new Date().getTime() - opStartTime
      
       this.checkTimingsForErrors(timings);
-      await this.compareSchemas(target,dbSchema1,dbSchema2,timings,{});
+      await this.compareSchemas(target,dbSchema1,source,dbSchema2,timings,{});
     
       const fc = new FileCompare(this.yadamu);      
       testParameters = dbi.parameters.TABLE_MATCHING ? {TABLE_MATCHING : dbi.parameters.TABLE_MATCHING} : {}
@@ -497,7 +539,7 @@ class TestHarness {
       fc.configureTest({},testParameters)
       await fc.report(this.yadamuLoggger,sourceFile,targetFile1, targetFile2, timings);    
 
-      this.yadamuLogger.log([`${this.constructor.name}`,'FILECOPY'],`Operation complete: [${operationsList[0]}] -->  [${operationsList[1]}] --> [${operationsList[2]}] --> [${operationsList[3]}]  --> [${operationsList[4]}]. Elapsed Time: ${YadamuTest.stringifyDuration(opElapsedTime)}s.`);
+      this.yadamuLogger.log([`${this.constructor.name}`,'FILECOPY'],`Operation complete: [${operationsList[0]}] -->  [${operationsList[1]}] --> [${operationsList[2]}] --> [${operationsList[3]}]  --> [${operationsList[4]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(opElapsedTime)}s.`);
 
   }
   
@@ -539,7 +581,7 @@ class TestHarness {
       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }
     else {
-      this.yadamuLogger.log([`${this.constructor.name}`,'DBCOPY'],`Operation complete: Source:[${operationsList[0]}] -->  ${(operationsList.length === 3 ? '[' + operationsList[1] + '] --> ' : '')}Target:${operationsList[operationsList.length-1]}]. Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
+      this.yadamuLogger.log([`${this.constructor.name}`,'DBCOPY'],`Operation complete: Source:[${operationsList[0]}] -->  ${(operationsList.length === 3 ? '[' + operationsList[1] + '] --> ' : '')}Target:${operationsList[operationsList.length-1]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
     }
   
   }
@@ -720,7 +762,7 @@ class TestHarness {
       const dbElapsedTime =  new Date().getTime() - dbStartTime
       
       this.checkTimingsForErrors(timings);   
-      await this.compareSchemas(source, originalSchema, targetSchema, timings, this.getCompareParameters(sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
+      await this.compareSchemas(source, originalSchema, target, targetSchema, timings, this.getCompareParameters(sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
       this.dbRoundtripResults(operationsList,dbElapsedTime)
       
   }
@@ -792,7 +834,7 @@ class TestHarness {
       await this.recreateSchema(sourceVendor,sourceConnectionProperties,steps[2])
       const timings = await this.copyContent(target,source,parameters,directory,steps[1],steps[2])
       if (parameters.MODE !== 'DDL_ONLY') {
-        await this.compareSchemas(source,steps[0],steps[2],timings,{});
+        await this.compareSchemas(source,steps[0],target,steps[2],timings,{});
       }
     }
   }
@@ -888,19 +930,19 @@ class TestHarness {
             const startTime = new Date().getTime();
             await this.runTask(job,target,taskConfigurationPath)
             const elapsedTime = new Date().getTime() - startTime;
-            this.yadamuLogger.log([`${this.constructor.name}`,'TASK'],`Operation complete: Source:"${job.source}". Target:"${target}". Task:"${taskConfigurationPath}". Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
+            this.yadamuLogger.log([`${this.constructor.name}`,'TASK'],`Operation complete: Source:"${job.source}". Target:"${target}". Task:"${taskConfigurationPath}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
           }
           const elapsedTime = new Date().getTime() - startTime;
-          this.yadamuLogger.log([`${this.constructor.name}`,'TARGET'],`Operation complete: Source:"${job.source}". Target:"${target}". Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
+          this.yadamuLogger.log([`${this.constructor.name}`,'TARGET'],`Operation complete: Source:"${job.source}". Target:"${target}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
         }
         const elapsedTime = new Date().getTime() - startTime;
-        this.yadamuLogger.log([`${this.constructor.name}`,'JOB'],`Operation complete: Source:"${job.source}". Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}ms.`);
+        this.yadamuLogger.log([`${this.constructor.name}`,'JOB'],`Operation complete: Source:"${job.source}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}ms.`);
       }
       const elapsedTime = new Date().getTime() - startTime;
-      this.yadamuLogger.log([`${this.constructor.name}`,'JOBS'],`Operation complete: Configuration:"${jobConfigurationPath}".  Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
+      this.yadamuLogger.log([`${this.constructor.name}`,'JOBS'],`Operation complete: Configuration:"${jobConfigurationPath}".  Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
     }
     const elapsedTime = new Date().getTime() - startTime;
-    this.yadamuLogger.log([`${this.constructor.name}`,'TEST'],`Operation complete: Configuration:"${this.yadamu.getConfigFilePath()}". Elapsed Time: ${YadamuTest.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.log([`${this.constructor.name}`,'TEST'],`Operation complete: Configuration:"${this.yadamu.getConfigFilePath()}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   
     this.yadamuLogger.close(); 
     this.yadamu.close()
