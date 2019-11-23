@@ -1,0 +1,29 @@
+{
+  "all"                      : [ "oracle", "mysql", "mssql"]
+, "oracle"                   : [ "HR","SH","OE","PM","IX","BI"]
+, "mysql"                    : [ "sakila", "jtest"]
+, "mssql"                    : [ "Northwind", "HumanResources", "Person", "Production", "Purchasing", "Sales", "AdventureWorksDW", "WWI_Application", "WWI_Purchasing", "WWI_Sales", "WWI_Warehouse", "WWI_Dimension", "WWI_Fact", "WWI_Integration"]
+, "HR"     : { "source" : {"schema" : "HR"    }, "target" : { "file" : "HR.json"},          "verify" : {"schema" : "HR1"    }}
+, "SH"     : { "source" : {"schema" : "SH"    }, "target" : { "file" : "SH.json"},          "verify" : {"schema" : "SH1"    }}
+, "OE"     : { "source" : {"schema" : "OE"    }, "target" : { "file" : "OE.json"},          "verify" : {"schema" : "OE1"    }}
+, "PM"     : { "source" : {"schema" : "PM"    }, "target" : { "file" : "PM.json"},          "verify" : {"schema" : "PM1"    }}
+, "IX"     : { "source" : {"schema" : "IX"    }, "target" : { "file" : "IX.json"},          "verify" : {"schema" : "IX1"    }}
+, "BI"     : { "source" : {"schema" : "BI"    }, "target" : { "file" : "BI.json"},          "verify" : {"schema" : "BI1"    }}
+, "sakila" : { "source" : {"schema" : "sakila"}, "target" : { "file" : "sakila.json"},      "verify" : {"schema" : "sakila1"}}
+, "jtest"  : { "source" : {"schema" : "jtest" }, "target" : { "file" : "jsonExample.json"}, "verify" : {"schema" : "jtest1" }}
+, "Northwind"             : {"source" : { "database": "Northwind",            "owner": "dbo"},            "target" : { "file" : "Northwind.json"},         "verify" : { "database": "Northwind1",          "owner": "dbo"}}
+, "HumanResources"        : {"source" : { "database": "AdventureWorks",       "owner": "HumanResources"}, "target" : { "file" : "HumanResources.json"},    "verify" : { "database": "AdventureWorks1",     "owner": "HumanResources"}}
+, "Person"                : {"source" : { "database": "AdventureWorks",       "owner": "Person"},         "target" : { "file" : "Person.json"},            "verify" : { "database": "AdventureWorks1",     "owner": "Person"}}
+, "Production"            : {"source" : { "database": "AdventureWorks",       "owner": "Production"},     "target" : { "file" : "Production.json"},        "verify" : { "database": "AdventureWorks1",     "owner": "Production"}}
+, "Purchasing"            : {"source" : { "database": "AdventureWorks",       "owner": "Purchasing"},     "target" : { "file" : "Purchasing.json"},        "verify" : { "database": "AdventureWorks1",     "owner": "Purchasing"}}
+, "Sales"                 : {"source" : { "database": "AdventureWorks",       "owner": "Sales"},          "target" : { "file" : "Sales.json"},             "verify" : { "database": "AdventureWorks1",     "owner": "Sales"}}
+, "AdventureWorksDW"      : {"source" : { "database": "AdventureWorksDW",     "owner": "dbo"},            "target" : { "file" : "AdventureWorksDW.json"},  "verify" : { "database": "AdventureWorksDW1",   "owner": "dbo"}}
+, "AdventureWorksAll"     : {"source" : { "database": "AdventureWorksAll",    "owner": "dbo"},            "target" : { "file" : "AdventureWorksAll.json"}, "verify" : { "database": "AdventureWorksAll1",  "owner": "dbo"}}
+, "WWI_Application"       : {"source" : { "database": "WorldWideImporters",   "owner": "Application"},    "target" : { "file" : "WWI_Application.json"},   "verify" : { "database": "WorldWideImporters1", "owner": "Application"},  "schemaPrefix": "WWI"}
+, "WWI_Purchasing"        : {"source" : { "database": "WorldWideImporters",   "owner": "Purchasing" },    "target" : { "file" : "WWI_Purchasing.json"},    "verify" : { "database": "WorldWideImporters1", "owner": "Purchasing"},   "schemaPrefix": "WWI"}
+, "WWI_Sales"             : {"source" : { "database": "WorldWideImporters",   "owner": "Sales"      },    "target" : { "file" : "WWI_Sales.json"},         "verify" : { "database": "WorldWideImporters1", "owner": "Sales"},        "schemaPrefix": "WWI"}
+, "WWI_Warehouse"         : {"source" : { "database": "WorldWideImporters",   "owner": "Warehouse"  },    "target" : { "file" : "WWI_Warehouse.json"},     "verify" : { "database": "WorldWideImporters1", "owner": "Warehouse"},    "schemaPrefix": "WWI"}
+, "WWI_Dimension"         : {"source" : { "database": "WorldWideImportersDW", "owner": "Dimension"  },    "target" : { "file" : "WWI_Dimension.json"},     "verify" : { "database": "WorldWideImporters1", "owner": "Dimension"},    "schemaPrefix": "WWI"}
+, "WWI_Fact"              : {"source" : { "database": "WorldWideImportersDW", "owner": "Fact"       },    "target" : { "file" : "WWI_Fact.json"},          "verify" : { "database": "WorldWideImporters1", "owner": "Fact"},         "schemaPrefix": "WWI"}
+, "WWI_Integration"       : {"source" : { "database": "WorldWideImportersDW", "owner": "Integration"},    "target" : { "file" : "WWI_Integration.json"},   "verify" : { "database": "WorldWideImporters1", "owner": "Integration"},  "schemaPrefix": "WWI"}
+}

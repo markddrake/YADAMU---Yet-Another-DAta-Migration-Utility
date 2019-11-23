@@ -1,7 +1,0 @@
-{
-    "connections": "tests/connections/standardConnections.json",
-    "mode": "FileRoundtrip",
-    "jobs": [
-        "tests/fileRoundtrip/fileRoundtrip.json"
-    ]
-}

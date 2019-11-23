@@ -1,1 +1,0 @@
-. ../unix/runAllTests.sh $BASH_SOURCE

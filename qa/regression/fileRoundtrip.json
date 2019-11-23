@@ -1,0 +1,54 @@
+{
+  "operation"                         : "fileRoundtrip"
+, "connections"                       : "qa/regression/connections.json"
+, "parameters": {
+    "MODE": "DATA_ONLY"
+  , "FEEDBACK": "COMMIT"
+  }
+, "tasks"                             : "qa/regression/fileRoundtripTasks.json"
+, "tests" : [{
+    "source": "file#6"
+  , "targets": [
+      "oracle19c"
+    , "oracle18c"
+    , "oracle12c"
+    , "mssql#1"
+    , "postgres#1"
+    , "mysql#1"
+    , "mariadb#1"
+    ]
+  , "parser" : "CLARINET"
+  , "directory" : "tests/fileRoundtrip/%source%"
+  , "tasks": [
+       "all"
+    ]
+  },{
+    "source": "file#6"
+  , "targets": [
+       "oracle11g"
+    ]
+  , "parser" : "CLARINET"
+  , "directory" : "tests/fileRoundtrip/%source%"
+  , "parameters": {
+      "MAPPINGS" : "qa/regression/mappingsOracle11g.json"
+    }
+  , "tasks": [
+       "all"
+    ]
+  },{
+    "source": "file#6"
+  , "targets": [
+      "oracle19c"
+    , "oracle18c"
+    , "oracle12c"
+    , "mssql#1"
+    , "postgres#1"
+    , "mysql#1"
+    ]
+  , "parser" : "RDBMS"
+  , "directory" : "tests/fileRoundtrip/%source%"
+  , "tasks": [
+       "all"
+    ]
+  }]
+}

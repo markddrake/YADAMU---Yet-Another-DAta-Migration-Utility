@@ -1,9 +1,0 @@
-[
-    ["MsSQL/Northwind.json",{"database": "Northwind1","owner": "dbo"},"Northwind1.json",{"database": "Northwind2","owner": "dbo"},"Northwind2.json"],
-    ["MsSQL/HumanResources.json",{"database": "HumanResources1","owner": "HumanResources"},"HumanResources1.json",{"database": "HumanResources2","owner": "HumanResources"},"HumanResources2.json"],
-    ["MsSQL/Person.json",{"database": "Person1","owner": "Person"},"Person1.json",{"database": "Person2","owner": "Person"},"Person2.json"],
-    ["MsSQL/Production.json",{"database": "Production1","owner": "Production"},"Production1.json",{"database": "Production2","owner": "Production"},"Production2.json"],
-    ["MsSQL/Purchasing.json",{"database": "Purchasing1","owner": "Purchasing"},"Purchasing1.json",{"database": "Purchasing2","owner": "Purchasing"},"Purchasing2.json"],
-    ["MsSQL/Sales.json",{"database": "Sales1","owner": "Sales"},"Sales1.json",{"database": "Sales2","owner": "Sales"},"Sales2.json"],
-    ["MsSQL/AdventureWorksDW.json",{"database": "AdventureWorksDW1","owner": "dbo"},"AdventureWorksDW1.json",{"database": "AdventureWorksDW2","owner": "dbo"},"AdventureWorksDW2.json"]
-]

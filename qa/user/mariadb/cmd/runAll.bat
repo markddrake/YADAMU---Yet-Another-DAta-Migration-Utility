@@ -1,0 +1,1 @@
+call %~dp0..\..\..\cmd\runCmdTests.bat %0

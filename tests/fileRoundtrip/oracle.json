@@ -1,8 +1,0 @@
-[
-    ["oracle19c/%MODE%/HR.json",{"schema": "HR1"},"HR1.json",{"schema": "HR2"},"HR2.json"],
-    ["oracle19c/%MODE%/SH.json",{"schema": "SH1"},"SH1.json",{"schema": "SH2"},"SH2.json"],
-    ["oracle19c/%MODE%/OE.json",{"schema": "OE1"},"OE1.json",{"schema": "OE2"},"OE2.json"],
-    ["oracle19c/%MODE%/PM.json",{"schema": "PM1"},"PM1.json",{"schema": "PM2"},"PM2.json"],
-    ["oracle19c/%MODE%/IX.json",{"schema": "IX1"},"IX1.json",{"schema": "IX2"},"IX2.json"],
-    ["oracle19c/%MODE%/BI.json",{"schema": "BI1"},"BI1.json",{"schema": "BI2"},"BI2.json"]
-]

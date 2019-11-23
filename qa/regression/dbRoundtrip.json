@@ -1,0 +1,131 @@
+{
+  "operation"                         : "dbRoundTrip"
+, "clone"                             : true
+, "connections"                       : "qa/regression/connections.json"
+, "parameters": {
+    "MODE": "DATA_ONLY"
+  , "FEEDBACK": "COMMIT"
+  }
+, "tasks"                             : "qa/regression/dbRoundtripTasks.json"
+, "tests"                  : [{
+    "source": "oracle19c"
+  , "targets": [
+	  "oracle19c",
+      "oracle18c",
+      "oracle12c",
+      "oracle11g",
+      "mssql#1",
+      "postgres#1",
+      "mysql#1",
+      "mariadb#1"
+    ]
+  , "tasks": [ 
+      "all" 
+	]
+  },{
+    "source": "oracle18c"
+  , "targets": [
+	  "oracle19c",
+      "oracle18c",
+      "oracle12c",
+      "oracle11g",
+      "mssql#1",
+      "postgres#1",
+      "mysql#1",
+      "mariadb#1"
+    ]
+  , "tasks": [ 
+      "all" 
+	]
+  },{
+    "source": "oracle12c"
+  ,   "targets": [
+	  "oracle19c",
+      "oracle18c",
+      "oracle12c",
+      "oracle11g",
+      "mssql#1",
+      "postgres#1",
+      "mysql#1",
+      "mariadb#1"
+    ]
+  , "tasks": [ 
+      "all" 
+	]
+  },{
+    "source": "oracle11g"
+  , "targets": [
+	  "oracle19c",
+      "oracle18c",
+      "oracle12c",
+      "oracle11g",
+      "mssql#1",
+      "postgres#1",
+      "mysql#1",
+      "mariadb#1"
+    ]
+  , "tasks": [ 
+      "all" 
+	]
+  },{
+    "source": "mssql#1"
+  , "targets": [
+	  "oracle19c",
+      "oracle18c",
+      "oracle12c",
+      "oracle11g",
+      "mssql#1",
+      "postgres#1",
+      "mysql#1",
+      "mariadb#1"
+    ]
+  , "tasks": [ 
+      "all" 
+	]
+  },{
+    "source": "postgres#1"
+  , "targets": [
+	  "oracle19c",
+      "oracle18c",
+      "oracle12c",
+      "oracle11g",
+      "mssql#1",
+      "postgres#1",
+      "mysql#1",
+      "mariadb#1"
+    ]
+  , "tasks": [ 
+      "all" 
+	]
+  },{
+    "source": "mysql#1"
+  , "targets": [
+	  "oracle19c",
+      "oracle18c",
+      "oracle12c",
+      "oracle11g",
+      "mssql#1",
+      "postgres#1",
+      "mysql#1",
+      "mariadb#1"
+    ]
+  , "tasks": [ 
+      "all" 
+	]
+  },{
+    "source": "mariadb#1"
+  , "targets": [
+	  "oracle19c",
+      "oracle18c",
+      "oracle12c",
+      "oracle11g",
+      "mssql#1",
+      "postgres#1",
+      "mysql#1",
+      "mariadb#1"
+    ]
+  , "tasks": [ 
+      "all" 
+	]
+  }]
+}

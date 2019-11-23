@@ -1,1 +1,0 @@
-export UTC=`date --utc +%FT%T.%3NZ`

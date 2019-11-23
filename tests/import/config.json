@@ -1,7 +1,0 @@
-{
-    "connections": "tests/connections/standardConnections.json",
-    "mode"       : "Import",
-    "jobs": [
-        "tests/import/import.json"
-    ]
-}

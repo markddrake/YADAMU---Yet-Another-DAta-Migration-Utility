@@ -1,0 +1,38 @@
+{
+  "yadamu"                    : {
+    "FILE"                    : "export.json"
+  , "MODE"                    : "DATA_ONLY"
+  }
+, "yadamuDBI"                 : {
+    "SPATIAL_FORMAT"          : "WKB"
+  , "BATCH_SIZE"              : 10000
+  , "BATCH_COMMIT"            : 5
+  }
+, "mariadb"                   : {
+    "TABLE_MATCHING"          : "INSENSITIVE"
+  }
+, "mongodb"                   : {
+    "PORT"                    : 27017
+  , "MONGO_MODE"              : "DOCUMENT"
+  , "MONGO_REMOVE_ID"         : false
+  , "SPATIAL_FORMAT"          : "GeoJSON"
+  }
+, "mssql"                     : {
+    "FROM_USER"               : "dbo"
+  , "TO_USER"                 : "dbo"
+  }
+, "mysql"                     : {
+    "TABLE_MATCHING"          : "INSENSITIVE"
+   ,"READ_KEEP_ALIVE"         : 10000
+  }
+, "oracle"                    : {
+    "LOB_CACHE_SIZE"          : 1024
+  }
+, "postgres"                  : {
+  }
+, "snowflake"                 : {
+    "FROM_USER"               : "public"
+  , "TO_USER"                 : "public"
+  , "SPATIAL_FORMAT"          : "GeoJSON"
+  }
+}

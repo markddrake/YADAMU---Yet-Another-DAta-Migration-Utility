@@ -1,0 +1,35 @@
+{
+  "name": "yadamu",
+  "version": "1.0.0",
+  "description": "User Interface for YADAMU",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ./"
+  },
+  "repository": {
+    "type": "git",
+    "url": "TBD"
+  },
+  "author": "Mark D Drake",
+  "license": "SEE LICENSE IN TDB.txt",
+  "dependencies": {
+    "bootstrap": "^4.3.1",
+    "font-awesome": "^4.7.0",
+    "jquery": "^3.4.1",
+    "mariadb": "^2.1.2",
+    "mssql": "^5.1.0",
+    "mysql": "^2.17.1",
+    "oracledb": "^4.0.1",
+    "pg": "^7.12.1",
+    "pg-copy-streams": "^2.2.2",
+    "pg-query-stream": "^2.0.1",
+    "popper.js": "^1.16.0",
+    "require": "^2.4.20",
+    "uuid": "^3.3.3",
+    "wkx": "^0.4.8"
+  },
+  "devDependencies": {
+    "electron": "^7.0.1",
+    "electron-packager": "^14.1.0"
+  }
+}
