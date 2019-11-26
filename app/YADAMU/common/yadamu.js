@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
   
 const FileWriter = require('../file/node/fileWriter.js');
 const FileReader = require('../file/node/fileReader.js');
@@ -50,6 +51,27 @@ class Yadamu {
 	   return this.parameters.RDBMS
 	 }
 	 return 'file'
+  }
+  
+  async ensurePassword(vendor,connectionProperties,passwordKey) {
+	if ((connectionProperties[passwordKey] === undefined) || (connectionProperties[passwordKey].length === 0)) {
+      const commandPrompt = readline.createInterface({input: process.stdin, output: process.stdout});
+	  commandPrompt._writeToOutput = function _writeToOutput(charToWrite) {
+        commandPrompt.output.write(charToWrite.length > 1 ? charToWrite : "*")
+      };
+	  	  
+	 	  
+	  const pwQuery = new Promise(function (resolve,reject) {
+        commandPrompt.question(`Enter password for ${vendor} connection: `, function(password) {
+	      commandPrompt.output.write(`\n`)
+          commandPrompt.close();
+		  resolve(password);
+	    })
+	  })
+
+	  const password = await pwQuery;
+	  connectionProperties[passwordKey] = password;
+    }
   }
 
   reportStatus(status,yadamuLogger) {

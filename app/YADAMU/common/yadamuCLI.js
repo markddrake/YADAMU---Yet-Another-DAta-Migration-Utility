@@ -330,12 +330,12 @@ class YadamuCLI {
   
   getUser(vendor,schema) {
     
-     return vendor === 'mssql' ? schema.mssql.owner : (vendor === 'snowflake' ? schema.snowflake.schema : schema.schema)
+     return vendor === 'mssql' ? schema.owner : (vendor === 'snowflake' ? schema.snowflake.schema : schema.schema)
      
   }
   
   getDescription(db,connectionName,schemaInfo) {
-    return `"${connectionName}"://"${db === 'mssql' ? `${schemaInfo.mssql.database}"."${schemaInfo.mssql.owner}` : schemaInfo.schema}"`
+    return `"${connectionName}"://"${db === 'mssql' ? `${schemaInfo.database}"."${schemaInfo.owner}` : schemaInfo.schema}"`
   }
   
  
@@ -366,7 +366,7 @@ class YadamuCLI {
 	  
       switch (sourceDatabase) {
          case 'mssql':
-           sourceParameters.MSSQL_SCHEMA_DB = sourceSchema.mssql.database
+           sourceParameters.MSSQL_SCHEMA_DB = sourceSchema.database
            break;
          default:
       }
@@ -376,7 +376,7 @@ class YadamuCLI {
 	  }
       switch (targetDatabase) {
          case 'mssql':
-           targetParameters.MSSQL_SCHEMA_DB = targetSchema.mssql.database
+           targetParameters.MSSQL_SCHEMA_DB = targetSchema.database
            break;
          default:
       }

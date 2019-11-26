@@ -666,7 +666,7 @@ class YadamuQA {
       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }
     else {
-      this.yadamuLogger.log([`${this.constructor.name}.dbRoundtrip()`,`TASK`],`Completed: Source:[${operationsList[0]}] -->  ${(operationsList.length === 3 ? '[' + operationsList[1] + '] --> ' : '')}Target:${operationsList[operationsList.length-1]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+      this.yadamuLogger.log([`${this.constructor.name}.dbRoundtrip()`,`OPERATION`],`Completed: Source:[${operationsList[0]}] -->  ${(operationsList.length === 3 ? '[' + operationsList[1] + '] --> ' : '')}Target:${operationsList[operationsList.length-1]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
     }
   
   }
@@ -884,7 +884,7 @@ class YadamuQA {
 	
 	let startTime = opStartTime
 	
-	if (test.parser === 'RDBMS') {
+	if (test.parser === 'SQL') {
 	  targetDBI.setParameters({"FILE" : sourceFile})
 	  timings.push(await this.yadamu.uploadData(targetDBI))
 	}
@@ -944,7 +944,7 @@ class YadamuQA {
 	
 	startTime = new Date().getTime();
 	
-  	if (test.parser === 'RDBMS') {
+  	if (test.parser === 'SQL') {
 	  targetDBI.setParameters({"FILE" : file1})
 	  timings.push(await this.yadamu.uploadData(targetDBI))
 	}
@@ -990,7 +990,7 @@ class YadamuQA {
 	await fileCompare.compareFiles(this.yadamuLoggger,sourceFile,file1, file2, timings)
 
 	const opElapsedTime =  new Date().getTime() - opStartTime
-    this.yadamuLogger.log([`${this.constructor.name}.fileRoundtrip()`],`Operation complete: [${this.operationsList[0]}] -->  [${this.operationsList[1]}] --> [${this.operationsList[2]}] --> [${this.operationsList[3]}]  --> [${this.operationsList[4]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(opElapsedTime)}s.`);
+    this.yadamuLogger.log([`${this.constructor.name}.fileRoundtrip()`,`${test.parser === 'SQL' ? 'SQL' : 'CLARINET'}`],`Operation complete: [${this.operationsList[0]}] -->  [${this.operationsList[1]}] --> [${this.operationsList[2]}] --> [${this.operationsList[3]}]  --> [${this.operationsList[4]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(opElapsedTime)}s.`);
 
   }
 
@@ -1025,7 +1025,7 @@ class YadamuQA {
 	const startTime = new Date().getTime();
 	
 	let timings
-	if (test.parser === 'RDBMS') {
+	if (test.parser === 'SQL') {
 	  targetDBI.setParameters({"FILE" : sourceFile})
 	  timings = await this.yadamu.uploadData(targetDBI)
 	}
@@ -1108,7 +1108,7 @@ class YadamuQA {
   }
   
   getTaskList(configuration,task) {
-    if (typeof task === 'string') {
+	if (typeof task === 'string') {
 	  if (this.expandedTaskList[task] === undefined) {
         this.expandedTaskList[task] = []
 	    if (Array.isArray(configuration.tasks[task])) {
@@ -1117,10 +1117,18 @@ class YadamuQA {
 		  }
 	    }
 	    else {
-		  this.expandedTaskList[task] = [configuration.tasks[task]]
+		  const taskList = configuration.tasks[task]
+	 	  if (taskList === undefined) {
+		    throw new Error(`Named task "${task}" not defined. Currently known tasks: "${Object.keys(configuration.tasks)}".`);
+	      }
+		  this.expandedTaskList[task] = [taskList]
 	    }
 	  }
-      return this.expandedTaskList[task]
+	  const taskList = this.expandedTaskList[task]
+	  if (taskList === undefined) {
+        throw new Error(`Named task "${task}" not defined. Currently known tasks: "${Object.keys(configuration.tasks)}".`);
+	  }
+	  return taskList
     }
     else {
       return [task]
@@ -1151,6 +1159,7 @@ class YadamuQA {
 		const startTime = new Date().getTime()
 		for (const task of test.tasks) {
 		  const operations = this.getTaskList(configuration,task)
+		  const startTime = new Date().getTime()
 		  for (const operation of operations) {
 			const mode = test.operation ? test.operation : configuration.operation
 			switch (mode.toUpperCase()) {
@@ -1168,12 +1177,14 @@ class YadamuQA {
 			    break;
 			}
 		  }
+          const elapsedTime = new Date().getTime() - startTime;
+          this.yadamuLogger.log([`${this.constructor.name}.doTests()`,`TASK`],`Completed. Source:[${test.source}]. Target:[${target}]. Task:[${task}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
 	    }
 		const elapsedTime = new Date().getTime() - startTime;
-        this.yadamuLogger.log([`${this.constructor.name}.doTests()`,`BATCH`],`Completed. Source:[${test.source}]. Target:[${target}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+        this.yadamuLogger.log([`${this.constructor.name}.doTests()`,`TARGET`],`Completed. Source:[${test.source}]. Target:[${target}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
       }		 
       const elapsedTime = new Date().getTime() - startTime;
-      this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`JOB`],`Completed. Source:[${test.source}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+      this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TEST`],`Completed. Source:[${test.source}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
     }
   }
   

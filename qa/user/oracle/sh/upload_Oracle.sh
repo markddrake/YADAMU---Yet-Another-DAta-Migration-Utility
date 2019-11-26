@@ -1,5 +1,5 @@
 source qa/sh/initialize.sh $1 $BASH_SOURCE[0] oracle upload
-export YADAMU_PARSER="CLARINET"
+export YADAMU_PARSER="SQL"
 export SCHEMAVER=1
 sqlplus $DB_USER/$DB_PWD@$DB_CONNECTION @$YADAMU_SQL_PATH/RECREATE_ORACLE_ALL.sql $YADAMU_LOG_PATH $SCHEMAVER 
 source $YADAMU_SCRIPT_PATH/upload_operations_Oracle.sh $YADAMU_INPUT_PATH $SCHEMAVER ""

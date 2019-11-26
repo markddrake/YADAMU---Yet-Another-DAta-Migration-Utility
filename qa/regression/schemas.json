@@ -1,0 +1,55 @@
+{
+     "HR"                             : {
+        "schema"                      : "HR"
+      }
+    ,"HR1"                           : {
+       "schema"                       : "HR1"
+      }       
+    ,"HR2"                           : {
+       "schema"                       : "HR2"
+      }       
+    ,"HR#MSSQL"                       : {    
+       "database"                     : "HR",
+       "owner"                        : "dbo"
+      }    
+    ,"HR1#MSSQL"                      : {    
+       "database"                     : "HR1",
+       "owner"                        : "dbo"
+      }    
+    ,"HR2#MSSQL"                      : {
+       "database"                     : "HR2",
+       "owner"                        : "dbo"
+      } 
+    ,"SH"                             : {
+        "schema"                      : "SH"
+      }
+    ,"SH1"                            : {
+       "schema"                       : "SH1"
+      }       
+    ,"SH2"                            : {
+       "schema"                       : "SH2"
+      }       
+    ,"SH#MSSQL"                       : {
+       "database"                     : "SH",
+       "owner"                        : "dbo"
+      }    
+    ,"SH1#MSSQL"                      : {
+       "database"                     : "SH1",
+       "owner"                        : "dbo"
+    ,"SH#MSSQL"                       : {
+       "database"                     : "SH2",
+       "owner"                        : "dbo"
+      }    
+    ,"Application"                    : {
+       "database"                     : "WorldWideImporters",
+       "owner"                        : "Application"
+      }     
+    ,"Application1      "             : {
+       "database"                     : "WWI_Application1",
+       "owner"                        : "dbo"
+      }     
+    ,"Application1#SCHEMA"                     : {
+       "schema"                       : "WWI_Application1"
+      }    
+  }
+}

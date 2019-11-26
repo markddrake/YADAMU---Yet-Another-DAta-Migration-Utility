@@ -1,5 +1,5 @@
 call qa\cmd\initialize.bat %1 %~dp0 mysql upload
-@set YADAMU_PARSER=RDBMS
+@set YADAMU_PARSER=SQL
 @set FILENAME=sakila
 @set SCHEMA=sakila
 @set SCHEMAVER=1

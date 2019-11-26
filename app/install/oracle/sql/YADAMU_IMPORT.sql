@@ -1127,7 +1127,7 @@ $END
            when ((TARGET_DATA_TYPE = 'GEOMETRY') or TARGET_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"')then
              case 
                when P_SPATIAL_FORMAT in ('WKB','EWKB') then
-                 'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKBGEOMETRY("' || COLUMN_NAME || '") end'
+                 'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKBGEOMETRY(OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || COLUMN_NAME || '")) end'
                when P_SPATIAL_FORMAT in ('WKT','EWKT') then
                  'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || COLUMN_NAME || '") end'
              end

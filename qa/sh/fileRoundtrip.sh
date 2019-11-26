@@ -1,7 +1,7 @@
 # Run from YADAMU_HOME
 export YADAMU_HOME=`pwd`
 export YADAMU_QA_HOME=$YADAMU_HOME/qa
-export YADAMU_TASK=dbRoundtrip
+export YADAMU_TASK=fileRoundtrip
 source $YADAMU_HOME/app/install/sh/installYadamu.sh
 source $YADAMU_QA_HOME/install/sh/installYadamu.sh
 unset YADAMU_LOG_PATH

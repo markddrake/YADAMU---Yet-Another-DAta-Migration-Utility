@@ -431,7 +431,7 @@ class MySQLDBI extends YadamuDBI {
   }    
   
   async initialize() {
-	super.initialize();      
+    await super.initialize(true);   
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
     this.setSpatialSerializer(this.spatialFormat);
     await this.getConnection();

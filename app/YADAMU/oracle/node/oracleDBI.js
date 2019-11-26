@@ -675,13 +675,6 @@ class OracleDBI extends YadamuDBI {
     }    
   }    
   
-  static async getConnectionPool(connectionProperties) {
-    
-    this.logConnectionProperties();
-    const pool = await oracledb.createPool(connectionProperties)
-    return pool;
-  }
-
   async getConnectionFromPool(pool,status) {
 
     const conn = pool.getConnection();
@@ -877,7 +870,7 @@ class OracleDBI extends YadamuDBI {
   */
   
   async initialize() {
-    super.initialize();
+    await super.initialize(true);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
     this.connection = await this.getConnection(this.connectionProperties,this.status)
   }

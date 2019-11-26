@@ -20,7 +20,7 @@
   , "parser" : "CLARINET"
   , "directory" : "tests/fileRoundtrip/%source%"
   , "tasks": [
-       "all"
+       "oracle", "mysql", "mssql"
     ]
   },{
     "source": "file#6"
@@ -33,7 +33,7 @@
       "MAPPINGS" : "qa/regression/mappingsOracle11g.json"
     }
   , "tasks": [
-       "all"
+       "oracle", "mysql", "mssql"
     ]
   },{
     "source": "file#6"
@@ -45,10 +45,10 @@
     , "postgres#1"
     , "mysql#1"
     ]
-  , "parser" : "RDBMS"
+  , "parser" : "SQL"
   , "directory" : "tests/fileRoundtrip/%source%"
   , "tasks": [
-       "all"
+       "oracle", "mysql", "mssql"
     ]
   }]
 }

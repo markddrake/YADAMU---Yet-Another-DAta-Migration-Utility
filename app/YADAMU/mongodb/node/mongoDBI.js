@@ -136,7 +136,7 @@ class MongoDBI extends YadamuDBI {
   
   async initialize() {
       
-     super.initialize();   
+     await super.initialize(true);   
      if (this.status.sqlTrace) {
        this.status.sqlTrace.write(`mongoURL ${this.getMongoURL()}\n`)      
      }

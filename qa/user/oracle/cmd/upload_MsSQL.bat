@@ -1,5 +1,5 @@
 call qa\cmd\initialize.bat %1 %~dp0 mssql upload
-@set YADAMU_PARSER=RDBMS
+@set YADAMU_PARSER=SQL
 @set SCHEMAVER=1
 sqlplus %DB_USER%/%DB_PWD%@%DB_CONNECTION% @%YADAMU_SQL_PATH%\RECREATE_MSSQL_ALL.sql %YADAMU_LOG_PATH% %SCHEMAVER% 
 call %YADAMU_SCRIPT_PATH%\upload_operations_MsSQL.bat %YADAMU_INPUT_PATH% %SCHEMAVER% ""

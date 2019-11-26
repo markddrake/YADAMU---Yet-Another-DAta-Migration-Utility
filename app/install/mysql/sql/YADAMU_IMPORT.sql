@@ -384,7 +384,7 @@ BEGIN
           ,group_concat(concat(case
                                 when TARGET_DATA_TYPE in ('timestamp','datetime') then
                                   concat('convert_tz(data."',COLUMN_NAME,'",''+00:00'',@@session.time_zone)')
-                                when TARGET_DATA_TYPE IN ('varchar','text') or TARGET_DATA_TYPE like 'varchar(%)%' then
+                                when TARGET_DATA_TYPE IN ('varchar','text','mediumtext','longtext') or TARGET_DATA_TYPE like 'varchar(%)%' then
                                   -- Bug #93498: JSON_TABLE does not handle JSON NULL correctly with VARCHAR
                                   -- Assume the string 'null' should be the SQL NULL
                                   concat('case when data."',column_name, '" = ''null'' then NULL else data."',column_name,'" end')

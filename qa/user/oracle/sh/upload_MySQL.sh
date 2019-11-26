@@ -1,5 +1,5 @@
 . qa/sh/initialize.sh $1 $BASH_SOURCE[0] mysql upload
-export YADAMU_PARSER="RDBMS"
+export YADAMU_PARSER="SQL"
 export FILENAME=sakila
 export SCHEMA=sakila
 export SCHEMAVER=1

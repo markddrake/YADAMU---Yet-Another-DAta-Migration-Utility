@@ -1,0 +1,35 @@
+{
+  "connections"                         : {
+    "oracle19c"                         : {
+      "oracle"                          : {
+        "user"                          : "SYSTEM"
+      , "password"                      : "oracle"
+      , "connectString"                 : "ORCL19c"
+      }
+    }
+  }
+ ,"schemas"                           : {
+    "HR"                             : {
+       "schema"                      : "HR"
+     }
+   , "HR1"                            : {
+       "schema"                       : "HR1"
+     }       
+  }
+ ,"parameters"                      : {
+    "MODE"                          : "DATA_ONLY"
+  }
+ ,"jobs"                            : [{
+     "source"                       : {
+        "connection"                : "oracle19c"
+      , "schema"                    : "HR"
+      }
+     ,"target"                      : {
+        "connection"                : "oracle19c"
+      , "schema"                    : "HR1"
+      }
+     ,"parameters"                  : {
+        "MODE"                      : "DATA_ONLY"
+      }
+   }]
+}

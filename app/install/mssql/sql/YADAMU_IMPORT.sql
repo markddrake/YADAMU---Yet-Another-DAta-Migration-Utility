@@ -256,20 +256,20 @@ BEGIN
                       when "TARGET_DATA_TYPE" = 'geometry'  then
                         case
                           when @SPATIAL_FORMAT in ('WKT','EWKT') then
-                            CONCAT('GEOMETRY::STGeomFromText(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
+                            CONCAT('geometry::STGeomFromText(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
                           when @SPATIAL_FORMAT in ('WKB','EWKB') then
-                            CONCAT('GEOMETRY::STGeomFromWKB(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
+                            CONCAT('geometry::STGeomFromWKB(CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2),4326) "',"COLUMN_NAME",'"')
                           else                            
-                            CONCAT('GEOMETRY::STGeomFromWKB(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
+                            CONCAT('geometry::STGeomFromWKB(CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2),4326) "',"COLUMN_NAME",'"')
                         end
                       when "TARGET_DATA_TYPE" = 'geography' then
                         case
                           when @SPATIAL_FORMAT in ('WKT','EWKT') then
-                            CONCAT('GEOGRAPHY::STGeomFromText(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
+                            CONCAT('geography::STGeomFromText(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
                           when @SPATIAL_FORMAT in ('WKB','EWKB') then
-                            CONCAT('GEOGRAPHY::STGeomFromWKB(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
+                            CONCAT('geography::STGeomFromWKB(CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2),4326) "',"COLUMN_NAME",'"')
                           else                            
-                            CONCAT('GEOGRAPHY::STGeomFromWKB(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
+                            CONCAT('geography::STGeomFromWKB(CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2),4326) "',"COLUMN_NAME",'"')
                         end
                       else
                         CONCAT('data."',"COLUMN_NAME",'"')

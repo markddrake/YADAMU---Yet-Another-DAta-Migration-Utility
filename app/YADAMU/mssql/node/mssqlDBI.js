@@ -269,7 +269,7 @@ class MSSQLDBI extends YadamuDBI {
   }   
   
   async initialize() {
-    super.initialize();  
+    await super.initialize(true);   
     this.pool = await this.getConnectionPool()
     this.transaction = new sql.Transaction(this.pool);
     this.requestSource = this.pool;

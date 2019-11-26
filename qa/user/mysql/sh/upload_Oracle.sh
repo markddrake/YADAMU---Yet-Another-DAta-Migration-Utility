@@ -1,5 +1,5 @@
 source qa/sh/initialize.sh $BASH_SOURCE[0] $BASH_SOURCE[0] oracle19c/$MODE  upload
-export YADAMU_PARSER="RDBMS"
+export YADAMU_PARSER="SQL"
 export SCHEMAVER=1
 mysql -u$DB_USER -p$DB_PWD -h$DB_HOST -D$DB_DBNAME -P$DB_PORT -v -f --init-command="set @ID=$SCHEMAVER; set @METHOD='$YADAMU_PARSER';" <$YADAMU_SQL_PATH/RECREATE_ORACLE_ALL.sql >>$YADAMU_LOG_PATH/RECREATE_SCHEMA.log
 source $YADAMU_SCRIPT_PATH/upload_operations_Oracle.sh $YADAMU_INPUT_PATH $SCHEMAVER ""

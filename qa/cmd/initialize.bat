@@ -1,6 +1,7 @@
 REM %1 is the path to the script that initiated this process
 REM %2 is the path to the script that called this script.
 REM %3 is the RDBMS name required to calculate the location of input and output folders.
+if not defined NODE_NO_WARNINGS set NODE_NO_WARNINGS=1
 if not defined YADAMU_HOME set YADAMU_HOME=%CD%
 if not defined MODE set MODE=DATA_ONLY
 @set YADAMU_SOURCE=%3

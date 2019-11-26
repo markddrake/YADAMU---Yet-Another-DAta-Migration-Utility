@@ -12,4 +12,5 @@ call %YADAMU_QA_HOME%\cmd\createOutputFolders.bat %YADAMU_HOME%
 REM call %YADAMU_QA_HOME%\cmd\exportUsers.bat 
 REM Create the MsSQL Schema required to hold the consolidated Adventure Works Schema
 call %YADAMU_QA_HOME%\cmd\exportUsers.bat
+if not defined NODE_NO_WARNINGS set NODE_NO_WARNINGS=1
 node %YADAMU_HOME%\app\YADAMU\common\test CONFIG=%YADAMU_QA_HOME%\regression\%YADAMU_TASK%.json >%YADAMU_LOG_PATH%\%YADAMU_TASK%.log

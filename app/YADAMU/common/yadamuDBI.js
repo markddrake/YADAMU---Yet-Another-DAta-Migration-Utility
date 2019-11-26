@@ -25,6 +25,7 @@ const DEFAULT_COMMIT_COUNT = 5;
 
 class YadamuDBI {
     
+  get PASSWORD_KEY_NAME()   { return 'password' };
   get DATABASE_VENDOR()     { return undefined };
   get SOFTWARE_VENDOR()     { return undefined };
   get SPATIAL_FORMAT()      { return spatialFormat };
@@ -312,7 +313,7 @@ class YadamuDBI {
   **
   */
   
-  initialize() {
+  async initialize(ensurePassword) {
     if (this.status.sqlTrace) {
        if (this.status.sqlTrace._writableState.ended === true) {
          this.status.sqlTrace = fs.createWriteStream(this.status.sqlTrace.path,{"flags":"a"})
@@ -340,7 +341,10 @@ class YadamuDBI {
     if (this.parameters.PARAMETER_TRACE === true) {
       this.yadamuLogger.writeDirect(`${Util.inspect(this.parameters,{colors:true})}\n`);
     }
-    
+	    
+    if (ensurePassword) {
+      await this.yadamu.ensurePassword(this.DATABASE_VENDOR, this.connectionProperties, this.PASSWORD_KEY_NAME);
+    }
   }
 
   /*

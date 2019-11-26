@@ -1,0 +1,29 @@
+{
+  "connections"                       : "qa/regression/connections.json"
+ ,"schemas"                           : "qa/regression/schemas.json"
+ ,"jobs"                            : [{
+     "source"                       : {
+        "connection"                : "oracle19c"
+      , "schema"                    : "HR"
+      }
+     ,"target"                      : {
+        "connection"                : "mysql#1"
+      , "schema"                    : "HR1"
+      }
+     ,"parameters"                  : {
+        "MODE"                      : "DATA_ONLY"
+      }
+  },{
+     "source"                       : {
+        "connection"                : "mysql#1"
+      , "schema"                    : "HR1"
+      }
+     ,"target"                      : {
+        "connection"                : "mssql#1"
+      , "schema"                    : "HR1#MSSQL"
+      }
+     ,"parameters"                  : {
+        "MODE"                      : "DATA_ONLY"
+      }
+  }]
+}

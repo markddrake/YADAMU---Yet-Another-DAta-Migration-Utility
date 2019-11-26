@@ -170,7 +170,7 @@ class snowflakeDBI extends YadamuDBI {
   } 
   
   async initialize() {
-     super.initialize();
+     await super.initialize(true);   
      await this.getConnection()
      this.spatialFormat = "GeoJSON"
   }

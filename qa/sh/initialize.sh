@@ -1,6 +1,7 @@
 # $1 is the path to the script that initiated this process
 # $2 is the path to the script that called this script.
 # $3 is the RDBMS name required to calculate the location of input and output folders.
+if [ -z ${NODE_NO_WARNINGS+x} ]; then export NODE_NO_WARNINGS=1; fi
 if [ -z ${YADAMU_HOME+x} ]; then export YADAMU_HOME=`pwd`; fi
 if [ -z ${MODE+x} ]; then  export MODE=DATA_ONLY; fi
 #for %%I in (%~dp1..) do set YADAMU_TARGET=%%~nxI

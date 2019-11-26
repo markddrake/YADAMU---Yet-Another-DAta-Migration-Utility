@@ -1,5 +1,5 @@
 call qa\cmd\initialize.bat %~dp0 %~dp0 oracle19c\%MODE% upload
-@set YADAMU_PARSER=RDBMS
+@set YADAMU_PARSER=SQL
 @set SCHEMAVER=1
 psql -U %DB_USER% -d %DB_DBNAME% -h %DB_HOST% -a -f %YADAMU_SQL_PATH%\YADAMU_TEST.sql >> %YADAMU_LOG_PATH%\install\YADAMU_TEST.log
 psql -U %DB_USER% -d %DB_DBNAME% -h %DB_HOST% -a -vID=%SCHEMAVER% -vMETHOD=%YADAMU_PARSER% -f %YADAMU_SQL_PATH%\RECREATE_ORACLE_ALL.sql >>%YADAMU_LOG_PATH%\RECREATE_SCHEMA.log

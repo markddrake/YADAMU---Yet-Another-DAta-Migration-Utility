@@ -20,7 +20,7 @@
       "mariadb#1"
     ]
   , "tasks": [ 
-      "all" 
+      "oracle","mysql","mssql"
 	]
   },{
     "source": "oracle18c"
@@ -35,7 +35,7 @@
       "mariadb#1"
     ]
   , "tasks": [ 
-      "all" 
+      "oracle","mysql","mssql"
 	]
   },{
     "source": "oracle12c"
@@ -50,7 +50,7 @@
       "mariadb#1"
     ]
   , "tasks": [ 
-      "all" 
+      "oracle","mysql","mssql"
 	]
   },{
     "source": "oracle11g"
@@ -65,7 +65,7 @@
       "mariadb#1"
     ]
   , "tasks": [ 
-      "all" 
+      "oracle","mysql","mssql"
 	]
   },{
     "source": "mssql#1"
@@ -80,7 +80,7 @@
       "mariadb#1"
     ]
   , "tasks": [ 
-      "all" 
+      "oracle","mysql","mssql"
 	]
   },{
     "source": "postgres#1"
@@ -95,7 +95,7 @@
       "mariadb#1"
     ]
   , "tasks": [ 
-      "all" 
+      "oracle","mysql","mssql"
 	]
   },{
     "source": "mysql#1"
@@ -110,7 +110,7 @@
       "mariadb#1"
     ]
   , "tasks": [ 
-      "all" 
+      "oracle","mysql","mssql"
 	]
   },{
     "source": "mariadb#1"
@@ -125,7 +125,7 @@
       "mariadb#1"
     ]
   , "tasks": [ 
-      "all" 
+      "oracle","mysql","mssql"
 	]
   }]
 }
