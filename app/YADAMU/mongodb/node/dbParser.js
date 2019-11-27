@@ -21,17 +21,20 @@ class DBParser extends Transform {
     if (this.query.stripID === true) {
       delete data._id
     }
-
-    if (this.query.outputMode === 'ARRAY') {
-      data = this.query.columns.map(function(key) {
-        return data[key]
-      },this)
+	
+    switch (this.query.transformation) {
+	  case 'DOCUMENT_TO_ARRAY' :
+        data = this.query.columns.map(function(key) {
+          return data[key]
+        },this)
+		break;
+      default:
     }
         
     if (!this.objectMode) {
       data = JSON.stringify(data);
     }
-        
+	
     this.push({data:data})
     done();
   }

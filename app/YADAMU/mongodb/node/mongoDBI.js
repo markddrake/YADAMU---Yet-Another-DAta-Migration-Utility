@@ -108,6 +108,13 @@ class MongoDBI extends YadamuDBI {
     }
 
   }    
+  
+  async useDatabase(database) {
+     if (this.status.sqlTrace) {
+       this.status.sqlTrace.write(`use ${database}\n`)      
+     }
+     this.db = await this.client.db(database);	  
+  }
 
   getMongoURL() {
     
@@ -119,7 +126,6 @@ class MongoDBI extends YadamuDBI {
   
     return{
       host             : this.parameters.HOSTNAME
-     ,database         : this.parameters.DATABASE
      ,port             : this.parameters.PORT
     }
   }
@@ -134,19 +140,16 @@ class MongoDBI extends YadamuDBI {
   **
   */
   
+  
   async initialize() {
       
-     await super.initialize(true);   
+	  // TODO : Support for Mongo Authentication ???
+     await super.initialize(false);   
      if (this.status.sqlTrace) {
        this.status.sqlTrace.write(`mongoURL ${this.getMongoURL()}\n`)      
      }
      this.client = new MongoClient(this.getMongoURL(),typeof this.connectionProperties.options === 'object' ? this.connectionProperties.options : {});
-     await this.client.connect();
-     if (this.status.sqlTrace) {
-       this.status.sqlTrace.write(`use ${this.connectionProperties.database}\n`)      
-     }
-     this.db = this.client.db(this.connectionProperties.database);
-     
+     await this.client.connect();     
   }
 
   /*
@@ -179,6 +182,16 @@ class MongoDBI extends YadamuDBI {
   ** Begin the current transaction
   **
   */
+  
+  async initializeExport() {
+	 super.initializeExport();
+	 await this.useDatabase(this.parameters.FROM_USER);
+  }
+  
+  async initializeImport() {
+	 super.initializeImport();
+	 await this.useDatabase(this.parameters.TO_USER);
+  }
   
   async beginTransaction() {
   }
@@ -268,8 +281,8 @@ class MongoDBI extends YadamuDBI {
   }
   
   async getSchemaInfo(schema) {
-    const schemaInfo = await this.db.listCollections().toArray();  
-    if (this.parameters.MONGO_MODEL === 'ARRAY') {
+	const schemaInfo = await this.db.listCollections().toArray();  
+    if ((this.parameters.MONGO_STORAGE_FORMAT === 'DOCUMENT') && (this.parameters.MONGO_EXPORT_FORMAT === 'ARRAY')) {
       const promises =  schemaInfo.map(function(collection) {     
         return this.db.collection(collection.name).mapReduce(
           function() {
@@ -385,8 +398,17 @@ class MongoDBI extends YadamuDBI {
   }
 
   createParser(query,objectMode) {
-    query.outputMode = this.parameters.MONGO_MODEL ? this.parameters.MONGO_MODEL : 'DOCUMENT'
-    query.stripID = this.parameters.MONGO_STRIP_ID ? this.parameters.MONGO_STRIP_ID : false
+	switch (true) {
+	  case ((this.parameters.MONGO_STORAGE_FORMAT === 'DOCUMENT') && (this.parameters.MONGO_EXPORT_FORMAT === 'ARRAY')) :
+	    query.transformation = 'DOCUMENT_TO_ARRAY'
+		break;
+	  case ((this.parameters.MONGO_STORAGE_FORMAT === 'ARRAY') && (this.parameters.MONGO_EXPORT_FORMAT === 'DOCUMENT')) :
+	    query.transformation = 'ARRAY_TO_DOCUMENT'
+		break;
+      default:
+	    query.transformation = 'NONE'
+    } 
+	query.stripID = this.parameters.MONGO_STRIP_ID ? this.parameters.MONGO_STRIP_ID : false
     return new DBParser(query,objectMode,this.yadamuLogger);
   }  
   

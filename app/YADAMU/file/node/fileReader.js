@@ -53,7 +53,7 @@ class FileReader extends YadamuDBI {
   }
 
   async initialize() {
-    super.initialize();
+    super.initialize(false);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT   
     const importFilePath = path.resolve(this.parameters.FILE);
     const stats = fs.statSync(importFilePath)

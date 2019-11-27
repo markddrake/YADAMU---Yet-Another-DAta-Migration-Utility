@@ -88,7 +88,6 @@
     "mongodb#1"                         : {
       "mongodb"                         : {
         "host"                          : "192.168.1.250"
-      , "database"                      : "admin"
       , "port"                          : 27017
       , "options"                       : {
            "socketTimeoutMS"            : 900000

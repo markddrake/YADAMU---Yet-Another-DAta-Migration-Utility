@@ -13,8 +13,9 @@
   }
 , "mongodb"                   : {
     "PORT"                    : 27017
-  , "MONGO_MODE"              : "DOCUMENT"
-  , "MONGO_REMOVE_ID"         : false
+  , "MONGO_STORAGE_FORMAT"    : "DOCUMENT"
+  , "MONGO_EXPORT_FORMAT"     : "ARRAY"
+  , "MONGO_STRIP_ID"          : false
   , "SPATIAL_FORMAT"          : "GeoJSON"
   }
 , "mssql"                     : {

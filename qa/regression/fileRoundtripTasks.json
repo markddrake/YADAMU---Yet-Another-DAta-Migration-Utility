@@ -5,16 +5,16 @@
 , "PM"                : { "source" : { "file" : "PM.json", "directory": "oracle19c/%mode%" },              "target" : {"schema" : "PM"}}
 , "IX"                : { "source" : { "file" : "IX.json", "directory": "oracle19c/%mode%" },              "target" : {"schema" : "IX"}}   
 , "BI"                : { "source" : { "file" : "BI.json", "directory": "oracle19c/%mode%" },              "target" : {"schema" : "BI"}}   
-, "sakila"            : { "source" : { "file" : "sakila.json", "directory": "mysql" },          "target" : {"schema" : "sakila"}}
-, "jtest"             : { "source" : { "file" : "jsonExample.json", "directory": "mysql" },     "target" : {"schema" : "jtest"}}
-, "Northwind"         : { "source" : { "file" : "Northwind.json", "directory": "mssql"},        "target" : { "database": "Northwind",         "owner": "dbo"}}
-, "HumanResources"    : { "source" : { "file" : "HumanResources.json", "directory": "mssql"},   "target" : { "database": "AdventureWorks",    "owner": "HumanResources"}}
-, "Person"            : { "source" : { "file" : "Person.json", "directory": "mssql"},           "target" : { "database": "AdventureWorks",    "owner": "Person"}}
-, "Production"        : { "source" : { "file" : "Production.json", "directory": "mssql"},       "target" : { "database": "AdventureWorks",    "owner": "Production"}}
-, "Purchasing"        : { "source" : { "file" : "Purchasing.json", "directory": "mssql"},       "target" : { "database": "AdventureWorks",    "owner": "Purchasing"}}
-, "Sales"             : { "source" : { "file" : "Sales.json", "directory": "mssql"},            "target" : { "database": "AdventureWorks",    "owner": "Sales"}}
-, "AdventureWorksDW"  : { "source" : { "file" : "AdventureWorksDW.json", "directory": "mssql"}, "target" : { "database": "AdventureWorksDW",  "owner": "dbo"}}
-, "AdventureWorksAll" : { "source" : { "file" : "AdventureWorksDW.json", "directory": "mssql"}, "target" : { "database": "AdventureWorksDW",  "owner": "dbo"}}
+, "sakila"            : { "source" : { "file" : "sakila.json", "directory": "mysql" },          " target" : {"schema" : "sakila"}}
+, "jtest"             : { "source" : { "file" : "jsonExample.json", "directory": "mysql" },      "target" : {"schema" : "jtest"}}
+, "Northwind"         : { "source" : { "file" : "Northwind.json", "directory": "mssql"},         "target" : { "database": "Northwind",         "owner": "dbo"}}
+, "HumanResources"    : { "source" : { "file" : "HumanResources.json", "directory": "mssql"},    "target" : { "database": "AdventureWorks",    "owner": "HumanResources"}}
+, "Person"            : { "source" : { "file" : "Person.json", "directory": "mssql"},            "target" : { "database": "AdventureWorks",    "owner": "Person"}}
+, "Production"        : { "source" : { "file" : "Production.json", "directory": "mssql"},        "target" : { "database": "AdventureWorks",    "owner": "Production"}}
+, "Purchasing"        : { "source" : { "file" : "Purchasing.json", "directory": "mssql"},        "target" : { "database": "AdventureWorks",    "owner": "Purchasing"}}
+, "Sales"             : { "source" : { "file" : "Sales.json", "directory": "mssql"},             "target" : { "database": "AdventureWorks",    "owner": "Sales"}}
+, "AdventureWorksDW"  : { "source" : { "file" : "AdventureWorksDW.json", "directory": "mssql"},  "target" : { "database": "AdventureWorksDW",  "owner": "dbo"}}
+, "AdventureWorksAll" : { "source" : { "file" : "AdventureWorksAll.json", "directory": "mssql"}, "target" : { "database": "AdventureWorksAll", "owner": "dbo"}}
 , "oracle"            : [ "HR","SH","OE","PM","IX","BI" ]
 , "mysql"             : [ "sakila","jtest" ]
 , "mssql"             : [ "Northwind","HumanResources","Person","Production","Purchasing","Sales","AdventureWorksDW","AdventureWorksAll" ]

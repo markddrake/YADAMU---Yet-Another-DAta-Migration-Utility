@@ -305,11 +305,11 @@ class YadamuCLI {
         dbi = new MySQLDBI(yadamu)
         break;
       case "mariadb" :
-        const MariaDBI = require('..ariadb/node/mariaDBI.js');
+        const MariaDBI = require('../mariadb/node/mariaDBI.js');
         dbi = new MariaDBI(yadamu)
         break;
       case "mongodb" :
-        const MongoDBI = require('../mongob/node/mongoDBI.js');
+        const MongoDBI = require('../mongodb/node/mongoDBI.js');
         dbi = new MongoDBI(yadamu)
         break;
       case "snowflake" :

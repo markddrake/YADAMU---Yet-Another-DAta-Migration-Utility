@@ -79,7 +79,7 @@ class FileWriter extends YadamuDBI {
   */
   
   async initialize() {
-    super.initialize();
+    super.initialize(false);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
     const exportFilePath = path.resolve(this.parameters.FILE);
     this.outputStream = fs.createWriteStream(exportFilePath);

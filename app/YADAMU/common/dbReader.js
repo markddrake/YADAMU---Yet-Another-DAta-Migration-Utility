@@ -122,6 +122,7 @@ class DBReader extends Readable {
     try {
       switch (this.nextPhase) {
          case 'systemInformation' :
+		   await this.dbi.initializeExport();
            const systemInformation = await this.getSystemInformation(Yadamu.EXPORT_VERSION);
            // Needed in case we have to generate DDL from the system information and metadata.
            this.dbi.setSystemInformation(systemInformation);

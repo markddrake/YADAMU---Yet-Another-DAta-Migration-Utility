@@ -46,7 +46,7 @@ class YadamuQA {
         dbi = new MariaQA(this.yadamu)
         break;
       case "mongodb" :
-        const MongoQA = require('../../YADAMU/mongob/node/mongoQA.js');
+        const MongoQA = require('../../mongodb/node/mongoQA.js');
         dbi = new MongoQA(this.yadamu)
         break;
       case "snowflake" :
@@ -302,7 +302,7 @@ class YadamuQA {
 	    parameters[key] = schemaInfo.schema !== undefined ? schemaInfo.schema : (schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner)
 		parameters[key] =  this.getPrefixedSchema(schemaPrefix,parameters[key])
     }
-
+    
 	return parameters
 
   }

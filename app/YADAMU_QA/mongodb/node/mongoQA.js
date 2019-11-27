@@ -18,10 +18,7 @@ class MongoQA extends MongoDBI {
     async recreateSchema() {
 
       try {
-        if (this.status.sqlTrace) {
-           this.status.sqlTrace.write(`use ${this.parameters.TOUSER`)      
-        }
-        this.db = await this.client.db(this.parameters.TOUSER)
+        await this.useDatabase(this.parameters.TO_USER)
         if (this.status.sqlTrace) {
           this.status.sqlTrace.write(`db.dropDatabase()\n`)      
         }
@@ -29,10 +26,6 @@ class MongoQA extends MongoDBI {
       } catch (e) {
         throw e;
       }
-      if (this.status.sqlTrace) {
-         this.status.sqlTrace.write(`use ${this.parameters.TOUSER}\n`)      
-      }
-      this.db = await this.client.db(this.parameters.TOUSER)
     }
 
     async getRowCounts(target) {
