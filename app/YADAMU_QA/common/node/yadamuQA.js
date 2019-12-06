@@ -181,11 +181,8 @@ class YadamuQA {
 	}
   }
   
-
   getTargetSchema(vendor,schemaInfo,prefix) {
 	  
-	 console.log(vendor,schemaInfo,prefix)
-
     /*
 	** 
 	** Transformations
@@ -859,8 +856,6 @@ class YadamuQA {
 	const filename2 = sourcePathComponents.name + ".2" + sourcePathComponents.ext
 	const file1 = path.join(targetDirectory,filename1)
 	const file2 = path.join(targetDirectory,filename2)
-
-    console.log(operation)
 
     const sourceSchema = operation.target;
 	const targetSchema1  = this.getTargetSchema(targetDatabase,operation.target);
