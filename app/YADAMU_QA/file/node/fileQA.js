@@ -4,11 +4,11 @@ const path = require('path');
 
 const DBWriter = require('../../../YADAMU/common/dbWriter.js');
 const YadamuLogger = require('../../../YADAMU/common/yadamuLogger.js');
-const FileWriter = require('../../../YADAMU/file/node/fileWriter.js');
-const FileParser = require('../../../YADAMU/file/node/fileParser.js');
+const FileDBI = require('../../../YADAMU/file/node/fileDBI.js');
+const TextParser = require('../../../YADAMU/file/node/fileParser.js');
 const FileStatistics = require('./fileStatistics.js');
 
-class FileQA extends FileWriter {
+class FileQA extends FileDBI {
   
   sortRows(array) {
      
@@ -66,7 +66,7 @@ class FileQA extends FileWriter {
       
     const nulLogger = new YadamuLogger(fs.createWriteStream("\\\\.\\NUL"),{});
     const self = this
-    const saxParser  = new FileParser(this.yadamuLogger)
+    const saxParser  = new TextParser(this.yadamuLogger)
     let readStream
     try {
       readStream = fs.createReadStream(file);         

@@ -1,11 +1,12 @@
 "use strict"
+"use strict"
 
 const path = require('path')
 const fs = require('fs');
 const Yadamu = require('./yadamuTest.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
-const FileWriter = require('../../../YADAMU/file/node/fileWriter.js');
-const FileReader = require('../../../YADAMU/file/node/fileReader.js');
+const {ConfigurationFileError} = require('../../../YADAMU/common/yadamuError.js');
+const FileDBI = require('../../../YADAMU/file/node/fileDBI.js');
 const FileQA = require('../../file/node/fileQA.js');
 
 class YadamuQA {
@@ -57,7 +58,8 @@ class YadamuQA {
         dbi = new FileQA(this.yadamu)
         break;
       default:   
-        this.yadamuLogger.error([`${this.constructor.name}.getDatabaseInterface()`,`${driver}`],`Unknown Database.`);  
+        const err = new ConfigurationFileError(`[${this.constructor.name}.getDatabaseInterface()]: Unsupported database vendor "${driver}".`);  
+		throw err
       }
 	  
       const connectionProperties = Object.assign({},testConnection)
@@ -69,6 +71,17 @@ class YadamuQA {
 	  dbi.configureTest(recreateSchema);
       return dbi;
   }
+
+  getConnection(connectionList, connectionName) {
+   
+    const connection = connectionList[connectionName]
+    if (connection === undefined) {
+      throw new ConfigurationFileError(`Named connection "${connectionName}" not found. Valid connections: "${Object.keys(connectionList)}".`);
+	}
+    return connection;
+	
+  }
+
   
   getPrefixedSchema(prefix,schema) {
 	  
@@ -76,7 +89,6 @@ class YadamuQA {
 	 
   }
  
-
   getSourceSchema(vendor,schemaInfo,prefix) {
 
     /*
@@ -171,6 +183,8 @@ class YadamuQA {
   
 
   getTargetSchema(vendor,schemaInfo,prefix) {
+	  
+	 console.log(vendor,schemaInfo,prefix)
 
     /*
 	** 
@@ -716,8 +730,8 @@ class YadamuQA {
 	
 	const sourceConnectionName = test.source
 
-    const sourceConnectionInfo = configuration.connections[sourceConnectionName]
-    const targetConnectionInfo = configuration.connections[targetConnectionName]
+    const sourceConnectionInfo = this.getConnection(configuration.connections,sourceConnectionName)
+    const targetConnectionInfo = this.getConnection(configuration.connections,targetConnectionName)
 
     const sourceDatabase =  Object.keys(sourceConnectionInfo)[0];
     const targetDatabase =  Object.keys(targetConnectionInfo)[0];
@@ -825,8 +839,8 @@ class YadamuQA {
 	
 	const sourceConnectionName = test.source
 
-    const sourceConnectionInfo = configuration.connections[sourceConnectionName]
-    const targetConnectionInfo = configuration.connections[targetConnectionName]
+    const sourceConnectionInfo = this.getConnection(configuration.connections,sourceConnectionName)
+    const targetConnectionInfo = this.getConnection(configuration.connections,targetConnectionName)
 
     const sourceDatabase =  Object.keys(sourceConnectionInfo)[0];
     const targetDatabase =  Object.keys(targetConnectionInfo)[0];
@@ -845,6 +859,8 @@ class YadamuQA {
 	const filename2 = sourcePathComponents.name + ".2" + sourcePathComponents.ext
 	const file1 = path.join(targetDirectory,filename1)
 	const file2 = path.join(targetDirectory,filename2)
+
+    console.log(operation)
 
     const sourceSchema = operation.target;
 	const targetSchema1  = this.getTargetSchema(targetDatabase,operation.target);
@@ -873,7 +889,7 @@ class YadamuQA {
 	
 	let sourceParameters  = Object.assign({},parameters)
 	sourceParameters.FILE = sourceFile
-    let fileReader = new FileReader(this.yadamu);
+    let fileReader = new FileDBI(this.yadamu);
 	fileReader.setParameters(sourceParameters);
     let sourceDescription = this.getDescription(sourceDatabase,operation.source)  
 
@@ -919,7 +935,7 @@ class YadamuQA {
 
 	targetParameters  = Object.assign({},parameters)
 	targetParameters.FILE = file1;
-    let fileWriter = new FileWriter(this.yadamu);
+    let fileWriter = new FileDBI(this.yadamu);
 	fileWriter.setParameters(targetParameters);
 	fileWriter.setTableMappings(tableMappings)
     targetDescription = this.getDescription(sourceDatabase,{"file" : filename1})  
@@ -933,7 +949,7 @@ class YadamuQA {
 	
 	sourceParameters  = Object.assign({},parameters)
 	sourceParameters.FILE = file1;
-    fileReader = new FileReader(this.yadamu);
+    fileReader = new FileDBI(this.yadamu);
 	fileReader.setParameters(sourceParameters);
     sourceDescription = this.getDescription(sourceDatabase,{"file" : filename1})  
 
@@ -974,7 +990,7 @@ class YadamuQA {
 
 	targetParameters  = Object.assign({},parameters)
 	targetParameters.FILE = file2;
-    fileWriter = new FileWriter(this.yadamu);
+    fileWriter = new FileDBI(this.yadamu);
 	fileWriter.setParameters(targetParameters);
 	fileWriter.setTableMappings(tableMappings)
     targetDescription = this.getDescription(sourceDatabase,{"file" : filename2})  
@@ -998,8 +1014,8 @@ class YadamuQA {
 	
 	const sourceConnectionName = test.source
 		
-    const sourceConnectionInfo = configuration.connections[sourceConnectionName]
-    const targetConnectionInfo = configuration.connections[targetConnectionName]
+    const sourceConnectionInfo = this.getConnection(configuration.connections,sourceConnectionName)
+    const targetConnectionInfo = this.getConnection(configuration.connections,targetConnectionName)
 
     const sourceDatabase =  Object.keys(sourceConnectionInfo)[0];
     const targetDatabase =  Object.keys(targetConnectionInfo)[0];
@@ -1015,7 +1031,7 @@ class YadamuQA {
 	const sourceParameters  = Object.assign({},parameters)
     const sourceFile = path.join(sourceConnection.directory.replace('%source%',targetConnectionName).replace('%vendor%',targetDatabase).replace('%mode%',parameters.MODE),operation.source.file)
 	sourceParameters.FILE = sourceFile
-    const fileReader = new FileReader(this.yadamu);
+    const fileReader = new FileDBI(this.yadamu);
 	fileReader.setParameters(sourceParameters);
 
     const targetParameters  = Object.assign({},parameters)
@@ -1055,8 +1071,8 @@ class YadamuQA {
 
 	const sourceConnectionName = test.source
 	
-    const sourceConnectionInfo = configuration.connections[sourceConnectionName]
-    const targetConnectionInfo = configuration.connections[targetConnectionName]
+    const sourceConnectionInfo = this.getConnection(configuration.connections,sourceConnectionName)
+    const targetConnectionInfo = this.getConnection(configuration.connections,targetConnectionName)
 
     const sourceDatabase =  Object.keys(sourceConnectionInfo)[0];
     const targetDatabase =  Object.keys(targetConnectionInfo)[0];
@@ -1074,7 +1090,7 @@ class YadamuQA {
 	const targetParameters  = Object.assign({},parameters)
     const targetFile = path.join(targetConnection.directory.replace('%source%',sourceConnectionName).replace('%vendor%',sourceDatabase).replace('%mode%',parameters.MODE),operation.target.file)
 	targetParameters.FILE = targetFile
-    const fileWriter = new FileWriter(this.yadamu);
+    const fileWriter = new FileDBI(this.yadamu);
 	fileWriter.setParameters(targetParameters);
 	
 	const startTime = new Date().getTime();
@@ -1086,7 +1102,7 @@ class YadamuQA {
 	if (operation.verify) {
       const sourceParameters  = Object.assign({},parameters)
       sourceParameters.FILE = targetFile
-	  const fileReader = new FileReader(this.yadamu);
+	  const fileReader = new FileDBI(this.yadamu);
 	  fileReader.setParameters(sourceParameters);
 	  
   	  const targetParameters  = Object.assign({},parameters)
@@ -1119,14 +1135,14 @@ class YadamuQA {
 	    else {
 		  const taskList = configuration.tasks[task]
 	 	  if (taskList === undefined) {
-		    throw new Error(`Named task "${task}" not defined. Currently known tasks: "${Object.keys(configuration.tasks)}".`);
+		    throw new ConfigurationFileError(`Named task "${task}" not defined. Valid values: "${Object.keys(configuration.tasks)}".`);
 	      }
 		  this.expandedTaskList[task] = [taskList]
 	    }
 	  }
 	  const taskList = this.expandedTaskList[task]
 	  if (taskList === undefined) {
-        throw new Error(`Named task "${task}" not defined. Currently known tasks: "${Object.keys(configuration.tasks)}".`);
+        throw new ConfigurationFileError(`Named task "${task}" not defined. Currently known tasks: "${Object.keys(configuration.tasks)}".`);
 	  }
 	  return taskList
     }

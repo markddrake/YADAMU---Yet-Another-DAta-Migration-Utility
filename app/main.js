@@ -7,8 +7,7 @@ const LogWriter = require('./YADAMU_UI/node/logWriter.js');
 const YadamuLibrary = require('./YADAMU/common/yadamuLibrary.js');
 const Yadamu = require('./YADAMU/common/yadamu.js')
 const YadamuGUI = require('./YADAMU/common/yadamuGUI.js')
-const FileReader = require('./YADAMU/file/node/fileReader.js');
-const FileWriter = require('./YADAMU/file/node/fileWriter.js');
+const FileDBI = require('./YADAMU/file/node/fileDBI.js');
 
 let sourceDBI = undefined
 let targetDBI = undefined;
@@ -271,7 +270,7 @@ ipcMain.on('target-mariadb', async function (event, connectionProps, parameters)
 })
 
 function setFileReader(parameters) {
-  const fileReader = new FileReader(yadamu);
+  const fileReader = new FileDBI(yadamu);
   fileReader.setParameters(parameters);
   return fileReader;
 }
@@ -281,7 +280,7 @@ ipcMain.on('source-filename',function (event, parameters) {
 })
 
 function setFileWriter(parameters) {
-  const fileWriter = new FileWriter(yadamu);
+  const fileWriter = new FileDBI(yadamu);
   fileWriter.setParameters(parameters);
   return fileWriter;
 }

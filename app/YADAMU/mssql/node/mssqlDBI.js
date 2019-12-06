@@ -506,19 +506,7 @@ class MSSQLDBI extends YadamuDBI {
   ** The following methods are used by the YADAMU DBReader class
   **
   */
-  
-  async initializeExport() {
-  }
-  
-  /*
-  **
-  ** The following methods are used by the YADAMU DBWriter class
-  **
-  */
-  
-  async initializeImport() {
-  }
-  
+    
   async generateStatementCache(schema, executeDDL) {
     /* ### OVERRIDE ### Pass additional parameter Database Name */
     const statementGenerator = new StatementGenerator(this, schema, this.metadata, this.systemInformation.spatialFormat, this.batchSize, this.commitSize, this.status, this.yadamuLogger);

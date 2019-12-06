@@ -12,8 +12,7 @@ class TableWriter extends YadamuWriter {
   }
 
   async appendRow(row) {
-    this.tableInfo.sourceDataTypes.forEach(function(sourceDataType,idx) {
-      const dataType = this.dbi.decomposeDataType(sourceDataType);
+    this.tableInfo.dataTypes.forEach(function(dataType,idx) {
       if (row[idx] !== null) {
         switch (dataType.type) {
           case '"MDSYS"."SDO_GEOMETRY"':

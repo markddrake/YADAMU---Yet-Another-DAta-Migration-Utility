@@ -5,7 +5,7 @@
 , "PM"                : { "source" : { "file" : "PM.json", "directory": "oracle19c/%mode%" },              "target" : {"schema" : "PM"}}
 , "IX"                : { "source" : { "file" : "IX.json", "directory": "oracle19c/%mode%" },              "target" : {"schema" : "IX"}}   
 , "BI"                : { "source" : { "file" : "BI.json", "directory": "oracle19c/%mode%" },              "target" : {"schema" : "BI"}}   
-, "sakila"            : { "source" : { "file" : "sakila.json", "directory": "mysql" },          " target" : {"schema" : "sakila"}}
+, "sakila"            : { "source" : { "file" : "sakila.json", "directory": "mysql" },           "target" : {"schema" : "sakila"}}
 , "jtest"             : { "source" : { "file" : "jsonExample.json", "directory": "mysql" },      "target" : {"schema" : "jtest"}}
 , "Northwind"         : { "source" : { "file" : "Northwind.json", "directory": "mssql"},         "target" : { "database": "Northwind",         "owner": "dbo"}}
 , "HumanResources"    : { "source" : { "file" : "HumanResources.json", "directory": "mssql"},    "target" : { "database": "AdventureWorks",    "owner": "HumanResources"}}

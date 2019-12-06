@@ -27,7 +27,10 @@
    ,"READ_KEEP_ALIVE"         : 10000
   }
 , "oracle"                    : {
-    "LOB_CACHE_SIZE"          : 1024
+    "BATCH_LOB_COUNT"         : 1024
+  , "LOB_MIN_SIZE"            : 32768
+  , "LOB_MAX_SIZE"            : 16777216
+  , "LOB_CACHE_COUNT"         : 50000
   }
 , "postgres"                  : {
   }

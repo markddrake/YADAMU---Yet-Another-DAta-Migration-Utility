@@ -37,6 +37,7 @@ class FileStatistics {
   async finalize() {
     return {}    
   }
+
   /*
   **
   **  Abort the database connection.
@@ -44,6 +45,24 @@ class FileStatistics {
   */
 
   async abort() {
+  }
+
+  async initializeExport() {
+  }
+
+  async finalizeExport() {
+  }
+
+  async initializeImport() {
+  }
+
+  async initializeData() {
+  }
+
+  async finalizeData() {
+  }
+
+  async finalizeImport() {
   }
 
   /*
@@ -148,9 +167,6 @@ class FileStatistics {
     return false;
   }
 
-  async finalizeDataLoad() {
-  }  
-
   async appendRow(row) { 
 
     this.tableInfo[this.tableName].rowCount++;
@@ -163,17 +179,6 @@ class FileStatistics {
     }
   }    
 
-  async initializeExport() {
-  }
-
-  async finalizeExport() {
-  }
-
-  async initializeImport() {
-  }
-
-  async finalizeImport() {
-  }
 }
 
 module.exports = FileStatistics

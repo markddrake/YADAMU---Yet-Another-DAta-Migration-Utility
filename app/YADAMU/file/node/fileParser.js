@@ -118,7 +118,7 @@ class TextParser extends Transform {
     });
       
     this.parser.on('closeobject',
-    async function () {
+    function () {
       // self.yadamuLogger.trace([`${self.constructor.this}.onCloseObject()`,`${self.jDepth}`],`\nObjectStack: ${self.objectStack}\nCurrentObject: ${self.currentObject}`);           
       self.jDepth--;
 
@@ -168,9 +168,11 @@ class TextParser extends Transform {
       switch (self.jDepth){
         case 1:
           // Push the completed first level object/array downstream. Replace the current top level object with an empty object of the same type.
-          self.push(self.currentObject);
+		  const key = self.objectStack.pop()
+          self.objectStack.pop()
+          self.push({[key]: self.currentObject});
           self.currentObject = [];
-          break;
+         break;
         case 2:
           if (self.dataPhase) {
             self.tableList.delete(self.currentTable);

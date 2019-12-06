@@ -6,9 +6,9 @@ const path = require('path');
 const Yadamu = require('./yadamu.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuLogger = require('./yadamuLogger.js');
+const {YadamuError, CommandLineError} = require('./yadamuError.js');
 
-const FileWriter = require('../file/node/fileWriter.js');
-const FileReader = require('../file/node/fileReader.js');
+const FileDBI = require('../file/node/fileDBI.js');
 
 const CHECK_SWITCH = ['YADAMUCLI' , 'YADAMUCMD', 'YADAMUGUI']
 
@@ -29,6 +29,17 @@ const SUPPORTED_ARGUMENTS = {
 , "COPY"      : ['COPY']
 , "TEST"      : ['TEST']
 }
+
+const REQUIRED_ARGUMENTS = {
+  "YADAMUCMD" : []
+, "YADAMUGUI" : []
+, "YADAMUCLI" : []
+, "IMPORT" : ['TO_USER']
+, "EXPORT" : ['FROM_USER']
+, "COPY"   : ['CONFIG']
+, "TEST"   : ['CONFIG']
+}
+
 const UNSUPPORTED_ARGUMENTS = {
   "YADAMUCLI" : ['FILE','CONFIG','CONFIGURATION']
 , "YADAMUCMD" : ['FILE','CONFIG','CONFIGURATION']
@@ -104,15 +115,25 @@ class YadamuCLI {
   	      operation = op
 		}
 		else {
-	      const err = new Error(`Conflicting operations: Please specify just one of ${JSON.stringify(validSwitches)} on the command line`)
+	      const err = new CommandLineError(`Conflicting operations: Please specify just one of ${JSON.stringify(validSwitches)} on the command line`)
 	      throw err;
 	    }
 	  }
     }
 	
-	this.command = operation;
-
-	/*
+	if (operation !== undefined) {
+	  const requiredArguments = REQUIRED_ARGUMENTS[operation];
+	  for (const argument of requiredArguments) {
+	    if (this.parameters[argument] === undefined) {
+		  const err = new CommandLineError(`["${operation}" requires that the following arguments ${JSON.stringify(requiredArguments)} be provided on the command line`)
+          throw err
+	    }
+	  }
+      this.command = operation;
+	}
+	
+	
+    /*
 
     if ((cmdLineOperation === undefined )  && (operation !== 'YADAMUGUI')) {
       const err = new Error(`[${operation}] requires one of the following arguments" ${JSON.stringify(validSwitches)} be specified on the command line`)
@@ -317,7 +338,7 @@ class YadamuCLI {
         dbi = new SnowflakeDBI(yadamu)
         break;
       case "file" :
-        dbi = new FileReader(yadamu)
+        dbi = new FileDBI(yadamu)
         break;
       default:   
         this.yadamuLogger.log([`${this.constructor.name}.getDatabaseInterface()`,`${driver}`],`Unknown Database.`);  

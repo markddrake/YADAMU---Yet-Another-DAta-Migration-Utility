@@ -20,8 +20,7 @@ class TableWriter extends YadamuWriter {
   }
   
   async appendRow(row) {
-    this.tableInfo.targetDataTypes.forEach(async function(targetDataType,idx) {
-      const dataType = this.dbi.decomposeDataType(targetDataType);
+    this.tableInfo.dataTypes.forEach(async function(dataType,idx) {
       if (row[idx] !== null) {
         switch (dataType.type) {
           case "bit" :

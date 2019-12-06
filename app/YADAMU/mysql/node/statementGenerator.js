@@ -27,12 +27,13 @@ class StatementGenerator {
       const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map(function(table,idx) {
         const tableInfo = statementCache[this.metadata[table].tableName];
+        tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.targetDataTypes);
         tableInfo.batchSize = this.batchSize;
         tableInfo.commitSize = this.commitSize;
         tableInfo.spatialFormat = this.spatialFormat
         tableInfo.insertMode = 'Batch';
         const columnNames = JSON.parse('[' + this.metadata[table].columns + ']');
-        
+		 
         const setOperators = tableInfo.targetDataTypes.map(function(targetDataType,idx) {
            switch (targetDataType) {
              case 'geometry':

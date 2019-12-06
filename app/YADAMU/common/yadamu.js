@@ -6,8 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
   
-const FileWriter = require('../file/node/fileWriter.js');
-const FileReader = require('../file/node/fileReader.js');
+const FileDBI = require('../file/node/fileDBI.js');
 const DBReader = require('./dbReader.js');
 const DBWriter = require('./dbWriter.js');
 const YadamuLogger = require('./yadamuLogger.js');
@@ -305,6 +304,15 @@ class Yadamu {
           case '--SQL_TRACE':
             parameters.SQL_TRACE = parameterValue;
             break;
+          case 'PERF_TRACE':
+          case '--PERF_TRACE':
+		  case 'PERFORMANCE_TRACE':
+          case '--PERFORMANCE_TRACE':
+            parameters.PERFORMANCE_TRACE = parameterValue;
+            break;
+                    case '--SQL_TRACE':
+            parameters.SQL_TRACE = parameterValue;
+            break;
           case 'PARAMETER_TRACE':
           case '--PARAMETER_TRACE':
             parameters.PARAMETER_TRACE = (parameterValue.toLowerCase() === 'true');
@@ -337,8 +345,8 @@ class Yadamu {
           case '--BATCH_COMMIT':
             Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
-          case 'LOB_CACHE_SIZE':
-          case '--LOB_CACHE_SIZE':
+          case 'BATCH_LOB_COUNT':
+          case '--BATCH_LOB_COUNT':
             Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           default:
@@ -368,8 +376,9 @@ class Yadamu {
 
   }
 
-  getDBReader(dbi) {
+  async getDBReader(dbi) {
     const dbReader = new DBReader(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
+	await dbReader.initialize();
     return dbReader;
   }
   
@@ -389,14 +398,13 @@ class Yadamu {
       await target.initialize();
       const dbReader = await this.getDBReader(source)
       const dbWriter = await this.getDBWriter(target)  
-      dbReader.setOutputStream(dbWriter);
+	  const inputStream = dbReader.getReader();
       const copyOperation = new Promise(function (resolve,reject) {
         try {
-          const reader = dbReader.getReader();
           dbWriter.on('finish', function(){resolve()})
           dbWriter.on('error',function(err){self.yadamuLogger.logException([`${dbWriter.constructor.name}.onError()`],err);reject(err)})
-          reader.on('error',function(err){self.yadamuLogger.logException([`${reader.constructor.name}.onError()`],err);reject(err)})
-          reader.pipe(dbWriter);
+          inputStream.on('error',function(err){self.yadamuLogger.logException([`${inputStream.constructor.name}.onError()`],err);reject(err)})
+          inputStream.pipe(dbWriter);
         } catch (err) {
           self.yadamuLogger.logException([`${self.constructor.name}.onError()`],err)
           reject(err);
@@ -444,14 +452,14 @@ class Yadamu {
   }
   
   async doImport(dbi) {
-    const fileReader = new FileReader(this)
+    const fileReader = new FileDBI(this)
     const timings = await this.pumpData(fileReader,dbi);
     await this.close();
     return timings
   }  
  
   async doExport(dbi) {
-    const fileWriter = new FileWriter(this)
+    const fileWriter = new FileDBI(this)
     const timings = await this.pumpData(dbi,fileWriter);
     await this.close();
     return timings
@@ -465,9 +473,9 @@ class Yadamu {
   
   async cloneFile(pathToFile) {
 
-    const fileReader = new FileReader(this)
-    const fileWriter = new fileWriter(this)
-    const timings = await this.pumpData(fileReader,FileWriter);
+    const fileReader = new FileDBI(this)
+    const fileWriter = new fileDBI(this)
+    const timings = await this.pumpData(fileReader,fileWriter);
     await this.close();
     return timings
   }

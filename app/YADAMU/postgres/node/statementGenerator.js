@@ -31,13 +31,13 @@ class StatementGenerator {
       const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map(function(table,idx) {
         const tableInfo = statementCache[this.metadata[table].tableName];
+        tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.targetDataTypes);
         const maxBatchSize = Math.trunc(45000 / tableInfo.targetDataTypes.length);
         tableInfo.batchSize = this.batchSize > maxBatchSize ? maxBatchSize : this.batchSize
         tableInfo.commitSize = this.commitSize
 
         tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('select ')-1) + '\nvalues ';        
-        tableInfo.insertOperators = tableInfo.targetDataTypes.map(function(targetDataType) {
-          const dataType = this.dbi.decomposeDataType(targetDataType);
+        tableInfo.insertOperators = tableInfo.dataTypes.map(function(dataType) {
           switch (dataType.type) {
             case "geography":
             case "geometry":
@@ -64,7 +64,7 @@ class StatementGenerator {
         },this)
         return tableInfo.ddl
       },this);
-    
+	  	  
       if (executeDDL === true) {
         await this.dbi.executeDDL(ddlStatements);
       }

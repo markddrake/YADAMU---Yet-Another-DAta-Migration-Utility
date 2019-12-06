@@ -74,6 +74,12 @@ class MongoDBI extends YadamuDBI {
       })
     })
   }
+  
+  initializeImport() {
+  }
+  
+  initializeExport() {
+  }
                                                                     ;
   async executeDDL(collectionList) {
            
@@ -351,13 +357,13 @@ class MongoDBI extends YadamuDBI {
         if (results[idx].length === 0) {
           // Empty Collection
           schemaInfo[idx].columns =  ["JSON_DATA"]
-          schemaInfo[idx].dataTypes = ["JSON"];
+          schemaInfo[idx].jsonDataTypes = ["JSON"];
           schemaInfo[idx].sizeConstraints = [""] 
         }
         else {
           const metadata = results[idx][0].value
           schemaInfo[idx].columns =  metadata.key
-          schemaInfo[idx].dataTypes = metadata.types
+          schemaInfo[idx].jsonDataTypes = metadata.types
           schemaInfo[idx].sizeConstraints = metadata.sizes
         }
       },this)
@@ -366,7 +372,7 @@ class MongoDBI extends YadamuDBI {
       schemaInfo.forEach(function(collection,idx) {
         schemaInfo[idx].TABLE_NAME =  collection.name
         schemaInfo[idx].columns =  ["JSON_DATA"];
-        schemaInfo[idx].dataTypes =  ["JSON"];
+        schemaInfo[idx].jsonDataTypes =  ["JSON"];
         schemaInfo[idx].sizeConstraints = [""] ;
       },this)
     } 
@@ -381,14 +387,14 @@ class MongoDBI extends YadamuDBI {
         const idx = collection.columns.indexOf('_id');
         if (idx > -1) {
           collection.columns.splice(idx,1);
-          collection.dataTypes.splice(idx,1);
+          collection.jsonDataTypes.splice(idx,1);
           collection.sizeConstraints.splice(idx,1);
         }
       }
       const tableMetadata =  {
         tableName       : collection.TABLE_NAME
        ,columns         : '"' + collection.columns.join('","') + '"'
-       ,dataTypes       : collection.dataTypes
+       ,dataTypes       : collection.jsonDataTypes
        ,sizeConstraints : collection.sizeConstraints
       } 
       metadata[collection.name] = tableMetadata

@@ -106,13 +106,13 @@
       "oracle"
     ]
   },{
-    "source": "mysql#1"
-  , "target": "file#2"
+    "source": "oracle11g"
+  , "target": "file#1"
   , "parameters": {
-      "MODE": "DATA_ONLY"
+      "MODE": "DDL_AND_DATA"
     }
   , "tasks": [
-      "mysql"
+      "oracle"
     ]
   },{
     "source": "mssql#1"
@@ -147,6 +147,15 @@
     }
   , "tasks": [
       "AdventureWorksAll"
+    ]
+  },{
+    "source": "mysql#1"
+  , "target": "file#2"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+      "mysql"
     ]
   }]
 }  

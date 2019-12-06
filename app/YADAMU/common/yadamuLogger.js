@@ -71,11 +71,14 @@ class YadamuLogger {
   closeStream() {
   
     const self = this
-
-    return new Promise(function(resolve,reject) {
-      self.os.on('finish',function() { resolve() });
-      self.os.close();
-    })
+	
+	if (self.os.close) { 
+      return new Promise(function(resolve,reject) {
+        self.os.on('finish',function() { resolve() });
+        self.os.close();
+      })
+	}
+	
   }
   
   async close() {

@@ -2,6 +2,7 @@
 
 const YadamuCLI = require('./yadamuCLI.js')
 const Yadamu = require('./yadamu.js')
+const {CommandLineError} = require('./yadamuError.js');
 
 class Import extends YadamuCLI {
 
@@ -18,7 +19,12 @@ async function main() {
     yadamuLogger.close(); 
     yadamu.close()  
   } catch (e) {
-    console.log(e);
+	if (e instanceof CommandLineError) {
+      console.log(e.message);
+	}
+	else {
+      console.log(e);
+	}
   }
   
 }

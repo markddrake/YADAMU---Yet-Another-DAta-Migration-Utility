@@ -288,6 +288,7 @@ class StatementGenerator {
     const ddlStatements = tables.map(function(table,idx) {
       const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);
+	  tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.sourceDataTypes);
       statementCache[this.metadata[table].tableName] = tableInfo;
       return tableInfo.ddl;
     },this)

@@ -33,7 +33,7 @@ class TableWriter extends YadamuWriter {
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
     
-    if ((this.tableInfo.dataTypes.length === 1) && (this.tableInfo.dataTypes[0] === 'JSON')) {
+    if ((this.tableInfo.sourceDataTypes.length === 1) && (this.tableInfo.sourceDataTypes[0] === 'JSON')) {
       this.insertMode = 'DOCUMENT_MODE'
     }
     else {
@@ -54,8 +54,7 @@ class TableWriter extends YadamuWriter {
       
     // Convert to GeoJSON
     
-    this.tableInfo.dataTypes.forEach(function(sourceDataType,idx) {
-      const dataType = this.dbi.decomposeDataType(sourceDataType);
+    this.tableInfo.dataTypes.forEach(function(dataType,idx) {
       if (row[idx] !== null) {
         switch (dataType.type) {
           case '"MDSYS"."SDO_GEOMETRY"':

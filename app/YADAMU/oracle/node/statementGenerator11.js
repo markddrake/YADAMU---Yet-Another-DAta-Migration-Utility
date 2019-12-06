@@ -12,10 +12,10 @@ class StatementGenerator11 extends StatementGenerator {
   // I know.... Attmpting to build XML via string concatenation will end in tears...
 
   
-  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize, lobCacheSize, importWrapper) {
-    super(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize, lobCacheSize)
+  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize, importWrapper) {
+    super(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize)
     this.importWapper = importWrapper
-    this.mappinhgs = {}
+    this.mappings = {}
   }
     
   generateDDL(targetSchema,tableName,dml,columns,declararions,assignments,variables){

@@ -33,8 +33,7 @@ class TableWriter extends YadamuWriter {
       
     // Batch Mode : Create one large array. Iterative Mode : Create an Array of Arrays.    
       
-    this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
-      const dataType = this.dbi.decomposeDataType(targetDataType);
+    this.tableInfo.dataTypes.forEach(function(dataType,idx) {
       if (row[idx] !== null) {
         switch (dataType.type) {
           case "tinyblob" :

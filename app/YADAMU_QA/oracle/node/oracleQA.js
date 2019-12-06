@@ -22,7 +22,9 @@ const sqlFailed =
 
 const sqlGatherSchemaStats = `begin dbms_stats.gather_schema_stats(ownname => :target); end;`;
 
-const sqlSchemaTableRows = `select TABLE_NAME, NUM_ROWS from ALL_TABLES where OWNER = :target`;
+// LEFT Join works in 11.x databases where 'EXTERNAL' column does not exist in ALL_TABLES
+
+const sqlSchemaTableRows = `select att.TABLE_NAME, NUM_ROWS from ALL_TABLES att LEFT JOIN ALL_EXTERNAL_TABlES axt on att.OWNER = axt.OWNER and att.TABLE_NAME = axt.TABLE_NAME where att.OWNER = :target and axt.OWNER is NULL and SECONDARY = 'N'`;
 
 const sqlCompareSchemas = `begin YADAMU_TEST.COMPARE_SCHEMAS(:source,:target,:maxTimestampPrecision); end;`;
 

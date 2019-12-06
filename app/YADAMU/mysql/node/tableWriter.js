@@ -19,8 +19,7 @@ class TableWriter extends YadamuWriter {
   }
 
   async appendRow(row) {
-    this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
-      const dataType = this.dbi.decomposeDataType(targetDataType);
+    this.tableInfo.dataTypes.forEach(function(dataType,idx) {
       if (row[idx] !== null) {
         switch (dataType.type) {
           case "tinyblob" :
@@ -91,8 +90,7 @@ class TableWriter extends YadamuWriter {
       return false;
     }
       
-    const newRow = this.tableInfo.targetDataTypes.map(function(targetDataType,idx) {
-      const dataType = this.dbi.decomposeDataType(targetDataType);
+    const newRow = this.tableInfo.dataTypes.map(function(dataType,idx) {
       switch (dataType.type) {
         case "geography":
         case "geometry": 

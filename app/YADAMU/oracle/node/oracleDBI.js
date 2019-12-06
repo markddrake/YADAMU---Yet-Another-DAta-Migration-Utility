@@ -204,12 +204,12 @@ begin
 
   for t in heirachicalTableList(V_SCHEMA) loop
     V_RESULT.extend(1);
-    V_RESULT(V_RESULT.COUNT) := YADAMU_UTILITIES.KVC(NULL,'begin DBMS_XDBZ.ENABLE_HIERARCHY(SYS_CONTEXT(''USERENV'',''CURRENT_SCHEMA''),''' || t.TABLE_NAME  || '''); END;');
+    V_RESULT(V_RESULT.COUNT) := YADAMU_UTILITIES.KVC(NULL,'begin DBMS_XDBZ.ENABLE_HIERARCHY(SYS_CONTEXT(''USERENV'',''CURRENT_SCHEMA''),''' || t.TABLE_NAME  || '''); end;');
   end loop;
 
   for i in indexedColumnList(V_SCHEMA) loop
     V_RESULT.extend(1);
-    V_RESULT(V_RESULT.COUNT) := YADAMU_UTILITIES.KVC(NULL,'BEGIN YADAMU_EXPORT_DDL.RENAME_INDEX(''' || i.TABLE_NAME  || ''',''' || i.INDEXED_EXPORT_SELECT_LIST || ''',''' || i.INDEX_NAME || '''); END;');
+    V_RESULT(V_RESULT.COUNT) := YADAMU_UTILITIES.KVC(NULL,'begin YADAMU_EXPORT_DDL.RENAME_INDEX(''' || i.TABLE_NAME  || ''',''' || i.INDEXED_EXPORT_SELECT_LIST || ''',''' || i.INDEX_NAME || '''); end;');
   end loop;
 
   :V2 := YADAMU_UTILITIES.JSON_ARRAY_CLOB(V_RESULT);
@@ -343,11 +343,11 @@ begin
   -- Renable the heirarchy for any heirachically enabled tables in the export file
 
   for t in heirachicalTableList(V_SCHEMA) loop
-    V_RESULT.APPEND('begin DBMS_XDBZ.ENABLE_HIERARCHY(SYS_CONTEXT(''USERENV'',''CURRENT_SCHEMA''),''' || t.TABLE_NAME  || '''); END;');
+    V_RESULT.APPEND('begin DBMS_XDBZ.ENABLE_HIERARCHY(SYS_CONTEXT(''USERENV'',''CURRENT_SCHEMA''),''' || t.TABLE_NAME  || '''); end;');
   end loop;
 
   for i in indexedColumnList(V_SCHEMA) loop
-    V_RESULT.APPEND('BEGIN YADAMU_EXPORT_DDL.RENAME_INDEX(''' || i.TABLE_NAME  || ''',''' || i.INDEXED_EXPORT_SELECT_LIST || ''',''' || i.INDEX_NAME || '''); END;');
+    V_RESULT.APPEND('begin YADAMU_EXPORT_DDL.RENAME_INDEX(''' || i.TABLE_NAME  || ''',''' || i.INDEXED_EXPORT_SELECT_LIST || ''',''' || i.INDEX_NAME || '''); end;');
   end loop;
 
   :V2 :=  V_RESULT.to_CLOB();
@@ -654,7 +654,7 @@ class OracleDBI extends YadamuDBI {
        status.sqlTrace.write(`${sqlStatement}\n/\n`);
     }
     result = await conn.execute(sqlStatement);
-    sqlStatement = `BEGIN :version := YADAMU_EXPORT.DATABASE_RELEASE(); END;`;
+    sqlStatement = `begin :version := YADAMU_EXPORT.DATABASE_RELEASE(); end;`;
     let args = {version:{dir: oracledb.BIND_OUT, type: oracledb.STRING}}
     if (status.sqlTrace) {
        status.sqlTrace.write(`${sqlStatement}\n/\n`);
@@ -662,7 +662,7 @@ class OracleDBI extends YadamuDBI {
     result = await conn.execute(sqlStatement,args);
     this.dbVersion = parseFloat(result.outBinds.version);
 
-    sqlStatement = `BEGIN :size := JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE; END;`;
+    sqlStatement = `begin :size := JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE; end;`;
     args = {size:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER}}
     if (status.sqlTrace) {
        status.sqlTrace.write(`${sqlStatement}\n/\n`);
@@ -671,8 +671,16 @@ class OracleDBI extends YadamuDBI {
     this.maxStringSize = result.outBinds.size;
     
     if (this.maxStringSize < 32768) {
-      this.yadamuLogger.info([`${this.constructor.name}.configureConnection()`],`Maximum VARCHAR2 size is ${this.maxStringSize}.`)
+      this.yadamuLogger.info([`${this.constructor.name}.configureConnection()`],`Maximum VARCHAR2 size for JSON operations is ${this.maxStringSize}.`)
     }    
+	
+	if (this.dbVersion < 12) {
+	  if (this.parameters.LOB_MIN_SIZE > 4000) {
+		this.parameters.LOB_MIN_SIZE=4000
+        this.yadamuLogger.info([`${this.constructor.name}.configureConnection()`],`Oracle version ${this.dbVersion}. Parameter LOB_MIN_SIZE reset to ${this.parameters.LOB_MIN_SIZE}.`)
+	  }
+    }	  
+
   }    
   
   async getConnectionFromPool(pool,status) {
@@ -727,14 +735,15 @@ class OracleDBI extends YadamuDBI {
   **
   */
 
-  async executeMany(sqlStatement,args,binds) {
+  async executeMany(sqlStatement,rows,binds) {
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement}\n/\n`);
-    }
-    
-    const results = await this.connection.executeMany(sqlStatement,args,binds);
-    return results;
+    if (rows.length > 0) {
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(`--\n-- Bulk Operation: ${rows.length} records.\n--\n${sqlStatement}\n/\n`);
+      }
+      const results = await this.connection.executeMany(sqlStatement,rows,binds);
+      return results;
+	}
   }
 
   async disableConstraints() {
@@ -757,7 +766,7 @@ class OracleDBI extends YadamuDBI {
   
   async refreshMaterializedViews() {
       
-    await this.setCurrentSchema(this.parameters.TO_USER);
+	// await this.setCurrentSchema(this.parameters.TO_USER);
     const sqlStatement = `begin :log := YADAMU_IMPORT.REFRESH_MATERIALIZED_VIEWS(:schema); end;`;
     const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH} , schema:this.parameters.TO_USER}     
     const results = await this.executeSQL(sqlStatement,args)
@@ -815,25 +824,25 @@ class OracleDBI extends YadamuDBI {
   }
   
   async applyDDL(ddl,sourceSchema,targetSchema) {
-      
-     await this.setCurrentSchema(this.parameters.TO_USER);
+
+    // await this.setCurrentSchema(this.parameters.TO_USER);
+	
+    let sqlStatement = `declare V_ABORT BOOLEAN;begin V_ABORT := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENT(:statement,:sourceSchema,:targetSchema); :abort := case when V_ABORT then 1 else 0 end; end;`; 
+    let args = {abort:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER} , statement:{type: oracledb.CLOB, maxSize: LOB_STRING_MAX_LENGTH, val:null}, sourceSchema:sourceSchema, targetSchema:this.parameters.TO_USER};
      
-     let sqlStatement = `declare V_ABORT BOOLEAN;begin V_ABORT := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENT(:statement,:sourceSchema,:targetSchema); :abort := case when V_ABORT then 1 else 0 end; end;`; 
-     let args = {abort:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER} , statement:{type: oracledb.CLOB, maxSize: LOB_STRING_MAX_LENGTH, val:null}, sourceSchema:sourceSchema, targetSchema:this.parameters.TO_USER};
-     
-     for (const ddlStatement of ddl) {
-        args.statement.val = ddlStatement
-        const results = await this.executeSQL(sqlStatement,args);
-        if (results.outBinds.abort === 1) {
-          break;
-        }
-     }
-     
-     sqlStatement = `begin :log := YADAMU_EXPORT_DDL.GENERATE_LOG(); end;`; 
-     args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}};
-     const results = await this.executeSQL(sqlStatement,args);   
-     await this.setCurrentSchema(this.connectionProperties.user);
-     return this.processLog(results);
+    for (const ddlStatement of ddl) {
+      args.statement.val = ddlStatement
+      const results = await this.executeSQL(sqlStatement,args);
+      if (results.outBinds.abort === 1) {
+        break;
+      }
+    }
+    
+    sqlStatement = `begin :log := YADAMU_EXPORT_DDL.GENERATE_LOG(); end;`; 
+    args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}};
+    const results = await this.executeSQL(sqlStatement,args);   
+	// await this.setCurrentSchema(this.connectionProperties.user);
+    return this.processLog(results);
   }
 
   async convertDDL2XML(ddlStatements) {
@@ -843,7 +852,7 @@ class OracleDBI extends YadamuDBI {
 
   
   async executeDDL(ddl) {
-      
+	  
     if ((this.maxStringSize < 32768) && (this.statementTooLarge(ddl))) {
       // DDL statements are too large send for server based execution (JSON Extraction will fail)
       await this.applyDDL(ddl,this.systemInformation.schema,this.parameters.TO_USER);
@@ -882,10 +891,37 @@ class OracleDBI extends YadamuDBI {
   */
  
   async finalize() {
-    await this.setCurrentSchema(this.connectionProperties.user);
+    // await this.setCurrentSchema(this.connectionProperties.user);
     await this.releaseConnection(this.connection, this.yadamuLogger);
   }
-   
+
+  async initializeExport() {
+    await this.setCurrentSchema(this.parameters.FROM_USER)
+  }
+
+  async finalizeExport() {
+    await this.setCurrentSchema(this.connectionProperties.user);
+  }
+
+  async initializeImport() {
+    await this.setCurrentSchema(this.parameters.TO_USER)
+  }
+
+  async initializeData() {
+    await this.disableConstraints();
+    await this.setDateFormatMask(this.connection,this.status,this.systemInformation.vendor);
+	// await this.setCurrentSchema(this.parameters.TO_USER)
+  }
+  
+  async finalizeData() {
+    await this.refreshMaterializedViews();
+    await this.enableConstraints();
+  }  
+
+  async finalizeImport() {
+    await this.setCurrentSchema(this.connectionProperties.user);
+  }
+
   /*
   **
   **  Abort the database connection.
@@ -1006,7 +1042,7 @@ class OracleDBI extends YadamuDBI {
 	     break;
     }	 
 	 
-    const sqlStatement = `BEGIN\n  ${settings}\n  :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema);\nEND;`;
+    const sqlStatement = `begin\n  ${settings}\n  :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema);\nend;`;
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlStatement}\n\/\n`)
     }
@@ -1274,20 +1310,14 @@ class OracleDBI extends YadamuDBI {
   **
   */
   
-  async initializeImport() {
-    await this.disableConstraints();
-    await this.setDateFormatMask(this.connection,this.status,this.systemInformation.vendor);
-    await this.setCurrentSchema(this.parameters.TO_USER)
-  }
-  
   async generateStatementCache(schema,executeDDL) {
-   // Override for LOB_CACHE_SIZE and Import Wrapper
+   // Override for BATCH_LOB_COUNT and Import Wrapper
     let statementGenerator 
     if (this.dbVersion < 12) {
-      statementGenerator = new StatementGenerator11(this,schema,this.metadata,this.systemInformation.spatialFormat,this.batchSize,this.commitSize, this.parameters.LOB_CACHE_SIZE, this.importWrapper)
+      statementGenerator = new StatementGenerator11(this,schema,this.metadata,this.systemInformation.spatialFormat,this.batchSize,this.commitSize, this.importWrapper)
     }
     else {
-      statementGenerator = new StatementGenerator(this,schema,this.metadata,this.systemInformation.spatialFormat,this.batchSize,this.commitSize, this.parameters.LOB_CACHE_SIZE)
+      statementGenerator = new StatementGenerator(this,schema,this.metadata,this.systemInformation.spatialFormat,this.batchSize,this.commitSize)
     }
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }
@@ -1295,13 +1325,7 @@ class OracleDBI extends YadamuDBI {
   getTableWriter(table) {
     return super.getTableWriter(TableWriter,table)
   }
-  
-  async finalizeImport() {
-    await this.enableConstraints();
-    await this.refreshMaterializedViews();
-    super.finalizeImport()
-  }  
-  
+    
   async dropWrappers() {
 
     let sqlStatment = sqlDropWrapper.replace(':1:',this.parameters.FROM_USER).replace(':2:',this.exportWrapper);

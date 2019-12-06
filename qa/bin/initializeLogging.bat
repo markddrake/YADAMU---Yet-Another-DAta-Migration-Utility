@@ -1,0 +1,9 @@
+if not exist %YADAMU_LOG_ROOT%\. mkdir %YADAMU_LOG_ROOT%
+if not defined YADAMU_TIMESTAMP call %YADAMU_HOME%\qa\bin\getUTCTime.bat
+@set YADAMU_LOG_PATH=%YADAMU_LOG_ROOT%
+if not [%1]==[] set YADAMU_LOG_PATH=%YADAMU_LOG_PATH%\%1
+if not exist %YADAMU_LOG_PATH%\ mkdir %YADAMU_LOG_PATH%
+@set YADAMU_LOG_PATH=%YADAMU_LOG_PATH%\%YADAMU_TIMESTAMP%
+if not exist %YADAMU_LOG_PATH%\ mkdir %YADAMU_LOG_PATH%
+@set YADAMU_IMPORT_LOG=%YADAMU_LOG_PATH%\yadamu.log
+@set YADAMU_EXPORT_LOG=%YADAMU_LOG_PATH%\yadamu.log

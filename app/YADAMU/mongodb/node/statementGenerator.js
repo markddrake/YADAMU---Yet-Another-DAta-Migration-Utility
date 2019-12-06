@@ -19,21 +19,22 @@ class StatementGenerator {
     let statementCache = {}
     const tables = Object.keys(this.metadata); 
     const collectionList = tables.map(function(table,idx) {
-      const tableInfo = {} 
       const tableMetadata = this.metadata[table]
+      const tableInfo = {} 
       tableInfo.tableName = tableMetadata.tableName
+      tableInfo.batchSize = this.batchSize;
+      tableInfo.commitSize = this.commitSize;
       if (tableMetadata.source) {
         tableInfo.keys = JSON.parse('[' + tableMetadata.source.columns + "]");
-        tableInfo.dataTypes = tableMetadata.source.dataTypes
+        tableInfo.sourceDataTypes = tableMetadata.source.dataTypes
         tableInfo.sizeConstraints = tableMetadata.source.sizeConstraints
       }
       else {
         tableInfo.keys = JSON.parse('[' + tableMetadata.columns + "]");
-        tableInfo.dataTypes = tableMetadata.dataTypes
+        tableInfo.sourceDataTypes = tableMetadata.dataTypes
         tableInfo.sizeConstraints = tableMetadata.sizeConstraints
       }
-      tableInfo.batchSize = this.batchSize;
-      tableInfo.commitSize = this.commitSize;
+ 	  tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.sourceDataTypes);
       tableInfo.insertMode = 'InsertMany';
       statementCache[tableInfo.tableName] = tableInfo;
       return tableInfo.tableName

@@ -189,6 +189,7 @@ class DBWriter extends Writable {
   }
   
   async initialize() {
+    await this.dbi.initializeImport();
 	this.targetSchemaInfo = await this.getTargetSchemaInfo()
   }
  
@@ -210,7 +211,7 @@ class DBWriter extends Writable {
           break;
         case 'table':
           if (this.currentTable === undefined) {
-            await this.dbi.initializeImport();
+            await this.dbi.initializeData();
           }
           else {
           // if (this.currentTable) {
@@ -277,8 +278,9 @@ class DBWriter extends Writable {
         this.yadamuLogger.info([`${this.constructor.name}`],`No tables found.`);
       }
       if (this.currentTable !== undefined) {
-        await this.dbi.finalizeImport();
+        await this.dbi.finalizeData();
       }
+      await this.dbi.finalizeImport();
       callback();
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._final()`,`"${this.currentTable}"`],e);

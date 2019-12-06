@@ -18,11 +18,10 @@ class StatementGenerator {
     this.yadamuLogger = yadamuLogger;
   }
   
-  bulkSupported(targetDataTypes) {
+  bulkSupported(dataTypes) {
     
     let supported = true;
-    targetDataTypes.forEach(function (targetDataType,idx) {
-      const dataType = this.dbi.decomposeDataType(targetDataType);
+    dataTypes.forEach(function (dataType,idx) {
       switch (dataType.type) {
         case 'geography':
          // TypeError: parameter.type.validate is not a function
@@ -48,15 +47,14 @@ class StatementGenerator {
    
   }
   
-  createBulkOperation(database, tableName, columnList, targetDataTypes) {
+  createBulkOperation(database, tableName, columnList, dataTypes) {
 
     const table = new sql.Table(database + '.' + this.dbi.parameters.TO_USER + '.' + tableName);
     table.create = false
     
     const columns = JSON.parse('[' +  columnList + ']')
   
-    targetDataTypes.forEach(function (targetDataType,idx) {
-      const dataType = this.dbi.decomposeDataType(targetDataType);
+    dataTypes.forEach(function (dataType,idx) {
       switch (dataType.type) {
         case 'bit':
           table.columns.add(columns[idx],sql.Bit);
@@ -215,7 +213,7 @@ class StatementGenerator {
           table.columns.add(columns[idx],sql.VarChar(4000),{nullable: true});
           break;
         default:
-          this.yadamuLogger.log([`${this.constructor.name}.createBulkOperation()`,`"${tableName}"`],`Unmapped data type [${targetDataType}].`);
+          this.yadamuLogger.log([`${this.constructor.name}.createBulkOperation()`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
       }
     },this)
     return table
@@ -240,6 +238,7 @@ class StatementGenerator {
       const tableName = this.metadata[table].tableName;
       statementCache[tableName] = JSON.parse(statementCache[tableName] );
       const tableInfo = statementCache[tableName];
+	  tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.targetDataTypes)
       tableInfo.batchSize =  this.batchSize;
       tableInfo.commitSize = this.commitSize;
 	  tableInfo.spatialFormat = this.spatialFormat
@@ -287,10 +286,10 @@ class StatementGenerator {
         }
       },this)
       tableInfo.dml = tableInfo.dml.slice(0,-1) + ")";
-      tableInfo.bulkSupported = this.bulkSupported(tableInfo.targetDataTypes);
+      tableInfo.bulkSupported = this.bulkSupported(tableInfo.dataTypes);
       try {
         if (tableInfo.bulkSupported) {
-          tableInfo.bulkOperation = this.createBulkOperation(database, tableName, this.metadata[table].columns, tableInfo.targetDataTypes);
+          tableInfo.bulkOperation = this.createBulkOperation(database, tableName, this.metadata[table].columns, tableInfo.dataTypes);
         }
         else {
           // Place holder for caching rows.

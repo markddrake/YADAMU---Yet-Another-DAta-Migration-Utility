@@ -2,8 +2,8 @@
 const fs = require('fs');
 const path = require('path');
 const Readable = require('stream').Readable;
-const Util = require('util')
-
+const util = require('util')
+const async_hooks = require('async_hooks');
 /* 
 **
 ** Require Database Vendors API 
@@ -75,6 +75,12 @@ class YadamuDBI {
     return results;      
     
   } 
+  
+  decomposeDataTypes(targetDataTypes) {
+	 return targetDataTypes.map(function (targetDataType) {
+       return this.decomposeDataType(targetDataType)
+	 },this)
+  }
   
   processLog(log,status,yadamuLogger) {
 
@@ -274,6 +280,22 @@ class YadamuDBI {
     Object.assign(this.parameters, this.yadamu.getCommandLineParameters());
     
   }
+
+  reportAsyncOperation(...args) {
+	 fs.writeFileSync(this.parameters.PERFORMANCE_TRACE, `${util.format(...args)}\n`, { flag: 'a' });
+  }
+  
+  enablePerformanceTrace() {
+ 
+    if (this.parameters.PERFORMANCE_TRACE) {
+      const self = this;
+      this.asyncHook = async_hooks.createHook({
+        init(asyncId, type, triggerAsyncId, resource) {self.reportAsyncOperation(asyncId, type, triggerAsyncId, resource)}
+      }).enable();
+	}
+  }
+  
+
   
   constructor(yadamu,parameters) {
     
@@ -305,6 +327,7 @@ class YadamuDBI {
     }   
  
     this.rejectManager = this.createRejectManager()
+	
   }
   
   /*  
@@ -314,6 +337,7 @@ class YadamuDBI {
   */
   
   async initialize(ensurePassword) {
+	this.enablePerformanceTrace();
     if (this.status.sqlTrace) {
        if (this.status.sqlTrace._writableState.ended === true) {
          this.status.sqlTrace = fs.createWriteStream(this.status.sqlTrace.path,{"flags":"a"})
@@ -339,7 +363,7 @@ class YadamuDBI {
     this.commitSize = this.batchSize * commitCount
     
     if (this.parameters.PARAMETER_TRACE === true) {
-      this.yadamuLogger.writeDirect(`${Util.inspect(this.parameters,{colors:true})}\n`);
+      this.yadamuLogger.writeDirect(`${util.inspect(this.parameters,{colors:true})}\n`);
     }
 	    
     if (ensurePassword) {
@@ -487,8 +511,14 @@ class YadamuDBI {
   async initializeImport() {
   }
   
-  async finalizeImport() {
+  async initializeData() {
+  }
+  
+  async finalizeData() {
     this.rejectManager.close();
+  }
+
+  async finalizeImport() {
   }
     
   async generateStatementCache(StatementGenerator,schema,executeDDL) {

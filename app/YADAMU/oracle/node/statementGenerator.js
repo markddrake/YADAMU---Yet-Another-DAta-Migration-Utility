@@ -4,52 +4,51 @@ const oracledb = require('oracledb');
 oracledb.fetchAsString = [ oracledb.DATE ]
 
 const Yadamu = require('../../common/yadamu.js');
-  
-const LOB_STRING_MAX_LENGTH    = 16 * 1024 * 1024;
-// const LOB_STRING_MAX_LENGTH    = 64 * 1024;
-const BFILE_STRING_MAX_LENGTH  =  2 * 1024;
-const STRING_MAX_LENGTH        =  4 * 1024;
 
-const DATA_TYPE_STRING_LENGTH = {
-  BLOB          : LOB_STRING_MAX_LENGTH
-, CLOB          : LOB_STRING_MAX_LENGTH
-, JSON          : LOB_STRING_MAX_LENGTH
-, NCLOB         : LOB_STRING_MAX_LENGTH
-, OBJECT        : LOB_STRING_MAX_LENGTH
-, XMLTYPE       : LOB_STRING_MAX_LENGTH
-, ANYDATA       : LOB_STRING_MAX_LENGTH
-, BFILE         : BFILE_STRING_MAX_LENGTH
-, DATE          : 24
-, TIMESTAMP     : 30
-, INTERVAL      : 16
-}  
-
+const LOB_TYPES = [oracledb.CLOB,oracledb.BLOB]
+     
 class StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize, lobCacheSize) {
+  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize) {
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
     this.spatialFormat = spatialFormat
     this.batchSize = batchSize
     this.commitSize = commitSize;
-    this.lobCacheSize = lobCacheSize
+	
+	this.BIND_LENGTH = {
+      BLOB          : this.dbi.parameters.LOB_MAX_SIZE
+    , CLOB          : this.dbi.parameters.LOB_MAX_SIZE
+    , JSON          : this.dbi.parameters.LOB_MAX_SIZE
+    , NCLOB         : this.dbi.parameters.LOB_MAX_SIZE
+    , OBJECT        : this.dbi.parameters.LOB_MAX_SIZE
+    , XMLTYPE       : this.dbi.parameters.LOB_MAX_SIZE
+    , ANYDATA       : this.dbi.parameters.LOB_MAX_SIZE
+    , GEOMETRY      : this.dbi.parameters.LOB_MAX_SIZE
+	, NUMBER        : 19
+	, BOOLEAN       : 5
+    , BFILE         : 4096
+    , DATE          : 24
+    , TIMESTAMP     : 30
+    , INTERVAL      : 16
+    }  
+
   }
- 
+   
   generateBinds(tableInfo, metadata) {
       
      // Binds describe the format that will be used to supply the data. Eg with SQLServer BIGINT values will be presented as String
 
-     tableInfo.lobCount = 0;
-     return tableInfo.targetDataTypes.map(function (targetDataType,idx) {
-       const dataType = this.dbi.decomposeDataType(targetDataType)
+     tableInfo.lobColumns = false;
+     return tableInfo.dataTypes.map(function (dataType,idx) {
        if (!dataType.length) {
           dataType.length = parseInt(metadata.sizeConstraints[idx]);
        }
        switch (dataType.type) {
          case 'NUMBER':
            if ((metadata.source.vendor === 'MSSQLSERVER') && (metadata.source.dataTypes[idx] === 'bigint')) {
-             return { type: oracledb.STRING, maxSize : 19}
+             return { type: oracledb.STRING, maxSize : this.BIND_LENGTH.NUMBER}
            }
          case 'FLOAT':
          case 'BINARY_FLOAT':
@@ -75,54 +74,54 @@ class StatementGenerator {
          case 'CLOB':
          case 'NCLOB':
          case 'ANYDATA':
-           tableInfo.lobCount++;
+           tableInfo.lobColumns = true;
            // return {type : oracledb.CLOB}
-           return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
+           return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.ANYDATA }
          case 'XMLTYPE':
            // Cannot Bind XMLTYPE > 32K as String: ORA-01461: can bind a LONG value only for insert into a LONG column when constructing XMLTYPE
-           tableInfo.lobCount++;
+           tableInfo.lobColumns = true;
            // return {type : oracledb.CLOB}
-           return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
+           return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.CLOB}
          case 'JSON':
            // Defalt JSON Storeage model: JSON store as CLOB
            // JSON store as BLOB can lead to Error: ORA-40479: internal JSON serializer error during export operations.
-           tableInfo.lobCount++;
            // return {type : oracledb.CLOB}
-           return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
+           tableInfo.lobColumns = true;
+           return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.JSON}
          case 'BLOB':
-           tableInfo.lobCount++;
            // return {type : oracledb.BUFFER}
-           // return {type : oracledb.BUFFER, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
-           return {type : oracledb.BLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
+           // return {type : oracledb.BUFFER, maxSize : BIND_LENGTH.BLOB }
+           tableInfo.lobColumns = true;
+           return {type : oracledb.BLOB, maxSize : this.BIND_LENGTH.BLOB}
          case 'RAW':
            // return { type :oracledb.STRING, maxSize : parseInt(metadata.sizeConstraints[idx])*2}
            return { type :oracledb.BUFFER, maxSize : parseInt(metadata.sizeConstraints[idx])}
          case 'BFILE':
-           return { type :oracledb.STRING, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type] }
+           return { type :oracledb.STRING, maxSize : this.BIND_LENGTH.BFILE }
          case 'BOOLEAN':
-            return { type: oracledb.STRING, maxSize : 5}         
+            return { type: oracledb.STRING, maxSize :  this.BIND_LENGTH.BOOLEAN }         
          case 'GEOMETRY':
-          case "\"MDSYS\".\"SDO_GEOMETRY\"":
-           tableInfo.lobCount++;
+         case "\"MDSYS\".\"SDO_GEOMETRY\"":
+           tableInfo.lobColumns = true;
            // return {type : oracledb.CLOB}
            switch (this.spatialFormat) { 
              case "WKB":
              case "EWKB":
-               return {type : oracledb.BLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
+               return {type : oracledb.BLOB, maxSize : this.BIND_LENGTH.GEOMETRY}
                break;
              case "WKT":
              case "EWKT":
              case "GeoJSON":
-               return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH[dataType.type]}
+               return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.JSON}
                break;
              default:
            }
            break;   
          default:
            if (dataType.type.indexOf('.') > -1) {
-             tableInfo.lobCount++;
              // return {type : oracledb.CLOB}
-             return {type : oracledb.CLOB, maxSize : DATA_TYPE_STRING_LENGTH['XMLTYPE']}
+             tableInfo.lobColumns = true
+			 return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.OBJECT}
            }
            return {type : oracledb.STRING, maxSize :  dataType.length}
        }
@@ -147,6 +146,74 @@ class StatementGenerator {
    const dmlBlock = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n\n  insert into "${targetSchema}"."${tableName}" (${columns}) values (${variables.join(',')});\nend;`;      
    return dmlBlock;
      
+  }
+
+  orderColumnsByBindType(tableInfo) {
+	 
+    /*
+    **
+    ** Avoid Error: ORA-24816: Expanded non LONG bind data supplied after actual LONG or LOB column 
+    ** 
+    ** When optimzing performance by binding Strings and Buffers to LOBS it is necessary to order the column list so that CLOB and BLOB columns are at the end of the list.
+    **
+    ** Set up an array that maps columns by binding data type. Scalar Columns, Spatial Columns
+    **
+    */
+
+    const bindOrdering = [];
+	
+    for (const colIdx in tableInfo.lobBinds) {
+	  switch (tableInfo.dataTypes[colIdx].type) {
+		// GEOMETRY is inserted by Stored Procedure.. Do not move to end of List.
+        case "GEOMETRY":
+        case "\"MDSYS\".\"SDO_GEOMETRY\"":
+		  bindOrdering.push(parseInt(colIdx))
+		  break
+        case "XMLTYPE":
+		  bindOrdering.push(parseInt(colIdx))
+		  break
+		default:
+          if (!LOB_TYPES.includes(tableInfo.lobBinds[colIdx].type)) {
+            bindOrdering.push(parseInt(colIdx))
+		  }
+	  }
+    }
+	
+    for (const colIdx in tableInfo.lobBinds) {
+      if (!bindOrdering.includes(parseInt(colIdx))) {
+        bindOrdering.push(parseInt(colIdx))
+	  }
+    }
+   
+    // Column Mappings contains the indices of the non LOB binds, following by the indices of the the LOB binds	
+	
+    // Reorder binds, dataTypes based on mapping
+	
+	const columns = []
+	const targetDataTypes = []
+	const sizeConstraints = []
+	const dataTypes = []
+	const binds = []
+	const lobBinds = []
+	
+	for (const idx in bindOrdering) {
+	  columns.push(tableInfo.columns[bindOrdering[idx]])
+	  targetDataTypes.push(tableInfo.targetDataTypes[bindOrdering[idx]])
+	  sizeConstraints.push(tableInfo.sizeConstraints[bindOrdering[idx]])
+	  dataTypes.push(tableInfo.dataTypes[bindOrdering[idx]])
+	  binds.push(tableInfo.binds[bindOrdering[idx]])
+	  lobBinds.push(tableInfo.lobBinds[bindOrdering[idx]])
+	}
+	
+    tableInfo.columns = columns;
+	tableInfo.targetDataTypes = targetDataTypes;
+	tableInfo.sizeConstraints = sizeConstraints;
+	tableInfo.dataTypes = dataTypes;
+    tableInfo.binds = binds;
+    tableInfo.lobBinds = lobBinds
+    tableInfo.bindOrdering = bindOrdering
+	
+    return tableInfo
   }
 
   async generateStatementCache(executeDDL, vendor) {
@@ -190,22 +257,56 @@ class StatementGenerator {
     const tables = Object.keys(this.metadata); 
     tables.forEach(function(table,idx) {
       const tableMetadata = this.metadata[table];
+
       const tableInfo = statementCache[tableMetadata.tableName];
-      const columns = JSON.parse('[' + tableMetadata.columns + ']');
-      if (tableInfo.ddl !== null) {
-        ddlStatements.push(tableInfo.ddl);
-      }
+	  
+      tableInfo.batchSize = this.batchSize
+      tableInfo.commitSize = this.commitSize;
+
+      tableInfo.columns = JSON.parse('[' + tableMetadata.columns + ']')
+	  tableInfo.sizeConstraints = tableMetadata.sizeConstraints
+	  
+ 	  tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.targetDataTypes);
+      tableInfo.binds = this.generateBinds(tableInfo,this.metadata[table]);
+
+	  if (tableInfo.lobColumns) {
+		// Do not 'copy' binds to lobBinds. binds is a collection of objects and we do not want to change properties of the objects in binds when we modify corresponding properties in lobBinds.
+		tableInfo.lobBinds = this.generateBinds(tableInfo,tableMetadata);
+
+        // Reorder select list to enable LOB optimization.
+        // Columns with LOB data types must come last in the insert column list
+		
+		tableInfo.binds = tableInfo.lobBinds.map(function(bind) {
+		  switch (bind.type) {
+		    case oracledb.CLOB:
+		      return { type: oracledb.STRING, maxSize : this.dbi.parameters.LOB_MIN_SIZE }
+			  break;
+		    case oracledb.BLOB:
+		      return { type: oracledb.BUFFER, maxSize : this.dbi.parameters.LOB_MIN_SIZE }
+			  break;
+		    default:
+		      return bind;	
+		  }			 
+	    },this);
+
+		this.orderColumnsByBindType(tableInfo);	    
+	  }
+	  else {
+		// Fill bindOrdering with values 1..n
+		tableInfo.bindOrdering = [...Array(tableInfo.columns.length).keys()]
+	  }
+	
       let plsqlRequired = false;        
 
       const assignments = [];
       const operators = [];
       const variables = []
       const values = []
-      
-      const declarations = columns.map(function(column,idx) {
+
+      const declarations = tableInfo.columns.map(function(column,idx) {
         variables.push(`"V_${column}"`);
         let targetDataType =  tableInfo.targetDataTypes[idx];
-        const dataType = this.dbi.decomposeDataType(targetDataType);
+        const dataType = tableInfo.dataTypes[idx];
         switch (dataType.type) {
           case "GEOMETRY":
           case "\"MDSYS\".\"SDO_GEOMETRY\"":
@@ -246,7 +347,7 @@ class StatementGenerator {
             }
         } 
         // Append length to bounded datatypes if necessary
-        targetDataType = (boundedTypes.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableMetadata.sizeConstraints[idx]})` : targetDataType;
+        targetDataType = (boundedTypes.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableInfo.sizeConstraints[idx]})` : targetDataType;
         return `${variables[idx]} ${targetDataType}`;
       },this)
       
@@ -259,26 +360,23 @@ class StatementGenerator {
             return `${variables[idx]} := ${value}`;
           }
         },this)
-        tableInfo.dml = this.generatePLSQL(this.targetSchema,this.metadata[table].tableName,tableInfo.dml,tableMetadata.columns,declarations,assignments,variables);
+        tableInfo.dml = this.generatePLSQL(this.targetSchema,this.metadata[table].tableName,tableInfo.dml,tableInfo.columns,declarations,assignments,variables);
       }
       else  {
-        tableInfo.dml = `insert into "${this.targetSchema}"."${this.metadata[table].tableName}" (${tableMetadata.columns}) values (${values.join(',')})`;
+        tableInfo.dml = `insert into "${this.targetSchema}"."${this.metadata[table].tableName}" (${tableInfo.columns.map(function(col){return `"${col}"`}).join(',')}) values (${values.join(',')})`;
       }
       
-      tableInfo.binds = this.generateBinds(tableInfo,this.metadata[table]);
-      tableInfo.batchSize = this.batchSize
-      if (tableInfo.lobCount > 0) {
-       // If some columns are bound as CLOB or BLOB restrict batchsize based on lobCacheSize
-         const lobBatchSize = Math.floor(this.lobCacheSize/tableInfo.lobCount);
-         tableInfo.batchSize = (lobBatchSize > this.batchSize) ? this.batchSize : lobBatchSize;
+	  if (tableInfo.ddl !== null) {
+        ddlStatements.push(tableInfo.ddl);
       }
-      tableInfo.commitSize = this.commitSize;
+	  
     },this);
     
     if (executeDDL === true) {
       await this.dbi.executeDDL(ddlStatements);
     }
-    return statementCache
+    
+	return statementCache
   }  
 }
 

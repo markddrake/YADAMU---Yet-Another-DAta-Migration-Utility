@@ -32,10 +32,9 @@ class TableWriter extends YadamuWriter {
     return results;
   }
 
-  async createPreparedStatement(insertStatement, targetDataTypes) {
+  async createPreparedStatement(insertStatement, dataTypes) {
     const ps = await this.dbi.getPreparedStatement();
-    targetDataTypes.forEach(function (targetDataType,idx) {
-      const dataType = this.dbi.decomposeDataType(targetDataType);
+    dataTypes.forEach(function (dataType,idx) {
       const column = 'C' + idx;
       switch (dataType.type) {
         case 'bit':
@@ -177,7 +176,7 @@ class TableWriter extends YadamuWriter {
           ps.input(column,sql.VarChar(4000));
           break;
         default:
-         this.yadamuLogger.log([`${this.constructor.name}.createPreparedStatement()`],`Unmapped data type [${targetDataType}].`);
+         this.yadamuLogger.log([`${this.constructor.name}.createPreparedStatement()`],`Unmapped data type [${dataType.type}].`);
       }
     },this)
     if (this.status.sqlTrace) {
@@ -189,8 +188,7 @@ class TableWriter extends YadamuWriter {
 
   async appendRow(row) {
       
-    this.tableInfo.targetDataTypes.forEach(function(targetDataType,idx) {
-       const dataType = this.dbi.decomposeDataType(targetDataType);
+    this.tableInfo.dataTypes.forEach(function(dataType,idx) {
        if (row[idx] !== null) {
          /*
          switch (dataType.type) {
@@ -307,7 +305,7 @@ class TableWriter extends YadamuWriter {
     // Cannot process table using BULK Mode. Prepare a statement use with record by record processing.
 
     if (this.tableInfo.preparedStatement === undefined) {
-      this.tableInfo.preparedStatement = await this.createPreparedStatement(this.tableInfo.dml, this.tableInfo.targetDataTypes) 
+      this.tableInfo.preparedStatement = await this.createPreparedStatement(this.tableInfo.dml, this.tableInfo.dataTypes) 
     }
 
     for (const row in this.tableInfo.bulkOperation.rows) {
