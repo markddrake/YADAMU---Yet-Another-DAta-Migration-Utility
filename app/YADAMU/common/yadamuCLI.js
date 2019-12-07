@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { performance } = require('perf_hooks');
 
 const Yadamu = require('./yadamu.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
@@ -363,7 +364,7 @@ class YadamuCLI {
   async doCopy() {
   
     const configuration = this.loadConfigurationFile()
-    const startTime = new Date().getTime();
+    const startTime = performance.now();
     for (const job of configuration.jobs) {
 
       // Initialize constructor parameters with values from configuration file
@@ -409,34 +410,34 @@ class YadamuCLI {
       await yadamu.doCopy(sourceDBI,targetDBI);      
       this.yadamuLogger.info([`${this.constructor.name}.doCopy()`],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`);
     }
-    const elapsedTime = new Date().getTime() - startTime;
+    const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`${this.constructor.name}.doCopy()`],`Operation complete: Configuration:"${this.parameters.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doImport() {
 	const yadamu = new Yadamu(this.command);
 	const dbi = this.getDatabaseInterface(yadamu,yadamu.getDefaultDatabase(),{},{})
-    const startTime = new Date().getTime();
+    const startTime = performance.now();
     await yadamu.doImport(dbi);
-    const elapsedTime = new Date().getTime() - startTime;
+    const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`${this.constructor.name}.doImport()`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doUpload() {
 	const yadamu = new Yadamu(this.command);
 	const dbi = this.getDatabaseInterface(yadamu,yadamu.getDefaultDatabase(),{},{})
-    const startTime = new Date().getTime();
+    const startTime = performance.now();
     await yadamu.doUpload(dbi);
-    const elapsedTime = new Date().getTime() - startTime;
+    const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`${this.constructor.name}.doUpload()`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doExport() {
 	const yadamu = new Yadamu(this.command);
 	const dbi = this.getDatabaseInterface(yadamu,yadamu.getDefaultDatabase(),{},{})
-    const startTime = new Date().getTime();
+    const startTime = performance.now();
     await yadamu.doExport(dbi);
-    const elapsedTime = new Date().getTime() - startTime;
+    const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`${this.constructor.name}.doExport()`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
@@ -445,9 +446,9 @@ class YadamuCLI {
 	const configuration = this.loadConfigurationFile()
     const YadamuQA = require('../../YADAMU_QA/common/node/yadamuQA.js');
 	const yadamuQA = new YadamuQA(configuration,this.yadamuLogger);
-	const startTime = new Date().getTime();
+	const startTime = performance.now();
 	await yadamuQA.doTests(configuration);
-	const elapsedTime = new Date().getTime() - startTime;
+	const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TESTS`],`Complete: Configuration:"${this.parameters.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
 
   }

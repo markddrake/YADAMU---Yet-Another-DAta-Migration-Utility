@@ -1,6 +1,10 @@
 "use strict";
+
 const fs = require('fs');
+const { performance } = require('perf_hooks');
+
 const sql = require('mssql');
+
 const DBFileLoader = require('./dbFileLoader');
 
 class StagingTable {
@@ -54,10 +58,10 @@ class StagingTable {
   
     let startTime;
     return new Promise(function(resolve, reject) {
-	  loader.on('finish',function(chunk) {resolve(new Date().getTime() - startTime)})
+	  loader.on('finish',function(chunk) {resolve(performance.now() - startTime)})
 	  inputStream.on('error',function(err){reject(err)});
 	  loader.on('error',function(err){reject(err)});
-	  startTime = new Date().getTime();
+	  startTime = performance.now();
       inputStream.pipe(loader);
     })
 

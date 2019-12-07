@@ -1,6 +1,7 @@
 "use strict";
 const Writable = require('stream').Writable
 const Readable = require('stream').Readable;
+const { performance } = require('perf_hooks');
 
 const YadamuLibrary = require('./yadamuLibrary.js');
 

@@ -1,6 +1,7 @@
 "use strict" 
 const fs = require('fs');
 const Readable = require('stream').Readable;
+const { performance } = require('perf_hooks');
 
 /* 
 **
@@ -280,9 +281,9 @@ class PostgresDBI extends YadamuDBI {
       inputStream.pipe(stream);
     })  
     
-    const startTime = new Date().getTime();
+    const startTime = performance.now();
     await importProcess;
-    const elapsedTime = new Date().getTime() - startTime
+    const elapsedTime = performance.now() - startTime
     inputStream.close()
     return elapsedTime;
   }

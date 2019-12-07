@@ -1,5 +1,7 @@
 "use strict"
 
+const { performance } = require('perf_hooks');
+
 const sql = require('mssql');
 // const WKX = require('wkx');
 
@@ -9,6 +11,98 @@ class TableWriter extends YadamuWriter {
     
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
+	
+	this.transformations = this.tableInfo.dataTypes.map(function(dataType) {
+	  switch (dataType.type) {
+        case "image" :
+		  return function(col,idx) {
+     	     // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
+             return Buffer.from(col,'hex');
+		  }
+          break;
+        case "varbinary":
+		  return function(col,idx) {
+             return Buffer.from(col,'hex');
+ 		  }
+          break;
+       case "geography":
+       case "geometry":
+		 switch (this.tableInfo.spatialFormat) {
+		   case "WKB":
+           case "EWKB":
+             return function(col,idx) {
+		       // Upload geography & Geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
+	           return Buffer.from(col,'hex');
+			 }
+			 break;
+		   default:
+             return null;	 
+		  }
+          break;
+        case "json":
+		  return function(col,idx) {
+             if (typeof col === 'object') {
+               return JSON.stringify(col);
+             }
+			 return col
+		  }
+          break;
+        case "datetime":
+		  return function(col,idx) {
+            if (typeof col === 'string') {
+              col = col.endsWith('Z') ? col : (col.endsWith('+00:00') ? `${col.slice(0,-6)}Z` : `${col}Z`)
+            }
+            else {
+              // Alternative is to rebuild the table with these data types mapped to date objects ....
+              col = coISOString();
+            }
+            if (col.length > 23) {
+               col = `${col.substr(0,23)}Z`;
+            }
+			return col;
+		  }
+          break;
+		case "time":
+        case "date":
+        case "datetime2":
+        case "datetimeoffset":
+		  return function(col,idx) {
+            if (typeof col === 'string') {
+              col = col.endsWith('Z') ? col : (col.endsWith('+00:00') ? `${col.slice(0,-6)}Z` : `${col}Z`)
+            }
+            else {
+              // Alternative is to rebuild the table with these data types mapped to date objects ....
+              col = col.toISOString();
+            }
+			return col;
+		  }
+          break;
+        case 'bit':
+		  return function(col,idx) {
+            if (typeof col === 'string') {
+              switch (col.toLowerCase()) {
+                case '00':
+                  return false;
+                  break;
+                case '01':
+                  return true;
+                  break;
+                case 'false':
+                  return true;
+                  break;
+                case 'true':
+                  return true;
+                  break;
+              }
+            }
+			return col
+		  }
+          break;
+        default :
+		  return null
+      }
+    },this)
+
   }
   
   batchComplete() {
@@ -188,91 +282,14 @@ class TableWriter extends YadamuWriter {
 
   async appendRow(row) {
       
-    this.tableInfo.dataTypes.forEach(function(dataType,idx) {
-       if (row[idx] !== null) {
-         /*
-         switch (dataType.type) {
-          case "geometry":
-          case "geography":
-            console.log(WKX.Geometry.parse(Buffer.from(row[idx],'hex')).toWkt())
-            break;
-          default:
-         }
-         */
-         switch (dataType.type) {
-           case "image" :
-    	     // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
-             row[idx] = Buffer.from(row[idx],'hex');
-             break;
-           case "varbinary":
-             row[idx] = Buffer.from(row[idx],'hex');
-             break;
-           case "geography":
-		     // Upload geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
-	     	 switch (this.tableInfo.spatialFormat) {
-			   case "WKB":
-               case "EWKB":
-                 row[idx] = Buffer.from(row[idx],'hex');
-			     break;
-			   default:
-		     }		   
-             break;
-           case "geometry":
-		     // Upload geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
-	     	 switch (this.tableInfo.spatialFormat) {
-			   case "WKB":
-               case "EWKB":
-                 row[idx] = Buffer.from(row[idx],'hex');
-			     break;
-			   default:
-		     }		   
-             break;
-           case "json":
-             if (typeof row[idx] === 'object') {
-               row[idx] = JSON.stringify(row[idx]);
-             }
-             break;
-           case "time":
-           case "date":
-           case "datetime":
-           case "datetime2":
-           case "datetimeoffset":
-             if (typeof row[idx] === 'string') {
-               row[idx] = row[idx].endsWith('Z') ? row[idx] : (row[idx].endsWith('+00:00') ? `${row[idx].slice(0,-6)}Z` : `${row[idx]}Z`)
-             }
-             else {
-               // Alternative is to rebuild the table with these data types mapped to date objects ....
-               row[idx] = row[idx].toISOString();
-             }
-             switch (dataType.type) {
-               case 'datetime':
-                 if (row[idx].length > 23) {
-                   row[idx] = `${row[idx].substr(0,23)}Z`;
-                 }
-             }
-             break;
-           case 'bit':
-             if (typeof row[idx] === 'string') {
-               switch (row[idx].toLowerCase()) {
-                 case '00':
-                   row[idx] = false;
-                   break;
-                 case '01':
-                   row[idx] = true;
-                   break;
-                 case 'false':
-                   row[idx] = true;
-                   break;
-                 case 'true':
-                   row[idx] = true;
-                   break;
-               }
-             }
-             break;
-           default :
-         }
-       }
-    },this)
+	// Use forEach not Map as transformations are not required for most columns. 
+	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
+	  
+	this.transformations.forEach(function (transformation,idx) {
+      if ((transformation !== null) && (row[idx] !== null)) {
+	    row[idx] = transformation(row[idx])
+      }
+	},this)
     this.tableInfo.bulkOperation.rows.add(...row);
   }
 
@@ -286,7 +303,7 @@ class TableWriter extends YadamuWriter {
       try {        
         await this.dbi.createSavePoint();
         const results = await this.dbi.getRequest().bulk(this.tableInfo.bulkOperation);
-        this.endTime = new Date().getTime();
+        this.endTime = performance.now();
         this.tableInfo.bulkOperation.rows.length = 0;
         return this.skipTable
       } catch (e) {
@@ -324,7 +341,7 @@ class TableWriter extends YadamuWriter {
       }
     }       
     
-    this.endTime = new Date().getTime();
+    this.endTime = performance.now();
     this.tableInfo.bulkOperation.rows.length = 0;
     return this.skipTable
   }

@@ -101,7 +101,7 @@ class YadamuServer {
      ,errorRaised   : false
      ,warningRaised : false
      ,statusMsg     : 'successfully'
-     ,startTime     : new Date().getTime()
+     ,startTime     : performance.now()
     }
 
     this.yadamuLogger = new YadamuLogger(process.stdout,this.status);

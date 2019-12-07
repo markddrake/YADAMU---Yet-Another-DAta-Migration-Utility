@@ -1,6 +1,7 @@
 "use strict" 
 const fs = require('fs');
 const Readable = require('stream').Readable;
+const { performance } = require('perf_hooks');
 
 /* 
 **
@@ -644,7 +645,7 @@ class MySQLDBI extends YadamuDBI {
 	
 	const self = this
     const is = this.conn.query(query.SQL_STATEMENT).stream();
-    const streamCreatedTime = new Date().getTime();
+    const streamCreatedTime = performance.now();
     is.on('end',
 	  async function() {
 		clearInterval(keepAliveHdl);
@@ -652,7 +653,7 @@ class MySQLDBI extends YadamuDBI {
 	})
 	is.on('error',
 	  async function(err) {
-        self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`,`${err.code}`],`Stream Processing Time: ${YadamuLibrary.stringifyDuration(new Date().getTime() - streamCreatedTime)}.`); 
+        self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`,`${err.code}`],`Stream Processing Time: ${YadamuLibrary.stringifyDuration(performance.now() - streamCreatedTime)}.`); 
 	    if ((err.fatal) && (err.code && (err.code === 'PROTOCOL_CONNECTION_LOST') || (err.code === 'ECONNRESET'))){
 		  err.yadamuHandled = true;
           self.yadamuLogger.warning([`${self.constructor.name}.getInputStream()`],`SQL Operation raised\n${err}`);

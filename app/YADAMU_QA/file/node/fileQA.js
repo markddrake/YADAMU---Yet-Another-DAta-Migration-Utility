@@ -243,9 +243,9 @@ class FileQA extends FileDBI {
                                     + ` ${(pMetadata[table].rowCount - cMetadata[table].rowCount).toString().padStart(colSizes[5])} |`
                                     + ` ${gMetadata[table].byteCount.toString().padStart(colSizes[6])} |`
                                     + ` ${pMetadata[table].byteCount.toString().padStart(colSizes[7])} |`
-                                    + ` ${(gMetadata[table].byteCount - pMetadata[table].byteCount).toString().padStart(colSizes[8])} |`
+                                    + ` ${(pMetadata[table].byteCount - gMetadata[table].byteCount).toString().padStart(colSizes[8])} |`
                                     + ` ${cMetadata[table].byteCount.toString().padStart(colSizes[9])} |`
-                                    + ` ${(pMetadata[table].byteCount - cMetadata[table].byteCount).toString().padStart(colSizes[10])} |`
+                                    + ` ${(cMetadata[table].byteCount - pMetadata[table].byteCount).toString().padStart(colSizes[10])} |`
                                     + ` ${tableTimings.padStart(colSizes[11])} |`
                               + '\n')
       if (idx+1 === tables.length) {

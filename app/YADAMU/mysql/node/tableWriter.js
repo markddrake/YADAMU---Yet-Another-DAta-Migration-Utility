@@ -1,5 +1,7 @@
 "use strict"
 
+const { performance } = require('perf_hooks');
+
 const WKX = require('wkx');
 
 const YadamuWriter = require('../../common/yadamuWriter.js');
@@ -10,6 +12,49 @@ class TableWriter extends YadamuWriter {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
     this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
     this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + ')'; 
+     
+    this.transformations = this.tableInfo.dataTypes.map(function(dataType,idx) {
+      switch (dataType.type) {
+        case "tinyblob" :
+        case "blob" :
+        case "mediumblob" :
+        case "longblob" :
+        case "varbinary" :
+        case "binary" :
+	      return function(col,idx) {
+            return Buffer.from(col,'hex');
+		  }
+          break;
+        case "json" :
+          return function(col,idx) {
+            if (typeof col === 'object') {
+              return JSON.stringify(col);
+            }
+			return col
+	      }
+          break;
+        case "date":
+        case "time":
+        case "datetime":
+        case "timestamp":
+          return function(col,idx) {
+            // If the the input is a string, assume 8601 Format with "T" seperating Date and Time and Timezone specified as 'Z' or +00:00
+            // Neeed to convert it into a format that avoiods use of convert_tz and str_to_date, since using these operators prevents the use of Bulk Insert.
+            // Session is already in UTC so we safely strip UTC markers from timestamps
+            if (typeof col !== 'string') {
+              col = col.toISOString();
+            }             
+            col = col.substring(0,10) + ' '  + (col.endsWith('Z') ? col.substring(11).slice(0,-1) : (col.endsWith('+00:00') ? col.substring(11).slice(0,-6) : col.substring(11)))
+            // Truncate fractional values to 6 digit precision
+            // ### Consider rounding, but what happens at '9999-12-31 23:59:59.999999
+            return col.substring(0,26);
+		  }
+		  break;
+        default :
+          return null
+      }
+    },this)
+
   }
 
   async finalize() {
@@ -19,51 +64,17 @@ class TableWriter extends YadamuWriter {
   }
 
   async appendRow(row) {
-    this.tableInfo.dataTypes.forEach(function(dataType,idx) {
-      if (row[idx] !== null) {
-        switch (dataType.type) {
-          case "tinyblob" :
-            row[idx] = Buffer.from(row[idx],'hex');
-            break;
-          case "blob" :
-            row[idx] = Buffer.from(row[idx],'hex');
-            break;
-          case "mediumblob" :
-            row[idx] = Buffer.from(row[idx],'hex');
-            break;
-          case "longblob" :
-            row[idx] = Buffer.from(row[idx],'hex');
-            break;
-          case "varbinary" :
-            row[idx] = Buffer.from(row[idx],'hex');
-            break;
-          case "binary" :
-            row[idx] = Buffer.from(row[idx],'hex');
-            break;
-          case "json" :
-            if (typeof row[idx] === 'object') {
-              row[idx] = JSON.stringify(row[idx]);
-            }
-            break;
-          case "date":
-          case "time":
-          case "datetime":
-          case "timestamp":
-            // If the the input is a string, assume 8601 Format with "T" seperating Date and Time and Timezone specified as 'Z' or +00:00
-            // Neeed to convert it into a format that avoiods use of convert_tz and str_to_date, since using these operators prevents the use of Bulk Insert.
-            // Session is already in UTC so we safely strip UTC markers from timestamps
-            if (typeof row[idx] !== 'string') {
-              row[idx] = row[idx].toISOString();
-            }             
-            row[idx] = row[idx].substring(0,10) + ' '  + (row[idx].endsWith('Z') ? row[idx].substring(11).slice(0,-1) : (row[idx].endsWith('+00:00') ? row[idx].substring(11).slice(0,-6) : row[idx].substring(11)))
-            // Truncate fractional values to 6 digit precision
-            // ### Consider rounding, but what happens at '9999-12-31 23:59:59.999999
-            row[idx] = row[idx].substring(0,26);
-          default :
-        }
+
+	// Use forEach not Map as transformations are not required for most columns. 
+	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
+	  
+	this.transformations.forEach(function (transformation,idx) {
+      if ((transformation !== null) && (row[idx] !== null)) {
+	    row[idx] = transformation(row[idx])
       }
-    },this)
-    this.batch.push(row);
+	},this)
+    this.tableInfo.bulkOperation.rows.add(...row);
+  }
   }
 
   async processWarnings(results) {
@@ -129,7 +140,7 @@ class TableWriter extends YadamuWriter {
         await this.dbi.createSavePoint();
         const results = await this.dbi.executeSQL(this.tableInfo.dml,[this.batch]);
         await this.processWarnings(results);
-        this.endTime = new Date().getTime();
+        this.endTime = performance.now();
         await this.dbi.releaseSavePoint();
         this.batch.length = 0;  
         return this.skipTable
@@ -165,7 +176,7 @@ class TableWriter extends YadamuWriter {
       }
     }     
     
-    this.endTime = new Date().getTime();
+    this.endTime = performance.now();
     this.batch.length = 0;  
     return this.skipTable 
   }

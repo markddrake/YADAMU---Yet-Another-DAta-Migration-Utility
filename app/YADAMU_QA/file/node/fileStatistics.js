@@ -9,6 +9,10 @@ class FileStatistics {
      this.parameters = {}
   }
   
+  isValidDDL() {
+    return true;
+  }
+  
   setSystemInformation(systemInformation) {
     this.systemInformation = systemInformation
   }

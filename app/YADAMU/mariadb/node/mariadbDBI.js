@@ -1,6 +1,8 @@
 "use strict" 
+
 const fs = require('fs');
 const Readable = require('stream').Readable;
+const { performance } = require('perf_hooks');
 
 /* 
 **
@@ -497,13 +499,13 @@ class MariadbDBI extends YadamuDBI {
       is.push(null)
     }).on('error',
     async function(err) {
-      self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`,`${err.code}`],`Connection Idle Time: ${YadamuLibrary.stringifyDuration(new Date().getTime() - self.lastUsedTime)}.`); 
+      self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`,`${err.code}`],`Connection Idle Time: ${YadamuLibrary.stringifyDuration(performance.now() - self.lastUsedTime)}.`); 
 	  if ((err.fatal) && (err.code && (err.code === 'PROTOCOL_CONNECTION_LOST') || (err.code === 'ECONNRESET'))){
 	    err.yadamuHandled = true;
         self.yadamuLogger.warning([`${self.constructor.name}.getInputStream()`],`SQL Operation raised\n${err}`);
         self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`],`Attemping reconnection.`);
         await self.reconnect()
-        this.lastUsedTime = new Date().getTime();
+        this.lastUsedTime = performance.now();
         self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`],`New connection availabe.`);
 	  }      
     })

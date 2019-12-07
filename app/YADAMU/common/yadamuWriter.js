@@ -1,5 +1,7 @@
 "use strict"
 
+const { performance } = require('perf_hooks');
+
 class YadamuWriter {
 
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
@@ -14,7 +16,7 @@ class YadamuWriter {
     this.batch = [];
     this.batchCount = 0;
 
-    this.startTime = new Date().getTime();
+    this.startTime = performance.now();
     this.endTime = undefined;
     this.insertMode = 'Batch';    
     this.suppressBatchWrites = (this.tableInfo.batchSize === this.tableInfo.commitSize)

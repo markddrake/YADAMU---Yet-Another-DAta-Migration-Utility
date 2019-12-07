@@ -1,10 +1,9 @@
-
-
 "use strict"
 
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const { performance } = require('perf_hooks');
   
 const FileDBI = require('../file/node/fileDBI.js');
 const DBReader = require('./dbReader.js');
@@ -75,7 +74,7 @@ class Yadamu {
 
   reportStatus(status,yadamuLogger) {
 
-    const endTime = new Date().getTime();
+    const endTime = performance.now();
       
     status.statusMsg = status.warningRaised === true ? 'with warnings' : status.statusMsg;
     status.statusMsg = status.errorRaised === true ? 'with errors'  : status.statusMsg;  
@@ -153,7 +152,7 @@ class Yadamu {
      ,errorRaised   : false
      ,warningRaised : false
      ,statusMsg     : 'successfully'
-     ,startTime     : new Date().getTime()
+     ,startTime     : performance.now()
     }
 	
     this.yadamuLogger = this.setYadamuLogger(this.parameters,this.status);
@@ -484,9 +483,9 @@ class Yadamu {
     const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
 
-    const startTime = new Date().getTime();
+    const startTime = performance.now();
     const json = await dbi.uploadFile(importFilePath);
-    const elapsedTime = new Date().getTime() - startTime;
+    const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.log([`${this.constructor.name}.uploadFile()`],`Processing file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
     return json;
   }

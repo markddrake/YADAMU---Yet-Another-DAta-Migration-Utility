@@ -1,6 +1,7 @@
 "use strict" 
 const fs = require('fs');
 const Readable = require('stream').Readable;
+const { performance } = require('perf_hooks');
 
 /* 
 **
@@ -168,12 +169,12 @@ class MSSQLDBI extends YadamuDBI {
   
   async verifyDataLoad(request,tableSpec) {    
     const statement = `select ISJSON("${tableSpec.columnName}") "VALID_JSON" from "${tableSpec.tableName}"`;
-    const startTime = new Date().getTime();
+    const startTime = performance.now();
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${statement}\ngo\n`)
     }  
     const results = await request.query(statement);
-    this.yadamuLogger.log([`${this.constructor.name}.verifyDataLoad()`],`: Upload succesful: ${results.recordsets[0][0].VALID_JSON === 1}. Elapsed time ${new Date().getTime() - startTime}ms.`);
+    this.yadamuLogger.log([`${this.constructor.name}.verifyDataLoad()`],`: Upload succesful: ${results.recordsets[0][0].VALID_JSON === 1}. Elapsed time ${performance.now() - startTime}ms.`);
     return results;
   }
   

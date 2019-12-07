@@ -2,7 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-  
+const { performance } = require('perf_hooks');
+
 const Yadamu = require('../../../YADAMU/common/yadamu.js');
 const YadamuTestDefaults = require('./yadamuDefaults.json')
 
@@ -18,7 +19,7 @@ class YadamuTest extends Yadamu {
   }
   
   reset() {
-    this.status.startTime     = new Date().getTime()
+    this.status.startTime     = performance.now()
     this.status.warningRaised = false;
     this.status.errorRaised   = false;
     this.status.statusMsg     = 'successfully'

@@ -1,5 +1,7 @@
 "use strict"
 
+const { performance } = require('perf_hooks');
+
 const WKX = require('wkx');
 
 const Yadamu = require('../../common/yadamu.js');
@@ -46,7 +48,7 @@ class TableWriter extends YadamuWriter {
     if (this.tableInfo.insertMode === 'Batch') {
       try {
         const result = await this.dbi.executeSQL(dmlStatement,this.batch);
-        this.endTime = new Date().getTime();
+        this.endTime = performance.now();
         this.batch.length = 0;  
         return this.skipTable
       } catch (e) {
@@ -73,7 +75,7 @@ class TableWriter extends YadamuWriter {
       }
     }     
     
-    this.endTime = new Date().getTime();
+    this.endTime = performance.now();
     this.batch.length = 0;
     return this.skipTable
   }

@@ -2,6 +2,7 @@
 const Readable = require('stream').Readable;
 const Yadamu = require('./yadamu.js')
 const YadamuLibrary = require('./yadamuLibrary.js')
+const { performance } = require('perf_hooks');
 
 class DBReader extends Readable {  
 
@@ -94,9 +95,9 @@ class DBReader extends Readable {
 	  }
     })
     
-    const startTime = new Date().getTime()
+    const startTime = performance.now()
     const rows = await copyOperation;
-    const elapsedTime = new Date().getTime() - startTime
+    const elapsedTime = performance.now() - startTime
     this.yadamuLogger.log([`${this.constructor.name}`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${rows}. Elaspsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`)
     return rows;
       

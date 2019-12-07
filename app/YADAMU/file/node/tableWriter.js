@@ -1,5 +1,7 @@
 "use strict"
 
+const { performance } = require('perf_hooks');
+
 const Yadamu = require('../../common/yadamu.js');
 
 class TableWriter {
@@ -8,7 +10,7 @@ class TableWriter {
     this.tableName = tableName
     this.outputStream = outputStream
     this.firstRow = true;
-    this.startTime = new Date().getTime();
+    this.startTime = performance.now();
   }
 
   async initialize() {
@@ -42,7 +44,7 @@ class TableWriter {
     this.outputStream.write(`]`);
     return {
       startTime    : this.startTime
-    , endTime      : new Date().getTime()
+    , endTime      : performance.now()
     , insertMode   : 'JSON'
     , skipTable    : false
     }    

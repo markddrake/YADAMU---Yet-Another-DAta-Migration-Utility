@@ -1,5 +1,7 @@
 "use strict"
 
+const { performance } = require('perf_hooks');
+
 const Yadamu = require('../../common/yadamu.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 
@@ -9,6 +11,78 @@ class TableWriter extends YadamuWriter {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
     this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
     this.batchRowCount = 0;
+
+    this.transformations = this.tableInfo.dataTypes.map(function(dataType,idx) {
+      switch (dataType.type) {
+        case "bit" :
+		  return function(col,idx) {
+            if (col === true) {
+              return 1
+            }
+            else {
+              return 0
+            }  
+		  }
+          break;
+        case "boolean" :
+ 		  return function(col,idx) {
+           switch (col) {
+              case "00" :
+                return false;
+                break;
+              case "01" :
+                return true;
+                break;
+              default:
+			    return col
+            }
+          }
+          break;
+        case "bytea" :
+		  return function(col,idx) {
+            return Buffer.from(col,'hex');
+		  }
+          break;
+        case "time" :
+		  return function(col,idx) {
+            if (typeof col === 'string') {
+              let components = col.split('T')
+              col = components.length === 1 ? components[0] : components[1]
+              return col.split('Z')[0]
+            }
+            else {
+              return col.getUTCHours() + ':' + col.getUTCMinutes() + ':' + col.getUTCSeconds() + '.' + col.getUTCMilliseconds();  
+            }
+		  }
+          break;
+        case 'date':
+        case 'datetime':
+        case 'timestamp':
+		  return function(col,idx) {
+            if (typeof col === 'string') {
+              if (col.endsWith('Z') && col.length === 28) {
+                col = col.slice(0,-2) + 'Z'
+              }
+              else {
+                if (!col.endsWith('+00:00')) {
+                  if (col.length === 27) {                                
+                    col = col.slice(0,-1) 
+                  }
+                }
+              }               
+            }
+            else {
+              // Avoid unexpected Time Zone Conversions when inserting from a Javascript Date object 
+              col = col.toISOString();
+            }
+			return col
+		  }
+          break;
+        default :
+		  return null
+      }
+    },this)
+
   }
 
   batchComplete() {
@@ -20,65 +94,17 @@ class TableWriter extends YadamuWriter {
   }
   
   async appendRow(row) {
-    this.tableInfo.dataTypes.forEach(async function(dataType,idx) {
-      if (row[idx] !== null) {
-        switch (dataType.type) {
-          case "bit" :
-            if (row[idx] === true) {
-              row[idx] = 1
-            }
-            else {
-              row[idx] = 0
-            }  
-            break;
-          case "boolean" :
-            switch (row[idx]) {
-              case "00" :
-                row[idx] = false;
-                break;
-              case "01" :
-                row[idx] = true;
-                break;
-              default:
-            }
-            break;
-          case "bytea" :
-            row[idx] = Buffer.from(row[idx],'hex');
-            break;
-          case "time" :
-            if (typeof row[idx] === 'string') {
-              let components = row[idx].split('T')
-              row[idx] = components.length === 1 ? components[0] : components[1]
-              row[idx] = row[idx].split('Z')[0]
-            }
-            else {
-              row[idx] = row[idx].getUTCHours() + ':' + row[idx].getUTCMinutes() + ':' + row[idx].getUTCSeconds() + '.' + row[idx].getUTCMilliseconds();  
-            }
-            break;
-          case 'date':
-          case 'datetime':
-          case 'timestamp':
-            if (typeof row[idx] === 'string') {
-              if (row[idx].endsWith('Z') && row[idx].length === 28) {
-                row[idx] = row[idx].slice(0,-2) + 'Z'
-              }
-              else {
-                if (!row[idx].endsWith('+00:00')) {
-                  if (row[idx].length === 27) {                                
-                    row[idx] = row[idx].slice(0,-1) 
-                  }
-                }
-              }               
-            }
-            else {
-              // Avoid unexpected Time Zone Conversions when inserting from a Javascript Date object 
-              row[idx] = row[idx].toISOString();
-            }
-            break;
-          default :
-        }
+	  
+	// Use forEach not Map as transformations are not required for most columns. 
+	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
+	  
+	this.transformations.forEach(function (transformation,idx) {
+      if ((transformation !== null) && (row[idx] !== null)) {
+	    row[idx] = transformation(row[idx])
       }
-    },this)
+	},this)
+    this.tableInfo.bulkOperation.rows.add(...row);
+  }
     this.batch.push(...row);
     this.batchRowCount++
   }
@@ -96,7 +122,7 @@ class TableWriter extends YadamuWriter {
         const args = Array(this.batchRowCount).fill(0).map(function() {return `(${this.tableInfo.insertOperators.map(function(operator) {return operator.replace('$%',`$${argNumber++}`)}).join(',')})`},this).join(',');
         const sqlStatement = this.tableInfo.dml + args
         const results = await this.dbi.insertBatch(sqlStatement,this.batch);
-        this.endTime = new Date().getTime();
+        this.endTime = performance.now();
         await this.dbi.releaseSavePoint();
         this.batch.length = 0;
         this.batchRowCount = 0;
@@ -134,7 +160,7 @@ class TableWriter extends YadamuWriter {
       }
     }
 
-    this.endTime = new Date().getTime();
+    this.endTime = performance.now();
     this.batchRowCount = 0;
     this.batch.length = 0;
     return this.skipTable   
