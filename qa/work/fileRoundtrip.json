@@ -1,0 +1,20 @@
+{
+  "operation"                         : "fileRoundtrip"
+, "connections"                       : "qa/regression/connections.json"
+, "parameters": {
+    "MODE": "DATA_ONLY"
+  , "FEEDBACK": "COMMIT"
+  }
+, "tasks"                             : "qa/regression/fileRoundtripTasks.json"
+, "tests" : [{
+    "source": "file#6"
+  , "targets": [
+       "mssql#1"
+    ]
+  , "parser" : "CLARINET"
+  , "directory" : "tests/fileRoundtrip/%source%"
+  , "tasks": [
+       "HumanResources"
+    ]
+  }]
+}
