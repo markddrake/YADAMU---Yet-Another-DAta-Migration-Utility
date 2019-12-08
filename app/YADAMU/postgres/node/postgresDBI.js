@@ -13,6 +13,7 @@ const CopyFrom = require('pg-copy-streams').from;
 const QueryStream = require('pg-query-stream')
 
 const YadamuDBI = require('../../common/yadamuDBI.js');
+const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
@@ -51,8 +52,15 @@ class PostgresDBI extends YadamuDBI {
   
    
   async getClient() {
+	this.logConnectionProperties();
+    const sqlStartTime = performance.now();
     const pgClient = new Client(this.connectionProperties);
     await pgClient.connect();
+    const sqlCumlativeTime = performance.now() - sqlStartTime;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+    }
+    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
     const yadamuLogger = this.yadamuLogger;
 
     pgClient.on('notice',function(n){ 
@@ -127,7 +135,22 @@ class PostgresDBI extends YadamuDBI {
   **  Connect to the database. Set global setttings
   **
   */
-   
+  
+  async executeQuery(sqlStatement,args) {
+	if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatement};\n\n`);
+    }
+
+    const sqlStartTime = performance.now();
+    const results = await this.pgClient.query(sqlStatement,args)
+    const sqlCumlativeTime = performance.now() - sqlStartTime;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+    }
+    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
+	return results
+  }
+  
   async initialize() {
     await super.initialize(true);   
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
@@ -151,9 +174,9 @@ class PostgresDBI extends YadamuDBI {
   */
 
   async abort() {
-     if (this.pgClient !== undefined) {
-       await this.pgClient.end();
-     }
+    try {
+      await this.pgClient.end();
+    } catch (e) {}
   }
 
 
@@ -168,12 +191,8 @@ class PostgresDBI extends YadamuDBI {
      const sqlStatement =  `begin transaction`
 
      if (this.activeTransaction === false) {
-       if (this.status.sqlTrace) {
-         this.status.sqlTrace.write(`${sqlStatement};\n\n`);
-       }
-
        this.activeTransaction = true;
-       await this.pgClient.query(sqlStatement);
+       await this.executeQuery(sqlStatement);
      }
   }
 
@@ -185,14 +204,10 @@ class PostgresDBI extends YadamuDBI {
   
   async commitTransaction() {
      const sqlStatement =  `commit transaction`
-
-
+	 
      if (this.activeTransaction === true) {
-       if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`${sqlStatement};\n\n`);
-       }
        this.activeTransaction = false;
-       await this.pgClient.query(sqlStatement);
+       await this.executeQuery(sqlStatement);
      }
   }
 
@@ -206,39 +221,24 @@ class PostgresDBI extends YadamuDBI {
      const sqlStatement =  `rollback transaction`
 
      if (this.activeTransaction === true) {
-       if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`${sqlStatement};\n\n`);
-       }
        this.activeTransaction = false;
-       await this.pgClient.query(sqlStatement);
+       await this.executeQuery(sqlStatement);
      }
   }
 
   async createSavePoint() {
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlCreateSavePoint};\n--\n`)
-    }
-    
-    await this.pgClient.query(sqlCreateSavePoint);
+    await this.executeQuery(sqlCreateSavePoint);
   }
   
   async restoreSavePoint() {
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlRestoreSavePoint};\n--\n`)
-    }
-
-    await this.pgClient.query(sqlRestoreSavePoint);
+    await this.executeQuery(sqlRestoreSavePoint);
   }  
 
   async releaseSavePoint() {
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlReleaseSavePoint};\n--\n`)
-    }
-
-    await this.pgClient.query(sqlReleaseSavePoint);    
+    await this.executeQuery(sqlReleaseSavePoint);    
   } 
   
   /*
@@ -255,15 +255,9 @@ class PostgresDBI extends YadamuDBI {
 
   async createStagingTable() {
   	let sqlStatement = `drop table if exists "YADAMU_STAGING"`;		
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement};\n\--\n`)
-    }    
-  	await this.pgClient.query(sqlStatement);
+  	await this.executeQuery(sqlStatement);
   	sqlStatement = `create temporary table if not exists "YADAMU_STAGING" (data ${this.useBinaryJSON === true ? 'jsonb' : 'json'}) on commit preserve rows`;					   
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement};\n\--\n`)
-    }    
-  	await this.pgClient.query(sqlStatement);
+  	await this.executeQuery(sqlStatement);
   }
   
   async loadStagingTable(importFilePath) {
@@ -274,7 +268,7 @@ class PostgresDBI extends YadamuDBI {
     }    
 
     let inputStream = fs.createReadStream(importFilePath);
-    const stream = this.pgClient.query(CopyFrom(copyStatement));
+    const stream = this.executeQuery(CopyFrom(copyStatement));
     const importProcess = new Promise(async function(resolve,reject) {  
       stream.on('end',function() {resolve()})
   	  stream.on('error',function(err){reject(err)});  	  
@@ -320,10 +314,7 @@ class PostgresDBI extends YadamuDBI {
 
   async processStagingTable(schema) {  	
   	const sqlStatement = `select ${this.useBinaryJSON ? 'import_jsonb' : 'import_json'}(data,$1) from "YADAMU_STAGING"`;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement};\n\--\n`)
-    }    
-  	var results = await this.pgClient.query(sqlStatement,[schema]);
+  	var results = await this.executeQuery(sqlStatement,[schema]);
     if (results.rows.length > 0) {
       if (this.useBinaryJSON  === true) {
 	    return this.processLog(results.rows[0].import_jsonb);  
@@ -358,14 +349,11 @@ class PostgresDBI extends YadamuDBI {
   async getPostgisInfo() {
 
     const sqlStatement  =  `SELECT PostGIS_full_version() "POSTGIS"`;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement};\n\--\n`)
-    }
     
     let postgis = undefined
     
     try {
-      const results = await this.pgClient.query(sqlStatement)
+      const results = await this.executeQuery(sqlStatement)
       return results.rows[0].POSTGIS;
 	} catch (e) {
       if (e.code && (e.code === '42883')) {
@@ -382,11 +370,7 @@ class PostgresDBI extends YadamuDBI {
   
     const postgisInfo = await this.getPostgisInfo();
    
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlSystemInformation};\n\--\n`)
-    }
-    
-    const results = await this.pgClient.query(sqlSystemInformation)
+    const results = await this.executeQuery(sqlSystemInformation)
     const sysInfo = results.rows[0];
 	
     return {
@@ -421,12 +405,7 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async fetchMetadata(schema) {
-
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlGenerateQueries};\n\--\n`)
-    }  
-    
-    const results = await this.pgClient.query(sqlGenerateQueries,[schema,this.spatialFormat]);
+    const results = await this.executeQuery(sqlGenerateQueries,[schema,this.spatialFormat]);
     this.metadata = results.rows[0].export_json;
   }
   
@@ -456,14 +435,9 @@ class PostgresDBI extends YadamuDBI {
     return new DBParser(query,objectMode,this.yadamuLogger);
   }  
   
-  async getInputStream(query,parser) {
-        
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${query.SQL_STATEMENT};\n\--\n`)
-    }  
-    
+  async getInputStream(query,parser) {        
     const queryStream = new QueryStream(query.SQL_STATEMENT)
-    return await this.pgClient.query(queryStream)   
+    return await this.executeQuery(queryStream)   
   }      
 
   /*
@@ -472,15 +446,9 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
-  async initializeDataLoad() {
-  }
-  
   async createSchema(schema) {
     const createSchema = `create schema if not exists "${schema}"`;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${createSchema};\n--\n`);
-    }
-    await this.pgClient.query(createSchema);   
+    await this.executeQuery(createSchema);   
   }
   
   async executeDDL(ddl) {
@@ -488,10 +456,7 @@ class PostgresDBI extends YadamuDBI {
     await Promise.all(ddl.map(async function(ddlStatement) {
       try {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
-        }
-        return await this.pgClient.query(ddlStatement);
+        return await this.executeQuery(ddlStatement);
       } catch (e) {
         this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
         this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
@@ -509,15 +474,9 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async insertBatch(sqlStatement,batch) {
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
-    }
-    const result = await this.pgClient.query(sqlStatement,batch)
+    const result = await this.executeQuery(sqlStatement,batch)
     return result;
   }
-  
-  async finalizeDataLoad() {
-  }  
 
 }
 

@@ -328,6 +328,8 @@ class YadamuDBI {
  
     this.rejectManager = this.createRejectManager()
 	
+	this.sqlCumlativeTime = 0
+	
   }
   
   /*  

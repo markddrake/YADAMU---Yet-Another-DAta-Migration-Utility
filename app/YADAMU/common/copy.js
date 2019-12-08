@@ -2,7 +2,7 @@
 
 const YadamuCLI = require('./yadamuCLI.js')
 const Yadamu = require('./yadamu.js')
-const {CommandLineError} = require('./yadamuError.js');
+const {ConfigurationFileError, CommandLineError} = require('./yadamuError.js');
 
 class Copy extends YadamuCLI {
 	
@@ -21,7 +21,7 @@ async function main() {
     yadamuLogger.close(); 
     yadamu.close()  
   } catch (e) {
-	if (e instanceof CommandLineError) {
+	if ((e instanceof CommandLineError) || (e instanceof ConfigurationFileError)) {
       console.log(e.message);
 	}
 	else {

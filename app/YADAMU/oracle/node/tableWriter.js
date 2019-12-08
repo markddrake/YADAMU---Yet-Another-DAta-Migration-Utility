@@ -38,7 +38,8 @@ class TableWriter extends YadamuWriter {
     this.tempLpbCount = 0;
     this.cachedLobCount = 0;
     this.dumpOracleTestcase = false;
-    
+    this.lobCumlativeTime = 0;
+	
     if (this.dbi.dbVersion < 12) {
       this.WKX = require('wkx') 
     }
@@ -247,6 +248,7 @@ class TableWriter extends YadamuWriter {
 
       if (this.bindRowAsLob) {
 	  // Use map combined with Promise.All to convert columns to temporaryLobs
+	  const lobStartTime = performance.now();
         row = await Promise.all(this.tableInfo.binds.map(function(bind,idx){
           if (row[idx] !== null) {
             switch (bind.type) {
@@ -271,6 +273,7 @@ class TableWriter extends YadamuWriter {
           }
           return null;
         },this))
+		this.lobCumlativeTime = this.lobCumlativeTime + (performance.now() - lobStartTime);
         this.lobBatch.push(row);
       }
       else {
@@ -529,6 +532,12 @@ end;`
     // await Promise.all(this.freeLobList());
     this.freeLobList();
     return this.skipTable     
+  }
+  
+  async finalize() {
+	const tableStats = await super.finalize();
+	tableStats.sqlTime = tableStats.sqlTime + this.lobCumlativeTime;
+    return tableStats;  
   }
 }
 

@@ -237,7 +237,14 @@ class MariadbDBI extends YadamuDBI {
     while (true) {
       // Will exit with result or exception.  
       try {
-        return await this.conn.query(sqlStatement,args)
+        const sqlStartTime = performance.now();
+        const results = await this.conn.query(sqlStatement,args)
+        const sqlCumlativeTime = performance.now() - sqlStartTime;
+        if (this.status.sqlTrace) {
+          this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+        }
+        this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime        
+		return results;
       } catch (e) {
         if (attemptReconnect && ((e.fatal) && (e.code && (e.code === 'ER_CMD_CONNECTION_CLOSED') || (e.code === 'ECONNABORTED') || (e.code === 'ER_SOCKET_UNEXPECTED_CLOSE') || (err.code === 'ECONNRESET')))){
           attemptReconnect = false;
@@ -341,8 +348,12 @@ class MariadbDBI extends YadamuDBI {
   */
 
   async abort() {
-    await this.conn.end();
-    await this.pool.end();
+	try {
+      await this.conn.end();
+    } catch (e) {}
+	try {
+      await this.pool.end();
+    } catch (e) {}
   }
 
   /*

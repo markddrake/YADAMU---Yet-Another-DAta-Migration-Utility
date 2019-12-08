@@ -24,7 +24,18 @@ const sqlGatherSchemaStats = `begin dbms_stats.gather_schema_stats(ownname => :t
 
 // LEFT Join works in 11.x databases where 'EXTERNAL' column does not exist in ALL_TABLES
 
-const sqlSchemaTableRows = `select att.TABLE_NAME, NUM_ROWS from ALL_TABLES att LEFT JOIN ALL_EXTERNAL_TABlES axt on att.OWNER = axt.OWNER and att.TABLE_NAME = axt.TABLE_NAME where att.OWNER = :target and axt.OWNER is NULL and SECONDARY = 'N' and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = 'IOT')`;
+const sqlSchemaTableRows = `select att.TABLE_NAME, NUM_ROWS 
+                              from ALL_TABLES att 
+							  LEFT JOIN ALL_EXTERNAL_TABlES axt 
+							         on att.OWNER = axt.OWNER and att.TABLE_NAME = axt.TABLE_NAME 
+					    where att.OWNER = :target 
+						  and axt.OWNER is NULL 
+						  and att.SECONDARY = 'N' 
+						  and att.DROPPED = 'NO'
+                          and att.TEMPORARY = 'N'
+                          and att.NESTED = 'NO'
+						  and (att.IOT_TYPE is NULL or att.IOT_TYPE = 'IOT')`;
+						  
 
 const sqlCompareSchemas = `begin YADAMU_TEST.COMPARE_SCHEMAS(:source,:target,:maxTimestampPrecision); end;`;
 

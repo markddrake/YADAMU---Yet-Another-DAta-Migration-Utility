@@ -803,14 +803,14 @@ class YadamuQA {
 
     }    
 	
-    const dbElapsedTime =  performance.now() - startTime
+    const opsElapsedTime =  performance.now() - startTime
 
     this.fixupTimings(timings);   
     const testParameters = {} // parameters ? Object.assign({},parameters) : {}
 	const compareParms = this.getCompareParameters(sourceDatabase,sourceVersion,targetDatabase,targetVersion,testParameters)
 	// Compare requires Table Mappings in order to process timings correctly
 	await this.compareSchemas(sourceDatabase, sourceConnection, compareParms, sourceSchema, targetDatabase, compareSchema, timings[timings.length-1], false, tableMappings)
-    this.dbRoundtripResults(operationsList,dbElapsedTime)
+    this.dbRoundtripResults(operationsList,opsElapsedTime)
 	
   }
   
@@ -879,7 +879,7 @@ class YadamuQA {
 	    targetSchema2.schema = targetSchema2.schema + "2" 
     }
 
-	const opStartTime = performance.now();
+	const opsStartTime = performance.now();
 
 	// Source File to Target Schema #1
 	
@@ -894,7 +894,7 @@ class YadamuQA {
 	let targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,true)
     let targetDescription = this.getDescription(targetDatabase,targetSchema1)
 	
-	let startTime = opStartTime
+	let startTime = opsStartTime
 	
 	if (test.parser === 'SQL') {
 	  targetDBI.setParameters({"FILE" : sourceFile})
@@ -911,7 +911,8 @@ class YadamuQA {
 	
 	// If the source schema for the export file came from the target database compare the imported schema with the source schema.
 	
-	if (operation.source.directory.indexOf(targetConnectionName) === 0) {
+    let compareStartTime = performance.now();
+    if (operation.source.directory.indexOf(targetConnectionName) === 0) {
       this.fixupTimings(timings);   
       const testParameters = {} // parameters ? Object.assign({},parameters) : {}
 	  const compareParms = this.getCompareParameters(targetDatabase,targetVersion,targetDatabase,targetVersion,testParameters)
@@ -922,7 +923,9 @@ class YadamuQA {
       await compareDBI.initialize();
 	  this.reportRowCounts(await compareDBI.getRowCounts(targetSchema1),timings[timings.length-1],parameters) 
       await compareDBI.finalize();
-    }		
+    }	
+    let compareElapsedTime = (performance.now() - compareStartTime);
+	
 	
 	sourceParameters  = Object.assign({},parameters)
     this.setUser(sourceParameters,'FROM_USER',targetDatabase, targetSchema1)
@@ -971,10 +974,12 @@ class YadamuQA {
 
     // Compare Target Schema #1 and Target Schema #2
 	
+	compareStartTime = performance.now();
     this.fixupTimings(timings);   
     const testParameters = {} // parameters ? Object.assign({},parameters) : {}
 	const compareParams = this.getCompareParameters(targetDatabase,targetVersion,targetDatabase,targetVersion,testParameters)
 	await this.compareSchemas(targetDatabase, targetConnection, compareParams, targetSchema1, targetDatabase, targetSchema2, timings[timings.length-1],false,tableMappings)
+	compareElapsedTime = compareElapsedTime + (performance.now() - compareStartTime);
 
 
 	// Target Schema #2 to File#2
@@ -997,12 +1002,13 @@ class YadamuQA {
     this.printResults('fileRoundTrip',`"${targetConnectionName}"://${sourceDescription}`,`"${sourceConnectionName}"://${targetDescription}`,elapsedTime)
 	this.operationsList.push(`"${sourceConnectionName}"://${targetDescription}`);
 	
+	const opsElapsedTime =  performance.now() - opsStartTime - compareElapsedTime
+	
 	const fileCompareParms = this.getCompareParameters(targetDatabase,targetVersion,'file',0,testParameters)
     const fileCompare = this.getDatabaseInterface('file',{},fileCompareParms,false,tableMappings)
 	await fileCompare.compareFiles(this.yadamuLoggger,sourceFile,file1, file2, timings)
 
-	const opElapsedTime =  performance.now() - opStartTime
-    this.yadamuLogger.log([`${this.constructor.name}.fileRoundtrip()`,`${test.parser === 'SQL' ? 'SQL' : 'CLARINET'}`],`Operation complete: [${this.operationsList[0]}] -->  [${this.operationsList[1]}] --> [${this.operationsList[2]}] --> [${this.operationsList[3]}]  --> [${this.operationsList[4]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(opElapsedTime)}s.`);
+    this.yadamuLogger.log([`${this.constructor.name}.fileRoundtrip()`,`${test.parser === 'SQL' ? 'SQL' : 'CLARINET'}`],`Operation complete: [${this.operationsList[0]}] -->  [${this.operationsList[1]}] --> [${this.operationsList[2]}] --> [${this.operationsList[3]}]  --> [${this.operationsList[4]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(opsElapsedTime)}s.`);
 
   }
 
@@ -1045,12 +1051,8 @@ class YadamuQA {
   	  timings  =await this.yadamu.pumpData(fileReader,targetDBI)
     }
 	
-    const elapsedTime = performance.now() - startTime
+    const opsElapsedTime = performance.now() - startTime
 	const tableMappings = targetDBI.reverseTableMappings();
-    this.printResults('import',`"${sourceConnectionName}"://${sourceDescription}`,`"${targetConnectionName}"://${targetDescription}`,elapsedTime)
-	
-	// ### TODO: Apply TableMappings transformations to timings
-	
 	
 	if ((operation.hasOwnProperty('verify')) && (parameters.MODE !== 'DDL_ONLY')) {
 	  const compareDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,false)
@@ -1058,6 +1060,8 @@ class YadamuQA {
 	  this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),timings,parameters) 
       await compareDBI.finalize();
     }		
+
+    this.printResults('import',`"${sourceConnectionName}"://${sourceDescription}`,`"${targetConnectionName}"://${targetDescription}`,opsElapsedTime)
       
   }
  
@@ -1093,8 +1097,8 @@ class YadamuQA {
   	timings.push(await this.yadamu.pumpData(sourceDBI,fileWriter));
     const elapsedTime = performance.now() - startTime
     const sourceVersion = sourceDBI.dbVersion;
-    this.printResults('export',`"${sourceConnectionName}"://${sourceDescription}`,`"${targetConnectionName}"://${targetDescription}`,elapsedTime)
-	
+	const opsElapsedTime = performance.now() - startTime
+		
 	if (operation.verify) {
       const sourceParameters  = Object.assign({},parameters)
       sourceParameters.FILE = targetFile
@@ -1117,6 +1121,8 @@ class YadamuQA {
       } 
     }
       
+    this.printResults('export',`"${sourceConnectionName}"://${sourceDescription}`,`"${targetConnectionName}"://${targetDescription}`,opsElapsedTime)
+
   }
   
   getTaskList(configuration,task) {

@@ -84,8 +84,6 @@ class TableWriter extends YadamuWriter {
 	    row[idx] = transformation(row[idx])
       }
 	},this)
-    this.tableInfo.bulkOperation.rows.add(...row);
-  }
 
     // Batch Mode : Create one large array. Iterative Mode : Create an Array of Arrays.    
 

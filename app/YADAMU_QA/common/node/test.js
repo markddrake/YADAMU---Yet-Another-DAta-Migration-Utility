@@ -2,7 +2,7 @@
 
 const YadamuCLI = require('../../../YADAMU/common/yadamuCLI.js')
 const Yadamu = require('../../../YADAMU/common/yadamu.js')
-const {CommandLineError} = require('../../../YADAMU/common/yadamuError.js');
+const {ConfigurationFileError, CommandLineError} = require('../../../YADAMU/common/yadamuError.js');
 
 class Test extends YadamuCLI {
 	
@@ -21,7 +21,7 @@ async function main() {
     yadamuLogger.close(); 
     yadamu.close()  
   } catch (e) {
-	if (e instanceof CommandLineError) {
+	if ((e instanceof CommandLineError) || (e instanceof ConfigurationFileError)) {
       console.log(e.message);
 	}
 	else {

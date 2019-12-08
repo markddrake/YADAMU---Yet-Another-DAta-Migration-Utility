@@ -73,8 +73,7 @@ class TableWriter extends YadamuWriter {
 	    row[idx] = transformation(row[idx])
       }
 	},this)
-    this.tableInfo.bulkOperation.rows.add(...row);
-  }
+    this.batch.push(row);
   }
 
   async processWarnings(results) {

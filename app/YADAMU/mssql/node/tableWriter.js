@@ -302,7 +302,7 @@ class TableWriter extends YadamuWriter {
     if (this.tableInfo.bulkSupported) {
       try {        
         await this.dbi.createSavePoint();
-        const results = await this.dbi.getRequest().bulk(this.tableInfo.bulkOperation);
+        const results = await this.dbi.bulkInsert(this.tableInfo.bulkOperation);
         this.endTime = performance.now();
         this.tableInfo.bulkOperation.rows.length = 0;
         return this.skipTable
@@ -331,7 +331,7 @@ class TableWriter extends YadamuWriter {
         for (const col in this.tableInfo.bulkOperation.rows[0]){
            args['C'+col] = this.tableInfo.bulkOperation.rows[row][col]
         }
-        const results = await this.tableInfo.preparedStatement.execute(args);
+        const results = await this.dbi.execute(this.tableInfo.preparedStatement,args,this.tableInfo.dml);
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.rows[row])] : []
         this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.tableInfo.bulkOperation.rows.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);

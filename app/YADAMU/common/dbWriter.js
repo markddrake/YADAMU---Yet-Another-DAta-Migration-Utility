@@ -185,8 +185,8 @@ class DBWriter extends Writable {
     const rowsWritten = rowsRead - skipCount;
     const throughput = isNaN(elapsedTime) ? 'N/A' : Math.round((rowsWritten/elapsedTime) * 1000)
     
-    this.yadamuLogger.log([`${this.constructor.name}`,`${this.tableName}`,`${results.insertMode}`],`Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(elapsedTime))}s. Throughput ${throughput} rows/s.`);
-    this.timings[this.tableName] = {rowCount: this.rowCount, insertMode: results.insertMode,  rowsSkipped: skipCount, elapsedTime: Math.round(elapsedTime).toString() + "ms", throughput: Math.round(throughput).toString() + "/s"};
+    this.yadamuLogger.log([`${this.constructor.name}`,`${this.tableName}`,`${results.insertMode}`],`Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. DB Time: ${YadamuLibrary.stringifyDuration(Math.round(results.sqlTime))}s. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(elapsedTime))}s. Throughput ${throughput} rows/s.`);
+    this.timings[this.tableName] = {rowCount: this.rowCount, insertMode: results.insertMode,  rowsSkipped: skipCount, elapsedTime: Math.round(elapsedTime).toString() + "ms", throughput: Math.round(throughput).toString() + "/s", sqlExecutionTime: Math.round(elapsedTime)};
   }
   
   async initialize() {

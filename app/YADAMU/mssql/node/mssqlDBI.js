@@ -11,6 +11,7 @@ const { performance } = require('perf_hooks');
 
 const sql = require('mssql');
 
+const YadamuLibrary = require('../../common/yadamuLibrary.js')
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
@@ -143,8 +144,15 @@ class MSSQLDBI extends YadamuDBI {
   async getConnectionPool() {
     this.setTargetDatabase();
     this.logConnectionProperties();
+
+    const sqlStartTime = performance.now();
 	const pool = new sql.ConnectionPool(this.connectionProperties)
     await pool.connect();
+    const sqlCumlativeTime = performance.now() - sqlStartTime;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+    }
+    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
 
     const yadamuLogger = this.yadamuLogger;
     pool.on('error',(err, p) => {
@@ -165,15 +173,75 @@ class MSSQLDBI extends YadamuDBI {
     })
     return request
   }
-      
-  
+
+  async executeQuery(sqlStatment,queryable) {
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatment}\ngo\n`)
+    }  
+
+    const sqlStartTime = performance.now();
+    const results = await queryable.query(sqlStatment);  
+    const sqlCumlativeTime = performance.now() - sqlStartTime;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+    }
+    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
+	return results;
+  }     
+ 
+  async executeBatch(sqlStatment,batchable) {
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatment}\ngo\n`)
+    }  
+
+    const sqlStartTime = performance.now();
+    const results = await batchable.batch(sqlStatment);  
+    const sqlCumlativeTime = performance.now() - sqlStartTime;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+    }
+    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
+	return results
+  }     
+
+  async execute(executeable,args,traceEntry) {
+     
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${traceEntry}\ngo\n`)
+    }  
+
+   	const sqlStartTime = performance.now();
+    const results = await executeable.execute(args);
+    const sqlCumlativeTime = performance.now() - sqlStartTime;
+	if (this.status.sqlTrace) {
+	  this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+    }
+    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
+	return results
+  }
+
+  async bulkInsert(bulkOperation) {
+     
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`--\n-- Bulk Operation: ${bulkOperation.path}. Rows ${bulkOperation.rows.length}.\n--\n`);
+    }
+
+   	const sqlStartTime = performance.now();
+    const results = await this.getRequest().bulk(bulkOperation);
+    const sqlCumlativeTime = performance.now() - sqlStartTime;
+	if (this.status.sqlTrace) {
+	  this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+    }
+    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
+	return results
+  }
+
+
   async verifyDataLoad(request,tableSpec) {    
     const statement = `select ISJSON("${tableSpec.columnName}") "VALID_JSON" from "${tableSpec.tableName}"`;
-    const startTime = performance.now();
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${statement}\ngo\n`)
-    }  
-    const results = await request.query(statement);
+    const results = await this.executeQuery(statement,this.getRequest());  
     this.yadamuLogger.log([`${this.constructor.name}.verifyDataLoad()`],`: Upload succesful: ${results.recordsets[0][0].VALID_JSON === 1}. Elapsed time ${performance.now() - startTime}ms.`);
     return results;
   }
@@ -182,11 +250,8 @@ class MSSQLDBI extends YadamuDBI {
     
     if (schema !== 'dbo') {
       const createSchema = `if not exists (select 1 from sys.schemas where name = N'${schema}') exec('create schema "${schema}"')`;
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`${createSchema}\ngo\n`);
-      }
       try {
-        const results = await this.getRequest().batch(createSchema);
+		const results = await this.executeBatch(createSchema,this.getRequest())
       } catch (e) {
         this.yadamuLogger.logException([`${this.constructor.name}.createSchema()`],e)
       }
@@ -202,10 +267,7 @@ class MSSQLDBI extends YadamuDBI {
     for (let ddlStatement of ddl) {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
       try {
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`${ddlStatement}\ngo\n`);
-        }
-        const results = await this.getRequest().batch(ddlStatement)   
+        const results = await this.executeBatch(ddlStatement,this.getRequest());
       } catch (e) {
         this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
         this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
@@ -323,8 +385,20 @@ class MSSQLDBI extends YadamuDBI {
   */
   
   async beginTransaction() {
-    await this.transaction.begin();
+	  
     // console.log(new Error('BEGIN TRANSACTION').stack)
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`begin transaction\ngo\n`);
+    }
+	  
+    const sqlStartTime = performance.now();
+    await this.transaction.begin();
+    const sqlCumlativeTime = performance.now() - sqlStartTime;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+    }
+    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
     this.requestSource = this.transaction
   }
 
@@ -335,8 +409,20 @@ class MSSQLDBI extends YadamuDBI {
   */
   
   async commitTransaction() {
-    await this.transaction.commit();
+	  
     // console.log(new Error('COMMIT TRANSACTION').stack)
+	
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`commit transaction\ngo\n`);
+    }
+	  
+    const sqlStartTime = performance.now();
+    await this.transaction.commit();
+    const sqlCumlativeTime = performance.now() - sqlStartTime;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+    }
+    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
     this.requestSource = this.pool
   }
 
@@ -347,23 +433,30 @@ class MSSQLDBI extends YadamuDBI {
   */
   
   async rollbackTransaction() {
-    await this.transaction.rollback();
+
     // console.log(new Error('ROLLBACK TRANSACTION').stack)
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`rollback transaction\ngo\n`);
+    }
+
+    const sqlStartTime = performance.now();
+    await this.transaction.rollback();
+    const sqlCumlativeTime = performance.now() - sqlStartTime;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+    }
+    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
+
     this.requestSource = this.pool
   }
   
   async createSavePoint() {
-
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlCreateSavePoint}\ngo\n`)
-    }
+    await this.executeQuery(sqlCreateSavePoint,this.getRequest());
   }
   
   async restoreSavePoint() {
-
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlRestoreSavePoint}\ngo\n`)
-    }
+    await this.executeQuery(sqlRestoreSavePoint,this.getRequest());
   }
   
   /*
@@ -416,8 +509,8 @@ class MSSQLDBI extends YadamuDBI {
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`${sqlSystemInformation}\ngo\n`)
     }
-    
-    const results = await this.getRequest().query(sqlSystemInformation);
+
+    const results = await this.executeQuery(sqlSystemInformation, await this.getRequest())
     const sysInfo =  results.recordsets[0][0];
    
     return {
@@ -453,15 +546,13 @@ class MSSQLDBI extends YadamuDBI {
   }
    
   async getSchemaInfo(schemaKey) {
-      
-    const statement = this.sqlTableInfo()
-      
+
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`--\n-- @SCHEMA="${this.parameters[schemaKey]}"\n--\n`)
-      this.status.sqlTrace.write(`${statement}\ngo\n`)
     }
-
-    const results = await this.getRequest().input('SCHEMA',sql.VarChar,this.parameters[schemaKey]).query(statement);
+      
+    const statement = this.sqlTableInfo()
+    const results = await this.executeQuery(statement, this.getRequest().input('SCHEMA',sql.VarChar,this.parameters[schemaKey]))
     return results.recordsets[0]
   
   }
@@ -487,10 +578,6 @@ class MSSQLDBI extends YadamuDBI {
   
   async getInputStream(query,parser) {
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${query.SQL_STATEMENT}\ngo\n`)
-    }
-       
     const readStream = new Readable({objectMode: true });
     readStream._read = function() {};
    
@@ -498,7 +585,7 @@ class MSSQLDBI extends YadamuDBI {
     request.stream = true // You can set streaming differently for each request
     request.on('row', function(row) {readStream.push(row)})
     request.on('done',function(result) {readStream.push(null)});
-    request.query(query.SQL_STATEMENT) 
+	this.executeQuery(query.SQL_STATEMENT,request);
     return readStream;      
   }      
 

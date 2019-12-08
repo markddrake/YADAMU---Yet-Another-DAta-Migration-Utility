@@ -173,15 +173,21 @@ class MySQLDBI extends YadamuDBI {
   establishConnection() {
    
     const self = this
-   
     const conn = this.conn;
+   
     return new Promise(function(resolve,reject) {
+                         const sqlStartTime = performance.now();
                          conn.connect(function(err) {
-                                        if (err) {
-                                          reject(err);
-                                        }
-                                        resolve();
-                                      })
+						   const sqlCumlativeTime = performance.now() - sqlStartTime;
+                           if (self.status.sqlTrace) {
+                             self.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+                           }
+                           self.sqlCumlativeTime = self.sqlCumlativeTime + sqlCumlativeTime
+                           if (err) {
+                             reject(err);
+                           }
+                           resolve();
+                         })
                       })
   } 
 
@@ -232,16 +238,18 @@ class MySQLDBI extends YadamuDBI {
     
     attemptReconnect = attemptReconnect === undefined ? true : attemptReconnect
     const self = this
-    
+  
     return new Promise(
                  function(resolve,reject) {
                    if (self.status.sqlTrace) {
                      self.status.sqlTrace.write(`${sqlStatement};\n--\n`);
                    }
+                   const sqlStartTime = performance.now();
 				   self.conn.query(
                      sqlStatement,
                      args,
                      async function(err,results,fields) {
+                       const sqlCumlativeTime = performance.now() - sqlStartTime;
                        if (err) {
                          if (attemptReconnect && ((err.fatal) && (err.code && (err.code === 'PROTOCOL_CONNECTION_LOST') || (err.code === 'ECONNRESET')))){
                            self.yadamuLogger.warning([`${self.constructor.name}.executeSQL()`],`SQL Operation raised\n${err}`);
@@ -255,6 +263,10 @@ class MySQLDBI extends YadamuDBI {
                            reject(err);
                          }
                        }
+                       if (self.status.sqlTrace) {
+                         self.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+                       }
+                       self.sqlCumlativeTime = self.sqlCumlativeTime + sqlCumlativeTime
                        resolve(results);
                    })
                })
@@ -458,8 +470,7 @@ class MySQLDBI extends YadamuDBI {
   async abort() {
     try {
       await this.conn.end();
-    } catch (e) {
-    }
+    } catch (e) {}
     this.connectionOpen = false;
   }
 

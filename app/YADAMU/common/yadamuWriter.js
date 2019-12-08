@@ -20,9 +20,11 @@ class YadamuWriter {
     this.endTime = undefined;
     this.insertMode = 'Batch';    
     this.suppressBatchWrites = (this.tableInfo.batchSize === this.tableInfo.commitSize)
+	this.sqlInitialTime = this.dbi.sqlCumlativeTime
   }
 
   async initialize() {
+	  
      await this.dbi.beginTransaction()
   }
 
@@ -66,6 +68,7 @@ class YadamuWriter {
     return {
       startTime    : this.startTime
     , endTime      : this.endTime
+	, sqlTime      : this.dbi.sqlCumlativeTime - this.sqlInitialTime
     , insertMode   : this.insertMode
     , skipTable    : this.skipTable
     , batchCount   : this.batchCount

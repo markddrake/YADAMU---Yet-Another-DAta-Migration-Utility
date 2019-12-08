@@ -221,16 +221,14 @@ class StatementGenerator {
 
   async generateStatementCache (executeDDL, vendor, database) {
 
-    const sqlStatement = `SET @RESULTS = '{}'; CALL master.dbo.sp_GENERATE_SQL(?,?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;	
+    const traceEntry = `SET @RESULTS = '{}'; CALL master.dbo.sp_GENERATE_SQL(?,?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;	
     
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement};\n--\n`)
-    }
-    let results = await this.dbi.getRequest()
+    let results = await this.dbi.execute(this.dbi.getRequest()
                             .input('TARGET_DATABASE',sql.VARCHAR,this.targetSchema)
                             .input('SPATIAL_FORMAT',sql.NVARCHAR,this.spatialFormat)
                             .input('METADATA',sql.NVARCHAR,JSON.stringify({metadata : this.metadata}))
-                            .execute('master.dbo.sp_GENERATE_SQL');
+							,'master.dbo.sp_GENERATE_SQL'
+							,traceEntry);
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
     const tables = Object.keys(this.metadata); 
