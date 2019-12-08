@@ -36,11 +36,11 @@ class YadamuQA {
         dbi = new PostgresQA(this.yadamu)
         break;
       case "mssql" :
-        const MsSQLQA = require('../../mssql/node/msSQLQA.js');
+        const MsSQLQA = require('../../mssql/node/mssqlQA.js');
         dbi = new MsSQLQA(this.yadamu)
         break;
       case "mysql" :
-        const MySQLQA = require('../../mysql/node/mySQLQA.js');
+        const MySQLQA = require('../../mysql/node/mysqlQA.js');
         dbi = new MySQLQA(this.yadamu)
         break;
       case "mariadb" :
