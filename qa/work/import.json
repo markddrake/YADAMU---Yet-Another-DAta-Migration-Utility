@@ -6,8 +6,9 @@
   , "FEEDBACK": "COMMIT"
   }
 , "tasks"                             : "qa/regression/exportTasks.json"
-, "tests"                  : [{
-    "source": "file#5"
+, "tests"            
+      : [{
+    "source": "file#4"
   , "targets": ["oracle19c"]
   , "parser" : "CLARINET"
   , "reverseOperations" : true
@@ -16,7 +17,7 @@
       "MODE": "DATA_ONLY"
     }
   , "tasks": [
-       "AdventureWorksDW"
+       "jtest"
     ]
   }]
 }

@@ -128,10 +128,10 @@ class TableWriter extends YadamuWriter {
           return null
       }
     },this)
-
+ 
     this.lobTransformations = new Array(this.tableInfo.binds.length).fill(null);
 	
-    if (this.tableInfo.lobColumns === true) {     
+	if (this.tableInfo.lobColumns === true) {     
 	  this.lobTransformations = this.tableInfo.lobBinds.map(function(lobBind) {
         switch (lobBind.type) {
           case oracledb.CLOB:
@@ -160,7 +160,7 @@ class TableWriter extends YadamuWriter {
 		    return null;
 	    }
       },this)
-    }	
+    }
   }
 
   async initialize() {
@@ -224,13 +224,13 @@ class TableWriter extends YadamuWriter {
 		// Bind Ordering and Row Ordering are the probably different. Use map to create a new array in BindOrdering when applying transformations
 	    row = this.transformations.map(function (transformation,bindIdx) {
           const rowIdx = this.tableInfo.bindOrdering[bindIdx]
-		  if (row[rowIdx] !== null) {
-   	        if (this.lobTransformations[bindIdx] !== null) {
-  		      row[rowIdx] = this.lobTransformations[bindIdx](row[rowIdx],this);
-		    }
+		  if (row[rowIdx] !== null) {			     
             if (transformation !== null) {
 			  row[rowIdx] = transformation(row[rowIdx]);
 			}
+   	        if (this.lobTransformations[bindIdx] !== null) {
+  		      row[rowIdx] = this.lobTransformations[bindIdx](row[rowIdx],this);		      
+		    }
 		  } 			
 		  return row[rowIdx]
 		},this)		
@@ -247,8 +247,9 @@ class TableWriter extends YadamuWriter {
 	  // Row is now in bindOrdering. Convert CLOB and BLOB to temporaryLOBs where necessary
 
       if (this.bindRowAsLob) {
-	  // Use map combined with Promise.All to convert columns to temporaryLobs
-	  const lobStartTime = performance.now();
+		if ((this.batch.length + this.lobBatch.length) === 0)  console.log('Binding LOBS');
+	    // Use map combined with Promise.All to convert columns to temporaryLobs
+	    const lobStartTime = performance.now();
         row = await Promise.all(this.tableInfo.binds.map(function(bind,idx){
           if (row[idx] !== null) {
             switch (bind.type) {
