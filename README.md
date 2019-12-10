@@ -72,3 +72,94 @@ Enter password for Postgres connection: ******
 
 C:\Development\YADAMU>
 ~~~
+YADAMU can also copy data directly between any of the supported databases. When copying between databases a confgurationf file is used to identify the source and target for the copy operation. This prevents the command line from becoming overly complex.
+
+The following shows a simple configuration file that can be used to copy the contents of the Northwind database from SQL Server into MySQL. The file defines two named connections, "sourceDB" and "targetDB". It also defines two named schemas, "sourceSchema" and "targetSchema". It then defines a single job that performs the copy. The JOB consists of a source and a target, which are defined in terms of the named connections and schemas.
+~~~json
+{
+  "connections"                       : {
+    "sourceDB"                        : {
+      "mssql"                         : {  
+        "user"                        : "sa"
+      , "server"                      : "yadamu-db1"
+      , "database"                    : "Northwind"
+      }
+    }
+  , "targetDB"                        : {
+      "mysql"                         : {
+        "user"                        : "root"
+      , "host"                        : "yadamu-db1"
+      , "database"                    : "sys"
+	    }
+    }
+  }
+, "schemas"                           : {
+    "sourceSchema"                    : {
+      "database"                      : "Northwind"
+    , "owner"                         : "dbo"
+    }
+  , "targetSchema"                    : {
+      "schema"                        : "Northwind1"
+    }       
+  }
+, "parameters"                        : {
+    "MODE"                            : "DATA_ONLY"
+  }
+, "jobs"                              : [{
+    "source"                          : {
+      "connection"                    : "sourceDB"
+    , "schema"                        : "sourceSchema"
+    }
+  , "target"                          : {
+      "connection"                    : "targetDB"
+    , "schema"                        : "targetSchema"
+    }
+  }]
+}
+~~~
+It is used with the copy command as shown below
+~~~
+C:\Development\YADAMU>bin\copy CONFIG=qa\regression\sampleJob.json
+
+C:\Development\YADAMU>REM Run from YADAMU_HOME
+
+C:\Development\YADAMU>node C:\Development\YADAMU\app\YADAMU\common\copy.js CONFIG=qa\regression\sampleJob.json
+Enter password for MSSQLSERVER connection: ********
+
+Enter password for MySQL connection: ********
+
+2019-12-10T08:16:50.488Z [DBReader][MSSQLSERVER]: Ready. Mode: DATA_ONLY.
+2019-12-10T08:16:50.489Z [DBWriter][MySQL]: Ready. Mode: DATA_ONLY.
+2019-12-10T08:16:50.698Z [INFO][MySQLDBI.executeDDL()]: Executed 13 DDL statements. Elapsed time: 00:00:00.006s.
+2019-12-10T08:16:50.710Z [DBReader][Categories]: Rows read: 8. Elaspsed Time: 00:00:00.155s. Throughput: 52 rows/s.
+2019-12-10T08:16:50.798Z [DBWriter][Categories][Batch]: Rows written 8. DB Time: 00:00:00.086s. Elaspsed Time 00:00:00.090s. Throughput 89 rows/s.
+2019-12-10T08:16:50.807Z [DBReader][CustomerCustomerDemo]: Rows read: 0. Elaspsed Time: 00:00:00.095s. Throughput: 0 rows/s.
+2019-12-10T08:16:50.808Z [DBWriter][CustomerCustomerDemo][Batch]: Rows written 0. DB Time: 00:00:00.000s. Elaspsed Time 00:00:00.000s. Throughput N/A rows/s.
+2019-12-10T08:16:50.813Z [DBReader][CustomerDemographics]: Rows read: 0. Elaspsed Time: 00:00:00.005s. Throughput: 0 rows/s.
+2019-12-10T08:16:50.823Z [DBWriter][CustomerDemographics][Batch]: Rows written 0. DB Time: 00:00:00.000s. Elaspsed Time 00:00:00.000s. Throughput N/A rows/s.
+2019-12-10T08:16:50.845Z [DBReader][Customers]: Rows read: 91. Elaspsed Time: 00:00:00.022s. Throughput: 4132 rows/s.
+2019-12-10T08:16:50.877Z [DBWriter][Customers][Batch]: Rows written 91. DB Time: 00:00:00.031s. Elaspsed Time 00:00:00.052s. Throughput 1764 rows/s.
+2019-12-10T08:16:50.887Z [DBReader][Employees]: Rows read: 9. Elaspsed Time: 00:00:00.041s. Throughput: 216 rows/s.
+2019-12-10T08:16:50.968Z [DBWriter][Employees][Batch]: Rows written 9. DB Time: 00:00:00.080s. Elaspsed Time 00:00:00.081s. Throughput 112 rows/s.
+2019-12-10T08:16:50.976Z [DBReader][EmployeeTerritories]: Rows read: 49. Elaspsed Time: 00:00:00.087s. Throughput: 559 rows/s.
+2019-12-10T08:16:51.049Z [DBWriter][EmployeeTerritories][Batch]: Rows written 49. DB Time: 00:00:00.072s. Elaspsed Time 00:00:00.073s. Throughput 667 rows/s.
+2019-12-10T08:16:51.104Z [DBReader][Order Details]: Rows read: 2155. Elaspsed Time: 00:00:00.127s. Throughput: 16899 rows/s.
+2019-12-10T08:16:51.200Z [DBWriter][Order Details][Batch]: Rows written 2155. DB Time: 00:00:00.087s. Elaspsed Time 00:00:00.141s. Throughput 15236 rows/s.
+2019-12-10T08:16:51.229Z [DBReader][Orders]: Rows read: 830. Elaspsed Time: 00:00:00.116s. Throughput: 7131 rows/s.
+2019-12-10T08:16:51.301Z [DBWriter][Orders][Batch]: Rows written 830. DB Time: 00:00:00.066s. Elaspsed Time 00:00:00.090s. Throughput 9241 rows/s.
+2019-12-10T08:16:51.307Z [DBReader][Products]: Rows read: 77. Elaspsed Time: 00:00:00.071s. Throughput: 1071 rows/s.
+2019-12-10T08:16:51.329Z [DBWriter][Products][Batch]: Rows written 77. DB Time: 00:00:00.021s. Elaspsed Time 00:00:00.021s. Throughput 3695 rows/s.
+2019-12-10T08:16:51.332Z [DBReader][Region]: Rows read: 4. Elaspsed Time: 00:00:00.024s. Throughput: 163 rows/s.
+2019-12-10T08:16:51.359Z [DBWriter][Region][Batch]: Rows written 4. DB Time: 00:00:00.025s. Elaspsed Time 00:00:00.026s. Throughput 154 rows/s.
+2019-12-10T08:16:51.371Z [DBReader][Shippers]: Rows read: 3. Elaspsed Time: 00:00:00.037s. Throughput: 79 rows/s.
+2019-12-10T08:16:51.399Z [DBWriter][Shippers][Batch]: Rows written 3. DB Time: 00:00:00.027s. Elaspsed Time 00:00:00.026s. Throughput 115 rows/s.
+2019-12-10T08:16:51.400Z [DBReader][Suppliers]: Rows read: 29. Elaspsed Time: 00:00:00.028s. Throughput: 1031 rows/s.
+2019-12-10T08:16:51.439Z [DBWriter][Suppliers][Batch]: Rows written 29. DB Time: 00:00:00.019s. Elaspsed Time 00:00:00.037s. Throughput 790 rows/s.
+2019-12-10T08:16:51.453Z [DBReader][Territories]: Rows read: 53. Elaspsed Time: 00:00:00.033s. Throughput: 1581 rows/s.
+2019-12-10T08:16:51.466Z [DBWriter][Territories][Batch]: Rows written 53. DB Time: 00:00:00.011s. Elaspsed Time 00:00:00.009s. Throughput 5628 rows/s.
+2019-12-10T08:16:51.480Z [Yadamu][COPY]: Operation completed successfully. Elapsed time: 00:00:09.373.
+2019-12-10T08:16:51.481Z [INFO][Copy.doCopy()]: Operation complete. Source:["sourceDB"://"Northwind"."dbo"]. Target:["targetDB"://"Northwind1"].
+2019-12-10T08:16:51.482Z [INFO][Copy.doCopy()]: Operation complete: Configuration:"qa\regression\sampleJob.json". Elapsed Time: 00:00:09.376s.
+
+C:\Development\YADAMU>
+~~~
