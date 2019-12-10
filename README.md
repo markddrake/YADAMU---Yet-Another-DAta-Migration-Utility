@@ -17,7 +17,7 @@ Support for other database and old versions of Oracle Postgres, MySQL and SQL Se
 
 Simple Examples of using YADAMU
 
-Pulling data from Oracle HR database and storing in a file called HR.json
+Pulling data from the HR Schema in an Oracle database iddentified by the TNS Alias ORCL19c and storing it in a file called HR.json
 ~~~
 C:\Development\YADAMU>bin\export rdbms=oracle userid=system/@ORCL19c file=HR.json FROM_USER=HR
 
