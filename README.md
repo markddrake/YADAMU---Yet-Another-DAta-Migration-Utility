@@ -11,48 +11,64 @@ For homogeneous Postgres, MySQL and SQL Server migrations, or hetrogeneous migra
 
 Details about this project can be found [here](http://markddrake.github.io/YADAMU---Yet-Another-DAta-Migration-Utility/docs)
 
-YADAMU currently supports Oracle Database versions 12cR2 and later, Postgres 11,  MySQL 8.0.12 and SQL Server 14.
+YADAMU currently supports Oracle Database versions 11.2.x and later, Postgres 11 and later,  MySQL 8.0.12 and SQL Server 14.
 
 Support for other database and old versions of Oracle Postgres, MySQL and SQL Server is under consideration.
 
-Examples of using YADAMU
+Simple Examples of using YADAMU
 
-Pulling data from SQL Server Northwind database and loading it into Oracle
-
+Pulling data from Oracle HR database and storing in a file called HR.json
 ~~~
-C:\Development\YADAMU\MSSQL>node node\export --USERNAME=sa --PASSWORD=pwd --HOSTNAME=192.168.1.250 --DATABASE=Northwind        --OWNER=\"dbo\"            --FILE=JSON\Northwind.json
-2018-10-20T03:40:52.330Z - Table: "Categories". Rows: 8. Elaspsed Time: 9ms. Throughput: 889 rows/s.
-2018-10-20T03:40:52.338Z - Table: "CustomerCustomerDemo". Rows: 0. Elaspsed Time: 3ms. Throughput: 0 rows/s.
-2018-10-20T03:40:52.340Z - Table: "CustomerDemographics". Rows: 0. Elaspsed Time: 2ms. Throughput: 0 rows/s.
-2018-10-20T03:40:52.356Z - Table: "Customers". Rows: 91. Elaspsed Time: 15ms. Throughput: 6067 rows/s.
-2018-10-20T03:40:52.370Z - Table: "Employees". Rows: 9. Elaspsed Time: 14ms. Throughput: 643 rows/s.
-2018-10-20T03:40:52.375Z - Table: "EmployeeTerritories". Rows: 49. Elaspsed Time: 4ms. Throughput: 12250 rows/s.
-2018-10-20T03:40:52.460Z - Table: "Order Details". Rows: 2155. Elaspsed Time: 85ms. Throughput: 25353 rows/s.
-2018-10-20T03:40:52.521Z - Table: "Orders". Rows: 830. Elaspsed Time: 55ms. Throughput: 15091 rows/s.
-2018-10-20T03:40:52.532Z - Table: "Products". Rows: 77. Elaspsed Time: 5ms. Throughput: 15400 rows/s.
-2018-10-20T03:40:52.537Z - Table: "Region". Rows: 4. Elaspsed Time: 5ms. Throughput: 800 rows/s.
-2018-10-20T03:40:52.547Z - Table: "Shippers". Rows: 3. Elaspsed Time: 3ms. Throughput: 1000 rows/s.
-2018-10-20T03:40:52.552Z - Table: "Suppliers". Rows: 29. Elaspsed Time: 5ms. Throughput: 5800 rows/s.
-2018-10-20T03:40:52.566Z - Table: "Territories". Rows: 53. Elaspsed Time: 4ms. Throughput: 13250 rows/s.
-Export operation successful.
+C:\Development\YADAMU>bin\export rdbms=oracle userid=system/@ORCL19c file=HR.json FROM_USER=HR
 
-C:\Development\YADAMU\MSSQL>cd ..\Oracle
-C:\Development\YADAMU\Oracle>node node/jSaxImport userid=system/oracle@ORCL18c toUser=ADVWRK1 file=..\MSSQL\JSON\Northwind.json
-(node:33520) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
-2018-10-20T03:43:06.625Z: Table "Categories". Rows 8. Elaspsed Time 54ms. Throughput 148 rows/s.
-2018-10-20T03:43:06.632Z: Table "CustomerCustomerDemo". Rows 0. Elaspsed Time 0ms. Throughput NaN rows/s.
-2018-10-20T03:43:06.632Z: Table "CustomerDemographics". Rows 0. Elaspsed Time 0ms. Throughput NaN rows/s.
-2018-10-20T03:43:06.658Z: Table "Customers". Rows 91. Elaspsed Time 21ms. Throughput 4333 rows/s.
-2018-10-20T03:43:06.736Z: Table "Employees". Rows 9. Elaspsed Time 62ms. Throughput 145 rows/s.
-2018-10-20T03:43:06.754Z: Table "EmployeeTerritories". Rows 49. Elaspsed Time 0ms. Throughput Infinity rows/s.
-2018-10-20T03:43:06.869Z: Table "Order Details". Rows 2155. Elaspsed Time 93ms. Throughput 23172 rows/s.
-2018-10-20T03:43:06.922Z: Table "Orders". Rows 830. Elaspsed Time 29ms. Throughput 28621 rows/s.
-2018-10-20T03:43:06.931Z: Table "Products". Rows 77. Elaspsed Time 1ms. Throughput 77000 rows/s.
-2018-10-20T03:43:06.934Z: Table "Region". Rows 4. Elaspsed Time 0ms. Throughput Infinity rows/s.
-2018-10-20T03:43:06.938Z: Table "Shippers". Rows 3. Elaspsed Time 0ms. Throughput Infinity rows/s.
-2018-10-20T03:43:06.968Z: Table "Suppliers". Rows 29. Elaspsed Time 18ms. Throughput 1611 rows/s.
-2018-10-20T03:43:06.973Z: Table "Territories". Rows 53. Elaspsed Time 0ms. Throughput Infinity rows/s.
+C:\Development\YADAMU>REM Run from YADAMU_HOMEC:\Development\YADAMU>node C:\Development\YADAMU\app\YADAMU\common\export.js rdbms=oracle userid=system/@ORCL19c file=HR.json FROM_USER=HR
+Enter password for Oracle connection: ******
 
-Import operation completed successfully.
-C:\Development\YADAMU\Oracle>
+2019-12-10T06:55:52.734Z [DBReader][Oracle]: Ready. Mode: DATA_ONLY.
+2019-12-10T06:55:52.767Z [DBWriter][FILE]: Ready. Mode: DATA_ONLY.
+2019-12-10T06:55:52.776Z [FileDBI]: Writing file "C:\Development\YADAMU\HR.json".
+2019-12-10T06:55:54.039Z [DBReader][JOBS]: Rows read: 19. Elaspsed Time: 00:00:00.006s. Throughput: 2948 rows/s.
+2019-12-10T06:55:54.046Z [DBWriter][JOBS][JSON]: Rows written 19. DB Time: 00:00:00.000s. Elaspsed Time 00:00:00.014s. Throughput 1399 rows/s.
+2019-12-10T06:55:54.052Z [DBReader][REGIONS]: Rows read: 4. Elaspsed Time: 00:00:00.005s. Throughput: 741 rows/s.
+2019-12-10T06:55:54.053Z [DBWriter][REGIONS][JSON]: Rows written 4. DB Time: 00:00:00.000s. Elaspsed Time 00:00:00.006s. Throughput 630 rows/s.
+2019-12-10T06:55:54.064Z [DBReader][COUNTRIES]: Rows read: 25. Elaspsed Time: 00:00:00.010s. Throughput: 2283 rows/s.
+2019-12-10T06:55:54.065Z [DBWriter][COUNTRIES][JSON]: Rows written 25. DB Time: 00:00:00.000s. Elaspsed Time 00:00:00.012s. Throughput 2132 rows/s.
+2019-12-10T06:55:54.087Z [DBReader][EMPLOYEES]: Rows read: 107. Elaspsed Time: 00:00:00.021s. Throughput: 4988 rows/s.
+2019-12-10T06:55:54.088Z [DBWriter][EMPLOYEES][JSON]: Rows written 107. DB Time: 00:00:00.000s. Elaspsed Time 00:00:00.022s. Throughput 4888 rows/s.
+2019-12-10T06:55:54.103Z [DBReader][LOCATIONS]: Rows read: 23. Elaspsed Time: 00:00:00.014s. Throughput: 1610 rows/s.
+2019-12-10T06:55:54.104Z [DBWriter][LOCATIONS][JSON]: Rows written 23. DB Time: 00:00:00.000s. Elaspsed Time 00:00:00.015s. Throughput 1542 rows/s.
+2019-12-10T06:55:54.119Z [DBReader][DEPARTMENTS]: Rows read: 27. Elaspsed Time: 00:00:00.014s. Throughput: 1922 rows/s.
+2019-12-10T06:55:54.122Z [DBWriter][DEPARTMENTS][JSON]: Rows written 27. DB Time: 00:00:00.000s. Elaspsed Time 00:00:00.017s. Throughput 1587 rows/s.
+2019-12-10T06:55:54.132Z [DBReader][JOB_HISTORY]: Rows read: 10. Elaspsed Time: 00:00:00.008s. Throughput: 1150 rows/s.
+2019-12-10T06:55:54.149Z [DBWriter][JOB_HISTORY][JSON]: Rows written 10. DB Time: 00:00:00.000s. Elaspsed Time 00:00:00.026s. Throughput 378 rows/s.
+2019-12-10T06:55:54.183Z [Yadamu][EXPORT]: Operation completed successfully. Elapsed time: 00:00:09.314.
+2019-12-10T06:55:54.207Z [INFO][Export.doExport()]: Operation complete: File:"HR.json". Elapsed Time: 00:00:08.974s.
+
+C:\Development\YADAMU>
+~~~
+Copying the data in HR.json into the HR1 schema in a postgres database named yadamu running on a server called yadamu-db1
+~~~
+C:\Development\YADAMU>bin\import rdbms=postgres username=postgres database=yadamu hostname=yadamu-db1 file=HR.json TO_USER=HR1
+
+C:\Development\YADAMU>REM Run from YADAMU_HOME
+
+C:\Development\YADAMU>node C:\Development\YADAMU\app\YADAMU\common\import.js rdbms=postgres username=postgres database=yadamu hostname=yadamu-db1 file=HR.json TO_USER=HR1
+Enter password for Postgres connection: ******
+
+2019-12-10T07:02:56.494Z [DBReader][FILE]: Ready. Mode: DATA_ONLY.
+2019-12-10T07:02:56.509Z [FileDBI]: Processing file "C:\Development\YADAMU\HR.json". Size 18847 bytes.
+2019-12-10T07:02:56.510Z [DBWriter][Postgres]: Ready. Mode: DATA_ONLY.
+2019-12-10T07:02:57.605Z [INFO][Client.onNotice()]: notice: schema "HR1" already exists, skipping
+2019-12-10T07:02:57.621Z [INFO][PostgresDBI.executeDDL()]: Executed 7 DDL statements. Elapsed time: 00:00:00.016s.
+2019-12-10T07:02:57.641Z [DBWriter][JOBS][Batch]: Rows written 19. DB Time: 00:00:00.015s. Elaspsed Time 00:00:00.015s. Throughput 1307 rows/s.
+2019-12-10T07:02:57.648Z [DBWriter][REGIONS][Batch]: Rows written 4. DB Time: 00:00:00.006s. Elaspsed Time 00:00:00.004s. Throughput 931 rows/s.
+2019-12-10T07:02:57.663Z [DBWriter][COUNTRIES][Batch]: Rows written 25. DB Time: 00:00:00.007s. Elaspsed Time 00:00:00.006s. Throughput 4152 rows/s.
+2019-12-10T07:02:57.694Z [DBWriter][EMPLOYEES][Batch]: Rows written 107. DB Time: 00:00:00.021s. Elaspsed Time 00:00:00.029s. Throughput 3706 rows/s.
+2019-12-10T07:02:57.712Z [DBWriter][LOCATIONS][Batch]: Rows written 23. DB Time: 00:00:00.009s. Elaspsed Time 00:00:00.007s. Throughput 3344 rows/s.
+2019-12-10T07:02:57.725Z [DBWriter][DEPARTMENTS][Batch]: Rows written 27. DB Time: 00:00:00.012s. Elaspsed Time 00:00:00.008s. Throughput 3193 rows/s.
+2019-12-10T07:02:57.736Z [DBWriter][JOB_HISTORY][Batch]: Rows written 10. DB Time: 00:00:00.008s. Elaspsed Time 00:00:00.005s. Throughput 1933 rows/s.
+2019-12-10T07:02:57.774Z [Yadamu][IMPORT]: Operation completed successfully. Elapsed time: 00:00:03.538.
+2019-12-10T07:02:57.864Z [INFO][Import.doImport()]: Operation complete: File:"HR.json". Elapsed Time: 00:00:03.536s.
+
+C:\Development\YADAMU>
 ~~~
