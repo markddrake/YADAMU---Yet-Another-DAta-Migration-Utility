@@ -1,7 +1,7 @@
 # YADAMU - Yet Another Data Migration Utility
 
 This project has morphed in scope from being a simple drop in replacement for Oracle's traditional IMP and EXP utilities.
-It now supports homegeneous IMPORT and EXPORT operations on Oracle 12c, Postgres, MySQL and SQL Server, as well as hetrogeneous migrations between any of the supported databases. Hence the new name - YADAMU. 
+It now supports homegeneous IMPORT and EXPORT operations on Oracle 11g, 12c 18c and 19c, Postgres, MySQL, MariaDB, SQL Server, as well as hetrogeneous migrations between any of the supported databases. Support for MongoDB is also available on an experimental basis. Hence the new name - YADAMU. 
 
 YADAMU migrates DDL and Content.
 
@@ -11,13 +11,13 @@ For homogeneous Postgres, MySQL and SQL Server migrations, or hetrogeneous migra
 
 Details about this project can be found [here](http://markddrake.github.io/YADAMU---Yet-Another-DAta-Migration-Utility/docs)
 
-YADAMU currently supports Oracle Database versions 11.2.x and later, Postgres 11 and later,  MySQL 8.0.12 and SQL Server 14.
+YADAMU currently supports Oracle Database versions 11.2.x and later, Postgres 11 and later,  MySQL 8.0.12, MariaDB 5.5 and SQL Server 14.
 
-Support for other database and old versions of Oracle Postgres, MySQL and SQL Server is under consideration.
+Support for other databases as well as older versions of Oracle, Postgres, MySQL/MariaDB and SQL Server is under consideration.
 
-Simple Examples of using YADAMU
+Simple examples of using YADAMU
 
-Pulling data from the HR Schema in an Oracle database iddentified by the TNS Alias ORCL19c and storing it in a file called HR.json
+Exporting data from the HR Schema in an Oracle database iddentified by the TNS Alias ORCL19c and storing it in a file called HR.json
 ~~~
 C:\Development\YADAMU>bin\export rdbms=oracle userid=system/@ORCL19c file=HR.json FROM_USER=HR
 
@@ -46,7 +46,7 @@ Enter password for Oracle connection: ******
 
 C:\Development\YADAMU>
 ~~~
-Copying the data in HR.json into the HR1 schema in a postgres database named yadamu running on a server called yadamu-db1
+Importing the data in HR.json into the HR1 schema in a postgres database named yadamu running on a server called yadamu-db1
 ~~~
 C:\Development\YADAMU>bin\import rdbms=postgres username=postgres database=yadamu hostname=yadamu-db1 file=HR.json TO_USER=HR1
 
