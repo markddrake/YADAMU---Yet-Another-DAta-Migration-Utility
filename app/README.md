@@ -1,45 +1,15 @@
-# electron-quick-start
+# YADAMU Graphical User Interface.
 
-**Clone and run for a quick way to see Electron in action.**
+The YADAMU Graphical User Interace is build using electron. 
+The interface consists of two panels: The source panel and the target panel. The source panel is used to configure where YADAMU is to read data from. The target panel is used to configure where YADAMU is to write data to. Both panels consist of a series of tabs which allow the user to select a file or enter connnection infomration for a database. Once Source and Target information has been defined use the "Perform Task" <img src="https://raw.githubusercontent.com/encharm/Font-Awesome-SVG-PNG/master/black/png/128/cogs.png" width="20"> button to initiate the operation. Use the "Save Configuration" <img src="https://raw.githubusercontent.com/encharm/Font-Awesome-SVG-PNG/master/black/png/128/save.png" width="20"> button to create a YADAMU configuration file that can be used to repeat the current operation using CONFIG option of the Command Line Interface's copy command.
 
-This is a minimal Electron application based on the [Quick Start Guide](https://electronjs.org/docs/tutorial/quick-start) within the Electron documentation.
+Note The "Perform Task" and "Save Configuration" buttons only become active once both connections have been tested successfully.
 
-**Use this app along with the [Electron API Demos](https://electronjs.org/#get-started) app for API code examples to help you get started.**
 
-A basic Electron application needs just these files:
+The following screenshot show the GUI ready to perform a copy of the HR schema from Oracle to postrgress. 
 
-- `package.json` - Points to the app's main file and lists its details and dependencies.
-- `main.js` - Starts the app and creates a browser window to render HTML. This is the app's **main process**.
-- `index.html` - A web page to render. This is the app's **renderer process**.
+<img src="https://github.com/markddrake/YADAMU---Yet-Another-DAta-Migration-Utility/blob/master/md/assets/screenshots/YADAMU_GUI%231.JPG">
 
-You can learn more about each of these components within the [Quick Start Guide](https://electronjs.org/docs/tutorial/quick-start).
+To start the GUI simply type bin\yadamu from the YADAMU directory. This should launch the application and dispay the GUI 
 
-## To Use
 
-To clone and run this repository you'll need [Git](https://git-scm.com) and [Node.js](https://nodejs.org/en/download/) (which comes with [npm](http://npmjs.com)) installed on your computer. From your command line:
-
-```bash
-# Clone this repository
-git clone https://github.com/electron/electron-quick-start
-# Go into the repository
-cd electron-quick-start
-# Install dependencies
-npm install
-# Run the app
-npm start
-```
-
-Note: If you're using Linux Bash for Windows, [see this guide](https://www.howtogeek.com/261575/how-to-run-graphical-linux-desktop-applications-from-windows-10s-bash-shell/) or use `node` from the command prompt.
-
-## Resources for Learning Electron
-
-- [electronjs.org/docs](https://electronjs.org/docs) - all of Electron's documentation
-- [electronjs.org/community#boilerplates](https://electronjs.org/community#boilerplates) - sample starter apps created by the community
-- [electron/electron-quick-start](https://github.com/electron/electron-quick-start) - a very basic starter Electron app
-- [electron/simple-samples](https://github.com/electron/simple-samples) - small applications with ideas for taking them further
-- [electron/electron-api-demos](https://github.com/electron/electron-api-demos) - an Electron app that teaches you how to use Electron
-- [hokein/electron-sample-apps](https://github.com/hokein/electron-sample-apps) - small demo apps for the various Electron APIs
-
-## License
-
-[CC0 1.0 (Public Domain)](LICENSE.md)
