@@ -1,5 +1,8 @@
 {
-  "connections"                       : "qa/regression/connections.json"
+  "connections"                       : { 
+    "sourceDB"                        : {
+	  "mssql"                         : {
+	     
  ,"schemas"                           : "qa/regression/schemas.json"
  ,"jobs"                            : [{
      "source"                       : {

@@ -3,7 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const Readable = require('stream').Readable;
 const util = require('util')
-const async_hooks = require('async_hooks');
+const { performance } = require('perf_hooks');const async_hooks = require('async_hooks');
+
 /* 
 **
 ** Require Database Vendors API 
@@ -242,7 +243,7 @@ class YadamuDBI {
     }
   }
   
-  async executeDDL(ddl) {
+  async executeDDLImpl(ddl) {
     await Promise.all(ddl.map(async function(ddlStatement) {
       try {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
@@ -255,6 +256,12 @@ class YadamuDBI {
         this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
       } 
     },this))
+  }
+  
+  async executeDDL(ddl) {
+    const startTime = performance.now();
+    await this.executeDDLImpl(ddl);
+    this.yadamuLogger.info([`${this.constructor.name}.executeDDL()`],`Executed ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
   }
   
   createRejectManager() {

@@ -846,8 +846,6 @@ class OracleDBI extends YadamuDBI {
   
   async applyDDL(ddl,sourceSchema,targetSchema) {
 
-    // await this.setCurrentSchema(this.parameters.TO_USER);
-	
     let sqlStatement = `declare V_ABORT BOOLEAN;begin V_ABORT := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENT(:statement,:sourceSchema,:targetSchema); :abort := case when V_ABORT then 1 else 0 end; end;`; 
     let args = {abort:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER} , statement:{type: oracledb.CLOB, maxSize: LOB_STRING_MAX_LENGTH, val:null}, sourceSchema:sourceSchema, targetSchema:this.parameters.TO_USER};
      
@@ -872,7 +870,7 @@ class OracleDBI extends YadamuDBI {
   }
 
   
-  async executeDDL(ddl) {
+  async executeDDLImpl(ddl) {
 	  
     if ((this.maxStringSize < 32768) && (this.statementTooLarge(ddl))) {
       // DDL statements are too large send for server based execution (JSON Extraction will fail)

@@ -2,6 +2,7 @@
 "use strict" 
 const fs = require('fs');
 const Readable = require('stream').Readable;
+const { performance } = require('perf_hooks');
 
 /* 
 **
@@ -81,7 +82,7 @@ class MongoDBI extends YadamuDBI {
   initializeExport() {
   }
                                                                     ;
-  async executeDDL(collectionList) {
+  async executeDDLImpl(collectionList) {
            
     const results = await Promise.all(collectionList.map(function(collectionName) {
       if (this.status.sqlTrace) {

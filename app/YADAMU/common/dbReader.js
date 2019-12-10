@@ -39,7 +39,10 @@ class DBReader extends Readable {
   }
   
   async getDDLOperations() {
-    return this.dbi.getDDLOperations()
+	const startTime = performance.now();
+    const ddl = await this.dbi.getDDLOperations()
+    this.yadamuLogger.info([`${this.dbi.constructor.name}.getDDLOperations()`],`Generated ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+	return ddl
   }
   
   async getMetadata() {

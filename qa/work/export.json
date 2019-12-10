@@ -8,13 +8,13 @@
   }
 , "tasks" : "qa/regression/exportTasks.json"
 , "tests"                  : [{
-    "source": "mssql#1"
+    "source": "oracle19c"
   , "target": "file#3"
   , "parameters": {
       "MODE": "DDL_AND_DATA"
     }
   , "tasks": [
-	  "mssql"
+	  "HR"
     ]
   }] 
 }

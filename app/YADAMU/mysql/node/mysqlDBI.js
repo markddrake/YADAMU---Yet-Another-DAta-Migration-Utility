@@ -62,6 +62,14 @@ const sqlRestoreSavePoint = `ROLLBACK TO SAVEPOINT YadamuInsert`;
 
 const sqlReleaseSavePoint = `RELEASE SAVEPOINT YadamuInsert`;
 
+const CONNECTION_PROPERTY_DEFAULTS = {
+  multipleStatements: true
+, typeCast          : true
+, supportBigNumbers : true
+, bigNumberStrings  : true          
+, dateStrings       : true
+}
+
 class MySQLDBI extends YadamuDBI {
     
   /*
@@ -314,6 +322,12 @@ class MySQLDBI extends YadamuDBI {
     return false;
   }
   
+  setConnectionProperties(connectionProperties) {
+	connectionProperties = Object.assign(connectionProperties,CONNECTION_PROPERTY_DEFAULTS);
+	super.setConnectionProperties(connectionProperties); 
+  }
+	  
+  
   newConnection() {
      
      const self = this;
@@ -380,7 +394,7 @@ class MySQLDBI extends YadamuDBI {
   **
   */
     
-  async executeDDL(ddl) {
+  async executeDDLImpl(ddl) {
     await this.createSchema(this.parameters.TO_USER);
     await Promise.all(ddl.map(function(ddlStatement) {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
@@ -402,20 +416,19 @@ class MySQLDBI extends YadamuDBI {
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 60000
 
   }
+  
+  setConnectionProperties(connectionProperties) {
+	 super.setConnectionProperties(Object.assign(connectionProperties,CONNECTION_PROPERTY_DEFAULTS));
+  }
 
   getConnectionProperties() {
-    return {
+    return Object.assign({
       host              : this.parameters.HOSTNAME
     , user              : this.parameters.USERNAME
     , password          : this.parameters.PASSWORD
     , database          : this.parameters.DATABASE
     , port              : this.parameters.PORT
-    , multipleStatements: true
-    , typeCast          : true
-    , supportBigNumbers : true
-    , bigNumberStrings  : true          
-    , dateStrings       : true
-    }
+    },CONNECTION_PROPERTY_DEFAULTS);
   }
   
   /*  

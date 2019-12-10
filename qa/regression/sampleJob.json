@@ -1,0 +1,40 @@
+{
+  "connections"                         : {
+    "sourceDB"                          : {
+      "mssql"                           : {  
+        "user"                          : "sa"
+      , "server"                        : "yadamu-db1"
+      , "database"                      : "Northwind"
+	  }
+	},
+	"targetDB"                          : {
+	  "mysql"                           : {
+	    "user"                          : "root"
+      , "host"                          : "yadamu-db1"
+      , "database"                      : "sys"
+	  }
+	}
+  }
+ ,"schemas"                           : {
+    "sourceSchema"                    : {
+       "database"                     : "Northwind"
+	 , "owner"                        : "dbo"
+     }
+   , "targetSchema"                   : {
+       "schema"                       : "Northwind1"
+     }       
+  }
+ ,"parameters"                      : {
+    "MODE"                          : "DATA_ONLY"
+  }
+ ,"jobs"                            : [{
+     "source"                       : {
+        "connection"                : "sourceDB"
+      , "schema"                    : "sourceSchema"
+      }
+     ,"target"                      : {
+        "connection"                : "targetDB"
+      , "schema"                    : "targetSchema"
+      }
+   }]
+}

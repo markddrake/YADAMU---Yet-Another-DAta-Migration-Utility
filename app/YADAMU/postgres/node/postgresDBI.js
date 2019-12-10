@@ -268,7 +268,7 @@ class PostgresDBI extends YadamuDBI {
     }    
 
     let inputStream = fs.createReadStream(importFilePath);
-    const stream = this.executeQuery(CopyFrom(copyStatement));
+    const stream = await this.executeQuery(CopyFrom(copyStatement));
     const importProcess = new Promise(async function(resolve,reject) {  
       stream.on('end',function() {resolve()})
   	  stream.on('error',function(err){reject(err)});  	  
@@ -451,7 +451,7 @@ class PostgresDBI extends YadamuDBI {
     await this.executeQuery(createSchema);   
   }
   
-  async executeDDL(ddl) {
+  async executeDDLImpl(ddl) {
     await this.createSchema(this.parameters.TO_USER);
     await Promise.all(ddl.map(async function(ddlStatement) {
       try {

@@ -258,7 +258,7 @@ class MSSQLDBI extends YadamuDBI {
     }     
   }
   
-  async executeDDL(ddl) {
+  async executeDDLImpl(ddl) {
     
     await this.beginTransaction()     
 

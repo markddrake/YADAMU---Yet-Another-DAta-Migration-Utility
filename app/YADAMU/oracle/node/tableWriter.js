@@ -247,7 +247,6 @@ class TableWriter extends YadamuWriter {
 	  // Row is now in bindOrdering. Convert CLOB and BLOB to temporaryLOBs where necessary
 
       if (this.bindRowAsLob) {
-		if ((this.batch.length + this.lobBatch.length) === 0)  console.log('Binding LOBS');
 	    // Use map combined with Promise.All to convert columns to temporaryLobs
 	    const lobStartTime = performance.now();
         row = await Promise.all(this.tableInfo.binds.map(function(bind,idx){
@@ -473,7 +472,6 @@ end;`
           }
         } 
         else {  
-        console.log(e)
           if (this.status.showInfoMsgs) {
             this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`,`${rows.length}`,`${lobInsert ? 'LOB' : 'Normal'}`],`executeMany() operation raised:\n${e}`);
             this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);

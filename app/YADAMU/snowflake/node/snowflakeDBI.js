@@ -115,7 +115,7 @@ class snowflakeDBI extends YadamuDBI {
     })
   }   
 
-  async executeDDL(ddl) {
+  async executeDDLImpl(ddl) {
     const results = await Promise.all(ddl.map(async function(ddlStatement) {
       try {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);

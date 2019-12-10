@@ -27,6 +27,14 @@ const sqlRestoreSavePoint = `ROLLBACK TO SAVEPOINT YadamuInsert`;
 
 const sqlReleaseSavePoint = `RELEASE SAVEPOINT YadamuInsert`;
 
+const CONNECTION_PROPERTY_DEFAULTS = {
+  multipleStatements: true
+, typeCast          : true
+, supportBigNumbers : true
+, bigNumberStrings  : true          
+, dateStrings       : true
+}
+
 class MariadbDBI extends YadamuDBI {
     
   async testConnection(connectionProperties,parameters) {   
@@ -259,7 +267,7 @@ class MariadbDBI extends YadamuDBI {
     } 
   }  
 
-  async executeDDL(ddl) {
+  async executeDDLImpl(ddl) {
     await this.createSchema(this.parameters.TO_USER);
     await Promise.all(ddl.map(function(ddlStatement) {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
@@ -283,19 +291,18 @@ class MariadbDBI extends YadamuDBI {
     this.pool = undefined;
   }
   
+  setConnectionProperties(connectionProperties) {
+	 super.setConnectionProperties(Object.assign(connectionProperties,CONNECTION_PROPERTY_DEFAULTS));
+  }
+
   getConnectionProperties() {
-    return {
+    return Object.assign({
       host              : this.parameters.HOSTNAME
     , user              : this.parameters.USERNAME
     , password          : this.parameters.PASSWORD
     , database          : this.parameters.DATABASE
     , port              : this.parameters.PORT
-    , multipleStatements: true
-    , typeCast          : true
-    , supportBigNumbers : true
-    , bigNumberStrings  : true          
-    , dateStrings       : true    
-    }
+    },CONNECTION_PROPERTY_DEFAULTS);
   }
   
   /*  

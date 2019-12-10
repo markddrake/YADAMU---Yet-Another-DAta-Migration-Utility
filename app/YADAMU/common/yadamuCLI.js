@@ -3,11 +3,12 @@
 const fs = require('fs');
 const path = require('path');
 const { performance } = require('perf_hooks');
+const assert = require('assert');
 
 const Yadamu = require('./yadamu.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuLogger = require('./yadamuLogger.js');
-const {YadamuError, CommandLineError} = require('./yadamuError.js');
+const {YadamuError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
 
 const FileDBI = require('../file/node/fileDBI.js');
 
@@ -121,65 +122,6 @@ class YadamuCLI {
 	    }
 	  }
     }
-	
-	if (operation !== undefined) {
-	  const requiredArguments = REQUIRED_ARGUMENTS[operation];
-	  for (const argument of requiredArguments) {
-	    if (this.parameters[argument] === undefined) {
-		  const err = new CommandLineError(`["${operation}" requires that the following arguments ${JSON.stringify(requiredArguments)} be provided on the command line`)
-          throw err
-	    }
-	  }
-      this.command = operation;
-	}
-	
-	
-    /*
-
-    if ((cmdLineOperation === undefined )  && (operation !== 'YADAMUGUI')) {
-      const err = new Error(`[${operation}] requires one of the following arguments" ${JSON.stringify(validSwitches)} be specified on the command line`)
-	  throw err
-	}
-	
-	
-	
-	if (operation !== 'DEFAULT') {
-      this.targetPath = path.resolve(this.parameters[operation]);
-	  if (FILE_REQURIED.includes(operation)) {
-        try {
-		  if (!fs.statSync(this.targetPath).isFile()) {
-	        const err = new Error(`The value provided for the "${operation}" argument must not be a directory`)
-		    throw err;
-		  }
-	    }
-        catch (e) {
-		  if (e.code && e.code === 'ENOENT') {
-            const err = new Error(`The file specified for the "${operation}" argument ("${this.targetPath}") must exist`)
-	        throw err
-		  }
-		  throw e;
-	    }
-	  }
-      else {
-        if (this.parameters.OVERWRITE !== 'YES') {
-          try {
-  		    if (fs.statSync(this.targetPath)) {
-	          const err = new Error(`The file specified for the "${operation}" argument ("${this.targetPath}") must not exist`)
-		      throw err;
-		    }
-	      }
-          catch (e) {
-			if (e.code && e.code === 'ENOENT') {
-		    }
-			else {
-  		      throw e;
-			}
-	      }
-	    }
-      }	  
-	}
-	this.operation = operation;
-	*/
   }
 
   processCommandLineSwitches() {
@@ -251,6 +193,17 @@ class YadamuCLI {
 	return this.parameters;
   }
 
+
+  validateParameters(parameters) {
+    const requiredArguments = REQUIRED_ARGUMENTS[this.command];
+	for (const argument of requiredArguments) {
+	  if (parameters[argument] === undefined) {
+	    const err = new CommandLineError(`["${this.command}" requires that the following arguments ${JSON.stringify(requiredArguments)} be provided on the command line`)
+        throw err
+	  }
+	}
+	
+  }
   
   loadJSON(path) {
   
@@ -262,13 +215,25 @@ class YadamuCLI {
     ** 
     */ 
 		  
-    const fileContents = fs.readFileSync(path);
 	
 	try {
-	  return JSON.parse(fileContents);
-    } catch (e) {
-	  this.yadamuLogger.error([`${this.constructor.name}.loadJSON()`],`JSON processing error while processing "${path}"`)
-      throw e
+      const fileContents = fs.readFileSync(path);
+	  try {
+	    return JSON.parse(fileContents);
+      } catch (e) {
+        const message = `JSON parsing error "${e.message}" while parsing "${path}".`;
+		this.yadamuLogger.error([`${this.constructor.name}.loadJSON()`],message)   
+        throw new ConfigurationFileError(`[${this.constructor.name}.loadJSON()] ${message}`) 
+      } 
+	} catch (e) {
+      switch (true) {
+		case (e.errno && (e.errno === -4058)):
+		  let message = `Cannot l JSON file "${path}".`;
+		  this.yadamuLogger.error([`${this.constructor.name}.loadJSON()`],message)   
+          throw new CommandLineError(`[${this.constructor.name}.loadJSON()] ${message}`)
+	    default:
+          throw e;		
+	  }
 	}
   }
 	  
@@ -319,15 +284,15 @@ class YadamuCLI {
         dbi = new PostgresDBI(yadamu)
         break;
       case "mssql" :
-        const MsSQLDBI = require('../mssql/node/msSQLDBI.js');
+        const MsSQLDBI = require('../mssql/node/mssqlDBI.js');
         dbi = new MsSQLDBI(yadamu)
         break;
       case "mysql" :
-        const MySQLDBI = require('../mysql/node/mySQLDBI.js');
+        const MySQLDBI = require('../mysql/node/mysqlDBI.js');
         dbi = new MySQLDBI(yadamu)
         break;
       case "mariadb" :
-        const MariaDBI = require('../mariadb/node/mariaDBI.js');
+        const MariaDBI = require('../mariadb/node/mariadbDBI.js');
         dbi = new MariaDBI(yadamu)
         break;
       case "mongodb" :
@@ -341,8 +306,11 @@ class YadamuCLI {
       case "file" :
         dbi = new FileDBI(yadamu)
         break;
-      default:   
-        this.yadamuLogger.log([`${this.constructor.name}.getDatabaseInterface()`,`${driver}`],`Unknown Database.`);  
+      default:
+	    const message = `Unsupported database vendor "${driver}".`
+        this.yadamuLogger.log([`${this.constructor.name}.getDatabaseInterface()`],message);  
+		const err = new ConfigurationFileError(`[${this.constructor.name}.getDatabaseInterface()]: ${message}`);
+		throw err
       }
 	  
 	  dbi.setConnectionProperties(connectionProperties);
@@ -372,13 +340,21 @@ class YadamuCLI {
       // Merge job specific parameters
       Object.assign(jobParameters,job.parameters ? job.parameters : {})
     
-      const sourceSchema = configuration.schemas[job.source.schema]
       const sourceConnection = configuration.connections[job.source.connection]
+	  assert.notStrictEqual(sourceConnection,undefined,new ConfigurationFileError(`Source Connection "${job.source.connection}" not found. Valid connections: "${Object.keys( configuration.connections)}".`))
+	  
+      const sourceSchema = configuration.schemas[job.source.schema]
+	  assert.notStrictEqual(sourceSchema,undefined,new ConfigurationFileError(`Source Schema: Named schema "${job.source.schema}" not found. Valid schemas: "${Object.keys( configuration.schemas)}".`))
+	  
       const sourceDatabase =  Object.keys(sourceConnection)[0];
       const sourceDescription = this.getDescription(sourceDatabase,job.source.connection,sourceSchema)
 
-      const targetSchema = configuration.schemas[job.target.schema]
       const targetConnection = configuration.connections[job.target.connection]
+	  assert.notStrictEqual(targetConnection,undefined,new ConfigurationFileError(`Target Connection "${job.source.connection}" not found. Valid connections: "${Object.keys( configuration.connections)}".`))
+
+      const targetSchema = configuration.schemas[job.target.schema]
+	  assert.notStrictEqual(targetSchema,undefined,new ConfigurationFileError(`Target Schema: Named schema "${job.source.schema}" not found. Valid schemas: "${Object.keys( configuration.schemas)}".`))
+
       const targetDatabase =  Object.keys(targetConnection)[0];
       const targetDescription = this.getDescription(targetDatabase,job.target.connection,targetSchema)
           
@@ -434,6 +410,7 @@ class YadamuCLI {
   
   async doExport() {
 	const yadamu = new Yadamu(this.command);
+	this.validateParameters(yadamu.getCommandLineParameters());
 	const dbi = this.getDatabaseInterface(yadamu,yadamu.getDefaultDatabase(),{},{})
     const startTime = performance.now();
     await yadamu.doExport(dbi);
@@ -456,3 +433,51 @@ class YadamuCLI {
 }
 
 module.exports = YadamuCLI;
+	
+    /*
+
+    if ((cmdLineOperation === undefined )  && (operation !== 'YADAMUGUI')) {
+      const err = new Error(`[${operation}] requires one of the following arguments" ${JSON.stringify(validSwitches)} be specified on the command line`)
+	  throw err
+	}
+	
+	
+	
+	if (operation !== 'DEFAULT') {
+      this.targetPath = path.resolve(this.parameters[operation]);
+	  if (FILE_REQURIED.includes(operation)) {
+        try {
+		  if (!fs.statSync(this.targetPath).isFile()) {
+	        const err = new Error(`The value provided for the "${operation}" argument must not be a directory`)
+		    throw err;
+		  }
+	    }
+        catch (e) {
+		  if (e.code && e.code === 'ENOENT') {
+            const err = new Error(`The file specified for the "${operation}" argument ("${this.targetPath}") must exist`)
+	        throw err
+		  }
+		  throw e;
+	    }
+	  }
+      else {
+        if (this.parameters.OVERWRITE !== 'YES') {
+          try {
+  		    if (fs.statSync(this.targetPath)) {
+	          const err = new Error(`The file specified for the "${operation}" argument ("${this.targetPath}") must not exist`)
+		      throw err;
+		    }
+	      }
+          catch (e) {
+			if (e.code && e.code === 'ENOENT') {
+		    }
+			else {
+  		      throw e;
+			}
+	      }
+	    }
+      }	  
+	}
+	this.operation = operation;
+	*/
+  
