@@ -9,8 +9,6 @@ For homogeneous Oracle migrations all schema objects supported by DBMS_METADATA 
 
 For homogeneous Postgres, MySQL and SQL Server migrations, or hetrogeneous migrations DDL operations are currently restriced to table layouts. Migration of indexes and other schema objects is not currently supported.
 
-Details about this project can be found [here](http://markddrake.github.io/YADAMU---Yet-Another-DAta-Migration-Utility/docs)
-
 YADAMU currently supports Oracle Database versions 11.2.x and later, Postgres 11 and later,  MySQL 8.0.12, MariaDB 5.5 and SQL Server 14.
 
 Support for other databases as well as older versions of Oracle, Postgres, MySQL/MariaDB and SQL Server is under consideration.
@@ -72,7 +70,7 @@ Enter password for Postgres connection: ******
 
 C:\Development\YADAMU>
 ~~~
-YADAMU can also copy data directly between any of the supported databases. When copying between databases a confgurationf file is used to identify the source and target for the copy operation. This prevents the command line from becoming overly complex.
+YADAMU can also copy data directly between any of the supported databases. When copying between databases a confguration file is used to specify the source and target for the copy operation. This prevents the command line from becoming overly complex.
 
 The following shows a simple configuration file that can be used to copy the contents of the Northwind database from SQL Server into MySQL. The file defines two named connections, "sourceDB" and "targetDB". It also defines two named schemas, "sourceSchema" and "targetSchema". It then defines a single job that performs the copy. The JOB consists of a source and a target, which are defined in terms of the named connections and schemas.
 ~~~json
