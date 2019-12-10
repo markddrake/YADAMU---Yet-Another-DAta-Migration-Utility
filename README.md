@@ -163,4 +163,4 @@ Enter password for MySQL connection: ********
 
 C:\Development\YADAMU>
 ~~~
-YADAMU includes a simple Graphical User Interface (GUI) that allows you to peform YADAMU operations without mastering the command line interface. The GUI can also be used to create and edit YADAMU configuration files. You can learn more about YADAMU's GUI here.
+YADAMU includes a simple Graphical User Interface (GUI) that allows you to peform YADAMU operations without mastering the command line interface. The GUI can also be used to create and edit YADAMU configuration files. You can learn more about YADAMU's GUI [here](https://github.com/markddrake/YADAMU---Yet-Another-DAta-Migration-Utility/blob/master/app/README.md).
