@@ -151,10 +151,13 @@ class PostgresDBI extends YadamuDBI {
 	return results
   }
   
+  async getDatabaseConnectionImpl() {
+    this.pgClient = await this.getClient()
+  } 
+  
   async initialize() {
     await super.initialize(true);   
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
-    this.pgClient = await this.getClient()
   }
 
   /*

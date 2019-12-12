@@ -1,0 +1,24 @@
+{
+  "connections"                       : "qa/regression/noPasswords.json"
+ ,"schemas"                           : {
+    "sourceSchema"                    : {
+       "schema"                       : "Northwind"
+     }
+   , "targetSchema"                   : {
+       "schema"                       : "Northwind1"
+     }       
+  }
+ ,"parameters"                      : {
+    "MODE"                          : "DATA_ONLY"
+  }
+ ,"jobs"                            : [{
+     "source"                       : {
+        "connection"                : "oracle19c"
+      , "schema"                    : "sourceSchema"
+      }
+     ,"target"                      : {
+        "connection"                : "postgres#1"
+      , "schema"                    : "targetSchema"
+      }
+   }]
+}

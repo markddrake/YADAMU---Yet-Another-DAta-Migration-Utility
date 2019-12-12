@@ -10,14 +10,14 @@ async function main() {
 
   try {
     const yadamuUpload = new Upload();
-    const yadamu = new Yadamu('UPLOAD',yadamuUpload.getParameters());
-    const yadamuLogger = yadamu.getYadamuLogger();
-    yadamuUpload.setLogger(yadamuLogger);
-    await yadamuUpload.doUpload();
-    yadamuLogger.close(); 
-    yadamu.close()  
+    try {
+      await yadamuUpload.doUpload();
+    } catch (e) {
+      Upload.reportError(e)
+	}
+    await yadamuUpload.close()  
   } catch (e) {
-    console.log(e);
+    Upload.reportError(e)
   }
   
 }

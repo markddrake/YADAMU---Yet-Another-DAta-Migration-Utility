@@ -408,6 +408,7 @@ class OracleDBI extends YadamuDBI {
     if (password.indexOf('@') > -1) {
 	  connectString = password.substring(password.indexOf('@')+1);
 	  password = password.substring(password,password.indexOf('@'));
+      console.log(`${new Date().toISOString()}[WARNING][this.constructor.name]: Suppling a password on the command line interface can be insecure`);
     }
     return {
       user          : user,
@@ -897,10 +898,13 @@ class OracleDBI extends YadamuDBI {
   **
   */
   
+  async getDatabaseConnectionImpl() {
+    this.connection = await this.getConnection(this.connectionProperties,this.status)
+  }
+  
   async initialize() {
     await super.initialize(true);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
-    this.connection = await this.getConnection(this.connectionProperties,this.status)
   }
     
   /*

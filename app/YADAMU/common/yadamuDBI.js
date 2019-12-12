@@ -13,6 +13,7 @@ const { performance } = require('perf_hooks');const async_hooks = require('async
 
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuRejectManager = require('./yadamuRejectManager.js');
+const {YadamuError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
 const DBParser = require('./dbParser.js');
 
 const DEFAULT_BATCH_SIZE   = 10000;
@@ -141,15 +142,6 @@ class YadamuDBI {
     },this) 
   }    
 
-
-  setParameters(parameters) {
-	 Object.assign(this.parameters, parameters ? parameters : {})
-  }
-  
-  setTableMappings(tableMappings) {
-	this.tableMappings = tableMappings
-  }
-
   logConnectionProperties() {    
     if (this.status.sqlTrace) {
       const pwRedacted = Object.assign({},this.connectionProperties)
@@ -184,8 +176,29 @@ class YadamuDBI {
     this.systemInformation = systemInformation
   }
   
+  setMetadata(metadata) {
+    this.metadata = metadata
+    if (this.tableMappings) {
+      this.applyTableMappings()
+    }
+    else {
+      this.validateIdentifiers()
+    }
+  }
+  
+  validateIdentifiers() {
+  }
+  
+  setParameters(parameters) {
+	 Object.assign(this.parameters, parameters ? parameters : {})
+  }
+  
   loadTableMappings(mappingFile) {
     this.tableMappings = require(path.resolve(mappingFile));
+  }
+
+  setTableMappings(tableMappings) {
+	this.tableMappings = tableMappings
   }
 
   reverseTableMappings() {
@@ -228,19 +241,6 @@ class YadamuDBI {
         }
       }   
     },this);   
-  }
-  
-  validateIdentifiers() {
-  }
-  
-  setMetadata(metadata) {
-    this.metadata = metadata
-    if (this.tableMappings) {
-      this.applyTableMappings()
-    }
-    else {
-      this.validateIdentifiers()
-    }
   }
   
   async executeDDLImpl(ddl) {
@@ -287,22 +287,6 @@ class YadamuDBI {
     Object.assign(this.parameters, this.yadamu.getCommandLineParameters());
     
   }
-
-  reportAsyncOperation(...args) {
-	 fs.writeFileSync(this.parameters.PERFORMANCE_TRACE, `${util.format(...args)}\n`, { flag: 'a' });
-  }
-  
-  enablePerformanceTrace() {
- 
-    if (this.parameters.PERFORMANCE_TRACE) {
-      const self = this;
-      this.asyncHook = async_hooks.createHook({
-        init(asyncId, type, triggerAsyncId, resource) {self.reportAsyncOperation(asyncId, type, triggerAsyncId, resource)}
-      }).enable();
-	}
-  }
-  
-
   
   constructor(yadamu,parameters) {
     
@@ -338,15 +322,67 @@ class YadamuDBI {
 	this.sqlCumlativeTime = 0
 	
   }
+
+  enablePerformanceTrace() { 
+    const self = this;
+    this.asyncHook = async_hooks.createHook({
+      init(asyncId, type, triggerAsyncId, resource) {self.reportAsyncOperation(asyncId, type, triggerAsyncId, resource)}
+    }).enable();
+  }
+
+  reportAsyncOperation(...args) {
+	 fs.writeFileSync(this.parameters.PERFORMANCE_TRACE, `${util.format(...args)}\n`, { flag: 'a' });
+  }
   
+  async getDatabaseConnection() {
+	 	
+	let interactiveCredentials = ((this.connectionProperties[this.PASSWORD_KEY_NAME] === undefined) || (this.connectionProperties[this.PASSWORD_KEY_NAME].length === 0)) 
+	let retryCount = interactiveCredentials ? 3 : 1;
+	
+	let prompt = `Enter password for ${this.DATABASE_VENDOR} connection: `
+	while (retryCount > 0) {
+	  retryCount--
+	  if (interactiveCredentials)  {
+  	    const pwQuery = this.yadamu.createQuestion(prompt);
+  	    const password = await pwQuery;
+	    this.connectionProperties[this.PASSWORD_KEY_NAME] = password;
+      }
+	  try {
+        await this.getDatabaseConnectionImpl()	
+		return;
+	  } catch (e) {		
+        switch (retryCount) {
+		  case 0: 
+		    if (interactiveCredentials) {
+		      throw new CommandLineError(`Unable to establish connection to ${this.DATABASE_VENDOR} after 3 attempts. Operation aborted.`);
+		      break;
+			}
+		    else {
+		      throw (e)
+		    }
+		    break;
+          case 1:
+		    console.log(`Database Error: ${e.message}`)
+            break;
+          case 2:			
+		    prompt = `Unable to establish connection. Re-${prompt}`;
+		    console.log(`Database Error: ${e.message}`)
+            break;
+		  default:
+		    throw e
+		}
+	  } 
+    }
+  }
+    
   /*  
   **
   **  Connect to the database. Set global setttings
   **
   */
-  
-  async initialize(ensurePassword) {
-	this.enablePerformanceTrace();
+
+  async initialize(openDatabase) {
+	
     if (this.status.sqlTrace) {
        if (this.status.sqlTrace._writableState.ended === true) {
          this.status.sqlTrace = fs.createWriteStream(this.status.sqlTrace.path,{"flags":"a"})
@@ -374,9 +410,13 @@ class YadamuDBI {
     if (this.parameters.PARAMETER_TRACE === true) {
       this.yadamuLogger.writeDirect(`${util.inspect(this.parameters,{colors:true})}\n`);
     }
-	    
-    if (ensurePassword) {
-      await this.yadamu.ensurePassword(this.DATABASE_VENDOR, this.connectionProperties, this.PASSWORD_KEY_NAME);
+	
+	if (this.parameters.PERFORMANCE_TRACE) {
+      this.enablePerformanceTrace();
+	}
+	
+	if (openDatabase) {
+      await this.getDatabaseConnection();
     }
   }
 

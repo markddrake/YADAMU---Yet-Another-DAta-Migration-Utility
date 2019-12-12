@@ -11,6 +11,7 @@ const DBWriter = require('./dbWriter.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuDefaults = require('./yadamuDefaults.json');
+const {YadamuError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
 
 class Yadamu {
 
@@ -51,27 +52,7 @@ class Yadamu {
 	 return 'file'
   }
   
-  async ensurePassword(vendor,connectionProperties,passwordKey) {
-	if ((connectionProperties[passwordKey] === undefined) || (connectionProperties[passwordKey].length === 0)) {
-      const commandPrompt = readline.createInterface({input: process.stdin, output: process.stdout});
-	  commandPrompt._writeToOutput = function _writeToOutput(charToWrite) {
-        commandPrompt.output.write(charToWrite.length > 1 ? charToWrite : "*")
-      };
-	  	  
-	 	  
-	  const pwQuery = new Promise(function (resolve,reject) {
-        commandPrompt.question(`Enter password for ${vendor} connection: `, function(password) {
-	      commandPrompt.output.write(`\n`)
-          commandPrompt.close();
-		  resolve(password);
-	    })
-	  })
-
-	  const password = await pwQuery;
-	  connectionProperties[passwordKey] = password;
-    }
-  }
-
+ 
   reportStatus(status,yadamuLogger) {
 
     const endTime = performance.now();
@@ -125,6 +106,7 @@ class Yadamu {
 
   async finalize(status,yadamuLogger) {
 
+    this.commandPrompt.close();
     await yadamuLogger.close();
 
     if (status.sqlTrace) {
@@ -136,33 +118,29 @@ class Yadamu {
     await this.finalize(this.status,this.yadamuLogger);
   }
   
-  constructor(operation,parameters) {
-    this.commandLineParameters = this.readCommandLineParameters();
-    this.yadamuLogger = new YadamuLogger(process.stdout)
-    
+  reloadParameters(parameters) {
+	 
+	this.loadParameters(parameters)
+    this.processParameters();    
+  }
+  
+  loadParameters(suppliedParameters) {
+
     // Start with Yadamu Defaults
     this.parameters = Object.assign({}, YadamuDefaults.yadamu);
+
     // Merge parameters read from configuration files
-    Object.assign(this.parameters, parameters ? parameters : {});
+    Object.assign(this.parameters, suppliedParameters ? suppliedParameters : {});
+
     // Merge parameters provided via command line arguments
     Object.assign(this.parameters,this.getCommandLineParameters())
-    
-    this.status = {
-      operation     : operation
-     ,errorRaised   : false
-     ,warningRaised : false
-     ,statusMsg     : 'successfully'
-     ,startTime     : performance.now()
-    }
-	
+
+  }
+
+  processParameters() {
+
     this.yadamuLogger = this.setYadamuLogger(this.parameters,this.status);
 
-    process.on('unhandledRejection', (err, p) => {
-      this.yadamuLogger.logException([`${this.constructor.name}.onUnhandledRejection()`,`"${this.status.operation}"`],err);
-      this.reportStatus(this.status,this.yadamuLogger)
-      process.exit()
-    })
-      
     if (this.parameters.SQL_TRACE) {
 	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQL_TRACE);
     }
@@ -171,17 +149,70 @@ class Yadamu {
       this.status.logFileName = this.parameters.LOG_FILE;
     }
 
+    if (this.parameters.DUMP_FILE) {
+      this.status.dumpFileName = this.parameters.DUMP_FILE
+    }
+
     if (this.parameters.LOG_LEVEL) {
       this.status.loglevel = this.parameters.LOG_LEVEL;
     }
     	
-    if (this.parameters.DUMP_FILE) {
-      this.status.dumpFileName = this.parameters.DUMP_FILE
+    this.status.showInfoMsgs = (this.status.loglevel && (this.status.loglevel > 2));  	
+
+  }	  
+  
+  constructor(operation,parameters) {
+    
+    const self = this; 
+	this.yadamuLogger = new YadamuLogger(process.stdout)
+
+    process.on('unhandledRejection', (err, p) => {
+      self.yadamuLogger.logException([`${self.constructor.name}.onUnhandledRejection()`,`"${self.status.operation}"`],err);
+      self.reportStatus(self.status,self.yadamuLogger)
+      process.exit()
+    })
+
+    this.status = {
+      operation     : operation
+     ,errorRaised   : false
+     ,warningRaised : false
+     ,statusMsg     : 'successfully'
+     ,startTime     : performance.now()
     }
-    
-    this.status.showInfoMsgs = (this.status.loglevel && (this.status.loglevel > 2));  
+
+    // Read Command Line Parameters
+    this.commandLineParameters = this.readCommandLineParameters();
+	this.loadParameters(parameters)
+    this.processParameters();    
+	
+	// Use an object to pass the prompt to ensure changes to prompt are picked up insde the writeToOutput function closure()
+
+    this.cli = { 
+	  "prompt" : null
+	} 
+
+    this.commandPrompt = readline.createInterface({input: process.stdin, output: process.stdout});
+    this.commandPrompt._writeToOutput = function _writeToOutput(charsToWrite) {
+	  if (charsToWrite.startsWith(self.cli.prompt)) {
+        self.commandPrompt.output.write(self.cli.prompt + '*'.repeat(charsToWrite.length-self.cli.prompt.length))
+      } 
+	  else {
+	    self.commandPrompt.output.write(charsToWrite.length > 1 ? charsToWrite : "*")
+      }
+    };	
+	
   }
-    
+     
+  createQuestion(prompt) {	
+    const self = this
+	this.cli.prompt = prompt;
+    return new Promise(function (resolve,reject) {
+      self.commandPrompt.question(self.cli.prompt, function(answer) {
+		resolve(answer);
+	  })
+	})
+  }
+  
   cloneDefaultParameters() {
      const parameters = Object.assign({},YadamuDefaults.yadamu)
      Object.assign(parameters, YadamuDefaults.yadamuDBI)
@@ -258,6 +289,7 @@ class Yadamu {
             break;
           case 'PASSWORD':
           case '--PASSWORD':
+		    console.log(`${new Date().toISOString()}[WARNING][this.constructor.name]: Suppling a password on the command line interface can be insecure`);
             parameters.PASSWORD = parameterValue;
             break;
           case 'DATABASE':
@@ -349,7 +381,7 @@ class Yadamu {
             Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           default:
-            console.log(`${new Date().toISOString()}[Yadamu][WARNING]: Unknown parameter: "${parameterName}". See yadamu --help for supported command line switches and arguments` )          
+            console.log(`${new Date().toISOString()}[WARNING][this.constructor.name]: Unknown parameter: "${parameterName}". See yadamu --help for supported command line switches and arguments` )          
         }
       }
     },this)
@@ -422,6 +454,12 @@ class Yadamu {
 	  this.status.err = e;
       await source.abort();
       await target.abort();
+
+	  if (e instanceof YadamuError) {
+		await this.close();
+	    // Prevent reportError from being called for Yadamu Errors
+		throw e
+	  }
     }
     return timings
   }

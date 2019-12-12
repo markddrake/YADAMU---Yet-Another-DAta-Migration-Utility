@@ -12,13 +12,12 @@ const {YadamuError, CommandLineError, ConfigurationFileError} = require('./yadam
 
 const FileDBI = require('../file/node/fileDBI.js');
 
-const CHECK_SWITCH = ['YADAMUCLI' , 'YADAMUCMD', 'YADAMUGUI']
+const REQUIRES_SWITCH = ['YADAMUCLI' , 'YADAMUCMD']
+const VALID_SWITCHES = ['EXPORT','IMPORT','UPLOAD','COPY','TEST']
 
-const FILE_REQURIED = ['INIT','IMPORT','UPLOAD','COPY','TEST']
-const CONFIGURATION_REQUIRED = ['INIT','COPY','TEST']
-const SUPPORTED_SWITCHES = ['INIT','IMPORT','UPLOAD','EXPORT','COPY','TEST']
-
-const REQUIRES_CONFIG = ['INIT','COPY','TEST']
+const FILE_MUST_EXIST = ['IMPORT']
+const FILE_MUST_NOT_EXIST = ['EXPORT']
+const CONFIGURATION_REQUIRED = ['COPY','TEST']
 
 const SUPPORTED_ARGUMENTS = {
   "YADAMUCMD" : []
@@ -42,14 +41,14 @@ const REQUIRED_ARGUMENTS = {
 , "TEST"   : ['CONFIG']
 }
 
-const UNSUPPORTED_ARGUMENTS = {
+const ILLIEGAL_ARGUMENTS = {
   "YADAMUCLI" : ['FILE','CONFIG','CONFIGURATION']
 , "YADAMUCMD" : ['FILE','CONFIG','CONFIGURATION']
-, "IMPORT"    : ['CONFIG','CONFIGURATION']
-, "UPLOAD"    : ['CONFIG','CONFIGURATION']
-, "EXPORT"    : ['CONGIG','CONFIGURATION']
-, "COPY"      : ['FILE']
-, "TEST"      : ['FILE']
+, "IMPORT"    : ['CONFIG','CONFIGURATION',"FROM_USER","OVERWRITE"]
+, "UPLOAD"    : ['CONFIG','CONFIGURATION',"FROM_USER","OVERWRITE"]
+, "EXPORT"    : ['CONGIG','CONFIGURATION',"TO_USER","FROM_USER"]
+, "COPY"      : ['FILE',"FROM_USER","TO_USER"]
+, "TEST"      : ['FILE',"FROM_USER","TO_USER"]
 }
 
 /*
@@ -86,16 +85,70 @@ const UNSUPPORTED_ARGUMENTS = {
 
 class YadamuCLI {
 
-  constructor() {  
-	this.command = this.constructor.name.toUpperCase()
-	 // Load this.parameters with the command line switches
-    this.processCommandLineSwitches();
-    this.validateSwitch();
+  static reportError(e) {
+	if ((e instanceof CommandLineError) || (e instanceof ConfigurationFileError)) {
+      console.log(e.message);
+	}
+	else {
+      console.log(e);
+  	}
   }
   
-  setLogger(logger) {
-  
-    this.yadamuLogger = logger;
+  checkFileExists(argument) {
+	const relativePath = this.parameters[argument]
+	const resolvedPath = path.resolve(relativePath);
+	try {
+	  if (!fs.statSync(resolvedPath).isFile()) {
+	    const err = new CommandLineError(`Found Directory ["${relativePath}"]. The path specified for the ${argument} argument must not resolve to a directory.`)
+	    throw err;
+	  }
+	}
+    catch (e) {
+	  if (e.code && e.code === 'ENOENT') {
+        const err = new CommandLineError(`File not found ["${relativePath}"]. THe path specified for the ${argument} argument must resolve to existing file.`)
+	    throw err
+	  }
+      throw e;
+    } 
+  }
+
+  checkFileDoesNotExist(argument) {
+	 
+	const relativePath = this.parameters[argument]
+	const resolvedPath = path.resolve(relativePath);
+	try {
+      if (fs.statSync(resolvedPath)) {
+	    const err = new CommandLineError(`File exists ["${relativePath}"]. The path specified for the ${argument} argument must not resolve to an existing file. Specify OVERWRITE=true to allow the file to be overwritten.`)
+	    throw err;
+	  }
+	} catch (e) {
+	  throw e
+	}
+  }
+
+  validateParameters(command) {
+    const requiredArguments = REQUIRED_ARGUMENTS[command];
+	for (const argument of requiredArguments) {
+	  if (this.parameters[argument] === undefined) {
+	    const err = new CommandLineError(`["${this.command}" requires that the following arguments ${JSON.stringify(requiredArguments)} be provided on the command line`)
+        throw err
+	  }
+	}
+    
+	const illegalArguments = ILLIEGAL_ARGUMENTS[command]
+	// TODO ### Check for illegal arguments
+
+    if (CONFIGURATION_REQUIRED.includes(command)) {
+	  this.checkFileExists('CONFIG') 
+    }
+	
+	if (FILE_MUST_EXIST.includes(command)) {
+	  this.checkFileExists('FILE')
+	}
+	
+	if ((FILE_MUST_NOT_EXIST.includes(command)) && (this.parameters.OVERWRITE !== true)) {
+      this.checkFileDoesNotExist('FILE')
+	}
 
   }
   
@@ -103,72 +156,40 @@ class YadamuCLI {
 	return this.command
   }
   
-  
-  validateSwitch() {
-	   
-	// Check for invalid combinations of command line swtiches. This is depenedant on which subclass of yadamuCLI is instantiaed.
-	
-	let operation = CHECK_SWITCH.indexOf(this.command) > -1 ? undefined : this.command;
-    const validSwitches = SUPPORTED_ARGUMENTS[this.command] 
-	const argNames = Object.keys(this.parameters);
-	for (const op of validSwitches) {
-      if (argNames.includes(op)) {
-  	    if (operation === undefined) {
-  	      operation = op
-		}
-		else {
-	      const err = new CommandLineError(`Conflicting operations: Please specify just one of ${JSON.stringify(validSwitches)} on the command line`)
-	      throw err;
-	    }
-	  }
-    }
-  }
-
-  processCommandLineSwitches() {
-   
-    /*
-	**
-	** Read Command Line Parameters that specify the operation to be performed.
-	**
-	*/
-   
+  getOperation(className) {
+	  
+	const commands = []
     this.parameters = {}
- 
     process.argv.forEach(function (arg) {
-     
+ 
       if (arg.indexOf('=') > -1) {
         const parameterName = arg.substring(0,arg.indexOf('='));
         const parameterValue = arg.substring(arg.indexOf('=')+1);
         switch (parameterName.toUpperCase()) {
-	      case 'INIT':		  
-	      case '--INIT':
-  	        this.parameters.INIT = parameterValue;
-  	        this.parameters.CONFIG = parameterValue;
-		    break;
-	      case 'COPY':		  
-	      case '--COPY':
-  	        this.parameters.COPY = parameterValue;
-  	        this.parameters.CONFIG = parameterValue;
-		    break;
-	      case 'TEST':		  
-	      case '--TEST':
-  	        this.parameters.TEST = parameterValue;
-  	        this.parameters.CONFIG = parameterValue;
+	      case 'EXPORT':		  
+	      case '--EXPORT':
+  	        commands.push('EXPORT')
+  	        this.parameters.FILE = parameterValue;
 		    break;
 	      case 'IMPORT':		  
 	      case '--IMPORT':
-  	        this.parameters.IMPORT = parameterValue;
+  	        commands.push('IMPORT')
   	        this.parameters.FILE = parameterValue;
 		    break;
 	      case 'UPLOAD':		  
 	      case '--UPLOAD':
-  	        this.parameters.UPLOAD = parameterValue;
+  	        commands.push('UPLOAD')
   	        this.parameters.FILE = parameterValue;
 		    break;
-	      case 'EXPORT':		  
-	      case '--EXPORT':
-  	        this.parameters.EXPORT = parameterValue;
-  	        this.parameters.FILE = parameterValue;
+	      case 'COPY':		  
+	      case '--COPY':
+  	        commands.push('COPY')
+  	        this.parameters.CONFIG = parameterValue;
+		    break;
+	      case 'TEST':		  
+	      case '--TEST':
+  	        commands.push('TEST')
+  	        this.parameters.CONFIG = parameterValue;
 		    break;
 	      case 'OVERWRITE':		  
 	      case '--OVERWRITE':
@@ -186,25 +207,74 @@ class YadamuCLI {
 		    break;
         }
       }
-    },this)
+    },this)	
+	
+	let err
+	let command
+	
+	if (REQUIRES_SWITCH.indexOf(className) > -1) {
+  	  switch (commands.length) {
+	    case 0:
+          err = new CommandLineError(`Must specify one of ${JSON.stringify(VALID_SWITCHES)} on the command line`)
+	      throw err;
+	      break;
+        case 1:
+		  command = commands[0]
+          break;
+	    default:
+	      err = new CommandLineError(`Conflicting operations: Please specify just one of ${JSON.stringify(VALID_SWITCHES)} on the command line`)
+	      throw err;
+	  }
+	}
+	else {
+      switch (commands.length) {
+	    case 0:
+		  command = className
+	      break;
+	    default:
+		  err = new CommandLineError(`The switches ${JSON.stringify(VALID_SWITCHES)} are not valid with the "${this.constructor.name}" command.`)
+	      throw err;
+	  }
+	}
+	
+	this.validateParameters(command)	
+	return command;
   }
+	  
 
+  constructor() {  
+
+    const className = this.constructor.name.toUpperCase()
+	switch (className) {
+	  case 'EXPORT':
+	  case 'IMPORT':
+	  case 'UPLOAD':
+	  case 'COPY':
+	  case 'TEST':
+	    this.command = this.getOperation(className);
+	    break;
+      default:
+	    this.command = this.getOperation(className)
+	}	
+	
+    this.yadamu = new Yadamu(this.command);
+    this.yadamuLogger = this.yadamu.getYadamuLogger()
+    // this.processCommandLineSwitches();
+    // this.validateSwitch();
+  }
+  
+  async close() {
+    await this.yadamu.close()
+  }
+    
   getParameters() {
 	return this.parameters;
   }
 
-
-  validateParameters(parameters) {
-    const requiredArguments = REQUIRED_ARGUMENTS[this.command];
-	for (const argument of requiredArguments) {
-	  if (parameters[argument] === undefined) {
-	    const err = new CommandLineError(`["${this.command}" requires that the following arguments ${JSON.stringify(requiredArguments)} be provided on the command line`)
-        throw err
-	  }
-	}
-	
+  getYadamu() {
+	return this.yadamu;
   }
-  
+
   loadJSON(path) {
   
     /*
@@ -263,7 +333,7 @@ class YadamuCLI {
   }
   
   loadConfigurationFile() {
-	if (REQUIRES_CONFIG.indexOf(this.command) > -1) {
+	if (CONFIGURATION_REQUIRED.indexOf(this.command) > -1) {
       const configuration = this.loadJSON(this.parameters.CONFIG);
       this.expandConfiguration(configuration);
 	  return configuration;
@@ -320,7 +390,9 @@ class YadamuCLI {
   
   getUser(vendor,schema) {
     
-     return vendor === 'mssql' ? schema.owner : (vendor === 'snowflake' ? schema.snowflake.schema : schema.schema)
+     const user = vendor === 'mssql' ? schema.owner : schema.schema
+	 assert.notStrictEqual(user,undefined,new ConfigurationFileError(`Incorrect schema specification for database vendor "${vendor}".`));
+	 return user
      
   }
   
@@ -350,7 +422,7 @@ class YadamuCLI {
       const sourceDescription = this.getDescription(sourceDatabase,job.source.connection,sourceSchema)
 
       const targetConnection = configuration.connections[job.target.connection]
-	  assert.notStrictEqual(targetConnection,undefined,new ConfigurationFileError(`Target Connection "${job.source.connection}" not found. Valid connections: "${Object.keys( configuration.connections)}".`))
+	  assert.notStrictEqual(targetConnection,undefined,new ConfigurationFileError(`Target Connection "${job.target.connection}" not found. Valid connections: "${Object.keys( configuration.connections)}".`))
 
       const targetSchema = configuration.schemas[job.target.schema]
 	  assert.notStrictEqual(targetSchema,undefined,new ConfigurationFileError(`Target Schema: Named schema "${job.source.schema}" not found. Valid schemas: "${Object.keys( configuration.schemas)}".`))
@@ -379,11 +451,11 @@ class YadamuCLI {
          default:
       }
 
-      const yadamu = new Yadamu(this.command,jobParameters);
-      const sourceDBI = this.getDatabaseInterface(yadamu,sourceDatabase,sourceConnection[sourceDatabase],sourceParameters)
-      const targetDBI = this.getDatabaseInterface(yadamu,targetDatabase,targetConnection[targetDatabase],targetParameters)    
+      this.yadamu.reloadParameters(jobParameters);
+      const sourceDBI = this.getDatabaseInterface(this.yadamu,sourceDatabase,sourceConnection[sourceDatabase],sourceParameters)
+      const targetDBI = this.getDatabaseInterface(this.yadamu,targetDatabase,targetConnection[targetDatabase],targetParameters)    
       
-      await yadamu.doCopy(sourceDBI,targetDBI);      
+      await this.yadamu.doCopy(sourceDBI,targetDBI);      
       this.yadamuLogger.info([`${this.constructor.name}.doCopy()`],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`);
     }
     const elapsedTime = performance.now() - startTime;
@@ -391,29 +463,26 @@ class YadamuCLI {
   }
   
   async doImport() {
-	const yadamu = new Yadamu(this.command);
 	const dbi = this.getDatabaseInterface(yadamu,yadamu.getDefaultDatabase(),{},{})
     const startTime = performance.now();
-    await yadamu.doImport(dbi);
+    await this.yadamu.doImport(dbi);
     const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`${this.constructor.name}.doImport()`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doUpload() {
-	const yadamu = new Yadamu(this.command);
 	const dbi = this.getDatabaseInterface(yadamu,yadamu.getDefaultDatabase(),{},{})
     const startTime = performance.now();
-    await yadamu.doUpload(dbi);
+    await thus.yadamu.doUpload(dbi);
     const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`${this.constructor.name}.doUpload()`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doExport() {
-	const yadamu = new Yadamu(this.command);
 	this.validateParameters(yadamu.getCommandLineParameters());
 	const dbi = this.getDatabaseInterface(yadamu,yadamu.getDefaultDatabase(),{},{})
     const startTime = performance.now();
-    await yadamu.doExport(dbi);
+    await thus.yadamu.doExport(dbi);
     const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`${this.constructor.name}.doExport()`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
@@ -433,51 +502,3 @@ class YadamuCLI {
 }
 
 module.exports = YadamuCLI;
-	
-    /*
-
-    if ((cmdLineOperation === undefined )  && (operation !== 'YADAMUGUI')) {
-      const err = new Error(`[${operation}] requires one of the following arguments" ${JSON.stringify(validSwitches)} be specified on the command line`)
-	  throw err
-	}
-	
-	
-	
-	if (operation !== 'DEFAULT') {
-      this.targetPath = path.resolve(this.parameters[operation]);
-	  if (FILE_REQURIED.includes(operation)) {
-        try {
-		  if (!fs.statSync(this.targetPath).isFile()) {
-	        const err = new Error(`The value provided for the "${operation}" argument must not be a directory`)
-		    throw err;
-		  }
-	    }
-        catch (e) {
-		  if (e.code && e.code === 'ENOENT') {
-            const err = new Error(`The file specified for the "${operation}" argument ("${this.targetPath}") must exist`)
-	        throw err
-		  }
-		  throw e;
-	    }
-	  }
-      else {
-        if (this.parameters.OVERWRITE !== 'YES') {
-          try {
-  		    if (fs.statSync(this.targetPath)) {
-	          const err = new Error(`The file specified for the "${operation}" argument ("${this.targetPath}") must not exist`)
-		      throw err;
-		    }
-	      }
-          catch (e) {
-			if (e.code && e.code === 'ENOENT') {
-		    }
-			else {
-  		      throw e;
-			}
-	      }
-	    }
-      }	  
-	}
-	this.operation = operation;
-	*/
-  

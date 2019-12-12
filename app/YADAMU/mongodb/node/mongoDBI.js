@@ -147,16 +147,18 @@ class MongoDBI extends YadamuDBI {
   **
   */
   
-  
-  async initialize() {
-      
-	  // TODO : Support for Mongo Authentication ???
-     await super.initialize(false);   
+  async getDatabaseConnectionImpl() {
      if (this.status.sqlTrace) {
        this.status.sqlTrace.write(`mongoURL ${this.getMongoURL()}\n`)      
      }
      this.client = new MongoClient(this.getMongoURL(),typeof this.connectionProperties.options === 'object' ? this.connectionProperties.options : {});
      await this.client.connect();     
+  }	  
+  
+  async initialize() {
+      
+	  // TODO : Support for Mongo Authentication ???
+     await super.initialize(false);   
   }
 
   /*

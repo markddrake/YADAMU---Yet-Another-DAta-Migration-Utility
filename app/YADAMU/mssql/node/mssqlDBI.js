@@ -27,7 +27,7 @@ const sqlCreateSavePoint = `SAVE TRANSACTION BulkInsert`;
 
 const sqlRestoreSavePoint = `ROLLBACK TRANSACTION BulkInsert`;
 
-class MSSQLDBI extends YadamuDBI {
+class MsSQLDBI extends YadamuDBI {
     
   /*
   **
@@ -39,7 +39,6 @@ class MSSQLDBI extends YadamuDBI {
     try {
       this.setConnectionProperties(connectionProperties);
       this.setTargetDatabase();
-	  // super.logConnectionParameters();
       const connection = await sql.connect(this.connectionProperties);
       await sql.close();
 	  super.setParameters(parameters)
@@ -148,7 +147,7 @@ class MSSQLDBI extends YadamuDBI {
     const sqlStartTime = performance.now();
 	const pool = new sql.ConnectionPool(this.connectionProperties)
     await pool.connect();
-    const sqlCumlativeTime = performance.now() - sqlStartTime;
+	const sqlCumlativeTime = performance.now() - sqlStartTime;
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
     }
@@ -331,9 +330,12 @@ class MSSQLDBI extends YadamuDBI {
     
   }   
   
+  async getDatabaseConnectionImpl() {
+    this.pool = await this.getConnectionPool()
+  }
+  
   async initialize() {
     await super.initialize(true);   
-    this.pool = await this.getConnectionPool()
     this.transaction = new sql.Transaction(this.pool);
     this.requestSource = this.pool;
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
@@ -607,4 +609,4 @@ class MSSQLDBI extends YadamuDBI {
   
 }
 
-module.exports = MSSQLDBI
+module.exports = MsSQLDBI

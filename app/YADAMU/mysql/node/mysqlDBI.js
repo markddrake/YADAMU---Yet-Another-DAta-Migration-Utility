@@ -82,7 +82,7 @@ class MySQLDBI extends YadamuDBI {
     try {
       this.setConnectionProperties(connectionProperties);
       this.conn = this.newConnection();
-      await this.establishConnection();
+      await this.openDatabaseConnection();
 	  await this.conn.end();
 	  super.setParameters(parameters)
 	} catch (e) {
@@ -178,7 +178,7 @@ class MySQLDBI extends YadamuDBI {
     }
   }
   
-  establishConnection() {
+  openDatabaseConnection() {
    
     const self = this
     const conn = this.conn;
@@ -345,7 +345,7 @@ class MySQLDBI extends YadamuDBI {
     this.logConnectionProperties();
 
     this.conn = this.newConnection();
-    await this.establishConnection();
+    await this.openDatabaseConnection();
 	// console.log('Setting KeepAlive to 5 Mins')
     // this.conn._socket.setKeepAlive(true, 3600000);
 
@@ -353,7 +353,7 @@ class MySQLDBI extends YadamuDBI {
     
     if (await this.setMaxAllowedPacketSize()) {
       this.conn = this.newConnection();
-      await this.establishConnection();
+      await this.openDatabaseConnection();
       this.connectionOpen = true;
     }
 
@@ -456,11 +456,14 @@ class MySQLDBI extends YadamuDBI {
     }  
   }    
   
+  async getDatabaseConnectionImpl() {
+	await this.getConnection();
+  }
+  
   async initialize() {
     await super.initialize(true);   
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
     this.setSpatialSerializer(this.spatialFormat);
-    await this.getConnection();
   }
 
   /*

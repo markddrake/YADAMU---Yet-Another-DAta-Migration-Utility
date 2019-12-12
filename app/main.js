@@ -16,10 +16,9 @@ let targetDBI = undefined;
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 
-function finalize(yadamu) {
+async function finalize(yadamu) {
 	
-  yadamuLogger.close(); 
-  yadamu.close()
+  await electronCmd.close();
   app.quit();
   
 }
@@ -28,44 +27,45 @@ async function main() {
 
   try {
 	// Override default Electron processing of uncaughtException
-    process.on('uncaughtException', function (e) { console.log(e);app.quit()});
-
-    const elecctronCmd = new YadamuGUI();
-    const operation = elecctronCmd.getCommand()
-    yadamu = new Yadamu(operation,elecctronCmd.getParameters());
-    yadamuLogger = yadamu.getYadamuLogger();
-	// First line offset 1 character to right when writing to console in Electron
-	yadamuLogger.writeDirect('\n');
-    elecctronCmd.setLogger(yadamuLogger);
-
-    switch (operation) {
-      case 'IMPORT':
-	    await elecctronCmd.doImport();
-		finalize(yadamu)
-     	break;
-	  case 'UPLOAD':
-	    await elecctronCmd.doUpload();
-		finalize(yadamu)
-	    break;
-	  case 'EXPORT':
-	    await elecctronCmd.doExport();
-		finalize(yadamu)
-	    break;
-	  case 'COPY':
-  	    await elecctronCmd.doCopy();
-		finalize(yadamu)
-	    break;
-	  case 'TEST':
-  	    await elecctronCmd.doTests();
-		finalize(yadamu)
-	    break;
-	  default:
-	    createWindow(operation,elecctronCmd.loadConfigurationFile())
-    } 
+    process.on('uncaughtException', function (e) { console.log(e);finalize()});
+    electronCmd = new YadamuGUI();
+    try {
+      const commamd = electronCmd.getCommand()
+      switch (commamd) {
+        case 'IMPORT':
+	      await electronCmd.doImport();
+		  await finalize()
+          break;
+        case 'UPLOAD':
+          await electronCmd.doUpload();
+          await finalize()
+          break;
+        case 'EXPORT':
+          await electronCmd.doExport();
+          await finalize()
+          break;
+        case 'COPY':
+          await electronCmd.executeJobs();
+          await finalize()
+          break;
+        case 'TEST':
+          await electronCmd.doTests();
+          await finalize()
+          break;
+  	    default:
+		  yadamu = electronCmd.getYadamu()
+		  yadamuLogger = yadamu.getYadamuLogger()
+	      createWindow(commamd,electronCmd.loadConfigurationFile())
+      } 
+	} catch (e) {
+      console.log(e)
+      await finalize()
+	}
   } catch (e) {
-    console.log(e);
-	app.quit();
-  }
+    console.log(e)
+    await finalize()
+  } 
+
 }
 
 function createWindow (operation,configuration) {
