@@ -175,6 +175,7 @@ class TextParser extends Transform {
          break;
         case 2:
           if (self.dataPhase) {
+		    self.push({eod: self.currentTable})
             self.tableList.delete(self.currentTable);
           }
           break;

@@ -8,6 +8,8 @@ const { performance } = require('perf_hooks');
 const FileDBI = require('../file/node/fileDBI.js');
 const DBReader = require('./dbReader.js');
 const DBWriter = require('./dbWriter.js');
+const DBReaderParallel = require('./dbReaderMaster.js');
+const DBWriterParallel = require('./dbWriterMaster.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuDefaults = require('./yadamuDefaults.json');
@@ -78,7 +80,7 @@ class Yadamu {
     }
   }
 
-  static processValue(parameterValue) {
+  processValue(parameterValue) {
 
     if ((parameterValue.startsWith('"') && parameterValue.endsWith('"')) && (parameterValue.indexOf('","') > 0 )) {
       // List of Values
@@ -93,7 +95,7 @@ class Yadamu {
     }
   }
 
-  static ensureNumeric(parameters,parameterName,parameterValue) {
+  ensureNumeric(parameters,parameterName,parameterValue) {
      
      if (isNaN(parameterValue)) {
        console.log(`${new Date().toISOString()}[Yadamu]: Invalid Numeric value for parameter: "${parameterName}".`)         
@@ -104,6 +106,23 @@ class Yadamu {
 
   }
 
+  isTrue(value){
+    if (typeof(value) === 'string'){
+        value = value.trim().toLowerCase();
+    }
+    switch(value){
+        case true:
+        case "true":
+        case 1:
+        case "1":
+        case "on":
+        case "yes":
+            return true;
+        default: 
+            return false;
+    }
+  }
+  
   async finalize(status,yadamuLogger) {
 
     this.commandPrompt.close();
@@ -271,7 +290,7 @@ class Yadamu {
             break;
 	      case 'OVERWRITE':		  
 	      case '--OVERWRITE':
-  	        parameters.OVERWRITE = parameterValue.toUpperCase();
+  	        parameters.OVERWRITE = this.isTrue(parameterValue.toUpperCase());
 		    break;
           case 'CONFIG':
           case '--CONFIG':
@@ -289,7 +308,7 @@ class Yadamu {
             break;
           case 'PASSWORD':
           case '--PASSWORD':
-		    console.log(`${new Date().toISOString()}[WARNING][this.constructor.name]: Suppling a password on the command line interface can be insecure`);
+		    console.log(`${new Date().toISOString()}[WARNING][${this.constructor.name}]: Suppling a password on the command line interface can be insecure`);
             parameters.PASSWORD = parameterValue;
             break;
           case 'DATABASE':
@@ -319,13 +338,17 @@ class Yadamu {
           case '--OWNER':
           case 'FROM_USER':
           case '--FROM_USER':
-            parameters.FROM_USER = Yadamu.processValue(parameterValue);
+            parameters.FROM_USER = this.processValue(parameterValue);
             break;
           case 'TOUSER':
           case '--TOUSER':
           case 'TO_USER':
           case '--TO_USER':
-            parameters.TO_USER = Yadamu.processValue(parameterValue);
+            parameters.TO_USER = this.processValue(parameterValue);
+            break;
+          case 'PARALLEL':
+          case '--PARALLEL':
+            parameters.PARALLEL = parameterValue;
             break;
           case 'LOG_FILE':
           case '--LOG_FILE':
@@ -370,15 +393,15 @@ class Yadamu {
             break
           case 'BATCH_SIZE':
           case '--BATCH_SIZE':
-            Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
+            this.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           case 'BATCH_COMMIT':
           case '--BATCH_COMMIT':
-            Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
+            this.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           case 'BATCH_LOB_COUNT':
           case '--BATCH_LOB_COUNT':
-            Yadamu.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
+            this.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           default:
             console.log(`${new Date().toISOString()}[WARNING][this.constructor.name]: Unknown parameter: "${parameterName}". See yadamu --help for supported command line switches and arguments` )          
@@ -407,15 +430,15 @@ class Yadamu {
 
   }
 
-  async getDBReader(dbi) {
-    const dbReader = new DBReader(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
+  async getDBReader(dbi,parallel) {
+	const dbReader = parallel ? new DBReaderParallel(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger) : new DBReader(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
 	await dbReader.initialize();
     return dbReader;
   }
   
-  async getDBWriter(dbi) {
-    const dbWriter = new DBWriter(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
-	await dbWriter.initialize();
+  async getDBWriter(dbi,parallel) {
+	const dbWriter = parallel ? new DBWriterParallel(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger) : new DBWriter(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
+    await dbWriter.initialize();
     return dbWriter;
   }
 
@@ -427,8 +450,10 @@ class Yadamu {
       const self = this
       await source.initialize();
       await target.initialize();
-      const dbReader = await this.getDBReader(source)
-      const dbWriter = await this.getDBWriter(target)  
+	  let parallel = ((this.parameters.PARALLEL) && (this.parameters.PARALLEL > 1))
+	  parallel = (parallel && source.isDatabase() && target.isDatabase());
+      const dbReader = await this.getDBReader(source,parallel)
+      const dbWriter = await this.getDBWriter(target,parallel)  
 	  const inputStream = dbReader.getReader();
       const copyOperation = new Promise(function (resolve,reject) {
         try {

@@ -128,7 +128,7 @@ class DBInterface extends YadamuDBI {
   }
    
   
-  async getInputStream(query,parser) {
+  async getInputStream(tableInfo,parser) {
   }      
   
   async generateStatementCache(schema,executeDDL) {

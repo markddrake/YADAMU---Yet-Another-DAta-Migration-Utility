@@ -1,30 +1,22 @@
 "use strict" 
 
-const Transform = require('stream').Transform;
+const YadamuParser = require('../../common/yadamuParser.js')
 
-class DBParser extends Transform {
+class DBParser extends YadamuParser {
   
-  constructor(query,objectMode,yadamuLogger) {
-    super({objectMode: true });   
-    this.query = query;
-    this.objectMode = objectMode
-    this.yadamuLogger = yadamuLogger;
-    this.counter = 0
-  }
-
-  getCounter() {
-    return this.counter;
+  constructor(tableInfo,objectMode,yadamuLogger) {
+    super(tableInfo,objectMode,yadamuLogger);      
   }
   
   async _transform (data,encodoing,done) {
     this.counter++;
-    if (this.query.stripID === true) {
+    if (this.tableInfo.stripID === true) {
       delete data._id
     }
 	
-    switch (this.query.transformation) {
+    switch (this.tableInfo.transformation) {
 	  case 'DOCUMENT_TO_ARRAY' :
-        data = this.query.columns.map(function(key) {
+        data = this.tableInfo.columns.map(function(key) {
           return data[key]
         },this)
 		break;

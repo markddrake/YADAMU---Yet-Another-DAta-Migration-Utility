@@ -3,18 +3,18 @@
 , "clone"                             : true
 , "connections"                       : "qa/regression/connections.json"
 , "parameters": {
-    "MODE": "DDL_AND_DATA"
+    "MODE": "DDL_ONLY"
   , "FEEDBACK": "COMMIT"
   }
 , "tasks" : "qa/regression/exportTasks.json"
 , "tests"                  : [{
-    "source": "oracle19c"
-  , "target": "file#3"
+    "source": "mssql#1"
+  , "target": "file#4"
   , "parameters": {
-      "MODE": "DDL_AND_DATA"
+      "MODE": "DATA_ONLY"
     }
   , "tasks": [
-	  "HR"
+	  "HumanResources"
     ]
   }] 
 }

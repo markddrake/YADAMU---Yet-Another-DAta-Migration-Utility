@@ -51,6 +51,10 @@ const ILLIEGAL_ARGUMENTS = {
 , "TEST"      : ['FILE',"FROM_USER","TO_USER"]
 }
 
+const ENUMERATED_PARAMETERS = {
+  "MODE" : ['DDL_ONLY','DATA_ONLY','DDL_AND_DATA']
+}
+
 /*
 **
 ** Instantiated directly Electron app.
@@ -128,9 +132,11 @@ class YadamuCLI {
 
   validateParameters(command) {
     const requiredArguments = REQUIRED_ARGUMENTS[command];
+    const cmdLineParamters = this.yadamu.getCommandLineParameters()
+	
 	for (const argument of requiredArguments) {
-	  if (this.parameters[argument] === undefined) {
-	    const err = new CommandLineError(`["${this.command}" requires that the following arguments ${JSON.stringify(requiredArguments)} be provided on the command line`)
+	  if (cmdLineParamters[argument] === undefined) {
+	    const err = new CommandLineError(`"${command}" requires that the following arguments ${JSON.stringify(requiredArguments)} be provided on the command line`)
         throw err
 	  }
 	}
@@ -146,10 +152,18 @@ class YadamuCLI {
 	  this.checkFileExists('FILE')
 	}
 	
-	if ((FILE_MUST_NOT_EXIST.includes(command)) && (this.parameters.OVERWRITE !== true)) {
+	if ((FILE_MUST_NOT_EXIST.includes(command)) && (cmdLineParamters.OVERWRITE !== true)) {
       this.checkFileDoesNotExist('FILE')
 	}
 
+    for (const parameter of Object.keys(cmdLineParamters)) {
+	  if (ENUMERATED_PARAMETERS[parameter] !== undefined) {
+	    if (!ENUMERATED_PARAMETERS[parameter].includes(cmdLineParamters[parameter])) {
+  	      const err = new CommandLineError(`Valid values for parameter "${parameter}" are ${JSON.stringify(ENUMERATED_PARAMETERS[parameter])}.`)
+          throw err
+	    }
+	  }
+    }	
   }
   
   getCommand() {
@@ -204,8 +218,8 @@ class YadamuCLI {
 	      case 'CONFIGURATION':		  
 	      case '--CONFIGURATION':
   	        this.parameters.CONFIG = parameterValue;
-		    break;
-        }
+		    break;   
+		}
       }
     },this)	
 	
@@ -237,7 +251,6 @@ class YadamuCLI {
 	  }
 	}
 	
-	this.validateParameters(command)	
 	return command;
   }
 	  
@@ -255,12 +268,22 @@ class YadamuCLI {
 	    break;
       default:
 	    this.command = this.getOperation(className)
-	}	
-	
+	}		
+
     this.yadamu = new Yadamu(this.command);
     this.yadamuLogger = this.yadamu.getYadamuLogger()
-    // this.processCommandLineSwitches();
-    // this.validateSwitch();
+
+	try {
+	  this.validateParameters(this.command)	
+	} catch (e) {
+      try {
+		// Should this be 'awaited'...
+	    this.yadamu.close()
+      } catch(e) {
+	    console.log(e)
+	  }
+      throw e
+	}
   }
   
   async close() {
@@ -463,7 +486,7 @@ class YadamuCLI {
   }
   
   async doImport() {
-	const dbi = this.getDatabaseInterface(yadamu,yadamu.getDefaultDatabase(),{},{})
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.getDefaultDatabase(),{},{})
     const startTime = performance.now();
     await this.yadamu.doImport(dbi);
     const elapsedTime = performance.now() - startTime;
@@ -471,18 +494,17 @@ class YadamuCLI {
   }
   
   async doUpload() {
-	const dbi = this.getDatabaseInterface(yadamu,yadamu.getDefaultDatabase(),{},{})
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.getDefaultDatabase(),{},{})
     const startTime = performance.now();
-    await thus.yadamu.doUpload(dbi);
+    await this.yadamu.doUpload(dbi);
     const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`${this.constructor.name}.doUpload()`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doExport() {
-	this.validateParameters(yadamu.getCommandLineParameters());
-	const dbi = this.getDatabaseInterface(yadamu,yadamu.getDefaultDatabase(),{},{})
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.getDefaultDatabase(),{},{})
     const startTime = performance.now();
-    await thus.yadamu.doExport(dbi);
+    await this.yadamu.doExport(dbi);
     const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`${this.constructor.name}.doExport()`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }

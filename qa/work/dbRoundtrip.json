@@ -7,13 +7,13 @@
   }
 , "tasks"                             : "qa/regression/dbRoundtripTasks.json"
 , "tests"                  : [{
-    "source": "mssql#1"
+    "source": "postgres#1"
   , "targets": ["oracle19c"]
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
   , "tasks": [
-      "WWI_Integration#1"
+      "PM#1"
     ]
   }]
 }

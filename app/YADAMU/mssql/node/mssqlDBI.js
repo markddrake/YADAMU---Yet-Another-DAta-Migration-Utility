@@ -11,6 +11,21 @@ const { performance } = require('perf_hooks');
 
 const sql = require('mssql');
 
+/*
+**
+** Unlike most Driver's which have a concept of a pool and connections MsSQL uses pool and request. 
+** The pool which acts a requestProvider, providing request objects on demand.
+** Each request is good for one operation.
+**
+** When working in parallel Master and Slave instances share the same Pool.
+**
+** Transactions are managed via a Transaction object. The transaction object owns a connection.
+** Each instance of the DBI owns it's own Transaction object. 
+** When operations need to be transactional the Transaction object becomes the requestProvider for the duration of the transaction.
+**
+*/
+
+
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const DBParser = require('./dbParser.js');
@@ -35,6 +50,60 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
   
+  sqlTableInfo() {
+     
+    let spatialClause = `concat('"',"COLUMN_NAME",'".${this.spatialSerializer} "',"COLUMN_NAME",'"')`
+   
+    if (this.parameters.SPATIAL_MAKE_VALID === true) {
+      spatialClause = `concat('case when "',"COLUMN_NAME",'".STIsValid = 0 then "',"COLUMN_NAME",'".makeValid().${this.spatialSerializer} else "',"COLUMN_NAME",'".${this.spatialSerializer} "',"COLUMN_NAME",'"')`
+    }
+      
+    return `select t."TABLE_SCHEMA" "TABLE_SCHEMA"
+                  ,t."TABLE_NAME"   "TABLE_NAME"
+                  ,string_agg(concat('"',c."COLUMN_NAME",'"'),',') within group (order by "ORDINAL_POSITION") "COLUMN_LIST"
+                  ,string_agg(concat('"',"DATA_TYPE",'"'),',') within group (order by "ORDINAL_POSITION") "DATA_TYPES"
+                  ,string_agg(concat('"',"COLLATION_NAME",'"'),',') within group (order by "ORDINAL_POSITION") "COLLATION_NAMES"
+                  ,string_agg(case
+                                 when ("NUMERIC_PRECISION" is not null) and ("NUMERIC_SCALE" is not null) 
+                                   then concat('"',"NUMERIC_PRECISION",',',"NUMERIC_SCALE",'"')
+                                 when ("NUMERIC_PRECISION" is not null) 
+                                   then concat('"',"NUMERIC_PRECISION",'"')
+                                 when ("DATETIME_PRECISION" is not null)
+                                   then concat('"',"DATETIME_PRECISION",'"')
+                                 when ("CHARACTER_MAXIMUM_LENGTH" is not null)
+                                   then concat('"',"CHARACTER_MAXIMUM_LENGTH",'"')
+                                 else
+                                   '""'
+                               end
+                              ,','
+                             )
+                    within group (order by "ORDINAL_POSITION") "SIZE_CONSTRAINTS"
+                   ,concat('select ',string_agg(case 
+                                                  when "DATA_TYPE" = 'hierarchyid' then
+                                                    concat('cast("',"COLUMN_NAME",'" as NVARCHAR(4000)) "',"COLUMN_NAME",'"') 
+                                                  when "DATA_TYPE" in ('geography','geometry') then
+                                                    ${spatialClause}
+                                                  when "DATA_TYPE" = 'datetime2' then
+                                                    concat('convert(VARCHAR(33),"',"COLUMN_NAME",'",127) "',"COLUMN_NAME",'"') 
+                                                  when "DATA_TYPE" = 'datetimeoffset' then
+                                                    concat('convert(VARCHAR(33),"',"COLUMN_NAME",'",127) "',"COLUMN_NAME",'"') 
+                                                  when "DATA_TYPE" = 'xml' then
+                                                    concat('replace(replace(convert(NVARCHAR(MAX),"',"COLUMN_NAME",'"),''&#x0A;'',''\n''),''&#x20;'','' '') "',"COLUMN_NAME",'"') 
+                                                  else 
+                                                    concat('"',"COLUMN_NAME",'"') 
+                                                end
+                                               ,','
+                                               ) 
+                                     within group (order by "ORDINAL_POSITION")
+                           ,' from "',t."TABLE_SCHEMA",'"."',t."TABLE_NAME",'"') "SQL_STATEMENT"
+              from "INFORMATION_SCHEMA"."COLUMNS" c, "INFORMATION_SCHEMA"."TABLES" t
+             where t."TABLE_NAME" = c."TABLE_NAME"
+               and t."TABLE_SCHEMA" = c."TABLE_SCHEMA"
+               and t."TABLE_TYPE" = 'BASE TABLE'
+               and t."TABLE_SCHEMA" = @SCHEMA
+             group by t."TABLE_SCHEMA", t."TABLE_NAME"`;  
+  }    
+
   async testConnection(connectionProperties,parameters) {   
     try {
       this.setConnectionProperties(connectionProperties);
@@ -48,70 +117,59 @@ class MsSQLDBI extends YadamuDBI {
 	} 
   }
 
-  sqlTableInfo() {
-     
-   let spatialClause = `concat('"',"COLUMN_NAME",'".${this.spatialSerializer} "',"COLUMN_NAME",'"')`
-   
-   if (this.parameters.SPATIAL_MAKE_VALID === true) {
-     spatialClause = `concat('case when "',"COLUMN_NAME",'".STIsValid = 0 then "',"COLUMN_NAME",'".makeValid().${this.spatialSerializer} else "',"COLUMN_NAME",'".${this.spatialSerializer} "',"COLUMN_NAME",'"')`
-   }
-      
-   return `select t."TABLE_SCHEMA" "TABLE_SCHEMA"
-         ,t."TABLE_NAME"   "TABLE_NAME"
-         ,string_agg(concat('"',c."COLUMN_NAME",'"'),',') within group (order by "ORDINAL_POSITION") "COLUMN_LIST"
-         ,string_agg(concat('"',"DATA_TYPE",'"'),',') within group (order by "ORDINAL_POSITION") "DATA_TYPES"
-         ,string_agg(concat('"',"COLLATION_NAME",'"'),',') within group (order by "ORDINAL_POSITION") "COLLATION_NAMES"
-         ,string_agg(case
-                       when ("NUMERIC_PRECISION" is not null) and ("NUMERIC_SCALE" is not null) 
-                         then concat('"',"NUMERIC_PRECISION",',',"NUMERIC_SCALE",'"')
-                       when ("NUMERIC_PRECISION" is not null) 
-                         then concat('"',"NUMERIC_PRECISION",'"')
-                       when ("DATETIME_PRECISION" is not null)
-                         then concat('"',"DATETIME_PRECISION",'"')
-                       when ("CHARACTER_MAXIMUM_LENGTH" is not null)
-                         then concat('"',"CHARACTER_MAXIMUM_LENGTH",'"')
-                       else
-                         '""'
-                     end
-                    ,','
-                   )
-                   within group (order by "ORDINAL_POSITION") "SIZE_CONSTRAINTS"
-         ,concat('select ',string_agg(case 
-                                        when "DATA_TYPE" = 'hierarchyid' then
-                                          concat('cast("',"COLUMN_NAME",'" as NVARCHAR(4000)) "',"COLUMN_NAME",'"') 
-                                        when "DATA_TYPE" in ('geography','geometry') then
-                                          ${spatialClause}
-                                        when "DATA_TYPE" = 'datetime2' then
-                                          concat('convert(VARCHAR(33),"',"COLUMN_NAME",'",127) "',"COLUMN_NAME",'"') 
-                                        when "DATA_TYPE" = 'datetimeoffset' then
-                                          concat('convert(VARCHAR(33),"',"COLUMN_NAME",'",127) "',"COLUMN_NAME",'"') 
-                                        when "DATA_TYPE" = 'xml' then
-                                          concat('replace(replace(convert(NVARCHAR(MAX),"',"COLUMN_NAME",'"),''&#x0A;'',''\n''),''&#x20;'','' '') "',"COLUMN_NAME",'"') 
-                                        else 
-                                          concat('"',"COLUMN_NAME",'"') 
-                                      end
-                                     ,','
-                                    ) 
-                                    within group (order by "ORDINAL_POSITION")
-                          ,' from "',t."TABLE_SCHEMA",'"."',t."TABLE_NAME",'"') "SQL_STATEMENT"
-     from "INFORMATION_SCHEMA"."COLUMNS" c, "INFORMATION_SCHEMA"."TABLES" t
-    where t."TABLE_NAME" = c."TABLE_NAME"
-      and t."TABLE_SCHEMA" = c."TABLE_SCHEMA"
-      and t."TABLE_TYPE" = 'BASE TABLE'
-      and t."TABLE_SCHEMA" = @SCHEMA
-    group by t."TABLE_SCHEMA", t."TABLE_NAME"`;  
-  }    
+  async configureConnection() {
 
-  decomposeDataType(targetDataType) {
-    const dataType = super.decomposeDataType(targetDataType);
-    if (dataType.length === -1) {
-      dataType.length = sql.MAX;
-    }
-    return dataType;
+    const statement = `SET QUOTED_IDENTIFIER ON`
+    const results = await this.generateRequest().batch(statement)
+
   }
   
+  setTargetDatabase() {  
+    if ((this.parameters.MSSQL_SCHEMA_DB) && (this.parameters.MSSQL_SCHEMA_DB !== this.connectionProperties.database)) {
+      this.connectionProperties.database = this.parameters.MSSQL_SCHEMA_DB
+    }
+  }
+
+  async createConnectionPool() {
+    
+	this.setTargetDatabase();
+    this.logConnectionProperties();
+
+    const sqlStartTime = performance.now();
+	this.pool = new sql.ConnectionPool(this.connectionProperties)
+    await this.pool.connect();
+	this.traceTiming(sqlStartTime,performance.now())
+
+    const yadamuLogger = this.yadamuLogger;
+    this.pool.on('error',(err, p) => {
+      this.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`sql.ConnectionPool.onError()`],err);
+      throw err
+    })
+    
+	this.transaction = new sql.Transaction(this.pool);
+    this.requestProvider = this.pool;
+	await this.configureConnection();
+  }
+    
+  async releaseConnection() {
+  };
+  
+  async getDatabaseConnectionImpl() {
+    await this.createConnectionPool()
+  }
+  
+  generateRequest() {
+    const yadamuLogger = this.yadamuLogger	
+	const request = new sql.Request(this.requestProvider)
+    request.on('info',function(infoMsg){ 
+      yadamuLogger.info([`sql.Request.onInfo()`],`${infoMsg.message}`);
+    })
+    return request
+  }
+
+  
   getPreparedStatement() {
-     return  new sql.PreparedStatement(this.pool)
+     return new sql.PreparedStatement(this.requestProvider)
   }
   
   setConnectionProperties(connectionProperties) {
@@ -126,69 +184,6 @@ class MsSQLDBI extends YadamuDBI {
     super.setConnectionProperties(connectionProperties)
   }
 
-  async setQuotedIdentifiers(databaseName) {
-    const statement = `SET QUOTED_IDENTIFIER ON`
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${statement}\ngo\n`)
-    }
-    const results = await this.getRequest().batch(statement)
-  }
-
-  setTargetDatabase() {  
-    if ((this.parameters.MSSQL_SCHEMA_DB) && (this.parameters.MSSQL_SCHEMA_DB !== this.connectionProperties.database)) {
-      this.connectionProperties.database = this.parameters.MSSQL_SCHEMA_DB
-    }
-  }
-
-  async getConnectionPool() {
-    this.setTargetDatabase();
-    this.logConnectionProperties();
-
-    const sqlStartTime = performance.now();
-	const pool = new sql.ConnectionPool(this.connectionProperties)
-    await pool.connect();
-	const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
-
-    const yadamuLogger = this.yadamuLogger;
-    pool.on('error',(err, p) => {
-      this.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`sql.ConnectionPool.onError()`],err);
-      throw err
-    })
-    
-	this.requestSource = pool;
-    await this.setQuotedIdentifiers()
-    return pool;
-  }
-  
-  getRequest() {
-    const yadamuLogger = this.yadamuLogger	
-	const request = new sql.Request(this.requestSource);
-    request.on('info',function(infoMsg){ 
-      yadamuLogger.info([`sql.Request.onInfo()`],`${infoMsg.message}`);
-    })
-    return request
-  }
-
-  async executeQuery(sqlStatment,queryable) {
-
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatment}\ngo\n`)
-    }  
-
-    const sqlStartTime = performance.now();
-    const results = await queryable.query(sqlStatment);  
-    const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
-	return results;
-  }     
- 
   async executeBatch(sqlStatment,batchable) {
 
     if (this.status.sqlTrace) {
@@ -197,11 +192,7 @@ class MsSQLDBI extends YadamuDBI {
 
     const sqlStartTime = performance.now();
     const results = await batchable.batch(sqlStatment);  
-    const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
+	this.traceTiming(sqlStartTime,performance.now())
 	return results
   }     
 
@@ -213,14 +204,10 @@ class MsSQLDBI extends YadamuDBI {
 
    	const sqlStartTime = performance.now();
     const results = await executeable.execute(args);
-    const sqlCumlativeTime = performance.now() - sqlStartTime;
-	if (this.status.sqlTrace) {
-	  this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
+	this.traceTiming(sqlStartTime,performance.now())
 	return results
   }
-
+ 
   async bulkInsert(bulkOperation) {
      
     if (this.status.sqlTrace) {
@@ -228,19 +215,26 @@ class MsSQLDBI extends YadamuDBI {
     }
 
    	const sqlStartTime = performance.now();
-    const results = await this.getRequest().bulk(bulkOperation);
-    const sqlCumlativeTime = performance.now() - sqlStartTime;
-	if (this.status.sqlTrace) {
-	  this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime	
+    const results = await this.generateRequest().bulk(bulkOperation);
+	this.traceTiming(sqlStartTime,performance.now())
 	return results
   }
 
+  async executeSQL(sqlStatment,queryable) {
 
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`${sqlStatment}\ngo\n`)
+    }  
+
+    const sqlStartTime = performance.now();
+    const results = await queryable.query(sqlStatment);  
+	this.traceTiming(sqlStartTime,performance.now())
+	return results;
+  }     
+ 
   async verifyDataLoad(request,tableSpec) {    
     const statement = `select ISJSON("${tableSpec.columnName}") "VALID_JSON" from "${tableSpec.tableName}"`;
-    const results = await this.executeQuery(statement,this.getRequest());  
+    const results = await this.executeSQL(statement,this.generateRequest());  
     this.yadamuLogger.log([`${this.constructor.name}.verifyDataLoad()`],`: Upload succesful: ${results.recordsets[0][0].VALID_JSON === 1}. Elapsed time ${performance.now() - startTime}ms.`);
     return results;
   }
@@ -250,7 +244,7 @@ class MsSQLDBI extends YadamuDBI {
     if (schema !== 'dbo') {
       const createSchema = `if not exists (select 1 from sys.schemas where name = N'${schema}') exec('create schema "${schema}"')`;
       try {
-		const results = await this.executeBatch(createSchema,this.getRequest())
+		const results = await this.executeBatch(createSchema,this.generateRequest())
       } catch (e) {
         this.yadamuLogger.logException([`${this.constructor.name}.createSchema()`],e)
       }
@@ -266,7 +260,7 @@ class MsSQLDBI extends YadamuDBI {
     for (let ddlStatement of ddl) {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
       try {
-        const results = await this.executeBatch(ddlStatement,this.getRequest());
+        const results = await this.executeBatch(ddlStatement,this.generateRequest());
       } catch (e) {
         this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
         this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
@@ -275,6 +269,14 @@ class MsSQLDBI extends YadamuDBI {
 
     await this.commitTransaction()      
 
+  }
+
+  decomposeDataType(targetDataType) {
+    const dataType = super.decomposeDataType(targetDataType);
+    if (dataType.length === -1) {
+      dataType.length = sql.MAX;
+    }
+    return dataType;
   }
 
   /*
@@ -294,7 +296,7 @@ class MsSQLDBI extends YadamuDBI {
 
     this.pool = undefined;
     this.transaction = undefined;
-    this.requestSource = undefined;
+    this.requestProvider = undefined;
     this.sql = sql
 
     sql.on('error',(err, p) => {
@@ -330,14 +332,8 @@ class MsSQLDBI extends YadamuDBI {
     
   }   
   
-  async getDatabaseConnectionImpl() {
-    this.pool = await this.getConnectionPool()
-  }
-  
   async initialize() {
     await super.initialize(true);   
-    this.transaction = new sql.Transaction(this.pool);
-    this.requestSource = this.pool;
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
     this.setSpatialSerializer(this.spatialFormat);
   }
@@ -364,6 +360,12 @@ class MsSQLDBI extends YadamuDBI {
   */
 
   async finalize() {
+    if (this.pool !== undefined) {
+	  if (this.preparedStatement !== undefined){
+        await this.preparedStatement.unprepare();
+      }	  
+      this.preparedStatement = undefined;
+	}
     await this.pool.close();
   }
 
@@ -375,8 +377,26 @@ class MsSQLDBI extends YadamuDBI {
 
   async abort() {
     if (this.pool !== undefined) {
-      await this.pool.close();
-    }
+	  if (this.preparedStatement !== undefined){
+		try {
+          await this.preparedStatement.unprepare();
+		} catch (e) {
+	      this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e);
+        }	  
+	    this.preparedStatement = undefined;
+      }
+      try {
+        await this.rollbackTransaction()
+      } catch (e) {
+	    this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e);
+      }	  
+      try {
+        await this.pool.close();
+      } catch (e) {
+	    this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e);
+      }	  
+	}
+	console.log('aborted')
   }
 
 
@@ -396,12 +416,8 @@ class MsSQLDBI extends YadamuDBI {
 	  
     const sqlStartTime = performance.now();
     await this.transaction.begin();
-    const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
-    this.requestSource = this.transaction
+	this.traceTiming(sqlStartTime,performance.now())
+    this.requestProvider = this.transaction
   }
 
   /*
@@ -420,12 +436,8 @@ class MsSQLDBI extends YadamuDBI {
 	  
     const sqlStartTime = performance.now();
     await this.transaction.commit();
-    const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
-    this.requestSource = this.pool
+	this.traceTiming(sqlStartTime,performance.now())
+    this.requestProvider = this.pool
   }
 
   /*
@@ -444,21 +456,16 @@ class MsSQLDBI extends YadamuDBI {
 
     const sqlStartTime = performance.now();
     await this.transaction.rollback();
-    const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
-
-    this.requestSource = this.pool
+	this.traceTiming(sqlStartTime,performance.now())
+    this.requestProvider = this.pool
   }
   
   async createSavePoint() {
-    await this.executeQuery(sqlCreateSavePoint,this.getRequest());
+    await this.executeSQL(sqlCreateSavePoint,this.generateRequest());
   }
   
   async restoreSavePoint() {
-    await this.executeQuery(sqlRestoreSavePoint,this.getRequest());
+    await this.executeSQL(sqlRestoreSavePoint,this.generateRequest());
   }
   
   /*
@@ -477,7 +484,7 @@ class MsSQLDBI extends YadamuDBI {
     
     const stagingTable = new StagingTable(this.pool,STAGING_TABLE,importFilePath,this.status); 
     let results = await stagingTable.uploadFile()
-    // results = await this.verifyDataLoad(this.getRequest(),STAGING_TABLE);
+    // results = await this.verifyDataLoad(this.generateRequest(),STAGING_TABLE);
   }
   
   /*
@@ -487,7 +494,7 @@ class MsSQLDBI extends YadamuDBI {
   */
 
   async processFile(hndl) {
-     let results = await this.getRequest().input('TARGET_DATABASE',sql.VarChar,this.parameters.TO_USER).execute('sp_IMPORT_JSON');
+     let results = await this.generateRequest().input('TARGET_DATABASE',sql.VarChar,this.parameters.TO_USER).execute('sp_IMPORT_JSON');
      results = results.recordset;
      const log = JSON.parse(results[0][Object.keys(results[0])[0]])
      super.processLog(log, this.status, this.yadamuLogger)
@@ -508,11 +515,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async getSystemInformation(EXPORT_VERSION) {     
   
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlSystemInformation}\ngo\n`)
-    }
-
-    const results = await this.executeQuery(sqlSystemInformation, await this.getRequest())
+    const results = await this.executeSQL(sqlSystemInformation, await this.generateRequest())
     const sysInfo =  results.recordsets[0][0];
    
     return {
@@ -554,7 +557,7 @@ class MsSQLDBI extends YadamuDBI {
     }
       
     const statement = this.sqlTableInfo()
-    const results = await this.executeQuery(statement, this.getRequest().input('SCHEMA',sql.VarChar,this.parameters[schemaKey]))
+    const results = await this.executeSQL(statement, this.generateRequest().input('SCHEMA',sql.VarChar,this.parameters[schemaKey]))
     return results.recordsets[0]
   
   }
@@ -574,20 +577,20 @@ class MsSQLDBI extends YadamuDBI {
     return metadata;   
   }
 
-  createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.yadamuLogger);
+  createParser(tableInfo,objectMode) {
+    return new DBParser(tableInfo,objectMode,this.yadamuLogger);
   }  
   
-  async getInputStream(query,parser) {
+  async getInputStream(tableInfo,parser) {
 
     const readStream = new Readable({objectMode: true });
     readStream._read = function() {};
    
-    const request = this.getRequest();
+    const request = this.generateRequest();
     request.stream = true // You can set streaming differently for each request
     request.on('row', function(row) {readStream.push(row)})
     request.on('done',function(result) {readStream.push(null)});
-	this.executeQuery(query.SQL_STATEMENT,request);
+	this.executeSQL(tableInfo.SQL_STATEMENT,request);
     return readStream;      
   }      
 
@@ -605,6 +608,26 @@ class MsSQLDBI extends YadamuDBI {
 
   getTableWriter(table) {
     return super.getTableWriter(TableWriter,table)
+  }
+
+  configureSlave(slaveNumber,pool) {
+	this.slaveNumber = slaveNumber
+	this.pool = pool
+	this.transaction = new sql.Transaction(this.pool)
+	this.requestProvider = pool
+  }
+
+  async newSlaveInterface(slaveNumber) {
+	const dbi = new MsSQLDBI(this.yadamu)
+	dbi.setParameters(this.parameters);
+	// return await super.newSlaveInterface(slaveNumber,dbi,this.pool)
+	dbi.configureSlave(slaveNumber,this.pool);
+	this.cloneSlaveConfiguration(dbi);
+	return dbi
+  }
+
+  tableWriterFactory(tableName) {
+    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
   }
   
 }

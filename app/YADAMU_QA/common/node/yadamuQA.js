@@ -1049,7 +1049,7 @@ class YadamuQA {
 	  timings = await this.yadamu.uploadData(targetDBI)
 	}
 	else {
-  	  timings  =await this.yadamu.pumpData(fileReader,targetDBI)
+  	  timings = await this.yadamu.pumpData(fileReader,targetDBI)
     }
 	
     const opsElapsedTime = performance.now() - startTime

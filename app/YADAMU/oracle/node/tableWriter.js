@@ -141,7 +141,7 @@ class TableWriter extends YadamuWriter {
                 return JSON.stringify(col);
               }
               self.cachedLobCount++
-              self.bindRowAsLob = self.bindRowAsLob || (Buffer.byteLength(col,'utf8') > self.dbi.parameters.LOB_MIN_SIZE) 
+              self.bindRowAsLob = self.bindRowAsLob || (Buffer.byteLength(col,'utf8') > self.dbi.parameters.LOB_MIN_SIZE) || Buffer.byteLength(col,'utf8') === 0
 			  return col;
 		    }
 		    break;
@@ -245,7 +245,6 @@ class TableWriter extends YadamuWriter {
       }
 	  
 	  // Row is now in bindOrdering. Convert CLOB and BLOB to temporaryLOBs where necessary
-
       if (this.bindRowAsLob) {
 	    // Use map combined with Promise.All to convert columns to temporaryLobs
 	    const lobStartTime = performance.now();

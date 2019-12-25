@@ -382,12 +382,36 @@ const sqlRestoreSavePoint =
   
 class OracleDBI extends YadamuDBI {
 
+  
+  get DATABASE_VENDOR()     { return 'Oracle' };
+  get SOFTWARE_VENDOR()     { return 'Oracle Corporation' };
+  get SPATIAL_FORMAT()      { return this.spatialFormat };
+  get DEFAULT_PARAMETERS()  { return this.yadamu.getYadamuDefaults().oracle }
+  get STATEMENT_TERMINATOR() { return '/' }
+
   /*
   **
   ** Local methods 
   **
   */
   
+  parseConnectionString(connectionString) {
+    
+    const user = YadamuLibrary.convertQuotedIdentifer(connectionString.substring(0,connectionString.indexOf('/')));
+    let password = connectionString.substring(connectionString.indexOf('/')+1);
+    let connectString = '';
+    if (password.indexOf('@') > -1) {
+	  connectString = password.substring(password.indexOf('@')+1);
+	  password = password.substring(password,password.indexOf('@'));
+      console.log(`${new Date().toISOString()}[WARNING][${this.constructor.name}]: Suppling a password on the command line interface can be insecure`);
+    }
+    return {
+      user          : user,
+      password      : password,
+      connectString : connectString
+    }
+  }     
+
   async testConnection(connectionProperties,parameters) {   
     super.setConnectionProperties(connectionProperties);
 	try {
@@ -400,22 +424,44 @@ class OracleDBI extends YadamuDBI {
 	
   }
   
-  static parseConnectionString(connectionString) {
-    
-    const user = YadamuLibrary.convertQuotedIdentifer(connectionString.substring(0,connectionString.indexOf('/')));
-    let password = connectionString.substring(connectionString.indexOf('/')+1);
-    let connectString = '';
-    if (password.indexOf('@') > -1) {
-	  connectString = password.substring(password.indexOf('@')+1);
-	  password = password.substring(password,password.indexOf('@'));
-      console.log(`${new Date().toISOString()}[WARNING][this.constructor.name]: Suppling a password on the command line interface can be insecure`);
+  async createConnectionPool() {
+    this.logConnectionProperties();
+	const sqlStartTime = performance.now();
+	this.connectionProperties.poolMax = this.parameters.PARALLEL ? parseInt(this.parameters.PARALLEL) + 1 : 3
+	this.pool = await oracledb.createPool(this.connectionProperties);
+	this.traceTiming(sqlStartTime,performance.now())
+  }
+  
+  async getConnectionFromPool() {
+	  
+	//  Donot Configure Connection here. 
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
     }
-    return {
-      user          : user,
-      password      : password,
-      connectString : connectString
-    }
-  }     
+    const sqlStartTime = performance.now();
+	const connection = await this.pool.getConnection();
+	this.traceTiming(sqlStartTime,performance.now())
+	return connection
+	
+  }
+
+  async getConnection() {
+    this.logConnectionProperties();
+	const sqlStartTime = performance.now();
+	this.connection = await oracledb.getConnection(this.connectionProperties);
+	this.traceTiming(sqlStartTime,performance.now())
+  }
+  
+  async releaseConnection() {
+    if (this.connection !== undefined && this.connection instanceof oracledb.Connection) {
+      try {
+        await this.connection.close();
+      } catch (e) {
+        this.yadamuLogger.logException([`${this.constructor.name}.releaseConnection()`],e);
+      } 
+	}
+  };
 
   stringFromClob(clob) {
      
@@ -626,52 +672,28 @@ class OracleDBI extends YadamuDBI {
 
     let sqlStatement = `ALTER SESSION SET NLS_DATE_FORMAT = '${this.getDateFormatMask(vendor)}'`
     if (status.sqlTrace) {
-      status.sqlTrace.write(`${sqlStatement}\n/\n`);
+      status.sqlTrace.write(this.traceSQL(sqlStatement));
     }
     let result = await conn.execute(sqlStatement);
   
     sqlStatement = `ALTER SESSION SET NLS_TIMESTAMP_FORMAT = '${this.getTimeStampFormatMask(vendor)}'`
     if (status.sqlTrace) {
-      status.sqlTrace.write(`${sqlStatement}\n/\n`);
+      status.sqlTrace.write(this.traceSQL(sqlStatement));
     }
     result = await conn.execute(sqlStatement);
   
   }
    
-  async configureConnection(conn,status) {
-    let sqlStatement = `ALTER SESSION SET TIME_ZONE = '+00:00'`
-    if (status.sqlTrace) {
-       status.sqlTrace.write(`${sqlStatement}\n/\n`);
-    }
-    let result = await conn.execute(sqlStatement);
-  
-    await this.setDateFormatMask(conn,status,'Oracle');
-    
-    sqlStatement = `ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF6TZH:TZM'`
-    if (status.sqlTrace) {
-       status.sqlTrace.write(`${sqlStatement}\n/\n`);
-    }
-    result = await conn.execute(sqlStatement);
-  
-    sqlStatement = `ALTER SESSION SET NLS_LENGTH_SEMANTICS = 'CHAR'`
-    if (status.sqlTrace) {
-       status.sqlTrace.write(`${sqlStatement}\n/\n`);
-    }
-    result = await conn.execute(sqlStatement);
-    sqlStatement = `begin :version := YADAMU_EXPORT.DATABASE_RELEASE(); end;`;
-    let args = {version:{dir: oracledb.BIND_OUT, type: oracledb.STRING}}
-    if (status.sqlTrace) {
-       status.sqlTrace.write(`${sqlStatement}\n/\n`);
-    }
-    result = await conn.execute(sqlStatement,args);
-    this.dbVersion = parseFloat(result.outBinds.version);
+  async configureConnection() {
+	  
+    let sqlStatement = `ALTER SESSION SET TIME_ZONE = '+00:00' NLS_DATE_FORMAT = '${this.getDateFormatMask('Oracle')}' NLS_TIMESTAMP_FORMAT = '${this.getTimeStampFormatMask('Oracle')}' NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF6TZH:TZM' NLS_LENGTH_SEMANTICS = 'CHAR'`
+    let result = await this.executeSQL(sqlStatement,{});
 
-    sqlStatement = `begin :size := JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE; end;`;
-    args = {size:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER}}
-    if (status.sqlTrace) {
-       status.sqlTrace.write(`${sqlStatement}\n/\n`);
-    }
-    result = await conn.execute(sqlStatement,args);
+    sqlStatement = `begin :version := YADAMU_EXPORT.DATABASE_RELEASE(); :size := JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE; end;`;
+    let args = {version:{dir: oracledb.BIND_OUT, type: oracledb.STRING},size:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER}}
+	result = await this.executeSQL(sqlStatement,args);
+
+    this.dbVersion = parseFloat(result.outBinds.version);
     this.maxStringSize = result.outBinds.size;
     
     if (this.maxStringSize < 32768) {
@@ -687,38 +709,6 @@ class OracleDBI extends YadamuDBI {
 
   }    
   
-  async getConnectionFromPool(pool,status) {
-
-    const conn = pool.getConnection();
-    await this.configureConnection(conn,status);
-    return conn;
-  
-  }
-
-  async getConnection(connectionProperties,status) {
-    this.logConnectionProperties();
-	const sqlStartTime = performance.now();
-    const conn = await oracledb.getConnection(connectionProperties)
-    const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-	this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
-    await this.configureConnection(conn,status);
-   
-   return conn;
-  }
-  
-  async releaseConnection(conn,yadamuLogger) {
-    if (conn !== undefined) {
-      try {
-        await conn.close();
-      } catch (e) {
-        this.yadamuLogger.logException([`${this.constructor.name}.releaseConnection()`],e);
-      }
-    }
-  };
-
   processLog(results) {
     if (results.outBinds.log !== null) {
       const log = JSON.parse(results.outBinds.log.replace(/\\r/g,'\\n'));
@@ -736,6 +726,7 @@ class OracleDBI extends YadamuDBI {
     const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 1024} , schema:schema}
     const results = await this.executeSQL(sqlStatement,args)
     this.processLog(results)
+    this.currentSchema = schema;
     
   }
   
@@ -749,15 +740,12 @@ class OracleDBI extends YadamuDBI {
 
     if (rows.length > 0) {
       if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`--\n-- Bulk Operation: ${rows.length} records.\n--\n${sqlStatement}\n/\n`);
+        this.status.sqlTrace.write(this.traceComment(`Bulk Operation: ${rows.length} records.`))
+		this.status.sqlTrace.write(this.traceSQL(sqlStatement));
       }
 	  const sqlStartTime = performance.now();
       const results = await this.connection.executeMany(sqlStatement,rows,binds);
-	  const sqlCumlativeTime = performance.now() - sqlStartTime;
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-      }
-	  this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
+      this.traceTiming(sqlStartTime,performance.now())
       return results;
 	}
   }
@@ -772,7 +760,7 @@ class OracleDBI extends YadamuDBI {
   }
     
   async enableConstraints() {
-  
+	  
     const sqlStatement = `begin :log := YADAMU_IMPORT.ENABLE_CONSTRAINTS(:schema); end;`;
     const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH} , schema:this.parameters.TO_USER} 
     const results = await this.executeSQL(sqlStatement,args)
@@ -782,7 +770,6 @@ class OracleDBI extends YadamuDBI {
   
   async refreshMaterializedViews() {
       
-	// await this.setCurrentSchema(this.parameters.TO_USER);
     const sqlStatement = `begin :log := YADAMU_IMPORT.REFRESH_MATERIALIZED_VIEWS(:schema); end;`;
     const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH} , schema:this.parameters.TO_USER}     
     const results = await this.executeSQL(sqlStatement,args)
@@ -793,16 +780,12 @@ class OracleDBI extends YadamuDBI {
   async executeSQL(sqlStatement,args) {
       
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement}\n/\n`);
+      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
     }    
 
     const sqlStartTime = performance.now();
     const results = await this.connection.execute(sqlStatement,args);
-	const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-	this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
+	this.traceTiming(sqlStartTime,performance.now())
     return results;
   }
 
@@ -811,12 +794,7 @@ class OracleDBI extends YadamuDBI {
   ** Overridden Methods
   **
   */
-  
-  get DATABASE_VENDOR()     { return 'Oracle' };
-  get SOFTWARE_VENDOR()     { return 'Oracle Corporation' };
-  get SPATIAL_FORMAT()      { return this.spatialFormat };
-  get DEFAULT_PARAMETERS()  { return this.yadamu.getYadamuDefaults().oracle }
-  get STATEMENT_SEPERATOR() { return '/' }
+
 
   constructor(yadamu) {
     super(yadamu,yadamu.getYadamuDefaults().oracle);
@@ -834,7 +812,7 @@ class OracleDBI extends YadamuDBI {
   getConnectionProperties() {
     
     if (this.parameters.USERID) {
-      return OracleDBI.parseConnectionString(this.parameters.USERID)
+      return this.parseConnectionString(this.parameters.USERID)
     }
     else {
      return{
@@ -861,7 +839,6 @@ class OracleDBI extends YadamuDBI {
     sqlStatement = `begin :log := YADAMU_EXPORT_DDL.GENERATE_LOG(); end;`; 
     args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}};
     const results = await this.executeSQL(sqlStatement,args);   
-	// await this.setCurrentSchema(this.connectionProperties.user);
     return this.processLog(results);
   }
 
@@ -897,11 +874,7 @@ class OracleDBI extends YadamuDBI {
   **  Connect to the database. Set global setttings
   **
   */
-  
-  async getDatabaseConnectionImpl() {
-    this.connection = await this.getConnection(this.connectionProperties,this.status)
-  }
-  
+    
   async initialize() {
     await super.initialize(true);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
@@ -912,11 +885,12 @@ class OracleDBI extends YadamuDBI {
   **  Gracefully close down the database connection.
   **
   */
- 
+
   async finalize() {
-    // await this.setCurrentSchema(this.connectionProperties.user);
-    await this.releaseConnection(this.connection, this.yadamuLogger);
+    await this.releaseConnection();
+	await this.pool.close();
   }
+
 
   async initializeExport() {
     await this.setCurrentSchema(this.parameters.FROM_USER)
@@ -933,7 +907,6 @@ class OracleDBI extends YadamuDBI {
   async initializeData() {
     await this.disableConstraints();
     await this.setDateFormatMask(this.connection,this.status,this.systemInformation.vendor);
-	// await this.setCurrentSchema(this.parameters.TO_USER)
   }
   
   async finalizeData() {
@@ -952,9 +925,16 @@ class OracleDBI extends YadamuDBI {
   */
 
   async abort() {
-    await this.releaseConnection(this.connection, this.yadamuLogger);
+    try {
+      await this.releaseConnection();
+	  if (this.pool !== undefined) {
+	    await this.pool.close();
+      }
+	} catch (e) {
+      this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e);
+	}
   }
-
+  
   /*
   **
   ** Commit the current transaction
@@ -964,17 +944,13 @@ class OracleDBI extends YadamuDBI {
   async commitTransaction() {
 
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\ncommit\n/\n`);
+      this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
     }    
 
     const sqlStartTime = performance.now();
     await this.connection.commit();
-	const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-	this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
-	  
+	const sqlOperationTime = performance.now() - sqlStartTime;
+	this.traceTiming(sqlStartTime,performance.now())
   }
 
   /*
@@ -986,17 +962,12 @@ class OracleDBI extends YadamuDBI {
   async rollbackTransaction() {
 
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\rollback transaction\n/\n`);
+      this.status.sqlTrace.write(this.traceSQL(`rollback transaction`));
     }    
 
     const sqlStartTime = performance.now();
     await this.connection.rollback();
-	const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-	this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
-
+	this.traceTiming(sqlStartTime,performance.now())
   }
   
   async createSavePoint() {
@@ -1090,16 +1061,12 @@ class OracleDBI extends YadamuDBI {
 	 
     const sqlStatement = `begin\n  ${settings}\n  :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema);\nend;`;
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement}\n\/\n`)
+      this.status.sqlTrace.write(this.traceSQL(sqlStatement))
     }
 		
     const sqlStartTime = performance.now();
     const results = await this.connection.execute(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}, json:hndl, schema:this.parameters.TO_USER});
-	const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-	this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
+	this.traceTiming(sqlStartTime,performance.now())
     return this.processLog(results);  
   }
   
@@ -1118,16 +1085,13 @@ class OracleDBI extends YadamuDBI {
   async getSystemInformation(EXPORT_VERSION) {     
 
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlSystemInformation}\n\/\n`)
+      this.status.sqlTrace.write(this.traceSQL(sqlSystemInformation))
     }
     
 	const sqlStartTime = performance.now();
     const results = await this.connection.execute(sqlSystemInformation,{sysInfo:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}})
-	const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-	this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
+	const sqlOperationTime = performance.now() - sqlStartTime;
+  	this.traceTiming(sqlStartTime,performance.now())
 
     return Object.assign({
       date               : new Date().toISOString()
@@ -1164,7 +1128,7 @@ class OracleDBI extends YadamuDBI {
     let bindVars
     
 	let sqlStartTime
-	let sqlCumlativeTime
+	let sqlOperationTime
 	
     switch (true) {
       case this.dbVersion < 12.2:
@@ -1177,31 +1141,27 @@ class OracleDBI extends YadamuDBI {
       
         bindVars = {v1 : this.parameters.FROM_USER, v2 : {dir : oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}};
         if (this.status.sqlTrace) {
-           this.status.sqlTrace.write(`${sqlFetchDDL11g}\n\/\n`)
+           this.status.sqlTrace.write(this.traceSQL(sqlFetchDDL11g))
         }     
         
     	sqlStartTime = performance.now();
         results = await this.connection.execute(sqlFetchDDL11g,bindVars)
-        sqlCumlativeTime = performance.now() - sqlStartTime;
+        sqlOperationTime = performance.now() - sqlStartTime;
         if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
+          this.status.sqlTrace.write(this.traceTiming(sqlOperationTime));
         }
-	    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
+	    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlOperationTime
         ddl = JSON.parse(results.outBinds.v2);
 		
         break;
       case this.dbVersion < 19:
         if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`${sqlFetchDDL}\n\/\n`)
+          this.status.sqlTrace.write(this.traceSQL(sqlFetchDDL))
         }
         sqlStartTime = performance.now();
         results = await this.connection.execute(sqlFetchDDL,{schema: this.parameters.FROM_USER},{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
-        sqlCumlativeTime = performance.now() - sqlStartTime;
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-        }
-	    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
-        ddl = results.rows.map(function(row) {
+        this.traceTiming(sqlStartTime,performance.now())
+	    ddl = results.rows.map(function(row) {
           return row.JSON;
         },this);
         break;
@@ -1215,16 +1175,12 @@ class OracleDBI extends YadamuDBI {
       
         bindVars = {v1 : this.parameters.FROM_USER, v2 : {dir : oracledb.BIND_OUT, type: oracledb.STRING, maxSize: LOB_STRING_MAX_LENGTH}};
         if (this.status.sqlTrace) {
-           this.status.sqlTrace.write(`${sqlFetchDDL19c}\n\/\n`)
+           this.status.sqlTrace.write(this.traceSQL(sqlFetchDDL19c))
         }     
 		
         sqlStartTime = performance.now();
         results = await this.connection.execute(sqlFetchDDL19c,bindVars)
-        sqlCumlativeTime = performance.now() - sqlStartTime;
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-        }
-	    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
+        this.traceTiming(sqlStartTime,performance.now())
         ddl = JSON.parse(results.outBinds.v2);
     }
     return ddl;    
@@ -1234,7 +1190,7 @@ class OracleDBI extends YadamuDBI {
   async getSchemaInfo(schema) {
      
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlTableInfo}\n\/\n`)
+      this.status.sqlTrace.write(this.traceSQL(sqlTableInfo))
     }
 
     const sqlStartTime = performance.now();
@@ -1248,11 +1204,7 @@ class OracleDBI extends YadamuDBI {
                                                                                                     ,SQL_STATEMENT:        {type: oracledb.STRING}
 																								}
     });
-    const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
+    this.traceTiming(sqlStartTime,performance.now())
     return results.rows;
   }
 
@@ -1332,11 +1284,11 @@ class OracleDBI extends YadamuDBI {
      
     // Generate a conventional relational select statement for this table
     
-    const query = {
+    const tableInfo = Object.assign({},tableMetadata,{
       fetchInfo   : {}
      ,jsonColumns : []
      ,rawColumns  : []
-    }   
+    });   
     
     let selectList = '';
     const columnList = JSON.parse('[' + tableMetadata.COLUMN_LIST + ']');
@@ -1345,64 +1297,56 @@ class OracleDBI extends YadamuDBI {
     dataTypeList.forEach(function(dataType,idx) {
       switch (dataType) {
         case 'JSON':
-          query.jsonColumns.push(idx);
+          tableInfo.jsonColumns.push(idx);
           break
         case 'RAW': 
-          query.rawColumns.push(idx);
+          tableInfo.rawColumns.push(idx);
           break;
         default:
       }
     })
     
-    query.sqlStatement = `select ${tableMetadata.NODE_SELECT_LIST} from "${tableMetadata.OWNER}"."${tableMetadata.TABLE_NAME}" t`; 
+    tableInfo.SQL_STATEMENT = `select ${tableMetadata.NODE_SELECT_LIST} from "${tableMetadata.OWNER}"."${tableMetadata.TABLE_NAME}" t`; 
     
     if (tableMetadata.WITH_CLAUSE !== null) {
         
        if (this.dbVersion < 12) {
          // Cannot use PL/SQL functions in With Clause
          // Need to wrap them in actual PL/SQL function
-         query.plsqlWrapper = this.createWrapper(tableMetadata.WITH_CLAUSE);
-         query.sqlStatement =  query.sqlStatement.replace(/SERIALIZE_OBJECT\(/g,`"${this.parameters.FROM_USER}"."${this.exportWrapper}"(`)
+         tableInfo.PLSQL_WRAPPER = this.createWrapper(tableMetadata.WITH_CLAUSE);
+         tableInfo.SQL_STATEMENT =  tableInfo.SQL_STATEMENT.replace(/SERIALIZE_OBJECT\(/g,`"${this.parameters.FROM_USER}"."${this.exportWrapper}"(`)
        }
        else {
-         query.sqlStatement = `with\n${tableMetadata.WITH_CLAUSE}\n${query.sqlStatement}`;
+         tableInfo.SQL_STATEMENT = `with\n${tableMetadata.WITH_CLAUSE}\n${tableInfo.SQL_STATEMENT}`;
        }
     }
     
-    return query
+    return tableInfo
   }
-      
-  createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.yadamuLogger);
+  
+  createParser(tableInfo,objectMode) {
+    return new DBParser(tableInfo,objectMode,this.yadamuLogger);
   }  
 
-  async getInputStream(query,parser) {
+  async getInputStream(tableInfo,parser) {
 
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${query.sqlStatement}\n\/\n`)
+      this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
     }
     
-    if ((this.dbVersion < 12) && (query.plsqlWrapper)) {
+    if ((this.dbVersion < 12) && (tableInfo.PLSQL_WRAPPER)) {
       if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`${query.plsqlWrapper}\n\/\n`)
+        this.status.sqlTrace.write(this.traceSQL(tableInfo.PLSQL_WRAPPER))
       }
 	  
       const sqlStartTime = performance.now();
-      await this.connection.execute(query.plsqlWrapper)
-      const sqlCumlativeTime = performance.now() - sqlStartTime;
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-      }
-      this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
+      await this.connection.execute(tableInfo.PLSQL_WRAPPER)
+      this.traceTiming(sqlStartTime,performance.now())
     }
 
     const sqlStartTime = performance.now();
-    const is = await this.connection.queryStream(query.sqlStatement,[],{extendedMetaData: true})
-    const sqlCumlativeTime = performance.now() - sqlStartTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-    }
-    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime
+    const is = await this.connection.queryStream(tableInfo.SQL_STATEMENT,[],{extendedMetaData: true})
+    this.traceTiming(sqlStartTime,performance.now())
     
     is.on('metadata',function(metadata) {parser.setColumnMetadata(metadata)})
     return is;
@@ -1434,14 +1378,14 @@ class OracleDBI extends YadamuDBI {
 
     let sqlStatment = sqlDropWrapper.replace(':1:',this.parameters.FROM_USER).replace(':2:',this.exportWrapper);
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatment}\n\/\n`)
+      this.status.sqlTrace.write(this.traceSQL(sqlStatment))
     }
 	
     await this.executeSQL(sqlStatment)
 
     sqlStatment = sqlDropWrapper.replace(':1:',this.parameters.FROM_USER).replace(':2:',this.importWrapper);
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatment}\n\/\n`)
+      this.status.sqlTrace.write(this.traceSQL(sqlStatment))
     }
     await this.executeSQL(sqlStatment)
   }    
@@ -1450,6 +1394,19 @@ class OracleDBI extends YadamuDBI {
     if (this.dbVersion < 12) {
       await this.dropWrappers();
     }      
+  }
+	  	  
+  async newSlaveInterface(slaveNumber) {
+	const dbi = new OracleDBI(this.yadamu)
+	dbi.setParameters(this.parameters);
+	const connection = await this.getConnectionFromPool()	
+    await super.newSlaveInterface(slaveNumber,dbi,connection)
+    await dbi.setCurrentSchema(this.currentSchema);
+    return dbi;
+  }
+
+  tableWriterFactory(tableName) {
+    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
   }
 
 }

@@ -43,7 +43,7 @@ class PostgresQA extends PostgresDBI {
         if (this.status.sqlTrace) {
           this.status.sqlTrace.write(`${dropSchema};\n--\n`)
         }
-        await this.pgClient.query(dropSchema);      
+        await this.executeSQL(dropSchema);      
       } catch (e) {
         if (e.errorNum && (e.errorNum === 1918)) {
         }
@@ -65,15 +65,15 @@ class PostgresQA extends PostgresDBI {
         this.status.sqlTrace.write(`${sqlCompareSchema};\n--\n`)
       }
       
-      await this.pgClient.query(sqlCompareSchema,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.STRIP_XML_DECLARATION === true, this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18])      
+      await this.executeSQL(sqlCompareSchema,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.STRIP_XML_DECLARATION === true, this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18])      
       
-      const successful = await this.pgClient.query(sqlSuccess)
+      const successful = await this.executeSQL(sqlSuccess)
             
       report.successful = successful.rows.map(function(row,idx) {          
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT]
       },this)
       
-      const failed = await this.pgClient.query(sqlFailed)
+      const failed = await this.executeSQL(sqlFailed)
 
       report.failed = failed.rows.map(function(row,idx) {
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.SQLERRM !== null ? row.SQLERRM : '')]
@@ -84,7 +84,7 @@ class PostgresQA extends PostgresDBI {
 	
 	async getRowCounts(target) {
         
-      const results = await this.pgClient.query(sqlSchemaTableRows,[target.schema]);
+      const results = await this.executeSQL(sqlSchemaTableRows,[target.schema]);
 
       return results.rows.map(function(row,idx) {          
         return [target.schema,row.TABLE_NAME,row.ROW_COUNT]

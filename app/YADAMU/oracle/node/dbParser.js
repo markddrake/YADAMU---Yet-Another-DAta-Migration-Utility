@@ -1,29 +1,20 @@
 "use strict" 
 
-const Transform = require('stream').Transform;
 const oracledb = require('oracledb');
 
+const YadamuParser = require('../../common/yadamuParser.js')
 const StringWriter = require('./stringWriter.js');
 const BufferWriter = require('./bufferWriter.js');
 
-class DBParser extends Transform {
+class DBParser extends YadamuParser {
   
-  constructor(query,objectMode,yadamuLogger) {
-    super({objectMode: true });  
-    this.query = query;
-    this.objectMode = objectMode
-    this.yadamuLogger = yadamuLogger
-    this.counter = 0
-    
+  constructor(tableInfo,objectMode,yadamuLogger) {
+    super(tableInfo,objectMode,yadamuLogger);      
     this.columnMetadata = undefined;
     this.includesLobs = false;
     
   }
 
-  getCounter() {
-    return this.counter;
-  }
-  
   setColumnMetadata(metadata) {
     this.columnMetadata = metadata
     this.columnMetadata.forEach(function (column) {
@@ -99,7 +90,7 @@ class DBParser extends Transform {
     }  
 
     // Convert the JSON columns into JSON objects
-    this.query.jsonColumns.forEach(function(idx) {
+    this.tableInfo.jsonColumns.forEach(function(idx) {
       if (data[idx] !== null) {
         try {
           data[idx] = JSON.parse(data[idx]) 
@@ -110,7 +101,7 @@ class DBParser extends Transform {
       }
     },this)
       
-    this.query.rawColumns.forEach(function(idx) {
+    this.tableInfo.rawColumns.forEach(function(idx) {
       if (data[idx] !== null) {
         if (Buffer.isBuffer(data[idx])) {
           data[idx] = data[idx].toString('hex');
@@ -124,6 +115,7 @@ class DBParser extends Transform {
     const res = this.push({data:data})
     done();
   }
+
 }
 
 module.exports = DBParser

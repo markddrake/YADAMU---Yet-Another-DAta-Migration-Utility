@@ -1,30 +1,12 @@
 "use strict" 
 
-const Transform = require('stream').Transform;
 
-class DBParser extends Transform {
-  
-  constructor(query,objectMode,yadamuLogger) {
-    super({objectMode: true });   
-    this.query = query;
-    this.objectMode = objectMode
-    this.yadamuLogger = yadamuLogger;
-    this.counter = 0
-  }
+const YadamuParser = require('./yadamuParser.js')
 
-  getCounter() {
-    return this.counter;
-  }
+class DBParser extends YadamuParser {
   
-  // Use in cases where query generates a column called JSON containing a serialized reprensentation of the generated JSON.
-  
-  async _transform (data,encodoing,done) {
-    this.counter++;
-    if (this.objectMode) {
-      data.json = JSON.parse(data.json);
-    }
-    this.push({data:data.json})
-    done();
+  constructor(tableInfo,objectMode,yadamuLogger) {
+    super(tableInfo,objectMode,yadamuLogger);      
   }
 }
 

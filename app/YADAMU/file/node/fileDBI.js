@@ -111,9 +111,8 @@ class FileDBI extends YadamuDBI {
   }
   
   async finalizeData() {
-    this.outputStream.write('}');
+	this.outputStream.write('}');
   }  
-  
   
   async finalizeImport() {
     this.outputStream.write('}')    

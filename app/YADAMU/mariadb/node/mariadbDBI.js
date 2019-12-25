@@ -40,8 +40,8 @@ class MariadbDBI extends YadamuDBI {
   async testConnection(connectionProperties,parameters) {   
     try {
 	  this.setConnectionProperties(connectionProperties);
-      this.conn = await mariadb.createConnection(this.connectionProperties);
-	  await this.conn.end();
+      this.connection = await mariadb.createConnection(this.connectionProperties);
+	  await this.connection.end();
 	  super.setParameters(parameters)
 	} catch (e) {
 	  throw (e)
@@ -120,7 +120,7 @@ class MariadbDBI extends YadamuDBI {
           	  group by t.table_schema, t.table_name`;
   }
      
-  async configureSession() {  
+  async configureConnection() {  
 
     const sqlSetITimeout  = `SET SESSION interactive_timeout = 600000`;
     await this.executeSQL(sqlSetITimeout);
@@ -156,29 +156,61 @@ class MariadbDBI extends YadamuDBI {
     if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
       this.yadamuLogger.info([`${this.constructor.name}.setMaxAllowedPacketSize()`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
       results = await this.executeSQL(sqlSetPacketSize);
-      await this.conn.end();
+      await this.connection.end();
       await this.pool.end();
       return true;
     }    
     return false;
   }
   
-  async getConnectionPool() {
-
+  async createConnectionPool() {
     this.logConnectionProperties();
+	let sqlStartTime = performance.now();
+	this.pool = mariadb.createPool(this.connectionProperties);
+	this.traceTiming(sqlStartTime,performance.now())
 
-    this.pool = mariadb.createPool(this.connectionProperties);
-    this.conn = await this.pool.getConnection();
-
+    this.connection = await this.getConnectionFromPool()
+	
     if (await this.setMaxAllowedPacketSize()) {
-      this.pool = mariadb.createPool(this.connectionProperties);
-      this.conn = await this.pool.getConnection();
+      this.logConnectionProperties();
+  	  sqlStartTime = performance.now();
+	  this.pool = mariadb.createPool(this.connectionProperties);
+      this.traceTiming(sqlStartTime,performance.now())  
     }
+	else {
+	  await this.releaseConnection();
+	}
+  }
+  
+  async getConnectionFromPool() {
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
+    }
+    const sqlStartTime = performance.now();
+	const connection = await this.pool.getConnection();
+	this.traceTiming(sqlStartTime,performance.now())
+    return connection
+  }
+
+  async getConnection() {
+    this.logConnectionProperties();
+	const sqlStartTime = performance.now();
+	this.connection = await oracledb.getConnection(this.connectionProperties);
+	this.traceTiming(sqlStartTime,performance.now())
+  }
+  
+  async releaseConnection() {
+    if (this.connection !== undefined && this.connection.close) {
+      try {
+        await this.connection.close();
+      } catch (e) {
+        this.yadamuLogger.logException([`${this.constructor.name}.releaseConnection()`],e);
+      }
     
-    await this.configureSession(); 	
-
-  }    
-
+	}
+  };
+  
   waitForRestart(delayms) {
     return new Promise(function (resolve, reject) {
         setTimeout(resolve, delayms);
@@ -192,10 +224,10 @@ class MariadbDBI extends YadamuDBI {
     if (this.conn) {
       try { 
         this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Closing Connection.`);
-        await this.conn.end();
-        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Connection Closed.`);
+        await this.connection.release();
+        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Connection Eeleased.`);
       } catch (e) {
-        this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`this.conn.end() raised\n${e}`);
+        this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`this.connection.release() raised\n${e}`);
       }
     }
 
@@ -211,7 +243,7 @@ class MariadbDBI extends YadamuDBI {
     
     while (retryCount < 10) {
       try {
-        await this.getConnectionPool()
+        await this.createConnectionPool()
         break;
       } catch (e) {
         if (e.fatal && (e.code && (e.code === 'ECONNREFUSED'))) {
@@ -246,12 +278,8 @@ class MariadbDBI extends YadamuDBI {
       // Will exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
-        const results = await this.conn.query(sqlStatement,args)
-        const sqlCumlativeTime = performance.now() - sqlStartTime;
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`--\n-- Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlCumlativeTime)}s.\n--\n`);
-        }
-        this.sqlCumlativeTime = this.sqlCumlativeTime + sqlCumlativeTime        
+        const results = await this.connection.query(sqlStatement,args)
+        this.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
         if (attemptReconnect && ((e.fatal) && (e.code && (e.code === 'ER_CMD_CONNECTION_CLOSED') || (e.code === 'ECONNABORTED') || (e.code === 'ER_SOCKET_UNEXPECTED_CLOSE') || (err.code === 'ECONNRESET')))){
@@ -329,11 +357,7 @@ class MariadbDBI extends YadamuDBI {
         this.spatialSerializer = "HEX(ST_AsBinary(";
     }  
   }  
-  
-  async getDatabaseConnectionImpl() {
-    await this.getConnectionPool();
-  }
-  
+    
   async initialize() {
     await super.initialize(true);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
@@ -347,7 +371,7 @@ class MariadbDBI extends YadamuDBI {
   */
 
   async finalize() {
-    await this.conn.end();
+    await this.connection.end();
     await this.pool.end();
   }
 
@@ -359,7 +383,7 @@ class MariadbDBI extends YadamuDBI {
 
   async abort() {
 	try {
-      await this.conn.end();
+      await this.connection.end();
     } catch (e) {}
 	try {
       await this.pool.end();
@@ -373,7 +397,7 @@ class MariadbDBI extends YadamuDBI {
   */
   
   async beginTransaction() {
-    await this.conn.beginTransaction();
+    await this.connection.beginTransaction();
   }
 
   /*
@@ -383,7 +407,7 @@ class MariadbDBI extends YadamuDBI {
   */
   
   async commitTransaction() {
-    await this.conn.commit();
+    await this.connection.commit();
   }
 
   /*
@@ -393,7 +417,7 @@ class MariadbDBI extends YadamuDBI {
   */
   
   async rollbackTransaction() {
-    await this.conn.rollback();
+    await this.connection.rollback();
   }
   
   async createSavePoint() {
@@ -502,17 +526,17 @@ class MariadbDBI extends YadamuDBI {
 
   }
    
-  async getInputStream(query,parser) {
+  async getInputStream(tableInfo,parser) {
        
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${query.SQL_STATEMENT};\n--\n`);
+      this.status.sqlTrace.write(`${tableInfo.SQL_STATEMENT};\n--\n`);
     }
 
 	const self = this
     const is = new Readable({objectMode: true });
     is._read = function() {};  
   
-    this.conn.queryStream(query.SQL_STATEMENT).on('data',
+    this.connection.queryStream(tableInfo.SQL_STATEMENT).on('data',
     function(row) {
       is.push(row)
     }).on('end',
@@ -547,6 +571,17 @@ class MariadbDBI extends YadamuDBI {
 
   async finalizeDataLoad() {
   }  
+
+  async newSlaveInterface(slaveNumber) {
+	const dbi = new MariadbDBI(this.yadamu)
+	dbi.setParameters(this.parameters);
+	const connection = await this.getConnectionFromPool()
+	return await super.newSlaveInterface(slaveNumber,dbi,connection)
+  }
+  
+  tableWriterFactory(tableName) {
+    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
+  }
 
 }
 

@@ -1,22 +1,13 @@
 "use strict" 
 
-const Transform = require('stream').Transform;
+const YadamuParser = require('../../common/yadamuParser.js')
 
-class DBParser extends Transform {
+class DBParser extends YadamuParser {
   
-  constructor(query,objectMode,yadamuLogger) {
-    super({objectMode: true });   
-    this.query = query;
-    this.objectMode = objectMode
-    this.yadamuLogger = yadamuLogger;
-    this.counter = 0
+  constructor(tableInfo,objectMode,yadamuLogger) {
+    super(tableInfo,objectMode,yadamuLogger);      
+  }
     
-  }
-
-  getCounter() {
-    return this.counter;
-  }
-  
   async _transform (data,encodoing,done) {
     this.counter++;
     if (!this.objectMode) {

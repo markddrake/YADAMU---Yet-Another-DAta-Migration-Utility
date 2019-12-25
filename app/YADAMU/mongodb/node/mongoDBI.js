@@ -49,6 +49,36 @@ const DBParser = require('./dbParser.js');
 
 class MongoDBI extends YadamuDBI {
     
+  getMongoURL() {
+    
+    return `mongodb://${this.connectionProperties.host}:${this.connectionProperties.port}`;
+    
+  }
+  
+  async getDatabaseConnectionImpl() {
+    await this.createConnectionPool();
+  }
+  
+  async createConnectionPool() {
+      
+    this.logConnectionProperties();
+	const poolSize = this.parameters.PARALLEL ? parseInt(this.parameters.PARALLEL) + 1 : 5
+    this.connectionProperties.options = typeof this.connectionProperties.options === 'object' ? this.connectionProperties.options : {}
+    if (poolSize > 5) {
+	  this.connectionProperties.options.poolSize = poolSize
+	}
+	if (this.status.sqlTrace) {
+       this.status.sqlTrace.write(`mongoURL ${this.getMongoURL()}\n`)      
+     }
+	let sqlStartTime = performance.now();
+    this.client = new MongoClient(this.getMongoURL(),this.connectionProperties.options);
+    await this.client.connect();    
+    this.traceTiming(sqlStartTime,performance.now())
+  }
+  
+  releaseConnection() {
+	// this.db.close() ?
+  }
   
   isValidDDL() {
     return (this.systemInformation.vendor === this.DATABASE_VENDOR)
@@ -75,12 +105,6 @@ class MongoDBI extends YadamuDBI {
       })
     })
   }
-  
-  initializeImport() {
-  }
-  
-  initializeExport() {
-  }
                                                                     ;
   async executeDDLImpl(collectionList) {
            
@@ -88,7 +112,10 @@ class MongoDBI extends YadamuDBI {
       if (this.status.sqlTrace) {
         this.status.sqlTrace.write(`db.createCollection(${collectionName})\n`)      
       }      
-      return this.db.createCollection(collectionName);
+      let sqlStartTime = performance.now();
+      const result = this.db.createCollection(collectionName);
+      this.traceTiming(sqlStartTime,performance.now())
+      return result
     },this));
 
   }    
@@ -119,16 +146,14 @@ class MongoDBI extends YadamuDBI {
   async useDatabase(database) {
      if (this.status.sqlTrace) {
        this.status.sqlTrace.write(`use ${database}\n`)      
+       this.status.sqlTrace.write(`db.stats()\n`)      
      }
-     this.db = await this.client.db(database);	  
+     let sqlStartTime = performance.now();
+     this.db = await this.client.db(database,{returnNonCachedInstance:true});	 
+     this.stats = await this.db.stats();	 
+     this.traceTiming(sqlStartTime,performance.now())
   }
 
-  getMongoURL() {
-    
-    return `mongodb://${this.connectionProperties.host}:${this.connectionProperties.port}`;
-    
-  }
-  
   getConnectionProperties() {
   
     return{
@@ -147,16 +172,7 @@ class MongoDBI extends YadamuDBI {
   **
   */
   
-  async getDatabaseConnectionImpl() {
-     if (this.status.sqlTrace) {
-       this.status.sqlTrace.write(`mongoURL ${this.getMongoURL()}\n`)      
-     }
-     this.client = new MongoClient(this.getMongoURL(),typeof this.connectionProperties.options === 'object' ? this.connectionProperties.options : {});
-     await this.client.connect();     
-  }	  
-  
-  async initialize() {
-      
+  async initialize() {   
 	  // TODO : Support for Mongo Authentication ???
      await super.initialize(false);   
   }
@@ -168,10 +184,9 @@ class MongoDBI extends YadamuDBI {
   */
 
   async finalize() {
-     
-     if (this.client) {
-       this.client.close();
-     }
+    if (this.client) {
+      this.client.close();
+    }
   }
 
   /*
@@ -181,9 +196,13 @@ class MongoDBI extends YadamuDBI {
   */
 
   async abort() {
-     if (this.client) {
-       this.client.close();
-     }      
+    if (this.client) {
+      try {
+        this.client.close();
+      } catch (e) {
+        console.log(e)
+	  }
+    }      
   }
 
   /*
@@ -261,7 +280,13 @@ class MongoDBI extends YadamuDBI {
   */
   
   async getSystemInformation(EXPORT_VERSION) {     
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`db.admin().buildInfo()\n`)      
+    }
+	let sqlStartTime = performance.now();
     const buildInfo = await this.db.admin().buildInfo()
+	const stats = await this.db.stats();
+    this.traceTiming(sqlStartTime,performance.now())
     return {
       date               : new Date().toISOString()
      ,timeZoneOffset     : new Date().getTimezoneOffset()
@@ -276,6 +301,7 @@ class MongoDBI extends YadamuDBI {
        ,platform         : process.platform
       }
      ,buildInfo          : buildInfo
+	 ,stats              : stats
     }
   }
 
@@ -290,10 +316,19 @@ class MongoDBI extends YadamuDBI {
   }
   
   async getSchemaInfo(schema) {
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`db.listCollections()\n`)      
+    }
+	let sqlStartTime = performance.now();
 	const schemaInfo = await this.db.listCollections().toArray();  
+    this.traceTiming(sqlStartTime,performance.now())
     if ((this.parameters.MONGO_STORAGE_FORMAT === 'DOCUMENT') && (this.parameters.MONGO_EXPORT_FORMAT === 'ARRAY')) {
       const promises =  schemaInfo.map(function(collection) {     
-        return this.db.collection(collection.name).mapReduce(
+        if (this.status.sqlTrace) {
+          this.status.sqlTrace.write(`db.collection(${collection.name}).mapReduce()\n`)      
+        }
+        let sqlStartTime = performance.now();
+        const results = this.db.collection(collection.name).mapReduce(
           function() {
             if (keys.length === 0) {
               emit('metadata',null)
@@ -351,6 +386,8 @@ class MongoDBI extends YadamuDBI {
              ,sizes   : []
           }
         })
+        this.traceTiming(sqlStartTime,performance.now())
+		return results;
       },this)
       
       
@@ -406,27 +443,32 @@ class MongoDBI extends YadamuDBI {
     
   }
 
-  createParser(query,objectMode) {
+  createParser(tableInfo,objectMode) {
 	switch (true) {
 	  case ((this.parameters.MONGO_STORAGE_FORMAT === 'DOCUMENT') && (this.parameters.MONGO_EXPORT_FORMAT === 'ARRAY')) :
-	    query.transformation = 'DOCUMENT_TO_ARRAY'
+	    tableInfo.transformation = 'DOCUMENT_TO_ARRAY'
 		break;
 	  case ((this.parameters.MONGO_STORAGE_FORMAT === 'ARRAY') && (this.parameters.MONGO_EXPORT_FORMAT === 'DOCUMENT')) :
-	    query.transformation = 'ARRAY_TO_DOCUMENT'
+	    tableInfo.transformation = 'ARRAY_TO_DOCUMENT'
 		break;
       default:
-	    query.transformation = 'NONE'
+	    tableInfo.transformation = 'NONE'
     } 
-	query.stripID = this.parameters.MONGO_STRIP_ID ? this.parameters.MONGO_STRIP_ID : false
-    return new DBParser(query,objectMode,this.yadamuLogger);
+	tableInfo.stripID = this.parameters.MONGO_STRIP_ID ? this.parameters.MONGO_STRIP_ID : false
+    return new DBParser(tableInfo,objectMode,this.yadamuLogger);
   }  
   
   async getInputStream(collection,parser) {
      
     const readStream = new Readable({objectMode: true });
     readStream._read = function() {};
-   
-    const mongoStream = this.db.collection(collection.name).find().stream();
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`db.collection(${collection.name}.find().stream()\n`)      
+    }
+   	let sqlStartTime = performance.now();
+    const mongoStream = await this.db.collection(collection.name).find().stream();
+    this.traceTiming(sqlStartTime,performance.now())
     mongoStream.on('data', function(data) {readStream.push(data)})
     mongoStream.on('end',function(result) {readStream.push(null)});
     return readStream;      
@@ -447,15 +489,45 @@ class MongoDBI extends YadamuDBI {
   }
 
   async insertMany(collection,array) {
+    if (this.status.sqlTrace) {
+	  this.status.sqlTrace.write(`db.collection(${collection}).insertMany(${array.length})\n`)      
+    }
+  	let sqlStartTime = performance.now();
     const results = await this.db.collection(collection).insertMany(array);
+    this.traceTiming(sqlStartTime,performance.now())
     return results;
   }
 
   async insertOne(collection,doc) {
+    if (this.status.sqlTrace) {
+	  this.status.sqlTrace.write(`db.collection(${collection}).insertOne()\n`)      
+    }
+ 	let sqlStartTime = performance.now();
     const results = await this.db.collection(collection).insertOne(doc);
+    this.traceTiming(sqlStartTime,performance.now())
     return results;
   }
 
+  async configureSlave(slaveNumber,client) {
+	this.slaveNumber = slaveNumber
+	this.client = client
+  }
+
+  async newSlaveInterface(slaveNumber) {
+	const dbi = new MongoDBI(this.yadamu)
+	dbi.setParameters(this.parameters);
+	// return await super.newSlaveInterface(slaveNumber,dbi,this.pool)
+	await dbi.configureSlave(slaveNumber,this.client);
+	this.cloneSlave
+	Configuration(dbi);
+	dbi.useDatabase(this.stats.db);
+	return dbi
+  }
+
+  tableWriterFactory(tableName) {
+    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
+  }
+  
 }
 
 module.exports = MongoDBI

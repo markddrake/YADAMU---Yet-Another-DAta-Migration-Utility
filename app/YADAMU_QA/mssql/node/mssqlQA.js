@@ -26,13 +26,9 @@ class MsSQLQA extends MsSQLDBI {
 	  await super.initialize();
 	}
 	
-	async useDatabase(databaseName) {
-      
+	async useDatabase(databaseName) {     
       const statement = `use ${databaseName}`
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`${statement}\ngo\n`)
-      }
-      const results = await this.getRequest().batch(statement)
+      const results = await this.executeBatch(statement,this.generateRequest());
     } 
 	
 	async recreateDatabase() {
@@ -44,20 +40,14 @@ class MsSQLQA extends MsSQLDBI {
       delete this.parameters.MSSQL_SCHEMA_DB;
       
 	  this.connectionProperties.database = 'master';
-      this.pool = await this.getConnectionPool(); 
+      await this.createConnectionPool(); 
 
       let results;       
       const dropDatabase = `drop database if exists "${MSSQL_SCHEMA_DB}"`;
-      if (this.status.sqlTrace) {
-         this.status.sqlTrace.write(`${dropDatabase}\ngo\n`)
-      }
-      results =  await this.getRequest().batch(dropDatabase);      
+      results =  await this.executeBatch(dropDatabase,this.generateRequest());      
       
       const createDatabase = `create database "${MSSQL_SCHEMA_DB}" COLLATE Latin1_General_100_CS_AS_SC`;
-      if (this.status.sqlTrace) {
-         this.status.sqlTrace.write(`${createDatabase}\ngo\n`)
-      }
-      results = await  this.getRequest().batch(createDatabase);      
+      results =  await this.executeBatch(createDatabase,this.generateRequest());      
       await this.pool.close();
 	  
 	  this.parameters.MSSQL_SCHEMA_DB = MSSQL_SCHEMA_DB
@@ -91,7 +81,7 @@ class MsSQLQA extends MsSQLDBI {
         this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION)\ngo\n`)
       }
 
-      const request = this.pool.request();
+      const request = this.generateRequest();
       let results = await request
                           .input('FORMAT_RESULTS',this.sql.Bit,false)
                           .input('SOURCE_DATABASE',this.sql.VarChar,source.database)

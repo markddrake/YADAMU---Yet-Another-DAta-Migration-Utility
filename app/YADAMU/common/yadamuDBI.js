@@ -32,7 +32,23 @@ class YadamuDBI {
   get SOFTWARE_VENDOR()     { return undefined };
   get SPATIAL_FORMAT()      { return spatialFormat };
   get DEFAULT_PARAMETERS()  { return this.yadamu.getYadamuDefaults().yadmuDBI }
-  get STATEMENT_SEPERATOR() { return '' }
+  get STATEMENT_TERMINATOR() { return '' }
+  
+  traceSQL(msg) {
+	 return(`${msg.trim()}${this.sqlTraceTag} ${this.sqlTerminator}`);
+  }
+  
+  traceTiming(startTime,endTime) {      
+  	const sqlOperationTime = endTime - startTime;
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(`--\n--${this.sqlTraceTag} Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlOperationTime)}s.\n--\n`);
+    }
+	this.sqlCumlativeTime = this.sqlCumlativeTime + sqlOperationTime
+  }
+ 
+  traceComment(comment) {
+    return `/* ${comment} */\n`
+  }
   
   doTimeout(milliseconds) {
     
@@ -136,8 +152,8 @@ class YadamuDBI {
                         break;
                     } 	
                   } 
-   				if ((status.sqlTrace) && (logEntry.sqlStatement)) {
-   				  status.sqlTrace.write(`${logEntry.sqlStatement}\n${this.STATEMENT_SEPERATOR}\n`)
+   				if ((status.sqlTrace) && (logEntry.sqlStatement)) {	
+   				  status.sqlTrace.write(this.traceSQL(logEntry.sqlStatement))
    		        }
     },this) 
   }    
@@ -146,7 +162,7 @@ class YadamuDBI {
     if (this.status.sqlTrace) {
       const pwRedacted = Object.assign({},this.connectionProperties)
       delete pwRedacted.password
-      this.status.sqlTrace.write(`--\n-- Connection Properies: ${JSON.stringify(pwRedacted)}\n--\n`)
+      this.status.sqlTrace.write(this.traceComment(`Connection Properies: ${JSON.stringify(pwRedacted)}`))
     }
   }
      
@@ -248,7 +264,7 @@ class YadamuDBI {
       try {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
         if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
+          this.status.sqlTrace.write(this.traceSQL(ddlStatement));
         }
         this.executeSQL(ddlStatement,{});
       } catch (e) {
@@ -296,6 +312,7 @@ class YadamuDBI {
     
 	this.spatialFormat = this.SPATIAL_FORMAT 
     this.yadamu = yadamu;
+	this.sqlTraceTag = '';
     this.status = yadamu.getStatus()
     this.yadamuLogger = yadamu.getYadamuLogger();
     this.initializeParameters(parameters);
@@ -320,7 +337,7 @@ class YadamuDBI {
     this.rejectManager = this.createRejectManager()
 	
 	this.sqlCumlativeTime = 0
-	
+	this.sqlTerminator = `\n${this.STATEMENT_TERMINATOR}\n`
   }
 
   enablePerformanceTrace() { 
@@ -334,9 +351,17 @@ class YadamuDBI {
 	 fs.writeFileSync(this.parameters.PERFORMANCE_TRACE, `${util.format(...args)}\n`, { flag: 'a' });
   }
   
-  async getDatabaseConnection() {
+  async getDatabaseConnectionImpl() {
+    await this.createConnectionPool();
+	this.connection = await this.getConnectionFromPool();
+	await this.configureConnection();
+  }  
+  
+  async getDatabaseConnection(requirePassword) {
 	 	
-	let interactiveCredentials = ((this.connectionProperties[this.PASSWORD_KEY_NAME] === undefined) || (this.connectionProperties[this.PASSWORD_KEY_NAME].length === 0)) 
+	
+		
+	let interactiveCredentials = (requirePassword && ((this.connectionProperties[this.PASSWORD_KEY_NAME] === undefined) || (this.connectionProperties[this.PASSWORD_KEY_NAME].length === 0))) 
 	let retryCount = interactiveCredentials ? 3 : 1;
 	
 	let prompt = `Enter password for ${this.DATABASE_VENDOR} connection: `
@@ -381,7 +406,7 @@ class YadamuDBI {
   **
   */
 
-  async initialize(openDatabase) {
+  async initialize(requirePassword) {
 	
     if (this.status.sqlTrace) {
        if (this.status.sqlTrace._writableState.ended === true) {
@@ -415,8 +440,8 @@ class YadamuDBI {
       this.enablePerformanceTrace();
 	}
 	
-	if (openDatabase) {
-      await this.getDatabaseConnection();
+	if (this.isDatabase()) {
+      await this.getDatabaseConnection(requirePassword);
     }
   }
 
@@ -516,6 +541,7 @@ class YadamuDBI {
   */
 
   async getDDLOperations() {
+	// Undefined means database does not provide mechanism to obtain DDL statements. Different to returning an empty Array.
     return undefined
   }
   
@@ -535,7 +561,7 @@ class YadamuDBI {
     return new DBParser(query,objectMode,this.yadamuLogger);      
   }
   
-  async getInputStream(query,parser) {
+  async getInputStream(tableInfo,parser) {
     throw new Error('Unimplemented Method')
   }      
 
@@ -616,7 +642,27 @@ class YadamuDBI {
   	  this.setOption('recreateSchema',true);
     }
   }
-	
+  
+  async cloneSlaveConfiguration(dbi) {
+	dbi.setParameters(this.parameters);
+	dbi.systemInformation = this.systemInformation
+	dbi.metadata = this.metadata
+	dbi.schemaCache = this.schemaCache
+	dbi.statementCache = this.statementCache
+  }	  
+
+  async newSlaveInterface(slaveNumber,dbi,connection) {
+	  
+	// Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
+	  
+	dbi.slaveNumber = slaveNumber
+	dbi.sqlTraceTag = ` /* Slave [${slaveNumber}] */`;
+	dbi.connection = connection
+	await dbi.configureConnection();
+	this.cloneSlaveConfiguration(dbi);
+    return dbi
+  }
+  
 }
 
 module.exports = YadamuDBI

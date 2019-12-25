@@ -10,12 +10,12 @@ class MongoQA extends MongoDBI {
     async initialize() {
 	  await super.initialize();
 	  if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
+		await this.recreateDatabase();
 	  }
 	}
 
     
-    async recreateSchema() {
+    async recreateDatabase() {
 
       try {
         await this.useDatabase(this.parameters.TO_USER)
@@ -23,6 +23,7 @@ class MongoQA extends MongoDBI {
           this.status.sqlTrace.write(`db.dropDatabase()\n`)      
         }
         await this.db.dropDatabase()
+        await this.useDatabase(this.parameters.TO_USER)
       } catch (e) {
         throw e;
       }

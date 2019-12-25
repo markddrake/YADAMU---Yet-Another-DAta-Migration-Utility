@@ -54,7 +54,7 @@ class TableWriter extends YadamuWriter {
             }
             else {
               // Alternative is to rebuild the table with these data types mapped to date objects ....
-              col = coISOString();
+              col = col.toISOString();
             }
             if (col.length > 23) {
                col = `${col.substr(0,23)}Z`;
@@ -120,8 +120,9 @@ class TableWriter extends YadamuWriter {
   async finalize() {
     const results = await super.finalize()
     results.insertMode = this.tableInfo.bulkSupported === true ? 'Bulk' : 'Iterative'
-    if (this.tableInfo.preparedStatement !== undefined){
-      await this.tableInfo.preparedStatement.unprepare();
+    if (this.dbi.preparedStatement !== undefined){
+      await this.dbi.preparedStatement.unprepare();
+	  this.dbi.preparedStatement = undefined;
     }
     return results;
   }
@@ -321,9 +322,7 @@ class TableWriter extends YadamuWriter {
     
     // Cannot process table using BULK Mode. Prepare a statement use with record by record processing.
 
-    if (this.tableInfo.preparedStatement === undefined) {
-      this.tableInfo.preparedStatement = await this.createPreparedStatement(this.tableInfo.dml, this.tableInfo.dataTypes) 
-    }
+    this.dbi.preparedStatement = await this.createPreparedStatement(this.tableInfo.dml, this.tableInfo.dataTypes) 
 
     for (const row in this.tableInfo.bulkOperation.rows) {
       try {
@@ -331,7 +330,8 @@ class TableWriter extends YadamuWriter {
         for (const col in this.tableInfo.bulkOperation.rows[0]){
            args['C'+col] = this.tableInfo.bulkOperation.rows[row][col]
         }
-        const results = await this.dbi.execute(this.tableInfo.preparedStatement,args,this.tableInfo.dml);
+		this.dbi.currentStatement = this.dbi.preparedStatement;
+        const results = await this.dbi.execute(this.dbi.preparedStatement,args,this.tableInfo.dml);
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.rows[row])] : []
         this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.tableInfo.bulkOperation.rows.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
@@ -340,7 +340,9 @@ class TableWriter extends YadamuWriter {
         }
       }
     }       
-    
+       
+    await this.dbi.preparedStatement.unprepare();   
+	this.dbi.preparedStatement = undefined;
     this.endTime = performance.now();
     this.tableInfo.bulkOperation.rows.length = 0;
     return this.skipTable

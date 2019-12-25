@@ -24,10 +24,8 @@ class DBWriter extends Writable {
     this.ddlComplete  = false;
     this.skipTable    = false;
 
-    this.configureFeedback(this.dbi.parameters.FEEDBACK);
-    
+    this.configureFeedback(this.dbi.parameters.FEEDBACK); 
     this.timings = {}
-	
   }      
   
   configureFeedback(feedbackModel) {
@@ -209,25 +207,15 @@ class DBWriter extends Writable {
           break;
         case 'metadata':
           await this.setMetadata(obj.metadata);
+          await this.dbi.initializeData();
           break;
         case 'table':
-          if (this.currentTable === undefined) {
-            await this.dbi.initializeData();
-          }
-          else {
-          // if (this.currentTable) {
-            const results = await this.currentTable.finalize();
-            this.skipTable = results.skipTable;
-            if (this.skipTable === false) {
-              const elapsedTime = results.endTime - results.startTime;
-              this.reportTableStatistics(elapsedTime,results);
-            }
-          }
+		  this.tableCount++;
+          this.rowCount = 0;
+          this.skipTable = false;
           this.tableName = obj.table;
           this.currentTable = this.dbi.getTableWriter(this.tableName);
           await this.currentTable.initialize();
-          this.rowCount = 0;
-          this.skipTable = false;
           break;
         case 'data': 
           if (this.skipTable === true) {
@@ -255,11 +243,21 @@ class DBWriter extends Writable {
             await this.dbi.beginTransaction();            
           }
           break;
+		case 'eod':
+          const results = await this.currentTable.finalize();
+          this.skipTable = results.skipTable;
+          if (!this.skipTable) {
+            const elapsedTime = results.endTime - results.startTime;            
+            this.reportTableStatistics(elapsedTime,results);
+          }
+		  this.currentTable = undefined
+		  break;
         default:
       }    
       callback();
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._write()`,`"${this.tableName}"`],e);
+	  await this.dbi.abort();
       process.nextTick(() => this.emit('error',e));
       callback(e);
     }
@@ -267,24 +265,20 @@ class DBWriter extends Writable {
  
   async _final(callback) {
     try {
-      if (this.currentTable !== undefined) {
-        const results = await this.currentTable.finalize();
-        this.skipTable = results.skipTable;
-        if (!this.skipTable) {
-          const elapsedTime = results.endTime - results.startTime;            
-          this.reportTableStatistics(elapsedTime,results);
-        }
+	  if (this.mode === 'DDL_ONLY') {
+        this.yadamuLogger.info([`${this.constructor.name}`],`DDL only export. No data written.`);
       }
       else {
-        this.yadamuLogger.info([`${this.constructor.name}`],`No tables found.`);
-      }
-      if (this.currentTable !== undefined) {
         await this.dbi.finalizeData();
-      }
+		if (Object.keys(this.timings).length === 0) {
+		  this.yadamuLogger.info([`${this.constructor.name}`],`No tables found.`);
+		}
+	  }
       await this.dbi.finalizeImport();
       callback();
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._final()`,`"${this.currentTable}"`],e);
+	  await this.dbi.abort();
       process.nextTick(() => this.emit('error',e));
       callback(e);
     } 

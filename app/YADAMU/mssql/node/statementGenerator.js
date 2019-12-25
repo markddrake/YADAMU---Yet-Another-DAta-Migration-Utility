@@ -223,7 +223,7 @@ class StatementGenerator {
 
     const traceEntry = `SET @RESULTS = '{}'; CALL master.dbo.sp_GENERATE_SQL(?,?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS";`;	
     
-    let results = await this.dbi.execute(this.dbi.getRequest()
+    let results = await this.dbi.execute(this.dbi.generateRequest()
                             .input('TARGET_DATABASE',sql.VARCHAR,this.targetSchema)
                             .input('SPATIAL_FORMAT',sql.NVARCHAR,this.spatialFormat)
                             .input('METADATA',sql.NVARCHAR,JSON.stringify({metadata : this.metadata}))

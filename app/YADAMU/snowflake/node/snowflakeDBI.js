@@ -325,20 +325,20 @@ class snowflakeDBI extends YadamuDBI {
     return metadata;  
   }
    
-  createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.yadamuLogger);
+  createParser(tableInfo,objectMode) {
+    return new DBParser(tableInfo,objectMode,this.yadamuLogger);
   }  
     
-  async getInputStream(query,parser) {
+  async getInputStream(tableInfo,parser) {
       
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${query.SQL_STATEMENT};\n--\n`)
+      this.status.sqlTrace.write(`${tableInfo.SQL_STATEMENT};\n--\n`)
     }
         
     const readStream = new Readable({objectMode: true });
     readStream._read = function() {};
     
-    const statement = this.connection.execute({sqlText: query.SQL_STATEMENT,  fetchAsString: ['Number','Date'], streamResult: true})
+    const statement = this.connection.execute({sqlText: tableInfo.SQL_STATEMENT,  fetchAsString: ['Number','Date'], streamResult: true})
     const snowflakeStream = statement.streamRows();
     snowflakeStream.on('data', function(row) {readStream.push(row)})
     snowflakeStream.on('end',function(result) {readStream.push(null)});
@@ -352,6 +352,21 @@ class snowflakeDBI extends YadamuDBI {
   getTableWriter(table) {
     return super.getTableWriter(TableWriter,table)
   }  
+
+  configureSlave(slaveNumber,connection) {
+	this.slaveNumber = slaveNumber
+	this.connection = connection
+  }
+
+  async newSlaveInterface(slaveNumber) {
+	const dbi = new OracleDBI(this.yadamu)
+	dbi.configureSlave(slaveNumber,await this.getConnectionFromPool())
+	return super.newSlaveInterface(dbi);
+  }
+
+  tableWriterFactory(tableName) {
+    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
+  }
 
 }
 

@@ -18,11 +18,7 @@ class StatementGenerator {
   async generateStatementCache (executeDDL, vendor) {    
   
     const sqlStatement = `select GENERATE_SQL($1,$2,$3)`
-    const results = await this.dbi.pgClient.query(sqlStatement,[{metadata : this.metadata}, this.targetSchema, this.spatialFormat])
-    
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
-    }
+    const results = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, this.targetSchema, this.spatialFormat])
     let statementCache = results.rows[0].generate_sql;
     if (statementCache === null) {
       statementCache = {}
