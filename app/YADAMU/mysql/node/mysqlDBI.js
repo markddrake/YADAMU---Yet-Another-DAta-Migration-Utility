@@ -165,7 +165,7 @@ class MySQLDBI extends YadamuDBI {
         const sqlStartTime = performance.now();
         self.pool.getConnection(
 		  function(err,connection) {
-            this.traceTiming(sqlStartTime,performance.now())
+            self.traceTiming(sqlStartTime,performance.now())
             if (err) {
               reject(err);
             }
@@ -347,7 +347,7 @@ class MySQLDBI extends YadamuDBI {
                            reject(err);
                          }
                        }
-					   this.traceTiming(sqlStartTime,sqlEndTime)
+					   self.traceTiming(sqlStartTime,sqlEndTime)
                        resolve(results);
                    })
                })
@@ -393,13 +393,11 @@ class MySQLDBI extends YadamuDBI {
     
   async executeDDLImpl(ddl) {
     await this.createSchema(this.parameters.TO_USER);
-    await Promise.all(ddl.map(function(ddlStatement) {
+    const ddlResults = await Promise.all(ddl.map(function(ddlStatement) {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`${ddlStatement};\n--\n`);
-      }
-      return this.connection.query(ddlStatement) 
-    },this))
+      return this.executeSQL(ddlStatement) 
+    },this))	
+	return ddlResults;
   }
 
   get DATABASE_VENDOR() { return 'MySQL' };
@@ -723,6 +721,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   tableWriterFactory(tableName) {
+    this.skipCount = 0;    
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
   }
 

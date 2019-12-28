@@ -52,11 +52,12 @@ class DBReaderMaster extends DBReader {
 	// When a table copy is complete ti will be assigned a new table to process.
 	// When all tables have been processed the Writer will free it's database connection and return  value.
 	  
-	let results = []
-	if (this.schemaInfo.length > 0) {
+	const maxSlaveCount = parseInt(this.dbi.parameters.PARALLEL)
+	const slaveCount = this.schemaInfo.length < maxSlaveCount ? this.schemaInfo.length : maxSlaveCount
+	if (slaveCount > 0) {
       const tasks = [...this.schemaInfo]
-	  const parallelTasks = Array(parseInt(this.dbi.parameters.PARALLEL)).fill(0)
-      results =  await Promise.all(parallelTasks.map(async function(dummy,idx) {
+	  const parallelTasks = Array(slaveCount).fill(0)
+      const tableWriters = await Promise.all(parallelTasks.map(async function(dummy,idx) {
     	 const tableWriter = await this.outputStream.newSlave(idx)		 
          const tableReaderDBI = await this.dbi.newSlaveInterface(idx);
 		 while (tasks.length > 0) {
@@ -66,10 +67,17 @@ class DBReaderMaster extends DBReader {
            const rows = await tableReader
 		   tableWriter.write({eod: task.TABLE_NAME})
 		 }
-		 tableWriter.write({releaseSlave : null})
+		 // tableWriter.write({releaseSlave : null})
 		 await tableReaderDBI.releaseConnection();
-		 return null 
+		 return tableWriter 
 	  },this))
+
+      tableWriters.forEach(function(tableWriter) {
+		 tableWriter.write({releaseSlave : null})
+	  },this)
+
+	  // console.log(tableWriters)
+	  
 	}
 	else {
       this.yadamuLogger.info([`${this.constructor.name}`],`No tables found.`);
@@ -98,7 +106,7 @@ class DBReaderMaster extends DBReader {
          case 'ddl' :
            let ddl = await this.getDDLOperations();
            if (ddl === undefined) {
-             // Database does not provide mechansim to retrieve DD	L statements used to create a schema (eg Oracle's DBMS_METADATA package)
+             // Database does not provide mechansim to retrieve DDL statements used to create a schema (eg Oracle's DBMS_METADATA package)
              // Reverse Engineer DDL from metadata.
              const metadata = await this.getMetadata();
              await this.generateStatementCache(metadata)
@@ -123,7 +131,7 @@ class DBReaderMaster extends DBReader {
 		     }
 		   );
            this.push({metadata: metadata});
-		   this.nextPhase = this.mode === 'DDL_ONLY' ? 'finished' : 'data';
+		   this.nextPhase = this.schemaInfo.length === 0 ? 'finished' : 'data';
 		   break;
 		 case 'data':
 			this.nextPhase = 'finished'

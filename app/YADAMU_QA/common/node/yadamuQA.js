@@ -750,6 +750,8 @@ class YadamuQA {
     const compareParameters = Object.assign({},parameters)
     this.setUser(sourceParameters,'FROM_USER',sourceDatabase, sourceSchema)
     this.setUser(compareParameters,'TO_USER', sourceDatabase, targetSchema)
+	
+	// If the ssource connection and target connection reference the same server perform a single DDL_AND_DATA copy between the source schema and target schema.
   	
 	const mode =  (sourceConnection === targetConnection) ? "DDL_AND_DATA" : "DDL_ONLY"
     sourceParameters.MODE = mode;
@@ -768,6 +770,9 @@ class YadamuQA {
     let targetVersion = compareDBI.dbVersion;
 
     this.printResults('dbRoundtrip',`"${sourceConnectionName}"://${sourceDescription}`,`"${sourceConnectionName}"://${compareDescription}`,elapsedTime)	
+	
+	// Test current value of MODE. If  the value is DDL_ONLY then the previous operation cloned the structure of the source schema into the compare schema.
+	// Now copy the data from the source schema to the target schema  and then from the target schema to the compare schema
 	
 	if (mode === 'DDL_ONLY') {
 	  operationsList.length = 0

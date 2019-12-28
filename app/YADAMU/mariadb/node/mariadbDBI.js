@@ -297,10 +297,11 @@ class MariadbDBI extends YadamuDBI {
 
   async executeDDLImpl(ddl) {
     await this.createSchema(this.parameters.TO_USER);
-    await Promise.all(ddl.map(function(ddlStatement) {
+    const ddlResults = await Promise.all(ddl.map(function(ddlStatement) {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
       return this.executeSQL(ddlStatement) 
     },this))
+	return ddlResults;
   }
 
   /*
@@ -580,6 +581,7 @@ class MariadbDBI extends YadamuDBI {
   }
   
   tableWriterFactory(tableName) {
+    this.skipCount = 0;    
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
   }
 

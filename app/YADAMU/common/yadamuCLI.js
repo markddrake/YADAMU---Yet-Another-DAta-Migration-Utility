@@ -321,7 +321,7 @@ class YadamuCLI {
 	} catch (e) {
       switch (true) {
 		case (e.errno && (e.errno === -4058)):
-		  let message = `Cannot l JSON file "${path}".`;
+		  let message = `Cannot load JSON file "${path}".`;
 		  this.yadamuLogger.error([`${this.constructor.name}.loadJSON()`],message)   
           throw new CommandLineError(`[${this.constructor.name}.loadJSON()] ${message}`)
 	    default:

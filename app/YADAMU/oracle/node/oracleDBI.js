@@ -1402,10 +1402,12 @@ class OracleDBI extends YadamuDBI {
 	const connection = await this.getConnectionFromPool()	
     await super.newSlaveInterface(slaveNumber,dbi,connection)
     await dbi.setCurrentSchema(this.currentSchema);
+    await dbi.setDateFormatMask(connection,this.status,this.systemInformation.vendor);
     return dbi;
   }
 
   tableWriterFactory(tableName) {
+    this.skipCount = 0;    
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
   }
 

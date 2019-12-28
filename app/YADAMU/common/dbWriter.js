@@ -265,7 +265,7 @@ class DBWriter extends Writable {
  
   async _final(callback) {
     try {
-	  if (this.mode === 'DDL_ONLY') {
+	  if (this.timings.length === 0) {
         this.yadamuLogger.info([`${this.constructor.name}`],`DDL only export. No data written.`);
       }
       else {

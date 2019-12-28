@@ -167,23 +167,17 @@ class TableWriter extends YadamuWriter {
     await this.disableTriggers()
   }
 
-  async finalize() {
-    const results = await super.finalize()
-    await this.enableTriggers();
-    return results;
-  }
-
   async disableTriggers() {
   
     const sqlStatement = `ALTER TABLE "${this.schema}"."${this.tableName}" DISABLE ALL TRIGGERS`;
-    return this.dbi.executeSQL(sqlStatement,[]);
+    return await this.dbi.executeSQL(sqlStatement,[]);
     
   }
 
   async enableTriggers() {
     
     const sqlStatement = `ALTER TABLE "${this.schema}"."${this.tableName}" ENABLE ALL TRIGGERS`;
-    return this.dbi.executeSQL(sqlStatement,[]);
+    return await this.dbi.executeSQL(sqlStatement,[]);
     
   }
 
@@ -535,6 +529,7 @@ end;`
   async finalize() {
 	const tableStats = await super.finalize();
 	tableStats.sqlTime = tableStats.sqlTime + this.lobCumlativeTime;
+    await this.enableTriggers();
     return tableStats;  
   }
 }

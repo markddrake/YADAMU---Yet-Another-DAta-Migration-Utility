@@ -515,6 +515,7 @@ class PostgresDBI extends YadamuDBI {
   }
   
   tableWriterFactory(tableName) {
+    this.skipCount = 0;    
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
   }
   
