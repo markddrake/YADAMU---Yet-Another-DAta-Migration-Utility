@@ -41,7 +41,7 @@ class FileDBI extends YadamuDBI {
      return false;
   }
 
-  getReader() {
+  getInputStream() {
 	return this.inputStream.pipe(this.parser);
   }
   

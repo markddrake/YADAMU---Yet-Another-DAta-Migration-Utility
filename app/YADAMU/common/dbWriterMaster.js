@@ -12,14 +12,32 @@ class DBWriterMaster extends DBWriter {
     super(dbi,mode,status,yadamuLogger,options);
     const self = this;
     this.dbi.sqlTraceTag = `/* Master */`;	
+	this.slaveException = undefined;
 	this.slaveCount = 0;
   }      
   
   async initialize() {
     await this.dbi.initializeImport();
 	this.targetSchemaInfo = await this.getTargetSchemaInfo()
+	const self = this;
+	// setInterval(function() {console.log('Active Slaves',self.slaveCount)},5000);
+  }
+  
+  checkComplete() {
+    // Slave Counting mechanism is Fragile. 
+    // Need a better mechanism to detect that all slaves have terminated.
+    // If slave throws an exception we may not get a slaveReleased message, causing Yadamu to Hang.
+    this.slaveCount--
+    if (this.slaveCount === 0) {
+      this.emit('AllDataWritten',this.slaveException);
+    }
   }
  
+  setSlaveException(slaveException) {
+    // Cache the exception raised by the first slave to fail to that it can be passed to callback in _final	 
+    this.slaveException = slaveException = null ? this.slaveException : slaveException;
+  }
+  
   async _write(obj, encoding, callback) {
     // console.log(new Date().toISOString(),`${this.constructor.name}._write`,Object.keys(obj)[0]);	
     try {
@@ -39,24 +57,17 @@ class DBWriterMaster extends DBWriter {
 		  this.emit('ReadyForData');
           break;
 	    case 'slaveReleased':
+          this.checkComplete()
 		  // Parallel Master only
-          // Slave Counting mechanism is Fragile. 
-          // Need a better mechanism to detect that all slaves have terminated.
-	      // If slave throws an exception we may not get a slaveReleased message, causing Yadamu to Hang.
-          this.slaveCount--
-          if (this.slaveCount === 0) {
-            this.emit('AllDataWritten');
-	      }
 		  break;     	
 		default:
       }    
 	  callback();
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._write()`,`"${this.tableName}"`],e);
-	  await this.dbi.abort();
-      process.nextTick(() => this.emit('error',e));
+	  // Passing the exception to callback triggers the onError() event
       callback(e);
-    }3
+    }
   }
  
   async _final(callback) {
@@ -71,11 +82,10 @@ class DBWriterMaster extends DBWriter {
 		}
       }		
       await this.dbi.finalizeImport();
-      callback();
+      callback(this.slaveException);
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._final()`,`"${this.currentTable}"`],e);
-	  await this.dbi.abort();
-      process.nextTick(() => this.emit('error',e));
+	  // Passing the exception to callback triggers the onError() event
       callback(e);
     } 
   } 

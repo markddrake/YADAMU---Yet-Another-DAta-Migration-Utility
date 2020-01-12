@@ -300,9 +300,9 @@ as
                  when atc.DATA_TYPE = 'ANYDATA' then  -- Can be owned by SYS or PUBLIC 
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end' || atc.COLUMN_NAME || '"'
                  when TYPECODE = 'COLLECTION' then
-                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
                  when TYPECODE = 'OBJECT' then
-                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
                  /*     
                  ** Comment out unsupported scalar data types and Object types
                  */
@@ -364,9 +364,9 @@ as
                  when atc.DATA_TYPE = 'ANYDATA' then  -- Can be owned by SYS or PUBLIC
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end "' || atc.COLUMN_NAME || '"'
                  when TYPECODE = 'COLLECTION' then
-                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
                  when TYPECODE = 'OBJECT' then
-                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else SERIALIZE_OBJECT(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
                  /*     
                  ** Comment out unsupported scalar data types and Object types
                  */
@@ -423,6 +423,9 @@ $END
   V_FIRST_ROW BOOLEAN := TRUE;
   V_OBJECT_SERIALIZATION CLOB;
   V_ROW                  EXPORT_METADATA_RECORD;
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN               
+    V_WRAPPER_NAME  VARCHAR2(30);
+$END
 
 begin
 --
@@ -447,14 +450,14 @@ begin
     for t in getTableMetadata loop  
 	
 	  V_OBJECT_SERIALIZATION := OBJECT_SERIALIZATION.SERIALIZE_TABLE_TYPES(t.OWNER,t.TABLE_NAME);
-	  
+
 	  DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENT,TRUE,DBMS_LOB.CALL);
       V_SQL_FRAGMENT := 'select JSON_ARRAY(';	  
       DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
       DBMS_LOB.APPEND(V_SQL_STATEMENT,TABLE_TO_LIST(t.EXPORT_SELECT_LIST));
       V_SQL_FRAGMENT := ' NULL on NULL returning '|| JSON_FEATURE_DETECTION.C_RETURN_TYPE || ') "JSON" from "' || t.OWNER || '"."' || t.TABLE_NAME || '" t';
       DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-
+-- 
  	  V_ROW.OWNER                := t.OWNER;
 	  V_ROW.TABLE_NAME           := t.TABLE_NAME;
 	  V_ROW.COLUMN_LIST          := TABLE_TO_LIST(t.COLUMN_LIST);
@@ -462,8 +465,38 @@ begin
 	  V_ROW.SIZE_CONSTRAINTS     := '[' || TABLE_TO_LIST(t.SIZE_CONSTRAINT_LIST) || ']';
 	  V_ROW.EXPORT_SELECT_LIST   := TABLE_TO_LIST(t.EXPORT_SELECT_LIST);
 	  V_ROW.NODE_SELECT_LIST     := TABLE_TO_LIST(t.NODE_SELECT_LIST);
-      V_ROW.WITH_CLAUSE          := V_OBJECT_SERIALIZATION;
+	  V_ROW.WITH_CLAUSE          := V_OBJECT_SERIALIZATION;
 	  V_ROW.SQL_STATEMENT        := V_SQL_STATEMENT;
+
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN               
+--
+	  /*
+	  **
+	  ** PL/SQL not supported in WITH CLAUSE in 11.2.x. Generate a PL/SQL procuedre that will be created before fetching rows, and dropped once the table has been processed. 
+      ** Need to assign a unqiue name to each proceudre to allow tables to processed using parallel operations
+      **
+      */
+
+      if (V_ROW.WITH_CLAUSE  is NOT NULL) then
+        V_WRAPPER_NAME := 'YEXP_' || utl_encode.text_encode(utl_raw.cast_to_varchar2(sys_guid()),'AL32UTF8',1);
+        
+        V_ROW.WITH_CLAUSE        := 'create or replace function "' || t.OWNER || '"."' || V_WRAPPER_NAME || '"(P_TABLE_OWNER VARCHAR2,P_ANYDATA ANYDATA) '
+	                             || 'return CLOB '
+							     ||	'as '
+							     || V_ROW.WITH_CLAUSE 
+                                 || 'begin '				 						 
+								 || '  return "SERIALIZE_OBJECT"(P_TABLE_OWNER, P_ANYDATA);'
+								 || 'end;';
+
+        -- Replace OBJECT_SERIALIZATION with WRAPPER FUNCTION in SQL_STATMENT
+	  
+	    V_ROW.SQL_STATEMENT      := REPLACE(V_ROW.SQL_STATEMENT ,'"SERIALIZE_OBJECT"(','"' || V_WRAPPER_NAME || '"(');
+	    V_ROW.NODE_SELECT_LIST   := REPLACE(V_ROW.NODE_SELECT_LIST ,'"SERIALIZE_OBJECT"(','"' || V_WRAPPER_NAME || '"(');
+	    V_ROW.EXPORT_SELECT_LIST := REPLACE(V_ROW.EXPORT_SELECT_LIST ,'"SERIALIZE_OBJECT"(','"' || V_WRAPPER_NAME || '"(');
+
+      end if;
+--
+$END
 	  
 	  PIPE ROW(V_ROW);
 

@@ -27,6 +27,7 @@ const sql = require('mssql');
 
 
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
+const {ConnectionError, MsSQLError} = require('../../common/yadamuError.js')
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
@@ -129,47 +130,108 @@ class MsSQLDBI extends YadamuDBI {
       this.connectionProperties.database = this.parameters.MSSQL_SCHEMA_DB
     }
   }
+  
+  getTransactionManager() {
+	const self = this
+	this.transactionInProgress = false;
+  	const transaction = new sql.Transaction(this.pool)
+	transaction.on('begin',
+	  function() {
+		self.transactionInProgress = true;
+	}).on('commit',
+	  function() {
+		self.transactionInProgress = false;
+	}).on('rollback',
+	  function() {
+		self.transactionInProgress = false;
+    });	
+    return transaction
+  }
 
   async createConnectionPool() {
     
 	this.setTargetDatabase();
     this.logConnectionProperties();
 
-    const sqlStartTime = performance.now();
-	this.pool = new sql.ConnectionPool(this.connectionProperties)
-    await this.pool.connect();
-	this.traceTiming(sqlStartTime,performance.now())
+	let stack
+	let operation
+	try {
+      const sqlStartTime = performance.now();
+      stack = new Error().stack;
+	  operation = 'sql.connectionPool()'
+	  this.pool = new sql.ConnectionPool(this.connectionProperties)
+      stack = new Error().stack;
+	  operation = 'sql.ConnectionPool.connect()'
+	  await this.pool.connect();
+	  this.traceTiming(sqlStartTime,performance.now())
 
-    const yadamuLogger = this.yadamuLogger;
-    this.pool.on('error',(err, p) => {
-      this.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`sql.ConnectionPool.onError()`],err);
-      throw err
-    })
+      const yadamuLogger = this.yadamuLogger;
+      this.pool.on('error',(err, p) => {
+        this.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`sql.ConnectionPool.onError()`],err);
+        throw err
+      })
     
-	this.transaction = new sql.Transaction(this.pool);
-    this.requestProvider = this.pool;
+	  this.transaction = this.getTransactionManager()
+      this.requestProvider = this.pool;
+	} catch (e) {
+	  throw new MsSQLError(e,stack,operation);
+    }		
+
 	await this.configureConnection();
   }
     
   async releaseConnection() {
-  };
-  
-  async getDatabaseConnectionImpl() {
-    await this.createConnectionPool()
+    if (this.preparedStatement !== undefined ) {
+      await this.preparedStatement.unprepare();
+	  this.preparedStatement = undefined;
+    }	
+    if (this.transactionInProgress) {
+      try {
+        await this.rollbackTransaction()
+      } catch (e) {
+	    if (e.code && (e.code === 'ENOTBEGUN')) {
+	      this.yadamuLogger.info([`${this.constructor.name}.abort()`],`Incosistent driver state. Transaction in Progress: ${this.transactionInProgress}. Rollback operation raised "${e.message}".`);
+        }			
+		else {
+          throw e
+		}
+      }
+	}  
   }
+    
+  async getDatabaseConnectionImpl() {
+	try {
+      await this.createConnectionPool();
+	} catch (e) {
+      const err = new ConnectionError(e,this.connectionProperties);
+	  throw err
+	}
+
+  } 
   
   generateRequest() {
-    const yadamuLogger = this.yadamuLogger	
-	const request = new sql.Request(this.requestProvider)
-    request.on('info',function(infoMsg){ 
-      yadamuLogger.info([`sql.Request.onInfo()`],`${infoMsg.message}`);
-    })
-    return request
+	let stack
+	try {
+      const yadamuLogger = this.yadamuLogger	
+	  stack = new Error().stack;
+	  const request = new sql.Request(this.requestProvider)
+      request.on('info',function(infoMsg){ 
+        yadamuLogger.info([`sql.Request.onInfo()`],`${infoMsg.message}`);
+      })
+      return request
+	} catch (e) {
+	  throw new MsSQLError(e,stack,`sql.Request(${this.requestProvider.constructor.name})`);
+    }
   }
 
-  
   getPreparedStatement() {
-     return new sql.PreparedStatement(this.requestProvider)
+	let stack
+	try {
+      stack = new Error().stack;
+	  return new sql.PreparedStatement(this.requestProvider)
+	} catch (e) {
+	  throw new MsSQLError(e,stack,'sql.PreparedStatement(${this.requestProvider.constructor.name})');
+    }
   }
   
   setConnectionProperties(connectionProperties) {
@@ -187,49 +249,72 @@ class MsSQLDBI extends YadamuDBI {
   async executeBatch(sqlStatment,batchable) {
 
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatment}\ngo\n`)
+      this.status.sqlTrace.write(this.traceSQL(sqlStatment))
     }  
 
-    const sqlStartTime = performance.now();
-    const results = await batchable.batch(sqlStatment);  
-	this.traceTiming(sqlStartTime,performance.now())
-	return results
+	let stack
+	try {
+      const sqlStartTime = performance.now();
+      stack = new Error().stack;
+      const results = await batchable.batch(sqlStatment);  
+	  this.traceTiming(sqlStartTime,performance.now())
+	  return results
+	} catch (e) {
+	  throw new MsSQLError(e,stack,sqlStatment);
+    }
   }     
 
   async execute(executeable,args,traceEntry) {
      
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${traceEntry}\ngo\n`)
+      this.status.sqlTrace.write(this.traceSQL(traceEntry))
     }  
 
-   	const sqlStartTime = performance.now();
-    const results = await executeable.execute(args);
-	this.traceTiming(sqlStartTime,performance.now())
-	return results
+	let stack
+	try {
+      const sqlStartTime = performance.now();
+      const results = await executeable.execute(args);
+	  this.traceTiming(sqlStartTime,performance.now())
+	  return results
+	} catch (e) {
+	  throw new MsSQLError(e,stack,traceEntry);
+    }
   }
  
   async bulkInsert(bulkOperation) {
      
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- Bulk Operation: ${bulkOperation.path}. Rows ${bulkOperation.rows.length}.\n--\n`);
+      this.status.sqlTrace.write(this.traceComment(`Bulk Operation: ${bulkOperation.path}. Rows ${bulkOperation.rows.length}.`))
     }
 
-   	const sqlStartTime = performance.now();
-    const results = await this.generateRequest().bulk(bulkOperation);
-	this.traceTiming(sqlStartTime,performance.now())
-	return results
+	let stack
+	try {
+      const sqlStartTime = performance.now();
+      stack = new Error().stack;
+      const results = await this.generateRequest().bulk(bulkOperation);
+	  this.traceTiming(sqlStartTime,performance.now())
+	  return results
+	} catch (e) {
+	  throw new MsSQLError(e,stack,`BULK INSERT ${bulkOperation.path}. Rows${bulkOperation.rows.length}`);
+    }
   }
 
   async executeSQL(sqlStatment,queryable) {
 
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatment}\ngo\n`)
+      this.status.sqlTrace.write(this.traceSQL(sqlStatment))
     }  
 
-    const sqlStartTime = performance.now();
-    const results = await queryable.query(sqlStatment);  
-	this.traceTiming(sqlStartTime,performance.now())
-	return results;
+	let stack
+	try {
+      const sqlStartTime = performance.now();
+      stack = new Error().stack;
+      const results = await queryable.query(sqlStatment);  
+	  this.traceTiming(sqlStartTime,performance.now())
+	  return results;
+	} catch (e) {
+	  throw new MsSQLError(e,stack,sqlStatment);
+    }
   }     
  
   async verifyDataLoad(request,tableSpec) {    
@@ -360,13 +445,9 @@ class MsSQLDBI extends YadamuDBI {
   */
 
   async finalize() {
-    if (this.pool !== undefined) {
-	  if (this.preparedStatement !== undefined){
-        await this.preparedStatement.unprepare();
-      }	  
-      this.preparedStatement = undefined;
-	}
+	await this.releaseConnection();
     await this.pool.close();
+	await this.sql.close();
   }
 
   /*
@@ -377,26 +458,18 @@ class MsSQLDBI extends YadamuDBI {
 
   async abort() {
     if (this.pool !== undefined) {
-	  if (this.preparedStatement !== undefined){
-		try {
-          await this.preparedStatement.unprepare();
-		} catch (e) {
-	      this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e);
-        }	  
-	    this.preparedStatement = undefined;
-      }
-      try {
-        await this.rollbackTransaction()
+	  try {
+        await this.releaseConnection();
       } catch (e) {
 	    this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e);
       }	  
       try {
         await this.pool.close();
+		await this.sql.close();
       } catch (e) {
 	    this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e);
       }	  
 	}
-	console.log('aborted')
   }
 
 
@@ -408,16 +481,21 @@ class MsSQLDBI extends YadamuDBI {
   
   async beginTransaction() {
 	  
-    // console.log(new Error('BEGIN TRANSACTION').stack)
-
+    const psuedoSQL = 'begin transaction'
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`begin transaction\ngo\n`);
+      this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
     }
 	  
-    const sqlStartTime = performance.now();
-    await this.transaction.begin();
-	this.traceTiming(sqlStartTime,performance.now())
-    this.requestProvider = this.transaction
+	let stack
+	try {
+      const sqlStartTime = performance.now();
+      stack = new Error().stack;
+      await this.transaction.begin();
+	  this.traceTiming(sqlStartTime,performance.now())
+      this.requestProvider = this.transaction
+	} catch (e) {
+	  throw new MsSQLError(e,stack,'sql.Transaction.begin()');
+    }
   }
 
   /*
@@ -428,16 +506,21 @@ class MsSQLDBI extends YadamuDBI {
   
   async commitTransaction() {
 	  
-    // console.log(new Error('COMMIT TRANSACTION').stack)
-	
+    const psuedoSQL = 'commit transaction'
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`commit transaction\ngo\n`);
+      this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
     }
 	  
-    const sqlStartTime = performance.now();
-    await this.transaction.commit();
-	this.traceTiming(sqlStartTime,performance.now())
-    this.requestProvider = this.pool
+	let stack
+	try {
+      const sqlStartTime = performance.now();
+      stack = new Error().stack;
+      await this.transaction.commit();
+	  this.traceTiming(sqlStartTime,performance.now())
+      this.requestProvider = this.pool
+	} catch (e) {
+	  throw new MsSQLError(e,stack,'sql.Transaction.commit()');
+    }
   }
 
   /*
@@ -446,26 +529,44 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
   
-  async rollbackTransaction() {
+  async rollbackTransaction(cause) {
 
-    // console.log(new Error('ROLLBACK TRANSACTION').stack)
-
+    const psuedoSQL = 'rollback transaction'
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`rollback transaction\ngo\n`);
+      this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
     }
-
-    const sqlStartTime = performance.now();
-    await this.transaction.rollback();
-	this.traceTiming(sqlStartTime,performance.now())
-    this.requestProvider = this.pool
+	  
+	let stack
+	try {
+      const sqlStartTime = performance.now();
+      stack = new Error().stack;
+      await this.transaction.rollback();
+	  this.traceTiming(sqlStartTime,performance.now())
+      this.requestProvider = this.pool
+	} catch (e) {
+	  let err = new MsSQLError(e,stack,'sql.Transaction.rollback()')
+	  if (cause instanceof Error) {
+        this.yadamuLogger.logException([`${this.constructor.name}.rollbackTransaction()`],err)
+	    err = cause
+	  }
+	  throw err;
+    }	
   }
   
   async createSavePoint() {
     await this.executeSQL(sqlCreateSavePoint,this.generateRequest());
   }
   
-  async restoreSavePoint() {
-    await this.executeSQL(sqlRestoreSavePoint,this.generateRequest());
+  async restoreSavePoint(cause) {
+   	try {
+      await this.executeSQL(sqlRestoreSavePoint,this.generateRequest());
+	} catch (e) {
+	  if (cause instanceof Error) {
+        this.yadamuLogger.logException([`${this.constructor.name}.restoreSavePoint()`],e)
+	    e = cause
+	  }
+	  throw e;
+	}	
   }
   
   /*
@@ -553,7 +654,7 @@ class MsSQLDBI extends YadamuDBI {
   async getSchemaInfo(schemaKey) {
 
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- @SCHEMA="${this.parameters[schemaKey]}"\n--\n`)
+      this.status.sqlTrace.write(this.traceComment(`@SCHEMA="${this.parameters[schemaKey]}"`)
     }
       
     const statement = this.sqlTableInfo()
@@ -613,7 +714,7 @@ class MsSQLDBI extends YadamuDBI {
   configureSlave(slaveNumber,pool) {
 	this.slaveNumber = slaveNumber
 	this.pool = pool
-	this.transaction = new sql.Transaction(this.pool)
+	this.transaction = this.getTransactionManager()
 	this.requestProvider = pool
   }
 

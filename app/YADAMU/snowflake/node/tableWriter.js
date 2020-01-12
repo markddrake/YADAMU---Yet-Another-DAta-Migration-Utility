@@ -42,12 +42,12 @@ class TableWriter extends YadamuWriter {
   }
 
   async writeBatch() {
-    this.batchCount++;
 
+    this.batchCount++;
    
     if (this.tableInfo.insertMode === 'Batch') {
       try {
-        const result = await this.dbi.executeSQL(dmlStatement,this.batch);
+        const result = await this.dbi.executeSQL(this.tableInfo.dml,this.batch);
         this.endTime = performance.now();
         this.batch.length = 0;  
         return this.skipTable
@@ -56,16 +56,20 @@ class TableWriter extends YadamuWriter {
           this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.batch.length}]. Batch Insert raised:\n${e}.`);
           this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
           this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch[0])}\n...\n${JSON.stringify(this.batch[this.batch.length-1])}\n`);
-          this.yadamuLogger.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative mode.`);          
+          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative mode.`);          
         }
         this.tableInfo.insertMode = 'Iterative'   
       }
     }
-          
+
+    // Suppress SQL Trace for Iterative Inserts
+	
+    const sqlTrace = this.status.sqlTrace
+
     for (const row in this.batch) {
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row])
-        await this.processWarnings(results);
+		this.status.sqlTrace = undefined
       } catch (e) {
         const errInfo = this.status.showInfoMsgs === true ? [this.tableInfo.dml,this.batch[row]] : []
         this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,this.batch[row],e,errInfo);
@@ -73,8 +77,12 @@ class TableWriter extends YadamuWriter {
           break;
         }
       }
-    }     
-    
+    }   
+	
+	this.status.sqlTrace = sqlTrace
+
+    // Todo Report Number of Insert Operations and elapsed time to sqlTrace file.
+
     this.endTime = performance.now();
     this.batch.length = 0;
     return this.skipTable

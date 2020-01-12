@@ -183,7 +183,7 @@ class DBWriter extends Writable {
     const rowsWritten = rowsRead - skipCount;
     const throughput = isNaN(elapsedTime) ? 'N/A' : Math.round((rowsWritten/elapsedTime) * 1000)
     
-    this.yadamuLogger.log([`${this.constructor.name}`,`${this.tableName}`,`${results.insertMode}`],`Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. DB Time: ${YadamuLibrary.stringifyDuration(Math.round(results.sqlTime))}s. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(elapsedTime))}s. Throughput ${throughput} rows/s.`);
+    this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`,`${results.insertMode}`],`Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. DB Time: ${YadamuLibrary.stringifyDuration(Math.round(results.sqlTime))}s. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(elapsedTime))}s. Throughput ${throughput} rows/s.`);
     this.timings[this.tableName] = {rowCount: this.rowCount, insertMode: results.insertMode,  rowsSkipped: skipCount, elapsedTime: Math.round(elapsedTime).toString() + "ms", throughput: Math.round(throughput).toString() + "/s", sqlExecutionTime: Math.round(elapsedTime)};
   }
   
@@ -229,7 +229,7 @@ class DBWriter extends Writable {
           if (this.currentTable.batchComplete()) {
             this.skipTable = await this.currentTable.writeBatch(this.status);
             if (this.skipTable) {
-               this.dbi.rollbackTransaction();
+              this.dbi.rollbackTransaction();
             }
             if (this.reportBatchWrites && this.currentTable.reportBatchWrites() && !this.currentTable.commitWork(this.rowCount)) {
               this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows written:  ${this.rowCount}.`);
@@ -257,9 +257,14 @@ class DBWriter extends Writable {
       callback();
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._write()`,`"${this.tableName}"`],e);
-	  await this.dbi.abort();
-      process.nextTick(() => this.emit('error',e));
-      callback(e);
+	  this.skipTable = true;
+	  try {
+        await this.dbi.rollbackTransaction(e)
+    	callback();
+	  } catch (e) {
+        // Passing the exception to callback triggers the onError() event
+        callback(e); 
+      }
     }
   }
  
@@ -278,8 +283,7 @@ class DBWriter extends Writable {
       callback();
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._final()`,`"${this.currentTable}"`],e);
-	  await this.dbi.abort();
-      process.nextTick(() => this.emit('error',e));
+	  // Passing the exception to callback triggers the onError() event
       callback(e);
     } 
   } 

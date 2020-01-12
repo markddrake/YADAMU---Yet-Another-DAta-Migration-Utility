@@ -143,7 +143,7 @@ class StatementGenerator {
   generatePLSQL(targetSchema,tableName,dml,columns,declarations,assignments,variables) {
 
    const plsqlFunctions = this.getPLSQL(dml);
-   const dmlBlock = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n\n  insert into "${targetSchema}"."${tableName}" (${columns}) values (${variables.join(',')});\nend;`;      
+   const dmlBlock = `declare\n  ${declarations.join(';\n  ')};\n\n${plsqlFunctions}\nbegin\n  ${assignments.join(';\n  ')};\n  insert into "${targetSchema}"."${tableName}" (${columns}) values (${variables.join(',')});\nend;`;      
    return dmlBlock;
      
   }
@@ -215,6 +215,10 @@ class StatementGenerator {
 	
     return tableInfo
   }
+  
+  generateWrapperNames(tableInfo) {
+	// Only Required with release 11.2.
+  }
 
   async generateStatementCache(executeDDL, vendor) {
             
@@ -257,7 +261,11 @@ class StatementGenerator {
     const tables = Object.keys(this.metadata); 
     tables.forEach(function(table,idx) {
       const tableMetadata = this.metadata[table];
-
+	  
+	  if (tableMetadata.WITH_CLAUSE) {
+		generateWrapperName(tableMetadata);
+	  }
+	  
       const tableInfo = statementCache[tableMetadata.tableName];
 	  
       tableInfo.batchSize = this.batchSize

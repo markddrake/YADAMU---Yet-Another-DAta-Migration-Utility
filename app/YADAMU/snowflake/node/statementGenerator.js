@@ -226,7 +226,6 @@ class StatementGenerator {
   
   generateTableInfo(metadata) {
       
-  
     const columnNames = metadata.columns.split(',');
     const dataTypes = metadata.dataTypes
     const sizeConstraints = metadata.sizeConstraints
@@ -238,8 +237,6 @@ class StatementGenerator {
                type : dataTypes[idx]
        }
 
-          
-        
        const sizeConstraint = sizeConstraints[idx]
        if ((sizeConstraint !== null) && (sizeConstraint.length > 0)) {
           const components = sizeConstraint.split(',');
@@ -270,7 +267,6 @@ class StatementGenerator {
     return { 
        ddl             : createStatement, 
        dml             : insertStatement,
-       insertSelect    : insertSelect,
        columns         : columnNames,     
        sourceDataTypes : metadata.source ? metadata.source.dataTypes : dataTypes,
        targetDataTypes : targetDataTypes, 

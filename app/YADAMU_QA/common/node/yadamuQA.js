@@ -53,8 +53,8 @@ class YadamuQA {
         dbi = new MongoQA(this.yadamu)
         break;
       case "snowflake" :
-        const SnowflakeQA = require('../../snowflake/node/snowflakeQA.js');
-        dbi = new SnowflakeQA(this.yadamu)
+        const SnowFlakeQA = require('../../snowflake/node/snowflakeQA.js');
+        dbi = new SnowFlakeQA(this.yadamu)
         break;
       case "file" :
         dbi = new FileQA(this.yadamu)
@@ -91,7 +91,7 @@ class YadamuQA {
 	 
   }
  
-  getSourceSchema(vendor,schemaInfo,prefix) {
+  getSourceSchema(vendor,schemaInfo,operation) {
 
     /*
 	** 
@@ -100,25 +100,25 @@ class YadamuQA {
 	** SchemaInfo              Vendor      Owner  Result
     ** ===============================================================================
     ** [database,owner]:       MsSQL              schemaInfo
-	** [database,owner]:       Snowflake          TBD
-	** [database,owner]:       Mongo       dbo    {databsase: `"${prefix}_${database}"`}
-	** [database,owner]:       Mongo       other  {databsase: `"${prefix}_${owner}"`}
-	** [database,owner]:       other       dbo    {schema: `"${prefix}_${database}"`}
-	** [database,owner]:       other       other  {schema: `"${Prefix}_${owner}"`}
+	** [database,owner]:       Snowflake          {database : schemaInfo.database, schema: schemaInfo.owner}
+	** [database,owner]:       Mongo       dbo    {databsase: `"${operation.schemaPrefix}_${database}"`}
+	** [database,owner]:       Mongo       other  {databsase: `"${operation.schemaPrefix}_${owner}"`}
+	** [database,owner]:       other       dbo    {schema: `"${operation.schemaPrefix}_${database}"`}
+	** [database,owner]:       other       other  {schema: `"${operation.schemaPrefix}_${owner}"`}
 	** [database,schema]:      other              TBD 
-	** [database]:             MsQL               {database: `"${Prefix}_${database}"`, owner: "dbo"}
+	** [database]:             MsQL               {database: `"${operation.schemaPrefix}_${database}"`, owner: "dbo"}
 	** [database]:             Snowflake          TBD 
 	** [database]:             Mongo              schemaInfo
 	** [database]:             other              {schema : `schemaInfo.database}
-	** [Schema]:               MsSQL       n/a    {database: `"${Prefix}_${schema}"`, owner: "dbo"}
+	** [Schema]:               MsSQL       n/a    {database: `"${operation.schemaPrefix}_${schema}"`, owner: "dbo"}
 	** [Schema]:               Snowflake   n/a    TBD
 	** [Schema]:               Mongo       n/a    {database : schemaInfo.schema}
 	** [Schema]:               other       n/a    schemaInfo
 	** 
 	*/
-	
+
 	schemaInfo = Object.assign({}, schemaInfo);
-	
+		
     switch (true) {
 	  case (schemaInfo.hasOwnProperty('database') && schemaInfo.hasOwnProperty('owner')) : 
 	    // MsSQL style schema information
@@ -127,17 +127,16 @@ class YadamuQA {
 		    return schemaInfo;
 			break;
 		  case 'snowflake':
-		    // ### TODO : Snowflake schema mappigns
-		    return schemaInfo;
+		    return {database: schemaInfo.database, schema: schemaInfo.owner};
 			break;
 		  case 'mongo':
         	let database = schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner
-	    	database = this.getPrefixedSchema(prefix,database) 
+	    	database = this.getPrefixedSchema(operation.schemaPrefix,database) 
 		    return { "database" : database }
 			break;
 	      default:
         	let schema = schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner
-	    	schema = this.getPrefixedSchema(prefix,schema) 
+	    	schema = this.getPrefixedSchema(operation.schemaPrefix,schema) 
 		    return { "schema" : schema }
 		}
 		break;
@@ -149,11 +148,11 @@ class YadamuQA {
 	    // Mongo 
 		switch (vendor) {
 		  case 'mssql':
-        	const database = this.getPrefixedSchema(prefix,schemaInfo.database) 
+        	const database = this.getPrefixedSchema(operation.schemaPrefix,schemaInfo.database) 
 		    return {"database": database, "owner" : "dbo"}
 			break;
 		  case 'snowflake':
-		    // ### TODO : Snowflake schema mappigns
+		    // ### TODO : Snowflake schema mappings
 		    return schemaInfo;
 			break;
 		  case 'mongo':
@@ -167,12 +166,11 @@ class YadamuQA {
 	    // Oracle, Mysql, MariaDB, Postgress 
 		switch (vendor) {
 		  case 'mssql':
-        	const database = this.getPrefixedSchema(prefix,schemaInfo.schema) 
+        	const database = this.getPrefixedSchema(operation.schemaPrefix,schemaInfo.schema) 
 		    return {"database": database, "owner" : "dbo"}
 			break;
 		  case 'snowflake':
-		    // ### TODO : Snowflake schema mappigns
-		    return schemaInfo;
+		    return {database : operation.vendor.toUpperCase(), schema : schemaInfo.schema}
 			break;
 		  case 'mongo':
 		    return {"database" : schemaInfo.schema};
@@ -183,7 +181,7 @@ class YadamuQA {
 	}
   }
   
-  getTargetSchema(vendor,schemaInfo,prefix) {
+  getTargetSchema(vendor,schemaInfo,operation) {
 	  
     /*
 	** 
@@ -191,26 +189,26 @@ class YadamuQA {
 	** 
 	** SchemaInfo              Vendor      Owner  Result
     ** ===============================================================================
-    ** [database,owner]:       MsSQL        dbo   {database: `"${Prefix}_${owner}"`, owner: "dbo"|
-    ** [database,owner]:       MsSQL        other {database: `"${Prefix}_${database}"`, owner: "dbo"|
-	** [database,owner]:       Snowflake          TBD
-	** [database,owner]:       Mongo       dbo    {databsase: `"${prefix}_${database}"`}
-	** [database,owner]:       Mongo       other  {databsase: `"${prefix}_${owner}"`}
-	** [database,owner]:       other       dbo    {schema: `"${prefix}_${database}"`}
-	** [database,owner]:       other       other  {schema: `"${Prefix}_${owner}"`}
+    ** [database,owner]:       MsSQL       dbo    {database: `"${operation.schemaPrefix}_${owner}"`, owner: "dbo"|
+    ** [database,owner]:       MsSQL       other  {database: `"${operation.schemaPrefix}_${database}"`, owner: "dbo"|
+	** [database,owner]:       Snowflake          {database : schemaInfo.database, schema: schemaInfo.owner}
+	** [database,owner]:       Mongo       dbo    {databsase: `"${operation.schemaPrefix}_${database}"`}
+	** [database,owner]:       Mongo       other  {databsase: `"${operation.schemaPrefix}_${owner}"`}
+	** [database,owner]:       other       dbo    {schema: `"${operation.schemaPrefix}_${database}"`}
+	** [database,owner]:       other       other  {schema: `"${operation.schemaPrefix}_${owner}"`}
 	** [database,schema]:      other              TBD 
-	** [database]:             MsQL               {database: `"${Prefix}_${database}"`, owner: "dbo"}
+	** [database]:             MsQL               {database: `"${operation.schemaPrefix}_${database}"`, owner: "dbo"}
 	** [database]:             Snowflake          TBD 
 	** [database]:             Mongo              schemaInfo
 	** [database]:             other              {schema : `schemaInfo.database}
-	** [Schema]:               MsSQL       n/a    {database: `"${Prefix}_${schema}"`, owner: "dbo"}
+	** [Schema]:               MsSQL       n/a    {database: `"${operation.schemaPrefix}_${schema}"`, owner: "dbo"}
 	** [Schema]:               Snowflake   n/a    TBD
 	** [Schema]:               Mongo       n/a    {database : schemaInfo.schema}
 	** [Schema]:               other       n/a    schemaInfo
 	** 
 	*/
-	
-    schemaInfo = Object.assign({}, schemaInfo);
+    
+	schemaInfo = Object.assign({}, schemaInfo);
 
     switch (true) {
 	  case (schemaInfo.hasOwnProperty('database') && schemaInfo.hasOwnProperty('owner')) : 
@@ -220,21 +218,20 @@ class YadamuQA {
 		switch (vendor) {
 		  case 'mssql':
             database = schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner
-	    	database = this.getPrefixedSchema(prefix,database) 
+	    	database = this.getPrefixedSchema(operation.schemaPrefix,database) 
 		    return {"database" : database, "owner" : "dbo"}
 			break;
 		  case 'snowflake':
-		    // ### TODO : Snowflake schema mappigns
-		    return schemaInfo;
+		    return {database: schemaInfo.database, schema: schemaInfo.owner};
 			break;
 		  case 'mongo':
         	database = schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner
-	    	database = this.getPrefixedSchema(prefix,database) 
+	    	database = this.getPrefixedSchema(operation.schemaPrefix,database) 
 		    return { "database" : database }
 			break;
 	      default:
         	schema = schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner
-	    	schema = this.getPrefixedSchema(prefix,schema) 
+	    	schema = this.getPrefixedSchema(operation.schemaPrefix,schema) 
 		    return { "schema" : schema }
 		}
 		break;
@@ -246,11 +243,10 @@ class YadamuQA {
 	    // Mongo 
 		switch (vendor) {
 		  case 'mssql':
-        	const database = this.getPrefixedSchema(prefix,schemaInfo.database) 
+        	const database = this.getPrefixedSchema(operation.schemaPrefix,schemaInfo.database) 
 		    return {"database": database, "owner" : "dbo"}
 			break;
 		  case 'snowflake':
-		    // ### TODO : Snowflake schema mappigns
 		    return schemaInfo;
 			break;
 		  case 'mongo':
@@ -264,12 +260,11 @@ class YadamuQA {
 	    // Oracle, Mysql, MariaDB, Postgress 
 		switch (vendor) {
 		  case 'mssql':
-        	const database = this.getPrefixedSchema(prefix,schemaInfo.schema) 
+        	const database = this.getPrefixedSchema(operation.schemaPrefix,schemaInfo.schema) 
 		    return {"database": database, "owner" : "dbo"}
 			break;
 		  case 'snowflake':
-		    // ### TODO : Snowflake schema mappigns
-		    return schemaInfo;
+		    return {database : operation.vendor.toUpperCase(), schema : schemaInfo.schema}
 			break;
 		  case 'mongo':
 		    return {"database" : schemaInfo.schema};
@@ -299,8 +294,8 @@ class YadamuQA {
   }   
   
   setUser(parameters,key,db,schemaInfo,schemaPrefix) {
-
-    switch (db) {
+	  
+	switch (db) {
       case 'mssql':
 	    if (schemaInfo.schema) {
 		  parameters.MSSQL_SCHEMA_DB = schemaInfo.schema
@@ -311,11 +306,15 @@ class YadamuQA {
 	      parameters[key] = schemaInfo.owner
 		}
         break;
+      case 'snowflake':
+	    parameters.SNOWFLAKE_SCHEMA_DB = schemaInfo.database
+	    parameters[key] = schemaInfo.schema;
+		break;
       default:
 	    parameters[key] = schemaInfo.schema !== undefined ? schemaInfo.schema : (schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner)
-		parameters[key] =  this.getPrefixedSchema(schemaPrefix,parameters[key])
+		parameters[key] = this.getPrefixedSchema(schemaPrefix,parameters[key])
     }
-    
+	
 	return parameters
 
   }
@@ -390,11 +389,12 @@ class YadamuQA {
     const compareParameters = Object.assign({}, testParameters)
     
     Object.assign(compareParameters, this.getDefaultValue('SPATIAL_PRECISION',testDefaults,sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
+    Object.assign(compareParameters, this.getDefaultValue('XSL_TRANSFORMATION',testDefaults,sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
    
     let versionSpecificKey = sourceVendor + "#" + sourceVersion;
     Object.assign(compareParameters, testDefaults[sourceVendor])
     Object.assign(compareParameters, testDefaults[versionSpecificKey] ? testDefaults[versionSpecificKey] : {})
-
+ 
     versionSpecificKey = targetVendor + "#" + targetVersion;
    
     Object.assign(compareParameters, testDefaults[targetVendor])
@@ -470,14 +470,23 @@ class YadamuQA {
     if (compareDBI.parameters.TIMESTAMP_PRECISION && (compareDBI.parameters.TIMESTAMP_PRECISION < 9)){
       this.yadamuLogger.info([`${this.constructor.name}.compareSchemas()`,`${sourceVendor}`,`${targetVendor}`],`Timestamp precision limited to ${compareDBI.parameters.TIMESTAMP_PRECISION} digits`);
     }
-	
-    await compareDBI.initialize();
-	if (reportRowCounts) {
-      this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),timings,parameters) 
+    if (compareDBI.parameters.XSL_TRANSFORMATION !== null) {
+      this.yadamuLogger.info([`${this.constructor.name}.compareSchemas()`,`${sourceVendor}`,`${targetVendor}`],`XSL Transformation ${compareDBI.parameters.XSL_TRANSFORMATION} applied when performing XML comparisons.`);
     }
 	
-    const report = await compareDBI.compareSchemas(sourceSchema,targetSchema);
-    await compareDBI.finalize();
+	let report
+	try {
+      await compareDBI.initialize();
+	  if (reportRowCounts) {
+        this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),timings,parameters) 
+      }	
+      report = await compareDBI.compareSchemas(sourceSchema,targetSchema);
+      await compareDBI.finalize();
+    } catch (e) {
+      this.yadamuLogger.logException([`${this.constructor.name}.compareSchemas()`],e)
+      await compareDBI.abort();
+      throw e
+    } 
 	
     if (parameters.TABLE_MATCHING === 'INSENSITIVE') {
       Object.keys(timings).forEach(function(tableName) {
@@ -738,12 +747,12 @@ class YadamuQA {
     const sourceConnection = sourceConnectionInfo[sourceDatabase]
 	const targetConnection = targetConnectionInfo[targetDatabase]
 
-    const sourceSchema  = this.getSourceSchema(sourceDatabase,operation.source,operation.schemaPrefix);
-    const targetSchema  = this.getTargetSchema(targetDatabase,operation.target,operation.schemaPrefix);
-	const compareSchema = this.getTargetSchema(sourceDatabase,operation.target,operation.schemaPrefix);
+    const sourceSchema  = this.getSourceSchema(sourceDatabase,operation.source,operation);
+    const targetSchema  = this.getTargetSchema(targetDatabase,operation.target,operation);
+	const compareSchema = this.getTargetSchema(sourceDatabase,operation.target,operation);
 	
-	const sourceDescription = this.getDescription(sourceDatabase,sourceSchema, operation.schemaPrefix)  
-    const targetDescription = this.getDescription(targetDatabase,targetSchema, operation.schemaPrefix)
+	const sourceDescription = this.getDescription(sourceDatabase,sourceSchema, operation)  
+    const targetDescription = this.getDescription(targetDatabase,targetSchema, operation)
 	const compareDescription = this.getDescription(sourceDatabase,targetSchema)
 
     const sourceParameters  = Object.assign({},parameters)
@@ -1031,10 +1040,10 @@ class YadamuQA {
     const sourceConnection = sourceConnectionInfo[sourceDatabase]
 	const targetConnection = targetConnectionInfo[targetDatabase]
 
-    const targetSchema  = this.getTargetSchema(targetDatabase,operation.target,operation.schemaPrefix); 
+    const targetSchema  = this.getTargetSchema(targetDatabase,operation.target,operation); 
 	
-    const sourceDescription = this.getDescription(sourceDatabase,operation.source,operation.schemaPrefix)  
-    const targetDescription = this.getDescription(targetDatabase,targetSchema, operation.schemaPrefix)
+    const sourceDescription = this.getDescription(sourceDatabase,operation.source,operation)  
+    const targetDescription = this.getDescription(targetDatabase,targetSchema, operation)
 
 	const sourceParameters  = Object.assign({},parameters)
     const sourceFile = path.join(sourceConnection.directory.replace('%source%',targetConnectionName).replace('%vendor%',targetDatabase).replace('%mode%',parameters.MODE),operation.source.file)
@@ -1043,7 +1052,7 @@ class YadamuQA {
 	fileReader.setParameters(sourceParameters);
 
     const targetParameters  = Object.assign({},parameters)
-    this.setUser(targetParameters,'TO_USER',targetDatabase, operation.target, operation.schemaPrefix)
+    this.setUser(targetParameters,'TO_USER',targetDatabase, operation.target, operation)
 
 	const targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,(operation.recreateTarget || test.recreateSchemas))
 	const startTime = performance.now();
@@ -1168,48 +1177,62 @@ class YadamuQA {
 	  
   async doTests(configuration) {
 
-    for (const test of configuration.tests) {
+    const startTime = performance.now()
+    try {
+      for (const test of configuration.tests) {
 	
-      // Initialize constructor parameters with values from configuration file
-      const testParameters = Object.assign({} , configuration.parameters ? configuration.parameters : {})
+        // Initialize constructor parameters with values from configuration file
+        const testParameters = Object.assign({} , configuration.parameters ? configuration.parameters : {})
 
-      // Merge test specific parameters
-      Object.assign(testParameters, test.parameters ? test.parameters : {})
+        // Merge test specific parameters
+        Object.assign(testParameters, test.parameters ? test.parameters : {})
   
-      const startTime = performance.now()
-	  const targets = test.target ? [test.target] : test.targets
-	  for (const target of targets) {
-        const targetConnection = configuration.connections[target]
-		const startTime = performance.now()
-		for (const task of test.tasks) {
-		  const operations = this.getTaskList(configuration,task)
+        const startTime = performance.now()
+	    const targets = test.target ? [test.target] : test.targets
+	    for (const target of targets) {
+          const targetConnection = configuration.connections[target]
 		  const startTime = performance.now()
-		  for (const operation of operations) {
-			const mode = test.operation ? test.operation : configuration.operation
-			switch (mode.toUpperCase()) {
- 		      case 'EXPORT':
-  		        await this.export(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
-				break;
- 		      case 'IMPORT':
-  		        await this.import(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
-				break;
-			  case 'DBROUNDTRIP':
-			    await this.dbRoundtrip(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
-			    break;
-			  case 'FILEROUNDTRIP':
-			    await this.fileRoundtrip(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
-			    break;
-			}
-		  }
-          const elapsedTime = performance.now() - startTime;
-          this.yadamuLogger.log([`${this.constructor.name}.doTests()`,`TASK`],`Completed. Source:[${test.source}]. Target:[${target}]. Task:[${task}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
-	    }
-		const elapsedTime = performance.now() - startTime;
-        this.yadamuLogger.log([`${this.constructor.name}.doTests()`,`TARGET`],`Completed. Source:[${test.source}]. Target:[${target}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
-      }		 
+          let mode
+		  for (const task of test.tasks) {
+    	    try {
+		      const operations = this.getTaskList(configuration,task)
+		      const startTime = performance.now()
+		      for (const operation of operations) {
+                mode = (test.operation ? test.operation : configuration.operation).toUpperCase()
+			    switch (mode) {
+ 		          case 'EXPORT':
+  		            await this.export(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
+  				    break;
+ 		          case 'IMPORT':
+    		        await this.import(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
+				    break;
+			      case 'DBROUNDTRIP':
+  			        await this.dbRoundtrip(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
+			        break;
+			      case 'FILEROUNDTRIP':
+			        await this.fileRoundtrip(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
+			        break;
+			    }
+			  }
+              const elapsedTime = performance.now() - startTime;
+              this.yadamuLogger.log([`${this.constructor.name}.doTests()`,`TASK`],`Completed. Source:[${test.source}]. Target:[${target}]. Task:[${task}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+		    } catch (e) {
+			  this.yadamuLogger.logException([`${this.constructor.name}.doTests()`,mode],e);
+			  throw e
+			}   
+	      }
+		  const elapsedTime = performance.now() - startTime;
+          this.yadamuLogger.log([`${this.constructor.name}.doTests()`,`TARGET`],`Completed. Source:[${test.source}]. Target:[${target}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+        }		 
+        const elapsedTime = performance.now() - startTime;
+        this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TEST`],`Completed. Source:[${test.source}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+      }
       const elapsedTime = performance.now() - startTime;
-      this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TEST`],`Completed. Source:[${test.source}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
-    }
+      this.yadamuLogger.info([`${this.constructor.name}.doTests()`],`Success. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+	} catch (e) {
+      const elapsedTime = performance.now() - startTime;
+      this.yadamuLogger.info([`${this.constructor.name}.doTests()`],`Failed. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+	}  
   }
   
 }

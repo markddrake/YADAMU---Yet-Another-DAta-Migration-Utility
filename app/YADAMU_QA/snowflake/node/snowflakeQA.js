@@ -1,7 +1,7 @@
 "use strict" 
-const SnowflakeDBI = require('../../../YADAMU/snowflake/node/snowflakeDBI.js');
+const SnowFlakeDBI = require('../../../YADAMU/snowflake/node/snowflakeDBI.js');
 
-class SnowflakeQA extends SnowflakeDBI {
+class SnowFlakeQA extends SnowFlakeDBI {
     
     constructor(yadamu) {
        super(yadamu)
@@ -15,9 +15,11 @@ class SnowflakeQA extends SnowflakeDBI {
 	}
 
     async recreateSchema() {
-       
+		
       try {
-        const dropSchema = `drop schema if exists "${this.paramteters.TO_USER}"`;
+        const createDatabase = `create database if not exists "${this.parameters.SNOWFLAKE_SCHEMA_DB}"`;
+        await this.executeSQL(createDatabase,[]);      
+        const dropSchema = `drop schema if exists "${this.parameters.TO_USER}"`;
         await this.executeSQL(dropSchema,[]);      
       } catch (e) {
         if (e.errorNum && (e.errorNum === 1918)) {
@@ -26,7 +28,7 @@ class SnowflakeQA extends SnowflakeDBI {
           throw e;
         }
       }
-      const createSchema = `create schema "${this.paramteters.TO_USER}"`;
+      const createSchema = `create schema "${this.parameters.TO_USER}"`;
       await this.executeSQL(createSchema,[]);      
     }   
 
@@ -45,4 +47,4 @@ class SnowflakeQA extends SnowflakeDBI {
       
 }
 
-module.exports = SnowflakeQA
+module.exports = SnowFlakeQA

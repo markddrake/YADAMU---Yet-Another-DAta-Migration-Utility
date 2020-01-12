@@ -14,6 +14,7 @@ const mariadb = require('mariadb');
 
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const {ConnectionError, MariadbError} = require('../../common/yadamuError.js')
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('../../dbShared/mysql/statementGenerator57.js');
@@ -33,6 +34,7 @@ const CONNECTION_PROPERTY_DEFAULTS = {
 , supportBigNumbers : true
 , bigNumberStrings  : true          
 , dateStrings       : true
+, trace             : true
 }
 
 class MariadbDBI extends YadamuDBI {
@@ -187,27 +189,27 @@ class MariadbDBI extends YadamuDBI {
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
     }
-    const sqlStartTime = performance.now();
-	const connection = await this.pool.getConnection();
-	this.traceTiming(sqlStartTime,performance.now())
-    return connection
+	
+    let stack
+	try {
+      const sqlStartTime = performance.now();
+	  stack = new Error().stack
+	  const connection = await this.pool.getConnection();
+	  this.traceTiming(sqlStartTime,performance.now())
+	  connection.ping()
+      return connection
+	} catch (e) {
+	  throw new MariadbError(e,stack,'mariadb.Pool.getConnection()')
+	}
   }
 
-  async getConnection() {
-    this.logConnectionProperties();
-	const sqlStartTime = performance.now();
-	this.connection = await oracledb.getConnection(this.connectionProperties);
-	this.traceTiming(sqlStartTime,performance.now())
-  }
-  
   async releaseConnection() {
     if (this.connection !== undefined && this.connection.close) {
       try {
         await this.connection.close();
       } catch (e) {
-        this.yadamuLogger.logException([`${this.constructor.name}.releaseConnection()`],e);
-      }
-    
+        this.yadamuLogger.logException([`${this.constructor.name}.releaseConnection()`],e); 
+	  }
 	}
   };
   
@@ -219,43 +221,38 @@ class MariadbDBI extends YadamuDBI {
    
   async reconnect() {
       
-    let retryCount = 0;
+    this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Attemping reconnection.`);
     
-    if (this.conn) {
+    if (this.connection) {
       try { 
-        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Closing Connection.`);
         await this.connection.release();
-        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Connection Eeleased.`);
       } catch (e) {
-        this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`this.connection.release() raised\n${e}`);
+        this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`this.connection.release() raised "${e}"`);
       }
     }
-
-    if (this.pool) {    
-      try { 
-        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Closing Pool.`);
-        await this.pool.end();
-        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Pool Closed.`);
-      } catch (e) {
-        this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`this.pool.end() raised\n${e}`);
-      }
-    }
-    
+	
+    let retryCount = 0;
+	let connectionFailure;
     while (retryCount < 10) {
       try {
-        await this.createConnectionPool()
-        break;
+        this.connection = await this.getConnectionFromPool()
+        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`New connection availabe.`);
+        return;
       } catch (e) {
-        if (e.fatal && (e.code && (e.code === 'ECONNREFUSED'))) {
+	  if (e.code && ((e.code === 'ER_GET_CONNECTION_TIMEOUT') || (e.code === 'ECONNREFUSED') )) {
+    	  connectionFailure = e
           this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Waiting for MariaDB server restart.`)
-          this.waitForRestart(100);
+          this.waitForRestart(1000);
           retryCount++;
         }
         else {
+		  this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`this.getConnectionFromPool() raised "${e.message}"`);
           throw e;
         }
       }
     }
+    this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Unable to re-establish connection.`)
+	throw connectionFailure  
   }
          
   async createSchema(schema) {    	
@@ -271,26 +268,30 @@ class MariadbDBI extends YadamuDBI {
     let attemptReconnect = true;
     
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${sqlStatement};\n--\n`);
+      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
     }
    
+    let stack
     while (true) {
-      // Will exit with result or exception.  
+      // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
+		stack = new Error().stack
         const results = await this.connection.query(sqlStatement,args)
         this.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-        if (attemptReconnect && ((e.fatal) && (e.code && (e.code === 'ER_CMD_CONNECTION_CLOSED') || (e.code === 'ECONNABORTED') || (e.code === 'ER_SOCKET_UNEXPECTED_CLOSE') || (err.code === 'ECONNRESET')))){
+        if (attemptReconnect &&  (e.code && (e.code && (e.code === 'ER_CMD_CONNECTION_CLOSED') || (e.code === 'ER_SOCKET_UNEXPECTED_CLOSE') || (e.code === 'ER_GET_CONNECTION_TIMEOUT')))) {
           attemptReconnect = false;
-          this.yadamuLogger.warning([`${this.constructor.name}.executeSQL()`],`SQL Operation raised\n${e}`);
-          this.yadamuLogger.info([`${this.constructor.name}.executeSQL()`],`Attemping reconnection.`);
-          await this.reconnect()
-          this.yadamuLogger.info([`${this.constructor.name}.executeSQL()`],`New connection availabe.`);
+          this.yadamuLogger.warning([`${this.constructor.name}.executeSQL()`],`SQL Operation raised "${e.message}"`);
+		  try {
+            await this.reconnect()
+		  } catch (e) {
+			throw e;
+          }	
           continue;
         }
-        throw (e)
+        throw new MariadbError(e,stack,sqlStatement)
       }      
     } 
   }  
@@ -370,6 +371,8 @@ class MariadbDBI extends YadamuDBI {
   **  Gracefully close down the database connection.
   **
   */
+  
+
 
   async finalize() {
     await this.connection.end();
@@ -383,12 +386,14 @@ class MariadbDBI extends YadamuDBI {
   */
 
   async abort() {
-	try {
-      await this.connection.end();
-    } catch (e) {}
-	try {
-      await this.pool.end();
-    } catch (e) {}
+    try {
+      await this.releaseConnection();
+	  if (this.pool !== undefined) {
+	    await this.pool.end();
+      }
+	} catch (e) {
+      this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e);
+	}
   }
 
   /*
@@ -398,9 +403,20 @@ class MariadbDBI extends YadamuDBI {
   */
   
   async beginTransaction() {
-    await this.connection.beginTransaction();
-  }
 
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(this.traceSQL(`begin transaction`));
+    }    
+
+    let stack
+	try {
+	  stack = new Error().stack
+      await this.connection.beginTransaction();
+	} catch (e) {
+      throw new MariadbError(e,stack,'mariadb.Connection.beginTransaction()');
+	} 
+  }
+ 
   /*
   **
   ** Commit the current transaction
@@ -408,7 +424,19 @@ class MariadbDBI extends YadamuDBI {
   */
   
   async commitTransaction() {
-    await this.connection.commit();
+	
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
+    }    
+
+	let stack
+	try {
+	  stack = new Error().stack
+      await this.connection.commit();
+	} catch (e) {
+      throw new MariadbError(e,stack,'mariadb.Connection.commit()');
+	} 
+
   }
 
   /*
@@ -417,16 +445,48 @@ class MariadbDBI extends YadamuDBI {
   **
   */
   
-  async rollbackTransaction() {
-    await this.connection.rollback();
+    
+  async rollbackTransaction(cause) {
+
+	// If rollbackTransaction was invoked due to encounterng an error and the restore operation results in a second exception being raised, log the exception raised by the restore operation and throw the original error.
+	// Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
+
+    if (this.status.sqlTrace) {
+      this.status.sqlTrace.write(this.traceSQL(`rollback transaction`));
+    }    
+
+	let stack
+	try {
+	  stack = new Error().stack
+      await this.connection.rollback();
+	} catch (e) {
+      e = new MariadbError(e,stack,'mariadb.Connection.rollback()')
+	  if (cause instanceof Error) {
+        this.yadamuLogger.logException([`${this.constructor.name}.rollbackTransaction()`],e)
+	    e = cause
+	  }
+	  throw e;
+	}
   }
   
   async createSavePoint() {
     await this.executeSQL(sqlCreateSavePoint);
   }
   
-  async restoreSavePoint() {
-    await this.executeSQL(sqlRestoreSavePoint);
+  async restoreSavePoint(cause) {
+
+	// If restoreSavePoint was invoked due to encounterng an error and the restore operation results in a second exception being raised, log the exception raised by the restore operation and throw the original error.
+	// Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
+
+	try {
+      await this.executeSQL(sqlRestoreSavePoint);
+	} catch (e) {
+	  if (cause instanceof Error) {
+        this.yadamuLogger.logException([`${this.constructor.name}.restoreSavePoint()`],e)
+	    e = cause
+	  }
+	  throw e;
+	}
   }  
 
   async releaseSavePoint() {
@@ -530,31 +590,39 @@ class MariadbDBI extends YadamuDBI {
   async getInputStream(tableInfo,parser) {
        
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${tableInfo.SQL_STATEMENT};\n--\n`);
+      this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT));
     }
 
 	const self = this
     const is = new Readable({objectMode: true });
     is._read = function() {};  
   
-    this.connection.queryStream(tableInfo.SQL_STATEMENT).on('data',
-    function(row) {
-      is.push(row)
-    }).on('end',
-    function() {
-      is.push(null)
-    }).on('error',
-    async function(err) {
-      self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`,`${err.code}`],`Connection Idle Time: ${YadamuLibrary.stringifyDuration(performance.now() - self.lastUsedTime)}.`); 
-	  if ((err.fatal) && (err.code && (err.code === 'PROTOCOL_CONNECTION_LOST') || (err.code === 'ECONNRESET'))){
-	    err.yadamuHandled = true;
-        self.yadamuLogger.warning([`${self.constructor.name}.getInputStream()`],`SQL Operation raised\n${err}`);
-        self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`],`Attemping reconnection.`);
-        await self.reconnect()
-        this.lastUsedTime = performance.now();
-        self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`],`New connection availabe.`);
-	  }      
-    })
+    let stack 
+    try {
+	  stack = new Error().stack
+	  this.connection.queryStream(tableInfo.SQL_STATEMENT).on('data',
+        function(row) {
+          is.push(row)
+      }).on('end',
+        function() {
+          is.push(null)
+      }).on('error',
+        async function(e) {
+          self.yadamuLogger.info([`${self.constructor.name}.getInputStream()`,`${e.code}`],`Connection Idle Time: ${YadamuLibrary.stringifyDuration(performance.now() - self.lastUsedTime)}.`); 
+          if (e.code && (e.code && (e.code === 'ER_CMD_CONNECTION_CLOSED') || (e.code === 'ER_SOCKET_UNEXPECTED_CLOSE') || (e.code === 'ER_GET_CONNECTION_TIMEOUT'))) {
+  	        e.yadamuHandled = true;
+            self.yadamuLogger.warning([`${self.constructor.name}.getInputStream()`],`SQL Operation raised "${e.message}"`);
+			try {
+              await self.reconnect()
+              this.lastUsedTime = performance.now();
+			} catch (e) {
+			  this.destroy(e)
+		    }
+	      }      
+      })
+	} catch (e) {
+	  throw new MariadbError(e,stack,tableInfo.SQL_STATEMENT)
+	}
     return is;      
   }      
   
@@ -575,6 +643,7 @@ class MariadbDBI extends YadamuDBI {
 
   async newSlaveInterface(slaveNumber) {
 	const dbi = new MariadbDBI(this.yadamu)
+	dbi.pool = this.pool
 	dbi.setParameters(this.parameters);
 	const connection = await this.getConnectionFromPool()
 	return await super.newSlaveInterface(slaveNumber,dbi,connection)

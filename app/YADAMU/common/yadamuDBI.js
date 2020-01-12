@@ -13,7 +13,7 @@ const { performance } = require('perf_hooks');const async_hooks = require('async
 
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuRejectManager = require('./yadamuRejectManager.js');
-const {YadamuError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
+const {YadamuError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuError.js');
 const DBParser = require('./dbParser.js');
 
 const DEFAULT_BATCH_SIZE   = 10000;
@@ -352,9 +352,15 @@ class YadamuDBI {
   }
   
   async getDatabaseConnectionImpl() {
-    await this.createConnectionPool();
-	this.connection = await this.getConnectionFromPool();
-	await this.configureConnection();
+	try {
+      await this.createConnectionPool();
+	  this.connection = await this.getConnectionFromPool();
+	  await this.configureConnection();
+	} catch (e) {
+      const err = new ConnectionError(e,this.connectionProperties);
+	  throw err
+	}
+
   }  
   
   async getDatabaseConnection(requirePassword) {
@@ -459,8 +465,11 @@ class YadamuDBI {
   **
   */
 
-  async abort() {
-    throw new Error('Unimplemented Method')
+  async abort(cause) {
+	if (cause instanceof Error) {
+      this.yadamuLogger.logException([`${this.constructor.name}`,`ABORT`],`Cause:`)
+	  this.yadamuLogger.logException(e)
+	}
   }
 
   /*
@@ -487,9 +496,35 @@ class YadamuDBI {
   **
   */
   
-  async rollbackTransaction() {
+  async rollbackTransaction(cause) {
+	if (cause instanceof Error) {
+      this.yadamuLogger.logException([`${this.constructor.name}`,`ROLLBACK`],`Cause:`)
+	  this.yadamuLogger.logException(e)
+	}
   }
   
+  /*
+  **
+  ** Set a Save Point
+  **
+  */
+    
+  async createSavePoint() {
+  }
+
+  /*
+  **
+  ** Revert to a Save Point
+  **
+  */
+
+  async restoreSavePoint(cause) {
+	if (cause instanceof Error) {
+      this.yadamuLogger.logException([`${this.constructor.name}`,`REVERT`],`Cause:`)
+	  this.yadamuLogger.logException(e)
+	}
+  }
+
   /*
   **
   ** The following methods are used by JSON_TABLE() style import operations  
@@ -559,6 +594,10 @@ class YadamuDBI {
     return new DBParser(query,objectMode,this.yadamuLogger);      
   }
   
+  processStreamingError(e,stack,tableInfo) {
+	return e
+  }
+  
   async getInputStream(tableInfo,parser) {
     throw new Error('Unimplemented Method')
   }      
@@ -623,6 +662,7 @@ class YadamuDBI {
      if (abort) {
        this.yadamuLogger.error([`${operation}`,`"${tableName}"`],`Maximum Error Count exceeded. Skipping Table.`);
      }
+	 console.log(this.skipCount,abort);
      return abort;     
   }
   

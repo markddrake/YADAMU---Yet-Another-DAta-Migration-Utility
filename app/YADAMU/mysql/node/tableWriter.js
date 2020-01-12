@@ -145,12 +145,12 @@ class TableWriter extends YadamuWriter {
         return this.skipTable
       } catch (e) {
         if (this.status.showInfoMsgs) {
-          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.batch.length}]. Batch Insert raised:\n${e}.`);
+          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.batch.length}]. Batch Insert raised: "${e}.`);
           this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
           this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch[0])}\n...\n${JSON.stringify(this.batch[this.batch.length-1])}\n`);
           this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative mode.`);          
         }
-        await this.dbi.restoreSavePoint();
+        await this.dbi.restoreSavePoint(e);
         this.tableInfo.insertMode = 'Iterative'   
         this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args
       }

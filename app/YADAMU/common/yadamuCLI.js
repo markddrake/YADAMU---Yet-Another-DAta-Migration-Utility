@@ -8,7 +8,7 @@ const assert = require('assert');
 const Yadamu = require('./yadamu.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuLogger = require('./yadamuLogger.js');
-const {YadamuError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
+const {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuError.js');
 
 const FileDBI = require('../file/node/fileDBI.js');
 
@@ -90,9 +90,12 @@ const ENUMERATED_PARAMETERS = {
 class YadamuCLI {
 
   static reportError(e) {
-	if ((e instanceof CommandLineError) || (e instanceof ConfigurationFileError)) {
+	if (e instanceof UserError) {
       console.log(e.message);
-	}
+	  if (process.env.YADAMU_SHOW_CAUSE === 'TRUE') {	  
+	    console.log(e); 
+      }
+  	}
 	else {
       console.log(e);
   	}
@@ -517,7 +520,7 @@ class YadamuCLI {
 	const startTime = performance.now();
 	await yadamuQA.doTests(configuration);
 	const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TESTS`],`Complete: Configuration:"${this.parameters.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TESTS`],`Completed: Configuration:"${this.parameters.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
 
   }
   

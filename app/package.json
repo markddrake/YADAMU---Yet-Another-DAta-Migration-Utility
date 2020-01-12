@@ -29,6 +29,7 @@
     "pg-query-stream": "^2.0.1",
     "popper.js": "^1.16.0",
     "require": "^2.4.20",
+    "snowflake-sdk": "^1.4.0",
     "uuid": "^3.3.3",
     "wkx": "^0.4.8"
   },

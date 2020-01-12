@@ -518,8 +518,7 @@ class MongoDBI extends YadamuDBI {
 	dbi.setParameters(this.parameters);
 	// return await super.newSlaveInterface(slaveNumber,dbi,this.pool)
 	await dbi.configureSlave(slaveNumber,this.client);
-	this.cloneSlave
-	Configuration(dbi);
+	this.cloneSlaveConfiguration(dbi);
 	dbi.useDatabase(this.stats.db);
 	return dbi
   }

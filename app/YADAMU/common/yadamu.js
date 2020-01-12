@@ -4,7 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { performance } = require('perf_hooks');
-  
 const FileDBI = require('../file/node/fileDBI.js');
 const DBReader = require('./dbReader.js');
 const DBWriter = require('./dbWriter.js');
@@ -13,7 +12,7 @@ const DBWriterParallel = require('./dbWriterMaster.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuDefaults = require('./yadamuDefaults.json');
-const {YadamuError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
+const {YadamuError, UserError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
 
 class Yadamu {
 
@@ -64,7 +63,7 @@ class Yadamu {
   
     yadamuLogger.log([`${this.constructor.name}`,`${status.operation}`],`Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}.`);
     if (!yadamuLogger.loggingToConsole()) {
-      console.log(`[${this.constructor.name}][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
+      console.log(`${new Date().toISOString()}[${this.constructor.name}][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
     }
   }
   
@@ -72,10 +71,10 @@ class Yadamu {
     
     if (!yadamuLogger.loggingToConsole()) {
       yadamuLogger.logException([`${this.constructor.name}`,`"${status.operation}"`],e);
-      console.log(`[ERROR][${this.constructor.name}][${status.operation}]: Operation failed: See "${parameters.LOG_FILE ? parameters.LOG_FILE  : 'above'}" for details.`);
+      console.log(`${new Date().toISOString()} [ERROR][${this.constructor.name}][${status.operation}]: Operation failed: See "${parameters.LOG_FILE ? parameters.LOG_FILE  : 'above'}" for details.`);
     }
     else {
-      console.log(`[ERROR][${this.constructor.name}][${status.operation}]: Operation Failed:`);
+      console.log(`${new Date().toISOString()} [ERROR][${this.constructor.name}][${status.operation}]: Operation Failed:`);
       console.log(e);
     }
   }
@@ -308,7 +307,7 @@ class Yadamu {
             break;
           case 'PASSWORD':
           case '--PASSWORD':
-		    console.log(`${new Date().toISOString()}[WARNING][${this.constructor.name}]: Suppling a password on the command line interface can be insecure`);
+		    console.log(`${new Date().toISOString()} [WARNING][${this.constructor.name}]: Suppling a password on the command line interface can be insecure`);
             parameters.PASSWORD = parameterValue;
             break;
           case 'DATABASE':
@@ -454,12 +453,23 @@ class Yadamu {
 	  parallel = (parallel && source.isDatabase() && target.isDatabase());
       const dbReader = await this.getDBReader(source,parallel)
       const dbWriter = await this.getDBWriter(target,parallel)  
-	  const inputStream = dbReader.getReader();
+	  const inputStream = dbReader.getInputStream();
       const copyOperation = new Promise(function (resolve,reject) {
         try {
-          dbWriter.on('finish', function(){resolve()})
-          dbWriter.on('error',function(err){self.yadamuLogger.logException([`${dbWriter.constructor.name}.onError()`],err);reject(err)})
-          inputStream.on('error',function(err){self.yadamuLogger.logException([`${inputStream.constructor.name}.onError()`],err);reject(err)})
+			
+          dbWriter.on('finish', function(){
+			resolve()
+		  })
+          dbWriter.on('error',function(err){
+			self.yadamuLogger.logException([`${dbWriter.constructor.name}.onError()`],err);
+			reject(err)
+	      })
+		  
+          inputStream.on('error',function(err){
+			 self.yadamuLogger.logException([`${inputStream.constructor.name}.onError()`],err);
+			 reject(err)
+		  })
+		  
           inputStream.pipe(dbWriter);
         } catch (err) {
           self.yadamuLogger.logException([`${self.constructor.name}.onError()`],err)
@@ -477,12 +487,12 @@ class Yadamu {
     } catch (e) {
 	  this.status.operationSuccessful = false;
 	  this.status.err = e;
-      await source.abort();
-      await target.abort();
-
-	  if (e instanceof YadamuError) {
+      await source.abort(e);
+	  await target.abort(e);
+	  
+	  if (e instanceof UserError) {
 		await this.close();
-	    // Prevent reportError from being called for Yadamu Errors
+	    // Prevent reportError from being called for User Errors
 		throw e
 	  }
     }
@@ -590,7 +600,7 @@ class Yadamu {
     } catch (e) {
 	  this.status.operationSuccessful = false;
 	  this.status.err = e;
-      await dbi.abort()
+      await dbi.abort(e)
     }
     return timings;
   }

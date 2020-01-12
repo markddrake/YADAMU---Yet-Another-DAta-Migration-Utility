@@ -35,7 +35,7 @@ class TableWriter extends YadamuWriter {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
     this.lobList = [];
     this.lobBatch = []
-    this.tempLpbCount = 0;
+    this.tempLobCount = 0;
     this.cachedLobCount = 0;
     this.dumpOracleTestcase = false;
     this.lobCumlativeTime = 0;
@@ -165,6 +165,7 @@ class TableWriter extends YadamuWriter {
 
   async initialize() {
     await this.disableTriggers()
+	
   }
 
   async disableTriggers() {
@@ -179,6 +180,24 @@ class TableWriter extends YadamuWriter {
     const sqlStatement = `ALTER TABLE "${this.schema}"."${this.tableName}" ENABLE ALL TRIGGERS`;
     return await this.dbi.executeSQL(sqlStatement,[]);
     
+  }
+
+  trackClobFromString(s) {
+    const clob = this.dbi.trackClobFromString(s)
+	this.lobList.push(clob);
+	return clob
+  }
+  
+  trackBlobFromHexBinary(s) {
+    const blob = this.dbi.trackBlobFromHexBinary(s)
+	this.lobList.push(blob);
+	return blob
+  }
+  
+  trackBlobFromBuffer(b) {
+	const blob = this.dbi.trackBlobFromBuffer(b)
+	this.lobList.push(blob);
+	return blob;
   }
 
   async appendRow(row) {
@@ -248,16 +267,16 @@ class TableWriter extends YadamuWriter {
               case oracledb.CLOB:
                 this.templobCount++
                 this.cachedLobCount--
-                return this.dbi.trackClobFromString(row[idx], this.lobList)                                                                    
+                return this.trackClobFromString(row[idx])                                                                    
                 break;
               case oracledb.BLOB:
                 this.templobCount++  
                 this.cachedLobCount--
                 if (typeof row[idx] === 'string') {
-                  return this.dbi.trackBlobFromHexBinary(row[idx], this.lobList)                                                                    
+                  return this.trackBlobFromHexBinary(row[idx])                                                                    
                 }
                 else {
-                  return this.dbi.trackBlobFromBuffer(row[idx], this.lobList)
+                  return this.trackBlobFromBuffer(row[idx])
                 }
                 break;
               default:

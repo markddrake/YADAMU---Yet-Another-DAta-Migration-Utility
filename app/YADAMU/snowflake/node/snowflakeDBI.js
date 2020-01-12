@@ -2,6 +2,7 @@
 "use strict" 
 const fs = require('fs');
 const Readable = require('stream').Readable;
+const { performance } = require('perf_hooks');
 
 /* 
 **
@@ -23,6 +24,7 @@ var snowflake = require('snowflake-sdk');
 
 const Yadamu = require('../../common/yadamu.js');
 const YadamuDBI =  require('../../common/yadamuDBI.js');
+const {ConnectionError, SnowFlakeError} = require('../../common/yadamuError.js')
 const DBParser = require('./dbParser.js');
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
@@ -74,38 +76,42 @@ const sqlCommitTransaction = `commit`;
 
 const sqlRollbackTransaction = `rollback`;
 
-class snowflakeDBI extends YadamuDBI {
+class SnowFlakeDBI extends YadamuDBI {
     
   // Promisfy ...
     
-  establishConnection() {
+  establishConnection(connection) {
       
-    const connection = this.connection;
     return new Promise(function(resolve,reject) {
-       connection.connect(function(err,conn) {
-         if (err) {
-           reject(err);
-         }
-         resolve(conn);
-       })
+	  const stack = new stack().error
+      connection.connect(function(err,connection) {
+        if (err) {
+          reject(new SnowFlakeError(err,stack,'snowflake-sdk.Connection.connect());
+        }
+        resolve(connection);
+      })
     })
   } 
-   
+  
   executeSQL(sqlStatement, args) {
-      
+      	  
     const self = this
-    
+
+    // Promisfy ...
+
     return new Promise(function(resolve,reject) {
       if (self.status.sqlTrace) {
-        self.status.sqlTrace.write(`${sqlStatement};\n--\n`);
+        self.status.sqlTrace.write(this.traceSQL(sqlStatement));
       }
+	  const stack = new stack().error
       self.connection.execute({
         sqlText: sqlStatement
        ,binds  : args
+	   ,fetchAsString: ['Number','Date','JSON']
        ,complete: function(err,statement,rows) {
                     if (err) {
-                      console.log(err);
-                      reject(err);
+                      self.yadamuLogger.logException([`${self.constructor.name}.executeSQL()`],err);
+                      reject(new SnowFlakeError(err,stack,statement.sqlText);
                     }
                     else {
                       resolve(rows);
@@ -114,7 +120,61 @@ class snowflakeDBI extends YadamuDBI {
       })
     })
   }   
+   
+  async testConnection(connectionProperties,parameters) {   
+    super.setConnectionProperties(connectionProperties);
+	this.setTargetDatabase();
+	try {
+      let connection = snowflake.createConnection(this.connectionProperties);
+      connection = await this.establishConnection(connection);
+      connection.destroy()
+	  super.setParameters(parameters)
+	} catch (e) {
+      throw e;
+	}
+	
+  }
+  
+  async createConnectionPool() {
+	  
+	// Snowflake-SDK does not support connection pooling
 
+  }
+  
+  async getConnectionFromPool() {
+
+    this.setTargetDatabase();
+    this.logConnectionProperties();
+    let connection = snowflake.createConnection(this.connectionProperties);
+    connection = await this.establishConnection(connection);
+    const sqlStartTime = performance.now();
+    this.traceTiming(sqlStartTime,performance.now())
+    return connection
+
+  }
+  
+  async releaseConnection() {
+    if (this.connection !== undefined && this.connection.destroy) {
+      try {
+        await this.connection.destroy();
+      } catch (e) {
+        this.yadamuLogger.logException([`${this.constructor.name}.releaseConnection()`],e);
+      }
+	}
+  };
+  
+  async configureConnection() {
+    
+    let results = await this.executeSQL(`alter session set autocommit = false timezone = 'UTC' TIMESTAMP_OUTPUT_FORMAT = 'YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM' TIMESTAMP_NTZ_OUTPUT_FORMAT = 'YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM'`);
+
+  }
+  
+  setTargetDatabase() {  
+    if ((this.parameters.SNOWFLAKE_SCHEMA_DB) && (this.parameters.SNOWFLAKE_SCHEMA_DB !== this.connectionProperties.database)) {
+      this.connectionProperties.database = this.parameters.SNOWFLAKE_SCHEMA_DB
+    }
+  }
+  
   async executeDDLImpl(ddl) {
     const results = await Promise.all(ddl.map(async function(ddlStatement) {
       try {
@@ -141,13 +201,6 @@ class snowflakeDBI extends YadamuDBI {
     , database          : this.parameters.DATABASE
     }
   }
-  isValidDDL() {
-    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
-  }
-  
-  objectMode() {
-    return true;
-  }
   
   constructor(yadamu) {
     super(yadamu,yadamu.getYadamuDefaults().snowflake)
@@ -159,19 +212,9 @@ class snowflakeDBI extends YadamuDBI {
   **  Connect to the database. Set global setttings
   **
   */
-  
-  async getConnection() {
-    this.logConnectionProperties();
-    this.connection = snowflake.createConnection(this.connectionProperties);
-    this.connection = await this.establishConnection();
-    let results = await this.executeSQL(`alter session set autocommit = false`);
-    results = await this.executeSQL(`alter session set timezone = 'UTC'`);
-    results = await this.executeSQL(`alter session set TIMESTAMP_OUTPUT_FORMAT = 'YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM'`);
-  } 
-  
+
   async initialize() {
      await super.initialize(true);   
-     await this.getConnection()
      this.spatialFormat = "GeoJSON"
   }
 
@@ -182,10 +225,7 @@ class snowflakeDBI extends YadamuDBI {
   */
 
   async finalize() {
-    if (this.connection) {
-      await this.connection.destroy();
-      this.connection = undefined;
-    }
+    await this.releaseConnection();
   }
 
   /*
@@ -195,9 +235,11 @@ class snowflakeDBI extends YadamuDBI {
   */
 
   async abort() {
+	 
     try {
-      await this.connection.destroy();
+      await this.releaseConnection();
     } catch (e) {
+	  this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e)
     }
     this.connection = undefined;
   }
@@ -332,7 +374,7 @@ class snowflakeDBI extends YadamuDBI {
   async getInputStream(tableInfo,parser) {
       
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${tableInfo.SQL_STATEMENT};\n--\n`)
+      this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
     }
         
     const readStream = new Readable({objectMode: true });
@@ -353,21 +395,20 @@ class snowflakeDBI extends YadamuDBI {
     return super.getTableWriter(TableWriter,table)
   }  
 
-  configureSlave(slaveNumber,connection) {
-	this.slaveNumber = slaveNumber
-	this.connection = connection
-  }
-
-  async newSlaveInterface(slaveNumber) {
-	const dbi = new OracleDBI(this.yadamu)
-	dbi.configureSlave(slaveNumber,await this.getConnectionFromPool())
-	return super.newSlaveInterface(dbi);
+ async newSlaveInterface(slaveNumber) {
+	const dbi = new SnowFlakeDBI(this.yadamu)
+	dbi.setParameters(this.parameters);
+	dbi.setConnectionProperties(this.connectionProperties)
+    await super.newSlaveInterface(slaveNumber,dbi,await dbi.getConnectionFromPool())
+	dbi.configureConnection();
+    return dbi;
   }
 
   tableWriterFactory(tableName) {
+    this.skipCount = 0;    
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
   }
 
 }
 
-module.exports = snowflakeDBI
+module.exports = SnowFlakeDBI

@@ -43,7 +43,7 @@ ON COMMIT PRESERVE  ROWS
 create or replace package YADAMU_TEST
 AUTHID CURRENT_USER
 as
-  procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9);
+  procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9, P_STYLESHEET VARCHAR2 DEFAULT NULL);
 end;
 /
 --
@@ -58,7 +58,7 @@ set define off
 create or replace package body YADAMU_TEST
 as
 --
-procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9)
+procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9, P_STYLESHEET VARCHAR2 DEFAULT NULL)
 as
   TABLE_NOT_FOUND EXCEPTION;
   PRAGMA EXCEPTION_INIT( TABLE_NOT_FOUND , -00942 );
@@ -66,6 +66,47 @@ as
   V_HASH_METHOD      NUMBER := 0;
   V_TIMESTAMP_LENGTH NUMBER  := 20 + P_TIMESTAMP_PRECISION;
   
+  -- Compensate for Snowflake's XML Fidelity issues, including alphabetical ordering of attributes and removal of trailing whitespace on text nodes.
+  
+  V_SNOWFLAKE_XSL XMLTYPE := XMLTYPE(
+'<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+	<xsl:template match="node()">
+		<xsl:copy>
+			<xsl:for-each select="@*">
+				<xsl:sort order="ascending" select="name()"/>
+				<xsl:copy/>
+			</xsl:for-each>
+			<xsl:apply-templates select="node()"/>
+		</xsl:copy>
+	</xsl:template>
+	<xsl:template match="text()">
+		<xsl:choose>
+			<xsl:when test="normalize-space(.) = ''''">
+				<xsl:value-of select="."/>
+			</xsl:when>
+			<xsl:otherwise>
+				<xsl:call-template name="rtrim">
+					<xsl:with-param name="arg" select="."/>
+				</xsl:call-template>
+			</xsl:otherwise>
+		</xsl:choose>
+	</xsl:template>
+	<xsl:template name="rtrim">
+		<xsl:param name="arg"/>
+		<xsl:choose>
+			<xsl:when test="substring($arg,string-length($arg),1)= '' ''">
+				<xsl:call-template name="rtrim">
+					<xsl:with-param name="arg" select="substring($arg,0,string-length($arg))"/>
+				</xsl:call-template>
+			</xsl:when>
+			<xsl:otherwise>
+				<xsl:value-of select="$arg"/>
+			</xsl:otherwise>
+		</xsl:choose>
+	</xsl:template>
+</xsl:stylesheet>
+');
+
   cursor getTableList
   is
   select aat.TABLE_NAME
@@ -74,21 +115,27 @@ as
              when ((V_HASH_METHOD < 0) and DATA_TYPE in ('SDO_GEOMETRY','XMLTYPE','ANYDATA','BLOB','CLOB','NCLOB')) then
     		   NULL
              when ((DATA_TYPE like 'TIMESTAMP(%)') and (DATA_SCALE > P_TIMESTAMP_PRECISION)) then
-               'substr(to_char("' || COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FF9''),1,' || V_TIMESTAMP_LENGTH || ') "' || COLUMN_NAME || '"'
+               'substr(to_char(t."' || COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FF9''),1,' || V_TIMESTAMP_LENGTH || ') "' || COLUMN_NAME || '"'
              when DATA_TYPE = 'BFILE' then
-	           'case when "' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || COLUMN_NAME || '") end' 
+	           'case when t."' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE(t."' || COLUMN_NAME || '") end "' || COLUMN_NAME || '"'
 		     when (DATA_TYPE = 'SDO_GEOMETRY') then
-               'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.TO_WKBGEOMETRY("' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end'
+               'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.TO_WKBGEOMETRY(t."' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
              when DATA_TYPE = 'XMLTYPE' then
-		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT "' || COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end' 
+    		   -- 'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
+			   case 
+			     when (P_STYLESHEET is null) then
+     		       'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
+				 else 
+				   'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT XMLTRANSFORM(t."' || COLUMN_NAME || '", X.XSL) as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
+			   end
 		     when DATA_TYPE = 'ANYDATA' then
-		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end' 
+		       'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(OBJECT_SERIALIZATION.SERIALIZE_ANYDATA(t."' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
 		     when DATA_TYPE in ('BLOB')  then
-   		       'case when "' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH("' || COLUMN_NAME || '",' || V_HASH_METHOD || ') end'
+   		       'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(t."' || COLUMN_NAME || '",' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
 			 when DATA_TYPE in ('CLOB','NCLOB')  then
-		        'case when "' || COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH("' || COLUMN_NAME || '",' || V_HASH_METHOD || ') end'
+		        'case when t."' || COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH(t."' || COLUMN_NAME || '",' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
              else
-	     	   '"' || COLUMN_NAME || '"'
+	     	   't."' || COLUMN_NAME || '"'
 		   end,
 		',') 
 		 WITHIN GROUP (ORDER BY INTERNAL_COLUMN_ID, COLUMN_NAME) COLUMN_LIST
@@ -139,8 +186,12 @@ $END
   P_SOURCE_COUNT      NUMBER := 0;
   P_TARGET_COUNT      NUMBER := 0;
   V_SQLERRM           VARCHAR2(4000);
-begin
   
+  V_STYLESHEET        XMLTYPE;
+  V_WITH_CLAUSE       VARCHAR2(256);
+  V_XSL_TABLE_CLAUSE  VARCHAR(256);
+begin
+
   -- Use EXECUTE IMMEDIATE to get the HASH Method Code so we do not get a compile error if accesss has not been granted to DBMS_CRYPTO
 
   begin
@@ -178,6 +229,21 @@ begin
       -- Not a TYPO: NULL is a string in this case.
       V_SQLERRM := 'NULL';
     end if;
+	
+	if (P_STYLESHEET IS NOT NULL) then
+	  case 
+	    when P_STYLESHEET = 'SNOWFLAKE.XSL' then
+		  V_STYLESHEET := V_SNOWFLAKE_XSL;
+        else
+		  V_STYLESHEET := NULL;
+	  end case;
+	  V_WITH_CLAUSE := 'WITH XSL_TABLE AS (SELECT :1 "XSL" FROM DUAL)';
+	  V_XSL_TABLE_CLAUSE := ', XSL_TABLE X';
+	else
+      V_STYLESHEET := NULL;
+	  V_WITH_CLAUSE := '';
+	  V_XSL_TABLE_CLAUSE := '';
+	end if;
 
     V_SQL_STATEMENT := 'insert into SCHEMA_COMPARE_RESULTS ' || YADAMU_UTILITIES.C_NEWLINE
                     || ' select ''' || P_SOURCE_SCHEMA  || ''' ' || YADAMU_UTILITIES.C_NEWLINE
@@ -185,20 +251,24 @@ begin
                     || '       ,'''  || t.TABLE_NAME || ''' ' || YADAMU_UTILITIES.C_NEWLINE
                     || '       ,(select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || YADAMU_UTILITIES.C_NEWLINE
                     || '       ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,(select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '")) '  || YADAMU_UTILITIES.C_NEWLINE
+                    || '       ,(' || V_WITH_CLAUSE || ' select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ' MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ')) '  || YADAMU_UTILITIES.C_NEWLINE
+                    || '       ,(' || V_WITH_CLAUSE || ' select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ' MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ')) '  || YADAMU_UTILITIES.C_NEWLINE
                     || '       ,' || V_SQLERRM  || YADAMU_UTILITIES.C_NEWLINE
 					|| '  from dual';
                     
 	begin
       DBMS_OUTPUT.PUT_LINE(V_SQL_STATEMENT);
-	  EXECUTE IMMEDIATE V_SQL_STATEMENT;
+	  if (V_STYLESHEET is not null) then
+        EXECUTE IMMEDIATE V_SQL_STATEMENT USING V_STYLESHEET, V_STYLESHEET;
+	  else
+	    EXECUTE IMMEDIATE V_SQL_STATEMENT;
+	  end if;
     exception 
       when OTHERS then
         V_SQLERRM := SQLERRM;					  
         begin 
           V_SQL_STATEMENT := 'select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '"';
-          execute immediate V_SQL_STATEMENT into P_SOURCE_COUNT;
+		  execute immediate V_SQL_STATEMENT into P_SOURCE_COUNT;
         exception
           when others then
             V_SQLERRM := SQLERRM;					  

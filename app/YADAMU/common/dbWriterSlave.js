@@ -27,6 +27,10 @@ class DBWriterSlave extends DBWriter {
           await this.currentTable.initialize();
           break;
         case 'data': 
+          if (this.skipTable === true) {
+            break;
+          }
+		  // throw new Error('Test');
           await this.currentTable.appendRow(obj.data);
           this.rowCount++;
           if ((this.rowCount % this.feedbackInterval === 0) & !this.currentTable.batchComplete()) {
@@ -61,15 +65,13 @@ class DBWriterSlave extends DBWriter {
   		  break;
 	    case 'releaseSlave':
 		  await this.dbi.releaseConnection()
-		  this.master.write({slaveReleased:null});
 		  break;     	
 		default:
       }    
 	  callback();
     } catch (e) {
-      this.yadamuLogger.logException([`${this.constructor.name}._write()`,`"${this.tableName}"`],e);
-	  await this.dbi.abort();
-      process.nextTick(() => this.emit('error',e));
+      this.yadamuLogger.logException([`${this.constructor.name}[${this.dbi.slaveNumber}]._write()`,`"${this.tableName}"`],e);
+	  // Passing the exception to callback triggers the onError() event
       callback(e);
     }
   }

@@ -15,29 +15,50 @@ class DBReaderMaster extends DBReader {
   }
     
   async createTableReader(dbi,tableMetadata,outputStream) {
-    const query = this.dbi.generateSelectStatement(tableMetadata)
-    const parser = dbi.createParser(query,outputStream.objectMode())
-    const inputStream = await dbi.getInputStream(query,parser)
+    const tableInfo = this.dbi.generateSelectStatement(tableMetadata)
+    const parser = dbi.createParser(tableInfo,outputStream.objectMode())
+    const inputStream = await dbi.getInputStream(tableInfo,parser)
 
     const self = this
     
     const tableReader = new Promise(function(resolve,reject) {  
-      const outputStreamError = function(err){reject(err)}       
-      outputStream.on('error',outputStreamError);
-      parser.on('end',function() {resolve(parser.getCounter())})
-      parser.on('error',function(err){reject(err)});
+
+      const outputStreamError = function(err){
+        // Named OnError Listener
+		self.yadamuLogger.logException([`${self.constructor.name}.createTableReader()`,`${tableMetadata.TABLE_NAME}`,`${this.constructor.name}.onError()`],err)
+	    reject(err)
+      }       
+
+      outputStream.on('error',
+	    outputStreamError
+	  );
+
+      parser.on('end',
+	    function() {
+		  outputStream.removeListener('error',outputStreamError)
+	      resolve(parser.getCounter())
+      })
+	  
+	  parser.on('error',
+	    function(err){
+		  reject(err)
+      });
+
+	  const stack = new Error().stack;
 	  inputStream.on('error',
 	    function(err) { 
 		  if (err.yadamuHandled === true) {
-	        self.yadamuLogger.log([`${self.constructor.name}.tableReader()`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${parser.getCounter()}. Read Pipe Closed`)
+	        self.yadamuLogger.info([`${self.constructor.name}.createTableReader()`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${parser.getCounter()}. Read Pipe Closed`)
 	      } 
-          reject(err)
+		  reject(self.dbi.processStreamingError(err,stack,tableInfo))
 	    }
       )		
+
 	  try {
         inputStream.pipe(parser).pipe(outputStream,{end: false })
 	  } catch (e) {
-		console.log(e);
+		self.yadamuLogger.logException([`${self.constructor.name}.createTableReader()`,`${tableMetadata.TABLE_NAME}`,`PIPE`],e)
+		throw e
 	  }
     })
     
@@ -64,26 +85,42 @@ class DBReaderMaster extends DBReader {
 		   const task = tasks.shift();
 		   tableWriter.write({table: task.TABLE_NAME})
            const tableReader = this.createTableReader(tableReaderDBI,task,tableWriter)
-           const rows = await tableReader
-		   tableWriter.write({eod: task.TABLE_NAME})
+           const startTime = performance.now()
+	       try {
+             const rows = await tableReader
+             const elapsedTime = performance.now() - startTime
+             this.yadamuLogger.info([`${this.constructor.name}`,`${task.TABLE_NAME}`],`Rows read: ${rows}. Elaspsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`)
+       	   } catch(e) {
+			 // Slave raised unrecoverable error. Slave cannot process any more tables.
+             this.yadamuLogger.logException([`${this.constructor.name}`,`${task.TABLE_NAME}`,`COPY`],e)
+			 this.outputStream.setSlaveException(e);
+			 break;
+           }
+           tableWriter.write({eod: task.TABLE_NAME})
 		 }
-		 // tableWriter.write({releaseSlave : null})
-		 await tableReaderDBI.releaseConnection();
+		 try {
+		   await tableReaderDBI.releaseConnection();
+		 } catch (e) {
+           this.yadamuLogger.logException([`${this.constructor.name}`,`${tableReaderDBI.constructor.name}.releaseConnection()`],e)
+		 }
 		 return tableWriter 
 	  },this))
-
-      tableWriters.forEach(function(tableWriter) {
-		 tableWriter.write({releaseSlave : null})
-	  },this)
-
-	  // console.log(tableWriters)
 	  
+      await Promise.all(tableWriters.map(function(tableWriter) {
+		const self = this;
+        return new Promise(function(resolve,reject) {
+		  tableWriter.write({releaseSlave: null},undefined,function(err) {
+            self.outputStream.write({slaveReleased: null})
+	        resolve()
+		  })
+		})
+	  },this));
 	}
 	else {
       this.yadamuLogger.info([`${this.constructor.name}`],`No tables found.`);
 	}
-	// All data has been sent and slaves have been instructed to close their connections. 
-	// Need to wait for all Writer slaves to complete final inserts and close connections before invoking masters final() method.
+	// All slaves terminated and been instructed to close their connections. 
+	// Need to wait for all Writer slaves to complete final inserts and close connections before invoking master's final() method.
 	// Push a null to the master writer to force the final method to be invoked.
   }
       
@@ -126,8 +163,21 @@ class DBReaderMaster extends DBReader {
 		     }
 		   );
            this.outputStream.on('AllDataWritten',
-		     function() {
-			   self.push(null)
+		     async function(err) {
+			   // If AllDataWritten supplies an Error  destory the reader with the error sent by the Master DBWriter.
+			   try {
+                 await self.dbi.finalizeExport();
+	             if (err instanceof Error) {
+                   self.destroy(err);				   
+				 }
+			     else {
+				   self.push(null)
+				 }
+			   } catch (e) {
+                 self.yadamuLogger.logException([`${this.constructor.name}.onAllDataWritten()`],e);
+				 e = (err instanceof Error) ? err : e
+                 self.destroy(e)
+			   }
 		     }
 		   );
            this.push({metadata: metadata});
@@ -137,13 +187,14 @@ class DBReaderMaster extends DBReader {
 			this.nextPhase = 'finished'
 			break;
 		 case 'finished':
+            await this.dbi.finalizeExport();
 	        this.push(null);
             break;
          default:
       }
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._read()`],e);
-      process.nextTick(() => this.emit('error',e));
+      this.destroy(e)
     }
   }
 }

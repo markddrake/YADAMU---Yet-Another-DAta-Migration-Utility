@@ -133,7 +133,7 @@ class TableWriter extends YadamuWriter {
           this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch.slice(0,this.tableInfo.columnCount))}\n...\n${JSON.stringify(this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))}\n`);
           this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
         }
-        await this.dbi.restoreSavePoint();
+        await this.dbi.restoreSavePoint(e);
         this.tableInfo.insertMode = 'Iterative' 
         repackBatch = true;
       }
@@ -149,7 +149,7 @@ class TableWriter extends YadamuWriter {
         const results = await this.dbi.insertBatch(sqlStatement,nextRow);
         this.dbi.releaseSavePoint();
       } catch(e) {
-        this.dbi.restoreSavePoint();
+        this.dbi.restoreSavePoint(e);
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,JSON.stringify(nextRow)] : []
         this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batchRowCount,row,nextRow,e,errInfo);
         if (this.skipTable) {

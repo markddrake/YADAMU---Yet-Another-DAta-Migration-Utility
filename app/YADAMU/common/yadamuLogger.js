@@ -1,10 +1,13 @@
 "use strict"
 
+const {DatabaseError, OracleError}  = require('./yadamuError.js');
+
 class YadamuLogger {
   
   constructor(outputStream,status) {
     this.os = outputStream;
     this.status = status;
+	this.showStackTraces = process.env.YADAMU_SHOW_CAUSE && process.env.YADAMU_SHOW_CAUSE.toUpperCase() === 'TRUE'
   }
 
   switchOutputStream(os) {
@@ -43,11 +46,38 @@ class YadamuLogger {
     args.unshift('ERROR')
     this.log(args,msg)
   }
+
+  logDatabaseError(e) {
+    this.os.write(`${e.message}\n`);
+	this.os.write(`${e.stack}\n`)
+	this.os.write(`SQL: ${e.sql}\n`);
+    if (e instanceof OracleError) {
+	  this.logOracleError(e)
+	}
+  }
+  
+  logOracleError(e) {
+	this.os.write(`ErroNum: ${e.errorNum}\n`);
+	this.os.write(`Offset: ${e.offset}\n`);
+	this.os.write(`Args/Binds: ${JSON.stringify(e.args)}\n`);
+	this.os.write(`OutputFormat/Rows: ${JSON.stringify(e.outputFormat)}\n`);
+  } 
   
   logException(args,e) {
+
+	if (e.yadamuAlreadyReported) {
+      this.info(args,`Caught exception: "${e.message}"`);
+	  return
+   	}
+
     this.error(args,`Caught exception`);
-    this.os.write(`${(e.stack ? e.stack : e)}\n`)
-    // console.log(new Error().stack);
+	if (e instanceof DatabaseError) {
+	  this.logDatabaseError(e);
+	}
+	else {
+	  this.os.write(`${(e.stack ? e.stack : e)}\n`)
+	}
+	e.yadamuAlreadyReported = true;
   }
   
   logRejected(args,e) {

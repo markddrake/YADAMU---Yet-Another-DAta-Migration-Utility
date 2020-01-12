@@ -1,7 +1,16 @@
 "use strict";
 
+const uuidv1 = require('uuid/v1');
+
 // Support for Oracle 11.2 
 // Oracle 11g has not support for parsing JSON so we send the metadata as XML !!!
+
+// Oracle 11g does not support PL/SQL in With Clause so we need to generate PL/SQL Wrappers for operations that require a with clause
+// 
+// We need to assign a unique ID for each procedure generated. Serial Mode requires one for the entire operation. Parallel Mode requires a unqiue ID for each slave.
+//
+// Since the Wrappers have to be dropped and recreated for each table a unique ID is generated for each table.
+//
 
 const Readable = require('stream').Readable;
 
@@ -9,26 +18,21 @@ const StatementGenerator = require('./StatementGenerator.js');
 
 class StatementGenerator11 extends StatementGenerator {
   
-  // I know.... Attmpting to build XML via string concatenation will end in tears...
-
-  
-  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize, importWrapper) {
+  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize) {
     super(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize)
-    this.importWapper = importWrapper
-    this.mappings = {}
   }
-    
-  generateDDL(targetSchema,tableName,dml,columns,declararions,assignments,variables){
-   const plsqlFunctions = dml.substring(dml.indexOf('\WITH\n')+5,dml.indexOf('\nselect'));
-   return `create or replace function "${this.targetSchema}"."{this.importWraper}"(P_TABLE_OWNER VARCHAR2,P_ANYDATA ANYDATA)\nreturn CLOB\nas\n${withClause}begin\nreturn SERIALIZE_OBJECT(P_TABLE_OWNER, P_ANYDATA);\nend;`;
-  }
+
+  // In 11g the seperator character appears to be \r rather than \n
 
   getPLSQL(dml) {
     return dml.substring(dml.indexOf('\rWITH\r')+5,dml.indexOf('\rselect'));
   }
-
+ 
+    
   metadataToXML() {
             
+    // I know.... Attmpting to build XML via string concatenation will end in tears...
+
     const tablesXML = Object.keys(this.metadata).map(function(tableID){
       const table = this.metadata[tableID]
       const columnsXML = JSON.parse(`[${table.columns}]`).map(function(columnName){return `<column>${columnName}</column>`},this).join('');
