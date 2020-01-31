@@ -193,9 +193,10 @@ class DBWriter extends Writable {
   }
  
   async _write(obj, encoding, callback) {
-    // console.log(new Date().toISOString(),`${this.constructor.name}._write`,Object.keys(obj)[0]);
+    const action = Object.keys(obj)[0]
+    // console.log(new Date().toISOString(),`${this.constructor.name}._write`,action);
     try {
-      switch (Object.keys(obj)[0]) {
+      switch (action) {
         case 'systemInformation':
           this.dbi.setSystemInformation(obj.systemInformation)
           break;
@@ -260,7 +261,13 @@ class DBWriter extends Writable {
 	  this.skipTable = true;
 	  try {
         await this.dbi.rollbackTransaction(e)
-    	callback();
+		if (['systemInformation','dd','metadata'].indexOf(action) > -1) {
+	      // Errors prior to processing rows are considered fatal
+		  callback(e);
+		}
+		else {
+    	  callback();
+		}
 	  } catch (e) {
         // Passing the exception to callback triggers the onError() event
         callback(e); 

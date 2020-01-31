@@ -47,7 +47,7 @@ as
    ,TARGET_DATA_TYPES  CLOB
   );
   
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
   $ELSE
   TYPE KVP_RECORD is RECORD (
     KEY                VARCHAR2(4000)
@@ -62,7 +62,7 @@ as
 
   function IMPORT_VERSION return NUMBER deterministic;
 --
-$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN 
+$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN 
 --
   procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'));
   function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) return CLOB;
@@ -169,12 +169,12 @@ as
 begin
   RESULTS_CACHE.extend();
 --  
-$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
 --
   select JSON_OBJECT('trace' value JSON_OBJECT('sqlStatement' value P_SQL_STATEMENT
-                     $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                     $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB) returning CLOB)
-                     $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                     $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
                      returning  VARCHAR2(32767)) returning  VARCHAR2(32767))
                      $ELSE
                      returning  VARCHAR2(4000)) returning  VARCHAR2(4000))
@@ -182,7 +182,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
     into RESULTS_CACHE(RESULTS_CACHE.count)
     from DUAL;
 --
-$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+$IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
   when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.JSON_OVERFLOW3 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
@@ -226,12 +226,12 @@ as
 begin
   RESULTS_CACHE.extend;
 --  
-$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
 --
   select JSON_OBJECT('ddl' value JSON_OBJECT('tableName' value P_TABLE_NAME, 'sqlStatement' value P_DDL_OPERATION
-                     $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                     $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB) returning CLOB)
-                     $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                     $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
                      returning  VARCHAR2(32767)) returning  VARCHAR2(32767))
                      $ELSE
                      returning  VARCHAR2(4000)) returning  VARCHAR2(4000))
@@ -239,7 +239,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
     into RESULTS_CACHE(RESULTS_CACHE.count)
     from DUAL;
 --
-$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+$IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
   when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.JSON_OVERFLOW3 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
@@ -286,12 +286,12 @@ as
 begin
   RESULTS_CACHE.extend;
 --  
-$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
 --
   select JSON_OBJECT('dml' value JSON_OBJECT('tableName' value P_TABLE_NAME, 'sqlStatement' value P_DML_OPERATION, 'rowCount' value P_ROW_COUNT, 'elapsedTime' value P_ELAPSED_TIME
-               $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+               $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                returning CLOB) returning CLOB)
-               $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+               $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
                returning  VARCHAR2(32767)) returning  VARCHAR2(32767))
                $ELSE
                returning  VARCHAR2(4000)) returning  VARCHAR2(4000))
@@ -299,7 +299,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
           into RESULTS_CACHE(RESULTS_CACHE.count)
           from DUAL;
 --
-$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+$IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
   when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.JSON_OVERFLOW3 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
@@ -350,12 +350,12 @@ as
 begin
   RESULTS_CACHE.extend;
 --  
-$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
 --
   select JSON_OBJECT('error' value JSON_OBJECT('severity' value P_SEVERITY, 'tableName' value P_TABLE_NAME, 'sqlStatement' value P_SQL_STATEMENT, 'code' value P_SQLCODE, 'msg' value P_SQLERRM, 'details' value P_STACK
-                     $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                     $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB) returning CLOB)
-                     $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                     $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
                      returning  VARCHAR2(32767)) returning  VARCHAR2(32767))
                      $ELSE
                      returning  VARCHAR2(4000)) returning  VARCHAR2(4000))
@@ -363,7 +363,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
      into RESULTS_CACHE(RESULTS_CACHE.count)
      from DUAL;
 --
-$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+$IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
   when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.JSON_OVERFLOW3 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
@@ -421,11 +421,11 @@ as
 begin
   RESULTS_CACHE.extend;
 --
-$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
 --
-  $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+  $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
   select JSON_OBJECT('info' value TREAT(P_PAYLOAD as JSON) returning CLOB)
-  $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+  $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
   select JSON_OBJECT('info' value JSON_QUERY(P_PAYLOAD,'$' returning VARCHAR2(32767))  returning VARCHAR2(32767))
   $ELSE
   select JSON_OBJECT('info' value JSON_QUERY(P_PAYLOAD,'$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
@@ -433,7 +433,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
     into RESULTS_CACHE(RESULTS_CACHE.count)
     from DUAL;
 --
-$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+$IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
   when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.JSON_OVERFLOW3 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
@@ -470,12 +470,12 @@ as
 begin
   RESULTS_CACHE.extend;
 --
-$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
 --
   select JSON_OBJECT('message' value P_PAYLOAD
-                     $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                     $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                      returning CLOB)
-                     $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                     $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
                      returning  VARCHAR2(32767))
                      $ELSE
                      returning  VARCHAR2(4000))
@@ -483,7 +483,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
      into RESULTS_CACHE(RESULTS_CACHE.count)
      from DUAL;
 --
-$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+$IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
   when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.JSON_OVERFLOW3 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
@@ -521,14 +521,14 @@ as
   V_RESULTS CLOB;
 begin
 --
-$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
 --
   select JSON_ARRAYAGG(
-           $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+           $IF YADAMU_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
            TREAT (COLUMN_VALUE as JSON) returning CLOB)
-           $ELSIF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+           $ELSIF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
            JSON_QUERY (COLUMN_VALUE, '$' returning CLOB) returning CLOB)
-           $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+           $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
            JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(32767)) returning VARCHAR2(32767))
            $ELSE   
            JSON_QUERY (COLUMN_VALUE, '$' returning VARCHAR2(4000)) returning VARCHAR2(4000))
@@ -537,7 +537,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
       from table(RESULTS_CACHE);
   RESULTS_CACHE := T_RESULTS_CACHE();
   return V_RESULTS;
-$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+$IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 exception
   when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.JSON_OVERFLOW3 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
@@ -802,11 +802,11 @@ begin
            return 'NUMBER';
         when P_DATA_TYPE = 'string' then
           case
-            when JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH is NULL then
+            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH is NULL then
               return 'VARCHAR2(32768)';
             when P_DATA_TYPE_LENGTH is NULL then
               return 'VARCHAR2(4000)';
-            when JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH < 32769 then
+            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH < 32769 then
               return 'VARCHAR2';
             when P_DATA_TYPE_LENGTH < 4001 then
               return 'VARCHAR2';
@@ -835,7 +835,7 @@ begin
   end if;
 end;
 --
-$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN 
+$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN 
 --
 function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_XMLTYPE_STORAGE_MODEL VARCHAR2 DEFAULT 'CLOB')
 --
@@ -847,6 +847,49 @@ $END
 --
 return TABLE_INFO_RECORD
 as
+  V_COLUMNS_CLAUSE            CLOB;
+  V_INSERT_SELECT_LIST        CLOB;
+  V_COLUMN_PATTERNS           CLOB;
+  V_XML_STORAGE_CLAUSE        CLOB;
+   
+  V_DESERIALIZATIONS          T_VC4000_TABLE;
+
+  V_SQL_FRAGMENT VARCHAR2(32767);
+  V_INSERT_HINT  VARCHAR2(128) := '';
+
+  C_CREATE_TABLE_BLOCK1 CONSTANT VARCHAR2(2048) :=
+'declare
+  TABLE_EXISTS EXCEPTION;
+  PRAGMA EXCEPTION_INIT( TABLE_EXISTS , -00955 );
+  V_STATEMENT CLOB := ''create table "';
+
+   C_CREATE_TABLE_BLOCK2 CONSTANT VARCHAR2(2048) := ''';
+begin
+  execute immediate V_STATEMENT;
+exception
+  when TABLE_EXISTS then
+    null;
+  when others then  
+    RAISE;
+end;';
+
+  V_DDL_STATEMENT     CLOB := NULL;
+  V_DML_STATEMENT     CLOB;
+  V_TARGET_DATA_TYPES CLOB;
+  V_RESULTS           TABLE_INFO_RECORD;
+  
+  V_EXISTING_TABLE    PLS_INTEGER := 0; 
+
+  $IF NOT YADAMU_FEATURE_DETECTION.COLLECT_PLSQL_SUPPORTED $THEN
+  V_COLUMNS_CLAUSE_TABLE      T_VC4000_TABLE;
+  V_INSERT_SELECT_TABLE       T_VC4000_TABLE;
+  V_COLUMN_PATTERNS_TABLE     T_VC4000_TABLE;
+  V_TARGET_DATA_TYPES_TABLE   T_VC4000_TABLE;
+  V_DESERIALIZATION_FUNCTIONS T_VC4000_TABLE;
+  V_XML_STORAGE_TEMP          T_VC4000_TABLE;
+  V_XML_STORAGE_TABLE         T_VC4000_TABLE;
+  $END
+  
   CURSOR generateStatementComponents
   is
   with 
@@ -888,7 +931,7 @@ as
              else 
                NULL 
            end "TYPE_NAME"
-$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN 
+$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN 
 --
          from JSON_TABLE('[' || P_COLUMN_LIST || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') c
              ,JSON_TABLE(P_DATA_TYPE_ARRAY,'$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') t
@@ -924,183 +967,21 @@ $END
            end "TYPE_EXISTS"
       from "SOURCE_TABLE_DEFINITIONS" st
   ),
-  "EXTENDED_TABLE_DEFINITIONS"
+  "TABLE_METADATA" 
   as (
-  select tt.*,
-         case 
-           when TYPE_EXISTS = 1 then 
-             OBJECT_SERIALIZATION.DESERIALIZE_TYPE(TYPE_OWNER,TYPE_NAME) 
-          else 
-            NULL 
-          end  "DESERIALIZATION_FUNCTION"
-    from "TARGET_TABLE_DEFINITIONS" tt
-  )
---
-  $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
---
-  select SERIALIZE_TABLE(
-           cast(collect(
-                        '"' || COLUMN_NAME || '" ' ||
-                        case
-                          when TYPE_EXISTS = 1 then
-                            '"' || TYPE_OWNER || '"."' || TYPE_NAME || '"'
-                          when TYPE_NAME is not NULL then
-                            'CLOB'
-                          -- Type Exist is NULL.
-                          when TARGET_DATA_TYPE = 'GEOMETRY' then
-                            '"MDSYS"."SDO_GEOMETRY"'
-                          when TARGET_DATA_TYPE = 'JSON' then
-                            -- BLOB results in Error: ORA-40479: internal JSON serializer error during export operations.
-                            'CLOB CHECK ("' || COLUMN_NAME || '" IS JSON)'
-                          when TARGET_DATA_TYPE = 'BOOLEAN' then
-                            'RAW(1)'
-                          when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID','BINARY_FLOAT','BINARY_DOUBLE') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE like '% TIME ZONE') or (TARGET_DATA_TYPE LIKE '%(%)') then
-                            TARGET_DATA_TYPE
-                          when DATA_TYPE_SCALE is not NULL then
-                            TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH || ',' || DATA_TYPE_SCALE || ')'
-                          when DATA_TYPE_LENGTH  is not NULL then
-                            TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH|| ')'
-                          else
-                            TARGET_DATA_TYPE
-                        end || YADAMU_UTILITIES.C_NEWLINE
-                        order by IDX
-                )
-                as T_VC4000_TABLE
-           )
-         ) COLUMNS_CLAUSE
-        ,SERIALIZE_TABLE(
-           cast(collect(
-                        -- Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results
-                        case
-                          when ((TARGET_DATA_TYPE = 'GEOMETRY') or (TARGET_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"')) then
-                            case 
-                              when P_SPATIAL_FORMAT in ('WKB','EWKB') then
-                                'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKBGEOMETRY(OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || COLUMN_NAME || '")) end'
-                              when P_SPATIAL_FORMAT in ('WKT','EWKT') then
-                                'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || COLUMN_NAME || '") end'
-                            end
-                          when TYPE_EXISTS = 1 then
-                            '"#' || TYPE_NAME || '"("' || COLUMN_NAME || '")'
-                          when TARGET_DATA_TYPE = 'BOOLEAN' then
-                            'HEXTORAW(case when "' || COLUMN_NAME || '" = ''true'' then ''1'' else ''0'' end)'
-                          when TARGET_DATA_TYPE = 'BFILE' then
-                            'OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || COLUMN_NAME || '")' 
-                          when (TARGET_DATA_TYPE = 'XMLTYPE') then
-                            -- Cannot map directly to XMLTYPE constructor as we need to test for NULL. 
-                            'case when "' || COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || COLUMN_NAME || '") end'
-                          when (TARGET_DATA_TYPE = 'ANYDATA') then
-                            -- ### TODO - Better deserialization of ANYDATA.
-                            'case when "' || COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || COLUMN_NAME || '") end' 
-                          when TARGET_DATA_TYPE = 'BLOB' then
-                            $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-                            'OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || COLUMN_NAME || '")'
-                            $ELSE
-                            'case when "' || COLUMN_NAME || '" is NULL then NULL else HEXTORAW("' || COLUMN_NAME || '") end'
-                            $END
-                          else
-                            '"' || COLUMN_NAME || '"'
-                        end
-                        order by IDX
-               )
-               as T_VC4000_TABLE
-           )
-         ) INSERT_SELECT_LIST
-        ,SERIALIZE_TABLE(
-           cast(collect('"' ||
-                        case
-                          when TYPE_EXISTS = 1 then
-                            '\"' || TYPE_OWNER || '\".\"' || TYPE_NAME || '\"'
-                          when TYPE_NAME is not NULL then
-                            'CLOB'
-                          -- Type Exist is NULL.
-                          else
-                            replace(TARGET_DATA_TYPE,'"','\"')
-                        end ||
-                        '"'
-                        order by IDX
-               )
-               as T_VC4000_TABLE
-           )
-         ) TARGET_DATA_TYPES
-        ,SERIALIZE_TABLE(
-           cast(collect(case
-                          when (TARGET_DATA_TYPE = 'XMLTYPE') then
-                            'XMLTYPE "' || COLUMN_NAME || '" STORE AS CLOB'
-                          else
-                            NULL
-                        end
-                        order by IDX
-               )
-               as T_VC4000_TABLE
-           )
-           ,YADAMU_UTILITIES.C_NEWLINE
-         ) XMLTYPE_STORAGE_CLAUSES
-        ,SERIALIZE_TABLE(
-           cast(collect(
-                        '"' || COLUMN_NAME || '" ' ||
-                        case
-                          when TYPE_EXISTS = 1 then
-                            'CLOB'
-                          when TARGET_DATA_TYPE  = 'GEOMETRY' then
-                            'CLOB'
-                          when TARGET_DATA_TYPE  = 'BOOLEAN' then
-                            'VARCHAR2(5)'
-                          when TARGET_DATA_TYPE = 'JSON' then
-                            JSON_FEATURE_DETECTION.C_RETURN_TYPE || ' FORMAT JSON'
-                          when TARGET_DATA_TYPE  = 'FLOAT' then
-                            'NUMBER'
-                          when TARGET_DATA_TYPE = 'BINARY_FLOAT' then
-                            'VARCHAR2(29)'
-                          when TARGET_DATA_TYPE = 'BINARY_DOUBLE' then
-                            'VARCHAR2(53)'
-                          when TARGET_DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE' then
-                            'TIMESTAMP WITH TIME ZONE'
-                          when TARGET_DATA_TYPE like 'RAW(%)' then
-                            'VARCHAR2'
-                          when TARGET_DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (TARGET_DATA_TYPE like 'INTERVAL%') then
-                            'VARCHAR2'
-                          when TARGET_DATA_TYPE in ('XMLTYPE','ANYDATA','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (TYPE_NAME is not NULL) then
-                            JSON_FEATURE_DETECTION.C_RETURN_TYPE
-                          when "TARGET_DATA_TYPE" in ('DATE','DATETIME') then
-                            "TARGET_DATA_TYPE"
-                          when "TARGET_DATA_TYPE" like 'TIMESTAMP%TIME ZONE' then
-                            "TARGET_DATA_TYPE"
-                          when "TARGET_DATA_TYPE"  LIKE '%(%)' then
-                            "TARGET_DATA_TYPE"
-                          when "DATA_TYPE_SCALE" is not NULL then
-                            "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ',' || "DATA_TYPE_SCALE" || ')'
-                          when "DATA_TYPE_LENGTH"  is not NULL then
-                            "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ')'
-                          else
-                            "TARGET_DATA_TYPE"
-                        end
-                        || ' PATH ''$[' || (IDX - 1) || ']'' ERROR ON ERROR' || YADAMU_UTILITIES.C_NEWLINE
-                        order by IDX
-                )
-                as T_VC4000_TABLE
-           )
-         ) COLUMN_PATTERNS
-        , cast(collect( DESERIALIZATION_FUNCTION) as T_VC4000_TABLE) "DESERIALIZATION_FUNCTIONS"
-    from "EXTENDED_TABLE_DEFINITIONS";
---
-  $ELSE
---
-  --
-  -- cast(collect(...) causes ORA-22814: attribute or element value is larger than specified in type in 12.2
-  --
-  select '"' || COLUMN_NAME || '" ' ||
+  select IDX
+        ,'"' || COLUMN_NAME || '" ' ||
          case
-           when TYPE_EXISTS = 1 then 
+           when TYPE_EXISTS = 1 then
              '"' || TYPE_OWNER || '"."' || TYPE_NAME || '"'
            when TYPE_NAME is not NULL then
-             'CLOB'  
+             'CLOB'
            -- Type Exist is NULL.
            when TARGET_DATA_TYPE = 'GEOMETRY' then
              '"MDSYS"."SDO_GEOMETRY"'
-           --
-           when TARGET_DATA_TYPE = 'JSON' then 
-             -- BLOB results in Error: ORA-40479: internaly JSON serializer error during export operations.
-             $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
+           when TARGET_DATA_TYPE = 'JSON' then
+             -- BLOB results in Error: ORA-40479: internal JSON serializer error during export operations.
+             $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
              --
              'CLOB CHECK ("' || COLUMN_NAME || '" IS JSON)'
              --
@@ -1110,46 +991,47 @@ $END
              --
              $END
              --
-           when TARGET_DATA_TYPE = 'BOOLEAN' then 
+           when TARGET_DATA_TYPE = 'BOOLEAN' then
              'RAW(1)'
-           when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID','BINARY_FLOAT','BINARY_DOUBLE') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE like '% TIME ZONE') or (TARGET_DATA_TYPE LIKE '%(%)') then 
+           when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID','BINARY_FLOAT','BINARY_DOUBLE') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE like '% TIME ZONE') or (TARGET_DATA_TYPE LIKE '%(%)') then
              TARGET_DATA_TYPE
-           when DATA_TYPE_SCALE is not NULL then 
+           when DATA_TYPE_SCALE is not NULL then
              TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH || ',' || DATA_TYPE_SCALE || ')'
-           when DATA_TYPE_LENGTH  is not NULL then 
+           when DATA_TYPE_LENGTH  is not NULL then
              TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH|| ')'
            else
              TARGET_DATA_TYPE
-         end || YADAMU_UTILITIES.C_NEWLINE 
-         COLUMNS_CLAUSE
-         /* Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results */
-        ,case
-           when ((TARGET_DATA_TYPE = 'GEOMETRY') or TARGET_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"')then
+         end
+  	     || YADAMU_UTILITIES.C_NEWLINE 
+  	     "COLUMNS_CLAUSE"
+        ,-- Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results
+         case
+           when ((TARGET_DATA_TYPE = 'GEOMETRY') or (TARGET_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"')) then
              case 
                when P_SPATIAL_FORMAT in ('WKB','EWKB') then
                  'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKBGEOMETRY(OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || COLUMN_NAME || '")) end'
                when P_SPATIAL_FORMAT in ('WKT','EWKT') then
                  'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || COLUMN_NAME || '") end'
              end
-           when TYPE_EXISTS = 1 then 
+           when TYPE_EXISTS = 1 then
              '"#' || TYPE_NAME || '"("' || COLUMN_NAME || '")'
-           when TARGET_DATA_TYPE = 'BOOLEAN' then 
+           when TARGET_DATA_TYPE = 'BOOLEAN' then
              'HEXTORAW(case when "' || COLUMN_NAME || '" = ''true'' then ''1'' else ''0'' end)'
-           when TARGET_DATA_TYPE = 'BFILE' then 
-             'OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || COLUMN_NAME || '")'
-           when (TARGET_DATA_TYPE = 'XMLTYPE') then 
-              -- Cannot map directly to XMLTYPE constructor as we need to test for NULL. 
-             'case when "' || COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || COLUMN_NAME || '") end' 
-           when (TARGET_DATA_TYPE = 'ANYDATA') then 
+           when TARGET_DATA_TYPE = 'BFILE' then
+             'OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || COLUMN_NAME || '")' 
+           when (TARGET_DATA_TYPE = 'XMLTYPE') then
+             -- Cannot map directly to XMLTYPE constructor as we need to test for NULL. 
+             'case when "' || COLUMN_NAME || '" is NULL then NULL else XMLTYPE("' || COLUMN_NAME || '") end'
+           when (TARGET_DATA_TYPE = 'ANYDATA') then
              -- ### TODO - Better deserialization of ANYDATA.
-             'case when "' || COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || COLUMN_NAME || '") end'
-           $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+             'case when "' || COLUMN_NAME || '" is NULL then NULL else ANYDATA.convertVARCHAR2("' || COLUMN_NAME || '") end' 
+           $IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
            when TARGET_DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE' then
              -- Problems with ORA-1881
               'TO_TIMESTAMP_TZ("' || COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FFTZHTZM'')'
            $END
            when TARGET_DATA_TYPE = 'BLOB' then
-             $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+             $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
              'OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || COLUMN_NAME || '")'
              $ELSE
              'case when "' || COLUMN_NAME || '" is NULL then NULL when substr("' || COLUMN_NAME || '",1,15) = ''SERIALIZE_BLOB_HEX:'' then NULL else HEXTORAW("' || COLUMN_NAME || '") end'
@@ -1157,18 +1039,7 @@ $END
            else
              '"' || COLUMN_NAME || '"'
          end 
-         INSERT_SELECT_LIST
-        ,'"' ||
-         case
-           when TYPE_EXISTS = 1 then 
-             '\"' || TYPE_OWNER || '\".\"' || TYPE_NAME || '\"'
-           when TYPE_NAME is not NULL then
-             -- Type Exist is NULL.
-             'CLOB'
-           else
-             TARGET_DATA_TYPE
-         end || '"' 
-         TARGET_DATA_TYPES
+         "INSERT_SELECT_LIST"
         ,case 
            when TARGET_DATA_TYPE = 'XMLTYPE' then
              'XMLTYPE "' || COLUMN_NAME || '" STORE AS CLOB'
@@ -1176,23 +1047,35 @@ $END
              NULL
          end                
          XMLTYPE_STORAGE_CLAUSES
+		 ,'"' ||
+  	     case
+           when TYPE_EXISTS = 1 then
+             '\"' || TYPE_OWNER || '\".\"' || TYPE_NAME || '\"'
+           when TYPE_NAME is not NULL then
+             'CLOB'
+           -- Type Exist is NULL.
+           else
+             replace(TARGET_DATA_TYPE,'"','\"')
+         end 
+  	     || '"'
+         "TARGET_DATA_TYPES"
         ,'"' || COLUMN_NAME || '" ' ||
          case
-           when TYPE_EXISTS = 1 then 
-             JSON_FEATURE_DETECTION.C_RETURN_TYPE
+           when TYPE_EXISTS = 1 then
+             'CLOB'
+           when TARGET_DATA_TYPE  = 'GEOMETRY' then
+             'CLOB'
            when TARGET_DATA_TYPE  = 'BOOLEAN' then
              'VARCHAR2(5)'
-           when TARGET_DATA_TYPE  = 'GEOMETRY' then
-             JSON_FEATURE_DETECTION.C_RETURN_TYPE
-           when TARGET_DATA_TYPE = 'JSON' then 
-             JSON_FEATURE_DETECTION.C_RETURN_TYPE || ' FORMAT JSON'
-           when TARGET_DATA_TYPE  = 'FLOAT' then 
+           when TARGET_DATA_TYPE = 'JSON' then
+             YADAMU_FEATURE_DETECTION.C_RETURN_TYPE || ' FORMAT JSON'
+           when TARGET_DATA_TYPE  = 'FLOAT' then
              'NUMBER'
-           when TARGET_DATA_TYPE = 'BINARY_FLOAT' then 
+           when TARGET_DATA_TYPE = 'BINARY_FLOAT' then
              'VARCHAR2(29)'
-           when TARGET_DATA_TYPE = 'BINARY_DOUBLE' then 
+           when TARGET_DATA_TYPE = 'BINARY_DOUBLE' then
              'VARCHAR2(53)'
-           $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+           $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
            when TARGET_DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE' then
              'TIMESTAMP WITH TIME ZONE'
            $ELSE
@@ -1200,77 +1083,66 @@ $END
              -- Avoid problems with ORA-1881 and ORA-01866 when JSON_TABLE returns TIMESTAMP and TIMESTAMP_WITH_TZ. Use SQL to convert from String to Native data types
              'VARCHAR2(48)'
            $END
-           when TARGET_DATA_TYPE like 'RAW(%)' then 
+           when TARGET_DATA_TYPE like 'RAW(%)' then
              'VARCHAR2'
-           when TARGET_DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (TARGET_DATA_TYPE like 'INTERVAL%') then 
+           when TARGET_DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (TARGET_DATA_TYPE like 'INTERVAL%') then
              'VARCHAR2'
-           when TARGET_DATA_TYPE in ('XMLTYPE','ANYDATA','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (TYPE_NAME is not NULL) then 
-             JSON_FEATURE_DETECTION.C_RETURN_TYPE
-           when "TARGET_DATA_TYPE" in ('DATE','DATETIME') then 
+           when TARGET_DATA_TYPE in ('XMLTYPE','ANYDATA','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (TYPE_NAME is not NULL) then
+             YADAMU_FEATURE_DETECTION.C_RETURN_TYPE
+           when "TARGET_DATA_TYPE" in ('DATE','DATETIME') then
              "TARGET_DATA_TYPE"
            when "TARGET_DATA_TYPE" like 'TIMESTAMP%TIME ZONE' then
              "TARGET_DATA_TYPE"
-           when "TARGET_DATA_TYPE"  LIKE '%(%)' then 
+           when "TARGET_DATA_TYPE"  LIKE '%(%)' then
              "TARGET_DATA_TYPE"
-           when "DATA_TYPE_SCALE" is not NULL then 
+           when "DATA_TYPE_SCALE" is not NULL then
              "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ',' || "DATA_TYPE_SCALE" || ')'
-           when "DATA_TYPE_LENGTH"  is not NULL then 
+           when "DATA_TYPE_LENGTH"  is not NULL then
              "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ')'
            else
              "TARGET_DATA_TYPE"
-         end  || ' PATH ''$[' || (IDX - 1) || ']'' ERROR ON ERROR' || YADAMU_UTILITIES.C_NEWLINE 
-         COLUMN_PATTERNS
-        ,DESERIALIZATION_FUNCTION
-    from "EXTENDED_TABLE_DEFINITIONS"
-   order by IDX;
-
-   V_COLUMNS_CLAUSE_TABLE      T_VC4000_TABLE;
-   V_INSERT_SELECT_TABLE       T_VC4000_TABLE;
-   V_COLUMN_PATTERNS_TABLE     T_VC4000_TABLE;
-   V_TARGET_DATA_TYPES_TABLE   T_VC4000_TABLE;
-   V_DESERIALIZATION_FUNCTIONS T_VC4000_TABLE;
-   V_XML_STORAGE_TEMP          T_VC4000_TABLE;
-   V_XML_STORAGE_TABLE         T_VC4000_TABLE;
---
-   $END
---
-
-  V_COLUMNS_CLAUSE            CLOB;
-  V_INSERT_SELECT_LIST        CLOB;
-  V_COLUMN_PATTERNS           CLOB;
-  V_XML_STORAGE_CLAUSE        CLOB;
-   
-  V_DESERIALIZATIONS          T_VC4000_TABLE;
-
-  V_SQL_FRAGMENT VARCHAR2(32767);
-  V_INSERT_HINT  VARCHAR2(128) := '';
-
-  C_CREATE_TABLE_BLOCK1 CONSTANT VARCHAR2(2048) :=
-'declare
-  TABLE_EXISTS EXCEPTION;
-  PRAGMA EXCEPTION_INIT( TABLE_EXISTS , -00955 );
-  V_STATEMENT CLOB := ''create table "';
-
-   C_CREATE_TABLE_BLOCK2 CONSTANT VARCHAR2(2048) := ''';
-begin
-  execute immediate V_STATEMENT;
-exception
-  when TABLE_EXISTS then
-    null;
-  when others then  
-    RAISE;
-end;';
-
-  V_DDL_STATEMENT     CLOB := NULL;
-  V_DML_STATEMENT     CLOB;
-  V_TARGET_DATA_TYPES CLOB;
-  V_RESULTS           TABLE_INFO_RECORD;
-  
-  V_EXISTING_TABLE    PLS_INTEGER := 0; 
+         end
+         || ' PATH ''$[' || (IDX - 1) || ']'' ERROR ON ERROR' || YADAMU_UTILITIES.C_NEWLINE
+		 "COLUMN_PATTERNS"
+        ,case 
+           when TYPE_EXISTS = 1 then 
+             OBJECT_SERIALIZATION.DESERIALIZE_TYPE(TYPE_OWNER,TYPE_NAME) 
+           else 
+             NULL 
+         end
+         "DESERIALIZATION_FUNCTIONS"
+    from "TARGET_TABLE_DEFINITIONS" tt
+  )
+  --
+  -- cast(collect(PLSQL_FUNCTION_RETURNING VARCHAR2 causes ORA-22814: attribute or element value is larger than specified in type in 12.2 and early 18.x and 19.x releases (Oracle Cloud).. 
+  -- 
+  -- This apparently is caused by the SQL "cast(collect( DESERIALIZATION_FUNCTION) as T_VC4000_TABLE) in the above statement
+  -- Possible workaround is "cast(collect(cast(DESERIALIZATION_FUNCTION as VARCHAR2(4000))) as T_VC4000_TABLE) 
+  --
+  $IF YADAMU_FEATURE_DETECTION.COLLECT_PLSQL_SUPPORTED $THEN
+  -- return 1 row of aggregated data
+  ,
+  "AGGREGATE_METADATA"
+  as (
+  select SERIALIZE_TABLE(cast(collect(cast(COLUMNS_CLAUSE            as VARCHAR2(4000)) order by IDX) as T_VC4000_TABLE)) COLUMNS_CLAUSE
+        ,SERIALIZE_TABLE(cast(collect(cast(INSERT_SELECT_LIST        as VARCHAR2(4000)) order by IDX) as T_VC4000_TABLE)) INSERT_SELECT_LIST
+        ,SERIALIZE_TABLE(cast(collect(cast(TARGET_DATA_TYPES         as VARCHAR2(4000)) order by IDX) as T_VC4000_TABLE)) TARGET_DATA_TYPES
+        ,SERIALIZE_TABLE(cast(collect(cast(XMLTYPE_STORAGE_CLAUSES   as VARCHAR2(4000)) order by IDX) as T_VC4000_TABLE),YADAMU_UTILITIES.C_NEWLINE) XMLTYPE_STORAGE_CLAUSES
+        ,SERIALIZE_TABLE(cast(collect(cast(COLUMN_PATTERNS           as VARCHAR2(4000)) order by IDX) as T_VC4000_TABLE)) COLUMN_PATTERNS
+        ,cast(collect(cast(DESERIALIZATION_FUNCTIONS as VARCHAR2(4000))) as T_VC4000_TABLE) DESERIALIZATION_FUNCTIONS
+  from "TABLE_METADATA"
+  )
+  select COLUMNS_CLAUSE, INSERT_SELECT_LIST, TARGET_DATA_TYPES, XMLTYPE_STORAGE_CLAUSES, COLUMN_PATTERNS, DESERIALIZATION_FUNCTIONS
+    from "AGGREGATE_METADATA";
+  $ELSE
+  -- return 1 row of for each table
+  select COLUMNS_CLAUSE, INSERT_SELECT_LIST, TARGET_DATA_TYPES, XMLTYPE_STORAGE_CLAUSES, COLUMN_PATTERNS, DESERIALIZATION_FUNCTIONS
+    from "TABLE_METADATA";
+  $END
 
 -- In 12.1 and later P_COLUMN_LIST is a parameter. In 11.2 it is replaced by P_COLUMNS an XMLTYPE collection that needs to converted into a quoted, comma seperated list using QUERY
 
-$IF NOT JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN 
+$IF NOT YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN 
 --
   P_COLUMN_LIST CLOB;
   P_DATA_TYPE_ARRAY CLOB;
@@ -1298,7 +1170,7 @@ $END
 --
   DBMS_LOB.CREATETEMPORARY(V_DML_STATEMENT,TRUE,DBMS_LOB.SESSION);  
 --
-  $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+  $IF YADAMU_FEATURE_DETECTION.COLLECT_PLSQL_SUPPORTED $THEN
 --
    -- Cursor only generates one row (Aggregration Operation),
   for o in generateStatementComponents loop
@@ -1363,7 +1235,7 @@ $END
     V_SQL_FRAGMENT := ')';
     DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
     -- 
-    $IF (NOT DBMS_DB_VERSION.VER_LE_11_2) $THEN
+    $IF ((NOT DBMS_DB_VERSION.VER_LE_11_2) AND (YADAMU_FEATURE_DETECTION.XMLSCHEMA_SUPPORTED)) $THEN
     --
     if (P_XMLTYPE_STORAGE_MODEL = 'CLOB') then      
       DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(YADAMU_UTILITIES.C_NEWLINE),YADAMU_UTILITIES.C_NEWLINE);
@@ -1409,6 +1281,9 @@ exception
     LOG_INFO('[' || P_COLUMN_LIST || ']');
     LOG_INFO('[' || REPLACE(P_DATA_TYPE_ARRAY,'"."','"."') || ']');
     LOG_INFO('[' || P_SIZE_CONSTRAINTS || ']');
+	LOG_INFO('{ "CallStack" : "' || DBMS_UTILITY.FORMAT_CALL_STACK() || '" }');
+	LOG_INFO('{ "BackTrace" : "' || DBMS_UTILITY.FORMAT_ERROR_BACKTRACE() || '" }');
+	LOG_INFO('{ "ErrorStack" : "' || DBMS_UTILITY.FORMAT_ERROR_STACK() || '" }');
     LOG_ERROR(C_FATAL_ERROR,'YADAMU_IMPORT.GENERATE_STATEMENTS()',NULL,SQLCODE,SQLERRM,DBMS_UTILITY.FORMAT_ERROR_STACK());
     raise;
 end;
@@ -1576,7 +1451,7 @@ begin
    P_DML_STATEMENT := V_SQL_STATEMENT;
 end;
 --
-$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
 procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
 as
@@ -1613,11 +1488,11 @@ as
                COLUMNS (
                  OWNER                        VARCHAR2(128)             PATH '$.owner'
                , TABLE_NAME                   VARCHAR2(128)             PATH '$.tableName'
-               $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+               $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                ,  COLUMN_LIST                          CLOB             PATH '$.columns'
                ,  DATA_TYPE_ARRAY                      CLOB FORMAT JSON PATH '$.dataTypes' 
                ,  SIZE_CONSTRAINTS                     CLOB FORMAT JSON PATH '$.sizeConstraints'
-               $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+               $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
                ,  COLUMN_LIST               VARCHAR2(32767)             PATH '$.columns'
                ,  DATA_TYPE_ARRAY           VARCHAR2(32767) FORMAT JSON PATH '$.dataTypes'
                ,  SIZE_CONSTRAINTS          VARCHAR2(32767) FORMAT JSON PATH '$.sizeConstraints'
@@ -1737,7 +1612,7 @@ as
     into V_RESULTS
   */
   select ROWNUM, TABLE_NAME, VENDOR, OWNER, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS
-$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
     from JSON_TABLE(
            P_METADATA,
@@ -1748,11 +1623,11 @@ $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
                  VENDOR                       VARCHAR2(128)             PATH '$.vendor'
                , OWNER                        VARCHAR2(128)             PATH '$.owner'
                , TABLE_NAME                   VARCHAR2(128)             PATH '$.tableName'
-               $IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+               $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                ,  COLUMN_LIST                          CLOB             PATH '$.columns'
                ,  DATA_TYPE_ARRAY                      CLOB FORMAT JSON PATH '$.dataTypes' 
                ,  SIZE_CONSTRAINTS                     CLOB FORMAT JSON PATH '$.sizeConstraints'
-               $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+               $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
                ,  COLUMN_LIST               VARCHAR2(32767)             PATH '$.columns'
                ,  DATA_TYPE_ARRAY           VARCHAR2(32767) FORMAT JSON PATH '$.dataTypes'
                ,  SIZE_CONSTRAINTS          VARCHAR2(32767) FORMAT JSON PATH '$.sizeConstraints'
@@ -1795,16 +1670,16 @@ begin
     V_TABLE_INFO := GENERATE_SQL(x.VENDOR,P_TARGET_SCHEMA, x.OWNER, x.TABLE_NAME, P_SPATIAL_FORMAT, x.COLUMN_LIST, x.DATA_TYPE_ARRAY, x.SIZE_CONSTRAINTS);
     V_FRAGMENT := '"' || x.TABLE_NAME || '" : ';
     DBMS_LOB.WRITEAPPEND(V_RESULTS,LENGTH(V_FRAGMENT),V_FRAGMENT);
-    $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+    $IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
     begin 
       select JSON_OBJECT('ddl' value V_TABLE_INFO.DDL,
                          'dml' value V_TABLE_INFO.DML,
                          'targetDataTypes' 
-                         $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+                         $IF YADAMU_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
                          value TREAT(V_TABLE_INFO.TARGET_DATA_TYPES AS JSON) returning CLOB
-                         $ELSIF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                         $ELSIF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                          value JSON_QUERY(V_TABLE_INFO.TARGET_DATA_TYPES,'$' returning  CLOB ERROR ON ERROR) returning  CLOB 
-                         $ELSIF JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+                         $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
                          value JSON_QUERY(V_TABLE_INFO.TARGET_DATA_TYPES,'$' returning  VARCHAR2(32767) ERROR ON ERROR) returning  VARCHAR2(32767) 
                          $ELSE
                          value JSON_QUERY(V_TABLE_INFO.TARGET_DATA_TYPES,'$' returning  VARCHAR2(4000) ERROR ON ERROR) returning VARCHAR2(4000)
@@ -1813,7 +1688,7 @@ begin
              )
         into V_TABLE_INFO_JSON
         from DUAL;    
-    $IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+    $IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
     --   
     exception
       when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.JSON_OVERFLOW3 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
@@ -1843,7 +1718,7 @@ begin
    return V_RESULTS;  
 end;
 --
-$IF JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 function GENERATE_IMPORT_LOG
 return CLOB
@@ -1897,7 +1772,7 @@ end;
 --
 $END
 --
-$IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'))
 return CLOB
 as

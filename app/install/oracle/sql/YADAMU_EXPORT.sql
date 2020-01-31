@@ -60,24 +60,24 @@ end;
 function JSON_FEATURES return VARCHAR2 deterministic
 as
 begin
-  $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+  $IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
   return JSON_OBJECT(
-           'parsing'        value JSON_FEATURE_DETECTION.PARSING_SUPPORTED
-          ,'generation'     value JSON_FEATURE_DETECTION.GENERATION_SUPPORTED
-          ,'treatAsJSON'    value JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED
-	  	  ,'CLOB'           value JSON_FEATURE_DETECTION.CLOB_SUPPORTED
-		  ,'extendedString' value JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED
-          ,'maxStringSize'  value JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE
+           'parsing'        value YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED
+          ,'generation'     value YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED
+          ,'treatAsJSON'    value YADAMU_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED
+	  	  ,'CLOB'           value YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED
+		  ,'extendedString' value YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED
+          ,'maxStringSize'  value YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE
 		 );
   $ELSE
   return YADAMU_UTILITIES.JSON_OBJECT_CLOB(
            YADAMU_UTILITIES.KVP_TABLE(
-             YADAMU_UTILITIES.KVB('parsing',        JSON_FEATURE_DETECTION.PARSING_SUPPORTED),
-             YADAMU_UTILITIES.KVB('generation',     JSON_FEATURE_DETECTION.GENERATION_SUPPORTED),
-             YADAMU_UTILITIES.KVB('treatAsJSON',    JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED),
-             YADAMU_UTILITIES.KVB('CLOB',           JSON_FEATURE_DETECTION.CLOB_SUPPORTED),
-             YADAMU_UTILITIES.KVB('extendedString', JSON_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED),
-             YADAMU_UTILITIES.KVN('maxStringSize',  JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE)
+             YADAMU_UTILITIES.KVB('parsing',        YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED),
+             YADAMU_UTILITIES.KVB('generation',     YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED),
+             YADAMU_UTILITIES.KVB('treatAsJSON',    YADAMU_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED),
+             YADAMU_UTILITIES.KVB('CLOB',           YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED),
+             YADAMU_UTILITIES.KVB('extendedString', YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED),
+             YADAMU_UTILITIES.KVN('maxStringSize',  YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE)
            )
          );
   $END
@@ -88,10 +88,10 @@ return CLOB
 as
    V_RESULTS CLOB;
 begin
-$IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
+$IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
 --
   select JSON_OBJECT(
-           $IF JSON_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
+           $IF YADAMU_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
            'jsonFeatures'     value TREAT(JSON_FEATURES() as JSON),
            $ELSE
            'jsonFeatures'     value JSON_QUERY(JSON_FEATURES(),'$' returning VARCHAR2(4000)),
@@ -107,7 +107,7 @@ $IF JSON_FEATURE_DETECTION.GENERATION_SUPPORTED $THEN
     from NLS_DATABASE_PARAMETERS;
     return V_RESULTS;
 --
-$IF NOT JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+$IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 exception
   when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.JSON_OVERFLOW3 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     return YADAMU_UTILITIES.JSON_OBJECT_CLOB(
@@ -173,7 +173,7 @@ as
         ,cast(collect('"' || atc.COLUMN_NAME || '"' ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST
 		,cast(collect(
                case 
-                 $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN               
+                 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN               
                  when (jc.FORMAT is not NULL) then
                    -- Does not attempt to preserve json storage details
                    -- If storage model fidelity is required then set specify MODE=DDL_AND_DATA on the export command line to include DDL statements to the file.
@@ -225,7 +225,7 @@ as
                  -- For some reason RAW columns have atc.DATA_TYPE_OWNER set to the current schema.
                  when atc.DATA_TYPE = 'RAW' then
                    '"' || atc.COLUMN_NAME || '"'
-                 $IF not JSON_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+                 $IF not YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
                  /*
                  ** Pre 18.1 Some Scalar Data Types are not natively supported by JSON_ARRAY()
                  */
@@ -247,9 +247,9 @@ as
                    'TO_CHAR("' || atc.COLUMN_NAME || '")'
                  when atc.DATA_TYPE = 'NCLOB' then
                    'TO_CLOB("' || atc.COLUMN_NAME || '")'
-                 $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN               
+                 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN               
                  when jc.FORMAT is not NULL then
-                   'JSON_QUERY("' ||  atc.COLUMN_NAME || '",''$'' returning ' || JSON_FEATURE_DETECTION.C_RETURN_TYPE || ')'
+                   'JSON_QUERY("' ||  atc.COLUMN_NAME || '",''$'' returning ' || YADAMU_FEATURE_DETECTION.C_RETURN_TYPE || ')'
                  $END
                  /*
                  ** 18.1 compatible handling of BLOB
@@ -384,7 +384,7 @@ as
     left outer join ALL_MVIEWS amv
 		         on amv.OWNER = aat.OWNER
 		        and amv.MVIEW_NAME = aat.TABLE_NAME
-    $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN               
+    $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN               
     left outer join ALL_JSON_COLUMNS jc
                  on jc.COLUMN_NAME = atc.COLUMN_NAME
                 AND jc.TABLE_NAME = atc.TABLE_NAME
@@ -429,7 +429,7 @@ $END
 
 begin
 --
-  $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
+  $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --  
   select SCHEMA
     bulk collect into V_SCHEMA_LIST
@@ -455,7 +455,7 @@ begin
       V_SQL_FRAGMENT := 'select JSON_ARRAY(';	  
       DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
       DBMS_LOB.APPEND(V_SQL_STATEMENT,TABLE_TO_LIST(t.EXPORT_SELECT_LIST));
-      V_SQL_FRAGMENT := ' NULL on NULL returning '|| JSON_FEATURE_DETECTION.C_RETURN_TYPE || ') "JSON" from "' || t.OWNER || '"."' || t.TABLE_NAME || '" t';
+      V_SQL_FRAGMENT := ' NULL on NULL returning '|| YADAMU_FEATURE_DETECTION.C_RETURN_TYPE || ') "JSON" from "' || t.OWNER || '"."' || t.TABLE_NAME || '" t';
       DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
 -- 
  	  V_ROW.OWNER                := t.OWNER;

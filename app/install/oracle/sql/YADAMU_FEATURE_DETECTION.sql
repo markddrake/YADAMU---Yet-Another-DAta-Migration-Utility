@@ -22,31 +22,41 @@ declare
   TREAT_AS_JSON_UNSUPPORTED EXCEPTION;
   PRAGMA EXCEPTION_INIT( TREAT_AS_JSON_UNSUPPORTED , -902);
 
+  WELL_THAT_PLSQL_DOES_NOT_WORK EXCEPTION;
+  PRAGMA EXCEPTION_INIT( WELL_THAT_PLSQL_DOES_NOT_WORK , -6550);
+
+  COLLECT_PLSQL_DOES_NOT_WORK EXCEPTION;
+  PRAGMA EXCEPTION_INIT( COLLECT_PLSQL_DOES_NOT_WORK , -22814);
+
+  WHAT_IS_CLOUD EXCEPTION;
+  PRAGMA EXCEPTION_INIT( WHAT_IS_CLOUD , -2003);
+
   V_PACKAGE_DEFINITION VARCHAR2(32767);
   
   V_DUMMY NUMBER;
+  V_DEPLOYMENT_MODEL VARCHAR2(32);
   V_CLOB_SUPPORTED BOOLEAN := TRUE;
 begin
-  V_PACKAGE_DEFINITION := 'CREATE OR REPLACE PACKAGE JSON_FEATURE_DETECTION AS' || C_NEWLINE;
+  V_PACKAGE_DEFINITION := 'CREATE OR REPLACE PACKAGE YADAMU_FEATURE_DETECTION AS' || C_NEWLINE;
 
-  $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  $IF DBMS_DB_VERSION.VER_LE_11_2 $then
 --
   V_CLOB_SUPPORTED := FALSE;
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-                         || '  PARSING_SUPPORTED         CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
-	                     || '  GENERATION_SUPPORTED      CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
+                         || '  JSON_PARSING_SUPPORTED         CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
+	                     || '  JSON_GENERATION_SUPPORTED      CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
 	                     || '  CLOB_SUPPORTED            CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
                          || '  EXTENDED_STRING_SUPPORTED CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
                          || '  TREAT_AS_JSON_SUPPORTED   CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
                          || '  C_RETURN_TYPE             CONSTANT VARCHAR2(32) := ''VARCHAR2(4000)'';' || C_NEWLINE
                          || '  C_MAX_STRING_SIZE         CONSTANT NUMBER       := DBMS_LOB.LOBMAXSIZE;';
 --                       
-  $ELSIF DBMS_DB_VERSION.VER_LE_12_1 $THEN
+  $ELSIF DBMS_DB_VERSION.VER_LE_12_1 $then
 --
   V_CLOB_SUPPORTED := FALSE;
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-                         || '  PARSING_SUPPORTED         CONSTANT BOOLEAN      := TRUE;'  || C_NEWLINE
-                         || '  GENERATION_SUPPORTED      CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
+                         || '  JSON_PARSING_SUPPORTED         CONSTANT BOOLEAN      := TRUE;'  || C_NEWLINE
+                         || '  JSON_GENERATION_SUPPORTED      CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
 	                     || '  CLOB_SUPPORTED            CONSTANT BOOLEAN      := FALSE;'
 
   begin
@@ -57,13 +67,13 @@ begin
                          || '  C_MAX_STRING_SIZE         CONSTANT NUMBER       := 32767;';
     end if;
   exception
-    WHEN EXTENDED_STRING_UNSUPPORTED THEN
+    when EXTENDED_STRING_UNSUPPORTED then
 	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                       || '  EXTENDED_STRING_SUPPORTED CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE;
                            || '  C_RETURN_TYPE             CONSTANT VARCHAR2(32) := ''VARCHAR2(4000)'';' || C_NEWLINE
                            || '  C_MAX_STRING_SIZE         CONSTANT NUMBER       := 4000;';
       end if;
-    WHEN OTHERS THEN
+    when OTHERS then
 	  RAISE;
   end;
                          || '  EXTENDED_STRING_SUPPORTED CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
@@ -75,8 +85,8 @@ begin
   begin
 --
     V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-                         || '  PARSING_SUPPORTED         CONSTANT BOOLEAN      := TRUE;'  || C_NEWLINE
-                         || '  GENERATION_SUPPORTED      CONSTANT BOOLEAN      := TRUE;'  || C_NEWLINE;
+                         || '  JSON_PARSING_SUPPORTED         CONSTANT BOOLEAN      := TRUE;'  || C_NEWLINE
+                         || '  JSON_GENERATION_SUPPORTED      CONSTANT BOOLEAN      := TRUE;'  || C_NEWLINE;
 	                     
     execute immediate 'select JSON_ARRAY(DUMMY returning CLOB) from DUAL';
     V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
@@ -84,11 +94,11 @@ begin
                          || '  C_RETURN_TYPE             CONSTANT VARCHAR2(32) := ''CLOB'';' || C_NEWLINE
                          || '  C_MAX_STRING_SIZE         CONSTANT NUMBER       := DBMS_LOB.LOBMAXSIZE;';
   exception
-    WHEN CLOB_UNSUPPORTED THEN
+    when CLOB_UNSUPPORTED then
       V_CLOB_SUPPORTED := FALSE;
 	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                       || '  CLOB_SUPPORTED          CONSTANT BOOLEAN      := FALSE;';
-    WHEN OTHERS THEN
+    when OTHERS then
 	  RAISE;
   end;
 
@@ -102,7 +112,7 @@ begin
                            || '  C_MAX_STRING_SIZE         CONSTANT NUMBER       := 32767;';
     end if;
   exception
-    WHEN EXTENDED_STRING_UNSUPPORTED THEN
+    when EXTENDED_STRING_UNSUPPORTED then
 	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                       || '  EXTENDED_STRING_SUPPORTED CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE;
       if (NOT V_CLOB_SUPPORTED) then
@@ -110,7 +120,7 @@ begin
 	                         || '  C_RETURN_TYPE             CONSTANT VARCHAR2(32) := ''VARCHAR2(4000)'';' || C_NEWLINE
                              || '  C_MAX_STRING_SIZE         CONSTANT NUMBER       := 4000;';
       end if;
-    WHEN OTHERS THEN
+    when OTHERS then
 	  RAISE;
   end;
   
@@ -120,19 +130,66 @@ begin
     V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                     || '  TREAT_AS_JSON_SUPPORTED CONSTANT BOOLEAN := TRUE;';
   exception
-    WHEN TREAT_AS_JSON_UNSUPPORTED THEN
+    when TREAT_AS_JSON_UNSUPPORTED then
 	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                       || '  TREAT_AS_JSON_SUPPORTED CONSTANT BOOLEAN := FALSE;';
-    WHEN OTHERS THEN
+    when OTHERS then
 	  RAISE;
   end;
 --
 $END
 --  
+  begin
+    execute immediate 'begin :1 := dbms_xmlschema.DELETE_CASCADE_FORCE; end;' using out V_DUMMY;
+    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                     || '  XMLSCHEMA_SUPPORTED CONSTANT BOOLEAN := TRUE;' || C_NEWLINE; 
+  exception
+    when WELL_THAT_PLSQL_DOES_NOT_WORK then
+	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                       || '  XMLSCHEMA_SUPPORTED CONSTANT BOOLEAN := FALSE;' || C_NEWLINE;
+    when OTHERS then
+      RAISE;
+  end; 
+  
+  -- cast(collect(PLSQL_FUNCTION_RETURNING VARCHAR2 causes ORA-22814: attribute or element value is larger than specified in type in 12.2 and early 18.x releases.
+  
+  begin
+
+    execute immediate 'select cast(collect(UTL_RAW.CAST_TO_VARCHAR2(''01'')) as T_VC4000_TABLE) from dual';
+    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                     || '   COLLECT_PLSQL_SUPPORTED CONSTANT BOOLEAN := TRUE;' || C_NEWLINE; 
+  exception
+    when COLLECT_PLSQL_DOES_NOT_WORK then
+	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                       || '  COLLECT_PLSQL_SUPPORTED CONSTANT BOOLEAN := FALSE;' || C_NEWLINE;
+    when OTHERS then
+      RAISE;
+  end; 
+  
+  begin
+
+    select case 
+             when SYS_CONTEXT('USERENV','CLOUD_SERVICE') is NULL then 
+	  	      'ON_PREMISIS' 
+		  	 else 
+			   SYS_CONTEXT('USERENV','CLOUD_SERVICE') 
+	       end
+      into V_DEPLOYMENT_MODEL
+      from DUAL;
+  exception 
+    when WHAT_IS_CLOUD then
+	  V_DEPLOYMENT_MODEL := 'ON_PREMISIS';
+	when OTHERS then
+	  RAISE;
+  end;
 
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                   || '  CLOUD_DEPLOYMENT_MODEL CONSTANT VARCHAR2(32) := ''' || V_DEPLOYMENT_MODEL || ''';' || C_NEWLINE;
+	
+  
+  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
                        || 'END;';
-                                         
+				      
   execute immediate V_PACKAGE_DEFINITION;
 end;
 /

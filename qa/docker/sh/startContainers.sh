@@ -1,0 +1,11 @@
+docker start ORA1903-01
+docker start ORA1803-01
+docker start ORA1220-01
+docker start ORA1210-01
+docker start ORA1120-01
+docker start MYSQL80-01
+docker start MSSQL17-01
+docker start MSSQL19-01
+docker start PGSQL12-01
+docker start MARIA10-01
+docker ps -a

@@ -36,6 +36,8 @@ class ConnectionError extends UserError {
 class DatabaseError extends Error {
   constructor(cause,stack,sql,) {
     super(cause.message);
+	this.oneLineMessage = this.message.indexOf('\r') > 0 ? this.message.substr(0,this.message.indexOf('\r')) : this.message
+	this.oneLineMessage = this.message.indexOf('\n') > 0 ? this.message.substr(0,this.message.indexOf('\n')) : this.message
     this.stack = `${stack.slice(0,5)}: ${cause.message}${stack.slice(5)}`
 	this.sql = sql
 	this.cause = cause
@@ -81,14 +83,18 @@ class MariadbError extends DatabaseError {
   //  const err = new MariadbError(cause,stack,sql)
   constructor(cause,stack,sql) {
     super(cause,stack,sql);
-	if (this.message.indexOf('\rsql: ') > 0) {
-	  this.message = this.message.substr(0,this.message.indexOf('\rsql: '))
-	}
   }
 }
 
 class SnowFlakeError extends DatabaseError {
   //  const err = new SnowFlakeError(cause,stack,sql)
+  constructor(cause,stack,sql) {
+    super(cause,stack,sql);
+  }
+}
+
+class MongodbError extends DatabaseError {
+  //  const err = new MongodbError(cause,stack,sql)
   constructor(cause,stack,sql) {
     super(cause,stack,sql);
   }
@@ -106,5 +112,6 @@ module.exports = {
 , MySQLError
 , MariadbError
 , PostgresError
-,SnowFlakeError
+, MongodbError
+, SnowFlakeError
 }

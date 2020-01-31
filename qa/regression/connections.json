@@ -60,7 +60,7 @@
         "user"                          : "root"
       , "host"                          : "yadamu-db1"
       , "database"                      : "sys"
-      , "password"                      : "Oracle#1"
+      , "password"                      : "oracle"
       , "port"                          : 3306
       , "multipleStatements"            : true
       , "typeCast"                      : true
@@ -75,7 +75,7 @@
         "user"                          : "root"
       , "host"                          : "yadamu-db1"
       , "database"                      : "mysql"
-      , "password"                      : "Oracle#1"
+      , "password"                      : "oracle"
       , "port"                          : 3307
       , "multipleStatements"            : true
       , "typeCast"                      : true

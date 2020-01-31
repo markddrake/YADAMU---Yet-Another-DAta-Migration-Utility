@@ -662,7 +662,6 @@ class YadamuDBI {
      if (abort) {
        this.yadamuLogger.error([`${operation}`,`"${tableName}"`],`Maximum Error Count exceeded. Skipping Table.`);
      }
-	 console.log(this.skipCount,abort);
      return abort;     
   }
   

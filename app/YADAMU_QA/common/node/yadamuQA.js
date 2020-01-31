@@ -293,7 +293,7 @@ class YadamuQA {
     }
   }   
   
-  setUser(parameters,key,db,schemaInfo,schemaPrefix) {
+  setUser(parameters,key,db,schemaInfo,operation) {
 	  
 	switch (db) {
       case 'mssql':
@@ -312,7 +312,7 @@ class YadamuQA {
 		break;
       default:
 	    parameters[key] = schemaInfo.schema !== undefined ? schemaInfo.schema : (schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner)
-		parameters[key] = this.getPrefixedSchema(schemaPrefix,parameters[key])
+		parameters[key] = operation ? this.getPrefixedSchema(operation.schemaPrefix,parameters[key]) : parameters[key]
     }
 	
 	return parameters
@@ -757,6 +757,7 @@ class YadamuQA {
 
     const sourceParameters  = Object.assign({},parameters)
     const compareParameters = Object.assign({},parameters)
+	
     this.setUser(sourceParameters,'FROM_USER',sourceDatabase, sourceSchema)
     this.setUser(compareParameters,'TO_USER', sourceDatabase, targetSchema)
 	
@@ -789,7 +790,7 @@ class YadamuQA {
       this.setUser(targetParameters,'TO_USER', targetDatabase, targetSchema)
       sourceParameters.MODE = "DATA_ONLY"
   	  targetParameters.MODE = "DATA_ONLY"
-      const targetDescription = this.getDescription(targetDatabase,targetSchema)
+      const targetDescription = this.getDescription(targetDatabase,targetSchema, operation)
   	  
 	  // Copy Source Schema to Target 
 	  
@@ -874,8 +875,8 @@ class YadamuQA {
 	const file2 = path.join(targetDirectory,filename2)
 
     const sourceSchema = operation.target;
-	const targetSchema1  = this.getTargetSchema(targetDatabase,operation.target);
-	const targetSchema2  = this.getTargetSchema(targetDatabase,operation.target);
+	const targetSchema1  = this.getTargetSchema(targetDatabase,operation.target,operation);
+	const targetSchema2  = this.getTargetSchema(targetDatabase,operation.target,operation);
 
 	switch (targetDatabase) {
 	  case "mssql" :
@@ -1041,7 +1042,6 @@ class YadamuQA {
 	const targetConnection = targetConnectionInfo[targetDatabase]
 
     const targetSchema  = this.getTargetSchema(targetDatabase,operation.target,operation); 
-	
     const sourceDescription = this.getDescription(sourceDatabase,operation.source,operation)  
     const targetDescription = this.getDescription(targetDatabase,targetSchema, operation)
 
@@ -1053,7 +1053,6 @@ class YadamuQA {
 
     const targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase, operation.target, operation)
-
 	const targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,(operation.recreateTarget || test.recreateSchemas))
 	const startTime = performance.now();
 	
@@ -1099,7 +1098,7 @@ class YadamuQA {
     const targetDescription = this.getDescription(targetDatabase,operation.target)
 
     const sourceParameters  = Object.assign({},parameters)
-    this.setUser(sourceParameters,'FROM_USER',sourceDatabase, operation.source)
+    this.setUser(sourceParameters,'FROM_USER',sourceDatabase, operation.source,operation)
     const sourceDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
 
 	const targetParameters  = Object.assign({},parameters)
@@ -1121,7 +1120,7 @@ class YadamuQA {
 	  fileReader.setParameters(sourceParameters);
 	  
   	  const targetParameters  = Object.assign({},parameters)
-      this.setUser(targetParameters,'TO_USER', sourceDatabase, operation.verify)
+      this.setUser(targetParameters,'TO_USER', sourceDatabase, operation.verify,operation)
 	  const targetDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,true)
 
       const startTime = performance.now();

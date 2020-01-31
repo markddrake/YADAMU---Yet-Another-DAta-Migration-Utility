@@ -654,7 +654,7 @@ class MsSQLDBI extends YadamuDBI {
   async getSchemaInfo(schemaKey) {
 
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceComment(`@SCHEMA="${this.parameters[schemaKey]}"`)
+      this.status.sqlTrace.write(this.traceComment(`@SCHEMA="${this.parameters[schemaKey]}"`))
     }
       
     const statement = this.sqlTableInfo()

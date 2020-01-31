@@ -10,7 +10,7 @@ set timing on
 set feedback on
 set echo on
 --
-ALTER SESSION SET PLSQL_CCFLAGS = 'DEBUG:TRUE'
+ALTER SESSION SET NLS_LENGTH_SEMANTICS = 'CHAR' PLSQL_CCFLAGS = 'DEBUG:FALSE'
 /
 set serveroutput on
 --
@@ -196,7 +196,7 @@ begin
 
   begin
     --
-    $IF JSON_FEATURE_DETECTION.PARSING_SUPPORTED $THEN
+    $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
     --
     execute immediate 'begin :1 := DBMS_CRYPTO.HASH_SH256; end;'  using OUT V_HASH_METHOD;
     --

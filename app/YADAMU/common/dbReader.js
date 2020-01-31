@@ -9,7 +9,6 @@ class DBReader extends Readable {
   constructor(dbi,mode,status,yadamuLogger,options) {
 
     super({objectMode: true });  
-    const self = this;
  
     this.dbi = dbi;
     this.mode = mode;
@@ -22,7 +21,6 @@ class DBReader extends Readable {
     this.nextPhase = 'systemInformation'
     this.ddlCompleted = false;
     this.outputStream = undefined;
-
   }
   
   pipe(target,options) {
@@ -91,7 +89,7 @@ class DBReader extends Readable {
 		  if (err.yadamuHandled === true) {
 	        self.yadamuLogger.info([`${self.constructor.name}.copyOperation()`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${parser.getCounter()}. Read Pipe Closed`)
 	      } 
-		  reject(self.dbi.processStreamingError(err,stack))
+		  reject(self.dbi.processStreamingError(err,stack,tableMetadata))
 		}
       );
 	  
@@ -141,6 +139,7 @@ class DBReader extends Readable {
   async _read() {
     // Error().stack(new Date().toISOString(),`${this.constructor.name}.read`,this.nextPhase); 
     try {
+       const self = this;
        switch (this.nextPhase) {
          case 'systemInformation' :
            const systemInformation = await this.getSystemInformation(Yadamu.EXPORT_VERSION);
@@ -176,7 +175,12 @@ class DBReader extends Readable {
          case 'data' :
 		   const task = this.schemaInfo.shift();
 		   // Only push once when finished
-		   this.outputStream.write({table: task.TABLE_NAME})
+		   await new Promise(async function(resolve,reject) {
+		     self.outputStream.write({table: task.TABLE_NAME},undefined,
+			   function(err) {
+                resolve()
+		       })
+		   })
            const rows = await this.copyContent(task,this.outputStream)
            this.push({eod: task.TABLE_NAME})
 	       this.nextPhase = this.schemaInfo.length === 0 ? 'finished' : 'data';

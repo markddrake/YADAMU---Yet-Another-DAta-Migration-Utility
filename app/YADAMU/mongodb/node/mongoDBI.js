@@ -14,6 +14,7 @@ const MongoClient = require('mongodb').MongoClient
 
 const Yadamu = require('../../common/yadamu.js');
 const YadamuDBI =  require('../../common/yadamuDBI.js');
+const {ConnectionError, MongodbError} = require('../../common/yadamuError.js')
 const TableWriter = require('./tableWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const DBParser = require('./dbParser.js');
@@ -48,6 +49,10 @@ const DBParser = require('./dbParser.js');
 */
 
 class MongoDBI extends YadamuDBI {
+	
+  traceMongo(apiCall) {
+	return `MongoClient.${apiCall}\n`
+  }
     
   getMongoURL() {
     
@@ -61,6 +66,7 @@ class MongoDBI extends YadamuDBI {
   
   async createConnectionPool() {
       
+	
     this.logConnectionProperties();
 	const poolSize = this.parameters.PARALLEL ? parseInt(this.parameters.PARALLEL) + 1 : 5
     this.connectionProperties.options = typeof this.connectionProperties.options === 'object' ? this.connectionProperties.options : {}
@@ -68,12 +74,19 @@ class MongoDBI extends YadamuDBI {
 	  this.connectionProperties.options.poolSize = poolSize
 	}
 	if (this.status.sqlTrace) {
-       this.status.sqlTrace.write(`mongoURL ${this.getMongoURL()}\n`)      
-     }
-	let sqlStartTime = performance.now();
-    this.client = new MongoClient(this.getMongoURL(),this.connectionProperties.options);
-    await this.client.connect();    
-    this.traceTiming(sqlStartTime,performance.now())
+       this.status.sqlTrace.write(this.traceComment(`connect ${this.getMongoURL()})`))      
+    }
+	
+	let stack
+	try {
+	  let sqlStartTime = performance.now();
+	  stack = new Error().stack
+      this.client = new MongoClient(this.getMongoURL(),this.connectionProperties.options);
+      await this.client.connect();   
+      this.traceTiming(sqlStartTime,performance.now())
+	} catch (e) {
+      throw new MongodbError(e,stack,'MongoClient()');
+	}
   }
   
   releaseConnection() {
@@ -97,9 +110,14 @@ class MongoDBI extends YadamuDBI {
     
     const self = this;  
     return new Promise(function(resolve, reject) {
+	  const operation = `db.collection(${tableName}`
+      if (self.status.sqlTrace) {
+        self.status.sqlTrace.write(self.traceMongo(operation))      
+      }      
+      const stack = new Error().stack
       self.db.collection(tableName,{strict: true},function(err,collection) {
         if (err != null) {
-          reject(err)
+          reject(new MondogdbError(err,stack,operation))
         }
         resolve(collection);
       })
@@ -107,15 +125,23 @@ class MongoDBI extends YadamuDBI {
   }
                                                                     ;
   async executeDDLImpl(collectionList) {
-           
+     
     const results = await Promise.all(collectionList.map(function(collectionName) {
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`db.createCollection(${collectionName})\n`)      
-      }      
-      let sqlStartTime = performance.now();
-      const result = this.db.createCollection(collectionName);
-      this.traceTiming(sqlStartTime,performance.now())
-      return result
+       let stack	
+       let operation
+       try {		
+	     operation = `db.createCollection(${collectionName})`
+         if (this.status.sqlTrace) {
+           this.status.sqlTrace.write(this.traceMongo(opertaion))      
+         }      
+         let sqlStartTime = performance.now();
+		 stack = new Error().stack
+         const result = this.db.createCollection(collectionName);
+         this.traceTiming(sqlStartTime,performance.now())
+         return result
+	   } catch (e) {
+		 throw new MongodbError(e,stack,operation);
+	   }
     },this));
 
   }    
@@ -144,14 +170,28 @@ class MongoDBI extends YadamuDBI {
   }    
   
   async useDatabase(database) {
-     if (this.status.sqlTrace) {
-       this.status.sqlTrace.write(`use ${database}\n`)      
-       this.status.sqlTrace.write(`db.stats()\n`)      
-     }
-     let sqlStartTime = performance.now();
-     this.db = await this.client.db(database,{returnNonCachedInstance:true});	 
-     this.stats = await this.db.stats();	 
-     this.traceTiming(sqlStartTime,performance.now())
+
+	 let stack
+	 let operation
+	 try {	
+	 operation = `client.db(${database})`
+       if (this.status.sqlTrace) {
+         this.status.sqlTrace.write(this.traceMongo(operation))   
+	   }
+       let sqlStartTime = performance.now();
+	   stack = new Error().stack;
+       this.db = await this.client.db(database,{returnNonCachedInstance:true});	 
+	   operation = `db.stats()`
+       if (this.status.sqlTrace) {
+         this.status.sqlTrace.write(this.traceMongo(operation))   
+	   }
+       sqlStartTime = performance.now();
+	   stack = new Error().stack;
+       this.stats = await this.db.stats();	 
+       this.traceTiming(sqlStartTime,performance.now())
+	 } catch (e) {
+	   throw new MongodbError(e,stack,operation)
+	 }
   }
 
   getConnectionProperties() {
@@ -280,29 +320,45 @@ class MongoDBI extends YadamuDBI {
   */
   
   async getSystemInformation(EXPORT_VERSION) {     
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`db.admin().buildInfo()\n`)      
-    }
-	let sqlStartTime = performance.now();
-    const buildInfo = await this.db.admin().buildInfo()
-	const stats = await this.db.stats();
-    this.traceTiming(sqlStartTime,performance.now())
-    return {
-      date               : new Date().toISOString()
-     ,timeZoneOffset     : new Date().getTimezoneOffset()
-     ,vendor             : this.DATABASE_VENDOR
-     ,spatialFormat      : this.SPATIAL_FORMAT 
-     ,schema             : this.parameters.FROM_USER
-     ,softwareVendor     : this.SOFTWARE_VENDOR
-     ,exportVersion      : EXPORT_VERSION
-     ,nodeClient         : {
-        version          : process.version
-       ,architecture     : process.arch
-       ,platform         : process.platform
+  
+	
+	let stack
+	let operation
+    try {
+      operation = `db.admin().buildInfo()`
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(traceMongo(operation))      
       }
-     ,buildInfo          : buildInfo
-	 ,stats              : stats
-    }
+	  let sqlStartTime = performance.now();
+	  stack = new Error().stack
+      const buildInfo = await this.db.admin().buildInfo()
+
+	  operation = 'db.admin().stats()';
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(traceMongo(operation))      
+      }
+	  stack = new Error().stack
+	  const stats = await this.db.stats();
+      this.traceTiming(sqlStartTime,performance.now())
+      return {
+        date               : new Date().toISOString()
+       ,timeZoneOffset     : new Date().getTimezoneOffset()
+       ,vendor             : this.DATABASE_VENDOR
+       ,spatialFormat      : this.SPATIAL_FORMAT 
+       ,schema             : this.parameters.FROM_USER
+       ,softwareVendor     : this.SOFTWARE_VENDOR
+       ,exportVersion      : EXPORT_VERSION
+       ,nodeClient         : {
+          version          : process.version
+         ,architecture     : process.arch
+         ,platform         : process.platform
+        }
+       ,buildInfo          : buildInfo
+	   ,stats              : stats
+      }
+	} catch (e) {
+      throw new MongodbError(e,stack,operation);
+	}
   }
 
   /*
@@ -316,107 +372,118 @@ class MongoDBI extends YadamuDBI {
   }
   
   async getSchemaInfo(schema) {
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`db.listCollections()\n`)      
-    }
-	let sqlStartTime = performance.now();
-	const schemaInfo = await this.db.listCollections().toArray();  
-    this.traceTiming(sqlStartTime,performance.now())
-    if ((this.parameters.MONGO_STORAGE_FORMAT === 'DOCUMENT') && (this.parameters.MONGO_EXPORT_FORMAT === 'ARRAY')) {
-      const promises =  schemaInfo.map(function(collection) {     
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`db.collection(${collection.name}).mapReduce()\n`)      
-        }
-        let sqlStartTime = performance.now();
-        const results = this.db.collection(collection.name).mapReduce(
-          function() {
-            if (keys.length === 0) {
-              emit('metadata',null)
-              emit('metadata',null)
-            }
-            newKeys = Object.keys(this)
-            keys = Array.from(new Set([].concat(...[keys,newKeys])))
-            dataTypeLength = ''
-            newKeys.forEach(function (key,idx) {
-              const dataType = this[key] === null ? null : typeof this[key]
-              if (dataType === 'string') {
-                dataTypeLength = this[key].length
+	  
+	let stack
+	let operation
+	try {
+	  operation = `db.listCollections().toArray()`;
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(this.traceComment(operation))      
+      }
+	  let sqlStartTime = performance.now();
+	  operation = `MongoClient.db.listCollections().toArray()`;
+	  stack = new Error().stack	
+	  const schemaInfo = await this.db.listCollections().toArray();  
+      this.traceTiming(sqlStartTime,performance.now())
+      if ((this.parameters.MONGO_STORAGE_FORMAT === 'DOCUMENT') && (this.parameters.MONGO_EXPORT_FORMAT === 'ARRAY')) {
+        const promises =  schemaInfo.map(function(collection) {     
+		  operation = `MongoClient.db.collection(${collection.name}.mapReduce()`;
+          if (this.status.sqlTrace) {
+            this.status.sqlTrace.write(traceMongo(operation))      
+          }
+          let sqlStartTime = performance.now();
+		  stack = new Error().stack
+          const results = this.db.collection(collection.name).mapReduce(
+            function() {
+              if (keys.length === 0) {
+                emit('metadata',null)
+                emit('metadata',null)
               }
-              if (!types[key]) {
-                types[key] = [dataType]
-                sizes[key] = '' + dataTypeLength
-              }
-              else {
-                if ((dataType !== null) && (types[key].indexOf(dataType) === -1)) {
-                  types[key].push(dataType);
+              newKeys = Object.keys(this)
+              keys = Array.from(new Set([].concat(...[keys,newKeys])))
+              dataTypeLength = ''
+              newKeys.forEach(function (key,idx) {
+                const dataType = this[key] === null ? null : typeof this[key]
+                if (dataType === 'string') {
+                  dataTypeLength = this[key].length
                 }
-                sizes[key] = dataTypeLength > sizes[key] ? '' + dataTypeLength : sizes[key]
-              }
-            },this)
-          },
-          function(key,values) {
-            const dataTypes = keys.map(function(key) {
-              const keyTypes = types[key]
-              if (keyTypes[0] === null) {
-                if (keyTypes.length === 1) {
-                  return 'string'
+                if (!types[key]) {
+                  types[key] = [dataType]
+                  sizes[key] = '' + dataTypeLength
                 }
                 else {
-                  keyTypes.shift()
+                  if ((dataType !== null) && (types[key].indexOf(dataType) === -1)) {
+                    types[key].push(dataType);
+                  }
+                  sizes[key] = dataTypeLength > sizes[key] ? '' + dataTypeLength : sizes[key]
                 }
-              }    
-              if (keyTypes.length > 1) {
-                return  'JSON'
-              }
-              else {
-                return keyTypes[0]
-              }
-            },this)
-            const sizeConstraints = keys.map(function(key) {
-              return sizes[key]
-            },this)
+              },this)
+            },
+            function(key,values) {
+              const dataTypes = keys.map(function(key) {
+                const keyTypes = types[key]
+                if (keyTypes[0] === null) {
+                  if (keyTypes.length === 1) {
+                    return 'string'
+                  }
+                  else {
+                    keyTypes.shift()
+                  }
+                }    
+                if (keyTypes.length > 1) {
+                  return  'JSON'
+                }
+                else {
+                 return keyTypes[0]
+                }
+              },this)
+              const sizeConstraints = keys.map(function(key) {
+                return sizes[key]
+              },this)
              
-            return {key : keys, types : dataTypes, sizes: sizeConstraints}
-          },
-          {
-            out       : { inline: 1}
-           ,scope     : { 
-              keys    : []
-             ,types   : {}
-             ,sizes   : []
-          }
-        })
-        this.traceTiming(sqlStartTime,performance.now())
-		return results;
-      },this)
+              return {key : keys, types : dataTypes, sizes: sizeConstraints}
+            },
+            {
+              out       : { inline: 1}
+             ,scope     : { 
+                keys    : []
+               ,types   : {}
+               ,sizes   : []
+            }
+          })
+          this.traceTiming(sqlStartTime,performance.now())
+		  return results;
+        },this)
       
-      
-      const results = await Promise.all(promises);
-      schemaInfo.forEach(function(collection,idx) {
-        schemaInfo[idx].TABLE_NAME =  collection.name
-        if (results[idx].length === 0) {
-          // Empty Collection
-          schemaInfo[idx].columns =  ["JSON_DATA"]
-          schemaInfo[idx].jsonDataTypes = ["JSON"];
-          schemaInfo[idx].sizeConstraints = [""] 
+        const results = await Promise.all(promises);
+        schemaInfo.forEach(function(collection,idx) {
+          schemaInfo[idx].TABLE_NAME =  collection.name
+            if (results[idx].length === 0) {
+              // Empty Collection
+              schemaInfo[idx].columns =  ["JSON_DATA"]
+              schemaInfo[idx].jsonDataTypes = ["JSON"];
+              schemaInfo[idx].sizeConstraints = [""] 
+            }
+            else {
+              const metadata = results[idx][0].value
+              schemaInfo[idx].columns =  metadata.key
+              schemaInfo[idx].jsonDataTypes = metadata.types
+              schemaInfo[idx].sizeConstraints = metadata.sizes
+            }
+          },this)
         }
         else {
-          const metadata = results[idx][0].value
-          schemaInfo[idx].columns =  metadata.key
-          schemaInfo[idx].jsonDataTypes = metadata.types
-          schemaInfo[idx].sizeConstraints = metadata.sizes
-        }
-      },this)
-    }
-    else {
-      schemaInfo.forEach(function(collection,idx) {
-        schemaInfo[idx].TABLE_NAME =  collection.name
-        schemaInfo[idx].columns =  ["JSON_DATA"];
-        schemaInfo[idx].jsonDataTypes =  ["JSON"];
-        schemaInfo[idx].sizeConstraints = [""] ;
-      },this)
-    } 
-    return schemaInfo
+          schemaInfo.forEach(function(collection,idx) {
+          schemaInfo[idx].TABLE_NAME =  collection.name
+          schemaInfo[idx].columns =  ["JSON_DATA"];
+          schemaInfo[idx].jsonDataTypes =  ["JSON"];
+          schemaInfo[idx].sizeConstraints = [""] ;
+        },this)
+      } 
+      return schemaInfo
+	} catch(e) {
+	  throw new MongodbError(e,stack,operation);
+	}
   }
 
   generateMetadata(collections,server) {    
@@ -463,15 +530,24 @@ class MongoDBI extends YadamuDBI {
     const readStream = new Readable({objectMode: true });
     readStream._read = function() {};
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`db.collection(${collection.name}.find().stream()\n`)      
-    }
-   	let sqlStartTime = performance.now();
-    const mongoStream = await this.db.collection(collection.name).find().stream();
-    this.traceTiming(sqlStartTime,performance.now())
-    mongoStream.on('data', function(data) {readStream.push(data)})
-    mongoStream.on('end',function(result) {readStream.push(null)});
-    return readStream;      
+    let stack
+	let operation
+	try {
+	  operation = `db.collection(${collection.name}.find().stream()`
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(operation)      
+      }
+   	  let sqlStartTime = performance.now();
+	  stack = new Error().stack;
+      const mongoStream = await this.db.collection(collection.name).find().stream();
+      this.traceTiming(sqlStartTime,performance.now())
+      mongoStream.on('data', function(data) {readStream.push(data)})
+      mongoStream.on('end',function(result) {readStream.push(null)});
+      mongoStream.on('error',function(e) {readStream.emit('error',e)});
+      return readStream;      
+    } catch (e) {
+      throw new MongodbError(e,stack,operation)
+	}
   }      
    
   /*
@@ -489,23 +565,38 @@ class MongoDBI extends YadamuDBI {
   }
 
   async insertMany(collection,array) {
-    if (this.status.sqlTrace) {
-	  this.status.sqlTrace.write(`db.collection(${collection}).insertMany(${array.length})\n`)      
-    }
-  	let sqlStartTime = performance.now();
-    const results = await this.db.collection(collection).insertMany(array);
-    this.traceTiming(sqlStartTime,performance.now())
-    return results;
+	  
+	let stack
+	const operation = `db.collection(${collection}).insertMany(${array.length})`;
+	try {
+      if (this.status.sqlTrace) {
+  	    this.status.sqlTrace.write(traceMongo(operation))      
+      }
+  	  let sqlStartTime = performance.now();
+	  stack = new Error().stack;
+      const results = await this.db.collection(collection).insertMany(array,{w:1});
+      this.traceTiming(sqlStartTime,performance.now())
+      return results;
+	} catch (e) {
+      throw new MongodbError(e,stack,operation);
+	}
   }
 
   async insertOne(collection,doc) {
-    if (this.status.sqlTrace) {
-	  this.status.sqlTrace.write(`db.collection(${collection}).insertOne()\n`)      
-    }
- 	let sqlStartTime = performance.now();
-    const results = await this.db.collection(collection).insertOne(doc);
-    this.traceTiming(sqlStartTime,performance.now())
-    return results;
+	let stack
+	const operation = `db.collection(${collection}).insertOne()`;
+	try {
+      if (this.status.sqlTrace) {
+  	    this.status.sqlTrace.write(traceMongo(operation))      
+      }
+  	  let sqlStartTime = performance.now();
+	  stack = new Error().stack;
+      const results = await this.db.collection(collection).insertOne(doc),{w:1};
+      this.traceTiming(sqlStartTime,performance.now())
+      return results;
+	} catch (e) {
+      throw new MongodbError(e,stack,operation);
+	}
   }
 
   async configureSlave(slaveNumber,client) {

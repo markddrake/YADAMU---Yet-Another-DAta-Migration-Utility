@@ -479,15 +479,23 @@ class OracleDBI extends YadamuDBI {
   };
 
   async closePool(drainTime) {
-    if ((this.pool instanceof oracledb.Pool) && (this.pool.status === oracledb.POOL_IS_OPEN)) {
+	try{
+    if ((this.pool instanceof oracledb.Pool) && (this.pool.status === oracledb.POOL_STATUS_OPEN)) {
 	  let stack;
       try {
         stack = new Error().stack
-        await this.pool.close(drainTime);
+		if (drainTime !== undefined)
+		  await this.pool.close(drainTime);
+	    else {
+		  await this.pool.close();	
+	    }
       } catch (e) {
 	    const err = new OracleError(e,stack,'Oracledb.Pool.close()')
 	    throw err;
 	  }
+	}
+	} catch (e) {
+	  console.log(e);
 	}
   }  
 
@@ -728,7 +736,7 @@ class OracleDBI extends YadamuDBI {
     let sqlStatement = `ALTER SESSION SET TIME_ZONE = '+00:00' NLS_DATE_FORMAT = '${this.getDateFormatMask('Oracle')}' NLS_TIMESTAMP_FORMAT = '${this.getTimeStampFormatMask('Oracle')}' NLS_TIMESTAMP_TZ_FORMAT = '${this.getTimeStampFormatMask('Oracle')}' NLS_LENGTH_SEMANTICS = 'CHAR'`
     let result = await this.executeSQL(sqlStatement,{});
 
-    sqlStatement = `begin :version := YADAMU_EXPORT.DATABASE_RELEASE(); :size := JSON_FEATURE_DETECTION.C_MAX_STRING_SIZE; end;`;
+    sqlStatement = `begin :version := YADAMU_EXPORT.DATABASE_RELEASE(); :size := YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE; end;`;
     let args = {version:{dir: oracledb.BIND_OUT, type: oracledb.STRING},size:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER}}
 	result = await this.executeSQL(sqlStatement,args);
 

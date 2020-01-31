@@ -66,7 +66,7 @@ class YadamuLogger {
   logException(args,e) {
 
 	if (e.yadamuAlreadyReported) {
-      this.info(args,`Caught exception: "${e.message}"`);
+      this.info(args,`Processed exception: "${e.oneLineMessage ? e.oneLineMessage : e.message}"`);
 	  return
    	}
 
