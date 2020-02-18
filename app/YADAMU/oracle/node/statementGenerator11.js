@@ -14,7 +14,7 @@ const uuidv1 = require('uuid/v1');
 
 const Readable = require('stream').Readable;
 
-const StatementGenerator = require('./StatementGenerator.js');
+const StatementGenerator = require('./statementGenerator.js');
 
 class StatementGenerator11 extends StatementGenerator {
   

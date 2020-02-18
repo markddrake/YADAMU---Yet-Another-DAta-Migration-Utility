@@ -1,0 +1,131 @@
+{
+    "oracle19c"                         : {
+      "oracle"                          : {
+        "user"                          : "SYSTEM"
+      , "password"                      : "oracle"
+      , "connectString"                 : "ORCL19c"
+      }
+    , "pathPrefix"                      : "JSON/oracle19c/%MODE%"
+    },
+    "oracle18c"                         : {
+      "oracle"                          : {
+        "user"                          : "SYSTEM"
+      , "password"                      : "oracle"
+      , "connectString"                 : "ORCL18c"
+      }
+    , "pathPrefix"                      : "JSON/oracle18c/%MODE%"
+    },
+    "oracle12c"           : {
+      "oracle"                          : {
+        "user"                          : "SYSTEM"
+      , "password"                      : "oracle"
+      , "connectString"                 : "ORCL12c"
+      }
+    , "pathPrefix"                      : "oracle12c/%MODE%"
+    },
+    "oracle11g"           : {
+      "oracle"                          : {
+        "user"                          : "SYSTEM"
+      , "password"                      : "oracle"
+      , "connectString"                 : "ORCL11g"
+      }
+    , "pathPrefix"                      : "JSON/oracle11g/%MODE%"
+    },
+    "mssql#1"                           : {
+      "mssql"                           : {  
+        "user"                          : "sa"
+      , "server"                        : "MSSQL17-01"
+      , "database"                      : "master"
+      , "password"                      : "oracle#1"
+      , "requestTimeout"                : 360000000
+      , "options"                       : {
+          "encrypt"                     : false 
+        , "abortTransactionOnError"     : false
+        }
+      }
+    , "pathPrefix"                      : "JSON/MsSQL"
+    },
+    "postgres#1"                        : {
+      "postgres"                        : {
+        "user"                          : "postgres"
+      , "host"                          : "PGSQL12-01"
+      , "database"                      : "yadamu"
+      , "password"                      : "oracle"
+      , "port"                          : 5432
+      }
+    , "pathPrefix"                      : "JSON/postgres"
+    },
+    "mysql#1"                           : {
+      "mysql"                           : {          
+        "user"                          : "root"
+      , "host"                          : "MYSQL80-01"
+      , "database"                      : "sys"
+      , "password"                      : "oracle"
+      , "port"                          : 3306
+      , "multipleStatements"            : true
+      , "typeCast"                      : true
+      , "supportBigNumbers"             : true
+      , "bigNumberStrings"              : true          
+      , "dateStrings"                   : true
+      }
+    , "pathPrefix"                      : "JSON/MySQL"
+    },
+    "mariadb#1"                         : {
+      "mariadb"                         : {
+        "user"                          : "root"
+      , "host"                          : "MARIA10-01"
+      , "database"                      : "mysql"
+      , "password"                      : "oracle"
+      , "port"                          : 3306
+      , "multipleStatements"            : true
+      , "typeCast"                      : true
+      , "supportBigNumbers"             : true
+      , "bigNumberStrings"              : true          
+      , "dateStrings"                   : true 
+      }
+    , "pathPrefix"                      : "JSON/mariaDB"
+    },
+    "mongodb#1"                         : {
+      "mongodb"                         : {
+        "host"                          : "localhost"
+      , "port"                          : 27017
+      , "options"                       : {
+           "socketTimeoutMS"            : 900000
+        }
+      }
+    },
+    "file#1"                            : {
+      "file"                            : {
+		"directory"                     : "JSON/%source%/%mode%" 
+      }
+    },
+    "file#2"                            : {
+      "file"                            : {
+		"directory"                     : "JSON/%vendor%" 
+      }
+    },
+    "file#3"                            : {
+      "file"                            : {
+		"directory"                     : "JSON/oracle19c/DATA_ONLY" 
+      }
+    },
+    "file#4"                            : {
+      "file"                            : {
+		"directory"                     : "JSON/MySQL" 
+      }
+    },
+    "file#5"                            : {
+      "file"                            : {
+		"directory"                     : "JSON/MsSQL" 
+      }
+    },
+    "file#6"                            : {
+      "file"                            : {
+		"directory"                     : "JSON" 
+      }
+	},
+    "scratch"                           : {
+      "file"                            : {
+		"directory"                     : "scratch" 
+      }
+    }}

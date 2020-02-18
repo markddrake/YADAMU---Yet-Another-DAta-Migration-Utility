@@ -32,4 +32,4 @@ mysql.exe -u%DB_USER% -p%DB_PWD% -h%DB_HOST% -D%DB_DBNAME% -P%DB_PORT% -v -f <%Y
 @set YADAMU_DB=postgres
 mkdir %YADAMU_LOG_PATH%\%YADAMU_DB%
 call %YADAMU_INSTALL%\%YADAMU_DB%\env\dbConnection.bat
-psql -U %DB_USER% -d %DB_DBNAME% -h %DB_HOST% -a -f %YADAMU_INSTALL%\postgres\sql\YADAMU_IMPORT.sql > %YADAMU_LOG_PATH%\%YADAMU_DB%\YADAMU_IMPORT.log
+psql -U %DB_USER% -d %DB_DBNAME% -h %DB_HOST% -a  -f %YADAMU_INSTALL%\postgres\sql\YADAMU_IMPORT.sql > %YADAMU_LOG_PATH%\%YADAMU_DB%\YADAMU_IMPORT.log

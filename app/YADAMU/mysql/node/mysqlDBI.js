@@ -92,23 +92,6 @@ class MySQLDBI extends YadamuDBI {
 	} 
   }
   
-  async setMaxAllowedPacketSize() {
-
-    const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
-    const sqlQueryPacketSize = `SELECT @@max_allowed_packet`;
-    const sqlSetPacketSize = `SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`
-      
-    let results = await this.executeSQL(sqlQueryPacketSize);
-    
-    if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
-      this.yadamuLogger.info([`${this.constructor.name}.setMaxAllowedPacketSize()`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
-      results = await this.executeSQL(sqlSetPacketSize);
-      await this.releaseConnection();
-      return true;
-    }    
-    return false;
-  }
-  
   async configureConnection() {
 
     const sqlSetITimeout  = `SET SESSION interactive_timeout = 600000`;
@@ -132,6 +115,25 @@ class MySQLDBI extends YadamuDBI {
     const disableAutoCommit = 'set autocommit = 0';
     await this.executeSQL(disableAutoCommit);
   }
+  
+  async checkMaxAllowedPacketSize() {
+
+    this.connection = await this.getConnectionFromPool()
+	
+    const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
+    const sqlQueryPacketSize = `SELECT @@max_allowed_packet`;
+    const sqlSetPacketSize = `SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`
+      
+    let results = await this.executeSQL(sqlQueryPacketSize);
+    
+    if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
+      this.yadamuLogger.info([`${this.constructor.name}.setMaxAllowedPacketSize()`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
+      results = await this.executeSQL(sqlSetPacketSize);
+	  
+    }    
+    await this.releaseConnection();
+  }
+  
 
   async createConnectionPool() {
 	 
@@ -146,22 +148,12 @@ class MySQLDBI extends YadamuDBI {
 	  const sqlStartTime = performance.now();
 	  this.pool = new mysql.createPool(this.connectionProperties);
 	  this.traceTiming(sqlStartTime,performance.now())
+      await this.checkMaxAllowedPacketSize()
 	} catch (e) {
       throw new MsSQLError(e,stack,opertion);
     }
 	
-    this.connection = await this.getConnectionFromPool()
-
-    if (await this.setMaxAllowedPacketSize()) {
-        await this.pool.end();
-        this.logConnectionProperties();
-  	    const sqlStartTime = performance.now();
-	    this.pool = new mysql.createPool(this.connectionProperties);
-        this.traceTiming(sqlStartTime,performance.now())
-      }
-	  else {
-	    await this.releaseConnection();
-	  }    
+	
   }
   
   async getConnectionFromPool() {
@@ -169,7 +161,7 @@ class MySQLDBI extends YadamuDBI {
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
     }
-
+	
 	const self = this;
 	const stack = new Error().stack;
     const connection = await new Promise(
@@ -186,6 +178,7 @@ class MySQLDBI extends YadamuDBI {
 		)
       }
 	)
+	
     return connection
   }
   
@@ -436,11 +429,10 @@ class MySQLDBI extends YadamuDBI {
     this.connectionOpen = false
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 60000
 	this.keepAliveHdl = undefined
-
   }
   
   setConnectionProperties(connectionProperties) {
-	 super.setConnectionProperties(Object.assign(connectionProperties,CONNECTION_PROPERTY_DEFAULTS));
+	 super.setConnectionProperties(Object.assign( Object.keys(connectionProperties).length > 0 ? connectionProperties : this.connectionProperties,CONNECTION_PROPERTY_DEFAULTS));
   }
 
   getConnectionProperties() {

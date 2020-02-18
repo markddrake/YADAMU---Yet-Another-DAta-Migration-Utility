@@ -82,7 +82,7 @@ class FileDBI extends YadamuDBI {
   }
 
   async initializeExport() {
-	// For FileDBI Export is writig data to the file system..
+	// For FileDBI Export is reading data to the file system..
 	super.initializeExport();
 	this.parser = new TextParser(this.yadamuLogger);
 	const importFilePath = path.resolve(this.parameters.FILE);
@@ -115,6 +115,7 @@ class FileDBI extends YadamuDBI {
   }  
   
   async finalizeImport() {
+	this.outputStream.write('}');
   }
   
   async finalize() {

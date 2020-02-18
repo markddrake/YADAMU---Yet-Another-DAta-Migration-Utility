@@ -9,12 +9,12 @@
 , "tests" : [{
     "source": "file#6"
   , "targets": [
-       "mssql#1"
+       "mysql#1"
     ]
-  , "parser" : "CLARINET"
+  , "parser" : "SQL"
   , "directory" : "tests/fileRoundtrip/%source%"
   , "tasks": [
-       "HumanResources"
+       "oracle"
     ]
   }]
 }

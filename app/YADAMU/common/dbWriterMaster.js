@@ -72,15 +72,15 @@ class DBWriterMaster extends DBWriter {
  
   async _final(callback) {
     try {
-	  if (this.timings.length === 0) {
+	  if (this.mode === "DDL_ONLY") {
         this.yadamuLogger.info([`${this.constructor.name}`],`DDL only export. No data written.`);
-	  }
+      }
       else {
-        await this.dbi.finalizeData();
 		if (Object.keys(this.timings).length === 0) {
 		  this.yadamuLogger.info([`${this.constructor.name}`],`No tables found.`);
 		}
-      }		
+        await this.dbi.finalizeData();
+	  }
       await this.dbi.finalizeImport();
       callback(this.slaveException);
     } catch (e) {

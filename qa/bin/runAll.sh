@@ -1,4 +1,4 @@
-source qa\bin\export.bat
-source qa\bin\import.bat
-source qa\bin\fileRoundtrip.bat
-source qa\bin\dbRoundtrip.bat
+source qa/bin/export.sh
+source qa/bin/import.sh
+source qa/bin/fileRoundtrip.sh
+source qa/bin/dbRoundtrip.sh

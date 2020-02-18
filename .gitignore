@@ -2,3 +2,4 @@
 */node/package-lock.json
 **/node_modules
 deploy.bat
+dockerfiles/software/oracle/oracle-instantclient19.5-basic_19.5.0.0.0-2_amd64.deb

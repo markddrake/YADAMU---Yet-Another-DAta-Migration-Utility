@@ -364,7 +364,7 @@ class YadamuDBI {
   }  
   
   async getDatabaseConnection(requirePassword) {
-	 		
+	  	 		
 	let interactiveCredentials = (requirePassword && ((this.connectionProperties[this.PASSWORD_KEY_NAME] === undefined) || (this.connectionProperties[this.PASSWORD_KEY_NAME].length === 0))) 
 	let retryCount = interactiveCredentials ? 3 : 1;
 	
@@ -411,8 +411,8 @@ class YadamuDBI {
   */
 
   async initialize(requirePassword) {
-	
-    if (this.status.sqlTrace) {
+	  
+	if (this.status.sqlTrace) {
        if (this.status.sqlTrace._writableState.ended === true) {
          this.status.sqlTrace = fs.createWriteStream(this.status.sqlTrace.path,{"flags":"a"})
        }

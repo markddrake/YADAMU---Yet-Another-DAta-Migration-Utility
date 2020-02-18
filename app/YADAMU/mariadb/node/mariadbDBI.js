@@ -146,7 +146,10 @@ class MariadbDBI extends YadamuDBI {
     await this.executeSQL(disableAutoCommit);   
   }
 
-  async setMaxAllowedPacketSize() {
+  async checkMaxAllowedPacketSize() {
+	  
+	this.connection = await this.getConnectionFromPool()
+
 
     const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
     const sqlQueryPacketSize = `SELECT @@max_allowed_packet`;
@@ -158,11 +161,10 @@ class MariadbDBI extends YadamuDBI {
     if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
       this.yadamuLogger.info([`${this.constructor.name}.setMaxAllowedPacketSize()`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
       results = await this.executeSQL(sqlSetPacketSize);
-      await this.connection.end();
-      await this.pool.end();
-      return true;
     }    
-    return false;
+	
+	await this.releaseConnection();
+	
   }
   
   async createConnectionPool() {
@@ -170,18 +172,7 @@ class MariadbDBI extends YadamuDBI {
 	let sqlStartTime = performance.now();
 	this.pool = mariadb.createPool(this.connectionProperties);
 	this.traceTiming(sqlStartTime,performance.now())
-
-    this.connection = await this.getConnectionFromPool()
-	
-    if (await this.setMaxAllowedPacketSize()) {
-      this.logConnectionProperties();
-  	  sqlStartTime = performance.now();
-	  this.pool = mariadb.createPool(this.connectionProperties);
-      this.traceTiming(sqlStartTime,performance.now())  
-    }
-	else {
-	  await this.releaseConnection();
-	}
+    await this.checkMaxAllowedPacketSize();
   }
   
   async getConnectionFromPool() {

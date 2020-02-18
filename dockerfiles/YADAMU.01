@@ -1,0 +1,25 @@
+FROM node:latest
+WORKDIR /usr/src/YADAMU
+COPY app/package*.json ./
+COPY dockerfiles/software/oracle/oracle-instantclient19.5-basic_19.5.0.0.0-2_amd64.deb .
+COPY dockerfiles/tnsnames.ora .
+COPY app app
+COPY dockerfiles/YADAMU-REGRESS/bin bin
+COPY qa/bin qa/bin
+COPY qa/regression qa/regression
+COPY dockerfiles/connections.json qa/regression
+RUN npm install\
+ && apt update \
+ && apt-get install libaio1 \
+ && apt install ./oracle-instantclient19.5-basic_19.5.0.0.0-2_amd64.deb \
+ && mkdir mnt \
+ && mkdir mnt/log \
+ &&	mkdir mnt/JSON \
+ && mkdir mnt/tests \ 
+ &&	mkdir mnt/work \	
+ && ln -s mnt/log \
+ && ln -s mnt/JSON \
+ && ln -s mnt/tests \
+ && ln -s mnt/work 
+ENV TNS_ADMIN=/usr/src/YADAMU
+cmd /bin/bash bin/runRegressionTests.sh

@@ -1051,7 +1051,7 @@ class OracleDBI extends YadamuDBI {
       await this.connection.rollback();
   	  this.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
-	  const err = new OracleError(e,stack,`Oracledb.Transaction.rollback()`,{},{})
+	  let err = new OracleError(e,stack,`Oracledb.Transaction.rollback()`,{},{})
 	  if (cause instanceof Error) {
         this.yadamuLogger.logException([`${this.constructor.name}.rollbackTransaction()`],err)
 	    err = cause

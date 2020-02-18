@@ -111,12 +111,12 @@
     },
     "file#4"                            : {
       "file"                            : {
-		"directory"                     : "JSON/mysql" 
+		"directory"                     : "JSON/MySQL" 
       }
     },
     "file#5"                            : {
       "file"                            : {
-		"directory"                     : "JSON/mssql" 
+		"directory"                     : "JSON/MsSQL" 
       }
     },
     "file#6"                            : {

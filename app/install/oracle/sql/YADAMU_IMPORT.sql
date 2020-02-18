@@ -1062,9 +1062,9 @@ $END
         ,'"' || COLUMN_NAME || '" ' ||
          case
            when TYPE_EXISTS = 1 then
-             'CLOB'
+             YADAMU_FEATURE_DETECTION.C_RETURN_TYPE
            when TARGET_DATA_TYPE  = 'GEOMETRY' then
-             'CLOB'
+             YADAMU_FEATURE_DETECTION.C_RETURN_TYPE
            when TARGET_DATA_TYPE  = 'BOOLEAN' then
              'VARCHAR2(5)'
            when TARGET_DATA_TYPE = 'JSON' then

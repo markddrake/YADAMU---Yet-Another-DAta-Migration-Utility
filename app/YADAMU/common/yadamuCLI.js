@@ -36,6 +36,7 @@ const REQUIRED_ARGUMENTS = {
 , "YADAMUGUI" : []
 , "YADAMUCLI" : []
 , "IMPORT" : ['TO_USER']
+, "UPLOAD" : ['TO_USER']
 , "EXPORT" : ['FROM_USER']
 , "COPY"   : ['CONFIG']
 , "TEST"   : ['CONFIG']
@@ -367,7 +368,7 @@ class YadamuCLI {
   }
   
   getDatabaseInterface(yadamu,driver,connectionProperties,parameters) {
-    
+
     let dbi = undefined
     
     switch (driver) {
@@ -408,10 +409,9 @@ class YadamuCLI {
 		const err = new ConfigurationFileError(`[${this.constructor.name}.getDatabaseInterface()]: ${message}`);
 		throw err
       }
-	  
 	  dbi.setConnectionProperties(connectionProperties);
       dbi.setParameters(parameters);
-      return dbi;
+	  return dbi;
   }
   
   getUser(vendor,schema) {

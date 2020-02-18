@@ -1,0 +1,10 @@
+postgres                         latest
+mysql                            latest
+mariadb                          latest
+mcr.microsoft.com/mssql/server   2017-latest
+oracle/database                  11.2.0.1-ee
+oracle/database                  12.1.0.2-ee
+oracle/database                  12.2.0.1-ee
+oracle/database                  18.3.0-ee
+oracle/database                  19.3.0-ee
+mcr.microsoft.com/mssql/server   2019-latest
