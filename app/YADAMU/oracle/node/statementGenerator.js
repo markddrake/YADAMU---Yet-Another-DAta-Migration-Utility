@@ -221,7 +221,7 @@ class StatementGenerator {
   }
 
   async generateStatementCache(executeDDL, vendor) {
-            
+	  
      /*
      **
      ** Turn the generated DDL Statements into an array and execute them as single batch via YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS()

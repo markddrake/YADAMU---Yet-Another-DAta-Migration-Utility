@@ -38,8 +38,7 @@ as
   C_XLARGE_CONTENT   CONSTANT VARCHAR2(32) := 'CONTENT_TOO_LARGE';
   C_XLARGE_SQL       CONSTANT VARCHAR2(32) := 'STATEMENT_TOO_LARGE';
   
-  TYPE T_RESULTS_CACHE is TABLE of CLOB;
-  RESULTS_CACHE        T_RESULTS_CACHE := T_RESULTS_CACHE();
+  RESULTS_CACHE        T_CLOB_TABLE := T_CLOB_TABLE();
   
   TYPE TABLE_INFO_RECORD is RECORD (
     DDL                CLOB
@@ -535,7 +534,7 @@ $IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
            $END
       into V_RESULTS
       from table(RESULTS_CACHE);
-  RESULTS_CACHE := T_RESULTS_CACHE();
+  RESULTS_CACHE := T_CLOB_TABLE();
   return V_RESULTS;
 $IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
@@ -546,7 +545,7 @@ exception
     begin
       OPEN V_CURSOR for 'select * from table(:1)' using RESULTS_CACHE;
       V_RESULTS := YADAMU_UTILITIES.JSON_ARRAYAGG_CLOB(V_CURSOR);
-      RESULTS_CACHE := T_RESULTS_CACHE();
+      RESULTS_CACHE := T_CLOB_TABLE();
       return V_RESULTS;
     end;
   when others then
@@ -573,7 +572,7 @@ $ELSE
        end loop;
      end if;
      V_RESULTS := YADAMU_UTILITIES.JSON_ARRAYAGG_CLOB(V_JSON_ARRAY_TABLE);
-     RESULTS_CACHE := T_RESULTS_CACHE();
+     RESULTS_CACHE := T_CLOB_TABLE();
      return V_RESULTS;
    end;
 --
@@ -980,8 +979,10 @@ $END
            when TARGET_DATA_TYPE = 'GEOMETRY' then
              '"MDSYS"."SDO_GEOMETRY"'
            when TARGET_DATA_TYPE = 'JSON' then
-             -- BLOB results in Error: ORA-40479: internal JSON serializer error during export operations.
-             $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
+             -- BLOB results in Error: ORA-40479: internal JSON serializer error during export operations.		 
+             $IF YADAMU_FEATURE_DETECTION.JSON_DATA_TYPE_SUPPORTED $THEN
+             'JSON'			 
+             $ELSIF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
              --
              'CLOB CHECK ("' || COLUMN_NAME || '" IS JSON)'
              --
@@ -1307,7 +1308,7 @@ return CLOB
 as
   V_RESULTS CLOB;
 begin
-  RESULTS_CACHE := T_RESULTS_CACHE();
+  RESULTS_CACHE := T_CLOB_TABLE();
   SET_CURRENT_SCHEMA(P_TARGET_SCHEMA);
   return GENERATE_LOG_RECORDS();
 end;
@@ -1338,7 +1339,7 @@ return CLOB
 as
   V_RESULTS CLOB;
 begin
-  RESULTS_CACHE := T_RESULTS_CACHE();
+  RESULTS_CACHE := T_CLOB_TABLE();
   DISABLE_CONSTRAINTS(P_TARGET_SCHEMA);
   return GENERATE_LOG_RECORDS();
 end;
@@ -1369,7 +1370,7 @@ return CLOB
 as
   V_RESULTS CLOB;
 begin
-  RESULTS_CACHE := T_RESULTS_CACHE();
+  RESULTS_CACHE := T_CLOB_TABLE();
   ENABLE_CONSTRAINTS(P_TARGET_SCHEMA);
   return GENERATE_LOG_RECORDS();
 end;
@@ -1400,7 +1401,7 @@ return CLOB
 as
   V_RESULTS CLOB;
 begin
-  RESULTS_CACHE := T_RESULTS_CACHE();
+  RESULTS_CACHE := T_CLOB_TABLE();
   REFRESH_MATERIALIZED_VIEWS(P_TARGET_SCHEMA);
   return GENERATE_LOG_RECORDS();
 end;

@@ -1,4 +1,3 @@
---
 create or replace package OBJECT_SERIALIZATION
 AUTHID CURRENT_USER
 as
@@ -694,7 +693,7 @@ begin
               ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
     when P_ATTR_TYPE_OWNER is not NULL then
       V_TYPECODE := extendTypeList(P_TYPE_LIST, P_ATTR_TYPE_OWNER, P_ATTR_TYPE_NAME);
-      $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('Adding "' || P_ATTR_TYPE_OWNER || '"."' || P_ATTR_TYPE_NAME || '": Type = "' || V_TYPECODE || '". Type count = ' || P_TYPE_LIST.count); $end
+      $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('Adding "' || P_ATTR_TYPE_OWNER || '"."' || P_ATTR_TYPE_NAME || '": Type = "' || V_TYPECODE || '". Type count = ' || P_TYPE_LIST.count); $END
       case
         when V_TYPECODE = 'COLLECTION' then
           V_PLSQL := V_PLSQL
@@ -745,7 +744,7 @@ as
      and TYPE_NAME = P_TYPE_RECORD.TYPE_NAME;
 
 begin
-  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('serializeType() : Processing Type: "' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '".'); $end
+  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('serializeType() : Processing Type: "' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '".'); $END
   DBMS_LOB.CREATETEMPORARY(V_PLSQL_BLOCK,TRUE,DBMS_LOB.CALL);
 
 
@@ -783,7 +782,7 @@ begin
 
     for a in getAttributes loop
 
-      $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('serializeType() : Processing Attribute: ' || a.ATTR_NAME || '. Data Type: ' || a.ATTR_TYPE_NAME); $end
+      $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('serializeType() : Processing Attribute: ' || a.ATTR_NAME || '. Data Type: ' || a.ATTR_TYPE_NAME); $END
 
       V_PLSQL := serializeAttr('V_OBJECT."' || a.ATTR_NAME || '"', a.ATTR_TYPE_OWNER, a.ATTR_TYPE_NAME, a.ATTR_TYPE_MOD, P_TYPE_LIST);
 
@@ -836,14 +835,14 @@ begin
   DBMS_LOB.CREATETEMPORARY(V_PLSQL_BLOCK,TRUE,DBMS_LOB.CALL);
   DBMS_LOB.WRITEAPPEND(V_PLSQL_BLOCK,length(CODE_SERIALIZE_OBJECT_PART1),CODE_SERIALIZE_OBJECT_PART1);
   
-  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.serializeTypes(): Type count = ' || P_TYPE_LIST.count); $end
+  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.serializeTypes(): Type count = ' || P_TYPE_LIST.count); $END
 
   if (P_TYPE_LIST.count = 0) then
     return NULL;
   end if;
 
   loop
-    $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.serializeTypes() : Processing[' || V_IDX || '].'); $end
+    $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.serializeTypes() : Processing[' || V_IDX || '].'); $END
     V_CASE_BLOCK := serializeType(P_TYPE_LIST(V_IDX),P_TYPE_LIST);
     DBMS_LOB.APPEND(V_PLSQL_BLOCK,V_CASE_BLOCK);
     DBMS_LOB.FREETEMPORARY(V_CASE_BLOCK);
@@ -905,13 +904,24 @@ function SERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE)
 return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TAB;
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  -- Cannot use local types in SQL in 11.2.x
+  V_TABLE_LIST TABLE_INFO_TABLE_GT := TABLE_INFO_TABLE_GT();
 begin
+  V_TABLE_LIST.extend(P_TABLE_LIST.count);
+  for i in P_TABLE_LIST.first .. P_TABLE_LIST.last loop
+     V_TABLE_LIST(i) := TABLE_INFO_RECORD_GT(P_TABLE_LIST(i).OWNER,P_TABLE_LIST(i).TABLE_NAME);
+  end loop;
+$ELSE
+  V_TABLE_LIST T_TABLE_INFO_TABLE := P_TABLE_LIST;
+begin
+$END  
   select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
     bulk collect into V_TYPE_LIST
   from ALL_TYPES at,
        (
          select distinct DATA_TYPE_OWNER,  DATA_TYPE
-           from ALL_TAB_COLS atc, TABLE(P_TABLE_LIST) tl
+           from ALL_TAB_COLS atc, TABLE(V_TABLE_LIST) tl
           where atc.DATA_TYPE_OWNER is not NULL
             and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
 	        and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
@@ -963,14 +973,14 @@ as
   V_IDX            PLS_INTEGER := 1;
 begin
 
-  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.DESERIALIZE_TYPES(): Type count = ' || P_TYPE_LIST.count); $end
+  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.DESERIALIZE_TYPES(): Type count = ' || P_TYPE_LIST.count); $END
  
   for V_IDX in 1 .. P_TYPE_LIST.count loop
     V_SQL_FRAGMENT := DESERIALIZE_TYPE(P_TYPE_LIST(V_IDX).OWNER,P_TYPE_LIST(V_IDX).TYPE_NAME);			
     DBMS_LOB.WRITEAPPEND(P_PLSQL_BLOCK,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   end loop;
 
-  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.DESERIALIZE_TYPES(): Size = ' || DBMS_LOB.GETLENGTH(P_PLSQL_BLOCK)); $end
+  $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.DESERIALIZE_TYPES(): Size = ' || DBMS_LOB.GETLENGTH(P_PLSQL_BLOCK)); $END
 
 end;
 --
@@ -1012,10 +1022,21 @@ end;
 procedure DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE,P_PLSQL_BLOCK IN OUT NOCOPY CLOB)
 as
   V_TYPE_LIST TYPE_LIST_TAB;
-begin  
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  -- Cannot use local types in SQL in 11.2.x
+  V_TABLE_LIST TABLE_INFO_TABLE_GT := TABLE_INFO_TABLE_GT();
+begin
+  V_TABLE_LIST.extend(P_TABLE_LIST.count);
+  for i in P_TABLE_LIST.first .. P_TABLE_LIST.last loop
+     V_TABLE_LIST(i) := TABLE_INFO_RECORD_GT(P_TABLE_LIST(i).OWNER,P_TABLE_LIST(i).TABLE_NAME);
+  end loop;
+$ELSE
+  V_TABLE_LIST T_TABLE_INFO_TABLE := P_TABLE_LIST;
+begin
+$END  
   select distinct DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
     bulk collect into V_TYPE_LIST
-    from ALL_TAB_COLS atc, TABLE(P_TABLE_LIST) tl
+    from ALL_TAB_COLS atc, TABLE(V_TABLE_LIST) tl
    where atc.DATA_TYPE_OWNER is not NULL
      and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
     and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))

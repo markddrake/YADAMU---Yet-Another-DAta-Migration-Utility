@@ -430,7 +430,9 @@ class OracleDBI extends YadamuDBI {
 	this.connectionProperties.poolMax = this.parameters.PARALLEL ? parseInt(this.parameters.PARALLEL) + 1 : 3
 	try {
       stack = new Error().stack
+      // this.yadamuLogger.trace([this.DATABASE_VENDOR],'Creating Pool');
 	  this.pool = await oracledb.createPool(this.connectionProperties);
+      // this.yadamuLogger.trace([this.DATABASE_VENDOR],'Pool Created');
       this.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
 	  const err = new OracleError(e,stack,'Oracledb.createPool()')
@@ -448,7 +450,9 @@ class OracleDBI extends YadamuDBI {
 	try {
       stack = new Error().stack
       const sqlStartTime = performance.now();
+      // this.yadamuLogger.trace([this.DATABASE_VENDOR],'Requestng Connection From Pool');
 	  const connection = await this.pool.getConnection();
+      // this.yadamuLogger.trace([this.DATABASE_VENDOR],'Connection Assigned');
       this.traceTiming(sqlStartTime,performance.now())
 	  return connection
     } catch (e) {
@@ -870,6 +874,7 @@ class OracleDBI extends YadamuDBI {
     this.dbVersion = undefined;
     this.maxStringSize = undefined;
 	this.wrapperList = [];
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Constructor Complete');
   }
 
   getConnectionProperties() {
@@ -939,8 +944,10 @@ class OracleDBI extends YadamuDBI {
   */
     
   async initialize() {
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Initialize');
     await super.initialize(true);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Initialize Complete');
   }
     
   /*

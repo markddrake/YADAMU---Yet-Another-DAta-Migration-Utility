@@ -8,6 +8,7 @@ COPY dockerfiles/YADAMU-REGRESS/bin bin
 COPY qa/bin qa/bin
 COPY qa/regression qa/regression
 COPY dockerfiles/connections.json qa/regression
+COPY dockerfiles/yadamuDefaults.json app/YADAMU/common
 RUN npm install\
  && apt update \
  && apt-get install libaio1 \
@@ -22,4 +23,4 @@ RUN npm install\
  && ln -s mnt/tests \
  && ln -s mnt/work 
 ENV TNS_ADMIN=/usr/src/YADAMU
-cmd /bin/bash bin/runRegressionTests.sh
+cmd /bin/bash bin/chooseTest.sh 

@@ -2,13 +2,13 @@
   "operation"                         : "import"
 , "connections"                       : "qa/regression/connections.json"
 , "parameters": {
-    "MODE": "DDL_ONLY"
+    "MODE": "DATA_ONLY"
   , "FEEDBACK": "COMMIT"
   }
 , "tasks"                             : "qa/regression/exportTasks.json"
 , "tests" : [{
-    "source":  "file#3"
-  , "targets": ["mssql#1","postgres#1","mysql#1","mariadb#1"]
+    "source":  "file-oracle19c-mode"
+  , "targets": ["mssql17","mssql19","postgres#1","mysql#1","mariadb#1"]
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
@@ -18,8 +18,8 @@
       "oracle"
     ]
   },{
-    "source": "file#4"
-  , "targets": ["oracle19c","oracle18c","oracle12c","oracle11g","mssql#1","postgres#1"]
+    "source": "file-mysql"
+  , "targets": ["oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1"]
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
@@ -29,7 +29,7 @@
       "mysql"
     ]
   },{
-    "source": "file#5"
+    "source": "file-mssql19"
   , "targets": ["oracle19c","oracle18c","oracle12c","oracle11g","postgres#1","mysql#1","mariadb#1"]
   , "parameters": {
       "MODE": "DATA_ONLY"

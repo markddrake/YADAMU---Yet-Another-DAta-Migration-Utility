@@ -47,7 +47,9 @@ class DBReader extends Readable {
   
   async getMetadata() {
       
+     const startTime = performance.now();
      this.schemaInfo = await this.dbi.getSchemaInfo('FROM_USER')
+     this.yadamuLogger.info([`${this.constructor.name}.getMetadata()`],`Generated metadata for ${this.schemaInfo.length} tables. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
      return this.dbi.generateMetadata(this.schemaInfo)
   }
       

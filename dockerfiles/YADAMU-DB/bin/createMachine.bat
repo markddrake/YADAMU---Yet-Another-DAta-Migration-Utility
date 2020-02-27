@@ -45,6 +45,8 @@ powershell.exe -noninteractive -NoProfile -ExecutionPolicy Bypass -Command "& {[
 docker-machine env    
 FOR /f "tokens=*" %%i IN ('docker-machine env') DO @%%i                                                          
 for /f "tokens=2 delims=:/" %%a in ("%DOCKER_HOST%") DO (SET DOCKER_IP_ADDR=%%a)
+scp "%USERPROFILE%\.ssh\id_rsa.pub"  docker@%DOCKER_IP_ADDR%:
+ssh docker@%DOCKER_IP_ADDR%  "cat id_rsa.pub >> .ssh/authorized_keys"
 scp %DCONFIG%\sh\createFileSystems.sh docker@%DOCKER_IP_ADDR%:
 ssh docker@%DOCKER_IP_ADDR% "sudo /bin/bash createFileSystems.sh" 
 scp %DCONFIG%\sh\fstabEntries docker@%DOCKER_IP_ADDR%:/var/lib/boot2docker

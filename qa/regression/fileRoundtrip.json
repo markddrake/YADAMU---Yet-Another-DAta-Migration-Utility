@@ -7,12 +7,13 @@
   }
 , "tasks"                             : "qa/regression/fileRoundtripTasks.json"
 , "tests" : [{
-    "source": "file#6"
+    "source": "file-JSON-root"
   , "targets": [
       "oracle19c"
     , "oracle18c"
     , "oracle12c"
-    , "mssql#1"
+    , "mssql17"
+    , "mssql19"
     , "postgres#1"
     , "mysql#1"
     , "mariadb#1"
@@ -23,7 +24,7 @@
        "oracle", "mysql", "mssql"
     ]
   },{
-    "source": "file#6"
+    "source": "file-JSON-root"
   , "targets": [
        "oracle11g"
     ]
@@ -36,12 +37,13 @@
        "oracle", "mysql", "mssql"
     ]
   },{
-    "source": "file#6"
+    "source": "file-JSON-root"
   , "targets": [
       "oracle19c"
     , "oracle18c"
     , "oracle12c"
-    , "mssql#1"
+    , "mssql17"
+    , "mssql19"
     , "postgres#1"
     , "mysql#1"
     ]

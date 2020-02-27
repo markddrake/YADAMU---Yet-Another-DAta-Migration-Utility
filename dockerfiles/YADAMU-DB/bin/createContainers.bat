@@ -1,3 +1,4 @@
+set DCONFIG=%CD%
 for /f "usebackq tokens=1 delims=," %%a in ("%DCONFIG%\bin\volumes.csv") do (
   docker volume create %%a
 )

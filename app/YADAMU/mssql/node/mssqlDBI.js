@@ -273,6 +273,7 @@ class MsSQLDBI extends YadamuDBI {
 	let stack
 	try {
       const sqlStartTime = performance.now();
+      stack = new Error().stack;
       const results = await executeable.execute(args);
 	  this.traceTiming(sqlStartTime,performance.now())
 	  return results

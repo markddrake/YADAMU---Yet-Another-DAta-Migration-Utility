@@ -15,6 +15,7 @@ class HttpDBI extends YadamuDBI {
   getConnectionProperties() {
     return {}
   }
+  
   isDatabase() {
     return false;
   }
@@ -23,7 +24,7 @@ class HttpDBI extends YadamuDBI {
      return false;
   }
   
-  getReader() {
+  getInputStream() {
     return this.stream.pipe(this.parser);
   }
   get DATABASE_VENDOR()    { return 'HTTP' };
@@ -65,18 +66,22 @@ class HttpDBI extends YadamuDBI {
 	super.initializeExport();
     this.parser = new TextParser(this.yadamuLogger);
   }
+  async initializeImport() {				  
+    super.incd itializeImport()						
+    this.stream.write(`{`)  
+  }
 
   async initializeData() {
-    this.outputStream.write(',');
-    this.outputStream.write('"data":{');      
+    this.stream.write(',');
+    this.stream.write('"data":{');      
   }
   
   async finalizeData() {
-    this.outputStream.write('}');
+    this.stream.write('}');
   }  
   
   async finalizeImport() {
-    this.outputStream.write('}')    
+    this.stream.write('}')    
    }
   async finalize() {
   }

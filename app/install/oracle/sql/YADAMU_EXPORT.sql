@@ -22,7 +22,13 @@ as
   function JSON_FEATURES return VARCHAR2 deterministic;
   function DATABASE_RELEASE return NUMBER deterministic;
 --
-END;
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+-- 
+  function ROWS_FROM_VC4000_TABLE(P_VC4000_TABLE T_VC4000_TABLE) return T_VC4000_TABLE pipelined;
+--
+$END
+--
+end;
 /
 --
 set TERMOUT on
@@ -33,6 +39,20 @@ show errors
 --
 create or replace package BODY YADAMU_EXPORT
 as
+--
+--
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+-- 
+function ROWS_FROM_VC4000_TABLE(P_VC4000_TABLE T_VC4000_TABLE) 
+return T_VC4000_TABLE pipelined
+as
+begin
+  for i in P_VC4000_TABLE.first .. P_VC4000_TABLE.last loop
+    pipe row (P_VC4000_TABLE(i));
+  end loop;
+end;
+--
+$END
 --
 function TABLE_TO_LIST(P_TABLE T_VC4000_TABLE,P_DELIMITER VARCHAR2 DEFAULT ',') 
 return CLOB
@@ -412,7 +432,16 @@ $END
            ((TABLE_TYPE is not NULL) and (atc.COLUMN_NAME in ('SYS_NC_ROWINFO$','SYS_NC_OID$','ACLOID','OWNERID')))
          )        
 	 and amv.MVIEW_NAME is NULL
+$IF YADAMU_FEATURE_DETECTION.TABLE_FUNCTION_OPTIMIZER_ISSUE $THEN               
+--
+-- 11.2.0.1.0 It appears that using table functions, such as in the clause "aat.OWNER in (select COLUMN_VALUE from TABLE(V_SCHEMA_LIST))", causes performance problems.
+-- For the moment work around the problem using an equality, and only support one schema at a time. Long term when supporting multi-schema exports, if support for releases earlier than
+-- 11.2.0.4.0  is required add an outer loop that loops over the set of schemas. Similar logic may also be required when supporting a filtering by table name.
+--
+     and aat.OWNER  =  P_OWNER_LIST
+$ELSE
      and aat.OWNER in (select COLUMN_VALUE from TABLE(V_SCHEMA_LIST))
+$END
 	 and case
     	   when P_TABLE_NAME is NULL then 1
 	       when P_TABLE_NAME is not NULL and aat.TABLE_NAME = P_TABLE_NAME then 1
@@ -423,12 +452,19 @@ $END
   V_FIRST_ROW BOOLEAN := TRUE;
   V_OBJECT_SERIALIZATION CLOB;
   V_ROW                  EXPORT_METADATA_RECORD;
+--
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN               
+--
     V_WRAPPER_NAME  VARCHAR2(30);
+--
 $END
-
+--
 begin
 --
+  $IF $$DEBUG $THEN
+  DBMS_OUTPUT.put_line(TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD"T"HH24:MI:SS.FF6') || ': Start');
+  $END
+
   $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --  
   select SCHEMA
@@ -437,18 +473,24 @@ begin
 --    
   $END 
 --
+-- If P_OWNER_LIST is not a valid JSON_ARRAY the previous statement will generate an empty set, in which case assume SCHEMA_LIST contains the name of a single schema.
+-- 
    if ((V_SCHEMA_LIST is NULL) or (V_SCHEMA_LIST.count = 0)) then 
      V_SCHEMA_LIST := T_VC4000_TABLE(P_OWNER_LIST);
 	end if;
---
+
   /* Create a  SQL statement for each of the tables in the schema */
   declare
     V_SQL_STATEMENT        CLOB;
 	V_TABLE_METADATA       CLOB;
   begin
 
+
     for t in getTableMetadata loop  
-	
+	  $IF $$DEBUG $THEN
+	  DBMS_OUTPUT.put_line(TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD"T"HH24:MI:SS.FF6') || ': PROCESSING "' || t.OWNER || '"."' || t.TABLE_NAME || '"');
+	  $END
+
 	  V_OBJECT_SERIALIZATION := OBJECT_SERIALIZATION.SERIALIZE_TABLE_TYPES(t.OWNER,t.TABLE_NAME);
 
 	  DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENT,TRUE,DBMS_LOB.CALL);
@@ -478,6 +520,9 @@ $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
       */
 
       if (V_ROW.WITH_CLAUSE  is NOT NULL) then
+	    $IF $$DEBUG $THEN
+  	    DBMS_OUTPUT.put_line(TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD"T"HH24:MI:SS.FF6') || ':"' || t.OWNER || '"."' || t.TABLE_NAME || '" Creating Wrappers' );
+	    $END
         V_WRAPPER_NAME := 'YEXP_' || utl_encode.text_encode(utl_raw.cast_to_varchar2(sys_guid()),'AL32UTF8',1);
         
         V_ROW.WITH_CLAUSE        := 'create or replace function "' || t.OWNER || '"."' || V_WRAPPER_NAME || '"(P_TABLE_OWNER VARCHAR2,P_ANYDATA ANYDATA) '
@@ -497,6 +542,9 @@ $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
       end if;
 --
 $END
+      $IF $$DEBUG $THEN
+      DBMS_OUTPUT.put_line(TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD"T"HH24:MI:SS.FF6') || ':"' || t.OWNER || '"."' || t.TABLE_NAME || '" Piping Row.' );
+	  $END
 	  
 	  PIPE ROW(V_ROW);
 

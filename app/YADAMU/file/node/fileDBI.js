@@ -173,8 +173,6 @@ class FileDBI extends YadamuDBI {
     return new TableWriter(tableName,this.outputStream);      
   }
 
-
-
 }
 
 module.exports = FileDBI

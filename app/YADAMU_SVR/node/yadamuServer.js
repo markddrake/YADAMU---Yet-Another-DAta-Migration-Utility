@@ -2,6 +2,7 @@
 
 const fs = require('fs')
 const path = require('path')
+const { performance } = require('perf_hooks');
 
 const Yadamu = require('../../YADAMU/common/yadamu.js');
 const YadamuLogger = require('../../YADAMU/common/yadamuLogger.js');
@@ -199,10 +200,11 @@ class YadamuServer {
 
   async copy(request,response) {
 
+      const yadamu = new Yadamu('HTTP',{});
+
 	  const sourceConnection = this.configuration.connections[request.params.connection]
       const sourceSchema = this.configuration.schemas[request.params.schema]
       const sourceDatabase =  Object.keys(sourceConnection)[0];
-      const yadamu = new Yadamu('HTTP',{});
 	  const sourceParameters = {
 		FROM_USER: this.getUser(sourceDatabase,sourceSchema)
 	  }
@@ -211,7 +213,6 @@ class YadamuServer {
 	  const targetConnection = this.configuration.connections[request.params.connection]
       const targetSchema = this.configuration.schemas[request.params.schema]
       const targetDatabase =  Object.keys(targetConnection)[0];
-      const yadamu = new Yadamu('HTTP',{});
 	  const targetParameters = {
 		TO_USER: this.getUser(targetDatabase,targetSchema)
 	  }
@@ -228,6 +229,12 @@ class YadamuServer {
   }
 	  
   async uploadSchemaMappings(request,response) {
+  }
+
+  async about(request,response) {
+	response.type('text')
+	response.write('YadamuServer v0.1. Copyright Yet Another Bay Area Software Company 2020.');
+	response.end();
   }
 	  
 }

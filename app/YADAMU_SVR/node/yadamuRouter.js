@@ -72,7 +72,7 @@ async function exportStream(request,response,next) {
   try {
     await yadamuServer.exportStream(request,response)
   } catch (e) {
-	yadamLogger.logException([`${getClassName()}.exportStream()`],'Exception',e)
+	yadamuLogger.logException([`${getClassName()}.exportStream()`],'Exception',e)
 	next(e);
   }
 }
@@ -133,6 +133,17 @@ async function uploadSchemaMappings(request,response,next) {
     await yadamuServer.uploadSchemaMappings(request,response)
   } catch (e) {
 	yadamuLogger.logException([`${getClassName()}.uploadSchemaMappings()`],'Exception',e)
+	next(e);
+  }
+}
+
+
+async function about(request,response,next) {
+  console.log('uploadSchemaMappings');
+  try {
+    await yadamuServer.about(request,response)
+  } catch (e) {
+	yadamuLogger.logException([`${getClassName()}.about()`],'Exception',e)
 	next(e);
   }
 }

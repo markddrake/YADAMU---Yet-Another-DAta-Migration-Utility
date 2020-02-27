@@ -3,35 +3,31 @@
       "oracle"                          : {
         "user"                          : "SYSTEM"
       , "password"                      : "oracle"
-      , "connectString"                 : "ORCL19c"
+      , "connectString"                 : "ORA1903"
       }
-    , "pathPrefix"                      : "JSON/oracle19c/%MODE%"
     },
     "oracle18c"                         : {
       "oracle"                          : {
         "user"                          : "SYSTEM"
       , "password"                      : "oracle"
-      , "connectString"                 : "ORCL18c"
+      , "connectString"                 : "ORA1803"
       }
-    , "pathPrefix"                      : "JSON/oracle18c/%MODE%"
     },
     "oracle12c"           : {
       "oracle"                          : {
         "user"                          : "SYSTEM"
       , "password"                      : "oracle"
-      , "connectString"                 : "ORCL12c"
+      , "connectString"                 : "ORA1220"
       }
-    , "pathPrefix"                      : "oracle12c/%MODE%"
     },
     "oracle11g"           : {
       "oracle"                          : {
         "user"                          : "SYSTEM"
       , "password"                      : "oracle"
-      , "connectString"                 : "ORCL11g"
+      , "connectString"                 : "ORA1120"
       }
-    , "pathPrefix"                      : "JSON/oracle11g/%MODE%"
     },
-    "mssql#1"                           : {
+    "mssql17"                           : {
       "mssql"                           : {  
         "user"                          : "sa"
       , "server"                        : "MSSQL17-01"
@@ -43,7 +39,19 @@
         , "abortTransactionOnError"     : false
         }
       }
-    , "pathPrefix"                      : "JSON/MsSQL"
+    },
+    "mssql19"                           : {
+      "mssql"                           : {  
+        "user"                          : "sa"
+      , "server"                        : "MSSQL19-01"
+      , "database"                      : "master"
+      , "password"                      : "oracle#1"
+      , "requestTimeout"                : 360000000
+      , "options"                       : {
+          "encrypt"                     : false 
+        , "abortTransactionOnError"     : false
+        }
+      }
     },
     "postgres#1"                        : {
       "postgres"                        : {
@@ -68,7 +76,6 @@
       , "bigNumberStrings"              : true          
       , "dateStrings"                   : true
       }
-    , "pathPrefix"                      : "JSON/MySQL"
     },
     "mariadb#1"                         : {
       "mariadb"                         : {
@@ -83,7 +90,6 @@
       , "bigNumberStrings"              : true          
       , "dateStrings"                   : true 
       }
-    , "pathPrefix"                      : "JSON/mariaDB"
     },
     "mongodb#1"                         : {
       "mongodb"                         : {
@@ -94,32 +100,37 @@
         }
       }
     },
-    "file#1"                            : {
+    "file-connection"                   : {
       "file"                            : {
-		"directory"                     : "JSON/%source%/%mode%" 
+		"directory"                     : "JSON/%connection%" 
       }
     },
-    "file#2"                            : {
+    "file-connection-mode"              : {
+      "file"                            : {
+		"directory"                     : "JSON/%connection%/%mode%" 
+      }
+    },
+    "file-vendor"                       : {
       "file"                            : {
 		"directory"                     : "JSON/%vendor%" 
       }
     },
-    "file#3"                            : {
+    "file-oracle19c-mode"               : {
       "file"                            : {
-		"directory"                     : "JSON/oracle19c/DATA_ONLY" 
+		"directory"                     : "JSON/oracle19c/%mode%" 
       }
     },
-    "file#4"                            : {
+    "file-mssql19"                      : {
       "file"                            : {
-		"directory"                     : "JSON/MySQL" 
+		"directory"                     : "JSON/mssql19" 
+      }
+    }, 
+    "file-mysql"                        : {
+      "file"                            : {
+		"directory"                     : "JSON/mysql" 
       }
     },
-    "file#5"                            : {
-      "file"                            : {
-		"directory"                     : "JSON/MsSQL" 
-      }
-    },
-    "file#6"                            : {
+    "file-JSON-root"                    : {
       "file"                            : {
 		"directory"                     : "JSON" 
       }

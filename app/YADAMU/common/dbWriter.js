@@ -77,8 +77,10 @@ class DBWriter extends Writable {
   }
   
   async generateStatementCache(metadata,ddlRequired) {
+    const startTime = performance.now()
     this.dbi.setMetadata(metadata)      
     await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER,!this.ddlComplete)
+	this.yadamuLogger.info([`${this.constructor.name}.generateStatementCache()`],`Generated ${this.dbi.statementCache ? Object.keys(this.dbi.statementCache).length : 'no'} DDL and DML statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
   }   
 
 

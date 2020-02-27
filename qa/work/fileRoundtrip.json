@@ -1,6 +1,6 @@
 {
   "operation"                         : "fileRoundtrip"
-, "connections"                       : "qa/regression/connections.json"
+, "connections"                       : "qa/work/connections.json"
 , "parameters": {
     "MODE": "DATA_ONLY"
   , "FEEDBACK": "COMMIT"
@@ -9,12 +9,12 @@
 , "tests" : [{
     "source": "file#6"
   , "targets": [
-       "mysql#1"
+       "oracle19c"
     ]
   , "parser" : "SQL"
   , "directory" : "tests/fileRoundtrip/%source%"
   , "tasks": [
-       "oracle"
+       "HR"
     ]
   }]
 }

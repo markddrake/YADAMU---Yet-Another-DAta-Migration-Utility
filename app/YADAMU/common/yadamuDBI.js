@@ -35,6 +35,7 @@ class YadamuDBI {
   get STATEMENT_TERMINATOR() { return '' }
   
   traceSQL(msg) {
+	 this.yadamuLogger.trace([this.DATABASE_VENDOR,'SQL'],msg)
 	 return(`${msg.trim()}${this.sqlTraceTag} ${this.sqlTerminator}`);
   }
   
