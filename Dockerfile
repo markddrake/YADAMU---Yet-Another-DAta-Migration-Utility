@@ -7,7 +7,7 @@ RUN npm install\
  && apt update \
  && apt-get -y install libaio1 \
  && apt-get -y install alien \
- && alien -i install ./oracle-instantclient19.6-basic-19.6.0.0.0-1.x86_64.rpm \
+ && alien -i ./oracle-instantclient19.6-basic-19.6.0.0.0-1.x86_64.rpm \
  && mkdir mnt \
  && mkdir mnt/log \
  &&	mkdir mnt/JSON \
