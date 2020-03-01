@@ -480,9 +480,9 @@ class YadamuQA {
 	let report
 	try {
       await compareDBI.initialize();
-	  console.log(sourceSchema,targetSchema)
+	  // Always use source schema mapping logic for export..
 	  const sourceSchemaInfo = this.getSourceSchema(sourceVendor,sourceSchema,{});
-	  const targetSchemaInfo = this.getTargetSchema(sourceVendor,targetSchema,{});
+	  const targetSchemaInfo = this.getSourceSchema(sourceVendor,targetSchema,{});
       if (reportRowCounts) {
         this.reportRowCounts(await compareDBI.getRowCounts(targetSchemaInfo),timings,parameters) 
       }	

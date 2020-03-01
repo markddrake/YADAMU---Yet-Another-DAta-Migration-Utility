@@ -1,23 +1,43 @@
 {
   "operation"                         : "import"
-, "connections"                       : "qa/regression/connections.json"
+, "connections"                       : "qa/work/oracleCloud.json"
 , "parameters": {
     "MODE": "DATA_ONLY"
   , "FEEDBACK": "COMMIT"
   }
 , "tasks"                             : "qa/regression/exportTasks.json"
-, "tests"            
-      : [{
-    "source": "file#3"
-  , "targets": ["oracle19c"]
-  , "parser" : "CLARINET"
-  , "reverseOperations" : true
-  , "recreateSchemas"   : true
+, "tests" : [{
+    "source":  "file-oracle19c-mode"
+  , "targets": ["oracle19c","oracle20c"]
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
+  , "reverseOperations" : true
+  , "recreateSchemas"   : true
   , "tasks": [
-       "HR"
+      "oracle"
+    ]
+  },{
+    "source": "file-mysql"
+  , "targets": ["oracle19c","oracle20c"]
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "reverseOperations" : true
+  , "recreateSchemas"   : true
+  , "tasks": [
+      "mysql"
+    ]
+  },{
+    "source": "file-mssql19"
+  , "targets": ["oracle19c","oracle20c"]
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "reverseOperations" : true
+  , "recreateSchemas"   : true
+  , "tasks": [
+      "mssql"
     ]
   }]
-}
+}  

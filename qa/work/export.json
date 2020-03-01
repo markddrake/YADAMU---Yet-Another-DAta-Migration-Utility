@@ -1,7 +1,7 @@
 {
   "operation"                         : "export"
 , "clone"                             : true
-, "connections"                       : "qa/regression/connections.json"
+, "connections"                       : "qa/regression/yadamu-db2.json"
 , "parameters": {
     "MODE": "DDL_ONLY"
   , "FEEDBACK": "COMMIT"
@@ -9,12 +9,12 @@
 , "tasks" : "qa/regression/exportTasks.json"
 , "tests"                  : [{
     "source": "mssql17"
-  , "target": "file#1"
+  , "target": "scratch"
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
   , "tasks": [
-	  "Northwind"
+	  "HumanResources"
     ]
   }] 
 }
