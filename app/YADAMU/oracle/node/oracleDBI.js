@@ -1372,8 +1372,8 @@ class OracleDBI extends YadamuDBI {
       }
     })
     
-    tableInfo.SQL_STATEMENT = `select ${tableMetadata.NODE_SELECT_LIST} from "${tableMetadata.OWNER}"."${tableMetadata.TABLE_NAME}" t`; 
-    
+	tableInfo.SQL_STATEMENT = `select ${tableMetadata.NODE_SELECT_LIST} from "${tableMetadata.OWNER}"."${tableMetadata.TABLE_NAME}" t`; 
+    tableMetadata.SQL_STATEMENT = tableInfo.SQL_STATEMENT
     return tableInfo
   }
   

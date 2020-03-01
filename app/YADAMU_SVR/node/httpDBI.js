@@ -67,7 +67,7 @@ class HttpDBI extends YadamuDBI {
     this.parser = new TextParser(this.yadamuLogger);
   }
   async initializeImport() {				  
-    super.incd itializeImport()						
+    super.initializeImport()						
     this.stream.write(`{`)  
   }
 

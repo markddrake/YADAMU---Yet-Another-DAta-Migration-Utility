@@ -480,11 +480,14 @@ class YadamuQA {
 	let report
 	try {
       await compareDBI.initialize();
-	  if (reportRowCounts) {
-        this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),timings,parameters) 
+	  console.log(sourceSchema,targetSchema)
+	  const sourceSchemaInfo = this.getSourceSchema(sourceVendor,sourceSchema,{});
+	  const targetSchemaInfo = this.getTargetSchema(sourceVendor,targetSchema,{});
+      if (reportRowCounts) {
+        this.reportRowCounts(await compareDBI.getRowCounts(targetSchemaInfo),timings,parameters) 
       }	
 	  startTime = performance.now();
-      report = await compareDBI.compareSchemas(sourceSchema,targetSchema);
+	  report = await compareDBI.compareSchemas(sourceSchemaInfo,targetSchemaInfo);
 	  elapsedTime = performance.now() - startTime;
       await compareDBI.finalize();
     } catch (e) {
@@ -1136,7 +1139,7 @@ class YadamuQA {
 	  fileReader.setParameters(sourceParameters);
 	  
   	  const targetParameters  = Object.assign({},parameters)
-      this.setUser(targetParameters,'TO_USER', sourceDatabase, operation.verify,operation)
+      this.setUser(targetParameters,'TO_USER', sourceDatabase, operation.verify, operation)
 	  const targetDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,true)
 
       const startTime = performance.now();
@@ -1147,7 +1150,7 @@ class YadamuQA {
       if (parameters.MODE !== 'DDL_ONLY') {
 		// Report rows Imported and Compare Schemas..
         const compareParms = this.getCompareParameters(sourceDatabase,sourceVersion,targetDatabase,0,parameters)
-  	    await this.compareSchemas(sourceDatabase, sourceConnection, compareParms, operation.source, targetDatabase, operation.verify, timings[timings.length-1],true)
+  	    await this.compareSchemas(sourceDatabase, sourceConnection, compareParms, operation.source, sourceDatabase, operation.verify, timings[timings.length-1],true)
       } 
     }
       

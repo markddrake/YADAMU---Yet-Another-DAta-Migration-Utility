@@ -1,8 +1,12 @@
+app
+bin
 dist
 JSON
 log
 md
+qa
 results
 scratch
 tests
+utilities
 work

@@ -64,7 +64,7 @@ as
   PRAGMA EXCEPTION_INIT( TABLE_NOT_FOUND , -00942 );
     
   V_HASH_METHOD      NUMBER := 0;
-  V_TIMESTAMP_LENGTH NUMBER  := 20 + P_TIMESTAMP_PRECISION;
+  V_TIMESTAMP_LENGTH NUMBER := 20 + P_TIMESTAMP_PRECISION;
   
   -- Compensate for Snowflake's XML Fidelity issues, including alphabetical ordering of attributes and removal of trailing whitespace on text nodes.
   
@@ -112,7 +112,7 @@ as
   select aat.TABLE_NAME
         ,LISTAGG(
            case 
-             when ((V_HASH_METHOD < 0) and DATA_TYPE in ('SDO_GEOMETRY','XMLTYPE','ANYDATA','BLOB','CLOB','NCLOB')) then
+             when ((V_HASH_METHOD < 0) and DATA_TYPE in ('SDO_GEOMETRY','XMLTYPE','ANYDATA','BLOB','CLOB','NCLOB','JSON')) then
     		   NULL
              when ((DATA_TYPE like 'TIMESTAMP(%)') and (DATA_SCALE > P_TIMESTAMP_PRECISION)) then
                'substr(to_char(t."' || COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FF9''),1,' || V_TIMESTAMP_LENGTH || ') "' || COLUMN_NAME || '"'
@@ -128,6 +128,8 @@ as
 				 else 
 				   'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT XMLTRANSFORM(t."' || COLUMN_NAME || '", X.XSL) as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
 			   end
+		     when DATA_TYPE = 'JSON' then
+		       'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || COLUMN_NAME || '" returning BLOB),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
 		     when DATA_TYPE = 'ANYDATA' then
 		       'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(OBJECT_SERIALIZATION.SERIALIZE_ANYDATA(t."' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
 		     when DATA_TYPE in ('BLOB')  then
@@ -141,7 +143,7 @@ as
 		 WITHIN GROUP (ORDER BY INTERNAL_COLUMN_ID, COLUMN_NAME) COLUMN_LIST
         ,LISTAGG(
            case 
-             when ((V_HASH_METHOD < 0) and DATA_TYPE in ('"MDSYS"."SDO_GEOMETRY"','XMLTYPE','BLOB','CLOB','NCLOB')) then
+             when ((V_HASH_METHOD < 0) and DATA_TYPE in ('"MDSYS"."SDO_GEOMETRY"','XMLTYPE','BLOB','CLOB','NCLOB','JSON')) then
     		   '"' || COLUMN_NAME || '"'
              else 
                NULL
