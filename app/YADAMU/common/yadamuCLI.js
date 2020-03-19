@@ -130,8 +130,12 @@ class YadamuCLI {
 	    throw err;
 	  }
 	} catch (e) {
-	  throw e
-	}
+	  if (e.code && e.code === 'ENOENT') {
+	  }
+	  else {
+	    throw e
+	  }
+ 	}
   }
 
   validateParameters(command) {
@@ -405,7 +409,7 @@ class YadamuCLI {
         break;
       default:
 	    const message = `Unsupported database vendor "${driver}".`
-        this.yadamuLogger.log([`${this.constructor.name}.getDatabaseInterface()`],message);  
+        this.yadamuLogger.info([`${this.constructor.name}.getDatabaseInterface()`],message);  
 		const err = new ConfigurationFileError(`[${this.constructor.name}.getDatabaseInterface()]: ${message}`);
 		throw err
       }

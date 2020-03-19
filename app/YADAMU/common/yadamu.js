@@ -61,7 +61,7 @@ class Yadamu {
     status.statusMsg = status.warningRaised === true ? 'with warnings' : status.statusMsg;
     status.statusMsg = status.errorRaised === true ? 'with errors'  : status.statusMsg;  
   
-    yadamuLogger.log([`${this.constructor.name}`,`${status.operation}`],`Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}.`);
+    yadamuLogger.info([`${this.constructor.name}`,`${status.operation}`],`Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}.`);
     if (!yadamuLogger.loggingToConsole()) {
       console.log(`${new Date().toISOString()}[${this.constructor.name}][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
     }
@@ -559,7 +559,7 @@ class Yadamu {
     const startTime = performance.now();
     const json = await dbi.uploadFile(importFilePath);
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.log([`${this.constructor.name}.uploadFile()`],`Processing file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
+    this.yadamuLogger.info([`${this.constructor.name}.uploadFile()`],`Processing file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
     return json;
   }
   

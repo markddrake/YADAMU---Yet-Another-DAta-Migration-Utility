@@ -89,7 +89,7 @@ class FileDBI extends YadamuDBI {
     const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
     this.inputStream = fs.createReadStream(importFilePath);
-    this.yadamuLogger.log([`${this.constructor.name}`],`Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.`)
+    this.yadamuLogger.info([`${this.constructor.name}`],`Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.`)
   }
 
   async finalizeExport() {
@@ -101,7 +101,7 @@ class FileDBI extends YadamuDBI {
 	super.initializeImport()
     const exportFilePath = path.resolve(this.parameters.FILE);
     this.outputStream = fs.createWriteStream(exportFilePath);
-    this.yadamuLogger.log([`${this.constructor.name}`],`Writing file "${exportFilePath}".`)
+    this.yadamuLogger.info([`${this.constructor.name}`],`Writing file "${exportFilePath}".`)
     this.outputStream.write(`{`)
   }
 

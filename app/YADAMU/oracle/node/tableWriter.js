@@ -39,7 +39,7 @@ class TableWriter extends YadamuWriter {
     this.cachedLobCount = 0;
     this.dumpOracleTestcase = false;
     this.lobCumlativeTime = 0;
-	
+	 
     if (this.dbi.dbVersion < 12) {
       this.WKX = require('wkx') 
     }
@@ -60,6 +60,8 @@ class TableWriter extends YadamuWriter {
             return null
           }
           break;
+		case "BFILE":
+		    // Convert JSON representation to String.
         case "JSON":
           return function(col,jdx) {
             // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
@@ -131,28 +133,58 @@ class TableWriter extends YadamuWriter {
  
     this.lobTransformations = new Array(this.tableInfo.binds.length).fill(null);
 	
+	/*
+	** NOTE:  ### this.cachedLobCount tracks the number of LOB column values that have been cached on the client as Strings or Buffers, 
+	** rather that cached on the server as temporary LOBs. bindRowAsLOB is set true if any LOB column value in the row exceeds the 
+	** maximum size defined for a client cached object, and forces all LOB values in the row to be converted to temporary LOBs
+    ** and cached on the server
+	**
+	*/
+	
 	if (this.tableInfo.lobColumns === true) {     
-	  this.lobTransformations = this.tableInfo.lobBinds.map(function(lobBind) {
+	  this.lobTransformations = this.tableInfo.lobBinds.map(function(lobBind,idx) {
         switch (lobBind.type) {
           case oracledb.CLOB:
 		    return function(col,self) {
               // Determine whether to bind content as string or temporary CLOB
               if (typeof col !== "string") {
-                return JSON.stringify(col);
+                col = JSON.stringify(col);
               }
               self.cachedLobCount++
-              self.bindRowAsLob = self.bindRowAsLob || (Buffer.byteLength(col,'utf8') > self.dbi.parameters.LOB_MIN_SIZE) || Buffer.byteLength(col,'utf8') === 0
+              self.bindRowAsLOB = self.bindRowAsLOB || (Buffer.byteLength(col,'utf8') > self.dbi.parameters.LOB_MIN_SIZE) || Buffer.byteLength(col,'utf8') === 0
 			  return col;
 		    }
 		    break;
           case oracledb.BLOB:
 		    return function(col,self) {
+			  /*
+			  **
+			  ** At this point we can have one of the following to deal with:
+			  ** 
+			  ** 1. A Buffer
+			  ** 2. A string containing HexBinary encodedd content
+			  ** 3. A JSON Objct
+			  **
+			  ** If we have a JSON object stringify it.
+			  ** If we have a HexBinary representation of a Buffer convert it into a Buffer unless the resuling buffer would exceed the maximu size defined for a client cached object.
+			  ** the maximum size of a client cached LOB.
+			  ** If we have an ojbect we need to serialize it and convert the serialization into a Buffer
+			  */
               // Determine whether to bind content as Buffer or temporary BLOB
-              if ((typeof col === "string") || ((col.length/2) <= self.dbi.parameters.LOB_MIN_SIZE)) {
-                col = Buffer.from(col,'hex')
+			  if ((typeof col === "object") && (!Buffer.isBuffer(col))) {
+				col = Buffer.from(JSON.stringify(col),'utf-8')
+			  }
+              if ((typeof col === "string") && (col.length/2) <= self.dbi.parameters.LOB_MIN_SIZE) {
+				if (self.tableInfo.dataTypes[idx].type === 'JSON') {
+				  col = Buffer.from(col,'utf-8')
+				}
+				else {
+				  col = Buffer.from(col,'hex')
+				}
               }
-              self.cachedLobCount++
-              self.bindRowAsLob = self.bindRowAsLob || (col.length > self.dbi.parameters.LOB_MIN_SIZE)  
+		      self.cachedLobCount++
+			  // If col ia still a string at this point the string is too large to be stored in the client side cache
+              self.bindRowAsLOB = self.bindRowAsLOB || (col.length > self.dbi.parameters.LOB_MIN_SIZE) 
 			  return col
 			}
             break
@@ -183,19 +215,19 @@ class TableWriter extends YadamuWriter {
   }
 
   trackClobFromString(s) {
-    const clob = this.dbi.trackClobFromString(s)
+    const clob = this.dbi.clobFromString(s)
 	this.lobList.push(clob);
 	return clob
   }
   
   trackBlobFromHexBinary(s) {
-    const blob = this.dbi.trackBlobFromHexBinary(s)
+    const blob = this.dbi.blobFromHexBinary(s)
 	this.lobList.push(blob);
 	return blob
   }
   
   trackBlobFromBuffer(b) {
-	const blob = this.dbi.trackBlobFromBuffer(b)
+	const blob = this.dbi.blobFromBuffer(b)
 	this.lobList.push(blob);
 	return blob;
   }
@@ -232,7 +264,7 @@ class TableWriter extends YadamuWriter {
     // if ( (this.batch.length + this.lobBatch.length) === 0 ) {console.log(row)}
 
     try {
-      this.bindRowAsLob = false;
+      this.bindRowAsLOB = false;
 	  if (this.tableInfo.lobColumns) {
 		// Bind Ordering and Row Ordering are the probably different. Use map to create a new array in BindOrdering when applying transformations
 	    row = this.transformations.map(function (transformation,bindIdx) {
@@ -258,10 +290,10 @@ class TableWriter extends YadamuWriter {
       }
 	  
 	  // Row is now in bindOrdering. Convert CLOB and BLOB to temporaryLOBs where necessary
-      if (this.bindRowAsLob) {
+      if (this.bindRowAsLOB) {
 	    // Use map combined with Promise.All to convert columns to temporaryLobs
 	    const lobStartTime = performance.now();
-        row = await Promise.all(this.tableInfo.binds.map(function(bind,idx){
+        row = await Promise.all(this.tableInfo.lobBinds.map(function(bind,idx){
           if (row[idx] !== null) {
             switch (bind.type) {
               case oracledb.CLOB:
@@ -272,7 +304,7 @@ class TableWriter extends YadamuWriter {
               case oracledb.BLOB:
                 this.templobCount++  
                 this.cachedLobCount--
-                if (typeof row[idx] === 'string') {
+				if (typeof row[idx] === 'string') {
                   return this.trackBlobFromHexBinary(row[idx])                                                                    
                 }
                 else {
@@ -529,7 +561,7 @@ end;`
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,rows[row])
       } catch (e) {
-        const record = await this.serializeLobs(rows[row])
+		const record = await this.serializeLobs(rows[row])
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,this.tableInfo.targetDataTypes,JSON.stringify(record)] : []
         this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,rows.length,row,record,e,errInfo);
         if (this.skipTable) {

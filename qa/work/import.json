@@ -14,7 +14,7 @@
     }
   , "reverseOperations" : true
   , "recreateSchemas"   : true
-  , "tasks": [
+  , "tasks": [11
       "oracle"
     ]
   },{

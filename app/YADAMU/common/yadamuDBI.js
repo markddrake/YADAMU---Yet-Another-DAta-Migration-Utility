@@ -31,20 +31,21 @@ class YadamuDBI {
   get DATABASE_VENDOR()     { return undefined };
   get SOFTWARE_VENDOR()     { return undefined };
   get SPATIAL_FORMAT()      { return spatialFormat };
+  get EXPORT_VERSION()      { return this.yadamu.EXPORT_VERSION }
   get DEFAULT_PARAMETERS()  { return this.yadamu.getYadamuDefaults().yadmuDBI }
   get STATEMENT_TERMINATOR() { return '' }
   
   traceSQL(msg) {
-	 this.yadamuLogger.trace([this.DATABASE_VENDOR,'SQL'],msg)
-	 return(`${msg.trim()}${this.sqlTraceTag} ${this.sqlTerminator}`);
+     this.yadamuLogger.trace([this.DATABASE_VENDOR,'SQL'],msg)
+     return(`${msg.trim()}${this.sqlTraceTag} ${this.sqlTerminator}`);
   }
   
   traceTiming(startTime,endTime) {      
-  	const sqlOperationTime = endTime - startTime;
+    const sqlOperationTime = endTime - startTime;
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(`--\n--${this.sqlTraceTag} Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlOperationTime)}s.\n--\n`);
     }
-	this.sqlCumlativeTime = this.sqlCumlativeTime + sqlOperationTime
+    this.sqlCumlativeTime = this.sqlCumlativeTime + sqlOperationTime
   }
  
   traceComment(comment) {
@@ -60,7 +61,7 @@ class YadamuDBI {
         setTimeout(
           function() {
            self.yadamuLogger.info([`${self.constructor.name}.doTimeout()`],`Awake.`);
-		   resolve();
+           resolve();
           },
           milliseconds
        )
@@ -96,11 +97,57 @@ class YadamuDBI {
   } 
   
   decomposeDataTypes(targetDataTypes) {
-	 return targetDataTypes.map(function (targetDataType) {
+     return targetDataTypes.map(function (targetDataType) {
        return this.decomposeDataType(targetDataType)
-	 },this)
+     },this)
   }
   
+  processError(yadamuLogger,logEntry,counters,logDDL) {
+	 
+	let warning = true;
+	  
+    switch (logEntry.severity) {
+      case 'CONTENT_TOO_LARGE' :
+        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database does not support VARCHAR2 values longer than ${this.maxStringSize} bytes.`)
+        return;
+      case 'SQL_TOO_LARGE':
+        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database is not configured for DLL statements longer than ${this.maxStringSize} bytes.`)
+        return;
+      case 'FATAL':
+        counters.errors++
+        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}`)
+        return
+      case 'WARNING':
+        counters.warnings++
+        break;
+      case 'IGNORE':
+        counters.warnings++
+        break;
+      case 'DUPLICATE':
+        counters.duplicates++
+        break;
+      case 'REFERENCE':
+        counters.reference++
+        break;
+      case 'AQ RELATED':
+        counters.aq++
+        break;
+      case 'RECOMPILATION':
+        counters.recompilation++
+        break;
+      default:
+	    warning = false
+    }
+    if (logDDL) { 
+	  if (warning) {
+        yadamuLogger.warning([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
+	  }
+	  else {
+        yadamuLogger.info([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
+	  }
+	}
+  }
+          
   processLog(log,status,yadamuLogger) {
 
     const logDML         = (status.loglevel && (status.loglevel > 0));
@@ -111,52 +158,47 @@ class YadamuDBI {
     if (status.dumpFileName) {
       fs.writeFileSync(status.dumpFileName,JSON.stringify(log));
     }
-    
-    log.forEach(function(result) {
-                  const logEntryType = Object.keys(result)[0];
-                  const logEntry = result[logEntryType];
-                  switch (true) {
-                    case (logEntryType === "message") : 
-                      yadamuLogger.log([`${this.constructor.name}`],`: ${logEntry}.`)
-                      break;
-                    case (logEntryType === "dml") : 
-                      yadamuLogger.log([`${this.constructor.name}`,`${logEntry.tableName}`],`Rows ${logEntry.rowCount}. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(logEntry.elapsedTime))}s. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.`)
-                      break;
-                    case (logEntryType === "info") :
-                      yadamuLogger.info([`${this.constructor.name}`],`"${JSON.stringify(logEntry)}".`);
-                      break;
-                    case (logDML && (logEntryType === "dml")) :
-                      yadamuLogger.log([`${this.constructor.name}`,`${logEntry.tableName}`,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`)
-                      break;
-                    case (logDDL && (logEntryType === "ddl")) :
-                      yadamuLogger.log([`${this.constructor.name}`,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`) 
-                      break;
-                    case (logTrace && (logEntryType === "trace")) :
-                      yadamuLogger.trace([`${this.constructor.name}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`\n${logEntry.sqlStatement}.`)
-                      break;
-                    case (logEntryType === "error"):
-   	                switch (true) {
-   		              case (logEntry.severity === 'FATAL') :
-                        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}`)
-   				        break
-   					  case (logEntry.severity === 'WARNING') :
-                        yadamuLogger.warning([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
-                        break;
-  					  case (logEntry.severity === 'CONTENT_TOO_LARGE') :
-                        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database does not support VARCHAR2 values longer than ${this.maxStringSize} bytes.`)
-                        break;
-    			      case (logEntry.severity === 'SQL_TOO_LARGE') :
-                        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database is not configured for DLL statements longer than ${this.maxStringSize} bytes.`)
-                        break;
-                      case (logDDLMsgs) :
-                        yadamuLogger.log([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
-                        break;
-                    } 	
-                  } 
-   				if ((status.sqlTrace) && (logEntry.sqlStatement)) {	
-   				  status.sqlTrace.write(this.traceSQL(logEntry.sqlStatement))
-   		        }
+     
+    const counters = {
+       errors        : 0
+      ,warnings      : 0
+      ,ignoreable    : 0
+      ,duplicates    : 0
+      ,reference     : 0
+      ,aq            : 0
+      ,recompilation : 0
+    };
+      
+	log.forEach(function(result) { 
+      const logEntryType = Object.keys(result)[0];
+      const logEntry = result[logEntryType];
+      switch (true) {
+        case (logEntryType === "message") : 
+          yadamuLogger.info([`${this.constructor.name}`],`: ${logEntry}.`)
+          break;
+        case (logEntryType === "dml") : 
+          yadamuLogger.info([`${this.constructor.name}`,`${logEntry.tableName}`],`Rows ${logEntry.rowCount}. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(logEntry.elapsedTime))}s. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.`)
+          break;
+        case (logEntryType === "info") :
+          yadamuLogger.info([`${this.constructor.name}`],`"${JSON.stringify(logEntry)}".`);
+          break;
+        case (logDML && (logEntryType === "dml")) :
+          yadamuLogger.dml([`${this.constructor.name}`,`${logEntry.tableName}`,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`)
+          break;
+        case (logDDL && (logEntryType === "ddl")) :
+          yadamuLogger.ddl([`${this.constructor.name}`,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`) 
+          break;
+        case (logTrace && (logEntryType === "trace")) :
+          yadamuLogger.trace([`${this.constructor.name}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`\n${logEntry.sqlStatement}.`)
+          break;
+        case (logEntryType === "error"):
+		  this.processError(yadamuLogger,logEntry,counters,logDDLMsgs);
+      } 
+      if ((status.sqlTrace) && (logEntry.sqlStatement)) { 
+        status.sqlTrace.write(this.traceSQL(logEntry.sqlStatement))
+      }
     },this) 
+	return counters;
   }    
 
   logConnectionProperties() {    
@@ -168,9 +210,9 @@ class YadamuDBI {
   }
      
   setConnectionProperties(connectionProperties) {
-	if (Object.getOwnPropertyNames(connectionProperties).length > 0) {	  
+    if (Object.getOwnPropertyNames(connectionProperties).length > 0) {    
       this.connectionProperties = connectionProperties 
-	}
+    }
   }
   
   getConnectionProperties() {
@@ -207,7 +249,7 @@ class YadamuDBI {
   }
   
   setParameters(parameters) {
-	 Object.assign(this.parameters, parameters ? parameters : {})
+     Object.assign(this.parameters, parameters ? parameters : {})
   }
   
   loadTableMappings(mappingFile) {
@@ -215,7 +257,7 @@ class YadamuDBI {
   }
 
   setTableMappings(tableMappings) {
-	this.tableMappings = tableMappings
+    this.tableMappings = tableMappings
   }
 
   reverseTableMappings() {
@@ -278,7 +320,7 @@ class YadamuDBI {
   async executeDDL(ddl) {
     const startTime = performance.now();
     await this.executeDDLImpl(ddl);
-    this.yadamuLogger.info([`${this.constructor.name}.executeDDL()`],`Executed ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+    this.yadamuLogger.ddl([`${this.constructor.name}.executeDDL()`],`Executed ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
   }
   
   createRejectManager() {
@@ -290,7 +332,7 @@ class YadamuDBI {
   setOption(name,value) {
     this.options[name] = value;
   }
-	
+    
   initializeParameters(parameters) {
     
     // In production mode the Databae default parameters are merged with the command Line Parameters loaded by YADAMU.
@@ -308,12 +350,12 @@ class YadamuDBI {
   constructor(yadamu,parameters) {
     
     this.options = {
-	  recreateTargetSchema : false
-	}
+      recreateTargetSchema : false
+    }
     
-	this.spatialFormat = this.SPATIAL_FORMAT 
+    this.spatialFormat = this.SPATIAL_FORMAT 
     this.yadamu = yadamu;
-	this.sqlTraceTag = '';
+    this.sqlTraceTag = '';
     this.status = yadamu.getStatus()
     this.yadamuLogger = yadamu.getYadamuLogger();
     this.initializeParameters(parameters);
@@ -336,9 +378,9 @@ class YadamuDBI {
     }   
  
     this.rejectManager = this.createRejectManager()
-	
-	this.sqlCumlativeTime = 0
-	this.sqlTerminator = `\n${this.STATEMENT_TERMINATOR}\n`
+    
+    this.sqlCumlativeTime = 0
+    this.sqlTerminator = `\n${this.STATEMENT_TERMINATOR}\n`
   }
 
   enablePerformanceTrace() { 
@@ -349,59 +391,59 @@ class YadamuDBI {
   }
 
   reportAsyncOperation(...args) {
-	 fs.writeFileSync(this.parameters.PERFORMANCE_TRACE, `${util.format(...args)}\n`, { flag: 'a' });
+     fs.writeFileSync(this.parameters.PERFORMANCE_TRACE, `${util.format(...args)}\n`, { flag: 'a' });
   }
   
   async getDatabaseConnectionImpl() {
-	try {
+    try {
       await this.createConnectionPool();
-	  this.connection = await this.getConnectionFromPool();
-	  await this.configureConnection();
-	} catch (e) {
+      this.connection = await this.getConnectionFromPool();
+      await this.configureConnection();
+    } catch (e) {
       const err = new ConnectionError(e,this.connectionProperties);
-	  throw err
-	}
+      throw err
+    }
 
   }  
   
   async getDatabaseConnection(requirePassword) {
-	  	 		
-	let interactiveCredentials = (requirePassword && ((this.connectionProperties[this.PASSWORD_KEY_NAME] === undefined) || (this.connectionProperties[this.PASSWORD_KEY_NAME].length === 0))) 
-	let retryCount = interactiveCredentials ? 3 : 1;
-	
-	let prompt = `Enter password for ${this.DATABASE_VENDOR} connection: `
-	while (retryCount > 0) {
-	  retryCount--
-	  if (interactiveCredentials)  {
-  	    const pwQuery = this.yadamu.createQuestion(prompt);
-  	    const password = await pwQuery;
-	    this.connectionProperties[this.PASSWORD_KEY_NAME] = password;
+                
+    let interactiveCredentials = (requirePassword && ((this.connectionProperties[this.PASSWORD_KEY_NAME] === undefined) || (this.connectionProperties[this.PASSWORD_KEY_NAME].length === 0))) 
+    let retryCount = interactiveCredentials ? 3 : 1;
+    
+    let prompt = `Enter password for ${this.DATABASE_VENDOR} connection: `
+    while (retryCount > 0) {
+      retryCount--
+      if (interactiveCredentials)  {
+        const pwQuery = this.yadamu.createQuestion(prompt);
+        const password = await pwQuery;
+        this.connectionProperties[this.PASSWORD_KEY_NAME] = password;
       }
-	  try {
-        await this.getDatabaseConnectionImpl()	
-		return;
-	  } catch (e) {		
+      try {
+        await this.getDatabaseConnectionImpl()  
+        return;
+      } catch (e) {     
         switch (retryCount) {
-		  case 0: 
-		    if (interactiveCredentials) {
-		      throw new CommandLineError(`Unable to establish connection to ${this.DATABASE_VENDOR} after 3 attempts. Operation aborted.`);
-		      break;
-			}
-		    else {
-		      throw (e)
-		    }
-		    break;
+          case 0: 
+            if (interactiveCredentials) {
+              throw new CommandLineError(`Unable to establish connection to ${this.DATABASE_VENDOR} after 3 attempts. Operation aborted.`);
+              break;
+            }
+            else {
+              throw (e)
+            }
+            break;
           case 1:
-		    console.log(`Database Error: ${e.message}`)
+            console.log(`Database Error: ${e.message}`)
             break;
-          case 2:			
-		    prompt = `Unable to establish connection. Re-${prompt}`;
-		    console.log(`Database Error: ${e.message}`)
+          case 2:           
+            prompt = `Unable to establish connection. Re-${prompt}`;
+            console.log(`Database Error: ${e.message}`)
             break;
-		  default:
-		    throw e
-		}
-	  } 
+          default:
+            throw e
+        }
+      } 
     }
   }
     
@@ -412,8 +454,8 @@ class YadamuDBI {
   */
 
   async initialize(requirePassword) {
-	  
-	if (this.status.sqlTrace) {
+      
+    if (this.status.sqlTrace) {
        if (this.status.sqlTrace._writableState.ended === true) {
          this.status.sqlTrace = fs.createWriteStream(this.status.sqlTrace.path,{"flags":"a"})
        }
@@ -440,12 +482,12 @@ class YadamuDBI {
     if (this.parameters.PARAMETER_TRACE === true) {
       this.yadamuLogger.writeDirect(`${util.inspect(this.parameters,{colors:true})}\n`);
     }
-	
-	if (this.parameters.PERFORMANCE_TRACE) {
+    
+    if (this.parameters.PERFORMANCE_TRACE) {
       this.enablePerformanceTrace();
-	}
-	
-	if (this.isDatabase()) {
+    }
+    
+    if (this.isDatabase()) {
       await this.getDatabaseConnection(requirePassword);
     }
   }
@@ -467,10 +509,10 @@ class YadamuDBI {
   */
 
   async abort(cause) {
-	if (cause instanceof Error) {
+    if (cause instanceof Error) {
       this.yadamuLogger.logException([`${this.constructor.name}`,`ABORT`],`Cause:`)
-	  this.yadamuLogger.logException(e)
-	}
+      this.yadamuLogger.logException(e)
+    }
   }
 
   /*
@@ -498,10 +540,10 @@ class YadamuDBI {
   */
   
   async rollbackTransaction(cause) {
-	if (cause instanceof Error) {
+    if (cause instanceof Error) {
       this.yadamuLogger.logException([`${this.constructor.name}`,`ROLLBACK`],`Cause:`)
-	  this.yadamuLogger.logException(e)
-	}
+      this.yadamuLogger.logException(e)
+    }
   }
   
   /*
@@ -520,10 +562,10 @@ class YadamuDBI {
   */
 
   async restoreSavePoint(cause) {
-	if (cause instanceof Error) {
+    if (cause instanceof Error) {
       this.yadamuLogger.logException([`${this.constructor.name}`,`REVERT`],`Cause:`)
-	  this.yadamuLogger.logException(e)
-	}
+      this.yadamuLogger.logException(e)
+    }
   }
 
   /*
@@ -575,7 +617,7 @@ class YadamuDBI {
   */
 
   async getDDLOperations() {
-	// Undefined means database does not provide mechanism to obtain DDL statements. Different to returning an empty Array.
+    // Undefined means database does not provide mechanism to obtain DDL statements. Different to returning an empty Array.
     return undefined
   }
   
@@ -596,7 +638,7 @@ class YadamuDBI {
   }
   
   processStreamingError(e,stack,tableInfo) {
-	return e
+    return e
   }
   
   async getInputStream(tableInfo,parser) {
@@ -674,30 +716,30 @@ class YadamuDBI {
       this.loadTableMappings(this.parameters.MAPPINGS);
     }  
     if (this.parameters.SQL_TRACE) {
-	  this.status.sqlTrace = fs.createWriteStream(this.parameters.SQL_TRACE,{flags : "a"});
+      this.status.sqlTrace = fs.createWriteStream(this.parameters.SQL_TRACE,{flags : "a"});
     }
-	if (recreateSchema === true) {
-  	  this.setOption('recreateSchema',true);
+    if (recreateSchema === true) {
+      this.setOption('recreateSchema',true);
     }
   }
   
   async cloneSlaveConfiguration(dbi) {
-	dbi.setParameters(this.parameters);
-	dbi.systemInformation = this.systemInformation
-	dbi.metadata = this.metadata
-	dbi.schemaCache = this.schemaCache
-	dbi.statementCache = this.statementCache
-  }	  
+    dbi.setParameters(this.parameters);
+    dbi.systemInformation = this.systemInformation
+    dbi.metadata = this.metadata
+    dbi.schemaCache = this.schemaCache
+    dbi.statementCache = this.statementCache
+  }   
 
   async newSlaveInterface(slaveNumber,dbi,connection) {
-	  
-	// Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
-	  
-	dbi.slaveNumber = slaveNumber
-	dbi.sqlTraceTag = ` /* Slave [${slaveNumber}] */`;
-	dbi.connection = connection
-	await dbi.configureConnection();
-	this.cloneSlaveConfiguration(dbi);
+      
+    // Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
+      
+    dbi.slaveNumber = slaveNumber
+    dbi.sqlTraceTag = ` /* Slave [${slaveNumber}] */`;
+    dbi.connection = connection
+    await dbi.configureConnection();
+    this.cloneSlaveConfiguration(dbi);
     return dbi
   }
   

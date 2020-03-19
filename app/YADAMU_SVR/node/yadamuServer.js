@@ -82,7 +82,7 @@ class YadamuServer {
         dbi = new FileDBI(yadamu)
         break;
       default:   
-        this.yadamuLogger.log([`${this.constructor.name}.getDatabaseInterface()`,`${driver}`],`Unknown Database.`);  
+        this.yadamuLogger.info([`${this.constructor.name}.getDatabaseInterface()`,`${driver}`],`Unknown Database.`);  
       }
 	  
 	  dbi.setConnectionProperties(connectionProperties);

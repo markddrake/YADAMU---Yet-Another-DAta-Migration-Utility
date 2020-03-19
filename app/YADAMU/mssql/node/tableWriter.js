@@ -271,7 +271,7 @@ class TableWriter extends YadamuWriter {
           ps.input(column,sql.VarChar(4000));
           break;
         default:
-         this.yadamuLogger.log([`${this.constructor.name}.createPreparedStatement()`],`Unmapped data type [${dataType.type}].`);
+         this.yadamuLogger.info([`${this.constructor.name}.createPreparedStatement()`],`Unmapped data type [${dataType.type}].`);
       }
     },this)
     if (this.status.sqlTrace) {

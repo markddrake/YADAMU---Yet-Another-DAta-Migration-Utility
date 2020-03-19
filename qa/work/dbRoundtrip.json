@@ -1,6 +1,6 @@
 {
   "operation"                         : "dbRoundtrip"
-, "connections"                       : "qa/regression/connections.json"
+, "connections"                       : "qa/wip/o20c/connections.json"
 , "parameters": {
     "MODE": "DATA_ONLY"
   , "FEEDBACK": "COMMIT"
@@ -8,12 +8,12 @@
 , "tasks"                             : "qa/regression/dbRoundtripTasks.json"
 , "tests"                  : [{
     "source": "oracle19c"
-  , "targets": ["oracle19c"]
+  , "targets": ["oracle20c"]
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
   , "tasks": [
-      "oracle"
+      "jsonExample#1"
     ]
   }]
 }

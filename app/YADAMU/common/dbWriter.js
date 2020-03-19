@@ -17,7 +17,7 @@ class DBWriter extends Writable {
     this.ddlRequired = (mode !== 'DATA_ONLY');    
     this.status = status;
     this.yadamuLogger = yadamuLogger;
-    this.yadamuLogger.log([`${this.constructor.name}`,`${dbi.DATABASE_VENDOR}`],`Ready. Mode: ${this.mode}.`)
+    this.yadamuLogger.info([`${this.constructor.name}`,`${dbi.DATABASE_VENDOR}`],`Ready. Mode: ${this.mode}.`)
         
     this.currentTable = undefined;
     this.rowCount     = undefined;

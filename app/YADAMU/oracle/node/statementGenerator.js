@@ -14,6 +14,7 @@ class StatementGenerator {
     this.targetSchema = targetSchema
     this.metadata = metadata
     this.spatialFormat = spatialFormat
+	this.objectsAsJSON = this.dbi.systemInformation.objectFormat === 'JSON';
     this.batchSize = batchSize
     this.commitSize = commitSize;
 	
@@ -86,8 +87,17 @@ class StatementGenerator {
            // Defalt JSON Storeage model: JSON store as CLOB
            // JSON store as BLOB can lead to Error: ORA-40479: internal JSON serializer error during export operations.
            // return {type : oracledb.CLOB}
-           tableInfo.lobColumns = true;
-           return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.JSON}
+		   switch (this.dbi.jsonDataType) {
+			  case 'JSON':
+			  case 'BLOB':
+                tableInfo.lobColumns = true;
+                return {type : oracledb.BLOB, maxSize : this.BIND_LENGTH.JSON}
+			  case 'CLOB':
+                tableInfo.lobColumns = true;
+                return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.JSON}
+			  default:
+			    return {type : oracledb.STRING, maxSize : 32767 }
+		   }
          case 'BLOB':
            // return {type : oracledb.BUFFER}
            // return {type : oracledb.BUFFER, maxSize : BIND_LENGTH.BLOB }
@@ -257,7 +267,7 @@ class StatementGenerator {
     await metadataLob.close();
     const statementCache = JSON.parse(results.outBinds.sql);
     const boundedTypes = ['CHAR','NCHAR','VARCHAR2','NVARCHAR2','RAW']
-    const ddlStatements = [];  
+    const ddlStatements = [JSON.stringify({jsonColumns:null})];  
     
     const tables = Object.keys(this.metadata); 
     tables.forEach(function(table,idx) {
@@ -338,7 +348,12 @@ class StatementGenerator {
              values.push(`OBJECT_SERIALIZATION.DESERIALIZE_XML(:${(idx+1)})`);
              break
            case "BFILE":
-             values.push(`OBJECT_SERIALIZATION.DESERIALIZE_BFILE(:${(idx+1)})`);
+		     if (this.objectsAsJSON) {
+               values.push(`OBJECT_TO_JSON.DESERIALIZE_BFILE(:${(idx+1)})`);
+			 }
+			 else {
+			   values.push(`OBJECT_SERIALIZATION.DESERIALIZE_BFILE(:${(idx+1)})`);
+             }
              break;
           case "ANYDATA":
             values.push(`ANYDATA.convertVARCHAR2(:${(idx+1)})`);
@@ -350,7 +365,7 @@ class StatementGenerator {
             if (targetDataType.indexOf('.') > -1) {
               plsqlRequired = true;
               values.push(`"#${targetDataType.slice(targetDataType.indexOf(".")+2,-1)}"(:${(idx+1)})`);
-            }
+			}
             else {
               values.push(`:${(idx+1)}`);
             }

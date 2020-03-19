@@ -16,6 +16,9 @@ declare
   CLOB_UNSUPPORTED EXCEPTION;
   PRAGMA EXCEPTION_INIT( CLOB_UNSUPPORTED , -40449);
 
+  OBJECTS_UNSUPPORTED EXCEPTION;
+  PRAGMA EXCEPTION_INIT( OBJECTS_UNSUPPORTED , -40654);
+
   JSON_DATA_TYPE_UNSUPPORTED EXCEPTION;
   PRAGMA EXCEPTION_INIT( JSON_DATA_TYPE_UNSUPPORTED , -40449);
 
@@ -46,57 +49,119 @@ begin
 
   $IF DBMS_DB_VERSION.VER_LE_11_2 $then
 --
-  V_CLOB_SUPPORTED := FALSE;
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
                          || '  JSON_PARSING_SUPPORTED         CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
 	                     || '  JSON_GENERATION_SUPPORTED      CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
-	                     || '  JSON_DATA_TYPE_SUPPORTED       CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
 	                     || '  CLOB_SUPPORTED                 CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
                          || '  EXTENDED_STRING_SUPPORTED      CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
-                         || '  TREAT_AS_JSON_SUPPORTED        CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
                          || '  C_RETURN_TYPE                  CONSTANT VARCHAR2(32) := ''VARCHAR2(4000)'';' || C_NEWLINE
-                         || '  C_MAX_STRING_SIZE              CONSTANT NUMBER       := DBMS_LOB.LOBMAXSIZE;';
---                       
+                         || '  C_MAX_STRING_SIZE              CONSTANT NUMBER       := DBMS_LOB.LOBMAXSIZE;' || C_NEWLINE
+						 || '  TREAT_AS_JSON_SUPPORTED        CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
+	                     || '  OBJECTS_AS_JSON                CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
+	                     || '  JSON_DATA_TYPE_SUPPORTED       CONSTANT BOOLEAN      := FALSE;';
+                        --                       
   $ELSIF DBMS_DB_VERSION.VER_LE_12_1 $then
 --
-  V_CLOB_SUPPORTED := FALSE;
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
                          || '  JSON_PARSING_SUPPORTED         CONSTANT BOOLEAN      := TRUE;'  || C_NEWLINE
                          || '  JSON_GENERATION_SUPPORTED      CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
-	                     || '  JSON_DATA_TYPE_SUPPORTED       CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
-	                     || '  CLOB_SUPPORTED                 CONSTANT BOOLEAN      := FALSE;'
-
+	                     || '  CLOB_SUPPORTED                 CONSTANT BOOLEAN      := FALSE;';
+	                     
   begin
     select length('X' || RPAD('X',4001)) into V_DUMMY from dual;
     V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                     || '  EXTENDED_STRING_SUPPORTED      CONSTANT BOOLEAN      := TRUE;' || C_NEWLINE;
+	                     || '  EXTENDED_STRING_SUPPORTED      CONSTANT BOOLEAN      := TRUE;' || C_NEWLINE
                          || '  C_RETURN_TYPE                  CONSTANT VARCHAR2(32) := ''VARCHAR2(32767)'';' || C_NEWLINE
                          || '  C_MAX_STRING_SIZE              CONSTANT NUMBER       := 32767;';
-    end if;
   exception
     when EXTENDED_STRING_UNSUPPORTED then
 	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                       || '  EXTENDED_STRING_SUPPORTED    CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE;
+	                       || '  EXTENDED_STRING_SUPPORTED    CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
                            || '  C_RETURN_TYPE                CONSTANT VARCHAR2(32) := ''VARCHAR2(4000)'';' || C_NEWLINE
                            || '  C_MAX_STRING_SIZE            CONSTANT NUMBER       := 4000;';
-      end if;
     when OTHERS then
 	  RAISE;
   end;
-                         || '  EXTENDED_STRING_SUPPORTED      CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
-                         || '  C_RETURN_TYPE                  CONSTANT VARCHAR2(32) := NULL;'  || C_NEWLINE
-                         || '  C_MAX_STRING_SIZE              CONSTANT NUMBER       := 0;';
---                       
+
+  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+                        || '  TREAT_AS_JSON_SUPPORTED        CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
+						|| '  OBJECTS_AS_JSON                CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
+                        || '  JSON_DATA_TYPE_SUPPORTED       CONSTANT BOOLEAN      := FALSE;';
+--
   $ELSE
 --
   begin
---
+    V_CLOB_SUPPORTED := TRUE;
     V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
                          || '  JSON_PARSING_SUPPORTED         CONSTANT BOOLEAN      := TRUE;'  || C_NEWLINE
                          || '  JSON_GENERATION_SUPPORTED      CONSTANT BOOLEAN      := TRUE;'  || C_NEWLINE;
 						 
     begin
-	
+	  -- Test for CLOB Support with JSON_GENERATION
+      execute immediate 'select JSON_ARRAY(DUMMY returning CLOB) from DUAL';
+      V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                       || '  CLOB_SUPPORTED                 CONSTANT BOOLEAN      := TRUE;'     || C_NEWLINE 
+                           || '  C_RETURN_TYPE                  CONSTANT VARCHAR2(32) := ''CLOB'';' || C_NEWLINE
+                           || '  C_MAX_STRING_SIZE              CONSTANT NUMBER       := DBMS_LOB.LOBMAXSIZE;';
+    exception
+      when CLOB_UNSUPPORTED then
+        V_CLOB_SUPPORTED := FALSE;
+	    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                         || '  CLOB_SUPPORTED                 CONSTANT BOOLEAN      := FALSE;';
+    when OTHERS then
+	  RAISE;
+    end;
+
+    begin
+      select length('X' || RPAD('X',4001)) into V_DUMMY from dual;
+      V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                       || '  EXTENDED_STRING_SUPPORTED      CONSTANT BOOLEAN      := TRUE;' || C_NEWLINE;
+      if (NOT V_CLOB_SUPPORTED) then
+        V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                         || '  C_RETURN_TYPE                CONSTANT VARCHAR2(32) := ''VARCHAR2(32767)'';' || C_NEWLINE
+                             || '  C_MAX_STRING_SIZE            CONSTANT NUMBER       := 32767;';
+      end if;
+    exception
+      when EXTENDED_STRING_UNSUPPORTED then
+	    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                         || '  EXTENDED_STRING_SUPPORTED    CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE;
+        if (NOT V_CLOB_SUPPORTED) then
+          V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                           || '  C_RETURN_TYPE              CONSTANT VARCHAR2(32) := ''VARCHAR2(4000)'';' || C_NEWLINE
+                               || '  C_MAX_STRING_SIZE          CONSTANT NUMBER       := 4000;';
+        end if;
+      when OTHERS then
+  	  RAISE;
+    end;
+  
+    begin
+	  -- Test for Treat as JSON support
+      execute immediate 'select TREAT(DUMMY AS JSON) from DUAL';
+      V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                     || '  TREAT_AS_JSON_SUPPORTED        CONSTANT BOOLEAN := TRUE;';
+    exception
+      when TREAT_AS_JSON_UNSUPPORTED then
+	    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                       || '  TREAT_AS_JSON_SUPPORTED      CONSTANT BOOLEAN := FALSE;';
+      when OTHERS then  
+  	    RAISE;
+    end;
+
+    begin
+	  -- Test for SQL Object type support with JSON Genearation 
+      execute immediate 'select JSON_ARRAY(DBURITYPE(''/sys/dual'')) from DUAL';
+      V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                     || '  OBJECTS_AS_JSON        CONSTANT BOOLEAN := TRUE;';
+    exception
+      when OBJECTS_UNSUPPORTED then
+	    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                       || '  OBJECTS_AS_JSON      CONSTANT BOOLEAN := FALSE;';
+      when OTHERS then  
+  	    RAISE;
+    end;
+
+    begin
+	  -- Test for Native JSON Data Type
       execute immediate 'select JSON_QUERY(''{}'',''$'' returning JSON) from dual';
       V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                       || '  JSON_DATA_TYPE_SUPPORTED      CONSTANT BOOLEAN      := TRUE;'     || C_NEWLINE;
@@ -107,59 +172,14 @@ begin
       when OTHERS then
 	    RAISE;
     end;
+  end;
 	
-    execute immediate 'select JSON_ARRAY(DUMMY returning CLOB) from DUAL';
-    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                     || '  CLOB_SUPPORTED                 CONSTANT BOOLEAN      := TRUE;'     || C_NEWLINE 
-                         || '  C_RETURN_TYPE                  CONSTANT VARCHAR2(32) := ''CLOB'';' || C_NEWLINE
-                         || '  C_MAX_STRING_SIZE              CONSTANT NUMBER       := DBMS_LOB.LOBMAXSIZE;';
-  exception
-    when CLOB_UNSUPPORTED then
-      V_CLOB_SUPPORTED := FALSE;
-	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                       || '  CLOB_SUPPORTED               CONSTANT BOOLEAN      := FALSE;';
-    when OTHERS then
-	  RAISE;
-  end;
 
-  begin
-    select length('X' || RPAD('X',4001)) into V_DUMMY from dual;
-    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                     || '  EXTENDED_STRING_SUPPORTED      CONSTANT BOOLEAN      := TRUE;' || C_NEWLINE;
-    if (NOT V_CLOB_SUPPORTED) then
-      V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                       || '  C_RETURN_TYPE                CONSTANT VARCHAR2(32) := ''VARCHAR2(32767)'';' || C_NEWLINE
-                           || '  C_MAX_STRING_SIZE            CONSTANT NUMBER       := 32767;';
-    end if;
-  exception
-    when EXTENDED_STRING_UNSUPPORTED then
-	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                       || '  EXTENDED_STRING_SUPPORTED    CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE;
-      if (NOT V_CLOB_SUPPORTED) then
-        V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                         || '  C_RETURN_TYPE              CONSTANT VARCHAR2(32) := ''VARCHAR2(4000)'';' || C_NEWLINE
-                             || '  C_MAX_STRING_SIZE          CONSTANT NUMBER       := 4000;';
-      end if;
-    when OTHERS then
-	  RAISE;
-  end;
-  
-  begin
-  
-    execute immediate 'select TREAT(DUMMY AS JSON) from DUAL';
-    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                     || '  TREAT_AS_JSON_SUPPORTED        CONSTANT BOOLEAN := TRUE;';
-  exception
-    when TREAT_AS_JSON_UNSUPPORTED then
-	  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                       || '  TREAT_AS_JSON_SUPPORTED      CONSTANT BOOLEAN := FALSE;';
-    when OTHERS then
-	  RAISE;
-  end;
---
 $END
 --  
+  -- 
   begin
+    -- XML Schema Support not avaialble in ATP and ADW
     execute immediate 'begin :1 := dbms_xmlschema.DELETE_CASCADE_FORCE; end;' using out V_DUMMY;
     V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                     || '  XMLSCHEMA_SUPPORTED            CONSTANT BOOLEAN := TRUE;' || C_NEWLINE; 
@@ -170,11 +190,9 @@ $END
     when OTHERS then
       RAISE;
   end; 
-  
-  -- cast(collect(PLSQL_FUNCTION_RETURNING VARCHAR2 causes ORA-22814: attribute or element value is larger than specified in type in 12.2 and early 18.x releases.
-  
+    
   begin
-
+    -- cast(collect(PLSQL_FUNCTION_RETURNING VARCHAR2 causes ORA-22814: attribute or element value is larger than specified in type in 12.2 and early 18.x releases.
     execute immediate 'select cast(collect(UTL_RAW.CAST_TO_VARCHAR2(''01'')) as T_VC4000_TABLE) from dual';
     V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                     || '   COLLECT_PLSQL_SUPPORTED       CONSTANT BOOLEAN := TRUE;' || C_NEWLINE; 
@@ -187,7 +205,7 @@ $END
   end; 
   
   begin
-
+    -- Oracle Cloud Service or On-Premise deployment - Eg is Cloud Lockdown in force
     select case 
              when SYS_CONTEXT('USERENV','CLOUD_SERVICE') is NULL then 
 	  	      'ON_PREMISIS' 

@@ -12,7 +12,6 @@ class DBParser extends YadamuParser {
     super(tableInfo,objectMode,yadamuLogger);      
     this.columnMetadata = undefined;
     this.includesLobs = false;
-    
   }
 
   setColumnMetadata(metadata) {
@@ -95,7 +94,7 @@ class DBParser extends YadamuParser {
         try {
           data[idx] = JSON.parse(data[idx]) 
         } catch (e) {
-          this.yadamuLogger.logException([`${this.constructor.name}._transform()`,`${DATABASE_VENDOR}`,`${counter}`],e);
+          this.yadamuLogger.logException([`${this.constructor.name}._transform()`,`${this.counter}`],e);
           this.yadamuLogger.writeDirect(`${data[idx]}\n`);
         } 
       }

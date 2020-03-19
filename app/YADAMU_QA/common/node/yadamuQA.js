@@ -356,7 +356,7 @@ class YadamuQA {
       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }
     else {
-      this.yadamuLogger.log([`${this.constructor.name}.${operation}()`,`COPY`],`Completed. Source:[${sourceDescription}]. Target:[${targetDescription}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+      this.yadamuLogger.info([`${this.constructor.name}.${operation}()`,`COPY`],`Completed. Source:[${sourceDescription}]. Target:[${targetDescription}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
     }
   
   }
@@ -384,12 +384,13 @@ class YadamuQA {
   } 
   
   getCompareParameters(sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters) {
-        
+		
     const testDefaults = this.yadamu.getYadamuTestDefaults()
     const compareParameters = Object.assign({}, testParameters)
     
     Object.assign(compareParameters, this.getDefaultValue('SPATIAL_PRECISION',testDefaults,sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
     Object.assign(compareParameters, this.getDefaultValue('XSL_TRANSFORMATION',testDefaults,sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
+    Object.assign(compareParameters, this.getDefaultValue('ORDERED_JSON',testDefaults,sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
    
     let versionSpecificKey = sourceVendor + "#" + sourceVersion;
     Object.assign(compareParameters, testDefaults[sourceVendor])
@@ -699,7 +700,7 @@ class YadamuQA {
       this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }
     else {
-      this.yadamuLogger.log([`${this.constructor.name}.dbRoundtrip()`,`OPERATION`],`Completed: Source:[${operationsList[0]}] -->  ${(operationsList.length === 3 ? '[' + operationsList[1] + '] --> ' : '')}Target:${operationsList[operationsList.length-1]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+      this.yadamuLogger.info([`${this.constructor.name}.dbRoundtrip()`,`OPERATION`],`Completed: Source:[${operationsList[0]}] -->  ${(operationsList.length === 3 ? '[' + operationsList[1] + '] --> ' : '')}Target:${operationsList[operationsList.length-1]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
     }
   
   }
@@ -807,10 +808,12 @@ class YadamuQA {
 	  
       sourceDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
       let targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,true) 
+	  
       this.propogateTableMatching(sourceDBI,targetDBI);
       let startTime = performance.now();
       timings.push(await this.yadamu.pumpData(sourceDBI,targetDBI));
       let elapsedTime = performance.now() - startTime
+      targetVersion = targetDBI.dbVersion
       tableMappings = targetDBI.reverseTableMappings();
       operationsList.push(`"${sourceConnectionName}"://${sourceDescription}`)
       operationsList.push(`"${targetConnectionName}"://${targetDescription}`)
@@ -1042,7 +1045,7 @@ class YadamuQA {
     const fileCompare = this.getDatabaseInterface('file',{},fileCompareParms,false,tableMappings)
 	await fileCompare.compareFiles(this.yadamuLoggger,sourceFile,file1, file2, timings)
 
-    this.yadamuLogger.log([`${this.constructor.name}.fileRoundtrip()`,`${test.parser === 'SQL' ? 'SQL' : 'CLARINET'}`],`Operation complete: [${this.operationsList[0]}] -->  [${this.operationsList[1]}] --> [${this.operationsList[2]}] --> [${this.operationsList[3]}]  --> [${this.operationsList[4]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(opsElapsedTime)}s.`);
+    this.yadamuLogger.info([`${this.constructor.name}.fileRoundtrip()`,`${test.parser === 'SQL' ? 'SQL' : 'CLARINET'}`],`Operation complete: [${this.operationsList[0]}] -->  [${this.operationsList[1]}] --> [${this.operationsList[2]}] --> [${this.operationsList[3]}]  --> [${this.operationsList[4]}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(opsElapsedTime)}s.`);
 
   }
 
@@ -1235,14 +1238,14 @@ class YadamuQA {
 			    }
 			  }
               const elapsedTime = performance.now() - startTime;
-              this.yadamuLogger.log([`${this.constructor.name}.doTests()`,`TASK`],`Completed. Source:[${sourceDescription}]. Target:[${targetDescription}]. Task:[${task}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+              this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TASK`],`Completed. Source:[${sourceDescription}]. Target:[${targetDescription}]. Task:[${task}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
 		    } catch (e) {
 			  this.yadamuLogger.logException([`${this.constructor.name}.doTests()`,mode],e);
 			  throw e
 			}   
 	      }
 		  const elapsedTime = performance.now() - startTime;
-          this.yadamuLogger.log([`${this.constructor.name}.doTests()`,`TARGET`],`Completed. Source:[${sourceDescription}]. Target:[${targetDescription}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+          this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TARGET`],`Completed. Source:[${sourceDescription}]. Target:[${targetDescription}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
         }		 
         const elapsedTime = performance.now() - startTime;
         this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TEST`],`Completed. Source:[${sourceDescription}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);

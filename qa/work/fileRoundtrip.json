@@ -1,20 +1,21 @@
 {
   "operation"                         : "fileRoundtrip"
-, "connections"                       : "qa/work/connections.json"
+, "connections"                       : "qa/work/YDB2.json"
 , "parameters": {
     "MODE": "DATA_ONLY"
   , "FEEDBACK": "COMMIT"
   }
 , "tasks"                             : "qa/regression/fileRoundtripTasks.json"
 , "tests" : [{
-    "source": "file#6"
+    "source": "file-JSON-root"
   , "targets": [
-       "oracle19c"
+       "oracle12c","oracle11g"
+	  
     ]
   , "parser" : "SQL"
   , "directory" : "tests/fileRoundtrip/%source%"
   , "tasks": [
-       "HR"
+       "jtest"
     ]
   }]
 }

@@ -35,6 +35,21 @@ class YadamuLogger {
     this.log(args,msg)
   }
   
+  dml(args,msg) {
+    args.unshift('DML')
+    this.log(args,msg)
+  }
+
+  ddl(args,msg) {
+    args.unshift('DDL')
+    this.log(args,msg)
+  }
+
+  sql(args,msg) {
+    args.unshift('SQL')
+    this.log(args,msg)
+  }
+
   warning(args,msg) {
     this.status.warningRaised = true;
     args.unshift('WARNING')

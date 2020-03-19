@@ -32,7 +32,9 @@
   , "LOB_MIN_SIZE"            : 32768
   , "LOB_MAX_SIZE"            : 16777216
   , "LOB_CACHE_COUNT"         : 50000
-  }
+  , "OBJECTS_AS_JSON"         : false
+  , "MIGRATE_JSON_STORAGE"    : false
+  , "JSON_STORAGE_FORMAT"     : "JSON"  }
 , "postgres"                  : {
   }
 , "snowflake"                 : {

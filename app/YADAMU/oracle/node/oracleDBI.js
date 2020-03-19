@@ -118,6 +118,9 @@ const sqlFetchDDL11g = `declare
 
 begin
 
+  V_RESULT.extend(1);
+  V_RESULT(V_RESULT.COUNT) := YADAMU_UTILITIES.KVC(NULL,'{"jsonColumns":null}');
+
   -- Use DBMS_METADATA package to access the XMLSchemas registered in the target database schema
 
   DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM,'PRETTY',false);
@@ -262,7 +265,36 @@ const sqlFetchDDL19c = `declare
         )
     and OWNER = C_SCHEMA;
 
+
+  V_JSON_COLUMNS   CLOB;
 begin
+--
+  select JSON_OBJECT('jsonColumns' value 
+           JSON_ARRAYAGG(
+		     JSON_OBJECT(
+			  'owner' value OWNER, 'tableName' value TABLE_NAME, 'columnName' value COLUMN_NAME, 'jsonFormat' value FORMAT, 'dataType' value  DATA_TYPE
+		     )
+         $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+             returning CLOB
+		   )
+           returning CLOB
+         $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+             returning VARCHAR2(32767)
+		   )
+           returning VARCHAR2(32767)
+         )
+         $ELSE   
+             returning VARCHAR2(4000)
+		   ) 
+		   returning VARCHAR2(4000)
+		 $END
+       )
+	into V_JSON_COLUMNS
+    from ALL_JSON_COLUMNS
+   where OBJECT_TYPE = 'TABLE'
+     and OWNER = V_SCHEMA;
+		 
+  V_RESULT.APPEND(V_JSON_COLUMNS);
 
   -- Use DBMS_METADATA package to access the XMLSchemas registered in the target database schema
 
@@ -358,7 +390,7 @@ end;`;
 
 const sqlTableInfo = 
 `select * 
-   from table(YADAMU_EXPORT.GET_DML_STATEMENTS(:schema,:tableName,:spatialFormat))`;
+   from table(YADAMU_EXPORT.GET_DML_STATEMENTS(:schema,:tableName,:spatialFormat,:objectsAsJSON))`;
 
 const sqlDropWrapper = `declare
   OBJECT_NOT_FOUND EXCEPTION;
@@ -640,7 +672,7 @@ class OracleDBI extends YadamuDBI {
     const hexBinToBinary = new HexBinToBinary()
   
     const self = this
-    const stack = new Error.stack();        
+    const stack = new Error().stack;        
     return new Promise(async function(resolve,reject) {
       try {
         const blob = await self.createLob(oracledb.BLOB);
@@ -665,7 +697,7 @@ class OracleDBI extends YadamuDBI {
   clobFromStringReader(s) {
       
 	const self = this
-    const stack = new Error.stack();
+    const stack = new Error().stack;
     return new Promise(async function(resolve,reject) {
       try {
         const clob = await self.createLob(oracledb.CLOB);
@@ -740,13 +772,30 @@ class OracleDBI extends YadamuDBI {
     let sqlStatement = `ALTER SESSION SET TIME_ZONE = '+00:00' NLS_DATE_FORMAT = '${this.getDateFormatMask('Oracle')}' NLS_TIMESTAMP_FORMAT = '${this.getTimeStampFormatMask('Oracle')}' NLS_TIMESTAMP_TZ_FORMAT = '${this.getTimeStampFormatMask('Oracle')}' NLS_LENGTH_SEMANTICS = 'CHAR'`
     let result = await this.executeSQL(sqlStatement,{});
 
-    sqlStatement = `begin :version := YADAMU_EXPORT.DATABASE_RELEASE(); :size := YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE; end;`;
-    let args = {version:{dir: oracledb.BIND_OUT, type: oracledb.STRING},size:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER}}
+    sqlStatement = 
+`begin 
+   :version := YADAMU_EXPORT.DATABASE_RELEASE(); 
+   :size := YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE; 
+   :jsonStorageModel := YADAMU_IMPORT.C_JSON_STORAGE_MODEL; 
+   if YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED then :jsonParser := 'TRUE'; else :jsonParser := 'FALSE'; end if;
+   if YADAMU_FEATURE_DETECTION.JSON_DATA_TYPE_SUPPORTED then :nativeDataType := 'TRUE'; else :nativeDataType := 'FALSE'; end if;
+ end;`;
+ 
+    let args = {
+		version:{dir: oracledb.BIND_OUT, type: oracledb.STRING}, 
+		size:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER}, 
+		jsonStorageModel:{dir: oracledb.BIND_OUT, type: oracledb.STRING}, 
+		jsonParser:{dir: oracledb.BIND_OUT, type: oracledb.STRING}, 
+		nativeDataType:{dir: oracledb.BIND_OUT, type: oracledb.STRING}
+	}
 	result = await this.executeSQL(sqlStatement,args);
 
     this.dbVersion = parseFloat(result.outBinds.version);
     this.maxStringSize = result.outBinds.size;
-    
+	this.jsonStorageModel = result.outBinds.jsonStorageModel;
+    this.nativeDataType = result.outBinds.nativeDataType === 'TRUE';
+	this.jsonParser = result.outBinds.jsonParser === 'TRUE';
+	
     if (this.maxStringSize < 32768) {
       this.yadamuLogger.info([`${this.constructor.name}.configureConnection()`],`Maximum VARCHAR2 size for JSON operations is ${this.maxStringSize}.`)
     }    
@@ -763,8 +812,8 @@ class OracleDBI extends YadamuDBI {
   processLog(results) {
     if (results.outBinds.log !== null) {
       const log = JSON.parse(results.outBinds.log.replace(/\\r/g,'\\n'));
-      super.processLog(log, this.status, this.yadamuLogger)
-      return log
+      this.ddlSummary = super.processLog(log, this.status, this.yadamuLogger)
+	  return log
     }
     else {
       return null
@@ -911,13 +960,94 @@ class OracleDBI extends YadamuDBI {
   }
 
   async convertDDL2XML(ddlStatements) {
-    const ddl = ddlStatements.map(function(ddlStatement){ return `<ddl>${ddlStatement.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\r/g,'\n')}</ddl>`},this).join('\n')
+    const ddl = ddlStatements.map(function(ddlStatement){ return `<ddl>${ddlStatement.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</ddl>`},this).join('\n')
     return this.blobFromString(`<ddlStatements>\n${ddl}\n</ddlStatements>`);
   }
-
+  
+  remapJSONColumns(jsonColumns,ddl) {
+	
+	 // Migrate JSON columns to Native JSON Datatype
+	 
+     ddl.forEach(function(ddlStatement,idx) {
+       jsonColumns.forEach(function(json)
+	   {
+		  if (ddlStatement.indexOf(`ALTER TABLE "${json.owner}"."${json.tableName}" ADD CHECK (`) === 0) {		
+		    const constraintTokens = ddlStatement.substring(ddlStatement.indexOf('(')+1,ddlStatement.lastIndexOf(')')).split(' ');
+			if ((constraintTokens.length > 2) && (constraintTokens[1].toUpperCase() === 'IS') &&  (constraintTokens[2].toUpperCase() === 'JSON')) {
+			  ddl[idx] = null;
+			}
+		  }
+		  if (ddlStatement.indexOf(`CREATE TABLE "${json.owner}"."${json.tableName}"`) === 0) {
+		    const lines = ddlStatement.split('\n');
+			lines.forEach(function(line,idx){
+			  // Look for the line that defines the target column.
+  		      const columnOffset = line.indexOf(`"${json.columnName}" ${json.dataType}`)
+			  if (columnOffset > -1) {
+				// Generate a new line.
+				lines[idx] = `${line.trim().startsWith('(') ? '  (' : ''}\t"${json.columnName}" ${this.jsonDataType}${line.indexOf('NOT NULL ENABLE') > -1 ? ' NOT NULL ENABLE' : ''}${line.trim().endsWith(',') ? ',' : ''}`
+			  }
+		    },this)
+            ddl[idx] = lines.join('\n');
+		  }
+		},this)
+     },this);
+	 
+	 // Strip NULL entries
+     return ddl.filter(function(n) { return n !== null})
+	 
+  }
+  
+  remapObjectColumns(ddl) {
+	  
+	 // Migrate Object Columns to JSON.
+	  
+     ddl.forEach(function(ddlStatement,idx) {
+       if (ddlStatement.indexOf(`CREATE TABLE`) === 0) {
+         const lines = ddlStatement.split('\n');
+         const createTableTokens = lines[0].split(' ')
+	     lines.forEach(function(line,idx){
+		   const qualifiedTableName = createTableTokens[2]
+ 		   if (line.indexOf('\t') > -1) {
+  	         const tokens = line.substr(line.indexOf('\t')).split(' ')
+			 // Do nor remap Oracle Spatial Objects
+		     if ((tokens[1].indexOf('"."') > -1) && (tokens[1].indexOf("MDSYS") !== 0)) {
+		       tokens[1] = this.jsonDataType;
+               lines[idx] = `${line.substr(0,line.indexOf('\t'))}${tokens.join(' ')}`;
+			   if (this.jsonParser && (this.jsonDataType !== 'JSON')) {
+				 ddl.push(`ALTER TABLE ${qualifiedTableName} ADD CHECK (${tokens[0]} IS JSON)`)
+			   }
+			 }
+		   }
+		 },this)
+         ddl[idx] = lines.join('\n');
+	   }
+	 },this)
+	 
+	 return ddl;
+  }		   
+	  
   
   async executeDDLImpl(ddl) {
-	  
+	
+    const jsonColumns = JSON.parse(ddl.shift())
+	
+	// Replace \r with \n.. Earlier database versions generate ddl statements with \r characters.
+	
+	ddl = ddl.map(function(ddlStatement) {
+      return ddlStatement.replace(/\r/g,'\n')
+	},this);	
+	
+    if (jsonColumns.jsonColumns !== null) {
+	  if ((this.parameters.MIGRATE_JSON_STORAGE === true))   {
+		 //### Do not remap JSON columns during export. Leave it until import to leave open the possiblility roundtripping objects via JSON.
+	    ddl = this.remapJSONColumns(jsonColumns.jsonColumns,ddl)
+	  } 
+	}
+	
+	if (this.systemInformation.objectFormat === 'JSON') {
+	  ddl = this.remapObjectColumns(ddl)
+    }
+	
     if ((this.maxStringSize < 32768) && (this.statementTooLarge(ddl))) {
       // DDL statements are too large send for server based execution (JSON Extraction will fail)
       await this.applyDDL(ddl,this.systemInformation.schema,this.parameters.TO_USER);
@@ -935,6 +1065,35 @@ class OracleDBI extends YadamuDBI {
         throw new Error(`Oracle DDL Execution Failure`);
       }
     }
+	
+    this.yadamuLogger.ddl([`${this.constructor.name}`,`[SUMMARY`],`Errors: ${this.ddlSummary.errors}, Warnings: ${this.ddlSummary.warnings}, Ingnoreable ${this.ddlSummary.ignoreable}, Duplicates: ${this.ddlSummary.duplicates}, Unresolved: ${this.ddlSummary.reference}, Compilation: ${this.ddlSummary.recompilation}, Miscellaneous ${this.ddlSummary.aq}.`)
+
+  }
+  
+  jsonDataType() {
+	  
+	switch (this.parameters.JSON_STORAGE_FORMAT) {
+      case 'JSON':
+	    if (!this.nativeStorageModel) {
+		  return this.jsonStorageModel;
+	    }
+		break;
+	  case 'BLOB':
+	  case 'CLOB':
+	    if (!this.jsonParser) {
+		  return this.jsonStorageModel;
+	    }
+        break;
+	  case 'VARCHAR2':
+	    if (!this.jsonParser) {
+		  return this.jsonStorageModel;
+	    }
+		return `VARCHAR2(${this.size})`;
+		break
+	  default:
+	    return this.jsonStogaeModel;
+	} 
+    return this.JSON_STORAGE_FORMAT
   }
   
   /*  
@@ -947,6 +1106,8 @@ class OracleDBI extends YadamuDBI {
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Initialize');
     await super.initialize(true);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
+	this.jsonDataType = this.jsonDataType();
+    this.yadamuLogger.info([`${this.constructor.name}.initialize()`],`Default storage model for JSON data is ${this.jsonDataType}.`)
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Initialize Complete');
   }
     
@@ -1002,13 +1163,13 @@ class OracleDBI extends YadamuDBI {
     try {
       await this.releaseConnection();
 	} catch (e) {
-      this.yadamuLogger.logException([`${this.constructor.name}.abort()`,`releaseConnection()`],e);
+      this.yadamulogger.infoException([`${this.constructor.name}.abort()`,`releaseConnection()`],e);
 	}
     try {
 	  // Force Termnination of All Current Connections.
 	  await this.closePool(0);
 	} catch (e) {
-      this.yadamuLogger.logException([`${this.constructor.name}.abort()`,`closePool()`],e);
+      this.yadamulogger.infoException([`${this.constructor.name}.abort()`,`closePool()`],e);
 	}
   }
   
@@ -1060,7 +1221,7 @@ class OracleDBI extends YadamuDBI {
 	} catch (e) {
 	  let err = new OracleError(e,stack,`Oracledb.Transaction.rollback()`,{},{})
 	  if (cause instanceof Error) {
-        this.yadamuLogger.logException([`${this.constructor.name}.rollbackTransaction()`],err)
+        this.yadamulogger.infoException([`${this.constructor.name}.rollbackTransaction()`],err)
 	    err = cause
 	  }
 	  throw err;
@@ -1080,7 +1241,7 @@ class OracleDBI extends YadamuDBI {
 	  await this.executeSQL(sqlRestoreSavePoint,[]);
 	} catch (e) {
 	  if (cause instanceof Error) {
-        this.yadamuLogger.logException([`${this.constructor.name}.restoreSavePoint()`],e)
+        this.yadamulogger.infoException([`${this.constructor.name}.restoreSavePoint()`],e)
 	    e = cause
 	  }
 	  throw e;
@@ -1194,7 +1355,8 @@ class OracleDBI extends YadamuDBI {
      ,timeZoneOffset     : new Date().getTimezoneOffset()
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT 
-     ,schema             : this.parameters.FROM_USER
+	 ,objectFormat       : this.parameters.OBJECTS_AS_JSON === true ? 'JSON' : 'NATIVE'
+     ,schema             : this.parameters.FROM_USER ? this.parameters.FROM_USER : this.parameters.TO_USER
      ,softwareVendor     : this.SOFTWARE_VENDOR
      ,exportVersion      : EXPORT_VERSION
      ,nodeClient         : {
@@ -1257,9 +1419,11 @@ class OracleDBI extends YadamuDBI {
   }
 
   async getSchemaInfo(schema) {
-     
+
+    const objectsAsJSON = this.parameters.OBJECTS_AS_JSON === true ? 'TRUE' : 'FALSE';
+
     const results = await this.executeSQL(sqlTableInfo
-	                                     ,{schema: this.parameters[schema], tableName: null, spatialFormat: this.spatialFormat}
+	                                     ,{schema: this.parameters[schema], tableName: null, spatialFormat: this.spatialFormat, objectsAsJSON : objectsAsJSON}
 										 ,{outFormat: 
 										    oracledb.OBJECT
 										   ,fetchInfo: {
@@ -1368,9 +1532,22 @@ class OracleDBI extends YadamuDBI {
         case 'RAW': 
           tableInfo.rawColumns.push(idx);
           break;
+        case "GEOMETRY":
+        case "\"MDSYS\".\"SDO_GEOMETRY\"":
+        case "XMLTYPE":
+        case "ANYDATA":
+		  break;
+        case "BFILE":
+		  if (this.parameters.OBJECTS_AS_JSON === true) { 
+            tableInfo.jsonColumns.push(idx);
+	      }
+		  break;
         default:
+		  if ((this.parameters.OBJECTS_AS_JSON === true) && (dataType.indexOf('.') > -1)){ 
+            tableInfo.jsonColumns.push(idx);
+	      }
       }
-    })
+    },this)
     
 	tableInfo.SQL_STATEMENT = `select ${tableMetadata.NODE_SELECT_LIST} from "${tableMetadata.OWNER}"."${tableMetadata.TABLE_NAME}" t`; 
     tableMetadata.SQL_STATEMENT = tableInfo.SQL_STATEMENT
@@ -1487,7 +1664,7 @@ class DDLCache extends Writable {
       }
       callback();
     } catch (e) {
-      this.yadamuLogger.logException([`${this.constructor.name}._write()`,`"${this.tableName}"`],e);
+      this.yadamulogger.infoException([`${this.constructor.name}._write()`,`"${this.tableName}"`],e);
       callback(e);
     }
   }
@@ -1501,7 +1678,6 @@ class DDLCache extends Writable {
   }
 }
  
-
 class Multiplexor extends Transform {
   
   constructor(saxParser,ddlWriter) {

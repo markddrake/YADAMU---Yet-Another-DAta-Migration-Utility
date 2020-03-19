@@ -43,7 +43,7 @@ ON COMMIT PRESERVE  ROWS
 create or replace package YADAMU_TEST
 AUTHID CURRENT_USER
 as
-  procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9, P_STYLESHEET VARCHAR2 DEFAULT NULL);
+  procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9, P_STYLESHEET VARCHAR2 DEFAULT NULL, P_ORDER_JSON VARCHAR2 DEFAULT 'FALSE');
 end;
 /
 --
@@ -58,7 +58,7 @@ set define off
 create or replace package body YADAMU_TEST
 as
 --
-procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9, P_STYLESHEET VARCHAR2 DEFAULT NULL)
+procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9, P_STYLESHEET VARCHAR2 DEFAULT NULL, P_ORDER_JSON VARCHAR2 DEFAULT 'FALSE')
 as
   TABLE_NOT_FOUND EXCEPTION;
   PRAGMA EXCEPTION_INIT( TABLE_NOT_FOUND , -00942 );
@@ -112,44 +112,90 @@ as
   select aat.TABLE_NAME
         ,LISTAGG(
            case 
-             when ((V_HASH_METHOD < 0) and DATA_TYPE in ('SDO_GEOMETRY','XMLTYPE','ANYDATA','BLOB','CLOB','NCLOB','JSON')) then
+             when ((V_HASH_METHOD < 0) and atc.DATA_TYPE in ('SDO_GEOMETRY','XMLTYPE','ANYDATA','BLOB','CLOB','NCLOB','JSON')) then
     		   NULL
-             when ((DATA_TYPE like 'TIMESTAMP(%)') and (DATA_SCALE > P_TIMESTAMP_PRECISION)) then
-               'substr(to_char(t."' || COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FF9''),1,' || V_TIMESTAMP_LENGTH || ') "' || COLUMN_NAME || '"'
-             when DATA_TYPE = 'BFILE' then
-	           'case when t."' || COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE(t."' || COLUMN_NAME || '") end "' || COLUMN_NAME || '"'
-		     when (DATA_TYPE = 'SDO_GEOMETRY') then
-               'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.TO_WKBGEOMETRY(t."' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
-             when DATA_TYPE = 'XMLTYPE' then
-    		   -- 'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
+             when ((atc.DATA_TYPE like 'TIMESTAMP(%)') and (DATA_SCALE > P_TIMESTAMP_PRECISION)) then
+               'substr(to_char(t."' || atc.COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FF9''),1,' || V_TIMESTAMP_LENGTH || ') "' || atc.COLUMN_NAME || '"'
+             when atc.DATA_TYPE = 'BFILE' then
+	           'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE(t."' || atc.COLUMN_NAME || '") end "' || atc.COLUMN_NAME || '"'
+		     when (atc.DATA_TYPE = 'SDO_GEOMETRY') then
+               'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.TO_WKBGEOMETRY(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+             when atc.DATA_TYPE = 'XMLTYPE' then
+    		   -- 'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || atc.COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 			   case 
 			     when (P_STYLESHEET is null) then
-     		       'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
+     		       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || atc.COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 				 else 
-				   'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT XMLTRANSFORM(t."' || COLUMN_NAME || '", X.XSL) as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
+				   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT XMLTRANSFORM(t."' || atc.COLUMN_NAME || '", X.XSL) as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 			   end
-		     when DATA_TYPE = 'JSON' then
-		       'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || COLUMN_NAME || '" returning BLOB),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
-		     when DATA_TYPE = 'ANYDATA' then
-		       'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(OBJECT_SERIALIZATION.SERIALIZE_ANYDATA(t."' || COLUMN_NAME || '"),' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
-		     when DATA_TYPE in ('BLOB')  then
-   		       'case when t."' || COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(t."' || COLUMN_NAME || '",' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
-			 when DATA_TYPE in ('CLOB','NCLOB')  then
-		        'case when t."' || COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH(t."' || COLUMN_NAME || '",' || V_HASH_METHOD || ') end "' || COLUMN_NAME || '"'
+			 /*
+			 **
+			 ** Order JSON where possible and required.
+			 **
+			 ** Oracle11g does not support JSON
+			 ** Oracle12c does not support ordering 
+			 ** Oracle18c use JSON_QUERY and force into BLOB format
+			 ** Oracle19c and above use JSON_SERIALIZE and force into BLOB format
+			 **
+			 */
+		     when atc.DATA_TYPE = 'JSON' then
+			   -- Oracle20c and Later
+			   case 
+    		     when P_ORDER_JSON = 'TRUE' then
+		           'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || atc.COLUMN_NAME || '" returning BLOB ORDERED),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			     else
+		           'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || atc.COLUMN_NAME || '" returning BLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			   end
+			 --
+		     $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN     
+			 --
+			 -- 11.x Does not satisfy JSON_PARSING_SUPPORTED
+			 --
+			 $IF DBMS_DB_VERSION.VER_LE_12 $THEN
+			 --
+			 --  JSON Sorting is no supported. No where clause so BLOB and CLOB fall through to the default BLOB and CLOB handlinng below
+			 --
+			 $ELSE		 
+			 --
+		     when jc.FORMAT is not NULL then
+			   -- We have a JSON column of type VARCHAR, CLOB or BLOB
+			   case 
+			     when P_ORDER_JSON = 'TRUE' then
+			       $IF DBMS_DB_VERSION.VER_LE_18 $THEN    
+				   -- Order and convert to BLOB using JSON_QUERY
+                   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning BLOB ORDERED),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+				   $ELSE
+				   -- Order and convert to BLOB using JSON_SERIALIZE
+                   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || atc.COLUMN_NAME || '" returning BLOB ORDERED),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+				   $END
+			     else 
+                   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning BLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			   end
+			 --
+			 $END
+			 --
+			 $END
+			 --
+		     when atc.DATA_TYPE = 'ANYDATA' then
+		       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(OBJECT_SERIALIZATION.SERIALIZE_ANYDATA(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+		     when atc.DATA_TYPE in ('BLOB')  then
+   		       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(t."' || atc.COLUMN_NAME || '",' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			 when atc.DATA_TYPE in ('CLOB','NCLOB')  then
+		        'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || atc.COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH(t."' || atc.COLUMN_NAME || '",' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
              else
-	     	   't."' || COLUMN_NAME || '"'
+	     	   't."' || atc.COLUMN_NAME || '"'
 		   end,
 		',') 
-		 WITHIN GROUP (ORDER BY INTERNAL_COLUMN_ID, COLUMN_NAME) COLUMN_LIST
+		 WITHIN GROUP (ORDER BY INTERNAL_COLUMN_ID, atc.COLUMN_NAME) COLUMN_LIST
         ,LISTAGG(
            case 
-             when ((V_HASH_METHOD < 0) and DATA_TYPE in ('"MDSYS"."SDO_GEOMETRY"','XMLTYPE','BLOB','CLOB','NCLOB','JSON')) then
-    		   '"' || COLUMN_NAME || '"'
+             when ((V_HASH_METHOD < 0) and atc.DATA_TYPE in ('"MDSYS"."SDO_GEOMETRY"','XMLTYPE','BLOB','CLOB','NCLOB','JSON')) then
+    		   '"' || atc.COLUMN_NAME || '"'
              else 
                NULL
 		   end,
 		',') 
-		 WITHIN GROUP (ORDER BY INTERNAL_COLUMN_ID, COLUMN_NAME) LOB_COLUMN_LIST
+		 WITHIN GROUP (ORDER BY INTERNAL_COLUMN_ID, atc.COLUMN_NAME) LOB_COLUMN_LIST
   from ALL_ALL_TABLES aat
        inner join ALL_TAB_COLS atc
 	           on atc.OWNER = aat.OWNER
@@ -162,6 +208,12 @@ as
 	                on axt.OWNER = aat.OWNER
 	               and axt.TABLE_NAME = aat.TABLE_NAME
        $END
+       $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN               
+       left outer join ALL_JSON_COLUMNS jc
+                 on jc.COLUMN_NAME = atc.COLUMN_NAME
+                AND jc.TABLE_NAME = atc.TABLE_NAME
+                and jc.OWNER = atc.OWNER
+       $END 
  where aat.STATUS = 'VALID'
    and aat.DROPPED = 'NO'
    and aat.TEMPORARY = 'N'
@@ -176,9 +228,9 @@ $END
    and (
 	    ((aat.TABLE_TYPE is NULL) and ((atc.HIDDEN_COLUMN = 'NO') and ((atc.VIRTUAL_COLUMN = 'NO') or ((atc.VIRTUAL_COLUMN = 'YES') and (atc.DATA_TYPE = 'XMLTYPE')))))
         or
-	    ((aat.TABLE_TYPE is not NULL) and (COLUMN_NAME in ('SYS_NC_OID$','SYS_NC_ROWINFO$')))
+	    ((aat.TABLE_TYPE is not NULL) and (atc.COLUMN_NAME in ('SYS_NC_OID$','SYS_NC_ROWINFO$')))
 	    or
-		((aat.TABLE_TYPE = 'XMLTYPE') and (COLUMN_NAME in ('ACLOID', 'OWNERID')))
+		((aat.TABLE_TYPE = 'XMLTYPE') and (atc.COLUMN_NAME in ('ACLOID', 'OWNERID')))
        )
 	and aat.OWNER = P_SOURCE_SCHEMA
     and ((TYPECODE is NULL) or (at.TYPE_NAME = 'XMLTYPE'))

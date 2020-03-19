@@ -14,7 +14,7 @@ class DBReader extends Readable {
     this.mode = mode;
     this.status = status;
     this.yadamuLogger = yadamuLogger;
-    this.yadamuLogger.log([`${this.constructor.name}`,`${dbi.DATABASE_VENDOR}`],`Ready. Mode: ${this.mode}.`)
+    this.yadamuLogger.info([`${this.constructor.name}`,`${dbi.DATABASE_VENDOR}`],`Ready. Mode: ${this.mode}.`)
        
     this.schemaInfo = [];
     
@@ -49,7 +49,7 @@ class DBReader extends Readable {
       
      const startTime = performance.now();
      this.schemaInfo = await this.dbi.getSchemaInfo('FROM_USER')
-     this.yadamuLogger.info([`${this.constructor.name}.getMetadata()`],`Generated metadata for ${this.schemaInfo.length} tables. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+     this.yadamuLogger.ddl([`${this.constructor.name}.getMetadata()`],`Generated metadata for ${this.schemaInfo.length} tables. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
      return this.dbi.generateMetadata(this.schemaInfo)
   }
       

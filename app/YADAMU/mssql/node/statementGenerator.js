@@ -213,7 +213,7 @@ class StatementGenerator {
           table.columns.add(columns[idx],sql.VarChar(4000),{nullable: true});
           break;
         default:
-          this.yadamuLogger.log([`${this.constructor.name}.createBulkOperation()`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
+          this.yadamuLogger.info([`${this.constructor.name}.createBulkOperation()`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
       }
     },this)
     return table

@@ -18,7 +18,7 @@ as
   TYPE EXPORT_METADATA_TABLE IS TABLE OF EXPORT_METADATA_RECORD;
   
   function GET_SYSTEM_INFORMATION return CLOB;
-  function GET_DML_STATEMENTS(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_RETURN_BINARY_JSON VARCHAR2 DEFAULT 'FALSE') return EXPORT_METADATA_TABLE PIPELINED;
+  function GET_DML_STATEMENTS(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_OBJECTS_AS_JSON VARCHAR2 DEFAULT 'FALSE', P_RETURN_BINARY_JSON VARCHAR2 DEFAULT 'FALSE') return EXPORT_METADATA_TABLE PIPELINED;
   function JSON_FEATURES return VARCHAR2 deterministic;
   function DATABASE_RELEASE return NUMBER deterministic;
 --
@@ -84,10 +84,11 @@ begin
   return JSON_OBJECT(
            'parsing'        value YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED
           ,'generation'     value YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED
-          ,'nativeDataType' value YADAMU_FEATURE_DETECTION.JSON_DATA_TYPE_SUPPORTED
-          ,'treatAsJSON'    value YADAMU_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED
 	  	  ,'CLOB'           value YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED
 		  ,'extendedString' value YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED
+          ,'treatAsJSON'    value YADAMU_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED
+          ,'objectsAsJSON'  value YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON
+          ,'nativeDataType' value YADAMU_FEATURE_DETECTION.JSON_DATA_TYPE_SUPPORTED
           ,'maxStringSize'  value YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE
 		 );
   $ELSE
@@ -95,10 +96,11 @@ begin
            YADAMU_UTILITIES.KVP_TABLE(
              YADAMU_UTILITIES.KVB('parsing',        YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED),
              YADAMU_UTILITIES.KVB('generation',     YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED),
-             YADAMU_UTILITIES.KVB('nativeDataType', YADAMU_FEATURE_DETECTION.JSON_DATA_TYPE_SUPPORTED),
-             YADAMU_UTILITIES.KVB('treatAsJSON',    YADAMU_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED),
              YADAMU_UTILITIES.KVB('CLOB',           YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED),
              YADAMU_UTILITIES.KVB('extendedString', YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED),
+             YADAMU_UTILITIES.KVB('treatAsJSON',    YADAMU_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED),
+             YADAMU_UTILITIES.KVB('objectsAsJSON',  YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON),
+             YADAMU_UTILITIES.KVB('nativeDataType', YADAMU_FEATURE_DETECTION.JSON_DATA_TYPE_SUPPORTED),
              YADAMU_UTILITIES.KVN('maxStringSize',  YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE)
            )
          );
@@ -174,7 +176,7 @@ begin
   end if;
 end;
 --
-function GET_DML_STATEMENTS(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL,P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_RETURN_BINARY_JSON VARCHAR2 DEFAULT 'FALSE')
+function GET_DML_STATEMENTS(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL,P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_OBJECTS_AS_JSON VARCHAR2 DEFAULT 'FALSE', P_RETURN_BINARY_JSON VARCHAR2 DEFAULT 'FALSE')
 return EXPORT_METADATA_TABLE 
 PIPELINED
 /*
@@ -199,7 +201,7 @@ as
                  when (jc.FORMAT is not NULL) then
                    -- Does not attempt to preserve json storage details
                    -- If storage model fidelity is required then set specify MODE=DDL_AND_DATA on the export command line to include DDL statements to the file.
-                   -- If DDL is not included in the file import operations will default to CLOB storage in Oracle 12.1 thru 18c.
+                   -- If DDL is not included in the file import operations will default to YADAMU_IMPORT.C_JSON_STORAGE_MODEL storage
                    '"JSON"'
                  $END                   
                  when (atc.DATA_TYPE like 'TIMESTAMP(%)') then
@@ -313,7 +315,12 @@ as
                  ** Fix for BFILENAME
                  */
                  when atc.DATA_TYPE = 'BFILE' then
-                   'OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '")'
+				   case
+				     when (P_OBJECTS_AS_JSON = 'TRUE') then 
+                       'OBJECT_TO_JSON.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '")'
+				     else 					
+                       'OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '")'
+				   end
                  /*
                  **
                  ** Support ANYDATA, OBJECT and COLLECTION types
@@ -322,9 +329,37 @@ as
                  when atc.DATA_TYPE = 'ANYDATA' then  -- Can be owned by SYS or PUBLIC 
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end' || atc.COLUMN_NAME || '"'
                  when TYPECODE = 'COLLECTION' then
-                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   --
+				   $IF YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON $THEN
+				   --
+				   case
+     				 when P_OBJECTS_AS_JSON = 'TRUE' then
+					   'JSON_ARRAY("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
+					 else
+                       'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+ 				   end
+				   -- 
+				   $ELSE
+				   --
+                     'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   $END
+				   --
                  when TYPECODE = 'OBJECT' then
-                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   --
+				   $IF YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON $THEN
+				   --
+				   case
+     				 when P_OBJECTS_AS_JSON = 'TRUE' then
+                       '"' || atc.COLUMN_NAME || '"'
+					 else
+                       'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   end
+				   -- 
+				   $ELSE
+				   --
+                     'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   $END
+				   --
                  /*     
                  ** Comment out unsupported scalar data types and Object types
                  */
@@ -342,6 +377,16 @@ as
                  when atc.DATA_TYPE = 'RAW' then
                    -- For some reason RAW columns have atc.DATA_TYPE_OWNER set to the current schema.
                    '"' || atc.COLUMN_NAME || '"'
+                 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN               
+				 when (atc.DATA_TYPE = 'BLOB' and jc.FORMAT is not null) then
+				   $IF DBMS_DB_VERSION.VER_LE_12 $THEN
+				   'JSON_QUERY("' || atc.COLUMN_NAME || '", ''$'' returning ' || YADAMU_FEATURE_DETECTION.C_RETURN_TYPE || ') "' || atc.COLUMN_NAME || '"'
+				   $ELSIF DBMS_DB_VERSION.VER_LE_18 $THEN
+				   'JSON_QUERY("' || atc.COLUMN_NAME || '", ''$'' returning ' || YADAMU_FEATURE_DETECTION.C_RETURN_TYPE || ') "' || atc.COLUMN_NAME || '"'
+				   $ELSE
+			 	   'JSON_SERIALIZE("' || atc.COLUMN_NAME || '" returning CLOB) "' || atc.COLUMN_NAME || '"'
+                   $END
+				 $END
                  when atc.DATA_TYPE like 'INTERVAL DAY% TO SECOND%' then
                    '''P''
                    || extract(DAY FROM "' || atc.COLUMN_NAME || '") || ''D''
@@ -382,7 +427,12 @@ as
                  when atc.DATA_TYPE = 'XMLTYPE' then  -- Can be owned by SYS or PUBLIC
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'BFILE' then
-                   'OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
+				   case
+				     when (P_OBJECTS_AS_JSON = 'TRUE') then 
+                       'OBJECT_TO_JSON.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
+				     else 					
+                       'OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
+				   end
                  when atc.DATA_TYPE = 'ANYDATA' then  -- Can be owned by SYS or PUBLIC
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_ANYDATA("' ||  atc.COLUMN_NAME || '") end "' || atc.COLUMN_NAME || '"'
 				 $IF YADAMU_FEATURE_DETECTION.JSON_DATA_TYPE_SUPPORTED  $THEN
@@ -400,9 +450,47 @@ as
 				   end
 			     $END
                  when TYPECODE = 'COLLECTION' then
-                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   --
+				   $IF YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON $THEN
+				   --
+				   case
+     				 when P_OBJECTS_AS_JSON = 'TRUE' then
+					   --
+					   -- Uncomment to use Native JSON_ARRAY function to generate a JSON from a SQL collection type.. Currently this fails with an ORA-00600 if the array contains an object with a REF
+					   --
+					   -- 'JSON_ARRAY("' || atc.COLUMN_NAME || ' returning CLOB") "' || atc.COLUMN_NAME || '"'
+					   --
+                       'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+  				     else
+                       'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+ 				   end
+				   -- 
+				   $ELSE
+				   --
+                     'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   $END
+				   --
                  when TYPECODE = 'OBJECT' then
-                   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   --
+				   $IF YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON $THEN
+				   --
+				   case
+     				 when P_OBJECTS_AS_JSON = 'TRUE' then
+					   --
+					   -- Uncomment to use Native JSON_OBJECT function to generate a JSON object from a SQL object type.. Currently this fails with an ORA-00600 if the array contains an object with a REF, and has a number of other issues.
+					   --
+					   -- 'JSON_OBJECT("' || atc.COLUMN_NAME || ' returning CLOB with TYPENAME")  "' || atc.COLUMN_NAME || '"'
+					   --
+  					   'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+					 else
+                       'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   end
+				   -- 
+				   $ELSE
+				   --
+                     'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
+				   $END
+				   --
                  /*     
                  ** Comment out unsupported scalar data types and Object types
                  */
@@ -430,15 +518,21 @@ as
     left outer join ALL_EXTERNAL_TABLES axt
                  on axt.OWNER = aat.OWNER
 	           and axt.TABLE_NAME = aat.TABLE_NAME
+    $ELSIF DBMS_DB_VERSION.VER_LE_12_1 $THEN
+    left outer join ALL_EXTERNAL_TABLES axt
+                 on axt.OWNER = aat.OWNER
+	           and axt.TABLE_NAME = aat.TABLE_NAME
     $END
    where aat.STATUS = 'VALID'
      and aat.DROPPED = 'NO'
      and aat.TEMPORARY = 'N'
-$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN               
-    and axt.TYPE_NAME is NULL
-$ELSE
+     $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+     and axt.TYPE_NAME is NULL
+     $ELSIF DBMS_DB_VERSION.VER_LE_12_1 $THEN               
+     and axt.TYPE_NAME is NULL
+     $ELSE
      and aat.EXTERNAL = 'NO'
-$END
+     $END
      and aat.NESTED = 'NO'
      and aat.SECONDARY = 'N'
      and (aat.IOT_TYPE is NULL or aat.IOT_TYPE = 'IOT')
@@ -450,7 +544,7 @@ $END
 	 and amv.MVIEW_NAME is NULL
 $IF YADAMU_FEATURE_DETECTION.TABLE_FUNCTION_OPTIMIZER_ISSUE $THEN               
 --
--- 11.2.0.1.0 It appears that using table functions, such as in the clause "aat.OWNER in (select COLUMN_VALUE from TABLE(V_SCHEMA_LIST))", causes performance problems.
+-- 11.2.0.1.0 It appears that using table functions, such as in the clause "aat.OWNER in (select COLUMN_VALUE from TABLE(V_SCHEMA_LIST))", causes severe performance problems.
 -- For the moment work around the problem using an equality, and only support one schema at a time. Long term when supporting multi-schema exports, if support for releases earlier than
 -- 11.2.0.4.0  is required add an outer loop that loops over the set of schemas. Similar logic may also be required when supporting a filtering by table name.
 --
@@ -507,7 +601,20 @@ begin
 	  DBMS_OUTPUT.put_line(TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD"T"HH24:MI:SS.FF6') || ': PROCESSING "' || t.OWNER || '"."' || t.TABLE_NAME || '"');
 	  $END
 
-	  V_OBJECT_SERIALIZATION := OBJECT_SERIALIZATION.SERIALIZE_TABLE_TYPES(t.OWNER,t.TABLE_NAME);
+      if P_OBJECTS_AS_JSON = 'TRUE' then
+	    --
+	    -- Uncomment conditional compilation to enable use of native JSON_OBJECT functionality rather than PL/SQL package
+		--
+	    -- 
+        -- $IF NOT YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON $THEN
+		--
+		V_OBJECT_SERIALIZATION := OBJECT_TO_JSON.SERIALIZE_TABLE_TYPES(t.OWNER,t.TABLE_NAME);
+		--
+		-- $END
+		--
+      else		  
+		V_OBJECT_SERIALIZATION := OBJECT_SERIALIZATION.SERIALIZE_TABLE_TYPES(t.OWNER,t.TABLE_NAME);
+      end if;
 
 	  DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENT,TRUE,DBMS_LOB.CALL);
       V_SQL_FRAGMENT := 'select JSON_ARRAY(';	  

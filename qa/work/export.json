@@ -8,13 +8,13 @@
   }
 , "tasks" : "qa/regression/exportTasks.json"
 , "tests"                  : [{
-    "source": "mssql17"
+    "source": "oracle11g"
   , "target": "scratch"
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
   , "tasks": [
-	  "HumanResources"
+	  "PM"
     ]
   }] 
 }
