@@ -844,6 +844,12 @@ class YadamuQA {
 	
   }
   
+  supportsDDLGeneration(instance) {
+	do { 
+	  if (Object.getOwnPropertyDescriptor(instance,'getDDLOperations')  !== null) return instance.constructor.name;
+	} while ((instance = Object.getPrototypeOf(instance)))
+  }
+  
   async fileRoundtrip(configuration,test,targetConnectionName,parameters,operation) {
   
   /*
@@ -875,8 +881,6 @@ class YadamuQA {
 
     const sourceConnection = sourceConnectionInfo[sourceDatabase]
 	const targetConnection = targetConnectionInfo[targetDatabase]
-  
-    const operationsList = []
 	
 	/*
 	**
@@ -885,8 +889,9 @@ class YadamuQA {
 	**
 	*/
 	
-	const sourceFile = path.join(path.join(sourceConnection.directory,operation.source.directory).replace('%connection%',targetConnectionName).replace('%vendor%',targetDatabase).replace('%mode%',parameters.MODE),operation.source.file)
-	const targetDirectory = path.join(test.directory,operation.source.directory).replace('%connection%',targetConnectionName).replace('%vendor%',targetDatabase).replace('%mode%',parameters.MODE);
+	const sourceFile = path.join(sourceConnection.directory,operation.source.directory,operation.source.file).replace('%connection%',targetConnectionName).replace('%vendor%',targetDatabase).replace('%mode%',parameters.MODE);		
+	const connectionPath = this.yadamu.getYadamuTestDefaults().DDL_SUPPORTED.includes(targetDatabase) ? path.join(targetConnectionName,parameters.MODE) : targetConnectionName
+    const targetDirectory = path.normalize(test.directory.replace('%sourceDirectory%',operation.source.directory).replace('%connection%',connectionPath).replace('%vendor%',targetDatabase).replace('%mode%',parameters.MODE));
 	fs.mkdirSync(targetDirectory,{ recursive : true })
 	
 	const sourcePathComponents = path.parse(operation.source.file);
@@ -929,6 +934,7 @@ class YadamuQA {
     let targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema1)
 	let targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,true)
+
     let targetDescription = this.getDescription(targetDatabase,targetSchema1)
 	
 	let startTime = opsStartTime
@@ -1018,7 +1024,6 @@ class YadamuQA {
 	await this.compareSchemas(targetDatabase, targetConnection, compareParams, targetSchema1, targetDatabase, targetSchema2, timings[timings.length-1],false,tableMappings)
 	compareElapsedTime = compareElapsedTime + (performance.now() - compareStartTime);
 
-
 	// Target Schema #2 to File#2
 	
 	sourceParameters  = Object.assign({},parameters)
@@ -1037,7 +1042,8 @@ class YadamuQA {
   	timings.push(await this.yadamu.pumpData(sourceDBI,fileWriter))
     elapsedTime = performance.now() - startTime
     this.printResults('fileRoundTrip',`"${targetConnectionName}"://${sourceDescription}`,`file://${file2}`,elapsedTime)
-	this.operationsList.push(`"${sourceConnectionName}"://${targetDescription}`);
+	
+	this.operationsList.push(`file://${file2}`);
 	
 	const opsElapsedTime =  performance.now() - opsStartTime - compareElapsedTime
 	

@@ -23,6 +23,7 @@ const DEFAULT_COMMIT_COUNT = 5;
 **
 ** YADAMU Database Inteface class 
 **
+**
 */
 
 class YadamuDBI {

@@ -6,8 +6,8 @@ call %~dp0\configureOracle.bat   ORA1120-01
 call %~dp0\configureMySQL.bat    MYSQL80-01
 call %~dp0\configureMariaDB.bat  MARIA10-01
 call %~dp0\configureMsSQL.bat    MSSQL17-01
-call %~dp0\configureMsSQL.bat    MYSQL19-01
-call %~dp0\configureMsSQL.bat    PGSQL12-01
+call %~dp0\configureMsSQL.bat    MSSQL19-01
+call %~dp0\configurePostgres.bat PGSQL12-01
 
 
 

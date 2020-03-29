@@ -9,13 +9,13 @@
 , "tests" : [{
     "source": "file-JSON-root"
   , "targets": [
-       "oracle12c","oracle11g"
+       "oracle19c"
 	  
     ]
-  , "parser" : "SQL"
-  , "directory" : "tests/fileRoundtrip/%source%"
+  , "parser" : "CLARINET"
+  , "directory" : "tests/fileRoundtrip/%connection%/%sourceDirectory%"
   , "tasks": [
-       "jtest"
+       "SH"
     ]
   }]
 }

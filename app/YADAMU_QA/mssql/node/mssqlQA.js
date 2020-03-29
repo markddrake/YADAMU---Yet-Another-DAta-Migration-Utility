@@ -66,19 +66,19 @@ class MsSQLQA extends MsSQLDBI {
 
       let args = 
 `--
---@FORMAT_RESULTS         = false
---@SOURCE_DATABASE        = '${source.database}'
---@SOURCE_SCHEMA          = '${source.owner}'
---@TARGET_DATABASE        = '${target.database}'
---@TARGET_SCHEMA          = '${target.owner}'
---@COMMENT                = ''
---@EMPTY_STRING_IS_NULL   = ${this.parameters.EMPTY_STRING_IS_NULL === true}
---@SPATIAL_PRECISION      = ${this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18}
---@DATE_TIME_PRECISION    = ${this.parameters.TIMESTAMP_PRECISION}
+-- declare @FORMAT_RESULTS         bit          = 0;
+-- declare @SOURCE_DATABASE        varchar(128) = '${source.database}';
+-- declare @SOURCE_SCHEMA          varchar(128) = '${source.owner}';
+-- declare @TARGET_DATABASE        varchar(128)  = '${target.database}';
+-- declare @TARGET_SCHEMA          varchar(128) = '${target.owner}';
+-- declare @COMMENT                varchar(128) = '';
+-- declare @EMPTY_STRING_IS_NULL   bit = ${this.parameters.EMPTY_STRING_IS_NULL === true};
+-- declare @SPATIAL_PRECISION      varchar(128) = ${this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18};
+-- declare @DATE_TIME_PRECISION    varchar(128)  = ${this.parameters.TIMESTAMP_PRECISION};
 --`;
             
       if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION)\ngo\n`)
+        this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION,@DATE_TIME_PRECISION)\ngo\n`)
       }
 
       const request = this.generateRequest();

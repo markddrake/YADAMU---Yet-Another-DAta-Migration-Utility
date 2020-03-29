@@ -19,7 +19,7 @@
     , "mariadb#1"
     ]
   , "parser" : "CLARINET"
-  , "directory" : "tests/fileRoundtrip/%source%"
+  , "directory" : "tests/fileRoundtrip/%connection%/%sourceDirectory%"
   , "tasks": [
        "oracle", "mysql", "mssql"
     ]
@@ -29,7 +29,7 @@
        "oracle11g"
     ]
   , "parser" : "CLARINET"
-  , "directory" : "tests/fileRoundtrip/%source%"
+  , "directory" : "tests/fileRoundtrip/"
   , "parameters": {
       "MAPPINGS" : "qa/regression/mappingsOracle11g.json"
     }
@@ -48,7 +48,7 @@
     , "mysql#1"
     ]
   , "parser" : "SQL"
-  , "directory" : "tests/fileRoundtrip/%source%"
+  , "directory" : "tests/fileRoundtrip/%connection%/%sourceDirectory%"
   , "tasks": [
        "oracle", "mysql", "mssql"
     ]

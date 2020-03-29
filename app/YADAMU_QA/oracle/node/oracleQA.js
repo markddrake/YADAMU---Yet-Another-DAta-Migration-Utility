@@ -37,7 +37,7 @@ const sqlSchemaTableRows = `select att.TABLE_NAME, NUM_ROWS
 						  and (att.IOT_TYPE is NULL or att.IOT_TYPE = 'IOT')`;
 						  
 
-const sqlCompareSchemas = `begin YADAMU_TEST.COMPARE_SCHEMAS(:source,:target,:maxTimestampPrecision,:xslTransformation,:useOrderedJSON); end;`;
+const sqlCompareSchemas = `begin YADAMU_TEST.COMPARE_SCHEMAS(:source,:target,:maxTimestampPrecision,:xslTransformation,:useOrderedJSON,:excludeMaterialzedViews); end;`;
 
 
 class OracleQA extends OracleDBI {
@@ -76,7 +76,7 @@ class OracleQA extends OracleDBI {
        ,failed     : []
       }
       
-      const args = {source:source.schema,target:target.schema,maxTimestampPrecision:this.parameters.TIMESTAMP_PRECISION,xslTransformation:this.parameters.XSL_TRANSFORMATION,useOrderedJSON:this.parameters.ORDERED_JSON.toString().toUpperCase()}
+      const args = {source:source.schema,target:target.schema,maxTimestampPrecision:this.parameters.TIMESTAMP_PRECISION,xslTransformation:this.parameters.XSL_TRANSFORMATION,useOrderedJSON:this.parameters.ORDERED_JSON.toString().toUpperCase(),excludeMaterialzedViews:Boolean(this.parameters.MODE === 'DATA_ONLY').toString().toUpperCase()}
       await this.executeSQL(sqlCompareSchemas,args)      
 
       const successful = await this.executeSQL(sqlSuccess,{})
