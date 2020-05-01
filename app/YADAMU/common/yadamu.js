@@ -13,6 +13,7 @@ const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuDefaults = require('./yadamuDefaults.json');
 const {YadamuError, UserError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
+const YadamuRejectManager = require('./yadamuRejectManager.js');
 
 class Yadamu {
 
@@ -53,7 +54,12 @@ class Yadamu {
 	 return 'file'
   }
   
- 
+  createRejectManager() {
+    const rejectFolderPath = this.parameters.REJECT_FOLDER ? this.parameters.REJECT_FOLDER : 'work/rejected';
+    this.rejectFilename = path.resolve(rejectFolderPath +  path.sep + 'yadamuRejected_' + new Date().toISOString().split(':').join('') + ".json");
+    return new YadamuRejectManager(this.rejectFilename,this.yadamuLogger);
+  }
+   
   reportStatus(status,yadamuLogger) {
 
     const endTime = performance.now();
@@ -183,7 +189,7 @@ class Yadamu {
     
     const self = this; 
 	this.yadamuLogger = new YadamuLogger(process.stdout)
-
+    
     process.on('unhandledRejection', (err, p) => {
       self.yadamuLogger.logException([`${self.constructor.name}.onUnhandledRejection()`,`"${self.status.operation}"`],err);
       self.reportStatus(self.status,self.yadamuLogger)
@@ -407,7 +413,6 @@ class Yadamu {
         }
       }
     },this)
-    
 	return parameters;
   }
   
@@ -444,9 +449,13 @@ class Yadamu {
   async doPumpOperation(source,target) {
 
     const timings = {}
+    this.rejectManager = this.createRejectManager()
 
+	let error;
     try {
       const self = this
+	  let failed = false;
+	  let cause = undefined;
       await source.initialize();
       await target.initialize();
 	  let parallel = ((this.parameters.PARALLEL) && (this.parameters.PARALLEL > 1))
@@ -454,33 +463,35 @@ class Yadamu {
       const dbReader = await this.getDBReader(source,parallel)
       const dbWriter = await this.getDBWriter(target,parallel)  
 	  const inputStream = dbReader.getInputStream();
+ 
+	  // On an error force the writer to end and invoke the resolve() or reject() from the writer's finish event.
+	  // This ensures the writer processes all pending records before connections are closed.
+	  
       const copyOperation = new Promise(function (resolve,reject) {
-        try {
-			
-          dbWriter.on('finish', function(){
-			resolve()
-		  })
-          dbWriter.on('error',function(err){
-			self.yadamuLogger.logException([`${dbWriter.constructor.name}.onError()`],err);
-			reject(err)
-	      })
-		  
-          inputStream.on('error',function(err){
-			 self.yadamuLogger.logException([`${inputStream.constructor.name}.onError()`],err);
-			 reject(err)
-		  })
-		  
-          inputStream.pipe(dbWriter);
-        } catch (err) {
-          self.yadamuLogger.logException([`${self.constructor.name}.onError()`],err)
-          reject(err);
-        }
+        dbWriter.on('finish', function(){
+		  // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${dbWriter.constructor.name}.onFinish()`],`${failed ? 'FAILED' : 'SUCCSESS'}`);
+          failed ? reject(cause) : resolve()
+		})
+        dbWriter.on('error',function(err){
+		  self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${dbWriter.constructor.name}.onError()`],err);
+		  cause = err;
+	      failed = true;
+		  reject(cause);
+	    })
+		inputStream.on('error',function(err){
+		  self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()`],err);
+		  cause = err;
+	      failed = true;
+		  dbWriter.end()
+        })		  
+        inputStream.pipe(dbWriter);
       })
       
       this.status.operationSuccessful = false;
       await copyOperation;
       await source.finalize();
       await target.finalize();
+      this.rejectManager.close();
 	  const timings = dbWriter.getTimings();
 	  this.status.operationSuccessful = true;
       return timings
@@ -488,8 +499,9 @@ class Yadamu {
 	  this.status.operationSuccessful = false;
 	  this.status.err = e;
       await source.abort(e);
-	  await target.abort(e);
-	  
+      await target.abort(e);
+      this.rejectManager.close();
+
 	  if (e instanceof UserError) {
 		await this.close();
 	    // Prevent reportError from being called for User Errors
@@ -508,7 +520,6 @@ class Yadamu {
     if ((target.isDatabase() === true) && (target.parameters.TO_USER === undefined)) {
       throw new Error('Missing mandatory parameter TO_USER');
     }
-   
     const timings = await this.doPumpOperation(source,target)
 	switch (this.status.operationSuccessful) {
       case true:
@@ -599,6 +610,7 @@ class Yadamu {
       return timings
     } catch (e) {
 	  this.status.operationSuccessful = false;
+	  console.log(e)
 	  this.status.err = e;
       await dbi.abort(e)
     }

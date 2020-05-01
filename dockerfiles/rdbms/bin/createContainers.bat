@@ -12,7 +12,7 @@ REM Oracle 12.2.0.1.0
 docker run --name ORA1220-01 -p 1523:1521 -e ORACLE_SID=CDB12200 -e ORACLE_PDB=PDB12200 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1220-01-DATA:/opt/oracle/oradata -vORA1220-01-DIAG:/opt/oracle/diag -vORA1220-01-DIAG:/opt/oracle/admin --shm-size=4g --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:12.2.0.1-ee 
 REM Oracle 12.1.0.2.0                                                                                                                                                        
 docker run --name ORA1210-01 -p 1524:1521 -e ORACLE_SID=CDB12100 -e ORACLE_PDB=PDB12100 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1210-01-DATA:/opt/oracle/oradata -vORA1210-01-DIAG:/opt/oracle/diag -vORA1210-01-DIAG:/opt/oracle/admin  --shm-size=4g --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:12.1.0.2-ee 
-REM Fix for Oracle 11.2.x persmissions
+REM Fix for Oracle 11.2..0.1.0 persmissions
 set /P DOCKER_USER=docker
 ssh %DOCKER_USER%@%DOCKER_IP_ADDR% "sudo chown 54321:54322 /var/lib/docker/volumes/ORA1120-01-DIAG/_data"
 REM Oracle 11.2.0.1.0                                                                                                                                                        
@@ -22,9 +22,9 @@ docker run --name MYSQL80-01 -p 3306:3306  -v MYSQL80-01-DATA:/var/lib/mysql -e 
 REM MaraDB 10.0
 docker run --name MARIA10-01 -p 3307:3306 -v MARIA10-01-DATA:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=oracle --shm-size=4g -d mariadb:latest  
 REM MsSQL 2017
-docker run --name MSSQL17-01 -p 1433:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -v MSSQL17-01-DATA:/var/opt/mssql --shm-size=4g -d mcr.microsoft.com/mssql/server:2017-latest
+docker run --name MSSQL17-01 -p 1433:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -e "MSSQL_MEMORY_LIMIT_MB=8192" -m10g -v MSSQL17-01-DATA:/var/opt/mssql --shm-size=4g -d mcr.microsoft.com/mssql/server:2017-latest
 REM MsSQL 2019
-docker run --name MSSQL19-01 -p 1434:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -v MSSQL19-01-DATA:/var/opt/mssql --shm-size=4g -d mcr.microsoft.com/mssql/server:2019-latest
+docker run --name MSSQL19-01 -p 1434:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -e "MSSQL_MEMORY_LIMIT_MB=8192" -m10g -v MSSQL19-01-DATA:/var/opt/mssql --shm-size=4g -d mcr.microsoft.com/mssql/server:2019-latest
 REM Postgres 12
 docker run --name PGSQL12-01 -p 5432:5432 -e POSTGRES_PASSWORD=oracle -v PGSQL12-01-DATA:/var/lib/postgresql/data  --shm-size=4g -d postgres:latest 
 docker system df

@@ -262,7 +262,7 @@ class TableWriter extends YadamuWriter {
     */
           
     // if ( (this.batch.length + this.lobBatch.length) === 0 ) {console.log(row)}
-
+	
     try {
       this.bindRowAsLOB = false;
 	  if (this.tableInfo.lobColumns) {
@@ -323,11 +323,14 @@ class TableWriter extends YadamuWriter {
       else {
         this.batch.push(row);
       }
-      return this.batch.length + this.lobBatch.length;
+      this.rowsCached++
     } catch (e) {
       const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,this.tableInfo.targetDataTypes,JSON.stringify(this.tableInfo.binds)] : []     
-      this.dbi.handleInsertError(`${this.constructor.name}.apppendRow()`,this.tableName,this.batch.length+this.lobBatch.length,-1,row,e,errInfo);
+      this.skipTable = await this.handleInsertError(`${this.constructor.name}.apppendRow()`,this.tableName,this.batch.length+this.lobBatch.length,-1,row,e,errInfo);
     }
+	
+	return this.skipTable
+	
   }
 
   avoidMutatingTable(insertStatement) {
@@ -370,16 +373,10 @@ end;`
     return plsqlBlock;
   }
  
- 
   batchComplete() {
-      
-    return (((this.batch.length + this.lobBatch.length) === this.tableInfo.batchSize) || (this.tempLobCount >= this.dbi.parameters.BATCH_LOB_COUNT) || (this.cachedLobCount > this.dbi.parameters.LOB_CACHE_COUNT))
-   
+    return ((this.rowsCached === this.tableInfo.batchSize) || (this.tempLobCount >= this.dbi.parameters.BATCH_LOB_COUNT) || (this.cachedLobCount > this.dbi.parameters.LOB_CACHE_COUNT))
   }
    
-  hasPendingRows() {
-    return (this.batch.length + this.lobBatch.length) > 0
-  }
   /*
   **
   ** Temporary LOB optimization via LOB column resuse disabled until oracledb supports reusing temporary lobs  
@@ -435,11 +432,11 @@ end;`
       
   
   resetBatch() {
-    this.batch.length = 0;
-    this.lobBatch.length = 0;
-    
+	this.batch.length = 0;
+	this.lobBatch.length = 0;   
     this.cachedLobCount = 0;
     this.tempLobCount = 0;
+	this.rowsCached = 0;
   }
   
   async writeBatch() {
@@ -469,6 +466,7 @@ end;`
           this.freeLobList();
         }         
         this.endTime = performance.now();
+        this.rowsWritten += this.rowsCached;
         this.resetBatch();
         return this.skipTable
       } catch (e) {
@@ -499,6 +497,7 @@ end;`
               this.freeLobList();
             }         
             this.endTime = performance.now();
+            this.rowsWritten += this.rowsCached
             this.resetBatch();
             return this.skipTable
           } catch (e) {
@@ -560,28 +559,35 @@ end;`
     for (const row in rows) {
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,rows[row])
+		this.rowsWritten++
       } catch (e) {
 		const record = await this.serializeLobs(rows[row])
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,this.tableInfo.targetDataTypes,JSON.stringify(record)] : []
-        this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,rows.length,row,record,e,errInfo);
+        this.skipTable = await this.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,rows.length,row,record,e,errInfo);
         if (this.skipTable) {
           break;
         }
       }
     } 
+	
     // ### Iterative must commit to allow a subsequent batch to rollback.
     this.endTime = performance.now();
-    this.resetBatch();
     // await Promise.all(this.freeLobList());
     this.freeLobList();
+    this.resetBatch();
     return this.skipTable     
   }
   
-  async finalize() {
-	const tableStats = await super.finalize();
+  getStatistics() {
+	const tableStats = super.getStatistics()
 	tableStats.sqlTime = tableStats.sqlTime + this.lobCumlativeTime;
-    await this.enableTriggers();
     return tableStats;  
+  }
+  
+  async finalize() {
+    const status = await super.finalize();
+    await this.enableTriggers();
+	return status;
   }
 }
 

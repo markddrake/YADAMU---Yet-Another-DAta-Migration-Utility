@@ -21,7 +21,7 @@ class YadamuQA {
 	this.yadamuLogger = this.yadamu.getYadamuLogger();
 	this.operationsList = []
   }
-
+  
   getDatabaseInterface(driver,testConnection,testParameters,recreateSchema,tableMappings) {
     
     let dbi = undefined
@@ -66,7 +66,6 @@ class YadamuQA {
 	  
       const connectionProperties = Object.assign({},testConnection)
       const parameters = testParameters ? Object.assign({},testParameters) : {}
-	  
 	  dbi.setConnectionProperties(connectionProperties);
       dbi.setParameters(parameters);
 	  dbi.setTableMappings(tableMappings);
@@ -802,6 +801,7 @@ class YadamuQA {
       this.setUser(targetParameters,'TO_USER', targetDatabase, targetSchema)
       sourceParameters.MODE = "DATA_ONLY"
   	  targetParameters.MODE = "DATA_ONLY"
+	  compareParameters.MODE = "DATA_ONLY"
       const targetDescription = this.getDescription(targetDatabase,targetSchema, operation)
   	  
 	  // Copy Source Schema to Target 
@@ -1071,7 +1071,7 @@ class YadamuQA {
     const targetSchema  = this.getTargetSchema(targetDatabase,operation.target,operation); 
     const sourceDescription = this.getDescription(sourceDatabase,operation.source,operation)  
     const targetDescription = this.getDescription(targetDatabase,targetSchema, operation)
-
+     
 	const sourceParameters  = Object.assign({},parameters)
     const sourceFile = path.join(sourceConnection.directory.replace('%connection%',targetConnectionName).replace('%vendor%',targetDatabase).replace('%mode%',parameters.MODE),operation.source.file)
 	sourceParameters.FILE = sourceFile
@@ -1205,6 +1205,8 @@ class YadamuQA {
   async doTests(configuration) {
 
     const startTime = performance.now()
+    let mode = configuration.operation.toUpperCase()
+
     try {
       for (const test of configuration.tests) {
 	
@@ -1213,7 +1215,8 @@ class YadamuQA {
 
         // Merge test specific parameters
         Object.assign(testParameters, test.parameters ? test.parameters : {})
-  
+        
+		this.yadamu.loadParameters(testParameters);
         const startTime = performance.now()
   	    let sourceDescription = test.source;
 	    const targets = test.target ? [test.target] : test.targets
@@ -1221,13 +1224,12 @@ class YadamuQA {
 		  let targetDescription = target
           const targetConnection = configuration.connections[target]
 		  const startTime = performance.now()
-          let mode
-		  for (const task of test.tasks) {
+          for (const task of test.tasks) {
     	    try {
 		      const operations = this.getTaskList(configuration,task)
 		      const startTime = performance.now()
 		      for (const operation of operations) {
-                mode = (test.operation ? test.operation : configuration.operation).toUpperCase()
+                let mode = (test.operation ? test.operation : configuration.operation).toUpperCase()
 			    switch (mode) {
  		          case 'EXPORT':
   		            targetDescription = 'file://' + await this.export(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
@@ -1244,23 +1246,23 @@ class YadamuQA {
 			    }
 			  }
               const elapsedTime = performance.now() - startTime;
-              this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TASK`],`Completed. Source:[${sourceDescription}]. Target:[${targetDescription}]. Task:[${task}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+              this.yadamuLogger.log([`TEST`,`TASK`,`Completed`],`Source:[${sourceDescription}]. Target:[${targetDescription}]. Task:[${task}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
 		    } catch (e) {
-			  this.yadamuLogger.logException([`${this.constructor.name}.doTests()`,mode],e);
+			  this.yadamuLogger.logException([`TEST`,mode],e);
 			  throw e
 			}   
 	      }
 		  const elapsedTime = performance.now() - startTime;
-          this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TARGET`],`Completed. Source:[${sourceDescription}]. Target:[${targetDescription}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+          this.yadamuLogger.log([`TEST`,mode,`TARGET`,`Completed`],`Source:[${sourceDescription}]. Target:[${targetDescription}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
         }		 
         const elapsedTime = performance.now() - startTime;
-        this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TEST`],`Completed. Source:[${sourceDescription}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+        this.yadamuLogger.log([`TEST`,`Completed`],`Source:[${sourceDescription}]. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
       }
       const elapsedTime = performance.now() - startTime;
-      this.yadamuLogger.info([`${this.constructor.name}.doTests()`],`Success. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+      this.yadamuLogger.log([`TEST`,mode,`SUCCESS`],`Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
 	} catch (e) {
       const elapsedTime = performance.now() - startTime;
-      this.yadamuLogger.info([`${this.constructor.name}.doTests()`],`Failed. Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+      this.yadamuLogger.error([`TEST`,mode,`FAILED`],`Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
 	}  
   }
   

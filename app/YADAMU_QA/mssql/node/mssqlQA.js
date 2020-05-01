@@ -28,7 +28,7 @@ class MsSQLQA extends MsSQLDBI {
 	
 	async useDatabase(databaseName) {     
       const statement = `use ${databaseName}`
-      const results = await this.executeBatch(statement,this.generateRequest());
+      const results = await this.executeSQL(statement);
     } 
 	
 	async recreateDatabase() {
@@ -42,13 +42,17 @@ class MsSQLQA extends MsSQLDBI {
 	  this.connectionProperties.database = 'master';
       await this.createConnectionPool(); 
 
-      let results;       
-      const dropDatabase = `drop database if exists "${MSSQL_SCHEMA_DB}"`;
-      results =  await this.executeBatch(dropDatabase,this.generateRequest());      
+      try {
+        let results;       
+        const dropDatabase = `drop database if exists "${MSSQL_SCHEMA_DB}"`;
+        results =  await this.executeSQL(dropDatabase);      
       
-      const createDatabase = `create database "${MSSQL_SCHEMA_DB}" COLLATE Latin1_General_100_CS_AS_SC`;
-      results =  await this.executeBatch(createDatabase,this.generateRequest());      
-      await this.pool.close();
+        const createDatabase = `create database "${MSSQL_SCHEMA_DB}" COLLATE ${this.defaultCollation}`;
+        results =  await this.executeSQL(createDatabase);      
+        await this.finalize()
+	  } catch (e) {
+		console.log(e);
+	  }
 	  
 	  this.parameters.MSSQL_SCHEMA_DB = MSSQL_SCHEMA_DB
 	  this.connectionProperties.database = database;
@@ -81,7 +85,7 @@ class MsSQLQA extends MsSQLDBI {
         this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION,@DATE_TIME_PRECISION)\ngo\n`)
       }
 
-      const request = this.generateRequest();
+      const request = this.getRequest();
       let results = await request
                           .input('FORMAT_RESULTS',this.sql.Bit,false)
                           .input('SOURCE_DATABASE',this.sql.VarChar,source.database)

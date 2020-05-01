@@ -11,7 +11,7 @@ class StatementGenerator {
     this.spatialFormat = spatialFormat
     this.commitSize = commitSize;
     this.status = status,
-    this.yadamuLogger = yadamuLogger
+    this.yadamuLogger = yadamuLogger	
   }
   
 

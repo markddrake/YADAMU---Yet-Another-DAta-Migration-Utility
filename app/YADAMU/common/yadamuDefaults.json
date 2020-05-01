@@ -2,6 +2,7 @@
   "yadamu"                    : {
     "FILE"                    : "export.json"
   , "MODE"                    : "DATA_ONLY"
+  , "READ_ON_ERROR"           : "SKIP"
   }
 , "yadamuDBI"                 : {
     "SPATIAL_FORMAT"          : "WKB"
@@ -24,13 +25,14 @@
   }
 , "mysql"                     : {
     "TABLE_MATCHING"          : "INSENSITIVE"
-   ,"READ_KEEP_ALIVE"         : 10000
+   ,"READ_KEEP_ALIVE"         : 0
   }
 , "oracle"                    : {
     "BATCH_LOB_COUNT"         : 1024
   , "LOB_MIN_SIZE"            : 32768
   , "LOB_MAX_SIZE"            : 16777216
   , "LOB_CACHE_COUNT"         : 50000
+  , "XML_STORAGE_FORMAT"      : "XML"
   , "OBJECTS_AS_JSON"         : false
   , "MIGRATE_JSON_STORAGE"    : false
   , "JSON_STORAGE_FORMAT"     : "JSON"

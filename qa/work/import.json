@@ -1,25 +1,26 @@
 {
   "operation"                         : "import"
-, "connections"                       : "qa/work/oracleCloud.json"
+, "connections"                       : "qa/work/YDB2.json"
 , "parameters": {
     "MODE": "DATA_ONLY"
   , "FEEDBACK": "COMMIT"
+  , "XML_STORAGE_MODEL": "CLOB"
   }
 , "tasks"                             : "qa/regression/exportTasks.json"
 , "tests" : [{
     "source":  "file-oracle19c-mode"
-  , "targets": ["oracle19c","oracle20c"]
+  , "targets": ["postgres#1","mssql17","mssql19","mysql#1","mariadb#1"]
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
   , "reverseOperations" : true
   , "recreateSchemas"   : true
-  , "tasks": [11
+  , "tasks": [
       "oracle"
     ]
   },{
     "source": "file-mysql"
-  , "targets": ["oracle19c","oracle20c"]
+  , "targets": ["oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1"]
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
@@ -30,7 +31,7 @@
     ]
   },{
     "source": "file-mssql19"
-  , "targets": ["oracle19c","oracle20c"]
+  , "targets": ["oracle19c","oracle18c","oracle12c","oracle11g","postgres#1","mysql#1","mariadb#1"]
   , "parameters": {
       "MODE": "DATA_ONLY"
     }

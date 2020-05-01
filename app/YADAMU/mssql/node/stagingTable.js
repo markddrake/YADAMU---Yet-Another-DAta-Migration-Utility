@@ -9,61 +9,54 @@ const DBFileLoader = require('./dbFileLoader');
 
 class StagingTable {
 
-  constructor(pool,tableSpec,importFilePath,status) {   
-    this.pool = pool;    
+  constructor(dbi,tableSpec,importFilePath,status) {   
+    this.dbi = dbi;
     this.tableSpec = tableSpec;
     this.filePath = importFilePath;
     this.status = status;
   }
   
-  async dropStagingTable() {
-    try {
-      const statement = `drop table if exists "${this.tableSpec.tableName}"`;
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`${statement}\n\/\n`)
-      }
-      const results = await this.pool.request().batch(statement)
-      return results;
-    } catch (e) {}
-  }
-    
-  async createStagingTable() {
-    const statement = `create table "${this.tableSpec.tableName}" ("${this.tableSpec.columnName}" NVARCHAR(MAX))`;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${statement}\n\/\n`)
-    }
-    const results = await this.pool.request().batch(statement)
-    return results;
-  } 
-
-  async initializeStagingTable() {
-    const statement = `insert into "${this.tableSpec.tableName}" values ('')`;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`${statement}\n\/\n`)
-    }
-    const results = await this.pool.request().batch(statement)
-    return results;
-  } 
-  
   async uploadFile() {
 
-    let results = await this.dropStagingTable();
-    results = await this.createStagingTable();
-    results = await this.initializeStagingTable();
+    let results
+	let self = this
+	await this.dbi.beginTransaction();
 
+    let statement = `drop table if exists "${this.tableSpec.tableName}"`;
+	results = await this.dbi.executeBatch(statement)
 
-    const statement = `update "${this.tableSpec.tableName}" set "${this.tableSpec.columnName}" .write(@data,null,null)`;     
+	statement = `create table "${this.tableSpec.tableName}" ("${this.tableSpec.columnName}" NVARCHAR(MAX) collate ${this.dbi.defaultCollation})`;
+    results = await this.dbi.executeBatch(statement)
+
+    statement = `insert into "${this.tableSpec.tableName}" values ('')`;
+    results = await this.dbi.executeBatch(statement)
+  
+    statement = `update "${this.tableSpec.tableName}" set "${this.tableSpec.columnName}" .write(@C0,null,null)`;  
+	await this.dbi.cachePreparedStatement(statement, [{type : "nvarchar"}]) 
+	
     const inputStream = fs.createReadStream(this.filePath);
-    const loader = new DBFileLoader(this.pool.request(),statement,this.status);
+    const loader = new DBFileLoader(this.dbi,this.status);
   
     let startTime;
-    return new Promise(function(resolve, reject) {
-	  loader.on('finish',function(chunk) {resolve(performance.now() - startTime)})
+    const fileUpload = new Promise(function(resolve, reject) {
+	  loader.on('finish',
+	    async function(chunk) {
+		  try {
+		    resolve(performance.now() - startTime)
+		  } catch (e) {
+			reject(e);
+		  }
+      })
 	  inputStream.on('error',function(err){reject(err)});
 	  loader.on('error',function(err){reject(err)});
 	  startTime = performance.now();
       inputStream.pipe(loader);
     })
+	
+	const elapsedTime = await fileUpload;
+    await this.dbi.clearCachedStatement(); 
+    await this.dbi.commitTransaction();
+	return elapsedTime;
 
   }
 }

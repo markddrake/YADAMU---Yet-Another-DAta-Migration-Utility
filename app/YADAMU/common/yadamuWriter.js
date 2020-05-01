@@ -8,19 +8,27 @@ class YadamuWriter {
     this.dbi = dbi;
     this.schema = this.dbi.parameters.TO_USER;
     this.tableName = tableName
-    this.tableInfo = tableInfo;
+    this.tableInfo = tableInfo
     this.status = status;
     this.yadamuLogger = yadamuLogger;    
-
+    this.rejectManager = this.dbi.yadamu.rejectManager
+	
     this.skipTable = false;
     this.batch = [];
-    this.batchCount = 0;
-
+	
+    this.batchCount = 0;     // Batches created
+	this.rowsCached = 0;     // Rows recieved and cached by appendRow(). Reset every time a batch of cached rows is written to disk
+	this.rowsWritten = 0;    // Rows written to disk in the current transaction
+	this.rowsCommitted = 0;  // Rows successfully committed to disk
+	this.rowsSkipped = 0;    // Rows not written to disk due to unrecoverable write errors
+	this.rowsLost = 0;       // Rows written to disk and thene lost as a result of a rollback or lost connnection 
+	
     this.startTime = performance.now();
     this.endTime = undefined;
     this.insertMode = 'Batch';    
-    this.suppressBatchWrites = (this.tableInfo.batchSize === this.tableInfo.commitSize)
+    this.supressBatchWriteLogging = (this.tableInfo.batchSize === this.tableInfo.commitSize) // Prevent duplicate logging if batchSize and Commit SIze are the same
 	this.sqlInitialTime = this.dbi.sqlCumlativeTime
+		
   }
 
   async initialize() {
@@ -29,50 +37,105 @@ class YadamuWriter {
   }
 
   batchComplete() {
-    return this.batch.length === this.tableInfo.batchSize;
+    return this.rowsCached === this.tableInfo.batchSize;
   }
   
   batchRowCount() {
-    return this.batch.length
+    return this.rowsCached
   }
   
   reportBatchWrites() {
-    return !this.suppressBatchWrites
+    return !this.supressBatchWriteLogging
   }
   
-  commitWork(rowCount) {
-    return (rowCount % this.tableInfo.commitSize) === 0;
+  commitWork() {
+    return (this.rowsWritten >= this.tableInfo.commitSize);
   }
 
   hasPendingRows() {
-    return this.batch.length > 0;
+    return this.rowsCached > 0;
   }
                  
   async appendRow(row) {
-  }    
+
+	// Use forEach not Map as transformations are not required for most columns. 
+	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
+	  
+	this.transformations.forEach(function (transformation,idx) {
+      if ((transformation !== null) && (row[idx] !== null)) {
+	    row[idx] = transformation(row[idx])
+      }
+	},this)
+	
+    this.batch.push(row);
+	
+	this.rowsCached++
+	return this.skipTable;
+  }  
   
   async writeBatch() {
+	this.rowsWritten += this.rowsCached;
+	this.rowsCached = 0;
     return this.skipTable     
+  }
+  
+  async commitTransaction() {
+	await this.dbi.commitTransaction()
+	this.rowsCommitted += this.rowsWritten;
+	this.rowsWritten = 0;
+  }
+  
+  async rollbackTransaction() {
+	this.rowsLost += this.rowsWritten;
+	this.rowsWritten = 0;
+	await this.dbi.rollbackTransaction()
+  }
+
+  rejectRow(tableName,row) {
+    // Allows the rejection process to be overridden by a particular driver.
+    this.rejectManager.rejectRow(tableName,row);
+  }
+  
+  async handleInsertError(operation,tableName,batchSize,row,record,err,info) {
+    this.rowsSkipped++;
+    this.status.warningRaised = true;
+    this.yadamuLogger.logRejected([`${operation}`,`"${tableName}"`,`${batchSize}`,`${row}`],err);
+    this.rejectRow(tableName,record);
+    info.forEach(function (info) {
+      this.yadamuLogger.writeDirect(`${info}\n`);
+    },this)
+
+    const abort = (this.rowsSkipped === ( this.dbi.parameters.MAX_ERRORS ? this.dbi.parameters.MAX_ERRORS : 10)) 
+    if (abort) {
+      this.yadamuLogger.error([`${operation}`,`"${tableName}"`],`Maximum Error Count exceeded. Skipping Table.`);
+    }
+    return abort;     
+  }
+  
+  getStatistics() {
+	return {
+      startTime     : this.startTime
+    , endTime       : this.endTime
+	, sqlTime       : this.dbi.sqlCumlativeTime - this.sqlInitialTime
+    , insertMode    : this.insertMode
+    , skipTable     : this.skipTable
+	, rowsLost      : this.rowsLost
+	, rowsSkipped   : this.rowsSkipped
+	, rowsCommitted : this.rowsCommitted
+    }    
   }
 
   async finalize() {
 	if (this.hasPendingRows()) {
       this.skipTable = await this.writeBatch();   
       if (this.skipTable) {
-        await this.dbi.rollbackTransaction()
+        await this.rollbackTransaction()
       }
     }
     if (!this.skipTable) {
-      await this.dbi.commitTransaction()
-    }   
-    return {
-      startTime    : this.startTime
-    , endTime      : this.endTime
-	, sqlTime      : this.dbi.sqlCumlativeTime - this.sqlInitialTime
-    , insertMode   : this.insertMode
-    , skipTable    : this.skipTable
-    , batchCount   : this.batchCount
-    }    
+      await this.commitTransaction()
+    }
+    return !this.skipTable
   }
 
 }

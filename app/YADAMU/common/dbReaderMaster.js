@@ -14,102 +14,68 @@ class DBReaderMaster extends DBReader {
     const self = this
   }
     
-  async createTableReader(dbi,tableMetadata,outputStream) {
-    const tableInfo = this.dbi.generateSelectStatement(tableMetadata)
-    const parser = dbi.createParser(tableInfo,outputStream.objectMode())
-    const inputStream = await dbi.getInputStream(tableInfo,parser)
-
-    const self = this
-    
-    const tableReader = new Promise(function(resolve,reject) {  
-
-      const outputStreamError = function(err){
-        // Named OnError Listener
-		self.yadamuLogger.logException([`${self.constructor.name}.createTableReader()`,`${tableMetadata.TABLE_NAME}`,`${this.constructor.name}.onError()`],err)
-	    reject(err)
-      }       
-
-      outputStream.on('error',
-	    outputStreamError
-	  );
-
-      parser.on('end',
-	    function() {
-		  outputStream.removeListener('error',outputStreamError)
-	      resolve(parser.getCounter())
-      })
-	  
-	  parser.on('error',
-	    function(err){
-		  reject(err)
-      });
-
-	  const stack = new Error().stack;
-	  inputStream.on('error',
-	    function(err) { 
-		  if (err.yadamuHandled === true) {
-	        self.yadamuLogger.info([`${self.constructor.name}.createTableReader()`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${parser.getCounter()}. Read Pipe Closed`)
-	      } 
-		  reject(self.dbi.processStreamingError(err,stack,tableInfo))
-	    }
-      )		
-
-	  try {
-        inputStream.pipe(parser).pipe(outputStream,{end: false })
-	  } catch (e) {
-		self.yadamuLogger.logException([`${self.constructor.name}.createTableReader()`,`${tableMetadata.TABLE_NAME}`,`PIPE`],e)
-		throw e
-	  }
-    })
-    
-	return tableReader
-  }
-    
   async processTables() {
 	  
-	// Create a Set of TableWriters that will execute operations table copy operations.
-	// The number of writers is determined by the parameter PARALLEL
-	// Each Writer will be assinged a table to process. 
-	// When a table copy is complete ti will be assigned a new table to process.
-	// When all tables have been processed the Writer will free it's database connection and return  value.
+	/*
+	**
+	** Create a Pool of dbWriterSlaves that will execute operations table copy operations.
+	** The number of writers is determined by the parameter PARALLEL
+	** Each Writer will be assinged a table to process. 
+	** When a copy is complete the Writer will be assigned a new table to process.
+	** When all tables have been processed the Writer will free it's database connection and return  value.
+	**
+    ** Each Writer is allocated a connection from the Reader connection pool.
+	** The same connection will be used to read all the tables processed by the Writer.
+	**
+	** The Writer requests a task from the taskList.
+    ** It creates a reader slave for the table and processes all the rows in the table.
+	** It then requests another task from the tasklist.
+	**
+	** When the task list is empty The Reader connection is returned to the pool.
+	**
+	*/
 	  
 	const maxSlaveCount = parseInt(this.dbi.parameters.PARALLEL)
 	const slaveCount = this.schemaInfo.length < maxSlaveCount ? this.schemaInfo.length : maxSlaveCount
 	if (slaveCount > 0) {
       const tasks = [...this.schemaInfo]
 	  const parallelTasks = Array(slaveCount).fill(0)
-      const tableWriters = await Promise.all(parallelTasks.map(async function(dummy,idx) {
-    	 const tableWriter = await this.outputStream.newSlave(idx)		 
-         const tableReaderDBI = await this.dbi.newSlaveInterface(idx);
+      const dbWriterSlavePool = await Promise.all(parallelTasks.map(async function(dummy,idx) {
+    	 const dbWriterSlave = await this.outputStream.newSlave(idx)		 
+         const slaveReaderDBI = await this.dbi.slaveDBI(idx);
 		 while (tasks.length > 0) {
 		   const task = tasks.shift();
-		   tableWriter.write({table: task.TABLE_NAME})
-           const tableReader = this.createTableReader(tableReaderDBI,task,tableWriter)
+		   dbWriterSlave.write({table: task.TABLE_NAME})
+           const copyOperation = this.createCopyOperation(slaveReaderDBI,task,dbWriterSlave)
            const startTime = performance.now()
+           let stats = {}
 	       try {
-             const rows = await tableReader
+             // this.yadamuLogger.trace([`${this.constructor.name}`,`${task.TABLE_NAME}`,`START`],``)
+             stats = await copyOperation
              const elapsedTime = performance.now() - startTime
-             this.yadamuLogger.info([`${this.constructor.name}`,`${task.TABLE_NAME}`],`Rows read: ${rows}. Elaspsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`)
+             // this.yadamuLogger.trace([`${this.constructor.name}`,`${task.TABLE_NAME}`,`SUCCESS`],`Rows read: ${stats.rowsRead}. Elaspsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((stats.rowsRead/elapsedTime) * 1000)} rows/s.`)
        	   } catch(e) {
 			 // Slave raised unrecoverable error. Slave cannot process any more tables.
+             // this.yadamuLogger.trace([`${this.constructor.name}`,`${task.TABLE_NAME}`,`FAILED`],`Rows read: ${stats.rowsRead}.`)
              this.yadamuLogger.logException([`${this.constructor.name}`,`${task.TABLE_NAME}`,`COPY`],e)
 			 this.outputStream.setSlaveException(e);
 			 break;
            }
-           tableWriter.write({eod: task.TABLE_NAME})
+ 		   stats.tableName = task.TABLE_NAME
+           dbWriterSlave.write({eod: stats})
 		 }
 		 try {
-		   await tableReaderDBI.releaseConnection();
+		   await slaveReaderDBI.releaseConnection();
 		 } catch (e) {
-           this.yadamuLogger.logException([`${this.constructor.name}`,`${tableReaderDBI.constructor.name}.releaseConnection()`],e)
+           this.yadamuLogger.logException([`${this.constructor.name}`,`${slaveReaderDBI.constructor.name}.releaseConnection()`],e)
 		 }
-		 return tableWriter 
+		 return dbWriterSlave 
 	  },this))
 	  
-      await Promise.all(tableWriters.map(function(tableWriter) {
+      await Promise.all(dbWriterSlavePool.map(function(dbWriterSlave) {
 		const self = this;
         return new Promise(function(resolve,reject) {
-		  tableWriter.write({releaseSlave: null},undefined,function(err) {
+		  dbWriterSlave.write({releaseSlave: null},undefined,function(err) {
             self.outputStream.write({slaveReleased: null})
 	        resolve()
 		  })
@@ -157,14 +123,17 @@ class DBReaderMaster extends DBReader {
          case 'metadata' :
            const metadata = await this.getMetadata();
 		   const self = this
+		   
 		   this.outputStream.on('ReadyForData',
 		     function() {
 			   self.processTables()
 		     }
 		   );
+		   
            this.outputStream.on('AllDataWritten',
 		     async function(err) {
-			   // If AllDataWritten supplies an Error  destory the reader with the error sent by the Master DBWriter.
+			   // If AllDataWritten is raised with an Error destory the reader with the error emitted by the DBWriter.
+			   // otherwise push a NULL indicating that the reader has finished reading.
 			   try {
                  await self.dbi.finalizeExport();
 	             if (err instanceof Error) {
@@ -180,6 +149,7 @@ class DBReaderMaster extends DBReader {
 			   }
 		     }
 		   );
+
            this.push({metadata: metadata});
 		   this.nextPhase = this.schemaInfo.length === 0 ? 'finished' : 'data';
 		   break;

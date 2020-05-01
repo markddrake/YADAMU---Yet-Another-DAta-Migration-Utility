@@ -11,8 +11,6 @@ class TableWriter extends YadamuWriter {
     this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
     this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + '),';
     
-    this.batchRowCount = 0;
-
     this.transformations = this.tableInfo.dataTypes.map(function(dataType,idx) {
       switch (dataType.type) {
         case "tinyblob" :
@@ -59,21 +57,13 @@ class TableWriter extends YadamuWriter {
 
   async initialize() {
   }
-
-  batchComplete() {
-    return (this.batchRowCount === this.tableInfo.batchSize)
-  }
   
-  batchRowCount() {
-    return this.batchRowCount 
-  }
-  
-  async finalize() {
-    const results = await super.finalize()
+  getStatistics() {
+    const results = super.getStatistics()
     results.insertMode = this.tableInfo.insertMode
     return results;
   }
-
+  
   async appendRow(row) {
             
 	// Use forEach not Map as transformations are not required for most columns. 
@@ -92,8 +82,10 @@ class TableWriter extends YadamuWriter {
     }
     else {
       this.batch.push(...row);
-    }
-    this.batchRowCount++
+    
+	}
+    this.rowsCached++
+	return this.skipTable;
   }
 
   async processWarnings(results) {
@@ -113,22 +105,23 @@ class TableWriter extends YadamuWriter {
 
     this.batchCount++; 
     let repackBatch = false;
-    
+
     if (this.tableInfo.insertMode === 'Batch') {
       try {    
         // Slice removes the unwanted last comma from the replicated args list.
-        const args = this.tableInfo.args.repeat(this.batchRowCount).slice(0,-1);
+        const args = this.tableInfo.args.repeat(this.rowsCached).slice(0,-1);
         await this.dbi.createSavePoint();
         const results = await this.dbi.executeSQL(this.tableInfo.dml.slice(0,-1) + args, this.batch);
         await this.processWarnings(results);
         this.endTime = performance.now();
         await this.dbi.releaseSavePoint();
+		this.rowsCommitted += this.rowsCached
         this.batch.length = 0;
-        this.batchRowCount = 0;
+        this.rowsCached = 0;
         return this.skipTable
       } catch (e) {
         if (this.status.showInfoMsgs) {
-          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.batchRowCount}].  Batch Insert raised:\n${e}.`);
+          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.rowsCached}].  Batch Insert raised:\n${e}.`);
           this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
           // Use Slice to print first and last row, rather than first and last value.
           this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch.slice(0,this.tableInfo.columnCount))}\n...\n${JSON.stringify(this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))}\n`);
@@ -141,31 +134,27 @@ class TableWriter extends YadamuWriter {
       }
     }
 
-    for (let row =0; row < this.batchRowCount; row++) {
+    for (let row =0; row < this.rowsCached; row++) {
       const nextRow = repackBatch ?  this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,nextRow);
         await this.processWarnings(results);
+		this.rowsWritten++;
       } catch (e) {
         const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []
-        this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batchRowCount,row,nextRow,e,errInfo);
+        this.skipTable = await this.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.rowsCached,row,nextRow,e,errInfo);
         if (this.skipTable) {
           break;
         }
       }
     }     
-    
+   
     this.endTime = performance.now();
     this.batch.length = 0;
-    this.batchRowCount = 0;
+    this.rowsCached = 0;
     return this.skipTable          
   }
 
-  async finalize() {
-    const results = await super.finalize()
-    results.insertMode = this.tableInfo.insertMode
-    return results;
-  }
 }
 
 module.exports = TableWriter;

@@ -56,24 +56,11 @@ class TableWriter extends YadamuWriter {
     },this)
 
   }
-
-  async finalize() {
-    const results = await super.finalize()
+  
+  getStatistics()  {
+	const results = super.getStatistics()
     results.insertMode = this.tableInfo.insertMode
-    return results;
-  }
-
-  async appendRow(row) {
-
-	// Use forEach not Map as transformations are not required for most columns. 
-	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
-	  
-	this.transformations.forEach(function (transformation,idx) {
-      if ((transformation !== null) && (row[idx] !== null)) {
-	    row[idx] = transformation(row[idx])
-      }
-	},this)
-    this.batch.push(row);
+ 	return results;
   }
 
   async processWarnings(results) {
@@ -121,13 +108,11 @@ class TableWriter extends YadamuWriter {
     try {
       const results = await this.dbi.executeSQL(dml,newRow)
       await this.processWarnings(results);
-      return true;
+	  this.rowsWritten++;
     } catch (e) {
       const errInfo = this.status.showInfoMsgs === true ? [dml,newRow] : []
-      this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.recodeSpatialData()`,this.tableName,this.batch.length,rowNumber,newRow,e,errInfo);
-    }
-    
-    return false;
+      this.skipTable = await this.handleInsertError(`${this.constructor.name}.recodeSpatialData()`,this.tableName,this.batch.length,rowNumber,newRow,e,errInfo);
+    }    
   }
  
   async writeBatch() {     
@@ -141,7 +126,9 @@ class TableWriter extends YadamuWriter {
         await this.processWarnings(results);
         this.endTime = performance.now();
         await this.dbi.releaseSavePoint();
-        this.batch.length = 0;  
+		this.batch.length = 0;  
+        this.rowsWritten += this.rowsCached;
+		this.rowsCached = 0;
         return this.skipTable
       } catch (e) {
         if (this.status.showInfoMsgs) {
@@ -160,23 +147,25 @@ class TableWriter extends YadamuWriter {
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row])
         await this.processWarnings(results);
+		this.rowsWritten++;
       } catch (e) {
-        if ((e.errno && e.errno === 3037) && (e.code && e.code === 'ER_GIS_INVALID_DATA') && (e.sqlState &&  e.sqlState === '22023')) {
+        if (e.spatialInsertFailed()) {
           this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.batch.length}], row ${row}. Spatial Insert ("${this.tableInfo.spatialFormat}") raised: "${e.code}". Converting to "WKT".`);
-          this.recodeSpatialData(this.batch[row],row);
+          await this.recodeSpatialData(this.batch[row],row);
         }
         else {
           const errInfo = this.status.showInfoMsgs === true ? [this.tableInfo.dml,this.batch[row]] : []
-          this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,this.batch[row],e,errInfo);
-          if (this.skipTable) {
-            break;
-          }
+          this.skipTable = await this.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,this.batch[row],e,errInfo);
+        }
+        if (this.skipTable) {
+          break;
         }
       }
     }     
-    
+	
     this.endTime = performance.now();
     this.batch.length = 0;  
+	this.rowsCached = 0;
     return this.skipTable 
   }
 }

@@ -5,6 +5,7 @@ class FileStatistics {
     
   constructor() {
      this.tableInfo = {}
+	 this.skipTable = false;
      this.tableName = undefined;
      this.parameters = {}
   }
@@ -153,6 +154,7 @@ class FileStatistics {
   }
 
   getTableWriter(tableName) {
+    this.skipTable = false
 
     this.tableInfo[tableName] = {
       rowCount  : 0
@@ -178,7 +180,7 @@ class FileStatistics {
   }
 
   async writeBatch() {
-    if  (this.tableInfo[this.tableName].rowCount > 1) {
+    if (this.tableInfo[this.tableName].rowCount > 1) {
       this.tableInfo[this.tableName].byteCount += this.tableInfo[this.tableName].rowCount - 1;
     }
   }    

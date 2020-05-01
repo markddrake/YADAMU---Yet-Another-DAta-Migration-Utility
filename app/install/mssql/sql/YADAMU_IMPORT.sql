@@ -1,10 +1,10 @@
 use master
 go
-create OR ALTER FUNCTION sp_MAP_FOREIGN_DATATYPE(@VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT) 
-RETURNS VARCHAR(128) 
-AS
-BEGIN
-  RETURN 
+create OR ALTER FUNCTION sp_MAP_FOREIGN_DATATYPE(@VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT, @DB_COLLATION NVARCHAR(32)) 
+returns VARCHAR(128) 
+as
+begin
+  return 
   case
     when @VENDOR = 'Oracle'
       then case 
@@ -40,7 +40,7 @@ BEGIN
                         then 'datetimeoffset'
                       else 
                        'datetime2' 
-               END
+               end
              when @DATA_TYPE = 'XMLTYPE'
                then 'xml'
              when @DATA_TYPE like '"%"."%"'
@@ -49,7 +49,7 @@ BEGIN
                then 'json'
              else
                lower(@DATA_TYPE)
-           END
+           end
     when @VENDOR in ('MySQL','MariaDB')   
       then case 
              when @DATA_TYPE = 'mediumint' 
@@ -90,7 +90,7 @@ BEGIN
                'varbinary(max)'
              else
                lower(@DATA_TYPE)
-           END
+           end
     when @VENDOR = 'Postgres'
       then case 
              when @DATA_TYPE = 'character varying' and @DATA_TYPE_LENGTH is null then
@@ -129,21 +129,30 @@ BEGIN
                'int'
              else
                lower(@DATA_TYPE)
-           END          
+           end          
+    when ((@VENDOR = 'MSSQLSERVER') and (@DB_COLLATION like '%UTF8'))
+      then case 
+             when @DATA_TYPE = 'text' then
+			   'varchar(max)'
+             when @DATA_TYPE = 'ntext' then
+			   'nvarchar(max)'
+             else
+               lower(@DATA_TYPE)
+		   end	   
     else 
       lower(@DATA_TYPE)
-  END
-END
+  end
+end
 --
 go
 --
 EXECUTE sp_ms_marksystemobject 'sp_MAP_FOREIGN_DATATYPE'
 go
 --
-create OR ALTER FUNCTION sp_GENERATE_STATEMENTS(@VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @COLUMN_LIST NVARCHAR(MAX),@DATA_TYPE_LIST NVARCHAR(MAX),@DATA_SIZE_LIST NVARCHAR(MAX)) 
-RETURNS NVARCHAR(MAX)
-AS
-BEGIN
+create OR ALTER FUNCTION sp_GENERATE_STATEMENTS(@VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @COLUMN_LIST NVARCHAR(MAX),@DATA_TYPE_LIST NVARCHAR(MAX),@DATA_SIZE_LIST NVARCHAR(MAX),@DB_COLLATION NVARCHAR(32)) 
+returns NVARCHAR(MAX)
+as
+begin
   DECLARE @COLUMNS_CLAUSE     NVARCHAR(MAX);
   DECLARE @INSERT_SELECT_LIST NVARCHAR(MAX);
   DECLARE @WITH_CLAUSE        NVARCHAR(MAX);
@@ -151,12 +160,16 @@ BEGIN
   
   DECLARE @DDL_STATEMENT      NVARCHAR(MAX);
   DECLARE @DML_STATEMENT      NVARCHAR(MAX);
-  DECLARE @DB_COLLATION       VARCHAR(256);
+  DECLARE @LEGACY_COLLATION   VARCHAR(256);
   
-  SELECT @DB_COLLATION = CONVERT (varchar(256), DATABASEPROPERTYEX('Northwind1','collation'));
+  SET @LEGACY_COLLATION = @DB_COLLATION;
   
-  if (@DB_COLLATION like '%_SC') begin
-    SET @DB_COLLATION = LEFT(@DB_COLLATION, LEN(@DB_COLLATION)-3);
+  if (@LEGACY_COLLATION like '%_UTF8') begin
+    SET @LEGACY_COLLATION = LEFT(@LEGACY_COLLATION, LEN(@LEGACY_COLLATION)-5);
+  end;
+ 
+  if (@LEGACY_COLLATION like '%_SC') begin
+    SET @LEGACY_COLLATION = LEFT(@LEGACY_COLLATION, LEN(@LEGACY_COLLATION)-3);
   end;
   
   WITH "SOURCE_TABLE_DEFINITION" as (
@@ -170,21 +183,21 @@ BEGIN
                           LEFT(s."VALUE",CHARINDEX(',',s."VALUE")-1)
                         else
                           s."VALUE"
-                      END 
-                      AS BIGINT) "DATA_TYPE_LENGTH"
+                      end 
+                      as BIGINT) "DATA_TYPE_LENGTH"
                 ,case
                    when CHARINDEX(',',s."VALUE") > 0  then 
                      RIGHT(s."VALUE", CHARINDEX(',',REVERSE(s."VALUE"))-1)
                    else 
                      NULL
-                 END "DATA_TYPE_SCALE"
+                 end "DATA_TYPE_SCALE"
             FROM OPENJSON(CONCAT('[',@COLUMN_LIST,']')) c,
                  OPENJSON(@DATA_TYPE_LIST) t,
                  OPENJSON(@DATA_SIZE_LIST) s
            WHERE c."KEY" = t."KEY" and c."KEY" = s."KEY"
   ),
   "TARGET_TABLE_DEFINITION" as (
-    select st.*, master.dbo.sp_MAP_FOREIGN_DATATYPE(@VENDOR, "DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
+    select st.*, master.dbo.sp_MAP_FOREIGN_DATATYPE(@VENDOR, "DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE",@DB_COLLATION) TARGET_DATA_TYPE
       from "SOURCE_TABLE_DEFINITION" st
   )
   SELECT @COLUMNS_CLAUSE =
@@ -195,8 +208,8 @@ BEGIN
                              when TARGET_DATA_TYPE LIKE '%(%)%' then
                                "TARGET_DATA_TYPE"
                              when "TARGET_DATA_TYPE" in('text','ntext')  then
-                               CONCAT("TARGET_DATA_TYPE",' collate ',@DB_COLLATION)
-                             when "TARGET_DATA_TYPE" in('xml','text','ntext','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney','geography','geometry','hierarchyid','uniqueidentifier')  then
+                               CONCAT("TARGET_DATA_TYPE",' collate ',@LEGACY_COLLATION)
+                             when "TARGET_DATA_TYPE" in('xml','image','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney','geography','geometry','hierarchyid','uniqueidentifier')  then
                                "TARGET_DATA_TYPE"                
                              when "DATA_TYPE_SCALE" IS NOT NULL then
                                CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
@@ -206,10 +219,10 @@ BEGIN
                                    CONCAT("TARGET_DATA_TYPE",'(max)')
                                  else 
                                    CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
-                               END
+                               end
                              else 
                                "TARGET_DATA_TYPE"
-                           END
+                           end
                          ) 
                    ,','                 
                    )
@@ -230,10 +243,10 @@ BEGIN
                                           CONCAT("TARGET_DATA_TYPE",'(max)')
                                         else 
                                           CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
-                                      END
+                                      end
                                     else 
                                       "TARGET_DATA_TYPE"
-                                  END,
+                                  end,
                                   '"'
                                  )
                            ,','                 
@@ -252,7 +265,7 @@ BEGIN
                             CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(max),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
                           else 
                             CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",'),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
-                        END
+                        end
                       when "TARGET_DATA_TYPE" = 'geometry'  then
                         case
                           when @SPATIAL_FORMAT in ('WKT','EWKT') then
@@ -273,7 +286,7 @@ BEGIN
                         end
                       else
                         CONCAT('data."',"COLUMN_NAME",'"')
-                    END 
+                    end 
                    ,','                 
                    )
        ,@WITH_CLAUSE =
@@ -305,7 +318,7 @@ BEGIN
                                   'varchar(max)'
                                 else 
                                   CONCAT('varchar(',cast(("DATA_TYPE_LENGTH" * 2) as VARCHAR),')')
-                              END
+                              end
                             when "DATA_TYPE_SCALE" IS NOT NULL then
                               CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
                             when "DATA_TYPE_LENGTH" IS NOT NULL  then
@@ -314,10 +327,10 @@ BEGIN
                                   CONCAT("TARGET_DATA_TYPE",'(max)')
                                 else 
                                   CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
-                              END
+                              end
                             else 
                               "TARGET_DATA_TYPE"
-                          END,
+                          end,
                           ' ''$[',"INDEX",']'''
                         )
                         ,','                    
@@ -327,16 +340,16 @@ BEGIN
    SET @DDL_STATEMENT = CONCAT('if object_id(''"',@SCHEMA,'"."',@TABLE_NAME,'"'',''U'') is NULL create table "',@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMNS_CLAUSE,')');   
    SET @DML_STATEMENT = CONCAT('insert into "' ,@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMN_LIST,') select ',@INSERT_SELECT_LIST,'  from "#YADAMU_STAGING" s cross apply OPENJSON("DATA",''$.data."',@TABLE_NAME,'"'') with ( ',@WITH_CLAUSE,') data');
    RETURN JSON_MODIFY(JSON_MODIFY(JSON_MODIFY('{}','$.ddl',@DDL_STATEMENT),'$.dml',@DML_STATEMENT),'$.targetDataTypes',JSON_QUERY(@TARGET_DATA_TYPES))
-END;
+end;
 --
 go
 --
 EXECUTE sp_ms_marksystemobject 'sp_GENERATE_STATEMENTS'
 go
 --
-create OR ALTER PROCEDURE sp_IMPORT_JSON(@TARGET_DATABASE VARCHAR(128)) 
-AS
-BEGIN
+create OR ALTER PROCEDURE sp_IMPORT_JSON(@TARGET_DATABASE VARCHAR(128),@DB_COLLATION VARCHAR(32)) 
+as
+begin
   DECLARE @OWNER            VARCHAR(128);
   DECLARE @TABLE_NAME       VARCHAR(128);
   DECLARE @STATEMENTS       NVARCHAR(MAX);
@@ -353,7 +366,7 @@ BEGIN
   DECLARE FETCH_METADATA 
   CURSOR FOR 
   select TABLE_NAME, 
-         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, SPATIAL_FORMAT, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS) as STATEMENTS
+         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, SPATIAL_FORMAT, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS,@DB_COLLATION) as STATEMENTS
    from "#YADAMU_STAGING"
          cross apply OPENJSON("DATA") 
          with (
@@ -374,48 +387,48 @@ BEGIN
                      ) v;
 
   SET @SQL_STATEMENT = CONCAT('if not exists (select 1 from sys.schemas where name = N''',@TARGET_DATABASE,''') exec(''create schema "',@TARGET_DATABASE,'"'')')
-  BEGIN TRY 
+  begin TRY 
     EXEC(@SQL_STATEMENT)
     SET @LOG_ENTRY = (
       select @TARGET_DATABASE as [ddl.tableName], @SQL_STATEMENT as [ddl.sqlStatement] 
         for JSON PATH, INCLUDE_NULL_VALUES
     )
     SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-  END TRY
-  BEGIN CATCH  
+  end TRY
+  begin CATCH  
     SET @LOG_ENTRY = (
       select 'FATAL' as 'error.severity', @TARGET_DATABASE as [error.tableName], @SQL_STATEMENT as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as [error.msg], CONCAT(ERROR_PROCEDURE(),'. Line: ', ERROR_LINE(),'. State',ERROR_STATE(),'. Severity:',ERROR_SEVERITY(),'.') as [error.details]
         for JSON PATH, INCLUDE_NULL_VALUES
     )
     SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-  END CATCH
+  end CATCH
         
   SET QUOTED_IDENTIFIER ON; 
-  BEGIN TRY
+  begin TRY
     OPEN FETCH_METADATA;
     FETCH FETCH_METADATA INTO @TABLE_NAME, @STATEMENTS
 
     WHILE @@FETCH_STATUS = 0 
-    BEGIN 
+    begin 
       SET @ROW_COUNT = 0;
       SET @SQL_STATEMENT = JSON_VALUE(@STATEMENTS,'$.ddl')
-      BEGIN TRY 
+      begin TRY 
         EXEC(@SQL_STATEMENT)
         SET @LOG_ENTRY = (
           select @TABLE_NAME as [ddl.tableName], @SQL_STATEMENT as [ddl.sqlStatement] 
              for JSON PATH, INCLUDE_NULL_VALUES
         )
         SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-      END TRY
-      BEGIN CATCH  
+      end TRY
+      begin CATCH  
         SET @LOG_ENTRY = (
           select 'FATAL' as 'error.severity', @TABLE_NAME as [error.tableName], @SQL_STATEMENT as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as [error.msg], CONCAT(ERROR_PROCEDURE(),'. Line: ', ERROR_LINE(),'. State',ERROR_STATE(),'. Severity:',ERROR_SEVERITY(),'.') as [error.details]
              for JSON PATH, INCLUDE_NULL_VALUES
         )
         SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-      END CATCH
+      end CATCH
       
-      BEGIN TRY 
+      begin TRY 
         SET @START_TIME = SYSUTCDATETIME();
         SET @SQL_STATEMENT = JSON_VALUE(@STATEMENTS,'$.dml')
         EXEC(@SQL_STATEMENT)
@@ -427,42 +440,42 @@ BEGIN
              for JSON PATH, INCLUDE_NULL_VALUES
           )
         SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-      END TRY  
-      BEGIN CATCH  
+      end TRY  
+      begin CATCH  
         SET @LOG_ENTRY = (
           select 'FATAL' as 'error.severity', @TABLE_NAME as [error.tableName],@SQL_STATEMENT  as [error.sqlStatement], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as [error.msg], CONCAT(ERROR_PROCEDURE(),'. Line: ', ERROR_LINE(),'. Severity:',ERROR_SEVERITY(),'.') as [error.details]
              for JSON PATH, INCLUDE_NULL_VALUES
         )
         SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-      END CATCH
+      end CATCH
 
       FETCH FETCH_METADATA INTO @TABLE_NAME, @STATEMENTS
-    END;
+    end;
    
     CLOSE FETCH_METADATA;
     DEALLOCATE FETCH_METADATA;
    
-  END TRY 
-  BEGIN CATCH
+  end TRY 
+  begin CATCH
     SET @LOG_ENTRY = (
       select 'FATAL' as 'error.severity', ERROR_PROCEDURE() as [error.tableName], ERROR_NUMBER() as [error.code], ERROR_MESSAGE() as [error.msg], CONCAT(ERROR_PROCEDURE(),'. Line: ', ERROR_LINE(),'. Severity:',ERROR_SEVERITY(),'.') as [error.details]
         for JSON PATH, INCLUDE_NULL_VALUES
     )
     SET @RESULTS = JSON_MODIFY(@RESULTS,'append $',JSON_QUERY(@LOG_ENTRY,'$[0]'))
-  END CATCH
+  end CATCH
 --
   SELECT @RESULTS;
-END
+end
 --
 go
 --
 EXECUTE sp_ms_marksystemobject 'sp_IMPORT_JSON'
 go
 --
-create OR ALTER FUNCTION sp_GENERATE_SQL(@TARGET_DATABASE VARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @METADATA NVARCHAR(MAX)) 
+create OR ALTER FUNCTION sp_GENERATE_SQL(@TARGET_DATABASE VARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @METADATA NVARCHAR(MAX),@DB_COLLATION NVARCHAR(32)) 
 returns NVARCHAR(MAX)
-AS
-BEGIN
+as
+begin
   DECLARE @OWNER            VARCHAR(128);
   DECLARE @TABLE_NAME       VARCHAR(128);
   DECLARE @STATEMENTS       NVARCHAR(MAX);
@@ -472,7 +485,7 @@ BEGIN
   DECLARE FETCH_METADATA 
   CURSOR FOR 
   select TABLE_NAME, 
-         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, @SPATIAL_FORMAT, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS) as STATEMENTS
+         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, @SPATIAL_FORMAT, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS,@DB_COLLATION) as STATEMENTS
   from  OPENJSON(@METADATA) 
          with (
            METADATA      nvarchar(max) '$.metadata' as json
@@ -495,16 +508,16 @@ BEGIN
   FETCH FETCH_METADATA INTO @TABLE_NAME, @STATEMENTS
 
   WHILE @@FETCH_STATUS = 0 
-  BEGIN 
+  begin 
     SET @RESULTS = JSON_MODIFY(@RESULTS,concat('lax $."',@TABLE_NAME,'"'),@STATEMENTS)
     FETCH FETCH_METADATA INTO @TABLE_NAME, @STATEMENTS
-  END;
+  end;
    
   CLOSE FETCH_METADATA;
   DEALLOCATE FETCH_METADATA;
     
   RETURN @RESULTS;
-END
+end
 --
 go
 --

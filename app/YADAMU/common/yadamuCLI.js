@@ -17,7 +17,7 @@ const VALID_SWITCHES = ['EXPORT','IMPORT','UPLOAD','COPY','TEST']
 
 const FILE_MUST_EXIST = ['IMPORT']
 const FILE_MUST_NOT_EXIST = ['EXPORT']
-const CONFIGURATION_REQUIRED = ['COPY','TEST']
+const CONFIGURATION_REQUIRED = ['COPY','TEST','CONNECTIONTEST']
 
 const SUPPORTED_ARGUMENTS = {
   "YADAMUCMD" : []
@@ -32,14 +32,15 @@ const SUPPORTED_ARGUMENTS = {
 }
 
 const REQUIRED_ARGUMENTS = {
-  "YADAMUCMD" : []
-, "YADAMUGUI" : []
-, "YADAMUCLI" : []
-, "IMPORT" : ['TO_USER']
-, "UPLOAD" : ['TO_USER']
-, "EXPORT" : ['FROM_USER']
-, "COPY"   : ['CONFIG']
-, "TEST"   : ['CONFIG']
+  "YADAMUCMD"      : []
+, "YADAMUGUI"      : []
+, "YADAMUCLI"      : []
+, "IMPORT"         : ['TO_USER']
+, "UPLOAD"         : ['TO_USER']
+, "EXPORT"         : ['FROM_USER']
+, "COPY"           : ['CONFIG']
+, "TEST"           : ['CONFIG']
+, "CONNECTIONTEST" : ['CONFIG','RDBMS']
 }
 
 const ILLIEGAL_ARGUMENTS = {
@@ -139,6 +140,7 @@ class YadamuCLI {
   }
 
   validateParameters(command) {
+	
     const requiredArguments = REQUIRED_ARGUMENTS[command];
     const cmdLineParamters = this.yadamu.getCommandLineParameters()
 	

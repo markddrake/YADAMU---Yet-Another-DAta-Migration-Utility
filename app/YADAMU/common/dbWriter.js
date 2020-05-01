@@ -19,14 +19,15 @@ class DBWriter extends Writable {
     this.yadamuLogger = yadamuLogger;
     this.yadamuLogger.info([`${this.constructor.name}`,`${dbi.DATABASE_VENDOR}`],`Ready. Mode: ${this.mode}.`)
         
-    this.currentTable = undefined;
-    this.rowCount     = undefined;
-    this.ddlComplete  = false;
-    this.skipTable    = false;
+    this.errorHandler   = undefined;
+	this.currentTable   = undefined;
+    this.rowCount       = undefined;
+    this.ddlComplete    = false;
 
     this.configureFeedback(this.dbi.parameters.FEEDBACK); 
 	this.tableCount = 0;
     this.timings = {}
+	
   }      
   
   configureFeedback(feedbackModel) {
@@ -59,11 +60,15 @@ class DBWriter extends Writable {
   objectMode() {
     return this.dbi.objectMode(); 
   }
-  
-  setOptions(options) {
-    OPTIONS = options
+    
+  setErrorHandler(errorHandler) {
+	 this.errorHandler = errorHandler
   }
   
+  setInputStreamType(ist) {
+	this.inputStreamType = ist
+  }
+	
   getTimings() {
     return this.timings
   }
@@ -179,20 +184,65 @@ class DBWriter extends Writable {
     }
   }      
   
-  reportTableStatistics(elapsedTime,results) {
-      
-    const skipCount = this.dbi.skipCount;
-    const rowsRead = this.rowCount;
-    const rowsWritten = rowsRead - skipCount;
-    const throughput = isNaN(elapsedTime) ? 'N/A' : Math.round((rowsWritten/elapsedTime) * 1000)
+  reportTableComplete(readerStatistics) {
+	  	  
+	const writerStatistics = this.currentTable.getStatistics();
+	
+    const readerElapsedTime = readerStatistics.readerEndTime - readerStatistics.pipeStartTime;
+    const writerElapsedTime = writerStatistics.endTime - writerStatistics.startTime;        
+	const pipeElapsedTime = writerStatistics.endTime - readerStatistics.pipeStartTime;
+	
+	const readerThroughput = isNaN(readerElapsedTime) ? 'N/A' : Math.round((readerStatistics.rowsRead/readerElapsedTime) * 1000)
+    const writerThroughput = isNaN(writerElapsedTime) ? 'N/A' : Math.round((writerStatistics.rowsCommitted/writerElapsedTime) * 1000)
+	
+	let readerStatus = ''
+	let rowCountSummary = ''
+	
+    const readerTimings = `Reader Elapsed Time: ${YadamuLibrary.stringifyDuration(readerElapsedTime)}s. Throughput ${Math.round(readerThroughput)} rows/s.`
+	const writerTimings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(writerElapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(writerStatistics.sqlTime))}s. Throughput: ${Math.round(writerThroughput)} rows/s.`
     
-    this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`,`${results.insertMode}`],`Rows written ${rowsWritten}${skipCount !== 0 ? ', skipped ' + skipCount : ''}. DB Time: ${YadamuLibrary.stringifyDuration(Math.round(results.sqlTime))}s. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(elapsedTime))}s. Throughput ${throughput} rows/s.`);
-    this.timings[this.tableName] = {rowCount: this.rowCount, insertMode: results.insertMode,  rowsSkipped: skipCount, elapsedTime: Math.round(elapsedTime).toString() + "ms", throughput: Math.round(throughput).toString() + "/s", sqlExecutionTime: Math.round(elapsedTime)};
+	if ((readerStatistics.rowsRead === 0) || (readerStatistics.rowsRead === writerStatistics.rowsCommitted)) {
+      rowCountSummary = `Rows ${readerStatistics.rowsRead}.`
+    }
+	else {
+      rowCountSummary = `Read ${readerStatistics.rowsRead}. Written ${writerStatistics.rowsCommitted}.`
+    }
+
+	rowCountSummary = writerStatistics.rowsSkipped > 0 ? `${rowCountSummary} Skipped ${writerStatistics.rowsSkipped}.` : rowCountSummary
+
+	if (readerStatistics.copyFailed) {
+	  rowCountSummary = `Read operation failed. ${rowCountSummary} `  
+      this.yadamuLogger.error([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+	}
+	else {
+	  if (readerStatistics.rowsRead !== writerStatistics.rowsCommitted) {
+        this.yadamuLogger.warning([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+      }
+	  else {
+        this.yadamuLogger.info([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+	  }
+    }	  
+		 
+    this.timings[this.tableName] = {rowCount: writerStatistics.rowsCommitted, insertMode: writerStatistics.insertMode,  rowsSkipped: writerStatistics.rowsSkipped, elapsedTime: Math.round(writerElapsedTime).toString() + "ms", throughput: Math.round(writerThroughput).toString() + "/s", sqlExecutionTime: Math.round(writerStatistics.sqlTime)};
   }
+  
   
   async initialize() {
     await this.dbi.initializeImport();
 	this.targetSchemaInfo = await this.getTargetSchemaInfo()
+  }
+  
+  abortTable() {
+	  
+	// Set skipTable TRUE. No More rows will be cached for writing. No more batches will be written. Batches that have been written but not commited will be rollbed back.
+
+    // this.yadamuLogger.trace([`${this.constructor.name}.abortTable`],``);
+	if (this.currentTable !== undefined) {
+	  this.currentTable.skipTable = true;
+	}
+	else {
+	  this.currentTable = { skipTable: true}
+	}
   }
  
   async _write(obj, encoding, callback) {
@@ -216,55 +266,55 @@ class DBWriter extends Writable {
         case 'table':
 		  this.tableCount++;
           this.rowCount = 0;
-          this.skipTable = false;
           this.tableName = obj.table;
           this.currentTable = this.dbi.getTableWriter(this.tableName);
           await this.currentTable.initialize();
           break;
         case 'data': 
-          if (this.skipTable === true) {
-            break;
+          // console.log(new Date().toISOString(),`${this.constructor.name}._write`,action,this.currentTable.skipTable);
+          if (this.currentTable.skipTable !== true) {
+		    await this.currentTable.appendRow(obj.data);
+            this.rowCount++;
           }
-          await this.currentTable.appendRow(obj.data);
-          this.rowCount++;
           if ((this.rowCount % this.feedbackInterval === 0) & !this.currentTable.batchComplete()) {
-            this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows buffered: ${this.currentTable.batchRowCount()}.`);
+            this.yadamuLogger.info([,`${this.tableName}`],`Rows buffered: ${this.currentTable.batchRowCount()}.`);
           }
-          if (this.currentTable.batchComplete()) {
-            this.skipTable = await this.currentTable.writeBatch(this.status);
-            if (this.skipTable) {
-              this.dbi.rollbackTransaction();
+          if ((this.currentTable.skipTable !== true) && (this.currentTable.batchComplete())) {
+			await this.currentTable.writeBatch(this.status);
+			if (this.currentTable.skipTable) {
+              await this.currentTable.rollbackTransaction();
             }
             if (this.reportBatchWrites && this.currentTable.reportBatchWrites() && !this.currentTable.commitWork(this.rowCount)) {
-              this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows written:  ${this.rowCount}.`);
+              this.yadamuLogger.info([`${this.tableName}`],`Rows written:  ${this.rowCount}.`);
             }                    
           }  
-          if (this.currentTable.commitWork(this.rowCount)) {
-            await this.dbi.commitTransaction(this.rowCount)
+          if ((this.currentTable.skipTable !== true) && (this.currentTable.commitWork(this.rowCount))) {
+            await this.currentTable.commitTransaction(this.rowCount)
             if (this.reportCommits) {
-              this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows commited: ${this.rowCount}.`);
+              this.yadamuLogger.info([`${this.tableName}`],`Rows commited: ${this.rowCount}.`);
             }          
             await this.dbi.beginTransaction();            
           }
           break;
 		case 'eod':
-          const results = await this.currentTable.finalize();
-          this.skipTable = results.skipTable;
-          if (!this.skipTable) {
-            const elapsedTime = results.endTime - results.startTime;            
-            this.reportTableStatistics(elapsedTime,results);
-          }
-		  this.currentTable = undefined
+          await this.currentTable.finalize();
+          this.reportTableComplete(obj.eod);
+          this.currentTable = undefined
+		  // Remove Table Specific Error Handlers
+		  if (this.errorHandler) {
+		    this.removeListener('error',this.errorHandler)		  
+			this.errorHandler = undefined
+		  }
 		  break;
         default:
       }    
       callback();
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._write()`,`"${this.tableName}"`],e);
-	  this.skipTable = true;
+	  this.currentTable.skipTable = true;
 	  try {
-        await this.dbi.rollbackTransaction(e)
-		if (['systemInformation','dd','metadata'].indexOf(action) > -1) {
+        await this.currentTable.rollbackTransaction(e)
+		if (['systemInformation','ddl','metadata'].indexOf(action) > -1) {
 	      // Errors prior to processing rows are considered fatal
 		  callback(e);
 		}

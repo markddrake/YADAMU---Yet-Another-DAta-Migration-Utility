@@ -4,20 +4,15 @@ const Writable = require('stream').Writable
 
 class DBFileLoader extends Writable {
      
-  constructor(request,statement,status) {
+  constructor(dbi) {
     super({})
-    this.request = request;
-    this.statement = statement;
-    this.status = status;
+    this.dbi = dbi;
   }
      
   async _write(chunk, encoding, next) {
     try {
       const data = chunk.toString()
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`${this.statement}\n\/\n`)
-      }
-      var results = await this.request.input('data',sql.NVARCHAR,data).batch(this.statement);
+      var results = await this.dbi.executeCachedStatement({C0: data})
       next(null,results);
     } catch (e) {
       next(e);

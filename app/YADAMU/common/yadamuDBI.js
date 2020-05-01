@@ -12,8 +12,7 @@ const { performance } = require('perf_hooks');const async_hooks = require('async
 */
 
 const YadamuLibrary = require('./yadamuLibrary.js');
-const YadamuRejectManager = require('./yadamuRejectManager.js');
-const {YadamuError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuError.js');
+const {YadamuError, CommandLineError, ConfigurationFileError, ConnectionError,DatabaseError} = require('./yadamuError.js');
 const DBParser = require('./dbParser.js');
 
 const DEFAULT_BATCH_SIZE   = 10000;
@@ -37,7 +36,7 @@ class YadamuDBI {
   get STATEMENT_TERMINATOR() { return '' }
   
   traceSQL(msg) {
-     this.yadamuLogger.trace([this.DATABASE_VENDOR,'SQL'],msg)
+     // this.yadamuLogger.trace([this.DATABASE_VENDOR,'SQL'],msg)
      return(`${msg.trim()}${this.sqlTraceTag} ${this.sqlTerminator}`);
   }
   
@@ -324,12 +323,6 @@ class YadamuDBI {
     this.yadamuLogger.ddl([`${this.constructor.name}.executeDDL()`],`Executed ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
   }
   
-  createRejectManager() {
-    const rejectFolderPath = this.parameters.REJECT_FOLDER ? this.parameters.REJECT_FOLDER : 'work/rejected';
-    this.rejectFilename = path.resolve(rejectFolderPath +  path.sep + 'yadamuRejected_' + new Date().toISOString().split(':').join('') + ".json");
-    return new YadamuRejectManager(this.rejectFilename,this.yadamuLogger);
-  }
-  
   setOption(name,value) {
     this.options[name] = value;
   }
@@ -362,6 +355,7 @@ class YadamuDBI {
     this.initializeParameters(parameters);
     this.systemInformation = undefined;
     this.metadata = undefined;
+    this.reconnectInProgress = false;
     this.connectionProperties = this.getConnectionProperties()   
     this.connection = undefined;
 
@@ -371,15 +365,12 @@ class YadamuDBI {
     this.tableInfo  = undefined;
     this.insertMode = 'Empty';
     this.skipTable = true;
-    this.skipCount = 0;
 
     this.tableMappings = undefined;
     if (this.parameters.MAPPINGS) {
       this.loadTableMappings(this.parameters.MAPPINGS);
     }   
  
-    this.rejectManager = this.createRejectManager()
-    
     this.sqlCumlativeTime = 0
     this.sqlTerminator = `\n${this.STATEMENT_TERMINATOR}\n`
   }
@@ -406,6 +397,51 @@ class YadamuDBI {
     }
 
   }  
+
+  waitForRestart(delayms) {
+    return new Promise(function (resolve, reject) {
+        setTimeout(resolve, delayms);
+    });
+  }
+  
+  async reconnectImpl() {
+    throw new Error(`Database Reconnection Not Implimented for ${this.DATABASE_VENDOR}`)
+  }
+  
+  async reconnect(cause) {
+
+    let retryCount = 0;
+    let connectionUnavailable 
+    
+	this.reconnectInProgress = true
+    this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`SQL Operation raised: ${cause}`);
+	 
+    while (retryCount < 10) {
+	  try {
+        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Attemping reconnection.`);
+        await this.reconnectImpl()
+	    await this.configureConnection();
+        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`${this.DATABASE_VENDOR} service. New connection availabe.`);
+        this.reconnectInProgress = false;
+		return;
+      } catch (connectionFailure) {
+		if (connectionFailure.serverUnavailable()) {
+		  connectionUnavailable = connectionFailure;
+          this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`${this.DATABASE_VENDOR} service unavailable. Waiting for restart.`)
+          await this.waitForRestart(5000);
+          retryCount++;
+        }
+        else {
+          this.yadamuLogger.logException([`${this.constructor.name}.reconnect()`,`${this.constructor.name}.reconnectImpl()`],connectionFailure);
+          this.reconnectInProgress = false;
+          throw connectionFailure;
+        }
+      }
+    }
+    // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`Unable to re-establish connection.`)
+    this.reconnectInProgress = false;
+	throw connectionUnavailable 	
+  }
   
   async getDatabaseConnection(requirePassword) {
                 
@@ -455,7 +491,7 @@ class YadamuDBI {
   */
 
   async initialize(requirePassword) {
-      
+
     if (this.status.sqlTrace) {
        if (this.status.sqlTrace._writableState.ended === true) {
          this.status.sqlTrace = fs.createWriteStream(this.status.sqlTrace.path,{"flags":"a"})
@@ -638,13 +674,20 @@ class YadamuDBI {
     return new DBParser(query,objectMode,this.yadamuLogger);      
   }
   
-  processStreamingError(e,stack,tableInfo) {
-    return e
+  forceEndOnInputStreamError(error) {
+	return false;
+  }
+  
+  streamingError(e,stack,tableInfo) {
+    return new DatabaseError(e,stack,tableInfo.SQL_STATEMENT)
   }
   
   async getInputStream(tableInfo,parser) {
     throw new Error('Unimplemented Method')
   }      
+
+  freeInputStream(inputStream){
+  }
 
   /*
   **
@@ -671,7 +714,6 @@ class YadamuDBI {
   }
   
   async finalizeData() {
-    this.rejectManager.close();
   }
 
   async finalizeImport() {
@@ -683,30 +725,8 @@ class YadamuDBI {
   }
 
   getTableWriter(TableWriter,table) {
-    this.skipCount = 0;    
     const tableName = this.metadata[table].tableName 
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger);
-  }
- 
-  rejectRow(tableName,row) {
-    // Allows the rejection process to be overridden by a particular driver.
-    this.rejectManager.rejectRow(tableName,row);
-  }
-  
-  async handleInsertError(operation,tableName,batchSize,row,record,err,info) {
-     this.skipCount++;
-     this.status.warningRaised = true;
-     this.yadamuLogger.logRejected([`${operation}`,`"${tableName}"`,`${batchSize}`,`${row}`],err);
-     this.rejectRow(tableName,record);
-     info.forEach(function (info) {
-       this.yadamuLogger.writeDirect(`${info}\n`);
-     },this)
-
-     const abort = (this.skipCount === ( this.parameters.MAX_ERRORS ? this.parameters.MAX_ERRORS : 10)) 
-     if (abort) {
-       this.yadamuLogger.error([`${operation}`,`"${tableName}"`],`Maximum Error Count exceeded. Skipping Table.`);
-     }
-     return abort;     
   }
   
   keepAlive(rowCount) {
@@ -732,13 +752,14 @@ class YadamuDBI {
     dbi.statementCache = this.statementCache
   }   
 
-  async newSlaveInterface(slaveNumber,dbi,connection) {
+  async slaveDBI(slaveNumber,dbi,connection) {
       
     // Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
       
     dbi.slaveNumber = slaveNumber
     dbi.sqlTraceTag = ` /* Slave [${slaveNumber}] */`;
     dbi.connection = connection
+	dbi.spatialFormat = this.spatialFormat
     await dbi.configureConnection();
     this.cloneSlaveConfiguration(dbi);
     return dbi

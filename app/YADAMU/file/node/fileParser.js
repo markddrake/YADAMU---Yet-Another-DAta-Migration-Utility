@@ -4,6 +4,7 @@ const { Transform } = require('stream');
 const Readable = require('stream').Readable;
 // const clarinet = require('clarinet');
 const clarinet = require('../../clarinet/clarinet.js');
+const { performance } = require('perf_hooks');
 
 class TextParser extends Transform {
   
@@ -13,6 +14,10 @@ class TextParser extends Transform {
   
     const self = this;
     
+	this.rowsRead = 0;
+	this.startTime = undefined;
+	this.endTime = undefined;
+	
     this.yadamuLogger = yadamuLogger;
 
     this.parser = clarinet.createStream();
@@ -36,6 +41,8 @@ class TextParser extends Transform {
           if (self.dataPhase) {
             self.currentTable = key;                
             self.push({ table : key});
+			self.startTime = performance.now();
+			self.rowsRead = 0;
           }
           break;
         default:
@@ -67,6 +74,8 @@ class TextParser extends Transform {
           if ((self.dataPhase) && (key != undefined)) {
             self.currentTable = key;                
             self.push({ table : key});
+			self.startTime = performance.now();
+			self.rowsRead = 0;
           }
           break;
         default:
@@ -175,13 +184,16 @@ class TextParser extends Transform {
          break;
         case 2:
           if (self.dataPhase) {
-		    self.push({eod: self.currentTable})
+			self.endTime = performance.now();
+			const tableReadStatistics =  {tableName: self.currentTable, rowsRead: self.rowsRead, pipeStartTime: self.startTime, readerEndTime: self.endTime, parserEndTime: self.endTime, copyFailed: false}
+		    self.push({eod: tableReadStatistics})
             self.tableList.delete(self.currentTable);
           }
           break;
         case 3:
           if (self.dataPhase) {
             self.push({ data : self.currentObject});
+			self.rowsRead++;
             skipObject = true;
           }
       }
@@ -234,6 +246,7 @@ class TextParser extends Transform {
     this.parser.write(data);
     callback();
   };
+
 }
 
 module.exports = TextParser;

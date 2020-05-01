@@ -3,6 +3,7 @@
     "FILE"                    : "export.json"
   , "MODE"                    : "DATA_ONLY"
   , "PARALLEL"                : 4
+  , "READ_ON_ERROR"           : "FLUSH"
   }
 , "yadamuDBI"                 : {
     "SPATIAL_FORMAT"          : "WKB"
@@ -25,7 +26,7 @@
   }
 , "mysql"                     : {
     "TABLE_MATCHING"          : "INSENSITIVE"
-   ,"READ_KEEP_ALIVE"         : 10000
+   ,"READ_KEEP_ALIVE"         : 0
   }
 , "oracle"                    : {
     "BATCH_LOB_COUNT"         : 1024

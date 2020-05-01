@@ -38,13 +38,12 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
-  async testConnection(connectionProperties,parameters) {   
+  async testConnection(connectionProperties) {   
     super.setConnectionProperties(connectionProperties);
 	try {
       const pgClient = new Client(this.connectionProperties);
       await pgClient.connect();
       await pgClient.end();     
-	  super.setParameters(parameters)
 	} catch (e) {
       throw e;
 	}
@@ -63,7 +62,6 @@ class PostgresDBI extends YadamuDBI {
 	
 	const self = this
     this.pool.on('error',(err, p) => {
-      // yadamuLogger.info([`${databaseVendor}`,`Client.onError()`],err.message);
 	  // Do not throw errors here.. Node will terminate immediately
 	  // const pgErr = new PostgresError(err,self.postgresStack,self.postgressOperation)
       // yadamuLogger.logException([`${databaseVendor}`,`Client.onError()`],pgErr);
@@ -126,6 +124,51 @@ class PostgresDBI extends YadamuDBI {
 	}
   };
   
+  async reconnectImpl() {
+      
+    // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`Attemping reconnection.`);
+       
+    /*
+    **
+    ** Attempt to close the connection. Log but do not throw any errors...
+    **
+    */	
+	
+    if (this.connection) {
+	  try { 
+		await this.connection.release();
+      } catch (e) {
+        this.yadamuLogger.logException([`${this.constructor.name}.reconnectImpl()`,`{this.constructor.name}.release()`],e);
+      }
+    }
+
+    let retryCount = 0;
+	let connectionFailure 
+    this.connectionOpen = false;
+    
+    while (retryCount < 10) {
+	  let stack
+      try {
+        this.connection = await this.getConnectionFromPool()
+        // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`New connection availabe.`);
+        return;
+      } catch (e) {
+        if (true) {
+		  connectionFailure = e;
+          this.yadamuLogger.warning([`${this.constructor.name}.reconnectImpl()`],`Waiting for ${this.DATABASE_VENDOR} restart.`)
+          await this.waitForRestart(500);
+          retryCount++;
+        }
+        else {
+          this.yadamuLogger.logException([`${this.constructor.name}.reconnectImpl()`,`${this.constructor.name}.getConnectionFromPool()`],e);
+          throw e;
+        }
+      }
+    }
+    // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`Unable to re-establish connection.`)
+	throw connectionFailure
+  }
+
   async configureConnection() {
     
 	const yadamuLogger = this.yadamuLogger
@@ -202,20 +245,33 @@ class PostgresDBI extends YadamuDBI {
   
   async executeSQL(sqlStatement,args) {
 	
-	if (this.status.sqlTrace) {
+    let attemptReconnect = !this.reconnectInProgress;
+
+	if ((this.status.sqlTrace) && (typeof sqlStatemeent === 'string')) {
       this.status.sqlTrace.write(this.traceSQL(sqlStatement));
     }
 
     let stack
-    try {
-      const sqlStartTime = performance.now()
-	  stack = new Error().stack;
-      const results = await this.connection.query(sqlStatement,args)
-      this.traceTiming(sqlStartTime,performance.now())
-	  return results
-	} catch (e) {
-      throw new PostgresError(e,stack,sqlStatement);
-	}
+    while (true) {
+      // Exit with result or exception.  
+      try {
+        const sqlStartTime = performance.now();
+		stack = new Error().stack
+        const results = await this.connection.query(sqlStatement,args)
+        this.traceTiming(sqlStartTime,performance.now())
+		return results;
+      } catch (e) {
+		const cause = new PostgresError(e,stack,sqlStatement);
+		if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause)
+          continue;
+        }
+        throw cause
+      }      
+    } 
+	
   }
   
   async initialize() {
@@ -233,7 +289,9 @@ class PostgresDBI extends YadamuDBI {
     let stack
 	try {
 	  stack = new Error().stack
-	  await this.pool.end();
+	  if (this.pool !== undefined && this.pool.end) {
+	    await this.pool.end();
+	  }
 	} catch (e) {
 	  throw new PostgresError(e,stack,'pg.Pool.close()')
 	}
@@ -537,6 +595,13 @@ class PostgresDBI extends YadamuDBI {
     return new DBParser(tableInfo,objectMode,this.yadamuLogger);
   }  
   
+  forceEndOnInputStreamError(error) {
+	return true;
+  }
+  
+  streamingError(e,stack,tableInfo) {
+    return new PostgresError(e,stack,tableInfo.SQL_STATEMENT)
+  }
   async getInputStream(tableInfo,parser) {        
     const queryStream = new QueryStream(tableInfo.SQL_STATEMENT)
     return await this.executeSQL(queryStream)   
@@ -580,15 +645,14 @@ class PostgresDBI extends YadamuDBI {
     return result;
   }
 
-  async newSlaveInterface(slaveNumber) {
+  async slaveDBI(slaveNumber) {
 	const dbi = new PostgresDBI(this.yadamu)
 	dbi.setParameters(this.parameters);
 	const connection = await this.getConnectionFromPool()
-	return await super.newSlaveInterface(slaveNumber,dbi,connection)
+	return await super.slaveDBI(slaveNumber,dbi,connection)
   }
   
   tableWriterFactory(tableName) {
-    this.skipCount = 0;    
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
   }
   

@@ -26,7 +26,7 @@ class DBWriterMaster extends DBWriter {
   checkComplete() {
     // Slave Counting mechanism is Fragile. 
     // Need a better mechanism to detect that all slaves have terminated.
-    // If slave throws an exception we may not get a slaveReleased message, causing Yadamu to Hang.
+    // If slave throws an exception we may not get a slaveReleased message, causing Yadamu to Han
     this.slaveCount--
     if (this.slaveCount === 0) {
       this.emit('AllDataWritten',this.slaveException);
@@ -95,7 +95,7 @@ class DBWriterMaster extends DBWriter {
   }
   
   async newSlave(slaveNumber) {
-	const dbi = await this.dbi.newSlaveInterface(slaveNumber);
+	const dbi = await this.dbi.slaveDBI(slaveNumber);
 	const slave = new DBWriterSlave(dbi,this.mode,this.status,this.yadamuLogger)
 	this.slaveCount++ 
 	slave.setMaster(this);

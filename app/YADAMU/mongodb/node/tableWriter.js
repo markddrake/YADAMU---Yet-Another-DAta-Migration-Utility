@@ -103,7 +103,9 @@ class TableWriter extends YadamuWriter {
       default:
         // ### Exception - Unknown Mode
     }
-    return this.batch.length;
+	
+	this.rowsCached++
+    return this.skipTable
 
   }
 
@@ -111,8 +113,11 @@ class TableWriter extends YadamuWriter {
       
     this.batchCount++;
     await this.dbi.insertMany(this.tableName,this.batch);
+	this.rowsWritten += this.rowsCached;
+
     this.endTime = performance.now();
     this.batch.length = 0;  
+	this.rowsCached = 0;
     return this.skipTable
   }
 }

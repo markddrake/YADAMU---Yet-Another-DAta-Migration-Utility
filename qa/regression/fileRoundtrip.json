@@ -4,6 +4,7 @@
 , "parameters": {
     "MODE": "DATA_ONLY"
   , "FEEDBACK": "COMMIT"
+  , "XML_STORAGE_MODEL": "CLOB"
   }
 , "tasks"                             : "qa/regression/fileRoundtripTasks.json"
 , "tests" : [{

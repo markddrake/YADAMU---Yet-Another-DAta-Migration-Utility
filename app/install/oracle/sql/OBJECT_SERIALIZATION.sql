@@ -151,7 +151,7 @@ return XMLTYPE
 as
 begin
   if (P_SERIALIZATION is not NULL) then
-    return XMLTYPE(P_SERIALIZATION);
+    return XMLTYPE(XMLDATA => P_SERIALIZATION, WELLFORMED =>1);
   end if;
   return NULL;
 end;
@@ -161,7 +161,7 @@ return XMLTYPE
 as
 begin
   if (P_SERIALIZATION is not NULL) then
-    return XMLTYPE(P_SERIALIZATION);
+    return XMLTYPE(XMLDATA => P_SERIALIZATION, WELLFORMED =>1);
   end if;
   return NULL;
 end;

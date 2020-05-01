@@ -1,20 +1,20 @@
 {
   "operation"                         : "export"
 , "clone"                             : true
-, "connections"                       : "qa/regression/yadamu-db2.json"
+, "connections"                       : "qa/work/YDB2.json"
 , "parameters": {
     "MODE": "DDL_ONLY"
   , "FEEDBACK": "COMMIT"
   }
 , "tasks" : "qa/regression/exportTasks.json"
 , "tests"                  : [{
-    "source": "oracle11g"
+    "source": "mssql19"
   , "target": "scratch"
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
   , "tasks": [
-	  "PM"
+	  "Northwind"
     ]
   }] 
 }

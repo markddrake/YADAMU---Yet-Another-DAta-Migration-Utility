@@ -95,7 +95,7 @@ class FileQA extends FileDBI {
     
     await processMetadata;
     nulLogger.close();
-    return statisticsCollector.tableInfo
+	return statisticsCollector.tableInfo
 	await statisticsCollector.finalize();
   }
   
@@ -190,7 +190,6 @@ class FileQA extends FileDBI {
     const gMetadata = await this.getContentMetadata(grandparent)
     const pMetadata = await this.getContentMetadata(parent)
     const cMetadata = await this.getContentMetadata(child);
-
     if (this.tableMappings) {
       timings = timings.map(function (t) {
         this.remapTableNames(t,this.tableMappings)

@@ -22,7 +22,11 @@ class DBReader extends Readable {
     this.ddlCompleted = false;
     this.outputStream = undefined;
   }
-  
+ 
+  isDatabase() {
+    return true;
+  }
+    
   pipe(target,options) {
     this.outputStream = super.pipe(target,options);
 	return this.outputStream;
@@ -53,64 +57,193 @@ class DBReader extends Readable {
      return this.dbi.generateMetadata(this.schemaInfo)
   }
       
-  async copyContent(tableMetadata,outputStream) {
-    
-    const tableInfo = this.dbi.generateSelectStatement(tableMetadata)
-    const parser = this.dbi.createParser(tableInfo,outputStream.objectMode())
-    const inputStream = await this.dbi.getInputStream(tableInfo,parser)
-
+  async createCopyOperation(dbi,tableMetadata,outputStream) {
+	  
+    /* 
+	**
+	** Input Stream has failed. 3 options
+    **   ABORT : Skip buffered records. Terminate YADAMU.
+	**   SKIP  : Skip buffered records. If connection was lost attempt to get a new connection. Continue Processing. 
+	**   FLUSH : Write buffered Records. If connection was lost attempt to get a new connection. Continue processing.
+	**
+	** Some Databases seem to raise multiple events for a given error. Only process the first event for a given record.
+	**   MSSQL : Will raise Connect Lost twice 
+	** 
+	*/ 
+	
+	/*
+	**
+	** The writer does not 'end' until all tables have been processed.
+	** The Output Stream Error handler needs to be set for each table processed, so that it gets the table specific 'reject' function.
+	** Once the table has been processed the error handler needs to be removed.
+	**
+	*/
+ 
     const self = this
+    const stack = new Error().stack;
+    // const startTime = performance.now();
+	let cause = undefined
+    let copyFailed = false;
+ 
+    const tableInfo = dbi.generateSelectStatement(tableMetadata)
+    const parser = dbi.createParser(tableInfo,outputStream.objectMode())
+    const inputStream = await dbi.getInputStream(tableInfo,parser)
+ 
     const copyOperation = new Promise(function(resolve,reject) {  
 	
+	  let pipeStartTime;
+	  let readerEndTime;
+	  let parserEndTime;
+	  
       const outputStreamError = function(err){
         // Named OnError Listener
-		self.yadamuLogger.logException([`${self.constructor.name}.copyContent()`,`${tableMetadata.TABLE_NAME}`,`${this.constructor.name}.onError()`],err)
+		self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${this.constructor.name}.onError()`,`${tableMetadata.TABLE_NAME}`],err)
 		reject(err)
 	  }       
     
 	  outputStream.on('error',
 	    outputStreamError
 	  );
+	  
+	  /* 
+	  **
+	  ** The listener needs to be removed when the writer completes processing the 'eod' message since the writer's end() event is supressed to allow for writing multiple tables to the same stream.
+	  **
+	  */
+	  
+	  outputStream.setErrorHandler(outputStreamError)
 
       parser.on('end',
-	    function(){
-		  outputStream.removeListener('error',outputStreamError)
-		  resolve(parser.getCounter())
+	    async function(){
+
+   	      // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${parser.constructor.name}.onEnd()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],`${copyFailed ? 'FAILED' : 'SUCCSESS'}. Stream open ${YadamuLibrary.stringifyDuration(performance.now() - pipeStartTime)}.`);
+
+    	  parserEndTime = performance.now()
+		  const pipeStatistics = {rowsRead: parser.getCounter(), pipeStartTime: pipeStartTime, readerEndTime: readerEndTime, parserEndTime: parserEndTime, copyFailed: copyFailed}
+          
+		  /*
+		  **
+		  ** Warning. InputStream's database connection may not be open at this point if end() fires after inputStream raised an error() event due to back end disconnecting
+		  **
+		  */
+		  
+		  if (cause && cause.lostConnection()) {
+	        // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()`,`${tableInfo.TABLE_NAME}`,`${cause.code}`],`Lost Connection: ${cause.lostConnection()}`); 
+		    await dbi.reconnect(cause)
+		  }
+		  
+		  /*
+		  **
+		  ** OracleDBI overides freeInputStream() to prevent non-standard close() event from firing and raising an NJS-018 exception since the input stream's connection has been closed
+		  **
+		  */
+  	      await dbi.freeInputStream(tableMetadata,inputStream);
+		  
+		  if (copyFailed) {
+            switch (dbi.parameters.READ_ON_ERROR) {
+	          case undefined:
+		      case 'ABORT':
+			    const rows = pipeStatistics.rowCount + 1;
+				// self.yadamuLogger.warning([`${this.constructor.name}`,`${tableMetadata.TABLE_NAME}`],`Reader failed at row: ${rows}.`)
+				outputStream.reportTableComplete();
+    		    reject(cause);
+                break;
+	          case 'SKIP':
+              case 'FLUSH':
+    		    break;
+		    }
+  		  }
+		  resolve(pipeStatistics)    		  
 	    }
 	  )
 
 	  parser.on('error',
-	    function(err) {
-		  reject(err)
+	    function(err) { 	 
+		  // Only report and process first error
+		  if (!copyFailed) {
+  	        switch (dbi.parameters.READ_ON_ERROR) {
+		      case undefined:
+			  case 'ABORT':
+	          case 'SKIP':
+			    outputStream.abortTable();
+              case 'FLUSH':
+  			    break;
+  		    }     		   
+			copyFailed = true;
+            cause = dbi.streamingError(err,stack,tableMetadata)
+   		    self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${parser.constructor.name}.onError()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],cause);
+		  } 
         }
 	  );
 
-      const stack = new Error().stack;
+      inputStream.on('end',
+	    function() {
+			// self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onEnd()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],`${copyFailed ? 'FAILED' : 'SUCCSESS'}`);
+			readerEndTime = performance.now()
+	    }
+	  )
+
 	  inputStream.on('error',
-	    function(err) { 
-		  if (err.yadamuHandled === true) {
-	        self.yadamuLogger.info([`${self.constructor.name}.copyOperation()`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${parser.getCounter()}. Read Pipe Closed`)
-	      } 
-		  reject(self.dbi.processStreamingError(err,stack,tableMetadata))
+	    function(err) { 	 
+		  // Only report and process first error
+          // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()`,`${tableInfo.TABLE_NAME}`,`${err.code}`],`Stream open ${YadamuLibrary.stringifyDuration(performance.now() - pipeStartTime)}.`); 
+		  if (!copyFailed) {
+  	        switch (dbi.parameters.READ_ON_ERROR) {
+		      case undefined:
+			  case 'ABORT':
+	          case 'SKIP':
+			    outputStream.abortTable();
+              case 'FLUSH':
+  			    break;
+  		    }     		   
+			copyFailed = true;
+            cause = dbi.streamingError(err,stack,tableMetadata)
+            self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],cause);
+			
+			/*
+			**
+			** It appears that some implementations do not always raise end() after error(). 
+			** Explicitly push a NULL seems to force end() 
+			**
+			** Oracle does not raise end() following a lost connection error
+			**
+			*/
+			
+			if (dbi.forceEndOnInputStreamError(cause)) {
+		      parser.push(null);
+			}
+		  } 
 		}
       );
 	  
 	  try {
+		pipeStartTime = performance.now();
         inputStream.pipe(parser).pipe(outputStream,{end: false })
 	  } catch (e) {
-		this.yadamuLogger.logException([`${this.constructor.name}.copyContent()`,`${tableMetadata.TABLE_NAME}`,`PIPE`],e)
+		self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${tableMetadata.TABLE_NAME}`,`PIPE`],e)
 		throw e
 	  }
     })
     
+	return copyOperation
+  }
+  
+  async copyContent(tableMetadata,outputStream) {
+	 
+    const copyOperation = this.createCopyOperation(this.dbi,tableMetadata,outputStream);
     const startTime = performance.now()
 	try {
-      const rows = await copyOperation;
+      const readerStatistics = await copyOperation;
       const elapsedTime = performance.now() - startTime
-      this.yadamuLogger.info([`${this.constructor.name}`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${rows}. Elaspsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`)
-      return rows;
+      // this.yadamuLogger.trace([`${this.constructor.name}`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${rows}. Elaspsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`)
+      return readerStatistics
 	} catch(e) {
-      this.yadamuLogger.logException([`${this.constructor.name}.copyContent()`,`${tableMetadata.TABLE_NAME}`,`COPY`],e);
+	  /*
+	  **
+	  ** The copyOperation had failed...
+	  **
+	  */      
+	  this.yadamuLogger.logException([`${this.constructor.name}.copyContent()`,`${tableMetadata.TABLE_NAME}`,`COPY`],e);
 	  throw e;
     }
       
@@ -183,8 +316,9 @@ class DBReader extends Readable {
                 resolve()
 		       })
 		   })
-           const rows = await this.copyContent(task,this.outputStream)
-           this.push({eod: task.TABLE_NAME})
+           const stats = await this.copyContent(task,this.outputStream)
+		   stats.tableName = task.TABLE_NAME
+           this.push({eod: stats})
 	       this.nextPhase = this.schemaInfo.length === 0 ? 'finished' : 'data';
 		   break;
 		 case 'finished':

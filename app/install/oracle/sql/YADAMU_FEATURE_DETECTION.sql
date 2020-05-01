@@ -40,9 +40,10 @@ declare
   V_PACKAGE_DEFINITION VARCHAR2(32767);
   
   V_DUMMY NUMBER;
-  V_DEPLOYMENT_MODEL VARCHAR2(32);
+  V_ORACLE_MANAGED_SERVICE VARCHAR2(5);
   V_CLOB_SUPPORTED BOOLEAN := TRUE;
   V_RDBMS_VERSION VARCHAR2(24);
+  V_XML_STORAGE_MODEL VARCHAR2(17);
   
 begin
   V_PACKAGE_DEFINITION := 'CREATE OR REPLACE PACKAGE YADAMU_FEATURE_DETECTION AS' || C_NEWLINE;
@@ -208,23 +209,22 @@ $END
     -- Oracle Cloud Service or On-Premise deployment - Eg is Cloud Lockdown in force
     select case 
              when SYS_CONTEXT('USERENV','CLOUD_SERVICE') is NULL then 
-	  	      'ON_PREMISIS' 
+	  	      'FALSE' 
 		  	 else 
-			   SYS_CONTEXT('USERENV','CLOUD_SERVICE') 
+			  'TRUE'
 	       end
-      into V_DEPLOYMENT_MODEL
+      into V_ORACLE_MANAGED_SERVICE
       from DUAL;
   exception 
     when WHAT_IS_CLOUD then
-	  V_DEPLOYMENT_MODEL := 'ON_PREMISIS';
+	  V_ORACLE_MANAGED_SERVICE := 'FALSE';
 	when OTHERS then
 	  RAISE;
   end;
 
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                   || '  CLOUD_DEPLOYMENT_MODEL          CONSTANT VARCHAR2(32) := ''' || V_DEPLOYMENT_MODEL || ''';' || C_NEWLINE;
+	                   || '  ORACLE_MANAGED_SERVICE           CONSTANT BOOLEAN := ' || V_ORACLE_MANAGED_SERVICE || ';' || C_NEWLINE;
 	
-  
   select version 
     into V_RDBMS_VERSION
     from product_component_version 
@@ -237,6 +237,19 @@ $END
 	V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                     || '  TABLE_FUNCTION_OPTIMIZER_ISSUE  CONSTANT BOOLEAN := FALSE;';
   end if;
+--
+--  Default XML Storage Mode
+--
+  execute immediate 'create table YADAMU_XML_STORAGE_TEST(X XMLTYPE)';
+  select STORAGE_TYPE 
+    into V_XML_STORAGE_MODEL
+	from USER_XML_TAB_COLS
+   where TABLE_NAME = 'YADAMU_XML_STORAGE_TEST' 
+     and COLUMN_NAME = 'X';
+  execute immediate 'drop table YADAMU_XML_STORAGE_TEST';
+  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                   || '  XML_STORAGE_MODEL CONSTANT VARCHAR2(17) := ''' || V_XML_STORAGE_MODEL || ''';'|| C_NEWLINE;
+
 
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
                        || 'END;';

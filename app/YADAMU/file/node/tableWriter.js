@@ -11,6 +11,8 @@ class TableWriter {
     this.outputStream = outputStream
     this.firstRow = true;
     this.startTime = performance.now();
+	this.currentTable = {}
+	this.rowsCommitted = 0; 
   }
 
   async initialize() {
@@ -35,19 +37,31 @@ class TableWriter {
     }
     
     this.outputStream.write(row);
+	this.rowsCommitted++;
   }
 
   async writeBatch() {
   }
 
+  async commitTransaction() {
+  }
+
+  async rollbackTransaction() {
+  }
+
+  getStatistics() {
+    return {
+      startTime     : this.startTime
+    , endTime       : performance.now()
+    , insertMode    : 'JSON'
+    , skipTable     : false
+	, rowsLost      : 0
+	, rowsSkipped   : 0
+	, rowsCommitted : this.rowsCommitted    }    
+  }
+  
   async finalize() {
     this.outputStream.write(`]`);
-    return {
-      startTime    : this.startTime
-    , endTime      : performance.now()
-    , insertMode   : 'JSON'
-    , skipTable    : false
-    }    
   }
 
 }

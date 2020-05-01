@@ -30,6 +30,7 @@ class YadamuParser extends Transform {
     this.push({data:data.json})
     done();
   }
+  
 }
 
 module.exports = YadamuParser

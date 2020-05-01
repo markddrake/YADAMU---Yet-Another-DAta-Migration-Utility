@@ -33,8 +33,8 @@ docker run --name MYSQL80-01  --shm-size="8g" -p 3306:3306  -v MYSQL80-01:/var/l
 # MaraDB 10.0
 docker run --name MARIA10-01  --shm-size="8g" -p 3307:3306 -v MARIA10-01:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=oracle -d mariadb:latest  
 # MsSQL 2017
-docker run --name MSSQL17-01  --shm-size="8g" -p 1433:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -v MSSQL17-01:/var/opt/mssql  -d mcr.microsoft.com/mssql/server:2017-latest
+docker run --name MSSQL17-01  --shm-size="8g" -p 1433:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -e "MSSQL_MEMORY_LIMIT_MB=16384" -v MSSQL17-01:/var/opt/mssql  -d mcr.microsoft.com/mssql/server:2017-latest
 # MsSQL 2019
-docker run --name MSSQL19-01  --shm-size="8g" -p 1434:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -v MSSQL19-01:/var/opt/mssql  -d mcr.microsoft.com/mssql/server:2019-latest
+docker run --name MSSQL19-01  --shm-size="8g" -p 1434:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -e "MSSQL_MEMORY_LIMIT_MB=16384" -v MSSQL19-01:/var/opt/mssql  -d mcr.microsoft.com/mssql/server:2019-latest
 # Postgres 12
 docker run --name PGSQL12-01  --shm-size="8g" -p 5432:5432 -e POSTGRES_PASSWORD=oracle -v PGSQL12-01:/var/lib/postgresql/data -d postgres:latest 

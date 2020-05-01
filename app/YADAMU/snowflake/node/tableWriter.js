@@ -37,8 +37,11 @@ class TableWriter extends YadamuWriter {
         }
       }
     },this)
+	
     this.batch.push(row);
-    return this.batch.length;
+	
+	this.rowsCached++;
+    return this.skipTable;
   }
 
   async writeBatch() {
@@ -50,6 +53,8 @@ class TableWriter extends YadamuWriter {
         const result = await this.dbi.executeSQL(this.tableInfo.dml,this.batch);
         this.endTime = performance.now();
         this.batch.length = 0;  
+		this.rowsWritten += this.rowsCached;
+		this.rowsCached = 0;
         return this.skipTable
       } catch (e) {
         if (this.status.showInfoMsgs) {
@@ -70,9 +75,10 @@ class TableWriter extends YadamuWriter {
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row])
 		this.status.sqlTrace = undefined
+		this.rowsWritten++;
       } catch (e) {
         const errInfo = this.status.showInfoMsgs === true ? [this.tableInfo.dml,this.batch[row]] : []
-        this.skipTable = await this.dbi.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,this.batch[row],e,errInfo);
+        this.skipTable = await this.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,this.batch[row],e,errInfo);
         if (this.skipTable) {
           break;
         }
@@ -81,10 +87,9 @@ class TableWriter extends YadamuWriter {
 	
 	this.status.sqlTrace = sqlTrace
 
-    // Todo Report Number of Insert Operations and elapsed time to sqlTrace file.
-
     this.endTime = performance.now();
     this.batch.length = 0;
+    this.rowsCached = 0;
     return this.skipTable
   }
 }

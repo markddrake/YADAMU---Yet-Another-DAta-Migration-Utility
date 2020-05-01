@@ -4,6 +4,7 @@
 , "parameters": {
     "MODE": "DDL_ONLY"
   , "FEEDBACK": "COMMIT"
+  , "XML_STORAGE_MODEL": "CLOB"
   }
 , "tasks"                             : "qa/regression/exportTasks.json"
 , "tests" : [{

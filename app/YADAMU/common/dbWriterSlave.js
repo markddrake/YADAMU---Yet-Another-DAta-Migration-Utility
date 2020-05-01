@@ -21,46 +21,39 @@ class DBWriterSlave extends DBWriter {
       switch (Object.keys(obj)[0]) {
 		case 'table':
           this.rowCount = 0;
-          this.skipTable = false;
           this.tableName = obj.table;
           this.currentTable = this.dbi.getTableWriter(this.tableName);
           await this.currentTable.initialize();
           break;
         case 'data': 
-          if (this.skipTable === true) {
-            break;
-          }
-		  // throw new Error('Test');
-          await this.currentTable.appendRow(obj.data);
-          this.rowCount++;
+          if (this.currentTable.skipTable !== true) {
+		    await this.currentTable.appendRow(obj.data);
+            this.rowCount++;
+		  }
           if ((this.rowCount % this.feedbackInterval === 0) & !this.currentTable.batchComplete()) {
-            this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows buffered: ${this.currentTable.batchRowCount()}.`);
+            this.yadamuLogger.info([`${this.tableName}`],`Rows buffered: ${this.currentTable.batchRowCount()}.`);
           }
-          if (this.currentTable.batchComplete()) {
-            this.skipTable = await this.currentTable.writeBatch(this.status);
-            if (this.skipTable) {
-               this.dbi.rollbackTransaction();
+          if ((this.currentTable.skipTable !== true) && (this.currentTable.batchComplete())) {
+            await this.currentTable.writeBatch(this.status);
+            if (this.currentTable.skipTable) {
+               this.currentTable.rollbackTransaction();
             }
             if (this.reportBatchWrites && this.currentTable.reportBatchWrites() && !this.currentTable.commitWork(this.rowCount)) {
-              this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows written:  ${this.rowCount}.`);
+              this.yadamuLogger.info([`${this.tableName}`],`Rows written:  ${this.rowCount}.`);
             }                    
           }  
-          if (this.currentTable.commitWork(this.rowCount)) {
-            await this.dbi.commitTransaction(this.rowCount)
+          if ((this.currentTable.skipTable !== true) && (this.currentTable.commitWork(this.rowCount))) {
+            await this.currentTable.commitTransaction(this.rowCount)
             if (this.reportCommits) {
-              this.yadamuLogger.info([`${this.constructor.name}`,`${this.tableName}`],`Rows commited: ${this.rowCount}.`);
+              this.yadamuLogger.info([`${this.tableName}`],`Rows commited: ${this.rowCount}.`);
             }          
             await this.dbi.beginTransaction();            
           }
 		  break;
 		case 'eod':
-          const results = await this.currentTable.finalize();
-          this.skipTable = results.skipTable;
-          if (!this.skipTable) {
-            const elapsedTime = results.endTime - results.startTime;            
-            this.reportTableStatistics(elapsedTime,results);
-		    this.master.setTimings(this.timings)
-          }
+          await this.currentTable.finalize();
+          this.reportTableComplete(obj.eod);
+		  this.master.setTimings(this.timings)
 		  this.currentTable = undefined
   		  break;
 	    case 'releaseSlave':
@@ -71,8 +64,15 @@ class DBWriterSlave extends DBWriter {
 	  callback();
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}[${this.dbi.slaveNumber}]._write()`,`"${this.tableName}"`],e);
-	  // Passing the exception to callback triggers the onError() event
-      callback(e);
+	  this.currentTable.skipTable = true;
+	  try {
+        await this.currentTable.rollbackTransaction(e)
+        callback();
+	  } catch (e) {
+        // Passing the exception to callback triggers the onError() event
+        callback(e); 
+      }
+
     }
   }
 

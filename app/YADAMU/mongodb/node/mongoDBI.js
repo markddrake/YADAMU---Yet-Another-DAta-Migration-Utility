@@ -604,10 +604,10 @@ class MongoDBI extends YadamuDBI {
 	this.client = client
   }
 
-  async newSlaveInterface(slaveNumber) {
+  async slaveDBI(slaveNumber) {
 	const dbi = new MongoDBI(this.yadamu)
 	dbi.setParameters(this.parameters);
-	// return await super.newSlaveInterface(slaveNumber,dbi,this.pool)
+	// return await super.slaveDBI(slaveNumber,dbi,this.pool)
 	await dbi.configureSlave(slaveNumber,this.client);
 	this.cloneSlaveConfiguration(dbi);
 	dbi.useDatabase(this.stats.db);
@@ -615,7 +615,6 @@ class MongoDBI extends YadamuDBI {
   }
 
   tableWriterFactory(tableName) {
-    this.skipCount = 0;    
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
   }
   

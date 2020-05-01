@@ -72,7 +72,7 @@ class YadamuLogger {
   }
   
   logOracleError(e) {
-	this.os.write(`ErroNum: ${e.errorNum}\n`);
+	this.os.write(`errorNum: ${e.errorNum}\n`);
 	this.os.write(`Offset: ${e.offset}\n`);
 	this.os.write(`Args/Binds: ${JSON.stringify(e.args)}\n`);
 	this.os.write(`OutputFormat/Rows: ${JSON.stringify(e.outputFormat)}\n`);
@@ -104,7 +104,7 @@ class YadamuLogger {
   }
 
   trace(args,msg) {
-    args.push('TRACE')
+    args.unshift('TRACE')
     this.log(args,msg)
   }
   
