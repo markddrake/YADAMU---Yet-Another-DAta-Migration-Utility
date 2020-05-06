@@ -9,6 +9,7 @@ class TableWriter extends YadamuWriter {
     
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
+	this.insertMode = 'Bulk';
 	
 	this.transformations = this.tableInfo.dataTypes.map(function(dataType) {
 	  switch (dataType.type) {

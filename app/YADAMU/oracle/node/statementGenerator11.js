@@ -1,6 +1,7 @@
 "use strict";
 
-const uuidv1 = require('uuid/v1');
+// const const { v4: uuidv4 } = require('uuid'); = require('uuid/v1');
+const { v1: uuidv1 } = require('uuid');
 
 // Support for Oracle 11.2 
 // Oracle 11g has not support for parsing JSON so we send the metadata as XML !!!

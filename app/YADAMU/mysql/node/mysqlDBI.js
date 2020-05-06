@@ -307,7 +307,7 @@ class MySQLDBI extends YadamuDBI {
    
   executeSQL(sqlStatement,args) {
     
-    let attemptReconnect = !this.reconnectInProgress;
+    let attemptReconnect = this.attemptReconnection;
 
     const self = this
   
@@ -325,7 +325,8 @@ class MySQLDBI extends YadamuDBI {
                        const sqlEndTime = performance.now()
                        if (err) {
          		         const mySQLError = new MySQLError(err,stack,sqlStatement)
-		                 if (mySQLError.lostConnection()) {
+		                 if (attemptReconnect && mySQLError.lostConnection()) {
+						   attemptReconnect = false
 						   try {
                              await self.reconnect(mySQLError)
                              results = await self.executeSQL(sqlStatement,args);
@@ -458,6 +459,12 @@ class MySQLDBI extends YadamuDBI {
     await this.releaseConnection();
 	await this.pool.end();  
   }
+  
+  async finalizeRead(tableInfo) {
+    await this.executeSQL(`FLUSH TABLE "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`)
+  }
+
+
   /*
   **
   **  Abort the database connection.
@@ -491,6 +498,7 @@ class MySQLDBI extends YadamuDBI {
 	try {
 	  stack = new Error().stack
       await this.connection.beginTransaction();
+	  super.beginTransaction;
 	} catch (e) {
       throw new MySQLError(e,stack,'mysql.Connection.beginTransaction()');
 	} 
@@ -513,6 +521,7 @@ class MySQLDBI extends YadamuDBI {
 	try {
 	  stack = new Error().stack
       await this.connection.commit();
+	  super.commitTransaction();
 	} catch (e) {
       throw new MySQLError(e,stack,'mysql.Connection.commit()');
 	} 
@@ -538,6 +547,7 @@ class MySQLDBI extends YadamuDBI {
 	try {
 	  stack = new Error().stack
       await this.connection.rollback();
+	  super.rollbackTransaction();
 	} catch (e) {
       e = new MySQLError(e,stack,'mysql.Connection.rollback()')
 	  if (cause instanceof Error) {
@@ -550,6 +560,7 @@ class MySQLDBI extends YadamuDBI {
   
   async createSavePoint() {
     await this.executeSQL(sqlCreateSavePoint);
+	super.createSavePoint();
    }
   
   async restoreSavePoint(cause) {
@@ -559,6 +570,7 @@ class MySQLDBI extends YadamuDBI {
 
 	try {
       await this.executeSQL(sqlRestoreSavePoint);
+	  super.restoreSavePoint();
 	} catch (e) {
 	  if (cause instanceof Error) {
         this.yadamuLogger.logException([`${this.constructor.name}.restoreSavePoint()`],e)
@@ -569,7 +581,8 @@ class MySQLDBI extends YadamuDBI {
   }  
 
   async releaseSavePoint() {
-    await this.executeSQL(sqlReleaseSavePoint);    
+    await this.executeSQL(sqlReleaseSavePoint);   
+    super.releaseSavePoint();
   } 
 
   /*
@@ -696,7 +709,6 @@ class MySQLDBI extends YadamuDBI {
   }
   
   async freeInputStream(tableInfo,inputStream) {
-    await this.executeSQL(`FLUSH TABLE "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`)
   }
   
   async getInputStream(tableInfo,parser) {

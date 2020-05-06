@@ -209,14 +209,14 @@ class DBWriter extends Writable {
     }
 
 	rowCountSummary = writerStatistics.rowsSkipped > 0 ? `${rowCountSummary} Skipped ${writerStatistics.rowsSkipped}.` : rowCountSummary
-
+   
 	if (readerStatistics.copyFailed) {
-	  rowCountSummary = `Read operation failed. ${rowCountSummary} `  
+	  rowCountSummary = readerStatistics.tableNotFound === true ? `Table not found.` : `Read operation failed. ${rowCountSummary} `  
       this.yadamuLogger.error([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
 	}
 	else {
 	  if (readerStatistics.rowsRead !== writerStatistics.rowsCommitted) {
-        this.yadamuLogger.warning([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+        this.yadamuLogger.error([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
       }
 	  else {
         this.yadamuLogger.info([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
@@ -277,7 +277,7 @@ class DBWriter extends Writable {
             this.rowCount++;
           }
           if ((this.rowCount % this.feedbackInterval === 0) & !this.currentTable.batchComplete()) {
-            this.yadamuLogger.info([,`${this.tableName}`],`Rows buffered: ${this.currentTable.batchRowCount()}.`);
+            this.yadamuLogger.info([`${this.tableName}`,this.currentTable.insertMode],`Rows buffered: ${this.currentTable.batchRowCount()}.`);
           }
           if ((this.currentTable.skipTable !== true) && (this.currentTable.batchComplete())) {
 			await this.currentTable.writeBatch(this.status);
@@ -285,13 +285,13 @@ class DBWriter extends Writable {
               await this.currentTable.rollbackTransaction();
             }
             if (this.reportBatchWrites && this.currentTable.reportBatchWrites() && !this.currentTable.commitWork(this.rowCount)) {
-              this.yadamuLogger.info([`${this.tableName}`],`Rows written:  ${this.rowCount}.`);
+              this.yadamuLogger.info([`${this.tableName}`,this.currentTable.insertMode],`Rows written:  ${this.rowCount}.`);
             }                    
           }  
           if ((this.currentTable.skipTable !== true) && (this.currentTable.commitWork(this.rowCount))) {
             await this.currentTable.commitTransaction(this.rowCount)
             if (this.reportCommits) {
-              this.yadamuLogger.info([`${this.tableName}`],`Rows commited: ${this.rowCount}.`);
+              this.yadamuLogger.info([`${this.tableName}`,this.currentTable.insertMode],`Rows commited: ${this.rowCount}.`);
             }          
             await this.dbi.beginTransaction();            
           }

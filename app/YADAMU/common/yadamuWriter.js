@@ -28,6 +28,8 @@ class YadamuWriter {
     this.insertMode = 'Batch';    
     this.supressBatchWriteLogging = (this.tableInfo.batchSize === this.tableInfo.commitSize) // Prevent duplicate logging if batchSize and Commit SIze are the same
 	this.sqlInitialTime = this.dbi.sqlCumlativeTime
+
+	dbi.currentTable = this;
 		
   }
 
@@ -35,6 +37,22 @@ class YadamuWriter {
 	  
      await this.dbi.beginTransaction()
   }
+
+
+  lostConnection() {
+   
+    /*
+    **
+    ** Invoked by the DBI when the connection is lost. Assume a rollback took place. All rows written but no committed are lost. 
+    ** In theory this cuuld be taken care of by invoking the current table's rollback method, rather than the DBI's rollback but 
+    ** if the rollback fails and processing continues the state of the counters could be indeterminate.
+    **
+    */
+	
+	this.rowsLost = this.rowsWritten;
+	this.rowsWritten = 0;
+  }	  
+	 
 
   batchComplete() {
     return this.rowsCached === this.tableInfo.batchSize;
@@ -135,6 +153,7 @@ class YadamuWriter {
     if (!this.skipTable) {
       await this.commitTransaction()
     }
+	this.dbi.currentTable = undefined;
     return !this.skipTable
   }
 

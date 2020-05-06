@@ -252,16 +252,6 @@ class MsSQLDBI extends YadamuDBI {
 	const self = this
 	this.transactionInProgress = false;
   	const transaction = new sql.Transaction(this.pool)
-	transaction.on('begin',
-	  function() {
-		self.transactionInProgress = true;
-	}).on('commit',
-	  function() {
-		self.transactionInProgress = false;
-	}).on('rollback',
-	  function() {
-		self.transactionInProgress = false;
-    });	
     return transaction
   }
 
@@ -515,7 +505,7 @@ class MsSQLDBI extends YadamuDBI {
         await this.rollbackTransaction()
       } catch (e) {
 	    if (e.code && (e.code === 'ENOTBEGUN')) {
-	      this.yadamuLogger.info([`${this.constructor.name}.abort()`],`Incosistent driver state. Transaction in Progress: ${this.transactionInProgress}. Rollback operation raised "${e.message}".`);
+	      this.yadamuLogger.info([`${this.constructor.name}.releaseConnection()`],`Incosistent driver state. Transaction in Progress: ${this.transactionInProgress}. Rollback operation raised "${e.message}".`);
         }			
 		else {
           throw e
@@ -536,23 +526,30 @@ class MsSQLDBI extends YadamuDBI {
     */	
 
     // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`Attemping reconnection.`);
-    const transactionInProgress = this.transactionInProgress 
 	
-    /*
+	/* 
+	**
+	** Call Releasse connection to clear any pending transactions or prepared statements. Ingore "Not connected errors" 
+	** If release connection throws 'lostConnection' reset the transaction state.
+	**
+	*/
+	
 	try {
 	  await this.releaseConnection();
 	} catch (e) {
-      this.yadamuLogger.logException([`${this.constructor.name}.reconnectImpl()`,`${this.constructor.name}.releaseConnection()`],e);
+	  if (!e.lostConnection()) {   
+        this.yadamuLogger.logException([`${this.constructor.name}.reconnectImpl()`,`${this.constructor.name}.releaseConnection()`],e);
+	  }
+	  else {
+		 // Reset Transaction State.
+		 super.rollbackTransaction()
+	  }
     }
-	*/
 	
     await this.pool.connect();
     this.requestProvider = this.pool
 	await this.executeSQL('select 1');
     this.transaction = this.getTransactionManager()
-    if (transactionInProgress) {
-      await this.beginTransaction()  
-    }
     // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`Reconnected, Transaction in Progress: ${this.transactionInProgress}.`);
   }
   
@@ -569,7 +566,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async executeBatch(sqlStatment) {
 
-    let attemptReconnect = !this.reconnectInProgress;
+    let attemptReconnect = this.attemptReconnection;
 
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(sqlStatment))
@@ -600,7 +597,7 @@ class MsSQLDBI extends YadamuDBI {
 
   async execute(procedure,args,output) {
      
-    let attemptReconnect = !this.reconnectInProgress;
+    let attemptReconnect = this.attemptReconnection;
     const psuedoSQL = `SET @RESULTS = '{}';CALL ${procedure}(${this.getArgNameList(args)}); SELECT @RESULTS "${output}";`
 
     if (this.status.sqlTrace) {
@@ -641,7 +638,7 @@ class MsSQLDBI extends YadamuDBI {
  
   async executeCachedStatement(args) {
 	
-    let attemptReconnect = !this.reconnectInProgress;
+    let attemptReconnect = this.attemptReconnection;
 
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(this.preparedStatement.sqlStatement))
@@ -691,8 +688,8 @@ class MsSQLDBI extends YadamuDBI {
 	
   async bulkInsert(bulkOperation) {
      
-    let attemptReconnect = !this.reconnectInProgress;
-
+    let attemptReconnect = this.attemptReconnection;
+	
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceComment(`Bulk Operation: ${bulkOperation.path}. Rows ${bulkOperation.rows.length}.`))
     }
@@ -722,7 +719,7 @@ class MsSQLDBI extends YadamuDBI {
 
   async executeSQL(sqlStatment,args,noReconnect) {
 
-    let attemptReconnect = !this.reconnectInProgress;
+    let attemptReconnect = this.attemptReconnection;
 
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(sqlStatment))
@@ -932,9 +929,11 @@ class MsSQLDBI extends YadamuDBI {
       await this.transaction.begin();
 	  this.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.transaction
+	  super.beginTransaction()
 	} catch (e) {
 	  throw new MsSQLError(e,stack,'sql.Transaction.begin()');
     }
+	
   }
 
   /*
@@ -959,9 +958,11 @@ class MsSQLDBI extends YadamuDBI {
       await this.transaction.commit();
 	  this.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.pool
+	  super.commitTransaction()
 	} catch (e) {
 	  throw new MsSQLError(e,stack,'sql.Transaction.commit()');
     }
+	
   }
 
   /*
@@ -986,6 +987,7 @@ class MsSQLDBI extends YadamuDBI {
       await this.transaction.rollback();
 	  this.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.pool
+	  super.rollbackTransaction()
 	} catch (e) {
 	  let err = new MsSQLError(e,stack,'sql.Transaction.rollback()')
 	  if (cause instanceof Error) {
@@ -994,22 +996,27 @@ class MsSQLDBI extends YadamuDBI {
 	  }
 	  throw err;
     }	
+	
   }
   
   async createSavePoint() {
     await this.executeSQL(sqlCreateSavePoint);
+    super.createSavePoint()
   }
   
   async restoreSavePoint(cause) {
+	  
    	try {
       await this.executeSQL(sqlRestoreSavePoint);
+      super.restoreSavePoint()
 	} catch (e) {
 	  if (cause instanceof Error) {
         this.yadamuLogger.logException([`${this.constructor.name}.restoreSavePoint()`],e)
 	    e = cause
 	  }
 	  throw e;
-	}	
+	}
+	
   }
   
   /*
@@ -1204,12 +1211,18 @@ class MsSQLDBI extends YadamuDBI {
   }
 
   async slaveDBI(slaveNumber) {
-	const dbi = new MsSQLDBI(this.yadamu)
+	const dbi = new PostgresDBI(this.yadamu)
 	dbi.setParameters(this.parameters);
+	const connection = await this.getConnectionFromPool()
+	return await super.slaveDBI(slaveNumber,dbi,connection)
+  }
+  
+
+  async slaveDBI(slaveNumber) {
+	const dbi = new MsSQLDBI(this.yadamu)
 	// return await super.slaveDBI(slaveNumber,dbi,this.pool)
-	dbi.spatialFormat = this.spatialFormat
 	dbi.configureSlave(slaveNumber,this.pool);
-	this.cloneSlaveConfiguration(dbi);
+	this.cloneMaster(dbi);
 	return dbi
   }
 

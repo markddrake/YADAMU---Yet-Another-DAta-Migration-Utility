@@ -7,6 +7,8 @@ const { performance } = require('perf_hooks');
 **
 ** Require Database Vendors API 
 **
+** ### pg_query-stream 3.x is not supported as it does not emit error events when the connection is lost: https://github.com/brianc/node-postgres/issues/2187
+**
 */
 const {Client,Pool} = require('pg')
 const CopyFrom = require('pg-copy-streams').from;
@@ -193,7 +195,7 @@ class PostgresDBI extends YadamuDBI {
           case '00000': // Table not found on Drop Table if exists
 		    break;
           default:
-            yadamuLogger.info([`${this.constructor.name}.onNotice()`],`${n}`);
+            yadamuLogger.info([`${this.constructor.name}.onNotice()`],`${JSON.stringify(n)}`);
         }
       }
 	)  
@@ -224,7 +226,7 @@ class PostgresDBI extends YadamuDBI {
        
     this.pgClient = undefined;
     this.useBinaryJSON = false
-    this.activeTransaction = false;
+    this.transactionInProgress = false;
   }
 
   getConnectionProperties() {
@@ -245,7 +247,7 @@ class PostgresDBI extends YadamuDBI {
   
   async executeSQL(sqlStatement,args) {
 	
-    let attemptReconnect = !this.reconnectInProgress;
+    let attemptReconnect = this.attemptReconnection;
 
 	if ((this.status.sqlTrace) && (typeof sqlStatemeent === 'string')) {
       this.status.sqlTrace.write(this.traceSQL(sqlStatement));
@@ -327,11 +329,9 @@ class PostgresDBI extends YadamuDBI {
   async beginTransaction() {
 
      const sqlStatement =  `begin transaction`
+     await this.executeSQL(sqlStatement);
+	 super.beginTransaction();
 
-     if (this.activeTransaction === false) {
-       this.activeTransaction = true;
-       await this.executeSQL(sqlStatement);
-     }
   }
 
   /*
@@ -343,11 +343,8 @@ class PostgresDBI extends YadamuDBI {
   async commitTransaction() {
 	  
      const sqlStatement =  `commit transaction`
-	 
-     if (this.activeTransaction === true) {
-       this.activeTransaction = false;
-       await this.executeSQL(sqlStatement);
-     }
+	 await this.executeSQL(sqlStatement);
+	 super.commitTransaction()
   }
 
   /*
@@ -361,14 +358,11 @@ class PostgresDBI extends YadamuDBI {
     const sqlStatement =  `rollback transaction`
 	 
 	try {
-      if (this.activeTransaction === true) {
-        this.activeTransaction = false;
-        await this.executeSQL(sqlStatement);
-      }
+      await this.executeSQL(sqlStatement);
+      super.rollbackTransaction()
 	} catch (e) {
 	  if (cause instanceof Error) {
-		e = e instanceof PostgresError ? e : new PostgresError(e,stack,sqlStatement)
-        this.yadamuLogger.logException([`${this.constructor.name}.rollbackTransaction()`],e)
+		this.yadamuLogger.logException([`${this.constructor.name}.rollbackTransaction()`],e)
 	    e = cause
 	  }
 	  throw e;
@@ -378,6 +372,7 @@ class PostgresDBI extends YadamuDBI {
   async createSavePoint() {
 
     await this.executeSQL(sqlCreateSavePoint);
+    super.createSavePoint();
   }
   
   async restoreSavePoint(cause) {
@@ -385,9 +380,9 @@ class PostgresDBI extends YadamuDBI {
     let stack
     try {
       await this.executeSQL(sqlRestoreSavePoint);
+      super.restoreSavePoint();
 	} catch (e) {
-      e = e instanceof PostgresError ? e : new PostgresError(e,stack,sqlStatement)
-	  if (cause instanceof Error) {
+      if (cause instanceof Error) {
         this.yadamuLogger.logException([`${this.constructor.name}.rollbackTransaction()`],e)
 	    e = cause
 	  }
@@ -398,7 +393,8 @@ class PostgresDBI extends YadamuDBI {
   async releaseSavePoint(cause) {
 
     await this.executeSQL(sqlReleaseSavePoint);    
-	
+    super.releaseSavePoint();
+
   } 
   
   /*
@@ -602,6 +598,7 @@ class PostgresDBI extends YadamuDBI {
   streamingError(e,stack,tableInfo) {
     return new PostgresError(e,stack,tableInfo.SQL_STATEMENT)
   }
+  
   async getInputStream(tableInfo,parser) {        
     const queryStream = new QueryStream(tableInfo.SQL_STATEMENT)
     return await this.executeSQL(queryStream)   
@@ -647,7 +644,6 @@ class PostgresDBI extends YadamuDBI {
 
   async slaveDBI(slaveNumber) {
 	const dbi = new PostgresDBI(this.yadamu)
-	dbi.setParameters(this.parameters);
 	const connection = await this.getConnectionFromPool()
 	return await super.slaveDBI(slaveNumber,dbi,connection)
   }

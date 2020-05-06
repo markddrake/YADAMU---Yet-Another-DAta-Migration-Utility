@@ -84,9 +84,14 @@ class DBReader extends Readable {
     // const startTime = performance.now();
 	let cause = undefined
     let copyFailed = false;
+	let tableMissing = false;
  
     const tableInfo = dbi.generateSelectStatement(tableMetadata)
     const parser = dbi.createParser(tableInfo,outputStream.objectMode())
+
+    // ### TESTING ONLY: Uncomment folllowing line to force Table Not Found condition
+    // tableInfo.SQL_STATEMENT = tableInfo.SQL_STATEMENT.replace(tableInfo.TABLE_NAME,tableInfo.TABLE_NAME + "1")
+
     const inputStream = await dbi.getInputStream(tableInfo,parser)
  
     const copyOperation = new Promise(function(resolve,reject) {  
@@ -119,18 +124,8 @@ class DBReader extends Readable {
    	      // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${parser.constructor.name}.onEnd()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],`${copyFailed ? 'FAILED' : 'SUCCSESS'}. Stream open ${YadamuLibrary.stringifyDuration(performance.now() - pipeStartTime)}.`);
 
     	  parserEndTime = performance.now()
-		  const pipeStatistics = {rowsRead: parser.getCounter(), pipeStartTime: pipeStartTime, readerEndTime: readerEndTime, parserEndTime: parserEndTime, copyFailed: copyFailed}
+		  const pipeStatistics = {rowsRead: parser.getCounter(), pipeStartTime: pipeStartTime, readerEndTime: readerEndTime, parserEndTime: parserEndTime, copyFailed: copyFailed, tableNotFound: tableMissing}
           
-		  /*
-		  **
-		  ** Warning. InputStream's database connection may not be open at this point if end() fires after inputStream raised an error() event due to back end disconnecting
-		  **
-		  */
-		  
-		  if (cause && cause.lostConnection()) {
-	        // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()`,`${tableInfo.TABLE_NAME}`,`${cause.code}`],`Lost Connection: ${cause.lostConnection()}`); 
-		    await dbi.reconnect(cause)
-		  }
 		  
 		  /*
 		  **
@@ -145,11 +140,20 @@ class DBReader extends Readable {
 		      case 'ABORT':
 			    const rows = pipeStatistics.rowCount + 1;
 				// self.yadamuLogger.warning([`${this.constructor.name}`,`${tableMetadata.TABLE_NAME}`],`Reader failed at row: ${rows}.`)
-				outputStream.reportTableComplete();
+				outputStream.reportTableComplete(pipeStatistics);
     		    reject(cause);
                 break;
 	          case 'SKIP':
               case 'FLUSH':
+		        /*
+		        **
+		        ** InputStream's database connection may not be open at this point if end() fires after inputStream raised an error() event due to back end disconnecting
+		        **
+		        */
+		        if (cause && cause.lostConnection()) {
+	              // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()`,`${tableInfo.TABLE_NAME}`,`${cause.code}`],`Lost Connection: ${cause.lostConnection()}`); 
+		          await dbi.reconnect(cause)
+		        }
     		    break;
 		    }
   		  }
@@ -198,7 +202,12 @@ class DBReader extends Readable {
   		    }     		   
 			copyFailed = true;
             cause = dbi.streamingError(err,stack,tableMetadata)
-            self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],cause);
+			if (cause.missingTable()) {
+			  tableMissing = true;
+			}
+			else {
+              self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],cause);
+		    }
 			
 			/*
 			**
@@ -221,7 +230,7 @@ class DBReader extends Readable {
         inputStream.pipe(parser).pipe(outputStream,{end: false })
 	  } catch (e) {
 		self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${tableMetadata.TABLE_NAME}`,`PIPE`],e)
-		throw e
+		reject(e)
 	  }
     })
     
@@ -236,6 +245,7 @@ class DBReader extends Readable {
       const readerStatistics = await copyOperation;
       const elapsedTime = performance.now() - startTime
       // this.yadamuLogger.trace([`${this.constructor.name}`,`${tableMetadata.TABLE_NAME}`],`Rows read: ${rows}. Elaspsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`)
+	  await this.dbi.finalizeRead(tableMetadata);
       return readerStatistics
 	} catch(e) {
 	  /*

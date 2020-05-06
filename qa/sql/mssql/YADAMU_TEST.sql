@@ -325,6 +325,9 @@ begin
    ,SQL_STATEMENT    nvarchar(max)
   );
 
+  create table #SOURCE_HASH_BUCKET(HASH varbinary(8000));
+  create table #TARGET_HASH_BUCKET(HASH varbinary(8000));
+
   set NOCOUNT ON;
 
   open FETCH_METADATA;
@@ -355,31 +358,26 @@ begin
       insert into #SCHEMA_COMPARE_RESULTS VALUES (@SOURCE_DATABASE, @SOURCE_SCHEMA, @TARGET_DATABASE, @TARGET_SCHEMA, @TABLE_NAME, @SOURCE_COUNT, @TARGET_COUNT, @MISSING_ROWS, @EXTRA_ROWS, NULL, NULL)
     end try
     begin catch
-	  select @SQL_STATEMENT
       if (ERROR_NUMBER() = 41317) 
       begin
 
         -- A user transaction that accesses memory optimized tables or natively compiled modules cannot access more than one user database or databases model and msdb, and it cannot write to master
 
-        declare @SOURCE_HASH_BUCKET table(HASH varbinary(8000));
-        declare @TARGET_HASH_BUCKET table(HASH varbinary(8000));
-
         begin try
-                    
-          set @SQL_STATEMENT = concat('WITH XML_TABLE(XML_DOC) as (select ',@COLUMN_LIST,' from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'" for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE )',@C_NEWLINE,
-                                      'select HASHBYTES(''SHA2_256'',cast(T2.ROW_XML.query(''.'') as nvarchar(max))) from XML_TABLE CROSS APPLY XML_DOC.nodes(''/Row'') as T2(ROW_XML)');
-                                                                      
-          insert into @SOURCE_HASH_BUCKET 
+		
+		  truncate table #SOURCE_HASH_BUCKET
+		  truncate table #TARGET_HASH_BUCKET
+		                  
+          set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
+		  insert into #SOURCE_HASH_BUCKET
           exec(@SQL_STATEMENT)
-       
-          set @SQL_STATEMENT = concat('WITH XML_TABLE(XML_DOC) as (select ',@COLUMN_LIST,' from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'" for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE )',@C_NEWLINE,
-                                      'select HASHBYTES(''SHA2_256'',cast(T2.ROW_XML.query(''.'') as nvarchar(max))) from XML_TABLE CROSS APPLY XML_DOC.nodes(''/Row'') as T2(ROW_XML)');
 
-          insert into @TARGET_HASH_BUCKET 
+          set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
+		  INSERT into #TARGET_HASH_BUCKET 
           exec(@SQL_STATEMENT)
           
-          select @MISSING_ROWS = count(*) from (select HASH from @SOURCE_HASH_BUCKET EXCEPT select HASH from @TARGET_HASH_BUCKET) T1;
-          select @EXTRA_ROWS = count(*) from (select HASH from @TARGET_HASH_BUCKET EXCEPT select HASH from @SOURCE_HASH_BUCKET) T1;
+          select @MISSING_ROWS = count(*) from (select HASH from #SOURCE_HASH_BUCKET EXCEPT select HASH from #TARGET_HASH_BUCKET) T1;
+          select @EXTRA_ROWS = count(*) from (select HASH from #TARGET_HASH_BUCKET EXCEPT select HASH from #SOURCE_HASH_BUCKET) T1;
 
           insert into #SCHEMA_COMPARE_RESULTS VALUES (@SOURCE_DATABASE, @SOURCE_SCHEMA, @TARGET_DATABASE, @TARGET_SCHEMA, @TABLE_NAME, @SOURCE_COUNT, @TARGET_COUNT, @MISSING_ROWS, @EXTRA_ROWS, NULL, NULL)
         end try
@@ -482,7 +480,7 @@ begin
       from #SCHEMA_COMPARE_RESULTS
      where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
         or MISSING_ROWS <> 0
-       or EXTRA_ROWS <> 0
+        or EXTRA_ROWS <> 0
         or SQLERRM is not NULL
      order by TABLE_NAME;
   end

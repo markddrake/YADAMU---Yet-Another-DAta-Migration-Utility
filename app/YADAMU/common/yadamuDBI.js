@@ -12,7 +12,7 @@ const { performance } = require('perf_hooks');const async_hooks = require('async
 */
 
 const YadamuLibrary = require('./yadamuLibrary.js');
-const {YadamuError, CommandLineError, ConfigurationFileError, ConnectionError,DatabaseError} = require('./yadamuError.js');
+const {YadamuError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuError.js');
 const DBParser = require('./dbParser.js');
 
 const DEFAULT_BATCH_SIZE   = 10000;
@@ -355,11 +355,17 @@ class YadamuDBI {
     this.initializeParameters(parameters);
     this.systemInformation = undefined;
     this.metadata = undefined;
-    this.reconnectInProgress = false;
+    this.attemptReconnection = this.setReconnectionState()
     this.connectionProperties = this.getConnectionProperties()   
     this.connection = undefined;
 
     this.statementCache = undefined;
+	
+	// Track Transaction and Savepoint state.
+	// Needed to restore transacation state when reconnecting.
+	
+	this.transactionInProgress = false;
+	this.savePointSet = false;
  
     this.tableName  = undefined;
     this.tableInfo  = undefined;
@@ -404,6 +410,21 @@ class YadamuDBI {
     });
   }
   
+  setReconnectionState() {
+	  
+    switch (this.parameters.READ_ON_ERROR) {
+	  case undefined:
+	  case 'ABORT':
+		return false;
+	  case 'SKIP':
+	  case 'FLUSH':
+	    return true;
+		break;
+	  default:
+	    return false;
+	}
+  }
+  
   async reconnectImpl() {
     throw new Error(`Database Reconnection Not Implimented for ${this.DATABASE_VENDOR}`)
   }
@@ -413,16 +434,31 @@ class YadamuDBI {
     let retryCount = 0;
     let connectionUnavailable 
     
-	this.reconnectInProgress = true
+    const transactionInProgress = this.transactionInProgress 
+    const savePointSet = this.savePointSet
+	
+	this.reconnectInProgress = true;
+	this.attemptReconnection = false
     this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`SQL Operation raised: ${cause}`);
+	
+	if (this.currentTable && this.currentTable.lostConnection && (typeof this.currentTable.lostConnection === 'function')) {
+	  this.currentTable.lostConnection();
+	}
 	 
     while (retryCount < 10) {
 	  try {
         this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Attemping reconnection.`);
         await this.reconnectImpl()
 	    await this.configureConnection();
-        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`${this.DATABASE_VENDOR} service. New connection availabe.`);
+		if (transactionInProgress) {
+		  await this.beginTransaction()
+		}
+		if (savePointSet) {
+		  await this.createSavePoint()
+		}
         this.reconnectInProgress = false;
+        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`${this.DATABASE_VENDOR} service. New connection availabe.`);
+        this.attemptReconnection = this.setReconnectionState()
 		return;
       } catch (connectionFailure) {
 		if (connectionFailure.serverUnavailable()) {
@@ -432,15 +468,17 @@ class YadamuDBI {
           retryCount++;
         }
         else {
+   	      this.reconnectInProgress = false;
           this.yadamuLogger.logException([`${this.constructor.name}.reconnect()`,`${this.constructor.name}.reconnectImpl()`],connectionFailure);
-          this.reconnectInProgress = false;
+          this.attemptReconnection = this.setReconnectionState()
           throw connectionFailure;
         }
       }
     }
     // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`Unable to re-establish connection.`)
     this.reconnectInProgress = false;
-	throw connectionUnavailable 	
+    this.attemptReconnection = this.setReconnectionState()
+    throw connectionUnavailable 	
   }
   
   async getDatabaseConnection(requirePassword) {
@@ -559,6 +597,8 @@ class YadamuDBI {
   */
   
   async beginTransaction() {
+	this.transactionInProgress = true;  
+	this.savePointSet = false;
   }
 
   /*
@@ -568,6 +608,8 @@ class YadamuDBI {
   */
     
   async commitTransaction() {
+	this.transactionInProgress = false;  
+	this.savePointSet = false;
   }
 
   /*
@@ -577,10 +619,8 @@ class YadamuDBI {
   */
   
   async rollbackTransaction(cause) {
-    if (cause instanceof Error) {
-      this.yadamuLogger.logException([`${this.constructor.name}`,`ROLLBACK`],`Cause:`)
-      this.yadamuLogger.logException(e)
-    }
+	this.transactionInProgress = false;  
+	this.savePointSet = false;
   }
   
   /*
@@ -590,6 +630,7 @@ class YadamuDBI {
   */
     
   async createSavePoint() {
+	this.savePointSet = true;
   }
 
   /*
@@ -599,10 +640,11 @@ class YadamuDBI {
   */
 
   async restoreSavePoint(cause) {
-    if (cause instanceof Error) {
-      this.yadamuLogger.logException([`${this.constructor.name}`,`REVERT`],`Cause:`)
-      this.yadamuLogger.logException(e)
-    }
+	this.savePointSet = false;
+  }
+
+  async releaseSavePoint(cause) {
+	this.savePointSet = false;
   }
 
   /*
@@ -724,6 +766,9 @@ class YadamuDBI {
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }
 
+  async finalizeRead(tableInfo) {
+  }
+
   getTableWriter(TableWriter,table) {
     const tableName = this.metadata[table].tableName 
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger);
@@ -744,12 +789,15 @@ class YadamuDBI {
     }
   }
   
-  async cloneSlaveConfiguration(dbi) {
-    dbi.setParameters(this.parameters);
-    dbi.systemInformation = this.systemInformation
-    dbi.metadata = this.metadata
+  async cloneMaster(dbi) {
+	// dbi.master = this
+	dbi.metadata = this.metadata
     dbi.schemaCache = this.schemaCache
+    dbi.spatialFormat = this.spatialFormat
     dbi.statementCache = this.statementCache
+    dbi.systemInformation = this.systemInformation
+    dbi.sqlTraceTag = ` /* Slave [${this.slaveNumber}] */`;
+	dbi.setParameters(this.parameters);
   }   
 
   async slaveDBI(slaveNumber,dbi,connection) {
@@ -757,11 +805,9 @@ class YadamuDBI {
     // Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
       
     dbi.slaveNumber = slaveNumber
-    dbi.sqlTraceTag = ` /* Slave [${slaveNumber}] */`;
     dbi.connection = connection
-	dbi.spatialFormat = this.spatialFormat
+    this.cloneMaster(dbi);
     await dbi.configureConnection();
-    this.cloneSlaveConfiguration(dbi);
     return dbi
   }
   

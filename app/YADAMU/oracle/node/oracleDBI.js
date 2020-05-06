@@ -475,6 +475,7 @@ class OracleDBI extends YadamuDBI {
   async getConnectionFromPool() {
 	  
 	//  Do not Configure Connection here. 
+	
 	let stack;
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
@@ -895,7 +896,7 @@ class OracleDBI extends YadamuDBI {
     
   async executeMany(sqlStatement,rows,binds) {
 
-    let attemptReconnect = !this.reconnectInProgress;
+    let attemptReconnect = this.attemptReconnection;
 
     if (rows.length > 0) {
       if (this.status.sqlTrace) {
@@ -931,7 +932,7 @@ class OracleDBI extends YadamuDBI {
 
   async executeSQL(sqlStatement,args,outputFormat) {
      
-    let attemptReconnect = !this.reconnectInProgress;
+    let attemptReconnect = this.attemptReconnection;
 
 	args = args === undefined ? {} : args
 	outputFormat = outputFormat === undefined ? {} : outputFormat
@@ -978,6 +979,12 @@ class OracleDBI extends YadamuDBI {
     this.dbVersion = undefined;
     this.maxStringSize = undefined;
 	this.wrapperList = [];
+	
+	// Oracle always had a transaction in progress, so beginTransaction is a no-op
+	
+	this.transactionInProgress = true;
+	
+	
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Constructor Complete');
   }
 
@@ -1227,13 +1234,13 @@ class OracleDBI extends YadamuDBI {
     try {
       await this.releaseConnection();
 	} catch (e) {
-      this.yadamulogger.logException([`${this.constructor.name}.abort()`,`releaseConnection()`],e);
+      this.yadamuLogger.logException([`${this.constructor.name}.abort()`,`releaseConnection()`],e);
 	}
     try {
 	  // Force Termnination of All Current Connections.
 	  await this.closePool(0);
 	} catch (e) {
-      this.yadamulogger.logException([`${this.constructor.name}.abort()`,`closePool()`],e);
+      this.yadamuLogger.logException([`${this.constructor.name}.abort()`,`closePool()`],e);
 	}
   }
   
@@ -1255,6 +1262,7 @@ class OracleDBI extends YadamuDBI {
       stack = new Error().stack
       await this.connection.commit();
   	  this.traceTiming(sqlStartTime,performance.now())
+	  super.commitTransaction()
 	} catch (e) {
 	  const err = new OracleError(e,stack,`Oracledb.Transaction.commit()`,{},{})
 	  throw err;
@@ -1282,10 +1290,11 @@ class OracleDBI extends YadamuDBI {
       stack = new Error().stack
       await this.connection.rollback();
   	  this.traceTiming(sqlStartTime,performance.now())
+	  super.rollbackTransaction()
 	} catch (e) {
 	  let err = new OracleError(e,stack,`Oracledb.Transaction.rollback()`,{},{})
 	  if (cause instanceof Error) {
-        this.yadamulogger.logException([`${this.constructor.name}.rollbackTransaction()`],err)
+        this.yadamuLogger.logException([`${this.constructor.name}.rollbackTransaction()`],err)
 	    err = cause
 	  }
 	  throw err;
@@ -1294,6 +1303,7 @@ class OracleDBI extends YadamuDBI {
   
   async createSavePoint() {
     await this.executeSQL(sqlCreateSavePoint,[]);
+	super.createSavePoint()
   }
 
   async restoreSavePoint(cause) {
@@ -1303,9 +1313,10 @@ class OracleDBI extends YadamuDBI {
 
 	try {
 	  await this.executeSQL(sqlRestoreSavePoint,[]);
+	  super.restoreSavePoint()
 	} catch (e) {
 	  if (cause instanceof Error) {
-        this.yadamulogger.logException([`${this.constructor.name}.restoreSavePoint()`],e)
+        this.yadamuLogger.logException([`${this.constructor.name}.restoreSavePoint()`],e)
 	    e = cause
 	  }
 	  throw e;
@@ -1709,6 +1720,7 @@ class OracleDBI extends YadamuDBI {
     	  
   async slaveDBI(slaveNumber) {
 	const dbi = new OracleDBI(this.yadamu)
+	dbi.pool = this.pool;
 	dbi.setParameters(this.parameters);
 	const connection = await this.getConnectionFromPool()	
     await super.slaveDBI(slaveNumber,dbi,connection)
@@ -1746,7 +1758,7 @@ class DDLCache extends Writable {
       }
       callback();
     } catch (e) {
-      this.yadamulogger.logException([`${this.constructor.name}._write()`,`"${this.tableName}"`],e);
+      this.yadamuLogger.logException([`${this.constructor.name}._write()`,`"${this.tableName}"`],e);
       callback(e);
     }
   }

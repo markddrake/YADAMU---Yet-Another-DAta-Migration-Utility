@@ -20,21 +20,21 @@
     "font-awesome": "^4.7.0",
     "jquery": "^3.5.0",
     "mariadb": "^2.3.1",
-    "mongodb": "^3.5.6",
+    "mongodb": "^3.5.7",
     "mssql": "^6.2.0",
     "mysql": "^2.18.1",
     "oracledb": "^4.2.0",
     "pg": "^8.0.3",
     "pg-copy-streams": "^2.2.2",
-    "pg-query-stream": "^3.0.6",
+    "pg-query-stream": "^2.1.2",
     "popper.js": "^1.16.1",
     "require": "^2.4.20",
-    "snowflake-sdk": "^1.5.1",
-    "uuid": "^7.0.3",
+    "snowflake-sdk": "^1.5.2",
+    "uuid": "^8.0.0",
     "wkx": "^0.5.0"
   },
   "devDependencies": {
-    "electron": "^8.2.3",
+    "electron": "^8.2.5",
     "electron-packager": "^14.2.1"
   }
 }

@@ -231,7 +231,7 @@ class MariadbDBI extends YadamuDBI {
   
   async executeSQL(sqlStatement,args) {
      
-    let attemptReconnect = !this.reconnectInProgress;
+    let attemptReconnect = this.attemptReconnection;
     
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(sqlStatement));
@@ -335,11 +335,13 @@ class MariadbDBI extends YadamuDBI {
   **
   */
   
-
-
   async finalize() {
     await this.connection.end();
     await this.pool.end();
+  }
+
+  async finalizeRead(tableInfo) {
+    await this.executeSQL(`FLUSH TABLE "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`)
   }
 
   /*
@@ -367,7 +369,7 @@ class MariadbDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-    let attemptReconnect = !this.reconnectInProgress;
+    let attemptReconnect = this.attemptReconnection;
     
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(`begin transaction`));
@@ -381,6 +383,7 @@ class MariadbDBI extends YadamuDBI {
 		stack = new Error().stack
         await this.connection.beginTransaction();
         this.traceTiming(sqlStartTime,performance.now())
+		super.beginTransaction()
 		break
       } catch (e) {
 		const cause = MariadbError(e,stack,'mariadb.Connection.beginTransaction()');
@@ -393,6 +396,7 @@ class MariadbDBI extends YadamuDBI {
         throw cause
       }      
     } 
+	
   }  
  
   /*
@@ -413,6 +417,7 @@ class MariadbDBI extends YadamuDBI {
       stack = new Error().stack
       await this.connection.commit();
       this.traceTiming(sqlStartTime,performance.now())
+	  super.commitTransaction()
     } catch (e) {
 	  const cause = new MariadbError(e,stack,'mariadb.Connection.commit()');
 	  if (cause.lostConnection()) {
@@ -422,6 +427,7 @@ class MariadbDBI extends YadamuDBI {
         throw cause
       }      
     } 
+	
   }  
 
 
@@ -447,6 +453,7 @@ class MariadbDBI extends YadamuDBI {
       stack = new Error().stack
       await this.connection.rollback();
       this.traceTiming(sqlStartTime,performance.now())
+	  super.rollbackTransaction()
     } catch (e) {
 	  const err = new MariadbError(e,stack,'mariadb.Connection.rollback()')
 	  if (err.lostConnection()) {
@@ -460,10 +467,12 @@ class MariadbDBI extends YadamuDBI {
         throw cause
       }      
     } 
+	
   }
   
   async createSavePoint() {
     await this.executeSQL(sqlCreateSavePoint);
+	super.createSavePoint()
   }
   
   async restoreSavePoint(cause) {
@@ -473,6 +482,7 @@ class MariadbDBI extends YadamuDBI {
 
 	try {
       await this.executeSQL(sqlRestoreSavePoint);
+	  super.restoreSavePoint();
 	} catch (e) {
 	  if (cause instanceof Error) {
         this.yadamuLogger.logException([`${this.constructor.name}.restoreSavePoint()`],e)
@@ -484,6 +494,7 @@ class MariadbDBI extends YadamuDBI {
 
   async releaseSavePoint() {
     await this.executeSQL(sqlReleaseSavePoint);    
+	super.releaseSavePoint();
   } 
 
   /*
@@ -583,12 +594,7 @@ class MariadbDBI extends YadamuDBI {
   streamingError(err,stack,tableInfo) {
 	 return new MariadbError(err,stack,tableInfo.SQL_STATEMENT)
   }
-  
-  async freeInputStream(tableInfo,inputStream) {
-    await this.executeSQL(`FLUSH TABLE "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`)
-  }
-  
-  
+    
   async getInputStream(tableInfo,parser) {
        
     if (this.status.sqlTrace) {

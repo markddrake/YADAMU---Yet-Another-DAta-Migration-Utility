@@ -115,9 +115,9 @@ class TableWriter extends YadamuWriter {
         await this.processWarnings(results);
         this.endTime = performance.now();
         await this.dbi.releaseSavePoint();
-		this.rowsCommitted += this.rowsCached
-        this.batch.length = 0;
-        this.rowsCached = 0;
+		this.batch.length = 0;  
+        this.rowsWritten += this.rowsCached;
+		this.rowsCached = 0;
         return this.skipTable
       } catch (e) {
         if (this.status.showInfoMsgs) {

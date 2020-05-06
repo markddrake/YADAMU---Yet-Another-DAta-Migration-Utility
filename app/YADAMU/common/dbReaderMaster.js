@@ -34,7 +34,7 @@ class DBReaderMaster extends DBReader {
 	** When the task list is empty The Reader connection is returned to the pool.
 	**
 	*/
-	  
+	let abortCopyOperations = false;
 	const maxSlaveCount = parseInt(this.dbi.parameters.PARALLEL)
 	const slaveCount = this.schemaInfo.length < maxSlaveCount ? this.schemaInfo.length : maxSlaveCount
 	if (slaveCount > 0) {
@@ -43,7 +43,7 @@ class DBReaderMaster extends DBReader {
       const dbWriterSlavePool = await Promise.all(parallelTasks.map(async function(dummy,idx) {
     	 const dbWriterSlave = await this.outputStream.newSlave(idx)		 
          const slaveReaderDBI = await this.dbi.slaveDBI(idx);
-		 while (tasks.length > 0) {
+		 while ((tasks.length > 0) && !abortCopyOperations){
 		   const task = tasks.shift();
 		   dbWriterSlave.write({table: task.TABLE_NAME})
            const copyOperation = this.createCopyOperation(slaveReaderDBI,task,dbWriterSlave)
@@ -59,6 +59,18 @@ class DBReaderMaster extends DBReader {
              // this.yadamuLogger.trace([`${this.constructor.name}`,`${task.TABLE_NAME}`,`FAILED`],`Rows read: ${stats.rowsRead}.`)
              this.yadamuLogger.logException([`${this.constructor.name}`,`${task.TABLE_NAME}`,`COPY`],e)
 			 this.outputStream.setSlaveException(e);
+			 switch (this.dbi.parameters.READ_ON_ERROR) {
+				case undefined:
+				case 'ABORT':
+				  abortCopyOperations = true;
+				  break;
+				case 'SKIP':
+				case 'FLUSH':
+				  abortCopyOperations = false;
+				  break
+				default:
+				  abortCopyOperations = true;
+			 }
 			 break;
            }
  		   stats.tableName = task.TABLE_NAME
