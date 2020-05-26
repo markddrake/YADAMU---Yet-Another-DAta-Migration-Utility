@@ -1,3 +1,3 @@
 export DB_USER=system
 export DB_PWD=oracle
-export DB_CONNECTION=ORCL12c
+export DB_CONNECTION=$ORACLE12C
