@@ -13,7 +13,6 @@ as
    ,COLUMN_PATTERN_LIST  CLOB
    ,WITH_CLAUSE          CLOB
    ,SQL_STATEMENT        CLOB
-   ,PARTITION_LIST       CLOB
   );
   
   TYPE EXPORT_METADATA_TABLE IS TABLE OF EXPORT_METADATA_RECORD;
@@ -498,8 +497,7 @@ as
                  else
                    '"' || atc.COLUMN_NAME || '"'
                end
-        order by INTERNAL_COLUMN_ID) as T_VC4000_TABLE) NODE_SELECT_LIST,
-		(select cast(collect(partition_name) as T_VC4000_TABLE) from ALL_TAB_PARTITIONS atp where ATP.TABLE_NAME = aat.TABLE_NAME) PARTITION_LIST
+        order by INTERNAL_COLUMN_ID) as T_VC4000_TABLE) NODE_SELECT_LIST
     from ALL_ALL_TABLES aat
          inner join ALL_TAB_COLS atc
                  on atc.OWNER = aat.OWNER
@@ -634,7 +632,6 @@ begin
 	  V_ROW.NODE_SELECT_LIST     := TABLE_TO_LIST(t.NODE_SELECT_LIST);
 	  V_ROW.WITH_CLAUSE          := V_OBJECT_SERIALIZATION;
 	  V_ROW.SQL_STATEMENT        := V_SQL_STATEMENT;
-	  V_ROW.PARTITiON_LIST       := TABLE_TO_LIST(t.PARTITION_LIST);
 
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN               
 --
