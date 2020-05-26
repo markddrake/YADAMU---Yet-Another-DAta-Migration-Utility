@@ -248,8 +248,9 @@ class MsSQLDBI extends YadamuDBI {
   }
     
   getTransactionManager() {
-    // this.yadamuLogger.trace([`${this.constructor.name}.getTransactionManager()`,this.slaveNumber],``)
-	const self = this
+
+    // this.yadamuLogger.trace([`${this.constructor.name}.getTransactionManager()`,this.getSlaveNumber()],``)
+
 	this.transactionInProgress = false;
   	const transaction = new sql.Transaction(this.pool)
     return transaction
@@ -257,16 +258,17 @@ class MsSQLDBI extends YadamuDBI {
 
   getRequest() {
 	let stack
+    const self = this
 	try {
       const yadamuLogger = this.yadamuLogger	
 	  stack = new Error().stack;
 	  const request = new sql.Request(this.requestProvider)
       request.on('info',function(infoMsg){ 
-        yadamuLogger.info([`sql.Request.onInfo()`],`${infoMsg.message}`);
+        yadamuLogger.info([`${self.DATABASE_VENDOR}`,`MESSAGE`],`${infoMsg.message}`);
       })
 	  return request;
 	} catch (e) {
-	  throw new MsSQLError(e,stack,`sql.Request(${this.requestProvider.constructor.name})`);
+	  throw new MsSQLError(e,stack,`sql.Request(${this.requestProvider.constuctor.name})`);
     }
   }
   
@@ -287,7 +289,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async getPreparedStatement(sqlStatement, dataTypes, incomingSpatialFormat) {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.getPreparedStatement()`,this.slaveNumber],sqlStatement);
+    // this.yadamuLogger.trace([`${this.constructor.name}.getPreparedStatement()`,this.getSlaveNumber()],sqlStatement);
 	
 	const spatialFormat = incomingSpatialFormat === undefined ? this.spatialFormat : incomingSpatialFormat
 	let stack
@@ -453,6 +455,9 @@ class MsSQLDBI extends YadamuDBI {
   }
 
   async createConnectionPool() {
+	  
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR],`createConnectionPool()`)
+  
 	this.setTargetDatabase();
     this.logConnectionProperties();
 
@@ -474,7 +479,7 @@ class MsSQLDBI extends YadamuDBI {
       stack = new Error().stack;
 	  operation = 'sql.ConnectionPool.connect()'
 	  await this.pool.connect();
-	  this.traceTiming(sqlStartTime,performance.now())
+      this.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.pool;
 	  this.transaction = this.getTransactionManager()
 	  
@@ -487,7 +492,7 @@ class MsSQLDBI extends YadamuDBI {
 
   async getDatabaseConnectionImpl() {
 	try {
-   	  // this.yadamuLogger.trace([`${this.constructor.name}.getDatabaseConnectionImpl()`,this.slaveNumber],``)
+   	  // this.yadamuLogger.trace(this.DATABASE_VENDOR,this.getSlaveNumber()],`getDatabaseConnectionImpl()`)
       await this.createConnectionPool();
 	} catch (e) {
       const err = new ConnectionError(e,this.connectionProperties);
@@ -495,8 +500,10 @@ class MsSQLDBI extends YadamuDBI {
 	}
   } 
   
-  async releaseConnection() {
-    // this.yadamuLogger.trace([`${this.constructor.name}.releaseConnection()`,this.slaveNumber],``)
+  async closeConnection() {
+
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`closeConnection({(this.preparedStatement !== undefined ),${this.transactionInProgress})`)
+
     if (this.preparedStatement !== undefined ) {
       await this.clearCachedStatement()
     }	
@@ -505,7 +512,7 @@ class MsSQLDBI extends YadamuDBI {
         await this.rollbackTransaction()
       } catch (e) {
 	    if (e.code && (e.code === 'ENOTBEGUN')) {
-	      this.yadamuLogger.info([`${this.constructor.name}.releaseConnection()`],`Incosistent driver state. Transaction in Progress: ${this.transactionInProgress}. Rollback operation raised "${e.message}".`);
+	      this.yadamuLogger.info([`${this.constructor.name}.sqlection()`],`Incosistent driver state. Transaction in Progress: ${this.transactionInProgress}. Rollback operation raised "${e.message}".`);
         }			
 		else {
           throw e
@@ -514,43 +521,34 @@ class MsSQLDBI extends YadamuDBI {
 	}  
   }
   
-  async reconnectImpl() {
-	  
-	/*
-    **
-    ** For a simple lost connection, where the serrver itself is still running, MSSQL seems to handle this automatically. 
-	** 
-	**
-	** We need to handle the case where the server is actually restarting and the new request fails by adding a re-try loop.
-    **
-    */	
+  async closePool() {
+  	
+  // this.yadamuLogger.trace([this.DATABASE_VENDOR],`closePool(${(this.pool !== undefined)})`)
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`Attemping reconnection.`);
-	
-	/* 
-	**
-	** Call Releasse connection to clear any pending transactions or prepared statements. Ingore "Not connected errors" 
-	** If release connection throws 'lostConnection' reset the transaction state.
-	**
-	*/
-	
-	try {
-	  await this.releaseConnection();
-	} catch (e) {
-	  if (!e.lostConnection()) {   
-        this.yadamuLogger.logException([`${this.constructor.name}.reconnectImpl()`,`${this.constructor.name}.releaseConnection()`],e);
-	  }
-	  else {
-		 // Reset Transaction State.
-		 super.rollbackTransaction()
+	if (this.pool !== undefined) {
+	  let stack
+	  let psudeoSQL
+      try {
+		stack = new Error().stack
+		psudeoSQL = 'MsSQL.Pool.close()'
+        await this.pool.close();
+		stack = new Error().stack
+		psudeoSQL = 'MsSQL.close()'
+		await sql.close();
+		// Setting pool to undefined seems to cause Error: No connection is specified for that request if a new pool is created.. ### Makes no sense
+	    // this.pool = undefined;
+      } catch(e) {
+	    // this.pool = undefined
+	    throw new MsSQLError(e,stack,psudeoSQL)
 	  }
     }
-	
-    await this.pool.connect();
+  }
+ 
+  async reconnectImpl() {
+    await this.pool.connect() 
     this.requestProvider = this.pool
-	await this.executeSQL('select 1');
+    await this.executeSQL('select 1');
     this.transaction = this.getTransactionManager()
-    // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`Reconnected, Transaction in Progress: ${this.transactionInProgress}.`);
   }
   
   setConnectionProperties(connectionProperties) {
@@ -587,7 +585,7 @@ class MsSQLDBI extends YadamuDBI {
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
-          await this.reconnect(cause)
+          await this.reconnect(cause,'BATCH OPERATION')
           continue;
         }
         throw cause
@@ -619,7 +617,7 @@ class MsSQLDBI extends YadamuDBI {
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
-          await this.reconnect(cause)
+          await this.reconnect(cause,'EXECUTE')
           continue;
         }
         throw cause
@@ -659,7 +657,7 @@ class MsSQLDBI extends YadamuDBI {
 	      this.preparedStatement === undefined;
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
-          await this.reconnect(cause)
+          await this.reconnect(cause,'PREPARED STATEMENT')
           this.cachePreparedStatement(this.preparedStatement.sqlStatement,this.preparedStatement.dataTypes);
           continue;
         }
@@ -670,11 +668,11 @@ class MsSQLDBI extends YadamuDBI {
   }
 
   async clearCachedStatement() {
-     // this.yadamuLogger.trace([`${this.constructor.name}.clearCachedStatement()`,this.slaveNumber],this.preparedStatement.sqlStatement)
+     // this.yadamuLogger.trace([`${this.constructor.name}.clearCachedStatement()`,this.getSlaveNumber()],this.preparedStatement.sqlStatement)
 	 if (this.preparedStatement !== undefined) {
 	   await this.preparedStatement.statement.unprepare()
-	   this.preparedStatement = undefined;
 	 }
+     this.preparedStatement = undefined;
   }
 
   async executePreparedStatement(sqlStatement,dataTypes,args) {
@@ -709,7 +707,7 @@ class MsSQLDBI extends YadamuDBI {
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
-          await this.reconnect(cause)
+          await this.reconnect(cause,'BULK INSERT')
           continue;
         }
         throw cause
@@ -740,7 +738,7 @@ class MsSQLDBI extends YadamuDBI {
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
-          await this.reconnect(cause)
+          await this.reconnect(cause,'SQL')
           continue;
         }
         throw cause
@@ -813,9 +811,11 @@ class MsSQLDBI extends YadamuDBI {
     this.requestProvider = undefined;
 	this.transaction = undefined;
     this.pool = undefined;
+	
+	// Allow subclasses to access constants defined by the sql object. Redeclaring the SQL object in a subclass causes strange behavoir
+	
+	this.sql = sql
     
-    this.sql = sql
-     
     sql.on('error',(err, p) => {
       this.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`mssql.onError()`],err);
       throw err
@@ -872,40 +872,23 @@ class MsSQLDBI extends YadamuDBI {
 
   /*
   **
-  **  Gracefully close down the database connection.
+  **  Gracefully close down the database connection and pool
   **
   */
 
-  async finalize() {
-    // this.yadamuLogger.trace([`${this.constructor.name}.finalize()`,this.slaveNumber],``)
-	await this.releaseConnection();
-    await this.pool.close();
-	await this.sql.close();
+  async finalize(poolOptions) {
+	await super.finalize(poolOptions)
   }
 
   /*
   **
-  **  Abort the database connection.
+  **  Abort the database connection and pool.
   **
   */
 
   async abort() {
-    // this.yadamuLogger.trace([`${this.constructor.name}.abort()`,this.slaveNumber],``)
-	if (this.pool !== undefined) {
-	  try {
-        await this.releaseConnection();
-      } catch (e) {
-	    this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e);
-      }	  
-      try {
-        await this.pool.close();
-		await this.sql.close();
-      } catch (e) {
-	    this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e);
-      }	  
-	}
+    await super.abort(true);
   }
-
 
   /*
   **
@@ -915,7 +898,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.slaveNumber],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getSlaveNumber()],``)
     	  
     const psuedoSQL = 'begin transaction'
     if (this.status.sqlTrace) {
@@ -944,7 +927,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async commitTransaction() {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.slaveNumber],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getSlaveNumber()],``)
 
     const psuedoSQL = 'commit transaction'
     if (this.status.sqlTrace) {
@@ -973,8 +956,13 @@ class MsSQLDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.slaveNumber],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getSlaveNumber()],``)
 
+	this.checkConnectionState(cause)
+
+	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
+	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
+		
     const psuedoSQL = 'rollback transaction'
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
@@ -989,32 +977,34 @@ class MsSQLDBI extends YadamuDBI {
       this.requestProvider = this.pool
 	  super.rollbackTransaction()
 	} catch (e) {
-	  let err = new MsSQLError(e,stack,'sql.Transaction.rollback()')
-	  if (cause instanceof Error) {
-        this.yadamuLogger.logException([`${this.constructor.name}.rollbackTransaction()`],err)
-	    err = cause
-	  }
-	  throw err;
+	  let newIssue = new MsSQLError(e,stack,'sql.Transaction.rollback()')
+	  this.checkCause(cause,newIssue)
     }	
 	
   }
   
   async createSavePoint() {
+
+    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getSlaveNumber()],``)
+
     await this.executeSQL(sqlCreateSavePoint);
     super.createSavePoint()
   }
   
   async restoreSavePoint(cause) {
-	  
+
+    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getSlaveNumber()],``)
+
+    this.checkConnectionState(cause)
+	
+	// If restoreSavePoint was invoked due to encounterng an error and the restore operation results in a second exception being raised, log the exception raised by the restore operation and throw the original error.
+	// Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
+	
    	try {
       await this.executeSQL(sqlRestoreSavePoint);
       super.restoreSavePoint()
-	} catch (e) {
-	  if (cause instanceof Error) {
-        this.yadamuLogger.logException([`${this.constructor.name}.restoreSavePoint()`],e)
-	    e = cause
-	  }
-	  throw e;
+	} catch (newIssue) {
+	  this.checkCause(cause,newIssue)
 	}
 	
   }
@@ -1058,7 +1048,7 @@ class MsSQLDBI extends YadamuDBI {
      let results = await this.execute('sp_IMPORT_JSON',args,'')		              
 	 results = results.recordset;
      const log = JSON.parse(results[0][Object.keys(results[0])[0]])
-     super.processLog(log, this.status, this.yadamuLogger)
+     super.processLog(log,'OPENJSON',this.status, this.yadamuLogger)
      return log
   }
   
@@ -1074,7 +1064,7 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
   
-  async getSystemInformation(EXPORT_VERSION) {     
+  async getSystemInformation() {     
   
     const results = await this.executeSQL(sqlSystemInformation)
     const sysInfo =  results.recordsets[0][0];
@@ -1088,7 +1078,7 @@ class MsSQLDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : EXPORT_VERSION
+     ,exportVersion      : this.EXPORT_VERSION
 	 ,sessionUser        : sysInfo.SESSION_USER
 	 ,currentUser        : sysInfo.CURRENT_USER
      ,dbName             : sysInfo.DATABASE_NAME
@@ -1160,7 +1150,7 @@ class MsSQLDBI extends YadamuDBI {
 	const self = this
     let readFailed = false;
     try {
-      // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.slaveNumber],tableInfo.TABLE_NAME)
+      // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getSlaveNumber()],tableInfo.TABLE_NAME)
       const readStream = new Readable({objectMode: true });
       readStream._read = function() {};
       stack = new Error().stack;
@@ -1199,36 +1189,35 @@ class MsSQLDBI extends YadamuDBI {
   }
 
   getTableWriter(table) {
-    // this.yadamuLogger.trace([`${this.constructor.name}.getTableWriter()`,this.slaveNumber],'table')
+    // this.yadamuLogger.trace([`${this.constructor.name}.getTableWriter()`,this.getSlaveNumber()],'table')
     return super.getTableWriter(TableWriter,table)
   }
 
-  configureSlave(slaveNumber,pool) {
-	this.slaveNumber = slaveNumber
-	this.pool = pool
-	this.transaction = this.getTransactionManager()
-	this.requestProvider = pool
-  }
+  async setSlaveConnection() {
+    // Override the default implementation provided by YadamuDBI.
 
-  async slaveDBI(slaveNumber) {
-	const dbi = new PostgresDBI(this.yadamu)
-	dbi.setParameters(this.parameters);
-	const connection = await this.getConnectionFromPool()
-	return await super.slaveDBI(slaveNumber,dbi,connection)
+    // Use the connection provider (master) pool
+    this.pool = this.connectionProvider.pool;
+	this.requestProvider = this.pool
+	this.transaction = this.getTransactionManager()	
   }
   
-
   async slaveDBI(slaveNumber) {
 	const dbi = new MsSQLDBI(this.yadamu)
-	// return await super.slaveDBI(slaveNumber,dbi,this.pool)
-	dbi.configureSlave(slaveNumber,this.pool);
-	this.cloneMaster(dbi);
+	await super.slaveDBI(slaveNumber,dbi)
 	return dbi
   }
+
 
   tableWriterFactory(tableName) {
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
   }
+  
+  async getConnectionID() {
+	const results = await this.executeSQL(`select @@SPID "SPID"`)
+	const pid = results.recordset[0].SPID
+    return pid
+}  
   
 }
 

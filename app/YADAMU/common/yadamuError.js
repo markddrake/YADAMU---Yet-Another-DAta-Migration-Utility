@@ -33,19 +33,34 @@ class ConnectionError extends UserError {
   }
 }
 
+class BatchInsertError extends Error {
+  constructor(cause,tableName,sql,batchSize,firstRow,lastRow,additionalInfo) {
+	super(cause.message)
+	this.cause = cause
+    this.tableName = tableName
+	this.sql = sql,
+	this.rows = [firstRow,`\n...\n`,lastRow]
+	if (typeof additionalInfo === 'object') {
+	  Object.assign(this,additionalInfo)
+    }
+  }
+}
 class DatabaseError extends Error {
   constructor(cause,stack,sql,) {
-    super(cause.message);
-	this.oneLineMessage = this.message.indexOf('\r') > 0 ? this.message.substr(0,this.message.indexOf('\r')) : this.message
-	this.oneLineMessage = this.oneLineMessage.indexOf('\n') > 0 ? this.oneLineMessage.substr(0,this.oneLineMessage.indexOf('\n')) : this.oneLineMessage
+	let oneLineMessage = cause.message.indexOf('\r') > 0 ? cause.message.substr(0,cause.message.indexOf('\r')) : cause.message 
+	oneLineMessage = oneLineMessage.indexOf('\n') > 0 ? oneLineMessage.substr(0,oneLineMessage.indexOf('\n')) : oneLineMessage
+    super(oneLineMessage);
     this.stack = `${stack.slice(0,5)}: ${cause.message}${stack.slice(5)}`
 	this.sql = sql
 	this.cause = cause
+	/*
+	// Clone properties of cause to DatabaseError
 	Object.keys(cause).forEach(function(key){
 	  if ((!this.hasOwnProperty(key))&& !(cause.key instanceof Error) && !(cause.key instanceof Function)) {
 		this[key] = cause[key]
 	  }
     },this)
+	*/
 	
   }
   
@@ -53,6 +68,16 @@ class DatabaseError extends Error {
 	return false;
   }
 
+  invalidPool() {
+	// console.log(this.cause);
+	return false;
+  } 
+
+ invalidConnection() {
+	// console.log(this.cause);
+	return false;
+  } 
+ 
   serverUnavailable() {
 	return false;
   }
@@ -72,7 +97,7 @@ class OracleError extends DatabaseError {
   }
 
   lostConnection() {
-	const knownErrors = [3113,3114,3135]
+	const knownErrors = [3113,3114,3135,28,1012]
     return (this.cause.errorNum && (knownErrors.indexOf(this.cause.errorNum) > -1))
   }
 
@@ -80,7 +105,15 @@ class OracleError extends DatabaseError {
 	const knownErrors = [1109,12514,12528,12537,12541]
 	return (this.cause.errorNum && (knownErrors.indexOf(this.cause.errorNum) > -1))
   }
- 
+
+  invalidPool() {
+	return this.cause.message.startsWith('NJS-002:')
+  } 
+
+  invalidConnection() {
+	return this.cause.message.startsWith('NJS-003:')
+  } 
+  
   missingTable() {
 	return (this.cause.errorNum && ((this.cause.errorNum === 942)))
   }
@@ -93,32 +126,35 @@ class MsSQLError extends DatabaseError {
     super(cause,stack,sql);
   }
 
-  lostConnection() {
-	const knownErrors = ['ETIMEOUT','ESOCKET','EINVALIDSTATE'] 
-	// console.log(this.cause.name,this.cause.code,this.cause.message,this.cause.message.indexOf('Connection lost - '))
+  lostConnection() { 
+    const knownErrors = ['ETIMEOUT','ESOCKET','EINVALIDSTATE'] 
 	let cause = this.cause
 	if (cause.name ===  'RequestError') {
-	  cause = cause.originalError 
-	  if (cause.info instanceof Error) {
-		cause = cause.info
+      if (cause.number && (cause.number === 596)) {
+        return true
+      } 
+      if (cause.originalError && (cause.origianlError instanceof Error)) {
+  	    cause = cause.originalError 
+  	    if (casse.info && (cause.info instanceof Error)) {
+		  cause = cause.info
+        }
+	  }
+	  switch (cause.name) {
+        case 'ConnectionError':
+	    case 'TransactionError':
+	      return (cause.code && (knownErrors.indexOf(cause.code) > -1))
+        default:
+	      return false; 
       }
 	}
-	switch (cause.name) {
-      case 'ConnectionError':
-	  case 'TransactionError':
-	    return (cause.code && (knownErrors.indexOf(cause.code) > -1))
-      default:
-	    return false; 
-	}
- }
+  }
 
   serverUnavailable() {
 	const knownErrors = ['ETIMEOUT','ESOCKET'] 
-	// console.log(this.cause.name,this.cause.code,this.cause.message,this.cause.message.indexOf('Connection lost - '))
 	let cause = this.cause
-	if (cause.name ===  'RequestError') {
+	if ((cause.name ===  'RequestError') && (cause.info !== undefined)) {
 	  cause = cause.originalError 
-	  if (cause.info instanceof Error) {
+	  if (cause  && (cause.info instanceof Error)) {
 		cause = cause.info
       }
 	}
@@ -128,7 +164,11 @@ class MsSQLError extends DatabaseError {
       default:
 	    return false; 
 	}
- }
+  }
+
+  invalidConnection() {
+	return ((this.cause.name === 'RequestError') && ((this.cause.code && (this.cause.code === 'EINVALIDSTATE'))))
+  }
 
   missingTable() {
 	return ((this.cause.name === 'RequestError') && ((this.cause.code && (this.cause.code === 'EREQUEST'))) && ((this.cause.number && (this.cause.number === 208))))
@@ -140,10 +180,21 @@ class PostgresError extends DatabaseError {
   //  const err = new PostgresError(cause,stack,sql)
   constructor(cause,stack,sql) {
     super(cause,stack,sql);
+	// Abbreviate Long Lists of Place Holders ...
+	if (this.sql.indexOf('),($') > 0) {
+	  const startElipises = this.sql.indexOf('),($') + 2 
+	  const endElipises =  this.sql.lastIndexOf('),($') + 2
+	  this.sql = this.sql.substring(0,startElipises) + '(...),' + this.sql.substring(endElipises);
+	}
   }
 
   lostConnection() {
 	return ((this.cause.severity && (this.cause.severity === 'FATAL')) && (this.cause.code && (this.cause.code === '57P01')) || ((this.cause.name === 'Error') && (this.cause.message === 'Connection terminated unexpectedly')))
+  }
+  
+  serverUnavailable() {
+	const knownErrors = ['Connection terminated unexpectedly']
+    return (this.cause.message && (knownErrors.indexOf(this.cause.message) > -1))
   }
 
   missingTable() {
@@ -156,10 +207,11 @@ class MySQLError extends DatabaseError {
   //  const err = new MySQLError(cause,stack,sql)
   constructor(cause,stack,sql) {
     super(cause,stack,sql);
+	// Abbreviate Long Lists of Place Holders ...
   }
   
   lostConnection() {
-	const knownErrors = ['ECONNRESET','PROTOCOL_CONNECTION_LOST','ER_CMD_CONNECTION_CLOSED','ER_SOCKET_UNEXPECTED_CLOSE','ER_GET_CONNECTION_TIMEOUT']
+	const knownErrors = ['ECONNRESET','PROTOCOL_CONNECTION_LOST','ER_CMD_CONNECTION_CLOSED','ER_SOCKET_UNEXPECTED_CLOSE','ER_GET_CONNECTION_TIMEOUT','PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR']
     return (this.cause.code && (knownErrors.indexOf(this.cause.code) > -1))
   }
   
@@ -182,7 +234,11 @@ class MariadbError extends DatabaseError {
   //  const err = new MariadbError(cause,stack,sql)
   constructor(cause,stack,sql) {
     super(cause,stack,sql);
-	// console.log('MaraidbError',cause)
+	if (this.sql.indexOf('?),(?') > 0) {
+	  const startElipises = this.sql.indexOf('?),(?') + 3
+	  const endElipises =  this.sql.lastIndexOf('?),(?') + 3
+	  this.sql = this.sql.substring(0,startElipises) + '(...),' + this.sql.substring(endElipises);
+	}
   }
   
   lostConnection() {
@@ -219,6 +275,7 @@ class MongodbError extends DatabaseError {
 module.exports = {
   YadamuError
 , UserError
+, BatchInsertError
 , DatabaseError
 , CommandLineError  
 , ConfigurationFileError

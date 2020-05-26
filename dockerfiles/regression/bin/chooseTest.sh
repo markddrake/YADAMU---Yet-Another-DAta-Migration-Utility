@@ -20,6 +20,10 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
   ;;
     
+  lostConnection)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
+  ;;
+
   all)
     source $YADAMU_SCRIPT_DIR/runRegressionTests.sh 
   ;;	

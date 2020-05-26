@@ -15,11 +15,10 @@ class YadamuRejectManager {
     this.recordCount = 0;
   }
   
-  createLogFile() {
-    const errorFolderPath = path.dirname(this.filename);
-    fs.mkdirSync(errorFolderPath, { recursive: true });
-    const ws = fs.createWriteStream(this.filename);
-    ws.write(`{ "errors": {`)
+  createLogFile(filename) {
+    const fileLocation = path.dirname(filename);
+    fs.mkdirSync(fileLocation, { recursive: true });
+    const ws = fs.createWriteStream(filename);
     return ws;
   }
    
@@ -36,9 +35,9 @@ class YadamuRejectManager {
    
   rejectRow(tableName,data) {
 
-  
     if (this.ws === undefined) {
-      this.ws = this.createLogFile();
+      this.ws = this.createLogFile(this.filename);
+      this.ws.write(`{ "errors": {`)
     }
     
     this.addTableName(tableName);
@@ -50,8 +49,8 @@ class YadamuRejectManager {
   }
   
   close() {
-    if (this.tableName !== undefined) {
-      this.yadamuLogger.info([`${this.constructor.name}`],`${this.recordCount} records written to "${this.ws.path}"`)
+    if (this.recordCount > 0) {
+      this.yadamuLogger.warning([`REJECTIONS`],`${this.recordCount} records written to "${this.ws.path}"`)
       this.ws.write(`]}}`);0
       this.ws.close();
     }

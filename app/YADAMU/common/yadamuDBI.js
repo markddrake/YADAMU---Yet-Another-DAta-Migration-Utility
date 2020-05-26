@@ -16,7 +16,7 @@ const {YadamuError, CommandLineError, ConfigurationFileError, ConnectionError} =
 const DBParser = require('./dbParser.js');
 
 const DEFAULT_BATCH_SIZE   = 10000;
-const DEFAULT_COMMIT_COUNT = 5;
+const DEFAULT_COMMIT_RATIO = 1;
 
 /*
 **
@@ -102,53 +102,57 @@ class YadamuDBI {
      },this)
   }
   
-  processError(yadamuLogger,logEntry,counters,logDDL) {
+  processError(yadamuLogger,logEntry,summary,logDDL) {
 	 
 	let warning = true;
 	  
     switch (logEntry.severity) {
       case 'CONTENT_TOO_LARGE' :
-        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database does not support VARCHAR2 values longer than ${this.maxStringSize} bytes.`)
+        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database does not support VARCHAR2 values longer than ${this.maxStringSize} bytes.`)
         return;
       case 'SQL_TOO_LARGE':
-        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database is not configured for DLL statements longer than ${this.maxStringSize} bytes.`)
+        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database is not configured for DLL statements longer than ${this.maxStringSize} bytes.`)
         return;
       case 'FATAL':
-        counters.errors++
-        yadamuLogger.error([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}`)
+        summary.errors++
+		const err =  new Error(logEntry.msg)
+		err.SQL = logEntry.sqlStatement
+		err.details = logEntry.details
+		summary.exceptions.push(err)
+        // yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}`)
         return
       case 'WARNING':
-        counters.warnings++
+        summary.warnings++
         break;
       case 'IGNORE':
-        counters.warnings++
+        summary.warnings++
         break;
       case 'DUPLICATE':
-        counters.duplicates++
+        summary.duplicates++
         break;
       case 'REFERENCE':
-        counters.reference++
+        summary.reference++
         break;
       case 'AQ RELATED':
-        counters.aq++
+        summary.aq++
         break;
       case 'RECOMPILATION':
-        counters.recompilation++
+        summary.recompilation++
         break;
       default:
 	    warning = false
     }
     if (logDDL) { 
 	  if (warning) {
-        yadamuLogger.warning([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
+        yadamuLogger.warning([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
 	  }
 	  else {
-        yadamuLogger.info([`${this.constructor.name}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
+        yadamuLogger.ddl([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
 	  }
 	}
   }
           
-  processLog(log,status,yadamuLogger) {
+  processLog(log, operation, status,yadamuLogger) {
 
     const logDML         = (status.loglevel && (status.loglevel > 0));
     const logDDL         = (status.loglevel && (status.loglevel > 1));
@@ -159,7 +163,7 @@ class YadamuDBI {
       fs.writeFileSync(status.dumpFileName,JSON.stringify(log));
     }
      
-    const counters = {
+    const summary = {
        errors        : 0
       ,warnings      : 0
       ,ignoreable    : 0
@@ -167,38 +171,45 @@ class YadamuDBI {
       ,reference     : 0
       ,aq            : 0
       ,recompilation : 0
+	  ,exceptions    : []
     };
-      
+      	  
 	log.forEach(function(result) { 
       const logEntryType = Object.keys(result)[0];
       const logEntry = result[logEntryType];
       switch (true) {
         case (logEntryType === "message") : 
-          yadamuLogger.info([`${this.constructor.name}`],`: ${logEntry}.`)
+          yadamuLogger.info([`${this.DATABASE_VENDOR}`],`${logEntry}.`)
           break;
         case (logEntryType === "dml") : 
-          yadamuLogger.info([`${this.constructor.name}`,`${logEntry.tableName}`],`Rows ${logEntry.rowCount}. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(logEntry.elapsedTime))}s. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.`)
+          yadamuLogger.info([`${logEntry.tableName}`,`SQL`],`Rows ${logEntry.rowCount}. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(logEntry.elapsedTime))}s. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.`)
           break;
         case (logEntryType === "info") :
-          yadamuLogger.info([`${this.constructor.name}`],`"${JSON.stringify(logEntry)}".`);
+          yadamuLogger.info([`${this.DATABASE_VENDOR}`],`"${JSON.stringify(logEntry)}".`);
           break;
         case (logDML && (logEntryType === "dml")) :
-          yadamuLogger.dml([`${this.constructor.name}`,`${logEntry.tableName}`,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`)
+          yadamuLogger.dml([`${this.DATABASE_VENDOR}`,`${logEntry.tableName}`,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`)
           break;
         case (logDDL && (logEntryType === "ddl")) :
-          yadamuLogger.ddl([`${this.constructor.name}`,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`) 
+          yadamuLogger.ddl([`${this.DATABASE_VENDOR}`,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`) 
           break;
         case (logTrace && (logEntryType === "trace")) :
-          yadamuLogger.trace([`${this.constructor.name}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`\n${logEntry.sqlStatement}.`)
+          yadamuLogger.trace([`${this.DATABASE_VENDOR}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`\n${logEntry.sqlStatement}.`)
           break;
         case (logEntryType === "error"):
-		  this.processError(yadamuLogger,logEntry,counters,logDDLMsgs);
+		  this.processError(yadamuLogger,logEntry,summary,logDDLMsgs);
       } 
       if ((status.sqlTrace) && (logEntry.sqlStatement)) { 
         status.sqlTrace.write(this.traceSQL(logEntry.sqlStatement))
       }
     },this) 
-	return counters;
+	
+    if (summary.exceptions.length > 0) {
+  	  const err = new Error(`${this.DATABASE_VENDOR} ${operation} failed.`);
+	  err.causes = summary.exceptions
+      throw err
+    }
+	return summary;
   }    
 
   logConnectionProperties() {    
@@ -231,6 +242,24 @@ class YadamuDBI {
     return true;
   }
   
+  trackCounters(counters) {
+    this.counters = counters
+  }
+  
+  trackLostConnection() {
+   
+    /*
+    **
+    ** Invoked by the DBI when the connection is lost. Assume a rollback took place. Any rows written but not committed are lost. 
+    **
+    */
+
+  	if ((this.counters !== undefined) && (this.counters.lost  !== undefined) && (this.counters.written  !== undefined)) {
+      this.counters.lost += this.counters.written;
+	  this.counters.written = 0;
+	}
+  }	  
+  
   setSystemInformation(systemInformation) {
     this.systemInformation = systemInformation
   }
@@ -250,6 +279,7 @@ class YadamuDBI {
   
   setParameters(parameters) {
      Object.assign(this.parameters, parameters ? parameters : {})
+     this.attemptReconnection = this.setReconnectionState()
   }
   
   loadTableMappings(mappingFile) {
@@ -318,9 +348,11 @@ class YadamuDBI {
   }
   
   async executeDDL(ddl) {
-    const startTime = performance.now();
-    await this.executeDDLImpl(ddl);
-    this.yadamuLogger.ddl([`${this.constructor.name}.executeDDL()`],`Executed ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+	if (ddl.length > 0) {
+      const startTime = performance.now();
+      await this.executeDDLImpl(ddl);
+      this.yadamuLogger.ddl([`${this.DATABASE_VENDOR}`],`Executed ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+	}
   }
   
   setOption(name,value) {
@@ -411,7 +443,7 @@ class YadamuDBI {
   }
   
   setReconnectionState() {
-	  
+     
     switch (this.parameters.READ_ON_ERROR) {
 	  case undefined:
 	  case 'ABORT':
@@ -419,17 +451,20 @@ class YadamuDBI {
 	  case 'SKIP':
 	  case 'FLUSH':
 	    return true;
-		break;
 	  default:
 	    return false;
 	}
   }
   
+  abortOnError() {
+	return !this.attemptReconnection
+  }
+    
   async reconnectImpl() {
     throw new Error(`Database Reconnection Not Implimented for ${this.DATABASE_VENDOR}`)
   }
   
-  async reconnect(cause) {
+  async reconnect(cause,operation) {
 
     let retryCount = 0;
     let connectionUnavailable 
@@ -437,17 +472,40 @@ class YadamuDBI {
     const transactionInProgress = this.transactionInProgress 
     const savePointSet = this.savePointSet
 	
-	this.reconnectInProgress = true;
 	this.attemptReconnection = false
-    this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`SQL Operation raised: ${cause}`);
+    this.reconnectInProgress = true;
+	this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`${operation}`],cause)
 	
-	if (this.currentTable && this.currentTable.lostConnection && (typeof this.currentTable.lostConnection === 'function')) {
-	  this.currentTable.lostConnection();
-	}
-	 
+	/*
+	**
+	** If a connection is lost while performing batched insert operatons using a table writer, adjust the table writers running total of records written but not committed. 
+	** When a connection is lost records that have written but not committed will be lost (rolled back by the database) when cleaning up after the lost connection.
+	** Table Writers invoke trackCounters and pass a counter object to the database interface before consuming rows in order for this to work correctly.
+	** To avoid the possibility of lost batches set COMMIT_RATIO to 1, so each batch is committed as soon as it is written.
+	**
+	*/
+	
+    this.trackLostConnection();
+	
     while (retryCount < 10) {
+		
+      /*
+      **
+      ** Attempt to close the connection. Handle but do not throw any errors...
+      **
+      */	
+	
 	  try {
-        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`Attemping reconnection.`);
+        await this.closeConnection()
+      } catch (e) {
+	    if (!e.invalidConnection()) {
+          this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`Error closing existing connection.`);
+		  this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`RECONNECT`],e)
+	    }
+	  }	 
+		 
+	  try {
+        this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`Attemping reconnection.`);
         await this.reconnectImpl()
 	    await this.configureConnection();
 		if (transactionInProgress) {
@@ -457,19 +515,19 @@ class YadamuDBI {
 		  await this.createSavePoint()
 		}
         this.reconnectInProgress = false;
-        this.yadamuLogger.info([`${this.constructor.name}.reconnect()`],`${this.DATABASE_VENDOR} service. New connection availabe.`);
+        this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`New connection available.`);
         this.attemptReconnection = this.setReconnectionState()
 		return;
       } catch (connectionFailure) {
-		if (connectionFailure.serverUnavailable()) {
+		if ((typeof connectionFailure.serverUnavailable == 'function') && connectionFailure.serverUnavailable()) {
 		  connectionUnavailable = connectionFailure;
-          this.yadamuLogger.warning([`${this.constructor.name}.reconnect()`],`${this.DATABASE_VENDOR} service unavailable. Waiting for restart.`)
+          this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`Waiting for restart.`)
           await this.waitForRestart(5000);
           retryCount++;
         }
         else {
    	      this.reconnectInProgress = false;
-          this.yadamuLogger.logException([`${this.constructor.name}.reconnect()`,`${this.constructor.name}.reconnectImpl()`],connectionFailure);
+          this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`RECONNECT`],connectionFailure);
           this.attemptReconnection = this.setReconnectionState()
           throw connectionFailure;
         }
@@ -509,7 +567,7 @@ class YadamuDBI {
             }
             break;
           case 1:
-            console.log(`Database Error: ${e.message}`)
+            console.log(`Connection Error: ${e.message}`)
             break;
           case 2:           
             prompt = `Unable to establish connection. Re-${prompt}`;
@@ -548,10 +606,10 @@ class YadamuDBI {
     batchSize = !Number.isInteger(batchSize) ? DEFAULT_BATCH_SIZE : batchSize
     this.batchSize = batchSize
     
-    let commitCount = this.parameters.BATCH_COMMIT ? Number(this.parameters.BATCH_COMMIT) : DEFAULT_COMMIT_COUNT
-    commitCount = isNaN(commitCount) ? DEFAULT_COMMIT_COUNT : commitCount
-    commitCount = commitCount < 0 ? DEFAULT_COMMIT_COUNT : commitCount
-    commitCount = !Number.isInteger(commitCount) ? DEFAULT_COMMIT_COUNT : commitCount
+    let commitCount = this.parameters.COMMIT_RATIO ? Number(this.parameters.COMMIT_RATIO) : DEFAULT_COMMIT_RATIO
+    commitCount = isNaN(commitCount) ? DEFAULT_COMMIT_RATIO : commitCount
+    commitCount = commitCount < 0 ? DEFAULT_COMMIT_RATIO : commitCount
+    commitCount = !Number.isInteger(commitCount) ? DEFAULT_COMMIT_RATIO : commitCount
     this.commitSize = this.batchSize * commitCount
     
     if (this.parameters.PARAMETER_TRACE === true) {
@@ -569,25 +627,71 @@ class YadamuDBI {
 
   /*
   **
-  **  Gracefully close down the database connection.
+  **  Gracefully close down the database connection and pool.
   **
   */
 
-  async finalize() {
-    throw new Error('Unimplemented Method')
+  async releaseSlaveConnection() {
+	await this.closeConnection()
+  }
+
+  async releaseMasterConnection() {
+	// Defer until finalize()
+	// await this.closeConnection()
+  }
+  
+  async finalize(poolOptions) {
+	await this.closeConnection()
+    await this.closePool(poolOptions);
   }
 
   /*
   **
-  **  Abort the database connection.
+  **  Abort the database connection and pool
   **
   */
 
-  async abort(cause) {
-    if (cause instanceof Error) {
-      this.yadamuLogger.logException([`${this.constructor.name}`,`ABORT`],`Cause:`)
-      this.yadamuLogger.logException(e)
-    }
+  async abort(poolOptions) {
+	
+	// Abort must not throw otherwise underlying cause of the abort will be lost.
+	
+    try {
+      await this.closeConnection();
+	} catch (e) {
+	  if (!e.invalidConnection()) {
+        this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','Connection'],e);
+	  }
+	}
+	
+    try {
+	  // Force Termnination of All Current Connections.
+	  await this.closePool(poolOptions);
+	} catch (e) {
+	  if (!e.invalidPool()) {
+        this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','Pool'],e);
+	  }
+	}
+	
+  }
+  
+  checkConnectionState(cause) {
+	 
+	// Throw cause if cause is a lost connection. Used by drivers to prevent attempting rollback or restore save point operations when the connection is lost.
+	  
+  	if (cause && (typeof cause.lostConnection === 'function') && cause.lostConnection()) {
+	  throw cause;
+	}
+  }
+
+  checkCause(cause,newError) {
+	 
+	 // Used by Rollback and Restore save point to log errors encountered while performing the required operation and throw the original cause.
+
+	  if (cause instanceof Error) {
+        this.yadamuLogger.handleException([`${this.constructor.name}.rollbackTransaction()`],newError)
+	    throw cause
+	  }
+	  throw newError
   }
 
   /*
@@ -596,8 +700,8 @@ class YadamuDBI {
   **
   */
   
-  async beginTransaction() {
-	this.transactionInProgress = true;  
+  beginTransaction() {
+    this.transactionInProgress = true;  
 	this.savePointSet = false;
   }
 
@@ -607,7 +711,7 @@ class YadamuDBI {
   **
   */
     
-  async commitTransaction() {
+  commitTransaction() {
 	this.transactionInProgress = false;  
 	this.savePointSet = false;
   }
@@ -618,7 +722,7 @@ class YadamuDBI {
   **
   */
   
-  async rollbackTransaction(cause) {
+  rollbackTransaction(cause) {
 	this.transactionInProgress = false;  
 	this.savePointSet = false;
   }
@@ -629,7 +733,7 @@ class YadamuDBI {
   **
   */
     
-  async createSavePoint() {
+  createSavePoint() {
 	this.savePointSet = true;
   }
 
@@ -639,11 +743,11 @@ class YadamuDBI {
   **
   */
 
-  async restoreSavePoint(cause) {
+  restoreSavePoint(cause) {
 	this.savePointSet = false;
   }
 
-  async releaseSavePoint(cause) {
+  releaseSavePoint(cause) {
 	this.savePointSet = false;
   }
 
@@ -685,7 +789,7 @@ class YadamuDBI {
   **
   */
   
-  async getSystemInformation(EXPORT_VERSION) {     
+  async getSystemInformation() {     
     throw new Error('Unimplemented Method')
   }
 
@@ -797,18 +901,57 @@ class YadamuDBI {
     dbi.statementCache = this.statementCache
     dbi.systemInformation = this.systemInformation
     dbi.sqlTraceTag = ` /* Slave [${this.slaveNumber}] */`;
-	dbi.setParameters(this.parameters);
   }   
 
-  async slaveDBI(slaveNumber,dbi,connection) {
+ 
+  async setSlaveConnection() {
+    // DBI implementations that do not use a pool / connection mechansim need to overide this function. eg MSSQLSERVER
+	this.connection = await this.connectionProvider.getConnectionFromPool()	
+  }
+
+  isMaster() {
+
+    return (this.slaveNumber === undefined)
+   
+  }
+
+  getSlaveNumber() {
+
+    return this.isMaster() ? 'Master' : this.slaveNumber
+
+  }
+  
+
+  async slaveDBI(slaveNumber,dbi) {
       
     // Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
       
     dbi.slaveNumber = slaveNumber
-    dbi.connection = connection
-    this.cloneMaster(dbi);
+	dbi.connectionProvider = this
+	await dbi.setSlaveConnection()
+    dbi.setParameters(this.parameters);
+	this.cloneMaster(dbi);
     await dbi.configureConnection();
-    return dbi
+	return dbi
+  }
+  
+  testLostConnection() {
+	const supportedModes = ['DATA_ONLY','DDL_AND_DATA']
+    return (
+	         (supportedModes.indexOf(this.parameters.MODE) > -1)
+	         && 
+			 (
+			   ((this.parameters.PARALLEL === undefined) || (this.parameters.PARALLEL < 1))
+			   ||
+			   ((this.parameters.PARALLEL > 1) && (this.slaveNumber !== undefined) && (this.slaveNumber === this.parameters.KILL_SLAVE_NUMBER))
+			 )
+			 && 
+			 (
+		       (this.parameters.FROM_USER && this.parameters.KILL_READER_AFTER && (this.parameters.KILL_READER_AFTER > 0)) 
+		       || 
+			   (this.parameters.TO_USER && this.parameters.KILL_WRITER_AFTER && (this.parameters.KILL_WRITER_AFTER > 0))
+		     )
+		   ) === true
   }
   
 }

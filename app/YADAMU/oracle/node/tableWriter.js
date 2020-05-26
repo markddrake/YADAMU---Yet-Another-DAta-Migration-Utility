@@ -6,6 +6,7 @@ const { performance } = require('perf_hooks');
 
 const oracledb = require('oracledb');
 
+const {BatchInsertError} = require('../../common/yadamuError.js')
 const YadamuWriter = require('../../common/yadamuWriter.js');
 
 class TableWriter extends YadamuWriter {
@@ -37,7 +38,7 @@ class TableWriter extends YadamuWriter {
     this.lobBatch = []
     this.tempLobCount = 0;
     this.cachedLobCount = 0;
-    this.dumpOracleTestcase = false;
+    this.exportTestdata = this.dbi.parameters.EXPORT_TESTCASE === true
     this.lobCumlativeTime = 0;
 	 
     if (this.dbi.dbVersion < 12) {
@@ -197,7 +198,7 @@ class TableWriter extends YadamuWriter {
 
   async initialize() {
     await this.disableTriggers()
-	
+    await super.initialize()
   }
 
   async disableTriggers() {
@@ -323,10 +324,10 @@ class TableWriter extends YadamuWriter {
       else {
         this.batch.push(row);
       }
-      this.rowsCached++
+      this.rowCounters.cached++
     } catch (e) {
-      const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,this.tableInfo.targetDataTypes,JSON.stringify(this.tableInfo.binds)] : []     
-      this.skipTable = await this.handleInsertError(`${this.constructor.name}.apppendRow()`,this.tableName,this.batch.length+this.lobBatch.length,-1,row,e,errInfo);
+      const errInfo = [this.tableInfo.dml,this.tableInfo.dataTypes,JSON.stringify(this.tableInfo.binds)]
+      this.skipTable = await this.handleInsertError('CACHE ONE',this.batch.length+this.lobBatch.length,-1,row,e,errInfo);
     }
 	
 	return this.skipTable
@@ -374,9 +375,74 @@ end;`
   }
  
   batchComplete() {
-    return ((this.rowsCached === this.tableInfo.batchSize) || (this.tempLobCount >= this.dbi.parameters.BATCH_LOB_COUNT) || (this.cachedLobCount > this.dbi.parameters.LOB_CACHE_COUNT))
+    return ((this.rowCounters.cached === this.tableInfo.batchSize) || (this.tempLobCount >= this.dbi.parameters.BATCH_LOB_COUNT) || (this.cachedLobCount > this.dbi.parameters.LOB_CACHE_COUNT))
   }
+
+
+  async serializeLob(lob) {
+    switch (lob.type) {
+      case oracledb.CLOB:
+        // ### Cannot re-read content that has been written to local clob
+        // return this.dbi.stringFromClob(lob)
+        return this.dbi.stringFromLocalClob(lob)
+      case oracledb.BLOB:
+        // ### Cannot re-read content that has been written to local blob
+        // return this.dbi.hexBinaryFromBlob(lob)
+        return this.dbi.hexBinaryFromLocalBlob(lob)
+      default:
+        return lob
+    }
+  }   
    
+
+  async serializeLobColumns(record) {
+	// Convert Lobs back to text
+    const newRecord = await Promise.all(record.map(function(val,idx) {
+      if (record[idx] instanceof oracledb.Lob) {
+	    return this.serializeLob(val)
+      }
+      return val
+    },this))
+	// Convert JSON strings to objects
+	newRecord.forEach(function(val,idx) {
+	  if ((this.tableInfo.dataTypes[idx].type === 'JSON') || ((this.tableInfo.dataTypes[idx].type === '"MDSYS"."SDO_GEOMETRY"') && (this.tableInfo.spatialFormat === 'GeoJSON'))) {
+		newRecord[idx] = JSON.parse(val);
+	  }
+	},this);
+    return newRecord;
+  }   
+      
+  async handleBatchException(cause,message,rows,binds) {
+ 
+    const additionalInfo = {
+	  dataTypes : this.tableInfo.dataTypes
+	, binds : binds
+	}
+
+    if (this.exportTestdata) {
+	  additionalInfo.testcase = {
+        DDL:   this.tableInfo.ddl
+      , DML:   this.tableInfo.dml
+      , binds: binds
+	  , data:  rows.slice(0,9)
+	  }
+	}
+   
+    const batchException = new BatchInsertError(cause,this.tableName,this.tableInfo.dml,rows.length,await this.serializeLobColumns(rows[0]),await this.serializeLobColumns(rows[rows.length-1]),additionalInfo)
+    this.yadamuLogger.handleWarning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],batchException)
+  }
+  
+  async handleInsertError(currentOperation,batchSize,row,record,err,info) {
+	 record = await this.serializeLobColumns(record)
+	 if (Array.isArray(err.args)) {
+		 err.args = await this.serializeLobColumns(err.args)
+	 }
+	 if (Array.isArray(info)) {
+	   info = await this.serializeLobColumns(info)
+	 }
+	 await super.handleInsertError(currentOperation,batchSize,row,record,err,info) 
+  }
+  
   /*
   **
   ** Temporary LOB optimization via LOB column resuse disabled until oracledb supports reusing temporary lobs  
@@ -406,39 +472,15 @@ end;`
   
   freeLobList() {
   }
-    
-  async serializeLobs(record) {
-    const newRecord = await Promise.all(this.tableInfo.binds.map(function(bind,idx) {
-      if (record[idx] !== null) {
-        switch (bind.type) {
-          case oracledb.CLOB:
-            // console.log(record[idx])
-            // ### Cannot re-read content that has been written to local clob
-            // return this.dbi.stringFromClob(record[idx])
-            return typeof record[idx] === 'string' ? record[idx] : this.dbi.stringFromLocalClob(record[idx])
-          case oracledb.BLOB:
-            // console.log(record[idx])
-            // ### Cannot re-read content that has been written to local blob
-            // return this.dbi.hexBinaryFromBlob(record[idx])
-            return this.dbi.hexBinaryFromLocalBlob(record[idx])
-          default:
-            return record[idx];
-        }
-      }
-      return record[idx];
-    },this))
-    return newRecord;
-  }   
       
-  
   resetBatch() {
 	this.batch.length = 0;
 	this.lobBatch.length = 0;   
     this.cachedLobCount = 0;
     this.tempLobCount = 0;
-	this.rowsCached = 0;
+	this.rowCounters.cached = 0;
   }
-  
+    
   async writeBatch() {
       
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
@@ -466,21 +508,15 @@ end;`
           this.freeLobList();
         }         
         this.endTime = performance.now();
-        this.rowsWritten += this.rowsCached;
+        this.rowCounters.written += this.rowCounters.cached;
         this.resetBatch();
         return this.skipTable
       } catch (e) {
-        await this.dbi.restoreSavePoint();
+        await this.dbi.restoreSavePoint(e);
         if (e.errorNum && (e.errorNum === 4091)) {
           // Mutating Table - Convert to Cursor based PL/SQL Block
-          if (this.status.showInfoMsgs) {
-            this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`,`${rows.length}`,`${lobInsert ? 'LOB' : 'Normal'}`],`executeMany() operation raised:\n${e}`);
-            this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
-            this.yadamuLogger.writeDirect(`${this.tableInfo.targetDataTypes}\n`);
-            this.yadamuLogger.writeDirect(`${JSON.stringify(binds)}\n`);
-            this.yadamuLogger.writeDirect(`${JSON.stringify(rows[0])}\n...\n${JSON.stringify(rows[rows.length-1])}\n`);
-            this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to PL/SQL Block.`);          
-          }
+		  this.handleBatchException(e,`Batch Insert`,rows,binds,lobInsert) 
+          this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to PL/SQL Block.`);          
           this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
           try {
             rows = this.batch
@@ -497,42 +533,20 @@ end;`
               this.freeLobList();
             }         
             this.endTime = performance.now();
-            this.rowsWritten += this.rowsCached
+            this.rowCounters.written += this.rowCounters.cached
             this.resetBatch();
             return this.skipTable
           } catch (e) {
-            await this.dbi.restoreSavePoint();
-            if (this.status.showInfoMsgs) {
-              this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`,`${rows.length}`,`${lobInsert ? 'LOB' : 'Normal'}`],`executeMany() with PL/SQL block raised:\n${e}`);
-              this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
-              this.yadamuLogger.writeDirect(`${this.tableInfo.targetDataTypes}\n`);
-              this.yadamuLogger.writeDirect(`${JSON.stringify(binds)}\n`);
-              this.yadamuLogger.writeDirect(`${JSON.stringify(rows[0])}\n...\n${JSON.stringify(rows[rows.length-1])}\n`);
-              this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to PL/SQL Block.`);          
-              this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
-            }
+            await this.dbi.restoreSavePoint(e);
+  		    await this.handleBatchException(e,`PL/SQL Block`,rows,binds,lobInsert) 
+            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
             this.insertMode = 'Iterative';
           }
         } 
         else {  
-          if (this.status.showInfoMsgs) {
-            this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`,`${rows.length}`,`${lobInsert ? 'LOB' : 'Normal'}`],`executeMany() operation raised:\n${e}`);
-            this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
-            this.yadamuLogger.writeDirect(`${this.tableInfo.targetDataTypes}\n`);
-            this.yadamuLogger.writeDirect(`${JSON.stringify(binds)}\n`);
-            this.yadamuLogger.writeDirect(`${JSON.stringify(rows[0])}\n...\n${JSON.stringify(rows[rows.length-1])}\n`);
-            this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
-            if (this.dumpOracleTestcase) {
-              console.log('DDL:')
-              console.log(this.tableInfo.ddl)
-              console.log('DML:')
-              console.log(this.tableInfo.dml)
-              console.log('BINDS:')
-              console.log(JSON.stringify(binds));
-              console.log('DATA:');
-              console.log(JSON.stringify(rows.slice(0,9)));
-            }
-          }
+          await this.dbi.restoreSavePoint(e);
+  		  await this.handleBatchException(e,`Batch Insert`,rows,binds,lobInsert) 
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
           this.insertMode = 'Iterative';
         }
       }
@@ -559,11 +573,10 @@ end;`
     for (const row in rows) {
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,rows[row])
-		this.rowsWritten++
+		this.rowCounters.written++
       } catch (e) {
-		const record = await this.serializeLobs(rows[row])
-        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,this.tableInfo.targetDataTypes,JSON.stringify(record)] : []
-        this.skipTable = await this.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,rows.length,row,record,e,errInfo);
+        const errInfo = [this.tableInfo.dml,this.tableInfo.dataTypes,rows[row]]
+        this.skipTable = await this.handleInsertError('INSERT ONE',rows.length,row,rows[row],e,errInfo);
         if (this.skipTable) {
           break;
         }

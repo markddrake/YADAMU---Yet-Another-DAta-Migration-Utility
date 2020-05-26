@@ -15,7 +15,6 @@ class YadamuTest extends Yadamu {
   
   constructor(mode) {
     super(mode)
-    this.status.showInfoMsgs = true;
   }
   
   reset() {

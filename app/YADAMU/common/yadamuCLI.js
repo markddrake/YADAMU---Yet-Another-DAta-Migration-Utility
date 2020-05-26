@@ -526,7 +526,7 @@ class YadamuCLI {
 	const startTime = performance.now();
 	await yadamuQA.doTests(configuration);
 	const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`${this.constructor.name}.doTests()`,`TESTS`],`Completed: Configuration:"${this.parameters.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.qa([`TEST`,`${this.parameters.CONFIG}`],`Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
 
   }
   

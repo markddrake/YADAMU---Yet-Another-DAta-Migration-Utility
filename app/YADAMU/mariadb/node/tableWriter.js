@@ -3,6 +3,7 @@
 const { performance } = require('perf_hooks');
 
 const YadamuWriter = require('../../common/yadamuWriter.js');
+const {BatchInsertError} = require('../../common/yadamuError.js')
 
 class TableWriter extends YadamuWriter {
 
@@ -56,6 +57,7 @@ class TableWriter extends YadamuWriter {
   }
 
   async initialize() {
+	await super.initialize()
   }
   
   getStatistics() {
@@ -84,7 +86,7 @@ class TableWriter extends YadamuWriter {
       this.batch.push(...row);
     
 	}
-    this.rowsCached++
+    this.rowCounters.cached++
 	return this.skipTable;
   }
 
@@ -100,7 +102,15 @@ class TableWriter extends YadamuWriter {
       },this)
     }
   }
-  
+    
+  handleBatchException(cause,message) {
+   
+    // Use Slice to add first and last row, rather than first and last value.
+    const batchException = new BatchInsertError(cause,this.tableName,this.tableInfo.dml,this.rowCounters.cached,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
+    this.yadamuLogger.handleWarning([this.dbi.DATABASE_VENDOR,this.tableName,`WRITE`,this.insertMode],batchException)
+
+  }
+  	
   async writeBatch() {     
 
     this.batchCount++; 
@@ -109,40 +119,35 @@ class TableWriter extends YadamuWriter {
     if (this.tableInfo.insertMode === 'Batch') {
       try {    
         // Slice removes the unwanted last comma from the replicated args list.
-        const args = this.tableInfo.args.repeat(this.rowsCached).slice(0,-1);
+        const args = this.tableInfo.args.repeat(this.rowCounters.cached).slice(0,-1);
         await this.dbi.createSavePoint();
         const results = await this.dbi.executeSQL(this.tableInfo.dml.slice(0,-1) + args, this.batch);
         await this.processWarnings(results);
         this.endTime = performance.now();
         await this.dbi.releaseSavePoint();
 		this.batch.length = 0;  
-        this.rowsWritten += this.rowsCached;
-		this.rowsCached = 0;
+        this.rowCounters.written += this.rowCounters.cached;
+		this.rowCounters.cached = 0;
         return this.skipTable
       } catch (e) {
-        if (this.status.showInfoMsgs) {
-          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.rowsCached}].  Batch Insert raised:\n${e}.`);
-          this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
-          // Use Slice to print first and last row, rather than first and last value.
-          this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch.slice(0,this.tableInfo.columnCount))}\n...\n${JSON.stringify(this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))}\n`);
-          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
-        }
-        await this.dbi.restoreSavePoint();
+        await this.dbi.restoreSavePoint(e);
+		this.handleBatchException(e,'Batch Insert')
+        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
         this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args.slice(0,-1)
         repackBatch = true;
       }
     }
 
-    for (let row =0; row < this.rowsCached; row++) {
+    for (let row =0; row < this.rowCounters.cached; row++) {
       const nextRow = repackBatch ?  this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,nextRow);
         await this.processWarnings(results);
-		this.rowsWritten++;
+		this.rowCounters.written++;
       } catch (e) {
-        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml] : []
-        this.skipTable = await this.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.rowsCached,row,nextRow,e,errInfo);
+        const errInfo = [this.tableInfo.dml]
+        this.skipTable = await this.handleInsertError(`INSERT ONE`,this.rowCounters.cached,row,nextRow,e,errInfo);
         if (this.skipTable) {
           break;
         }
@@ -151,7 +156,7 @@ class TableWriter extends YadamuWriter {
    
     this.endTime = performance.now();
     this.batch.length = 0;
-    this.rowsCached = 0;
+    this.rowCounters.cached = 0;
     return this.skipTable          
   }
 

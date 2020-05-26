@@ -3,16 +3,17 @@
 const { performance } = require('perf_hooks');
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuWriter = require('../../common/yadamuWriter.js');
 
-class TableWriter {
+class TableWriter extends YadamuWriter {
 
-  constructor(tableName,outputStream) {
-    this.tableName = tableName
+  // Simulate subclass of YadamuWriter. Actaully extending YadamuWriter is problametic. ???
+
+  constructor(dbi,tableName,tableInfo,status,yadamuLogger,outputStream) {
+    super(dbi,tableName,tableInfo,status,yadamuLogger)
+    this.insertMode = 'JSON';    
     this.outputStream = outputStream
     this.firstRow = true;
-    this.startTime = performance.now();
-	this.currentTable = {}
-	this.rowsCommitted = 0; 
   }
 
   async initialize() {
@@ -37,7 +38,7 @@ class TableWriter {
     }
     
     this.outputStream.write(row);
-	this.rowsCommitted++;
+	this.rowCounters.committed++;
   }
 
   async writeBatch() {
@@ -49,17 +50,6 @@ class TableWriter {
   async rollbackTransaction() {
   }
 
-  getStatistics() {
-    return {
-      startTime     : this.startTime
-    , endTime       : performance.now()
-    , insertMode    : 'JSON'
-    , skipTable     : false
-	, rowsLost      : 0
-	, rowsSkipped   : 0
-	, rowsCommitted : this.rowsCommitted    }    
-  }
-  
   async finalize() {
     this.outputStream.write(`]`);
   }

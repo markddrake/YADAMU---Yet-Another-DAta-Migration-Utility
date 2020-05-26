@@ -263,6 +263,9 @@ class StatementGenerator {
               case "EWRT":
                 setOperators.push(' ' + columnName + ' =  ST_GeomFromText(?)');
                 break;
+              case "GeoJSON":
+                setOperators.push(' ' + columnName + ' =  ST_GeomFromGeoJSON(?)');
+                break;
               default:
                 setOperators.push(' ' + columnName + ' = ST_GeomFromWKB(UNHEX(?))');
             }              

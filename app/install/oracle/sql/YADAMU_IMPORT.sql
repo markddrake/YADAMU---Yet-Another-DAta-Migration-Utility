@@ -1039,6 +1039,8 @@ $END
                  'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKBGEOMETRY(OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("' || COLUMN_NAME || '")) end'
                when P_SPATIAL_FORMAT in ('WKT','EWKT') then
                  'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_WKTGEOMETRY("' || COLUMN_NAME || '") end'
+               when P_SPATIAL_FORMAT in ('GeoJSON') then
+                 'case when "' || COLUMN_NAME || '" is NULL then NULL else SDO_UTIL.FROM_GEOJSON("' || COLUMN_NAME || '") end'
              end
            when TYPE_EXISTS = 1 then
              '"#' || TYPE_NAME || '"("' || COLUMN_NAME || '")'

@@ -23,17 +23,6 @@ const sqlSchemaTableRows = `select TABLE_NAME, TABLE_ROWS from INFORMATION_SCHEM
 
 class MariadbQA extends MariadbDBI {
     
-    constructor(yadamu) {
-       super(yadamu)
-    }
-	
-	async initialize() {
-	  await super.initialize();
-	  if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
-	}
-
     async recreateSchema() {
         
       try {
@@ -48,8 +37,45 @@ class MariadbQA extends MariadbDBI {
       }
       const createUser = `create schema "${this.parameters.TO_USER}"`;
       await this.executeSQL(createUser,{});      
-    }    
+    }   
+	
+	async scheduleTermination(pid) {
+	  const self = this
+	  const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
+	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
+	  const timer = setTimeout(
+	    async function(pid) {
+          if (self.pool !== undefined && self.pool.end) {
+		    self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Killing connection.`);
+	        const conn = await self.getConnectionFromPool();
+		    const res = await conn.query(`kill ${pid}`);
+		    await conn.release()
+		  }
+		  else {
+		    self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
+		  }
+		},
+		killDelay,
+	    pid
+      )
+	  timer.unref()
+	}	
 
+	constructor(yadamu) {
+       super(yadamu)
+    }
+	
+	async initialize() {
+	  await super.initialize();
+	  if (this.options.recreateSchema === true) {
+		await this.recreateSchema();
+	  }
+	  if (this.testLostConnection()) {
+		const dbiID = await this.getConnectionID();
+		this.scheduleTermination(dbiID);
+	  }
+	}
+ 
     async compareSchemas(source,target) {
 
       const report = {
@@ -85,6 +111,14 @@ class MariadbQA extends MariadbDBI {
       
     }
     
+  async slaveDBI(idx)  {
+	const slaveDBI = await super.slaveDBI(idx);
+	if (slaveDBI.testLostConnection()) {
+	  const dbiID = await slaveDBI.getConnectionID();
+	  this.scheduleTermination(dbiID);
+    }
+	return slaveDBI
+  }
       
 }
 

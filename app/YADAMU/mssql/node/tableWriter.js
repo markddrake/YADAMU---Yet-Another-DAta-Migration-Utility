@@ -3,7 +3,9 @@
 const { performance } = require('perf_hooks');
 // const WKX = require('wkx');
 
+const {BatchInsertError} = require('../../common/yadamuError.js')
 const YadamuWriter = require('../../common/yadamuWriter.js');
+const {BatchInsertError} = require('../../common/yadamuError.js')
 
 class TableWriter extends YadamuWriter {
     
@@ -131,10 +133,21 @@ class TableWriter extends YadamuWriter {
 	
     this.tableInfo.bulkOperation.rows.add(...row);
 
-	this.rowsCached++;
+	this.rowCounters.cached++;
 	return this.skipTable;
   }
 
+  handleBatchException(cause,message) {
+   
+    const additionalInfo = {
+      columns: this.tableInfo.bulkOperation.columns
+	}
+	
+    const batchException = new BatchInsertError(cause,this.tableName,this.tableInfo.dml,this.tableInfo.bulkOperation.rows.length,this.tableInfo.bulkOperation.rows[0],this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1],additionalInfo)
+    this.yadamuLogger.handleWarning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],batchException)
+
+  }
+  
   async writeBatch() {
 
     this.batchCount++;
@@ -147,18 +160,13 @@ class TableWriter extends YadamuWriter {
         const results = await this.dbi.bulkInsert(this.tableInfo.bulkOperation);
         this.endTime = performance.now();
         this.tableInfo.bulkOperation.rows.length = 0;
-		this.rowsWritten += this.rowsCached;
-		this.rowsCached = 0;
+		this.rowCounters.written += this.rowCounters.cached;
+		this.rowCounters.cached = 0;
         return this.skipTable
       } catch (e) {
-        if (this.status.showInfoMsgs) {
-          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.tableInfo.bulkOperation.rows.length}].  Bulk Operation raised:\n${e.message}.`);
-          this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
-          this.yadamuLogger.writeDirect(`{${JSON.stringify(this.tableInfo.bulkOperation.columns)}\n`);
-          this.yadamuLogger.writeDirect(`${JSON.stringify(this.tableInfo.bulkOperation.rows[0])}\n...\n${JSON.stringify(this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1])}\n`)
-          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative operations.`);          
-        }
-        await this.dbi.restoreSavePoint();
+        await this.dbi.restoreSavePoint(e);
+		this.handleBatchException(e,'Bulk Operation')
+        this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],` to Iterative mode.`);          
         this.tableInfo.bulkSupported = false;
       }
     }
@@ -174,10 +182,10 @@ class TableWriter extends YadamuWriter {
            args['C'+col] = this.tableInfo.bulkOperation.rows[row][col]
         }
         const results = await this.dbi.executeCachedStatement(args);
-		this.rowsWritten++
+		this.rowCounters.written++
       } catch (e) {
-        const errInfo = this.status.showInfoMsgs ? [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.rows[row])] : []
-        this.skipTable = await this.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.tableInfo.bulkOperation.rows.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
+        const errInfo = [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.rows[row])]
+        this.skipTable = await this.handleInsertError(`INSERT ONE`,this.tableInfo.bulkOperation.rows.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
         if (this.skipTable) {
           break;
         }
@@ -188,7 +196,7 @@ class TableWriter extends YadamuWriter {
 	
     this.endTime = performance.now();
     this.tableInfo.bulkOperation.rows.length = 0;
-	this.rowsCached = 0;
+	this.rowCounters.cached = 0;
     return this.skipTable
   }
 }

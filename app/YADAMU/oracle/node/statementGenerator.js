@@ -281,6 +281,7 @@ class StatementGenerator {
 	  
       tableInfo.batchSize = this.batchSize
       tableInfo.commitSize = this.commitSize;
+	  tableInfo.spatialFormat = this.spatialFormat
 
       tableInfo.columns = JSON.parse('[' + tableMetadata.columns + ']')
 	  tableInfo.sizeConstraints = tableMetadata.sizeConstraints

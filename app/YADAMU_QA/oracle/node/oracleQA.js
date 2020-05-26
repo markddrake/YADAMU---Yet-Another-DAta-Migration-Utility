@@ -1,6 +1,7 @@
 "use strict" 
 
 const OracleDBI = require('../../../YADAMU/oracle/node/oracleDBI.js');
+const {OracleError} = require('../../../YADAMU/common/yadamuError.js')
 
 const sqlSuccess =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL' "RESULTS", TARGET_ROW_COUNT
@@ -42,15 +43,40 @@ const sqlCompareSchemas = `begin YADAMU_TEST.COMPARE_SCHEMAS(:source,:target,:ma
 
 class OracleQA extends OracleDBI {
     
-    constructor(yadamu) {
-       super(yadamu)
-    }
-
-	async initialize() {
-	  await super.initialize();
-	  if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
+	async scheduleTermination(pid) {
+	  const self = this
+      const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
+	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
+	  const timer = setTimeout(
+	    async function(pid) {
+		   if ((self.pool instanceof self.oracledb.Pool) && (self.pool.status === self.oracledb.POOL_STATUS_OPEN)) {
+		     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,self.getSlaveNumber()],`Killing connection.`);
+			 const conn = await self.getConnectionFromPool();
+			 const sqlStatement = `ALTER SYSTEM KILL SESSION '${pid.sid}, ${pid.serial}'`
+			 let stack
+			 try {
+			   stack = new Error().stack
+	           const res = await conn.execute(sqlStatement);
+ 		       await conn.close()
+			 } catch (e) {
+			   if ((e.errorNum && ((e.errorNum === 27) || (e.errorNum === 31))) || (e.message.startsWith('DPI-1010'))) {
+				 // The Slave has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourself (Error 27)
+			     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,self.getSlaveNumber()],`Slave finished prior to termination.`)
+ 			   }
+			   else {
+				 const cause = new OracleError(e,stack,sqlStatement)
+			     self.yadamuLogger.handleException(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,self.getSlaveNumber()],cause)
+			   }
+			 }
+		   }
+		   else {
+		     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial],`Unable to Kill Connection: Connection Pool no longer available.`);
+		   }
+		},
+		killDelay,
+	    pid
+      )
+	  timer.unref()
 	}
 	
  	async recreateSchema() {
@@ -59,7 +85,7 @@ class OracleQA extends OracleDBI {
         const dropUser = `drop user "${this.parameters.TO_USER}" cascade`;
         await this.executeSQL(dropUser,{});      
       } catch (e) {
-        if (e.errorNum && (e.errorNum === 1918)) {
+        if ((e.cause) && (e.cause.errorNum && (e.cause.errorNum === 1918))) {
         }
         else {
           throw e;
@@ -69,6 +95,21 @@ class OracleQA extends OracleDBI {
       await this.executeSQL(createUser,{});      
     }  
 
+    constructor(yadamu) {
+       super(yadamu)
+    }
+
+	async initialize() {
+	  await super.initialize();
+	  if (this.options.recreateSchema === true) {
+		await this.recreateSchema();
+	  }
+	  if (this.testLostConnection()) {
+		const dbiID = await this.getConnectionID();
+		this.scheduleTermination(dbiID);
+	  }
+	}
+	
 	async compareSchemas(source,target) {
 
       const report = {
@@ -107,6 +148,15 @@ class OracleQA extends OracleDBI {
       },this)
       
     }
+
+  async slaveDBI(idx)  {
+	const slaveDBI = await super.slaveDBI(idx);
+	if (slaveDBI.testLostConnection()) {
+	  const dbiID = await slaveDBI.getConnectionID();
+	  this.scheduleTermination(dbiID);
+    }
+	return slaveDBI
+  }
 
 }
 	

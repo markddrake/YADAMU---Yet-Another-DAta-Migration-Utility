@@ -368,11 +368,13 @@ begin
 		  truncate table #SOURCE_HASH_BUCKET
 		  truncate table #TARGET_HASH_BUCKET
 		                  
-          set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
+          -- set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
+          set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
 		  insert into #SOURCE_HASH_BUCKET
           exec(@SQL_STATEMENT)
 
-          set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
+          -- set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
+		  set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
 		  INSERT into #TARGET_HASH_BUCKET 
           exec(@SQL_STATEMENT)
           

@@ -49,6 +49,9 @@ class FileDBI extends YadamuDBI {
   get SOFTWARE_VENDOR()    { return 'N/A' };
   get SPATIAL_FORMAT()     { return this.spatialFormat };
   get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().file }
+    
+  async releaseConnection() {
+  }
   
   constructor(yadamu) {
     super(yadamu,yadamu.getYadamuDefaults().file )
@@ -59,6 +62,10 @@ class FileDBI extends YadamuDBI {
 
   isValidDDL() {
     return true;
+  }
+  
+  generateStatementCache() {
+	this.statementCache = {}
   }
   
   setSystemInformation(systemInformation) {
@@ -128,6 +135,8 @@ class FileDBI extends YadamuDBI {
   **
   */
 
+  asy
+
   async abort() {
 
     if (this.inputStream !== undefined) {
@@ -170,8 +179,9 @@ class FileDBI extends YadamuDBI {
       this.outputStream.write(',');
     }
 
-    return new TableWriter(tableName,this.outputStream);      
+    return new TableWriter(this,tableName,{},this.status,this.yadamuLogger,this.outputStream);      
   }
+
 
 }
 

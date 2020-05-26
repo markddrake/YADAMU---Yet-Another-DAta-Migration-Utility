@@ -92,7 +92,7 @@
     },
     "mongodb#1"                         : {
       "mongodb"                         : {
-        "host"                          : "localhost"
+        "host"                          : "yadamu-db1"
       , "port"                          : 27017
       , "options"                       : {
            "socketTimeoutMS"            : 900000

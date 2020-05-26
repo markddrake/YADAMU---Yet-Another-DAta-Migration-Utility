@@ -77,7 +77,7 @@ class FileQA extends FileDBI {
       files[fidx].size = -1;
     }
      
-    const statisticsCollector = new FileStatistics()  	
+    const statisticsCollector = new FileStatistics(this.yadamu)  	
 	await statisticsCollector.initialize();
     const writer = new DBWriter(statisticsCollector, null, null, nulLogger);
 	await writer.initialize();
@@ -85,7 +85,11 @@ class FileQA extends FileDBI {
     const processMetadata = new Promise(function (resolve,reject) {
       try {
         writer.on('finish',function() {resolve(saxParser.checkState())});
-        writer.on('error', function(err){self.yadamuLogger.logException([`${writer.constructor.name}.onError()}`],err);reject(err)})      
+        writer.on('error', function(err){
+		  console.log(err)
+		  self.yadamuLogger.logException([`${writer.constructor.name}.onError()}`],err);
+		  reject(err)
+		})      
         readStream.pipe(saxParser).pipe(writer);
       } catch (err) {
         self.yadamuLogger.logException([`${this.constructor.name}.getConentMetadata()`],err);
@@ -190,6 +194,7 @@ class FileQA extends FileDBI {
     const gMetadata = await this.getContentMetadata(grandparent)
     const pMetadata = await this.getContentMetadata(parent)
     const cMetadata = await this.getContentMetadata(child);
+	
     if (this.tableMappings) {
       timings = timings.map(function (t) {
         this.remapTableNames(t,this.tableMappings)

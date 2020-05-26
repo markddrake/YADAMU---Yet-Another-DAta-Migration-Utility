@@ -4,6 +4,7 @@ const { performance } = require('perf_hooks');
 
 class YadamuWriter {
 
+
   constructor(dbi,tableName,tableInfo,status,yadamuLogger) {
     this.dbi = dbi;
     this.schema = this.dbi.parameters.TO_USER;
@@ -17,14 +18,18 @@ class YadamuWriter {
     this.batch = [];
 	
     this.batchCount = 0;     // Batches created
-	this.rowsCached = 0;     // Rows recieved and cached by appendRow(). Reset every time a batch of cached rows is written to disk
-	this.rowsWritten = 0;    // Rows written to disk in the current transaction
-	this.rowsCommitted = 0;  // Rows successfully committed to disk
-	this.rowsSkipped = 0;    // Rows not written to disk due to unrecoverable write errors
-	this.rowsLost = 0;       // Rows written to disk and thene lost as a result of a rollback or lost connnection 
+	
+	this.rowCounters = {
+	  cached    : 0 // Rows recieved and cached by appendRow(). Reset every time a batch of cached rows is written to disk
+	, written   : 0 // Rows written to disk in the current transaction
+	, committed : 0 // Rows successfully committed to disk
+	, skipped   : 0 // Rows not written to disk due to unrecoverable write errors
+	, lost      : 0 // Rows written to disk and thene lost as a result of a rollback or lost connnection 
+	}
+	
+	this.dbi.trackCounters(this.rowCounters)
 	
     this.startTime = performance.now();
-    this.endTime = undefined;
     this.insertMode = 'Batch';    
     this.supressBatchWriteLogging = (this.tableInfo.batchSize === this.tableInfo.commitSize) // Prevent duplicate logging if batchSize and Commit SIze are the same
 	this.sqlInitialTime = this.dbi.sqlCumlativeTime
@@ -33,33 +38,16 @@ class YadamuWriter {
 		
   }
 
-  async initialize() {
-	  
+  async initialize() {  
      await this.dbi.beginTransaction()
   }
-
-
-  lostConnection() {
-   
-    /*
-    **
-    ** Invoked by the DBI when the connection is lost. Assume a rollback took place. All rows written but no committed are lost. 
-    ** In theory this cuuld be taken care of by invoking the current table's rollback method, rather than the DBI's rollback but 
-    ** if the rollback fails and processing continues the state of the counters could be indeterminate.
-    **
-    */
-	
-	this.rowsLost = this.rowsWritten;
-	this.rowsWritten = 0;
-  }	  
-	 
-
+ 
   batchComplete() {
-    return this.rowsCached === this.tableInfo.batchSize;
+    return ((this.rowCounters.cached === this.tableInfo.batchSize) && !this.skipTable)
   }
   
   batchRowCount() {
-    return this.rowsCached
+    return this.rowCounters.cached
   }
   
   reportBatchWrites() {
@@ -67,11 +55,11 @@ class YadamuWriter {
   }
   
   commitWork() {
-    return (this.rowsWritten >= this.tableInfo.commitSize);
+    return (this.rowCounters.written >= this.tableInfo.commitSize);
   }
 
   hasPendingRows() {
-    return this.rowsCached > 0;
+    return this.rowCounters.cached > 0;
   }
                  
   async appendRow(row) {
@@ -87,26 +75,28 @@ class YadamuWriter {
 	
     this.batch.push(row);
 	
-	this.rowsCached++
+	this.rowCounters.cached++
 	return this.skipTable;
   }  
   
   async writeBatch() {
-	this.rowsWritten += this.rowsCached;
-	this.rowsCached = 0;
+	this.rowCounters.written += this.rowCounters.cached;
+	this.rowCounters.cached = 0;
     return this.skipTable     
   }
   
   async commitTransaction() {
-	await this.dbi.commitTransaction()
-	this.rowsCommitted += this.rowsWritten;
-	this.rowsWritten = 0;
+    if (!this.skipTable) {
+      await this.dbi.commitTransaction()
+	  this.rowCounters.committed += this.rowCounters.written;
+	  this.rowCounters.written = 0;
+	}
   }
   
-  async rollbackTransaction() {
-	this.rowsLost += this.rowsWritten;
-	this.rowsWritten = 0;
-	await this.dbi.rollbackTransaction()
+  async rollbackTransaction(cause) {
+      this.rowCounters.lost += this.rowCounters.written;
+	  this.rowCounters.written = 0;
+  	  await this.dbi.rollbackTransaction(cause)
   }
 
   rejectRow(tableName,row) {
@@ -114,18 +104,18 @@ class YadamuWriter {
     this.rejectManager.rejectRow(tableName,row);
   }
   
-  async handleInsertError(operation,tableName,batchSize,row,record,err,info) {
-    this.rowsSkipped++;
-    this.status.warningRaised = true;
-    this.yadamuLogger.logRejected([`${operation}`,`"${tableName}"`,`${batchSize}`,`${row}`],err);
-    this.rejectRow(tableName,record);
+  async handleInsertError(currentOperation,batchSize,row,record,err,info) {
+    this.rowCounters.skipped++;
+    this.rejectRow(this.tableName,record);
+    this.yadamuLogger.logRejected([this.dbi.DATABASE_VENDOR,this.tableName,currentOperation,batchSize,row],err);
+	/*
     info.forEach(function (info) {
       this.yadamuLogger.writeDirect(`${info}\n`);
     },this)
-
-    const abort = (this.rowsSkipped === ( this.dbi.parameters.MAX_ERRORS ? this.dbi.parameters.MAX_ERRORS : 10)) 
+    */
+    const abort = (this.rowCounters.skipped === ( this.dbi.parameters.MAX_ERRORS ? this.dbi.parameters.MAX_ERRORS : 10)) 
     if (abort) {
-      this.yadamuLogger.error([`${operation}`,`"${tableName}"`],`Maximum Error Count exceeded. Skipping Table.`);
+      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
     }
     return abort;     
   }
@@ -133,25 +123,25 @@ class YadamuWriter {
   getStatistics() {
 	return {
       startTime     : this.startTime
-    , endTime       : this.endTime
+    , endTime       : performance.now()
 	, sqlTime       : this.dbi.sqlCumlativeTime - this.sqlInitialTime
     , insertMode    : this.insertMode
     , skipTable     : this.skipTable
-	, rowsLost      : this.rowsLost
-	, rowsSkipped   : this.rowsSkipped
-	, rowsCommitted : this.rowsCommitted
+	, counters      : this.rowCounters
     }    
   }
 
   async finalize() {
-	if (this.hasPendingRows()) {
-      this.skipTable = await this.writeBatch();   
-      if (this.skipTable) {
+ 	if (this.dbi.transactionInProgress === true) {
+	  if (this.hasPendingRows()) {
+        this.skipTable = await this.writeBatch();   
+      }
+      if (this.skipTable === true) {
         await this.rollbackTransaction()
       }
-    }
-    if (!this.skipTable) {
-      await this.commitTransaction()
+      else {
+        await this.commitTransaction()
+      }
     }
 	this.dbi.currentTable = undefined;
     return !this.skipTable

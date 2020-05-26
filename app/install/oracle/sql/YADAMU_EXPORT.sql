@@ -13,6 +13,7 @@ as
    ,COLUMN_PATTERN_LIST  CLOB
    ,WITH_CLAUSE          CLOB
    ,SQL_STATEMENT        CLOB
+   ,PARTITION_LIST       CLOB
   );
   
   TYPE EXPORT_METADATA_TABLE IS TABLE OF EXPORT_METADATA_RECORD;
@@ -306,6 +307,14 @@ as
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) <> ''13032'' then t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
                            'else NULL ' ||
                        'end "' || atc.COLUMN_NAME || '"'
+                   when P_SPATIAL_FORMAT in ('GeoJSON') then                   
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_GeoJSON()' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' || atc.COLUMN_NAME || '".get_GeoJSON() ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''NULL'' then NULL ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) <> ''13032'' then t."' || atc.COLUMN_NAME || '".get_GeoJSON() ' ||
+                           'else NULL ' ||
+                       'end "' || atc.COLUMN_NAME || '"'
                    end
                  when atc.DATA_TYPE = 'XMLTYPE' then -- Can be owned by SYS or PUBLIC
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
@@ -497,7 +506,8 @@ as
                  else
                    '"' || atc.COLUMN_NAME || '"'
                end
-        order by INTERNAL_COLUMN_ID) as T_VC4000_TABLE) NODE_SELECT_LIST
+        order by INTERNAL_COLUMN_ID) as T_VC4000_TABLE) NODE_SELECT_LIST,
+		(select cast(collect(partition_name) as T_VC4000_TABLE) from ALL_TAB_PARTITIONS atp where ATP.TABLE_NAME = aat.TABLE_NAME) PARTITION_LIST
     from ALL_ALL_TABLES aat
          inner join ALL_TAB_COLS atc
                  on atc.OWNER = aat.OWNER
@@ -632,6 +642,7 @@ begin
 	  V_ROW.NODE_SELECT_LIST     := TABLE_TO_LIST(t.NODE_SELECT_LIST);
 	  V_ROW.WITH_CLAUSE          := V_OBJECT_SERIALIZATION;
 	  V_ROW.SQL_STATEMENT        := V_SQL_STATEMENT;
+	  V_ROW.PARTITiON_LIST       := TABLE_TO_LIST(t.PARTITION_LIST);
 
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN               
 --

@@ -14,7 +14,7 @@ class DBReader extends Readable {
     this.mode = mode;
     this.status = status;
     this.yadamuLogger = yadamuLogger;
-    this.yadamuLogger.info([`${this.constructor.name}`,`${dbi.DATABASE_VENDOR}`],`Ready. Mode: ${this.mode}.`)
+    this.yadamuLogger.info([`Reader`,`${dbi.DATABASE_VENDOR}`,`${this.mode}`,`${this.dbi.slaveNumber !== undefined ? this.dbi.slaveNumber : 'Master'}`],`Ready.`)
        
     this.schemaInfo = [];
     
@@ -44,7 +44,7 @@ class DBReader extends Readable {
 	const startTime = performance.now();
     const ddl = await this.dbi.getDDLOperations()
 	if (ddl !== undefined) {
-      this.yadamuLogger.info([`${this.dbi.constructor.name}.getDDLOperations()`],`Generated ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+      this.yadamuLogger.ddl([`${this.dbi.DATABASE_VENDOR}`],`Generated ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
 	}
 	return ddl
   }
@@ -53,7 +53,7 @@ class DBReader extends Readable {
       
      const startTime = performance.now();
      this.schemaInfo = await this.dbi.getSchemaInfo('FROM_USER')
-     this.yadamuLogger.ddl([`${this.constructor.name}.getMetadata()`],`Generated metadata for ${this.schemaInfo.length} tables. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+     this.yadamuLogger.ddl([`${this.dbi.DATABASE_VENDOR}`],`Generated metadata for ${this.schemaInfo.length} tables. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
      return this.dbi.generateMetadata(this.schemaInfo)
   }
       
@@ -100,29 +100,15 @@ class DBReader extends Readable {
 	  let readerEndTime;
 	  let parserEndTime;
 	  
-      const outputStreamError = function(err){
-        // Named OnError Listener
-		self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${this.constructor.name}.onError()`,`${tableMetadata.TABLE_NAME}`],err)
-		reject(err)
-	  }       
-    
-	  outputStream.on('error',
-	    outputStreamError
-	  );
+	  // Output Stream sets table specific error handler while processsing table's data
 	  
-	  /* 
-	  **
-	  ** The listener needs to be removed when the writer completes processing the 'eod' message since the writer's end() event is supressed to allow for writing multiple tables to the same stream.
-	  **
-	  */
+	  outputStream.registerRejectionHandler(tableInfo.TABLE_NAME,reject)
 	  
-	  outputStream.setErrorHandler(outputStreamError)
-
-      parser.on('end',
+	  parser.on('end',
 	    async function(){
 
    	      // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${parser.constructor.name}.onEnd()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],`${copyFailed ? 'FAILED' : 'SUCCSESS'}. Stream open ${YadamuLibrary.stringifyDuration(performance.now() - pipeStartTime)}.`);
-
+          // parser.unpipe(outputStream)
     	  parserEndTime = performance.now()
 		  const pipeStatistics = {rowsRead: parser.getCounter(), pipeStartTime: pipeStartTime, readerEndTime: readerEndTime, parserEndTime: parserEndTime, copyFailed: copyFailed, tableNotFound: tableMissing}
           
@@ -151,8 +137,8 @@ class DBReader extends Readable {
 		        **
 		        */
 		        if (cause && cause.lostConnection()) {
-	              // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()`,`${tableInfo.TABLE_NAME}`,`${cause.code}`],`Lost Connection: ${cause.lostConnection()}`); 
-		          await dbi.reconnect(cause)
+	              // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${parser.constructor.name}.onEnd()`,`${tableInfo.TABLE_NAME}`,`${cause.code}`],`Lost Connection: ${cause.lostConnection()}`); 
+		          await dbi.reconnect(cause,'INPUT STREAM')
 		        }
     		    break;
 		    }
@@ -164,6 +150,7 @@ class DBReader extends Readable {
 	  parser.on('error',
 	    function(err) { 	 
 		  // Only report and process first error
+  		  // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${parser.constructor.name}.onError()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],`${copyFailed ? 'FAILED' : 'SUCCSESS'}`);
 		  if (!copyFailed) {
   	        switch (dbi.parameters.READ_ON_ERROR) {
 		      case undefined:
@@ -175,8 +162,10 @@ class DBReader extends Readable {
   		    }     		   
 			copyFailed = true;
             cause = dbi.streamingError(err,stack,tableMetadata)
-   		    self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${parser.constructor.name}.onError()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],cause);
-		  } 
+   		    self.yadamuLogger.handleException([`${dbi.DATABASE_VENDOR}`,`Reader`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],cause);
+		  }
+  		  // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${parser.constructor.name}.onError()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],`emit('end')`);
+   	      parser.emit('end');
         }
 	  );
 
@@ -191,6 +180,7 @@ class DBReader extends Readable {
 	    function(err) { 	 
 		  // Only report and process first error
           // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()`,`${tableInfo.TABLE_NAME}`,`${err.code}`],`Stream open ${YadamuLibrary.stringifyDuration(performance.now() - pipeStartTime)}.`); 
+          readerEndTime = performance.now()
 		  if (!copyFailed) {
   	        switch (dbi.parameters.READ_ON_ERROR) {
 		      case undefined:
@@ -206,7 +196,8 @@ class DBReader extends Readable {
 			  tableMissing = true;
 			}
 			else {
-              self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],cause);
+              // self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()}`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],cause);
+              self.yadamuLogger.handleException([`${dbi.DATABASE_VENDOR}`,`Reader`,`${tableMetadata.TABLE_NAME}`,dbi.parameters.READ_ON_ERROR],cause);			 
 		    }
 			
 			/*
@@ -219,7 +210,8 @@ class DBReader extends Readable {
 			*/
 			
 			if (dbi.forceEndOnInputStreamError(cause)) {
-		      parser.push(null);
+              // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()`,`${tableInfo.TABLE_NAME}`,`${err.code}`],`parser.push(NULL)`); 
+          	  parser.push(null);
 			}
 		  } 
 		}
@@ -229,7 +221,7 @@ class DBReader extends Readable {
 		pipeStartTime = performance.now();
         inputStream.pipe(parser).pipe(outputStream,{end: false })
 	  } catch (e) {
-		self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${tableMetadata.TABLE_NAME}`,`PIPE`],e)
+		self.yadamuLogger.handleException([`${dbi.DATABASE_VENDOR}`,`Reader`,`${tableMetadata.TABLE_NAME}`,`PIPE`],e)
 		reject(e)
 	  }
     })
@@ -253,7 +245,7 @@ class DBReader extends Readable {
 	  ** The copyOperation had failed...
 	  **
 	  */      
-	  this.yadamuLogger.logException([`${this.constructor.name}.copyContent()`,`${tableMetadata.TABLE_NAME}`,`COPY`],e);
+	  this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`Reader`,`${tableMetadata.TABLE_NAME}`,`COPY`],e);
 	  throw e;
     }
       
@@ -287,7 +279,7 @@ class DBReader extends Readable {
        const self = this;
        switch (this.nextPhase) {
          case 'systemInformation' :
-           const systemInformation = await this.getSystemInformation(Yadamu.EXPORT_VERSION);
+           const systemInformation = await this.getSystemInformation();
            // Needed in case we have to generate DDL from the system information and metadata.
            this.dbi.setSystemInformation(systemInformation);
            this.push({systemInformation : systemInformation});
@@ -333,15 +325,18 @@ class DBReader extends Readable {
 		   break;
 		 case 'finished':
            await this.dbi.finalizeExport();
+		   await this.dbi.releaseMasterConnection();
 		   this.push(null);
            break;
          default:
       }
     } catch (e) {
-      this.yadamuLogger.logException([`${this.constructor.name}._read()`],e);
+      this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`Read`],e);
+	  await this.dbi.releaseMasterConnection();
       this.destroy(e);
     }
   }
+  
 }
 
 module.exports = DBReader;

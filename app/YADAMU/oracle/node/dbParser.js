@@ -74,45 +74,49 @@ class DBParser extends YadamuParser {
     });
   };
   
-  async _transform (data,encodoing,done) {
-    this.counter++;
-    if (this.includesLobs) {
-      data = await Promise.all(data.map(function (item,idx) {
-               if ((item !== null) && (this.columnMetadata[idx].fetchType === oracledb.CLOB)) {
-                 return this.clob2String(item)
-               }
-               if ((item !== null) && (this.columnMetadata[idx].fetchType === oracledb.BLOB)) {
-                 return this.blob2HexBinary(item)
-               }  
-               return item
-      },this))
-    }  
+  async _transform (data,encodoing,callback) {
+	try {
+      this.counter++;
+      if (this.includesLobs) {
+        data = await Promise.all(data.map(function (item,idx) {
+                 if ((item !== null) && (this.columnMetadata[idx].fetchType === oracledb.CLOB)) {
+                   return this.clob2String(item)
+                 } 
+                 if ((item !== null) && (this.columnMetadata[idx].fetchType === oracledb.BLOB)) {
+                   return this.blob2HexBinary(item)
+                 }  
+                 return item
+        },this))
+      }  
 
-    // Convert the JSON columns into JSON objects
-    this.tableInfo.jsonColumns.forEach(function(idx) {
-      if (data[idx] !== null) {
-        try {
-          data[idx] = JSON.parse(data[idx]) 
-        } catch (e) {
-          this.yadamuLogger.logException([`${this.constructor.name}._transform()`,`${this.counter}`],e);
-          this.yadamuLogger.writeDirect(`${data[idx]}\n`);
-        } 
-      }
-    },this)
-      
-    this.tableInfo.rawColumns.forEach(function(idx) {
-      if (data[idx] !== null) {
-        if (Buffer.isBuffer(data[idx])) {
-          data[idx] = data[idx].toString('hex');
+      // Convert the JSON columns into JSON objects
+      this.tableInfo.jsonColumns.forEach(function(idx) {
+        if (data[idx] !== null) {
+          try {
+            data[idx] = JSON.parse(data[idx]) 
+          } catch (e) {
+            this.yadamuLogger.logException([`${this.constructor.name}._transform()`,`${this.counter}`],e);
+            this.yadamuLogger.writeDirect(`${data[idx]}\n`);
+          } 
         }
-      }
-    },this)
+      },this)
+      
+      this.tableInfo.rawColumns.forEach(function(idx) {
+        if (data[idx] !== null) {
+          if (Buffer.isBuffer(data[idx])) {
+            data[idx] = data[idx].toString('hex');
+          }
+        }
+      },this)
     
-    if (!this.objectMode) {
-      data = JSON.stringify(data);
-    }
-    const res = this.push({data:data})
-    done();
+      if (!this.objectMode) {
+        data = JSON.stringify(data);
+      }
+      const res = this.push({data:data})
+      callback();
+	} catch (e) {
+      callback(e)
+	}
   }
 
 }

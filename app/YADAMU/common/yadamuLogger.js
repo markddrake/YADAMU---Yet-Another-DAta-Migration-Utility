@@ -1,13 +1,22 @@
 "use strict"
 
+const fs = require('fs');
+const path = require('path');
+const util = require('util');
+
 const {DatabaseError, OracleError}  = require('./yadamuError.js');
+const YadamuLibrary = require('./yadamuLibrary.js');
+const StringWriter = require('./stringWriter.js')
 
 class YadamuLogger {
   
-  constructor(outputStream,status) {
+  constructor(outputStream,state) {
     this.os = outputStream;
-    this.status = status;
-	this.showStackTraces = process.env.YADAMU_SHOW_CAUSE && process.env.YADAMU_SHOW_CAUSE.toUpperCase() === 'TRUE'
+    this.state = state;
+    this.exceptionFolderPath = this.state.exceptionFolder === undefined ? 'exception' : YadamuLibrary.pathSubstitutions(this.state.exceptionFolder) 
+    this.exceptionFilePrefix = this.state.exceptionFilePrefix === undefined ? 'exception' : YadamuLibrary.pathSubstitutions(this.state.EXCEPTION_FILE_PREFIX);
+    this.exceptionFolderLocation = undefined
+	this.inlineStackTrace = process.env.YADAMU_SHOW_CAUSE && process.env.YADAMU_SHOW_CAUSE.toUpperCase() === 'TRUE'
   }
 
   switchOutputStream(os) {
@@ -27,22 +36,29 @@ class YadamuLogger {
   }
   
   log(args,msg) {
-    this.os.write(`${new Date().toISOString()} ${args.map(function (arg) { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+	const ts = new Date().toISOString()
+    this.os.write(`${ts} ${args.map(function (arg) { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+	return ts
+  }
+  
+  qa(args,msg) {
+    args.unshift('QA')
+    return this.log(args,msg)
   }
   
   info(args,msg) {
     args.unshift('INFO')
-    this.log(args,msg)
+    return this.log(args,msg)
   }
   
   dml(args,msg) {
     args.unshift('DML')
-    this.log(args,msg)
+    return this.log(args,msg)
   }
 
   ddl(args,msg) {
     args.unshift('DDL')
-    this.log(args,msg)
+    return this.log(args,msg)
   }
 
   sql(args,msg) {
@@ -51,15 +67,33 @@ class YadamuLogger {
   }
 
   warning(args,msg) {
-    this.status.warningRaised = true;
+    this.state.warningRaised = true;
     args.unshift('WARNING')
-    this.log(args,msg)
+    return this.log(args,msg)
   }
 
   error(args,msg) {
-    this.status.errorRaised = true;
+    this.state.errorRaised = true;
     args.unshift('ERROR')
-    this.log(args,msg)
+    return this.log(args,msg)
+  }
+
+  serializeException(e) {
+    return util.inspect(e,{depth:null})
+  }
+
+  serializeException1(e) {
+ 	try {
+	  const out = new StringWriter();
+	  const err = new StringWriter();
+	  const con = new console.Console(out,err);
+	  con.dir(e, { depth: null });
+	  const serialization = out.toString();
+	  return serialization
+	  this.os.write(`cause: ${strCause}\n`)
+	} catch (e) {
+      console.log(e);
+	}
   }
 
   logDatabaseError(e) {
@@ -69,11 +103,12 @@ class YadamuLogger {
     if (e instanceof OracleError) {
 	  this.logOracleError(e)
 	}
+	if (e.cause instanceof Error) {
+      this.os.write(`cause: ${this.serializeException(e.cause)}\n`)
+	}
   }
   
   logOracleError(e) {
-	this.os.write(`errorNum: ${e.errorNum}\n`);
-	this.os.write(`Offset: ${e.offset}\n`);
 	this.os.write(`Args/Binds: ${JSON.stringify(e.args)}\n`);
 	this.os.write(`OutputFormat/Rows: ${JSON.stringify(e.outputFormat)}\n`);
   } 
@@ -81,7 +116,7 @@ class YadamuLogger {
   logException(args,e) {
 
 	if (e.yadamuAlreadyReported) {
-      this.info(args,`Processed exception: "${e.oneLineMessage ? e.oneLineMessage : e.message}"`);
+      this.info(args,`Processed exception: "${e.message}"`);
 	  return
    	}
 
@@ -90,17 +125,75 @@ class YadamuLogger {
 	  this.logDatabaseError(e);
 	}
 	else {
-	  this.os.write(`${(e.stack ? e.stack : e)}\n`)
+	  this.os.write(`${this.serializeException(e)}\n`)
 	}
 	e.yadamuAlreadyReported = true;
   }
+
+  createLogFile(filename) {
+    if (this.exceptionFolderLocation == undefined) {
+      this.exceptionFolderLocation = path.dirname(filename);
+      fs.mkdirSync(this.exceptionFolderLocation, { recursive: true });
+    }
+    const ws = fs.openSync(filename,'w');
+    return ws;
+  }
   
+  writeExceptionToFile(exceptionFile,ts,args,e) {
+	const errorLog = this.createLogFile(exceptionFile)
+	fs.writeSync(errorLog,`${ts} ${args.map(function (arg) { return '[' + arg + ']'}).join('')}: ${e.message}\n`)
+	fs.writeSync(errorLog,this.serializeException(e));
+	fs.closeSync(errorLog)
+  }
+
+  handleException(args,e) {
+	 
+    // Handle Exception does not produce any output if the exception has already been processed by handleException ot logException
+
+	if (e.yadamuAlreadyReported !== true) {
+	  if (this.inlineStackTrace) {
+		this.logException(args,e)
+	  }
+	  else {
+		const largs = [...args]
+		const ts = this.error(args,e.message);
+        const exceptionFile = path.resolve(`${this.exceptionFolderPath}${path.sep}${this.exceptionFilePrefix}_${ts.replace(/:/g,'.')}.trace`);
+		this.writeExceptionToFile(exceptionFile,ts,args,e)
+	    this.info(largs,`Exception logged to "${exceptionFile}".`)
+		e.yadamuAlreadyReported = true;
+	  }
+	}
+  }
+  
+  handleWarning(args,e) {
+	 
+    // Handle Exception does not produce any output if the exception has already been processed by handleException ot logException
+
+	if (e.yadamuAlreadyReported !== true) {
+	  if (this.inlineStackTrace) {
+		this.logException(args,e)
+	  }
+	  else {
+		const largs = [...args]
+		const ts = this.warning(args,e.message);
+        const exceptionFile = path.resolve(`${this.exceptionFolderPath}${path.sep}${this.exceptionFilePrefix}_${ts.replace(/:/g,'.')}.trace`);
+		this.writeExceptionToFile(exceptionFile,ts,args,e)
+	    this.info(largs,`Exception logged to "${exceptionFile}".`)
+		e.yadamuAlreadyReported = true;
+	  }
+	}
+  }
+
   logRejected(args,e) {
-    this.status.warningRaised = true;
-    args.unshift('REJECTED')
-    this.log(args,`Cause`)
-    this.os.write(`${(e.stack ? e.stack : e)}\n`)
-    // console.log(new Error().stack);
+	args.unshift('REJECTED')
+	this.handleException(args,e);
+    /*
+	const largs = [...args]
+	const ts = this.warning(args,e.message);
+    const exceptionFile = path.resolve(`${this.exceptionFolderPath}${path.sep}${this.exceptionFilePrefix}_${ts.replace(/:/g,'.')}.trace`);
+	this.writeExceptionToFile(exceptionFile,ts,args,e)
+	this.warning(largs,`Details logged to "${exceptionFile}".`)
+	*/
   }
 
   trace(args,msg) {

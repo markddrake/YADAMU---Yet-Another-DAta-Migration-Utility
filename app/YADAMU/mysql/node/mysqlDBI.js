@@ -131,7 +131,7 @@ class MySQLDBI extends YadamuDBI {
       results = await this.executeSQL(sqlSetPacketSize);
 	  
     }    
-    await this.releaseConnection();
+    await this.closeConnection();
   }
   
 
@@ -158,7 +158,9 @@ class MySQLDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-    if (this.status.sqlTrace) {
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`getConnectionFromPool()`)
+	
+	if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
     }
 	
@@ -182,38 +184,49 @@ class MySQLDBI extends YadamuDBI {
     return connection
   }
   
-  async releaseConnection() {
+  async closeConnection() {
+
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`closeConnection(${this.connection !== undefined && this.connection.release})`)
 
  	if (this.keepAliveHdl) {
 	  clearInterval(this.keepAliveHdl)
 	}
 
     if (this.connection !== undefined && this.connection.release) {
+	  let stack;
       try {
+        stack = new Error().stack
         await this.connection.release();
-	    this.connectionOpen = false;
+		this.connection = undefined;
       } catch (e) {
-        this.yadamuLogger.logException([`${this.constructor.name}.releaseConnection()`],e);
+        this.connection = undefined;
+  	    const err = new MySQLError(e,stack,'MySQL.Connection.release()')
+	    throw err;
       }
 	}
   };
       
-  async reconnectImpl() {
-      
-    // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`Attemping reconnection.`);
-       
-    /*
-    **
-    ** Attempt to close the connection. Log but do not throw any errors...
-    **
-    */	
+  async closePool() {
+	  
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR],`closePool(${(this.pool !== undefined && this.pool.end)})`)
+	  
+    if (this.pool !== undefined && this.pool.end) {
+      let stack;
+      try {
+        stack = new Error().stack
+        await this.pool.end();
+        this.pool = undefined;
+      } catch (e) {
+        this.pool = undefined;
+  	    throw new MariadbError(e,stack,'Mariadb.Pool.end()')
+	  }
+	}
+	
+  };	  
 
-    await this.releaseConnection();
-    this.connection = await this.getConnectionFromPool()
+  async reconnectImpl() {
+    this.connection = this.isMaster() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
     await this.connection.ping()
-	
-    // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`New connection availabe.`);
-	
   }
 
 
@@ -324,11 +337,11 @@ class MySQLDBI extends YadamuDBI {
                      async function(err,results,fields) {
                        const sqlEndTime = performance.now()
                        if (err) {
-         		         const mySQLError = new MySQLError(err,stack,sqlStatement)
-		                 if (attemptReconnect && mySQLError.lostConnection()) {
+         		         const cause = new MySQLError(err,stack,sqlStatement)
+		                 if (attemptReconnect && cause.lostConnection()) {
 						   attemptReconnect = false
 						   try {
-                             await self.reconnect(mySQLError)
+                             await self.reconnect(cause,'SQL')
                              results = await self.executeSQL(sqlStatement,args);
                              resolve(results);
 						   } catch (e) {
@@ -336,7 +349,7 @@ class MySQLDBI extends YadamuDBI {
                            }							 
               1          }
                          else {
-                           reject(new MySQLError(err,stack,sqlStatement));
+                           reject(cause);
                          }
                        }
 					   self.traceTiming(sqlStartTime,sqlEndTime)
@@ -399,7 +412,6 @@ class MySQLDBI extends YadamuDBI {
   
   constructor(yadamu) {
     super(yadamu,yadamu.getYadamuDefaults().mysql)
-    this.connectionOpen = false
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
 	this.keepAliveHdl = undefined
   }
@@ -438,6 +450,9 @@ class MySQLDBI extends YadamuDBI {
       case "EWKT":
         this.spatialSerializer = "(ST_AsText(";
         break;
+       case "GeoJSON":
+	     this.spatialSerializer = "(ST_AsGeoJSON("
+		 break;
      default:
         this.spatialSerializer = "HEX(ST_AsBinary(";
     }  
@@ -449,37 +464,29 @@ class MySQLDBI extends YadamuDBI {
     this.setSpatialSerializer(this.spatialFormat);
   }
 
-  /*
-  **
-  **  Gracefully close down the database connection.
-  **
-  */
-
-  async finalize() {
-    await this.releaseConnection();
-	await this.pool.end();  
-  }
-  
   async finalizeRead(tableInfo) {
     await this.executeSQL(`FLUSH TABLE "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`)
   }
 
+  /*
+  **
+  **  Gracefully close down the database connection and pool
+  **
+  */
+
+  async finalize() {
+    await super.finalize()
+  }
+  
 
   /*
   **
-  **  Abort the database connection.
+  **  Abort the database connection and pool
   **
   */
 
   async abort() {
-    try {
-      await this.releaseConnection();
-	  if (this.pool !== undefined) {
-	    await this.pool.end();
-      }
-	} catch (e) {
-      this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e);
-	}
+	await super.abort()
   }
 
   /*
@@ -489,6 +496,8 @@ class MySQLDBI extends YadamuDBI {
   */
   
   async beginTransaction() {
+	  
+    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getSlaveNumber()],``)
 
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(`begin transaction`));
@@ -498,7 +507,7 @@ class MySQLDBI extends YadamuDBI {
 	try {
 	  stack = new Error().stack
       await this.connection.beginTransaction();
-	  super.beginTransaction;
+	  super.beginTransaction();
 	} catch (e) {
       throw new MySQLError(e,stack,'mysql.Connection.beginTransaction()');
 	} 
@@ -513,6 +522,8 @@ class MySQLDBI extends YadamuDBI {
   
   async commitTransaction() {
 	
+    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getSlaveNumber()],``)
+
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
     }    
@@ -536,51 +547,57 @@ class MySQLDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-	// If rollbackTransaction was invoked due to encounterng an error and the restore operation results in a second exception being raised, log the exception raised by the restore operation and throw the original error.
-	// Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
+    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getSlaveNumber()],``)
 
+	this.checkConnectionState(cause)
+
+	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
+	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
+			
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(`rollback transaction`));
     }    
-
+	
 	let stack
 	try {
 	  stack = new Error().stack
       await this.connection.rollback();
 	  super.rollbackTransaction();
 	} catch (e) {
-      e = new MySQLError(e,stack,'mysql.Connection.rollback()')
-	  if (cause instanceof Error) {
-        this.yadamuLogger.logException([`${this.constructor.name}.rollbackTransaction()`],e)
-	    e = cause
-	  }
-	  throw e;
+      const newIssue = new MySQLError(e,stack,'mysql.Connection.rollback()')
+	  this.checkCause(cause,newIssue)
 	}
   }
   
   async createSavePoint() {
+
+    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getSlaveNumber()],``)
+
     await this.executeSQL(sqlCreateSavePoint);
 	super.createSavePoint();
    }
   
   async restoreSavePoint(cause) {
 
+    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getSlaveNumber()],``)
+
+	this.checkConnectionState(cause)
+
 	// If restoreSavePoint was invoked due to encounterng an error and the restore operation results in a second exception being raised, log the exception raised by the restore operation and throw the original error.
 	// Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
-
+	
 	try {
       await this.executeSQL(sqlRestoreSavePoint);
 	  super.restoreSavePoint();
-	} catch (e) {
-	  if (cause instanceof Error) {
-        this.yadamuLogger.logException([`${this.constructor.name}.restoreSavePoint()`],e)
-	    e = cause
-	  }
-	  throw e;
+	} catch (newIssue) {
+	  this.checkCause(cause,newIssue)
 	}
   }  
 
   async releaseSavePoint() {
+
+    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getSlaveNumber()],``)
+
     await this.executeSQL(sqlReleaseSavePoint);   
     super.releaseSavePoint();
   } 
@@ -609,10 +626,10 @@ class MySQLDBI extends YadamuDBI {
   **
   */
   
-  processLog(results) {
+  processLog(results,operation) {
     if (results[0].logRecords !== null) {
       const log = JSON.parse(results[0].logRecords);
-      super.processLog(log, this.status, this.yadamuLogger)
+      super.processLog(log, operation, this.status, this.yadamuLogger)
       return log
     }
     else {
@@ -625,7 +642,7 @@ class MySQLDBI extends YadamuDBI {
     const sqlStatement = `SET @RESULTS = ''; CALL IMPORT_JSON(?,@RESULTS); SELECT @RESULTS "logRecords";`;					   
 	let results = await  this.executeSQL(sqlStatement,this.parameters.TO_USER);
     results = results.pop();
-	return this.processLog(results);
+	return this.processLog(results,'JSON_TABLE');
   }
   
   /*
@@ -640,7 +657,7 @@ class MySQLDBI extends YadamuDBI {
   **
   */
   
-  async getSystemInformation(EXPORT_VERSION) {     
+  async getSystemInformation() {     
   
     const results = await this.executeSQL(sqlSystemInformation); 
     const sysInfo = results[0];
@@ -651,7 +668,7 @@ class MySQLDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : EXPORT_VERSION
+     ,exportVersion      : this.EXPORT_VERSION
      ,sessionUser        : sysInfo.SESSION_USER
      ,dbName             : sysInfo.DATABASE_NAME
      ,serverHostName     : sysInfo.SERVER_HOST
@@ -716,7 +733,7 @@ class MySQLDBI extends YadamuDBI {
     /*
 	**
 	** Intermittant Timeout problem with MySQL causes premature abort on Input Stream
-	** Use a KeepAlive query to prevent Timeouts on the MySQL Connection.
+	** If this occures set READ_KEEP_ALIVE to a value >  0 Use a KeepAlive query to prevent Timeouts on the MySQL Connection.
 	** Use a local keepAliveHdl to allow for parallel operaitons
     **
 	** Use setInterval.. 
@@ -786,17 +803,18 @@ class MySQLDBI extends YadamuDBI {
 
   async slaveDBI(slaveNumber) {
 	const dbi = new MySQLDBI(this.yadamu)
-	// Need to share pool with slave so slave can initiate a reconnect operation
-	dbi.pool = this.pool
-	dbi.setParameters(this.parameters);
-	const connection = await this.getConnectionFromPool()
-	return await super.slaveDBI(slaveNumber,dbi,connection)
+	return await super.slaveDBI(slaveNumber,dbi)
   }
 
   tableWriterFactory(tableName) {
     return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
   }
 
+  async getConnectionID() {
+	const results = await this.executeSQL(`select connection_id() "pid"`)
+	const pid = results[0].pid;
+    return pid
+  }
 }
 
 module.exports = MySQLDBI

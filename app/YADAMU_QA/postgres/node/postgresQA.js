@@ -26,17 +26,6 @@ const sqlCompareSchema = `call COMPARE_SCHEMA($1,$2,$3,$4,$5)`
 
 class PostgresQA extends PostgresDBI {
     
-    constructor(yadamu) {
-       super(yadamu);
-    }
-    
-	async initialize() {
-	  await super.initialize();
-	  if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
-	}
-	
     async recreateSchema() {
       try {
         const dropSchema = `drop schema if exists "${this.parameters.TO_USER}" cascade`;
@@ -54,6 +43,43 @@ class PostgresQA extends PostgresDBI {
       await this.createSchema(this.parameters.TO_USER);    
     }      
 
+	async scheduleTermination(pid) {
+	  const self = this
+      const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
+	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
+	  const timer = setTimeout(
+	    async function(pid) {
+		   if (self.pool !== undefined && self.pool.end) {
+		     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Killing connection.`);
+	         const conn = await self.getConnectionFromPool();
+		     const res = await conn.query(`select pg_terminate_backend(${pid})`);
+		     await conn.release()
+		   }
+		   else {
+		     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
+		   }
+		},
+		killDelay,
+	    pid
+      )
+	  timer.unref()
+	}
+	
+    constructor(yadamu) {
+       super(yadamu);
+    }
+    
+	async initialize() {
+	  await super.initialize();
+	  if (this.options.recreateSchema === true) {
+		await this.recreateSchema();
+	  }
+	  if (this.testLostConnection()) {
+		const dbiID = await this.getConnectionID();
+		this.scheduleTermination(dbiID);
+	  }
+	}
+	
     async compareSchemas(source,target) {
 
       const report = {
@@ -90,8 +116,16 @@ class PostgresQA extends PostgresDBI {
         return [target.schema,row.TABLE_NAME,row.ROW_COUNT]
       },this)
       
+    }    
+	
+  async slaveDBI(idx)  {
+	const slaveDBI = await super.slaveDBI(idx);
+	if (slaveDBI.testLostConnection()) {
+	  const dbiID = await slaveDBI.getConnectionID();
+	  this.scheduleTermination(dbiID);
     }
-    
+	return slaveDBI
+  }
 }
 
 module.exports = PostgresQA

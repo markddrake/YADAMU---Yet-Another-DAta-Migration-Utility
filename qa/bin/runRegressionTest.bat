@@ -8,4 +8,4 @@ call %YADAMU_QA_HOME%\install\bin\installYadamu.bat
 @set YADAMU_LOG_ROOT=%YADAMU_HOME%\log
 call %YADAMU_QA_HOME%\bin\initializeLogging.bat %YADAMU_TASK%
 if not defined NODE_NO_WARNINGS set NODE_NO_WARNINGS=1
-node %YADAMU_HOME%\app\YADAMU_QA\common\node\test.js CONFIG=%YADAMU_QA_HOME%\regression\%YADAMU_TASK%.json >%YADAMU_LOG_PATH%\%YADAMU_TASK%.log
+node %YADAMU_HOME%\app\YADAMU_QA\common\node\test.js CONFIG=%YADAMU_QA_HOME%\regression\%YADAMU_TASK%.json EXCEPTION_FOLDER=%YADAMU_LOG_PATH%>%YADAMU_LOG_PATH%\%YADAMU_TASK%.log

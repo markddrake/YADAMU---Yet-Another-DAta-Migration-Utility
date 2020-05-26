@@ -6,3 +6,4 @@ source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
+source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection

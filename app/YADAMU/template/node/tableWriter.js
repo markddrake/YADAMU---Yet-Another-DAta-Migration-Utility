@@ -9,13 +9,16 @@ class TableWriter extends YadamuWriter {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
   }
 
-
   async appendRow(row) {
+	this.rowCounters.cached++
   }
 
   async writeBatch() {
     this.batchCount++;
-    return this.skipTable
+    this.batch.length = 0;
+    this.rowCounters.written += this.rowCounters.cached;
+    this.rowCounters.cached = 0;
+	return this.skipTable
   }
 }
 

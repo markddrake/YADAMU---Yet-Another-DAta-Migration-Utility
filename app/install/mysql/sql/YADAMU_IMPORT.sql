@@ -420,6 +420,8 @@ BEGIN
                                   concat('case when data."',column_name, '" = ''null'' then NULL else ST_MultiLineStringFromWKB(UNHEX(data."',COLUMN_NAME,'")) end')
                                 when TARGET_DATA_TYPE = 'multipolygon' and P_SPATIAL_FORMAT in ('WKB','EWKB') then
                                   concat('case when data."',column_name, '" = ''null'' then NULL else ST_MultiPolygonFromWKB(UNHEX(data."',COLUMN_NAME,'")) end')
+                                when TARGET_DATA_TYPE = 'geometry' and P_SPATIAL_FORMAT in ('GeoJSON') then
+                                  concat('case when data."',column_name, '" = ''null'' then NULL else ST_GeomFromGeoJSON(data."',COLUMN_NAME,'") end')
                                 when TARGET_DATA_TYPE like '%blob' then
                                   concat('UNHEX(data."',COLUMN_NAME,'")')
                                 when TARGET_DATA_TYPE like '%binary%' then

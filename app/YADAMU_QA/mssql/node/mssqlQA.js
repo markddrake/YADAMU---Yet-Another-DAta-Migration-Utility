@@ -1,6 +1,7 @@
 "use strict" 
 
 const MsSQLDBI = require('../../../YADAMU/mssql/node/mssqlDBI.js');
+const {MsSQLError} = require('../../../YADAMU/common/yadamuError.js')
 
 const sqlSchemaTableRows = `SELECT sOBJ.name AS [TableName], SUM(sPTN.Rows) AS [RowCount] 
    FROM sys.objects AS sOBJ 
@@ -18,14 +19,7 @@ class MsSQLQA extends MsSQLDBI {
     constructor(yadamu) {
        super(yadamu)
     }
-    
-	async initialize() {
-	  if (this.options.recreateSchema === true) {
-		await this.recreateDatabase();
-	  }
-	  await super.initialize();
-	}
-	
+
 	async useDatabase(databaseName) {     
       const statement = `use ${databaseName}`
       const results = await this.executeSQL(statement);
@@ -51,14 +45,60 @@ class MsSQLQA extends MsSQLDBI {
         results =  await this.executeSQL(createDatabase);      
         await this.finalize()
 	  } catch (e) {
-		console.log(e);
+		this.yadamuLogger.qa([this.DATABASE_VENDOR,'recreateDatabase()'],e.message);
 	  }
 	  
 	  this.parameters.MSSQL_SCHEMA_DB = MSSQL_SCHEMA_DB
 	  this.connectionProperties.database = database;
-       
-   }
-   
+	  
+    }
+	
+	async scheduleTermination(pid) {
+	  const self = this
+	  const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
+	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
+	  const timer = setTimeout(
+	    async function(pid) {
+		  if (self.pool !== undefined) {
+		     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Killing connection.`);
+		     const request = await self.getRequest();
+			 let stack
+			 const sqlStatement = `kill ${pid}`
+			 try {
+			   stack = new Error().stack
+  		       const res = await request.query(sqlStatement);
+			 } catch (e) {
+			   if (e.number && (e.number === 6104)) {
+				 // The Slave has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourself (Error 27)
+			     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Slave finished prior to termination.`)
+ 			   }
+			   else {
+				 const cause = new MsSQLError(e,stack,sqlStatement)
+			     self.yadamuLogger.handleException(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],cause)
+			   }
+			 } 
+		   }
+		   else {
+		     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
+		   }
+		},
+		killDelay,
+	    pid
+      )
+	  timer.unref()
+	}
+	
+	async initialize() {
+	  if (this.options.recreateSchema === true) {
+		await this.recreateDatabase();
+	  }
+	  await super.initialize();
+	  if (this.testLostConnection()) {
+        const dbiID = await this.getConnectionID();
+		this.scheduleTermination(dbiID);
+	  }
+    }
+	   
    async compareSchemas(source,target) {
 	   
       const report = {
@@ -124,6 +164,15 @@ class MsSQLQA extends MsSQLDBI {
         return [connectInfo.owner === 'dbo' ? connectInfo.database : connectInfo.owner,row.TableName,row.RowCount]
       },this)
     }
+	
+  async slaveDBI(idx)  {
+	const slaveDBI = await super.slaveDBI(idx);
+	if (slaveDBI.testLostConnection()) {
+	  const dbiID = await slaveDBI.getConnectionID();
+	  this.scheduleTermination(dbiID);
+    }
+	return slaveDBI
+  }
     
 }
 module.exports = MsSQLQA

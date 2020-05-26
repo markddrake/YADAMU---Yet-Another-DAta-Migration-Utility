@@ -62,9 +62,13 @@ class YadamuLibrary {
     }             
     return metadata
   }
-  
+
+  static pathSubstitutions(path) {
+    return path.replace(/%date%/g,).replace(/%time%/g,).replace(/%isoDateTime%/,new Date().toISOString().replace(/:/g,'.'))
+  }
 }
 
 module.exports.convertQuotedIdentifer  = YadamuLibrary.convertQuotedIdentifer
 module.exports.convertIdentifierCase  = YadamuLibrary.convertIdentifierCase
 module.exports.stringifyDuration = YadamuLibrary.stringifyDuration
+module.exports.pathSubstitutions = YadamuLibrary.pathSubstitutions

@@ -8,7 +8,7 @@
 , "yadamuDBI"                 : {
     "SPATIAL_FORMAT"          : "WKB"
   , "BATCH_SIZE"              : 10000
-  , "BATCH_COMMIT"            : 5
+  , "COMMIT_RATIO"            : 5
   }
 , "mariadb"                   : {
     "TABLE_MATCHING"          : "INSENSITIVE"
@@ -21,8 +21,7 @@
   , "SPATIAL_FORMAT"          : "GeoJSON"
   }
 , "mssql"                     : {
-    "FROM_USER"               : "dbo"
-  , "TO_USER"                 : "dbo"
+    "DEFAULT_USER"            : "dbo"
   }
 , "mysql"                     : {
     "TABLE_MATCHING"          : "INSENSITIVE"
@@ -39,8 +38,7 @@
 , "postgres"                  : {
   }
 , "snowflake"                 : {
-    "FROM_USER"               : "public"
-  , "TO_USER"                 : "public"
+    "DEFAULT_USER"            : "public"
   , "SPATIAL_FORMAT"          : "GeoJSON"
   }
 }

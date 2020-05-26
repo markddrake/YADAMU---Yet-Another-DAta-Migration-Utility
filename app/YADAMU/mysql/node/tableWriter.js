@@ -4,6 +4,7 @@ const { performance } = require('perf_hooks');
 
 const WKX = require('wkx');
 
+const {BatchInsertError} = require('../../common/yadamuError.js')
 const YadamuWriter = require('../../common/yadamuWriter.js');
 
 class TableWriter extends YadamuWriter {
@@ -108,11 +109,18 @@ class TableWriter extends YadamuWriter {
     try {
       const results = await this.dbi.executeSQL(dml,newRow)
       await this.processWarnings(results);
-	  this.rowsWritten++;
+	  this.rowCounters.written++;
     } catch (e) {
-      const errInfo = this.status.showInfoMsgs === true ? [dml,newRow] : []
-      this.skipTable = await this.handleInsertError(`${this.constructor.name}.recodeSpatialData()`,this.tableName,this.batch.length,rowNumber,newRow,e,errInfo);
+      const errInfo = [dml,newRow]
+      this.skipTable = await this.handleInsertError(`INSERT (WKB->WKT)`,this.batch.length,rowNumber,newRow,e,errInfo);
     }    
+  }
+  
+  handleBatchException(cause,message) {
+   
+    const batchException = new BatchInsertError(cause,this.tableName,this.tableInfo.dml,this.batch.length,this.batch[0],this.batch[this.batch.length-1])
+    this.yadamuLogger.handleWarning([this.dbi.DATABASE_VENDOR,this.tableName,`WRITE`,this.insertMode],batchException)
+
   }
  
   async writeBatch() {     
@@ -127,17 +135,13 @@ class TableWriter extends YadamuWriter {
         this.endTime = performance.now();
         await this.dbi.releaseSavePoint();
 		this.batch.length = 0;  
-        this.rowsWritten += this.rowsCached;
-		this.rowsCached = 0;
+        this.rowCounters.written += this.rowCounters.cached;
+		this.rowCounters.cached = 0;
         return this.skipTable
       } catch (e) {
-        if (this.status.showInfoMsgs) {
-          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.batch.length}]. Batch Insert raised: "${e}.`);
-          this.yadamuLogger.writeDirect(`${this.tableInfo.dml}\n`);
-          this.yadamuLogger.writeDirect(`${JSON.stringify(this.batch[0])}\n...\n${JSON.stringify(this.batch[this.batch.length-1])}\n`);
-          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Switching to Iterative mode.`);          
-        }
         await this.dbi.restoreSavePoint(e);
+		handleBatchException(e,'Batch Insert')
+        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative'   
         this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args
       }
@@ -147,15 +151,15 @@ class TableWriter extends YadamuWriter {
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row])
         await this.processWarnings(results);
-		this.rowsWritten++;
+		this.rowCounters.written++;
       } catch (e) {
         if (e.spatialInsertFailed()) {
           this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Batch size [${this.batch.length}], row ${row}. Spatial Insert ("${this.tableInfo.spatialFormat}") raised: "${e.code}". Converting to "WKT".`);
           await this.recodeSpatialData(this.batch[row],row);
         }
         else {
-          const errInfo = this.status.showInfoMsgs === true ? [this.tableInfo.dml,this.batch[row]] : []
-          this.skipTable = await this.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,this.batch[row],e,errInfo);
+          const errInfo = [this.tableInfo.dml,this.batch[row]]
+          this.skipTable = await this.handleInsertError(`INSERT ONE`,this.batch.length,row,this.batch[row],e,errInfo);
         }
         if (this.skipTable) {
           break;
@@ -165,7 +169,7 @@ class TableWriter extends YadamuWriter {
 	
     this.endTime = performance.now();
     this.batch.length = 0;  
-	this.rowsCached = 0;
+	this.rowCounters.cached = 0;
     return this.skipTable 
   }
 }

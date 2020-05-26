@@ -15,9 +15,11 @@ const YadamuDefaults = require('./yadamuDefaults.json');
 const {YadamuError, UserError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
 const YadamuRejectManager = require('./yadamuRejectManager.js');
 
+const YADAMU_VERSION = '1.0'
+
 class Yadamu {
 
-  get EXPORT_VERSION() { return '1.0' };
+  get EXPORT_VERSION() { return YADAMU_VERSION };
   get YADAMU_DEFAULT_PARAMETERS() { return YadamuDefaults.yadamu }
      
   static nameMatch(source,target,rule) {
@@ -55,9 +57,10 @@ class Yadamu {
   }
   
   createRejectManager() {
-    const rejectFolderPath = this.parameters.REJECT_FOLDER ? this.parameters.REJECT_FOLDER : 'work/rejected';
-    this.rejectFilename = path.resolve(rejectFolderPath +  path.sep + 'yadamuRejected_' + new Date().toISOString().split(':').join('') + ".json");
-    return new YadamuRejectManager(this.rejectFilename,this.yadamuLogger);
+    const rejectFolderPath = this.parameters.REJECT_FOLDER ? YadamuLibrary.pathSubstitutions(this.parameters.REJECT_FOLDER) : 'rejections';
+    const rejectFileName = this.parameters.REJECT_FILE_PREFIX ? YadamuLibrary.pathSubstitutions(this.parameters.REJECT_FILE_PREFIX) : 'rejections';
+    const rejectFile = path.resolve(`${rejectFolderPath}${path.sep}${rejectFileName}_${new Date().toISOString().replace(/:/g,'.')}.json`);
+    return new YadamuRejectManager(rejectFile,this.yadamuLogger);
   }
    
   reportStatus(status,yadamuLogger) {
@@ -67,9 +70,22 @@ class Yadamu {
     status.statusMsg = status.warningRaised === true ? 'with warnings' : status.statusMsg;
     status.statusMsg = status.errorRaised === true ? 'with errors'  : status.statusMsg;  
   
-    yadamuLogger.info([`${this.constructor.name}`,`${status.operation}`],`Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}.`);
+    const terminationArgs = [`YADAMU`,`${status.operation}`]
+    const terminationMessage = `Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}.`
+
+    switch (true) {
+      case (status.errorRaised === true):
+        yadamuLogger.error(terminationArgs,terminationMessage)
+        break;
+      case (status.warningRaised === true):
+        yadamuLogger.warning(terminationArgs,terminationMessage)
+        break
+      default:
+        yadamuLogger.info(terminationArgs,terminationMessage)
+    }
+
     if (!yadamuLogger.loggingToConsole()) {
-      console.log(`${new Date().toISOString()}[${this.constructor.name}][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
+      console.log(`${new Date().toISOString()}[YADAMU][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
     }
   }
   
@@ -77,11 +93,11 @@ class Yadamu {
     
     if (!yadamuLogger.loggingToConsole()) {
       yadamuLogger.logException([`${this.constructor.name}`,`"${status.operation}"`],e);
-      console.log(`${new Date().toISOString()} [ERROR][${this.constructor.name}][${status.operation}]: Operation failed: See "${parameters.LOG_FILE ? parameters.LOG_FILE  : 'above'}" for details.`);
+      console.log(`${new Date().toISOString()} [ERROR][YADAMU][${status.operation}]: Operation failed: See "${parameters.LOG_FILE ? parameters.LOG_FILE  : 'above'}" for details.`);
     }
     else {
-      console.log(`${new Date().toISOString()} [ERROR][${this.constructor.name}][${status.operation}]: Operation Failed:`);
-      console.log(e);
+      console.log(`${new Date().toISOString()} [ERROR][YADAMU][${status.operation}]: Operation Failed:`);
+      console.dir(e,{depth:null});
     }
   }
 
@@ -163,6 +179,9 @@ class Yadamu {
 
   processParameters() {
 
+    this.status.exceptionFolder     = this.parameters.EXCEPTION_FOLDER
+    this.status.exceptionFilePrefix = this.parameters.EXCEPTION_FILE_PREFIX
+
     this.yadamuLogger = this.setYadamuLogger(this.parameters,this.status);
 
     if (this.parameters.SQL_TRACE) {
@@ -181,28 +200,36 @@ class Yadamu {
       this.status.loglevel = this.parameters.LOG_LEVEL;
     }
     	
-    this.status.showInfoMsgs = (this.status.loglevel && (this.status.loglevel > 2));  	
-
   }	  
+  
+  setDefaultParameter(parameters,defaultName,parameterName) {	 
+    
+     // Set default value is parameter is not defined and default is defined.	
+ 
+	 if ((parameters.defaultName !== undefined) && (parameters.parameterName === undefined)) {
+		paramteres[parameterName] = parameters[defaultName]
+	 }
+  } 
   
   constructor(operation,parameters) {
     
     const self = this; 
-	this.yadamuLogger = new YadamuLogger(process.stdout)
+	this.yadamuLogger = new YadamuLogger(process.stdout,{})
     
+    this.status = {
+      operation        : operation
+     ,errorRaised      : false
+     ,warningRaised    : false
+     ,statusMsg        : 'successfully'
+     ,startTime        : performance.now()
+    }
+	
     process.on('unhandledRejection', (err, p) => {
-      self.yadamuLogger.logException([`${self.constructor.name}.onUnhandledRejection()`,`"${self.status.operation}"`],err);
+      self.yadamuLogger.logException([`${self.constructor.name}`,`${self.status.operation}`,`UNHANDLED REJECTION`],err);
+      self.status.errorRaised = true;
       self.reportStatus(self.status,self.yadamuLogger)
       process.exit()
     })
-
-    this.status = {
-      operation     : operation
-     ,errorRaised   : false
-     ,warningRaised : false
-     ,statusMsg     : 'successfully'
-     ,startTime     : performance.now()
-    }
 
     // Read Command Line Parameters
     this.commandLineParameters = this.readCommandLineParameters();
@@ -262,7 +289,7 @@ class Yadamu {
   getCommandLineParameters() {
     return this.commandLineParameters
   }
-    
+     
   readCommandLineParameters() {
    
     const parameters = {}
@@ -388,6 +415,22 @@ class Yadamu {
           case '--DUMP_FILE':
             parameters.DUMP_FILE = parameterValue;
             break;
+          case 'EXCEPTION_FOLDER':
+          case '--EXCEPTION_FOLDER':
+            parameters.EXCEPTION_FOLDER = parameterValue;
+            break;
+          case 'EXCEPTION_FILE_PREFIX':
+          case '--EXCEPTION_FILE_PREFIX':
+            parameters.EXCEPTION_FILE_PREFIX = parameterValue;
+            break;
+          case 'REJECT_FOLDER':
+          case '--REJECT_FOLDER':
+            parameters.REJECT_FOLDER = parameterValue;
+            break;
+          case 'REJECT_FILE_PREFIX':
+          case '--REJECT_FILE_PREFIX':
+            parameters.REJECT_FILE_PREFIX = parameterValue;
+            break;
           case 'FEEDBACK':
           case '--FEEDBACK':
             parameters.FEEDBACK = parameterValue.toUpperCase();
@@ -400,8 +443,8 @@ class Yadamu {
           case '--BATCH_SIZE':
             this.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
-          case 'BATCH_COMMIT':
-          case '--BATCH_COMMIT':
+          case 'COMMIT_RATIO':
+          case '--COMMIT_RATIO':
             this.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           case 'BATCH_LOB_COUNT':
@@ -468,18 +511,18 @@ class Yadamu {
 	  // This ensures the writer processes all pending records before connections are closed.
 	  
       const copyOperation = new Promise(function (resolve,reject) {
-        dbWriter.on('finish', function(){
-		  // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${dbWriter.constructor.name}.onFinish()`],`${failed ? 'FAILED' : 'SUCCSESS'}`);
+        dbWriter.on('close', function(){
+		  // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${dbWriter.constructor.name}.onClose()`],`${failed ? 'FAILED' : 'SUCCSESS'}`);
           failed ? reject(cause) : resolve()
 		})
         dbWriter.on('error',function(err){
-		  self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${dbWriter.constructor.name}.onError()`],err);
+		  self.yadamuLogger.handleException([[`Writer`,`${target.DATABASE_VENDOR}`]],err);
 		  cause = err;
 	      failed = true;
 		  reject(cause);
 	    })
 		inputStream.on('error',function(err){
-		  self.yadamuLogger.logException([`${self.constructor.name}.copyOperation()`,`${inputStream.constructor.name}.onError()`],err);
+		  self.yadamuLogger.handleException([`Reader`,`${source.DATABASE_VENDOR}`],err)
 		  cause = err;
 	      failed = true;
 		  dbWriter.end()
@@ -512,11 +555,13 @@ class Yadamu {
   }
     
   async pumpData(source,target) {
-      
+     
+	this.setDefaultParameter(source.parameters,'DEFAULT_USER','FROM_USER')
     if ((source.isDatabase() === true) && (source.parameters.FROM_USER === undefined)) {
       throw new Error('Missing mandatory parameter FROM_USER');
     }
 
+	this.setDefaultParameter(source.parameters,'DEFAULT_USER','TO_USER')
     if ((target.isDatabase() === true) && (target.parameters.TO_USER === undefined)) {
       throw new Error('Missing mandatory parameter TO_USER');
     }
@@ -570,7 +615,7 @@ class Yadamu {
     const startTime = performance.now();
     const json = await dbi.uploadFile(importFilePath);
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`${this.constructor.name}.uploadFile()`],`Processing file "${importFilePath}". Size ${fileSizeInBytes}. File Upload elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
+    this.yadamuLogger.info([`${dbi.DATABASE_VENDOR}`,`UPLOAD`],`File "${importFilePath}". Size ${fileSizeInBytes}. Elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
     return json;
   }
   
@@ -604,13 +649,13 @@ class Yadamu {
       const pathToFile = dbi.parameters.FILE;
       const hndl = await this.uploadFile(dbi,pathToFile);
       const log = await dbi.processFile(hndl)
+	  await dbi.releaseMasterConnection()
       await dbi.finalize();
 	  const timings = this.getTimings(log);  
 	  this.status.operationSuccessful = true;
       return timings
     } catch (e) {
 	  this.status.operationSuccessful = false;
-	  console.log(e)
 	  this.status.err = e;
       await dbi.abort(e)
     }
