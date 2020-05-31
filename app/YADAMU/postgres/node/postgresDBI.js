@@ -118,6 +118,47 @@ class PostgresDBI extends YadamuDBI {
     await configureConnection();
   }
   
+  async configureConnection() {
+    
+	const yadamuLogger = this.yadamuLogger
+    const databaseVendor = this.DATABASE_VENDOR
+   
+    const self = this
+    this.connection.on('error',
+	  function(err, p) {
+        // yadamuLogger.info([`${databaseVendor}`,`Connection.onError()`],err.message);
+   	    // Do not throw errors here.. Node will terminate immediately
+   	    // const pgErr = new PostgresError(err,self.postgresStack,self.postgressOperation)  
+        // throw pgErr
+      }
+	)
+
+    this.connection.on('notice',
+	  function(n){ 
+	    const notice = JSON.parse(JSON.stringify(n));
+        switch (notice.code) {
+          case '42P07': // Table exists on Create Table if not exists
+            break;
+          case '00000': // Table not found on Drop Table if exists
+		    break;
+          default:
+            yadamuLogger.info([`${self.DATABASE_VENDOR}`,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`);
+        }
+      }
+  
+	)  
+  
+    const setTimezone = `set timezone to 'UTC'`
+	this.executeSQL(setTimezone);
+
+    const setFloatPrecision = `set extra_float_digits to 3`
+	this.executeSQL(setFloatPrecision);
+
+    const setIntervalFormat =  `SET intervalstyle = 'iso_8601';`;
+	this.executeSQL(setIntervalFormat);
+					
+  }
+
   async closeConnection() {
 
   	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`closeConnection(${(this.connection !== undefined && this.connection.release)})`)
@@ -156,60 +197,6 @@ class PostgresDBI extends YadamuDBI {
   async reconnectImpl() {
     this.connection = this.isMaster() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
     await this.executeSQL('select 1')
-  }
-
-  async configureConnection() {
-    
-	const yadamuLogger = this.yadamuLogger
-    const databaseVendor = this.DATABASE_VENDOR
-   
-    const self = this
-    this.connection.on('error',
-	  function(err, p) {
-        // yadamuLogger.info([`${databaseVendor}`,`Connection.onError()`],err.message);
-   	    // Do not throw errors here.. Node will terminate immediately
-   	    // const pgErr = new PostgresError(err,self.postgresStack,self.postgressOperation)  
-        // throw pgErr
-      }
-	)
-
-    this.connection.on('notice',
-	  function(n){ 
-	    const notice = JSON.parse(JSON.stringify(n));
-        switch (notice.code) {
-          case '42P07': // Table exists on Create Table if not exists
-            break;
-          case '00000': // Table not found on Drop Table if exists
-		    break;
-          default:
-            yadamuLogger.info([`${self.DATABASE_VENDOR}`,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`);
-        }
-      }
-  
-	)  
-																						 
-			   
-	  
-  
-    const setTimezone = `set timezone to 'UTC'`
-							   
-														   
-	 
-	this.executeSQL(setTimezone);
-  
-    const setFloatPrecision = `set extra_float_digits to 3`
-							   
-																 
-	 
-	this.executeSQL(setFloatPrecision);
-
-    const setIntervalFormat =  `SET intervalstyle = 'iso_8601';`;
-							   
-																
-	 
-	this.executeSQL(setIntervalFormat);
-
-					
   }
   
   /*
@@ -360,8 +347,7 @@ class PostgresDBI extends YadamuDBI {
       await this.executeSQL(sqlStatement);
       super.rollbackTransaction()
 	} catch (newIssue) {
-	  this.checkCause(cause,newIssue);
-											   
+	  this.checkCause(cause,newIssue);								   
 	}
   }
 
@@ -657,16 +643,10 @@ class PostgresDBI extends YadamuDBI {
   ** The following methods are used by the YADAMU DBwriter class
   **
   */
-  
-							  
    
-  
   async createSchema(schema) {
     const createSchema = `create schema if not exists "${schema}"`;
-							   
-														   
-	 
-    await this.executeSQL(createSchema);   
+	await this.executeSQL(createSchema);   
   }
   
   async executeDDLImpl(ddl) {
@@ -674,9 +654,6 @@ class PostgresDBI extends YadamuDBI {
     await Promise.all(ddl.map(async function(ddlStatement) {
       try {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
-								   
-															   
-		 
         return await this.executeSQL(ddlStatement);
       } catch (e) {
         this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
@@ -695,8 +672,6 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async insertBatch(sqlStatement,batch) {
-							   
-														   
 	 
     const result = await this.executeSQL(sqlStatement,batch)
     return result;

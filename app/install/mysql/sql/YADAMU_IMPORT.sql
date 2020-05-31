@@ -235,7 +235,29 @@ BEGIN
         else
           return lower(P_DATA_TYPE);
       end case;       
-    else
+    when P_SOURCE_VENDOR = 'MongoDB' then
+      -- MongoDB typing based on JSON Typing and the Javascript TypeOf Operator
+      -- ### Todo MongoDB typing based on BSON ?
+      case
+        when P_DATA_TYPE in ('undefined','object','function','symbol') then 
+          return 'JSON';
+        when P_DATA_TYPE = 'boolean' then
+           return 'boolean';
+        when P_DATA_TYPE = 'number' then
+           return 'decimal';
+        when P_DATA_TYPE = 'string' then
+          case
+            when P_DATA_TYPE_LENGTH is null then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 16777215  then return 'longtext';
+            when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
+            else return 'varchar';            
+          end case;
+        when P_DATA_TYPE = 'bigint' then
+           return 'bigint';
+        else 
+           return lower(P_DATA_TYPE);
+      end case;    
+	else
       return lower(P_DATA_TYPE);
   end case;
 end;

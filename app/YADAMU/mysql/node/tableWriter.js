@@ -13,7 +13,8 @@ class TableWriter extends YadamuWriter {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
     this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
     this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + ')'; 
-     
+    this.warningManager = this.dbi.yadamu.warningManager
+
     this.transformations = this.tableInfo.dataTypes.map(function(dataType,idx) {
       switch (dataType.type) {
         case "tinyblob" :
@@ -70,8 +71,8 @@ class TableWriter extends YadamuWriter {
       const warnings = await this.dbi.executeSQL('show warnings');
       warnings.forEach(function(warning,idx) {
         if (warning.Level === 'Warning') {
-          this.yadamuLogger.info([`${this.constructor.name}.writeBatch()`,`"${this.tableName}"`],`Warnings reported by bulk insert operation. Details: ${JSON.stringify(warning)}`)
-          this.yadamuLogger.writeDirect(`${this.batch[idx]}\n`)
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode,idx],`${warning.Code} Details: ${warning.Message}.`)
+		  this.warningManager.rejectRow(this.tableName,this.batch[idx]);
         }
       },this)
     }
@@ -112,7 +113,7 @@ class TableWriter extends YadamuWriter {
 	  this.rowCounters.written++;
     } catch (e) {
       const errInfo = [dml,newRow]
-      this.skipTable = await this.handleInsertError(`INSERT (WKB->WKT)`,this.batch.length,rowNumber,newRow,e,errInfo);
+      await this.handleInsertError(`INSERT (WKB->WKT)`,this.batch.length,rowNumber,newRow,e,errInfo);
     }    
   }
   
@@ -159,7 +160,7 @@ class TableWriter extends YadamuWriter {
         }
         else {
           const errInfo = [this.tableInfo.dml,this.batch[row]]
-          this.skipTable = await this.handleInsertError(`INSERT ONE`,this.batch.length,row,this.batch[row],e,errInfo);
+          await this.handleInsertError(`INSERT ONE`,this.batch.length,row,this.batch[row],e,errInfo);
         }
         if (this.skipTable) {
           break;

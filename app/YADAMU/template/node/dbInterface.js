@@ -41,32 +41,33 @@ class DBInterface extends YadamuDBI {
 	// ###  Get a Database connection directly from the database (E.G. not using the pool)
   }
   
+  async configureConnection() {
+	### Configure the new connection here. Performed for every connection 
+  }
+
   async closeConnection() {
 	/// ### Release connection and return to pool
   }
   
-  async closePool() {
+  async closePool(options) {
 	// ### Close database connection pool
   }
   
   async reconnectImpl() {
-	 // Override default which returns unsupported
-      this.connection = this.isMaster() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+	 // Override default which returns unsupported. Generic code is below.
+     this.connection = this.isMaster() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
   }
-  
-  async configureConnection() {
-	### Configure the new connection here. Performed for every connection 
-  }
-  
+    
+  // ### Remove or override super.isValudDDL() which returns true
   
   isValidDDL() {
-	// ### Override super.isValudDDL() which returns false
-    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
+	 return super.isValidDDL()
   }
   
+  // ### Remove or override super.objectMode() which returns true  
+  
   objectMode() {
-	// ### Override super.isValudDDL() which returns false  
-    return true;
+    return super.objectMode();
   }
 
   get DATABASE_VENDOR()    { return ### };

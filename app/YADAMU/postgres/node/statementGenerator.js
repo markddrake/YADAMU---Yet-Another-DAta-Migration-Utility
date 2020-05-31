@@ -50,6 +50,9 @@ class StatementGenerator {
                 case "EWKT":
                   return "ST_GeomFromEWKT($%)"
                   break;
+                case "GeoJSON":
+                  return "ST_GeomFromGeoJSON($%)"
+                  break;
                 default:
                   return "ST_GeomFromWKB(decode($%))"
             }

@@ -63,6 +63,13 @@ class Yadamu {
     return new YadamuRejectManager(rejectFile,this.yadamuLogger);
   }
    
+  createWarningManager() {
+    const rejectFolderPath = this.parameters.REJECT_FOLDER ? YadamuLibrary.pathSubstitutions(this.parameters.REJECT_FOLDER) : 'rejections';
+    const rejectFileName = this.parameters.REJECT_FILE_PREFIX ? YadamuLibrary.pathSubstitutions(this.parameters.REJECT_FILE_PREFIX) : 'warnings';
+    const rejectFile = path.resolve(`${rejectFolderPath}${path.sep}${rejectFileName}_${new Date().toISOString().replace(/:/g,'.')}.json`);
+    return new YadamuRejectManager(rejectFile,this.yadamuLogger);
+  }
+
   reportStatus(status,yadamuLogger) {
 
     const endTime = performance.now();
@@ -493,6 +500,7 @@ class Yadamu {
 
     const timings = {}
     this.rejectManager = this.createRejectManager()
+	this.warningManager = this.createWarningManager();
 
 	let error;
     try {
@@ -535,6 +543,7 @@ class Yadamu {
       await source.finalize();
       await target.finalize();
       this.rejectManager.close();
+	  this.warningManager.close();
 	  const timings = dbWriter.getTimings();
 	  this.status.operationSuccessful = true;
       return timings

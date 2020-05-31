@@ -213,7 +213,7 @@ class StatementGenerator {
           table.columns.add(columns[idx],sql.VarChar(4000),{nullable: true});
           break;
         default:
-          this.yadamuLogger.info([`${this.constructor.name}.createBulkOperation()`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,`BULK OPERATION`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
       }
     },this)
     return table
@@ -266,6 +266,9 @@ class StatementGenerator {
                case "EWKB":
                  tableInfo.dml = tableInfo.dml + 'geography::STGeomFromWKB(@C' + idx + ',4326)' + ','
                  break
+			   case "GeoJSON":
+                 tableInfo.dml = tableInfo.dml + 'geography::STGeomFromText(@C' + idx + ',4326)' + ','
+                 break
                default:
                  tableInfo.dml = tableInfo.dml + 'geography::STGeomFromWKB(@C' + idx + ',4326)' + ','
             }    
@@ -280,6 +283,9 @@ class StatementGenerator {
                case "EWKB":
                  tableInfo.dml = tableInfo.dml + 'geometry::STGeomFromWKB(@C' + idx + ',4326)' + ','
                  break
+			   case "GeoJSON":
+                 tableInfo.dml = tableInfo.dml + 'geometry::STGeomFromText(@C' + idx + ',4326)' + ','
+                 break			   
                default:
                  tableInfo.dml = tableInfo.dml + 'geometry::STGeomFromWKB(@C' + idx + ',4326)' + ','
             }      

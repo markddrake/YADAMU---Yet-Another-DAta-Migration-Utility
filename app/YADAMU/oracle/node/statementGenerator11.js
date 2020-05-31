@@ -21,6 +21,9 @@ class StatementGenerator11 extends StatementGenerator {
   
   constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize) {
     super(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize)
+	
+	// 11.x does not support GeoJSON. We need to use WKX to convert GeoJSON to WKT
+	this.GEOJSON_FUNCTION = 'DESERIALIZE_WKTGEOMETRY'
   }
 
   // In 11g the seperator character appears to be \r rather than \n

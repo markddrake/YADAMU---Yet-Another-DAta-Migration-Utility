@@ -11,6 +11,7 @@ class TableWriter extends YadamuWriter {
     super(dbi,tableName,tableInfo,status,yadamuLogger)
     this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
     this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + '),';
+    this.warningManager = this.dbi.yadamu.warningManager
     
     this.transformations = this.tableInfo.dataTypes.map(function(dataType,idx) {
       switch (dataType.type) {
@@ -96,8 +97,8 @@ class TableWriter extends YadamuWriter {
       const warnings = await this.dbi.executeSQL('show warnings');
       warnings.forEach(function(warning,idx) {
         if (warning.Level === 'Warning') {
-          this.yadamuLogger.warning([`${this.constructor.name}.writeBatch()`],`Warnings reported by bulk insert operation. Details: ${JSON.stringify(warning)}`)
-          this.yadamuLogger.writeDirect(`${this.batch[idx]}\n`)
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode,idx],`${warning.Code} Details: ${warning.Message}.`)
+		  this.warningManager.rejectRow(this.tableName,this.batch[idx]);
         }
       },this)
     }
@@ -147,7 +148,7 @@ class TableWriter extends YadamuWriter {
 		this.rowCounters.written++;
       } catch (e) {
         const errInfo = [this.tableInfo.dml]
-        this.skipTable = await this.handleInsertError(`INSERT ONE`,this.rowCounters.cached,row,nextRow,e,errInfo);
+        await this.handleInsertError(`INSERT ONE`,this.rowCounters.cached,row,nextRow,e,errInfo);
         if (this.skipTable) {
           break;
         }

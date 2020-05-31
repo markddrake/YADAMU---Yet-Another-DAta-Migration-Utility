@@ -33,10 +33,20 @@ class FileDBI extends YadamuDBI {
 
   }
   
+  // Override YadamuDBI
+  
+  isValidDDL() {
+    return false;
+  }
+  
+  // Override YadamuDBI
+  
   isDatabase() {
     return false;
   }
   
+  // Override YadamuDBI
+
   objectMode() {
      return false;
   }
@@ -60,10 +70,6 @@ class FileDBI extends YadamuDBI {
     this.firstTable = true;
   }
 
-  isValidDDL() {
-    return true;
-  }
-  
   generateStatementCache() {
 	this.statementCache = {}
   }

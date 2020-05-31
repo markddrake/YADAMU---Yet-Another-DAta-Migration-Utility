@@ -35,6 +35,7 @@ class StatementGenerator {
     , INTERVAL      : 16
     }  
 
+    this.GEOJSON_FUNCTION = 'DESERIALIZE_GEOJSON'
   }
    
   generateBinds(tableInfo, metadata) {
@@ -340,7 +341,7 @@ class StatementGenerator {
                  values.push(`OBJECT_SERIALIZATION.DESERIALIZE_WKTGEOMETRY(:${(idx+1)})`);
                  break;
                case "GeoJSON":
-                 values.push(`OBJECT_SERIALIZATION.DESERIALIZE_GEOJSON(:${(idx+1)})`);
+                 values.push(`OBJECT_SERIALIZATION.${this.GEOJSON_FUNCTION}(:${(idx+1)})`);
                  break;
                default:
             }

@@ -1,9 +1,8 @@
 "use strict"
 
 const { performance } = require('perf_hooks');
-// const WKX = require('wkx');
+const WKX = require('wkx');
 
-const {BatchInsertError} = require('../../common/yadamuError.js')
 const YadamuWriter = require('../../common/yadamuWriter.js');
 const {BatchInsertError} = require('../../common/yadamuError.js')
 
@@ -36,6 +35,11 @@ class TableWriter extends YadamuWriter {
 	           return Buffer.from(col,'hex');
 			 }
 			 break;
+		   case "GeoJSON":
+             return function(col,idx) {
+  		       return WKX.Geometry.parseGeoJSON(JSON.parse(col)).toWkt();
+			 }
+		     break;
 		   default:
              return null;	 
 		  }
@@ -185,7 +189,7 @@ class TableWriter extends YadamuWriter {
 		this.rowCounters.written++
       } catch (e) {
         const errInfo = [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.rows[row])]
-        this.skipTable = await this.handleInsertError(`INSERT ONE`,this.tableInfo.bulkOperation.rows.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
+        await this.handleInsertError(`INSERT ONE`,this.tableInfo.bulkOperation.rows.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
         if (this.skipTable) {
           break;
         }

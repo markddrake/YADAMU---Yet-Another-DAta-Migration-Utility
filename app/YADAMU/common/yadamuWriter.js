@@ -12,6 +12,7 @@ class YadamuWriter {
     this.tableInfo = tableInfo
     this.status = status;
     this.yadamuLogger = yadamuLogger;    
+	this.maxErrors =  this.dbi.parameters.MAX_ERRORS ? this.dbi.parameters.MAX_ERRORS : 10
     this.rejectManager = this.dbi.yadamu.rejectManager
 	
     this.skipTable = false;
@@ -108,16 +109,11 @@ class YadamuWriter {
     this.rowCounters.skipped++;
     this.rejectRow(this.tableName,record);
     this.yadamuLogger.logRejected([this.dbi.DATABASE_VENDOR,this.tableName,currentOperation,batchSize,row],err);
-	/*
-    info.forEach(function (info) {
-      this.yadamuLogger.writeDirect(`${info}\n`);
-    },this)
-    */
-    const abort = (this.rowCounters.skipped === ( this.dbi.parameters.MAX_ERRORS ? this.dbi.parameters.MAX_ERRORS : 10)) 
-    if (abort) {
+
+    if (this.rowCounters.skipped === this.maxErrors) {
       this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
+      this.skipTable = true;
     }
-    return abort;     
   }
   
   getStatistics() {

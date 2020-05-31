@@ -2,7 +2,7 @@
 
 const { performance } = require('perf_hooks');
 
-// const WKX = require('wkx');
+const WKX = require('wkx');
 
 const oracledb = require('oracledb');
 
@@ -41,20 +41,17 @@ class TableWriter extends YadamuWriter {
     this.exportTestdata = this.dbi.parameters.EXPORT_TESTCASE === true
     this.lobCumlativeTime = 0;
 	 
-    if (this.dbi.dbVersion < 12) {
-      this.WKX = require('wkx') 
-    }
-    
 	// Set up an Array of Transformation functions to be applied to the incoming rows
 	
     this.transformations = this.tableInfo.dataTypes.map(function(dataType,idx) {          
       switch (dataType.type) {            
         case "GEOMETRY":
+        case '"MDSYS"."SDO_GEOMETRY"':
           // Metadata based decision
           if ((this.dbi.dbVersion < 12) && (this.tableInfo.spatialFormat === 'GeoJSON')) {
-            // GeoJSON not supported by SDO_UTIL in 11.x database
-            return function(col,jdx) {
-              return this.WKX.Geometry.parseGeoJSON(col).toWKT();
+            // SDO_UTIL does not support GeoJSON in 11.x database
+            return function(col,jdx,self) {
+			  return WKX.Geometry.parseGeoJSON(JSON.parse(col)).toWkt();
             }
           }
           else {
@@ -64,7 +61,7 @@ class TableWriter extends YadamuWriter {
 		case "BFILE":
 		    // Convert JSON representation to String.
         case "JSON":
-          return function(col,jdx) {
+          return function(col,jdx,self) {
             // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
             // row[idx] = Buffer.from(JSON.stringify(row[idx]))
             // Default JSON Storage model is JSON store as CLOB.
@@ -78,7 +75,7 @@ class TableWriter extends YadamuWriter {
           }
           break;
         case "RAW":
-          return function(col,jdx) {
+          return function(col,jdx,self) {
             if (typeof col === 'boolean') {
               return  col === true ? '01' : '00'
             }
@@ -86,7 +83,7 @@ class TableWriter extends YadamuWriter {
           }
           break;
         case "BOOLEAN":
-          return function(col,jdx) {
+          return function(col,jdx,self) {
             switch (col) {
               case true:
                  return 'true';
@@ -98,7 +95,7 @@ class TableWriter extends YadamuWriter {
 		  }
           break;
         case "DATE":
-          return function(col,jdx) { 
+          return function(col,jdx,self) { 
             if (col instanceof Date) {
               return col.toISOString()
             }
@@ -106,7 +103,7 @@ class TableWriter extends YadamuWriter {
           }
           break;
         case "TIMESTAMP":
-          return function(col,jdx) { 
+          return function(col,jdx,self) { 
             // A Timestamp not explicitly marked as UTC should be coerced to UTC.
             // Avoid Javascript dates due to lost of precsion.
             // row[bindIdx] = new Date(Date.parse(col.endsWith('Z') ? col : col + 'Z'));
@@ -120,7 +117,7 @@ class TableWriter extends YadamuWriter {
           }
           break;
         case "XMLTYPE" :
-          return function(col,jdx) { 
+          return function(col,jdx,self) { 
             // Cannot passs XMLTYPE as BUFFER
             // Reason: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
             // bindRow[idx] = Buffer.from(col);
@@ -146,7 +143,7 @@ class TableWriter extends YadamuWriter {
 	  this.lobTransformations = this.tableInfo.lobBinds.map(function(lobBind,idx) {
         switch (lobBind.type) {
           case oracledb.CLOB:
-		    return function(col,self) {
+		    return function(col,jdx,self) {
               // Determine whether to bind content as string or temporary CLOB
               if (typeof col !== "string") {
                 col = JSON.stringify(col);
@@ -157,7 +154,7 @@ class TableWriter extends YadamuWriter {
 		    }
 		    break;
           case oracledb.BLOB:
-		    return function(col,self) {
+		    return function(col,jdx,self) {
 			  /*
 			  **
 			  ** At this point we can have one of the following to deal with:
@@ -272,10 +269,10 @@ class TableWriter extends YadamuWriter {
           const rowIdx = this.tableInfo.bindOrdering[bindIdx]
 		  if (row[rowIdx] !== null) {			     
             if (transformation !== null) {
-			  row[rowIdx] = transformation(row[rowIdx]);
+			  row[rowIdx] = transformation(row[rowIdx],rowIdx,this);
 			}
    	        if (this.lobTransformations[bindIdx] !== null) {
-  		      row[rowIdx] = this.lobTransformations[bindIdx](row[rowIdx],this);		      
+  		      row[rowIdx] = this.lobTransformations[bindIdx](row[rowIdx],rowIdx,this);		      
 		    }
 		  } 			
 		  return row[rowIdx]
@@ -285,7 +282,7 @@ class TableWriter extends YadamuWriter {
 		// Bind Ordering and Row Ordering are the same. Apply transformations directly to ROW where required
 	    this.transformations.forEach(function (transformation,idx) {
           if ((transformation !== null) && (row[idx] !== null)) {			
-	        row[idx] = transformation(row[idx])
+	        row[idx] = transformation(row[idx],idx,this)
           }
 	    },this)
       }
@@ -327,7 +324,7 @@ class TableWriter extends YadamuWriter {
       this.rowCounters.cached++
     } catch (e) {
       const errInfo = [this.tableInfo.dml,this.tableInfo.dataTypes,JSON.stringify(this.tableInfo.binds)]
-      this.skipTable = await this.handleInsertError('CACHE ONE',this.batch.length+this.lobBatch.length,-1,row,e,errInfo);
+      await this.handleInsertError('CACHE ONE',this.batch.length+this.lobBatch.length,-1,row,e,errInfo);
     }
 	
 	return this.skipTable
@@ -576,7 +573,7 @@ end;`
 		this.rowCounters.written++
       } catch (e) {
         const errInfo = [this.tableInfo.dml,this.tableInfo.dataTypes,rows[row]]
-        this.skipTable = await this.handleInsertError('INSERT ONE',rows.length,row,rows[row],e,errInfo);
+        await this.handleInsertError('INSERT ONE',rows.length,row,rows[row],e,errInfo);
         if (this.skipTable) {
           break;
         }

@@ -439,7 +439,7 @@ class MsSQLDBI extends YadamuDBI {
             statement.input(column,sql.VarChar(4000));
             break;
           default:
-            this.yadamuLogger.info([`${this.constructor.name}.createstatement()`],`Unmapped data type [${dataType.type}].`);
+            this.yadamuLogger.warning([this.DATABASE_VENDOR,`PREPARED STATEMENT`],`Unmapped data type [${dataType.type}].`);
         }
       },this)
 	  
@@ -471,7 +471,7 @@ class MsSQLDBI extends YadamuDBI {
 	  this.pool = new sql.ConnectionPool(this.connectionProperties)
       this.pool.on('error',(err, p) => {
 		if (!self.reconnectInProgress) {
-          self.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`sql.ConnectionPool.onError()`],err);
+          self.yadamuLogger.logException([this.DATABASE_VENDOR,`sql.ConnectionPool.onError()`],err);
 		}
         throw err
       })
@@ -652,7 +652,7 @@ class MsSQLDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = new MsSQLError(e,stack,sqlStatement);
+		const cause = new MsSQLError(e,stack,this.preparedStatement.sqlStatement);
 		if (attemptReconnect && cause.lostConnection()) {
 	      this.preparedStatement === undefined;
           attemptReconnect = false;
@@ -661,7 +661,6 @@ class MsSQLDBI extends YadamuDBI {
           this.cachePreparedStatement(this.preparedStatement.sqlStatement,this.preparedStatement.dataTypes);
           continue;
         }
-		this.clearCachedStatement();
         throw cause
       }      
     } 

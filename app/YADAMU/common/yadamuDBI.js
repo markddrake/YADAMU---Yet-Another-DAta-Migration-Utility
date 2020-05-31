@@ -12,7 +12,7 @@ const { performance } = require('perf_hooks');const async_hooks = require('async
 */
 
 const YadamuLibrary = require('./yadamuLibrary.js');
-const {YadamuError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuError.js');
+const {YadamuError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError} = require('./yadamuError.js');
 const DBParser = require('./dbParser.js');
 
 const DEFAULT_BATCH_SIZE   = 10000;
@@ -903,7 +903,6 @@ class YadamuDBI {
     dbi.sqlTraceTag = ` /* Slave [${this.slaveNumber}] */`;
   }   
 
- 
   async setSlaveConnection() {
     // DBI implementations that do not use a pool / connection mechansim need to overide this function. eg MSSQLSERVER
 	this.connection = await this.connectionProvider.getConnectionFromPool()	
@@ -921,7 +920,6 @@ class YadamuDBI {
 
   }
   
-
   async slaveDBI(slaveNumber,dbi) {
       
     // Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.

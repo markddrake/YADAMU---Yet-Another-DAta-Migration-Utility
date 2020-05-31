@@ -177,8 +177,30 @@ class StatementGenerator {
            default:                               return dataType.toLowerCase();
          }
          break;
-       default: 
-         return dataType.toLowerCase();
+       case 'MongoDB':
+         switch (dataType) {
+           case "undefined":
+		   case "object":
+		   case "function":
+		   case "symbol":
+		     return 'json';
+		   case "boolean":
+		     return 'boolean';
+           case "string":
+		     switch (true) {
+               case (dataTypeLength === undefined): return 'longtext';
+               case (dataTypeLength > 16777215):    return 'longtext';
+               case (dataTypeLength > 65535):       return 'mediumtext';
+               default:                             return 'varchar';
+             }
+		   case "bigint":
+             return "bigint";
+           default
+             dataType.toLowerCase();
+		 }
+		 break;
+  	   default :
+         return dataType.toLowerCase();0	
     }  
   }
   

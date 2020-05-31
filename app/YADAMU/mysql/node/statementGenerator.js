@@ -47,6 +47,9 @@ class StatementGenerator {
                  case "EWRT":
                    return ' "' + columnNames[idx] + '"' + " = ST_GeomFromText(?)";
                    break;
+                 case "GeoJSON":
+                   return ' "' + columnNames[idx] + '"' + " = ST_GeomFromGeoJSON(?)";
+                   break;
                  default:
                    return ' "' + columnNames[idx] + '"' + " = ST_GeomFromWKB(UNHEX(?))";
                }              

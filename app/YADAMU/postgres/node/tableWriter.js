@@ -139,7 +139,7 @@ class TableWriter extends YadamuWriter {
     } 
      
     let argNumber = 1;
-    const args = Array(1).fill(0).map(function() {return `(${Array(this.tableInfo.targetDataTypes.length).fill(0).map(function(){return `$${argNumber++}`}).join(',')})`},this).join(',');
+    const args = Array(1).fill(0).map(function() {return `(${this.tableInfo.insertOperators.map(function(operator) {return operator.replace('$%',`$${argNumber++}`)}).join(',')})`},this).join(',');
     const sqlStatement = this.tableInfo.dml + args
     for (let row =0; row < this.rowCounters.cached; row++) {
       const nextRow = repackBatch ?  this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
@@ -151,7 +151,7 @@ class TableWriter extends YadamuWriter {
       } catch(e) {
         this.dbi.restoreSavePoint(e);
         const errInfo = [this.tableInfo.dml,JSON.stringify(nextRow)]
-        this.skipTable = await this.handleInsertError(`INSERT ONE`,this.rowCounters.cached,row,nextRow,e,errInfo);
+        await this.handleInsertError(`INSERT ONE`,this.rowCounters.cached,row,nextRow,e,errInfo);
         if (this.skipTable) {
           break;
         }

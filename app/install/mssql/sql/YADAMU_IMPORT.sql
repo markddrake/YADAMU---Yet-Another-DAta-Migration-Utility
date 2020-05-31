@@ -6,139 +6,161 @@ as
 begin
   return 
   case
-    when @VENDOR = 'Oracle'
-      then case 
-             when @DATA_TYPE = 'VARCHAR2' 
-               then 'varchar'
-             when @DATA_TYPE = 'NVARCHAR2' 
-               then 'nvarchar'
-             when @DATA_TYPE = 'CLOB'
-               then 'varchar(max)'
-             when @DATA_TYPE = 'NCLOB'
-               then 'nvarchar(max)'
-             when @DATA_TYPE = 'NUMBER'
-               then 'decimal'
-             when @DATA_TYPE = 'BINARY_DOUBLE'
-               then 'float(53)'
-             when @DATA_TYPE = 'BINARY_FLOAT'
-               then 'real'
-             when @DATA_TYPE = 'RAW'
-               then 'varbinary'
-             when @DATA_TYPE = 'BLOB'
-               then 'varbinary(max)'
-             when @DATA_TYPE = 'BFILE'
-               then 'varchar(2048)'  
-             when @DATA_TYPE in ('ROWID','UROWID') 
-               then 'varchar(18)'                  
-             when @DATA_TYPE in ('ANYDATA') 
-               then 'nvarchar(max)'                
-             when (CHARINDEX('INTERVAL',@DATA_TYPE) = 1)
-               then 'varchar(16)'                  
-             when (CHARINDEX('TIMESTAMP',@DATA_TYPE) = 1) 
-               then case
-                      when (CHARINDEX('TIME ZONE',@DATA_TYPE) > 0) 
-                        then 'datetimeoffset'
-                      else 
-                       'datetime2' 
-               end
-             when @DATA_TYPE = 'XMLTYPE'
-               then 'xml'
-             when @DATA_TYPE like '"%"."%"'
-               then 'nvarchar(max)'
-             when @DATA_TYPE = 'JSON' 
-               then 'json'
-             else
-               lower(@DATA_TYPE)
-           end
-    when @VENDOR in ('MySQL','MariaDB')   
-      then case 
-             when @DATA_TYPE = 'mediumint' 
-               then 'int'
-             when @DATA_TYPE = 'datetime' 
-               then 'datetime2'
-             when @DATA_TYPE = 'timestamp' 
-               then 'datetime2'
-             when @DATA_TYPE = 'float' 
-               then 'real'
-             when @DATA_TYPE = 'double' 
-               then 'float(53)'
-             when @DATA_TYPE = 'enum'
-               then 'varchar(255)'
-             when @DATA_TYPE = 'set'
-               then 'varchar(255)'
-             when @DATA_TYPE = 'year'
-               then 'smallint'
-             when @DATA_TYPE = 'json' 
-               then 'json'
-             when @DATA_TYPE = 'blob' and @DATA_TYPE_LENGTH > 8000  
-               then 'varbinary(max)'
-             when @DATA_TYPE = 'blob' 
-               then 'varbinary'
-             when @DATA_TYPE = 'varchar' then
-               -- For MySQL may need to add column character set to the table metadata object in order to accutately determine varchar Vs nvarchar ? 
-               -- Alternatively the character set could be used when generating metadata from the MySQL dictionaly that distinguishes varchar from nvarchar even thought the dictionaly does not.
-               'nvarchar'
-             when @DATA_TYPE = 'text' then
-               'nvarchar(max)'
-             when @DATA_TYPE = 'mediumtext' then
-               'nvarchar(max)'
-             when @DATA_TYPE = 'longtext' then
-               'nvarchar(max)'
-             when @DATA_TYPE = 'longblob' then
-               'varbinary(max)'
-             when @DATA_TYPE = 'mediumblob' then
-               'varbinary(max)'
-             else
-               lower(@DATA_TYPE)
-           end
-    when @VENDOR = 'Postgres'
-      then case 
-             when @DATA_TYPE = 'character varying' and @DATA_TYPE_LENGTH is null then
-               'nvarchar(max)'
-             when @DATA_TYPE = 'character varying' then
-               'nvarchar'
-             when @DATA_TYPE = 'character' then
-               'nchar'
-             when @DATA_TYPE = 'text' then
-               'nvarchar(max)'
-             when @DATA_TYPE = 'bytea' and @DATA_TYPE_LENGTH > 8000  then 
-               'varbinary(max)'
-             when @DATA_TYPE = 'bytea' then
-               'varbinary'
-             when @DATA_TYPE = 'boolean' then
-               'bit'
-             when @DATA_TYPE = 'timestamp' then
-               'datetime'
-             when @DATA_TYPE = 'timestamp with time zone' then
-               'datetimeoffset'
-             when @DATA_TYPE = 'timestamp without time zone' then
-               'datetime2'
-             when @DATA_TYPE = 'time without time zone' then
-               'time'
-             when (CHARINDEX('interval',@DATA_TYPE) = 1) then
-               'varchar(64)'
-             when @DATA_TYPE = 'double precision' then
-               'float(53)'
-             when @DATA_TYPE = 'real' then
-               'real'
-             when @DATA_TYPE = 'geometry' then
-               'geometry'
-             when @DATA_TYPE = 'geography'then
-               'geography'
-             when @DATA_TYPE = 'integer' then
-               'int'
-             else
-               lower(@DATA_TYPE)
-           end          
-    when ((@VENDOR = 'MSSQLSERVER') and (@DB_COLLATION like '%UTF8'))
-      then case 
-             when @DATA_TYPE = 'text' then
-			   'varchar(max)'
-             when @DATA_TYPE = 'ntext' then
-			   'nvarchar(max)'
-             else
-               lower(@DATA_TYPE)
-		   end	   
+    when @VENDOR = 'Oracle' then
+      case 
+        when @DATA_TYPE = 'VARCHAR2' 
+          then 'varchar'
+        when @DATA_TYPE = 'NVARCHAR2' 
+          then 'nvarchar'
+        when @DATA_TYPE = 'CLOB'
+          then 'varchar(max)'
+        when @DATA_TYPE = 'NCLOB'
+          then 'nvarchar(max)'
+        when @DATA_TYPE = 'NUMBER'
+          then 'decimal'
+        when @DATA_TYPE = 'BINARY_DOUBLE'
+          then 'float(53)'
+        when @DATA_TYPE = 'BINARY_FLOAT'
+          then 'real'
+        when @DATA_TYPE = 'RAW'
+          then 'varbinary'
+        when @DATA_TYPE = 'BLOB'
+          then 'varbinary(max)'
+        when @DATA_TYPE = 'BFILE'
+          then 'varchar(2048)'  
+        when @DATA_TYPE in ('ROWID','UROWID') 
+          then 'varchar(18)'                  
+        when @DATA_TYPE in ('ANYDATA') 
+          then 'nvarchar(max)'                
+        when (CHARINDEX('INTERVAL',@DATA_TYPE) = 1)
+          then 'varchar(16)'                  
+        when (CHARINDEX('TIMESTAMP',@DATA_TYPE) = 1) 
+          then case
+                 when (CHARINDEX('TIME ZONE',@DATA_TYPE) > 0) 
+                   then 'datetimeoffset'
+                 else 
+                  'datetime2' 
+          end
+        when @DATA_TYPE = 'XMLTYPE'
+          then 'xml'
+        when @DATA_TYPE like '"%"."%"'
+          then 'nvarchar(max)'
+        when @DATA_TYPE = 'JSON' 
+          then 'json'
+        else
+          lower(@DATA_TYPE)
+      end
+    when @VENDOR in ('MySQL','MariaDB') then
+      case 
+        when @DATA_TYPE = 'mediumint' 
+          then 'int'
+        when @DATA_TYPE = 'datetime' 
+          then 'datetime2'
+        when @DATA_TYPE = 'timestamp' 
+          then 'datetime2'
+        when @DATA_TYPE = 'float' 
+          then 'real'
+        when @DATA_TYPE = 'double' 
+          then 'float(53)'
+        when @DATA_TYPE = 'enum'
+          then 'varchar(255)'
+        when @DATA_TYPE = 'set'
+          then 'varchar(255)'
+        when @DATA_TYPE = 'year'
+          then 'smallint'
+        when @DATA_TYPE = 'json' 
+          then 'json'
+        when @DATA_TYPE = 'blob' and @DATA_TYPE_LENGTH > 8000  
+          then 'varbinary(max)'
+        when @DATA_TYPE = 'blob' 
+          then 'varbinary'
+        when @DATA_TYPE = 'varchar' then
+          -- For MySQL may need to add column character set to the table metadata object in order to accutately determine varchar Vs nvarchar ? 
+          -- Alternatively the character set could be used when generating metadata from the MySQL dictionaly that distinguishes varchar from nvarchar even thought the dictionaly does not.
+          'nvarchar'
+        when @DATA_TYPE = 'text' then
+          'nvarchar(max)'
+        when @DATA_TYPE = 'mediumtext' then
+          'nvarchar(max)'
+        when @DATA_TYPE = 'longtext' then
+          'nvarchar(max)'
+        when @DATA_TYPE = 'longblob' then
+          'varbinary(max)'
+        when @DATA_TYPE = 'mediumblob' then
+          'varbinary(max)'
+        else
+          lower(@DATA_TYPE)
+      end
+    when @VENDOR = 'Postgres' then
+      case 
+        when @DATA_TYPE = 'character varying' and @DATA_TYPE_LENGTH is null then
+          'nvarchar(max)'
+        when @DATA_TYPE = 'character varying' then
+          'nvarchar'
+        when @DATA_TYPE = 'character' then
+          'nchar'
+        when @DATA_TYPE = 'text' then
+          'nvarchar(max)'
+        when @DATA_TYPE = 'bytea' and @DATA_TYPE_LENGTH > 8000  then 
+          'varbinary(max)'
+        when @DATA_TYPE = 'bytea' then
+          'varbinary'
+        when @DATA_TYPE = 'boolean' then
+          'bit'
+        when @DATA_TYPE = 'timestamp' then
+          'datetime'
+        when @DATA_TYPE = 'timestamp with time zone' then
+          'datetimeoffset'
+        when @DATA_TYPE = 'timestamp without time zone' then
+          'datetime2'
+        when @DATA_TYPE = 'time without time zone' then
+          'time'
+        when (CHARINDEX('interval',@DATA_TYPE) = 1) then
+          'varchar(64)'
+        when @DATA_TYPE = 'double precision' then
+          'float(53)'
+        when @DATA_TYPE = 'real' then
+          'real'
+        when @DATA_TYPE = 'geometry' then
+          'geometry'
+        when @DATA_TYPE = 'geography'then
+          'geography'
+        when @DATA_TYPE = 'integer' then
+          'int'
+        else
+          lower(@DATA_TYPE)
+      end          
+    when ((@VENDOR = 'MSSQLSERVER') and (@DB_COLLATION like '%UTF8')) then
+      case 
+        when @DATA_TYPE = 'text' then
+		  'varchar(max)'
+        when @DATA_TYPE = 'ntext' then
+		  'nvarchar(max)'
+        else
+          lower(@DATA_TYPE)
+	  end	   
+    when @VENDOR = 'MongoDB' then
+      -- MongoDB typing based on JSON Typing and the Javascript TypeOf Operator
+      -- ### Todo MongoDB typing based on BSON ?
+      case
+        when @DATA_TYPE in ('undefined','object','function','symbol') then 
+          'json'
+        when @DATA_TYPE = 'boolean' then
+          'bit'
+        when @DATA_TYPE = 'number' then
+          'decimal'
+        when @DATA_TYPE = 'string' then
+          case
+            when @DATA_TYPE_LENGTH > 4000 then
+              'nvarchar(max)'
+            else
+              'nvarchar(max)'
+          end
+        when @DATA_TYPE = 'bigint' then
+           'bigint'
+        else 
+           lower(@DATA_TYPE)
+      end
     else 
       lower(@DATA_TYPE)
   end
