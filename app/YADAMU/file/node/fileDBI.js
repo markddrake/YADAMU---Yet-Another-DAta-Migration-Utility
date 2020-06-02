@@ -33,10 +33,10 @@ class FileDBI extends YadamuDBI {
 
   }
   
-  // Override YadamuDBI
+  // Override YadamuDBI - Any DDL is considered valid and written to the export file.
   
   isValidDDL() {
-    return false;
+    return true;
   }
   
   // Override YadamuDBI
@@ -140,9 +140,7 @@ class FileDBI extends YadamuDBI {
   **  Abort the database connection.
   **
   */
-
-  asy
-
+  
   async abort() {
 
     if (this.inputStream !== undefined) {
