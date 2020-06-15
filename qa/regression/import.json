@@ -31,7 +31,7 @@
     ]
   },{
     "source": "file-mssql19"
-  , "targets": ["oracle19c","oracle18c","oracle12c","oracle11g","postgres#1","mysql#1","mariadb#1"]
+  , "targets": ["oracle19c","oracle18c","oracle12c","postgres#1","mysql#1","mariadb#1"]
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
@@ -40,5 +40,19 @@
   , "tasks": [
       "mssql"
     ]
+  },{
+    "source": "file-mssql19"
+  , "targets": ["oracle11g"]
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    , "MAPPINGS": "qa/regression/mappingsOracle11g.json"
+	}
+  , "reverseOperations" : true
+  , "recreateSchemas"   : true
+  , "tasks": [
+      "mssql"
+    ]
   }]
 }  
+
+      

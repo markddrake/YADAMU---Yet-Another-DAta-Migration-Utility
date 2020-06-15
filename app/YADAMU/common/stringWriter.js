@@ -9,9 +9,9 @@ class StringWriter extends Writable {
     this.chunks = []
   }
 
-  _write(chunk, encoding, done) {
+  _write(chunk, encoding, callback) {
      this.chunks.push(chunk);
-     done();
+     callback();
   }
   
   toString() {

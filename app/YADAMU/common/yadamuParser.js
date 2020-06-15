@@ -22,13 +22,13 @@ class YadamuParser extends Transform {
 
   // For use in cases where the database generates a single column containing a serialized JSON reprensentation of the row.
   
-  async _transform (data,encodoing,done) {
+  async _transform (data,encoding,callback) {
     this.counter++;
     if (this.objectMode) {
       data.json = JSON.parse(data.json);
     }
     this.push({data:data.json})
-    done();
+    callback();
   }
   
 }

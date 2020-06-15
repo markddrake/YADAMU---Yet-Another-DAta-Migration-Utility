@@ -24,10 +24,18 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
   ;;
 
+  mongoImport)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoImport
+  ;;
+
+  mongoRoundtrip)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoRoundtrip
+  ;;
+
   all)
     source $YADAMU_SCRIPT_DIR/runRegressionTests.sh 
   ;;	
   *)
-    echo "valid values are export, import, fileRoundtrip, dbRoundtrip, or all (default)"
+    echo "valid values are export, import, fileRoundtrip, dbRoundtrip, lostConnection,  mongoImport, mongoRoundtrip or all (default)"
   ;;
 esac

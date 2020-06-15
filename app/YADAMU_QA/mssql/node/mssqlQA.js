@@ -54,14 +54,12 @@ class MsSQLQA extends MsSQLDBI {
     }
 	
 	async scheduleTermination(pid) {
-	  const self = this
 	  const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
 	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
-	  const timer = setTimeout(
-	    async function(pid) {
-		  if (self.pool !== undefined) {
-		     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Killing connection.`);
-		     const request = await self.getRequest();
+	  const timer = setTimeout(async (pid) => {
+		  if (this.pool !== undefined) {
+		     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Killing connection.`);
+		     const request = await this.getRequest();
 			 let stack
 			 const sqlStatement = `kill ${pid}`
 			 try {
@@ -69,17 +67,17 @@ class MsSQLQA extends MsSQLDBI {
   		       const res = await request.query(sqlStatement);
 			 } catch (e) {
 			   if (e.number && (e.number === 6104)) {
-				 // The Slave has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourself (Error 27)
-			     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Slave finished prior to termination.`)
+				 // The Slave has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourthis (Error 27)
+			     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Slave finished prior to termination.`)
  			   }
 			   else {
 				 const cause = new MsSQLError(e,stack,sqlStatement)
-			     self.yadamuLogger.handleException(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],cause)
+			     this.yadamuLogger.handleException(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],cause)
 			   }
 			 } 
 		   }
 		   else {
-		     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
+		     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
 		   }
 		},
 		killDelay,
@@ -142,15 +140,15 @@ class MsSQLQA extends MsSQLDBI {
 	  
       const successful = results.recordsets[results.recordsets.length-2]
       
-      report.successful = successful.map(function(row,idx) {          
+      report.successful = successful.map((row,idx) => {          
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT,]
-      },this)
+      })
         
       const failed = results.recordsets[results.recordsets.length-1]
 
-      report.failed = failed.map(function(row,idx) {
+      report.failed = failed.map((row,idx) => {
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.SQLERRM !== null ? row.SQLERRM : '')]
-      },this)
+      })
 
       return report
     }
@@ -160,18 +158,18 @@ class MsSQLQA extends MsSQLDBI {
       await this.useDatabase(connectInfo.database);
       const results = await this.pool.request().input('SCHEMA',this.sql.VarChar,connectInfo.owner).query(sqlSchemaTableRows);
       
-      return results.recordset.map(function(row,idx) {          
+      return results.recordset.map((row,idx) => {          
         return [connectInfo.owner === 'dbo' ? connectInfo.database : connectInfo.owner,row.TableName,row.RowCount]
-      },this)
+      })
     }
 	
-  async slaveDBI(idx)  {
-	const slaveDBI = await super.slaveDBI(idx);
-	if (slaveDBI.testLostConnection()) {
-	  const dbiID = await slaveDBI.getConnectionID();
+  async workerDBI(idx)  {
+	const workerDBI = await super.workerDBI(idx);
+	if (workerDBI.testLostConnection()) {
+	  const dbiID = await workerDBI.getConnectionID();
 	  this.scheduleTermination(dbiID);
     }
-	return slaveDBI
+	return workerDBI
   }
     
 }

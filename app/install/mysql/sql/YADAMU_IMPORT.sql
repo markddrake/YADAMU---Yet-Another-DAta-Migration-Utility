@@ -243,6 +243,8 @@ BEGIN
           return 'JSON';
         when P_DATA_TYPE = 'boolean' then
            return 'boolean';
+        when P_DATA_TYPE = 'ObjectId' then
+           return 'binary(12)';
         when P_DATA_TYPE = 'number' then
            return 'decimal';
         when P_DATA_TYPE = 'string' then

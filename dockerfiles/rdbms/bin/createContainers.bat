@@ -27,6 +27,8 @@ REM MsSQL 2019
 docker run --name MSSQL19-01 -p 1434:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -e "MSSQL_MEMORY_LIMIT_MB=8192" -m10g -v MSSQL19-01-DATA:/var/opt/mssql --shm-size=4g -d mcr.microsoft.com/mssql/server:2019-latest
 REM Postgres 12
 docker run --name PGSQL12-01 -p 5432:5432 -e POSTGRES_PASSWORD=oracle -v PGSQL12-01-DATA:/var/lib/postgresql/data  --shm-size=4g -d postgres:latest 
+REM MongoDB 4.0
+docker run --name MONGO40-01 -p 27017:27017 -v MONGO40-01-DATA:/data/db   --shm-size=4g -d mongo:latest 
 docker system df
 for /f "usebackq tokens=1 delims=," %%a in ("%DCONFIG%\bin\containers.csv") do (
   docker network connect YADAMU-NET %%a

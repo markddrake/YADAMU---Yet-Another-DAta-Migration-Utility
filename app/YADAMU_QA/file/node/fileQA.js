@@ -5,14 +5,14 @@ const path = require('path');
 const DBWriter = require('../../../YADAMU/common/dbWriter.js');
 const YadamuLogger = require('../../../YADAMU/common/yadamuLogger.js');
 const FileDBI = require('../../../YADAMU/file/node/fileDBI.js');
-const TextParser = require('../../../YADAMU/file/node/fileParser.js');
-const FileStatistics = require('./fileStatistics.js');
+const JSONParser = require('../../../YADAMU/file/node/jsonParser.js');
+const StatisticsCollector = require('./statisticsCollector.js');
 
 class FileQA extends FileDBI {
   
   sortRows(array) {
      
-    array.sort(function (a,b){
+    array.sort((a,b) => {
       for (const i in array) {
         if (a[i] < b[i]) return -1
         if (a[i] > b[i]) return 1;
@@ -65,8 +65,7 @@ class FileQA extends FileDBI {
   async getContentMetadata(file,sort) {
       
     const nulLogger = new YadamuLogger(fs.createWriteStream("\\\\.\\NUL"),{});
-    const self = this
-    const saxParser  = new TextParser(this.yadamuLogger)
+    const jsonParser  = new JSONParser(this.yadamuLogger)
     let readStream
     try {
       readStream = fs.createReadStream(file);         
@@ -76,23 +75,21 @@ class FileQA extends FileDBI {
       } 
       files[fidx].size = -1;
     }
-     
-    const statisticsCollector = new FileStatistics(this.yadamu)  	
-	await statisticsCollector.initialize();
-    const writer = new DBWriter(statisticsCollector, null, null, nulLogger);
-	await writer.initialize();
+
+    const statisticsCollector = new StatisticsCollector(this,this.yadamuLogger)  	
+
 	
-    const processMetadata = new Promise(function (resolve,reject) {
+    const processMetadata = new Promise((resolve,reject) => {
       try {
-        writer.on('finish',function() {resolve(saxParser.checkState())});
-        writer.on('error', function(err){
+        statisticsCollector.on('finish',() => {resolve(jsonParser.checkState())});
+        statisticsCollector.on('error', (err) => {
 		  console.log(err)
-		  self.yadamuLogger.logException([`${writer.constructor.name}.onError()}`],err);
+		  this.yadamuLogger.logException([`${writer.constructor.name}.onError()}`],err);
 		  reject(err)
 		})      
-        readStream.pipe(saxParser).pipe(writer);
+        readStream.pipe(jsonParser).pipe(statisticsCollector);
       } catch (err) {
-        self.yadamuLogger.logException([`${this.constructor.name}.getConentMetadata()`],err);
+        this.yadamuLogger.logException([`${this.constructor.name}.getConentMetadata()`],err);
         reject(err);
       }
     })    
@@ -115,22 +112,22 @@ class FileQA extends FileDBI {
   
   makeLowerCase(object) {
         
-    Object.keys(object).forEach(function(key) {
+    Object.keys(object).forEach((key) => {
       if (key !== key.toLowerCase()) {
         object[key.toLowerCase()] = Object.assign({}, object[key])
         delete object[key]
       }
-    },this)
+    })
   }
    
   remapTableNames(timings,mappings) {
         
-    Object.keys(mappings).forEach(function(table) {
+    Object.keys(mappings).forEach((table) => {
       if (timings[table] && (mappings[table].tableName != table)) {
         timings[mappings[table].tableName] =  Object.assign({}, timings[table])
         delete timings[table]
       }
-    },this)
+    })
   }
 
   async recreateSchema(target,password) {
@@ -141,9 +138,9 @@ class FileQA extends FileDBI {
     let colSizes = [48, 18, 12, 12, 12, 12]
  
     let seperatorSize = (colSizes.length * 3) - 1;
-    colSizes.forEach(function(size) {
+    colSizes.forEach((size)  => {
       seperatorSize += size;
-    },this)
+    })
     
     const gStats = fs.statSync(path.resolve(grandparent));
     let pStats
@@ -187,28 +184,19 @@ class FileQA extends FileDBI {
  
     colSizes = [48, 18, 12, 12, 12, 12, 18, 12, 12, 12, 12, 48]
     seperatorSize = (colSizes.length * 3) - 1;
-    colSizes.forEach(function(size) {
+    colSizes.forEach((size)  => {
       seperatorSize += size;
-    },this)
+    })
     
     const gMetadata = await this.getContentMetadata(grandparent)
     const pMetadata = await this.getContentMetadata(parent)
     const cMetadata = await this.getContentMetadata(child);
-	
-    if (this.tableMappings) {
-      timings = timings.map(function (t) {
-        this.remapTableNames(t,this.tableMappings)
-        return t
-      },this);
-      this.remapTableNames(pMetadata,this.tableMappings)
-      this.remapTableNames(cMetadata,this.tableMappings)
-    }
-
+		
     if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
-      timings = timings.map(function (t) {
+      timings = timings.map((t) => {
         this.makeLowerCase(t)
         return t
-      },this);
+      });
      
       this.makeLowerCase(gMetadata)
       this.makeLowerCase(pMetadata);
@@ -216,11 +204,13 @@ class FileQA extends FileDBI {
     }
 
     const tables = Object.keys(gMetadata).sort();     
-    tables.forEach(function (table,idx) {
-      const tableTimings = timings[0][table].elapsedTime.padStart(10) 
-                         + (timings[1][table] ? timings[1][table].elapsedTime : "-1").padStart(10)
-                         + (timings[2][table] ? timings[2][table].elapsedTime : "-1").padStart(10) 
-                         + (timings[3][table] ? timings[3][table].elapsedTime : "-1").padStart(10);
+
+    tables.forEach((table,idx) => {
+	  const tableName = table;
+      const tableTimings = timings[0][tableName].elapsedTime.padStart(10) 
+                         + (timings[1][tableName] ? timings[1][tableName].elapsedTime : "-1").padStart(10)
+                         + (timings[2][tableName] ? timings[2][tableName].elapsedTime : "-1").padStart(10) 
+                         + (timings[3][tableName] ? timings[3][tableName].elapsedTime : "-1").padStart(10);
  
       if (idx === 0) {                            
         this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
@@ -255,7 +245,7 @@ class FileQA extends FileDBI {
       if (idx+1 === tables.length) {
           this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
       }
-    },this)
+    })
   }
   
 }

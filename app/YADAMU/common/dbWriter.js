@@ -1,4 +1,4 @@
-"use strict";
+"use strict" 
 const Writable = require('stream').Writable
 const Readable = require('stream').Readable;
 const { performance } = require('perf_hooks');
@@ -7,16 +7,44 @@ const YadamuLibrary = require('./yadamuLibrary.js');
 
 class DBWriter extends Writable {
   
+  /*
+  **
+  ** The DB Writer should always be invoked with the option {end: false}. 
+  ** 
+  ** If one or more workers are used to process data these should be registered with the DBWriter by calling the DBWriter's registerWorker()
+  ** function. Once a worker has completed all of it's tasks it must send a 'workerComplete' message to the DBWriter. Thw worker complete message
+  ** must be sent via the same pipe that is sending information to the DBWriter. Typically this is done by invoking the DBWriter's write()  method.
+  ** When all workers have trasnmitted "workerComplete" messages the DBWriter sends itsef a 'dataComplete' message. This allows the worker to work 
+  ** independantly of each other, and ensures the writer does not receive the 'dataCompete' message until all workers have terminated.
+  **
+  ** If no workers are instantiated then the DBReader is repsonsible for sending the 'dataComplete' message directory to the DBWriter.
+  **
+  ** When the DBWriter receieves the 'dataComplete' message it emits a 'dataComplete' event'. The DBReader listens for this event, performs 
+  ** any necessary clean-up, such as closing database connections or releasing other resources, and then sends an 'exportComplete' message
+  ** back to the DBWriter.
+  **
+  ** When the DBWriter receives an 'exportComplete' message the writer will invoke it's end() method which causes the _finish() method to execute and
+  ** a 'finish' or 'close' event to be emitted.
+  */
+ 
   constructor(dbi,mode,status,yadamuLogger,options) {
 
     super({objectMode: true});
     
+	/*
+	this.theEnd = this.end
+	this.end = (chunk,encoding,callback) => {
+      console.log(new Error().stack)
+	  return this.theEnd(chunk,encoding,callback)
+	}
+	*/
+	
     this.dbi = dbi;
     this.mode = mode;
     this.ddlRequired = (mode !== 'DATA_ONLY');    
     this.status = status;
     this.yadamuLogger = yadamuLogger;
-    this.yadamuLogger.info([`Writer`,`${dbi.DATABASE_VENDOR}`,`${this.mode}`,`${this.dbi.slaveNumber !== undefined ? this.dbi.slaveNumber : 'Master'}`],`Ready.`)
+    this.yadamuLogger.info([`Writer`,`${dbi.DATABASE_VENDOR}`,`${this.mode}`,`${this.dbi.workerNumber !== undefined ? this.dbi.workerNumber : 'Primary'}`],`Ready.`)
         
     this.transactionManager = this.dbi
 	this.currentTable   = undefined;
@@ -25,10 +53,12 @@ class DBWriter extends Writable {
 
     this.configureFeedback(this.dbi.parameters.FEEDBACK); 
 	this.tableCount = 0;
+
+	this.workerStatus = [];
+  	this.workerException = undefined;
     this.timings = {}
 	
-    this.rejectionHandlers = {}
-
+	
   }      
   
   configureFeedback(feedbackModel) {
@@ -58,23 +88,41 @@ class DBWriter extends Writable {
     }      
   }
   
-  objectMode() {
-    return this.dbi.objectMode(); 
-  }
-
   setInputStreamType(ist) {
 	this.inputStreamType = ist
   }
-	
+
+  initializeWorkers(workerCount) {
+	this.workerStatus = new Array(workerCount).fill('WAITING');
+  }
+  
+  registerWorker(worker) {
+	this.setWorkerStatus(worker.dbi.isPrimary() ? 0 : worker.dbi.getWorkerNumber(),'ACTIVE')
+  }
+
+  setWorkerException(workerException) {
+    // Cache the exception raised by the first worker to fail to that it can be passed to callback in _final	 
+    this.workerException = this.workerException === undefined ? workerException : this.workerException;
+  }
+  
+  setWorkerStatus(workerId,workerStatus) {
+    this.workerStatus[workerId] = workerStatus
+	// this.yadamuLogger.trace([`${this.constructor.name}.setWorkerStatus()`],`${workerId}. Status: ${this.workerStatus}`);
+  }
+  
+  workersComplete() {
+    return this.workerStatus.every( v => v === 'COMPLETE')
+  }
+  
   getTimings() {
     return this.timings
   }
   
   generateMetadata(schemaInfo) {
     const metadata = this.dbi.generateMetadata(schemaInfo,false)
-    Object.keys(metadata).forEach(function(table) {
+    Object.keys(metadata).forEach((table) => {
        metadata[table].vendor = this.dbi.DATABASE_VENDOR;
-    },this)
+    })
     return metadata
   }
   
@@ -84,14 +132,14 @@ class DBWriter extends Writable {
     await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER,!this.ddlComplete)
 	let ddlStatementCount = 0
 	let dmlStatementCount = 0
-	Object.keys(this.dbi.statementCache).forEach(function(tableName) {
+	Object.keys(this.dbi.statementCache).forEach((tableName) => {
 	  if (this.dbi.statementCache[tableName].ddl !== null) {
 		ddlStatementCount++;
 	  }
 	  if (this.dbi.statementCache[tableName].dml !== null) {
 		dmlStatementCount++;
       }
-    },this)	  
+    })	  
 	this.yadamuLogger.ddl([`${this.dbi.DATABASE_VENDOR}`],`Generated ${ddlStatementCount === 0 ? 'no' : ddlStatementCount} DDL and ${dmlStatementCount === 0 ? 'no' : dmlStatementCount} DML statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
   }   
 
@@ -104,8 +152,7 @@ class DBWriter extends Writable {
 
   }
   
-  async setMetadata(metadata) {
-    
+  async setMetadata(sourceMetadata) {
     /*
     **
     ** Match tables in target schema with the metadata from the export source
@@ -115,16 +162,16 @@ class DBWriter extends Writable {
     ** Tables which do not exist in the target schema need to be created.
     **
     */ 
-	
+
     if (this.targetSchemaInfo === null) {
-      this.dbi.setMetadata(metadata)      
+      this.dbi.setMetadata(sourceMetadata)      
     }
     else {    
     
-       // Copy the source metadata 
-    
-      Object.keys(metadata).forEach(function(table) {
-        const tableMetadata = metadata[table]
+       // Copy the source metadata 	   
+	   
+      Object.keys(sourceMetadata).forEach((table) => {
+        const tableMetadata = sourceMetadata[table]
         if (!tableMetadata.hasOwnProperty('vendor')) {
            tableMetadata.vendor = this.dbi.systemInformation.vendor;   
         }
@@ -134,106 +181,66 @@ class DBWriter extends Writable {
          ,dataTypes       : tableMetadata.dataTypes
          ,sizeConstraints : tableMetadata.sizeConstraints
         }
-      },this)
-      	  
-	
-      if (this.targetSchemaInfo.length > 0) {
+      })
     
-        // Merge metadata for existing table with metadata from export source
-
-        const exportTableNames = Object.keys(metadata)
+      if (this.targetSchemaInfo.length > 0) {
         const targetMetadata = this.generateMetadata(this.targetSchemaInfo,false)
-      
-        // Transform tablenames based on TABLE_MATCHING parameter.    
+    
+        // Apply table Mappings 
 
-        let targetNamesTransformed = this.targetSchemaInfo.map(function(tableInfo) {
+  	    if (this.dbi.tableMappings !== undefined)  {
+          sourceMetadata = this.dbi.applyTableMappings(sourceMetadata)	  
+	    }
+	 
+        // Get source and target Tablenames. Apply name transformations based on TABLE_MATCHING parameter.    
+
+        let targetTableNames = this.targetSchemaInfo.map((tableInfo) => {
           return tableInfo.TABLE_NAME;
-        },this)
-          
-        let exportNamesTransformed = exportTableNames.map(function(tableName) {
-          return tableName;
-        },this)
+        })
+
+        const sourceKeyNames = Object.keys(sourceMetadata)
+        let sourceTableNames = sourceKeyNames.map((key) => {
+          return sourceMetadata[key].tableName;
+        })
 
         switch ( this.dbi.parameters.TABLE_MATCHING ) {
           case 'UPPERCASE' :
-            exportNamesTransformed = exportNamesTransformed.map(function(tableName) {
+            sourceTableNames = sourceTableNames.map((tableName) => {
               return tableName.toUpperCase();
-            },this)
+            })
             break;
           case 'LOWERCASE' :
-            exportNamesTransformed = exportTableNames.map(function(tableName) {
+            sourceTableNames = sourceTableNames.map((tableName) => {
               return tableName.toLowerCase();
-            },this)
+            })
             break;
           case 'INSENSITIVE' :
-            exportNamesTransformed = exportTableNames.map(function(tableName) {
+            sourceTableNames = sourceTableNames.map((tableName) => {
               return tableName.toLowerCase();
-            },this)
-            targetNamesTransformed = targetNamesTransformed.map(function(tableName) {
+            })
+            targetTableNames = targetTableNames.map((tableName) => {
               return tableName.toLowerCase();
-            },this)
+            })
             break;
           default:
         }
            
-        targetNamesTransformed.forEach(function(targetName, idx){
-          const tableIdx = exportNamesTransformed.findIndex(function(member){return member === targetName})
+        // Merge metadata for existing table with metadata from export source
+
+        targetTableNames.forEach((targetName, idx) => {
+          const tableIdx = sourceTableNames.findIndex((sourceName) => {return sourceName === targetName})
           if ( tableIdx > -1)    {
-            // Overwrite metadata from source with metadata from target.
-            targetMetadata[this.targetSchemaInfo[idx].TABLE_NAME].source = metadata[exportTableNames[tableIdx]].source
-            metadata[exportTableNames[tableIdx]] = targetMetadata[this.targetSchemaInfo[idx].TABLE_NAME]
+            // Copy the source metadata to the source object in the target meteadata. 
+            targetMetadata[this.targetSchemaInfo[idx].TABLE_NAME].source = sourceMetadata[sourceKeyNames[tableIdx]].source
+			// Overwrite source metadata with target Metadata
+            sourceMetadata[sourceKeyNames[tableIdx]] = targetMetadata[this.targetSchemaInfo[idx].TABLE_NAME]
           }
-        },this)
+        })
       }    
-      
-      await this.generateStatementCache(metadata,!this.ddlComplete)
+	  await this.generateStatementCache(sourceMetadata,!this.ddlComplete)
     }
   }      
-  
-  reportTableComplete(readerStatistics) {
-	  	  
-	const writerStatistics = this.currentTable.getStatistics();
-	const readerElapsedTime = readerStatistics.readerEndTime - readerStatistics.pipeStartTime;
-    const writerElapsedTime = writerStatistics.endTime - writerStatistics.startTime;        
-	const pipeElapsedTime = writerStatistics.endTime - readerStatistics.pipeStartTime;
-	const readerThroughput = isNaN(readerElapsedTime) ? 'N/A' : Math.round((readerStatistics.rowsRead/readerElapsedTime) * 1000)
-    const writerThroughput = isNaN(writerElapsedTime) ? 'N/A' : Math.round((writerStatistics.counters.committed/writerElapsedTime) * 1000)
-	
-	let readerStatus = ''
-	let rowCountSummary = ''
-	
-    const readerTimings = `Reader Elapsed Time: ${YadamuLibrary.stringifyDuration(readerElapsedTime)}s. Throughput ${Math.round(readerThroughput)} rows/s.`
-	const writerTimings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(writerElapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(writerStatistics.sqlTime))}s. Throughput: ${Math.round(writerThroughput)} rows/s.`
     
-	if ((readerStatistics.rowsRead === 0) || (readerStatistics.rowsRead === writerStatistics.counters.committed)) {
-      rowCountSummary = `Rows ${readerStatistics.rowsRead}.`
-    }
-	else {
-      rowCountSummary = `Read ${readerStatistics.rowsRead}. Written ${writerStatistics.counters.committed}.`
-    }
-
-	rowCountSummary = writerStatistics.counters.skipped > 0 ? `${rowCountSummary} Skipped ${writerStatistics.counters.skipped}.` : rowCountSummary
-   
-	if (readerStatistics.copyFailed) {
-	  rowCountSummary = readerStatistics.tableNotFound === true ? `Table not found.` : `Read operation failed. ${rowCountSummary} `  
-      this.yadamuLogger.error([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
-	}
-	else {
-	  if (readerStatistics.rowsRead !== writerStatistics.counters.committed) {
-        this.yadamuLogger.error([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
-      }
-	  else {
-        this.yadamuLogger.info([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
-	  }
-    }	  
-		 
-    this.timings[this.tableName] = {rowCount: writerStatistics.counters.committed, insertMode: writerStatistics.insertMode,  rowsSkipped: writerStatistics.counters.skipped, elapsedTime: Math.round(writerElapsedTime).toString() + "ms", throughput: Math.round(writerThroughput).toString() + "/s", sqlExecutionTime: Math.round(writerStatistics.sqlTime)};
-  }
-  
-  registerRejectionHandler(tableName,reject) {
-	 this.rejectionHandlers[tableName] = reject
-  }
-  
   async initialize() {
     await this.dbi.initializeImport();
 	this.targetSchemaInfo = await this.getTargetSchemaInfo()
@@ -248,12 +255,16 @@ class DBWriter extends Writable {
 
     this.transactionManager.skipTable = true;
   }
+  
+  recordTimings(timings) {
+	Object.assign(this.timings,timings)
+  }
  
   async _write(obj, encoding, callback) {
-    const action = Object.keys(obj)[0]
-    // console.log(new Date().toISOString(),`${this.constructor.name}._write`,action);
-    try {
-      switch (action) {
+	const messageType = Object.keys(obj)[0]
+	try {
+	  // this.yadamuLogger.trace([this.constructor.name,`WRITE`,this.dbi.DATABASE_VENDOR],messageType)
+      switch (messageType) {
         case 'systemInformation':
           this.dbi.setSystemInformation(obj.systemInformation)
           break;
@@ -265,65 +276,40 @@ class DBWriter extends Writable {
           break;
         case 'metadata':
           await this.setMetadata(obj.metadata);
-          await this.dbi.initializeData();
+		  await this.dbi.initializeData();
+		  this.emit('ddlComplete');
           break;
-        case 'table':
-		  this.tableCount++;
-          this.rowCount = 0;
-          this.tableName = obj.table;
-          this.currentTable = this.dbi.getTableWriter(this.tableName);
-		  this.transactionManager = this.currentTable;
-		  // Add table specific error handler to output stream
-		  this.on('error',function(err){
-			this.yadamuLogger.handleException([`${this.constructor.name}.onError()`,`${this.tableName}`],err)
-		    this.rejectionHandlers[this.tableName](err)
-	      });
-	      await this.currentTable.initialize();
-          break;
-        case 'data':
-          if (this.currentTable.skipTable === false) {
-            // console.log(new Date().toISOString(),`${this.constructor.name}._write`,action,this.currentTable.skipTable);
-  	        await this.currentTable.appendRow(obj.data);
-            this.rowCount++;
-            if ((this.rowCount % this.feedbackInterval === 0) & !this.currentTable.batchComplete()) {
-              this.yadamuLogger.info([`${this.tableName}`,this.currentTable.insertMode],`Rows buffered: ${this.currentTable.batchRowCount()}.`);
-            }
-            if (this.currentTable.batchComplete()) {
-  			  await this.currentTable.writeBatch(this.status);
-			  if (this.currentTable.skipTable) {
-                await this.transactionManager.rollbackTransaction();
-              }
-              if (this.reportBatchWrites && this.currentTable.reportBatchWrites() && !this.currentTable.commitWork(this.rowCount)) {
-                this.yadamuLogger.info([`${this.tableName}`,this.currentTable.insertMode],`Rows written:  ${this.rowCount}.`);
-              }                    
-            }  
-            if (this.currentTable.commitWork(this.rowCount)) {
-              await this.transactionManager.commitTransaction(this.rowCount)
-              if (this.reportCommits) {
-                this.yadamuLogger.info([`${this.tableName}`,this.currentTable.insertMode],`Rows commited: ${this.rowCount}.`);
-              }          
-              await this.dbi.beginTransaction();            
-			}
+		case 'timings':
+		  this.recordTimings(obj.timings);
+		  break;
+		case 'workerComplete':
+		  this.setWorkerStatus(obj.workerComplete === 'Primary' ? 0 : obj.workerComplete,'COMPLETE')
+	      // Be careful to ensure that workers allways have appropriate error handling attached.
+		  // There is a danger that if worker throws an unexpected exception / rejection the dbWriter will not get a "workerComplete" message, causing YADAMU to hang
+	      // this.yadamuLogger.trace([this.constructor.name,`WRITE`,this.dbi.DATABASE_VENDOR,messageType,obj.workerComplete],`${this.workerStatus}`)
+          if (this.workersComplete()) {
+	        this.write({dataComplete: null})
           }
           break;
-		case 'eod':
-          await this.currentTable.finalize();
-          this.reportTableComplete(obj.eod);
-		  // Remove Table Specific Error Handler from output stream.
-   	      this.removeListener('error',this.listeners('error').pop())
-		  delete this.rejectionHandlers[this.tableName]
-		  this.transactionManager = this.dbi
-          this.currentTable = undefined
+  	    case 'eof':		 
+		   // 'eof' is generated by the JSON Parser (Text or HTML Parser) when the parsing operation detects the end of the outermost object or array.
+		   // It is the equivilant of dataComplete for a Database based reader. The DBWriter will recieve an EOF when the parser is processing 
+		   // a DDL_ONLY file which contains no 'data' object.
+		case 'dataComplete':
+          this.emit('dataComplete',this.workerException);
 		  break;
+		case 'exportComplete':
+		  this.end();
+          break;
         default:
       }    
       callback();
     } catch (e) {
-	this.yadamuLogger.handleException([`Writer`,`${this.dbi.DATABASE_VENDOR}`,`"${this.tableName === undefined ? action : this.tableName}"`],e);
+	  this.yadamuLogger.handleException([this.constructor.name,`WRITE`,this.dbi.DATABASE_VENDOR,messageType],e);
 	  this.transactionManager.skipTable = true;
 	  try {
         await this.transactionManager.rollbackTransaction(e)
-		if ((['systemInformation','ddl','metadata'].indexOf(action) > -1) || this.dbi.abortOnError()){
+		if ((['systemInformation','ddl','metadata'].indexOf(messageType) > -1) || this.dbi.abortOnError()){
 	      // Errors prior to processing rows are considered fatal
 		  callback(e);
 		}
@@ -338,6 +324,7 @@ class DBWriter extends Writable {
   }
  
   async _final(callback) {
+    // this.yadamuLogger.trace([this.constructor.name],'final()')
     try {
 	  if (this.mode === "DDL_ONLY") {
         this.yadamuLogger.info([`${this.dbi.DATABASE_VENDOR}`],`DDL only export. No data written.`);
@@ -349,15 +336,15 @@ class DBWriter extends Writable {
         await this.dbi.finalizeData();
 	  }
       await this.dbi.finalizeImport();
-      await this.dbi.releaseMasterConnection()
-      callback();
+      await this.dbi.releasePrimaryConnection()
+      callback(this.workerException);
     } catch (e) {
       this.yadamuLogger.logException([`${this.dbi.DATABASE_VENDOR}`,`"${this.currentTable}"`],e);
 	  // Passing the exception to callback triggers the onError() event
       callback(e);
     } 
   } 
-   
+	     
 }
 
 module.exports = DBWriter;

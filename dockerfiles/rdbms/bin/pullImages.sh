@@ -6,6 +6,7 @@ docker load < /c/Docker/Images/Oracle_EE_11.2.0.1.0.tar
 docker pull mysql
 docker pull postgres
 docker pull mariadb
+docker pull mongo
 docker pull mcr.microsoft.com/mssql/server:2017-latest
 docker pull mcr.microsoft.com/mssql/server:2019-latest
 docker images

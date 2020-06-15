@@ -1,20 +1,196 @@
 {
   "operation"                         : "export"
-, "clone"                             : true
 , "connections"                       : "qa/work/YDB2.json"
 , "parameters": {
     "MODE": "DDL_ONLY"
   , "FEEDBACK": "COMMIT"
+  , "XML_STORAGE_MODEL": "CLOB"
   }
-, "tasks" : "qa/regression/exportTasks.json"
-, "tests"                  : [{
-    "source": "mssql19"
-  , "target": "scratch"
+, "tasks"                             : "qa/regression/exportTasks.json"
+, "tests" : [{
+    "source": "oracle19c"
+  , "target": "file-connection-mode"
+  , "parameters": {
+      "MODE": "DDL_ONLY"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle19c"
+  , "target": "file-connection-mode"
   , "parameters": {
       "MODE": "DATA_ONLY"
     }
   , "tasks": [
-	  "Northwind"
+      "oracle"
     ]
-  }] 
-}
+  },{
+    "source": "oracle19c"
+  , "target": "file-connection-mode"
+  , "parameters": {
+      "MODE": "DDL_AND_DATA"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle18c"
+  , "target": "file-connection-mode"
+  , "parameters": {
+      "MODE": "DDL_ONLY"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle18c"
+  , "target": "file-connection-mode"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle18c"
+  , "target": "file-connection-mode"
+  , "parameters": {
+      "MODE": "DDL_AND_DATA"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle12c"
+  , "target": "file-connection-mode"
+  , "parameters": {
+      "MODE": "DDL_ONLY"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle12c"
+  , "target": "file-connection-mode"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle12c"
+  , "target": "file-connection-mode"
+  , "parameters": {
+      "MODE": "DDL_AND_DATA"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle11g"
+  , "target": "file-connection-mode"
+  , "parameters": {
+      "MODE": "DDL_ONLY"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle11g"
+  , "target": "file-connection-mode"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle11g"
+  , "target": "file-connection-mode"
+  , "parameters": {
+      "MODE": "DDL_AND_DATA"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "mssql17"
+  , "target": "file-connection"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+      "mssql"
+    ]
+  },{
+    "source": "file-connection"
+  , "target": "mssql17"
+  , "operation" : "import"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+	  { "source" : { "file" : "Northwind.json"},        "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": true}
+    , { "source" : { "file" : "HumanResources.json"},   "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    , { "source" : { "file" : "Person.json"},           "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    , { "source" : { "file" : "Production.json"},       "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    , { "source" : { "file" : "Purchasing.json"},       "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    , { "source" : { "file" : "Sales.json"},            "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    , { "source" : { "file" : "AdventureWorksDW.json"}, "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    ]  
+  },{
+    "source": "mssql17"
+  , "target": "file-connection"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+      "AdventureWorksAll"
+    ]
+  },{
+    "source": "mssql19"
+  , "target": "file-connection"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+      "mssql"
+    ]
+  },{
+    "source": "file-connection"
+  , "target": "mssql19"
+  , "operation" : "import"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+	  { "source" : { "file" : "Northwind.json"},        "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": true}
+    , { "source" : { "file" : "HumanResources.json"},   "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    , { "source" : { "file" : "Person.json"},           "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    , { "source" : { "file" : "Production.json"},       "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    , { "source" : { "file" : "Purchasing.json"},       "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    , { "source" : { "file" : "Sales.json"},            "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    , { "source" : { "file" : "AdventureWorksDW.json"}, "target" : { "database": "AdventureWorksAll",    "owner": "dbo"}, "recreateTarget": false}
+    ]  
+  },{
+    "source": "mssql19"
+  , "target": "file-connection"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+      "AdventureWorksAll"
+    ]
+  },{
+    "source": "mysql#1"
+  , "target": "file-vendor"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+      "mysql"
+    ]
+  }]
+}  

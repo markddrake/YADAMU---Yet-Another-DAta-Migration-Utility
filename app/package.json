@@ -13,10 +13,12 @@
   "author": "Mark D Drake",
   "license": "SEE LICENSE IN TDB.txt",
   "dependencies": {
+    "@teradataprebuilt/nativelib-win32": "^1.0.0-beta.1",
     "bootstrap": "^4.4.1",
     "cookie-parser": "^1.4.5",
     "express": "^4.17.1",
     "express-session": "^1.17.1",
+    "ffi-napi": "^3.0.1",
     "font-awesome": "^4.7.0",
     "jquery": "^3.5.0",
     "mariadb": "^2.3.1",
@@ -28,13 +30,12 @@
     "pg-copy-streams": "^2.2.2",
     "pg-query-stream": "^2.1.2",
     "popper.js": "^1.16.1",
-    "require": "^2.4.20",
     "snowflake-sdk": "^1.5.2",
+    "teradata-nodejs-driver": "^1.0.0-rc.2",
     "uuid": "^8.0.0",
     "wkx": "^0.5.0"
   },
   "devDependencies": {
-    "electron": "^8.2.5",
-    "electron-packager": "^14.2.1"
+    "electron": "^9.0.0"
   }
 }

@@ -7,8 +7,7 @@ const { performance } = require('perf_hooks');
 const FileDBI = require('../file/node/fileDBI.js');
 const DBReader = require('./dbReader.js');
 const DBWriter = require('./dbWriter.js');
-const DBReaderParallel = require('./dbReaderMaster.js');
-const DBWriterParallel = require('./dbWriterMaster.js');
+const DBReaderParallel = require('./dbReaderParallel.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuDefaults = require('./yadamuDefaults.json');
@@ -20,7 +19,9 @@ const YADAMU_VERSION = '1.0'
 class Yadamu {
 
   get EXPORT_VERSION() { return YADAMU_VERSION };
+  get YADAMU_DEFAULTS() { return YadamuDefaults };
   get YADAMU_DEFAULT_PARAMETERS() { return YadamuDefaults.yadamu }
+  get YADAMU_DRIVERS() { return YadamuDefaults.drivers }
      
   static nameMatch(source,target,rule) {
       
@@ -74,8 +75,9 @@ class Yadamu {
 
     const endTime = performance.now();
       
-    status.statusMsg = status.warningRaised === true ? 'with warnings' : status.statusMsg;
-    status.statusMsg = status.errorRaised === true ? 'with errors'  : status.statusMsg;  
+	const counters = yadamuLogger.getCounters();
+    status.statusMsg = status.warningRaised === true ? `with ${counters.warnings} warnings` : status.statusMsg;
+    status.statusMsg = status.errorRaised === true ? `with ${counters.errors} errors and ${counters.warnings} warnings`  : status.statusMsg;  
   
     const terminationArgs = [`YADAMU`,`${status.operation}`]
     const terminationMessage = `Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}.`
@@ -113,7 +115,7 @@ class Yadamu {
     if ((parameterValue.startsWith('"') && parameterValue.endsWith('"')) && (parameterValue.indexOf('","') > 0 )) {
       // List of Values
 	  let parameterValues = parameterValue.substring(1,parameterValue.length-1).split(',');
-	  parameterValues = parameterValues.map(function(value) {
+	  parameterValues = parameterValues.map((value) => {
         return YadamuLibrary.convertQutotedIdentifer(value);
 	  })
 	  return parameterValues
@@ -220,9 +222,10 @@ class Yadamu {
   
   constructor(operation,parameters) {
     
-    const self = this; 
 	this.yadamuLogger = new YadamuLogger(process.stdout,{})
     
+	const self = this
+	
     this.status = {
       operation        : operation
      ,errorRaised      : false
@@ -232,9 +235,9 @@ class Yadamu {
     }
 	
     process.on('unhandledRejection', (err, p) => {
-      self.yadamuLogger.logException([`${self.constructor.name}`,`${self.status.operation}`,`UNHANDLED REJECTION`],err);
-      self.status.errorRaised = true;
-      self.reportStatus(self.status,self.yadamuLogger)
+      this.yadamuLogger.logException([`${this.constructor.name}`,`${this.status.operation}`,`UNHANDLED REJECTION`],err);
+      this.status.errorRaised = true;
+      this.reportStatus(this.status,this.yadamuLogger)
       process.exit()
     })
 
@@ -262,10 +265,9 @@ class Yadamu {
   }
      
   createQuestion(prompt) {	
-    const self = this
 	this.cli.prompt = prompt;
-    return new Promise(function (resolve,reject) {
-      self.commandPrompt.question(self.cli.prompt, function(answer) {
+    return new Promise((resolve,reject) => {
+      this.commandPrompt.question(this.cli.prompt, (answer) => {
 		resolve(answer);
 	  })
 	})
@@ -301,7 +303,7 @@ class Yadamu {
    
     const parameters = {}
  
-    process.argv.forEach(function (arg) {
+    process.argv.forEach((arg) => {
      
       if (arg.indexOf('=') > -1) {
         const parameterName = arg.substring(0,arg.indexOf('='));
@@ -462,7 +464,7 @@ class Yadamu {
             console.log(`${new Date().toISOString()}[WARNING][this.constructor.name]: Unknown parameter: "${parameterName}". See yadamu --help for supported command line switches and arguments` )          
         }
       }
-    },this)
+    })
 	return parameters;
   }
   
@@ -477,8 +479,8 @@ class Yadamu {
   
   closeFile(outputStream) {
         
-    return new Promise(function(resolve,reject) {
-      outputStream.on('finish',function() { resolve() });
+    return new Promise((resolve,reject) => {
+      outputStream.on('finish',() => { resolve() });
       outputStream.close();
     })
 
@@ -491,20 +493,19 @@ class Yadamu {
   }
   
   async getDBWriter(dbi,parallel) {
-	const dbWriter = parallel ? new DBWriterParallel(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger) : new DBWriter(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
+	const dbWriter = new DBWriter(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
     await dbWriter.initialize();
     return dbWriter;
   }
 
   async doPumpOperation(source,target) {
-
+	  
     const timings = {}
     this.rejectManager = this.createRejectManager()
 	this.warningManager = this.createWarningManager();
 
 	let error;
     try {
-      const self = this
 	  let failed = false;
 	  let cause = undefined;
       await source.initialize();
@@ -513,29 +514,72 @@ class Yadamu {
 	  parallel = (parallel && source.isDatabase() && target.isDatabase());
       const dbReader = await this.getDBReader(source,parallel)
       const dbWriter = await this.getDBWriter(target,parallel)  
-	  const inputStream = dbReader.getInputStream();
+	  dbReader.waitForDataComplete(dbWriter)
+
+	  // A file based input stream consist of be a set of pipe operations. 
+	  // The reject function meeds to attached to the error handler for the first reader in the sequence.
+		
  
 	  // On an error force the writer to end and invoke the resolve() or reject() from the writer's finish event.
 	  // This ensures the writer processes all pending records before connections are closed.
 	  
-      const copyOperation = new Promise(function (resolve,reject) {
-        dbWriter.on('close', function(){
-		  // self.yadamuLogger.trace([`${self.constructor.name}.copyOperation()`,`${dbWriter.constructor.name}.onClose()`],`${failed ? 'FAILED' : 'SUCCSESS'}`);
+      const copyOperation = new Promise((resolve,reject) => {
+
+
+        const closeEvent = process.version < 'v11' ? 'finish' : 'close'
+
+        /*
+        **
+        ** Uncomment the following statements to trace events
+        **
+		
+	    dbReader.on('error',(err) => {
+		  this.yadamuLogger.trace([`${this.constructor.name}.copyOperation()`,`${dbReader.constructor.name}.onError()`],`${err.message}`)
+        })
+
+        dbReader.on('destroy',() => {
+		  this.yadamuLogger.trace([`Reader`,`${target.DATABASE_VENDOR}`],'onDestroy()');
+	    })
+
+        dbWriter.on('error',(err) => {
+		  this.yadamuLogger.trace([`${this.constructor.name}.copyOperation()`,`${dbWriter.constructor.name}.onError()`],`${err.message}`)
+        })
+
+        **
+		*/
+
+	    const inputStreamError = (err) => {
+		  this.yadamuLogger.handleException([`Reader`,`${source.DATABASE_VENDOR}`],err)
+		  cause = err;
+	      failed = true;
+		  dbWriter.end()
+	    }
+
+	    const outputStreamError = (err) => {
+		  this.yadamuLogger.handleException([`Writer`,`${target.DATABASE_VENDOR}`],err);
+		  cause = err;
+	      failed = true;
+		  reject(cause);
+	    }
+
+        const inputStream = dbReader.getInputStream(inputStreamError,outputStreamError);
+
+		dbWriter.on(closeEvent, () => {
+		  // this.yadamuLogger.trace([`${this.constructor.name}.copyOperation()`,`${dbWriter.constructor.name}.on${closeEvent}()`],`${failed ? 'FAILED' : 'SUCCSESS'}`);
           failed ? reject(cause) : resolve()
 		})
-        dbWriter.on('error',function(err){
-		  self.yadamuLogger.handleException([[`Writer`,`${target.DATABASE_VENDOR}`]],err);
+		
+        dbReader.on('error',(err) => {
+		  this.yadamuLogger.handleException([`Reader`,`${source.DATABASE_VENDOR}`],err);
 		  cause = err;
 	      failed = true;
 		  reject(cause);
 	    })
-		inputStream.on('error',function(err){
-		  self.yadamuLogger.handleException([`Reader`,`${source.DATABASE_VENDOR}`],err)
-		  cause = err;
-	      failed = true;
-		  dbWriter.end()
-        })		  
-        inputStream.pipe(dbWriter);
+		
+        dbWriter.on('error',(err) => {
+	    })
+		
+        inputStream.pipe(dbWriter,{end: false});
       })
       
       this.status.operationSuccessful = false;
@@ -633,7 +677,7 @@ class Yadamu {
   getTimings(log) {
       
      const timings = {}
-     log.forEach(function(entry) {
+     log.forEach((entry) => {
        switch (Object.keys(entry)[0]) {
          case 'dml' :
            timings[entry.dml.tableName] = {rowCount : entry.dml.rowCount, insertMode : "SQL", elapsedTime : entry.dml.elapsedTime + "ms", throughput: Math.round((entry.dml.rowCount/Math.round(entry.dml.elapsedTime)) * 1000).toString() + "/s"}
@@ -643,7 +687,7 @@ class Yadamu {
            break;
          default:
        }
-     },this)
+     })
      return timings
   }
 
@@ -658,7 +702,7 @@ class Yadamu {
       const pathToFile = dbi.parameters.FILE;
       const hndl = await this.uploadFile(dbi,pathToFile);
       const log = await dbi.processFile(hndl)
-	  await dbi.releaseMasterConnection()
+	  await dbi.releasePrimaryConnection()
       await dbi.finalize();
 	  const timings = this.getTimings(log);  
 	  this.status.operationSuccessful = true;

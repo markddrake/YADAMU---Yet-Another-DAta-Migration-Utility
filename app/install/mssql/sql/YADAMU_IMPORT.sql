@@ -145,6 +145,8 @@ begin
       case
         when @DATA_TYPE in ('undefined','object','function','symbol') then 
           'json'
+        when @DATA_TYPE = 'ObjectId' then
+          'binary(12)'
         when @DATA_TYPE = 'boolean' then
           'bit'
         when @DATA_TYPE = 'number' then

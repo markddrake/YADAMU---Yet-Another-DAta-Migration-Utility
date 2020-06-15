@@ -16,16 +16,18 @@ class StatementGenerator {
   
   async generateStatementCache (executeDDL, vendor) {    
      
-    let statementCache = {}
-    const tables = Object.keys(this.metadata); 
-    const collectionList = tables.map(function(table,idx) {
+    const statementCache = {}
+	const collectionList = []
+    const tableList = Object.keys(this.metadata); 
+	tableList.forEach((table,idx) => {
       const tableMetadata = this.metadata[table]
       const tableInfo = {} 
       tableInfo.tableName = tableMetadata.tableName
       tableInfo.batchSize = this.batchSize;
       tableInfo.commitSize = this.commitSize;
+      tableInfo.ddl = tableMetadata.tableName
       if (tableMetadata.source) {
-        tableInfo.keys = JSON.parse('[' + tableMetadata.source.columns + "]");
+		tableInfo.keys = JSON.parse('[' + tableMetadata.source.columns + "]");
         tableInfo.sourceDataTypes = tableMetadata.source.dataTypes
         tableInfo.sizeConstraints = tableMetadata.source.sizeConstraints
       }
@@ -35,11 +37,28 @@ class StatementGenerator {
         tableInfo.sizeConstraints = tableMetadata.sizeConstraints
       }
  	  tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.sourceDataTypes);
-      tableInfo.insertMode = 'InsertMany';
+
+      if ((tableInfo.sourceDataTypes.length === 1) && (tableInfo.sourceDataTypes[0] === 'JSON')) {
+	    // If the source table consists of a single JSON Column then insert each row into MongoDB 'As Is'	
+        tableInfo.insertMode = 'DOCUMENT_MODE'
+      }
+      else {
+	    switch (this.dbi.writeTransformation) {
+  		  case 'ARRAY_TO_DOCUMENT':
+		    tableInfo.insertMode = 'OBJECT'
+		    break;
+		  case 'PRESERVE':
+		    tableInfo.insertMode = 'ARRAY'
+		    break;
+		  default:
+		    tableInfo.insertMode = 'OBJECT'
+	    }
+      }    
+      collectionList.push(tableInfo.tableName)
       statementCache[tableInfo.tableName] = tableInfo;
-      return tableInfo.tableName
-    },this);
-    
+
+    });
+   
     if (executeDDL) {
       await this.dbi.executeDDL(collectionList);
     }

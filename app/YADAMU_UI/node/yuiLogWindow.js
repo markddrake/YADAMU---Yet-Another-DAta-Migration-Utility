@@ -12,11 +12,11 @@ window.$ = window.jQuery = require('jquery')
 window.popper = require('popper.js');
 window.Bootstrap = require('bootstrap')
 
-ipcRenderer.on('reset-log', function (event) {
+ipcRenderer.on('reset-log',(event) => {
   document.getElementById("log").innerHTML = "";
 })
 
-ipcRenderer.on('write-log', function (event,msg) {
+ipcRenderer.on('write-log',(event,msg) => {
   document.getElementById("log").innerHTML += msg;
 })
 

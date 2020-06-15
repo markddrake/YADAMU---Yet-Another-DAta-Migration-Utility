@@ -37,13 +37,13 @@ class StatementGenerator11 extends StatementGenerator {
             
     // I know.... Attmpting to build XML via string concatenation will end in tears...
 
-    const tablesXML = Object.keys(this.metadata).map(function(tableID){
+    const tablesXML = Object.keys(this.metadata).map((tableID) => {
       const table = this.metadata[tableID]
-      const columnsXML = JSON.parse(`[${table.columns}]`).map(function(columnName){return `<column>${columnName}</column>`},this).join('');
-      const dataTypesXML = table.dataTypes.map(function(dataType){return `<dataType>${dataType}</dataType>`},this).join('');
-      const sizeConstraintsXML = table.sizeConstraints.map(function(sizeConstraint){return `<sizeConstraint>${sizeConstraint === null ? '' : sizeConstraint}</sizeConstraint>`},this).join('');
+      const columnsXML = JSON.parse(`[${table.columns}]`).map((columnName) => {return `<column>${columnName}</column>`}).join('');
+      const dataTypesXML = table.dataTypes.map((dataType) => {return `<dataType>${dataType}</dataType>`}).join('');
+      const sizeConstraintsXML = table.sizeConstraints.map((sizeConstraint) => {return `<sizeConstraint>${sizeConstraint === null ? '' : sizeConstraint}</sizeConstraint>`}).join('');
       return `<table><vendor>${table.vendor}</vendor><owner>${table.owner}</owner><tableName>${table.tableName}</tableName><columns>${columnsXML}</columns><dataTypes>${dataTypesXML}</dataTypes><sizeConstraints>${sizeConstraintsXML}</sizeConstraints></table>`
-    },this).join('');
+    }).join('');
     return `<metadata>${tablesXML}</metadata>`
     
   }

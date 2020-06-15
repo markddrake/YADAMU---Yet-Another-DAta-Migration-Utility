@@ -2,12 +2,23 @@
   "yadamu"                    : {
     "FILE"                    : "export.json"
   , "MODE"                    : "DATA_ONLY"
-  , "READ_ON_ERROR"           : "SKIP"
+  , "ON_ERROR"                : "SKIP"
   }
 , "yadamuDBI"                 : {
     "SPATIAL_FORMAT"          : "WKB"
   , "BATCH_SIZE"              : 10000
   , "COMMIT_RATIO"            : 5
+  }
+, "drivers"                   : {
+    "file"                    : "../../file/node/fileDBI.js"
+   ,"oracle"                  : "../../oracle/node/oracleDBI.js"
+   ,"postgres"                : "../../postgres/node/postgresDBI.js"
+   ,"mssql"                   : "../../mssql/node/mssqlDBI.js"
+   ,"mysql"                   : "../../mysql/node/mysqlDBI.js"
+   ,"mariadb"                 : "../../mariadb/node/mariadbDBI.js"
+   ,"mongodb"                 : "../../mongodb/node/mongoDBI.js"
+   ,"snowflake"               : "../../snowflake/node/snowflakeDBI.js"
+   ,"teradata"                : "../../teradata/node/teradataDBI.js"
   }
 , "mariadb"                   : {
     "TABLE_MATCHING"          : "INSENSITIVE"

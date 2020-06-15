@@ -1,0 +1,44 @@
+{
+  "operation"                         : "import"
+, "connections"                       : "qa/regression/connections.json"
+, "parameters": {
+    "MODE": "DATA_ONLY"
+  , "FEEDBACK": "COMMIT"
+  , "XML_STORAGE_MODEL": "CLOB"
+  }
+, "tasks"                             : "qa/regression/exportTasks.json"
+, "tests" : [{
+    "source":  "file-oracle19c-mode"
+  , "targets": ["mongodb#1"]
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "reverseOperations" : true
+  , "recreateSchemas"   : true
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "file-mysql"
+  , "targets": ["mongodb#1"]
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "reverseOperations" : true
+  , "recreateSchemas"   : true
+  , "tasks": [
+      "mysql"
+    ]
+  },{
+    "source": "file-mssql19"
+  , "targets": ["mongodb#1"]
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "reverseOperations" : true
+  , "recreateSchemas"   : true
+  , "tasks": [
+      "mssql"
+    ]
+  }]
+}  

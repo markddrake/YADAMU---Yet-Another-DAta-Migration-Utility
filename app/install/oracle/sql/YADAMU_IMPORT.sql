@@ -817,6 +817,8 @@ begin
       case
         when P_DATA_TYPE in ('undefined','object','function','symbol') then 
           return 'JSON';
+        when P_DATA_TYPE = 'ObjectId' then
+           return 'RAW(12)';
         when P_DATA_TYPE = 'boolean' then
            return 'BOOLEAN';
         when P_DATA_TYPE = 'number' then

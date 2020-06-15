@@ -14,9 +14,9 @@ const mariadb = require('mariadb');
 
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
-const {ConnectionError, MariadbError} = require('../../common/yadamuError.js')
-const DBParser = require('./dbParser.js');
-const TableWriter = require('./tableWriter.js');
+const MariadbError = require('./mariadbError.js')
+const MariadbParser = require('./mariadbParser.js');
+const MariadbWriter = require('./mariadbWriter.js');
 const StatementGenerator = require('../../dbShared/mysql/statementGenerator57.js');
 
 const sqlSystemInformation = 
@@ -196,7 +196,7 @@ class MariadbDBI extends YadamuDBI {
 
   async closeConnection() {
 	  
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`closeConnection(${(this.connection !== undefined && this.connection.end)})`)
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && this.connection.end)})`)
 	  
     if (this.connection !== undefined && this.connection.end) {
       let stack;
@@ -230,7 +230,7 @@ class MariadbDBI extends YadamuDBI {
   };
    
   async reconnectImpl() {
-    this.connection = this.isMaster() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isPrimary() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
   }
 
   async createSchema(schema) {    	
@@ -273,10 +273,10 @@ class MariadbDBI extends YadamuDBI {
 
   async executeDDLImpl(ddl) {
     await this.createSchema(this.parameters.TO_USER);
-    const ddlResults = await Promise.all(ddl.map(function(ddlStatement) {
+    const ddlResults = await Promise.all(ddl.map((ddlStatement) => {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
       return this.executeSQL(ddlStatement) 
-    },this))
+    }))
 	return ddlResults;
   }
 
@@ -376,7 +376,7 @@ class MariadbDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
     let attemptReconnect = this.attemptReconnection;
     
@@ -416,7 +416,7 @@ class MariadbDBI extends YadamuDBI {
   
   async commitTransaction() {
 	    
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
@@ -451,7 +451,7 @@ class MariadbDBI extends YadamuDBI {
     
   async rollbackTransaction(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
 
 	this.checkConnectionState(cause)
 	
@@ -478,7 +478,7 @@ class MariadbDBI extends YadamuDBI {
   
   async createSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 
     await this.executeSQL(sqlCreateSavePoint);
 	super.createSavePoint()
@@ -486,7 +486,7 @@ class MariadbDBI extends YadamuDBI {
   
   async restoreSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 
     this.checkConnectionState();
 
@@ -503,7 +503,7 @@ class MariadbDBI extends YadamuDBI {
 
   async releaseSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
     await this.executeSQL(sqlReleaseSavePoint);    
 	super.releaseSavePoint();
@@ -622,25 +622,23 @@ class MariadbDBI extends YadamuDBI {
   }
 
   createParser(query,objectMode) {
-    return new DBParser(query,objectMode,this.yadamuLogger);
+    return new MariadbParser(query,objectMode,this.yadamuLogger);
   }  
 
-  getTableWriter(table) {
-    return super.getTableWriter(TableWriter,table)
+  getOutputStream(primary) {
+	 return super.getOutputStream(MariadbWriter,primary)
   }
-
+ 
+  /*
   async finalizeDataLoad() {
   }  
-
-  async slaveDBI(slaveNumber) {
+  */
+  
+  async workerDBI(workerNumber) {
 	const dbi = new MariadbDBI(this.yadamu)
-	return await super.slaveDBI(slaveNumber,dbi)
+	return await super.workerDBI(workerNumber,dbi)
   }
   
-  tableWriterFactory(tableName) {
-    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
-  }
-
   async getConnectionID() {
 	const results = await this.executeSQL(`select connection_id() "pid"`)
 	const pid = results[0].pid;

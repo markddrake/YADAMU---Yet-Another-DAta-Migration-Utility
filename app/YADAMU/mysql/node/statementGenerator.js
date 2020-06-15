@@ -25,7 +25,7 @@ class StatementGenerator {
     else {
 
       const tables = Object.keys(this.metadata); 
-      const ddlStatements = tables.map(function(table,idx) {
+      const ddlStatements = tables.map((table,idx) => {
         const tableInfo = statementCache[this.metadata[table].tableName];
         tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.targetDataTypes);
         tableInfo.batchSize = this.batchSize;
@@ -34,7 +34,7 @@ class StatementGenerator {
         tableInfo.insertMode = 'Batch';
         const columnNames = JSON.parse('[' + this.metadata[table].columns + ']');
 		 
-        const setOperators = tableInfo.targetDataTypes.map(function(targetDataType,idx) {
+        const setOperators = tableInfo.targetDataTypes.map((targetDataType,idx) => {
            switch (targetDataType) {
              case 'geometry':
                tableInfo.insertMode = 'Iterative';
@@ -66,7 +66,7 @@ class StatementGenerator {
              default:
                return ' "' + columnNames[idx] + '" = ?'
            }
-        },this) 
+        }) 
         
         if (tableInfo.insertMode === 'Iterative') {
           tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('(')) + ` set ` + setOperators.join(',');
@@ -75,7 +75,7 @@ class StatementGenerator {
           tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + `  values ?`;
         } 
         return tableInfo.ddl;
-      },this);
+      });
       if (executeDDL === true) {
         await this.dbi.executeDDL(ddlStatements);
       }

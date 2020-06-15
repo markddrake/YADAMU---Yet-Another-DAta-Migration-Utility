@@ -9,10 +9,9 @@ const YadamuTestDefaults = require('./yadamuDefaults.json')
 
 class YadamuTest extends Yadamu {
     
-  getYadamuTestDefaults() {
-    return YadamuTestDefaults
-  }
-  
+  get YADAMU_TEST_DEFAULTS() { return YadamuTestDefaults };	
+  get YADAMU_DRIVERS() { return YadamuTestDefaults.drivers };	
+
   constructor(mode) {
     super(mode)
   }

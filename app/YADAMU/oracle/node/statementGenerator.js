@@ -43,7 +43,7 @@ class StatementGenerator {
      // Binds describe the format that will be used to supply the data. Eg with SQLServer BIGINT values will be presented as String
 
      tableInfo.lobColumns = false;
-     return tableInfo.dataTypes.map(function (dataType,idx) {
+     return tableInfo.dataTypes.map((dataType,idx) => {
        if (!dataType.length) {
           dataType.length = parseInt(metadata.sizeConstraints[idx]);
        }
@@ -64,6 +64,7 @@ class StatementGenerator {
          case 'CHAR':
          case 'VARCHAR':
          case 'VARCHAR2':
+           // return { type: oracledb.STRING, maxSize : dataType.length}
            return { type: oracledb.STRING, maxSize : dataType.length * 2}
          case 'NCHAR':
          case 'NVARCHAR2':
@@ -136,7 +137,7 @@ class StatementGenerator {
            }
            return {type : oracledb.STRING, maxSize :  dataType.length}
        }
-     },this)
+     })
   
   }
   
@@ -271,7 +272,7 @@ class StatementGenerator {
     const ddlStatements = [JSON.stringify({jsonColumns:null})];  
     
     const tables = Object.keys(this.metadata); 
-    tables.forEach(function(table,idx) {
+    tables.forEach((table,idx) => {
       const tableMetadata = this.metadata[table];
 	  
 	  if (tableMetadata.WITH_CLAUSE) {
@@ -297,7 +298,7 @@ class StatementGenerator {
         // Reorder select list to enable LOB optimization.
         // Columns with LOB data types must come last in the insert column list
 		
-		tableInfo.binds = tableInfo.lobBinds.map(function(bind) {
+		tableInfo.binds = tableInfo.lobBinds.map((bind) => {
 		  switch (bind.type) {
 		    case oracledb.CLOB:
 		      return { type: oracledb.STRING, maxSize : this.dbi.parameters.LOB_MIN_SIZE }
@@ -308,7 +309,7 @@ class StatementGenerator {
 		    default:
 		      return bind;	
 		  }			 
-	    },this);
+	    });
 
 		this.orderColumnsByBindType(tableInfo);	    
 	  }
@@ -324,7 +325,7 @@ class StatementGenerator {
       const variables = []
       const values = []
 
-      const declarations = tableInfo.columns.map(function(column,idx) {
+      const declarations = tableInfo.columns.map((column,idx) => {
         variables.push(`"V_${column}"`);
         let targetDataType =  tableInfo.targetDataTypes[idx];
         const dataType = tableInfo.dataTypes[idx];
@@ -375,28 +376,28 @@ class StatementGenerator {
         // Append length to bounded datatypes if necessary
         targetDataType = (boundedTypes.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableInfo.sizeConstraints[idx]})` : targetDataType;
         return `${variables[idx]} ${targetDataType}`;
-      },this)
+      })
       
       if (plsqlRequired === true) {
-        const assignments = values.map(function(value,idx) {
+        const assignments = values.map((value,idx) => {
           if (value[1] === '#') {
             return `${setOracleDateMask}${setOracleTimeStampMask}${variables[idx]} := ${value}${setSourceDateMask}${setSourceTimeStampMask}`;
           }
           else {
             return `${variables[idx]} := ${value}`;
           }
-        },this)
+        })
         tableInfo.dml = this.generatePLSQL(this.targetSchema,this.metadata[table].tableName,tableInfo.dml,tableInfo.columns,declarations,assignments,variables);
       }
       else  {
-        tableInfo.dml = `insert into "${this.targetSchema}"."${this.metadata[table].tableName}" (${tableInfo.columns.map(function(col){return `"${col}"`}).join(',')}) values (${values.join(',')})`;
+        tableInfo.dml = `insert into "${this.targetSchema}"."${this.metadata[table].tableName}" (${tableInfo.columns.map((col) => {return `"${col}"`}).join(',')}) values (${values.join(',')})`;
       }
       
 	  if (tableInfo.ddl !== null) {
         ddlStatements.push(tableInfo.ddl);
       }
 	  
-    },this);
+    });
     
     if (executeDDL === true) {
       await this.dbi.executeDDL(ddlStatements);

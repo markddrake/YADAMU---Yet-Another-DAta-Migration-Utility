@@ -3,9 +3,9 @@ const fs = require('fs');
 const path = require('path');
 
 const YadamuDBI = require('../../common/yadamuDBI.js');
-const TableWriter = require('./tableWriter.js');
-const TextParser = require('./fileParser.js');
-
+const FileWriter = require('./fileWriter.js');
+const JSONParser = require('./jsonParser.js');
+const EventManager = require('./eventManager.js')
 /*
 **
 ** YADAMU Database Inteface class skeleton
@@ -18,17 +18,18 @@ class FileDBI extends YadamuDBI {
     return {}
   }
   
+  exportComplete(message) {
+	this.eventManager.exportComplete(message);
+  }
+  
   closeInputStream() {      
     this.inputStream.close();
   }
 
   closeOutputStream() {
-        
-     const outputStream = this.outputStream;
-        
-     return new Promise(function(resolve,reject) {
-      outputStream.on('finish',function() { resolve() });
-      outputStream.close();
+     return new Promise((resolve,reject) => {
+      this.outputStream.on('finish',() => { resolve() });
+      this.outputStream.close();
     })
 
   }
@@ -48,13 +49,32 @@ class FileDBI extends YadamuDBI {
   // Override YadamuDBI
 
   objectMode() {
-     return false;
+     return false;  
   }
 
-  getInputStream() {
-	return this.inputStream.pipe(this.parser);
+  async getMetadata() {
+	return []
   }
   
+  async getSystemInformation() {
+	return {}
+  }
+
+  async setSystemInformation(systemInformation) {
+	super.setSystemInformation(systemInformation) 
+    if (this.outputStream !== undefined) {
+      this.outputStream.write(`"systemInformation":${JSON.stringify(this.systemInformation)}`);
+	}
+  }
+  
+  setMetadata(metadata) {
+	super.setMetadata(metadata)
+    if (this.outputStream !== undefined) {
+  	  this.outputStream.write(',');
+      this.outputStream.write(`"metadata":${JSON.stringify(this.metadata)}`);
+	}
+  }
+ 
   get DATABASE_VENDOR()    { return 'FILE' };
   get SOFTWARE_VENDOR()    { return 'N/A' };
   get SPATIAL_FORMAT()     { return this.spatialFormat };
@@ -63,27 +83,19 @@ class FileDBI extends YadamuDBI {
   async releaseConnection() {
   }
   
-  constructor(yadamu) {
+  constructor(yadamu,defaults) {
+	defaults = defaults === undefined ? yadamu.getYadamuDefaults().file : defaults 
     super(yadamu,yadamu.getYadamuDefaults().file )
     this.outputStream = undefined;
     this.inputStream = undefined;
+	this.ddl = undefined;
     this.firstTable = true;
   }
 
   generateStatementCache() {
 	this.statementCache = {}
   }
-  
-  setSystemInformation(systemInformation) {
-    this.outputStream.write(`"systemInformation":${JSON.stringify(systemInformation)}`);
-	 
-  }
-
-  setMetadata(metadata) {
-    this.outputStream.write(',');
-    this.outputStream.write(`"metadata":${JSON.stringify(metadata)}`);
-  }
-    
+      
   async executeDDL(ddl) {
     this.outputStream.write(',');
     this.outputStream.write(`"ddl":${JSON.stringify(ddl)}`);
@@ -95,27 +107,24 @@ class FileDBI extends YadamuDBI {
   }
 
   async initializeExport() {
-	// For FileDBI Export is reading data to the file system..
+	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
+	// For FileDBI Export is Reading data from the file system..
 	super.initializeExport();
-	this.parser = new TextParser(this.yadamuLogger);
-	const importFilePath = path.resolve(this.parameters.FILE);
-    const stats = fs.statSync(importFilePath)
-    const fileSizeInBytes = stats.size
-    this.inputStream = fs.createReadStream(importFilePath);
-    this.yadamuLogger.info([`${this.constructor.name}`],`Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.`)
   }
 
   async finalizeExport() {
+ 	// this.yadamuLogger.trace([this.constructor.name,],'finalizeExport()')
 	this.closeInputStream()
   }
   
   async initializeImport() {
-	// For FileDBI Import is Writing data to the file system..
+	// this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
+	// For FileDBI Import is Writing data to the file system.
 	super.initializeImport()
     const exportFilePath = path.resolve(this.parameters.FILE);
     this.outputStream = fs.createWriteStream(exportFilePath);
-    this.yadamuLogger.info([`${this.constructor.name}`],`Writing file "${exportFilePath}".`)
-    this.outputStream.write(`{`)
+    this.yadamuLogger.info([this.DATABASE_VENDOR],`Writing file "${exportFilePath}".`)
+	this.outputStream.write(`{`)
   }
 
   async initializeData() {
@@ -124,10 +133,12 @@ class FileDBI extends YadamuDBI {
   }
   
   async finalizeData() {
+	// this.yadamuLogger.trace([this.constructor.name],`finalizeData()`)
 	this.outputStream.write('}');
   }  
   
   async finalizeImport() {
+    // this.yadamuLogger.trace([this.constructor.name],`finalizeImport()`)
 	this.outputStream.write('}');
   }
   
@@ -140,23 +151,23 @@ class FileDBI extends YadamuDBI {
   **  Abort the database connection.
   **
   */
-  
+
   async abort() {
 
-    if (this.inputStream !== undefined) {
-      try {
+    try {
+      if (this.inputStream !== undefined) {
         await this.closeInputStream()
-      } catch (err) {
-        this.yadamuLogger.logException([`${this.constructor.name}.abort()`],err)
-      }
+	  }
+    } catch (err) {
+      this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','InputStream'],err);
     }
-      
-    if (this.oututStream !== undefined) {
-      try {
+	 
+    try {
+      if (this.outputStream !== undefined) {
         await this.closeOutputStream()
-      } catch (err) {
-        this.yadamuLogger.logException([`${this.constructor.name}.abort()`],e)
-      }
+	  }
+    } catch (err) {
+      this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','OutputStream'],err);
     }
   }
 
@@ -165,28 +176,55 @@ class FileDBI extends YadamuDBI {
   **  Generate a set of DDL operations from the metadata generated by an Export operation
   **
   */
+  
+      
+  async generateStatementCache(schema,executeDDL) {
+
+    this.statementCache = []
+  }
+
 
   async getDDLOperations() {
     return []
   }
   
   async getSchemaInfo(schema) {
-    return null
+    return []
+  }
+  
+  getTableInfo(tableName) {
+	return { tableName: tableName}
   }
 
-  getTableWriter(tableName) {
-
-    if (this.firstTable === true) {
-      this.firstTable = false
-    }
-    else {
-      this.outputStream.write(',');
-    }
-
-    return new TableWriter(this,tableName,{},this.status,this.yadamuLogger,this.outputStream);      
+  createParser(tableInfo,objectMode) {
+ 	// this.yadamuLogger.trace([this.constructor.name,],'createParser()')
+	const jsonParser = new JSONParser(this.yadamuLogger,this.parameters.MODE);
+    return jsonParser
+  }  
+  
+  getInputStream() {
+ 	// this.yadamuLogger.trace([this.constructor.name,],'getInputStream()')
+	const importFilePath = path.resolve(this.parameters.FILE);
+    const stats = fs.statSync(importFilePath)
+    const fileSizeInBytes = stats.size
+    this.yadamuLogger.info([this.DATABASE_VENDOR],`Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.`)
+    this.inputStream = fs.createReadStream(importFilePath);
+	return this.inputStream;
+  }
+  
+  getEventStream(inputCallback,outputCallback) {
+    this.getInputStream()
+	this.inputStream.on('error',inputCallback)
+	this.eventManager = new EventManager(this.yadamuLogger,outputCallback)
+	return this.inputStream.pipe(this.createParser()).pipe(this.eventManager,{end: false})
   }
 
-
+  getOutputStream(primary) {
+    // Override parent method to allow output stream to be passed to worker
+    // return super.getOutputStream(FileWriter,primary)
+	 return new FileWriter(this,primary,this.status,this.yadamuLogger,this.outputStream)
+  }
+  
 }
 
 module.exports = FileDBI

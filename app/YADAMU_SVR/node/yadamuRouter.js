@@ -27,7 +27,7 @@ function getRouter() {
   // const yadamuServer = new YadamuServer();
   
   /*
-  router.use(function initalizeSession(req, res, next) {
+  router.use((req, res, next) => {
     setSessionId(req.cookies,req.session);
     initializeApplication(req.session);
     next();

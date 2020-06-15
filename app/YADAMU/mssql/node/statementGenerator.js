@@ -21,7 +21,7 @@ class StatementGenerator {
   bulkSupported(dataTypes) {
     
     let supported = true;
-    dataTypes.forEach(function (dataType,idx) {
+    dataTypes.forEach((dataType,idx) => {
       switch (dataType.type) {
         case 'geography':
          // TypeError: parameter.type.validate is not a function
@@ -42,7 +42,7 @@ class StatementGenerator {
           break;
         */
       }
-     },this)
+     })
     return supported;
    
   }
@@ -54,7 +54,7 @@ class StatementGenerator {
     
     const columns = JSON.parse('[' +  columnList + ']')
   
-    dataTypes.forEach(function (dataType,idx) {
+    dataTypes.forEach((dataType,idx) => {
       switch (dataType.type) {
         case 'bit':
           table.columns.add(columns[idx],sql.Bit);
@@ -215,7 +215,7 @@ class StatementGenerator {
         default:
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,`BULK OPERATION`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
       }
-    },this)
+    })
     return table
   }
 
@@ -237,7 +237,7 @@ class StatementGenerator {
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
     const tables = Object.keys(this.metadata); 
-    const ddlStatements = tables.map(function(table,idx) {
+    const ddlStatements = tables.map((table,idx) => {
       const tableName = this.metadata[table].tableName;
       statementCache[tableName] = JSON.parse(statementCache[tableName] );
       const tableInfo = statementCache[tableName];
@@ -247,7 +247,7 @@ class StatementGenerator {
 	  tableInfo.spatialFormat = this.spatialFormat
       // Create table before attempting to Prepare Statement..
       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + "\nVALUES (";
-      this.metadata[table].columns.split(',').forEach(function(column,idx) {
+      this.metadata[table].columns.split(',').forEach((column,idx) => {
         switch(tableInfo.targetDataTypes[idx]) {
           case 'image':
 		    // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
@@ -293,7 +293,7 @@ class StatementGenerator {
           default: 
              tableInfo.dml = tableInfo.dml + '@C' + idx+ ','
         }
-      },this)
+      })
       tableInfo.dml = tableInfo.dml.slice(0,-1) + ")";
       tableInfo.bulkSupported = this.bulkSupported(tableInfo.dataTypes);
       try {
@@ -309,7 +309,7 @@ class StatementGenerator {
         this.yadamuLogger.logException([`${this.constructor.name}`],e)
         this.yadamuLogger.writeDirect(`${tableInfo.ddl}`)
       } 
-    },this);
+    });
     
     if (executeDDL === true) {
       await this.dbi.executeDDL(ddlStatements);

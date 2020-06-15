@@ -9,11 +9,11 @@ const { performance } = require('perf_hooks');
 **
 */
 const mysql = require('mysql');
-const DBParser = require('./dbParser.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
-const {ConnectionError, MySQLError} = require('../../common/yadamuError.js')
-const TableWriter = require('./tableWriter.js');
+const MySQLError = require('./mysqlError.js')
+const MySQLParser = require('./mysqlParser.js');
+const MySQLWriter = require('./mysqlWriter.js');
 const StatementGenerator80 = require('./statementGenerator.js');
 const StatementGenerator57 = require('../../dbShared/mysql/statementGenerator57.js');
 
@@ -158,20 +158,17 @@ class MySQLDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`getConnectionFromPool()`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
 	
 	if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
     }
 	
-	const self = this;
 	const stack = new Error().stack;
-    const connection = await new Promise(
-	  function(resolve,reject) {
+    const connection = await new Promise((resolve,reject) => {
         const sqlStartTime = performance.now();
-        self.pool.getConnection(
-		  function(err,connection) {
-            self.traceTiming(sqlStartTime,performance.now())
+        this.pool.getConnection((err,connection) => {
+            this.traceTiming(sqlStartTime,performance.now())
             if (err) {
 		      reject(new MySQLError(err,stack,'mysql.Pool.getConnection()'));
             }
@@ -186,7 +183,7 @@ class MySQLDBI extends YadamuDBI {
   
   async closeConnection() {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`closeConnection(${this.connection !== undefined && this.connection.release})`)
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${this.connection !== undefined && this.connection.release})`)
 
  	if (this.keepAliveHdl) {
 	  clearInterval(this.keepAliveHdl)
@@ -225,7 +222,7 @@ class MySQLDBI extends YadamuDBI {
   };	  
 
   async reconnectImpl() {
-    this.connection = this.isMaster() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isPrimary() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
     await this.connection.ping()
   }
 
@@ -322,27 +319,24 @@ class MySQLDBI extends YadamuDBI {
     
     let attemptReconnect = this.attemptReconnection;
 
-    const self = this
-  
-    return new Promise(
-                 function(resolve,reject) {
-                   if (self.status.sqlTrace) {
-                     self.status.sqlTrace.write(this.traceSQL(sqlStatement));
+    return new Promise((resolve,reject) => {
+                   if (this.status.sqlTrace) {
+                     this.status.sqlTrace.write(this.traceSQL(sqlStatement));
                    }
 				   const stack = new Error().stack;
                    const sqlStartTime = performance.now(); 
-				   self.connection.query(
+				   this.connection.query(
                      sqlStatement,
                      args,
-                     async function(err,results,fields) {
+                     async (err,results,fields) => {
                        const sqlEndTime = performance.now()
                        if (err) {
          		         const cause = new MySQLError(err,stack,sqlStatement)
 		                 if (attemptReconnect && cause.lostConnection()) {
 						   attemptReconnect = false
 						   try {
-                             await self.reconnect(cause,'SQL')
-                             results = await self.executeSQL(sqlStatement,args);
+                             await this.reconnect(cause,'SQL')
+                             results = await this.executeSQL(sqlStatement,args);
                              resolve(results);
 						   } catch (e) {
                              reject(e);
@@ -352,7 +346,7 @@ class MySQLDBI extends YadamuDBI {
                            reject(cause);
                          }
                        }
-					   self.traceTiming(sqlStartTime,sqlEndTime)
+					   this.traceTiming(sqlStartTime,sqlEndTime)
                        resolve(results);
                    })
                })
@@ -398,10 +392,10 @@ class MySQLDBI extends YadamuDBI {
     
   async executeDDLImpl(ddl) {
     await this.createSchema(this.parameters.TO_USER);
-    const ddlResults = await Promise.all(ddl.map(function(ddlStatement) {
+    const ddlResults = await Promise.all(ddl.map((ddlStatement) => {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
       return this.executeSQL(ddlStatement) 
-    },this))	
+    }))	
 	return ddlResults;
   }
 
@@ -497,7 +491,7 @@ class MySQLDBI extends YadamuDBI {
   
   async beginTransaction() {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(`begin transaction`));
@@ -522,7 +516,7 @@ class MySQLDBI extends YadamuDBI {
   
   async commitTransaction() {
 	
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
@@ -547,7 +541,7 @@ class MySQLDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
 
 	this.checkConnectionState(cause)
 
@@ -571,7 +565,7 @@ class MySQLDBI extends YadamuDBI {
   
   async createSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 
     await this.executeSQL(sqlCreateSavePoint);
 	super.createSavePoint();
@@ -579,7 +573,7 @@ class MySQLDBI extends YadamuDBI {
   
   async restoreSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 
 	this.checkConnectionState(cause)
 
@@ -596,7 +590,7 @@ class MySQLDBI extends YadamuDBI {
 
   async releaseSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
     await this.executeSQL(sqlReleaseSavePoint);   
     super.releaseSavePoint();
@@ -745,7 +739,7 @@ class MySQLDBI extends YadamuDBI {
     let keepAliveHdl = undefined
    
     if (this.keepAliveInterval > 0) {
-      this.yadamuLogger.info([`${self.constructor.name}.getInputStream()`],`Stating Keep Alive. Interval ${this.keepAliveInterval}ms.`)
+      this.yadamuLogger.info([`${this.constructor.name}.getInputStream()`],`Stating Keep Alive. Interval ${this.keepAliveInterval}ms.`)
       keepAliveHdl = setInterval(this.keepAlive,this.keepAliveInterval,this);
 	}
 
@@ -753,13 +747,12 @@ class MySQLDBI extends YadamuDBI {
       this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
     }
 	
-	const self = this
 	const stack = new Error().stack;
     const is = this.connection.query(tableInfo.SQL_STATEMENT).stream();
 
     is.on('end',
-	  async function() {
-		// self.yadamuLogger.trace([`${self.constructor.name}.getInputStream()`,`${is.constructor.name}.onEnd()`,`${tableInfo.TABLE_NAME}`],``); 
+	  async () => {
+		// this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,`${is.constructor.name}.onEnd()`,`${tableInfo.TABLE_NAME}`],``); 
         if (keepAliveHdl !== undefined) {
 		  clearInterval(keepAliveHdl);
 		  keepAliveHdl = undefined
@@ -781,13 +774,12 @@ class MySQLDBI extends YadamuDBI {
     }
   }
   
-  getTableWriter(table) {
-    return super.getTableWriter(TableWriter,table)
-
+  getOutputStream(primary) {
+	 return super.getOutputStream(MySQLWriter,primary)
   }
-  
+   
   createParser(tableInfo,objectMode) {
-    this.parser = new DBParser(tableInfo,objectMode,this.yadamuLogger,this);
+    this.parser = new MySQLParser(tableInfo,objectMode,this.yadamuLogger,this);
 	return this.parser;
   }  
     
@@ -801,15 +793,11 @@ class MySQLDBI extends YadamuDBI {
 	}
   }
 
-  async slaveDBI(slaveNumber) {
+  async workerDBI(workerNumber) {
 	const dbi = new MySQLDBI(this.yadamu)
-	return await super.slaveDBI(slaveNumber,dbi)
+	return await super.workerDBI(workerNumber,dbi)
   }
-
-  tableWriterFactory(tableName) {
-    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
-  }
-
+  
   async getConnectionID() {
 	const results = await this.executeSQL(`select connection_id() "pid"`)
 	const pid = results[0].pid;

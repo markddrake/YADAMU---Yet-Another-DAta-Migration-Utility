@@ -16,9 +16,9 @@ const QueryStream = require('pg-query-stream')
 
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
-const {ConnectionError, PostgresError} = require('../../common/yadamuError.js')
-const DBParser = require('./dbParser.js');
-const TableWriter = require('./tableWriter.js');
+const PostgresError = require('./postgresError.js')
+const PostgresParser = require('./postgresParser.js');
+const PostgresWriter = require('./postgresWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 
 const sqlGenerateQueries = `select EXPORT_JSON($1,$2)`;
@@ -63,10 +63,9 @@ class PostgresDBI extends YadamuDBI {
 	this.pool = new Pool(this.connectionProperties);
     this.traceTiming(sqlStartTime,performance.now())
 	
-	const self = this
-    this.pool.on('error',(err, p) => {
+	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  // const pgErr = new PostgresError(err,self.postgresStack,self.postgressOperation)
+	  // const pgErr = new PostgresError(err,this.postgresStack,this.postgressOperation)
       // yadamuLogger.logException([`${databaseVendor}`,`Client.onError()`],pgErr);
       // throw pgErr
     })
@@ -75,7 +74,7 @@ class PostgresDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`getConnectionFromPool()`)
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
 
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
@@ -123,18 +122,15 @@ class PostgresDBI extends YadamuDBI {
 	const yadamuLogger = this.yadamuLogger
     const databaseVendor = this.DATABASE_VENDOR
    
-    const self = this
-    this.connection.on('error',
-	  function(err, p) {
+    this.connection.on('error',(err, p) => {
         // yadamuLogger.info([`${databaseVendor}`,`Connection.onError()`],err.message);
    	    // Do not throw errors here.. Node will terminate immediately
-   	    // const pgErr = new PostgresError(err,self.postgresStack,self.postgressOperation)  
+   	    // const pgErr = new PostgresError(err,this.postgresStack,this.postgressOperation)  
         // throw pgErr
       }
 	)
 
-    this.connection.on('notice',
-	  function(n){ 
+    this.connection.on('notice',(n) => { 
 	    const notice = JSON.parse(JSON.stringify(n));
         switch (notice.code) {
           case '42P07': // Table exists on Create Table if not exists
@@ -142,7 +138,7 @@ class PostgresDBI extends YadamuDBI {
           case '00000': // Table not found on Drop Table if exists
 		    break;
           default:
-            yadamuLogger.info([`${self.DATABASE_VENDOR}`,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`);
+            yadamuLogger.info([this.DATABASE_VENDOR,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`);
         }
       }
   
@@ -161,7 +157,7 @@ class PostgresDBI extends YadamuDBI {
 
   async closeConnection() {
 
-  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`closeConnection(${(this.connection !== undefined && this.connection.release)})`)
+  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && this.connection.release)})`)
 	  
     if (this.connection !== undefined && this.connection.release) {
 	  let stack
@@ -195,7 +191,7 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async reconnectImpl() {
-    this.connection = this.isMaster() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isPrimary() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
     await this.executeSQL('select 1')
   }
   
@@ -302,7 +298,7 @@ class PostgresDBI extends YadamuDBI {
   
   async beginTransaction() {
 
-     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getSlaveNumber()],``)
+     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
      const sqlStatement =  `begin transaction`
      await this.executeSQL(sqlStatement);
@@ -318,7 +314,7 @@ class PostgresDBI extends YadamuDBI {
   
   async commitTransaction() {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     const sqlStatement =  `commit transaction`
     await this.executeSQL(sqlStatement);
@@ -334,7 +330,7 @@ class PostgresDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-   // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getSlaveNumber()],``)
+   // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
 
     this.checkConnectionState(cause)
 
@@ -353,7 +349,7 @@ class PostgresDBI extends YadamuDBI {
 
   async createSavePoint() {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 																
 	 
 
@@ -363,7 +359,7 @@ class PostgresDBI extends YadamuDBI {
   
   async restoreSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 																 
 	 
 
@@ -384,7 +380,7 @@ class PostgresDBI extends YadamuDBI {
 
   async releaseSavePoint(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getSlaveNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
     await this.executeSQL(sqlReleaseSavePoint);    
     super.releaseSavePoint();
@@ -425,9 +421,9 @@ class PostgresDBI extends YadamuDBI {
 
     let inputStream = fs.createReadStream(importFilePath);
     const stream = await this.executeSQL(CopyFrom(copyStatement));
-    const importProcess = new Promise(async function(resolve,reject) {  
-      stream.on('end',function() {resolve()})
-  	  stream.on('error',function(err){reject(err)});  	  
+    const importProcess = new Promise(async (resolve,reject) => {  
+      stream.on('end',() => {resolve()})
+  	  stream.on('error',(err) => {reject(err)});  	  
       inputStream.pipe(stream);
     })  
     
@@ -571,10 +567,6 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async fetchMetadata(schema) {
-
-							   
-																 
-	   
 	
     const results = await this.executeSQL(sqlGenerateQueries,[schema,this.spatialFormat]);
     this.metadata = results.rows[0].export_json;
@@ -582,9 +574,9 @@ class PostgresDBI extends YadamuDBI {
   
   generateTableInfo() {
       
-    const tableInfo = Object.keys(this.metadata).map(function(value) {
+    const tableInfo = Object.keys(this.metadata).map((value) => {
       return {TABLE_NAME : value, SQL_STATEMENT : this.metadata[value].sqlStatemeent}
-    },this)
+    })
     return tableInfo;    
     
   }
@@ -603,7 +595,7 @@ class PostgresDBI extends YadamuDBI {
   }   
 
   createParser(tableInfo,objectMode) {
-    return new DBParser(tableInfo,objectMode,this.yadamuLogger);
+    return new PostgresParser(tableInfo,objectMode,this.yadamuLogger);
   }  
   
   forceEndOnInputStreamError(error) {
@@ -651,7 +643,7 @@ class PostgresDBI extends YadamuDBI {
   
   async executeDDLImpl(ddl) {
     await this.createSchema(this.parameters.TO_USER);
-    await Promise.all(ddl.map(async function(ddlStatement) {
+    await Promise.all(ddl.map(async (ddlStatement) => {
       try {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
         return await this.executeSQL(ddlStatement);
@@ -659,33 +651,28 @@ class PostgresDBI extends YadamuDBI {
         this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
         this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
       }
-    },this))
+    }))
   }
   
   async generateStatementCache(schema,executeDDL) {
     await super.generateStatementCache(StatementGenerator, schema, executeDDL)
   }
 
-  getTableWriter(table) {
-    const tableName = this.metadata[table].tableName
-    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger);      
+  getOutputStream(primary) {
+	 return super.getOutputStream(PostgresWriter,primary)
   }
-  
+ 
   async insertBatch(sqlStatement,batch) {
 	 
     const result = await this.executeSQL(sqlStatement,batch)
     return result;
   }
 
-  async slaveDBI(slaveNumber) {
+  async workerDBI(workerNumber) {
 	const dbi = new PostgresDBI(this.yadamu)
-	return await super.slaveDBI(slaveNumber,dbi)
+	return await super.workerDBI(workerNumber,dbi)
   }
-  
-  tableWriterFactory(tableName) {
-    return new TableWriter(this,tableName,this.statementCache[tableName],this.status,this.yadamuLogger)
-  }
-
+ 
   async getConnectionID() {
 	const results = await this.executeSQL(`select pg_backend_pid()`)
 	const pid = results.rows[0].pg_backend_pid;

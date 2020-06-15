@@ -184,7 +184,7 @@ class YadamuCLI {
 	  
 	const commands = []
     this.parameters = {}
-    process.argv.forEach(function (arg) {
+    process.argv.forEach((arg) => {
  
       if (arg.indexOf('=') > -1) {
         const parameterName = arg.substring(0,arg.indexOf('='));
@@ -231,7 +231,7 @@ class YadamuCLI {
 		    break;   
 		}
       }
-    },this)	
+    })	
 	
 	let err
 	let command
@@ -317,8 +317,7 @@ class YadamuCLI {
     ** ### TODO : Check file exists and has reasonable upper limit for size before processeing
     ** 
     */ 
-		  
-	
+		 
 	try {
       const fileContents = fs.readFileSync(path);
 	  try {
@@ -377,47 +376,20 @@ class YadamuCLI {
 
     let dbi = undefined
     
-    switch (driver) {
-      case "oracle"  : 
-        const OracleDBI = require('../oracle/node/oracleDBI.js');
-        dbi = new OracleDBI(yadamu)
-        break;
-      case "postgres" :
-        const PostgresDBI = require('../postgres/node/postgresDBI.js');
-        dbi = new PostgresDBI(yadamu)
-        break;
-      case "mssql" :
-        const MsSQLDBI = require('../mssql/node/mssqlDBI.js');
-        dbi = new MsSQLDBI(yadamu)
-        break;
-      case "mysql" :
-        const MySQLDBI = require('../mysql/node/mysqlDBI.js');
-        dbi = new MySQLDBI(yadamu)
-        break;
-      case "mariadb" :
-        const MariaDBI = require('../mariadb/node/mariadbDBI.js');
-        dbi = new MariaDBI(yadamu)
-        break;
-      case "mongodb" :
-        const MongoDBI = require('../mongodb/node/mongoDBI.js');
-        dbi = new MongoDBI(yadamu)
-        break;
-      case "snowflake" :
-        const SnowflakeDBI = require('../snowflake/node/snowflakeDBI.js');
-        dbi = new SnowflakeDBI(yadamu)
-        break;
-      case "file" :
-        dbi = new FileDBI(yadamu)
-        break;
-      default:
-	    const message = `Unsupported database vendor "${driver}".`
-        this.yadamuLogger.info([`${this.constructor.name}.getDatabaseInterface()`],message);  
-		const err = new ConfigurationFileError(`[${this.constructor.name}.getDatabaseInterface()]: ${message}`);
-		throw err
-      }
-	  dbi.setConnectionProperties(connectionProperties);
-      dbi.setParameters(parameters);
-	  return dbi;
+    if (this.yadamu.YADAMU_DRIVERS.hasOwnProperty(driver)) { 
+	  const DBI = require(this.yadamu.YADAMU_DRIVERS[driver]);
+	  dbi = new DBI(this.yadamu);
+    }	
+    else {   
+	  const message = `Unsupported database vendor "${driver}".`
+      this.yadamuLogger.info([`${this.constructor.name}.getDatabaseInterface()`],message);  
+	  const err = new ConfigurationFileError(`[${this.constructor.name}.getDatabaseInterface()]: ${message}`);
+	  throw err
+    }
+
+    dbi.setConnectionProperties(connectionProperties);
+    dbi.setParameters(parameters);
+	return dbi;
   }
   
   getUser(vendor,schema) {
@@ -524,9 +496,9 @@ class YadamuCLI {
     const YadamuQA = require('../../YADAMU_QA/common/node/yadamuQA.js');
 	const yadamuQA = new YadamuQA(configuration,this.yadamuLogger);
 	const startTime = performance.now();
-	await yadamuQA.doTests(configuration);
+	const results = await yadamuQA.doTests(configuration);
 	const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.qa([`TEST`,`${this.parameters.CONFIG}`],`Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.qa([`TEST`,`${this.parameters.CONFIG}`],`${results} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
 
   }
   

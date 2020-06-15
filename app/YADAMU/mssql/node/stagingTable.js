@@ -19,7 +19,6 @@ class StagingTable {
   async uploadFile() {
 
     let results
-	let self = this
 	await this.dbi.beginTransaction();
 
     let statement = `drop table if exists "${this.tableSpec.tableName}"`;
@@ -38,17 +37,16 @@ class StagingTable {
     const loader = new DBFileLoader(this.dbi,this.status);
   
     let startTime;
-    const fileUpload = new Promise(function(resolve, reject) {
-	  loader.on('finish',
-	    async function(chunk) {
+    const fileUpload = new Promise((resolve, reject) => {
+	  loader.on('finish',async (chunk) => {
 		  try {
 		    resolve(performance.now() - startTime)
 		  } catch (e) {
 			reject(e);
 		  }
       })
-	  inputStream.on('error',function(err){reject(err)});
-	  loader.on('error',function(err){reject(err)});
+	  inputStream.on('error',(err) => {reject(err)});
+	  loader.on('error',(err) => {reject(err)});
 	  startTime = performance.now();
       inputStream.pipe(loader);
     })

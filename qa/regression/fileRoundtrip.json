@@ -13,6 +13,7 @@
       "oracle19c"
     , "oracle18c"
     , "oracle12c"
+    , "oracle11g"
     , "mssql17"
     , "mssql19"
     , "postgres#1"
@@ -21,19 +22,6 @@
     ]
   , "parser" : "CLARINET"
   , "directory" : "tests/fileRoundtrip/%connection%/%sourceDirectory%"
-  , "tasks": [
-       "oracle", "mysql", "mssql"
-    ]
-  },{
-    "source": "file-JSON-root"
-  , "targets": [
-       "oracle11g"
-    ]
-  , "parser" : "CLARINET"
-  , "directory" : "tests/fileRoundtrip/"
-  , "parameters": {
-      "MAPPINGS" : "qa/regression/mappingsOracle11g.json"
-    }
   , "tasks": [
        "oracle", "mysql", "mssql"
     ]

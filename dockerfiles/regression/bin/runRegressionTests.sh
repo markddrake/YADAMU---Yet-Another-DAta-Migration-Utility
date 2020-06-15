@@ -7,3 +7,5 @@ source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
+source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoImport
+source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoRoundtrip

@@ -504,8 +504,8 @@ function loadConfiguration(configuration) {
     const sourcePrefix = 'source-' + sourceDatabase + '-';
     const targetPrefix = 'target-' + targetDatabase + '-';
 	
-	Object.keys(sourceConnection[sourceDatabase]).forEach(function (key) {setInitialValue(sourcePrefix + key,sourceConnection[sourceDatabase][key])},this)
-	Object.keys(targetConnection[targetDatabase]).forEach(function (key) {setInitialValue(targetPrefix + key,targetConnection[targetDatabase][key])},this)
+	Object.keys(sourceConnection[sourceDatabase]).forEach((key) => {setInitialValue(sourcePrefix + key,sourceConnection[sourceDatabase][key])})
+	Object.keys(targetConnection[targetDatabase]).forEach((key) => {setInitialValue(targetPrefix + key,targetConnection[targetDatabase][key])})
 	
 	document.getElementById(sourcePrefix+'schema').value = sourceSchemaInfo.schema
 	document.getElementById(targetPrefix+'schema').value = targetSchemaInfo.schema

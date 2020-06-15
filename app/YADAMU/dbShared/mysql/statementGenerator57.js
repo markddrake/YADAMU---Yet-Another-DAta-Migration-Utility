@@ -184,6 +184,8 @@ class StatementGenerator {
 		   case "function":
 		   case "symbol":
 		     return 'json';
+		   case "ObjectId":
+		     return "binary(12)";
 		   case "boolean":
 		     return 'boolean';
            case "string":
@@ -195,8 +197,8 @@ class StatementGenerator {
              }
 		   case "bigint":
              return "bigint";
-           default
-             dataType.toLowerCase();
+           default:
+             return dataType.toLowerCase();
 		 }
 		 break;
   	   default :
@@ -247,16 +249,16 @@ class StatementGenerator {
   generateTableInfo(metadata) {
       
     let insertMode = 'Batch';
-  
+
     const columnNames = metadata.columns.split(',');
     const dataTypes = metadata.dataTypes
     const sizeConstraints = metadata.sizeConstraints
     const targetDataTypes = [];
     const setOperators = []
   
-    const columnClauses = columnNames.map(function(columnName,idx) {    
-        
-       const dataType = {
+    const columnClauses = columnNames.map((columnName,idx) => {    
+       
+	   const dataType = {
                 type : dataTypes[idx]
              }    
         
@@ -270,7 +272,7 @@ class StatementGenerator {
        }
     
        let targetDataType = this.mapForeignDataType(metadata.vendor,dataType.type,dataType.length,dataType.scale);
-    
+       
        targetDataTypes.push(targetDataType);
        let ensureNullable = false;
        switch (targetDataType) {
@@ -298,7 +300,7 @@ class StatementGenerator {
            setOperators.push(' ' + columnName + ' = ?')
        }
        return `${columnName} ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)} ${ensureNullable === true ? 'null':''}`
-    },this)
+    })
                                        
     const createStatement = `create table if not exists "${this.targetSchema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
     let insertStatement = `insert into "${this.targetSchema}"."${metadata.tableName}"`;
@@ -323,13 +325,13 @@ class StatementGenerator {
     const statementCache = {}
     const tables = Object.keys(this.metadata); 
 
-    const ddlStatements = tables.map(function(table,idx) {
+    const ddlStatements = tables.map((table,idx) => {
       const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);
 	  tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.targetDataTypes);
       statementCache[this.metadata[table].tableName] = tableInfo;
       return tableInfo.ddl;
-    },this)
+    })
     if (executeDDL === true) {
       await this.dbi.executeDDL(ddlStatements)
     }

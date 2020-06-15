@@ -93,7 +93,7 @@
     },
     "mongodb#1"                         : {
       "mongodb"                         : {
-        "host"                          : "localhost"
+        "host"                          : "MONGO40-01"
       , "port"                          : 27017
       , "options"                       : {
            "socketTimeoutMS"            : 900000

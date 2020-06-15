@@ -44,14 +44,12 @@ const sqlCompareSchemas = `begin YADAMU_TEST.COMPARE_SCHEMAS(:source,:target,:ma
 class OracleQA extends OracleDBI {
     
 	async scheduleTermination(pid) {
-	  const self = this
       const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
 	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
-	  const timer = setTimeout(
-	    async function(pid) {
-		   if ((self.pool instanceof self.oracledb.Pool) && (self.pool.status === self.oracledb.POOL_STATUS_OPEN)) {
-		     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,self.getSlaveNumber()],`Killing connection.`);
-			 const conn = await self.getConnectionFromPool();
+	  const timer = setTimeout(async (pid) => {
+		   if ((this.pool instanceof this.oracledb.Pool) && (this.pool.status === this.oracledb.POOL_STATUS_OPEN)) {
+		     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],`Killing connection.`);
+			 const conn = await this.getConnectionFromPool();
 			 const sqlStatement = `ALTER SYSTEM KILL SESSION '${pid.sid}, ${pid.serial}'`
 			 let stack
 			 try {
@@ -60,17 +58,17 @@ class OracleQA extends OracleDBI {
  		       await conn.close()
 			 } catch (e) {
 			   if ((e.errorNum && ((e.errorNum === 27) || (e.errorNum === 31))) || (e.message.startsWith('DPI-1010'))) {
-				 // The Slave has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourself (Error 27)
-			     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,self.getSlaveNumber()],`Slave finished prior to termination.`)
+				 // The Slave has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourthis (Error 27)
+			     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],`Slave finished prior to termination.`)
  			   }
 			   else {
 				 const cause = new OracleError(e,stack,sqlStatement)
-			     self.yadamuLogger.handleException(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,self.getSlaveNumber()],cause)
+			     this.yadamuLogger.handleException(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],cause)
 			   }
 			 }
 		   }
 		   else {
-		     self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial],`Unable to Kill Connection: Connection Pool no longer available.`);
+		     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial],`Unable to Kill Connection: Connection Pool no longer available.`);
 		   }
 		},
 		killDelay,
@@ -116,21 +114,20 @@ class OracleQA extends OracleDBI {
         successful : []
        ,failed     : []
       }
-      
       const args = {source:source.schema,target:target.schema,maxTimestampPrecision:this.parameters.TIMESTAMP_PRECISION,xslTransformation:this.parameters.XSL_TRANSFORMATION,useOrderedJSON:this.parameters.ORDERED_JSON.toString().toUpperCase(),excludeMaterialzedViews:Boolean(this.parameters.MODE === 'DATA_ONLY').toString().toUpperCase()}
       await this.executeSQL(sqlCompareSchemas,args)      
 
       const successful = await this.executeSQL(sqlSuccess,{})
             
-      report.successful = successful.rows.map(function(row,idx) {          
+      report.successful = successful.rows.map((row,idx) => {          
         return [row[0],row[1],row[2],row[4]]
-      },this)
+      })
         
       const failed = await this.executeSQL(sqlFailed,{})
       
-      report.failed = failed.rows.map(function(row,idx) {
+      report.failed = failed.rows.map((row,idx) => {
         return [row[0],row[1],row[2],row[4],row[5],row[6],row[7],row[8]]
-      },this)
+      })
       
       return report
     }
@@ -143,19 +140,19 @@ class OracleQA extends OracleDBI {
       args = {target:target.schema}
       const results = await this.executeSQL(sqlSchemaTableRows,args)
       
-      return results.rows.map(function(row,idx) {          
+      return results.rows.map((row,idx) => {          
         return [target.schema,row[0],row[1]]
-      },this)
+      })
       
     }
 
-  async slaveDBI(idx)  {
-	const slaveDBI = await super.slaveDBI(idx);
-	if (slaveDBI.testLostConnection()) {
-	  const dbiID = await slaveDBI.getConnectionID();
+  async workerDBI(idx)  {
+	const workerDBI = await super.workerDBI(idx);
+	if (workerDBI.testLostConnection()) {
+	  const dbiID = await workerDBI.getConnectionID();
 	  this.scheduleTermination(dbiID);
     }
-	return slaveDBI
+	return workerDBI
   }
 
 }

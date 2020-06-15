@@ -4,19 +4,23 @@ const fs = require('fs');
 const path = require('path');
 const util = require('util');
 
-const {DatabaseError, OracleError}  = require('./yadamuError.js');
+const {DatabaseError}  = require('./yadamuError.js');
+const OracleError  = require('../oracle/node/oracleError.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const StringWriter = require('./stringWriter.js')
 
 class YadamuLogger {
   
   constructor(outputStream,state) {
+   
+    this.resetCounters();
+	
     this.os = outputStream;
     this.state = state;
     this.exceptionFolderPath = this.state.exceptionFolder === undefined ? 'exception' : YadamuLibrary.pathSubstitutions(this.state.exceptionFolder) 
     this.exceptionFilePrefix = this.state.exceptionFilePrefix === undefined ? 'exception' : YadamuLibrary.pathSubstitutions(this.state.EXCEPTION_FILE_PREFIX);
     this.exceptionFolderLocation = undefined
-	this.inlineStackTrace = process.env.YADAMU_SHOW_CAUSE && process.env.YADAMU_SHOW_CAUSE.toUpperCase() === 'TRUE'
+	this.inlineStackTrace = process.env.YADAMU_INLINE_STACK && process.env.YADAMU_INLINE_STACK.toUpperCase() === 'TRUE'
   }
 
   switchOutputStream(os) {
@@ -32,12 +36,12 @@ class YadamuLogger {
   }
 
   logNoTimestamp(args,msg) {
-    this.os.write(`${args.map(function (arg) { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+    this.os.write(`${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${msg}\n`)
   }
   
   log(args,msg) {
 	const ts = new Date().toISOString()
-    this.os.write(`${ts} ${args.map(function (arg) { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+    this.os.write(`${ts} ${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${msg}\n`)
 	return ts
   }
   
@@ -68,12 +72,14 @@ class YadamuLogger {
 
   warning(args,msg) {
     this.state.warningRaised = true;
+	this.counters.warnings++
     args.unshift('WARNING')
-    return this.log(args,msg)
+	return this.log(args,msg)
   }
 
   error(args,msg) {
     this.state.errorRaised = true;
+	this.counters.errors++
     args.unshift('ERROR')
     return this.log(args,msg)
   }
@@ -141,7 +147,7 @@ class YadamuLogger {
   
   writeExceptionToFile(exceptionFile,ts,args,e) {
 	const errorLog = this.createLogFile(exceptionFile)
-	fs.writeSync(errorLog,`${ts} ${args.map(function (arg) { return '[' + arg + ']'}).join('')}: ${e.message}\n`)
+	fs.writeSync(errorLog,`${ts} ${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${e.message}\n`)
 	fs.writeSync(errorLog,this.serializeException(e));
 	fs.closeSync(errorLog)
   }
@@ -151,7 +157,7 @@ class YadamuLogger {
     // Handle Exception does not produce any output if the exception has already been processed by handleException ot logException
 
 	if (e.yadamuAlreadyReported !== true) {
-	  if (this.inlineStackTrace) {
+	  if (this.inlineStackTrace === true) {
 		this.logException(args,e)
 	  }
 	  else {
@@ -170,7 +176,7 @@ class YadamuLogger {
     // Handle Exception does not produce any output if the exception has already been processed by handleException ot logException
 
 	if (e.yadamuAlreadyReported !== true) {
-	  if (this.inlineStackTrace) {
+	  if (this.inlineStackTrace === true) {
 		this.logException(args,e)
 	  }
 	  else {
@@ -205,15 +211,26 @@ class YadamuLogger {
     return this.os === process.stdout;
   }
   
+  resetCounters() {
+	this.counters = {
+	  errors   : 0
+    , warnings : 0
+	, failed   : 0
+	}
+  }
+  
+  getCounters(reset) {
+	const counters = Object.assign({},this.counters)
+    if (reset) this.resetCounters();
+	return counters
+  }
   
   closeStream() {
   
-    const self = this
-	
-	if (self.os.close) { 
-      return new Promise(function(resolve,reject) {
-        self.os.on('finish',function() { resolve() });
-        self.os.close();
+	if (this.os.close) { 
+      return new Promise((resolve,reject) => {
+        this.os.on('finish',() => { resolve() });
+        this.os.close();
       })
 	}
 	

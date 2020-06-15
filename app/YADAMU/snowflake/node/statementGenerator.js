@@ -231,7 +231,7 @@ class StatementGenerator {
     const sizeConstraints = metadata.sizeConstraints
     const targetDataTypes = [];
           
-    const columnClauses = columnNames.map(function(columnName,idx) {    
+    const columnClauses = columnNames.map((columnName,idx) => {    
         
        const dataType = {
                type : dataTypes[idx]
@@ -250,7 +250,7 @@ class StatementGenerator {
     
        targetDataTypes.push(targetDataType);
        return `${columnName} ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)}`
-    },this)
+    })
 
     const createStatement = `create table if not exists "${this.targetSchema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
 
@@ -258,10 +258,10 @@ class StatementGenerator {
     let insertStatement
     
     if (insertMode === 'Batch') {
-      insertStatement = `insert into "${this.targetSchema}"."${metadata.tableName}" (${metadata.columns}) values ( ${columnNames.map(function(){return '?'}).join(',')})`; 
+      insertStatement = `insert into "${this.targetSchema}"."${metadata.tableName}" (${metadata.columns}) values ( ${columnNames.map(() => {return '?'}).join(',')})`; 
     }
     else {
-      insertStatement = `insert into "${this.targetSchema}"."${metadata.tableName}" (${metadata.columns}) select ${targetDataTypes.map(function(dataType,idx) {return dataType == 'VARIANT' ? (metadata.dataTypes[idx] === 'XMLTYPE' ? 'PARSE_XML(?)' : 'PARSE_JSON(?)') : '?'},this).join(',')}`
+      insertStatement = `insert into "${this.targetSchema}"."${metadata.tableName}" (${metadata.columns}) select ${targetDataTypes.map((dataType,idx) => {return dataType == 'VARIANT' ? (metadata.dataTypes[idx] === 'XMLTYPE' ? 'PARSE_XML(?)' : 'PARSE_JSON(?)') : '?'}).join(',')}`
     }
     
     return { 
@@ -281,13 +281,13 @@ class StatementGenerator {
     const statementCache = {}
     const tables = Object.keys(this.metadata); 
  
-    const ddlStatements = tables.map(function(table,idx) {
+    const ddlStatements = tables.map((table,idx) => {
       const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);
 	  tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.sourceDataTypes);
       statementCache[this.metadata[table].tableName] = tableInfo;
       return tableInfo.ddl;
-    },this)
+    })
     if (executeDDL === true) {
       await this.dbi.executeDDL(ddlStatements)
     }

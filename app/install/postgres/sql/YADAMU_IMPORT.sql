@@ -400,6 +400,8 @@ begin
 		  return V_JSON_TYPE;
         when 'symbol' then
 		  return V_JSON_TYPE;
+		when 'ObjectId' then
+	      return 'bytea';
         when 'boolean' then
            return 'boolean';
         when 'number' then
@@ -430,7 +432,6 @@ as $$
 declare
   V_COLUMNS_CLAUSE     TEXT;
   V_INSERT_SELECT_LIST TEXT;
-  V_COLUMN_COUNT       TEXT;
   V_TARGET_DATA_TYPES  JSONB;
   V_GEOMETRY_TYPE      VARCHAR(32);
   V_POSTGIS_VERSION    VARCHAR(512);

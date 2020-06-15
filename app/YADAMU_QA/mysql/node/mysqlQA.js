@@ -26,9 +26,8 @@ class MySQLQA extends MySQLDBI {
 
     doTimeout(milliseconds) {
     
-       return new Promise(function (resolve,reject) {
-        setTimeout(
-          function() {
+       return new Promise((resolve,reject) => {
+        setTimeout(() => {
 		   resolve();
           },
           milliseconds
@@ -53,19 +52,17 @@ class MySQLQA extends MySQLDBI {
     }    
 	
 	async scheduleTermination(pid) {
-	  const self = this
 	  const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
 	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
-	  const timer = setTimeout(
-	    async function(pid) {
-          if (self.pool !== undefined && self.pool.end) {
-    	    self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Killing connection.`);
-     	    const conn = await self.getConnectionFromPool();
+	  const timer = setTimeout(async (pid) => {
+          if (this.pool !== undefined && this.pool.end) {
+    	    this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Killing connection.`);
+     	    const conn = await this.getConnectionFromPool();
 		    const res = await conn.query(`kill ${pid}`);
 		    await conn.release()
 		  }
 		  else {
-		    self.yadamuLogger.qa(['KILL',self.DATABASE_VENDOR,killOperation,killDelay,pid,self.getSlaveNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
+		    this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
 		  }
 		},
 		killDelay,
@@ -108,15 +105,15 @@ class MySQLQA extends MySQLDBI {
 
       const successful = await this.executeSQL(sqlSuccess,{})
           
-      report.successful = successful.map(function(row,idx) {          
+      report.successful = successful.map((row,idx) => {          
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT]
-      },this)
+      })
 
       const failed = await this.executeSQL(sqlFailed,{})
 
-      report.failed = failed.map(function(row,idx) {
+      report.failed = failed.map((row,idx) => {
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.SQLEERM !== undefined ? row.SQLERRM : '')]
-      },this)
+      })
       
       return report
     }
@@ -125,19 +122,19 @@ class MySQLQA extends MySQLDBI {
 
       const results = await this.executeSQL(sqlSchemaTableRows,[target.schema]);
       
-      return results.map(function(row,idx) {          
+      return results.map((row,idx) => {          
         return [target.schema,row.TABLE_NAME,row.TABLE_ROWS]
-      },this)
+      })
 
     }
     
-  async slaveDBI(idx)  {
-	const slaveDBI = await super.slaveDBI(idx);
-	if (slaveDBI.testLostConnection()) {
-	  const dbiID = await slaveDBI.getConnectionID();
+  async workerDBI(idx)  {
+	const workerDBI = await super.workerDBI(idx);
+	if (workerDBI.testLostConnection()) {
+	  const dbiID = await workerDBI.getConnectionID();
 	  this.scheduleTermination(dbiID);
     }
-	return slaveDBI
+	return workerDBI
   }
 }
 
