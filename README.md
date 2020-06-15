@@ -9,7 +9,16 @@ For homogeneous Oracle migrations all schema objects supported by DBMS_METADATA 
 
 For homogeneous Postgres, MySQL and SQL Server migrations, or hetrogeneous migrations DDL operations are currently restriced to table layouts. Migration of indexes and other schema objects is not currently supported.
 
-YADAMU currently supports Oracle Database versions 11.2.x and later, Postgres 11 and later,  MySQL 8.0.12, MariaDB 5.5 and SQL Server 14.
+Supported Databases :
+* Oracle 11.2.x and later
+* Microsoft SQL Server 2017 and later
+* Postgres 11 and later
+* MySQL 8.0.12 and later
+* MariaDB 5.5 and later
+
+Experimenal support is available for
+* MongoDB 4.0 and later
+* Snowflake Data Warehouse
 
 Support for other databases as well as older versions of Oracle, Postgres, MySQL/MariaDB and SQL Server is under consideration.
 
