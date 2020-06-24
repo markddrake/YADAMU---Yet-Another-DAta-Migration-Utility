@@ -230,7 +230,7 @@ class MariadbDBI extends YadamuDBI {
   };
    
   async reconnectImpl() {
-    this.connection = this.isPrimary() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
   }
 
   async createSchema(schema) {    	
@@ -345,6 +345,7 @@ class MariadbDBI extends YadamuDBI {
   }
 
   async finalizeRead(tableInfo) {
+    this.checkConnectionState(this.fatalError) 
     await this.executeSQL(`FLUSH TABLE "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`)
   }
 
@@ -603,18 +604,38 @@ class MariadbDBI extends YadamuDBI {
 
   }
   
-  streamingError(err,stack,tableInfo) {
-	 return new MariadbError(err,stack,tableInfo.SQL_STATEMENT)
+  streamingError(err,sqlStatement) {
+	 return new MariadbError(err,this.streamingStackTrace,sqlStatement)
   }
     
-  async getInputStream(tableInfo,parser) {
-       
+  async getInputStream(tableInfo) {
+    
+	let attemptReconnect = this.attemptReconnection;
+    
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT));
+      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
     }
+   
+    while (true) {
+      // Exit with result or exception.  
+      try {
+        const sqlStartTime = performance.now();
+		this.streamingStackTrace = new Error().stack
+		const is = this.connection.queryStream(tableInfo.SQL_STATEMENT);
+	    this.traceTiming(sqlStartTime,performance.now())
+		return is;
+      } catch (e) {
+		const cause = new MariadbError(e,this.streamingStackTrace,sqlStatement)
+		if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause,'SQL')
+          continue;
+        }
+        throw cause
+      }      
+    } 	
 	
-	const is = this.connection.queryStream(tableInfo.SQL_STATEMENT);
-	return is;
   }
   
   async generateStatementCache(schema,executeDDL) {
@@ -625,15 +646,10 @@ class MariadbDBI extends YadamuDBI {
     return new MariadbParser(query,objectMode,this.yadamuLogger);
   }  
 
-  getOutputStream(primary) {
-	 return super.getOutputStream(MariadbWriter,primary)
+  getOutputStream(tableName) {
+	 return super.getOutputStream(MariadbWriter,tableName)
   }
- 
-  /*
-  async finalizeDataLoad() {
-  }  
-  */
-  
+
   async workerDBI(workerNumber) {
 	const dbi = new MariadbDBI(this.yadamu)
 	return await super.workerDBI(workerNumber,dbi)

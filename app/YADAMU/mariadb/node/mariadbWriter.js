@@ -7,8 +7,8 @@ const {BatchInsertError} = require('../../common/yadamuError.js')
 
 class MariadbWriter extends YadamuWriter {
 
-  constructor(dbi,primary,status,yadamuLogger) {
-    super({objectMode: true},dbi,primary,status,yadamuLogger)
+  constructor(dbi,tableName,status,yadamuLogger) {
+    super({objectMode: true},dbi,tableName,status,yadamuLogger)
     this.warningManager = this.dbi.yadamu.warningManager
   }
   

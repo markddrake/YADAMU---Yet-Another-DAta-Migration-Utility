@@ -2,6 +2,10 @@
 const fs = require('fs');
 const path = require('path');
 
+const util = require('util')
+const stream = require('stream')
+const pipeline = util.promisify(stream.pipeline);
+
 const DBWriter = require('../../../YADAMU/common/dbWriter.js');
 const YadamuLogger = require('../../../YADAMU/common/yadamuLogger.js');
 const FileDBI = require('../../../YADAMU/file/node/fileDBI.js');
@@ -31,40 +35,8 @@ class FileQA extends FileDBI {
     }
   }
 
-  /* 
-  **
-  ** Do not use with large files
-  **
-
-  
-  getContentMetadata(file,sort) {
-      
-    const metadata = {}
-    
-    const content = require(path.resolve(file));
-    if (content.data) {
-      const tables = Object.keys(content.data);
-   
-      // Do not use .forEach or .Map - Memory usage is too high
-      
-      for (const table of tables) {
-        metadata[table] = {
-          rowCount : content.data[table].length
-        , byteCount: JSON.stringify(content.data[table]).length
-        , hash     : ( this.deepCompare === true ? deepCompare(content.data[table]) : null )
-        }
-      }
-    }
-    return metadata;       
-  }
-  
-  **
-  **
-  */
-
   async getContentMetadata(file,sort) {
       
-    const nulLogger = new YadamuLogger(fs.createWriteStream("\\\\.\\NUL"),{});
     const jsonParser  = new JSONParser(this.yadamuLogger)
     let readStream
     try {
@@ -77,27 +49,15 @@ class FileQA extends FileDBI {
     }
 
     const statisticsCollector = new StatisticsCollector(this,this.yadamuLogger)  	
-
-	
-    const processMetadata = new Promise((resolve,reject) => {
-      try {
-        statisticsCollector.on('finish',() => {resolve(jsonParser.checkState())});
-        statisticsCollector.on('error', (err) => {
-		  console.log(err)
-		  this.yadamuLogger.logException([`${writer.constructor.name}.onError()}`],err);
-		  reject(err)
-		})      
-        readStream.pipe(jsonParser).pipe(statisticsCollector);
-      } catch (err) {
-        this.yadamuLogger.logException([`${this.constructor.name}.getConentMetadata()`],err);
-        reject(err);
-      }
-    })    
-    
-    await processMetadata;
-    nulLogger.close();
-	return statisticsCollector.tableInfo
-	await statisticsCollector.finalize();
+     
+    try {
+	  await pipeline(readStream,jsonParser,statisticsCollector);
+	  await statisticsCollector.finalize();
+      return statisticsCollector.tableInfo
+    } catch (err) {
+	  console.log('Pipeline Failed',err)
+      this.yadamuLogger.logException([`${this.constructor.name}.getConentMetadata()`],err);
+    }
   }
   
   configureTest(recreateSchema) {
@@ -134,7 +94,6 @@ class FileQA extends FileDBI {
   }        
   
   async compareFiles(yadamuLogger,grandparent,parent,child,timings) {
-      
     let colSizes = [48, 18, 12, 12, 12, 12]
  
     let seperatorSize = (colSizes.length * 3) - 1;

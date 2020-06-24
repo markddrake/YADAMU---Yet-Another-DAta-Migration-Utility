@@ -13,6 +13,12 @@ const EventManager = require('./eventManager.js')
 */
 
 class FileDBI extends YadamuDBI {
+ 
+  /*
+  **
+  ** !!! For the FileDBI an export operaton involves reading data from the file system and an Import operation involves writing data to the file system !!!
+  **
+  */
 
   getConnectionProperties() {
     return {}
@@ -108,7 +114,6 @@ class FileDBI extends YadamuDBI {
 
   async initializeExport() {
 	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
-	// For FileDBI Export is Reading data from the file system..
 	super.initializeExport();
   }
 
@@ -118,8 +123,8 @@ class FileDBI extends YadamuDBI {
   }
   
   async initializeImport() {
-	// this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
 	// For FileDBI Import is Writing data to the file system.
+    // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
 	super.initializeImport()
     const exportFilePath = path.resolve(this.parameters.FILE);
     this.outputStream = fs.createWriteStream(exportFilePath);
@@ -183,7 +188,6 @@ class FileDBI extends YadamuDBI {
     this.statementCache = []
   }
 
-
   async getDDLOperations() {
     return []
   }
@@ -196,33 +200,26 @@ class FileDBI extends YadamuDBI {
 	return { tableName: tableName}
   }
 
-  createParser(tableInfo,objectMode) {
- 	// this.yadamuLogger.trace([this.constructor.name,],'createParser()')
-	const jsonParser = new JSONParser(this.yadamuLogger,this.parameters.MODE);
-    return jsonParser
-  }  
-  
-  getInputStream() {
- 	// this.yadamuLogger.trace([this.constructor.name,],'getInputStream()')
-	const importFilePath = path.resolve(this.parameters.FILE);
+  getInputStream() {  
+    // Return an Event Stream based on processing the inputStream with the JSONParser class
+  	const importFilePath = path.resolve(this.parameters.FILE);
     const stats = fs.statSync(importFilePath)
     const fileSizeInBytes = stats.size
     this.yadamuLogger.info([this.DATABASE_VENDOR],`Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.`)
     this.inputStream = fs.createReadStream(importFilePath);
-	return this.inputStream;
+    const jsonParser  = new JSONParser(this.yadamuLogger,this.parameters.MODE);
+    const eventManager = new EventManager(this.yadamuLogger)
+	this.eventStream = this.inputStream.pipe(jsonParser).pipe(eventManager)
+	return this.eventStream;
   }
-  
-  getEventStream(inputCallback,outputCallback) {
-    this.getInputStream()
-	this.inputStream.on('error',inputCallback)
-	this.eventManager = new EventManager(this.yadamuLogger,outputCallback)
-	return this.inputStream.pipe(this.createParser()).pipe(this.eventManager,{end: false})
-  }
-
-  getOutputStream(primary) {
+    
+  getOutputStream(tableName) {
+    // this.yadamuLogger.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
     // Override parent method to allow output stream to be passed to worker
     // return super.getOutputStream(FileWriter,primary)
-	 return new FileWriter(this,primary,this.status,this.yadamuLogger,this.outputStream)
+	const os =  new FileWriter(this,tableName,this.status,this.yadamuLogger,this.firstTable,this.outputStream)
+	this.firstTable = false;
+    return os;
   }
   
 }

@@ -413,7 +413,6 @@ const sqlRestoreSavePoint =
   
 class OracleDBI extends YadamuDBI {
 
-  
   get DATABASE_VENDOR()     { return 'Oracle' };
   get SOFTWARE_VENDOR()     { return 'Oracle Corporation' };
   get SPATIAL_FORMAT()      { return this.spatialFormat };
@@ -507,7 +506,9 @@ class OracleDBI extends YadamuDBI {
   async closeConnection() {
 	  
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && (typeof this.connection.close === 'function'))})`)
-    if (this.connection !== undefined && (typeof this.connection.close === 'function')) {
+	// console.log(new Error().stack)
+	
+	if (this.connection !== undefined && (typeof this.connection.close === 'function')) {
       let stack;
       try {
         stack = new Error().stack
@@ -544,7 +545,7 @@ class OracleDBI extends YadamuDBI {
   }  
 
   async reconnectImpl() {
-    this.connection = this.isPrimary() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
   }
 
   async createLob(lobType) {
@@ -813,11 +814,11 @@ class OracleDBI extends YadamuDBI {
     this.nativeDataType = result.outBinds.nativeDataType === 'TRUE';
 	this.jsonParser = result.outBinds.jsonParser === 'TRUE';
 	
-    if ((this.isPrimary()) && (this.maxStringSize < 32768)) {
+    if ((this.isManager()) && (this.maxStringSize < 32768)) {
       this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`${this.dbVersion}`,`Configuration`],`Maximum VARCHAR2 size for JSON operations is ${this.maxStringSize}.`)
     }    
 	
-	if ((this.isPrimary()) && (this.dbVersion < 12)) {
+	if ((this.isManager()) && (this.dbVersion < 12)) {
 	  if (this.parameters.LOB_MIN_SIZE > 4000) {
 		this.parameters.LOB_MIN_SIZE=4000
         this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`${this.dbVersion}`,`Configuration`],`Parameter LOB_MIN_SIZE reset to ${this.parameters.LOB_MIN_SIZE}.`)
@@ -1160,7 +1161,7 @@ class OracleDBI extends YadamuDBI {
     await super.initialize(true);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
 	this.jsonDataType = this.jsonDataType();
-	if (this.isPrimary()) {
+	if (this.isManager()) {
       this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`${this.dbVersion}`,`Configuration`],`Default storage model for JSON data is ${this.jsonDataType}.`)
 	}
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Initialize Complete');
@@ -1177,6 +1178,7 @@ class OracleDBI extends YadamuDBI {
   }
 
   async finalizeExport() {
+	this.checkConnectionState(this.fatalError) 
 	if (this.dbVersion < 12) {
       await this.dropWrappers();
     }      
@@ -1193,15 +1195,15 @@ class OracleDBI extends YadamuDBI {
   }
   
   async finalizeData() {
-	  
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR],`finalizeData()`);
-	
+    this.checkConnectionState(this.fatalError) 
 	await this.refreshMaterializedViews();
     await this.enableConstraints();
   }  
 
   async finalizeImport() {
-    await this.setCurrentSchema(this.connectionProperties.user);
+    this.checkConnectionState(this.fatalError) 
+	await this.setCurrentSchema(this.connectionProperties.user);
   }
 
   /*
@@ -1496,6 +1498,7 @@ class OracleDBI extends YadamuDBI {
                                              ,NODE_SELECT_LIST:     {type: oracledb.STRING}
                                              ,WITH_CLAUSE:          {type: oracledb.STRING}
                                              ,SQL_STATEMENT:        {type: oracledb.STRING}
+											 ,PARTITION_LIST:       {type: oracledb.STRING}
 	                                        }
                                           }
 										 );
@@ -1617,18 +1620,10 @@ class OracleDBI extends YadamuDBI {
     return new OracleParser(tableInfo,objectMode,this.yadamuLogger); 
   }  
   
-  streamingError(e,stack,tableInfo) {
-	return new OracleError(e,stack,tableInfo.SQL_STATEMENT,{},{})
+  streamingError(e,sqlStatement) {
+	return new OracleError(e,this.streamingStackTrace,sqlStatement,{},{})
   }
   
-  async freeInputStream(tableInfo,inputStream) {
-    inputStream.destroy();
-  }
-
-  forceEndOnInputStreamError(error) {
-	return true;
-  }
-
   async getInputStream(tableInfo,parser) {
 
     if (tableInfo.WITH_CLAUSE !== null) {
@@ -1640,25 +1635,35 @@ class OracleDBI extends YadamuDBI {
       }
 	}
 
+    let attemptReconnect = this.attemptReconnection;
+
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
     }
-    
-    let stack
-	let is
-    const sqlStartTime = performance.now();
-	try {
-      stack = new Error().stack
-      is = await this.connection.queryStream(tableInfo.SQL_STATEMENT,[],{extendedMetaData: true})
-      this.traceTiming(sqlStartTime,performance.now())
-	  is.on('metadata',(metadata) => {parser.setColumnMetadata(metadata)})
-      return is;
-	} catch (e) {
-	  const err = new OracleError(e,stack,tableInfo.SQL_STATEMENT,{},{})
-	  throw err;
-	}
-	 
-  }
+
+    while (true) {
+      // Exit with result or exception.  
+      try {
+        const sqlStartTime = performance.now();
+        this.streamingStackTrace = new Error().stack
+        const is = await this.connection.queryStream(tableInfo.SQL_STATEMENT,[],{extendedMetaData: true})
+        this.traceTiming(sqlStartTime,performance.now())
+	    is.on('metadata',(metadata) => {parser.setColumnMetadata(metadata)})
+	    return is;
+	  } catch (e) {
+		const cause = OracleError(e,this.streamingStackTrace ,tableInfo.SQL_STATEMENT,{},{})
+        if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause,'SQL')
+          await this.setCurrentSchema(this.parameters.TO_USER)
+		  await this.setDateFormatMask(this.connection,this.status,this.systemInformation.vendor);
+		  continue;
+        }
+        throw cause		  
+      }      
+    } 
+  }  
     
   /*
   **
@@ -1678,8 +1683,8 @@ class OracleDBI extends YadamuDBI {
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }
 
-  getOutputStream(primary) {
-	 return super.getOutputStream(OracleWriter,primary)
+  getOutputStream(tableName) {
+	 return super.getOutputStream(OracleWriter,tableName)
   }
     
   async dropWrappers() {

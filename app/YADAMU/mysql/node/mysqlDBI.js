@@ -222,7 +222,7 @@ class MySQLDBI extends YadamuDBI {
   };	  
 
   async reconnectImpl() {
-    this.connection = this.isPrimary() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
     await this.connection.ping()
   }
 
@@ -459,6 +459,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   async finalizeRead(tableInfo) {
+    this.checkConnectionState(this.fatalError) 	  
     await this.executeSQL(`FLUSH TABLE "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`)
   }
 
@@ -715,14 +716,14 @@ class MySQLDBI extends YadamuDBI {
 
   }
   
-  streamingError(err,stack,tableInfo) {
-	 return new MySQLError(err,stack,tableInfo.SQL_STATEMENT)
+  streamingError(err,sqlStatement) {
+	 return new MySQLError(err,this.streamingStackTrace,sqlStatement)
   }
   
   async freeInputStream(tableInfo,inputStream) {
   }
   
-  async getInputStream(tableInfo,parser) {
+  async getInputStream(tableInfo) {
 
     /*
 	**
@@ -743,23 +744,38 @@ class MySQLDBI extends YadamuDBI {
       keepAliveHdl = setInterval(this.keepAlive,this.keepAliveInterval,this);
 	}
 
+	let attemptReconnect = this.attemptReconnection;
+    
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
     }
-	
-	const stack = new Error().stack;
-    const is = this.connection.query(tableInfo.SQL_STATEMENT).stream();
 
-    is.on('end',
-	  async () => {
-		// this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,`${is.constructor.name}.onEnd()`,`${tableInfo.TABLE_NAME}`],``); 
-        if (keepAliveHdl !== undefined) {
-		  clearInterval(keepAliveHdl);
-		  keepAliveHdl = undefined
-		}
-	})
-     
-    return is
+    while (true) {
+      // Exit with result or exception.  
+      try {
+        const sqlStartTime = performance.now();
+		this.streamingStackTrace = new Error().stack
+        const is = this.connection.query(tableInfo.SQL_STATEMENT).stream();
+        is.on('end', async () => {
+		  // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,`${is.constructor.name}.onEnd()`,`${tableInfo.TABLE_NAME}`],``); 
+          if (keepAliveHdl !== undefined) {
+		    clearInterval(keepAliveHdl);
+		    keepAliveHdl = undefined
+		  }
+	    })
+		return is;
+      } catch (e) {
+		const cause = new MySQLError(e,this.streamingStackTrace,sqlStatement)
+		if (attemptReconnect && cause.lostConnection()) {
+          attemptReconnect = false;
+		  // reconnect() throws cause if it cannot reconnect...
+          await this.reconnect(cause,'SQL')
+          continue;
+        }
+        throw cause
+      }      
+    } 	
+		
   }      
 
   async generateStatementCache(schema,executeDDL) {
@@ -774,8 +790,8 @@ class MySQLDBI extends YadamuDBI {
     }
   }
   
-  getOutputStream(primary) {
-	 return super.getOutputStream(MySQLWriter,primary)
+  getOutputStream(tableName) {
+	 return super.getOutputStream(MySQLWriter,tableName)
   }
    
   createParser(tableInfo,objectMode) {

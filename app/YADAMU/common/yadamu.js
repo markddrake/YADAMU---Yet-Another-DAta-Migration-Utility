@@ -8,6 +8,11 @@ const FileDBI = require('../file/node/fileDBI.js');
 const DBReader = require('./dbReader.js');
 const DBWriter = require('./dbWriter.js');
 const DBReaderParallel = require('./dbReaderParallel.js');
+
+const util = require('util')
+const stream = require('stream')
+const pipeline = util.promisify(stream.pipeline);
+
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuDefaults = require('./yadamuDefaults.json');
@@ -503,6 +508,9 @@ class Yadamu {
     const timings = {}
     this.rejectManager = this.createRejectManager()
 	this.warningManager = this.createWarningManager();
+    
+	let dbReader
+	let dbWriter
 
 	let error;
     try {
@@ -512,78 +520,15 @@ class Yadamu {
       await target.initialize();
 	  let parallel = ((this.parameters.PARALLEL) && (this.parameters.PARALLEL > 1))
 	  parallel = (parallel && source.isDatabase() && target.isDatabase());
-      const dbReader = await this.getDBReader(source,parallel)
-      const dbWriter = await this.getDBWriter(target,parallel)  
-	  dbReader.waitForDataComplete(dbWriter)
 
-	  // A file based input stream consist of be a set of pipe operations. 
-	  // The reject function meeds to attached to the error handler for the first reader in the sequence.
-		
- 
-	  // On an error force the writer to end and invoke the resolve() or reject() from the writer's finish event.
-	  // This ensures the writer processes all pending records before connections are closed.
-	  
-      const copyOperation = new Promise((resolve,reject) => {
+      dbReader = await this.getDBReader(source,parallel)
+      dbWriter = await this.getDBWriter(target,parallel) 
 
+      // dbReader.getInputStream() returns this for d1atabases...	  
+	  const is = dbReader.getInputStream();
+	  await pipeline(is,dbWriter)
 
-        const closeEvent = process.version < 'v11' ? 'finish' : 'close'
-
-        /*
-        **
-        ** Uncomment the following statements to trace events
-        **
-		
-	    dbReader.on('error',(err) => {
-		  this.yadamuLogger.trace([`${this.constructor.name}.copyOperation()`,`${dbReader.constructor.name}.onError()`],`${err.message}`)
-        })
-
-        dbReader.on('destroy',() => {
-		  this.yadamuLogger.trace([`Reader`,`${target.DATABASE_VENDOR}`],'onDestroy()');
-	    })
-
-        dbWriter.on('error',(err) => {
-		  this.yadamuLogger.trace([`${this.constructor.name}.copyOperation()`,`${dbWriter.constructor.name}.onError()`],`${err.message}`)
-        })
-
-        **
-		*/
-
-	    const inputStreamError = (err) => {
-		  this.yadamuLogger.handleException([`Reader`,`${source.DATABASE_VENDOR}`],err)
-		  cause = err;
-	      failed = true;
-		  dbWriter.end()
-	    }
-
-	    const outputStreamError = (err) => {
-		  this.yadamuLogger.handleException([`Writer`,`${target.DATABASE_VENDOR}`],err);
-		  cause = err;
-	      failed = true;
-		  reject(cause);
-	    }
-
-        const inputStream = dbReader.getInputStream(inputStreamError,outputStreamError);
-
-		dbWriter.on(closeEvent, () => {
-		  // this.yadamuLogger.trace([`${this.constructor.name}.copyOperation()`,`${dbWriter.constructor.name}.on${closeEvent}()`],`${failed ? 'FAILED' : 'SUCCSESS'}`);
-          failed ? reject(cause) : resolve()
-		})
-		
-        dbReader.on('error',(err) => {
-		  this.yadamuLogger.handleException([`Reader`,`${source.DATABASE_VENDOR}`],err);
-		  cause = err;
-	      failed = true;
-		  reject(cause);
-	    })
-		
-        dbWriter.on('error',(err) => {
-	    })
-		
-        inputStream.pipe(dbWriter,{end: false});
-      })
-      
       this.status.operationSuccessful = false;
-      await copyOperation;
       await source.finalize();
       await target.finalize();
       this.rejectManager.close();
@@ -592,6 +537,10 @@ class Yadamu {
 	  this.status.operationSuccessful = true;
       return timings
     } catch (e) {
+	  // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
+	  if ((e.code === 'ERR_STREAM_PREMATURE_CLOSE') && (dbReader.fatalError instanceof Error)) {
+		e = dbReader.fatalError
+	  }
 	  this.status.operationSuccessful = false;
 	  this.status.err = e;
       await source.abort(e);

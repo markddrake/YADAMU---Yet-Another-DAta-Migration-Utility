@@ -10,8 +10,8 @@ const {BatchInsertError} = require('../../common/yadamuError.js')
 
 class SnowflakeWriter extends YadamuWriter {
 
-  constructor(dbi,primary,status,yadamuLogger) {
-    super({objectMode: true},dbi,primary,status,yadamuLogger)
+  constructor(dbi,tableName,status,yadamuLogger) {
+    super({objectMode: true},dbi,tableName,status,yadamuLogger)
   }
   
   setTableInfo(tableInfo) {

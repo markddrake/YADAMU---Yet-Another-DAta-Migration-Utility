@@ -33,7 +33,7 @@ class MongoQA extends MongoDBI {
 			  , $all      : false
 			  , $ownOps   : true
 			}
-		    this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,null,this.getWorkerNumber()],`Killing connection.`);
+		    this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,null,this.getWorkerNumber()],`Killing connection.`);
 			let operation
 			try {
 	          const dbAdmin = await this.client.db('admin',{returnNonCachedInstance:true});	 
@@ -58,7 +58,7 @@ class MongoQA extends MongoDBI {
 			}
 	      }
 		  else {
-		    this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
+		    this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
 		  }
 		},
 		killDelay

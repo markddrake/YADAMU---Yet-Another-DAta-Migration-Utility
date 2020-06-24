@@ -239,6 +239,14 @@ class YadamuDBI {
   objectMode() {
     return true;
   }
+   
+  setFatalError(e) {
+    this.fatalError = e
+  }
+  
+  invalidConnection() {
+	return ((this.fatalError instanceof DatabaseError) && this.fatalError.lostConnection())
+  }
   
   setCounters(counters) {
 	// Share counteres with the Writer so adjustments can be made if the connection is lost.
@@ -401,7 +409,6 @@ class YadamuDBI {
 	  const outboundMetadata = {}
 	  Object.keys(mappedMetadata).forEach((tableName) => { outboundMetadata[this.transformTableName(tableName,mappings)] = mappedMetadata[tableName] })
 	  return outboundMetadata
-	  console.log(ouboundMetadata)
 	}
 	else {
       return metadata
@@ -485,9 +492,10 @@ class YadamuDBI {
       this.loadTableMappings(this.parameters.MAPPINGS);
     }   
  
-    this.sqlTraceTag = `/* Primary */`;	
+    this.sqlTraceTag = `/* Manager */`;	
     this.sqlCumlativeTime = 0
     this.sqlTerminator = `\n${this.STATEMENT_TERMINATOR}\n`
+	this.fatalError = undefined
   }
 
   enablePerformanceTrace() { 
@@ -541,7 +549,7 @@ class YadamuDBI {
     throw new Error(`Database Reconnection Not Implimented for ${this.DATABASE_VENDOR}`)
 	
 	// Default code for databases that support reconnection
-    this.connection = this.isPrimary() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
 
   }
   
@@ -759,7 +767,7 @@ class YadamuDBI {
 	 
 	// Throw cause if cause is a lost connection. Used by drivers to prevent attempting rollback or restore save point operations when the connection is lost.
 	  
-  	if (cause && (typeof cause.lostConnection === 'function') && cause.lostConnection()) {
+  	if ((cause instanceof DatabaseError) && cause.lostConnection()) {
 	  throw cause;
 	}
   }
@@ -969,8 +977,9 @@ class YadamuDBI {
 	 return tableInfo
   }
   
-  getOutputStream(TableWriter,primary) {
-    return new TableWriter(this,primary,this.status,this.yadamuLogger)
+  getOutputStream(TableWriter,tableName) {
+    // this.yadamuLogger.trace([this.constructor.name,`getOutputStream(${tableName})`],'')
+    return new TableWriter(this,tableName,this.status,this.yadamuLogger)
   }
   
   keepAlive(rowCount) {
@@ -988,7 +997,7 @@ class YadamuDBI {
     }
   }
   
-  async clonePrimary(dbi) {
+  async cloneManager(dbi) {
 	// dbi.master = this
 	dbi.metadata = this.metadata
     dbi.schemaCache = this.schemaCache
@@ -1004,7 +1013,7 @@ class YadamuDBI {
 	this.connection = await this.connectionProvider.getConnectionFromPool()	
   }
 
-  isPrimary() {
+  isManager() {
 
     return (this.workerNumber === undefined)
    
@@ -1012,7 +1021,7 @@ class YadamuDBI {
 
   getWorkerNumber() {
 
-    return this.isPrimary() ? 'Primary' : this.workerNumber
+    return this.isManager() ? 'Manager' : this.workerNumber
 
   }
   
@@ -1024,7 +1033,7 @@ class YadamuDBI {
 	dbi.connectionProvider = this
 	await dbi.setWorkerConnection()
     dbi.setParameters(this.parameters);
-	this.clonePrimary(dbi);
+	this.cloneManager(dbi);
     await dbi.configureConnection();
 	return dbi
   }

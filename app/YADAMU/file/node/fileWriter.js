@@ -9,22 +9,24 @@ class FileWriter extends YadamuWriter {
 
   // Simulate subclass of YadamuWriter. Actaully extending YadamuWriter is problametic. ???
 
-  constructor(dbi,primary,status,yadamuLogger,outputStream) {
-    super({objectMode: true},dbi,primary,status,yadamuLogger)
-    this.outputStream = outputStream
-	this.tableSeperator = ''
-  }
-
-  setTableInfo(tableInfo) {
-	super.setTableInfo(tableInfo)
-	let tableName = this.tableInfo.tableName
+  constructor(dbi,tableName,status,yadamuLogger,firstTable,outputStream) {
+    super({objectMode: true},dbi,tableName,status,yadamuLogger)
+    this.tableName = tableName  
+    this.outputStream = outputStream	
+    this.tableInfo = this.dbi.getTableInfo(tableName)
+	this.setTableInfo(tableName)
+	
 	this.insertMode = 'JSON';    
     if (this.dbi.tableMappings && this.dbi.tableMappings.hasOwnProperty(tableName)) {
 	  tableName = this.dbi.tableMappings[tableName].tableName
 	}
-    this.outputStream.write(`${this.tableSeperator}"${tableName}":[`);
+    const tableSeperator = firstTable ? '' :  ','
+	this.outputStream.write(`${tableSeperator}"${tableName}":[`);
 	this.tableSeperator = ',';
 	this.rowSeperator = '';
+  }
+
+  setTableInfo(tableInfo) {
   }
 
   async initialize() {
@@ -40,7 +42,7 @@ class FileWriter extends YadamuWriter {
 
   cacheRow(row) {
       
-    this.outputStream.write(`${this.rowSeperator}${row}`);
+    this.outputStream.write(`${this.rowSeperator}${JSON.stringify(row)}`);
 	this.rowSeperator = ','
     this.rowCounters.committed++;
   }

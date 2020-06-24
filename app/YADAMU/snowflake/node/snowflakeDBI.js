@@ -474,11 +474,11 @@ class SnowflakeDBI extends YadamuDBI {
     return new SnowflakeParser(tableInfo,objectMode,this.yadamuLogger);
   }  
   
-  streamingError(e,stack,tableInfo) {
-    return new SnowflakeError(e,stack,tableInfo.SQL_STATEMENT)
+  streamingError(e,sqlStatement) {
+    return new SnowflakeError(e,this.streamingStackTrace,sqlStatement)
   }
   
-  async getInputStream(tableInfo,parser) {        
+  async getInputStream(tableInfo) {        
 
     // Get an input stream from a SQL result set.
 	
@@ -489,6 +489,7 @@ class SnowflakeDBI extends YadamuDBI {
     const readStream = new Readable({objectMode: true });
     readStream._read = () => {};
     
+	this.streamingStackTrace = new Error().stack
     const statement = this.connection.execute({sqlText: tableInfo.SQL_STATEMENT,  fetchAsString: ['Number','Date'], streamResult: true})
     const snowflakeStream = statement.streamRows();
     snowflakeStream.on('data',(row) => {readStream.push(row)})
@@ -511,9 +512,9 @@ class SnowflakeDBI extends YadamuDBI {
     await super.generateStatementCache(StatementGenerator,schema,executeDDL) 
   }
  
-  getOutputStream(primary) {
+  getOutputStream(tableName) {
 	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(SnowflakeWriter,primary)
+	 return super.getOutputStream(SnowflakeWriter,tableName)
   }
  
   async workerDBI(workerNumber) {

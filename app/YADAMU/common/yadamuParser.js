@@ -1,6 +1,7 @@
 "use strict" 
 
 const Transform = require('stream').Transform;
+const { performance } = require('perf_hooks');
 
 class YadamuParser extends Transform {
     
@@ -30,7 +31,14 @@ class YadamuParser extends Transform {
     this.push({data:data.json})
     callback();
   }
-  
+
+   _final(callback) {
+	// this.yadamuLogger.trace([this.constructor.name,this.tableInfo.TABLE_NAME],'_final()');
+	this.endTime = performance.now();
+	callback()
+	// Force invoking end() to Emit 'end'. Since parser i
+	// this.emit('end');
+  } 
 }
 
 module.exports = YadamuParser

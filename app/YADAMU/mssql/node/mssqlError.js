@@ -15,9 +15,9 @@ class MsSQLError extends DatabaseError {
       if (cause.number && (cause.number === 596)) {
         return true
       } 
-      if (cause.originalError && (cause.origianlError instanceof Error)) {
+      if (cause.originalError && (cause.originalError instanceof Error)) {
   	    cause = cause.originalError 
-  	    if (casse.info && (cause.info instanceof Error)) {
+  	    if (cause.info && (cause.info instanceof Error)) {
 		  cause = cause.info
         }
 	  }

@@ -191,7 +191,7 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async reconnectImpl() {
-    this.connection = this.isPrimary() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
     await this.executeSQL('select 1')
   }
   
@@ -602,23 +602,22 @@ class PostgresDBI extends YadamuDBI {
 	return true;
   }
   
-  streamingError(e,stack,tableInfo) {
-    return new PostgresError(e,stack,tableInfo.SQL_STATEMENT)
+  streamingError(e,sqlStatement) {
+    return new PostgresError(e,this.streamingStackTrace,sqlStatement)
   }
   
-  async getInputStream(tableInfo,parser) {        
+  async getInputStream(tableInfo) {        
   
-    let stack
     while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
-		stack = new Error().stack
+		this.streamingStackTrace = new Error().stack
         const queryStream = new QueryStream(tableInfo.SQL_STATEMENT)
         this.traceTiming(sqlStartTime,performance.now())
         return await this.executeSQL(queryStream)   
       } catch (e) {
-		const cause = new PostgresError(e,stack,sqlStatement);
+		const cause = new PostgresError(e,this.streamingStackTrace,sqlStatement);
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -658,8 +657,8 @@ class PostgresDBI extends YadamuDBI {
     await super.generateStatementCache(StatementGenerator, schema, executeDDL)
   }
 
-  getOutputStream(primary) {
-	 return super.getOutputStream(PostgresWriter,primary)
+  getOutputStream(tableName) {
+	 return super.getOutputStream(PostgresWriter,tableName)
   }
  
   async insertBatch(sqlStatement,batch) {

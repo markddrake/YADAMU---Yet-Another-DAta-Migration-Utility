@@ -2,6 +2,8 @@
 
 const util = require('util')
 const Transform = require('stream').Transform;
+const Readable = require('stream').Readable;
+const { performance } = require('perf_hooks');
 
 class EventManager extends Transform {
     
@@ -16,53 +18,109 @@ class EventManager extends Transform {
   **
   */
 	
-  constructor(yadamuLogger,errorCallback) {
+  constructor(yadamuLogger) {
     super({objectMode: true});
 	this.yadamuLogger = yadamuLogger
-	this.errorCallback = errorCallback
-	this.dbWriter = undefined
-	this.worker = undefined;
-	this.switched = false
+    this.dbWriterDetached = false;
+	
+    this.pipeStatistics = {
+ 	  rowsRead       : 0
+    , pipeStartTime  : undefined
+    , readerEndTime  : undefined
+    , parserEndTime  : undefined
+    , copyFailed     : false
+    , tableNotFound  : false
+    }
+  
+    this.copyOperations = []
+	
   }	
+   
   
-  createWorker(dbWriter) {
-	this.dbWriter = dbWriter
-    const worker = dbWriter.dbi.getOutputStream(dbWriter)
-    dbWriter.listeners('error').forEach((f) => {worker.on('error',f)})
-    dbWriter.on('ddlComplete',() => {
-      // this.yadamuLogger.trace([this.constructor.name,`onddlComplete()`],`Attaching pipe to ${this.worker.constructor.name}`)
-	  this.pipe(worker)
-      this.switched = true;
-	});
-	return worker
-  }
-  
-  pipe(target,options) {
-    const result = super.pipe(target,options);
-	this.worker = this.worker === undefined ? this.createWorker(result) : this.worker
-	return result;
+  pipe(outputStream,options) {
+	// Cache the target outputStream
+	this.outputStream = outputStream
+	if (this.dbWriter === undefined) {
+	  this.dbWriter = outputStream;
+	  this.ddlComplete = new Promise((resolve,reject) => {
+	    this.dbWriter.once('ddlComplete',() => {
+ 	      // this.yadamuLogger.trace([this.constructor.name],`DDL Complete`)
+		  resolve(true);
+		})
+	  })
+	}
+	return super.pipe(outputStream,options);
   } 
- 
+
+  async createWorker(tableName) {
+    const worker = this.dbWriter.dbi.getOutputStream(tableName);
+	await worker.initialize()
+	this.copyOperation = new Promise((resolve,reject) => {
+	  worker.once('allDataReceived',async () => {
+        // this.yadamuLogger.trace([this.constructor.name,worker.constructor.name,worker.tableName],`All Data Received`)
+  	    this.pipeStatistics.parserEndTime = performance.now()    
+	    this.unpipe(this.outputStream);
+		const currentStats = Object.assign({},this.pipeStatistics)
+		const reportComplete = new Promise((resolve,reject) => {
+		  worker.end(null,null,() => {
+		    const timings = worker.reportPerformance(currentStats);
+		    worker.removeAllListeners('end');
+	        this.dbWriter.recordTimings(timings);
+		    resolve(worker.tableName)
+	     })
+	   })
+	   resolve(reportComplete)
+	 })
+   })
+   // Copy error events from dbWriter to worker
+   // this.dbWriter.eventNames().forEach((e) => {e !== 'allDataReceived' ? this.dbWriter.listeners(e).forEach((f) => {console.log(e);worker.on(e,f)}) : null});
+   this.dbWriter.listeners('error').forEach((f) => {worker.on('error',f)});
+   return worker
+  }
+    
   async _transform (data,encoding,callback)  {
 	const messageType = Object.keys(data)[0]
     // this.yadamuLogger.trace([this.constructor.name,`_transform()`,messageType],``)
-	if (messageType === 'table') {
-	  // Need to register the Error callback for each Table to be compatible with a database backed reader.
-	  this.worker.registerErrorCallback(data.table,this.errorCallback)
-    } 
-    this.push(data);
-	if (messageType === 'metadata') {
-	  // this.yadamuLogger.trace([this.constructor.name,`_transform()`],`Detaching pipe from ${this.dbWriter.constructor.name}`)
-	  this.unpipe(this.dbWriter)
+	switch (messageType) {
+	  case 'data':
+	    this.pipeStatistics.rowsRead++
+        this.push(data);
+		break;
+      case 'metadata' :
+        this.push(data)
+        this.push({pause:true})
+ 	    await this.ddlComplete
+		this.unpipe(this.dbWriter)
+		this.dbWriterDetached = true;
+	    break;
+      case 'table':
+		// Switch Workers - Couldnot get this work with 'drain' for some reason
+	    this.pipeStatistics.pipeStartTime =	performance.now()    
+		this.pipeStatistics.readerStartTime = performance.now()    
+	    this.pipeStatistics.rowsRead = 0;
+		const worker = await this.createWorker(data.table)
+		this.pipe(worker) 
+	    break;
+      case 'eod':
+	    this.pipeStatistics.readerEndTime =	performance.now()    
+        this.push(data);
+		const result = await this.copyOperation
+		this.copyOperations.push(result)
+	    break;
+	  case 'eof':
+	    await this.copyOperations
+		if (this.dbWriterDetached) {
+	      this.pipe(this.dbWriter); 
+		  this.dbWriter.deferredCallback()
+		}
+	    this.push(data);
+		break;
+	  default:
+        this.push(data);
 	}
-	callback()
+    callback();
   }  
   
-  exportComplete() {
-    // this.yadamuLogger.trace([this.constructor.name],`exportComplete()`)
-	this.dbWriter.write({exportComplete:true})
-	this.destroy()
-  } 
 }
 
 module.exports = EventManager

@@ -48,7 +48,7 @@ class OracleQA extends OracleDBI {
 	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
 	  const timer = setTimeout(async (pid) => {
 		   if ((this.pool instanceof this.oracledb.Pool) && (this.pool.status === this.oracledb.POOL_STATUS_OPEN)) {
-		     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],`Killing connection.`);
+		     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],`Killing connection.`);
 			 const conn = await this.getConnectionFromPool();
 			 const sqlStatement = `ALTER SYSTEM KILL SESSION '${pid.sid}, ${pid.serial}'`
 			 let stack
@@ -59,16 +59,16 @@ class OracleQA extends OracleDBI {
 			 } catch (e) {
 			   if ((e.errorNum && ((e.errorNum === 27) || (e.errorNum === 31))) || (e.message.startsWith('DPI-1010'))) {
 				 // The Slave has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourthis (Error 27)
-			     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],`Slave finished prior to termination.`)
+			     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],`Slave finished prior to termination.`)
  			   }
 			   else {
 				 const cause = new OracleError(e,stack,sqlStatement)
-			     this.yadamuLogger.handleException(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],cause)
+			     this.yadamuLogger.handleException(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],cause)
 			   }
 			 }
 		   }
 		   else {
-		     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial],`Unable to Kill Connection: Connection Pool no longer available.`);
+		     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial],`Unable to Kill Connection: Connection Pool no longer available.`);
 		   }
 		},
 		killDelay,

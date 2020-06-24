@@ -1364,7 +1364,7 @@ class YadamuQA {
   			        counters = await this.dbRoundtrip(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
 			        break;
 			      case 'LOSTCONNECTION':
-  			        counters = await this.dbRoundtrip(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
+			        counters = await this.dbRoundtrip(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
 			        break;
 			    }
 				this.aggregateCounters(operationCounters,counters)
@@ -1376,6 +1376,10 @@ class YadamuQA {
 			  }
 			  this.aggregateCounters(taskCounters,operationCounters)
 		    } catch (e) {
+			  this.aggregateCounters(taskCounters,operationCounters)
+  	          this.aggregateCounters(targetCounters,taskCounters)
+              this.aggregateCounters(sourceCounters,targetCounters)
+              this.aggregateCounters(testCounters,sourceCounters)
 			  this.yadamuLogger.logException([mode,`TASK`],e);
 			  throw e
 			}   
@@ -1396,8 +1400,9 @@ class YadamuQA {
       this.aggregateCounters(testCounters,sourceCounters)
 	} catch (e) {
       const elapsedTime = performance.now() - startTime;
-	  this.yadamuLogger.logException([mode,`FAILED`],e)
-      this.yadamuLogger.error([mode,`FAILED`],`Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+      this.aggregateCounters(testCounters,sourceCounters)
+	  this.yadamuLogger.handleException([mode,`FAILED`],e)
+      this.yadamuLogger.error([mode,`FAILED`],`${this.formatCounters(sourceCounters)} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
 	}  
     const elapsedTime = performance.now() - startTime;
 	summary.push([new Date().toISOString(),'','','',Object.assign({},testCounters),YadamuLibrary.stringifyDuration(elapsedTime)])

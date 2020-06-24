@@ -1,5 +1,6 @@
 "use strict"
 
+const assert = require('assert').strict;
 const { performance } = require('perf_hooks');
 
 const WKX = require('wkx');
@@ -32,8 +33,8 @@ class OracleWriter extends YadamuWriter {
   **
   */
 
-  constructor(dbi,primary,status,yadamuLogger) {
-    super({objectMode: true},dbi,primary,status,yadamuLogger)
+  constructor(dbi,tableName,status,yadamuLogger) {
+    super({objectMode: true},dbi,tableName,status,yadamuLogger)
 	const TRUE_AS_ROW  =  Buffer.from('01','hex')
 	const FALSE_AS_RAW =  Buffer.from('00','hex')
   }
@@ -269,7 +270,7 @@ class OracleWriter extends YadamuWriter {
     // if ( (this.batch.length + this.lobBatch.length) === 0 ) {console.log(row)}
 
     // this.yadamuLogger.trace([this.constructor.name,this.tableInfo.lobColumns,this.rowCounters.cached],'cacheRow()')
-
+    assert.strictEqual(this.tableInfo.dataTypes.length,row.length,`Table ${this.tableName}. Expected ${this.tableInfo.dataTypes.length} columns, recieved ${row.length} columns. Data ${JSON.stringify(row)}`)
     try {
       this.bindRowAsLOB = false;
 	  if (this.tableInfo.lobColumns) {
@@ -422,7 +423,6 @@ end;`
       
   async handleBatchException(cause,message,rows,binds) {
 
- 
     const additionalInfo = {
 	  dataTypes : this.tableInfo.dataTypes
 	, binds : binds
@@ -554,7 +554,6 @@ end;`
           }
         } 
         else {  
-          await this.dbi.restoreSavePoint(e);
   		  await this.handleBatchException(e,`Batch Insert`,rows,binds,lobInsert) 
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
           this.insertMode = 'Iterative';

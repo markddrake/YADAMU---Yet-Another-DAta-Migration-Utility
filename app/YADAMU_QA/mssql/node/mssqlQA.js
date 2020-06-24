@@ -58,7 +58,7 @@ class MsSQLQA extends MsSQLDBI {
 	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
 	  const timer = setTimeout(async (pid) => {
 		  if (this.pool !== undefined) {
-		     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Killing connection.`);
+		     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Killing connection.`);
 		     const request = await this.getRequest();
 			 let stack
 			 const sqlStatement = `kill ${pid}`
@@ -68,16 +68,16 @@ class MsSQLQA extends MsSQLDBI {
 			 } catch (e) {
 			   if (e.number && (e.number === 6104)) {
 				 // The Slave has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourthis (Error 27)
-			     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Slave finished prior to termination.`)
+			     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Slave finished prior to termination.`)
  			   }
 			   else {
 				 const cause = new MsSQLError(e,stack,sqlStatement)
-			     this.yadamuLogger.handleException(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],cause)
+			     this.yadamuLogger.handleException(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],cause)
 			   }
 			 } 
 		   }
 		   else {
-		     this.yadamuLogger.qa(['KILL',this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
+		     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
 		   }
 		},
 		killDelay,

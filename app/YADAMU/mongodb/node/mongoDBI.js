@@ -380,7 +380,7 @@ class MongoDBI extends YadamuDBI {
 
   async reconnectImpl() {
 	// Default code for databases that support reconnection
-    this.connection = this.isPrimary() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
 
   }
   

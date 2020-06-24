@@ -7,24 +7,21 @@ const YadamuLibrary = require('./yadamuLibrary.js');
 
 class YadamuWriter extends Writable {
 
-  constructor(options,dbi,primary,status,yadamuLogger) {
+  constructor(options,dbi,tableName,status,yadamuLogger) {
 	super(options)
     this.dbi = dbi;
     this.schema = this.dbi.parameters.TO_USER;
     this.status = status;
     this.yadamuLogger = yadamuLogger;    
-    this.primary = primary
-    primary.registerWorker(this)
 	this.maxErrors =  this.dbi.parameters.MAX_ERRORS ? this.dbi.parameters.MAX_ERRORS : 10
     this.rejectManager = this.dbi.yadamu.rejectManager
     this.configureFeedback(this.dbi.parameters.FEEDBACK); 	
-	this.resetWriter();
-	this.errorCallbacks = {}
-	this.errorCallback = undefined
 	
-  }
-  
-  resetWriter() {
+	this.tableName = tableName  
+    this.tableInfo = this.dbi.getTableInfo(tableName)
+	this.supressBatchWriteLogging = (this.tableInfo.batchSize === this.tableInfo.commitSize) // Prevent duplicate logging if batchSize and Commit SIze are the same
+	this.setTableInfo(tableName);
+ 	
  	this.rowCounters = {
       received   : 0 // Rows accepted
 	, batchCount : 0 // Batches created
@@ -44,26 +41,13 @@ class YadamuWriter extends Writable {
   }
   
   setTableInfo(tableName) {
-	// this.yadamuLogger.trace([this.constructor.name],`setTableInfo(${tableName})`)
-	this.tableName = tableName  
-    this.tableInfo = this.dbi.getTableInfo(tableName)
-	this.supressBatchWriteLogging = (this.tableInfo.batchSize === this.tableInfo.commitSize) // Prevent duplicate logging if batchSize and Commit SIze are the same
- 	
-	// Set Skip Table to true if MODE is DDL_ONLY otherwise false.
-	// Strictly defensive as YadamuWriter implementations should never receive rows during DDL_ONLY operations.
-	
-	this.resetWriter();
-    // Register the table specific onError callback 
-	this.errorCallback = this.errorCallbacks[tableName]
-	delete this.errorCallbacks[tableName]
-	this.on('error',(err) => {this.errorCallback(err)})
+	// In-Lined in constructor
   }
-  
-  registerErrorCallback(tableName,callback) {
-	// this.yadamuLogger.trace([this.constructor.name,tableName],`registerErrorCallback(${typeof callback})`)
-    this.errorCallbacks[tableName] = callback;
+   
+  newTable(tableName) { 
+    // Used by statisticsCollector
   }
-
+   
   async initialize() {  
      await this.beginTransaction()
   }
@@ -166,6 +150,7 @@ class YadamuWriter extends Writable {
   }
   
   async rollbackTransaction(cause) {
+      // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],'rollbackTransaction()')
       this.rowCounters.lost += this.rowCounters.written;
 	  this.rowCounters.written = 0;
   	  await this.dbi.rollbackTransaction(cause)
@@ -255,6 +240,96 @@ class YadamuWriter extends Writable {
     }
   }
 
+  
+  async _write(obj, encoding, callback) {
+	const messageType = Object.keys(obj)[0]
+	try {
+	  // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),messageType],'_write()')
+      switch (messageType) {
+		case 'table':
+	      this.newTable(obj.table)
+		  break;  
+        case 'data':
+          if (this.skipTable === false) {
+			await this.processRow(obj.data)
+          }
+		  // ### Else Throw an Error to stop the reader ????
+		  break;
+	  case 'eod':
+        // Used when processing serial data sources such as files to indicate that all records have been processed by the writer
+	    // this.yadamuLogger.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType],`Emit "allDataReceived"`)  
+	    this.emit('allDataReceived')
+		break;
+  	  default:
+      }
+      callback();
+    } catch (e) {		
+      this.yadamuLogger.handleException([`Writer`,this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.parameters.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);
+  	  /*
+	  **
+	  ** Error Handling. 
+	  **   ABORT: Rollback the current transaction. Pass the error to the cllback function, which should propogate the error.
+	  **   SKIP:  
+	  **   FLUSH: 
+	  **
+	  */
+	  try {
+        switch (this.dbi.parameters.ON_ERROR) {
+		  case undefined:
+		  case 'ABORT': 
+  		    await this.rollbackTransaction(e)
+            callback(e);
+		    break;
+		  case 'SKIP':
+		  case 'FLUSH':
+            callback();
+		    break;
+		  default:
+		}
+      } catch (e) {
+        // Passing the exception to callback triggers the onError() event
+		callback(e)	
+      }
+    }
+  }
+  
+  async flushCache() {
+    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.hasPendingRows(),this.rowCounters.received,this.rowCounters.committed,this.rowCounters.written,this.rowCounters.cached],'_flushCahce()')
+    if (this.hasPendingRows()) {
+      this.skipTable = await this.writeBatch();   
+    }
+    if (this.skipTable === true) {
+      await this.rollbackTransaction()
+    }
+    else {
+      await this.commitTransaction()
+    }
+    this.endTime = performance.now()
+  }	  
+  	   	  
+  async _final(callback) {
+    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],'_final()')
+	this.endTime = performance.now();
+	try {
+	  await this.flushCache()
+      callback();
+    } catch (e) {
+      this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`"${this.currentTable}"`],e);
+	  // Passing the exception to callback triggers the onError() event
+      callback(e);
+    } 
+  } 
+
+  async forcedEnd() {
+	// Called when a writer fails. Once a writer has emitted an 'error' event calling the end() method does not appear to invoke that the _final() method.
+	// this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],'forcedEnd()')
+	try {
+	  await this.flushCache();
+    } catch (e) {
+      this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`"${this.tableName}"`],e);
+    } 
+  }
+  
   reportPerformance(readerStatistics) {
 	  	  
 	const writerStatistics = this.getStatistics();
@@ -293,82 +368,9 @@ class YadamuWriter extends Writable {
     }	  
 	
     const timings = {[this.tableName] : {rowCount: writerStatistics.counters.committed, insertMode: writerStatistics.insertMode,  rowsSkipped: writerStatistics.counters.skipped, elapsedTime: Math.round(writerElapsedTime).toString() + "ms", throughput: Math.round(writerThroughput).toString() + "/s", sqlExecutionTime: Math.round(writerStatistics.sqlTime)}};
-    this.primary.write({timings: timings})
+    return timings;
   }
   
-  async flushCache(readerStatistics) {
-    // this.yadamuLogger.trace([this.constructor.name,this.hasPendingRows(),this.batch.length,this.lobBatch.length],'_flushCahce()')
-    if (this.hasPendingRows()) {
-      this.skipTable = await this.writeBatch();   
-    }
-    if (this.skipTable === true) {
-      await this.rollbackTransaction()
-    }
-    else {
-      await this.commitTransaction()
-    }
-    this.endTime = performance.now()
-    this.reportPerformance(readerStatistics);
-
-    // Remove the table specific onError callback
-	this.removeListener('error',this.errorCallback);
-  }	  
-  	   
-  async _write(obj, encoding, callback) {
-	const messageType = Object.keys(obj)[0]
-	try {
-	  // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),messageType],'_write()')
-      switch (messageType) {
-	    case 'table':
-  	      this.setTableInfo(obj.table);
-		  await this.initialize()
-		  break;
-        case 'data':
-          if (this.skipTable === false) {
-			await this.processRow(obj.data)
-          }
-		  // ### Else Throw an Error to stop the reader ????
-		  break;
-		case 'eod':
-		  await this.flushCache(obj.eod)
-		  break;
-  	    case 'eof':		 
-		case 'dataComplete':
-		   // 'eof' is generated by the JSON Parser (Text or HTML Parser) when the parsing operation detects the end of the outermost object or array. It is the equivilant of dataComplete for a Database based reader		  
-		   // 'dataComplete' is generated by a database export when there is no more data for this worker to process.
-	      this.end()
-		  break;
-		default:
-      }
-      callback();
-    } catch (e) {
-	  this.yadamuLogger.handleException([`Writer`,`${this.dbi.DATABASE_VENDOR}`,this.tableName,this.dbi.getWorkerNumber(),messageType],e);
-	  this.skipTable = true;
-	  try {
-        await this.rollbackTransaction(e)
-        callback();
-      } catch (e) {
-        // Passing the exception to callback triggers the onError() event
-        callback(e); 
-      }
-    }
-  }
- 
-  async _final(callback) {
-	// this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],'final()')
-	try {
-	  if (!this.dbi.isPrimary()) {
-		await this.dbi.releaseWorkerConnection();
-      }
-	  this.primary.write({workerComplete: this.dbi.getWorkerNumber()})
-      callback();
-    } catch (e) {
-      this.yadamuLogger.logException([`${this.dbi.DATABASE_VENDOR}`,`"${this.currentTable}"`],e);
-	  // Passing the exception to callback triggers the onError() event
-      callback(e);
-    } 
-  } 
-
 }
 
 module.exports = YadamuWriter;

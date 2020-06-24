@@ -398,16 +398,37 @@ class ExampleDBI extends YadamuDBI {
     return new ExampleParser(tableInfo,objectMode,this.yadamuLogger);
   }  
   
-  streamingError(e,stack,tableInfo) {
-    return new ExampleError(e,stack,tableInfo.SQL_STATEMENT)
+  streamingError(e,sqlStatement) {
+    return new ExampleError(e,this.streamingStackTrace,sqlStatement)
   }
   
-  async getInputStream(tableInfo,parser) {        
-    // Get an input stream from a SQL result set.
-	
+  async getInputStream(tableInfo,parser) {   
+  
+    // Get an input stream from a SQL statement
+
 	// In the worst case scenario where this is supported by the database it may be necessary to create a readable stream 
 	// with a dummy read() method and push rows into it from a cursor
-	
+
+   /*
+      const readStream = new Readable({objectMode: true });
+      readStream._read = () => {};
+      this.streamingStackTrace = new Error().stack;
+	  const resultsSet = ### Get some kind of stream or cursor ###
+      resultsSet.on('data', (row) => {readStream.push(row)})
+	  resultsSet.on('error',(err, p) => {
+		if  (!readFailed) {
+          readStream.destroy(err);
+		}
+		else {}
+		readFailed = true;
+      })
+      resultsSet.on('done',(result) => {readStream.push(null)});
+      return readStream;      
+	} catch (e) {
+	  throw new DatabaseError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT);
+    }
+   */
+  
     throw new Error('Unimplemented Method')
   }      
 
@@ -426,9 +447,9 @@ class ExampleDBI extends YadamuDBI {
     await super.generateStatementCache(StatementGenerator, schema, executeDDL)
   }
 
-  getOutputStream(primary) {
+  getOutputStream(tableName) {
 	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(ExampleWriter,primary)
+	 return super.getOutputStream(ExampleWriter,tableName)
   }
  
   async workerDBI(workerNumber) {

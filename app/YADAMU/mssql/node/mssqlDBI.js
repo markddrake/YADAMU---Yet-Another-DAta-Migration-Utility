@@ -17,7 +17,7 @@ const sql = require('mssql');
 ** The pool which acts a requestProvider, providing request objects on demand.
 ** Each request is good for one operation.
 **
-** When working in parallel Primary and Worker instances share the same Pool.
+** When working in parallel Manager and Worker instances share the same Pool.
 **
 ** Transactions are managed via a Transaction object. The transaction object owns a connection.
 ** Each instance of the DBI owns it's own Transaction object. 
@@ -1133,23 +1133,18 @@ class MsSQLDBI extends YadamuDBI {
     return new MsSQLParser(tableInfo,objectMode,this.yadamuLogger);
   }  
   
-  streamingError(err,stack,tableInfo) {
-	 return new MsSQLError(err,stack,tableInfo.SQL_STATEMENT)
+  streamingError(err,sqlStatement) {
+	 return new MsSQLError(err,this.streamingStackTrace,sqlStatement)
   }
 
-  forceEndOnInputStreamError(error) {
-	return true;
-  }
+  async getInputStream(tableInfo) {
 
-  async getInputStream(tableInfo,parser) {
-
-    let stack;
     let readFailed = false;
     try {
       // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
       const readStream = new Readable({objectMode: true });
       readStream._read = () => {};
-      stack = new Error().stack;
+      this.streamingStackTrace = new Error().stack;
       const request = this.getRequest();
       request.stream = true // You can set streaming differently for each request
       request.on('row', (row) => {readStream.push(row)})
@@ -1164,7 +1159,7 @@ class MsSQLDBI extends YadamuDBI {
       request.query(tableInfo.SQL_STATEMENT);  
       return readStream;      
 	} catch (e) {
-	  throw new MsSQLError(e,stack,tableInfo.SQL_STATEMENT);
+	  throw new MsSQLError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT);
     }
   }      
 
@@ -1180,8 +1175,8 @@ class MsSQLDBI extends YadamuDBI {
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL, this.systemInformation.vendor, this.parameters.MSSQL_SCHEMA_DB ? this.parameters.MSSQL_SCHEMA_DB : this.connectionProperties.database)
   }
 
-  getOutputStream(primary) {
-	 return super.getOutputStream(MsSQLWriter,primary)
+  getOutputStream(tableName) {
+	 return super.getOutputStream(MsSQLWriter,tableName)
   }
  
  async setWorkerConnection() {
