@@ -3,7 +3,6 @@
 const { performance } = require('perf_hooks');
 
 const YadamuWriter = require('../../common/yadamuWriter.js');
-const {BatchInsertError} = require('../../common/yadamuError.js')
 
 class MariadbWriter extends YadamuWriter {
 
@@ -18,7 +17,7 @@ class MariadbWriter extends YadamuWriter {
     this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + '),';
     
     this.transformations = this.tableInfo.dataTypes.map((dataType,idx) => {
-      switch (dataType.type) {
+      switch (dataType.type.toLowerCase()) {
         case "tinyblob" :
         case "blob" :
         case "mediumblob" :
@@ -108,12 +107,9 @@ class MariadbWriter extends YadamuWriter {
     }
   }
     
-  handleBatchException(cause,message) {
-   
+  handleBatchError(operation,cause) {
     // Use Slice to add first and last row, rather than first and last value.
-    const batchException = new BatchInsertError(cause,this.tableInfo.tableName,this.tableInfo.dml,this.rowCounters.cached,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
-    this.yadamuLogger.handleWarning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`WRITE`,this.insertMode],batchException)
-
+	super.handleBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
   }
   	
   async writeBatch() {     
@@ -134,9 +130,9 @@ class MariadbWriter extends YadamuWriter {
         this.rowCounters.written += this.rowCounters.cached;
 		this.rowCounters.cached = 0;
         return this.skipTable
-      } catch (e) {
-        await this.dbi.restoreSavePoint(e);
-		this.handleBatchException(e,'Batch Insert')
+      } catch (cause) {
+		this.handleBatchError(`INSERT MANY`,cause)
+        await this.dbi.restoreSavePoint(cause);
         this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
         this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args.slice(0,-1)
@@ -150,9 +146,8 @@ class MariadbWriter extends YadamuWriter {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,nextRow);
         await this.processWarnings(results);
 		this.rowCounters.written++;
-      } catch (e) {
-        const errInfo = [this.tableInfo.dml]
-        await this.handleInsertError(`INSERT ONE`,this.rowCounters.cached,row,nextRow,e,errInfo);
+      } catch (cause) {
+        await this.handleIterativeError(`INSERT ONE`,cause,row,nextRow)
         if (this.skipTable) {
           break;
         }

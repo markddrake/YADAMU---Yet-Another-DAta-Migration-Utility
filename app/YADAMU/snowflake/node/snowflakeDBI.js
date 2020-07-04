@@ -1,6 +1,5 @@
 "use strict" 
 const fs = require('fs');
-const Readable = require('stream').Readable;
 const { performance } = require('perf_hooks');
 
 /* 
@@ -16,6 +15,7 @@ const SnowflakeError = require('./snowflakeError.js')
 const SnowflakeParser = require('./snowflakeParser.js');
 const SnowflakeWriter = require('./snowflakeWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
+const SnowflakeReader = require('./snowflakeReader.js');
 
 const sqlTableInfo = 
 `select t.table_schema "TABLE_SCHEMA"
@@ -72,7 +72,7 @@ class SnowflakeDBI extends YadamuDBI {
 	  const stack = new Error().stack
       connection.connect((err,connection) => {
         if (err) {
-          reject(new SnowflakeError(err,stack,`snowflake-sdk.Connection.connect()`));
+          reject(this.captureException(new SnowflakeError(err,stack,`snowflake-sdk.Connection.connect()`)))
         }
         resolve(connection);
       })
@@ -88,7 +88,7 @@ class SnowflakeDBI extends YadamuDBI {
       connection.destroy()
 	  super.setParameters(parameters)
 	} catch (e) {
-      throw e;
+      throw this.captureException(new SnowflakeError(e,'Snowflake-SDK.connection.connect()'))
 	}
   }
   
@@ -168,7 +168,7 @@ class SnowflakeDBI extends YadamuDBI {
       }
 
 	  const stack = new Error().stack;
-      const sqlStartTime = performance.now(); 
+      const sqlStartTime = performance.now();
 	  this.connection.execute({
         sqlText        : sqlStatement
       , binds          : args
@@ -176,7 +176,7 @@ class SnowflakeDBI extends YadamuDBI {
       , complete       : async function(err,statement,rows) {
 		                   const sqlEndTime = performance.now()
                            if (err) {
-              		         const cause = new SnowflakeError(err,stack,sqlStatement)
+              		         const cause = this.captureException(new SnowflakeError(err,stack,sqlStatement))
     		                 if (attemptReconnect && cause.lostConnection()) {
 	      				       attemptReconnect = false
 			   			       try {
@@ -314,7 +314,7 @@ class SnowflakeDBI extends YadamuDBI {
       await this.executeSQL(sqlRollbackTransaction,[]);
       super.rollbackTransaction()
     } catch (newIssue) {
-	  this.checkCause(cause,newIssue);								   
+	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue);								   
 	}
   }
 
@@ -475,27 +475,17 @@ class SnowflakeDBI extends YadamuDBI {
   }  
   
   streamingError(e,sqlStatement) {
-    return new SnowflakeError(e,this.streamingStackTrace,sqlStatement)
+    return this.captureException(new SnowflakeError(e,this.streamingStackTrace,sqlStatement))
   }
-  
-  async getInputStream(tableInfo) {        
 
-    // Get an input stream from a SQL result set.
+  async getInputStream(tableInfo) {
+
+    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
+    this.streamingStackTrace = new Error().stack;
+    return new SnowflakeReader(this.connection,tableInfo.SQL_STATEMENT);
 	
-	if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
-    }
-        
-    const readStream = new Readable({objectMode: true });
-    readStream._read = () => {};
-    
-	this.streamingStackTrace = new Error().stack
-    const statement = this.connection.execute({sqlText: tableInfo.SQL_STATEMENT,  fetchAsString: ['Number','Date'], streamResult: true})
-    const snowflakeStream = statement.streamRows();
-    snowflakeStream.on('data',(row) => {readStream.push(row)})
-    snowflakeStream.on('end',(result) => {readStream.push(null)});
-    return readStream;      
-  }   
+  }  
+  
 
   /*
   **

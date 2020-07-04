@@ -140,17 +140,13 @@ begin
           lower(@DATA_TYPE)
 	  end	   
     when @VENDOR = 'MongoDB' then
-      -- MongoDB typing based on JSON Typing and the Javascript TypeOf Operator
-      -- ### Todo MongoDB typing based on BSON ?
+      -- MongoDB typing based on aggregation $type operator and BSON type
+	  -- ### No support for depricated Data types undefined, dbPointer, symbol
       case
         when @DATA_TYPE in ('undefined','object','function','symbol') then 
           'json'
-        when @DATA_TYPE = 'ObjectId' then
-          'binary(12)'
-        when @DATA_TYPE = 'boolean' then
-          'bit'
-        when @DATA_TYPE = 'number' then
-          'decimal'
+        when @DATA_TYPE = 'double' then
+          'float(53)'
         when @DATA_TYPE = 'string' then
           case
             when @DATA_TYPE_LENGTH > 4000 then
@@ -158,8 +154,38 @@ begin
             else
               'nvarchar(max)'
           end
-        when @DATA_TYPE = 'bigint' then
-           'bigint'
+        when @DATA_TYPE = 'object' then 
+          'json'		  
+        when @DATA_TYPE = 'array' then 
+          'json'
+        when @DATA_TYPE = 'binData' then 
+          'varbinary(max)'
+        when @DATA_TYPE = 'objectId' then
+          'binary(12)'
+        when @DATA_TYPE = 'bool' then
+          'bit'
+        when @DATA_TYPE = 'null' then
+              'nvarchar(2048)'
+        when @DATA_TYPE = 'regex' then
+              'nvarchar(2048)'
+        when @DATA_TYPE = 'javascript' then
+              'nvarchar(max)'
+        when @DATA_TYPE = 'javascriptWithScope' then
+              'nvarchar(max)'		  
+        when @DATA_TYPE = 'int' then
+          'int'
+        when @DATA_TYPE = 'long' then
+          'bigint'
+        when @DATA_TYPE = 'decimal' then
+          'decimal'
+        when @DATA_TYPE = 'timestamp' then
+          'datatime2'
+        when @DATA_TYPE = 'date' then
+          'datatime2'
+        when @DATA_TYPE = 'minkey' then 
+          'json'		  
+        when @DATA_TYPE = 'maxkey' then 
+          'json'		  
         else 
            lower(@DATA_TYPE)
       end

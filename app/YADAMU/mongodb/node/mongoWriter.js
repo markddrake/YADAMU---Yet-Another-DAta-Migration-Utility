@@ -42,8 +42,8 @@ class MongoWriter extends YadamuWriter {
   setTableInfo(tableInfo) {
 	super.setTableInfo(tableInfo)
     this.transformations = this.tableInfo.dataTypes.map((dataType,idx) => {
-      switch (dataType.type) {
-        case '"MDSYS"."SDO_GEOMETRY"':
+      switch (dataType.type.toLowerCase()) {
+        case '"mdsys"."sdo_geometry"':
         case 'geography':
         case 'geometry':
           switch (this.dbi.systemInformation.spatialFormat) {
@@ -60,7 +60,6 @@ class MongoWriter extends YadamuWriter {
             default:
           }
 		  return null
-        case 'RAW':
         case 'raw':
 		case 'binary':
 		case 'bytea':
@@ -78,7 +77,19 @@ class MongoWriter extends YadamuWriter {
             return ObjectID(col)
 	      }
           break;
-        default:
+		case 'date':
+		case 'time':
+		case 'dateTime':
+		case 'timestamp':
+		  if (this.dbi.parameters.MONGO_NATIVEJS_DATE) {
+	        return (col,idx) => {
+              return new Date(col)
+	        }		
+          }			
+		  else {
+		    return null
+	      }
+		default:
 		  return null
 	  }
 	})
@@ -132,6 +143,10 @@ class MongoWriter extends YadamuWriter {
 
   }
 
+  handleBatchError(operation,cause) {
+   	super.handleBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+  }
+ 
   async writeBatch() {
     
     // ### Todo: ERROR HANDLING and Iterative Mode.

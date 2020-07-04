@@ -51,6 +51,7 @@ class FileWriter extends YadamuWriter {
   }
   
   async flushCache(readerStatistics) {
+    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.hasPendingRows(),this.rowCounters.received,this.rowCounters.committed,this.rowCounters.written,this.rowCounters.cached],'_flushCahce()')  
 	this.outputStream.write(']');
 	super.flushCache(readerStatistics);
   }

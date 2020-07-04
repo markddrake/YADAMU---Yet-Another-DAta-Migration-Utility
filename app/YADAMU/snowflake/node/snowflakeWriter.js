@@ -50,6 +50,10 @@ class SnowflakeWriter extends YadamuWriter {
 
   }
         
+  handleBatchError(operation,cause) {
+   	super.handleBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+  }
+ 		
   async writeBatch() {
 	  
     this.rowCounters.batchCount++;
@@ -62,9 +66,9 @@ class SnowflakeWriter extends YadamuWriter {
         this.rowCounters.written += this.rowCounters.cached;
         this.rowCounters.cached = 0;
         return this.skipTable
-      } catch (e) {
-        await this.dbi.restoreSavePoint(e);
-		this.handleBatchException(e,'Batch Insert')
+      } catch (cause) {
+		this.handleBatchError(`INSERT MANY`,cause)
+        await this.dbi.restoreSavePoint(cause);
 		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative'   
       }
@@ -79,9 +83,8 @@ class SnowflakeWriter extends YadamuWriter {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row])
 		this.status.sqlTrace = undefined
 		this.rowCounters.written++;
-      } catch (e) {
-        const errInfo = this.status.showInfoMsgs === true ? [this.tableInfo.dml,this.batch[row]] : []
-        await this.handleInsertError(`${this.constructor.name}.writeBatch()`,this.tableName,this.batch.length,row,this.batch[row],e,errInfo);
+      } catch (cause) {
+        await this.handleInsertError(`INSERT ONE`,cause,this.batch.length,row,this.batch[row]);
         if (this.skipTable) {
           break;
         }

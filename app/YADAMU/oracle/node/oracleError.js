@@ -4,9 +4,33 @@ const {DatabaseError} = require('../../common/yadamuError.js')
 
 class OracleError extends DatabaseError {
   //  const err = new OracleError(cause,stack,sql,args,outputFormat)
+  
+  obfuscateBindValues(args) {
+	if (Array.isArray(args)) {
+	  return args.map((arg) => {
+	    if (arg.type && arg.val) {
+	      switch (true) {
+		    case (Buffer.isBuffer(arg.val)):
+			  arg.val = "Buffer"
+			  break;
+			case ((typeof arg.val === 'object') && (arg.val.constructor !== undefined) && (arg.val.constructor.name === 'Lob')):
+			  arg.val = "Lob"
+			  break;
+			default:
+		      arg.val = typeof arg.val
+		  }
+	    }
+	    return arg
+	  })
+	}
+	else {
+	  return args
+	}
+  }
+ 
   constructor(cause,stack,sql,args,outputFormat) {
     super(cause,stack,sql);
-	this.args = args
+	this.args = this.obfuscateBindValues(args)
 	this.outputFormat = outputFormat
 	
   }

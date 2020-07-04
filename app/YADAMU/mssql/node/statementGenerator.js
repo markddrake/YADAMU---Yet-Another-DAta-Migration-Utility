@@ -167,7 +167,7 @@ class StatementGenerator {
           table.columns.add(columns[idx],sql.Variant, {nullable: true});
           break;
         case 'binary':
-          table.columns.add(columns[idx],sql.Binary, {nullable: true});
+          table.columns.add(columns[idx],sql.Binary(dataType.length), {nullable: true});
           break;
         case 'varbinary':
           // sql.VarBinary ([length])

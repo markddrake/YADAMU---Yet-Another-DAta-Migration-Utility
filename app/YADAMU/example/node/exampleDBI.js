@@ -13,6 +13,7 @@ const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
 const ExampleError = require('./exampleError.js')
 const ExampleParser = require('./exampleParser.js');
 const ExampleWriter = require('./exampleWriter.js');
+const ExampleReader = require('./exampleReader.js');
 const StatementGenerator = require('./statementGenerator.js');
 
 class ExampleDBI extends YadamuDBI {
@@ -100,7 +101,7 @@ class ExampleDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = new ExampleError(e,stack,sqlStatement);
+		const cause = this.captureException(this.captureException(new ExampleError(e,stack,sqlStatement))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -212,7 +213,7 @@ class ExampleDBI extends YadamuDBI {
       await this.executeSQL(sqlStatement);
       super.rollbackTransaction()
 	} catch (newIssue) {
-	  this.checkCause(cause,newIssue);								   
+	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue);								   
 	}
   }
 
@@ -254,7 +255,7 @@ class ExampleDBI extends YadamuDBI {
       await this.executeSQL(sqlRestoreSavePoint);
       super.restoreSavePoint();
 	} catch (newIssue) {
-	  this.checkCause(cause,newIssue);
+	  this.checkCause('RESTORE SAVPOINT',cause,newIssue);
 	}
   }  
   
@@ -399,35 +400,19 @@ class ExampleDBI extends YadamuDBI {
   }  
   
   streamingError(e,sqlStatement) {
-    return new ExampleError(e,this.streamingStackTrace,sqlStatement)
+    return this.captureException(new ExampleError(e,this.streamingStackTrace,sqlStatement))
   }
   
-  async getInputStream(tableInfo,parser) {   
+  async getInputStream(tableInfo) {
+
+    // Either return the databases native readable stream or use the ExampleReader to create a class that wraps a cursor or event stream in a Readable
+
+    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
+    this.streamingStackTrace = new Error().stack;
+    return new ExampleReader(this.connection,tableInfo.SQL_STATEMENT);
+	
+  }  
   
-    // Get an input stream from a SQL statement
-
-	// In the worst case scenario where this is supported by the database it may be necessary to create a readable stream 
-	// with a dummy read() method and push rows into it from a cursor
-
-   /*
-      const readStream = new Readable({objectMode: true });
-      readStream._read = () => {};
-      this.streamingStackTrace = new Error().stack;
-	  const resultsSet = ### Get some kind of stream or cursor ###
-      resultsSet.on('data', (row) => {readStream.push(row)})
-	  resultsSet.on('error',(err, p) => {
-		if  (!readFailed) {
-          readStream.destroy(err);
-		}
-		else {}
-		readFailed = true;
-      })
-      resultsSet.on('done',(result) => {readStream.push(null)});
-      return readStream;      
-	} catch (e) {
-	  throw new DatabaseError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT);
-    }
-   */
   
     throw new Error('Unimplemented Method')
   }      

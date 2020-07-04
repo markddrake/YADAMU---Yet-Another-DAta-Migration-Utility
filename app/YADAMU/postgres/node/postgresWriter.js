@@ -4,7 +4,6 @@ const { performance } = require('perf_hooks');
 
 const Yadamu = require('../../common/yadamu.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
-const {BatchInsertError} = require('../../common/yadamuError.js')
 
 class PostgresWriter extends YadamuWriter {
 
@@ -106,10 +105,11 @@ class PostgresWriter extends YadamuWriter {
 	return this.skipTable
   }
     
-  handleBatchException(cause,message) {
+  handleBatchError(operation,cause) {
    
     // Use Slice to add first and last row, rather than first and last value.
-    const batchException = new BatchInsertError(cause,this.tableInfo.tableName,this.tableInfo.dml,this.rowCounters.cached,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
+      	super.handleBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
+    const batchException = this.createBatchException(cause,this.tableInfo.tableName,this.tableInfo.dml,this.rowCounters.cached,)
     this.yadamuLogger.handleWarning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],batchException)
 
   }
@@ -133,10 +133,10 @@ class PostgresWriter extends YadamuWriter {
 		this.rowCounters.written += this.rowCounters.cached;
         this.rowCounters.cached = 0;
         return this.skipTable
-      } catch (e) {
-        await this.dbi.restoreSavePoint(e);
-		this.handleBatchException(e,'Batch Insert')
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
+      } catch (cause) {
+        this.handleBatchError(`INSERT MANY`,cause)
+        await this.dbi.restoreSavePoint(cause);
+		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
         repackBatch = true;
       }
@@ -152,10 +152,9 @@ class PostgresWriter extends YadamuWriter {
         const results = await this.dbi.insertBatch(sqlStatement,nextRow);
         this.dbi.releaseSavePoint();
 		this.rowCounters.written++;
-      } catch(e) {
-        this.dbi.restoreSavePoint(e);
-        const errInfo = [this.tableInfo.dml,JSON.stringify(nextRow)]
-        await this.handleInsertError(`INSERT ONE`,this.rowCounters.cached,row,nextRow,e,errInfo);
+      } catch(cause) {
+        this.dbi.restoreSavePoint(cause);
+        await this.handleIterativeError(`INSERT ONE`,cause,row,nextRow);
         if (this.skipTable) {
           break;
         }

@@ -26,7 +26,8 @@ const DEFAULT_COMMIT_RATIO = 1;
 */
 
 class YadamuDBI {
-    
+
+  static get SAVE_POINT_NAME()     { return 'YADAMU_INSERT' }
   get PASSWORD_KEY_NAME()   { return 'password' };
   get DATABASE_VENDOR()     { return undefined };
   get SOFTWARE_VENDOR()     { return undefined };
@@ -37,7 +38,7 @@ class YadamuDBI {
   
   traceSQL(msg) {
      // this.yadamuLogger.trace([this.DATABASE_VENDOR,'SQL'],msg)
-     return(`${msg.trim()}${this.sqlTraceTag} ${this.sqlTerminator}`);
+     return(`${msg.trim()} ${this.sqlTraceTag} ${this.sqlTerminator}`);
   }
   
   traceTiming(startTime,endTime) {      
@@ -51,6 +52,34 @@ class YadamuDBI {
   traceComment(comment) {
     return `/* ${comment} */\n`
   }
+
+
+  stringToJSON(value) {
+    // Poor man's test for JSON Object or Array
+    if ((typeof value === "string") && ((value.indexOf('{') === 0) || (value.indexOf('[') === 0))) {
+	  try {
+	    return JSON.parse(value)
+	  } catch (e) {
+		return value
+      }
+	}
+	else {
+	  // Convert Buffers to Hex
+      if (Buffer.isBuffer(value)) {
+		return value.toString('hex')
+	  }
+	  else {
+	    return value
+	  }
+	}
+  }
+
+  columnsToJSON(row) {
+    // Convert columns containing serialized JSON strings into objects
+	return row.map((col) => {
+	  return this.stringToJSON(col)
+	})     
+  }	
   
   doTimeout(milliseconds) {
     
@@ -239,13 +268,16 @@ class YadamuDBI {
   objectMode() {
     return true;
   }
+    
+  captureException(err) {
+    // Reset by passing undefined 
+    this.firstError = this.firstError === undefined ? err : this.firstError
+	this.latestError = err
+    return err
+  }	
    
-  setFatalError(e) {
-    this.fatalError = e
-  }
-  
   invalidConnection() {
-	return ((this.fatalError instanceof DatabaseError) && this.fatalError.lostConnection())
+	return ((this.latestError instanceof DatabaseError) && (this.latestError.lostConnection() || this.latestError.serverUnavailable()))
   }
   
   setCounters(counters) {
@@ -495,7 +527,8 @@ class YadamuDBI {
     this.sqlTraceTag = `/* Manager */`;	
     this.sqlCumlativeTime = 0
     this.sqlTerminator = `\n${this.STATEMENT_TERMINATOR}\n`
-	this.fatalError = undefined
+	this.firstError = undefined
+	this.latestError = undefined
   }
 
   enablePerformanceTrace() { 
@@ -768,16 +801,16 @@ class YadamuDBI {
 	// Throw cause if cause is a lost connection. Used by drivers to prevent attempting rollback or restore save point operations when the connection is lost.
 	  
   	if ((cause instanceof DatabaseError) && cause.lostConnection()) {
-	  throw cause;
+      throw cause;
 	}
   }
 
-  checkCause(cause,newError) {
+  checkCause(operation,cause,newError) {
 	 
 	 // Used by Rollback and Restore save point to log errors encountered while performing the required operation and throw the original cause.
 
 	  if (cause instanceof Error) {
-        this.yadamuLogger.handleException([`${this.constructor.name}.rollbackTransaction()`],newError)
+        this.yadamuLogger.handleException([this.DATABASE_VENDOR,operation],newError)
 	    throw cause
 	  }
 	  throw newError
@@ -913,11 +946,12 @@ class YadamuDBI {
 	return false;
   }
   
-  streamingError(e,stack,tableInfo) {
-    return new DatabaseError(e,stack,tableInfo.SQL_STATEMENT)
+  streamingError(cause,sqlStatement) {
+    return this.captureException(new DatabaseError(cause,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(tableInfo,parser) {
+	this.streamingStackTrace = new Error().stack;
     throw new Error('Unimplemented Method')
   }      
 
@@ -971,7 +1005,6 @@ class YadamuDBI {
 	 // Statement Cache is keyed by actual table name so we need the mapped name if there is a mapping.
 	 
 	 let mappedTableName = this.transformTableName(tableName,this.tableMappings)
-	 // console.log(tableName,mappedTableName,this.tableMappings)
      const tableInfo = this.statementCache[mappedTableName]
 	 tableInfo.tableName = mappedTableName
 	 return tableInfo
@@ -1005,7 +1038,7 @@ class YadamuDBI {
     dbi.statementCache = this.statementCache
     dbi.systemInformation = this.systemInformation
 	dbi.setTableMappings(this.tableMappings)
-    dbi.sqlTraceTag = ` /* Worker [${this.getWorkerNumber()}] */`;
+    dbi.sqlTraceTag = ` /* Worker [${dbi.getWorkerNumber()}] */`;
   }   
 
   async setWorkerConnection() {
@@ -1034,7 +1067,7 @@ class YadamuDBI {
 	await dbi.setWorkerConnection()
     dbi.setParameters(this.parameters);
 	this.cloneManager(dbi);
-    await dbi.configureConnection();
+	await dbi.configureConnection();
 	return dbi
   }
   

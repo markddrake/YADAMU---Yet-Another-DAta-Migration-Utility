@@ -27,14 +27,14 @@ class DBWriter extends Writable {
   ** a 'finish' or 'close' event to be emitted.
   */
  
-  constructor(dbi,mode,status,yadamuLogger,options) {
+  constructor(dbi,yadamuLogger,options) {
 
     super({objectMode: true});
 	
     this.dbi = dbi;
-    this.mode = mode;
-    this.ddlRequired = (mode !== 'DATA_ONLY');    
-    this.status = status;
+    this.mode = dbi.parameters.MODE;
+    this.ddlRequired = (this.mode !== 'DATA_ONLY');    
+    this.status = dbi.yadamu.getStatus()
     this.yadamuLogger = yadamuLogger;
     this.yadamuLogger.info([`Writer`,dbi.DATABASE_VENDOR,this.mode,this.dbi.getWorkerNumber()],`Ready.`)
         

@@ -1311,17 +1311,18 @@ class YadamuQA {
 	  
   async doTests(configuration) {
 
-    const startTime = performance.now()
-	const summary = [['End Time','Test','Source','Target','Results','ElapsedTime']]
-    const testCounters = this.initializeCounters()
-    let mode = configuration.operation.toUpperCase()
- 
     this.yadamuLogger.qa([`Environemnt`,process.arch,process.platform,process.version],`Running tests`);
+
+    const startTime = performance.now()
+    const testCounters = this.initializeCounters()
+	const summary = [['End Time','Test','Source','Target','Results','ElapsedTime']]
+ 
+    let sourceCounters
+    let mode = configuration.operation.toUpperCase()
         
     try {
-      const sourceCounters = this.initializeCounters()
       for (const test of configuration.tests) {
-	
+        sourceCounters = this.initializeCounters()
         // Initialize constructor parameters with values from configuration file
         const testParameters = Object.assign({} , configuration.parameters ? configuration.parameters : {})
 
@@ -1339,9 +1340,9 @@ class YadamuQA {
 		  const startTime = performance.now()
 		  const taskCounters = this.initializeCounters()
           for (const task of test.tasks) {
+  	        const operationCounters = this.initializeCounters()
     	    try {
 		      const operations = this.getTaskList(configuration,task)
-			  const operationCounters = this.initializeCounters()
 		      const startTime = performance.now()
 		      for (const operation of operations) {
                 mode = (test.operation ? test.operation : configuration.operation).toUpperCase()

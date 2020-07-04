@@ -812,32 +812,56 @@ begin
       -- MariaDB and MySQL currentyl share the same mappings
       return UPPER(P_DATA_TYPE);
     when P_SOURCE_VENDOR = 'MongoDB' then
-      -- MongoDB typing based on JSON Typing and the Javascript TypeOf Operator
-      -- ### Todo MongoDB typing based on BSON ?
+      -- MongoDB typing based on aggregation $type operator and BSON type
+	  -- ### No support for depricated Data types undefined, dbPointer, symbol
       case
-        when P_DATA_TYPE in ('undefined','object','function','symbol') then 
-          return 'JSON';
-        when P_DATA_TYPE = 'ObjectId' then
-           return 'RAW(12)';
-        when P_DATA_TYPE = 'boolean' then
-           return 'BOOLEAN';
-        when P_DATA_TYPE = 'number' then
-           return 'NUMBER';
+        when P_DATA_TYPE = 'double' then
+           return 'BINARY_DOUBLE';
         when P_DATA_TYPE = 'string' then
           case
             when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH is NULL then
-              return 'VARCHAR2(32768)';
+              return 'VARCHAR2(32767)';
             when P_DATA_TYPE_LENGTH is NULL then
               return 'VARCHAR2(4000)';
-            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH < 32769 then
+            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH < 32768 then
               return 'VARCHAR2';
             when P_DATA_TYPE_LENGTH < 4001 then
               return 'VARCHAR2';
             else
               return 'CLOB';
           end case;
-        when P_DATA_TYPE = 'bigint' then
+        when P_DATA_TYPE = 'object' then 
+          return 'JSON';
+        when P_DATA_TYPE = 'array' then
+          return 'JSON';
+        when P_DATA_TYPE = 'binData' then
+          return 'BLOB';
+        when P_DATA_TYPE = 'objectId' then
+           return 'RAW(12)';
+        when P_DATA_TYPE = 'bool' then
+           return 'BOOLEAN';
+        when P_DATA_TYPE = 'null' then
+           return 'VARCHAR2(2048)';
+        when P_DATA_TYPE = 'regex' then
+           return 'VARCHAR2(4000)';
+        when P_DATA_TYPE = 'javascript' then
+           return 'CLOB';
+        when P_DATA_TYPE = 'javascriptWithScope' then
+           return 'CLOB';
+        when P_DATA_TYPE = 'int' then
+           return 'NUMBER(10,0)';
+        when P_DATA_TYPE = 'long' then
            return 'NUMBER(19,0)';
+        when P_DATA_TYPE = 'decimal' then
+           return 'NUMBER';
+        when P_DATA_TYPE = 'timestamp' then
+           return 'TIMESTAMP(9) WITH TIME ZONE';
+        when P_DATA_TYPE = 'date' then
+           return 'TIMESTAMP(3) WITH TIME ZONE';
+        when P_DATA_TYPE = 'minkey' then
+           return 'JSON';
+        when P_DATA_TYPE = 'maxKey' then
+           return 'JSON';
         else 
            return UPPER(P_DATA_TYPE);
       end case;

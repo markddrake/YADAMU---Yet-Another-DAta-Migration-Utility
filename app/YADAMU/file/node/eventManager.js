@@ -18,9 +18,10 @@ class EventManager extends Transform {
   **
   */
 	
-  constructor(yadamuLogger) {
+  constructor(yadamu) {
     super({objectMode: true});
-	this.yadamuLogger = yadamuLogger
+	this.yadamu = yadamu
+	this.yadamuLogger = yadamu.getYadamuLogger();
     this.dbWriterDetached = false;
 	
     this.pipeStatistics = {
@@ -86,8 +87,15 @@ class EventManager extends Transform {
 	    this.pipeStatistics.rowsRead++
         this.push(data);
 		break;
+      case 'systemInformation' :
+        this.push(data)
+		this.yadamu.rejectionManager.setSystemInformation(data.systemInformation)
+		this.yadamu.warningManager.setSystemInformation(data.systemInformation)
+	    break;
       case 'metadata' :
         this.push(data)
+		this.yadamu.rejectionManager.setMetadata(data.metadata)
+		this.yadamu.warningManager.setMetadata(data.metadata)
         this.push({pause:true})
  	    await this.ddlComplete
 		this.unpipe(this.dbWriter)

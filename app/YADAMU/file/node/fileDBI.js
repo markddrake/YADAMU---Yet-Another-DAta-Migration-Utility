@@ -89,9 +89,9 @@ class FileDBI extends YadamuDBI {
   async releaseConnection() {
   }
   
-  constructor(yadamu,defaults) {
-	defaults = defaults === undefined ? yadamu.getYadamuDefaults().file : defaults 
+  constructor(yadamu,exportFilePath) {
     super(yadamu,yadamu.getYadamuDefaults().file )
+	this.exportFilePath = exportFilePath
     this.outputStream = undefined;
     this.inputStream = undefined;
 	this.ddl = undefined;
@@ -110,11 +110,14 @@ class FileDBI extends YadamuDBI {
   async initialize() {
     super.initialize(false);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
+	this.exportFilePath = this.exportFilePath === undefined ? this.parameters.FILE : this.exportFilePath
+	this.exportFilePath =  path.resolve(this.exportFilePath)
   }
 
   async initializeExport() {
 	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
 	super.initializeExport();
+    this.inputStream = fs.createReadStream(this.exportFilePath);
   }
 
   async finalizeExport() {
@@ -126,9 +129,8 @@ class FileDBI extends YadamuDBI {
 	// For FileDBI Import is Writing data to the file system.
     // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
 	super.initializeImport()
-    const exportFilePath = path.resolve(this.parameters.FILE);
-    this.outputStream = fs.createWriteStream(exportFilePath);
-    this.yadamuLogger.info([this.DATABASE_VENDOR],`Writing file "${exportFilePath}".`)
+    this.outputStream = fs.createWriteStream(this.exportFilePath);
+    this.yadamuLogger.info([this.DATABASE_VENDOR],`Writing file "${this.exportFilePath}".`)
 	this.outputStream.write(`{`)
   }
 
@@ -146,8 +148,14 @@ class FileDBI extends YadamuDBI {
     // this.yadamuLogger.trace([this.constructor.name],`finalizeImport()`)
 	this.outputStream.write('}');
   }
-  
+    
   async finalize() {
+    if (this.inputStream !== undefined) {
+      await this.closeInputStream()
+    }
+    if (this.outputStream !== undefined) {
+      await this.closeOutputStream()
+    }
   }
 
 
@@ -197,18 +205,26 @@ class FileDBI extends YadamuDBI {
   }
   
   getTableInfo(tableName) {
-	return { tableName: tableName}
+	
+    if (tableName === null) {
+	  // Hack to enable statisticsCollector to use the YadamuWriter interface to collect statistics about the cotnents of a YADAMU export file...
+      return {}
+    }
+	  
+    // Include a dummy dataTypes array of the correct length to ensure the column count assertion does not throw
+	return { 
+	  tableName : tableName
+    , dataTypes : new Array(this.metadata[tableName].dataTypes.length).fill(null)
+    }
   }
 
   getInputStream() {  
     // Return an Event Stream based on processing the inputStream with the JSONParser class
-  	const importFilePath = path.resolve(this.parameters.FILE);
-    const stats = fs.statSync(importFilePath)
+    const stats = fs.statSync(this.exportFilePath)
     const fileSizeInBytes = stats.size
-    this.yadamuLogger.info([this.DATABASE_VENDOR],`Processing file "${importFilePath}". Size ${fileSizeInBytes} bytes.`)
-    this.inputStream = fs.createReadStream(importFilePath);
+    this.yadamuLogger.info([this.DATABASE_VENDOR],`Processing file "${this.exportFilePath}". Size ${fileSizeInBytes} bytes.`)
     const jsonParser  = new JSONParser(this.yadamuLogger,this.parameters.MODE);
-    const eventManager = new EventManager(this.yadamuLogger)
+    const eventManager = new EventManager(this.yadamu)
 	this.eventStream = this.inputStream.pipe(jsonParser).pipe(eventManager)
 	return this.eventStream;
   }

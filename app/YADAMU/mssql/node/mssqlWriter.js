@@ -4,7 +4,6 @@ const { performance } = require('perf_hooks');
 const WKX = require('wkx');
 
 const YadamuWriter = require('../../common/yadamuWriter.js');
-const {BatchInsertError} = require('../../common/yadamuError.js')
 
 class MsSQLWriter extends YadamuWriter {
     
@@ -24,6 +23,7 @@ class MsSQLWriter extends YadamuWriter {
              return Buffer.from(col,'hex');
 		  }
           break;
+		case "binary":
         case "varbinary":
 		  return (col,idx) => {
              return Buffer.from(col,'hex');
@@ -145,15 +145,13 @@ class MsSQLWriter extends YadamuWriter {
 	return this.skipTable;
   }
 
-  handleBatchException(cause,message) {
+  handleBatchError(operation,cause) {
    
     const additionalInfo = {
-      columns: this.tableInfo.bulkOperation.columns
+      columnDefinitions: this.tableInfo.bulkOperation.columns
 	}
-	
-    const batchException = new BatchInsertError(cause,this.tableInfo.tableName,this.tableInfo.dml,this.tableInfo.bulkOperation.rows.length,this.tableInfo.bulkOperation.rows[0],this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1],additionalInfo)
-    this.yadamuLogger.handleWarning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],batchException)
 
+    super.handleBatchError(operation,cause,this.tableInfo.bulkOperation.rows[0],this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1],additionalInfo)
   }
   
   async writeBatch() {
@@ -161,7 +159,7 @@ class MsSQLWriter extends YadamuWriter {
     this.rowCounters.batchCount++;
       
     // ### Savepoint Support ?
-
+ 
     if (this.tableInfo.bulkSupported) {
       try {        
         await this.dbi.createSavePoint();
@@ -171,10 +169,10 @@ class MsSQLWriter extends YadamuWriter {
 		this.rowCounters.written += this.rowCounters.cached;
 		this.rowCounters.cached = 0;
         return this.skipTable
-      } catch (e) {
-        await this.dbi.restoreSavePoint(e);
-		this.handleBatchException(e,'Bulk Operation')
-        this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],` to Iterative mode.`);          
+      } catch (cause) {
+        this.handleBatchError(`INSERT MANY`,cause)
+        await this.dbi.restoreSavePoint(cause);
+		this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Switching to Iterative mode.`);          
         this.tableInfo.bulkSupported = false;
       }
     }
@@ -191,9 +189,8 @@ class MsSQLWriter extends YadamuWriter {
         }
         const results = await this.dbi.executeCachedStatement(args);
 		this.rowCounters.written++
-      } catch (e) {
-        const errInfo = [this.tableInfo.dml,JSON.stringify(this.tableInfo.bulkOperation.rows[row])]
-        await this.handleInsertError(`INSERT ONE`,this.tableInfo.bulkOperation.rows.length,row,this.tableInfo.bulkOperation.rows[row],e,errInfo);
+      } catch (cause) {
+        await this.handleIterativeError(`INSERT ONE`,cause,row,this.tableInfo.bulkOperation.rows[row]);
         if (this.skipTable) {
           break;
         }

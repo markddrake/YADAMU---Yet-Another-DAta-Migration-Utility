@@ -8,8 +8,8 @@ const DBReader = require('../common/dbReader.js');
 
 class DBReaderParallel extends DBReader {  
 
-  constructor(dbi,mode,status,yadamuLogger,options) {
-    super(dbi,mode,status,yadamuLogger,options); 
+  constructor(dbi,yadamuLogger,options) {
+    super(dbi,yadamuLogger,options); 
     this.dbi.sqlTraceTag = `/* Manager */`;	
   }
   
@@ -30,12 +30,12 @@ class DBReaderParallel extends DBReader {
 	          const task = tasks.shift();
   		      await this.pipelineTable(task,readerDBI,writerDBI)
             }
-		    readerDBI.releaseWorkerConnection()
-            writerDBI.releaseWorkerConnection()
+		    await readerDBI.releaseWorkerConnection()
+            await writerDBI.releaseWorkerConnection()
 		    resolve(idx)
 		  } catch(e) {
-			readerDBI.releaseWorkerConnection()
-            writerDBI.releaseWorkerConnection()
+			await readerDBI.releaseWorkerConnection()
+            await writerDBI.releaseWorkerConnection()
 		    resolve(e)
 		  }
 		})

@@ -57,11 +57,11 @@ const sqlInformationSchemaDirty  =
    ) c
   group by c.table_schema, c.table_name`;
 
-const sqlCreateSavePoint = `SAVEPOINT YadamuInsert`;
+const sqlCreateSavePoint  = `SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
 
-const sqlRestoreSavePoint = `ROLLBACK TO SAVEPOINT YadamuInsert`;
+const sqlRestoreSavePoint = `ROLLBACK TO SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
 
-const sqlReleaseSavePoint = `RELEASE SAVEPOINT YadamuInsert`;
+const sqlReleaseSavePoint = `RELEASE SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
 
 const CONNECTION_PROPERTY_DEFAULTS = {
   multipleStatements: true
@@ -150,7 +150,7 @@ class MySQLDBI extends YadamuDBI {
 	  this.traceTiming(sqlStartTime,performance.now())
       await this.checkMaxAllowedPacketSize()
 	} catch (e) {
-      throw new MySQLError(e,stack,operation);
+      throw this.captureException(new MySQLError(e,stack,operation))
     }
 	
 	
@@ -170,7 +170,7 @@ class MySQLDBI extends YadamuDBI {
         this.pool.getConnection((err,connection) => {
             this.traceTiming(sqlStartTime,performance.now())
             if (err) {
-		      reject(new MySQLError(err,stack,'mysql.Pool.getConnection()'));
+		      reject(this.captureException(new MySQLError(err,stack,'mysql.Pool.getConnection()')))
             }
             resolve(connection);
           }
@@ -197,8 +197,7 @@ class MySQLDBI extends YadamuDBI {
 		this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-  	    const err = new MySQLError(e,stack,'MySQL.Connection.release()')
-	    throw err;
+  	    throw this.captureException(new MySQLError(e,stack,'MySQL.Connection.release()'))
       }
 	}
   };
@@ -331,7 +330,7 @@ class MySQLDBI extends YadamuDBI {
                      async (err,results,fields) => {
                        const sqlEndTime = performance.now()
                        if (err) {
-         		         const cause = new MySQLError(err,stack,sqlStatement)
+         		         const cause = this.captureException(new MySQLError(err,stack,sqlStatement))
 		                 if (attemptReconnect && cause.lostConnection()) {
 						   attemptReconnect = false
 						   try {
@@ -504,7 +503,7 @@ class MySQLDBI extends YadamuDBI {
       await this.connection.beginTransaction();
 	  super.beginTransaction();
 	} catch (e) {
-      throw new MySQLError(e,stack,'mysql.Connection.beginTransaction()');
+      throw this.captureException(new MySQLError(e,stack,'mysql.Connection.beginTransaction()'))
 	} 
 
   }
@@ -529,7 +528,7 @@ class MySQLDBI extends YadamuDBI {
       await this.connection.commit();
 	  super.commitTransaction();
 	} catch (e) {
-      throw new MySQLError(e,stack,'mysql.Connection.commit()');
+      throw this.captureException(new MySQLError(e,stack,'mysql.Connection.commit()'))
 	} 
 
   }
@@ -559,8 +558,8 @@ class MySQLDBI extends YadamuDBI {
       await this.connection.rollback();
 	  super.rollbackTransaction();
 	} catch (e) {
-      const newIssue = new MySQLError(e,stack,'mysql.Connection.rollback()')
-	  this.checkCause(cause,newIssue)
+      const newIssue = this.captureException(new MySQLError(e,stack,'mysql.Connection.rollback()'))
+	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
 	}
   }
   
@@ -585,7 +584,7 @@ class MySQLDBI extends YadamuDBI {
       await this.executeSQL(sqlRestoreSavePoint);
 	  super.restoreSavePoint();
 	} catch (newIssue) {
-	  this.checkCause(cause,newIssue)
+	  this.checkCause('RESTORE SAVPOINT',cause,newIssue)
 	}
   }  
 
@@ -717,7 +716,7 @@ class MySQLDBI extends YadamuDBI {
   }
   
   streamingError(err,sqlStatement) {
-	 return new MySQLError(err,this.streamingStackTrace,sqlStatement)
+	 return this.captureException(new MySQLError(err,this.streamingStackTrace,sqlStatement))
   }
   
   async freeInputStream(tableInfo,inputStream) {
@@ -765,7 +764,7 @@ class MySQLDBI extends YadamuDBI {
 	    })
 		return is;
       } catch (e) {
-		const cause = new MySQLError(e,this.streamingStackTrace,sqlStatement)
+		const cause = this.captureException(new MySQLError(e,this.streamingStackTrace,sqlStatement))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

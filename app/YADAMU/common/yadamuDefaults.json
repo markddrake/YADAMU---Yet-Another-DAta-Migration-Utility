@@ -29,6 +29,8 @@
   , "MONGO_EXPORT_FORMAT"     : "ARRAY"
   , "MONGO_STRIP_ID"          : false
   , "SPATIAL_FORMAT"          : "GeoJSON"
+  , "DEFAULT_STRING_LENGTH"   : "32"
+  , "MAX_STRING_LENGTH"       : "16777216"
   }
 , "mssql"                     : {
     "DEFAULT_USER"            : "dbo"

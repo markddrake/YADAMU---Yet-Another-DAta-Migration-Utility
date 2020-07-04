@@ -389,23 +389,11 @@ begin
           return lower(V_DATA_TYPE);
       end case;
 	when 'MongoDB' then
-      -- MongoDB typing based on JSON Typing and the Javascript TypeOf Operator
-      -- ### Todo MongoDB typing based on BSON ?
+      -- MongoDB typing based on aggregation $type operator and BSON type
+	  -- ### No support for depricated Data types undefined, dbPointer, symbol
       case V_DATA_TYPE
-        when 'undefined' then
-		  return V_JSON_TYPE;
-        when 'object' then
-		  return V_JSON_TYPE;
-        when 'function' then
-		  return V_JSON_TYPE;
-        when 'symbol' then
-		  return V_JSON_TYPE;
-		when 'ObjectId' then
-	      return 'bytea';
-        when 'boolean' then
-           return 'boolean';
-        when 'number' then
-           return 'numeric';
+        when 'double' then
+           return 'double precision';
         when 'string' then
           case
 		    when P_DATA_TYPE_LENGTH = -1 then
@@ -415,8 +403,38 @@ begin
 			else
 			  return 'text';
           end case;
-        when 'bigint' then
+        when 'object' then
+		  return C_JSON_TYPE;
+        when 'array' then
+		  return C_JSON_TYPE;
+        when 'binData' then
+		  return 'bytea';
+		when 'objectId' then
+	      return 'bytea';
+        when 'boolean' then
+           return 'bool';
+        when 'null' then
+           return 'character varying(2048)';
+        when 'regex' then
+           return 'character varying(4000)';
+        when 'javascript' then
+           return 'text';
+        when 'javascriptWithScope' then
+           return 'text';
+        when 'int' then
+           return 'int';
+        when 'long' then
            return 'bigint';
+        when 'decimal' then
+           return 'numeric';
+        when 'date' then
+           return 'timestamp';
+        when 'timestamp' then
+           return 'timestamp';
+        when 'minkey' then
+		  return C_JSON_TYPE;
+        when 'maxkey' then
+		  return C_JSON_TYPE;
         else 
            return lower(P_DATA_TYPE);
       end case;    

@@ -179,14 +179,7 @@ class StatementGenerator {
          break;
        case 'MongoDB':
          switch (dataType) {
-           case "undefined":
-		   case "object":
-		   case "function":
-		   case "symbol":
-		     return 'json';
-		   case "ObjectId":
-		     return "binary(12)";
-		   case "boolean":
+			case "double":
 		     return 'boolean';
            case "string":
 		     switch (true) {
@@ -195,8 +188,36 @@ class StatementGenerator {
                case (dataTypeLength > 65535):       return 'mediumtext';
                default:                             return 'varchar';
              }
-		   case "bigint":
-             return "bigint";
+		   case "object":
+		   case "array":
+		     return 'JSON';
+		   case "binData":
+		     return 'longblob';
+		   case "objectId":
+		     return "binary(12)";
+		   case "bool":
+		     return 'boolean';
+           case "null":
+		     return 'varchar(128)';
+           case "regex":
+		     return 'varchar(256)';
+           case "javascript":
+		     return 'longtext';
+		   case "javascriptWithScope":
+		     return 'longtext';
+		   case "int":
+		     return 'int';
+		   case "long":
+		     return 'bigint';
+		   case "decimal":
+		     return 'decimal';
+		   case "timestamp":
+		     return 'datetime(6)';
+		   case "date":
+		     return 'datatime(6)';
+		   case "minkey":
+		   case "maxkey":
+             return "JSON";
            default:
              return dataType.toLowerCase();
 		 }
@@ -313,6 +334,7 @@ class StatementGenerator {
     return { 
        ddl             : createStatement, 
        dml             : insertStatement, 
+	   columns         : columnNames,
        targetDataTypes : targetDataTypes, 
        insertMode      : insertMode,
        batchSize       : this.batchSize, 

@@ -34,14 +34,27 @@ class ConnectionError extends UserError {
 }
 
 class BatchInsertError extends Error {
-  constructor(cause,tableName,sql,batchSize,firstRow,lastRow,additionalInfo) {
+  constructor(cause,tableName,batchSize,firstRow,lastRow,info) {
 	super(cause.message)
 	this.cause = cause
     this.tableName = tableName
-	this.sql = sql,
-	this.rows = [firstRow,`\n...\n`,lastRow]
-	if (typeof additionalInfo === 'object') {
-	  Object.assign(this,additionalInfo)
+	this.batchSize = batchSize
+	this.rows = [firstRow,lastRow]
+	if (typeof info === 'object') {
+	  Object.assign(this,info)
+    }
+  }
+}
+
+class IterativeInsertError extends Error {
+  constructor(cause,tableName,batchSize,rowNumber,row,info) {
+	super(cause.message)
+	this.cause = cause
+    this.tableName = tableName
+    this.rowNumber = `${rowNumber} of ${batchSize}`
+	this.row = row
+	if (typeof info === 'object') {
+	  Object.assign(this,info)
     }
   }
 }
@@ -96,6 +109,7 @@ module.exports = {
   YadamuError
 , UserError
 , BatchInsertError
+, IterativeInsertError
 , DatabaseError
 , CommandLineError  
 , ConfigurationFileError

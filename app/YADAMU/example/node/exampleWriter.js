@@ -66,7 +66,10 @@ class ExampleWriter extends YadamuWriter {
 
   }
     
-      
+  handleBatchError(operation,cause) {
+   	super.handleBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+  }
+       
   async writeBatch() {
 	  
 	/*
@@ -89,9 +92,9 @@ class ExampleWriter extends YadamuWriter {
         this.rowCounters.written += this.rowCounters.cached;
 		this.rowCounters.cached = 0;
         return this.skipTable
-      } catch (e) {
-        await this.dbi.restoreSavePoint(e);
-		this.handleBatchException(e,'Batch Insert')
+      } catch (cause) {
+        await this.dbi.restoreSavePoint(cause);
+		this.handleBatchException(`INSERT MANY`,cause)
         this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
         
@@ -102,9 +105,9 @@ class ExampleWriter extends YadamuWriter {
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,batch[row]);
    	    this.rowCounters.written++
-      } catch (e) {
-        const errInfo = [this.tableInfo.dml]
-        await this.handleInsertError(`INSERT ONE`,this.rowCounters.cached,row,batch[row],e,errInfo);
+      } catch (cause) {
+        const errInfo = {}
+        await this.handleIterativeError(`INSERT ONE`,cause,row,batch[row],errInfo);
         if (this.skipTable) {
           break;
         }

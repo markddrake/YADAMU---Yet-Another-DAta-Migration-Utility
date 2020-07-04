@@ -15,11 +15,12 @@ class PostgresError extends DatabaseError {
   }
 
   lostConnection() {
-	return ((this.cause.severity && (this.cause.severity === 'FATAL')) && (this.cause.code && (this.cause.code === '57P01')) || ((this.cause.name === 'Error') && (this.cause.message === 'Connection terminated unexpectedly')))
+	const knownErrors = ['Connection terminated unexpectedly','Client has encountered a connection error and is not queryable']
+	return ((this.cause.severity && (this.cause.severity === 'FATAL')) && (this.cause.code && (this.cause.code === '57P01')) || ((this.cause.name === 'Error') && (knownErrors.indexOf(this.cause.message) > -1)))
   }
   
   serverUnavailable() {
-	const knownErrors = ['Connection terminated unexpectedly']
+	const knownErrors = ['Connection terminated unexpectedly','Client has encountered a connection error and is not queryable']
     return (this.cause.message && (knownErrors.indexOf(this.cause.message) > -1))
   }
 

@@ -21,15 +21,15 @@ const PostgresParser = require('./postgresParser.js');
 const PostgresWriter = require('./postgresWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 
-const sqlGenerateQueries = `select EXPORT_JSON($1,$2)`;
+const sqlGenerateQueries   = `select EXPORT_JSON($1,$2)`;
 
 const sqlSystemInformation = `select current_database() database_name,current_user,session_user,current_setting('server_version_num') database_version`;					   
 
-const sqlCreateSavePoint = `SAVEPOINT YadamuInsert`;
+const sqlCreateSavePoint   =  `SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
 
-const sqlRestoreSavePoint = `ROLLBACK TO SAVEPOINT YadamuInsert`;
+const sqlRestoreSavePoint  = `ROLLBACK TO SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
 
-const sqlReleaseSavePoint = `RELEASE SAVEPOINT YadamuInsert`;
+const sqlReleaseSavePoint  = `RELEASE SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
 
 
 class PostgresDBI extends YadamuDBI {
@@ -65,7 +65,7 @@ class PostgresDBI extends YadamuDBI {
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  // const pgErr = new PostgresError(err,this.postgresStack,this.postgressOperation)
+	  // const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))
       // yadamuLogger.logException([`${databaseVendor}`,`Client.onError()`],pgErr);
       // throw pgErr
     })
@@ -88,7 +88,7 @@ class PostgresDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
-	  throw new PostgresError(e,stack,'pg.Pool.connect()')
+	  throw this.captureException(new PostgresError(e,stack,'pg.Pool.connect()'))
 	}
   }
 
@@ -112,7 +112,7 @@ class PostgresDBI extends YadamuDBI {
     
 	  this.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
-      throw new PostgresException(e,stack,operation);
+      throw this.captureException(new PostgresException(e,stack,operation))
 	}
     await configureConnection();
   }
@@ -125,7 +125,7 @@ class PostgresDBI extends YadamuDBI {
     this.connection.on('error',(err, p) => {
         // yadamuLogger.info([`${databaseVendor}`,`Connection.onError()`],err.message);
    	    // Do not throw errors here.. Node will terminate immediately
-   	    // const pgErr = new PostgresError(err,this.postgresStack,this.postgressOperation)  
+   	    // const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))  
         // throw pgErr
       }
 	)
@@ -145,13 +145,13 @@ class PostgresDBI extends YadamuDBI {
 	)  
   
     const setTimezone = `set timezone to 'UTC'`
-	this.executeSQL(setTimezone);
+	await this.executeSQL(setTimezone);
 
     const setFloatPrecision = `set extra_float_digits to 3`
-	this.executeSQL(setFloatPrecision);
+	await this.executeSQL(setFloatPrecision);
 
     const setIntervalFormat =  `SET intervalstyle = 'iso_8601';`;
-	this.executeSQL(setIntervalFormat);
+	await this.executeSQL(setIntervalFormat);
 					
   }
 
@@ -167,7 +167,7 @@ class PostgresDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-		const err = new PostgresError(e,stack,'Client.release()');
+		const err = this.captureException(new PostgresError(e,stack,'Client.release()'))
 		throw err
       }
 	}
@@ -185,7 +185,7 @@ class PostgresDBI extends YadamuDBI {
         this.pool = undefined
   	  } catch (e) {
         this.pool = undefined
-	    throw new PostgresError(e,stack,'pg.Pool.close()')
+	    throw this.captureException(new PostgresError(e,stack,'pg.Pool.close()'))
 	  }
 	}
   }
@@ -248,7 +248,7 @@ class PostgresDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = new PostgresError(e,stack,sqlStatement);
+		const cause = this.captureException(new PostgresError(e,stack,sqlStatement))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -343,7 +343,7 @@ class PostgresDBI extends YadamuDBI {
       await this.executeSQL(sqlStatement);
       super.rollbackTransaction()
 	} catch (newIssue) {
-	  this.checkCause(cause,newIssue);								   
+	  this.checkCause('ROLBACK TRANSACTION',cause,newIssue);								   
 	}
   }
 
@@ -374,7 +374,7 @@ class PostgresDBI extends YadamuDBI {
       await this.executeSQL(sqlRestoreSavePoint);
       super.restoreSavePoint();
 	} catch (newIssue) {
-	  this.checkCause(cause,newIssue);
+	  this.checkCause('RESTORE SAVEPOINT',cause,newIssue);
 	}
   }  
 
@@ -603,7 +603,7 @@ class PostgresDBI extends YadamuDBI {
   }
   
   streamingError(e,sqlStatement) {
-    return new PostgresError(e,this.streamingStackTrace,sqlStatement)
+    return this.captureException(new PostgresError(e,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(tableInfo) {        
@@ -617,7 +617,7 @@ class PostgresDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
         return await this.executeSQL(queryStream)   
       } catch (e) {
-		const cause = new PostgresError(e,this.streamingStackTrace,sqlStatement);
+		const cause = this.captureException(new PostgresError(e,this.streamingStackTrace,sqlStatement))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

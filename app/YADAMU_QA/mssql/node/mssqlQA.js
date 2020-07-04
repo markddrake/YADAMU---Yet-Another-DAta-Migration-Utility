@@ -1,7 +1,7 @@
 "use strict" 
 
 const MsSQLDBI = require('../../../YADAMU/mssql/node/mssqlDBI.js');
-const {MsSQLError} = require('../../../YADAMU/common/yadamuError.js')
+const MsSQLError = require('../../../YADAMU/mssql/node/mssqlError.js')
 
 const sqlSchemaTableRows = `SELECT sOBJ.name AS [TableName], SUM(sPTN.Rows) AS [RowCount] 
    FROM sys.objects AS sOBJ 
@@ -67,8 +67,8 @@ class MsSQLQA extends MsSQLDBI {
   		       const res = await request.query(sqlStatement);
 			 } catch (e) {
 			   if (e.number && (e.number === 6104)) {
-				 // The Slave has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourthis (Error 27)
-			     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Slave finished prior to termination.`)
+				 // The Worker has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourthis (Error 27)
+			     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Worker finished prior to termination.`)
  			   }
 			   else {
 				 const cause = new MsSQLError(e,stack,sqlStatement)

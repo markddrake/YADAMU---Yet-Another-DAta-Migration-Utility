@@ -1,59 +1,84 @@
 "use strict"   
-const fs = require('fs')
-const fsp = require('fs').promises;
-const path = require('path')
-const assert = require('assert')
+
+const fs = require('fs');
+const path = require('path');
+
+const DBWriter = require('./dbWriter.js');
+const YadamuLogger = require('./yadamuLogger.js');
+const FileDBI = require('../file/node/fileDBI.js');
 
 class YadamuRejectManager {
+  
+  constructor(yadamu,usage,filename) {
 
-  constructor(filename,yadamuLogger) {
+    this.usage = usage
     this.filename = filename;
-    this.yadamuLogger  = yadamuLogger;
-    this.tableName = undefined;
-    this.ws = undefined;
-    this.seperator = undefined;
-    this.recordCount = 0;
+	this.yadamuLogger =  yadamu.getYadamuLogger()
+	this.dbi = new FileDBI(yadamu,filename)
+	this.dbi.initialize()
+	// Use a NULL Logger in production
+    // const logger = this.yadamuLogger
+	const logger = new YadamuLogger(fs.createWriteStream("\\\\.\\NUL"),{});
+    this.writer = new DBWriter(this.dbi,logger);  
+	this.ddlComplete = new Promise((resolve,reject) => {
+	  this.writer.once('ddlComplete',() => {
+ 	    resolve(true);
+	  })
+	})
+	this.recordCount = 0
+	this.tableWriter = undefined
   }
   
-  createLogFile(filename) {
-    const fileLocation = path.dirname(filename);
-    fs.mkdirSync(fileLocation, { recursive: true });
-    const ws = fs.createWriteStream(filename);
-    return ws;
+  setSystemInformation(systemInformation) {
+	this.systemInformation = systemInformation
   }
-   
-  addTableName(tableName) {
-    if (this.tableName !== tableName) {
-      if (this.tableName) {
-        this.ws.write(`],`);
-      }
-      this.ws.write(`"${tableName}" : [`)
-      this.tableName = tableName
-      this.seperator = '';
-    }
-  }    
-   
-  rejectRow(tableName,data) {
+  
+  setMetadata(metadata) {
+	this.metadata = metadata
+  }
+  
+  async rejectRow(tableName,data) {
 
-    if (this.ws === undefined) {
-      this.ws = this.createLogFile(this.filename);
-      this.ws.write(`{ "errors": {`)
-    }
-    
-    this.addTableName(tableName);
-    
-    this.ws.write(`${this.seperator}${JSON.stringify(data)}`);
-    this.seperator = ',';
+	if (this.recordCount === 0) {
+      const errorFolderPath = path.dirname(this.filename);
+      fs.mkdirSync(errorFolderPath, { recursive: true });
+      await this.writer.initialize()    
+      this.writer.write({systemInformation: this.systemInformation})
+	  this.writer.write({metadata: this.metadata})
+	  this.writer.write({pause:true})
+	  await this.ddlComplete
+	  this.tableWriter = this.dbi.getOutputStream(tableName)
+	}
+	else {
+	  if (tableName !== this.tableWriter.tableName) {
+    	await new Promise((resolve,reject) => {
+		  this.tableWriter.end(null,null,() => {
+            resolve()
+          })
+        })		
+		this.tableWriter = this.dbi.getOutputStream(tableName)
+	  }
+	}
+    this.tableWriter.write({data: data})
     this.recordCount++;
-     
   }
   
-  close() {
-    if (this.recordCount > 0) {
-      this.yadamuLogger.warning([`REJECTIONS`],`${this.recordCount} records written to "${this.ws.path}"`)
-      this.ws.write(`]}}`);0
-      this.ws.close();
-    }
+  async close() {
+	if (this.recordCount > 0) {
+      await new Promise((resolve,reject) => {
+		this.tableWriter.end(null,null,() => {
+          resolve()
+        })
+      })		
+	  this.writer.deferredCallback();	
+	  await new Promise((resolve,reject) => {
+	    this.writer.end(null,null,() => {
+          resolve()
+        })
+      })		
+	  await this.dbi.finalize()    
+      this.yadamuLogger.info([this.usage],`${this.recordCount} records written to "${this.filename}"`)
+	}
   }
 }
     

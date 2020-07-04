@@ -404,11 +404,9 @@ exception
     RAISE;
 end;`
 
-const sqlCreateSavePoint = 
-`SAVEPOINT BATCH_INSERT`;
+const sqlCreateSavePoint  = `SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
 
-const sqlRestoreSavePoint = 
-`ROLLBACK TO BATCH_INSERT`;
+const sqlRestoreSavePoint = `ROLLBACK TO ${YadamuDBI.SAVE_POINT_NAME}`;
 
   
 class OracleDBI extends YadamuDBI {
@@ -466,8 +464,7 @@ class OracleDBI extends YadamuDBI {
       // this.yadamuLogger.trace([this.DATABASE_VENDOR],'Pool Created');
       this.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
-	  const err = new OracleError(e,stack,'Oracledb.createPool()')
-	  throw err;
+	  throw this.captureException(new OracleError(e,stack,'Oracledb.createPool()'))
 	}
   }
   
@@ -490,8 +487,7 @@ class OracleDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
 	  return connection
     } catch (e) {
-	  const err = new OracleError(e,stack,'Oracledb.Pool.getConnection()')
-	  throw err;
+	  throw this.captureException(new OracleError(e,stack,'Oracledb.Pool.getConnection()'))
 	}
 	
   }
@@ -506,7 +502,6 @@ class OracleDBI extends YadamuDBI {
   async closeConnection() {
 	  
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && (typeof this.connection.close === 'function'))})`)
-	// console.log(new Error().stack)
 	
 	if (this.connection !== undefined && (typeof this.connection.close === 'function')) {
       let stack;
@@ -516,7 +511,7 @@ class OracleDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-  	    throw new OracleError(e,stack,'Oracledb.Connection.close()')
+  	    throw this.captureException(new OracleError(e,stack,'Oracledb.Connection.close()'))
 	  }
 	}
   };
@@ -539,7 +534,7 @@ class OracleDBI extends YadamuDBI {
         this.pool = undefined
       } catch (e) {
         this.pool = undefined
-	    throw new OracleError(e,stack,'Oracledb.Pool.close()')
+	    throw this.captureException(new OracleError(e,stack,'Oracledb.Pool.close()'))
       }
     }
   }  
@@ -558,8 +553,7 @@ class OracleDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
 	  return lob;
    	} catch (e) {
-	  const err = new OracleError(e,stack,`Oracledb.Connection.createLob()`,{},{})
-	  throw err
+	  throw this.captureException(new OracleError(e,stack,`Oracledb.Connection.createLob()`))
     }
   }
 
@@ -578,7 +572,7 @@ class OracleDBI extends YadamuDBI {
   			const cause = new OracleError(e,stack,'Oracledb.lob.close(CLOB)')
 			this.yadamuLogger.handleException(cause);
 		  }
-          reject(err instanceof OracleError ? err : new OracleError(err,stack,'Oracledb.Lob(CLOB).onError()',{},{}));
+		  reject(this.captureException(err instanceof OracleError ? err : new OracleError(err,stack,'Oracledb.Lob(CLOB).onError()')))
         });
         
         stringWriter.on('finish',async () => {
@@ -593,7 +587,7 @@ class OracleDBI extends YadamuDBI {
 		
         clob.pipe(stringWriter);
       } catch (err) {
-        reject(err instanceof OracleError ? err : new OracleError(err,stack,'Oracledb.Lob(CLOB).pipe()',{},{}));
+		reject(this.captureException(err instanceof OracleError ? err : new OracleError(err,stack,'Oracledb.Lob(CLOB).pipe()')))
       }
     });
   };
@@ -619,7 +613,7 @@ class OracleDBI extends YadamuDBI {
 			const cause = new OracleError(e,stack,'Oracledb.lob.close(BLOB)')
 			this.yadamuLogger.handleException(cause);
 		  }
-          reject(err instanceof OracleError ? err : new OracleError(err,stack,'Oracledb.Lob(BLOB).onError()',{},{}));
+    	  reject(this.captureException(err instanceof OracleError ? err : new OracleError(err,stack,'Oracledb.Lob(BLOB).onError()')))
         });
           
         bufferWriter.on('finish',async () => {
@@ -634,7 +628,7 @@ class OracleDBI extends YadamuDBI {
         
         blob.pipe(bufferWriter);
       } catch (err) {
-        reject(e instanceof OracleError ? e : new OracleError(e,stack,'Oracledb.Lob(BLOB).pipe()',{},{}))
+     	reject(this.captureException(err instanceof OracleError ? err : new OracleError(e,stack,'Oracledb.Lob(BLOB).pipe()')))
       }
     });
   };
@@ -654,20 +648,18 @@ class OracleDBI extends YadamuDBI {
         const blob =  await this.createLob(oracledb.BLOB);
         
 		blob.on('error', (err) => {
-			reject(e instanceof OracleError ? e : new OracleError(e,stack,'Oracledb.Lob(BLOB).pipe()',{},{}));
-	    });
-		
-        blob.on('finish', 
-		  () => {resolve(blob);
+		  reject(this.captureException(e instanceof OracleError ? e : new OracleError(e,stack,'Oracledb.Lob(BLOB).pipe()')))
+	    }).on('finish', () => {
+		  resolve(blob);
 		});
 		
-        stream.on('error',
-		  (err) =>{reject(err);
+        stream.on('error',(err) => {
+	      reject(err);
 		});
 		
 	    stream.pipe(blob);  // copies the text to the temporary LOB
 	  } catch (e) {
-	    reject(e instanceof OracleError ? e : new OracleError(e,stack,'Oracledb.Lob(BLOB).pipe()',{},{}))	  
+		reject(this.captureException(e instanceof OracleError ? e : new OracleError(e,stack,'Oracledb.Lob(BLOB).pipe()')))
 	  }
     });  
   };
@@ -703,13 +695,17 @@ class OracleDBI extends YadamuDBI {
     return new Promise(async (resolve,reject) => {
       try {
         const blob = await this.createLob(oracledb.BLOB);
-        blob.on('error',(err) =>{reject(new OracleError(err,stack,'Oracledb.Lob(BLOB).onError()',{},{}));});
-        blob.on('finish', () => {resolve(blob)});
+        blob.on('error',(err) => {
+		  reject(this.captureException(reject,new OracleError(err,stack,'Oracledb.Lob(BLOB).onError()')))
+		}).on('finish', () => {
+	      resolve(blob)
+		});
+		
         r.on('error', (err) =>{reject(err);});
         r.pipe(hexBinToBinary).pipe(blob);  // copies the text to the temporary LOB
       }
       catch (e) {
-        reject(e instanceof OracleError ? e : new OracleError(e,stack,'Oracledb.Lob(BLOB).pipe()',{},{}))	  
+		reject(this.captureException(e instanceof OracleError ? e : new OracleError(e,stack,'Oracledb.Lob(BLOB).pipe()')))
       }
     });  
   }
@@ -727,13 +723,17 @@ class OracleDBI extends YadamuDBI {
     return new Promise(async (resolve,reject) => {
       try {
         const clob = await this.createLob(oracledb.CLOB);
-		clob.on('error',(err) =>{reject(new OracleError(err,stack,'Oracledb.Lob(BLOB).onError()',{},{}));});
-		clob.on('finish',() => {resolve(clob)});
+		clob.on('error',(err) => {
+		  reject(this.captureException(new OracleError(err,stack,'Oracledb.Lob(BLOB).onError()')))
+		}).on('finish',() => {
+		  resolve(clob)
+		});
+		
 		s.on('error',(err) =>{reject(err);});
 		s.pipe(clob);  // copies the text to the temporary LOB
       }
       catch (e) {
-	    reject(e instanceof OracleError ? e : new OracleError(e,stack,'Oracledb.Lob(CLOB).pipe()',{},{}))	  
+		reject(this.captureException(e instanceof OracleError ? e : new OracleError(e,stack,'Oracledb.Lob(CLOB).pipe()')))
 	  }
     });  
   }
@@ -909,8 +909,8 @@ class OracleDBI extends YadamuDBI {
             await this.setCurrentSchema(this.parameters.TO_USER)
 		    await this.setDateFormatMask(this.connection,this.status,this.systemInformation.vendor);
 		    continue;
-          }
-          throw cause
+          }		  	  
+		  throw this.captureException(cause)
         }      
       } 
 	}
@@ -947,7 +947,7 @@ class OracleDBI extends YadamuDBI {
 		  await this.setDateFormatMask(this.connection,this.status,this.systemInformation.vendor);
 		  continue;
         }
-        throw cause		  
+        throw this.captureException(cause)
       }      
     } 
   }  
@@ -1250,8 +1250,7 @@ class OracleDBI extends YadamuDBI {
   	  this.traceTiming(sqlStartTime,performance.now())
 	  super.commitTransaction()
 	} catch (e) {
-	  const err = new OracleError(e,stack,`Oracledb.Transaction.commit()`,{},{})
-	  throw err;
+	  throw this.captureException(new OracleError(e,stack,`Oracledb.Transaction.commit()`))
 	}
   }
 
@@ -1282,8 +1281,8 @@ class OracleDBI extends YadamuDBI {
   	  this.traceTiming(sqlStartTime,performance.now())
 	  super.rollbackTransaction()
 	} catch (e) {
-	  let newIssue = new OracleError(e,stack,`Oracledb.Transaction.rollback()`,{},{})
-	  this.checkCause(cause,newIssue)
+	  const newIssue = this.captureException(new OracleError(e,stack,`Oracledb.Transaction.rollback()`))
+	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
 	}	
   }
   
@@ -1308,7 +1307,7 @@ class OracleDBI extends YadamuDBI {
 	  await this.executeSQL(sqlRestoreSavePoint,[]);
 	  super.restoreSavePoint()
 	} catch (newIssue) {
-	  this.checkCause(cause,newIssue)
+	  this.checkCause('RESTORE SAVPOINT',cause,newIssue)
 	}
   }
 
@@ -1620,8 +1619,8 @@ class OracleDBI extends YadamuDBI {
     return new OracleParser(tableInfo,objectMode,this.yadamuLogger); 
   }  
   
-  streamingError(e,sqlStatement) {
-	return new OracleError(e,this.streamingStackTrace,sqlStatement,{},{})
+  streamingError(cause,sqlStatement) {
+	return this.captureException(new OracleError(cause,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(tableInfo,parser) {

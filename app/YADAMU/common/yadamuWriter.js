@@ -1,9 +1,11 @@
 "use strict"
 
+const assert = require('assert').strict;
 const Writable = require('stream').Writable
 const { performance } = require('perf_hooks');
 
 const YadamuLibrary = require('./yadamuLibrary.js');
+const {BatchInsertError,IterativeInsertError} = require('./yadamuError.js')
 
 class YadamuWriter extends Writable {
 
@@ -14,7 +16,7 @@ class YadamuWriter extends Writable {
     this.status = status;
     this.yadamuLogger = yadamuLogger;    
 	this.maxErrors =  this.dbi.parameters.MAX_ERRORS ? this.dbi.parameters.MAX_ERRORS : 10
-    this.rejectManager = this.dbi.yadamu.rejectManager
+    this.rejectionManager = this.dbi.yadamu.rejectionManager
     this.configureFeedback(this.dbi.parameters.FEEDBACK); 	
 	
 	this.tableName = tableName  
@@ -69,13 +71,25 @@ class YadamuWriter extends Writable {
   }
   
   commitWork() {
-    return (this.rowCounters.written >= this.tableInfo.commitSize);
+    return ((this.rowCounters.written >= this.tableInfo.commitSize) && !this.skipTable)
   }
 
   hasPendingRows() {
-    return this.rowCounters.cached > 0;
+    return ((this.rowCounters.cached > 0) && !this.skipTable)
   }
-                 
+              
+
+  async checkColumnCount(row){
+	try {
+      assert.strictEqual(this.tableInfo.dataTypes.length,row.length,`Table ${this.tableName}. Incorrect number of columns supplied.`)
+	} catch (cause) {
+	  const info = {
+		columns: this.tableInfo.columns
+	  }
+	  await this.handleIterativeError('CACHE',cause,this.rowCounters.received+1,row,info);
+	}
+  }
+			  
   cacheRow(row) {
 
     // Apply transformations and cache transformed row.
@@ -111,7 +125,7 @@ class YadamuWriter extends Writable {
         return this.skipTable
       } catch (e) {
         await this.dbi.restoreSavePoint(e);
-		this.handleBatchException(e,'Batch Insert')
+		this.handleBatchError(`INSERT MANY`,e,this.batch[0],this.batch[this.batch.length-1])
         this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
         
@@ -122,9 +136,9 @@ class YadamuWriter extends Writable {
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,batch[row]);
    	    this.rowCounters.written++
-      } catch (e) {
-        const errInfo = [this.tableInfo.dml]
-        await this.handleInsertError(`INSERT ONE`,this.rowCounters.cached,row,batch[row],e,errInfo);
+      } catch (cause) {
+        const errInfo = {}
+        await this.handleIterativeError(`INSERT ONE`,cause,row,batch[row],errInfo);
         if (this.skipTable) {
           break;
         }
@@ -156,20 +170,63 @@ class YadamuWriter extends Writable {
   	  await this.dbi.rollbackTransaction(cause)
   }
 
-  rejectRow(tableName,row) {
-    // Allows the rejection process to be overridden by a particular driver.
-    this.rejectManager.rejectRow(tableName,row);
+  createBatchException(cause,batchSize,firstRow,lastRow,info) {
+
+    const details = {
+	  currentSettings        : {
+	    yadamu               : this.dbi.yadamu
+	  , systemInformation    : this.dbi.systemInformation
+	  , metadata             : { 
+	      [this.tableName]   : this.dbi.metadata[this.tableName]
+	    }
+	  }
+	, columns              : this.tableInfo.columns
+	, dataTypes            : this.tableInfo.dataTypes 
+	}
+    Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
+    return new BatchInsertError(cause,this.tableName,batchSize,this.dbi.columnsToJSON(firstRow),this.dbi.columnsToJSON(lastRow),details)
   }
   
-  async handleInsertError(currentOperation,batchSize,row,record,err,info) {
-    this.rowCounters.skipped++;
-    this.rejectRow(this.tableInfo.tableName,record);
-    this.yadamuLogger.logRejected([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,currentOperation,batchSize,row],err);
+  createIterativeException(cause,batchSize,rowNumber,row,info) {
+    // String to Object conversion takes place in the handleIterativeError since the JSON record is written to the Rejected Records file
+    const details = {
+	  currentSettings        : {
+	    yadamu               : this.dbi.yadamu
+	  , systemInformation    : this.dbi.systemInformation
+	  , metadata             : { 
+	      [this.tableName]   : this.dbi.metadata[this.tableName]
+	    }
+	  }
+	, columns              : this.tableInfo.columns
+	, dataTypes            : this.tableInfo.dataTypes 
+	}
+    Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
+    return new IterativeInsertError(cause,this.tableName,batchSize,rowNumber,row,details)
+  }
+  	
+  async rejectRow(tableName,row) {
+    // Allows the rejection process to be overridden by a particular driver.
+    await this.rejectionManager.rejectRow(tableName,row);
+  }
+  
+  async handleIterativeError(operation,cause,rowNumber,record,info) {
+	  
+	this.rowCounters.skipped++;
+	record = this.dbi.columnsToJSON(record)
+    await this.rejectRow(this.tableName,record);
+
+	const iterativeError = this.createIterativeException(cause,this.rowCounters.cached,rowNumber,record,info)
+    this.yadamuLogger.logRejected([this.dbi.DATABASE_VENDOR,this.tableName,operation,this.rowCounters.cached,rowNumber],iterativeError);
 
     if (this.rowCounters.skipped === this.maxErrors) {
-      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
+      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
       this.skipTable = true;
     }
+  }
+
+  handleBatchError(operation,cause,firstRow,lastRow,info) {
+    const batchException = this.createBatchException(cause,this.rowCounters.cached,firstRow,lastRow,info)
+    this.yadamuLogger.handleWarning([this.dbi.DATABASE_VENDOR,this.tableName,operation,this.insertMode,this.rowCounters.cached],batchException)
   }
   
   getStatistics() {
@@ -184,7 +241,6 @@ class YadamuWriter extends Writable {
   }
 
   async finalize() {
-	this.dbi.currentTable = undefined;
     return !this.skipTable
   }
 
@@ -216,8 +272,8 @@ class YadamuWriter extends Writable {
   }
   
   async processRow(data) {
-    // console.log(new Date().toISOString(),`${this.constructor.name}._write`,action,this.skipTable);
-  	this.cacheRow(data)
+	await this.checkColumnCount(data)
+  	await this.cacheRow(data)
     this.rowCounters.received++;
     if ((this.rowCounters.received % this.feedbackInterval === 0) & !this.batchComplete()) {
       this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows buffered: ${this.batchRowCount()}.`);
@@ -314,7 +370,7 @@ class YadamuWriter extends Writable {
 	  await this.flushCache()
       callback();
     } catch (e) {
-      this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`"${this.currentTable}"`],e);
+      this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`"${this.tableName}"`],e);
 	  // Passing the exception to callback triggers the onError() event
       callback(e);
     } 

@@ -66,14 +66,14 @@ class Yadamu {
     const rejectFolderPath = this.parameters.REJECT_FOLDER ? YadamuLibrary.pathSubstitutions(this.parameters.REJECT_FOLDER) : 'rejections';
     const rejectFileName = this.parameters.REJECT_FILE_PREFIX ? YadamuLibrary.pathSubstitutions(this.parameters.REJECT_FILE_PREFIX) : 'rejections';
     const rejectFile = path.resolve(`${rejectFolderPath}${path.sep}${rejectFileName}_${new Date().toISOString().replace(/:/g,'.')}.json`);
-    return new YadamuRejectManager(rejectFile,this.yadamuLogger);
+    return new YadamuRejectManager(this,'REJECTIONS',rejectFile);
   }
    
   createWarningManager() {
     const rejectFolderPath = this.parameters.REJECT_FOLDER ? YadamuLibrary.pathSubstitutions(this.parameters.REJECT_FOLDER) : 'rejections';
     const rejectFileName = this.parameters.REJECT_FILE_PREFIX ? YadamuLibrary.pathSubstitutions(this.parameters.REJECT_FILE_PREFIX) : 'warnings';
     const rejectFile = path.resolve(`${rejectFolderPath}${path.sep}${rejectFileName}_${new Date().toISOString().replace(/:/g,'.')}.json`);
-    return new YadamuRejectManager(rejectFile,this.yadamuLogger);
+    return new YadamuRejectManager(this,'WARNINGS',rejectFile);
   }
 
   reportStatus(status,yadamuLogger) {
@@ -492,13 +492,13 @@ class Yadamu {
   }
 
   async getDBReader(dbi,parallel) {
-	const dbReader = parallel ? new DBReaderParallel(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger) : new DBReader(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
+	const dbReader = parallel ? new DBReaderParallel(dbi, this.yadamuLogger) : new DBReader(dbi, this.yadamuLogger);
 	await dbReader.initialize();
     return dbReader;
   }
   
   async getDBWriter(dbi,parallel) {
-	const dbWriter = new DBWriter(dbi, dbi.parameters.MODE, this.status, this.yadamuLogger);
+	const dbWriter = new DBWriter(dbi, this.yadamuLogger);
     await dbWriter.initialize();
     return dbWriter;
   }
@@ -506,7 +506,7 @@ class Yadamu {
   async doPumpOperation(source,target) {
 	  
     const timings = {}
-    this.rejectManager = this.createRejectManager()
+    this.rejectionManager = this.createRejectManager()
 	this.warningManager = this.createWarningManager();
     
 	let dbReader
@@ -531,21 +531,23 @@ class Yadamu {
       this.status.operationSuccessful = false;
       await source.finalize();
       await target.finalize();
-      this.rejectManager.close();
-	  this.warningManager.close();
+      await this.rejectionManager.close();
+	  await this.warningManager.close();
 	  const timings = dbWriter.getTimings();
 	  this.status.operationSuccessful = true;
       return timings
     } catch (e) {
 	  // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
-	  if ((e.code === 'ERR_STREAM_PREMATURE_CLOSE') && (dbReader.fatalError instanceof Error)) {
-		e = dbReader.fatalError
+	
+	  if ((e.code === 'ERR_STREAM_PREMATURE_CLOSE') && (dbReader.underlyingError instanceof Error)) {
+		e = dbReader.underlyingError
 	  }
 	  this.status.operationSuccessful = false;
 	  this.status.err = e;
       await source.abort(e);
       await target.abort(e);
-      this.rejectManager.close();
+      await this.rejectionManager.close();
+	  await this.warningManager.close();
 
 	  if (e instanceof UserError) {
 		await this.close();

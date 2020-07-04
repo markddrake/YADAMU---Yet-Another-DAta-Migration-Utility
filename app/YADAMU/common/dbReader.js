@@ -61,13 +61,13 @@ class DBReader extends Readable {
   **
   */
 
-  constructor(dbi,mode,status,yadamuLogger,options) {
+  constructor(dbi,yadamuLogger,options) {
 
     super({objectMode: true });  
  
     this.dbi = dbi;
-    this.mode = mode;
-    this.status = status;
+    this.mode = dbi.parameters.MODE
+    this.status = dbi.yadamu.getStatus()
     this.yadamuLogger = yadamuLogger;
     this.yadamuLogger.info([`Reader`,dbi.DATABASE_VENDOR,this.mode,this.dbi.getWorkerNumber()],`Ready.`)
        
@@ -121,14 +121,15 @@ class DBReader extends Readable {
      
   abortOnError(cause,dbi) {
 	 const abortCodes = ['ABORT',undefined]
-	 dbi.setFatalError(cause);
+	 // dbi.setFatalError(cause);
 	 return abortCodes.indexOf(dbi.parameters.ON_ERROR) > -1
   }
   
   async pipelineTable(task,readerDBI,writerDBI) {
 	 
+    const abortCurrentTable = ['ABORT','SKIP']
     const continueProcessing = ['SKIP','FLUSH']
-
+	
     const pipeStatistics = {
       rowsRead       : 0
     , pipeStartTime  : undefined
@@ -183,15 +184,12 @@ class DBReader extends Readable {
           if ((continueProcessing.indexOf(readerDBI.parameters.ON_ERROR) > -1)  && cause.lostConnection()) {
             // Re-establish the input stream connection 
    		    await readerDBI.reconnect(cause,'READER')
-            if (readerDBI.parameters.ON_ERROR === 'SKIP') {
-     	        tableOutputStream.abortWriter();
-            }
-          }
-          else {
-            tableOutputStream.abortWriter();
           }
         }		
         this.yadamuLogger.handleException(['PIPELINE',mappedTableName,this.dbi.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'STREAM PROCESSING',stream,errorDBI.parameters.ON_ERROR],cause)
+        if (abortCurrentTable.indexOf(writerDBI.parameters.ON_ERROR) > -1) {
+          tableOutputStream.abortWriter();
+		}
         await tableOutputStream.forcedEnd();
       }
       pipeStatistics.pipeEndTime = performance.now();
@@ -210,17 +208,18 @@ class DBReader extends Readable {
   }
 
   async pipelineTables(readerDBI,writerDBI) {
+	 
 	
     if (this.schemaInfo.length > 0) {
       this.yadamuLogger.info(['SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`Processing Tables`);
 	  for (const task of this.schemaInfo) {
 	    try {
           await this.pipelineTable(task,readerDBI,writerDBI)
-	    } catch (e) {
-	      this.yadamuLogger.handleException(['SEQUENTIAL','PIPELINES',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],e)
-		  // Throwing here will raise 'ERR_STREAM_PREMATURE_CLOSE' on the Writer
-          this.fatalError = e;
-	      throw(e)
+	    } catch (cause) {
+	      this.yadamuLogger.handleException(['SEQUENTIAL','PIPELINES',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
+		  // Throwing here raises 'ERR_STREAM_PREMATURE_CLOSE' on the Writer. Cache the cause 
+          this.underlyingError = cause;
+	      throw(cause)
 	    }
 	  }
     }
@@ -267,6 +266,8 @@ class DBReader extends Readable {
            const systemInformation = await this.getSystemInformation();
 		   // Needed in case we have to generate DDL from the system information and metadata.
            this.dbi.setSystemInformation(systemInformation);
+		   this.dbi.yadamu.rejectionManager.setSystemInformation(systemInformation)
+		   this.dbi.yadamu.warningManager.setSystemInformation(systemInformation)
            this.push({systemInformation : systemInformation});
            if (this.mode === 'DATA_ONLY') {
              this.nextPhase = 'metadata';
@@ -292,6 +293,8 @@ class DBReader extends Readable {
          case 'metadata' :
            const metadata = await this.getMetadata();
            this.push({metadata: this.dbi.transformMetadata(metadata,this.dbi.inverseTableMappings)});
+		   this.dbi.yadamu.rejectionManager.setMetadata(metadata)
+		   this.dbi.yadamu.warningManager.setMetadata(metadata)
 		   this.nextPhase = 'pause';
 		   break;
 		 case 'pause':
@@ -311,31 +314,36 @@ class DBReader extends Readable {
       }
     } catch (e) {
       this.yadamuLogger.handleException([`READER`,this.dbi.DATABASE_VENDOR,`_READ(${this.nextPhase})`,this.dbi.parameters.ON_ERROR],e);
+	  this.underlyingError = e;
 	  await this.dbi.releasePrimaryConnection();
       this.destroy(e)
     }
   }  
+
+  causedByLostConnection(cause) {
+    return 
+  }
+  	   
    
-  async exportComplete() {
+  async exportComplete(cause) {
   	// Finalize the export and release the primary connection.
 	// this.yadamuLogger.trace([this.constructor.name,this.dbi.isDatabase()],'completeExport()')
-	try {
-      await this.dbi.finalizeExport();
-	} catch (e) {
-      this.yadamuLogger.handleException(['READER',this.dbi.DATABASE_VENDOR,'EXPORT_COMPLETE()',this.dbi.parameters.ON_ERROR],e)
-	}
-	await this.dbi.releasePrimaryConnection();
   }
   
-  async _destroy(e,callback) {
+  async _destroy(cause,callback) {
     try {
- 	  await this.exportComplete() 
-      callback()
+      await this.dbi.finalizeExport();
+	  await this.dbi.releasePrimaryConnection();
+	  callback()
+	} catch (e) {
+      if (cause instanceof DatabaseError && cause.lostConnection()) {
+        callback(cause)
+	  }
+	  else {
+        this.yadamuLogger.handleException([`READER`,this.dbi.DATABASE_VENDOR,`_DESTROY()`,this.dbi.parameters.ON_ERROR],e);		
+        callback(e)
+      }
     }
-	catch (e) {
-      this.yadamuLogger.handleException([`READER`,this.dbi.DATABASE_VENDOR,`_DESTROY()`,this.dbi.parameters.ON_ERROR],e);		
-      callback(e)
-	}
   }
   
 }

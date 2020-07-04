@@ -34,8 +34,12 @@ class SnowFlakeQA extends SnowFlakeDBI {
 
     async getRowCounts(target) {
     }
-    
-    async report(source,target) {
+	
+    async compareSchemas(source,target) {
+
+     const sqlStatement = 'call COMPARE_SCHEMAS(:1,:2);
+     results = await this.executeSQL(sqlStatement,[source,target]);
+	 console.log(results);
 
       const report = {
         successful : []

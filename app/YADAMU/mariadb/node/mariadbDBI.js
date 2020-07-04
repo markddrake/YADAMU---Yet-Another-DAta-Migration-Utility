@@ -19,14 +19,14 @@ const MariadbParser = require('./mariadbParser.js');
 const MariadbWriter = require('./mariadbWriter.js');
 const StatementGenerator = require('../../dbShared/mysql/statementGenerator57.js');
 
-const sqlSystemInformation = 
+const sqlSystemInformation =  
 `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
 
-const sqlCreateSavePoint = `SAVEPOINT YadamuInsert`;
+const sqlCreateSavePoint  = `SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
 
-const sqlRestoreSavePoint = `ROLLBACK TO SAVEPOINT YadamuInsert`;
+const sqlRestoreSavePoint = `ROLLBACK TO SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
 
-const sqlReleaseSavePoint = `RELEASE SAVEPOINT YadamuInsert`;
+const sqlReleaseSavePoint = `RELEASE SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
 
 const CONNECTION_PROPERTY_DEFAULTS = {
   multipleStatements: true
@@ -190,7 +190,7 @@ class MariadbDBI extends YadamuDBI {
 	  connection.ping()
       return connection
 	} catch (e) {
-	  throw new MariadbError(e,stack,'mariadb.Pool.getConnection()')
+	  throw this.captureException(new MariadbError(e,stack,'mariadb.Pool.getConnection()'))
 	}
   }
 
@@ -206,7 +206,7 @@ class MariadbDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-  	    throw new MariadbError(e,stack,'Mariadb.Connection.end()')
+  	    throw this.captureException(new MariadbError(e,stack,'Mariadb.Connection.end()'))
 	  }
 	}
   };
@@ -223,7 +223,7 @@ class MariadbDBI extends YadamuDBI {
         this.pool = undefined;
       } catch (e) {
         this.pool = undefined;
-  	    throw new MariadbError(e,stack,'Mariadb.Pool.end()')
+  	    throw this.captureException(new MariadbError(e,stack,'Mariadb.Pool.end()'))
 	  }
 	}
 	
@@ -259,7 +259,7 @@ class MariadbDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = new MariadbError(e,stack,sqlStatement)
+		const cause = this.captureException(new MariadbError(e,stack,sqlStatement))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -431,7 +431,7 @@ class MariadbDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
 	  super.commitTransaction()
     } catch (e) {
-	  const cause = new MariadbError(e,stack,'mariadb.Connection.commit()');
+	  const cause = this.captureException(new MariadbError(e,stack,'mariadb.Connection.commit()'))
 	  if (cause.lostConnection()) {
         await this.reconnect(cause,'COMMIT TRANSACTION')
 	  }
@@ -471,8 +471,8 @@ class MariadbDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
 	  super.rollbackTransaction()
     } catch (e) {
-	  const newIssue = new MariadbError(e,stack,'mariadb.Connection.rollback()')
-	  this.checkCause(cause,newIssue)
+	  const newIssue = this.captureException(new MariadbError(e,stack,'mariadb.Connection.rollback()'))
+	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
     } 
 	
   }
@@ -498,7 +498,7 @@ class MariadbDBI extends YadamuDBI {
       await this.executeSQL(sqlRestoreSavePoint);
 	  super.restoreSavePoint();
 	} catch (newIssue) {
-	  this.checkCause(cause,newIssue)
+	  this.checkCause('RESTORE SAVPOINT',cause,newIssue)
 	}
   }  
 
@@ -605,7 +605,7 @@ class MariadbDBI extends YadamuDBI {
   }
   
   streamingError(err,sqlStatement) {
-	 return new MariadbError(err,this.streamingStackTrace,sqlStatement)
+	 return this.captureException(new MariadbError(err,this.streamingStackTrace,sqlStatement))
   }
     
   async getInputStream(tableInfo) {
@@ -613,7 +613,7 @@ class MariadbDBI extends YadamuDBI {
 	let attemptReconnect = this.attemptReconnection;
     
     if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
+      this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT));
     }
    
     while (true) {
@@ -625,7 +625,7 @@ class MariadbDBI extends YadamuDBI {
 	    this.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
-		const cause = new MariadbError(e,this.streamingStackTrace,sqlStatement)
+		const cause = this.captureException(new MariadbError(e,this.streamingStackTrace,sqlStatement))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

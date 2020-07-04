@@ -239,14 +239,8 @@ BEGIN
       -- MongoDB typing based on JSON Typing and the Javascript TypeOf Operator
       -- ### Todo MongoDB typing based on BSON ?
       case
-        when P_DATA_TYPE in ('undefined','object','function','symbol') then 
-          return 'JSON';
-        when P_DATA_TYPE = 'boolean' then
-           return 'boolean';
-        when P_DATA_TYPE = 'ObjectId' then
-           return 'binary(12)';
-        when P_DATA_TYPE = 'number' then
-           return 'decimal';
+        when P_DATA_TYPE = 'double' then
+           return 'double';
         when P_DATA_TYPE = 'string' then
           case
             when P_DATA_TYPE_LENGTH is null then return 'longtext';
@@ -254,8 +248,38 @@ BEGIN
             when P_DATA_TYPE_LENGTH > 65535  then return 'mediumtext';
             else return 'varchar';            
           end case;
-        when P_DATA_TYPE = 'bigint' then
+        when P_DATA_TYPE = 'object' then 
+          return 'JSON';
+        when P_DATA_TYPE = 'array' then 
+          return 'JSON';
+        when P_DATA_TYPE = 'binData' then 
+          return 'longblob';
+        when P_DATA_TYPE = 'ObjectId' then
+           return 'binary(12)';
+        when P_DATA_TYPE = 'bool' then
+           return 'boolean';
+        when P_DATA_TYPE = 'null' then
+           return 'varchar(128)';
+        when P_DATA_TYPE = 'regex' then
+           return 'varchar(256)';
+        when P_DATA_TYPE = 'javascript' then
+           return 'longtext';
+        when P_DATA_TYPE = 'javascriptWithScope' then
+           return 'longtext';
+        when P_DATA_TYPE = 'int' then
+           return 'int';
+        when P_DATA_TYPE = 'long' then
            return 'bigint';
+        when P_DATA_TYPE = 'decimal' then
+           return 'decimal';
+        when P_DATA_TYPE = 'timestamp' then
+           return 'datetime(6)';
+        when P_DATA_TYPE = 'date' then
+           return 'datetime(6)';
+        when P_DATA_TYPE = 'minkey' then 
+          return 'JSON';
+        when P_DATA_TYPE = 'maxkey' then 
+          return 'JSON';
         else 
            return lower(P_DATA_TYPE);
       end case;    

@@ -35,7 +35,16 @@ case $YADAMU_TEST_NAME  in
   all)
     source $YADAMU_SCRIPT_DIR/runRegressionTests.sh 
   ;;	
+  
+  cmdLine) 
+    source  $YADAMU_SCRIPT_DIR/runCmdTests.sh
+  ;;
+
+  interactive)
+    sleep 365d
+  ;; 
+  
   *)
-    echo "valid values are export, import, fileRoundtrip, dbRoundtrip, lostConnection,  mongoImport, mongoRoundtrip or all (default)"
+    echo "valid values are export, import, fileRoundtrip, dbRoundtrip, lostConnection,  mongoImport, mongoRoundtrip, cmdLine, interactive or all (default)"
   ;;
 esac

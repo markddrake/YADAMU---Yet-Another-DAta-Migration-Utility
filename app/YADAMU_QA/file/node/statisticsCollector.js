@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const { performance } = require('perf_hooks');
 
-const DBWriter = require('../../../YADAMU/common/dbWriter.js');
 const YadamuWriter = require('../../../YADAMU/common/yadamuWriter.js');
 const YadamuLogger = require('../../../YADAMU/common/yadamuLogger.js');
 
@@ -12,7 +11,7 @@ class StatisticsCollector extends YadamuWriter {
   constructor(dbi,yadamuLogger) {
 	const nulLogger = new YadamuLogger(fs.createWriteStream("\\\\.\\NUL"),{});
 	// nulLogger is used to supress row counting. ### Use of the nulLogger means supresses error reporting as well as row counting
-    super({objectMode: true},dbi,new DBWriter(dbi,'FILE_COMPARE',{},nulLogger,{}),{},nulLogger)  
+    super({objectMode: true},dbi,null,{},nulLogger)  
 	this.nulLogger = nulLogger
 	this.tableInfo = {}
   }
@@ -30,6 +29,9 @@ class StatisticsCollector extends YadamuWriter {
 
   batchComplete() {
     return false
+  }
+  
+  async checkColumnCount(row){
   }
   
   cacheRow(row) { 

@@ -1,7 +1,7 @@
 "use strict" 
 
 const OracleDBI = require('../../../YADAMU/oracle/node/oracleDBI.js');
-const {OracleError} = require('../../../YADAMU/common/yadamuError.js')
+const OracleError = require('../../../YADAMU/oracle/node/oracleError.js')
 
 const sqlSuccess =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL' "RESULTS", TARGET_ROW_COUNT
@@ -58,8 +58,8 @@ class OracleQA extends OracleDBI {
  		       await conn.close()
 			 } catch (e) {
 			   if ((e.errorNum && ((e.errorNum === 27) || (e.errorNum === 31))) || (e.message.startsWith('DPI-1010'))) {
-				 // The Slave has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourthis (Error 27)
-			     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],`Slave finished prior to termination.`)
+				 // The Worker has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourself (Error 27)
+			     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],`Worker finished prior to termination.`)
  			   }
 			   else {
 				 const cause = new OracleError(e,stack,sqlStatement)

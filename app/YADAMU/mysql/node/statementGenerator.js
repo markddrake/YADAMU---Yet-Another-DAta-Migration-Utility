@@ -27,12 +27,12 @@ class StatementGenerator {
       const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map((table,idx) => {
         const tableInfo = statementCache[this.metadata[table].tableName];
+        tableInfo.columns = JSON.parse('[' + this.metadata[table].columns + ']');
         tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.targetDataTypes);
         tableInfo.batchSize = this.batchSize;
         tableInfo.commitSize = this.commitSize;
         tableInfo.spatialFormat = this.spatialFormat
         tableInfo.insertMode = 'Batch';
-        const columnNames = JSON.parse('[' + this.metadata[table].columns + ']');
 		 
         const setOperators = tableInfo.targetDataTypes.map((targetDataType,idx) => {
            switch (targetDataType) {
@@ -41,17 +41,17 @@ class StatementGenerator {
                switch (this.spatialFormat) {
                  case "WKB":
                  case "EWKB":
-                   return ' "' + columnNames[idx] + '"' + " = ST_GeomFromWKB(UNHEX(?))";
+                   return ' "' + tableInfo.columns[idx] + '"' + " = ST_GeomFromWKB(UNHEX(?))";
                    break;
                  case "WKT":
                  case "EWRT":
-                   return ' "' + columnNames[idx] + '"' + " = ST_GeomFromText(?)";
+                   return ' "' + tableInfo.columns[idx] + '"' + " = ST_GeomFromText(?)";
                    break;
                  case "GeoJSON":
-                   return ' "' + columnNames[idx] + '"' + " = ST_GeomFromGeoJSON(?)";
+                   return ' "' + tableInfo.columns[idx] + '"' + " = ST_GeomFromGeoJSON(?)";
                    break;
                  default:
-                   return ' "' + columnNames[idx] + '"' + " = ST_GeomFromWKB(UNHEX(?))";
+                   return ' "' + tableInfo.columns[idx] + '"' + " = ST_GeomFromWKB(UNHEX(?))";
                }              
              /*
              **
@@ -61,10 +61,10 @@ class StatementGenerator {
              case 'time':
              case 'datetime':
                tableInfo.insertMode = 'Iterative';
-               return ' "' + columnNames[idx] + '"' + " = str_to_date(?,'%Y-%m-%dT%T.%fZ')"
+               return ' "' + tableInfo.columns[idx] + '"' + " = str_to_date(?,'%Y-%m-%dT%T.%fZ')"
             */
              default:
-               return ' "' + columnNames[idx] + '" = ?'
+               return ' "' + tableInfo.columns[idx] + '" = ?'
            }
         }) 
         

@@ -4,10 +4,12 @@ const fs = require('fs');
 const path = require('path');
 const util = require('util');
 
-const {DatabaseError}  = require('./yadamuError.js');
-const OracleError  = require('../oracle/node/oracleError.js');
+const DBWriter = require('./dbWriter.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const StringWriter = require('./stringWriter.js')
+const {DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuError.js');
+const OracleError  = require('../oracle/node/oracleError.js');
+const FileDBI = require('../file/node/fileDBI.js');
 
 class YadamuLogger {
   
@@ -152,6 +154,62 @@ class YadamuLogger {
 	fs.closeSync(errorLog)
   }
 
+  async writeDataFile(dataFilePath,tableName,currentSettings,data) {
+	try {
+	  const dbi = new FileDBI(currentSettings.yadamu,dataFilePath)
+	  await dbi.initialize()
+	  // const logger = this
+      const logger = new YadamuLogger(fs.createWriteStream("\\\\.\\NUL"),{});  
+	  const dbWriter = new DBWriter(dbi,logger);  
+	  const ddlComplete = new Promise((resolve,reject) => {
+	    dbWriter.once('ddlComplete',() => {
+ 	      resolve(true);
+	    })
+	  })
+	  await dbWriter.initialize()
+      dbWriter.write({systemInformation: currentSettings.systemInformation})
+	  dbWriter.write({metadata: currentSettings.metadata})
+	  dbWriter.write({pause:true})
+	  await ddlComplete
+	  const tableWriter = dbi.getOutputStream(tableName)
+	  tableWriter.initialize();
+	  for (const d of data) {
+        tableWriter.write({data:d})
+	  }
+	  await new Promise((resolve,reject) => {
+		tableWriter.end(null,null,() => {
+          resolve()
+        })
+      })		
+	  dbWriter.deferredCallback();
+	  await new Promise((resolve,reject) => {
+		dbWriter.end(null,null,() => {
+          resolve()
+        })
+      })		
+	  await dbi.finalize()
+	} catch (e) {
+	  console.log(e)
+	}
+  }
+  
+  generateDataFile(exceptionFile,e) {
+    if (e instanceof IterativeInsertError) {
+	  // Write the row information a seperate file and replace the row tag with a reference to the file
+	  e.dataFilePath = `${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`
+	  this.writeDataFile(e.dataFilePath,e.tableName,e.currentSettings,[e.row])
+	  delete e.currentSettings
+	  delete e.row
+	}
+	if (e instanceof BatchInsertError) {
+	  // Write the row information a seperate file and replace the row tag with a reference to the file
+	  e.dataFilePath = `${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`
+	  this.writeDataFile(e.dataFilePath,e.tableName,e.currentSettings,e.rows)
+	  delete e.currentSettings
+	  delete e.rows
+	}
+  }
+
   handleException(args,e) {
 	 
     // Handle Exception does not produce any output if the exception has already been processed by handleException ot logException
@@ -164,6 +222,7 @@ class YadamuLogger {
 		const largs = [...args]
 		const ts = this.error(args,e.message);
         const exceptionFile = path.resolve(`${this.exceptionFolderPath}${path.sep}${this.exceptionFilePrefix}_${ts.replace(/:/g,'.')}.trace`);
+		this.generateDataFile(exceptionFile,e);
 		this.writeExceptionToFile(exceptionFile,ts,args,e)
 	    this.info(largs,`Exception logged to "${exceptionFile}".`)
 		e.yadamuAlreadyReported = true;
@@ -183,6 +242,7 @@ class YadamuLogger {
 		const largs = [...args]
 		const ts = this.warning(args,e.message);
         const exceptionFile = path.resolve(`${this.exceptionFolderPath}${path.sep}${this.exceptionFilePrefix}_${ts.replace(/:/g,'.')}.trace`);
+		this.generateDataFile(exceptionFile,e);
 		this.writeExceptionToFile(exceptionFile,ts,args,e)
 	    this.info(largs,`Exception logged to "${exceptionFile}".`)
 		e.yadamuAlreadyReported = true;
