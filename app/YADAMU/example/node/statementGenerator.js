@@ -2,16 +2,12 @@
 
 class StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize, status, yadamuLogger) {
+  constructor(dbi, targetSchema, metadata, spatialFormat) {
     
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
-    this.batchSize = batchSize
     this.spatialFormat = spatialFormat
-    this.commitSize = commitSize;
-    this.status = status,
-    this.yadamuLogger = yadamuLogger	
   }
   
 

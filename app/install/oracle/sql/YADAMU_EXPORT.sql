@@ -2,24 +2,29 @@ create or replace package YADAMU_EXPORT
 authid CURRENT_USER
 as
   TYPE EXPORT_METADATA_RECORD is RECORD (
-    OWNER                VARCHAR2(128)
-   ,TABLE_NAME           VARCHAR2(128)
-   ,COLUMN_LIST          CLOB
-   ,DATA_TYPE_LIST       CLOB
-   ,SIZE_CONSTRAINTS     CLOB
-   ,EXPORT_SELECT_LIST   CLOB
-   ,NODE_SELECT_LIST     CLOB
-   ,IMPORT_SELECT_LIST   CLOB
-   ,COLUMN_PATTERN_LIST  CLOB
-   ,WITH_CLAUSE          CLOB
-   ,SQL_STATEMENT        CLOB
-   ,PARTITION_LIST       CLOB
+    TABLE_SCHEMA          VARCHAR2(128)
+   ,TABLE_NAME            VARCHAR2(128)
+   ,COLUMN_NAME_ARRAY     CLOB
+   ,DATA_TYPE_ARRAY       CLOB
+   ,SIZE_CONSTRAINT_ARRAY CLOB
+   ,CLIENT_SELECT_LIST    CLOB
+   ,EXPORT_SELECT_LIST    CLOB
+   ,WITH_CLAUSE           CLOB
+   ,PARTITION_LIST        CLOB
   );
   
   TYPE EXPORT_METADATA_TABLE IS TABLE OF EXPORT_METADATA_RECORD;
   
   function GET_SYSTEM_INFORMATION return CLOB;
-  function GET_DML_STATEMENTS(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_OBJECTS_AS_JSON VARCHAR2 DEFAULT 'FALSE', P_RETURN_BINARY_JSON VARCHAR2 DEFAULT 'FALSE') return EXPORT_METADATA_TABLE PIPELINED;
+
+  function GET_DML_STATEMENTS(
+    P_OWNER_LIST             VARCHAR2 
+  , P_SPATIAL_FORMAT         VARCHAR2 DEFAULT 'WKB' 
+  , P_OBJECTS_AS_JSON        VARCHAR2 DEFAULT 'FALSE' 
+  , P_TREAT_RAW1_AS_BOOLEAN  VARCHAR2 DEFAULT 'TRUE'
+  , P_RETURN_BINARY_JSON     VARCHAR2 DEFAULT 'FALSE'
+  ) return EXPORT_METADATA_TABLE PIPELINED;
+
   function JSON_FEATURES return VARCHAR2 deterministic;
   function DATABASE_RELEASE return NUMBER deterministic;
 --
@@ -177,7 +182,13 @@ begin
   end if;
 end;
 --
-function GET_DML_STATEMENTS(P_OWNER_LIST VARCHAR2,P_TABLE_NAME VARCHAR2 DEFAULT NULL,P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_OBJECTS_AS_JSON VARCHAR2 DEFAULT 'FALSE', P_RETURN_BINARY_JSON VARCHAR2 DEFAULT 'FALSE')
+function GET_DML_STATEMENTS(
+  P_OWNER_LIST             VARCHAR2 
+, P_SPATIAL_FORMAT         VARCHAR2 DEFAULT 'WKB' 
+, P_OBJECTS_AS_JSON        VARCHAR2 DEFAULT 'FALSE' 
+, P_TREAT_RAW1_AS_BOOLEAN  VARCHAR2 DEFAULT 'TRUE'
+, P_RETURN_BINARY_JSON     VARCHAR2 DEFAULT 'FALSE'
+)
 return EXPORT_METADATA_TABLE 
 PIPELINED
 /*
@@ -192,10 +203,10 @@ as
   
   cursor getTableMetadata
   is
-  select aat.owner
+  select aat.owner 
         ,aat.table_name
 		,sum(case when ((TYPECODE in ('COLLECTION', 'OBJECT')) and (atc.DATA_TYPE not in ('XMLTYPE','ANYDATA','RAW'))) then 1 else 0 end) OBJECT_COUNT
-        ,cast(collect('"' || atc.COLUMN_NAME || '"' ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) COLUMN_LIST
+        ,cast(collect('"' || atc.COLUMN_NAME || '"' ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) COLUMN_NAME_LIST
 		,cast(collect(
                case 
                  $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN               
@@ -205,6 +216,8 @@ as
                    -- If DDL is not included in the file import operations will default to YADAMU_IMPORT.C_JSON_STORAGE_MODEL storage
                    '"JSON"'
                  $END                   
+                 when (atc.DATA_TYPE = 'RAW' and atc.DATA_LENGTH = 1 and P_TREAT_RAW1_AS_BOOLEAN = 'TRUE') then
+                   '"BOOLEAN"'
                  when (atc.DATA_TYPE like 'TIMESTAMP(%)') then
                    '"TIMESTAMP"'
                  when (DATA_TYPE_OWNER is null) then
@@ -325,7 +338,8 @@ as
                  */
                  when atc.DATA_TYPE = 'BFILE' then
 				   case
-				     when (P_OBJECTS_AS_JSON = 'TRUE') then 
+				     -- when (P_OBJECTS_AS_JSON = 'TRUE') then 
+                     when 1 = 1 then
                        'OBJECT_TO_JSON.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '")'
 				     else 					
                        'OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '")'
@@ -386,6 +400,7 @@ as
                  when atc.DATA_TYPE = 'RAW' then
                    -- For some reason RAW columns have atc.DATA_TYPE_OWNER set to the current schema.
                    '"' || atc.COLUMN_NAME || '"'
+                 /*
                  $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN               
 				 when (atc.DATA_TYPE = 'BLOB' and jc.FORMAT is not null) then
 				   $IF DBMS_DB_VERSION.VER_LE_12 $THEN
@@ -396,6 +411,7 @@ as
 			 	   'JSON_SERIALIZE("' || atc.COLUMN_NAME || '" returning CLOB) "' || atc.COLUMN_NAME || '"'
                    $END
 				 $END
+                 */
                  when atc.DATA_TYPE like 'INTERVAL DAY% TO SECOND%' then
                    '''P''
                    || extract(DAY FROM "' || atc.COLUMN_NAME || '") || ''D''
@@ -437,7 +453,8 @@ as
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'BFILE' then
 				   case
-				     when (P_OBJECTS_AS_JSON = 'TRUE') then 
+				     -- when (P_OBJECTS_AS_JSON = 'TRUE') then 
+                     when (1=1) then 
                        'OBJECT_TO_JSON.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
 				     else 					
                        'OBJECT_SERIALIZATION.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
@@ -506,7 +523,7 @@ as
                  else
                    '"' || atc.COLUMN_NAME || '"'
                end
-        order by INTERNAL_COLUMN_ID) as T_VC4000_TABLE) NODE_SELECT_LIST,
+        order by INTERNAL_COLUMN_ID) as T_VC4000_TABLE) CLIENT_SELECT_LIST,
 		(select cast(collect(partition_name) as T_VC4000_TABLE) from ALL_TAB_PARTITIONS atp where ATP.TABLE_NAME = aat.TABLE_NAME) PARTITION_LIST
     from ALL_ALL_TABLES aat
          inner join ALL_TAB_COLS atc
@@ -562,11 +579,14 @@ $IF YADAMU_FEATURE_DETECTION.TABLE_FUNCTION_OPTIMIZER_ISSUE $THEN
 $ELSE
      and aat.OWNER in (select COLUMN_VALUE from TABLE(V_SCHEMA_LIST))
 $END
+/*
+     -- Table Name Filtering impliemented in YadamuDBI so it is done in one place
 	 and case
     	   when P_TABLE_NAME is NULL then 1
 	       when P_TABLE_NAME is not NULL and aat.TABLE_NAME = P_TABLE_NAME then 1
 		   else 0
   		 end = 1
+*/
    group by aat.OWNER, aat.TABLE_NAME;
    
   V_FIRST_ROW BOOLEAN := TRUE;
@@ -625,24 +645,16 @@ begin
       else		  
 		V_OBJECT_SERIALIZATION := OBJECT_SERIALIZATION.SERIALIZE_TABLE_TYPES(t.OWNER,t.TABLE_NAME);
       end if;
-
-	  DBMS_LOB.CREATETEMPORARY(V_SQL_STATEMENT,TRUE,DBMS_LOB.CALL);
-      V_SQL_FRAGMENT := 'select JSON_ARRAY(';	  
-      DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-      DBMS_LOB.APPEND(V_SQL_STATEMENT,TABLE_TO_LIST(t.EXPORT_SELECT_LIST));
-      V_SQL_FRAGMENT := ' NULL on NULL returning '|| YADAMU_FEATURE_DETECTION.C_RETURN_TYPE || ') "JSON" from "' || t.OWNER || '"."' || t.TABLE_NAME || '" t';
-      DBMS_LOB.WRITEAPPEND(V_SQL_STATEMENT,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
--- 
- 	  V_ROW.OWNER                := t.OWNER;
-	  V_ROW.TABLE_NAME           := t.TABLE_NAME;
-	  V_ROW.COLUMN_LIST          := TABLE_TO_LIST(t.COLUMN_LIST);
-	  V_ROW.DATA_TYPE_LIST       := '[' || TABLE_TO_LIST(t.DATA_TYPE_LIST) || ']';
-	  V_ROW.SIZE_CONSTRAINTS     := '[' || TABLE_TO_LIST(t.SIZE_CONSTRAINT_LIST) || ']';
-	  V_ROW.EXPORT_SELECT_LIST   := TABLE_TO_LIST(t.EXPORT_SELECT_LIST);
-	  V_ROW.NODE_SELECT_LIST     := TABLE_TO_LIST(t.NODE_SELECT_LIST);
-	  V_ROW.WITH_CLAUSE          := V_OBJECT_SERIALIZATION;
-	  V_ROW.SQL_STATEMENT        := V_SQL_STATEMENT;
-	  V_ROW.PARTITiON_LIST       := TABLE_TO_LIST(t.PARTITION_LIST);
+      
+ 	  V_ROW.TABLE_SCHEMA          := t.OWNER;
+	  V_ROW.TABLE_NAME            := t.TABLE_NAME;
+	  V_ROW.COLUMN_NAME_ARRAY     := '[' || TABLE_TO_LIST(t.COLUMN_NAME_LIST)  || ']';
+	  V_ROW.DATA_TYPE_ARRAY       := '[' || TABLE_TO_LIST(t.DATA_TYPE_LIST) || ']';
+	  V_ROW.SIZE_CONSTRAINT_ARRAY := '[' || TABLE_TO_LIST(t.SIZE_CONSTRAINT_LIST) || ']';
+	  V_ROW.CLIENT_SELECT_LIST    := TABLE_TO_LIST(t.CLIENT_SELECT_LIST);
+	  V_ROW.EXPORT_SELECT_LIST    := TABLE_TO_LIST(t.EXPORT_SELECT_LIST);
+	  V_ROW.WITH_CLAUSE           := V_OBJECT_SERIALIZATION;
+	  V_ROW.PARTITiON_LIST        := TABLE_TO_LIST(t.PARTITION_LIST);
 
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN               
 --
@@ -669,8 +681,7 @@ $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
 
         -- Replace OBJECT_SERIALIZATION with WRAPPER FUNCTION in SQL_STATMENT
 	  
-	    V_ROW.SQL_STATEMENT      := REPLACE(V_ROW.SQL_STATEMENT ,'"SERIALIZE_OBJECT"(','"' || V_WRAPPER_NAME || '"(');
-	    V_ROW.NODE_SELECT_LIST   := REPLACE(V_ROW.NODE_SELECT_LIST ,'"SERIALIZE_OBJECT"(','"' || V_WRAPPER_NAME || '"(');
+	    V_ROW.CLIENT_SELECT_LIST := REPLACE(V_ROW.CLIENT_SELECT_LIST ,'"SERIALIZE_OBJECT"(','"' || V_WRAPPER_NAME || '"(');
 	    V_ROW.EXPORT_SELECT_LIST := REPLACE(V_ROW.EXPORT_SELECT_LIST ,'"SERIALIZE_OBJECT"(','"' || V_WRAPPER_NAME || '"(');
 
       end if;

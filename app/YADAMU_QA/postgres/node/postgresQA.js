@@ -2,29 +2,16 @@
 
 const PostgresDBI = require('../../../YADAMU/postgres/node/postgresDBI.js');
 
-const sqlSuccess =
-`select SOURCE_SCHEMA "SOURCE_SCHEMA", TARGET_SCHEMA "TARGET_SCHEMA", TABLE_NAME "TABLE_NAME", 'SUCCESSFUL' "RESULTS", TARGET_ROW_COUNT "TARGET_ROW_COUNT"
-   from SCHEMA_COMPARE_RESULTS 
-  where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
-    and MISSING_ROWS = 0
-    and EXTRA_ROWS = 0
-    and SQLERRM is NULL
- order by TABLE_NAME`;
-
-const sqlFailed = 
-`select SOURCE_SCHEMA "SOURCE_SCHEMA", TARGET_SCHEMA "TARGET_SCHEMA", TABLE_NAME "TABLE_NAME", 'FAILED' "RESULTS", SOURCE_ROW_COUNT "SOURCE_ROW_COUNT", TARGET_ROW_COUNT "TARGET_ROW_COUNT", MISSING_ROWS "MISSING_ROWS", EXTRA_ROWS "EXTRA_ROWS",  SQLERRM "SQLERRM"
-   from SCHEMA_COMPARE_RESULTS 
-  where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
-     or MISSING_ROWS <> 0
-      or EXTRA_ROWS <> 0
-    or SQLERRM is NOT NULL
-  order by TABLE_NAME`;
-
-const sqlSchemaTableRows = `select relname "TABLE_NAME", n_live_tup "ROW_COUNT" from pg_stat_user_tables where schemaname = $1`;
-
-const sqlCompareSchema = `call COMPARE_SCHEMA($1,$2,$3,$4,$5)`
-
 class PostgresQA extends PostgresDBI {
+    
+    static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
+    static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
+    static get SQL_SUCCESS()               { return _SQL_SUCCESS }
+    static get SQL_FAILED()                { return _SQL_FAILED }
+
+    constructor(yadamu) {
+       super(yadamu);
+    }
     
     async recreateSchema() {
       try {
@@ -63,10 +50,6 @@ class PostgresQA extends PostgresDBI {
 	  timer.unref()
 	}
 	
-    constructor(yadamu) {
-       super(yadamu);
-    }
-    
 	async initialize() {
 	  await super.initialize();
 	  if (this.options.recreateSchema === true) {
@@ -85,35 +68,21 @@ class PostgresQA extends PostgresDBI {
        ,failed     : []
       }
 
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`${sqlCompareSchema};\n--\n`)
-      }
+      await this.executeSQL(PostgresQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.STRIP_XML_DECLARATION === true, this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18])      
       
-      await this.executeSQL(sqlCompareSchema,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.STRIP_XML_DECLARATION === true, this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18])      
+      const successful = await this.executeSQL(PostgresQA.SQL_SUCCESS)            
+      report.successful = successful.rows
       
-      const successful = await this.executeSQL(sqlSuccess)
-            
-      report.successful = successful.rows.map((row,idx) => {          
-        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT]
-      })
-      
-      const failed = await this.executeSQL(sqlFailed)
-
-      report.failed = failed.rows.map((row,idx) => {
-        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.SQLERRM !== null ? row.SQLERRM : '')]
-      })
+      const failed = await this.executeSQL(PostgresQA.SQL_FAILED)
+      report.failed = failed.rows
 
       return report
     }
 	
 	async getRowCounts(target) {
         
-      const results = await this.executeSQL(sqlSchemaTableRows,[target.schema]);
-
-      return results.rows.map((row,idx) => {          
-        return [target.schema,row.TABLE_NAME,row.ROW_COUNT]
-      })
-      
+      const results = await this.executeSQL(PostgresQA.SQL_SCHEMA_TABLE_ROWS,[target.schema]);
+      return results.rows
     }    
 	
   async workerDBI(idx)  {
@@ -127,3 +96,25 @@ class PostgresQA extends PostgresDBI {
 }
 
 module.exports = PostgresQA
+
+const _SQL_SUCCESS =
+`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT
+   from SCHEMA_COMPARE_RESULTS 
+  where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
+    and MISSING_ROWS = 0
+    and EXTRA_ROWS = 0
+    and SQLERRM is NULL
+ order by TABLE_NAME`;
+
+const _SQL_FAILED = 
+`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS,  SQLERRM
+   from SCHEMA_COMPARE_RESULTS 
+  where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
+     or MISSING_ROWS <> 0
+      or EXTRA_ROWS <> 0
+    or SQLERRM is NOT NULL
+  order by TABLE_NAME`;
+
+const _SQL_SCHEMA_TABLE_ROWS = `select schemaname, relname, n_live_tup from pg_stat_user_tables where schemaname = $1`;
+
+const _SQL_COMPARE_SCHEMAS = `call COMPARE_SCHEMA($1,$2,$3,$4,$5)`

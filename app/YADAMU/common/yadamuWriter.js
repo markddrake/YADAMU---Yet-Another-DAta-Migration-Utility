@@ -5,9 +5,13 @@ const Writable = require('stream').Writable
 const { performance } = require('perf_hooks');
 
 const YadamuLibrary = require('./yadamuLibrary.js');
-const {BatchInsertError,IterativeInsertError} = require('./yadamuError.js')
+const {BatchInsertError, IterativeInsertError, DatabaseError} = require('./yadamuError.js')
 
 class YadamuWriter extends Writable {
+
+  get BATCH_SIZE()     {  return this.tableInfo._BATCH_SIZE }
+  get COMMIT_COUNT()   {  return this.tableInfo._COMMIT_COUNT }
+  get SPATIAL_FORMAT() {  return this.tableInfo._SPATIAL_FORMAT}
 
   constructor(options,dbi,tableName,status,yadamuLogger) {
 	super(options)
@@ -15,15 +19,12 @@ class YadamuWriter extends Writable {
     this.schema = this.dbi.parameters.TO_USER;
     this.status = status;
     this.yadamuLogger = yadamuLogger;    
-	this.maxErrors =  this.dbi.parameters.MAX_ERRORS ? this.dbi.parameters.MAX_ERRORS : 10
-    this.rejectionManager = this.dbi.yadamu.rejectionManager
-    this.configureFeedback(this.dbi.parameters.FEEDBACK); 	
-	
+	this.configureFeedback(this.dbi.parameters.FEEDBACK); 	
 	this.tableName = tableName  
     this.tableInfo = this.dbi.getTableInfo(tableName)
-	this.supressBatchWriteLogging = (this.tableInfo.batchSize === this.tableInfo.commitSize) // Prevent duplicate logging if batchSize and Commit SIze are the same
+	this.supressBatchWriteLogging = (this.BATCH_SIZE === this.COMMIT_COUNT) // Prevent duplicate logging if batchSize and Commit SIze are the same
 	this.setTableInfo(tableName);
- 	
+
  	this.rowCounters = {
       received   : 0 // Rows accepted
 	, batchCount : 0 // Batches created
@@ -33,11 +34,12 @@ class YadamuWriter extends Writable {
 	, skipped    : 0 // Rows not written to disk due to unrecoverable write errors
 	, lost       : 0 // Rows written to disk and thene lost as a result of a rollback or lost connnection 
 	}
+    
 	this.dbi.setCounters(this.rowCounters)
 	
     this.batch = [];
     this.insertMode = 'Batch';    
-    this.skipTable = this.dbi.parameters.MODE === 'DDL_ONLY';
+    this.skipTable = this.dbi.MODE === 'DDL_ONLY';
     this.sqlInitialTime = this.dbi.sqlCumlativeTime
 	this.startTime = performance.now();
   }
@@ -59,7 +61,7 @@ class YadamuWriter extends Writable {
   }
  
   batchComplete() {
-    return ((this.rowCounters.cached === this.tableInfo.batchSize) && !this.skipTable)
+    return ((this.rowCounters.cached === this.BATCH_SIZE) && !this.skipTable)
   }
   
   batchRowCount() {
@@ -71,7 +73,7 @@ class YadamuWriter extends Writable {
   }
   
   commitWork() {
-    return ((this.rowCounters.written >= this.tableInfo.commitSize) && !this.skipTable)
+    return ((this.rowCounters.written >= this.COMMIT_COUNT) && !this.skipTable)
   }
 
   hasPendingRows() {
@@ -79,12 +81,15 @@ class YadamuWriter extends Writable {
   }
               
 
-  async checkColumnCount(row){
+  async checkColumnCount(row) {
+     
 	try {
-      assert.strictEqual(this.tableInfo.dataTypes.length,row.length,`Table ${this.tableName}. Incorrect number of columns supplied.`)
+	  if (!this.skipTable) {
+        assert.strictEqual(this.tableInfo.columnNames.length,row.length,`Table ${this.tableName}. Incorrect number of columns supplied.`)
+	  }
 	} catch (cause) {
 	  const info = {
-		columns: this.tableInfo.columns
+		columnNames: this.tableInfo.columnNames
 	  }
 	  await this.handleIterativeError('CACHE',cause,this.rowCounters.received+1,row,info);
 	}
@@ -97,7 +102,7 @@ class YadamuWriter extends Writable {
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 
-    // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.rowCounters.cached],'cacheRow()')
+    // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.rowCounters.cached],'cacheRow()')    
 	  
 	this.transformations.forEach((transformation,idx) => {
       if ((transformation !== null) && (row[idx] !== null)) {
@@ -112,7 +117,7 @@ class YadamuWriter extends Writable {
   }  
   
   async writeBatch() {
-		
+				
     if (this.tableInfo.insertMode === 'Batch') {
       try {    
         await this.dbi.createSavePoint();
@@ -125,7 +130,7 @@ class YadamuWriter extends Writable {
         return this.skipTable
       } catch (e) {
         await this.dbi.restoreSavePoint(e);
-		this.handleBatchError(`INSERT MANY`,e,this.batch[0],this.batch[this.batch.length-1])
+		this.reportBatchError(`INSERT MANY`,e,this.batch[0],this.batch[this.batch.length-1])
         this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
         
@@ -180,11 +185,11 @@ class YadamuWriter extends Writable {
 	      [this.tableName]   : this.dbi.metadata[this.tableName]
 	    }
 	  }
-	, columns              : this.tableInfo.columns
-	, dataTypes            : this.tableInfo.dataTypes 
+	, columnNames          : this.tableInfo.columnNames
+	, targetDataTypes      : this.tableInfo.targetDataTypes 
 	}
     Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
-    return new BatchInsertError(cause,this.tableName,batchSize,this.dbi.columnsToJSON(firstRow),this.dbi.columnsToJSON(lastRow),details)
+    return new BatchInsertError(cause,this.tableName,batchSize,firstRow,lastRow,details)
   }
   
   createIterativeException(cause,batchSize,rowNumber,row,info) {
@@ -197,8 +202,8 @@ class YadamuWriter extends Writable {
 	      [this.tableName]   : this.dbi.metadata[this.tableName]
 	    }
 	  }
-	, columns              : this.tableInfo.columns
-	, dataTypes            : this.tableInfo.dataTypes 
+	, columnNames            : this.tableInfo.columnNames
+	, targetDataTypes        : this.tableInfo.targetDataTypes 
 	}
     Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
     return new IterativeInsertError(cause,this.tableName,batchSize,rowNumber,row,details)
@@ -206,25 +211,24 @@ class YadamuWriter extends Writable {
   	
   async rejectRow(tableName,row) {
     // Allows the rejection process to be overridden by a particular driver.
-    await this.rejectionManager.rejectRow(tableName,row);
+    await this.dbi.yadamu.REJECTION_MANAGER.rejectRow(tableName,row);
   }
   
   async handleIterativeError(operation,cause,rowNumber,record,info) {
 	  
 	this.rowCounters.skipped++;
-	record = this.dbi.columnsToJSON(record)
-    await this.rejectRow(this.tableName,record);
+	await this.rejectRow(this.tableName,record);
 
 	const iterativeError = this.createIterativeException(cause,this.rowCounters.cached,rowNumber,record,info)
     this.yadamuLogger.logRejected([this.dbi.DATABASE_VENDOR,this.tableName,operation,this.rowCounters.cached,rowNumber],iterativeError);
 
-    if (this.rowCounters.skipped === this.maxErrors) {
+    if (this.rowCounters.skipped === this.dbi.TABLE_MAX_ERRORS) {
       this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
       this.skipTable = true;
     }
   }
 
-  handleBatchError(operation,cause,firstRow,lastRow,info) {
+  reportBatchError(operation,cause,firstRow,lastRow,info) {
     const batchException = this.createBatchException(cause,this.rowCounters.cached,firstRow,lastRow,info)
     this.yadamuLogger.handleWarning([this.dbi.DATABASE_VENDOR,this.tableName,operation,this.insertMode,this.rowCounters.cached],batchException)
   }
@@ -262,7 +266,6 @@ class YadamuWriter extends Writable {
         this.reportBatchWrites = true;
         return;
       }
-    
       if (!isNaN(feedbackModel)) {
         this.reportCommits = true;
         this.reportBatchWrites = true;
@@ -276,7 +279,7 @@ class YadamuWriter extends Writable {
   	await this.cacheRow(data)
     this.rowCounters.received++;
     if ((this.rowCounters.received % this.feedbackInterval === 0) & !this.batchComplete()) {
-      this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows buffered: ${this.batchRowCount()}.`);
+      this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows Cached: ${this.batchRowCount()}.`);
     }
     if (this.batchComplete()) {
       await this.writeBatch(this.status);
@@ -319,8 +322,9 @@ class YadamuWriter extends Writable {
   	  default:
       }
       callback();
-    } catch (e) {		
-      this.yadamuLogger.handleException([`Writer`,this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.parameters.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);
+    } catch (e) {
+      this.yadamuLogger.handleException([`Writer`,this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.yadamu.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);
+  	  /*
   	  /*
 	  **
 	  ** Error Handling. 
@@ -330,10 +334,13 @@ class YadamuWriter extends Writable {
 	  **
 	  */
 	  try {
-        switch (this.dbi.parameters.ON_ERROR) {
+        switch (this.dbi.yadamu.ON_ERROR) {
 		  case undefined:
 		  case 'ABORT': 
-  		    await this.rollbackTransaction(e)
+		    if (this.dbi.transactionInProgress === true) {
+			  // No need to check for lost connction. Rollback will pass through a lost connection error without attempting to perform the rollback operation 
+  		      await this.rollbackTransaction(e)
+			}
             callback(e);
 		    break;
 		  case 'SKIP':
@@ -349,16 +356,18 @@ class YadamuWriter extends Writable {
     }
   }
   
-  async flushCache() {
-    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.hasPendingRows(),this.rowCounters.received,this.rowCounters.committed,this.rowCounters.written,this.rowCounters.cached],'_flushCahce()')
-    if (this.hasPendingRows()) {
+  async flushCache(cause) {
+    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.hasPendingRows(),this.skipTable,this.rowCounters.received,this.rowCounters.committed,this.rowCounters.written,this.rowCounters.cached],'_flushCahce()')
+    if (this.hasPendingRows() && !this.skipTable) {
       this.skipTable = await this.writeBatch();   
     }
-    if (this.skipTable === true) {
-      await this.rollbackTransaction()
-    }
-    else {
-      await this.commitTransaction()
+	if (this.dbi.transactionInProgress === true) {
+      if (this.skipTable === true) {
+        await this.rollbackTransaction(cause)
+      }
+      else {
+        await this.commitTransaction()
+	  }
     }
     this.endTime = performance.now()
   }	  
@@ -376,11 +385,11 @@ class YadamuWriter extends Writable {
     } 
   } 
 
-  async forcedEnd() {
+  async forcedEnd(cause) {
 	// Called when a writer fails. Once a writer has emitted an 'error' event calling the end() method does not appear to invoke that the _final() method.
 	// this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],'forcedEnd()')
 	try {
-	  await this.flushCache();
+	  await this.flushCache(cause);
     } catch (e) {
       this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`"${this.tableName}"`],e);
     } 

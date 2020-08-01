@@ -11,15 +11,15 @@ class YadamuRejectManager {
   
   constructor(yadamu,usage,filename) {
 
+    this.yadamu = yadamu
     this.usage = usage
     this.filename = filename;
-	this.yadamuLogger =  yadamu.getYadamuLogger()
 	this.dbi = new FileDBI(yadamu,filename)
 	this.dbi.initialize()
-	// Use a NULL Logger in production
-    // const logger = this.yadamuLogger
-	const logger = new YadamuLogger(fs.createWriteStream("\\\\.\\NUL"),{});
-    this.writer = new DBWriter(this.dbi,logger);  
+	// Use a NULL Logger in production.
+    // this.logger =  YadamuLogger.consoleLogger();
+	this.logger = YadamuLogger.nulLogger();
+    this.writer = new DBWriter(this.dbi,this.logger);  
 	this.ddlComplete = new Promise((resolve,reject) => {
 	  this.writer.once('ddlComplete',() => {
  	    resolve(true);
@@ -57,6 +57,8 @@ class YadamuRejectManager {
           })
         })		
 		this.tableWriter = this.dbi.getOutputStream(tableName)
+		// Disable Column Count Checks
+		this.tableWriter.checkColumnCount = () => {}
 	  }
 	}
     this.tableWriter.write({data: data})
@@ -77,7 +79,8 @@ class YadamuRejectManager {
         })
       })		
 	  await this.dbi.finalize()    
-      this.yadamuLogger.info([this.usage],`${this.recordCount} records written to "${this.filename}"`)
+      await this.logger.close()
+      this.yadamu.LOGGER.info([this.usage],`${this.recordCount} records written to "${this.filename}"`)
 	}
   }
 }

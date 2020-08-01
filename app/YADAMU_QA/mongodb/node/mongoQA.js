@@ -106,7 +106,7 @@ class MongoQA extends MongoDBI {
            report.successful.push([source.schema,target.schema,collectionName,targetCounts.find(element => element[1] === collectionName)[2]])
 		 }
 		 else {
-		   report.failed.push([source.schema,target.schema,collectionName, sourceCounts.find(element => element[1] === collectionName)[2],targetCounts.find(element => element[1] === collectionName)[2],NaN,NaN,null,null])
+		   report.failed.push([source.schema,target.schema,collectionName, sourceCounts.find(element => element[1] === collectionName)[2],targetCounts.find(element => element[1] === collectionName)[2],sourceHash.collections[collectionName],targetHash.collections[collectionName],null,null])
 		 }
 	  })
 		   

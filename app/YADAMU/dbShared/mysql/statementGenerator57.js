@@ -1,21 +1,36 @@
 "use strict";
 
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
+
 // Code Shared by MySQL 5.7 and MariaDB. 
 
-const unboundedTypes = ['date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum'];
-const spatialTypes   = ['geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection'];
-const nationalTypes  = ['nchar','nvarchar'];
-const integerTypes   = ['tinyint','mediumint','smallint','int','bigint']
-
 class StatementGenerator {
+
+  static get UNBOUNDED_TYPES() { 
+    StatementGenerator._UNBOUNDED_TYPES = StatementGenerator._UNBOUNDED_TYPES || Object.freeze(['date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum'])
+    return StatementGenerator._UNBOUNDED_TYPES;
+  }
+
+  static get SPATIAL_TYPES() { 
+    StatementGenerator._SPATIAL_TYPES = StatementGenerator._SPATIAL_TYPES || Object.freeze(['geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection'])
+    return StatementGenerator._SPATIAL_TYPES;
+  }
+
+  static get NATIONAL_TYPES() { 
+    StatementGenerator._NATIONAL_TYPES = StatementGenerator._NATIONAL_TYPES || Object.freeze(['nchar','nvarchar'])
+    return StatementGenerator._NATIONAL_TYPES;
+  }
   
-  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize) {
+  static get INTEGER_TYPES() { 
+    StatementGenerator._INTEGER_TYPES = StatementGenerator._INTEGER_TYPES || Object.freeze(['tinyint','mediumint','smallint','int','bigint'])
+    return StatementGenerator._INTEGER_TYPES;
+  }
+  
+  constructor(dbi, targetSchema, metadata, spatialFormat) {
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
     this.spatialFormat = spatialFormat
-    this.batchSize = batchSize
-    this.commitSize = commitSize;    
   }
     
   mapForeignDataType(vendor, dataType, dataTypeLength, dataTypeSize) {
@@ -42,6 +57,7 @@ class StatementGenerator {
            case 'ROWID':                   return 'varchar(32)';
            case 'ANYDATA':                 return 'longtext';
            case '"MDSYS"."SDO_GEOMETRY"':  return 'geometry';
+           case 'BOOLEAN':                 return this.dbi.TREAT_TINYINT1_AS_BOOLEAN ? 'boolean' : 'tinyint(1)'
            default :
              if (dataType.indexOf('TIME ZONE') > -1) {
                return 'datetime'; 
@@ -66,7 +82,8 @@ class StatementGenerator {
                case (dataTypeLength > 65535):      return 'mediumblob';
                default:                            return 'binary';
              }
-           case 'bit':                             return 'boolean';
+           case 'boolean':                         return 'tinyint(1)';
+           case 'bit':                             return 'tinyint(1)';
            case 'char':
              switch (true) {
                case (dataTypeLength === -1):       return 'longtext';
@@ -155,10 +172,12 @@ class StatementGenerator {
                default:                             return 'datetime';
              }
            case 'numeric':                          return 'decimal';
+           case 'boolean':                          return 'tinyint(1)';
            case 'double precision':                 return 'double';
            case 'real':                             return 'float';
            case 'integer':                          return 'int';
            case 'xml':                              return 'longtext';     
+           case 'jsonb':                            return 'json';     
            case 'text':                             return 'longtext';     
            case 'geography':       
            case 'geography':                        return 'geometry';     
@@ -172,15 +191,15 @@ class StatementGenerator {
        case 'MySQL':
        case 'MariaDB':
          switch (dataType) {
-           case 'set':                            return 'varchar(512)';
+           case 'boolean':                        return this.dbi.TREAT_TINYINT1_AS_BOOLEAN ? 'boolean' : 'tinyint(1)';
+           case 'set':                            return 'json';
            case 'enum':                           return 'varchar(512)';
            default:                               return dataType.toLowerCase();
          }
          break;
        case 'MongoDB':
          switch (dataType) {
-			case "double":
-		     return 'boolean';
+			case "double":                 	        return 'double';
            case "string":
 		     switch (true) {
                case (dataTypeLength === undefined): return 'longtext';
@@ -190,13 +209,13 @@ class StatementGenerator {
              }
 		   case "object":
 		   case "array":
-		     return 'JSON';
+		     return 'json';
 		   case "binData":
 		     return 'longblob';
 		   case "objectId":
 		     return "binary(12)";
 		   case "bool":
-		     return 'boolean';
+		     return 'tinyint(1)';
            case "null":
 		     return 'varchar(128)';
            case "regex":
@@ -236,21 +255,25 @@ class StatementGenerator {
      if (targetDataType.endsWith(" unsigned")) {
        return targetDataType
      }
+   
+     if (targetDataType === "boolean") {
+       return 'tinyint(1)'
+     }
   
-     if (unboundedTypes.includes(targetDataType)) {
+     if (StatementGenerator.UNBOUNDED_TYPES.includes(targetDataType)) {
        return targetDataType
      }
   
-     if (spatialTypes.includes(targetDataType)) {
+     if (StatementGenerator.SPATIAL_TYPES.includes(targetDataType)) {
        return targetDataType
      }
   
-     if (nationalTypes.includes(targetDataType)) {
+     if (StatementGenerator.NATIONAL_TYPES.includes(targetDataType)) {
        return targetDataType + '(' + length + ')'
      }
   
      if (scale) {
-       if (integerTypes.includes(targetDataType)) {
+       if (StatementGenerator.INTEGER_TYPES.includes(targetDataType)) {
          return targetDataType + '(' + length + ')';
        }
        return targetDataType + '(' + length + ',' + scale + ')';
@@ -267,33 +290,21 @@ class StatementGenerator {
      return targetDataType;     
   }
       
-  generateTableInfo(metadata) {
+  generateTableInfo(tableMetadata) {
       
     let insertMode = 'Batch';
 
-    const columnNames = metadata.columns.split(',');
-    const dataTypes = metadata.dataTypes
-    const sizeConstraints = metadata.sizeConstraints
+    const columnNames = tableMetadata.columnNames
+    const dataTypes = tableMetadata.dataTypes
+    const sizeConstraints = tableMetadata.sizeConstraints
     const targetDataTypes = [];
     const setOperators = []
-  
-    const columnClauses = columnNames.map((columnName,idx) => {    
-       
-	   const dataType = {
-                type : dataTypes[idx]
-             }    
-        
-       const sizeConstraint = sizeConstraints[idx]
-       if ((sizeConstraint !== null) && (sizeConstraint.length > 0)) {
-          const components = sizeConstraint.split(',');
-          dataType.length = parseInt(components[0])
-          if (components.length > 1) {
-            dataType.scale = parseInt(components[1])
-          }
-       }
     
-       let targetDataType = this.mapForeignDataType(metadata.vendor,dataType.type,dataType.length,dataType.scale);
-       
+    const columnClauses = columnNames.map((columnName,idx) => {    
+    
+
+	   const dataType = YadamuLibrary.composeDataType(dataTypes[idx],sizeConstraints[idx])       
+       let targetDataType = this.mapForeignDataType(tableMetadata.vendor,dataType.type,dataType.length,dataType.scale);
        targetDataTypes.push(targetDataType);
        let ensureNullable = false;
        switch (targetDataType) {
@@ -302,47 +313,48 @@ class StatementGenerator {
             switch (this.spatialFormat) {
               case "WKB":
               case "EWKB":
-                setOperators.push(' ' + columnName + ' = ST_GeomFromWKB(UNHEX(?))');
+                setOperators.push(' "' + columnName + '" = ST_GeomFromWKB(?)');
                 break
               case "WKT":
               case "EWRT":
-                setOperators.push(' ' + columnName + ' =  ST_GeomFromText(?)');
+                setOperators.push(' "' + columnName + '" =  ST_GeomFromText(?)');
                 break;
               case "GeoJSON":
-                setOperators.push(' ' + columnName + ' =  ST_GeomFromGeoJSON(?)');
+                setOperators.push(' "' + columnName + '" =  ST_GeomFromGeoJSON(?)');
                 break;
               default:
-                setOperators.push(' ' + columnName + ' = ST_GeomFromWKB(UNHEX(?))');
+                setOperators.push(' "' + columnName + '" = ST_GeomFromWKB(?)');
             }              
             break;                                                 
          case 'timestamp':
             ensureNullable = true;
          default:
-           setOperators.push(' ' + columnName + ' = ?')
+           setOperators.push(' "' + columnName + '"= ?')
        }
-       return `${columnName} ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)} ${ensureNullable === true ? 'null':''}`
+       return `"${columnName}" ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)} ${ensureNullable === true ? 'null':''}`
     })
                                        
-    const createStatement = `create table if not exists "${this.targetSchema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
-    let insertStatement = `insert into "${this.targetSchema}"."${metadata.tableName}"`;
+    const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
+    let insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}"`;
     if (insertMode === 'Iterative') {
       insertStatement += ` set` + setOperators.join(',');
     }
     else {
-      insertStatement += `(${metadata.columns}) values ?`;
+      insertStatement += ` ("${columnNames.join('","')}") values ?`;
     }
     return { 
        ddl             : createStatement, 
        dml             : insertStatement, 
-	   columns         : columnNames,
+	   columnNames     : columnNames,
        targetDataTypes : targetDataTypes, 
        insertMode      : insertMode,
-       batchSize       : this.batchSize, 
-       commitSize      : this.commitSize
+       _BATCH_SIZE     : this.dbi.BATCH_SIZE,
+       _COMMIT_COUNT   : this.dbi.COMMIT_COUNT,
+       _SPATIAL_FORMAT : this.spatialFormat
     }
   }
   
-  async generateStatementCache(executeDDL,vendor) {
+  async generateStatementCache(executeDDL) {
       
     const statementCache = {}
     const tables = Object.keys(this.metadata); 
@@ -350,7 +362,6 @@ class StatementGenerator {
     const ddlStatements = tables.map((table,idx) => {
       const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);
-	  tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.targetDataTypes);
       statementCache[this.metadata[table].tableName] = tableInfo;
       return tableInfo.ddl;
     })

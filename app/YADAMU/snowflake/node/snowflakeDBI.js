@@ -9,57 +9,46 @@ const { performance } = require('perf_hooks');
 */
 const snowflake = require('snowflake-sdk');
 
+const Yadamu = require('../../common/yadamu.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
+const SnowflakeConstants = require('./snowflakeConstants.js');
 const SnowflakeError = require('./snowflakeError.js')
+const SnowflakeReader = require('./snowflakeReader.js');
 const SnowflakeParser = require('./snowflakeParser.js');
 const SnowflakeWriter = require('./snowflakeWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
-const SnowflakeReader = require('./snowflakeReader.js');
-
-const sqlTableInfo = 
-`select t.table_schema "TABLE_SCHEMA"
-         ,t.table_name   "TABLE_NAME"
-         ,listagg(concat('"',c.column_name,'"'),',') within group (order by ordinal_position) "COLUMN_LIST"
-         ,listagg(concat('"',data_type,'"'),',') within group (order by ordinal_position) "DATA_TYPES"
-         ,listagg(case
-                       when (numeric_precision is not null) and (numeric_scale is not null) 
-                         then concat('"',numeric_precision,',',numeric_scale,'"')
-                       when (numeric_precision is not null) 
-                         then concat('"',numeric_precision,'"')
-                       when (datetime_precision is not null)
-                         then concat('"',datetime_precision,'"')
-                       when (character_maximum_length is not null)
-                         then concat('"',character_maximum_length,'"')
-                       else
-                         '""'
-                     end
-                    ,','
-                   )
-                   within group (order by ordinal_position) "SIZE_CONSTRAINTS"
-         ,concat('select ',listagg(case
-                                     when c.data_type = 'VARIANT' then
-                                       concat('TO_VARCHAR("',column_name,'") "',column_name,'"')
-                                     else
-                                       concat('"',column_name,'"')
-                                   end
-                                  ,',') within group (order by ordinal_position)
-                          ,' from "',t.table_schema,'"."',t.table_name,'"') "SQL_STATEMENT"
-     from information_schema.columns c, information_schema.tables t
-    where t.table_name = c.table_name
-      and t.table_schema = c.table_schema
-      and t.table_type = 'BASE TABLE'
-      and t.table_schema = ?
-    group by t.table_schema, t.table_name`;
-
-const sqlBeginTransaction = `begin`;
-
-const sqlCommitTransaction = `commit`;
-
-const sqlRollbackTransaction = `rollback`;
 
 class SnowflakeDBI extends YadamuDBI {
-    
+
+  static get SQL_CONFIGURE_CONNECTION()                       { return _SQL_CONFIGURE_CONNECTION }
+  static get SQL_SYSTEM_INFORMATION()                         { return _SQL_SYSTEM_INFORMATION }
+  static get SQL_SCHEMA_INFORMATION()                         { return _SQL_SCHEMA_INFORMATION }
+  static get SQL_GET_DLL_STATEMENTS()                         { return _SQL_GET_DLL_STATEMENTS }
+  static get SQL_BEGIN_TRANSACTION()                          { return _SQL_BEGIN_TRANSACTION }  
+  static get SQL_COMMIT_TRANSACTION()                         { return _SQL_COMMIT_TRANSACTION }
+  static get SQL_ROLLBACK_TRANSACTION()                       { return _SQL_ROLLBACK_TRANSACTION }
+ 
+  // Instance level getters.. invoke as this.METHOD
+
+  // Not available until configureConnection() has been called 
+ 
+  // Define Getters based on configuration settings here
+ 
+  // Override YadamuDBI
+
+  get DATABASE_VENDOR()      { return SnowflakeConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()      { return SnowflakeConstants.SOFTWARE_VENDOR};
+  get STATEMENT_TERMINATOR() { return SnowflakeConstants.STATEMENT_TERMINATOR };
+
+  // Enable configuration via command line parameters
+
+  get SPATIAL_FORMAT()        { return this.parameters.SPATIAL_FORMAT || SnowflakeConstants.SPATIAL_FORMAT };
+  
+  constructor(yadamu) {	  
+    super(yadamu,SnowflakeConstants.DEFAULT_PARAMETERS);
+  }
+
   /*
   **
   ** Local methods 
@@ -96,6 +85,10 @@ class SnowflakeDBI extends YadamuDBI {
   	// Snowflake-SDK does not support connection pooling
   }
   
+  async useDatabase(database) {
+	 await this.executeSQL(`use database "${database}"`)
+  }
+  
   async getConnectionFromPool() {
   	// Snowflake-SDK does not support connection pooling
     this.setDatabase();
@@ -114,7 +107,8 @@ class SnowflakeDBI extends YadamuDBI {
   
   async configureConnection() {    
     // Perform connection specific configuration such as setting sesssion time zone to UTC...
-	 const results = await this.executeSQL(`alter session set autocommit = false timezone = 'UTC' TIMESTAMP_OUTPUT_FORMAT = 'YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM' TIMESTAMP_NTZ_OUTPUT_FORMAT = 'YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM'`);
+	//  await this.useDatabase(this.connectionProperties.database);
+	const results = await this.executeSQL(SnowflakeDBI.SQL_CONFIGURE_CONNECTION);
   }
 
   async closeConnection() {
@@ -131,27 +125,13 @@ class SnowflakeDBI extends YadamuDBI {
   	// Snowflake-SDK does not support connection pooling
   }
     
-  /*
-  **
-  ** Overridden Methods
-  **
-  */
-  
-  get DATABASE_VENDOR() { return 'SNOWFLAKE' };
-  get SOFTWARE_VENDOR() { return 'Snokwflake Inc' };
-  get SPATIAL_FORMAT()  { return this.spatialFormat };
-  get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().snowflake }
-
-  constructor(yadamu) {
-    super(yadamu,yadamu.getYadamuDefaults().example);
-  }
-
   getConnectionProperties() {
 	// Convert supplied parameters to format expected by connection mechansim
     return {
-      account           : this.parameters.HOSTNAME
+      account           : this.parameters.ACCOUNT
     , username          : this.parameters.USERNAME
     , password          : this.parameters.PASSWORD
+	, warehouse         : this.parameters.WAREHOUSE
     , database          : this.parameters.DATABASE
     }
      
@@ -159,7 +139,7 @@ class SnowflakeDBI extends YadamuDBI {
 
   executeSQL(sqlStatement,args) {
     
-    let attemptReconnect = this.attemptReconnection;
+    let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
     return new Promise((resolve,reject) => {
 
@@ -173,7 +153,7 @@ class SnowflakeDBI extends YadamuDBI {
         sqlText        : sqlStatement
       , binds          : args
 	  , fetchAsString  : ['Number','Date','JSON']
-      , complete       : async function(err,statement,rows) {
+      , complete       : async (err,statement,rows) => {
 		                   const sqlEndTime = performance.now()
                            if (err) {
               		         const cause = this.captureException(new SnowflakeError(err,stack,sqlStatement))
@@ -219,7 +199,6 @@ class SnowflakeDBI extends YadamuDBI {
   
   async initialize() {
     await super.initialize(true);   
-    this.spatialFormat = "GeoJSON"
   }
     
   /*
@@ -259,7 +238,7 @@ class SnowflakeDBI extends YadamuDBI {
 	**
 	*/
 	
-     await this.executeSQL(sqlBeginTransaction,[]);
+     await this.executeSQL(SnowflakeDBI.SQL_BEGIN_TRANSACTION,[]);
      super.beginTransaction();
 
   }
@@ -281,8 +260,8 @@ class SnowflakeDBI extends YadamuDBI {
 	**
 	*/
 
-     await this.executeSQL(sqlCommitTransaction,[]);
 	 super.commitTransaction();
+     await this.executeSQL(SnowflakeDBI.SQL_COMMIT_TRANSACTION,[]);
 	
   }
 
@@ -308,11 +287,10 @@ class SnowflakeDBI extends YadamuDBI {
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
 	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 	
-    const sqlStatement =  `rollback transaction`
-	 
+     
 	try {
-      await this.executeSQL(sqlRollbackTransaction,[]);
       super.rollbackTransaction()
+      await this.executeSQL(SnowflakeDBI.SQL_ROLLBACK_TRANSACTION,[]);
     } catch (newIssue) {
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue);								   
 	}
@@ -325,69 +303,7 @@ class SnowflakeDBI extends YadamuDBI {
   async restoreSavePoint(cause) {
 	throw new Error('Unimplemented Method')
   }  
-  
-  /*
-  **
-  ** The following methods are used by JSON_TABLE() style import operations  
-  **
-  */
 
-  /*
-  **
-  **  Upload a JSON File to the server. Optionally return a handle that can be used to process the file
-  **
-  */
-  
-  async loadStagingTable(importFilePath) {
-	// Process a JSON file that has been uploaded to the server using the database's native JSON capabilities. In most use cases 
-	// using client side implementaions are faster, more efficient and can handle much larger files. 
-	// The default implementation throws an unsupport feature exception
-	super.loadStagingTable()
-  }
-  
-  async uploadFile(importFilePath) {
-	// Upload a JSON file to the server so it can be parsed and processed using the database's native JSON capabilities. In most use cases 
-	// using client side implementaions are faster, more efficient and can handle much larger files. 
-	// The default implementation throws an unsupport feature exception
-	super.uploadFile()
-  }
-  
-  /*
-  **
-  **  Process a JSON File that has been uploaded to the server. 
-  **
-  */
-
-  processLog(log,operation) {
-    super.processLog(log, operation, this.status, this.yadamuLogger)
-    return log
-  }
-
-  async processStagingTable(schema) {  	
-  	const sqlStatement = `select ${this.useBinaryJSON ? 'import_jsonb' : 'import_json'}(data,$1) from "YADAMU_STAGING"`;
-							   
-														   
-		 
-  	var results = await this.executeSQL(sqlStatement,[schema]);
-    if (results.rows.length > 0) {
-      if (this.useBinaryJSON  === true) {
-	    return this.processLog(results.rows[0].import_jsonb,'JSONB_EACH');  
-      }
-      else {
-	    return this.processLog(results.rows[0].import_json,'JSON_EACH');  
-      }
-    }
-    else {
-      this.yadamuLogger.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL IMPORT_JSONB()' : 'CALL_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`);
-      // Return value will be parsed....
-      return [];
-    }
-  }
-
-  async processFile(hndl) {
-     return await this.processStagingTable(this.parameters.TO_USER)
-  }
-  
   /*
   **
   ** The following methods are used by the YADAMU DBReader class
@@ -405,9 +321,8 @@ class SnowflakeDBI extends YadamuDBI {
     // Get Information about the target server
 	
   
-    const sqlStatement = 'SELECT CURRENT_WAREHOUSE() WAREHOUSE, CURRENT_DATABASE() DATABASE_NAME, CURRENT_SCHEMA() SCHEMA, CURRENT_ACCOUNT() ACCOUNT, CURRENT_VERSION() DATABASE_VERSION, CURRENT_CLIENT() CLIENT';
     
-    const results = await this.executeSQL(sqlStatement,[]);
+    const results = await this.executeSQL(SnowflakeDBI.SQL_SYSTEM_INFORMATION,[]);
     
     const sysInfo = results[0];
 
@@ -440,38 +355,84 @@ class SnowflakeDBI extends YadamuDBI {
   async getDDLOperations() {
     return undefined
   }
+
+  async describeVariantColumns(schemaInfo) {
+      
+    // Horrible Hack to get information columns which appear as type USER_DEFINED_TYPE in the INFORMATION SCHEMA
+    
+    const SAMPLE_SIZE  = 1000
+    
+    
+    return await Promise.all(schemaInfo.map(async (tableInfo) => {
+    
+      const SQL_DESCRIBE_TABLE = `desc table "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`
+	  
+      const columnNames = JSON.parse(tableInfo.COLUMN_NAME_ARRAY)
+      let dataTypes = JSON.parse(tableInfo.DATA_TYPE_ARRAY)
+      const sizeConstraints = JSON.parse(tableInfo.SIZE_CONSTRAINT_ARRAY)
+      
+      if (dataTypes.includes('USER_DEFINED_TYPE') || dataTypes.includes('BINARY')) {
+	    // Perform a describe to get more info about the USER_DEFINED_TYPE and BINARY
+	    const descOutput = await this.executeSQL(SQL_DESCRIBE_TABLE);
+	    dataTypes.forEach((dataType,idx) => {
+          dataTypes[idx] = dataType === 'USER_DEFINED_TYPE' ? descOutput[idx].type : dataType
+          sizeConstraints[idx] = dataType === 'BINARY' ? '' + YadamuLibrary.decomposeDataType(descOutput[idx].type).length : sizeConstraints[idx] 
+        })
+	  }
+      /*
+      **
+      ** Sucky DUCK-TYPING of VARIANT columns.. Basically if 1000 random rows contain JSON it's JSON otherwise it's XML !
+      **
+      */
+      if (dataTypes.includes('VARIANT')) {
+	    // -- Use TRY_PARSE_JSON test a random sample of non null columns to see of they contain valid JSON, if so, assume JSON otherwise assume XML.
+	    dataTypes = await Promise.all(dataTypes.map(async (dataType,idx) => {
+           if (dataType === 'VARIANT') {
+             const columnName = columnNames[idx]
+             const SQL_ANALYZE_VARIANT = `with SAMPLE_DATA_SET as (
+  select "${columnName}" from "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}" 
+           sample (1000 rows) 
+           where "${columnName}" is not null
+)
+select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
+       (select count(*) from SAMPLE_DATA_SET where TRY_PARSE_JSON("${columnName}") is not null) "JSON",
+       (select count(*) from SAMPLE_DATA_SET where IS_OBJECT("${columnName}")) "OBJECTS",
+       (select count(*) from SAMPLE_DATA_SET where IS_ARRAY("${columnName}")) "ARRAYS"`
+             let results = await this.executeSQL(SQL_ANALYZE_VARIANT)
+             switch (true) {
+               case (results[0].SAMPLED_ROWS === '0'):
+                 break;
+               case (results[0].SAMPLED_ROWS === results[0].JSON): 
+                 dataType = 'JSON'
+                 break
+               case (results[0].SAMPLED_ROWS === results[0].OBJECTS):
+                 // #### Bad Assumption ???? What about other VARIANT types....
+                 dataType = 'XML'
+                 break
+               case (results[0].ARRAY > 0):
+                 break;
+               default:
+             }               
+           }
+           return dataType
+        }))
+	  }
+      tableInfo.COLUMN_NAME_ARRAY = columnNames
+      tableInfo.DATA_TYPE_ARRAY = dataTypes
+      tableInfo.SIZE_CONSTRAINT_ARRAY = sizeConstraints
+	  return tableInfo
+	}))
+  }
+
+  async getSchemaInfo(keyName) {
+
+    let schemaInfo = await this.executeSQL(SnowflakeDBI.SQL_SCHEMA_INFORMATION,[this.parameters[keyName]])
+    schemaInfo = await this.describeVariantColumns(schemaInfo)
+    return schemaInfo
+  }
   
-  generateMetadata(tableInfo,server) {    
-    const metadata = {}
-    for (let table of tableInfo) {
-      metadata[table.TABLE_NAME] = {
-        owner                    : table.TABLE_SCHEMA
-       ,tableName                : table.TABLE_NAME
-       ,columns                  : table.COLUMN_LIST
-       ,dataTypes                : JSON.parse('[' + table.DATA_TYPES + ']')
-       ,sizeConstraints          : JSON.parse('[' + table.SIZE_CONSTRAINTS + ']')
-      }
-    }
-    return metadata;  
-  }
-   
-  generateTableInfo() {
-    
-    // Psuedo Code shown below..
-	
-    const tableInfo = Object.keys(this.metadata).map((value) => {
-      return {TABLE_NAME : value, SQL_STATEMENT : this.metadata[value].sqlStatemeent}
-    })
-    return tableInfo;    
-    
-  }
-
-  async getSchemaInfo(schemaKey) {
-    return await this.executeSQL(sqlTableInfo,[this.parameters[schemaKey]])
-  }
-
-  createParser(tableInfo,objectMode) {
-    return new SnowflakeParser(tableInfo,objectMode,this.yadamuLogger);
+  createParser(tableInfo) {
+    return new SnowflakeParser(tableInfo,this.yadamuLogger);
   }  
   
   streamingError(e,sqlStatement) {
@@ -514,11 +475,52 @@ class SnowflakeDBI extends YadamuDBI {
 	return await super.workerDBI(workerNumber,dbi)
   }
  
-  async getConnectionID() {
-	// Get a uniqueID for the current connection
-    throw new Error('Unimplemented Method')
-  }
-	  
 }
 
 module.exports = SnowflakeDBI
+
+const _SQL_CONFIGURE_CONNECTION = `alter session set autocommit=false timezone='UTC' TIMESTAMP_OUTPUT_FORMAT='YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM' TIMESTAMP_NTZ_OUTPUT_FORMAT='YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM' TIME_INPUT_FORMAT='YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM' GEOGRAPHY_OUTPUT_FORMAT ='WKB'`
+
+const _SQL_SYSTEM_INFORMATION   = `select CURRENT_WAREHOUSE() WAREHOUSE, CURRENT_DATABASE() DATABASE_NAME, CURRENT_SCHEMA() SCHEMA, CURRENT_ACCOUNT() ACCOUNT, CURRENT_VERSION() DATABASE_VERSION, CURRENT_CLIENT() CLIENT`
+    
+const _SQL_SCHEMA_INFORMATION = 
+`select t.table_schema   "TABLE_SCHEMA"
+         ,t.table_name   "TABLE_NAME"
+         ,concat('[',listagg(concat('"',c.column_name,'"'),',') within group (order by ordinal_position),']') "COLUMN_NAME_ARRAY"
+         ,concat('[',listagg(concat('"',data_type,'"'),',') within group (order by ordinal_position),']') "DATA_TYPE_ARRAY"
+         ,concat('[',listagg(case
+                       when (numeric_precision is not null) and (numeric_scale is not null) 
+                         then concat('"',numeric_precision,',',numeric_scale,'"')
+                       when (numeric_precision is not null) 
+                         then concat('"',numeric_precision,'"')
+                       when (datetime_precision is not null)
+                         then concat('"',datetime_precision,'"')
+                       when (character_maximum_length is not null)
+                         then concat('"',character_maximum_length,'"')
+                       else
+                         '""'
+                     end
+                    ,','                   
+                   ) within group (order by ordinal_position)
+                 ,']') "SIZE_CONSTRAINT_ARRAY"
+         ,listagg(case
+                   when c.data_type = 'VARIANT' then
+                     concat('TO_VARCHAR("',column_name,'") "',column_name,'"')
+                   else
+                     concat('"',column_name,'"')
+                   end
+                  ,','
+                 ) within group (order by ordinal_position) "CLIENT_SELECT_LIST"
+     from information_schema.columns c, information_schema.tables t
+    where t.table_name = c.table_name
+      and t.table_schema = c.table_schema
+      and t.table_type = 'BASE TABLE'
+      and t.table_schema = ?
+    group by t.table_schema, t.table_name`;
+
+const _SQL_BEGIN_TRANSACTION    = `begin`;
+
+const _SQL_COMMIT_TRANSACTION   = `commit`;
+
+const _SQL_ROLLBACK_TRANSACTION = `rollback`;
+

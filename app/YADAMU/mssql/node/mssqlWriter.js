@@ -1,9 +1,9 @@
 "use strict"
 
 const { performance } = require('perf_hooks');
-const WKX = require('wkx');
-
 const YadamuWriter = require('../../common/yadamuWriter.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 
 class MsSQLWriter extends YadamuWriter {
     
@@ -11,49 +11,22 @@ class MsSQLWriter extends YadamuWriter {
     super({objectMode: true},dbi,tableName,status,yadamuLogger)
   }
   
-  setTableInfo(tableInfo) {
-	super.setTableInfo(tableInfo)
+  setTableInfo(tableName) {
+	super.setTableInfo(tableName)
 	this.insertMode = 'Bulk';
-	
-	this.transformations = this.tableInfo.dataTypes.map((dataType) => {
-	  switch (dataType.type) {
-        case "image" :
-		  return (col,idx) => {
-     	     // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
-             return Buffer.from(col,'hex');
-		  }
-          break;
-		case "binary":
-        case "varbinary":
-		  return (col,idx) => {
-             return Buffer.from(col,'hex');
- 		  }
-          break;
-       case "geography":
-       case "geometry":
-		 switch (this.tableInfo.spatialFormat) {
-		   case "WKB":
-           case "EWKB":
-             return (col,idx) => {
-		       // Upload geography & Geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
-	           return Buffer.from(col,'hex');
-			 }
-			 break;
-		   case "GeoJSON":
-             return (col,idx) => {
-  		       return WKX.Geometry.parseGeoJSON(JSON.parse(col)).toWkt();
-			 }
-		     break;
-		   default:
-             return null;	 
-		  }
-          break;
+    this.dataTypes  = YadamuLibrary.decomposeDataTypes(this.tableInfo.targetDataTypes)
+
+	this.transformations = this.dataTypes.map((dataType,idx) => {      
+	  switch (dataType.type.toLowerCase()) {
         case "json":
 		  return (col,idx) => {
-             if (typeof col === 'object') {
-               return JSON.stringify(col);
-             }
-			 return col
+            return typeof col === 'object' ? JSON.stringify(col) : col
+		  }
+          break;
+        case 'bit':
+        case 'boolean':
+		  return (col,idx) => {
+            return YadamuLibrary.toBoolean(col)
 		  }
           break;
         case "datetime":
@@ -84,27 +57,6 @@ class MsSQLWriter extends YadamuWriter {
               col = col.toISOString();
             }
 			return col;
-		  }
-          break;
-        case 'bit':
-		  return (col,idx) => {
-            if (typeof col === 'string') {
-              switch (col.toLowerCase()) {
-                case '00':
-                  return false;
-                  break;
-                case '01':
-                  return true;
-                  break;
-                case 'false':
-                  return true;
-                  break;
-                case 'true':
-                  return true;
-                  break;
-              }
-            }
-			return col
 		  }
           break;
         default :
@@ -145,21 +97,23 @@ class MsSQLWriter extends YadamuWriter {
 	return this.skipTable;
   }
 
-  handleBatchError(operation,cause) {
+  reportBatchError(operation,cause) {
    
     const additionalInfo = {
       columnDefinitions: this.tableInfo.bulkOperation.columns
 	}
 
-    super.handleBatchError(operation,cause,this.tableInfo.bulkOperation.rows[0],this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1],additionalInfo)
+    super.reportBatchError(operation,cause,this.tableInfo.bulkOperation.rows[0],this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1],additionalInfo)
   }
   
   async writeBatch() {
-
-    this.rowCounters.batchCount++;
       
-    // ### Savepoint Support ?
- 
+    this.rowCounters.batchCount++;
+    
+    if (this.SPATIAL_FORMAT === 'GeoJSON') {
+      YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,this.tableInfo.bulkOperation.rows,true)
+    } 
+
     if (this.tableInfo.bulkSupported) {
       try {        
         await this.dbi.createSavePoint();
@@ -170,7 +124,7 @@ class MsSQLWriter extends YadamuWriter {
 		this.rowCounters.cached = 0;
         return this.skipTable
       } catch (cause) {
-        this.handleBatchError(`INSERT MANY`,cause)
+        this.reportBatchError(`INSERT MANY`,cause)
         await this.dbi.restoreSavePoint(cause);
 		this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Switching to Iterative mode.`);          
         this.tableInfo.bulkSupported = false;
@@ -179,7 +133,7 @@ class MsSQLWriter extends YadamuWriter {
     
     // Cannot process table using BULK Mode. Prepare a statement use with record by record processing.
  
-    await this.dbi.cachePreparedStatement(this.tableInfo.dml, this.tableInfo.dataTypes,this.tableInfo.spatialFormat) 
+    await this.dbi.cachePreparedStatement(this.tableInfo.dml, this.dataTypes,this.SPATIAL_FORMAT) 
 
     for (const row in this.tableInfo.bulkOperation.rows) {
       try {

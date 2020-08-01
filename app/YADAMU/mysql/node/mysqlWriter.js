@@ -2,40 +2,40 @@
 
 const { performance } = require('perf_hooks');
 
-const WKX = require('wkx');
-
 const YadamuWriter = require('../../common/yadamuWriter.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 
 class MySQLWriter extends YadamuWriter {
 
   constructor(dbi,tableName,status,yadamuLogger) {
     super({objectMode: true},dbi,tableName,status,yadamuLogger)
-    this.warningManager = this.dbi.yadamu.warningManager
+    console.log(this.tableInfo);
   }
   
-  setTableInfo(tableInfo) {
-	super.setTableInfo(tableInfo)   
-	this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
+  setTableInfo(tableName) {
+	super.setTableInfo(tableName)   
+	this.tableInfo.columnCount = this.tableInfo.columnNames.length;
     this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + ')'; 
     
-    this.transformations = this.tableInfo.dataTypes.map((dataType,idx) => {
+	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
+      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
       switch (dataType.type.toLowerCase()) {
-        case "tinyblob" :
-        case "blob" :
-        case "mediumblob" :
-        case "longblob" :
-        case "varbinary" :
-        case "binary" :
-	      return (col,idx) => {
-            return Buffer.from(col,'hex');
-		  }
-          break;
         case "json" :
           return (col,idx) => {
-            if (typeof col === 'object') {
-              return JSON.stringify(col);
-            }
-			return col
+            return typeof col === 'object' ? JSON.stringify(col) : col
+	      }
+          break;
+        case "geometry" :
+          if (this.SPATIAL_FORMAT === 'GeoJSON') {
+            return (col,idx) => {
+              return typeof col === 'object' ? JSON.stringify(col) : col
+	        }
+          }
+          return null;
+        case "boolean":
+          return (col,idx) => {
+            return YadamuLibrary.booleanToInt(col)
 	      }
           break;
         case "date":
@@ -75,58 +75,32 @@ class MySQLWriter extends YadamuWriter {
       warnings.forEach((warning,idx) => {
         if (warning.Level === 'Warning') {
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,idx],`${warning.Code} Details: ${warning.Message}.`)
-		  this.warningManager.rejectRow(this.tableInfo.tableName,this.batch[idx]);
+		  this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,this.batch[idx]);
         }
       })
     }
   }
   
-  async recodeSpatialData(row,rowNumber) {  
-
-    // Convert spatial data in current row from WKB to WKT and retry Insert...
-    // Update current insert statement to reflect change in spatial data format.
-    // 
-    // ### TODO: Convert all remaining rows in current batch ? Convert all remaining batches 
-    
-    if ((this.tableInfo.spatialFormat === 'WKT') || (this.tableInfo.spatialFormat === 'EWKT')) {
-      return false;
-    }
+  recodeSpatialColumns(batch,row,msg) {
       
-    const newRow = this.tableInfo.dataTypes.map((dataType,idx) => {
-      switch (dataType.type) {
-        case "geography":
-        case "geometry": 
-          if (row[idx] !== null) {
-            return WKX.Geometry.parse(Buffer.from(row[idx],'hex')).toWkt()
-          }
-          else {
-            return row[idx]
-          }
-          break;
-        default:  
-          return row[idx]
-      }
-    })
-
-    const dml = this.tableInfo.dml.replace(/ST_GeomFromWKB\(UNHEX\(\?\)\)/g,'ST_GeomFromText(?)')
-     
-    try {
-      const results = await this.dbi.executeSQL(dml,newRow)
-      await this.processWarnings(results);
-	  this.rowCounters.written++;
-    } catch (cause) {
-      await this.handleIterativeError(`INSERT [WKB=>WKT]`,cause,rowNumber,newRow);
-    }    
+    // If MySQL rejects a WKB record recode the entire batch as WKT
+    
+    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`INSERT ONE`,this.batch.length,row,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
+    YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch,true)
   }
   
-  handleBatchError(operation,cause) {
-   	super.handleBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+  reportBatchError(operation,cause) {
+   	super.reportBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
   }
  
   async writeBatch() {     
 
     this.rowCounters.batchCount++;
-   
+
+    console.log(this.tableInfo.dml);
+    console.log(this.batch[0])
+	console.log(this.SPATIAL_FORMAT)
+
     if (this.tableInfo.insertMode === 'Batch') {
       try {
         await this.dbi.createSavePoint();
@@ -139,7 +113,7 @@ class MySQLWriter extends YadamuWriter {
 		this.rowCounters.cached = 0;
         return this.skipTable
       } catch (cause) {
-		this.handleBatchError(cause,'INSERT MANY')
+		this.reportBatchError(cause,'INSERT MANY')
         await this.dbi.restoreSavePoint(cause);
         this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative'   
@@ -147,25 +121,32 @@ class MySQLWriter extends YadamuWriter {
       }
     }
           
+    let batchRecoded = false     
+    let dml = this.tableInfo.dml
     for (const row in this.batch) {
-      try {
-        const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch[row])
-        await this.processWarnings(results);
-		this.rowCounters.written++;
-      } catch (cause) {
-        if (cause.spatialInsertFailed()) {
-          this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`INSERT ONE`,this.batch.length,row,this.tableInfo.spatialFormat],`${cause.message} Converting to "WKT".`);
-          await this.recodeSpatialData(this.batch[row],row);
-        }
-        else {
-          await this.handleIterativeError(`INSERT ONE`,cause,row,this.batch[row]);
-        }
-        if (this.skipTable) {
+      // Enable retry after correcting spatial issues.. Break on successful insert or unfixable error
+      while (true) {      
+        try {
+          const results = await this.dbi.executeSQL(dml,this.batch[row])
+          await this.processWarnings(results);
+		  this.rowCounters.written++;
           break;
+        } catch (cause) {
+          if (cause.spatialInsertFailed() && !batchRecoded) {
+		    this.recodeSpatialColumns(this.batch,row,cause.message)
+            batchRecoded = true;
+            dml = this.tableInfo.dml.replace(/ST_GeomFromWKB\(\?\)/g,'ST_GeomFromText(?)')
+          }
+          else {
+            await this.handleIterativeError(`INSERT ONE`,cause,row,this.batch[row]);
+            break;
+          }
         }
       }
+      if (this.skipTable) {
+        break;
+      }
     }     
-	
     this.endTime = performance.now();
     this.batch.length = 0;  
 	this.rowCounters.cached = 0;

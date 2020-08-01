@@ -31,7 +31,9 @@ class MsSQLReader extends Readable {
 		  }
 		}
 	  }).on('error',(err, p) => {
-		if (!this.streamFailed) {
+        if (!this.streamFailed) {
+          // Destroy should emit the error but doesn't seem too? 
+          this.emit('error',err)
           this.destroy(err);
 		}
 		this.streamFailed = true;
@@ -64,6 +66,14 @@ class MsSQLReader extends Readable {
 		}
 	  }
 	}
+	
+	_destroy(cause,callback) {
+	   if (!this.streamComplete) {
+		 this.request.cancel();
+	   }
+	   callback()
+	}
+	
 }
 
 module.exports = MsSQLReader

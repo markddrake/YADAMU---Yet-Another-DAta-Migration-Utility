@@ -9,71 +9,56 @@ const { performance } = require('perf_hooks');
 **
 */
 const mysql = require('mysql');
+
+const Yadamu = require('../../common/yadamu.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const MySQLConstants = require('./mysqlConstants.js')
 const MySQLError = require('./mysqlError.js')
 const MySQLParser = require('./mysqlParser.js');
 const MySQLWriter = require('./mysqlWriter.js');
 const StatementGenerator80 = require('./statementGenerator.js');
 const StatementGenerator57 = require('../../dbShared/mysql/statementGenerator57.js');
 
-const sqlSystemInformation = 
-`select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
-
-// Check for duplicate entries INFORMATION_SCHEMA.columns
-
-const sqlCheckInformationSchemaState =
-`select distinct c.table_schema, c.table_name
-   from information_schema.columns c, information_schema.tables t
-  where t.table_name = c.table_name 
-    and c.extra <> 'VIRTUAL GENERATED'
-    and t.table_schema = c.table_schema
-    and t.table_type = 'BASE TABLE'
-    and t.table_schema = ?
-  group by TABLE_SCHEMA,TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION
-  having count(*) > 1`
-
-const sqlInformationSchemaClean =
-`   from information_schema.columns c, information_schema.tables t
-  where t.table_name = c.table_name 
-    and c.extra <> 'VIRTUAL GENERATED'
-    and t.table_schema = c.table_schema
-    and t.table_type = 'BASE TABLE'
-    and t.table_schema = ?
-      group by t.table_schema, t.table_name`;
-      
-   
-// Hack for Duplicate Entries in INFORMATION_SCHEMA.columns seen MySQL 5.7
-
-const sqlInformationSchemaDirty  = 
-`   from (
-     select distinct c.table_catalog, c.table_schema, c.table_name,column_name,ordinal_position,data_type,column_type,character_maximum_length,numeric_precision,numeric_scale,datetime_precision
-       from information_schema.columns c, information_schema.tables t
-       where t.table_name = c.table_name 
-         and c.extra <> 'VIRTUAL GENERATED'
-         and t.table_schema = c.table_schema
-         and t.table_type = 'BASE TABLE'
-         and t.table_schema = ?
-   ) c
-  group by c.table_schema, c.table_name`;
-
-const sqlCreateSavePoint  = `SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
-
-const sqlRestoreSavePoint = `ROLLBACK TO SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
-
-const sqlReleaseSavePoint = `RELEASE SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
-
-const CONNECTION_PROPERTY_DEFAULTS = {
-  multipleStatements: true
-, typeCast          : true
-, supportBigNumbers : true
-, bigNumberStrings  : true          
-, dateStrings       : true
-, trace             : true
-}
-
 class MySQLDBI extends YadamuDBI {
     
+  // Until we have static constants
+
+  static get SQL_CONFIGURE_CONNECTION()                       { return _SQL_CONFIGURE_CONNECTION }
+  static get SQL_SYSTEM_INFORMATION()                         { return _SQL_SYSTEM_INFORMATION }
+  static get SQL_GET_DLL_STATEMENTS()                         { return _SQL_GET_DLL_STATEMENTS }
+  static get SQL_CHECK_INFORAMATION_SCHEMA_STATE()            { return _SQL_CHECK_INFORAMATION_SCHEMA_STATE } 
+  static get SQL_INFORMATION_SCHEMA_FROM_CLAUSE()             { return _SQL_INFORMATION_SCHEMA_FROM_CLAUSE }
+  static get SQL_INFORMATION_SCHEMA_FROM_CLAUSE_DUPLICATES()  { return _SQL_INFORMATION_SCHEMA_FROM_CLAUSE_DUPLICATES }
+  static get SQL_CREATE_SAVE_POINT()                          { return _SQL_CREATE_SAVE_POINT }  
+  static get SQL_RESTORE_SAVE_POINT()                         { return _SQL_RESTORE_SAVE_POINT }
+  static get SQL_RELEASE_SAVE_POINT()                         { return _SQL_RELEASE_SAVE_POINT }
+
+
+  // Instance level getters.. invoke as this.METHOD
+
+  // Not available until configureConnection() has been called 
+ 
+  // Define Getters based on configuration settings here
+ 
+  // Override YadamuDBI
+
+  get DATABASE_VENDOR()            { return MySQLConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()            { return MySQLConstants.SOFTWARE_VENDOR};
+  get STATEMENT_TERMINATOR()       { return MySQLConstants.STATEMENT_TERMINATOR };
+  
+  // Enable configuration via command line parameters
+  get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT            || MySQLConstants.SPATIAL_FORMAT }
+  get TABLE_MATCHING()             { return this.parameters.TABLE_MATCHING            || MySQLConstants.TABLE_MATCHING}
+  get READ_KEEP_ALIVE()            { return this.parameters.READ_KEEP_ALIVE           || MySQLConstants.READ_KEEP_ALIVE}
+  get TREAT_TINYINT1_AS_BOOLEAN()  { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MySQLConstants.TREAT_TINYINT1_AS_BOOLEAN }
+  
+  constructor(yadamu) {
+    super(yadamu,MySQLConstants.DEFAULT_PARAMETERS)
+    this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
+	this.keepAliveHdl = undefined
+  }
+
   /*
   **
   ** Local methods 
@@ -94,26 +79,8 @@ class MySQLDBI extends YadamuDBI {
   
   async configureConnection() {
 
-    const sqlSetITimeout  = `SET SESSION interactive_timeout = 600000`;
-    await this.executeSQL(sqlSetITimeout);
+    await this.executeSQL(MySQLDBI.SQL_CONFIGURE_CONNECTION);
 
-    const sqlSetWTimeout  = `SET SESSION wait_timeout = 600000`;
-    await this.executeSQL(sqlSetWTimeout);
-
-    const sqlSetSqlMode = `SET SESSION SQL_MODE='ANSI_QUOTES,PAD_CHAR_TO_FULL_LENGTH'`;
-    await this.executeSQL(sqlSetSqlMode);
-    
-    const sqlTimeZone = `SET TIME_ZONE = '+00:00'`;
-    await this.executeSQL(sqlTimeZone);
-   
-    const setGroupConcatLength = `SET SESSION group_concat_max_len = 1024000`
-    await this.executeSQL(setGroupConcatLength);
-
-    const enableFileUpload = `SET GLOBAL local_infile = 'ON'`
-    await this.executeSQL(enableFileUpload);
-
-    const disableAutoCommit = 'set autocommit = 0';
-    await this.executeSQL(disableAutoCommit);
   }
   
   async checkMaxAllowedPacketSize() {
@@ -225,98 +192,9 @@ class MySQLDBI extends YadamuDBI {
     await this.connection.ping()
   }
 
-
-  async sqlTableInfo(schema) {
-
-    /*
-    **
-    ** During testing on 5.7 it appeared tha that is is possible for the Information Schema to get corrupted
-    ** In the corrupt state some table contains duplicate entires for each column in the table.
-    ** 
-    ** This routine checks for this state and creates a query that will workaround the problem if the 
-    ** Information schema is corrupt.
-    ** 
-    */   
-    
-    const selectSchemaInfo = 
-      `select c.table_schema "TABLE_SCHEMA"
-             ,c.table_name "TABLE_NAME"
-             ,group_concat(concat('"',column_name,'"') order by ordinal_position separator ',')  "COLUMN_LIST"
-             ,concat('[',group_concat(json_quote(data_type) order by ordinal_position separator ','),']')  "DATA_TYPES"
-             ,concat('[',group_concat(json_quote(
-                                  case when (numeric_precision is not null) and (numeric_scale is not null)
-                                         then concat(numeric_precision,',',numeric_scale) 
-                                       when (numeric_precision is not null)
-                                         then case
-                                                when column_type like '%unsigned' 
-                                                  then numeric_precision
-                                                else
-                                                  numeric_precision + 1
-                                              end
-                                       when (datetime_precision is not null)
-                                         then datetime_precision
-                                       when (character_maximum_length is not null)
-                                         then character_maximum_length
-                                       else   
-                                         ''   
-                                  end
-                                 ) 
-                                 order by ordinal_position separator ','
-                          ),']') "SIZE_CONSTRAINTS"
-             ,concat(
-                'select json_array('
-                  ,group_concat(
-                   case 
-                     when data_type in ('date','time','datetime','timestamp') then
-                       -- Force ISO 8601 rendering of value 
-                       concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')')
-                     when data_type = 'year' then
-                       -- Prevent rendering of value as base64:type13: 
-                       concat('CAST("', column_name, '"as DECIMAL)')
-                     when data_type like '%blob' then
-                       -- Force HEXBINARY rendering of value
-                       concat('HEX("', column_name, '")')
-                     when data_type = 'varbinary' then
-                       -- Force HEXBINARY rendering of value
-                       concat('HEX("', column_name, '")')
-                     when data_type = 'binary' then
-                       -- Force HEXBINARY rendering of value
-                       concat('HEX("', column_name, '")')
-                     when data_type = 'geometry' then
-                       -- Force ${this.spatialFormat} rendering of value
-                       concat('${this.spatialSerializer}"', column_name, '"))')
-                     when data_type = 'float' then
-                       -- Render Floats with greatest possible precision 
-                       -- Risk of Overflow ????
-                       concat('(floor(1e15*"',column_name,'")/1e15)')                                      
-                     else
-                       concat('"',column_name,'"')
-                   end
-                   order by ordinal_position separator ','
-                 )
-                 ,') "json" from "'
-                 ,c.table_schema
-                 ,'"."'
-                 ,c.table_name
-                 ,'"'
-               ) "SQL_STATEMENT"`;
-       
-  
-    const results = await this.executeSQL(sqlCheckInformationSchemaState,[schema]);
-    if (results.length ===  0) {
-      return `${selectSchemaInfo} ${sqlInformationSchemaClean}`
-    }
-    else {
-      for (const i in results) {
-        this.yadamuLogger.warning([`${this.constructor.name}`,`"${results[i].TABLE_SCHEMA}"."${results[i].TABLE_NAME}"`],`Duplicate entires detected in INFORMATION_SCHEMA.COLUMNS.`)
-      }
-      return `${selectSchemaInfo} ${sqlInformationSchemaDirty}`
-    }
-  }
-   
   executeSQL(sqlStatement,args) {
     
-    let attemptReconnect = this.attemptReconnection;
+    let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
     return new Promise((resolve,reject) => {
                    if (this.status.sqlTrace) {
@@ -350,12 +228,7 @@ class MySQLDBI extends YadamuDBI {
                    })
                })
   }  
-
-  setConnectionProperties(connectionProperties) {
-	connectionProperties = Object.assign(connectionProperties,CONNECTION_PROPERTY_DEFAULTS);
-	super.setConnectionProperties(connectionProperties); 
-  }
-	        
+     
   async createSchema(schema) {    	
   
 	const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;					   
@@ -383,12 +256,6 @@ class MySQLDBI extends YadamuDBI {
 	return results;
   }
   
-  /*
-  **
-  ** Overridden Methods
-  **
-  */
-    
   async executeDDLImpl(ddl) {
     await this.createSchema(this.parameters.TO_USER);
     const ddlResults = await Promise.all(ddl.map((ddlStatement) => {
@@ -398,19 +265,8 @@ class MySQLDBI extends YadamuDBI {
 	return ddlResults;
   }
 
-  get DATABASE_VENDOR() { return 'MySQL' };
-  get SOFTWARE_VENDOR() { return 'Oracle Corporation (MySQL)' };
-  get SPATIAL_FORMAT()  { return this.spatialFormat };
-  get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().mysql }
-  
-  constructor(yadamu) {
-    super(yadamu,yadamu.getYadamuDefaults().mysql)
-    this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
-	this.keepAliveHdl = undefined
-  }
-  
   setConnectionProperties(connectionProperties) {
-	 super.setConnectionProperties(Object.assign( Object.keys(connectionProperties).length > 0 ? connectionProperties : this.connectionProperties,CONNECTION_PROPERTY_DEFAULTS));
+	 super.setConnectionProperties(Object.assign( Object.keys(connectionProperties).length > 0 ? connectionProperties : this.connectionProperties, MySQLConstants.CONNECTION_PROPERTY_DEFAULTS));
   }
 
   getConnectionProperties() {
@@ -420,7 +276,7 @@ class MySQLDBI extends YadamuDBI {
     , password          : this.parameters.PASSWORD
     , database          : this.parameters.DATABASE
     , port              : this.parameters.PORT
-    },CONNECTION_PROPERTY_DEFAULTS);
+    },MySQLConstants.CONNECTION_PROPERTY_DEFAULTS);
   }
   
   /*  
@@ -432,29 +288,28 @@ class MySQLDBI extends YadamuDBI {
   setSpatialSerializer(spatialFormat) {      
     switch (spatialFormat) {
       case "WKB":
-        this.spatialSerializer = "HEX(ST_AsBinary(";
+        this.spatialSerializer = "ST_AsBinary(";
         break;
       case "EWKB":
-        this.spatialSerializer = "HEX(ST_AsBinary(";
+        this.spatialSerializer = "ST_AsBinary(";
         break;
       case "WKT":
-        this.spatialSerializer = "(ST_AsText(";
+        this.spatialSerializer = "ST_AsText(";
         break;
       case "EWKT":
-        this.spatialSerializer = "(ST_AsText(";
+        this.spatialSerializer = "ST_AsText(";
         break;
        case "GeoJSON":
-	     this.spatialSerializer = "(ST_AsGeoJSON("
+	     this.spatialSerializer = "ST_AsGeoJSON("
 		 break;
      default:
-        this.spatialSerializer = "HEX(ST_AsBinary(";
+        this.spatialSerializer = "ST_AsBinary(";
     }  
   }    
   
   async initialize() {
     await super.initialize(true);   
-    this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
-    this.setSpatialSerializer(this.spatialFormat);
+    this.setSpatialSerializer(this.SPATIAL_FORMAT);
   }
 
   async finalizeRead(tableInfo) {
@@ -524,9 +379,9 @@ class MySQLDBI extends YadamuDBI {
 
 	let stack
 	try {
+	  super.commitTransaction();
 	  stack = new Error().stack
       await this.connection.commit();
-	  super.commitTransaction();
 	} catch (e) {
       throw this.captureException(new MySQLError(e,stack,'mysql.Connection.commit()'))
 	} 
@@ -554,9 +409,9 @@ class MySQLDBI extends YadamuDBI {
 	
 	let stack
 	try {
+	  super.rollbackTransaction();
 	  stack = new Error().stack
       await this.connection.rollback();
-	  super.rollbackTransaction();
 	} catch (e) {
       const newIssue = this.captureException(new MySQLError(e,stack,'mysql.Connection.rollback()'))
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
@@ -567,7 +422,7 @@ class MySQLDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 
-    await this.executeSQL(sqlCreateSavePoint);
+    await this.executeSQL(MySQLDBI.SQL_CREATE_SAVE_POINT);
 	super.createSavePoint();
    }
   
@@ -581,7 +436,7 @@ class MySQLDBI extends YadamuDBI {
 	// Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
 	
 	try {
-      await this.executeSQL(sqlRestoreSavePoint);
+      await this.executeSQL(MySQLDBI.SQL_RESTORE_SAVE_POINT);
 	  super.restoreSavePoint();
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVPOINT',cause,newIssue)
@@ -592,7 +447,7 @@ class MySQLDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
-    await this.executeSQL(sqlReleaseSavePoint);   
+    await this.executeSQL(MySQLDBI.SQL_RELEASE_SAVE_POINT);   
     super.releaseSavePoint();
   } 
 
@@ -631,7 +486,6 @@ class MySQLDBI extends YadamuDBI {
     }
   }
 
-
   async processFile(hndl) {
     const sqlStatement = `SET @RESULTS = ''; CALL IMPORT_JSON(?,@RESULTS); SELECT @RESULTS "logRecords";`;					   
 	let results = await  this.executeSQL(sqlStatement,this.parameters.TO_USER);
@@ -653,7 +507,7 @@ class MySQLDBI extends YadamuDBI {
   
   async getSystemInformation() {     
   
-    const results = await this.executeSQL(sqlSystemInformation); 
+    const results = await this.executeSQL(MySQLDBI.SQL_SYSTEM_INFORMATION); 
     const sysInfo = results[0];
     return {
       date               : new Date().toISOString()
@@ -690,38 +544,80 @@ class MySQLDBI extends YadamuDBI {
     return undefined
   }
     
-  async getSchemaInfo(schema) {
+  async getSchemaInfo(keyName) {
       
-    const tableInfo = await this.sqlTableInfo();
-    return await this.executeSQL(tableInfo,[this.parameters[schema]]);
-
-  }
-
-  generateMetadata(tableInfo,server) {    
-
-    const metadata = {}
-  
-    for (let table of tableInfo) {
-       metadata[table.TABLE_NAME] = {
-         owner                    : table.TABLE_SCHEMA
-       , tableName                : table.TABLE_NAME
-       , columns                  : table.COLUMN_LIST
-       , dataTypes                : JSON.parse(table.DATA_TYPES)
-       , sizeConstraints          : JSON.parse(table.SIZE_CONSTRAINTS)
-      }
-    }
-  
-    return metadata;    
+    /*
+    **
+    ** During testing on 5.7 it appeared tha that is is possible for the Information Schema to get corrupted
+    ** In the corrupt state some table contains duplicate entires for each column in the table.
+    ** 
+    ** This routine checks for this state and creates a query that will workaround the problem if the 
+    ** Information schema is corrupt.
+    ** 
+    */   
+    
+    const SQL_SCHEMA_INFORMATION_SELECT_CLAUSE = 
+      `select c.table_schema "TABLE_SCHEMA"
+             ,c.table_name "TABLE_NAME"
+             ,concat('[',group_concat(concat('"',column_name,'"') order by ordinal_position separator ','),']')  "COLUMN_NAME_ARRAY"
+             ,concat('[',group_concat(case 
+                                        when column_type = 'tinyint(1)' then 
+                                          json_quote('${this.TREAT_TINYINT1_AS_BOOLEAN ? 'boolean' : 'tinyint(1)'}')
+                                        else 
+                                          json_quote(data_type)
+                                      end 
+                                      order by ordinal_position separator ','),']')  "DATA_TYPE_ARRAY"
+             ,concat('[',group_concat(json_quote(
+                                  case when (numeric_precision is not null) and (numeric_scale is not null)
+                                         then concat(numeric_precision,',',numeric_scale) 
+                                       when (numeric_precision is not null)
+                                         then case
+                                                when column_type like '%unsigned' then 
+                                                  numeric_precision
+                                                else
+                                                  numeric_precision + 1
+                                              end
+                                       when (datetime_precision is not null)
+                                         then datetime_precision
+                                       when (character_maximum_length is not null)
+                                         then character_maximum_length
+                                       else   
+                                         ''   
+                                  end
+                                 ) 
+                                 order by ordinal_position separator ','
+                          ),']') "SIZE_CONSTRAINT_ARRAY"
+             ,group_concat(
+                   case 
+                     when data_type in ('date','time','datetime','timestamp') then
+                       -- Force ISO 8601 rendering of value 
+                       concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')',' "',column_name,'"')
+                     when data_type = 'year' then
+                       -- Prevent rendering of value as base64:type13: 
+                       concat('CAST("', column_name, '"as DECIMAL) "',column_name,'"')
+                     when data_type = 'geometry' then
+                       -- Force ${this.spatialFormat} rendering of value
+                       concat('${this.spatialSerializer}"', column_name, '") "',column_name,'"')
+                     when data_type = 'float' then
+                       -- Render Floats with greatest possible precision 
+                       -- Risk of Overflow ????
+                       concat('(floor(1e15*"',column_name,'")/1e15) "',column_name,'"')                                      
+                     else
+                       concat('"',column_name,'"')
+                   end
+                   order by ordinal_position separator ','
+              ) "CLIENT_SELECT_LIST"`;
+         
+    const duplicates = await this.executeSQL(MySQLDBI.SQL_CHECK_INFORAMATION_SCHEMA_STATE,[this.parameters[keyName]]);
+    const SQL_SCHEMA_INFORMATION = `${SQL_SCHEMA_INFORMATION_SELECT_CLAUSE}\n${duplicates.length === 0 ? MySQLDBI.SQL_INFORMATION_SCHEMA_FROM_CLAUSE : MySQLDBI.SQL_INFORMATION_SCHEMA_FROM_CLAUSE_DUPLICATES}`;
+	return await this.executeSQL(SQL_SCHEMA_INFORMATION,[this.parameters[keyName]]);
 
   }
   
   streamingError(err,sqlStatement) {
 	 return this.captureException(new MySQLError(err,this.streamingStackTrace,sqlStatement))
   }
-  
-  async freeInputStream(tableInfo,inputStream) {
-  }
-  
+
   async getInputStream(tableInfo) {
 
     /*
@@ -743,7 +639,7 @@ class MySQLDBI extends YadamuDBI {
       keepAliveHdl = setInterval(this.keepAlive,this.keepAliveInterval,this);
 	}
 
-	let attemptReconnect = this.attemptReconnection;
+	let attemptReconnect = this.ATTEMPT_RECONNECTION;
     
     if (this.status.sqlTrace) {
       this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
@@ -754,7 +650,7 @@ class MySQLDBI extends YadamuDBI {
       try {
         const sqlStartTime = performance.now();
 		this.streamingStackTrace = new Error().stack
-        const is = this.connection.query(tableInfo.SQL_STATEMENT).stream();
+		const is = this.connection.query(tableInfo.SQL_STATEMENT).stream();
         is.on('end', async () => {
 		  // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,`${is.constructor.name}.onEnd()`,`${tableInfo.TABLE_NAME}`],``); 
           if (keepAliveHdl !== undefined) {
@@ -764,7 +660,7 @@ class MySQLDBI extends YadamuDBI {
 	    })
 		return is;
       } catch (e) {
-		const cause = this.captureException(new MySQLError(e,this.streamingStackTrace,sqlStatement))
+		const cause = this.captureException(new MySQLError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -792,9 +688,9 @@ class MySQLDBI extends YadamuDBI {
   getOutputStream(tableName) {
 	 return super.getOutputStream(MySQLWriter,tableName)
   }
-   
-  createParser(tableInfo,objectMode) {
-    this.parser = new MySQLParser(tableInfo,objectMode,this.yadamuLogger,this);
+
+  createParser(tableInfo) {
+    this.parser = new MySQLParser(tableInfo,this.yadamuLogger,this);
 	return this.parser;
   }  
     
@@ -822,3 +718,49 @@ class MySQLDBI extends YadamuDBI {
 
 module.exports = MySQLDBI
 
+const _SQL_CONFIGURE_CONNECTION = `SET AUTOCOMMIT = 0, TIME_ZONE = '+00:00',SESSION INTERACTIVE_TIMEOUT = 600000, WAIT_TIMEOUT = 600000, SQL_MODE='ANSI_QUOTES,PAD_CHAR_TO_FULL_LENGTH', GROUP_CONCAT_MAX_LEN = 1024000, GLOBAL LOCAL_INFILE = 'ON'`
+
+const _SQL_SYSTEM_INFORMATION   = `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
+
+// Check for duplicate entries INFORMATION_SCHEMA.columns
+
+const _SQL_CHECK_INFORAMATION_SCHEMA_STATE =
+`select distinct c.table_schema, c.table_name
+   from information_schema.columns c, information_schema.tables t
+  where t.table_name = c.table_name 
+    and c.extra <> 'VIRTUAL GENERATED'
+    and t.table_schema = c.table_schema
+    and t.table_type = 'BASE TABLE'
+    and t.table_schema = ?
+  group by TABLE_SCHEMA,TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION
+  having count(*) > 1`
+
+const _SQL_INFORMATION_SCHEMA_FROM_CLAUSE =
+`   from information_schema.columns c, information_schema.tables t
+  where t.table_name = c.table_name 
+    and c.extra <> 'VIRTUAL GENERATED'
+    and t.table_schema = c.table_schema
+    and t.table_type = 'BASE TABLE'
+    and t.table_schema = ?
+      group by t.table_schema, t.table_name`;
+      
+   
+// Hack for Duplicate Entries in INFORMATION_SCHEMA.columns seen MySQL 5.7
+
+const _SQL_INFORMATION_SCHEMA_FROM_CLAUSE_DUPLICATES  = 
+`   from (
+     select distinct c.table_catalog, c.table_schema, c.table_name,column_name,ordinal_position,data_type,column_type,character_maximum_length,numeric_precision,numeric_scale,datetime_precision
+       from information_schema.columns c, information_schema.tables t
+       where t.table_name = c.table_name 
+         and c.extra <> 'VIRTUAL GENERATED'
+         and t.table_schema = c.table_schema
+         and t.table_type = 'BASE TABLE'
+         and t.table_schema = ?
+   ) c
+  group by c.table_schema, c.table_name`;
+
+const _SQL_CREATE_SAVE_POINT  = `SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+
+const _SQL_RESTORE_SAVE_POINT = `ROLLBACK TO SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+
+const _SQL_RELEASE_SAVE_POINT = `RELEASE SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;

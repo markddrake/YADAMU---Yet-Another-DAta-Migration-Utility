@@ -1,7 +1,7 @@
 "use strict"
 
-const YadamuCLI = require('../../../YADAMU/common/yadamuCLI.js')
 const Yadamu = require('../../../YADAMU/common/yadamu.js')
+const YadamuCLI = require('../../../YADAMU/common/yadamuCLI.js')
 const {ConfigurationFileError, CommandLineError} = require('../../../YADAMU/common/yadamuError.js');
 
 class Test extends YadamuCLI {}

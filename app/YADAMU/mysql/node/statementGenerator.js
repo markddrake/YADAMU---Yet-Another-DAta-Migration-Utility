@@ -1,39 +1,40 @@
 "use strict";
 
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
+
 class StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize) {    
+  constructor(dbi, targetSchema, metadata, spatialFormat) {    
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
     this.spatialFormat = spatialFormat
-    this.batchSize = batchSize
-    this.commitSize = commitSize;
   }
   
 
-  async generateStatementCache(executeDDL, vendor) {    
-   
-    const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,@RESULTS); SELECT @RESULTS "SQL_STATEMENTS"`;                       
-    
+  async generateStatementCache(executeDDL) {    
+    const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,@RESULTS); SELECT @RESULTS "INSERT_INFORMATION"`;                       
     let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),this.targetSchema,this.spatialFormat]);
     results = results.pop();
-    let statementCache = JSON.parse(results[0].SQL_STATEMENTS)
+    let statementCache = JSON.parse(results[0].INSERT_INFORMATION)
     if (statementCache === null) {
       statementCache = {}      
     }
     else {
-
       const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map((table,idx) => {
-        const tableInfo = statementCache[this.metadata[table].tableName];
-        tableInfo.columns = JSON.parse('[' + this.metadata[table].columns + ']');
-        tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.targetDataTypes);
-        tableInfo.batchSize = this.batchSize;
-        tableInfo.commitSize = this.commitSize;
-        tableInfo.spatialFormat = this.spatialFormat
-        tableInfo.insertMode = 'Batch';
-		 
+        const tableMetadata = this.metadata[table];
+        const tableName = tableMetadata.tableName;
+        const tableInfo = statementCache[tableName];
+        tableInfo.columnNames = tableMetadata.columnNames
+
+        const dataTypes = YadamuLibrary.decomposeDataTypes(tableInfo.targetDataTypes)
+
+        tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
+        tableInfo._COMMIT_COUNT   = this.dbi.COMMIT_COUNT
+        tableInfo._SPATIAL_FORMAT = this.spatialFormat
+        tableInfo.insertMode      = 'Batch';
+        
         const setOperators = tableInfo.targetDataTypes.map((targetDataType,idx) => {
            switch (targetDataType) {
              case 'geometry':
@@ -41,17 +42,17 @@ class StatementGenerator {
                switch (this.spatialFormat) {
                  case "WKB":
                  case "EWKB":
-                   return ' "' + tableInfo.columns[idx] + '"' + " = ST_GeomFromWKB(UNHEX(?))";
+                   return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromWKB(?)";
                    break;
                  case "WKT":
                  case "EWRT":
-                   return ' "' + tableInfo.columns[idx] + '"' + " = ST_GeomFromText(?)";
+                   return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromText(?)";
                    break;
                  case "GeoJSON":
-                   return ' "' + tableInfo.columns[idx] + '"' + " = ST_GeomFromGeoJSON(?)";
+                   return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromGeoJSON(?)";
                    break;
                  default:
-                   return ' "' + tableInfo.columns[idx] + '"' + " = ST_GeomFromWKB(UNHEX(?))";
+                   return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromWKB(?)";
                }              
              /*
              **
@@ -61,10 +62,10 @@ class StatementGenerator {
              case 'time':
              case 'datetime':
                tableInfo.insertMode = 'Iterative';
-               return ' "' + tableInfo.columns[idx] + '"' + " = str_to_date(?,'%Y-%m-%dT%T.%fZ')"
+               return ' "' + tableInfo.columnNames[idx] + '"' + " = str_to_date(?,'%Y-%m-%dT%T.%fZ')"
             */
              default:
-               return ' "' + tableInfo.columns[idx] + '" = ?'
+               return ' "' + tableInfo.columnNames[idx] + '" = ?'
            }
         }) 
         

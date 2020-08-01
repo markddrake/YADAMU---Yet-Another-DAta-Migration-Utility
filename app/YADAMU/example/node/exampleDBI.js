@@ -8,8 +8,10 @@ const { performance } = require('perf_hooks');
 **
 */
 
+const Yadamu = require('../../common/yadamu.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
+const ExampleConstants = require('./ExampleConstants.js');
 const ExampleError = require('./exampleError.js')
 const ExampleParser = require('./exampleParser.js');
 const ExampleWriter = require('./exampleWriter.js');
@@ -17,7 +19,38 @@ const ExampleReader = require('./exampleReader.js');
 const StatementGenerator = require('./statementGenerator.js');
 
 class ExampleDBI extends YadamuDBI {
+   
+  static get SQL_CONFIGURE_CONNECTION()                       { return _SQL_CONFIGURE_CONNECTION }
+  static get SQL_SYSTEM_INFORMATION()                         { return _SQL_SYSTEM_INFORMATION }
+  static get SQL_SCHEMA_INFORMATION()                         { return _SQL_SCHEMA_INFORMATION } 
+  static get SQL_GET_DLL_STATEMENTS()                         { return _SQL_GET_DLL_STATEMENTS }
+  static get SQL_BEGIN_TRANSACTION()                          { return _SQL_BEGIN_TRANSACTION }  
+  static get SQL_COMMIT_TRANSACTION()                         { return _SQL_COMMIT_TRANSACTION }
+  static get SQL_ROLLBACK_TRANSACTION()                       { return _SQL_SQL_ROLLBACK_TRANSACTION }
+  static get SQL_CREATE_SAVE_POINT()                          { return _SQL_CREATE_SAVE_POINT }  
+  static get SQL_RESTORE_SAVE_POINT()                         { return _SQL_RESTORE_SAVE_POINT }
+  static get SQL_RELEASE_SAVE_POINT()                         { return _SQL_RELEASE_SAVE_POINT }
     
+  // Instance level getters.. invoke as this.METHOD
+
+  // Not available until configureConnection() has been called 
+ 
+  // Define Getters based on configuration settings here
+ 
+  // Override YadamuDBI
+
+  get DATABASE_VENDOR()        { return ExampleConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()        { return ExampleConstants.SOFTWARE_VENDOR};
+  get STATEMENT_TERMINATOR()   { return ExampleConstants.STATEMENT_TERMINATOR };
+
+  // Enable configuration via command line parameters
+
+  get SPATIAL_FORMAT()        { return this.parameters.SPATIAL_FORMAT || ExampleConstants.SPATIAL_FORMAT };
+
+  constructor(yadamu) {
+    super(yadamu,ExampleConstants.DEFAULT_PARAMETERS);
+  }
+
   /*
   **
   ** Local methods 
@@ -58,21 +91,6 @@ class ExampleDBI extends YadamuDBI {
     // Close the connection pool
 	throw new Error('Unimplemented Method')
   }
-    
-  /*
-  **
-  ** Overridden Methods
-  **
-  */
-  
-  get DATABASE_VENDOR()    { return 'Vendor' }
-  get SOFTWARE_VENDOR()    { return 'Company Name' }
-  get SPATIAL_FORMAT()     { return this.spatialFormat };
-  get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().example }
-
-  constructor(yadamu) {
-    super(yadamu,yadamu.getYadamuDefaults().example);
-  }
 
   getConnectionProperties() {
 	// Convert supplied parameters to format expected by connection mechansim
@@ -85,7 +103,7 @@ class ExampleDBI extends YadamuDBI {
 	  
 	// Execute the supplied SQL statement binding the specified arguments
 	
-    let attemptReconnect = this.attemptReconnection;
+    let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
 	if ((this.status.sqlTrace) && (typeof sqlStatemeent === 'string')) {
       this.status.sqlTrace.write(this.traceSQL(sqlStatement));
@@ -116,7 +134,6 @@ class ExampleDBI extends YadamuDBI {
   
   async initialize() {
     await super.initialize(true);   
-    this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT									  
   }
     
   /*
@@ -179,9 +196,9 @@ class ExampleDBI extends YadamuDBI {
 	**
 	*/
 	
+	super.commitTransaction()
     const sqlStatement =  `commit transaction`
     await this.executeSQL(sqlStatement);
-	super.commitTransaction()
 	
   }
 
@@ -210,8 +227,8 @@ class ExampleDBI extends YadamuDBI {
     const sqlStatement =  `rollback transaction`
 	 
 	try {
-      await this.executeSQL(sqlStatement);
       super.rollbackTransaction()
+      await this.executeSQL(sqlStatement);
 	} catch (newIssue) {
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue);								   
 	}
@@ -252,7 +269,7 @@ class ExampleDBI extends YadamuDBI {
 		
     let stack
     try {
-      await this.executeSQL(sqlRestoreSavePoint);
+      await this.executeSQL(SQL_RESTORE_SAVE_POINT);
       super.restoreSavePoint();
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVPOINT',cause,newIssue);
@@ -383,20 +400,33 @@ class ExampleDBI extends YadamuDBI {
     
   }
   
-  async getSchemaInfo(schema) {
-    return await this.executeSQL('GENERATE METADATA FROM SCHEMA')
-  }
-
-  generateMetadata(tableInfo,server) {     
-    return this.metadata;
+  async getSchemaInfo(keyName) {
+    
+    /*
+    ** Returns an array of information about each table in the schema being exported.
+    **
+    ** The following item are mandatory, since they are required to build the "metadata" object that forms part of the YADAMU export file 
+    ** and which is used as the starting point when for database to database copy operations.
+    ** 
+    ** TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME_ARRAY, DATA_TYPE_ARRAY, SIZE_CONSTRAINT_ARRAY
+    **
+    ** The Arrays are expected to be valid JSON arrays.
+    **
+    ** The query may also return additional information about the SQL that should be used to retieve the data from the schema
+    **
+    ** Implimentations should provde a custom impliemtnation of generateMetadata() if they need more than the minimum set of information about the schema.
+    **
+    */
+          
+    return await this.executeSQL('GENERATE METADATA FROM SCHEMA',this.parameters[keyName])
   }
    
   generateSelectStatement(tableMetadata) {
      return tableMetadata;
   }   
 
-  createParser(tableInfo,objectMode) {
-    return new ExampleParser(tableInfo,objectMode,this.yadamuLogger);
+  createParser(tableInfo) {
+    return new ExampleParser(tableInfo,this.yadamuLogger);
   }  
   
   streamingError(e,sqlStatement) {
@@ -451,4 +481,4 @@ class ExampleDBI extends YadamuDBI {
 	  
 }
 
-module.exports = PostgresDBI
+module.exports = ExampleDBI

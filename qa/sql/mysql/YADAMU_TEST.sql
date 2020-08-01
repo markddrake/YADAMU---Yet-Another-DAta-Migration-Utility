@@ -189,16 +189,22 @@ DELIMITER $$
 --
 CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_MAP_EMPTY_STRING_TO_NULL BOOLEAN, P_SPATIAL_PRECISION INT)
 BEGIN
-  declare C_NEWLINE          VARCHAR(1) DEFAULT CHAR(13);
- 
-  declare NO_MORE_ROWS       INT DEFAULT FALSE;
-  declare V_TABLE_NAME       VARCHAR(128);
-  declare V_COLUMN_LIST      TEXT;
-  declare V_STATEMENT        TEXT;
+  declare TABLE_NOT_FOUND CONDITION for 1146; 
+
+  declare C_NEWLINE             VARCHAR(1) DEFAULT CHAR(13);
+  
+  declare NO_MORE_ROWS          INT DEFAULT FALSE;
+  declare MISSING_TABLE         INT DEFAULT FALSE;
+  declare V_TABLE_NAME          VARCHAR(128);
+  declare V_SOURCE_COLUMN_LIST  TEXT;
+  declare V_TARGET_COLUMN_LIST  TEXT;
+  declare V_STATEMENT           TEXT;
+  declare V_COUNT_STATEMENT     TEXT;
   
   
   declare MISSING_ROWS INT;
   declare EXTRA_ROWS INT;
+  declare ROW_COUNT INT;
   
   declare V_SQLSTATE         INT;
   declare V_SQLERRM          TEXT;
@@ -206,6 +212,29 @@ BEGIN
   declare TABLE_METADATA 
   CURSOR FOR 
   select c.table_name "TABLE_NAME"
+        ,group_concat(case 
+                        when data_type in ('geometry') then
+                          case
+                            when P_SPATIAL_PRECISION = 18 then
+                              concat('"',column_name,'"') 
+                            else                            
+                              concat('ROUND_GEOMETRY(',column_name,',',P_SPATIAL_PRECISION,')')
+                          end
+                        when data_type in ('blob', 'varbinary', 'binary') then
+                          concat('hex("',column_name,'")') 
+                        when data_type in ('set') then
+						  -- Set is stored as a JSON_ARRAY in the target...
+                          concat('cast(concat(''["'',replace("',column_name,'",'','',''","''),''"]'') as json)') 
+                        when data_type in ('varchar','text','mediumtext','longtext') then
+                          case
+                            when P_MAP_EMPTY_STRING_TO_NULL then
+                              concat('case when "',column_name,'" = '''' then NULL else "',column_name,'" end') 
+                            else 
+                              concat('"',column_name,'"') 
+                          end 
+                        else concat('"',column_name,'"') 
+                      end
+					  order by ordinal_position separator ',')  "SOURCE_COLUMNS"
         ,group_concat(case 
                         when data_type in ('geometry') then
                           case
@@ -225,7 +254,7 @@ BEGIN
                           end 
                         else concat('"',column_name,'"') 
                       end 
-                      order by ordinal_position separator ',')  "COLUMNS"
+                      order by ordinal_position separator ',')  "TARGET_COLUMNS"
    from (
      select distinct c.table_catalog, c.table_schema, c.table_name,column_name,ordinal_position,data_type,column_type,character_maximum_length,numeric_precision,numeric_scale,datetime_precision
        from information_schema.columns c, information_schema.tables t
@@ -237,8 +266,30 @@ BEGIN
    ) c
   group by c.table_schema, c.table_name;
 
+
   declare CONTINUE HANDLER FOR NOT FOUND set NO_MORE_ROWS = TRUE;
-  
+
+  declare CONTINUE HANDLER FOR TABLE_NOT_FOUND
+  begin 
+    get diagnostics CONDITION 1
+       V_SQLSTATE = RETURNED_SQLSTATE, V_SQLERRM = MESSAGE_TEXT; 
+    set V_COUNT_STATEMENT = concat('select count(*) into @ROW_COUNT from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'"');
+    set @STATEMENT = V_COUNT_STATEMENT;
+    PREPARE STATEMENT FROM @STATEMENT;
+    EXECUTE STATEMENT;
+    DEALLOCATE PREPARE STATEMENT;
+    
+    insert into SCHEMA_COMPARE_RESULTS values (P_SOURCE_SCHEMA,P_TARGET_SCHEMA,V_TABLE_NAME,@ROW_COUNT,-1,@ROW_COUNT,-1,V_SQLERRM);
+    set MISSING_TABLE = true;
+  end;  
+ 
+  declare CONTINUE HANDLER FOR SQLEXCEPTION
+  begin 
+    get diagnostics CONDITION 1
+       V_SQLSTATE = RETURNED_SQLSTATE, V_SQLERRM = MESSAGE_TEXT; 
+    insert into SCHEMA_COMPARE_RESULTS values (P_SOURCE_SCHEMA,P_TARGET_SCHEMA,V_TABLE_NAME,-1,-1,-1,-1,V_SQLERRM);
+  end;  
+
   set SESSION SQL_MODE=ANSI_QUOTES;
   set SESSION group_concat_max_len = 131072;
   set max_heap_table_size = 1 * 1024 *1024 *1024;
@@ -250,7 +301,7 @@ BEGIN
    ,TARGET_ROW_COUNT INT
    ,MISSING_ROWS     INT
    ,EXTRA_ROWS       INT
-   ,SQLERRM          VARCHAR(512)
+   ,NOTES            VARCHAR(512)
   );
   
   create temporary table if not exists SOURCE_HASH_TABLE (
@@ -270,7 +321,8 @@ BEGIN
   OPEN TABLE_METADATA;
     
   PROCESS_TABLE : LOOP
-    FETCH TABLE_METADATA INTO V_TABLE_NAME, V_COLUMN_LIST;
+    SET MISSING_TABLE = false;
+    FETCH TABLE_METADATA INTO V_TABLE_NAME, V_SOURCE_COLUMN_LIST, V_TARGET_COLUMN_LIST;
     IF NO_MORE_ROWS THEN
       LEAVE PROCESS_TABLE;
     END IF;
@@ -278,20 +330,23 @@ BEGIN
     TRUNCATE TABLE SOURCE_HASH_TABLE;
     TRUNCATE TABLE TARGET_HASH_TABLE;
     
-    set V_STATEMENT = CONCAT('insert into SOURCE_HASH_TABLE select SHA2(JSON_ARRAY(',V_COLUMN_LIST,'),256) HASH, COUNT(*) CNT from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'" GROUP BY HASH');
+    set V_STATEMENT = CONCAT('insert into SOURCE_HASH_TABLE select SHA2(JSON_ARRAY(',V_SOURCE_COLUMN_LIST,'),256) HASH, COUNT(*) CNT from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'" GROUP BY HASH');
     
     set @STATEMENT = V_STATEMENT;
     PREPARE STATEMENT FROM @STATEMENT;
     EXECUTE STATEMENT;
     DEALLOCATE PREPARE STATEMENT;
     
-    set V_STATEMENT = CONCAT('insert into TARGET_HASH_TABLE select SHA2(JSON_ARRAY(',V_COLUMN_LIST,'),256) HASH, COUNT(*) CNT from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'" GROUP BY HASH');
-    
+    set V_STATEMENT = CONCAT('insert into TARGET_HASH_TABLE select SHA2(JSON_ARRAY(',V_TARGET_COLUMN_LIST,'),256) HASH, COUNT(*) CNT from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'" GROUP BY HASH');
+        
     set @STATEMENT = V_STATEMENT;
     PREPARE STATEMENT FROM @STATEMENT;
+    if MISSING_TABLE then
+      ITERATE PROCESS_TABLE;
+    end if;
     EXECUTE STATEMENT;
     DEALLOCATE PREPARE STATEMENT;
-    
+
     select count(*) 
       into @MISSING_ROWS
       from SOURCE_HASH_TABLE T1 
@@ -320,8 +375,8 @@ BEGIN
     PREPARE STATEMENT FROM @STATEMENT;
     EXECUTE STATEMENT;
     DEALLOCATE PREPARE STATEMENT;
-     
-    END LOOP;
+    
+  END LOOP;
  
   CLOSE TABLE_METADATA;
   

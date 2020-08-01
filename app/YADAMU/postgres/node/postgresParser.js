@@ -4,16 +4,33 @@ const YadamuParser = require('../../common/yadamuParser.js')
 
 class PostgresParser extends YadamuParser {
   
-  constructor(tableInfo,objectMode,yadamuLogger) {
-    super(tableInfo,objectMode,yadamuLogger);      
+  constructor(tableInfo,yadamuLogger) {
+    super(tableInfo,yadamuLogger);      
+    
+    /*
+    this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType) => {
+	  switch (dataType.toLowerCase()) {
+	  }
+	})
+	
+	// Use a dummy rowTransformation function if there are no transformations required.
+
+    this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          transformation(row,idx)
+        }
+      }) 
+    }
+    */
   }
     
   async _transform (data,encoding,callback) {
     this.counter++;
-    if (!this.objectMode) {
-      data.json = JSON.stringify(data.json);
-    }
-    this.push({data:data.json})
+    data = Object.values(data)
+    // this.rowTransformation(data)
+    // if (this.counter===1) console.log(data)
+    this.push({data:data})
     callback();
   }
 }

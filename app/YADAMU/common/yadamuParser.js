@@ -5,10 +5,9 @@ const { performance } = require('perf_hooks');
 
 class YadamuParser extends Transform {
     
-  constructor(tableInfo,objectMode,yadamuLogger) {
+  constructor(tableInfo,yadamuLogger) {
     super({objectMode: true });  
     this.tableInfo = tableInfo;
-    this.objectMode = objectMode
     this.yadamuLogger = yadamuLogger
     this.counter = 0
     
@@ -25,9 +24,9 @@ class YadamuParser extends Transform {
   
   async _transform (data,encoding,callback) {
     this.counter++;
-    if (this.objectMode) {
-      data.json = JSON.parse(data.json);
-    }
+	if (!Array.isArray(data)) {
+	  data = Object.values(data)
+	}
     this.push({data:data.json})
     callback();
   }

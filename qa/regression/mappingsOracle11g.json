@@ -7,10 +7,10 @@
     },
     "DimEmployee" : {
       "tableName" : "DimEmployee",
-      "columns" : { "ParentEmployeeNationalIDAlternateKey" : "ParentEmployeeNationalID" }
+      "columnNames" : { "ParentEmployeeNationalIDAlternateKey" : "ParentEmployeeNationalID" }
     },
     "Production" : {
       "tableName" : "Production",
-      "columns" : { "productmodelproductdescriptionculture" : "productmodelpdc" }
+      "columnNames" : { "productmodelproductdescriptionculture" : "productmodelpdc" }
     }   
 }    

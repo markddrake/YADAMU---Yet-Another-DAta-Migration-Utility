@@ -4,28 +4,24 @@ const YadamuParser = require('../../common/yadamuParser.js')
 
 class SnowflakeParser extends YadamuParser {
   
-  constructor(tableInfo,objectMode,yadamuLogger) {
-    super(tableInfo,objectMode,yadamuLogger);      
-    this.columnList = JSON.parse("[" + tableInfo.COLUMN_LIST + "]");
+  constructor(tableInfo,yadamuLogger) {
+    super(tableInfo,yadamuLogger);      
   }
-
+  
   async _transform (data,encoding,callback) {
-    let output = []
+    // Snowflake generates object based output, not array based outout. Transform object to array based on columnList
     this.counter++;
-    
-
-    output = this.columnList.map((key) => {
-      return data[key] !== 'NULL' ? data[key] : null
-      return data[key]
-    })
-
-    if (!this.objectMode) {
-      output = JSON.stringify(output)
-    }
-
-    // if (this.counter === 1) { console.log(data,output)}
-
-    this.push({data : output})
+	// if (this.counter === 1) console.log('Snowflake Parser',data)
+    data = Object.values(data)
+	data.forEach((val,idx) => {
+	   if (data[idx] === 'NULL') {
+		 data[idx] = null;
+	   }
+       if (Buffer.isBuffer(data[idx])) {
+         data[idx] = data[idx].toStringSf()
+       }
+	})
+    this.push({data : data})
     callback();
   }
 }

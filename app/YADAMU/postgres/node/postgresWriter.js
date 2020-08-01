@@ -3,6 +3,7 @@
 const { performance } = require('perf_hooks');
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 
 class PostgresWriter extends YadamuWriter {
@@ -13,38 +14,22 @@ class PostgresWriter extends YadamuWriter {
   
   setTableInfo(tableInfo) {
 	super.setTableInfo(tableInfo)
-    this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
-
-    this.transformations = this.tableInfo.dataTypes.map((dataType,idx) => {
-      switch (dataType.type) {
-        case "bit" :
-		  return (col,idx) => {
-            if (col === true) {
-              return 1
-            }
-            else {
-              return 0
-            }  
-		  }
-          break;
+    this.tableInfo.columnCount = this.tableInfo.columnNames.length;
+    
+	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
+      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
+      switch (dataType.type.toLowerCase()) {
+        case "json" :
+		case "jsonb":
+	      // https://github.com/brianc/node-postgres/issues/442
+	      return (col,idx) => {
+            return typeof col === 'object' ? JSON.stringify(col) : col
+          }
+		case "bit" :
         case "boolean" :
  		  return (col,idx) => {
-           switch (col) {
-              case "00" :
-                return false;
-                break;
-              case "01" :
-                return true;
-                break;
-              default:
-			    return col
-            }
+             return YadamuLibrary.toBoolean(col)
           }
-          break;
-        case "bytea" :
-		  return (col,idx) => {
-            return Buffer.from(col,'hex');
-		  }
           break;
         case "time" :
 		  return (col,idx) => {
@@ -105,13 +90,9 @@ class PostgresWriter extends YadamuWriter {
 	return this.skipTable
   }
     
-  handleBatchError(operation,cause) {
-   
+  reportBatchError(operation,cause) {
     // Use Slice to add first and last row, rather than first and last value.
-      	super.handleBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
-    const batchException = this.createBatchException(cause,this.tableInfo.tableName,this.tableInfo.dml,this.rowCounters.cached,)
-    this.yadamuLogger.handleWarning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],batchException)
-
+	super.reportBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
   }
       
   async writeBatch() {
@@ -126,7 +107,7 @@ class PostgresWriter extends YadamuWriter {
         let argNumber = 1;
         const args = Array(this.rowCounters.cached).fill(0).map(() => {return `(${this.tableInfo.insertOperators.map((operator) => {return operator.replace('$%',`$${argNumber++}`)}).join(',')})`}).join(',');
         const sqlStatement = this.tableInfo.dml + args
-        const results = await this.dbi.insertBatch(sqlStatement,this.batch);
+		const results = await this.dbi.insertBatch(sqlStatement,this.batch);
         this.endTime = performance.now();
         await this.dbi.releaseSavePoint();
         this.batch.length = 0;
@@ -134,7 +115,7 @@ class PostgresWriter extends YadamuWriter {
         this.rowCounters.cached = 0;
         return this.skipTable
       } catch (cause) {
-        this.handleBatchError(`INSERT MANY`,cause)
+        this.reportBatchError(`INSERT MANY`,cause)
         await this.dbi.restoreSavePoint(cause);
 		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 

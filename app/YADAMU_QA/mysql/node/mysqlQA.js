@@ -2,28 +2,17 @@
 
 const MySQLDBI = require('../../../YADAMU/mysql/node/mysqlDBI.js');
 
-const sqlSuccess =
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL' as "RESULTS", TARGET_ROW_COUNT
-  from SCHEMA_COMPARE_RESULTS 
- where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
-   and MISSING_ROWS = 0
-   and EXTRA_ROWS = 0
-   and SQLERRM is NULL
-order by TABLE_NAME`;
-
-const sqlFailed = 
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'FAILED' as "RESULTS", SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, SQLERRM "NOTES"
-  from SCHEMA_COMPARE_RESULTS 
- where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
-    or MISSING_ROWS <> 0
-    or EXTRA_ROWS <> 0
-    or SQLERRM is NOT NULL
- order by TABLE_NAME`;
-
-const sqlSchemaTableRows = `select TABLE_NAME, TABLE_ROWS from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = ?`;
-
 class MySQLQA extends MySQLDBI {
 
+    static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
+    static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
+    static get SQL_SUCCESS()               { return _SQL_SUCCESS }
+    static get SQL_FAILED()                { return _SQL_FAILED }
+
+    constructor(yadamu) {
+       super(yadamu)
+    }
+	
     doTimeout(milliseconds) {
     
        return new Promise((resolve,reject) => {
@@ -71,10 +60,6 @@ class MySQLQA extends MySQLDBI {
 	  timer.unref()
 	}	
 
-    constructor(yadamu) {
-       super(yadamu)
-    }
-	
 	async initialize() {
 	  await super.initialize();
 	  if (this.options.recreateSchema === true) {
@@ -100,19 +85,18 @@ class MySQLQA extends MySQLDBI {
        ,failed     : []
       }
 
-      const sqlStatement = `CALL COMPARE_SCHEMAS(?,?,?, ?);`;					   
-      let results = await this.executeSQL(sqlStatement,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18]);
+      let results = await this.executeSQL(MySQLQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18]);
 
-      const successful = await this.executeSQL(sqlSuccess,{})
+      const successful = await this.executeSQL(MySQLQA.SQL_SUCCESS,{})
           
       report.successful = successful.map((row,idx) => {          
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT]
       })
 
-      const failed = await this.executeSQL(sqlFailed,{})
+      const failed = await this.executeSQL(MySQLQA.SQL_FAILED,{})
 
       report.failed = failed.map((row,idx) => {
-        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.SQLEERM !== undefined ? row.SQLERRM : '')]
+        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.NOTES !== undefined ? row.NOTES : '')]
       })
       
       return report
@@ -120,7 +104,7 @@ class MySQLQA extends MySQLDBI {
    
     async getRowCounts(target) {
 
-      const results = await this.executeSQL(sqlSchemaTableRows,[target.schema]);
+      const results = await this.executeSQL(MySQLQA.SQL_SCHEMA_TABLE_ROWS,[target.schema]);
       
       return results.map((row,idx) => {          
         return [target.schema,row.TABLE_NAME,row.TABLE_ROWS]
@@ -139,3 +123,25 @@ class MySQLQA extends MySQLDBI {
 }
 
 module.exports = MySQLQA
+
+const _SQL_SUCCESS =
+`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL' as "RESULTS", TARGET_ROW_COUNT
+  from SCHEMA_COMPARE_RESULTS 
+ where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
+   and MISSING_ROWS = 0
+   and EXTRA_ROWS = 0
+   and NOTES is NULL
+order by TABLE_NAME`;
+
+const _SQL_FAILED = 
+`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'FAILED' as "RESULTS", SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, NOTES
+  from SCHEMA_COMPARE_RESULTS 
+ where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
+    or MISSING_ROWS <> 0
+    or EXTRA_ROWS <> 0
+    or NOTES is NOT NULL
+ order by TABLE_NAME`;
+
+const _SQL_SCHEMA_TABLE_ROWS = `select TABLE_NAME, TABLE_ROWS from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = ?`;
+
+const _SQL_COMPARE_SCHEMAS =  `CALL COMPARE_SCHEMAS(?,?,?, ?);`;

@@ -33,7 +33,11 @@ class StagingTable {
     statement = `update "${this.tableSpec.tableName}" set "${this.tableSpec.columnName}" .write(@C0,null,null)`;  
 	await this.dbi.cachePreparedStatement(statement, [{type : "nvarchar"}]) 
 	
-    const inputStream = fs.createReadStream(this.filePath);
+    const inputStream = await new Promise((resolve,reject) => {
+      const inputStream = fs.createReadStream(this.filePath);
+      inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err)})
+    })
+
     const loader = new DBFileLoader(this.dbi,this.status);
   
     let startTime;

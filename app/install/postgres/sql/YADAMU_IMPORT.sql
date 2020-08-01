@@ -5,11 +5,10 @@
 */
 --
 create or replace function EXPORT_JSON(P_SCHEMA VARCHAR, P_SPATIAL_FORMAT VARCHAR) 
-returns JSONB
+returns TABLE ( TABLE_SCHEMA VARCHAR, TABLE_NAME VARCHAR, COLUMN_NAME_ARRAY JSONB, DATA_TYPE_ARRAY JSONB, SIZE_CONSTRAINT_ARRAY JSONB, CLIENT_SELECT_LIST TEXT, ERRORS JSONB)
 as $$
 declare
   R                  RECORD;
-  V_RESULTS          JSONB = '{}';
   V_SQL_STATEMENT    TEXT = NULL;
   PLPGSQL_CTX        TEXT;
   
@@ -18,8 +17,7 @@ begin
 
   for r in select t.table_schema "TABLE_SCHEMA"
                  ,t.table_name "TABLE_NAME"
-	             ,string_agg('"' || column_name || '"',',' order by ordinal_position) "COLUMN_LIST" 
-                 ,jsonb_agg(column_name order by ordinal_position) "COLUMN_NAME_ARRAY"
+	             ,jsonb_agg(column_name order by ordinal_position) "COLUMN_NAME_ARRAY"
 	             ,jsonb_agg(case 
                               when data_type = 'USER-DEFINED' then
                                 udt_name 
@@ -29,7 +27,7 @@ begin
                                 data_type 
                             end 
                             order by ordinal_position
-                           ) "DATA_TYPES"
+                           ) "DATA_TYPE_ARRAY"
                  ,jsonb_agg(case
                               when (numeric_precision is not null) and (numeric_scale is not null) then
                                 cast(numeric_precision as varchar) || ',' || cast(numeric_scale as varchar)
@@ -37,42 +35,46 @@ begin
                                 cast(numeric_precision as varchar)
                               when (character_maximum_length is not null) then 
                                 cast(character_maximum_length as varchar)
+                              when (datetime_precision is not null) then 
+                                cast(datetime_precision as varchar)
                             end
                             order by ordinal_position
-                          ) "SIZE_CONSTRAINTS"
-	             ,'select jsonb_build_array(' || string_agg(case   
-                                                              when data_type = 'bytea' then
-                                                                 'encode("' || column_name || '",''hex'')'
-                                                              when data_type = 'xml' then
-                                                                 '"' || column_name || '"' || '::text'
-                                                              when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
-                                                                 case 
-                                                                   when P_SPATIAL_FORMAT = 'WKB' then
-                                                                     'encode(ST_AsBinary("' || column_name || '"),''hex'')'
-                                                                   when P_SPATIAL_FORMAT = 'WKT' then
-                                                                     'ST_AsText("' || column_name || '",18)'
-                                                                   when P_SPATIAL_FORMAT = 'EWKB' then
-                                                                     'encode(ST_AsEWKB("' || column_name || '"),''hex'')'
-                                                                   when P_SPATIAL_FORMAT = 'EWKT' then
-                                                                     'ST_AsEWKT("' || column_name || '")'
-                                                                   when P_SPATIAL_FORMAT = 'GeoJSON' then
-                                                                     'ST_AsGeoJSON("' || column_name || '")'
-                                                                   else
-                                                                     'ST_AsEWKB("' || column_name || '"),''hex'')'
-                                                                 end
-                                                              when data_type in ('date','timestamp without time zone') then
-                                                                 '"' || column_name || '"::timestamptz'
-                                                              when data_type in ('money') then
-                                                                /* Suppress printing Currency Symbols */
-                                                                /* then '("' || column_name || '"/1::money) */
-                                                                '("' || column_name || '"::numeric)'
-                                                              when data_type in ('time', 'time with time zone','time without time zone') then 
-                                                                '(''1970-01-01 ''|| "' || column_name || '")::timestamptz' 
-                                                              else
-                                                                '"' || column_name || '"'
-                                                            end
-                                                           ,',' order by ordinal_position
-                                                           ) || ') "json" from "' || t.table_schema || '"."' || t.table_name ||'"' "SQL_STATEMENT" 
+                          ) "SIZE_CONSTRAINT_ARRAY"
+	             ,string_agg(case 
+                               when data_type = 'xml' then
+                                  '"' || column_name || '"' || '::text'
+                               when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
+                                  case 
+                                    when P_SPATIAL_FORMAT = 'WKB' then
+                                      'ST_AsBinary("' || column_name || '") "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'WKT' then
+                                      'ST_AsText("' || column_name || '",18) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'EWKB' then
+                                      'ST_AsEWKB("' || column_name || '") "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'EWKT' then
+                                      'ST_AsEWKT("' || column_name || '") "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                      'ST_AsGeoJSON("' || column_name || '") "' || COLUMN_NAME || '"'
+                                    else
+                                      'ST_AsEWKB("' || column_name || '")) "' || COLUMN_NAME || '"'
+                                  end
+                               when data_type like 'interval%' then
+                                  '"' || COLUMN_NAME ||'"::varchar "' || COLUMN_NAME || '"'
+                               when data_type in ('date','timestamp without time zone') then
+                                  'to_char ("' || COLUMN_NAME ||'" at time zone ''UTC'', ''YYYY-MM-DD"T"HH24:MI:SS.US"Z"'') "' || COLUMN_NAME || '"'
+                               when data_type in ('money') then
+                                 /* Suppress printing Currency Symbols */
+                                 /* then '("' || column_name || '"/1::money) */
+                                 '("' || column_name || '"::numeric) "' || COLUMN_NAME || '"'
+                               when data_type in ('time', 'time with time zone','time without time zone') then 
+                                 '''1971-01-01T'' || to_char("' || COLUMN_NAME || '",''HH24:MI:SS.US"Z"'')  "' || COLUMN_NAME || '"'
+                                when data_type like 'timestamp%' then 
+                                  'to_char ("' || COLUMN_NAME ||'" at time zone ''UTC'', ''YYYY-MM-DD"T"HH24:MI:SS.US"Z"'') "' || COLUMN_NAME || '"'
+                               else
+                                 '"' || column_name || '"'
+                             end,
+			                 ',' order by ordinal_position
+                               ) "CLIENT_SELECT_LIST"
             from information_schema.columns c, information_schema.tables t
            where t.table_name = c.table_name 
 	         and t.table_schema = c.table_schema
@@ -94,45 +96,37 @@ begin
                when value = 'bytea' 
                  then 'to_char(max(octet_length("' || (r."COLUMN_NAME_ARRAY" ->> cast((idx -1) as int)) || '")),''FM999999999999999999'')'
                else
-                 '''' || COALESCE ((r."SIZE_CONSTRAINTS" ->> cast((idx -1) as int)),'') || ''''
+                 '''' || COALESCE ((r."SIZE_CONSTRAINT_ARRAY" ->> cast((idx -1) as int)),'') || ''''
              end
             ,','
            ) 
         || ') FROM "' || r."TABLE_SCHEMA" || '"."' || r."TABLE_NAME" || '"'
-      from  jsonb_array_elements_text(r."DATA_TYPES") WITH ORDINALITY as c(value, idx)
+      from  jsonb_array_elements_text(r."DATA_TYPE_ARRAY") WITH ORDINALITY as c(value, idx)
       into V_SQL_STATEMENT
-     where r."DATA_TYPES" ? 'bytea';
+     where r."DATA_TYPE_ARRAY" ? 'bytea';
 
-    raise notice '%', V_SQL_STATEMENT;
-     
     if (V_SQL_STATEMENT is not NULL) then
       execute V_SQL_STATEMENT into V_SIZE_CONSTRAINTS;
     else
-      V_SIZE_CONSTRAINTS := r."SIZE_CONSTRAINTS";
+      V_SIZE_CONSTRAINTS := r."SIZE_CONSTRAINT_ARRAY";
     end if;
 
-    V_RESULTS := jsonb_set(
-                   V_RESULTS
-                  ,('{' || r."TABLE_NAME" || '}')::text[]
-                  ,jsonb_build_object(
-                     'owner',           r."TABLE_SCHEMA"
-                    ,'tableName',       r."TABLE_NAME"
-                    ,'columns',         r."COLUMN_LIST"
-                    ,'dataTypes',       r."DATA_TYPES"
-                    ,'sizeConstraints', V_SIZE_CONSTRAINTS
-                    ,'sqlStatemeent',   r."SQL_STATEMENT"     
-                   )
-                 );
-                                        
-
+    TABLE_SCHEMA          := r."TABLE_SCHEMA";
+    TABLE_NAME            := r."TABLE_NAME";
+    COLUMN_NAME_ARRAY     := r."COLUMN_NAME_ARRAY";
+    DATA_TYPE_ARRAY       := r."DATA_TYPE_ARRAY";
+    SIZE_CONSTRAINT_ARRAY := V_SIZE_CONSTRAINTS;
+    CLIENT_SELECT_LIST    := r."CLIENT_SELECT_LIST";
+    return NEXT;
   end loop;
-  return V_RESULTS;
+  return;
 exception
   when others then
     GET STACKED DIAGNOSTICS PLPGSQL_CTX = PG_EXCEPTION_CONTEXT;
-    V_RESULTS := '[]';
-    V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call EXPORT_JSON(P_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
-    return V_RESULTS;
+    ERRORS := '[]';
+    ERRORS := jsonb_insert(ERRORS, CAST('{' || jsonb_array_length(ERRORS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call EXPORT_JSON(P_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
+    return NEXT;
+    return;
 end;  
 $$ LANGUAGE plpgsql;
 --
@@ -158,6 +152,19 @@ begin
   V_DATA_TYPE := P_DATA_TYPE;
 
   case P_SOURCE_VENDOR 
+    when 'Postgres' then
+      case V_DATA_TYPE 
+        when 'timestamp with time zone' then
+          return 'timestamp(' || P_DATA_TYPE_LENGTH || ') with time zone';
+        when 'timestamp without time zone' then
+          return 'timestamp(' || P_DATA_TYPE_LENGTH || ') without time zone';
+        when 'time with time zone' then
+          return 'time(' || P_DATA_TYPE_LENGTH || ') with time zone';
+        when 'time without time zone' then
+          return 'time(' || P_DATA_TYPE_LENGTH || ') without time zone';
+        else
+          return lower(V_DATA_TYPE);
+      end case;
     when 'Oracle' then
       case V_DATA_TYPE
         when 'VARCHAR2' then
@@ -248,7 +255,7 @@ begin
         when 'longblob' then
            return 'bytea';
         when 'set' then
-           return 'varchar(255)';   
+           return 'jsonb';   
         when 'tinyint' then
            return 'smallint';
         when 'tinytext' then
@@ -298,7 +305,7 @@ begin
         when 'longblob' then
            return 'bytea';
         when 'set' then
-           return 'varchar(255)';   
+           return 'jsonb';   
         when 'tinyint' then
            return 'smallint';
         when 'tinytext' then
@@ -389,8 +396,8 @@ begin
           return lower(V_DATA_TYPE);
       end case;
 	when 'MongoDB' then
-      -- MongoDB typing based on aggregation $type operator and BSON type
-	  -- ### No support for depricated Data types undefined, dbPointer, symbol
+      -- MongoDB typing based on BSON type model and the aggregation $type operator
+      -- ### No support for depricated Data types undefined, dbPointer, symbol
       case V_DATA_TYPE
         when 'double' then
            return 'double precision';
@@ -444,10 +451,11 @@ begin
 end;
 $$ LANGUAGE plpgsql;
 --
-create or replace function GENERATE_STATEMENTS(P_SOURCE_VENDOR VARCHAR, P_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_SPATIAL_FORMAT VARCHAR, P_COLUMNS TEXT, P_DATA_TYPES JSONB, P_SIZE_CONSTRAINTS JSONB,P_BINARY_JSON BOOLEAN)
+create or replace function GENERATE_STATEMENTS(P_SOURCE_VENDOR VARCHAR, P_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_SPATIAL_FORMAT VARCHAR, P_COLUMN_NAME_ARRAY JSONB, P_DATA_TYPE_ARRAY JSONB, P_SIZE_CONSTRAINT_ARRAY JSONB,P_BINARY_JSON BOOLEAN)
 returns JSONB
 as $$
 declare
+  V_COLUMN_LIST        TEXT;
   V_COLUMNS_CLAUSE     TEXT;
   V_INSERT_SELECT_LIST TEXT;
   V_TARGET_DATA_TYPES  JSONB;
@@ -485,9 +493,9 @@ begin
               else
                 NULL
            end DATA_TYPE_SCALE
-      from JSON_ARRAY_ELEMENTS_TEXT(('[' || P_COLUMNS || ']')::json)  WITH ORDINALITY as c(VALUE, IDX)
-          ,JSONB_ARRAY_ELEMENTS_TEXT(P_DATA_TYPES) WITH ORDINALITY t(VALUE, IDX)
-          ,JSONB_ARRAY_ELEMENTS_TEXT(P_SIZE_CONSTRAINTS) WITH ORDINALITY s(VALUE, IDX)
+      from JSONB_ARRAY_ELEMENTS_TEXT(P_COLUMN_NAME_ARRAY)     WITH ORDINALITY as c(VALUE, IDX)
+          ,JSONB_ARRAY_ELEMENTS_TEXT(P_DATA_TYPE_ARRAY)       WITH ORDINALITY as t(VALUE, IDX)
+          ,JSONB_ARRAY_ELEMENTS_TEXT(P_SIZE_CONSTRAINT_ARRAY) WITH ORDINALITY as s(VALUE, IDX)
      where (c.IDX = t.IDX) and (c.IDX = s.IDX)
   ),
   TARGET_TABLE_DEFINITIONS
@@ -496,22 +504,25 @@ begin
            MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR,DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT, V_GEOMETRY_TYPE) TARGET_DATA_TYPE
       from SOURCE_TABLE_DEFINITIONS st
   ) 
-  select STRING_AGG('"' || COLUMN_NAME || '" ' || TARGET_DATA_TYPE || 
+  select STRING_AGG('"' || COLUMN_NAME || '"',',') COLUMN_NAME_LIST,
+         STRING_AGG('"' || COLUMN_NAME || '" ' || TARGET_DATA_TYPE || 
                     case 
-                      when TARGET_DATA_TYPE like '%(%)' 
-                        then ''
-                      when TARGET_DATA_TYPE like '%with time zone' 
-                        then ''
-                      when TARGET_DATA_TYPE in ('smallint', 'mediumint', 'int', 'bigint','real','text','bytea','integer','money','xml','json','jsonb','image','date','double precision','geography','geometry') 
-                        then ''
-                      when (TARGET_DATA_TYPE = 'time' and DATA_TYPE_LENGTH::INT > 6)
-                        then '(6)'
-                      when TARGET_DATA_TYPE like 'interval%'
-                        then ''
-                      when DATA_TYPE_LENGTH is NOT NULL and DATA_TYPE_SCALE IS NOT NULL
-                        then '(' || DATA_TYPE_LENGTH || ',' || DATA_TYPE_SCALE || ')'
-                      when DATA_TYPE_LENGTH is NOT NULL 
-                        then '(' || DATA_TYPE_LENGTH  || ')'
+                      when TARGET_DATA_TYPE like '%(%)' then 
+                        ''
+                      when TARGET_DATA_TYPE like '%with time zone' then 
+                        ''
+                      when TARGET_DATA_TYPE like '%without time zone' then 
+                        ''
+                      when TARGET_DATA_TYPE in ('boolean','smallint', 'mediumint', 'int', 'bigint','real','text','bytea','integer','money','xml','json','jsonb','image','date','double precision','geography','geometry') then 
+                        ''
+                      when (TARGET_DATA_TYPE = 'time' and DATA_TYPE_LENGTH::INT > 6) then 
+                        '(6)'
+                      when TARGET_DATA_TYPE like 'interval%' then 
+                        ''
+                      when DATA_TYPE_LENGTH is NOT NULL and DATA_TYPE_SCALE IS NOT NULL then 
+                        '(' || DATA_TYPE_LENGTH || ',' || DATA_TYPE_SCALE || ')'
+                      when DATA_TYPE_LENGTH is NOT NULL then 
+                        '(' || DATA_TYPE_LENGTH  || ')'
                       else
                         ''
                     end
@@ -519,7 +530,7 @@ begin
                    ) COLUMNS_CLAUSE
         ,STRING_AGG(case 
                       when TARGET_DATA_TYPE = 'bytea' then  
-                       'decode( value ->> ' || IDX-1 || ',''hex'')'
+                        'decode( value ->> ' || IDX-1 || ',''hex'')'
                       when TARGET_DATA_TYPE in ('geometry','geography') then 
                         case 
                           when P_SPATIAL_FORMAT = 'WKB' then
@@ -534,7 +545,11 @@ begin
                             'ST_GeomFromGeoJSON( value ->> ' || IDX-1 || ')'
                           end
                       when TARGET_DATA_TYPE in ('time', 'time with time zone','time without time zone')  then  
-                       'cast( value ->> ' || IDX-1 || ' as timestamp)::' || TARGET_DATA_TYPE
+                        'cast( value ->> ' || IDX-1 || ' as timestamp)::' || TARGET_DATA_TYPE
+                      when TARGET_DATA_TYPE like 'time%time zone'  then  
+                        'cast( value ->> ' || IDX-1 || ' as timestamp)::' || TARGET_DATA_TYPE
+                      when TARGET_DATA_TYPE in ('time', 'time with time zone','time without time zone')  then  
+                        'cast( value ->> ' || IDX-1 || ' as timestamp)::' || TARGET_DATA_TYPE
                       when TARGET_DATA_TYPE = 'bit' then  
                         'case when value ->> ' || IDX-1 || ' = ''true'' then B''1'' when value ->> ' || IDX-1 || ' = ''false''  then B''0'' else cast( value ->> ' || IDX-1 || ' as ' || TARGET_DATA_TYPE || ') end'
                       else
@@ -543,13 +558,13 @@ begin
                     || ' "' || COLUMN_NAME || '"', CHR(10) || '  ,'
                    ) INSERT_SELECT_LIST
         ,JSONB_AGG(TARGET_DATA_TYPE) TARGET_DATA_TYPES
-    into V_COLUMNS_CLAUSE, V_INSERT_SELECT_LIST, V_TARGET_DATA_TYPES
+    into V_COLUMN_LIST, V_COLUMNS_CLAUSE, V_INSERT_SELECT_LIST, V_TARGET_DATA_TYPES
     from TARGET_TABLE_DEFINITIONS;
 
   return JSONB_BUILD_OBJECT(
-                    'ddl', 'CREATE TABLE IF NOT EXISTS "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || CHR(10) || '   ' || V_COLUMNS_CLAUSE || CHR(10) || ')',       
-                    'dml', 'INSERT into "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || P_COLUMNS || ')' || CHR(10) || 'select ' || V_INSERT_SELECT_LIST || CHR(10) || '  from ' || case WHEN P_BINARY_JSON then 'jsonb_array_elements' else 'json_array_elements' end || '($1 -> ''data'' -> ''' || P_TABLE_NAME || ''')',
-                    'targetDataTypes', V_TARGET_DATA_TYPES 
+                    'ddl', 'CREATE TABLE IF NOT EXISTS "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || CHR(10) || '   ' || V_COLUMNS_CLAUSE || CHR(10) || ')'
+                    ,'dml', 'INSERT into "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || V_COLUMN_LIST || ')' || CHR(10) || 'select ' || V_INSERT_SELECT_LIST || CHR(10) || '  from ' || case WHEN P_BINARY_JSON then 'jsonb_array_elements' else 'json_array_elements' end || '($1 -> ''data'' -> ''' || P_TABLE_NAME || ''')'
+                    ,'targetDataTypes', V_TARGET_DATA_TYPES
                );
 end;  
 $$ LANGUAGE plpgsql;
@@ -568,14 +583,14 @@ declare
   PLPGSQL_CTX        TEXT;
 begin
   for r in select "tableName"
-                 ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor', P_SCHEMA,"tableName", P_JSON #> '{systemInformation}' ->> 'spatialFormat', "columns","dataTypes","sizeConstraints",TRUE) "TABLE_INFO"
+                 ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor', P_SCHEMA,"tableName", P_JSON #> '{systemInformation}' ->> 'spatialFormat', "columnNames", "dataTypes", "sizeConstraints", TRUE) "TABLE_INFO"
              from JSONB_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
-                                                                 "owner"            VARCHAR, 
-                                                                 "tableName"        VARCHAR, 
-                                                                 "columns"          TEXT, 
-                                                                 "dataTypes"        JSONB, 
-                                                                 "sizeConstraints"  JSONB
+                                                                "tableSchema"      VARCHAR, 
+                                                                "tableName"        VARCHAR, 
+                                                                "columnsNames"     JSONB, 
+                                                                "dataTypes"        JSONB, 
+                                                                "sizeConstraints"  JSONB
                                                               ) 
   loop
                                                               
@@ -626,14 +641,14 @@ declare
 begin
 
   for r in select "tableName"
-                 ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor',P_SCHEMA,"tableName", P_JSON #> '{systemInformation}' ->> 'spatialFormat',"columns","dataTypes","sizeConstraints",FALSE) "TABLE_INFO"
+                 ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor',P_SCHEMA,"tableName", P_JSON #> '{systemInformation}' ->> 'spatialFormat',"columnNames","dataTypes","sizeConstraints",FALSE) "TABLE_INFO"
              from JSON_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSON_TO_RECORD(value) as METADATA(
-                                                                "owner"            VARCHAR, 
-                                                                 "tableName"        VARCHAR, 
-                                                                 "columns"          TEXT, 
-                                                                 "dataTypes"        JSONB, 
-                                                                 "sizeConstraints"  JSONB
+                                                               "tableSchema"      VARCHAR, 
+                                                               "tableName"        VARCHAR, 
+                                                               "columnNames"      JSONB,
+                                                               "dataTypes"        JSONB, 
+                                                               "sizeConstraints"  JSONB
                                                               ) 
   loop
   
@@ -677,14 +692,14 @@ begin
   RETURN QUERY
     select jsonb_object_agg(
            "tableName",
-           GENERATE_STATEMENTS("vendor",P_SCHEMA,"tableName",P_SPATIAL_FORMAT,"columns","dataTypes","sizeConstraints",FALSE)
+           GENERATE_STATEMENTS("vendor",P_SCHEMA,"tableName",P_SPATIAL_FORMAT,"columnNames","dataTypes","sizeConstraints",FALSE)
          )
     from JSONB_EACH(P_JSON -> 'metadata')  
          CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
                                                        "vendor"           VARCHAR,
-                                                       "owner"            VARCHAR, 
+                                                       "tableSchema"      VARCHAR, 
                                                        "tableName"        VARCHAR, 
-                                                       "columns"          TEXT, 
+                                                       "columnNames"      JSONB, 
                                                        "dataTypes"        JSONB, 
                                                        "sizeConstraints"  JSONB
                                                      );

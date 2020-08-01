@@ -1,26 +1,37 @@
 "use strict";
 
 const Yadamu = require('../../common/yadamu.js');
-
-const unboundedTypes = ['date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum'];
-const spatialTypes   = ['geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection'];
-const nationalTypes  = ['nchar','nvarchar'];
-const integerTypes   = ['tinyint','mediumint','smallint','int','bigint']
-
-// const variantMapping = "VARCHAR(16777216)"
-const variantMapping = "VARIANT"
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const SnowflakeConstants = require('./snowflakeConstants.js');
 
 class StatementGenerator {
   
- 
-  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize) {
-        
+  static get UNBOUNDED_TYPES() { 
+    StatementGenerator._UNBOUNDED_TYPES = StatementGenerator._UNBOUNDED_TYPES || Object.freeze([SnowflakeConstants.VARIANT_DATA_TYPE,'GEOGRAPHY','DOUBLE','FLOAT','BOOLEAN'])
+    return this._UNBOUNDED_TYPES;
+  }
+
+  static get SPATIAL_TYPES() { 
+    StatementGenerator._SPATIAL_TYPES = StatementGenerator._SPATIAL_TYPES || Object.freeze(['GEOMETRY'])
+    return this._SPATIAL_TYPES;
+  }
+
+  static get INTEGER_TYPES() { 
+    StatementGenerator._INTEGER_TYPES = StatementGenerator._INTEGER_TYPES || Object.freeze(['TINYINT','MEDIUMINT','SMALLINT','INT','BIGINT'])
+    return this._INTEGER_TYPES;
+  }
+  
+  static get STRONGLY_TYPED_VARIANTS() { 
+    StatementGenerator._STRONGLY_TYPED_VARIANTS = StatementGenerator._STRONGLY_TYPED_VARIANTS || Object.freeze(['XML','XMLTYPE','JSON','JSONB','SET'])
+    return this._STRONGLY_TYPED_VARIANTS;
+  }
+
+  constructor(dbi, targetSchema, metadata, spatialFormat) {
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
     this.spatialFormat = spatialFormat
-    this.batchSize = batchSize
-    this.commitSize = commitSize;
+    
   }
   
    mapForeignDataType(vendor, dataType, dataTypeLength, dataTypeSize) {
@@ -33,10 +44,11 @@ class StatementGenerator {
            case 'NUMBER':                  return 'NUMBER';
            case 'BINARY_FLOAT':            return 'FLOAT';
            case 'BINARY_DOUBLE':           return 'FLOAT';
-           case 'CLOB':                    return 'VARCHAR(16777216)';
-           case 'BLOB':                    return 'BINARY(8388608)';
-           case 'NCLOB':                   return 'VARCHAR(16777216)';
-           case 'XMLTYPE':                 return variantMapping;
+           case 'CLOB':                    return SnowflakeConstants.CLOB_TYPE;
+           case 'BLOB':                    return SnowflakeConstants.BLOB_TYPE;
+           case 'NCLOB':                   return SnowflakeConstants.CLOB_TYPE;
+           case 'XMLTYPE':                 return SnowflakeConstants.XML_TYPE;
+           case 'JSON':                    return SnowflakeConstants.JSON_TYPE;
            case 'TIMESTAMP':
              switch (true) {
                case (dataTypeLength > 6):  return 'datetime(6)';
@@ -47,7 +59,7 @@ class StatementGenerator {
            case 'RAW':                     return 'BINARY';
            case 'ROWID':                   return 'VARCHAR(32)';
            case 'ANYDATA':                 return 'VARCHAR(16777216)';
-           case '"MDSYS"."SDO_GEOMETRY"':  return variantMapping;
+           case '"MDSYS"."SDO_GEOMETRY"':  return 'GEOGRAPHY';
            default :
              if (dataType.indexOf('LOCAL TIME ZONE') > -1) {
                return 'TIMESTAMP_LTZ'; 
@@ -59,23 +71,34 @@ class StatementGenerator {
                return 'VARCHAR(16)'; 
              }
              if (dataType.indexOf('XMLTYPE') > -1) { 
-               return variantMapping;
+               return SnowflakeConstants.XML_TYPE;
              }
              if (dataType.indexOf('.') > -1) { 
-               return 'VARCHAR(16777216)';
+               return SnowflakeConstants.CLOB_TYPE;
              }
              return dataType.toUpperCase();
          }
          break;
        case 'MSSQLSERVER':
          switch (dataType) {
+           case 'nvarchar':                        return 'VARCHAR';
+           case 'nchar':                           return 'CHAR';
+           case 'ntext':                           return 'VARCHAR';
+           case 'smallmoney':                      return 'DECIMAL(10,4)';
+           case 'money':                           return 'DECIMAL(19,4)';
+           case 'bit':                             return 'BOOLEAN';
+           case 'image':                           return SnowflakeConstants.BLOB_TYPE;
+           case 'uniqueidentifier':                return 'VARCHAR(64)';
+           case 'xml':                             return SnowflakeConstants.XML_TYPE;
+           case 'hierarchyid':                     return 'VARCHAR(4000)';
+           case 'datetime2':                       return 'DATETIME';
+             /*
            case 'binary':
              switch (true) {
                case (dataTypeLength > 16777215):   return 'longblob';
                case (dataTypeLength > 65535):      return 'mediumblob';
                default:                            return 'binary';
              }
-           case 'bit':                             return 'boolean';
            case 'char':
              switch (true) {
                case (dataTypeLength === -1):       return 'longtext';
@@ -93,10 +116,7 @@ class StatementGenerator {
            case 'datetimeoffset':                  return 'datetime';
            case 'geography':                       return 'geometry';
            case 'geometry':                        return 'geometry';
-           case 'hierarchyid':                     return 'varchar(4000)';
-           case 'image':                           return 'longblob';
            case 'mediumint':                       return 'int';
-           case 'money':                           return 'decimal(19,4)';
            case 'nchar':
              switch (true) {
                 case (dataTypeLength === -1):      return 'longtext';
@@ -119,7 +139,6 @@ class StatementGenerator {
            case 'smallmoney':                      return 'decimal(10,4)';
            case 'text':                            return 'longtext';
            case 'tinyint':                         return 'smallint';
-           case 'uniqueidentifier':                return 'varchar(64)';
            case 'varbinary':
              switch (true) {
                case (dataTypeLength === -1):       return 'longblob';
@@ -135,7 +154,8 @@ class StatementGenerator {
                default:                            return 'varchar';
              }
            case 'xml':                             return 'longtext';
-           default:                                return dataType.toLowerCase();
+           */
+           default:                                return dataType.toUpperCase();
          }
          break;
        case 'Postgres':                            
@@ -180,63 +200,92 @@ class StatementGenerator {
          break
        case 'MySQL':
        case 'MariaDB':
-         switch (dataType) {
-           case 'set':                            return 'varchar(512)';
-           case 'enum':                           return 'varchar(512)';
-           default:                               return dataType.toLowerCase();
+         switch (dataType.toLowerCase()) {
+           case 'mediumint':                      return 'INT';
+           case 'year':                           return 'NUMBER(4)';
+           case 'blob':                           return SnowflakeConstants.BLOB_TYPE;;
+           case 'geometry':                       return 'GEOGRAPHY';
+           case 'set':                            return SnowflakeConstants.JSON_TYPE;
+           case 'enum':                           return 'VARCHAR(512)';
+           case 'json':                           return SnowflakeConstants.JSON_TYPE;
+           case 'xml':                            return SnowflakeConstants.XML_TYPE;
+           default:                               return dataType.toUpperCase();
          }
          break;
        case 'SNOWFLAKE':
-         return dataType.toUpperCase();
+         switch (dataType.toUpperCase()) {
+           case 'JSON':                           return SnowflakeConstants.JSON_TYPE;
+           case 'SET':                            return SnowflakeConstants.JSON_TYPE;
+           case 'XML':                            return SnowflakeConstants.XML_TYPE;
+           case 'XMLTYPE':                        return SnowflakeConstants.XML_TYPE;
+           default:                               return dataType.toUpperCase();
+         }
        default: 
          return dataType.toLowerCase();
     }  
   } 
   
-  getColumnDataType(targetDataType, length, scale) {
+  columnDataType(targetDataType, length, scale) {
   
+     length = ((length > SnowflakeConstants.MAX_CHARACTER_SIZE) || (length < 0)) ? SnowflakeConstants.MAX_CHARACTER_SIZE : length
+     length = ((targetDataType === 'VARBINARY') && (length > SnowflakeConstants.MAX_BINARY_SIZE)) ? SnowflakeConstants.MAX_BINARY_SIZE : length
+     
      if (RegExp(/\(.*\)/).test(targetDataType)) {
        return targetDataType
      }
+     
+     if (StatementGenerator.INTEGER_TYPES.includes(targetDataType)) {
+       return targetDataType
+     }
        
-     if (unboundedTypes.includes(targetDataType)) {
+     if (StatementGenerator.UNBOUNDED_TYPES.includes(targetDataType)) {
        return targetDataType
      }
   
-     if (spatialTypes.includes(targetDataType)) {
+  
+     if (StatementGenerator.SPATIAL_TYPES.includes(targetDataType)) {
        return targetDataType
      }
   
      if (scale) {
-       if (integerTypes.includes(targetDataType)) {
-         return targetDataType + '(' + length + ')';
-       }
        return targetDataType + '(' + length + ',' + scale + ')';
      }                                                   
   
      if (length) {
-       if (targetDataType === 'double')  {
-         return targetDataType
-       }
        return targetDataType + '(' + length + ')';
      }
   
      return targetDataType;     
   }
   
-  generateTableInfo(metadata) {
-      
-    const columnNames = metadata.columns.split(',');
-    const dataTypes = metadata.dataTypes
-    const sizeConstraints = metadata.sizeConstraints
+  generateTableInfo(tableMetadata) {
+        
+    let parserRequired = false;
+    const columnNames = tableMetadata.columnNames
+    const dataTypes = tableMetadata.dataTypes
+    const sizeConstraints = tableMetadata.sizeConstraints
+    const selectList = Object.keys(new Array(dataTypes.length).fill(null)).map((idx) => {return(`column${parseInt(idx)+1}`)})
     const targetDataTypes = [];
-          
+
     const columnClauses = columnNames.map((columnName,idx) => {    
         
+       // If the 'class' of a VARIANT datatype cannot be determned by insepecting the information available from Snowflake type it based on the incoming data stream 
+       
+       if ((dataTypes[idx] === SnowflakeConstants.VARIANT_DATA_TYPE) && tableMetadata.source) {
+         if (StatementGenerator.STRONGLY_TYPED_VARIANTS.includes(tableMetadata.source.dataTypes[idx].toUpperCase())) {
+           dataTypes[idx] = tableMetadata.source.dataTypes[idx]
+         }
+       }
+        
        const dataType = {
-               type : dataTypes[idx]
+         type : dataTypes[idx]
        }
 
+       if (StatementGenerator.STRONGLY_TYPED_VARIANTS.includes(dataType.type.toUpperCase())) {
+         parserRequired =  true;
+         selectList[idx] = dataType.type.startsWith('XML') ? `PARSE_XML(${selectList[idx]})` : `TRY_PARSE_JSON(${selectList[idx]})`
+       }
+       
        const sizeConstraint = sizeConstraints[idx]
        if ((sizeConstraint !== null) && (sizeConstraint.length > 0)) {
           const components = sizeConstraint.split(',');
@@ -245,34 +294,47 @@ class StatementGenerator {
             dataType.scale = parseInt(components[1])
           }
        }
-    
-       let targetDataType = this.mapForeignDataType(metadata.vendor,dataType.type,dataType.length,dataType.scale);
-    
+           
+       let targetDataType = this.mapForeignDataType(tableMetadata.vendor,dataType.type,dataType.length,dataType.scale);
+      
        targetDataTypes.push(targetDataType);
-       return `${columnName} ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)}`
+       return `"${columnName}" ${this.columnDataType(targetDataType,dataType.length,dataType.scale)}`
     })
+	
+    const createStatement = `create ${this.dbi.TRANSIENT_TABLES ? 'transient ' : ''}table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')}) ${this.dbi.DATA_RETENTION_TIME !== undefined ? `DATA_RETENTION_TIME_IN_DAYS=${this.dbi.DATA_RETENTION_TIME}` : ''} `;
 
-    const createStatement = `create table if not exists "${this.targetSchema}"."${metadata.tableName}"(\n  ${columnClauses.join(',')})`;
-
-    let insertMode = targetDataTypes.includes("VARIANT") ? 'Iterative' : 'Batch';
     let insertStatement
-    
-    if (insertMode === 'Batch') {
-      insertStatement = `insert into "${this.targetSchema}"."${metadata.tableName}" (${metadata.columns}) values ( ${columnNames.map(() => {return '?'}).join(',')})`; 
-    }
+    const valuesBlock = `(${columnNames.map((dataType,idx) => {return '?'}).join(',')})`
+
+    if (parserRequired) {
+      // Cannot pass JSON or XML (There is no JavaScript XML object) directly to an insert
+      // Cannot pass strings (Expression type does not match column data type, expecting VARIANT but got VARCHAR(236) for column data',)
+      // Cannot use JSON_PARSE or XML_PARSE directly in the bind list.
+      // Array Binds are no support with simple insert ... select ?, JSON_PARSE(?) (QL compilation error: Array bind currently not supported for this query type)
+      
+      // Benoit Dageville's solution using "INSERT ... SELECT JSON_PARSE() FROM VALUES (?,?,...),..."
+             
+      insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${tableMetadata.columnNames.join('","')}") select ${selectList.join(',')} from values `
+			
+      // Batch needs to consist of a single array of values rather than an Array of Arrays when the table contains a VARIANT column
+      // Bind list is added at execution time since the full bind list is a function of the number of rows in the batch being inserted. 
+      
+    } 
     else {
-      insertStatement = `insert into "${this.targetSchema}"."${metadata.tableName}" (${metadata.columns}) select ${targetDataTypes.map((dataType,idx) => {return dataType == 'VARIANT' ? (metadata.dataTypes[idx] === 'XMLTYPE' ? 'PARSE_XML(?)' : 'PARSE_JSON(?)') : '?'}).join(',')}`
+      insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values ${valuesBlock}`;
     }
-    
+
     return { 
        ddl             : createStatement, 
        dml             : insertStatement,
-       columns         : columnNames,     
-       sourceDataTypes : metadata.source ? metadata.source.dataTypes : dataTypes,
+       valuesBlock     : valuesBlock,
+       columnNames     : columnNames,     
        targetDataTypes : targetDataTypes, 
-       insertMode      : insertMode,
-       batchSize       : this.batchSize, 
-       commitSize      : this.commitSize
+       insertMode      : 'Batch',
+       parserRequired  : parserRequired,
+       _BATCH_SIZE     : this.dbi.BATCH_SIZE,
+       _COMMIT_COUNT   : this.dbi.COMMIT_COUNT,
+       _SPATIAL_FORMAT : this.spatialFormat
     }
   }
   
@@ -280,11 +342,10 @@ class StatementGenerator {
       
     const statementCache = {}
     const tables = Object.keys(this.metadata); 
- 
+
     const ddlStatements = tables.map((table,idx) => {
       const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);
-	  tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.sourceDataTypes);
       statementCache[this.metadata[table].tableName] = tableInfo;
       return tableInfo.ddl;
     })
@@ -293,7 +354,6 @@ class StatementGenerator {
     }
     return statementCache;
   }
-
 }
 
 module.exports = StatementGenerator;

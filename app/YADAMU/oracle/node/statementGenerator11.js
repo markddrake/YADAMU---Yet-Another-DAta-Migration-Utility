@@ -18,12 +18,12 @@ const Readable = require('stream').Readable;
 const StatementGenerator = require('./statementGenerator.js');
 
 class StatementGenerator11 extends StatementGenerator {
+    
+  // 11.x does not support GeoJSON. We need to use WKX to convert GeoJSON to WKT
+  get GEOJSON_FUNCTION() { return 'DESERIALIZE_WKTGEOMETRY' }
   
-  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize) {
-    super(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize)
-	
-	// 11.x does not support GeoJSON. We need to use WKX to convert GeoJSON to WKT
-	this.GEOJSON_FUNCTION = 'DESERIALIZE_WKTGEOMETRY'
+  constructor(dbi, targetSchema, metadata, spatialFormat) {
+    super(dbi, targetSchema, metadata, spatialFormat)
   }
 
   // In 11g the seperator character appears to be \r rather than \n
@@ -37,20 +37,20 @@ class StatementGenerator11 extends StatementGenerator {
             
     // I know.... Attmpting to build XML via string concatenation will end in tears...
 
-    const tablesXML = Object.keys(this.metadata).map((tableID) => {
-      const table = this.metadata[tableID]
-      const columnsXML = JSON.parse(`[${table.columns}]`).map((columnName) => {return `<column>${columnName}</column>`}).join('');
+    const metadataXML = Object.keys(this.metadata).map((tableName) => {
+      const table = this.metadata[tableName]
+      const columnsXML = table.columnNames.map((columnName) => {return `<columnName>${columnName}</columnName>`}).join('');
       const dataTypesXML = table.dataTypes.map((dataType) => {return `<dataType>${dataType}</dataType>`}).join('');
       const sizeConstraintsXML = table.sizeConstraints.map((sizeConstraint) => {return `<sizeConstraint>${sizeConstraint === null ? '' : sizeConstraint}</sizeConstraint>`}).join('');
-      return `<table><vendor>${table.vendor}</vendor><owner>${table.owner}</owner><tableName>${table.tableName}</tableName><columns>${columnsXML}</columns><dataTypes>${dataTypesXML}</dataTypes><sizeConstraints>${sizeConstraintsXML}</sizeConstraints></table>`
+      return `<table><vendor>${table.vendor}</vendor><tableSchema>${table.tableSchema}</tableSchema><tableName>${table.tableName}</tableName><columnNames>${columnsXML}</columnNames><dataTypes>${dataTypesXML}</dataTypes><sizeConstraints>${sizeConstraintsXML}</sizeConstraints></table>`
     }).join('');
-    return `<metadata>${tablesXML}</metadata>`
+    return `<metadata>${metadataXML}</metadata>`
     
   }
   
   async getMetadataLob() {
     const metadataXML = this.metadataToXML();    
-    return await this.dbi.blobFromString(metadataXML);
+    return await this.dbi.stringToBlob(metadataXML);
   }
       
 }

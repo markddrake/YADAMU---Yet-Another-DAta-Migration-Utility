@@ -1,31 +1,20 @@
 "use strict" 
 
-const YadamuParser = require('../../common/yadamuParser.js')
+const SharedParser = require('../../dbShared/mysql/mysqlParser.js')
 
-class MySQLParser extends YadamuParser {
+class MySQLParser extends SharedParser {
   
-  constructor(tableInfo,objectMode,yadamuLogger) {
-    super(tableInfo,objectMode,yadamuLogger);      
-  }
+  constructor(tableInfo,yadamuLogger) {
+    super(tableInfo,yadamuLogger); 
+  }    
   
+  // MySQL requires Object to Array Transformation
   
   async _transform (data,encoding,callback) {
-	this.counter++
-   
-    if (this.objectMode === true) {
-      if (typeof data.json === 'string') {
-		data.json = JSON.parse(data.json);
-	  }
-	}
-	else {
-      if (typeof data.json === 'object') {
-        data.json = JSON.stringify(data.json);
-	  }
-    }
-    
-	this.push({data:data.json})
-    callback();
+    data = Object.values(data)    
+	super._transform(data,encoding,callback)
   }
+  
 }
 
 module.exports = MySQLParser

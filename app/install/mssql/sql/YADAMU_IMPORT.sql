@@ -8,72 +8,82 @@ begin
   case
     when @VENDOR = 'Oracle' then
       case 
-        when @DATA_TYPE = 'VARCHAR2' 
-          then 'varchar'
-        when @DATA_TYPE = 'NVARCHAR2' 
-          then 'nvarchar'
-        when @DATA_TYPE = 'CLOB'
-          then 'varchar(max)'
-        when @DATA_TYPE = 'NCLOB'
-          then 'nvarchar(max)'
-        when @DATA_TYPE = 'NUMBER'
-          then 'decimal'
-        when @DATA_TYPE = 'BINARY_DOUBLE'
-          then 'float(53)'
-        when @DATA_TYPE = 'BINARY_FLOAT'
-          then 'real'
-        when @DATA_TYPE = 'RAW'
-          then 'varbinary'
-        when @DATA_TYPE = 'BLOB'
-          then 'varbinary(max)'
-        when @DATA_TYPE = 'BFILE'
-          then 'varchar(2048)'  
-        when @DATA_TYPE in ('ROWID','UROWID') 
-          then 'varchar(18)'                  
-        when @DATA_TYPE in ('ANYDATA') 
-          then 'nvarchar(max)'                
-        when (CHARINDEX('INTERVAL',@DATA_TYPE) = 1)
-          then 'varchar(16)'                  
-        when (CHARINDEX('TIMESTAMP',@DATA_TYPE) = 1) 
-          then case
+        when @DATA_TYPE = 'VARCHAR2' then 
+          'varchar'
+        when @DATA_TYPE = 'NVARCHAR2' then
+          'nvarchar'
+        when @DATA_TYPE = 'CLOB' then
+          'varchar(max)'
+        when @DATA_TYPE = 'NCLOB' then
+          'nvarchar(max)'
+        when @DATA_TYPE = 'NUMBER' then
+          'decimal'
+        when @DATA_TYPE = 'BINARY_DOUBLE' then
+          'float(53)'
+        when @DATA_TYPE = 'BINARY_FLOAT' then
+          'real'
+        when @DATA_TYPE = 'BOOLEAN' then 
+          'bit'
+        when @DATA_TYPE = 'RAW' and @DATA_TYPE_LENGTH = 1 then 
+          'bit'
+        when @DATA_TYPE = 'RAW' then
+          'varbinary'
+        when @DATA_TYPE = 'BLOB' then
+          'varbinary(max)'
+        when @DATA_TYPE = 'BFILE' then
+          'varchar(2048)'  
+        when @DATA_TYPE in ('ROWID','UROWID') then
+          'varchar(18)'                  
+        when @DATA_TYPE in ('ANYDATA') then
+          'nvarchar(max)'                
+        when (CHARINDEX('INTERVAL',@DATA_TYPE) = 1) then
+          'varchar(16)'                  
+        when (CHARINDEX('TIMESTAMP',@DATA_TYPE) = 1) then
+          case
                  when (CHARINDEX('TIME ZONE',@DATA_TYPE) > 0) 
                    then 'datetimeoffset'
                  else 
                   'datetime2' 
           end
-        when @DATA_TYPE = 'XMLTYPE'
-          then 'xml'
-        when @DATA_TYPE like '"%"."%"'
-          then 'nvarchar(max)'
-        when @DATA_TYPE = 'JSON' 
-          then 'json'
+        when @DATA_TYPE = 'XMLTYPE' then
+          'xml'
+        when @DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"' then
+          'geometry'                
+        when @DATA_TYPE like '"%"."%"' then
+          'nvarchar(max)'
+        when @DATA_TYPE = 'JSON' then
+          'json'
         else
           lower(@DATA_TYPE)
       end
     when @VENDOR in ('MySQL','MariaDB') then
       case 
-        when @DATA_TYPE = 'mediumint' 
-          then 'int'
-        when @DATA_TYPE = 'datetime' 
-          then 'datetime2'
-        when @DATA_TYPE = 'timestamp' 
-          then 'datetime2'
-        when @DATA_TYPE = 'float' 
-          then 'real'
-        when @DATA_TYPE = 'double' 
-          then 'float(53)'
-        when @DATA_TYPE = 'enum'
-          then 'varchar(255)'
-        when @DATA_TYPE = 'set'
-          then 'varchar(255)'
-        when @DATA_TYPE = 'year'
-          then 'smallint'
-        when @DATA_TYPE = 'json' 
-          then 'json'
-        when @DATA_TYPE = 'blob' and @DATA_TYPE_LENGTH > 8000  
-          then 'varbinary(max)'
-        when @DATA_TYPE = 'blob' 
-          then 'varbinary'
+        when @DATA_TYPE = 'tinyint' and @DATA_TYPE_LENGTH = 1 then
+          'bit'
+        when @DATA_TYPE = 'boolean' then
+          'bit'
+        when @DATA_TYPE = 'mediumint' then
+          'int'
+        when @DATA_TYPE = 'datetime' then
+          'datetime2'
+        when @DATA_TYPE = 'timestamp' then
+          'datetime2'
+        when @DATA_TYPE = 'float' then
+          'real'
+        when @DATA_TYPE = 'double' then
+          'float(53)'
+        when @DATA_TYPE = 'enum' then
+          'varchar(255)'
+        when @DATA_TYPE = 'set' then
+          'json'
+        when @DATA_TYPE = 'year' then
+          'smallint'
+        when @DATA_TYPE = 'json' then
+          'json'
+        when @DATA_TYPE = 'blob' and @DATA_TYPE_LENGTH > 8000  then
+          'varbinary(max)'
+        when @DATA_TYPE = 'blob' then
+          'varbinary'
         when @DATA_TYPE = 'varchar' then
           -- For MySQL may need to add column character set to the table metadata object in order to accutately determine varchar Vs nvarchar ? 
           -- Alternatively the character set could be used when generating metadata from the MySQL dictionaly that distinguishes varchar from nvarchar even thought the dictionaly does not.
@@ -125,6 +135,8 @@ begin
           'geometry'
         when @DATA_TYPE = 'geography'then
           'geography'
+        when @DATA_TYPE = 'jsonb'then
+          'json'
         when @DATA_TYPE = 'integer' then
           'int'
         else
@@ -133,15 +145,15 @@ begin
     when ((@VENDOR = 'MSSQLSERVER') and (@DB_COLLATION like '%UTF8')) then
       case 
         when @DATA_TYPE = 'text' then
-		  'varchar(max)'
+          'varchar(max)'
         when @DATA_TYPE = 'ntext' then
-		  'nvarchar(max)'
+          'nvarchar(max)'
         else
           lower(@DATA_TYPE)
-	  end	   
+      end      
     when @VENDOR = 'MongoDB' then
-      -- MongoDB typing based on aggregation $type operator and BSON type
-	  -- ### No support for depricated Data types undefined, dbPointer, symbol
+      -- MongoDB typing based on BSON type model and the aggregation $type operator
+      -- ### No support for depricated Data types undefined, dbPointer, symbol
       case
         when @DATA_TYPE in ('undefined','object','function','symbol') then 
           'json'
@@ -155,7 +167,7 @@ begin
               'nvarchar(max)'
           end
         when @DATA_TYPE = 'object' then 
-          'json'		  
+          'json'          
         when @DATA_TYPE = 'array' then 
           'json'
         when @DATA_TYPE = 'binData' then 
@@ -171,7 +183,7 @@ begin
         when @DATA_TYPE = 'javascript' then
               'nvarchar(max)'
         when @DATA_TYPE = 'javascriptWithScope' then
-              'nvarchar(max)'		  
+              'nvarchar(max)'         
         when @DATA_TYPE = 'int' then
           'int'
         when @DATA_TYPE = 'long' then
@@ -183,9 +195,34 @@ begin
         when @DATA_TYPE = 'date' then
           'datatime2'
         when @DATA_TYPE = 'minkey' then 
-          'json'		  
+          'json'          
         when @DATA_TYPE = 'maxkey' then 
-          'json'		  
+          'json'          
+        else 
+           lower(@DATA_TYPE)
+      end
+    when @VENDOR = 'SNOWFLAKE' then
+      case
+        when @DATA_TYPE = 'TEXT' then
+          case
+            when @DATA_TYPE_LENGTH > (8000) then
+              'nvarchar(max)'
+            else
+              'nvarchar'
+          end
+        when @DATA_TYPE = 'TIMESTAMP_NTZ' then
+          'datetimeoffset'
+        when @DATA_TYPE = 'NUMBER' then
+          'decimal'
+        when @DATA_TYPE = 'BINARY' then
+          case
+            when @DATA_TYPE_LENGTH > (8000) then
+              'varbinary(max)'
+            else
+              'varbinary'
+          end
+        when @DATA_TYPE = 'VARIANT' then
+          'varbinary(max)'
         else 
            lower(@DATA_TYPE)
       end
@@ -199,10 +236,11 @@ go
 EXECUTE sp_ms_marksystemobject 'sp_MAP_FOREIGN_DATATYPE'
 go
 --
-create OR ALTER FUNCTION sp_GENERATE_STATEMENTS(@VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @COLUMN_LIST NVARCHAR(MAX),@DATA_TYPE_LIST NVARCHAR(MAX),@DATA_SIZE_LIST NVARCHAR(MAX),@DB_COLLATION NVARCHAR(32)) 
+create OR ALTER FUNCTION sp_GENERATE_STATEMENTS(@VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @COLUMN_NAMES_ARRAY NVARCHAR(MAX),@DATA_TYPES_ARARY NVARCHAR(MAX),@SIZE_CONSTRAINTS_ARRAY NVARCHAR(MAX),@DB_COLLATION NVARCHAR(32)) 
 returns NVARCHAR(MAX)
 as
 begin
+  DECLARE @COLUMN_LIST        NVARCHAR(MAX);  
   DECLARE @COLUMNS_CLAUSE     NVARCHAR(MAX);
   DECLARE @INSERT_SELECT_LIST NVARCHAR(MAX);
   DECLARE @WITH_CLAUSE        NVARCHAR(MAX);
@@ -241,18 +279,21 @@ begin
                    else 
                      NULL
                  end "DATA_TYPE_SCALE"
-            FROM OPENJSON(CONCAT('[',@COLUMN_LIST,']')) c,
-                 OPENJSON(@DATA_TYPE_LIST) t,
-                 OPENJSON(@DATA_SIZE_LIST) s
+            FROM OPENJSON(@COLUMN_NAMES_ARRAY) c,
+                 OPENJSON(@DATA_TYPES_ARARY) t,
+                 OPENJSON(@SIZE_CONSTRAINTS_ARRAY) s
            WHERE c."KEY" = t."KEY" and c."KEY" = s."KEY"
   ),
   "TARGET_TABLE_DEFINITION" as (
     select st.*, master.dbo.sp_MAP_FOREIGN_DATATYPE(@VENDOR, "DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE",@DB_COLLATION) TARGET_DATA_TYPE
       from "SOURCE_TABLE_DEFINITION" st
   )
-  SELECT @COLUMNS_CLAUSE =
+  SELECT @COLUMN_LIST = STRING_AGG(CONCAT('"',"COLUMN_NAME",'"'),',')
+        ,@COLUMNS_CLAUSE =
          STRING_AGG(CONCAT('"',"COLUMN_NAME",'" ',
                            case
+                             when "TARGET_DATA_TYPE" = 'boolean' then
+                               'bit'
                              when "TARGET_DATA_TYPE" = 'json' then
                                'nvarchar(max)'
                              when TARGET_DATA_TYPE LIKE '%(%)%' then
@@ -416,7 +457,7 @@ begin
   DECLARE FETCH_METADATA 
   CURSOR FOR 
   select TABLE_NAME, 
-         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, SPATIAL_FORMAT, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS,@DB_COLLATION) as STATEMENTS
+         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, SPATIAL_FORMAT, v.COLUMN_NAMES_ARRAY, v.DATA_TYPES_ARARY, v.SIZE_CONSTRAINTS_ARRAY,@DB_COLLATION) as STATEMENTS
    from "#YADAMU_STAGING"
          cross apply OPENJSON("DATA") 
          with (
@@ -425,15 +466,13 @@ begin
           ,METADATA       nvarchar(max) '$.metadata' as json
          ) x
          cross apply OPENJSON(x.METADATA) y
-		 cross apply OPENJSON(y.value) 
-		             with (
-					   OWNER                        NVARCHAR(128)  '$.owner'
-			          ,TABLE_NAME                   NVARCHAR(128)  '$.tableName'
-			          ,COLUMN_LIST                  NVARCHAR(MAX)  '$.columns'
-			          ,DATA_TYPE_LIST               NVARCHAR(MAX)  '$.dataTypes' as json
-			          ,SIZE_CONSTRAINTS             NVARCHAR(MAX)  '$.sizeConstraints' as json
-			          ,INSERT_SELECT_LIST           NVARCHAR(MAX)  '$.insertSelectList'
-                      ,COLUMN_PATTERNS              NVARCHAR(MAX)  '$.columnPatterns'
+         cross apply OPENJSON(y.value) 
+                     with (
+                       OWNER                        NVARCHAR(128)  '$.owner'
+                      ,TABLE_NAME                   NVARCHAR(128)  '$.tableName'
+                      ,COLUMN_NAMES_ARRAY           NVARCHAR(MAX)  '$.columnNames' as json
+                      ,DATA_TYPES_ARARY             NVARCHAR(MAX)  '$.dataTypes' as json
+                      ,SIZE_CONSTRAINTS_ARRAY       NVARCHAR(MAX)  '$.sizeConstraints' as json
                      ) v;
 
   SET @SQL_STATEMENT = CONCAT('if not exists (select 1 from sys.schemas where name = N''',@TARGET_DATABASE,''') exec(''create schema "',@TARGET_DATABASE,'"'')')
@@ -535,22 +574,20 @@ begin
   DECLARE FETCH_METADATA 
   CURSOR FOR 
   select TABLE_NAME, 
-         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, @SPATIAL_FORMAT, v.COLUMN_LIST, v.DATA_TYPE_LIST, v.SIZE_CONSTRAINTS,@DB_COLLATION) as STATEMENTS
+         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, @SPATIAL_FORMAT, v.COLUMN_NAMES_ARRAY, v.DATA_TYPES_ARARY, v.SIZE_CONSTRAINTS_ARRAY,@DB_COLLATION) as STATEMENTS
   from  OPENJSON(@METADATA) 
          with (
            METADATA      nvarchar(max) '$.metadata' as json
          ) x
          cross apply OPENJSON(x.METADATA) y
-		 cross apply OPENJSON(y.value) 
-		             with(
-					   VENDOR                       NVARCHAR(128)  '$.vendor'
-			          ,OWNER                        NVARCHAR(128)  '$.owner'
-			          ,TABLE_NAME                   NVARCHAR(128)  '$.tableName'
-			          ,COLUMN_LIST                  NVARCHAR(MAX)  '$.columns'
-			          ,DATA_TYPE_LIST               NVARCHAR(MAX)  '$.dataTypes' as json
-			          ,SIZE_CONSTRAINTS             NVARCHAR(MAX)  '$.sizeConstraints' as json
-			          ,INSERT_SELECT_LIST           NVARCHAR(MAX)  '$.insertSelectList'
-                      ,COLUMN_PATTERNS              NVARCHAR(MAX)  '$.columnPatterns'
+         cross apply OPENJSON(y.value) 
+                     with(
+                       VENDOR                       NVARCHAR(128)  '$.vendor'
+                      ,OWNER                        NVARCHAR(128)  '$.owner'
+                      ,TABLE_NAME                   NVARCHAR(128)  '$.tableName'
+                      ,COLUMN_NAMES_ARRAY           NVARCHAR(MAX)  '$.columnNames' as json
+                      ,DATA_TYPES_ARARY             NVARCHAR(MAX)  '$.dataTypes' as json
+                      ,SIZE_CONSTRAINTS_ARRAY       NVARCHAR(MAX)  '$.sizeConstraints' as json
                      ) v;
  
   SET QUOTED_IDENTIFIER ON; 

@@ -3,6 +3,7 @@
 const { performance } = require('perf_hooks');
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 const {BatchInsertError} = require('../../common/yadamuError.js')
 
@@ -15,15 +16,29 @@ class ExampleWriter extends YadamuWriter {
   setTableInfo(tableInfo) {
 	super.setTableInfo(tableInfo)
 
-    this.transformations = this.tableInfo.dataTypes.map((dataType,idx) => {
-      switch (dataType.type) {
-		/*
-		**
-		** Add conversion functions for specific data types here..
-        FOO:
-		   return (col,idx) => { conversion code for the data type of foo col }
-		**
-	    */
+	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {        
+      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
+      /*	
+	  if (YadamuLibrary.isBinaryDataType(dataType.type)){
+        // For Interfaces that what Binary content rendered as hexBinary string 
+        return (col,idx) => {
+		  return (Buffer.isBuffer(col)) return col.toString('hex') : col
+          }
+	    } 
+	  }
+	  */
+	  switch (dataType.type.toLowerCase()) {
+        case "json":
+		  return (col,idx) => {
+            return typeof col === 'object' ? JSON.stringify(col) : col
+		  }
+          break;
+        case 'bit':
+        case 'boolean':
+		  return (col,idx) => {
+            return YadamuLibrary.toBoolean(col)
+		  }
+          break;
         default :
 		  return null
       }
@@ -66,8 +81,8 @@ class ExampleWriter extends YadamuWriter {
 
   }
     
-  handleBatchError(operation,cause) {
-   	super.handleBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+  reportBatchError(operation,cause) {
+   	super.reportBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
   }
        
   async writeBatch() {

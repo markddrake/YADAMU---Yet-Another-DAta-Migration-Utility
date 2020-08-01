@@ -6,56 +6,12 @@ const { performance } = require('perf_hooks');
 const assert = require('assert');
 
 const Yadamu = require('./yadamu.js');
+const YadamuConstants = require('./yadamuConstants.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuError.js');
 
 const FileDBI = require('../file/node/fileDBI.js');
-
-const REQUIRES_SWITCH = ['YADAMUCLI' , 'YADAMUCMD']
-const VALID_SWITCHES = ['EXPORT','IMPORT','UPLOAD','COPY','TEST']
-
-const FILE_MUST_EXIST = ['IMPORT']
-const FILE_MUST_NOT_EXIST = ['EXPORT']
-const CONFIGURATION_REQUIRED = ['COPY','TEST','CONNECTIONTEST']
-
-const SUPPORTED_ARGUMENTS = {
-  "YADAMUCMD" : []
-, "YADAMUGUI" : ['INIT','IMPORT','UPLOAD','EXPORT','COPY','TEST']
-, "YADAMUCLI" : ['IMPORT','UPLOAD','EXPORT','COPY','TEST']
-, "IMPORT"    : ['IMPORT']
-, "UPLOAD"    : ['UPLOAD']
-, "EXPORT"    : ['EXPORT']
-, "INIT"      : ['INIT']
-, "COPY"      : ['COPY']
-, "TEST"      : ['TEST']
-}
-
-const REQUIRED_ARGUMENTS = {
-  "YADAMUCMD"      : []
-, "YADAMUGUI"      : []
-, "YADAMUCLI"      : []
-, "IMPORT"         : ['TO_USER']
-, "UPLOAD"         : ['TO_USER']
-, "EXPORT"         : ['FROM_USER']
-, "COPY"           : ['CONFIG']
-, "TEST"           : ['CONFIG']
-, "CONNECTIONTEST" : ['CONFIG','RDBMS']
-}
-
-const ILLIEGAL_ARGUMENTS = {
-  "YADAMUCLI" : ['FILE','CONFIG','CONFIGURATION']
-, "YADAMUCMD" : ['FILE','CONFIG','CONFIGURATION']
-, "IMPORT"    : ['CONFIG','CONFIGURATION',"FROM_USER","OVERWRITE"]
-, "UPLOAD"    : ['CONFIG','CONFIGURATION',"FROM_USER","OVERWRITE"]
-, "EXPORT"    : ['CONGIG','CONFIGURATION',"TO_USER","FROM_USER"]
-, "COPY"      : ['FILE',"FROM_USER","TO_USER"]
-, "TEST"      : ['FILE',"FROM_USER","TO_USER"]
-}
-
-const ENUMERATED_PARAMETERS = {
-  "MODE" : ['DDL_ONLY','DATA_ONLY','DDL_AND_DATA']
-}
 
 /*
 **
@@ -91,6 +47,85 @@ const ENUMERATED_PARAMETERS = {
 
 class YadamuCLI {
 
+  static get REQUIRES_SWITCH() {
+    YadamuCLI._REQUIRES_SWITCH = YadamuCLI._REQUIRES_SWITCH || Object.freeze(['YADAMUCLI' , 'YADAMUCMD'])
+    return YadamuCLI._REQUIRES_SWITCH
+  }
+
+  static get VALID_SWITCHES() {
+    YadamuCLI._VALID_SWITCHES = YadamuCLI._VALID_SWITCHES || Object.freeze(['EXPORT','IMPORT','UPLOAD','COPY','TEST'])
+    return YadamuCLI._VALID_SWITCHES
+  }
+
+  static get FILE_MUST_EXIST() {
+    YadamuCLI._FILE_MUST_EXIST = YadamuCLI._FILE_MUST_EXIST || Object.freeze(['IMPORT'])
+    return YadamuCLI._FILE_MUST_EXIST
+  }
+  
+  static get FILE_MUST_NOT_EXIST() {
+    YadamuCLI._FILE_MUST_NOT_EXIST = YadamuCLI._FILE_MUST_NOT_EXIST || Object.freeze(['EXPORT'])
+    return YadamuCLI._FILE_MUST_NOT_EXIST
+  }
+  
+  static get CONFIGURATION_REQUIRED() {
+    YadamuCLI._CONFIGURATION_REQUIRED = YadamuCLI._CONFIGURATION_REQUIRED || Object.freeze(['COPY','TEST','CONNECTIONTEST'])
+    return YadamuCLI._CONFIGURATION_REQUIRED
+  }
+
+  static get ENUMERATED_PARAMETERS() {
+    YadamuCLI._ENUMERATED_PARAMETERS = YadamuCLI._ENUMERATED_PARAMETERS || Object.freeze(['DDL_ONLY','DATA_ONLY','DDL_AND_DATA'])
+    return YadamuCLI._ENUMERATED_PARAMETERS
+  }
+
+  static get SUPPORTED_ARGUMENTS() {
+    YadamuCLI._SUPPORTED_ARGUMENTS = YadamuCLI._SUPPORTED_ARGUMENTS || Object.freeze({
+      "YADAMUCMD" : Object.freeze([])
+    , "YADAMUGUI" : Object.freeze(['INIT','IMPORT','LOAD','UPLOAD','EXPORT','UNLOAD','COPY','TEST'])
+    , "YADAMUCLI" : Object.freeze(['IMPORT','LOAD','UPLOAD','EXPORT','UNLOAD','COPY','TEST'])
+    , "IMPORT"    : Object.freeze(['IMPORT'])
+    , "LOAD"      : Object.freeze(['LOAD'])
+    , "UPLOAD"    : Object.freeze(['UPLOAD'])
+    , "EXPORT"    : Object.freeze(['EXPORT'])
+    , "UNLOAD"    : Object.freeze(['UNLOAD'])
+    , "INIT"      : Object.freeze(['INIT'])
+    , "COPY"      : Object.freeze(['COPY'])
+    , "TEST"      : Object.freeze(['TEST'])
+    })
+    return YadamuCLI._SUPPORTED_ARGUMENTS
+  }
+
+  static get REQUIRED_ARGUMENTS() {
+    YadamuCLI._REQUIRED_ARGUMENTS = YadamuCLI._REQUIRED_ARGUMENTS || Object.freeze({
+      "YADAMUCMD"      : Object.freeze([])
+    , "YADAMUGUI"      : Object.freeze([])
+    , "YADAMUCLI"      : Object.freeze([])
+    , "IMPORT"         : Object.freeze(['TO_USER'])
+    , "LOAD"           : Object.freeze(['TO_USER'])
+    , "UPLOAD"         : Object.freeze(['TO_USER'])
+    , "EXPORT"         : Object.freeze(['FROM_USER'])
+    , "UNLOAD"         : Object.freeze(['FROM_USER'])
+    , "COPY"           : Object.freeze(['CONFIG'])
+    , "TEST"           : Object.freeze(['CONFIG'])
+    , "CONNECTIONTEST" : Object.freeze(['CONFIG','RDBMS'])
+    })
+    return YadamuCLI._REQUIRED_ARGUMENTS
+  }
+
+  static get ILLEGAL_ARGUMENTS() {
+    YadamuCLI._ILLEGAL_ARGUMENTS = YadamuCLI._ILLEGAL_ARGUMENTS || Object.freeze({
+      "YADAMUCLI" : Object.freeze(['FILE','CONFIG','CONFIGURATION'])
+    , "YADAMUCMD" : Object.freeze(['FILE','CONFIG','CONFIGURATION'])
+    , "IMPORT"    : Object.freeze(['CONFIG','CONFIGURATION',"FROM_USER","OVERWRITE"])
+    , "LOAD"      : Object.freeze(['CONFIG','CONFIGURATION',"FROM_USER","OVERWRITE"])
+    , "UPLOAD"    : Object.freeze(['CONFIG','CONFIGURATION',"FROM_USER","OVERWRITE"])
+    , "EXPORT"    : Object.freeze(['CONGIG','CONFIGURATION',"TO_USER"])
+    , "UNLOAD"    : Object.freeze(['CONGIG','CONFIGURATION',"TO_USER"])
+    , "COPY"      : Object.freeze(['FILE',"FROM_USER","TO_USER"])
+    , "TEST"      : Object.freeze(['FILE',"FROM_USER","TO_USER"])
+    })
+    return YadamuCLI._ILLEGAL_ARGUMENTS
+  }
+
   static reportError(e) {
 	if (e instanceof UserError) {
       console.log(e.message);
@@ -103,6 +138,41 @@ class YadamuCLI {
   	}
   }
   
+  constructor() {  
+
+    const className = this.constructor.name.toUpperCase()
+	switch (className) {
+	  case 'EXPORT':
+	  case 'UNLOAD':
+	  case 'IMPORT':
+	  case 'LOAD':
+	  case 'IMPORT':
+	  case 'UPLOAD':
+	  case 'COPY':
+	  case 'TEST':
+	    this.command = this.getOperation(className);
+	    break;
+      default:
+	    this.command = this.getOperation(className)
+	}		
+
+    this.yadamu = new Yadamu(this.command);
+    
+    this.yadamuLogger = this.yadamu.LOGGER
+
+	try {
+	  this.validateParameters(this.command)	
+	} catch (e) {
+      try {
+		// Should this be 'awaited'...
+	    this.yadamu.close()
+      } catch(e) {
+	    console.log(e)
+	  }
+      throw e
+	}
+  }
+
   checkFileExists(argument) {
 	const relativePath = this.parameters[argument]
 	const resolvedPath = path.resolve(relativePath);
@@ -140,36 +210,32 @@ class YadamuCLI {
   }
 
   validateParameters(command) {
-	
-    const requiredArguments = REQUIRED_ARGUMENTS[command];
-    const cmdLineParamters = this.yadamu.getCommandLineParameters()
-	
-	for (const argument of requiredArguments) {
-	  if (cmdLineParamters[argument] === undefined) {
-	    const err = new CommandLineError(`"${command}" requires that the following arguments ${JSON.stringify(requiredArguments)} be provided on the command line`)
+      
+	for (const argument of YadamuCLI.REQUIRED_ARGUMENTS[command]) {
+	  if (this.yadamu.COMMAND_LINE_PARAMETERS[argument] === undefined) {
+	    const err = new CommandLineError(`"${command}" requires that the following arguments ${JSON.stringify(YadamuCLI.REQUIRED_ARGUMENTS[command])} be provided on the command line`)
         throw err
 	  }
 	}
     
-	const illegalArguments = ILLIEGAL_ARGUMENTS[command]
 	// TODO ### Check for illegal arguments
 
-    if (CONFIGURATION_REQUIRED.includes(command)) {
+    if (YadamuCLI.CONFIGURATION_REQUIRED.includes(command)) {
 	  this.checkFileExists('CONFIG') 
     }
 	
-	if (FILE_MUST_EXIST.includes(command)) {
+	if (YadamuCLI.FILE_MUST_EXIST.includes(command)) {
 	  this.checkFileExists('FILE')
 	}
 	
-	if ((FILE_MUST_NOT_EXIST.includes(command)) && (cmdLineParamters.OVERWRITE !== true)) {
+	if ((YadamuCLI.FILE_MUST_NOT_EXIST.includes(command)) && (this.yadamu.COMMAND_LINE_PARAMETERS.OVERWRITE !== true)) {
       this.checkFileDoesNotExist('FILE')
 	}
 
-    for (const parameter of Object.keys(cmdLineParamters)) {
-	  if (ENUMERATED_PARAMETERS[parameter] !== undefined) {
-	    if (!ENUMERATED_PARAMETERS[parameter].includes(cmdLineParamters[parameter])) {
-  	      const err = new CommandLineError(`Valid values for parameter "${parameter}" are ${JSON.stringify(ENUMERATED_PARAMETERS[parameter])}.`)
+    for (const parameter of Object.keys(this.yadamu.COMMAND_LINE_PARAMETERS)) {
+	  if (YadamuCLI.ENUMERATED_PARAMETERS[parameter] !== undefined) {
+	    if (!YadamuCLI.ENUMERATED_PARAMETERS[parameter].includes(this.yadamu.COMMAND_LINE_PARAMETERS[parameter])) {
+  	      const err = new CommandLineError(`Valid values for parameter "${parameter}" are ${JSON.stringify(YadamuCLI.ENUMERATED_PARAMETERS[parameter])}.`)
           throw err
 	    }
 	  }
@@ -236,17 +302,17 @@ class YadamuCLI {
 	let err
 	let command
 	
-	if (REQUIRES_SWITCH.indexOf(className) > -1) {
+	if (YadamuCLI.REQUIRES_SWITCH.indexOf(className) > -1) {
   	  switch (commands.length) {
 	    case 0:
-          err = new CommandLineError(`Must specify one of ${JSON.stringify(VALID_SWITCHES)} on the command line`)
+          err = new CommandLineError(`Must specify one of ${JSON.stringify(YadamuCLI.VALID_SWITCHES)} on the command line`)
 	      throw err;
 	      break;
         case 1:
 		  command = commands[0]
           break;
 	    default:
-	      err = new CommandLineError(`Conflicting operations: Please specify just one of ${JSON.stringify(VALID_SWITCHES)} on the command line`)
+	      err = new CommandLineError(`Conflicting operations: Please specify just one of ${JSON.stringify(YadamuCLI.VALID_SWITCHES)} on the command line`)
 	      throw err;
 	  }
 	}
@@ -256,46 +322,14 @@ class YadamuCLI {
 		  command = className
 	      break;
 	    default:
-		  err = new CommandLineError(`The switches ${JSON.stringify(VALID_SWITCHES)} are not valid with the "${this.constructor.name}" command.`)
+		  err = new CommandLineError(`The switches ${JSON.stringify(YadamuCLI.VALID_SWITCHES)} are not valid with the "${this.constructor.name}" command.`)
 	      throw err;
 	  }
 	}
 	
 	return command;
   }
-	  
-
-  constructor() {  
-
-    const className = this.constructor.name.toUpperCase()
-	switch (className) {
-	  case 'EXPORT':
-	  case 'IMPORT':
-	  case 'UPLOAD':
-	  case 'COPY':
-	  case 'TEST':
-	    this.command = this.getOperation(className);
-	    break;
-      default:
-	    this.command = this.getOperation(className)
-	}		
-
-    this.yadamu = new Yadamu(this.command);
-    this.yadamuLogger = this.yadamu.getYadamuLogger()
-
-	try {
-	  this.validateParameters(this.command)	
-	} catch (e) {
-      try {
-		// Should this be 'awaited'...
-	    this.yadamu.close()
-      } catch(e) {
-	    console.log(e)
-	  }
-      throw e
-	}
-  }
-  
+	    
   async close() {
     await this.yadamu.close()
   }
@@ -365,7 +399,7 @@ class YadamuCLI {
   }
   
   loadConfigurationFile() {
-	if (CONFIGURATION_REQUIRED.indexOf(this.command) > -1) {
+	if (YadamuCLI.CONFIGURATION_REQUIRED.indexOf(this.command) > -1) {
       const configuration = this.loadJSON(this.parameters.CONFIG);
       this.expandConfiguration(configuration);
 	  return configuration;
@@ -376,8 +410,8 @@ class YadamuCLI {
 
     let dbi = undefined
     
-    if (this.yadamu.YADAMU_DRIVERS.hasOwnProperty(driver)) { 
-	  const DBI = require(this.yadamu.YADAMU_DRIVERS[driver]);
+    if (YadamuConstants.YADAMU_DRIVERS.hasOwnProperty(driver)) { 
+	  const DBI = require(YadamuConstants.YADAMU_DRIVERS[driver]);
 	  dbi = new DBI(this.yadamu);
     }	
     else {   
@@ -460,45 +494,63 @@ class YadamuCLI {
       const targetDBI = this.getDatabaseInterface(this.yadamu,targetDatabase,targetConnection[targetDatabase],targetParameters)    
       
       await this.yadamu.doCopy(sourceDBI,targetDBI);      
-      this.yadamuLogger.info([`${this.constructor.name}.doCopy()`],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`);
+      this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`);
     }
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`${this.constructor.name}.doCopy()`],`Operation complete: Configuration:"${this.parameters.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete: Configuration:"${this.parameters.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doImport() {
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.getDefaultDatabase(),{},{})
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
     const startTime = performance.now();
     await this.yadamu.doImport(dbi);
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`${this.constructor.name}.doImport()`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`YADAMU`,`IMPORT`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+  }
+  
+  async doLoad() {
+    const fs = this.getDatabaseInterface(this.yadamu,'Loader',{},{})
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const startTime = performance.now();
+    await this.yadamu.doCopy(fs,dbi);      
+    const elapsedTime = performance.now() - startTime;
+    this.yadamuLogger.info([`YADAMU`,`LOAD`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doUpload() {
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.getDefaultDatabase(),{},{})
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
     const startTime = performance.now();
     await this.yadamu.doUpload(dbi);
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`${this.constructor.name}.doUpload()`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`YADAMU`,`UPLOAD`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doExport() {
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.getDefaultDatabase(),{},{})
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
     const startTime = performance.now();
     await this.yadamu.doExport(dbi);
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`${this.constructor.name}.doExport()`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`YADAMU`,`EXPORT`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+  }
+  
+  async doUnload() {
+    const fs = this.getDatabaseInterface(this.yadamu,'Loader',{},{})
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const startTime = performance.now();
+    await this.yadamu.doCopy(dbi,fs);      
+    const elapsedTime = performance.now() - startTime;
+    this.yadamuLogger.info([`YADAMU`,`UNLOAD`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doTests() {
-	
+    
 	const configuration = this.loadConfigurationFile()
     const YadamuQA = require('../../YADAMU_QA/common/node/yadamuQA.js');
-	const yadamuQA = new YadamuQA(configuration,this.yadamuLogger);
+	const yadamuQA = new YadamuQA(configuration);
 	const startTime = performance.now();
 	const results = await yadamuQA.doTests(configuration);
 	const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.qa([`TEST`,`${this.parameters.CONFIG}`],`${results} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.qa([`YADAMU`,`TEST`,`${this.parameters.CONFIG}`],`${results} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
 
   }
   

@@ -3,37 +3,27 @@
 const { performance } = require('perf_hooks');
 
 const YadamuWriter = require('../../common/yadamuWriter.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
 
 class MariadbWriter extends YadamuWriter {
 
   constructor(dbi,tableName,status,yadamuLogger) {
     super({objectMode: true},dbi,tableName,status,yadamuLogger)
-    this.warningManager = this.dbi.yadamu.warningManager
-  }
   
-  setTableInfo(tableInfo) {
-	super.setTableInfo(tableInfo)
-    this.tableInfo.columnCount = this.tableInfo.targetDataTypes.length;
+    this.tableInfo.columnCount = this.tableInfo.columnNames.length;
     this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + '),';
-    
-    this.transformations = this.tableInfo.dataTypes.map((dataType,idx) => {
+	
+	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
+      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
       switch (dataType.type.toLowerCase()) {
-        case "tinyblob" :
-        case "blob" :
-        case "mediumblob" :
-        case "longblob" :
-        case "varbinary" :
-        case "binary" :
-	      return (col,idx) => {
-            return Buffer.from(col,'hex');
-		  }
-          break;
         case "json" :
           return (col,idx) => {
-            if (typeof col === 'object') {
-              return JSON.stringify(col);
-            }
-			return col
+            return typeof col === 'object' ? JSON.stringify(col) : col
+	      }
+          break;
+        case "boolean":
+          return (col,idx) => {
+            return YadamuLibrary.booleanToInt(col)
 	      }
           break;
         case "date":
@@ -74,7 +64,7 @@ class MariadbWriter extends YadamuWriter {
             
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
-	  
+    	
 	this.transformations.forEach((transformation,idx) => {
       if ((transformation !== null) && (row[idx] !== null)) {
 	    row[idx] = transformation(row[idx])
@@ -90,6 +80,7 @@ class MariadbWriter extends YadamuWriter {
       this.batch.push(...row);
     
 	}
+    
     this.rowCounters.cached++
 	return this.skipTable;
   }
@@ -101,18 +92,20 @@ class MariadbWriter extends YadamuWriter {
       warnings.forEach((warning,idx) => {
         if (warning.Level === 'Warning') {
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,idx],`${warning.Code} Details: ${warning.Message}.`)
-		  this.warningManager.rejectRow(this.tableInfo.tableName,this.batch[idx]);
+		  this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,this.batch[idx]);
         }
       })
     }
   }
     
-  handleBatchError(operation,cause) {
+  reportBatchError(operation,cause) {
     // Use Slice to add first and last row, rather than first and last value.
-	super.handleBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
+	super.reportBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
   }
   	
-  async writeBatch() {     
+  async writeBatch() {
+
+     // console.log(this.batch.slice(0,this.tableInfo.columnCount))
 
     this.rowCounters.batchCount++; 
     let repackBatch = false;
@@ -131,7 +124,7 @@ class MariadbWriter extends YadamuWriter {
 		this.rowCounters.cached = 0;
         return this.skipTable
       } catch (cause) {
-		this.handleBatchError(`INSERT MANY`,cause)
+		this.reportBatchError(`INSERT MANY`,cause)
         await this.dbi.restoreSavePoint(cause);
         this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 

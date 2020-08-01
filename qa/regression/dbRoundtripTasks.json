@@ -1,30 +1,30 @@
 {
-    "all"                  : [ "oracle", "mysql", "mssql" ]
-  , "oracle"           : [ "HR#1", "SH#1", "OE#1", "PM#1", "IX#1", "BI#1" ]
-  ,	"mysql"            : [ "sakila#1", "jsonExample#1" ]
-  , "mssql"            : [ "Northwind#1", "AdventureWorks#1", "WorldWideImporters#1" ]
-  , "HR#1"                 : { "vendor": "oracle", "source" : { "schema" : "HR"},     "target" : { "schema" : "HR1"}}
-  , "SH#1"                 : { "vendor": "oracle", "source" : { "schema" : "SH"},     "target" : { "schema" : "SH1"}}
-  , "OE#1"                 : { "vendor": "oracle", "source" : { "schema" : "OE"},     "target" : { "schema" : "OE1"}}
-  , "PM#1"                 : { "vendor": "oracle", "source" : { "schema" : "PM"},     "target" : { "schema" : "PM1"}}
-  , "IX#1"                 : { "vendor": "oracle", "source" : { "schema" : "IX"},     "target" : { "schema" : "IX1"}}
-  , "BI#1"                 : { "vendor": "oracle", "source" : { "schema" : "BI"},     "target" : { "schema" : "BI1"}}
-  , "sakila#1"             : { "vendor": "mysql",  "source" : { "schema" : "sakila"}, "target" : {"schema" : "sakila1"}} 
-  , "jsonExample#1"        : { "vendor": "mysql",  "source" : { "schema" : "jtest"},  "target" : {"schema" : "jtest1"}} 
-  , "AdventureWorks#1"     : [ "ADV_Sales#1", "ADV_Person#1", "ADV_Production#1", "ADV_Purchasing#1", "ADV_HumanResources#1", "AdventureWorksDW#1"]
-  , "WorldWideImporters#1" : [ "WWI_Application#1", "WWI_Purchasing#1", "WWI_Sales#1", "WWI_Warehouse#1", "WWI_Dimension#1", "WWI_Fact#1", "WWI_Integration#1" ]
-  , "Northwind#1"          : { "vendor": "mssql",  "source" : { "database" : "Northwind",            "owner" : "dbo"            }, "target" : { "database" : "Northwind1",        "owner" : "dbo"}}     
-  , "ADV_Sales#1"          : { "vendor": "mssql",  "source" : { "database" : "AdventureWorks",       "owner" : "Sales"          }, "target" : { "database" : "Sales1",            "owner" : "dbo"}}
-  , "ADV_Person#1"         : { "vendor": "mssql",  "source" : { "database" : "AdventureWorks",       "owner" : "Person"         }, "target" : { "database" : "Person1",           "owner" : "dbo"}}
-  , "ADV_Production#1"     : { "vendor": "mssql",  "source" : { "database" : "AdventureWorks",       "owner" : "Production"     }, "target" : { "database" : "Production1",       "owner" : "dbo"}}
-  , "ADV_Purchasing#1"     : { "vendor": "mssql",  "source" : { "database" : "AdventureWorks",       "owner" : "Purchasing"     }, "target" : { "database" : "Purchasing1",       "owner" : "dbo"}}
-  , "ADV_HumanResources#1" : { "vendor": "mssql",  "source" : { "database" : "AdventureWorks",       "owner" : "HumanResources" }, "target" : { "database" : "HumanResources1",   "owner" : "dbo"}}
-  , "AdventureWorksDW#1"   : { "vendor": "mssql",  "source" : { "database" : "AdventureWorksDW",     "owner" : "dbo"            }, "target" : { "database" : "AdventureWorksDW1", "owner" : "dbo"}}
-  , "WWI_Application#1"    : { "vendor": "mssql",  "source" : { "database" : "WorldWideImporters",   "owner" : "Application"    }, "target" : { "database" : "Application1",      "owner" : "dbo"}, "schemaPrefix" : "WWI"}
-  , "WWI_Purchasing#1"     : { "vendor": "mssql",  "source" : { "database" : "WorldWideImporters",   "owner" : "Purchasing"     }, "target" : { "database" : "Purchasing1",       "owner" : "dbo"}, "schemaPrefix" : "WWI"}
-  , "WWI_Sales#1"          : { "vendor": "mssql",  "source" : { "database" : "WorldWideImporters",   "owner" : "Sales"          }, "target" : { "database" : "Sales1",            "owner" : "dbo"}, "schemaPrefix" : "WWI"}
-  , "WWI_Warehouse#1"      : { "vendor": "mssql",  "source" : { "database" : "WorldWideImporters",   "owner" : "Warehouse"      }, "target" : { "database" : "Warehouse1",        "owner" : "dbo"}, "schemaPrefix" : "WWI"}
-  , "WWI_Dimension#1"      : { "vendor": "mssql",  "source" : { "database" : "WorldWideImportersDW", "owner" : "Dimension"      }, "target" : { "database" : "Dimension1",        "owner" : "dbo"}, "schemaPrefix" : "WWI"}
-  , "WWI_Fact#1"           : { "vendor": "mssql",  "source" : { "database" : "WorldWideImportersDW", "owner" : "Fact"           }, "target" : { "database" : "Fact1",             "owner" : "dbo"}, "schemaPrefix" : "WWI"}
-  , "WWI_Integration#1"    : { "vendor": "mssql",  "source" : { "database" : "WorldWideImportersDW", "owner" : "Integration"    }, "target" : { "database" : "Integration1",      "owner" : "dbo"}, "schemaPrefix" : "WWI"}
+   "all"                 : [ "oracle", "mysql", "mssql" ]
+  , "oracle"             : [ "HR", "SH", "OE", "PM", "IX", "BI" ]
+  ,	"mysql"              : [ "sakila", "jsonExample" ]
+  , "mssql"              : [ "Northwind", "AdventureWorks", "WorldWideImporters" ]
+  , "AdventureWorks"     : [ "Sales", "Person", "Production", "Purchasing", "HumanResources", "AdventureWorksDW"]
+  , "WorldWideImporters" : [ "WWI_Application", "WWI_Purchasing", "WWI_Sales", "WWI_Warehouse", "WWI_Dimension", "WWI_Fact", "WWI_Integration" ]
+  , "HR"                 : { "rdbms": "oracle", "source" : { "schema" : "HR"    }, "target" : { "schema" : "HR1"}}
+  , "SH"                 : { "rdbms": "oracle", "source" : { "schema" : "SH"    }, "target" : { "schema" : "SH1"}}
+  , "OE"                 : { "rdbms": "oracle", "source" : { "schema" : "OE"    }, "target" : { "schema" : "OE1"}}
+  , "PM"                 : { "rdbms": "oracle", "source" : { "schema" : "PM"    }, "target" : { "schema" : "PM1"}}
+  , "IX"                 : { "rdbms": "oracle", "source" : { "schema" : "IX"    }, "target" : { "schema" : "IX1"}}
+  , "BI"                 : { "rdbms": "oracle", "source" : { "schema" : "BI"    }, "target" : { "schema" : "BI1"}}
+  , "sakila"             : { "rdbms": "mysql",  "source" : { "schema" : "sakila"}, "target" : {"schema" : "sakila1"}} 
+  , "jsonExample"        : { "rdbms": "mysql",  "source" : { "schema" : "jtest" }, "target" : {"schema" : "jtest1"}} 
+  , "Northwind"          : { "rdbms": "mssql",  "source" : { "database" : "Northwind",            "owner" : "dbo"           }, "target" : { "database" : "Northwind1",        "owner" : "dbo"}}     
+  , "Sales"              : { "rdbms": "mssql",  "source" : { "database" : "AdventureWorks",       "owner" : "Sales"         }, "target" : { "database" : "Sales1",            "owner" : "dbo"}}
+  , "Person"             : { "rdbms": "mssql",  "source" : { "database" : "AdventureWorks",       "owner" : "Person"        }, "target" : { "database" : "Person1",           "owner" : "dbo"}}
+  , "Production"         : { "rdbms": "mssql",  "source" : { "database" : "AdventureWorks",       "owner" : "Production"    }, "target" : { "database" : "Production1",       "owner" : "dbo"}}
+  , "Purchasing"         : { "rdbms": "mssql",  "source" : { "database" : "AdventureWorks",       "owner" : "Purchasing"    }, "target" : { "database" : "Purchasing1",       "owner" : "dbo"}}
+  , "HumanResources"     : { "rdbms": "mssql",  "source" : { "database" : "AdventureWorks",       "owner" : "HumanResources"}, "target" : { "database" : "HumanResources1",   "owner" : "dbo"}}
+  , "AdventureWorksDW"   : { "rdbms": "mssql",  "source" : { "database" : "AdventureWorksDW",     "owner" : "dbo"           }, "target" : { "database" : "AdventureWorksDW1", "owner" : "dbo"}}
+  , "WWI_Application"    : { "rdbms": "mssql",  "source" : { "database" : "WorldWideImporters",   "owner" : "Application"   }, "target" : { "database" : "Application1",      "owner" : "dbo"}, "schemaPrefix" : "WWI"}
+  , "WWI_Purchasing"     : { "rdbms": "mssql",  "source" : { "database" : "WorldWideImporters",   "owner" : "Purchasing"    }, "target" : { "database" : "Purchasing1",       "owner" : "dbo"}, "schemaPrefix" : "WWI"}
+  , "WWI_Sales"          : { "rdbms": "mssql",  "source" : { "database" : "WorldWideImporters",   "owner" : "Sales"         }, "target" : { "database" : "Sales1",            "owner" : "dbo"}, "schemaPrefix" : "WWI"}
+  , "WWI_Warehouse"      : { "rdbms": "mssql",  "source" : { "database" : "WorldWideImporters",   "owner" : "Warehouse"     }, "target" : { "database" : "Warehouse1",        "owner" : "dbo"}, "schemaPrefix" : "WWI"}
+  , "WWI_Dimension"      : { "rdbms": "mssql",  "source" : { "database" : "WorldWideImportersDW", "owner" : "Dimension"     }, "target" : { "database" : "Dimension1",        "owner" : "dbo"}, "schemaPrefix" : "WWI"}
+  , "WWI_Fact"           : { "rdbms": "mssql",  "source" : { "database" : "WorldWideImportersDW", "owner" : "Fact"          }, "target" : { "database" : "Fact1",             "owner" : "dbo"}, "schemaPrefix" : "WWI"}
+  , "WWI_Integration"    : { "rdbms": "mssql",  "source" : { "database" : "WorldWideImportersDW", "owner" : "Integration"   }, "target" : { "database" : "Integration1",      "owner" : "dbo"}, "schemaPrefix" : "WWI"}
 }

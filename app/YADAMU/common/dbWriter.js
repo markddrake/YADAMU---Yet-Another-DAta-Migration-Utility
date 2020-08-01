@@ -32,11 +32,10 @@ class DBWriter extends Writable {
     super({objectMode: true});
 	
     this.dbi = dbi;
-    this.mode = dbi.parameters.MODE;
-    this.ddlRequired = (this.mode !== 'DATA_ONLY');    
-    this.status = dbi.yadamu.getStatus()
+    this.ddlRequired = (this.dbi.MODE !== 'DATA_ONLY');    
+    this.status = dbi.yadamu.STATUS
     this.yadamuLogger = yadamuLogger;
-    this.yadamuLogger.info([`Writer`,dbi.DATABASE_VENDOR,this.mode,this.dbi.getWorkerNumber()],`Ready.`)
+    this.yadamuLogger.info([`Writer`,dbi.DATABASE_VENDOR,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
         
     this.transactionManager = this.dbi
 	this.currentTable   = undefined;
@@ -96,7 +95,7 @@ class DBWriter extends Writable {
   
   async generateStatementCache(metadata,ddlRequired) {
     const startTime = performance.now()
-    this.dbi.setMetadata(metadata)      
+    await this.dbi.setMetadata(metadata)      
     await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER,!this.ddlComplete)
 	let ddlStatementCount = 0
 	let dmlStatementCount = 0
@@ -145,7 +144,7 @@ class DBWriter extends Writable {
         }
         tableMetadata.source = {
           vendor          : tableMetadata.vendor
-         ,columns         : tableMetadata.columns
+         ,columnNames     : tableMetadata.columnNames
          ,dataTypes       : tableMetadata.dataTypes
          ,sizeConstraints : tableMetadata.sizeConstraints
         }
@@ -171,7 +170,7 @@ class DBWriter extends Writable {
           return sourceMetadata[key].tableName;
         })
 
-        switch ( this.dbi.parameters.TABLE_MATCHING ) {
+        switch ( this.dbi.TABLE_MATCHING ) {
           case 'UPPERCASE' :
             sourceTableNames = sourceTableNames.map((tableName) => {
               return tableName.toUpperCase();
@@ -266,7 +265,7 @@ class DBWriter extends Writable {
       }    
       callback();
     } catch (e) {
-	  this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_WRITE(${messageType})`,this.dbi.parameters.ON_ERROR],e);
+	  this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_WRITE(${messageType})`,this.dbi.yadamu.ON_ERROR],e);
 	  this.transactionManager.skipTable = true;
 	  try {
         await this.transactionManager.rollbackTransaction(e)
@@ -287,7 +286,7 @@ class DBWriter extends Writable {
   async _final(callback) {                                                                   
     // this.yadamuLogger.trace([this.constructor.name],'final()')
     try {
-	  if (this.mode === "DDL_ONLY") {
+	  if (this.dbi.MODE === "DDL_ONLY") {
         this.yadamuLogger.info([`${this.dbi.DATABASE_VENDOR}`],`DDL only export. No data written.`);
       }
       else {
@@ -300,7 +299,7 @@ class DBWriter extends Writable {
       await this.dbi.releasePrimaryConnection()
       callback();
     } catch (e) {
-      this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_FINAL(${this.currentTable})`,this.dbi.parameters.ON_ERROR],e);
+      this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_FINAL(${this.currentTable})`,this.dbi.yadamu.ON_ERROR],e);
 	  // Passing the exception to callback triggers the onError() event
       callback(e);
     } 

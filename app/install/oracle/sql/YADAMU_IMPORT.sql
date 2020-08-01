@@ -40,7 +40,8 @@ as
 --
   C_JSON_STORAGE_MODEL constant VARCHAR2(32) := 'CLOB';
 --
-  $ELSIF DBMS_DB_VERSION.VER_LE_12 $THEN
+  -- $ELSIF DBMS_DB_VERSION.VER_LE_12 $THEN
+  $ELSIF DBMS_DB_VERSION.VER_LE_12_1 $THEN
 --
   C_JSON_STORAGE_MODEL constant VARCHAR2(32) := 'CLOB';
 --
@@ -51,7 +52,9 @@ as
   $END
 --
 
-  C_XML_STORAGE_MODEL  constant VARCHAR2(17) := 'BINARY XML';
+  C_XML_STORAGE_MODEL      constant VARCHAR2(17) := 'BINARY XML';
+  C_TREAT_RAW1_AS_BOOLEAN  constant VARCHAR2(5)  := 'TRUE';
+  C_SPATIAL_FORMAT         constant VARCHAR2(7)  := 'WKB';
 
   C_SUCCESS          constant VARCHAR2(32) := 'SUCCESS';
   C_FATAL_ERROR      constant VARCHAR2(32) := 'FATAL';
@@ -85,24 +88,77 @@ as
 --
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN 
 --
-  procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'),P_JSON_STORAGE_MODEL VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL, P_XML_STORAGE_MODEL VARCHAR2 DEFAULT C_XML_STORAGE_MODEL);
-  function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'),P_JSON_STORAGE_MODEL VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL, P_XML_STORAGE_MODEL VARCHAR2 DEFAULT C_XML_STORAGE_MODEL) return CLOB;
-  function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_JSON_STORAGE_MODEL VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL, P_XML_STORAGE_MODEL VARCHAR2 DEFAULT C_XML_STORAGE_MODEL) return TABLE_INFO_RECORD;
+  procedure IMPORT_JSON(
+    P_JSON_DUMP_FILE  IN OUT NOCOPY BLOB
+  , P_TARGET_SCHEMA                 VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
+  , P_JSON_DATA_TYPE            VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
+  , P_XML_STORAGE_CLAUSE             VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+  , P_TREAT_RAW1_AS_BOOLEAN         VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  );
+
+  function IMPORT_JSON(
+    P_JSON_DUMP_FILE IN OUT NOCOPY BLOB
+  , P_TARGET_SCHEMA                VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
+  , P_JSON_DATA_TYPE           VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
+  , P_XML_STORAGE_CLAUSE            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+  , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  ) return CLOB;
+
+  function GENERATE_SQL(
+    P_SOURCE_VENROR                VARCHAR2
+  , P_TARGET_SCHEMA                VARCHAR2 
+  , P_TABLE_OWNER                  VARCHAR2 
+  , P_TABLE_NAME                   VARCHAR2 
+  , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
+  , P_COLUMN_NAME_ARRAY            CLOB
+  , P_DATA_TYPE_ARRAY              CLOB
+  , P_SIZE_CONSTRAINT_ARRAY        CLOB
+  , P_JSON_DATA_TYPE           VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
+  , P_XML_STORAGE_CLAUSE            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+  , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  ) return TABLE_INFO_RECORD;
 --
 $ELSE
 --
-  function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_COLUMNS_XML XMLTYPE, P_DATA_TYPES_XML XMLTYPE, P_SIZE_CONSTRAINTS_XML XMLTYPE, P_JSON_STORAGE_MODEL VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL, P_XML_STORAGE_MODEL VARCHAR2 DEFAULT C_XML_STORAGE_MODEL) return TABLE_INFO_RECORD;
+  function GENERATE_SQL(
+    P_SOURCE_VENROR                VARCHAR2
+  , P_TARGET_SCHEMA                VARCHAR2 
+  , P_TABLE_OWNER                  VARCHAR2 
+  , P_TABLE_NAME                   VARCHAR2 
+  , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
+  , P_COLUMN_NAME_XML              XMLTYPE
+  , P_DATA_TYPE_XML                XMLTYPE
+  , P_SIZE_CONSTRAINT_XML          XMLTYPE
+  , P_JSON_DATA_TYPE           VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
+  , P_XML_STORAGE_CLAUSE            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+  , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  ) return TABLE_INFO_RECORD;
 --
 $END  
 --
-  function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'), P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_JSON_STORAGE_MODEL VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL, P_XML_STORAGE_MODEL VARCHAR2 DEFAULT C_XML_STORAGE_MODEL) return CLOB;
+  function GENERATE_STATEMENTS(
+    P_METADATA       IN OUT NOCOPY BLOB
+  , P_TARGET_SCHEMA                VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
+  , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
+  , P_JSON_DATA_TYPE           VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
+  , P_XML_STORAGE_CLAUSE            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+  , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  ) return CLOB;
+
   function SET_CURRENT_SCHEMA(P_TARGET_SCHEMA VARCHAR2) return CLOB;
   
   function DISABLE_CONSTRAINTS(P_TARGET_SCHEMA VARCHAR2) return CLOB;
   function ENABLE_CONSTRAINTS(P_TARGET_SCHEMA VARCHAR2) return CLOB;
   function REFRESH_MATERIALIZED_VIEWS(P_TARGET_SCHEMA VARCHAR2) return CLOB;
 
-  function MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR VARCHAR2,P_DATA_TYPE VARCHAR2, P_DATA_TYPE_LENGTH NUMBER, P_DATA_TYPE_SCALE NUMBER) return VARCHAR2;
+  function MAP_FOREIGN_DATATYPE(
+    P_SOURCE_VENDOR                VARCHAR2
+  , P_DATA_TYPE                    VARCHAR2
+  , P_DATA_TYPE_LENGTH             NUMBER
+  , P_DATA_TYPE_SCALE              NUMBER
+  , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  ) return VARCHAR2;
+
   function GET_MILLISECONDS(P_START_TIME TIMESTAMP, P_END_TIME TIMESTAMP) return NUMBER;
   function SERIALIZE_TABLE(P_TABLE T_VC4000_TABLE,P_DELIMITER VARCHAR2 DEFAULT ',')  return CLOB;
 
@@ -602,13 +658,25 @@ $END
 --
 end;
 --
-function MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR VARCHAR2, P_DATA_TYPE VARCHAR2, P_DATA_TYPE_LENGTH NUMBER, P_DATA_TYPE_SCALE NUMBER)
+function MAP_FOREIGN_DATATYPE(
+ P_SOURCE_VENDOR         VARCHAR2
+, P_DATA_TYPE             VARCHAR2
+, P_DATA_TYPE_LENGTH      NUMBER
+, P_DATA_TYPE_SCALE       NUMBER
+, P_TREAT_RAW1_AS_BOOLEAN VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+)
 return VARCHAR2
 as
 begin
   case 
     when P_SOURCE_VENDOR = 'Oracle' then
-       return UPPER(P_DATA_TYPE);
+      case 
+        -- MAP RAW(1) to VIRTUAL BOLEAN DATA TYPE
+        when P_DATA_TYPE = 'RAW' and P_DATA_TYPE_LENGTH = 1 and P_TREAT_RAW1_AS_BOOLEAN = 'TRUE' then
+           return 'BOOLEAN';
+        else 
+         return UPPER(P_DATA_TYPE);
+      end case;
     when P_SOURCE_VENDOR = 'MSSQLSERVER' then
       case 
         -- exact numbers
@@ -735,6 +803,8 @@ begin
           end case;
         when P_DATA_TYPE = 'xml' then
            return 'XMLTYPE';
+        when P_DATA_TYPE = 'jsonb' then
+           return 'JSON';
         when P_DATA_TYPE in ('geography','geometry') then
            return 'GEOMETRY';
         when P_DATA_TYPE = 'numeric' then
@@ -777,7 +847,7 @@ begin
           return 'CLOB';
         -- Binary Data types
         when P_DATA_TYPE = 'bit' then
-          return 'RAW(1)';
+          return 'BOOLEAN';
         when P_DATA_TYPE = 'binary' then
           -- return 'RAW(' || CEIL(P_DATA_TYPE_LENGTH/8) || ')';
           return 'RAW';
@@ -802,7 +872,7 @@ begin
         when P_DATA_TYPE in ('geography','geometry')  then
            return 'GEOMETRY';
         when P_DATA_TYPE = 'set' then
-           return 'VARCHAR2(512)';
+           return 'JSON';
         when P_DATA_TYPE = 'year' then
            return 'NUMBER(4)';
         else
@@ -812,7 +882,7 @@ begin
       -- MariaDB and MySQL currentyl share the same mappings
       return UPPER(P_DATA_TYPE);
     when P_SOURCE_VENDOR = 'MongoDB' then
-      -- MongoDB typing based on aggregation $type operator and BSON type
+      -- MongoDB typing based on BSON type model and the aggregation $type operator
 	  -- ### No support for depricated Data types undefined, dbPointer, symbol
       case
         when P_DATA_TYPE = 'double' then
@@ -862,6 +932,32 @@ begin
            return 'JSON';
         when P_DATA_TYPE = 'maxKey' then
            return 'JSON';
+      end case;
+    when P_SOURCE_VENDOR = 'SNOWFLAKE' then
+          case
+        when P_DATA_TYPE = 'TEXT' then
+          case
+            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH is NULL then
+              return 'VARCHAR2(32767)';
+            when P_DATA_TYPE_LENGTH is NULL then
+              return 'VARCHAR2(4000)';
+            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH < 32768 then
+              return 'VARCHAR2';
+            when P_DATA_TYPE_LENGTH < 4001 then
+              return 'VARCHAR2';
+            else
+              return 'CLOB';
+          end case;         
+        when P_DATA_TYPE = 'BINARY' then
+           return 'RAW';
+        when P_DATA_TYPE = 'XML' then
+           return 'XMLTYPE';
+        when P_DATA_TYPE = 'TIMESTAMP_LTZ' then
+           return 'TIMESTAMP(' || P_DATA_TYPE_LENGTH || ') WITH LOCAL TIME ZONE';
+        when P_DATA_TYPE = 'GEOGRAPHY'  then
+           return 'GEOMETRY';
+        when P_DATA_TYPE = 'VARIANT'  then
+           return 'CLOB';
         else 
            return UPPER(P_DATA_TYPE);
       end case;
@@ -884,22 +980,46 @@ end;
 --
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN 
 --
-function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_COLUMN_LIST CLOB, P_DATA_TYPE_ARRAY CLOB, P_SIZE_CONSTRAINTS CLOB, P_JSON_STORAGE_MODEL VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL, P_XML_STORAGE_MODEL VARCHAR2 DEFAULT C_XML_STORAGE_MODEL)
+function GENERATE_SQL(
+  P_SOURCE_VENROR                VARCHAR2
+, P_TARGET_SCHEMA                VARCHAR2 
+, P_TABLE_OWNER                  VARCHAR2 
+, P_TABLE_NAME                   VARCHAR2 
+, P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
+, P_COLUMN_NAME_ARRAY            CLOB
+, P_DATA_TYPE_ARRAY              CLOB
+, P_SIZE_CONSTRAINT_ARRAY        CLOB
+, P_JSON_DATA_TYPE           VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
+, P_XML_STORAGE_CLAUSE            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+, P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+)
 --
 $ELSE
 --
-function GENERATE_SQL(P_SOURCE_VENROR VARCHAR2,P_TARGET_SCHEMA VARCHAR2, P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_COLUMNS_XML XMLTYPE, P_DATA_TYPES_XML XMLTYPE, P_SIZE_CONSTRAINTS_XML XMLTYPE, P_JSON_STORAGE_MODEL VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL, P_XML_STORAGE_MODEL VARCHAR2 DEFAULT C_XML_STORAGE_MODEL)
---            
+function GENERATE_SQL(
+  P_SOURCE_VENROR                VARCHAR2
+, P_TARGET_SCHEMA                VARCHAR2 
+, P_TABLE_OWNER                  VARCHAR2 
+, P_TABLE_NAME                   VARCHAR2 
+, P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
+, P_COLUMN_NAME_XML              XMLTYPE
+, P_DATA_TYPE_XML                XMLTYPE
+, P_SIZE_CONSTRAINT_XML          XMLTYPE
+, P_JSON_DATA_TYPE           VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
+, P_XML_STORAGE_CLAUSE            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+, P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+)
 $END       
 --
 return TABLE_INFO_RECORD
 as
+  V_COLUMN_LIST               CLOB;
   V_COLUMNS_CLAUSE            CLOB;
   V_INSERT_SELECT_LIST        CLOB;
   V_COLUMN_PATTERNS           CLOB;
   V_XML_STORAGE_CLAUSE        CLOB;
   
-  V_XML_STORAGE_MODEL         VARCHAR2(17) := P_XML_STORAGE_MODEL;  
+  V_XML_STORAGE_MODEL         VARCHAR2(17) := P_XML_STORAGE_CLAUSE;  
   
   V_DESERIALIZATIONS          T_VC4000_TABLE;
 
@@ -930,6 +1050,7 @@ end;';
   V_EXISTING_TABLE    PLS_INTEGER := 0; 
 
   $IF NOT YADAMU_FEATURE_DETECTION.COLLECT_PLSQL_SUPPORTED $THEN
+  V_COLUMN_LIST_TABLE         T_VC4000_TABLE;
   V_COLUMNS_CLAUSE_TABLE      T_VC4000_TABLE;
   V_INSERT_SELECT_TABLE       T_VC4000_TABLE;
   V_COLUMN_PATTERNS_TABLE     T_VC4000_TABLE;
@@ -982,15 +1103,15 @@ end;';
            end "TYPE_NAME"
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN 
 --
-         from JSON_TABLE('[' || P_COLUMN_LIST || ']','$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') c
-             ,JSON_TABLE(P_DATA_TYPE_ARRAY,'$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') t
-             ,JSON_TABLE(P_SIZE_CONSTRAINTS,'$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') s
+         from JSON_TABLE(P_COLUMN_NAME_ARRAY,    '$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') c
+             ,JSON_TABLE(P_DATA_TYPE_ARRAY,      '$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') t
+             ,JSON_TABLE(P_SIZE_CONSTRAINT_ARRAY,'$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') s
 --
 $ELSE
 --
-         from XMLTABLE('/columns/column'     passing  P_COLUMNS_XML COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') c
-             ,XMLTABLE('/dataTypes/dataType' passing P_DATA_TYPES_XML COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') t
-             ,XMLTABLE('/sizeConstraints/sizeConstraint' passing P_SIZE_CONSTRAINTS_XML COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') s
+         from XMLTABLE('/columnNames/columnName'         passing P_COLUMN_NAME_XML     COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') c
+             ,XMLTABLE('/dataTypes/dataType'             passing P_DATA_TYPE_XML       COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') t
+             ,XMLTABLE('/sizeConstraints/sizeConstraint' passing P_SIZE_CONSTRAINT_XML COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') s
 ---            
 $END       
 --
@@ -999,7 +1120,7 @@ $END
   "TARGET_TABLE_DEFINITIONS" 
   as (
     select st.*
-          ,MAP_FOREIGN_DATATYPE(P_SOURCE_VENROR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") TARGET_DATA_TYPE
+          ,MAP_FOREIGN_DATATYPE(P_SOURCE_VENROR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE",P_TREAT_RAW1_AS_BOOLEAN) TARGET_DATA_TYPE
           ,case
              -- Probe rather than Join since most rows are not objects.
              when (TYPE_NAME is not null) then
@@ -1019,6 +1140,8 @@ $END
   "TABLE_METADATA" 
   as (
   select IDX
+        ,'"' || COLUMN_NAME || '"'
+         "COLUMN_LIST"
         ,'"' || COLUMN_NAME || '" ' ||
          case
            when TYPE_EXISTS = 1 then
@@ -1030,16 +1153,16 @@ $END
              '"MDSYS"."SDO_GEOMETRY"'
            when TARGET_DATA_TYPE = 'JSON' then
 		     case 
-			   when P_JSON_STORAGE_MODEL = 'JSON' then
+			   when P_JSON_DATA_TYPE = 'JSON' then
                  'JSON'			 
 			   else
                  $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
                  --
-                 P_JSON_STORAGE_MODEL || case when P_JSON_STORAGE_MODEL = 'VARCHAR2' then '(' || YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE || ')' else '' end || ' CHECK ("' || COLUMN_NAME || '" IS JSON)'
+                 P_JSON_DATA_TYPE || case when P_JSON_DATA_TYPE = 'VARCHAR2' then '(' || YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE || ')' else '' end || ' CHECK ("' || COLUMN_NAME || '" IS JSON)'
                  --
                  $ELSE
                  --
-                 P_JSON_STORAGE_MODEL
+                 P_JSON_DATA_TYPE
                  --
                  $END
 			     --
@@ -1059,6 +1182,8 @@ $END
   	     "COLUMNS_CLAUSE"
         ,-- Cast JSON representation back into SQL data type where implicit coversion does happen or results in incorrect results
          case
+           when (TARGET_DATA_TYPE = 'BOOLEAN') then
+             'HEXTORAW(LTRIM(TO_CHAR("' || COLUMN_NAME || '", ''0X'')))'
            when ((TARGET_DATA_TYPE = 'GEOMETRY') or (TARGET_DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"')) then
              case 
                when P_SPATIAL_FORMAT in ('WKB','EWKB') then
@@ -1070,8 +1195,6 @@ $END
              end
            when TYPE_EXISTS = 1 then
              '"#' || TYPE_NAME || '"("' || COLUMN_NAME || '")'
-           when TARGET_DATA_TYPE = 'BOOLEAN' then
-             'HEXTORAW(case when "' || COLUMN_NAME || '" = ''true'' then ''1'' else ''0'' end)'
            when TARGET_DATA_TYPE = 'BFILE' then
              'OBJECT_SERIALIZATION.DESERIALIZE_BFILE("' || COLUMN_NAME || '")' 
            when (TARGET_DATA_TYPE = 'XMLTYPE') then
@@ -1092,7 +1215,7 @@ $END
 			 $ELSIF DBMS_DB_VERSION.VER_LE_12 $THEN
 			 -- JSON Stored as BLOB needs explict conversion
 			 case 
-			    when P_JSON_STORAGE_MODEL = 'BLOB' then
+			    when P_JSON_DATA_TYPE = 'BLOB' then
 	              'YADAMU_UTILITIES.CLOBTOBLOB("' || COLUMN_NAME || '")'
 				else
                   '"' || COLUMN_NAME || '"'
@@ -1100,7 +1223,7 @@ $END
 			 $ELSIF DBMS_DB_VERSION.VER_LE_18 $THEN
 			 -- JSON Stored as BLOB needs explict conversion
 			 case 
-			    when P_JSON_STORAGE_MODEL = 'BLOB' or P_JSON_STORAGE_MODEL = 'JSON' then
+			    when P_JSON_DATA_TYPE = 'BLOB' or P_JSON_DATA_TYPE = 'JSON' then
 	              'YADAMU_UTILITIES.CLOBTOBLOB("' || COLUMN_NAME || '")'
 				else
                   '"' || COLUMN_NAME || '"'
@@ -1145,7 +1268,8 @@ $END
            when TARGET_DATA_TYPE  = 'GEOMETRY' then
              YADAMU_FEATURE_DETECTION.C_RETURN_TYPE
            when TARGET_DATA_TYPE  = 'BOOLEAN' then
-             'VARCHAR2(5)'
+             -- Maybe TRUE / FALSE or 01/00
+             'NUMBER(1)'
            when TARGET_DATA_TYPE = 'JSON' then
              YADAMU_FEATURE_DETECTION.C_RETURN_TYPE || ' FORMAT JSON'
            when TARGET_DATA_TYPE  = 'FLOAT' then
@@ -1203,7 +1327,8 @@ $END
   ,
   "AGGREGATE_METADATA"
   as (
-  select SERIALIZE_TABLE(cast(collect(cast(COLUMNS_CLAUSE            as VARCHAR2(4000)) order by IDX) as T_VC4000_TABLE)) COLUMNS_CLAUSE
+  select SERIALIZE_TABLE(cast(collect(cast(COLUMN_LIST               as VARCHAR2(4000)) order by IDX) as T_VC4000_TABLE)) COLUMN_LIST
+        ,SERIALIZE_TABLE(cast(collect(cast(COLUMNS_CLAUSE            as VARCHAR2(4000)) order by IDX) as T_VC4000_TABLE)) COLUMNS_CLAUSE
         ,SERIALIZE_TABLE(cast(collect(cast(INSERT_SELECT_LIST        as VARCHAR2(4000)) order by IDX) as T_VC4000_TABLE)) INSERT_SELECT_LIST
         ,SERIALIZE_TABLE(cast(collect(cast(TARGET_DATA_TYPES         as VARCHAR2(4000)) order by IDX) as T_VC4000_TABLE)) TARGET_DATA_TYPES
         ,SERIALIZE_TABLE(cast(collect(cast(XMLTYPE_STORAGE_CLAUSES   as VARCHAR2(4000)) order by IDX) as T_VC4000_TABLE),YADAMU_UTILITIES.C_NEWLINE) XMLTYPE_STORAGE_CLAUSES
@@ -1211,31 +1336,31 @@ $END
         ,cast(collect(cast(DESERIALIZATION_FUNCTIONS as VARCHAR2(4000))) as T_VC4000_TABLE) DESERIALIZATION_FUNCTIONS
   from "TABLE_METADATA"
   )
-  select COLUMNS_CLAUSE, INSERT_SELECT_LIST, TARGET_DATA_TYPES, XMLTYPE_STORAGE_CLAUSES, COLUMN_PATTERNS, DESERIALIZATION_FUNCTIONS
+  select COLUMN_LIST, COLUMNS_CLAUSE, INSERT_SELECT_LIST, TARGET_DATA_TYPES, XMLTYPE_STORAGE_CLAUSES, COLUMN_PATTERNS, DESERIALIZATION_FUNCTIONS
     from "AGGREGATE_METADATA";
   $ELSE
   -- return 1 row of for each table
-  select COLUMNS_CLAUSE, INSERT_SELECT_LIST, TARGET_DATA_TYPES, XMLTYPE_STORAGE_CLAUSES, COLUMN_PATTERNS, DESERIALIZATION_FUNCTIONS
+  select COLUMN_LIST, COLUMNS_CLAUSE, INSERT_SELECT_LIST, TARGET_DATA_TYPES, XMLTYPE_STORAGE_CLAUSES, COLUMN_PATTERNS, DESERIALIZATION_FUNCTIONS
     from "TABLE_METADATA";
   $END
 
--- In 12.1 and later P_COLUMN_LIST is a parameter. In 11.2 it is replaced by P_COLUMNS an XMLTYPE collection that needs to converted into a quoted, comma seperated list using QUERY
-
+--
+-- Needed for Error Message Generation
+--
 $IF NOT YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN 
 --
-  P_COLUMN_LIST CLOB;
-  P_DATA_TYPE_ARRAY CLOB;
-  P_SIZE_CONSTRAINTS CLOB;
+  P_COLUMN_NAME_ARRAY      CLOB;
+  P_DATA_TYPE_ARRAY        CLOB;
+  P_SIZE_CONSTRAINT_ARRAY  CLOB;
 begin
-
-  select XMLCAST(XMLQUERY('fn:string-join(for $c in /columns/column return concat("&quot;",$c/text(),"&quot;"),",")' passing P_COLUMNS_XML returning CONTENT) as CLOB)
-    into P_COLUMN_LIST
+  select XMLCAST(XMLQUERY('concat("[",fn:string-join(for $c in /columnNames/columnName return concat("&quot;",$c/text(),"&quot;"),","),"]")' passing P_COLUMN_NAME_XML returning CONTENT) as CLOB)
+    into P_COLUMN_NAME_ARRAY
     from dual;
-  select XMLCAST(XMLQUERY('concat("[",fn:string-join(for $c in /columns/column return concat("&quot;",$c/text(),"&quot;"),","),"]")' passing P_DATA_TYPES_XML returning CONTENT) as CLOB)
+  select XMLCAST(XMLQUERY('concat("[",fn:string-join(for $c in /dataTypes/dataType return concat("&quot;",$c/text(),"&quot;"),","),"]")' passing P_DATA_TYPE_XML returning CONTENT) as CLOB)
     into P_DATA_TYPE_ARRAY
     from dual;
-  select XMLCAST(XMLQUERY('concat("[",fn:string-join(for $c in /columns/column return concat("&quot;",$c/text(),"&quot;"),","),"]")' passing P_SIZE_CONSTRAINTS_XML returning CONTENT) as CLOB)
-    into P_SIZE_CONSTRAINTS
+  select XMLCAST(XMLQUERY('concat("[",fn:string-join(for $c in /sizeConstraints/sizeConstraint return concat("&quot;",$c/text(),"&quot;"),","),"]")' passing P_SIZE_CONSTRAINT_XML returning CONTENT) as CLOB)
+    into P_SIZE_CONSTRAINT_ARRAY
     from dual;
 --
 $ELSE
@@ -1251,7 +1376,7 @@ $END
   -- OBJECT RELATIONAL IS ONLY SUPPORTED IN CONJUNCTION VIA DDL_AND_DATA OPERATIONS 
   -- WE DO NOT NEED TO CONSIDER OBJECT RELATIONAL STORAGE OPTION WHEN GENERATING DDL STATEMENTS FROM YADAMU METADATA
   --
-  if (P_XML_STORAGE_MODEL = 'XML') then
+  if (P_XML_STORAGE_CLAUSE = 'XML') then
     V_XML_STORAGE_MODEL := C_XML_STORAGE_MODEL;
   end if;
   --
@@ -1269,6 +1394,7 @@ $END
 --
    -- Cursor only generates one row (Aggregration Operation),
   for o in generateStatementComponents loop
+    V_COLUMN_LIST            := o.COLUMN_LIST;
     V_COLUMNS_CLAUSE         := o.COLUMNS_CLAUSE;
     V_INSERT_SELECT_LIST     := o.INSERT_SELECT_LIST;
     V_TARGET_DATA_TYPES      := o.TARGET_DATA_TYPES;
@@ -1286,8 +1412,9 @@ $END
 --
   open generateStatementComponents;
   fetch generateStatementComponents
-        bulk collect into V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_TARGET_DATA_TYPES_TABLE, V_XML_STORAGE_TEMP, V_COLUMN_PATTERNS_TABLE, V_DESERIALIZATION_FUNCTIONS;
+        bulk collect into V_COLUMN_LIST_TABLE, V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_TARGET_DATA_TYPES_TABLE, V_XML_STORAGE_TEMP, V_COLUMN_PATTERNS_TABLE, V_DESERIALIZATION_FUNCTIONS;
 
+  V_COLUMN_LIST    := SERIALIZE_TABLE(V_COLUMN_LIST_TABLE);
   V_COLUMNS_CLAUSE := SERIALIZE_TABLE(V_COLUMNS_CLAUSE_TABLE);
   V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
   V_TARGET_DATA_TYPES := SERIALIZE_TABLE(V_TARGET_DATA_TYPES_TABLE);
@@ -1355,7 +1482,7 @@ $END
   
   V_SQL_FRAGMENT := 'insert' || V_INSERT_HINT || ' into "' || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '" (';
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
-  DBMS_LOB.APPEND(V_DML_STATEMENT,P_COLUMN_LIST);
+  DBMS_LOB.APPEND(V_DML_STATEMENT,V_COLUMN_LIST);
   V_SQL_FRAGMENT :=  ')' || YADAMU_UTILITIES.C_NEWLINE;
   DBMS_LOB.WRITEAPPEND(V_DML_STATEMENT,LENGTH(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   
@@ -1379,9 +1506,9 @@ $END
   
 exception
   when OTHERS then 
-    LOG_INFO('[' || P_COLUMN_LIST || ']');
+    LOG_INFO('[' || V_COLUMN_LIST || ']');
     LOG_INFO('[' || REPLACE(P_DATA_TYPE_ARRAY,'"."','"."') || ']');
-    LOG_INFO('[' || P_SIZE_CONSTRAINTS || ']');
+    LOG_INFO('[' || P_SIZE_CONSTRAINT_ARRAY || ']');
 	LOG_INFO('{ "CallStack" : "' || DBMS_UTILITY.FORMAT_CALL_STACK() || '" }');
 	LOG_INFO('{ "BackTrace" : "' || DBMS_UTILITY.FORMAT_ERROR_BACKTRACE() || '" }');
 	LOG_INFO('{ "ErrorStack" : "' || DBMS_UTILITY.FORMAT_ERROR_STACK() || '" }');
@@ -1554,7 +1681,13 @@ end;
 --
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
-procedure IMPORT_JSON(P_JSON_DUMP_FILE IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'),P_JSON_STORAGE_MODEL VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL, P_XML_STORAGE_MODEL VARCHAR2 DEFAULT C_XML_STORAGE_MODEL)
+procedure IMPORT_JSON(
+  P_JSON_DUMP_FILE  IN OUT NOCOPY BLOB
+, P_TARGET_SCHEMA                 VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
+, P_JSON_DATA_TYPE            VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
+, P_XML_STORAGE_CLAUSE             VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+, P_TREAT_RAW1_AS_BOOLEAN         VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+)
 as
   MUTATING_TABLE      EXCEPTION ; PRAGMA EXCEPTION_INIT( MUTATING_TABLE , -04091 );
   INVALID_IMPORT_FILE EXCEPTION ; PRAGMA EXCEPTION_INIT( INVALID_IMPORT_FILE , -40441 );
@@ -1578,7 +1711,7 @@ as
 
   CURSOR operationsList
   is
-  select ROWNUM, TABLE_NAME, SOURCE_VENDOR, SPATIAL_FORMAT, OWNER, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS
+  select ROWNUM, TABLE_NAME, SOURCE_VENDOR, SPATIAL_FORMAT, OWNER, COLUMN_NAME_ARRAY, DATA_TYPE_ARRAY, SIZE_CONSTRAINT_ARRAY
       from JSON_TABLE(
            P_JSON_DUMP_FILE,
            '$'           
@@ -1587,20 +1720,20 @@ as
              SPATIAL_FORMAT          VARCHAR2(128)                      PATH '$.systemInformation.spatialFormat',   
              NESTED                                                     PATH '$.metadata.*'
                COLUMNS (
-                 OWNER                        VARCHAR2(128)             PATH '$.owner'
+                 OWNER                        VARCHAR2(128)             PATH '$.tableSchema'
                , TABLE_NAME                   VARCHAR2(128)             PATH '$.tableName'
                $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-               ,  COLUMN_LIST                          CLOB             PATH '$.columns'
+               ,  COLUMN_NAME_ARRAY                    CLOB FORMAT JSON PATH '$.columnNames'
                ,  DATA_TYPE_ARRAY                      CLOB FORMAT JSON PATH '$.dataTypes' 
-               ,  SIZE_CONSTRAINTS                     CLOB FORMAT JSON PATH '$.sizeConstraints'
+               ,  SIZE_CONSTRAINT_ARRAY                CLOB FORMAT JSON PATH '$.sizeConstraints'
                $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-               ,  COLUMN_LIST               VARCHAR2(32767)             PATH '$.columns'
+               ,  COLUMN_NAME_ARRAY         VARCHAR2(32767) FORMAT JSON PATH '$.columnNames'
                ,  DATA_TYPE_ARRAY           VARCHAR2(32767) FORMAT JSON PATH '$.dataTypes'
-               ,  SIZE_CONSTRAINTS          VARCHAR2(32767) FORMAT JSON PATH '$.sizeConstraints'
+               ,  SIZE_CONSTRAINT_ARRAY     VARCHAR2(32767) FORMAT JSON PATH '$.sizeConstraints'
                $ELSE
-               ,  COLUMN_LIST                VARCHAR2(4000)             PATH '$.columns'
+               ,  COLUMN_NAME_ARRAY          VARCHAR2(4000) FORMAT JSON PATH '$.columnNames'
                ,  DATA_TYPE_ARRAY            VARCHAR2(4000) FORMAT JSON PATH '$.dataTypes'
-               ,  SIZE_CONSTRAINTS           VARCHAR2(4000) FORMAT JSON PATH '$.sizeConstraints'
+               ,  SIZE_CONSTRAINT_ARRAY      VARCHAR2(4000) FORMAT JSON PATH '$.sizeConstraints'
                $END
              )
            )
@@ -1632,10 +1765,10 @@ begin
   if ((NOT V_ABORT_DATALOAD) and G_INCLUDE_DATA) then
 
     DISABLE_CONSTRAINTS(P_TARGET_SCHEMA) ;
-
+     
     for o in operationsList loop
       V_NOTHING_DONE := FALSE;
-      V_TABLE_INFO := GENERATE_SQL(o.SOURCE_VENDOR,P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.SPATIAL_FORMAT, o.COLUMN_LIST, o.DATA_TYPE_ARRAY, o.SIZE_CONSTRAINTS,P_JSON_STORAGE_MODEL,P_XML_STORAGE_MODEL); 
+      V_TABLE_INFO := GENERATE_SQL(o.SOURCE_VENDOR,P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.SPATIAL_FORMAT, o.COLUMN_NAME_ARRAY, o.DATA_TYPE_ARRAY, o.SIZE_CONSTRAINT_ARRAY, P_JSON_DATA_TYPE, P_XML_STORAGE_CLAUSE, P_TREAT_RAW1_AS_BOOLEAN); 
       V_STATEMENT := V_TABLE_INFO.DDL;
       if (V_STATEMENT is not NULL) then
         begin
@@ -1703,7 +1836,14 @@ end;
 --
 $END
 --
-function GENERATE_STATEMENTS(P_METADATA IN OUT NOCOPY BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'), P_SPATIAL_FORMAT VARCHAR2 DEFAULT 'WKB', P_JSON_STORAGE_MODEL VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL, P_XML_STORAGE_MODEL VARCHAR2 DEFAULT C_XML_STORAGE_MODEL)
+function GENERATE_STATEMENTS(
+  P_METADATA       IN OUT NOCOPY BLOB
+, P_TARGET_SCHEMA                VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
+, P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
+, P_JSON_DATA_TYPE           VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
+, P_XML_STORAGE_CLAUSE            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+, P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+) 
 return CLOB
 as
   V_RESULTS         CLOB;
@@ -1718,12 +1858,12 @@ as
   /*
   select JSON_OBJECTAGG(
            TABLE_NAME,
-           TREAT(GENERATE_STATEMENTS(SOURCE_VENDOR,P_TARGET_SCHEMA, OWNER, TABLE_NAME, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS) as JSON) 
+           TREAT(GENERATE_STATEMENTS(SOURCE_VENDOR,P_TARGET_SCHEMA, OWNER, TABLE_NAME, COLUMN_NAME_ARRAY, DATA_TYPE_ARRAY, SIZE_CONSTRAINT_ARRAY) as JSON) 
            returning CLOB
          )
     into V_RESULTS
   */
-  select ROWNUM, TABLE_NAME, VENDOR, OWNER, COLUMN_LIST, DATA_TYPE_ARRAY, SIZE_CONSTRAINTS
+  select ROWNUM, TABLE_NAME, VENDOR, OWNER, COLUMN_NAME_ARRAY, DATA_TYPE_ARRAY, SIZE_CONSTRAINT_ARRAY
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
     from JSON_TABLE(
@@ -1733,20 +1873,20 @@ $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
              NESTED                                                     PATH '$.metadata.*'
                COLUMNS (
                  VENDOR                       VARCHAR2(128)             PATH '$.vendor'
-               , OWNER                        VARCHAR2(128)             PATH '$.owner'
+               , OWNER                        VARCHAR2(128)             PATH '$.tableSchema'
                , TABLE_NAME                   VARCHAR2(128)             PATH '$.tableName'
                $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-               ,  COLUMN_LIST                          CLOB             PATH '$.columns'
+               ,  COLUMN_NAME_ARRAY                    CLOB FORMAT JSON PATH '$.columnNames'
                ,  DATA_TYPE_ARRAY                      CLOB FORMAT JSON PATH '$.dataTypes' 
-               ,  SIZE_CONSTRAINTS                     CLOB FORMAT JSON PATH '$.sizeConstraints'
+               ,  SIZE_CONSTRAINT_ARRAY                CLOB FORMAT JSON PATH '$.sizeConstraints'
                $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
-               ,  COLUMN_LIST               VARCHAR2(32767)             PATH '$.columns'
+               ,  COLUMN_NAME_ARRAY         VARCHAR2(32767) FORMAT JSON PATH '$.columnNames'
                ,  DATA_TYPE_ARRAY           VARCHAR2(32767) FORMAT JSON PATH '$.dataTypes'
-               ,  SIZE_CONSTRAINTS          VARCHAR2(32767) FORMAT JSON PATH '$.sizeConstraints'
+               ,  SIZE_CONSTRAINT_ARRAY     VARCHAR2(32767) FORMAT JSON PATH '$.sizeConstraints'
                $ELSE
-               ,  COLUMN_LIST                VARCHAR2(4000)             PATH '$.columns'
+               ,  COLUMN_NAME_ARRAY          VARCHAR2(4000) FORMAT JSON PATH '$.columnNames'
                ,  DATA_TYPE_ARRAY            VARCHAR2(4000) FORMAT JSON PATH '$.dataTypes'
-               ,  SIZE_CONSTRAINTS           VARCHAR2(4000) FORMAT JSON PATH '$.sizeConstraints'
+               ,  SIZE_CONSTRAINT_ARRAY      VARCHAR2(4000) FORMAT JSON PATH '$.sizeConstraints'
                $END
              )
            )
@@ -1759,11 +1899,11 @@ $ELSE
           passing XMLTYPE(P_METADATA,nls_charset_id('AL32UTF8'))
           COLUMNS
             VENDOR                       VARCHAR2(128)             PATH '/table/vendor'
-          , OWNER                        VARCHAR2(128)             PATH '/table/owner'
+          , OWNER                        VARCHAR2(128)             PATH '/table/tableSchema'
           , TABLE_NAME                   VARCHAR2(128)             PATH '/table/tableName'
-          , COLUMN_LIST                        XMLTYPE             PATH '/table/columns'
+          , COLUMN_NAME_ARRAY                  XMLTYPE             PATH '/table/columnNames'
           , DATA_TYPE_ARRAY                    XMLTYPE             PATH '/table/dataTypes' 
-          , SIZE_CONSTRAINTS                   XMLTYPE             PATH '/table/sizeConstraints'
+          , SIZE_CONSTRAINT_ARRAY              XMLTYPE             PATH '/table/sizeConstraints'
        )             
 --
 $END
@@ -1771,15 +1911,14 @@ $END
    where TABLE_NAME is not NULL;
 
 begin
-   DBMS_LOB.CREATETEMPORARY(V_RESULTS,TRUE,DBMS_LOB.SESSION);
-   DBMS_LOB.WRITEAPPEND(V_RESULTS,1,'{');
-
+  DBMS_LOB.CREATETEMPORARY(V_RESULTS,TRUE,DBMS_LOB.SESSION);
+  DBMS_LOB.WRITEAPPEND(V_RESULTS,1,'{');
   for x in getStatements() loop
     if (x.ROWNUM > 1) then
       DBMS_LOB.WRITEAPPEND(V_RESULTS,1,',');
     end if;
     
-    V_TABLE_INFO := GENERATE_SQL(x.VENDOR,P_TARGET_SCHEMA, x.OWNER, x.TABLE_NAME, P_SPATIAL_FORMAT, x.COLUMN_LIST, x.DATA_TYPE_ARRAY, x.SIZE_CONSTRAINTS, P_JSON_STORAGE_MODEL, P_XML_STORAGE_MODEL);
+    V_TABLE_INFO := GENERATE_SQL(x.VENDOR,P_TARGET_SCHEMA, x.OWNER, x.TABLE_NAME, P_SPATIAL_FORMAT, x.COLUMN_NAME_ARRAY, x.DATA_TYPE_ARRAY, x.SIZE_CONSTRAINT_ARRAY, P_JSON_DATA_TYPE, P_XML_STORAGE_CLAUSE, P_TREAT_RAW1_AS_BOOLEAN);
     V_FRAGMENT := '"' || x.TABLE_NAME || '" : ';
     DBMS_LOB.WRITEAPPEND(V_RESULTS,LENGTH(V_FRAGMENT),V_FRAGMENT);
     $IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
@@ -1885,11 +2024,17 @@ end;
 $END
 --
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
-function IMPORT_JSON(P_JSON_DUMP_FILE IN OUT BLOB,P_TARGET_SCHEMA VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA'),P_JSON_STORAGE_MODEL VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL, P_XML_STORAGE_MODEL VARCHAR2 DEFAULT C_XML_STORAGE_MODEL)
+function IMPORT_JSON(
+  P_JSON_DUMP_FILE IN OUT NOCOPY BLOB
+, P_TARGET_SCHEMA                VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
+, P_JSON_DATA_TYPE           VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
+, P_XML_STORAGE_CLAUSE            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+, P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+) 
 return CLOB
 as
 begin
-  IMPORT_JSON(P_JSON_DUMP_FILE, P_TARGET_SCHEMA,P_JSON_STORAGE_MODEL,P_XML_STORAGE_MODEL);
+  IMPORT_JSON(P_JSON_DUMP_FILE, P_TARGET_SCHEMA,P_JSON_DATA_TYPE,P_XML_STORAGE_CLAUSE,P_TREAT_RAW1_AS_BOOLEAN);
   return GENERATE_IMPORT_LOG();
 exception
   when others then

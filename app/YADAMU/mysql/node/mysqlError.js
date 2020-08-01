@@ -25,7 +25,7 @@ class MySQLError extends DatabaseError {
 
   spatialInsertFailed() {
 	// MySQL could not decode spatial data in WKB format
-    return ((this.cause.errno && this.cause.errno === 3037) && (this.cause.code && this.cause.code === 'ER_GIS_INVALID_DATA') && (this.cause.sqlState &&  this.cause.sqlState === '22023'))
+    return (this.cause.code && (this.cause.code === 'ER_GIS_INVALID_DATA'))
   }
 }
 

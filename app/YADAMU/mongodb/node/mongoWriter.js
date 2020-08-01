@@ -7,6 +7,7 @@ const WKX = require('wkx');
 const ObjectID = require('mongodb').ObjectID
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 const {BatchInsertError} = require('../../common/yadamuError.js')
 
@@ -37,62 +38,68 @@ class MongoWriter extends YadamuWriter {
 
   constructor(dbi,tableName,status,yadamuLogger) {
     super({objectMode: true},dbi,tableName,status,yadamuLogger)
-  }
-  
-  setTableInfo(tableInfo) {
-	super.setTableInfo(tableInfo)
-    this.transformations = this.tableInfo.dataTypes.map((dataType,idx) => {
-      switch (dataType.type.toLowerCase()) {
-        case '"mdsys"."sdo_geometry"':
-        case 'geography':
+    
+    this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
+       switch(targetDataType.toLowerCase()){
+        case 'objectid':
+	      return (row,idx) => {
+			row[idx] = ObjectID(row[idx])
+	      }
+          break;
         case 'geometry':
+        case 'geography':
+        case '"MDSYS"."SDO_GEOMETRY"':
           switch (this.dbi.systemInformation.spatialFormat) {
             case "WKB":
-              return (col,idx) => {
-			    return JSON.stringify(WKX.Geometry.parse(Buffer.from(col,'hex')).toGeoJSON())
-			  }
             case "EWKB":
+              return (row,idx) => {
+			    row[idx] = WKX.Geometry.parse(row[idx]).toGeoJSON()
+			  }
  			  return null
             case "WKT":
- 			  return null
             case "EWKT":
- 			  return null
+              return (row,idx) => {
+        	    row[idx] = WKX.Geometry.parse(row[idx]).toGeoJSON()
+              }
             default:
           }
 		  return null
-        case 'raw':
-		case 'binary':
-		case 'bytea':
-		  if ((this.tableInfo.keys[idx] === '_id') && (this.tableInfo.sizeConstraints[idx] === '12')) {
-  	        return (col,idx) => {
-              return ObjectID(col)
+        case 'boolean':
+          return (row,idx) => {
+            row[idx] = YadamuLibrary.toBoolean(row[idx])
+	      }
+        case 'object':
+          return (row,idx) => {
+            row[idx] = typeof row[idx] === 'string' ? JSON.parse(row[idx]) : row[idx]
+	      }
+		case 'binData':
+		  if ((this.tableInfo.columnNames[idx] === '_id') && (this.tableInfo.sizeConstraints[idx] === '12')) {
+  	        return (row,idx) => {
+              row[idx] = ObjectID(row[idx])
 	        }
 		  }
-		  else {
-			 return null
-		  }
-		  break;
-        case 'ObjectId':
-	      return (col,idx) => {
-            return ObjectID(col)
-	      }
-          break;
+		  return null
 		case 'date':
-		case 'time':
-		case 'dateTime':
-		case 'timestamp':
-		  if (this.dbi.parameters.MONGO_NATIVEJS_DATE) {
-	        return (col,idx) => {
-              return new Date(col)
+		  if (this.dbi.MONGO_NATIVEJS_DATE) {
+	        return (row,idx) => {
+              row[idx] =  new Date(row[idx])
 	        }		
           }			
-		  else {
-		    return null
-	      }
+		  return null
 		default:
 		  return null
 	  }
 	})
+
+    // Use a dummy rowTransformation function if there are no transformations required.
+
+    this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          transformation(row,idx)
+        }
+      }) 
+    }
   }
   
   async initialize() {
@@ -108,11 +115,7 @@ class MongoWriter extends YadamuWriter {
       
     // Apply transformation
     
-	this.transformations.forEach((transformation,idx) => {
-      if ((transformation !== null) && (row[idx] !== null)) {
-	    row[idx] = transformation(row[idx])
-      }
-	})
+    this.rowTransformation(row)
 
     switch (this.tableInfo.insertMode) {
       case 'DOCUMENT' :
@@ -126,7 +129,7 @@ class MongoWriter extends YadamuWriter {
       case 'BSON':
       case 'OBJECT' :
         const mDocument = {}
-        this.tableInfo.keys.forEach((key,idx) => {
+        this.tableInfo.columnNames.forEach((key,idx) => {
            mDocument[key] = row[idx]
         });
         this.batch.push(mDocument);
@@ -138,13 +141,14 @@ class MongoWriter extends YadamuWriter {
         // ### Exception - Unknown Mode
     }
 	
-	this.rowCounters.cached++
+    this.rowCounters.cached++
     return this.skipTable
 
   }
-
-  handleBatchError(operation,cause) {
-   	super.handleBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+  
+  
+  reportBatchError(operation,cause) {
+   	super.reportBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
   }
  
   async writeBatch() {

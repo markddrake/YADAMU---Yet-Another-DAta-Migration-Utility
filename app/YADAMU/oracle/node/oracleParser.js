@@ -1,4 +1,7 @@
 "use strict" 
+const util = require('util')
+const stream = require('stream')
+const pipeline = util.promisify(stream.pipeline);
 
 const oracledb = require('oracledb');
 
@@ -6,109 +9,111 @@ const YadamuParser = require('../../common/yadamuParser.js')
 const StringWriter = require('../../common/stringWriter.js');
 const BufferWriter = require('../../common/bufferWriter.js');
 
+const OracleError = require('./oracleError.js');
+
 class OracleParser extends YadamuParser {
   
-  constructor(tableInfo,objectMode,yadamuLogger) {
-    super(tableInfo,objectMode,yadamuLogger);      
-    this.columnMetadata = undefined;
-    this.includesLobs = false;
+  constructor(tableInfo,yadamuLogger) {
+    super(tableInfo,yadamuLogger); 
   }
+  
+  async closeLob(lob) {
+	let stack
+	const operation = 'oracledb.Lob.close()'
+    try {
+	  stack = new Error().stack
+      await lob.close()
+	} catch (e) {
+      this.yadamuLogger.handleException([this.constructor.name,'CLOSE_LOB'],new OracleError(e,stack,operation))
+    }
+  }	 
 
-  setColumnMetadata(metadata) {
-    this.columnMetadata = metadata
-    this.columnMetadata.forEach((column) => {
-      if ((column.fetchType === oracledb.CLOB) || (column.fetchType === oracledb.BLOB)) {
-        this.includesLobs = true;
+  async blobToBuffer(blob) {
+	  
+	let stack
+	const operation = 'oracledb.Lob.pipe(Buffer)'
+    try {
+      const bufferWriter = new  BufferWriter();
+	  stack = new Error().stack
+  	  await pipeline(blob,bufferWriter)
+	  await this.closeLob(blob)
+      return bufferWriter.toBuffer()
+	} catch(e) {
+	  await this.closeLob(blob)
+	  throw new OracleError(e,stack,operation)
+	}
+  }	
+  
+  async clobToString(clob) {
+     
+    let stack
+	const operation = 'oracledb.Lob.pipe(String)'
+	try {
+      const stringWriter = new  StringWriter();
+      clob.setEncoding('utf8');  // set the encoding so we get a 'string' not a 'buffer'
+	  stack = new Error().stack
+  	  await pipeline(clob,stringWriter)
+	  await this.closeLob(clob)
+	  return stringWriter.toString()
+	} catch(e) {
+	  await this.closeLob(clob)
+	  throw new OracleError(e,stack,operation)
+	}
+  };
+
+  setColumnMetadata(metadata) { 
+
+    this.jsonTransformations = new Array(metadata.length).fill(null)
+    
+    this.transformations = metadata.map((column,idx) => {
+	  switch (column.fetchType) {
+		 case oracledb.CLOB:
+		   return (row,idx)  => {
+             row[idx] = this.clobToString(row[idx])
+		   }           
+	     case oracledb.BLOB:	
+           if (this.tableInfo.jsonColumns.includes(idx)) {
+             // Convert JSON store as BLOB to string
+		     this.jsonTransformations[idx] = (row,idx)  => {
+               row[idx] = row[idx].toString('utf8')
+		     }
+           }
+           return (row,idx)  => {
+             row[idx] = this.blobToBuffer(row[idx])
+		   }
+         default:
+  		   return null;
       }
     })
-  }
-  
-  blob2HexBinary(blob) {
-  
-    return new Promise(async (resolve,reject) => {
-      try {
-      const bufferWriter = new  BufferWriter();
-          
-        blob.on('error',async (err) => {
-           await blob.close();
-           reject(err);
-        });
-          
-        bufferWriter.on('finish',async () => {
-          await blob.close(); 
-          resolve(bufferWriter.toHexBinary());
-        });
-         
-        blob.pipe(bufferWriter);
-      } catch (err) {
-        reject(err);
-      }
-    });
-  };
+	
+	// Use a dummy rowTransformation function if there are no transformations required.
+	
+    this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          transformation(row,idx)
+        }
+      }) 
+    }
+	
+    this.jsonTransformation = this.jsonTransformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.jsonTransformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          transformation(row,idx)
+        }
+      }) 
+    }
     
-  clob2String(clob) {
-     
-    return new Promise(async (resolve,reject) => {
-      try {
-        const stringWriter = new  StringWriter();
-        clob.setEncoding('utf8');  // set the encoding so we get a 'string' not a 'buffer'
-        
-        clob.on('error',async (err) => {
-           await clob.close();
-           reject(err);
-        });
-        
-        stringWriter.on('finish',async () => {
-          await clob.close(); 
-          resolve(stringWriter.toString());
-        });
-       
-        clob.pipe(stringWriter);
-      } catch (err) {
-        reject(err);
-      }
-    });
-  };
+  }
   
   async _transform (data,encoding,callback) {
 	try {
       this.counter++;
-	  if (this.includesLobs) {
-        data = await Promise.all(data.map((item,idx) => {
-                 if ((item !== null) && (this.columnMetadata[idx].fetchType === oracledb.CLOB)) {
-                   return this.clob2String(item)
-                 } 
-                 if ((item !== null) && (this.columnMetadata[idx].fetchType === oracledb.BLOB)) {
-                   return this.blob2HexBinary(item)
-                 }  
-                 return item
-        }))
-      }  
-
-      // Convert the JSON columns into JSON objects
-      this.tableInfo.jsonColumns.forEach((idx) => {
-        if (data[idx] !== null) {
-          try {
-            data[idx] = JSON.parse(data[idx]) 
-          } catch (e) {
-            this.yadamuLogger.logException([`${this.constructor.name}._transform()`,`${this.counter}`],e);
-            this.yadamuLogger.writeDirect(`${data[idx]}\n`);
-          } 
-        }
-      })
-      
-      this.tableInfo.rawColumns.forEach((idx) => {
-        if (data[idx] !== null) {
-          if (Buffer.isBuffer(data[idx])) {
-            data[idx] = data[idx].toString('hex');
-          }
-        }
-      })
-    
-      if (!this.objectMode) {
-        data = JSON.stringify(data);
-      }
-      const res = this.push({data:data})
+	  this.rowTransformation(data)
+	  const row = await Promise.all(data)
+	  this.jsonTransformation(row)
+      // if (this.counter === 1) console.log(row)
+	  this.push({data:row})
       callback();
 	} catch (e) {
       callback(e)

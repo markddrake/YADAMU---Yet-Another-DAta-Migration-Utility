@@ -1,69 +1,94 @@
 "use strict";
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
 
 class StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, spatialFormat, batchSize, commitSize) {
+  constructor(dbi, targetSchema, metadata, spatialFormat) {
     
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
     this.spatialFormat = spatialFormat
-    this.batchSize = batchSize
-    this.commitSize = commitSize;
   }
   
-  async generateStatementCache (executeDDL, vendor) {    
-     
-    const statementCache = {}
-	const collectionList = []
-    const tableList = Object.keys(this.metadata); 
-	tableList.forEach((table,idx) => {
-      const tableMetadata = this.metadata[table]
-      const tableInfo = {} 
-      tableInfo.tableName = tableMetadata.tableName
-      tableInfo.batchSize = this.batchSize;
-      tableInfo.commitSize = this.commitSize;
-      tableInfo.ddl = tableMetadata.tableName
-      if (tableMetadata.source) {
-		tableInfo.keys = JSON.parse('[' + tableMetadata.source.columns + "]");
-        tableInfo.sourceDataTypes = tableMetadata.source.dataTypes
-        tableInfo.sizeConstraints = tableMetadata.source.sizeConstraints
+  mapForeignDataType(vendor, dataType, dataTypeLength, dataTypeSize) {
+    
+      if (vendor === 'MONGO') {
+        return dataType;
       }
-      else {
-        tableInfo.keys = JSON.parse('[' + tableMetadata.columns + "]");
-        tableInfo.sourceDataTypes = tableMetadata.dataTypes
-        tableInfo.sizeConstraints = tableMetadata.sizeConstraints
-      }
- 	  tableInfo.dataTypes = this.dbi.decomposeDataTypes(tableInfo.sourceDataTypes);
-
-      if ((tableInfo.sourceDataTypes.length === 1) && (tableInfo.sourceDataTypes[0] === 'JSON')) {
+      
+      switch (true) {
+        case (YadamuLibrary.isNumericDataType(dataType)):
+          return 'number'
+        case YadamuLibrary.isDateDataType(dataType):
+          return 'date'
+         case YadamuLibrary.isBinaryDataType(dataType):
+           return 'binData'
+         case YadamuLibrary.isSpatialDataType(dataType):
+           return 'geometry'
+         case YadamuLibrary.isJSON(dataType):
+           return 'object'
+         default:
+           return 'string'
+      }           
+  } 
+  
+  generateTableInfo(tableMetadata) {
+          
+    let insertMode = 'Batch';
+    const columnNames = tableMetadata.columnNames
+    const targetDataTypes = tableMetadata.dataTypes.map((dataType) => { return this.mapForeignDataType(tableMetadata.vendor,dataType)})
+ 
+    if ((tableMetadata.columnNames.length === 1) && (tableMetadata.dataTypes[0] === 'JSON')) {
 	    // If the source table consists of a single JSON Column then insert each row into MongoDB 'As Is'	
-        tableInfo.insertMode = 'DOCUMENT_MODE'
-      }
-      else {
-	    switch (this.dbi.writeTransformation) {
-  		  case 'ARRAY_TO_DOCUMENT':
-		    tableInfo.insertMode = 'OBJECT'
-		    break;
-		  case 'PRESERVE':
-		    tableInfo.insertMode = 'ARRAY'
-		    break;
-		  default:
-		    tableInfo.insertMode = 'OBJECT'
-	    }
-      }    
-      collectionList.push(tableInfo.tableName)
-      statementCache[tableInfo.tableName] = tableInfo;
+        insertMode = 'DOCUMENT_MODE'
+    }
+    else {
+	  switch (this.dbi.writeTransformation) {
+  	    case 'ARRAY_TO_DOCUMENT':
+		  insertMode = 'OBJECT'
+		  break;
+		case 'PRESERVE':
+		  insertMode = 'ARRAY'
+		  break;
+		default:
+		  insertMode = 'OBJECT'
+	  }
+    }    
 
-    });
-   
-    if (executeDDL) {
-      await this.dbi.executeDDL(collectionList);
+    return {
+       ddl             : `createCollection(${tableMetadata.tableName})`,
+       dml             : `insertMany(${tableMetadata.tableName})`,
+	   columnNames     : columnNames,
+       targetDataTypes : targetDataTypes, 
+       insertMode      : insertMode,
+       _BATCH_SIZE     : this.dbi.BATCH_SIZE,
+       _COMMIT_COUNT   : this.dbi.COMMIT_COUNT,
+       _SPATIAL_FORMAT : this.spatialFormat
+    }
+  }
+    
+    
+    
+  async generateStatementCache(executeDDL) {
+    
+    const statementCache = {}
+    const tables = Object.keys(this.metadata); 
+    
+    const collectionList = tables.map((table,idx) => {
+      const tableMetadata = this.metadata[table];
+      const tableInfo = this.generateTableInfo(tableMetadata);
+      statementCache[tableMetadata.tableName] = tableInfo;
+      return tableMetadata.tableName;
+    })
+    if (executeDDL === true) {
+      await this.dbi.executeDDL(collectionList)
     }
     return statementCache;
-  }
+  }  
+
 }
 
 module.exports = StatementGenerator;

@@ -79,7 +79,7 @@ class DatabaseError extends Error {
   }
   
   cloneStack(stack) {
-	return `${stack.slice(0,5)}: ${this.cause.message}${stack.slice(5)}`
+	return stack && stack.indexOf('Error') === 0 ? `${stack.slice(0,5)}: ${this.cause.message}${stack.slice(5)}` : stack
   }
   
   lostConnection() {
@@ -87,12 +87,10 @@ class DatabaseError extends Error {
   }
 
   invalidPool() {
-	// console.log(this.cause);
 	return false;
   } 
 
  invalidConnection() {
-	// console.log(this.cause);
 	return false;
   } 
  
@@ -103,6 +101,11 @@ class DatabaseError extends Error {
   missingTable() {
 	return false;
   }
+  
+  spatialInsertFailed() {
+	return false;
+  }
+  
 }
 
 module.exports = {

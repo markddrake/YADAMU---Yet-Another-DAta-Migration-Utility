@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
+const Yadamu = require('../../common/yadamu.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const FileWriter = require('./fileWriter.js');
 const JSONParser = require('./jsonParser.js');
@@ -20,6 +21,24 @@ class FileDBI extends YadamuDBI {
   **
   */
 
+  constructor(yadamu,exportFilePath) {
+    super(yadamu)
+	this.exportFilePath = exportFilePath
+    this.outputStream = undefined;
+    this.inputStream = undefined;
+	this.ddl = undefined;
+    this.tableSeperator = '';
+  }
+
+  generateStatementCache() {
+	this.statementCache = {}
+  }
+      
+  async executeDDL(ddl) {
+    this.outputStream.write(',');
+    this.outputStream.write(`"ddl":${JSON.stringify(ddl)}`);
+  }
+  
   getConnectionProperties() {
     return {}
   }
@@ -73,40 +92,25 @@ class FileDBI extends YadamuDBI {
 	}
   }
   
-  setMetadata(metadata) {
-	super.setMetadata(metadata)
-    if (this.outputStream !== undefined) {
-  	  this.outputStream.write(',');
+  async writeMetadata(metadata) {
+     if (this.outputStream !== undefined) {
+ 	  this.outputStream.write(',');
       this.outputStream.write(`"metadata":${JSON.stringify(this.metadata)}`);
 	}
   }
+  
+  async setMetadata(metadata) {
+    Object.values(metadata).forEach((table) => {delete table.source})
+	super.setMetadata(metadata)
+    await this.writeMetadata(metadata)
+  }
  
   get DATABASE_VENDOR()    { return 'FILE' };
-  get SOFTWARE_VENDOR()    { return 'N/A' };
-  get SPATIAL_FORMAT()     { return this.spatialFormat };
-  get DEFAULT_PARAMETERS() { return this.yadamu.getYadamuDefaults().file }
-    
+  get SOFTWARE_VENDOR()    { return 'YABASC' };
+
   async releaseConnection() {
   }
-  
-  constructor(yadamu,exportFilePath) {
-    super(yadamu,yadamu.getYadamuDefaults().file )
-	this.exportFilePath = exportFilePath
-    this.outputStream = undefined;
-    this.inputStream = undefined;
-	this.ddl = undefined;
-    this.firstTable = true;
-  }
-
-  generateStatementCache() {
-	this.statementCache = {}
-  }
-      
-  async executeDDL(ddl) {
-    this.outputStream.write(',');
-    this.outputStream.write(`"ddl":${JSON.stringify(ddl)}`);
-  }
-
+ 
   async initialize() {
     super.initialize(false);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
@@ -117,7 +121,10 @@ class FileDBI extends YadamuDBI {
   async initializeExport() {
 	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
 	super.initializeExport();
-    this.inputStream = fs.createReadStream(this.exportFilePath);
+    await new Promise((resolve,reject) => {
+      this.inputStream = fs.createReadStream(this.exportFilePath);
+      this.inputStream.on('open',() => {resolve()}).on('error',(err) => {reject(err)})
+    })
   }
 
   async finalizeExport() {
@@ -133,7 +140,7 @@ class FileDBI extends YadamuDBI {
     this.yadamuLogger.info([this.DATABASE_VENDOR],`Writing file "${this.exportFilePath}".`)
 	this.outputStream.write(`{`)
   }
-
+  
   async initializeData() {
     this.outputStream.write(',');
     this.outputStream.write('"data":{'); 
@@ -210,11 +217,15 @@ class FileDBI extends YadamuDBI {
 	  // Hack to enable statisticsCollector to use the YadamuWriter interface to collect statistics about the cotnents of a YADAMU export file...
       return {}
     }
-	  
-    // Include a dummy dataTypes array of the correct length to ensure the column count assertion does not throw
+	 
+	// ### Need to simplify and standardize DataTypes - Data type mapping for Files.. 
+	
+	// Include a dummy dataTypes array of the correct length to ensure the column count assertion does not throw
 	return { 
-	  tableName : tableName
-    , dataTypes : new Array(this.metadata[tableName].dataTypes.length).fill(null)
+	  tableName       : tableName
+	, _SPATIAL_FORMAT : this.systemInformation.spatialFormat
+    , columnNames     : [... this.metadata[tableName].columnNames]
+    , targetDataTypes : [... this.metadata[tableName].dataTypes]
     }
   }
 
@@ -223,7 +234,7 @@ class FileDBI extends YadamuDBI {
     const stats = fs.statSync(this.exportFilePath)
     const fileSizeInBytes = stats.size
     this.yadamuLogger.info([this.DATABASE_VENDOR],`Processing file "${this.exportFilePath}". Size ${fileSizeInBytes} bytes.`)
-    const jsonParser  = new JSONParser(this.yadamuLogger,this.parameters.MODE);
+    const jsonParser  = new JSONParser(this.yadamuLogger,this.MODE);
     const eventManager = new EventManager(this.yadamu)
 	this.eventStream = this.inputStream.pipe(jsonParser).pipe(eventManager)
 	return this.eventStream;
@@ -233,8 +244,9 @@ class FileDBI extends YadamuDBI {
     // this.yadamuLogger.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
     // Override parent method to allow output stream to be passed to worker
     // return super.getOutputStream(FileWriter,primary)
-	const os =  new FileWriter(this,tableName,this.status,this.yadamuLogger,this.firstTable,this.outputStream)
-	this.firstTable = false;
+	this.outputStream.write(`${this.tableSeperator}"${tableName}":`);
+	const os =  new FileWriter(this,tableName,this.status,this.yadamuLogger,this.outputStream)
+	this.tableSeperator = ',';
     return os;
   }
   

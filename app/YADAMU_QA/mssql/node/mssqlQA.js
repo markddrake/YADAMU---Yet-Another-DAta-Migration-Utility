@@ -3,19 +3,11 @@
 const MsSQLDBI = require('../../../YADAMU/mssql/node/mssqlDBI.js');
 const MsSQLError = require('../../../YADAMU/mssql/node/mssqlError.js')
 
-const sqlSchemaTableRows = `SELECT sOBJ.name AS [TableName], SUM(sPTN.Rows) AS [RowCount] 
-   FROM sys.objects AS sOBJ 
-  INNER JOIN sys.partitions AS sPTN ON sOBJ.object_id = sPTN.object_id 
-  WHERE sOBJ.type = 'U' 
-    AND sOBJ.schema_id = SCHEMA_ID(@SCHEMA) 
-    AND sOBJ.is_ms_shipped = 0x0
-    AND index_id < 2
- GROUP BY sOBJ.schema_id, sOBJ.name`;
-
-const sqlCompareSchema = `sp_COMPARE_SCHEMA`
-
 class MsSQLQA extends MsSQLDBI {
     
+    static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
+    static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
+
     constructor(yadamu) {
        super(yadamu)
     }
@@ -59,7 +51,8 @@ class MsSQLQA extends MsSQLDBI {
 	  const timer = setTimeout(async (pid) => {
 		  if (this.pool !== undefined) {
 		     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Killing connection.`);
-		     const request = await this.getRequest();
+			 // Do not use getRequest() as it will fail with "There is a request in progress during write opeations. Get a new Request directly using the current pool
+		     const request = new this.sql.Request(this.pool);
 			 let stack
 			 const sqlStatement = `kill ${pid}`
 			 try {
@@ -134,18 +127,16 @@ class MsSQLQA extends MsSQLDBI {
                           .input('EMPTY_STRING_IS_NULL',this.sql.Bit,(this.parameters.EMPTY_STRING_IS_NULL === true ? 1 : 0))
                           .input('SPATIAL_PRECISION',this.sql.Int,(this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18))
                           .input('DATE_TIME_PRECISION',this.sql.Int,this.parameters.TIMESTAMP_PRECISION)
-                          .execute(sqlCompareSchema,{},{resultSet: true});
+                          .execute(MsSQLQA.SQL_COMPARE_SCHEMAS,{},{resultSet: true});
 
       // Use length-2 and length-1 to allow Debugging info to be included in the output
 	  
-      const successful = results.recordsets[results.recordsets.length-2]
-      
+      const successful = results.recordsets[results.recordsets.length-2]      
       report.successful = successful.map((row,idx) => {          
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT,]
       })
         
       const failed = results.recordsets[results.recordsets.length-1]
-
       report.failed = failed.map((row,idx) => {
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.SQLERRM !== null ? row.SQLERRM : '')]
       })
@@ -156,7 +147,7 @@ class MsSQLQA extends MsSQLDBI {
     async getRowCounts(connectInfo) {
         
       await this.useDatabase(connectInfo.database);
-      const results = await this.pool.request().input('SCHEMA',this.sql.VarChar,connectInfo.owner).query(sqlSchemaTableRows);
+      const results = await this.pool.request().input('SCHEMA',this.sql.VarChar,connectInfo.owner).query(MsSQLQA.SQL_SCHEMA_TABLE_ROWS);
       
       return results.recordset.map((row,idx) => {          
         return [connectInfo.owner === 'dbo' ? connectInfo.database : connectInfo.owner,row.TableName,row.RowCount]
@@ -174,3 +165,15 @@ class MsSQLQA extends MsSQLDBI {
     
 }
 module.exports = MsSQLQA
+
+const _SQL_SCHEMA_TABLE_ROWS = `SELECT sOBJ.name AS [TableName], SUM(sPTN.Rows) AS [RowCount] 
+   FROM sys.objects AS sOBJ 
+  INNER JOIN sys.partitions AS sPTN ON sOBJ.object_id = sPTN.object_id 
+  WHERE sOBJ.type = 'U' 
+    AND sOBJ.schema_id = SCHEMA_ID(@SCHEMA) 
+    AND sOBJ.is_ms_shipped = 0x0
+    AND index_id < 2
+ GROUP BY sOBJ.schema_id, sOBJ.name`;
+
+const _SQL_COMPARE_SCHEMAS = `sp_COMPARE_SCHEMA`
+

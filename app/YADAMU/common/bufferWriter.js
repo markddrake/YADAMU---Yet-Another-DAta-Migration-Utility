@@ -15,8 +15,12 @@ class BufferWriter extends Writable {
      callback();
   }
   
+  toBuffer() {
+	return Buffer.concat(this.chunks)
+  }
+  
   toHexBinary() {
-    return Buffer.concat(this.chunks).toString('hex');
+    return this.toBuffer().toString('hex');
   }
   
 }

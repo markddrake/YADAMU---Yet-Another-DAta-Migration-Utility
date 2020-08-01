@@ -16,7 +16,7 @@ class DBReaderParallel extends DBReader {
   async pipelineTables(primaryReaderDBI,primaryWriterDBI) {
 	 
     if (this.schemaInfo.length > 0) {
-      const maxWorkerCount = parseInt(this.dbi.parameters.PARALLEL)
+      const maxWorkerCount = parseInt(this.dbi.yadamu.PARALLEL)
   	  const workerCount = this.schemaInfo.length < maxWorkerCount ? this.schemaInfo.length : maxWorkerCount
       this.yadamuLogger.info(['PARALLEL',workerCount,this.schemaInfo.length,primaryReaderDBI.DATABASE_VENDOR,primaryWriterDBI.DATABASE_VENDOR],`Processing Tables`);
       const tasks = [...this.schemaInfo]
@@ -28,7 +28,9 @@ class DBReaderParallel extends DBReader {
 		  try {
 	        while (tasks.length > 0) {
 	          const task = tasks.shift();
-  		      await this.pipelineTable(task,readerDBI,writerDBI)
+              if (task.INCLUDE_TABLE === true) {
+  		        await this.pipelineTable(task,readerDBI,writerDBI)
+              }
             }
 		    await readerDBI.releaseWorkerConnection()
             await writerDBI.releaseWorkerConnection()

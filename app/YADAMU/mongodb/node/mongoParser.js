@@ -4,29 +4,46 @@ const YadamuParser = require('../../common/yadamuParser.js')
 
 class MongoParser extends YadamuParser {
   
-  constructor(tableInfo,objectMode,yadamuLogger) {
-    super(tableInfo,objectMode,yadamuLogger); 
+  constructor(tableInfo,yadamuLogger) {
+    super(tableInfo,yadamuLogger); 
+    this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType) => {
+	  switch (dataType) {
+		 case 'binData':
+		   return (row,idx)  => {
+             row[idx] = row[idx].buffer;
+		   }
+        default:
+		  return null;
+      }
+    })
+	
+	// Use a dummy rowTransformation function if there are no transformations required.
+	
+    this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          transformation(row,idx)
+        }
+      }) 
+    }
+		
   }
   
   async _transform (data,encoding,callback) {
 	this.counter++;
-    if (this.tableInfo.idTransformation === 'STRIP') {
+    if (this.tableInfo.ID_TRANSFORMATION === 'STRIP') {
       delete data._id
     }
 	else {
 	  data._id = data._id.toString()
     }
 	
-    switch (this.tableInfo.readTransformation) {
+    switch (this.tableInfo.READ_TRANSFORMATION) {
 	  case 'DOCUMENT_TO_ARRAY' :
-	data = this.tableInfo.columns.map((key) => {
-          return data[key]
-        })
+	    data = Object.values(data)
+        this.rowTransformation(data)
 		break;
       default:
-    }
-    if (!this.objectMode) {
-      data = JSON.stringify(data);
     }
     this.push({data:data})
     callback();

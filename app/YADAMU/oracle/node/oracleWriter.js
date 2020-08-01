@@ -2,10 +2,10 @@
 
 const { performance } = require('perf_hooks');
 
-const WKX = require('wkx');
-
 const oracledb = require('oracledb');
 
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 
 class OracleWriter extends YadamuWriter {
@@ -33,12 +33,6 @@ class OracleWriter extends YadamuWriter {
 
   constructor(dbi,tableName,status,yadamuLogger) {
     super({objectMode: true},dbi,tableName,status,yadamuLogger)
-	const TRUE_AS_ROW  =  Buffer.from('01','hex')
-	const FALSE_AS_RAW =  Buffer.from('00','hex')
-  }
-  
-  setTableInfo(tableInfo) {
-	super.setTableInfo(tableInfo)
     this.lobList = [];
     this.lobBatch = []
     this.tempLobCount = 0;
@@ -46,18 +40,19 @@ class OracleWriter extends YadamuWriter {
     this.includeTestcase = this.dbi.parameters.EXPORT_TESTCASE === true
     this.lobCumlativeTime = 0;
 	
-	 
 	// Set up an Array of Transformation functions to be applied to the incoming rows
-	
-    this.transformations = this.tableInfo.dataTypes.map((dataType,idx) => {          
-      switch (dataType.type) {            
+
+	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
+      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
+      switch (dataType.type.toUpperCase()) {
         case "GEOMETRY":
+        case "GEOGRAPHY":
         case '"MDSYS"."SDO_GEOMETRY"':
           // Metadata based decision
-          if ((this.dbi.dbVersion < 12) && (this.tableInfo.spatialFormat === 'GeoJSON')) {
+          if ((this.dbi.DB_VERSION < 12) && (this.SPATIAL_FORMAT === 'GeoJSON')) {
             // SDO_UTIL does not support GeoJSON in 11.x database
             return (col,jdx) =>  {
-			  return WKX.Geometry.parseGeoJSON(JSON.parse(col)).toWkt();
+			  return YadamuSpatialLibrary.geoJSONtoWKT(col)
             }
           }
           else {
@@ -66,38 +61,31 @@ class OracleWriter extends YadamuWriter {
           break;
 		case "BFILE":
 		    // Convert JSON representation to String.
+        case "SET":
         case "JSON":
           return (col,jdx) =>  {
-            // JSON store as BLOB results in Error: ORA-40479: internal JSON serializer error during export operations
             // row[idx] = Buffer.from(JSON.stringify(row[idx]))
-            // Default JSON Storage model is JSON store as CLOB.
             // JSON must be shipped in Serialized Form
-            if (typeof col === 'object') {
-              return JSON.stringify(col)
-            } 
-            else {
-              return col
-            }
+            return typeof col === 'object' ? JSON.stringify(col) : col
           }
           break;
         case "RAW":
+          /*
+          if (this.dbi.TREAT_RAW1_AS_BOOLEAN) {
+            if (typeof col === 'boolean') {
+              return  new Buffer.from(col === true ? [1] : [0])
+            }
+          */
           return (col,jdx) =>  {
             if (typeof col === 'boolean') {
-              return  col === true ? this.TRUE_AS_RAW: FALSE_AS_RAW
+              return  new Buffer.from(col === true ? [1] : [0])
             }
-            return Buffer.from(col,'hex');
+            return col
           }
           break;
         case "BOOLEAN":
           return (col,jdx) =>  {
-            switch (col) {
-              case true:
-                 return 'true';
-              case false:
-                 return 'false';
-              default:
-                return col;
-            }
+            return YadamuLibrary.booleanToBuffer(col)
 		  }
           break;
         case "DATE":
@@ -155,7 +143,7 @@ class OracleWriter extends YadamuWriter {
                 col = JSON.stringify(col);
               }
               this.cachedLobCount++
-              this.bindRowAsLOB = this.bindRowAsLOB || (Buffer.byteLength(col,'utf8') > this.dbi.parameters.LOB_MIN_SIZE) || Buffer.byteLength(col,'utf8') === 0
+              this.bindRowAsLOB = this.bindRowAsLOB || (Buffer.byteLength(col,'utf8') > this.dbi.LOB_MIN_SIZE) || Buffer.byteLength(col,'utf8') === 0
 			  return col;
 		    }
 		    break;
@@ -178,8 +166,8 @@ class OracleWriter extends YadamuWriter {
 			  if ((typeof col === "object") && (!Buffer.isBuffer(col))) {
 				col = Buffer.from(JSON.stringify(col),'utf-8')
 			  }
-              if ((typeof col === "string") && (col.length/2) <= this.dbi.parameters.LOB_MIN_SIZE) {
-				if (this.tableInfo.dataTypes[idx].type === 'JSON') {
+              if ((typeof col === "string") && (col.length/2) <= this.dbi.LOB_MIN_SIZE) {
+				if (YadamuLibrary.decomposeDataType(this.tableInfo.targetDataTypes[idx]).type === 'JSON') {
 				  col = Buffer.from(col,'utf-8')
 				}
 				else {
@@ -188,7 +176,7 @@ class OracleWriter extends YadamuWriter {
               }
 		      this.cachedLobCount++
 			  // If col ia still a string at this point the string is too large to be stored in the client side cache
-              this.bindRowAsLOB = this.bindRowAsLOB || (col.length > this.dbi.parameters.LOB_MIN_SIZE) 
+              this.bindRowAsLOB = this.bindRowAsLOB || (col.length > this.dbi.LOB_MIN_SIZE) 
 			  return col
 			}
             break
@@ -218,23 +206,41 @@ class OracleWriter extends YadamuWriter {
     
   }
 
-  trackClobFromString(s) {
-    const clob = this.dbi.clobFromString(s)
+  trackStringToClob(s) {
+    const clob = this.dbi.stringToClob(s)
 	this.lobList.push(clob);
 	return clob
   }
   
-  trackBlobFromHexBinary(s) {
-    const blob = this.dbi.blobFromHexBinary(s)
-	this.lobList.push(blob);
-	return blob
-  }
-  
-  trackBlobFromBuffer(b) {
+  trackBufferToBlob(b) {
 	const blob = this.dbi.blobFromBuffer(b)
 	this.lobList.push(blob);
 	return blob;
   }
+  
+  checkBindMappings(row) {
+	
+	// Check performed on re-ordered rows. When all binds have been checked disable check
+    // Clone the array of bind positions as bad things happen if you splice the target of a forEach operation inside the forEach operation
+    
+    // Loop backwards to the splice operation has no effect on the idx of the remaining items
+    
+    for (let i=this.tableInfo.numericBindPositions.length-1; i >= 0; i--) {
+      const bindIdx = this.tableInfo.numericBindPositions[i]
+      if (row[bindIdx] !== null) {
+		if (typeof row[bindIdx] === 'string') {
+          this.tableInfo.binds[bindIdx] = {type: oracledb.STRING, maxSize : 128}
+		  if (this.tableInfo.lobBinds) {
+			this.tableInfo.lobBinds[bindIdx] = {type: oracledb.STRING, maxSize : 128}
+		  }
+		}
+		this.tableInfo.numericBindPositions.splice(i,1)
+      }
+    }
+    if (this.tableInfo.numericBindPositions.length === 0) {
+      this.checkBindMappings = (row) => {}
+    }
+  } 
 
   cacheRow(row) {
       
@@ -265,11 +271,11 @@ class OracleWriter extends YadamuWriter {
 	** If talbeInfo.lobColuns = false then there are no lobs so there is no need to re-order the row.
     */
           
-    // if (this.rowCounters.received === 1) {console.log(row)}
 
     // this.yadamuLogger.trace([this.constructor.name,this.tableInfo.lobColumns,this.rowCounters.cached],'cacheRow()')
+    // if (this.rowCounters.received === 1) {console.log(row)}
 		
-    try {
+    try {          
       this.bindRowAsLOB = false;
 	  if (this.tableInfo.lobColumns) {
 		// Bind Ordering and Row Ordering are the probably different. Use map to create a new array in BindOrdering when applying transformations
@@ -305,16 +311,16 @@ class OracleWriter extends YadamuWriter {
               case oracledb.CLOB:
                 this.templobCount++
                 this.cachedLobCount--
-                return this.trackClobFromString(row[idx])                                                                    
+                return this.trackStringToClob(row[idx])                                                                    
                 break;
               case oracledb.BLOB:
                 this.templobCount++  
                 this.cachedLobCount--
 				if (typeof row[idx] === 'string') {
-                  return this.trackBlobFromHexBinary(row[idx])                                                                    
+                  return this.trackBufferToBlob(Buffer.from(row[idx],'hex'))                                                                    
                 }
                 else {
-                  return this.trackBlobFromBuffer(row[idx])
+                  return this.trackBufferToBlob(row[idx])
                 }
                 break;
               default:
@@ -329,6 +335,8 @@ class OracleWriter extends YadamuWriter {
       else {
         this.batch.push(row);
       }
+
+	  this.checkBindMappings(row)
       this.rowCounters.cached++
     } catch (cause) {
 	  this.handleIterativeError('CACHE ONE',cause,this.rowCounters.cached+1,row);
@@ -379,37 +387,39 @@ end;`
   }
  
   batchComplete() {
-    return ((this.rowCounters.cached === this.tableInfo.batchSize) || (this.tempLobCount >= this.dbi.parameters.BATCH_LOB_COUNT) || (this.cachedLobCount > this.dbi.parameters.LOB_CACHE_COUNT))
+    return ((this.rowCounters.cached === this.BATCH_SIZE) || (this.tempLobCount >= this.dbi.BATCH_LOB_COUNT) || (this.cachedLobCount > this.dbi.LOB_CACHE_COUNT))
   }
 
-
   async serializeLob(lob) {
-    switch (lob.type) {
+	switch (lob.type) {
       case oracledb.CLOB:
-        // ### Cannot re-read content that has been written to local clob
-        // return this.dbi.stringFromClob(lob)
-        return this.dbi.stringFromLocalClob(lob)
+        // ### Cannot directly re-read content that has been written to local clob
+        return await  this.dbi.clientClobToString(lob)
       case oracledb.BLOB:
-        // ### Cannot re-read content that has been written to local blob
-        // return this.dbi.hexBinaryFromBlob(lob)
-        return this.dbi.hexBinaryFromLocalBlob(lob)
+        // ### Cannot directly re-read content that has been written to local blob
+        return await this.dbi.clientBlobToBuffer(lob)
       default:
         return lob
-    }
+    } 
   }   
    
-
   async serializeLobColumns(row) {
-	// Convert Lobs back to text
-    return await Promise.all(row.map((col,idx) => {
+	// Convert Lobs back to Strings or Buffers
+    const newRow = await Promise.all(row.map((col,idx) => {
       if (col instanceof oracledb.Lob) {
 	    return this.serializeLob(col)
       }
       return col
     }))
+	// Put the Lobs back into the original order
+	const columnOrderedRow = []
+	this.tableInfo.bindOrdering.forEach((lidx,idx) => {
+	  columnOrderedRow[lidx] = newRow[idx]
+	})
+	return columnOrderedRow 
   }   
        	  
-  async handleBatchError(operation,cause,rows) {
+  async reportBatchError(operation,cause,rows) {
 	  
 	// If cause is generated by the SQL layer it alreadys contain SQL and bind information.
 
@@ -425,7 +435,10 @@ end;`
 	  }
 	}
 	
-	super.handleBatchError(operation,cause,await this.serializeLobColumns(rows[0]),await this.serializeLobColumns(rows[rows.length-1]),info)
+	const firstRow = await this.serializeLobColumns(rows[0])
+	const lastRow  = await this.serializeLobColumns(rows[rows.length-1])
+	
+	super.reportBatchError(operation,cause,firstRow,lastRow,info)
   }
   
   async serializeLobBinds(binds) {
@@ -491,7 +504,7 @@ end;`
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
     // Infortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
     // So we have to free the current tempLob Cache and create a new one for each batch
-
+    
     this.rowCounters.batchCount++;
     let rows = undefined;
     let binds = undefined;
@@ -521,7 +534,7 @@ end;`
         this.resetBatch();
         return this.skipTable
       } catch (cause) {
-	    this.handleBatchError(`INSERT MANY`,cause,rows) 
+	    await this.reportBatchError(`INSERT MANY`,cause,rows) 
         await this.dbi.restoreSavePoint(cause);
         if (cause.errorNum && (cause.errorNum === 4091)) {
           // Mutating Table - Convert to Cursor based PL/SQL Block
@@ -544,7 +557,7 @@ end;`
             this.resetBatch();
             return this.skipTable
           } catch (cause) {
-  		    await this.handleBatchError(`INSERT MANY [PL/SQL]`,cause,rows) 
+  		    await this.reportBatchError(`INSERT MANY [PL/SQL]`,cause,rows) 
             await this.dbi.restoreSavePoint(cause);
             this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
             this.insertMode = 'Iterative';
@@ -557,41 +570,29 @@ end;`
       }
     }
 
-    if (lobInsert) {
-      if (this.batch.length > this.lobBatch.length) {
-        this.batch.forEach((row) => {
-          this.lobBatch.push(row);
-        })
-        rows = this.lobBatch;
-      } 
-      else {
-        this.lobBatch.forEach((row) => {
-          this.batch.push(row);
-        });
-        rows = this.batch;
-      }
-    }
-    else {
-      rows = this.batch;
-    }
-
-    for (const row in rows) {
-      let boundRow
-      try {
-		// Create a bound row by cloning the current set of binds and adding the column value.
-		// boundRow = await Promise.all([... new Array(rows[row].length).keys()].map(async (i) => {const bind = Object.assign({},binds[i]); bind.val=await rows[row][i]; return bind}))
-		boundRow = [... new Array(rows[row].length).keys()].map((i) => {return Object.assign({},binds[i],{val: rows[row][i]})})
-        const results = await this.dbi.executeSQL(this.tableInfo.dml,boundRow)
-		this.rowCounters.written++
-      } catch (cause) {
-        await this.handleIterativeError('INSERT ONE',cause,row,await this.serializeLobColumns(rows[row]));
-        if (this.skipTable) {
-          break;
+    const allRows  = [this.batch,this.lobBatch]
+	const allBinds = [this.tableInfo.binds,this.tableInfo.lobBinds]
+    while (allRows.length > 0) {
+	  const rows = allRows.shift();
+	  const binds = allBinds.shift();
+      for (const row in rows) {
+        try {
+		  // Create a bound row by cloning the current set of binds and adding the column value.
+		  // boundRow = await Promise.all([... new Array(rows[row].length).keys()].map(async (i) => {const bind = Object.assign({},binds[i]); bind.val=await rows[row][i]; return bind}))
+		  const boundRow = rows[row].map((col,idx) => {return Object.assign({},binds[idx],{val: col})})
+          const results = await this.dbi.executeSQL(this.tableInfo.dml,boundRow)
+		  this.rowCounters.written++
+        } catch (cause) {
+          await this.handleIterativeError('INSERT ONE',cause,row,await this.serializeLobColumns(rows[row]));
+          if (this.skipTable) {
+			// Truncate the allRows array to terminate the outer loop as well
+			allRows.length = 0
+            break;
+          }
         }
-      }
+	  }
     } 
 	
-    // ### Iterative must commit to allow a subsequent batch to rollback.
     this.endTime = performance.now();
     // await Promise.all(this.freeLobList());
     this.freeLobList();

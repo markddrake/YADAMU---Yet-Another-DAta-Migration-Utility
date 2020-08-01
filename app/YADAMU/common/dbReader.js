@@ -66,10 +66,9 @@ class DBReader extends Readable {
     super({objectMode: true });  
  
     this.dbi = dbi;
-    this.mode = dbi.parameters.MODE
-    this.status = dbi.yadamu.getStatus()
+    this.status = dbi.yadamu.STATUS
     this.yadamuLogger = yadamuLogger;
-    this.yadamuLogger.info([`Reader`,dbi.DATABASE_VENDOR,this.mode,this.dbi.getWorkerNumber()],`Ready.`)
+    this.yadamuLogger.info([`Reader`,dbi.DATABASE_VENDOR,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
        
     this.schemaInfo = [];
     
@@ -122,7 +121,7 @@ class DBReader extends Readable {
   abortOnError(cause,dbi) {
 	 const abortCodes = ['ABORT',undefined]
 	 // dbi.setFatalError(cause);
-	 return abortCodes.indexOf(dbi.parameters.ON_ERROR) > -1
+	 return abortCodes.indexOf(dbi.yadamu.ON_ERROR) > -1
   }
   
   async pipelineTable(task,readerDBI,writerDBI) {
@@ -144,10 +143,10 @@ class DBReader extends Readable {
     let errorDBI
        
     try {
-      const tableInfo = readerDBI.generateSelectStatement(task)
+      const tableInfo = readerDBI.generateQueryInformation(task)
       // ### TESTING ONLY: Uncomment folllowing line to force Table Not Found condition
       // tableInfo.SQL_STATEMENT = tableInfo.SQL_STATEMENT.replace(tableInfo.TABLE_NAME,tableInfo.TABLE_NAME + "1")
-      const transformer = readerDBI.createParser(tableInfo,true)
+      const transformer = readerDBI.createParser(tableInfo)
       const tableInputStream = await readerDBI.getInputStream(tableInfo,transformer)
       tableInputStream.on('error',(err) => { 
         pipeStatistics.readerEndTime = performance.now()
@@ -158,10 +157,10 @@ class DBReader extends Readable {
       const mappedTableName = writerDBI.transformTableName(task.TABLE_NAME,readerDBI.getInverseTableMappings())
       const tableOutputStream = writerDBI.getOutputStream(mappedTableName)
       transformer.on('error',(err) => { 
-      pipeStatistics.parserEndTime = performance.now()
-     })
+        pipeStatistics.parserEndTime = performance.now()
+      })
     
-   	 try {
+   	  try {
         await tableOutputStream.initialize()
         pipeStatistics.pipeStartTime = performance.now();
         await pipeline(tableInputStream,transformer,tableOutputStream)
@@ -181,16 +180,16 @@ class DBReader extends Readable {
 		  stream = 'READER'
     	  errorDBI = readerDBI
           cause = readerDBI.streamingError(e,tableInfo.SQL_STATEMENT)
-          if ((continueProcessing.indexOf(readerDBI.parameters.ON_ERROR) > -1)  && cause.lostConnection()) {
+          if ((continueProcessing.indexOf(readerDBI.yadamu.ON_ERROR) > -1)  && cause.lostConnection()) {
             // Re-establish the input stream connection 
    		    await readerDBI.reconnect(cause,'READER')
           }
         }		
-        this.yadamuLogger.handleException(['PIPELINE',mappedTableName,this.dbi.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'STREAM PROCESSING',stream,errorDBI.parameters.ON_ERROR],cause)
-        if (abortCurrentTable.indexOf(writerDBI.parameters.ON_ERROR) > -1) {
+        this.yadamuLogger.handleException(['PIPELINE',mappedTableName,this.dbi.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'STREAM PROCESSING',stream,errorDBI.yadamu.ON_ERROR],cause)
+        if (abortCurrentTable.indexOf(writerDBI.yadamu.ON_ERROR) > -1) {
           tableOutputStream.abortWriter();
 		}
-        await tableOutputStream.forcedEnd();
+        await tableOutputStream.forcedEnd(cause);
       }
       pipeStatistics.pipeEndTime = performance.now();
       pipeStatistics.rowsRead = transformer.getCounter()
@@ -199,7 +198,7 @@ class DBReader extends Readable {
       this.dbWriter.recordTimings(timings);
    
       if (cause && (this.abortOnError(cause,errorDBI))) {
-        throw cause;
+		throw cause;
       }
     } catch (e) {
       this.yadamuLogger.handleException(['PIPELINE',task.TABLE_NAME,this.dbi.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'STREAM CREATION'],e)
@@ -208,18 +207,18 @@ class DBReader extends Readable {
   }
 
   async pipelineTables(readerDBI,writerDBI) {
-	 
-	
-    if (this.schemaInfo.length > 0) {
+	if (this.schemaInfo.length > 0) {
       this.yadamuLogger.info(['SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`Processing Tables`);
 	  for (const task of this.schemaInfo) {
-	    try {
-          await this.pipelineTable(task,readerDBI,writerDBI)
-	    } catch (cause) {
-	      this.yadamuLogger.handleException(['SEQUENTIAL','PIPELINES',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
-		  // Throwing here raises 'ERR_STREAM_PREMATURE_CLOSE' on the Writer. Cache the cause 
-          this.underlyingError = cause;
-	      throw(cause)
+        if (task.INCLUDE_TABLE === true) {
+	      try {
+            await this.pipelineTable(task,readerDBI,writerDBI)
+	      } catch (cause) {
+	        this.underlyingError = cause;
+	        this.yadamuLogger.handleException(['SEQUENTIAL','PIPELINES',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
+		    // Throwing here raises 'ERR_STREAM_PREMATURE_CLOSE' on the Writer. Cache the cause 
+            throw(cause)
+          }
 	    }
 	  }
     }
@@ -266,10 +265,10 @@ class DBReader extends Readable {
            const systemInformation = await this.getSystemInformation();
 		   // Needed in case we have to generate DDL from the system information and metadata.
            this.dbi.setSystemInformation(systemInformation);
-		   this.dbi.yadamu.rejectionManager.setSystemInformation(systemInformation)
-		   this.dbi.yadamu.warningManager.setSystemInformation(systemInformation)
+		   this.dbi.yadamu.REJECTION_MANAGER.setSystemInformation(systemInformation)
+		   this.dbi.yadamu.WARNING_MANAGER.setSystemInformation(systemInformation)
            this.push({systemInformation : systemInformation});
-           if (this.mode === 'DATA_ONLY') {
+           if (this.dbi.MODE === 'DATA_ONLY') {
              this.nextPhase = 'metadata';
            }
            else { 
@@ -288,13 +287,13 @@ class DBReader extends Readable {
              })
            } 
            this.push({ddl: ddl});
-		   this.nextPhase = this.mode === 'DDL_ONLY' ? 'exportComplete' : 'metadata';
+		   this.nextPhase = this.dbi.MODE === 'DDL_ONLY' ? 'exportComplete' : 'metadata';
            break;
          case 'metadata' :
            const metadata = await this.getMetadata();
            this.push({metadata: this.dbi.transformMetadata(metadata,this.dbi.inverseTableMappings)});
-		   this.dbi.yadamu.rejectionManager.setMetadata(metadata)
-		   this.dbi.yadamu.warningManager.setMetadata(metadata)
+		   this.dbi.yadamu.REJECTION_MANAGER.setMetadata(metadata)
+		   this.dbi.yadamu.WARNING_MANAGER.setMetadata(metadata)
 		   this.nextPhase = 'pause';
 		   break;
 		 case 'pause':
@@ -304,33 +303,24 @@ class DBReader extends Readable {
 		 case 'copyData':
 		   await this.ddlComplete
 		   await this.pipelineTables(this.dbi,this.dbWriter.dbi);
-    	   // this.yadamuLogger.trace([this.constructor.name,,this.dbi.DATABASE_VENDOR,`_READ(${this.nextPhase})`,this.dbi.parameters.ON_ERROR],'Exeucting Deferred Callback')
+    	   // this.yadamuLogger.trace([this.constructor.name,,this.dbi.DATABASE_VENDOR,`_READ(${this.nextPhase})`,this.dbi.yadamu.ON_ERROR],'Exeucting Deferred Callback')
 		   this.dbWriter.deferredCallback();
 		   // No 'break' - fall through to 'exportComplete'.
 		 case 'exportComplete':
- 		   this.push(null);
+		   this.push(null);
 		   break;
 	    default:
       }
     } catch (e) {
-      this.yadamuLogger.handleException([`READER`,this.dbi.DATABASE_VENDOR,`_READ(${this.nextPhase})`,this.dbi.parameters.ON_ERROR],e);
+	  this.yadamuLogger.handleException([`READER`,this.dbi.DATABASE_VENDOR,`_READ(${this.nextPhase})`,this.dbi.yadamu.ON_ERROR],e);
 	  this.underlyingError = e;
 	  await this.dbi.releasePrimaryConnection();
       this.destroy(e)
     }
   }  
-
-  causedByLostConnection(cause) {
-    return 
-  }
-  	   
    
-  async exportComplete(cause) {
-  	// Finalize the export and release the primary connection.
-	// this.yadamuLogger.trace([this.constructor.name,this.dbi.isDatabase()],'completeExport()')
-  }
-  
   async _destroy(cause,callback) {
+    // this.yadamuLogger.trace([this.constructor.name,this.dbi.isDatabase()],'_destroy()')
     try {
       await this.dbi.finalizeExport();
 	  await this.dbi.releasePrimaryConnection();
@@ -340,7 +330,7 @@ class DBReader extends Readable {
         callback(cause)
 	  }
 	  else {
-        this.yadamuLogger.handleException([`READER`,this.dbi.DATABASE_VENDOR,`_DESTROY()`,this.dbi.parameters.ON_ERROR],e);		
+        this.yadamuLogger.handleException([`READER`,this.dbi.DATABASE_VENDOR,`_DESTROY()`,this.dbi.yadamu.ON_ERROR],e);		
         callback(e)
       }
     }

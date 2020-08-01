@@ -13,16 +13,116 @@ const FileDBI = require('../file/node/fileDBI.js');
 
 class YadamuLogger {
   
-  constructor(outputStream,state) {
+  /*
+  **
+  **  Create from a path. 
+  **
+  **  If path is undefined, null or || or not valid use process.out
+  ** 
+  **  Exception Folder can be absolute or relative. If not supplied use default. If relative assume relative to supplied path. 
+  **  
+  **
+  */
+
+  static get LOGGER_DEFAULTS() {
+    this._LOGGER_DEFAULTS = this._LOGGER_DEFAULTS || Object.freeze({
+      "EXCEPTION_FOLDER"          : 'exception'
+    , "EXCEPTION_FILE_PREFIX"     : 'exception'
+    })
+    return this._LOGGER_DEFAULTS;
+  }
+  
+  static  get EXCEPTION_FOLDER() { return this.LOGGER_DEFAULTS.EXCEPTION_FOLDER }
+  static  get EXCEPTION_FILE_PREFIX() { return this.LOGGER_DEFAULTS.EXCEPTION_FILE_PREFIX }
+  
+  /*
+  **
+  ** _EXCEPTION_FOLDER_PATH contains the path passed to createYadamuLogger or the default value for the location of the exception folder.
+  **
+  ** _EXCEPTION_FOLDER contains a validated path to an existing folder.
+  **
+  */
+
+  set EXCEPTION_FOLDER_PATH(value) {
+    /*
+    **
+    ** Calculate the absolure path to the folder used when logging an exception.
+    **
+    ** If the supplied value is null or undefined start with the system defined default
+    ** 
+    ** If the value if not absolute convert it to an absolute path. 
+    ** If logging to a file treat the location as relative to the location of the log file
+    ** If logging to stdout treat the location relative as relative to the current working directory.
+    **
+    **
+    */
+    let exceptionFolderPath = value
+    let exceptionFolderRoot = this.IS_CONSOLE_LOGGER ? process.cwd() : path.dirname(this.os.path);
+    
+    exceptionFolderPath = ((exceptionFolderPath === null) || (exceptionFolderPath === undefined)) ? YadamuLogger.EXCEPTION_FOLDER : exceptionFolderPath
+    exceptionFolderPath = YadamuLibrary.pathSubstitutions(exceptionFolderPath)
+    exceptionFolderPath = exceptionFolderPath === '' ? exceptionFolderRoot : exceptionFolderPath
+    exceptionFolderPath = (!path.isAbsolute(exceptionFolderPath)) ? path.join(exceptionFolderRoot,exceptionFolderPath) : exceptionFolderPath
+    this._EXCEPTION_FOLDER_PATH = exceptionFolderPath;
+  }
+  
+  get EXCEPTION_FOLDER() {
+    this._EXCEPTION_FOLDER = this._EXCEPTION_FOLDER || (() => {
+      // If EXCEPTION_FOLDER_PATH has not been explictly set, invoke the setter method passing the empty string. 
+      // This will set it to the directory containing the current log file or the current working directory when logging to the console;
+      this._EXCEPTION_FOLDER_PATH = this._EXCEPTION_FOLDER_PATH || (() => { this.EXCEPTION_FOLDER_PATH = ''; return this.EXCEPTION_FOLDER})()
+      fs.mkdirSync(this._EXCEPTION_FOLDER_PATH,{recursive: true});
+      return this._EXCEPTION_FOLDER_PATH
+    })();
+    return this._EXCEPTION_FOLDER
+  }
+
+  set EXCEPTION_FILE_PREFIX(value) {
+    let exceptionFilePrefix = value
+    exceptionFilePrefix = ((exceptionFilePrefix === null) || (exceptionFilePrefix === undefined)) ? YadamuLogger.EXCEPTION_FILE_PREFIX : exceptionFilePrefix
+    exceptionFilePrefix = YadamuLibrary.pathSubstitutions(exceptionFilePrefix)
+    this._EXCEPTION_FILE_PREFIX = exceptionFilePrefix
+  }
+  
+  get EXCEPTION_FILE_PREFIX() { return this._EXCEPTION_FILE_PREFIX || YadamuLibrary.pathSubstitutions(YadamuLogger.EXCEPTION_FILE_PREFIX) }
+  
+  get LOG_STACK_TRACE_TO_CONSOLE() {
+     return process.env.YADAMU_PRINT_STACK && process.env.YADAMU_PRINT_STACK.toUpperCase() === 'TRUE' 
+  }
+ 
+  get IS_CONSOLE_LOGGER() {
+    return this.os === process.stdout;
+  }
+
+  static fileLogger(logFilePath,state,exceptionFolder,exceptionFilePrefix) {
+    const os = ((logFilePath === undefined) || (logFilePath === '') || (logFilePath === null)) ? process.stdout : (() => {
+    try {
+      const absolutePath = path.resolve(logFilePath);
+      return fs.createWriteStream(this.parameters.LOG_FILE,{flags : "a"})
+    } catch (e) {
+      return process.out;
+    }
+    })();   
+    return new YadamuLogger(os,state,exceptionFolder,exceptionFilePrefix)
+  }
+    
+  static nulLogger() {
+    // TODO : Create a subclass that actually does not write stuff to NUL
+    const nul = fs.createWriteStream("\\\\.\\NUL",{flags : "a"})
+    return new YadamuLogger(nul,{})
+  }
+  
+  static consoleLogger(state,exceptionFolder,exceptionFilePrefix) {
+    return new YadamuLogger(process.stdout,state,exceptionFolder,exceptionFilePrefix)
+  }
+  
+  constructor(outputStream,state,exceptionFolder,exceptionFilePrefix) {
    
-    this.resetCounters();
-	
     this.os = outputStream;
     this.state = state;
-    this.exceptionFolderPath = this.state.exceptionFolder === undefined ? 'exception' : YadamuLibrary.pathSubstitutions(this.state.exceptionFolder) 
-    this.exceptionFilePrefix = this.state.exceptionFilePrefix === undefined ? 'exception' : YadamuLibrary.pathSubstitutions(this.state.EXCEPTION_FILE_PREFIX);
-    this.exceptionFolderLocation = undefined
-	this.inlineStackTrace = process.env.YADAMU_INLINE_STACK && process.env.YADAMU_INLINE_STACK.toUpperCase() === 'TRUE'
+	this.EXCEPTION_FOLDER_PATH = exceptionFolder
+    this.EXCEPTION_FILE_PREFIX = exceptionFilePrefix
+    this.resetCounters();
   }
 
   switchOutputStream(os) {
@@ -139,12 +239,17 @@ class YadamuLogger {
   }
 
   createLogFile(filename) {
-    if (this.exceptionFolderLocation == undefined) {
-      this.exceptionFolderLocation = path.dirname(filename);
-      fs.mkdirSync(this.exceptionFolderLocation, { recursive: true });
-    }
     const ws = fs.openSync(filename,'w');
     return ws;
+  }
+  
+  writeLogToFile(args,log) {
+	const ts = new Date().toISOString()
+    const logFile = path.resolve(`${this.EXCEPTION_FOLDER_PATH}${path.sep}${this.LOG_FILE_PREFIX}_${ts.replace(/:/g,'.')}.json`);
+	const errorLog = this.createLogFile(logFile)
+    fs.writeSync(errorLog,JSON.stringify(log));
+	fs.closeSync(errorLog)	
+    this.info(args,`Server Log written to "${logFile}".`)
   }
   
   writeExceptionToFile(exceptionFile,ts,args,e) {
@@ -159,7 +264,7 @@ class YadamuLogger {
 	  const dbi = new FileDBI(currentSettings.yadamu,dataFilePath)
 	  await dbi.initialize()
 	  // const logger = this
-      const logger = new YadamuLogger(fs.createWriteStream("\\\\.\\NUL"),{});  
+      const logger = YadamuLogger.nulLogger();
 	  const dbWriter = new DBWriter(dbi,logger);  
 	  const ddlComplete = new Promise((resolve,reject) => {
 	    dbWriter.once('ddlComplete',() => {
@@ -172,6 +277,8 @@ class YadamuLogger {
 	  dbWriter.write({pause:true})
 	  await ddlComplete
 	  const tableWriter = dbi.getOutputStream(tableName)
+	  // Disable the columnCountCheck when writing an error report
+	  tableWriter.checkColumnCount = () => {}
 	  tableWriter.initialize();
 	  for (const d of data) {
         tableWriter.write({data:d})
@@ -188,6 +295,7 @@ class YadamuLogger {
         })
       })		
 	  await dbi.finalize()
+      await logger.close();
 	} catch (e) {
 	  console.log(e)
 	}
@@ -196,14 +304,14 @@ class YadamuLogger {
   generateDataFile(exceptionFile,e) {
     if (e instanceof IterativeInsertError) {
 	  // Write the row information a seperate file and replace the row tag with a reference to the file
-	  e.dataFilePath = `${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`
+	  e.dataFilePath = path.resolve(`${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`);
 	  this.writeDataFile(e.dataFilePath,e.tableName,e.currentSettings,[e.row])
 	  delete e.currentSettings
 	  delete e.row
 	}
 	if (e instanceof BatchInsertError) {
 	  // Write the row information a seperate file and replace the row tag with a reference to the file
-	  e.dataFilePath = `${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`
+	  e.dataFilePath = path.resolve(`${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`);
 	  this.writeDataFile(e.dataFilePath,e.tableName,e.currentSettings,e.rows)
 	  delete e.currentSettings
 	  delete e.rows
@@ -211,17 +319,16 @@ class YadamuLogger {
   }
 
   handleException(args,e) {
-	 
     // Handle Exception does not produce any output if the exception has already been processed by handleException ot logException
 
 	if (e.yadamuAlreadyReported !== true) {
-	  if (this.inlineStackTrace === true) {
+	  if (this.LOG_STACK_TRACE_TO_CONSOLE === true) {
 		this.logException(args,e)
 	  }
 	  else {
 		const largs = [...args]
 		const ts = this.error(args,e.message);
-        const exceptionFile = path.resolve(`${this.exceptionFolderPath}${path.sep}${this.exceptionFilePrefix}_${ts.replace(/:/g,'.')}.trace`);
+        const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
 		this.generateDataFile(exceptionFile,e);
 		this.writeExceptionToFile(exceptionFile,ts,args,e)
 	    this.info(largs,`Exception logged to "${exceptionFile}".`)
@@ -235,13 +342,13 @@ class YadamuLogger {
     // Handle Exception does not produce any output if the exception has already been processed by handleException ot logException
 
 	if (e.yadamuAlreadyReported !== true) {
-	  if (this.inlineStackTrace === true) {
+	  if (this.LOG_STACK_TRACE_TO_CONSOLE === true) {
 		this.logException(args,e)
 	  }
 	  else {
 		const largs = [...args]
 		const ts = this.warning(args,e.message);
-        const exceptionFile = path.resolve(`${this.exceptionFolderPath}${path.sep}${this.exceptionFilePrefix}_${ts.replace(/:/g,'.')}.trace`);
+        const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
 		this.generateDataFile(exceptionFile,e);
 		this.writeExceptionToFile(exceptionFile,ts,args,e)
 	    this.info(largs,`Exception logged to "${exceptionFile}".`)
@@ -256,8 +363,8 @@ class YadamuLogger {
     /*
 	const largs = [...args]
 	const ts = this.warning(args,e.message);
-    const exceptionFile = path.resolve(`${this.exceptionFolderPath}${path.sep}${this.exceptionFilePrefix}_${ts.replace(/:/g,'.')}.trace`);
-	this.writeExceptionToFile(exceptionFile,ts,args,e)
+    const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
+    this.writeExceptionToFile(exceptionFile,ts,args,e)
 	this.warning(largs,`Details logged to "${exceptionFile}".`)
 	*/
   }
@@ -265,10 +372,6 @@ class YadamuLogger {
   trace(args,msg) {
     args.unshift('TRACE')
     this.log(args,msg)
-  }
-  
-  loggingToConsole() {
-    return this.os === process.stdout;
   }
   
   resetCounters() {
@@ -298,9 +401,8 @@ class YadamuLogger {
   
   async close() {
 
-    if (this.os !== process.stdout) {
-      const closer = this.closeStream()
-      await closer;
+    if (!this.IS_CONSOLE_LOGGER) {
+      await this.closeStream()
       this.os = process.stdout
     }    
   }

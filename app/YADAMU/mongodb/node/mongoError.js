@@ -3,9 +3,9 @@
 const {DatabaseError} = require('../../common/yadamuError.js')
 
 class MongoError extends DatabaseError {
-  //  const err = new MongodbError(cause,sql)
+  //  const err = new MongodbError(cause,stack,operation)
   constructor(cause,stack,operation) {
-    super(cause,null,sql)
+    super(cause,stack,operation)
   }
     
   lostConnection() {

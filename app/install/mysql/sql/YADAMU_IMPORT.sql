@@ -76,7 +76,7 @@ BEGIN
             else return 'tinyblob';
           end case;
         when P_DATA_TYPE = 'bit' then
-          return 'boolean';
+          return 'tinyint(1)';
         when P_DATA_TYPE = 'char' then
           case 
             when P_DATA_TYPE_LENGTH = -1 then return 'longtext';
@@ -175,7 +175,7 @@ BEGIN
             else return 'varbinary';
          end case;
        when P_DATA_TYPE = 'boolean' then
-         return 'boolean';
+         return 'tinyint(1)';
        when P_DATA_TYPE = 'timestamp' then
          case
            when P_DATA_TYPE_LENGTH is NULL then
@@ -222,22 +222,26 @@ BEGIN
          return 'longtext';
        when P_DATA_TYPE = 'xml' then
          return 'longtext';
+       when P_DATA_TYPE = 'jsonb' then
+         return 'json';
        else
          return lower(P_DATA_TYPE);
      end case;
     when P_SOURCE_VENDOR in ('MySQL','MariaDB') then
       case 
-        -- Metadata does not contain sufficinet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM and SET to TEXT.
-        when P_DATA_TYPE = 'set' then
-          return 'varchar(512)';
+        -- Metadata does not contain sufficinet infromation to rebuild ENUM and SET data types. Enable roundtrip by mappong ENUM 
+        when P_DATA_TYPE = 'boolean' then
+          return 'tinyint(1)';
         when P_DATA_TYPE = 'enum' then
           return 'varchar(512)';
+        when P_DATA_TYPE = 'set' then
+          return 'json';
         else
           return lower(P_DATA_TYPE);
       end case;       
     when P_SOURCE_VENDOR = 'MongoDB' then
-      -- MongoDB typing based on JSON Typing and the Javascript TypeOf Operator
-      -- ### Todo MongoDB typing based on BSON ?
+      -- MongoDB typing based on BSON type model and the aggregation $type operator
+      -- ### No support for depricated Data types undefined, dbPointer, symbol
       case
         when P_DATA_TYPE = 'double' then
            return 'double';
@@ -257,7 +261,7 @@ BEGIN
         when P_DATA_TYPE = 'ObjectId' then
            return 'binary(12)';
         when P_DATA_TYPE = 'bool' then
-           return 'boolean';
+           return 'tinyint(1)';
         when P_DATA_TYPE = 'null' then
            return 'varchar(128)';
         when P_DATA_TYPE = 'regex' then
@@ -281,8 +285,33 @@ BEGIN
         when P_DATA_TYPE = 'maxkey' then 
           return 'JSON';
         else 
-           return lower(P_DATA_TYPE);
+          return lower(P_DATA_TYPE);
       end case;    
+    when P_SOURCE_VENDOR = 'SNOWFLAKE' then
+      case
+        when P_DATA_TYPE = 'number' then
+          return 'numeric';
+       when P_DATA_TYPE = 'geography' then
+         return 'geometry';
+        when P_DATA_TYPE = 'text' then
+          return 'varchar';
+        when P_DATA_TYPE = 'timestamp_ntz' then
+          case 
+            when P_DATA_TYPE_LENGTH > 6 then
+              return 'datetime(6)';
+            else
+              return 'datetime';
+          end case;
+        when P_DATA_TYPE = 'binary' then
+          case
+            when P_DATA_TYPE_LENGTH is null then return 'varbinary(4096)';
+            when P_DATA_TYPE_LENGTH > 16777215  then return 'longblob';
+            when P_DATA_TYPE_LENGTH > 65535  then return 'mediumblob';
+            else return 'varbinary';
+         end case;
+        else 
+          return lower(P_DATA_TYPE);
+       end case;
 	else
       return lower(P_DATA_TYPE);
   end case;
@@ -295,8 +324,9 @@ DELIMITER $$
 --
 DROP PROCEDURE IF EXISTS GENERATE_SQL;
 --
-CREATE PROCEDURE GENERATE_SQL(P_SOURCE_VENDOR VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_TABLE_NAME VARCHAR(128), P_SPATIAL_FORMAT VARCHAR(128), P_COLUMN_LIST TEXT, P_DATA_TYPE_LIST JSON, P_SIZE_CONSTRAINTS JSON, OUT P_TABLE_INFO JSON)
+CREATE PROCEDURE GENERATE_SQL(P_SOURCE_VENDOR VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_TABLE_NAME VARCHAR(128), P_SPATIAL_FORMAT VARCHAR(128), P_COLUMN_NAME_ARRAY JSON, P_DATA_TYPE_ARRAY JSON, P_SIZE_CONSTRAINT_ARRAY JSON, OUT P_TABLE_INFO JSON)
 BEGIN
+  DECLARE V_COLUMN_LIST        TEXT;
   DECLARE V_COLUMNS_CLAUSE     TEXT;
   DECLARE V_INSERT_SELECT_LIST TEXT;
   DECLARE V_COLUMN_PATTERNS    TEXT;
@@ -311,20 +341,23 @@ BEGIN
   
   DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
   BEGIN 
+
+  -- select P_SOURCE_VENDOR, P_TARGET_SCHEMA, P_TABLE_NAME, P_SPATIAL_FORMAT, P_COLUMN_NAME_ARRAY, P_DATA_TYPE_ARRAY, P_SIZE_CONSTRAINT_ARRAY;
+
     GET DIAGNOSTICS CONDITION 1
         V_SQLSTATE = RETURNED_SQLSTATE, 
         V_SQLERRM = MESSAGE_TEXT;
         
         SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',CAST(V_TARGET_DATA_TYPES as JSON),
                                        'error', JSON_OBJECT(
-                                                  'severity','FATAL',
-                                                  'tableName', P_TABLE_NAME,
-                                                  'columns', P_COLUMN_LIST, 
-                                                  'dataTypes', P_DATA_TYPE_LIST,
-                                                  'sizeConstraints',P_SIZE_CONSTRAINTS,
-                                                  'code', V_SQLSTATE, 
-                                                  'msg', V_SQLERRM, 
-                                                  'details', 'GENERATE_SQL' 
+                                                  'severity',         'FATAL',
+                                                  'tableName',        P_TABLE_NAME,
+                                                  'columnNames',      P_COLUMN_NAME_ARRAY, 
+                                                  'dataTypes',        P_DATA_TYPE_ARRAY,
+                                                  'sizeConstraints',  P_SIZE_CONSTRAINT_ARRAY,
+                                                  'code',             V_SQLSTATE, 
+                                                  'msg',              V_SQLERRM, 
+                                                  'details',          'GENERATE_SQL' 
                                                 )
                                       );
 
@@ -337,22 +370,22 @@ BEGIN
             ,c.VALUE "COLUMN_NAME"
             ,t.VALUE "DATA_TYPE"
             ,case
-               when s.VALUE in ('','null')
-                 then NULL
-               when INSTR(s.VALUE,',') > 0
-                 then SUBSTR(s.VALUE,1,INSTR(s.VALUE,',')-1)
+               when s.VALUE in ('','null') then
+                 NULL
+               when INSTR(s.VALUE,',') > 0 then
+                 SUBSTR(s.VALUE,1,INSTR(s.VALUE,',')-1)
                else
                  s.VALUE
              end "DATA_TYPE_LENGTH"
             ,case
-               when INSTR(s.VALUE,',') > 0
-                 then SUBSTR(s.VALUE, INSTR(s.VALUE,',')+1)
+               when INSTR(s.VALUE,',') > 0 then
+                 SUBSTR(s.VALUE, INSTR(s.VALUE,',')+1)
                else
                  NULL
              end "DATA_TYPE_SCALE"
-           from JSON_TABLE(CONCAT('[',P_COLUMN_LIST,']'),'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(128) PATH '$')) c
-               ,JSON_TABLE(P_DATA_TYPE_LIST,'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(128) PATH '$')) t
-               ,JSON_TABLE(P_SIZE_CONSTRAINTS,'$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(32) PATH '$')) s
+           from JSON_TABLE(P_COLUMN_NAME_ARRAY,     '$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(128) PATH '$')) c
+               ,JSON_TABLE(P_DATA_TYPE_ARRAY,       '$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(128) PATH '$')) t
+               ,JSON_TABLE(P_SIZE_CONSTRAINT_ARRAY, '$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(32) PATH '$')) s
           where (c."KEY" = t."KEY") and (c."KEY" = s."KEY")
     ),
     "TARGET_TABLE_DEFINITIONS" 
@@ -362,67 +395,62 @@ BEGIN
             ,CAST(MAP_FOREIGN_DATATYPE(P_SOURCE_VENDOR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE") as CHAR) TARGET_DATA_TYPE
         from "SOURCE_TABLE_DEFINITIONS" st
     )
-    select group_concat(concat('"',COLUMN_NAME,'" ',TARGET_DATA_TYPE,
+    select group_concat(concat('"',COLUMN_NAME,'"') order by "IDX" separator ',') "COLUMN_LIST"
+          ,group_concat(concat('"',COLUMN_NAME,'" ',
                                case
-                                 when TARGET_DATA_TYPE like '%(%)'
-                                   then ''
-                                 when TARGET_DATA_TYPE like '%unsigned' 
-                                   then ''
-                                 when TARGET_DATA_TYPE in ('date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum') 
-                                   then ''
-                                 when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection')
-                                   then '' 
-                                 when TARGET_DATA_TYPE in ('nchar','nvarchar')
+                                 when TARGET_DATA_TYPE = 'boolean' then
+                                   'tinyint(1)'
+                                 when TARGET_DATA_TYPE like '%(%)' then
+                                   TARGET_DATA_TYPE
+                                 when TARGET_DATA_TYPE like '%unsigned'  then
+                                   TARGET_DATA_TYPE
+                                 when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint','date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum')  then
+                                   TARGET_DATA_TYPE
+                                 when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection') then
+                                   TARGET_DATA_TYPE
+                                 when TARGET_DATA_TYPE in ('nchar','nvarchar')  then
                                    -- then concat('(',DATA_TYPE_LENGTH,')',' CHARACTER SET UTF8MB4 ')
-                                   then concat('(',CAST(DATA_TYPE_LENGTH as CHAR),')')
-                                 when DATA_TYPE_SCALE is not NULL
-                                   then case 
-                                          when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
-                                            then concat('(',CAST(DATA_TYPE_LENGTH as CHAR),')')
-                                          else
-                                            concat('(',CAST(DATA_TYPE_LENGTH as CHAR),',',CAST(DATA_TYPE_SCALE as CHAR),')')
-                                        end
-                                 when DATA_TYPE_LENGTH is not NULL and DATA_TYPE_LENGTH != 'null'
-                                   then case 
-                                          when TARGET_DATA_TYPE in ('double')
-                                            -- Do not add length restriction when scale is not specified
-                                            then ''                                            
-                                          else
-                                            concat('(',CAST(DATA_TYPE_LENGTH as CHAR),')')
-                                        end
+                                   concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),')')
+                                 when DATA_TYPE_SCALE is not NULL then
+                                   concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),',',CAST(DATA_TYPE_SCALE as CHAR),')')
+                                 when DATA_TYPE_LENGTH is not NULL and DATA_TYPE_LENGTH != 'null' then
+                                   case 
+                                     when TARGET_DATA_TYPE in ('double') then
+                                       -- Do not add length restriction when scale is not specified
+                                       TARGET_DATA_TYPE
+                                     else
+                                       concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),')')
+                                   end
                                  else
-                                   ''
+                                   TARGET_DATA_TYPE
                                end
                               )
                      order by "IDX" separator '  ,'
                     ) COLUMNS_CLAUSE
         ,concat('[',group_concat(JSON_QUOTE(
                                case
-                                 when TARGET_DATA_TYPE like '%(%)'
-                                   then TARGET_DATA_TYPE
-                                 when TARGET_DATA_TYPE like '%unsigned' 
-                                   then TARGET_DATA_TYPE
-                                 when TARGET_DATA_TYPE in ('date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum') 
-                                   then TARGET_DATA_TYPE
-                                 when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection')
-                                   then TARGET_DATA_TYPE
-                                 when TARGET_DATA_TYPE in ('nchar','nvarchar')
-                                   then concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),')',' CHARACTER SET UTF8MB4 ')
-                                 when DATA_TYPE_SCALE is not NULL 
-                                   then case 
-                                          when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
-                                            then concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),')')
-                                          else
-                                            concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),',',CAST(DATA_TYPE_SCALE AS CHAR),')')
-                                        end
-                                 when DATA_TYPE_LENGTH is not NULL and DATA_TYPE_LENGTH <> 0
-                                   then case 
-                                          when TARGET_DATA_TYPE in ('double')
-                                            -- Do not add length restriction when scale is not specified
-                                            then TARGET_DATA_TYPE                                        
-                                          else
-                                            concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),')')
-                                        end
+                                 when TARGET_DATA_TYPE = 'boolean' then
+                                   'tinyint(1)'
+                                 when TARGET_DATA_TYPE like '%(%)' then
+                                   TARGET_DATA_TYPE
+                                 when TARGET_DATA_TYPE like '%unsigned'  then
+                                   TARGET_DATA_TYPE
+                                 when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint''date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum')  then
+                                   TARGET_DATA_TYPE
+                                 when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection') then
+                                   TARGET_DATA_TYPE
+                                 when TARGET_DATA_TYPE in ('nchar','nvarchar') then
+                                   concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),')',' CHARACTER SET UTF8MB4 ')
+                                 when DATA_TYPE_SCALE is not NULL  then
+                                   concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),',',CAST(DATA_TYPE_SCALE AS CHAR),')')
+                                 when DATA_TYPE_LENGTH is not NULL and DATA_TYPE_LENGTH <> 0 then
+                                   case 
+                                     when TARGET_DATA_TYPE in ('double') then
+                                       -- Do not add length restriction when scale is not specified
+                                       TARGET_DATA_TYPE                                        
+                                     else
+                                       concat(TARGET_DATA_TYPE,'(',CAST(DATA_TYPE_LENGTH as CHAR),')')
+                                    end
                                  else
                                    TARGET_DATA_TYPE
                                end
@@ -482,43 +510,42 @@ BEGIN
                     ) INSERT_SELECT_LIST
           ,group_concat(concat('"',COLUMN_NAME,'" ',
                                case
-                                 when TARGET_DATA_TYPE like '%(%)'
-                                   then TARGET_DATA_TYPE
-                                 when TARGET_DATA_TYPE like '%unsigned' 
-                                   then TARGET_DATA_TYPE
-                                 when TARGET_DATA_TYPE like '%blob' 
-                                   then 'longtext'
-                                 when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','geometrycollection','multipoint','multilinestring','multipolygon')
-                                   then 'varchar(4096)'
-                                 when TARGET_DATA_TYPE in ('date','time','tinytext','mediumtext','text','longtext','json','set','enum') 
-                                   then TARGET_DATA_TYPE
-                                 when DATA_TYPE_SCALE is not NULL
-                                   then case 
-                                          when DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint') 
-                                            then concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')')
-                                          else
-                                            concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
-                                        end
-                                 when DATA_TYPE_LENGTH is not NULL and DATA_TYPE_LENGTH <> 0
-                                   then case 
-                                          when TARGET_DATA_TYPE in ('double')
-                                            -- Do not add length restriction when scale is not specified
-                                            then TARGET_DATA_TYPE
-                                          else
-                                            concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')')
-                                        end
+                                 when TARGET_DATA_TYPE = 'boolean' then
+                                   'tinyint(1)'
+                                 when TARGET_DATA_TYPE like '%(%)' then
+                                   TARGET_DATA_TYPE
+                                 when TARGET_DATA_TYPE like '%unsigned'  then
+                                   TARGET_DATA_TYPE
+                                 when TARGET_DATA_TYPE like '%blob'  then
+                                   'longtext'
+                                 when TARGET_DATA_TYPE in ('geometry','point','linestring','polygon','geometrycollection','multipoint','multilinestring','multipolygon') then
+                                   'varchar(4096)'
+                                 when TARGET_DATA_TYPE in ('tinyint','smallint','mediumint','int','bigint','date','time','tinytext','mediumtext','text','longtext','json','set','enum') then
+                                   TARGET_DATA_TYPE
+                                 when DATA_TYPE_SCALE is not NULL then
+                                   concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,',',DATA_TYPE_SCALE,')')
+                                 when DATA_TYPE_LENGTH is not NULL and DATA_TYPE_LENGTH <> 0 then
+                                   case 
+                                     when TARGET_DATA_TYPE in ('double') then
+                                       -- Do not add length restriction unless scale is specified
+                                       TARGET_DATA_TYPE
+                                     else
+                                       concat(TARGET_DATA_TYPE,'(',DATA_TYPE_LENGTH,')')
+                                   end
                                  else
                                    TARGET_DATA_TYPE
                                end,
                                ' PATH ''$[',IDX-1,']'' NULL ON ERROR',CHAR(32)
                               )
                      order by "IDX" separator '    ,'
-                    ) COLUMN_PATTERNS
-      into V_COLUMNS_CLAUSE, V_TARGET_DATA_TYPES, V_INSERT_SELECT_LIST, V_COLUMN_PATTERNS
+                    ) COLUMN_PATTERNS 
+      into V_COLUMN_LIST, V_COLUMNS_CLAUSE, V_TARGET_DATA_TYPES, V_INSERT_SELECT_LIST, V_COLUMN_PATTERNS
       from "TARGET_TABLE_DEFINITIONS";
 
+  -- select  V_COLUMN_LIST, V_COLUMNS_CLAUSE, V_TARGET_DATA_TYPES, V_INSERT_SELECT_LIST, V_COLUMN_PATTERNS;
+
   SET V_DDL_STATEMENT = concat('create table if not exists "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',V_COLUMNS_CLAUSE,')'); 
-  SET V_DML_STATEMENT = concat('insert into "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',P_COLUMN_LIST,')',CHAR(32),'select ',V_INSERT_SELECT_LIST,CHAR(32),'  from "YADAMU_STAGING" js,JSON_TABLE(js."DATA",''$.data."',P_TABLE_NAME,'"[*]'' COLUMNS (',CHAR(32),V_COLUMN_PATTERNS,')) data');     
+  SET V_DML_STATEMENT = concat('insert into "',P_TARGET_SCHEMA,'"."',P_TABLE_NAME,'"(',V_COLUMN_LIST,')',CHAR(32),'select ',V_INSERT_SELECT_LIST,CHAR(32),'  from "YADAMU_STAGING" js,JSON_TABLE(js."DATA",''$.data."',P_TABLE_NAME,'"[*]'' COLUMNS (',CHAR(32),V_COLUMN_PATTERNS,')) data');     
   SET P_TABLE_INFO = JSON_OBJECT('ddl',V_DDL_STATEMENT,'dml',V_DML_STATEMENT,'targetDataTypes',CAST(V_TARGET_DATA_TYPES as JSON));
     
 END;
@@ -532,28 +559,28 @@ DELIMITER $$
 --
 CREATE PROCEDURE IMPORT_JSON(P_TARGET_SCHEMA VARCHAR(128), OUT P_RESULTS JSON) 
 BEGIN
-  DECLARE NO_MORE_ROWS        INT DEFAULT FALSE;
+  DECLARE NO_MORE_ROWS             INT DEFAULT FALSE;
   
-  DECLARE V_VENDOR           VARCHAR(32);
-  DECLARE V_TABLE_NAME       VARCHAR(128);
-  DECLARE V_SPATIAL_FORMAT   VARCHAR(128);
-  DECLARE V_COLUMN_LIST      TEXT;
-  DECLARE V_DATA_TYPE_LIST   JSON;
-  DECLARE V_SIZE_CONSTRAINTS JSON;
-  DECLARE V_TABLE_INFO       JSON;
+  DECLARE V_VENDOR                 VARCHAR(32);
+  DECLARE V_TABLE_NAME             VARCHAR(128);
+  DECLARE V_SPATIAL_FORMAT         VARCHAR(128);
+  DECLARE V_COLUMN_NAME_ARRAY      JSON;
+  DECLARE V_DATA_TYPE_ARRAY        JSON;
+  DECLARE V_SIZE_CONSTRAINT_ARRAY  JSON;
+  DECLARE V_TABLE_INFO             JSON;
   
-  DECLARE V_STATEMENT         TEXT;
-  DECLARE V_START_TIME        BIGINT;
-  DECLARE V_END_TIME          BIGINT;
-  DECLARE V_ELAPSED_TIME      BIGINT;
-  DECLARE V_ROW_COUNT         BIGINT;
+  DECLARE V_STATEMENT              TEXT;
+  DECLARE V_START_TIME             BIGINT;
+  DECLARE V_END_TIME               BIGINT;
+  DECLARE V_ELAPSED_TIME           BIGINT;
+  DECLARE V_ROW_COUNT              BIGINT;
   
-  DECLARE V_SQLSTATE          INT;
-  DECLARE V_SQLERRM           TEXT;
+  DECLARE V_SQLSTATE               INT;
+  DECLARE V_SQLERRM                TEXT;
   
   DECLARE TABLE_METADATA 
   CURSOR FOR 
-  select VENDOR, TABLE_NAME, SPATIAL_FORMAT, COLUMN_LIST, DATA_TYPE_LIST, SIZE_CONSTRAINTS
+  select VENDOR, TABLE_NAME, SPATIAL_FORMAT, COLUMN_NAME_ARRAY, DATA_TYPE_ARRAY, SIZE_CONSTRAINT_ARRAY
     from YADAMU_STAGING js,
          JSON_TABLE(
            js.DATA,
@@ -563,13 +590,11 @@ BEGIN
              SPATIAL_FORMAT                  VARCHAR(128) PATH '$.systemInformation.spatialFormat',
              NESTED PATH '$.metadata.*' 
                COLUMNS (
-                OWNER                        VARCHAR(128) PATH '$.owner'
+                OWNER                        VARCHAR(128) PATH '$.tableSchema'
                ,TABLE_NAME                   VARCHAR(128) PATH '$.tableName'
-               ,COLUMN_LIST                          TEXT PATH '$.columns'
-               ,DATA_TYPE_LIST                       JSON PATH '$.dataTypes'
-               ,SIZE_CONSTRAINTS                     JSON PATH '$.sizeConstraints'
-               ,INSERT_SELECT_LIST                   TEXT PATH '$.insertSelectList'
-               ,COLUMN_PATTERNS                      TEXT PATH '$.columnPatterns'
+               ,COLUMN_NAME_ARRAY                    JSON PATH '$.columnNames'
+               ,DATA_TYPE_ARRAY                      JSON PATH '$.dataTypes'
+               ,SIZE_CONSTRAINT_ARRAY                JSON PATH '$.sizeConstraints'
              )
           )) c;
 
@@ -590,7 +615,7 @@ BEGIN
   OPEN TABLE_METADATA;
     
   PROCESS_TABLE : LOOP
-    FETCH TABLE_METADATA INTO V_VENDOR, V_TABLE_NAME, V_SPATIAL_FORMAT, V_COLUMN_LIST, V_DATA_TYPE_LIST, V_SIZE_CONSTRAINTS;
+    FETCH TABLE_METADATA INTO V_VENDOR, V_TABLE_NAME, V_SPATIAL_FORMAT, V_COLUMN_NAME_ARRAY, V_DATA_TYPE_ARRAY, V_SIZE_CONSTRAINT_ARRAY;
     IF NO_MORE_ROWS THEN
       LEAVE PROCESS_TABLE;
     END IF;
@@ -599,7 +624,7 @@ BEGIN
       LEAVE PROCESS_TABLE;
     END IF; 
     
-    CALL GENERATE_SQL(V_VENDOR, P_TARGET_SCHEMA, V_TABLE_NAME, V_SPATIAL_FORMAT, V_COLUMN_LIST, V_DATA_TYPE_LIST, V_SIZE_CONSTRAINTS, V_TABLE_INFO);
+    CALL GENERATE_SQL(V_VENDOR, P_TARGET_SCHEMA, V_TABLE_NAME, V_SPATIAL_FORMAT, V_COLUMN_NAME_ARRAY, V_DATA_TYPE_ARRAY, V_SIZE_CONSTRAINT_ARRAY, V_TABLE_INFO);
       
     SET V_STATEMENT = JSON_UNQUOTE(JSON_EXTRACT(V_TABLE_INFO,'$.ddl'));
     SET @STATEMENT = V_STATEMENT;
@@ -635,33 +660,31 @@ DELIMITER $$
 --
 CREATE PROCEDURE GENERATE_STATEMENTS(P_METADATA JSON, P_TARGET_SCHEMA VARCHAR(128), P_SPATIAL_FORMAT VARCHAR(128), OUT P_RESULTS JSON)
 BEGIN
-  DECLARE NO_MORE_ROWS       INT DEFAULT FALSE;
+  DECLARE NO_MORE_ROWS             INT DEFAULT FALSE;
   
-  DECLARE V_VENDOR           VARCHAR(32);
-  DECLARE V_TABLE_NAME       VARCHAR(128);
-  DECLARE V_COLUMN_LIST      TEXT;
-  DECLARE V_DATA_TYPE_LIST   JSON;
-  DECLARE V_SIZE_CONSTRAINTS JSON;
-  DECLARE V_TABLE_INFO       JSON;
+  DECLARE V_VENDOR                 VARCHAR(32);
+  DECLARE V_TABLE_NAME             VARCHAR(128);
+  DECLARE V_COLUMN_NAME_ARRAY      JSON;
+  DECLARE V_DATA_TYPE_ARRAY        JSON;
+  DECLARE V_SIZE_CONSTRAINT_ARRAY  JSON;
+  DECLARE V_TABLE_INFO             JSON;
   
-  DECLARE V_SQLSTATE         INT;
-  DECLARE V_SQLERRM          TEXT;
+  DECLARE V_SQLSTATE               INT;
+  DECLARE V_SQLERRM                TEXT;
   
   DECLARE TABLE_METADATA 
   CURSOR FOR 
-  select VENDOR, TABLE_NAME, COLUMN_LIST, DATA_TYPE_LIST, SIZE_CONSTRAINTS
+  select VENDOR, TABLE_NAME, COLUMN_NAME_ARRAY, DATA_TYPE_ARRAY, SIZE_CONSTRAINT_ARRAY
     from JSON_TABLE(
            P_METADATA,
            '$.metadata.*' 
            COLUMNS (
-                VENDOR                       VARCHAR(32)  PATH '$.vendor',
-                OWNER                        VARCHAR(128) PATH '$.owner'
+                VENDOR                       VARCHAR(32)  PATH '$.vendor'
+               ,OWNER                        VARCHAR(128) PATH '$.tableSchema'
                ,TABLE_NAME                   VARCHAR(128) PATH '$.tableName'
-               ,COLUMN_LIST                          TEXT PATH '$.columns'
-               ,DATA_TYPE_LIST                       JSON PATH '$.dataTypes'
-               ,SIZE_CONSTRAINTS                     JSON PATH '$.sizeConstraints'
-               ,INSERT_SELECT_LIST                   TEXT PATH '$.insertSelectList'
-               ,COLUMN_PATTERNS                      TEXT PATH '$.columnPatterns'
+               ,COLUMN_NAME_ARRAY                    JSON PATH '$.columnNames'
+               ,DATA_TYPE_ARRAY                      JSON PATH '$.dataTypes'
+               ,SIZE_CONSTRAINT_ARRAY                JSON PATH '$.sizeConstraints'
              )
           ) c;
 
@@ -675,14 +698,14 @@ BEGIN
                           '$',
                           JSON_OBJECT('error',
                             JSON_OBJECT(
-                              'severity','FATAL',
-                              'tableName', V_TABLE_NAME,
-                              'columns', V_COLUMN_LIST, 
-                              'dataTypes', V_DATA_TYPE_LIST,
-                              'sizeConstraints',V_SIZE_CONSTRAINTS,
-                              'code', V_SQLSTATE, 
-                              'msg', V_SQLERRM, 
-                              'details', 'GENERATE_STATEMENTS' 
+                              'severity',        'FATAL',
+                              'tableName',       V_TABLE_NAME,
+                              'columnName',      V_COLUMN_NAME_ARRAY, 
+                              'dataTypes',       V_DATA_TYPE_ARRAY,
+                              'sizeConstraints', V_SIZE_CONSTRAINT_ARRAY,
+                              'code',            V_SQLSTATE, 
+                              'msg',             V_SQLERRM, 
+                              'details',         'GENERATE_STATEMENTS' 
                             )
                           )
                         );
@@ -697,12 +720,12 @@ BEGIN
   OPEN TABLE_METADATA;
     
   PROCESS_TABLE : LOOP
-    FETCH TABLE_METADATA INTO V_VENDOR, V_TABLE_NAME, V_COLUMN_LIST, V_DATA_TYPE_LIST, V_SIZE_CONSTRAINTS;
+    FETCH TABLE_METADATA INTO V_VENDOR, V_TABLE_NAME, V_COLUMN_NAME_ARRAY, V_DATA_TYPE_ARRAY, V_SIZE_CONSTRAINT_ARRAY;
     IF NO_MORE_ROWS THEN
       LEAVE PROCESS_TABLE;
     END IF;
     
-    CALL GENERATE_SQL(V_VENDOR, P_TARGET_SCHEMA, V_TABLE_NAME, P_SPATIAL_FORMAT, V_COLUMN_LIST, V_DATA_TYPE_LIST, V_SIZE_CONSTRAINTS, V_TABLE_INFO);
+    CALL GENERATE_SQL(V_VENDOR, P_TARGET_SCHEMA, V_TABLE_NAME, P_SPATIAL_FORMAT, V_COLUMN_NAME_ARRAY, V_DATA_TYPE_ARRAY, V_SIZE_CONSTRAINT_ARRAY, V_TABLE_INFO);
     SET P_RESULTS = JSON_INSERT(P_RESULTS,concat('$."',V_TABLE_NAME,'"'),V_TABLE_INFO);
      
   END LOOP;

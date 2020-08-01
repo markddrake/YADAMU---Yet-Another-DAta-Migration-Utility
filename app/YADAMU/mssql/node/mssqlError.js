@@ -12,7 +12,7 @@ class MsSQLError extends DatabaseError {
     const knownErrors = ['ETIMEOUT','ESOCKET','EINVALIDSTATE'] 
 	let cause = this.cause
 	if (cause.name ===  'RequestError') {
-      if (cause.number && (cause.number === 596)) {
+      if ((cause.number && (cause.number === 596)) || (cause.code && (knownErrors.indexOf(cause.code) > -1))) {
         return true
       } 
       if (cause.originalError && (cause.originalError instanceof Error)) {
@@ -21,14 +21,14 @@ class MsSQLError extends DatabaseError {
 		  cause = cause.info
         }
 	  }
-	  switch (cause.name) {
-        case 'ConnectionError':
-	    case 'TransactionError':
-	      return (cause.code && (knownErrors.indexOf(cause.code) > -1))
-        default:
-	      return false; 
-      }
 	}
+	switch (cause.name) {
+      case 'ConnectionError':
+      case 'TransactionError':
+	    return (cause.code && (knownErrors.indexOf(cause.code) > -1))
+      default:
+	    return false; 
+    }
   }
 
   serverUnavailable() {
