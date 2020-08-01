@@ -221,7 +221,6 @@ as
 begin
   declare @OWNER            varchar(128);
   declare @TABLE_NAME       varchar(128);
-  declare @MEMORY_OPTIMIZED bit;
   declare @COLUMN_LIST      nvarchar(max);
   declare @ALT_COLUMN_LIST  nvarchar(max);
   declare @SQL_STATEMENT    nvarchar(max);
@@ -237,7 +236,6 @@ begin
   declare FETCH_METADATA 
   cursor for 
   select t.TABLE_NAME
-        ,st.is_memory_optimized
         ,string_agg(case 
                       when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @DATE_TIME_PRECISION)) then
                         -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@DATE_TIME_PRECISION,')) "',c.COLUMN_NAME,'"')
@@ -269,9 +267,9 @@ begin
                             concat('master.dbo.sp_geometryAsBinaryZM("',c.COLUMN_NAME,'",',@SPATIAL_PRECISION,') "',c.COLUMN_NAME,'"')
                         end
                       when c.DATA_TYPE in ('xml','text','ntext') then
-                        concat('CAST("',c.COLUMN_NAME,'" as nvarchar(max))  collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
+                        concat('HASHBYTES(''SHA2_256'',CAST("',c.COLUMN_NAME,'" as nvarchar(max))) "',c.COLUMN_NAME,'"')
                       when c.DATA_TYPE in ('image') then
-                        concat('CAST("',c.COLUMN_NAME,'" as varbinary(max)) "',c.COLUMN_NAME,'"')
+                        concat('HASHBYTES(''SHA2_256'',CAST("',c.COLUMN_NAME,'" as varbinary(max))) "',c.COLUMN_NAME,'"')
 				      else  
                         concat('"',c.COLUMN_NAME,'"')
                       end
@@ -303,19 +301,17 @@ begin
                       end
                    ,',') 
          within group (order by ordinal_position) "ALT_COLUMN_LIST"
-   from INFORMATION_SCHEMA.COLUMNS c, INFORMATION_SCHEMA.TABLES t, sys.tables st
+   from INFORMATION_SCHEMA.COLUMNS c, INFORMATION_SCHEMA.TABLES t
   where t.TABLE_NAME = c.TABLE_NAME
     and t.TABLE_SCHEMA = c.TABLE_SCHEMA
-    and t.TABLE_NAME = st.name
-    and SCHEMA_ID(t.TABlE_SCHEMA) = st.SCHEMA_ID
     and t.TABLE_TYPE = 'BASE TABLE'
     and t.TABLE_SCHEMA = @SOURCE_SCHEMA
     -- and t.table_catalog = @SOURCE_DATABASE
-  group by t.TABLE_SCHEMA, t.TABLE_NAME, st.is_memory_optimized;
+  group by t.TABLE_SCHEMA, t.TABLE_NAME;
  
   set QUOTED_IDENTIFIER ON; 
   
-  DECLARE @SCHEMA_COMPARE_RESULTS TABLE(
+  create table #SCHEMA_COMPARE_RESULTS (
     SOURCE_DATABASE  nvarchar(128)
    ,SOURCE_SCHEMA    nvarchar(128)
    ,TARGET_DATABASE  nvarchar(128)
@@ -329,124 +325,97 @@ begin
    ,SQL_STATEMENT    nvarchar(max)
   );
 
-  CREATE TABLE #SOURCE_ROWS (
-    HASH VARBINARY(8000)
-  )
-
-  CREATE TABLE #TARGET_ROWS (
-    HASH VARBINARY(8000)
-  )
+  create table #SOURCE_HASH_BUCKET(HASH varbinary(8000));
+  create table #TARGET_HASH_BUCKET(HASH varbinary(8000));
 
   set NOCOUNT ON;
 
   open FETCH_METADATA;
-  fetch FETCH_METADATA into @TABLE_NAME, @MEMORY_OPTIMIZED, @COLUMN_LIST, @ALT_COLUMN_LIST
+  fetch FETCH_METADATA into @TABLE_NAME, @COLUMN_LIST, @ALT_COLUMN_LIST
   while @@FETCH_STATUS = 0 
   begin    
     begin try 
-      if (@SPATIAL_PRECISION = 18) begin
-        set @COLUMN_LIST = @ALT_COLUMN_LIST
-      end;
-    
-      set @SOURCE_COUNT = -1;
       set @SQL_STATEMENT = concat('select @SOURCE_COUNT = count(*) from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"')
 	  exec sp_executesql @SQL_STATEMENT,N'@SOURCE_COUNT bigint OUTPUT', @SOURCE_COUNT OUTPUT
           
-      set @TARGET_COUNT = -1;
       set @SQL_STATEMENT = concat('select @TARGET_COUNT = count(*) from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"')
 	  exec sp_executesql @SQL_STATEMENT,N'@TARGET_COUNT bigint OUTPUT', @TARGET_COUNT OUTPUT
-      
-      if (@MEMORY_OPTIMIZED = 1) begin
-    	truncate table #SOURCE_ROWS;
-		truncate table #TARGET_ROWS;
-        
-        -- set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
-        set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
-        insert into #SOURCE_ROWS
-        exec(@SQL_STATEMENT)
 
-        -- set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
-		set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
-		INSERT into #TARGET_ROWS
-        exec(@SQL_STATEMENT)
-        
-        set @SQL_STATEMENT = concat('with ',
-                                    'MISSING_ROWS as (',
-                                    ' select * from #SOURCE_ROWS EXCEPT select * from #TARGET_ROWS ',
-                                    '),',
-                                    'EXTRA_ROWS as (',
-                                   ' select * from #TARGET_ROWS EXCEPT select * from #SOURCE_ROWS ',
-                                   ')',
-                                   'select ''',@SOURCE_DATABASE,''' "SOURCE_DATABASE",''',@SOURCE_SCHEMA,''' "SOURCE_SCHEMA",''',@TARGET_DATABASE,'''"TARGET_DATABASE",''',@TARGET_SCHEMA,'''"TARGET_SCHEMA",''',@TABLE_NAME,'''"TABLE_NAME",',
-                                               @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ');
-      end
-      else begin
-        set @SQL_STATEMENT = concat('with ',
-                                    'SOURCE_ROWS as (',
-                                    '  select ',@COLUMN_LIST,' from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"',
-                                    '),',
-                                    'TARGET_ROWS as (',
-                                    '  select ',@COLUMN_LIST,' from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"',
-                                    '),',
-                                    'MISSING_ROWS as (',
-                                    ' select * from SOURCE_ROWS EXCEPT select * from TARGET_ROWS ',
-                                    '),',
-                                    'EXTRA_ROWS as (',
-                                    ' select * from TARGET_ROWS EXCEPT select * from SOURCE_ROWS ',
-                                    ')',
-                                    'select ''',@SOURCE_DATABASE,''' "SOURCE_DATABASE",''',@SOURCE_SCHEMA,''' "SOURCE_SCHEMA",''',@TARGET_DATABASE,'''"TARGET_DATABASE",''',@TARGET_SCHEMA,'''"TARGET_SCHEMA",''',@TABLE_NAME,'''"TABLE_NAME",',
-                                                @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ')
-      end
-      
-      insert into @SCHEMA_COMPARE_RESULTS                  
-      exec (@SQL_STATEMENT)
-                                        
+      set @SQL_STATEMENT = concat('select @MISSING_ROWS = count(*) from (select ',@COLUMN_LIST,' from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'" EXCEPT select ',@COLUMN_LIST,' from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'") T');
+	  exec sp_executesql @SQL_STATEMENT,N'@MISSING_ROWS bigint OUTPUT', @MISSING_ROWS OUTPUT
+
+      set @SQL_STATEMENT = concat('select @EXTRA_ROWS = count(*) from (select ',@COLUMN_LIST,' from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'" EXCEPT select ',@COLUMN_LIST,' from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'") T');
+	  exec sp_executesql @SQL_STATEMENT,N'@EXTRA_ROWS bigint OUTPUT', @EXTRA_ROWS OUTPUT
+	  
+	  if ((@SPATIAL_PRECISION = 18) and ((@MISSING_ROWS > 0) and (@EXTRA_ROWS > 0) and (@MISSING_ROWS = @EXTRA_ROWS))) begin
+        set @SQL_STATEMENT = concat('select @MISSING_ROWS = count(*) from (select ',@ALT_COLUMN_LIST,' from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'" EXCEPT select ',@ALT_COLUMN_LIST,' from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'") T');
+        exec sp_executesql @SQL_STATEMENT,N'@MISSING_ROWS bigint OUTPUT', @MISSING_ROWS OUTPUT
+
+        set @SQL_STATEMENT = concat('select @EXTRA_ROWS = count(*) from (select ',@ALT_COLUMN_LIST,' from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'" EXCEPT select ',@ALT_COLUMN_LIST,' from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'") T');
+        exec sp_executesql @SQL_STATEMENT,N'@EXTRA_ROWS bigint OUTPUT', @EXTRA_ROWS OUTPUT
+	  end
+
+      insert into #SCHEMA_COMPARE_RESULTS VALUES (@SOURCE_DATABASE, @SOURCE_SCHEMA, @TARGET_DATABASE, @TARGET_SCHEMA, @TABLE_NAME, @SOURCE_COUNT, @TARGET_COUNT, @MISSING_ROWS, @EXTRA_ROWS, NULL, NULL)
     end try
     begin catch
-      -- This should not happend but it does.. 
-      if (ERROR_NUMBER() = 41317) begin
-        begin try 
-          -- A user transaction that accesses memory optimized tables or natively compiled modules cannot access more than one user database or databases model and msdb, and it cannot write to master
-    	  truncate table #SOURCE_ROWS;
-		  truncate table #TARGET_ROWS;
-        
+      if (ERROR_NUMBER() = 41317) 
+      begin
+
+        -- A user transaction that accesses memory optimized tables or natively compiled modules cannot access more than one user database or databases model and msdb, and it cannot write to master
+
+        begin try
+		
+		  truncate table #SOURCE_HASH_BUCKET
+		  truncate table #TARGET_HASH_BUCKET
+		                  
           -- set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
           set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
-          insert into #SOURCE_ROWS
+		  insert into #SOURCE_HASH_BUCKET
           exec(@SQL_STATEMENT)
 
           -- set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
 		  set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
-		  INSERT into #TARGET_ROWS
+		  INSERT into #TARGET_HASH_BUCKET 
           exec(@SQL_STATEMENT)
-        
-          set @SQL_STATEMENT = concat('with ',
-                                      'MISSING_ROWS as (',
-                                      ' select * from #SOURCE_ROWS EXCEPT select * from #TARGET_ROWS ',
-                                      '),',
-                                      'EXTRA_ROWS as (',
-                                     ' select * from #TARGET_ROWS EXCEPT select * from #SOURCE_ROWS ',
-                                     ')',
-                                     'select ''',@SOURCE_DATABASE,''' "SOURCE_DATABASE",''',@SOURCE_SCHEMA,''' "SOURCE_SCHEMA",''',@TARGET_DATABASE,'''"TARGET_DATABASE",''',@TARGET_SCHEMA,'''"TARGET_SCHEMA",''',@TABLE_NAME,'''"TABLE_NAME",',
-                                               @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ');
+          
+          select @MISSING_ROWS = count(*) from (select HASH from #SOURCE_HASH_BUCKET EXCEPT select HASH from #TARGET_HASH_BUCKET) T1;
+          select @EXTRA_ROWS = count(*) from (select HASH from #TARGET_HASH_BUCKET EXCEPT select HASH from #SOURCE_HASH_BUCKET) T1;
 
-          insert into @SCHEMA_COMPARE_RESULTS                  
-          exec (@SQL_STATEMENT)
+          insert into #SCHEMA_COMPARE_RESULTS VALUES (@SOURCE_DATABASE, @SOURCE_SCHEMA, @TARGET_DATABASE, @TARGET_SCHEMA, @TABLE_NAME, @SOURCE_COUNT, @TARGET_COUNT, @MISSING_ROWS, @EXTRA_ROWS, NULL, NULL)
         end try
-        begin catch 
+        begin catch
           set @BAD_STATEMENT = @SQL_STATEMENT
           set @SQLERRM = concat(ERROR_NUMBER(),': ',ERROR_MESSAGE())
-          insert into @SCHEMA_COMPARE_RESULTS VALUES (@SOURCE_DATABASE, @SOURCE_SCHEMA, @TARGET_DATABASE, @TARGET_SCHEMA, @TABLE_NAME, @SOURCE_COUNT, @TARGET_COUNT, -1, -1, @SQLERRM , @BAD_STATEMENT)
-         set @SQLERRM = NULL
         end catch
       end
-      else begin      
+      else 
+      begin
         set @BAD_STATEMENT = @SQL_STATEMENT
         set @SQLERRM = concat(ERROR_NUMBER(),': ',ERROR_MESSAGE())
-        insert into @SCHEMA_COMPARE_RESULTS VALUES (@SOURCE_DATABASE, @SOURCE_SCHEMA, @TARGET_DATABASE, @TARGET_SCHEMA, @TABLE_NAME, @SOURCE_COUNT, @TARGET_COUNT, -1, -1, @SQLERRM , @BAD_STATEMENT)
-        set @SQLERRM = NULL
       end
     end catch
+    
+    if (@SQLERRM IS NOT NULL)
+    begin
+      begin try
+        set @SQL_STATEMENT = concat('select @SOURCE_COUNT = count(*) from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"')
+        exec sp_executesql @SQL_STATEMENT ,N'@SOURCE_COUNT bigint OUTPUT', @SOURCE_COUNT OUTPUT
+      end try
+      begin catch
+         set @SQLERRM =  concat(ERROR_NUMBER(),': ',ERROR_MESSAGE(),'. ',@SQL_STATEMENT)
+         set @SOURCE_COUNT = -1
+      end catch
+      begin try
+        set @SQL_STATEMENT = concat('select @TARGET_COUNT = count(*) from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"')
+        exec sp_executesql @SQL_STATEMENT,N'@TARGET_COUNT bigint OUTPUT', @TARGET_COUNT OUTPUT
+      end try
+      begin catch
+        set @SQLERRM =  concat(ERROR_NUMBER(),': ',ERROR_MESSAGE(),'. ',@SQL_STATEMENT)
+        set @TARGET_COUNT = -1
+      end catch
+      insert into #SCHEMA_COMPARE_RESULTS VALUES (@SOURCE_DATABASE, @SOURCE_SCHEMA, @TARGET_DATABASE, @TARGET_SCHEMA, @TABLE_NAME, @SOURCE_COUNT, @TARGET_COUNT, -1, -1,@SQLERRM,@BAD_STATEMENT)
+      set @SQLERRM = NULL
+    end
 	--
 	-- Probably Overkill: Workaround for 
 	--
@@ -460,14 +429,14 @@ begin
 	-- DBCC FREESESSIONCACHE WITH NO_INFOMSGS
 	-- DBCC FREEPROCCACHE WITH NO_INFOMSGS
 	
-    fetch FETCH_METADATA into @TABLE_NAME, @MEMORY_OPTIMIZED, @COLUMN_LIST, @ALT_COLUMN_LIST
+    fetch FETCH_METADATA into @TABLE_NAME, @COLUMN_LIST, @ALT_COLUMN_LIST
   end
    
   close FETCH_METADATA;
   deallocate FETCH_METADATA;
   
   select @SOURCE_COUNT = COUNT(*) 
-    from @SCHEMA_COMPARE_RESULTS
+    from #SCHEMA_COMPARE_RESULTS
    where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
       or MISSING_ROWS <> 0
       or EXTRA_ROWS <> 0
@@ -481,7 +450,7 @@ begin
     set NOCOUNT OFF;
 
     select cast(FORMATMESSAGE('%32s %32s %48s %16s', SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, cast(TARGET_ROW_COUNT as varchar(16))) as nvarchar(256)) "SUCCESS          Source Schenma                    Target Schema                                            Table          Rows"
-      from @SCHEMA_COMPARE_RESULTS
+      from #SCHEMA_COMPARE_RESULTS
      where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
        and MISSING_ROWS = 0
        and EXTRA_ROWS = 0
@@ -491,7 +460,7 @@ begin
     if (@SOURCE_COUNT > 0) 
     begin
       select cast(FORMATMESSAGE('%32s %32s %48s %16s %16s %16s %16s %64s', SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, cast(SOURCE_ROW_COUNT as varchar(16)), cast(TARGET_ROW_COUNT as varchar(16)), cast(MISSING_ROWS as varchar(16)), cast(EXTRA_ROWS as varchar(16)), SQLERRM) as nvarchar(256)) "FAILED           Source Schenma                    Target Schema                                            Table Details..."
-        from @SCHEMA_COMPARE_RESULTS
+        from #SCHEMA_COMPARE_RESULTS
        where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
           or MISSING_ROWS <> 0
          or EXTRA_ROWS <> 0
@@ -502,15 +471,15 @@ begin
   else 
   begin
     select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT
-      from @SCHEMA_COMPARE_RESULTS
+      from #SCHEMA_COMPARE_RESULTS
      where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
        and MISSING_ROWS = 0
        and EXTRA_ROWS = 0
        and SQLERRM is NULL
     order by TABLE_NAME;
   
-    select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, SQLERRM, SQL_STATEMENT
-      from @SCHEMA_COMPARE_RESULTS
+    select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, SQLERRM
+      from #SCHEMA_COMPARE_RESULTS
      where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
         or MISSING_ROWS <> 0
         or EXTRA_ROWS <> 0
