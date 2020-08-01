@@ -10,7 +10,6 @@ class MySQLWriter extends YadamuWriter {
 
   constructor(dbi,tableName,status,yadamuLogger) {
     super({objectMode: true},dbi,tableName,status,yadamuLogger)
-    console.log(this.tableInfo);
   }
   
   setTableInfo(tableName) {
@@ -97,9 +96,6 @@ class MySQLWriter extends YadamuWriter {
 
     this.rowCounters.batchCount++;
 
-    console.log(this.tableInfo.dml);
-    console.log(this.batch[0])
-	console.log(this.SPATIAL_FORMAT)
 
     if (this.tableInfo.insertMode === 'Batch') {
       try {
