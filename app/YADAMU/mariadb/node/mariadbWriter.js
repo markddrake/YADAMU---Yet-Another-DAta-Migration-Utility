@@ -21,6 +21,13 @@ class MariadbWriter extends YadamuWriter {
             return typeof col === 'object' ? JSON.stringify(col) : col
 	      }
           break;
+        case "geometry" :
+          if (this.SPATIAL_FORMAT === 'GeoJSON') {
+            return (col,idx) => {
+              return typeof col === 'object' ? JSON.stringify(col) : col
+	        }
+          }
+          return null;
         case "boolean":
           return (col,idx) => {
             return YadamuLibrary.booleanToInt(col)

@@ -107,7 +107,7 @@ class MsSQLWriter extends YadamuWriter {
   }
   
   async writeBatch() {
-      
+
     this.rowCounters.batchCount++;
     
     if (this.SPATIAL_FORMAT === 'GeoJSON') {

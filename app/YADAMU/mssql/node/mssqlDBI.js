@@ -57,7 +57,6 @@ class MsSQLDBI extends YadamuDBI {
 
   // Not available until configureConnection() has been called 
   
-  get DB_VERSION()             { return this._DB_VERSION }
   get DB_COLLATION()           { return this._DB_COLLATION }
     
   // Override YadamuDBI

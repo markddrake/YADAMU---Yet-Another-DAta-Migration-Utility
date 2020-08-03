@@ -77,10 +77,7 @@ class OracleWriter extends YadamuWriter {
             }
           */
           return (col,jdx) =>  {
-            if (typeof col === 'boolean') {
-              return  new Buffer.from(col === true ? [1] : [0])
-            }
-            return col
+            return typeof col === 'boolean' ? new Buffer.from(col === true ? [1] : [0]) :  col
           }
           break;
         case "BOOLEAN":

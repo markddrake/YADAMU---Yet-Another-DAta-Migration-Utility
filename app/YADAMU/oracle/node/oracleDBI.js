@@ -53,7 +53,6 @@ class OracleDBI extends YadamuDBI {
 
   // Not available until configureConnection() has been called 
   
-  get DB_VERSION()             { return this._DB_VERSION }
   get MAX_STRING_SIZE()        { return this._MAX_STRING_SIZE }
   get JSON_STORAGE_MODEL()     { return this._JSON_STORAGE_MODEL }
   get XML_STORAGE_MODEL()      { return this._XML_STORAGE_MODEL }

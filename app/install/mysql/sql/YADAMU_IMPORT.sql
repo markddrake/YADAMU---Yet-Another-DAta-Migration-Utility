@@ -73,7 +73,7 @@ BEGIN
             when P_DATA_TYPE_LENGTH > 16777215 then return 'longblob';
             when P_DATA_TYPE_LENGTH > 65535  then return 'mediumblob';
             when P_DATA_TYPE_LENGTH > 255  then return 'blob';
-            else return 'tinyblob';
+            else return 'binary';
           end case;
         when P_DATA_TYPE = 'bit' then
           return 'tinyint(1)';

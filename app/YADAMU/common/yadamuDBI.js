@@ -91,6 +91,12 @@ class YadamuDBI {
     return this._ATTEMPT_RECONNECTION
   }
 
+  // Instance level getters.. invoke as this.METHOD
+
+  // Not available until configureConnection() has been called 
+
+  get DB_VERSION()             { return this._DB_VERSION }
+
   constructor(yadamu,parameters) {
   
     this.options = {

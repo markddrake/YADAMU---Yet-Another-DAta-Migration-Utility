@@ -38,7 +38,7 @@ class MongoWriter extends YadamuWriter {
 
   constructor(dbi,tableName,status,yadamuLogger) {
     super({objectMode: true},dbi,tableName,status,yadamuLogger)
-    
+
     this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
        switch(targetDataType.toLowerCase()){
         case 'objectid':
@@ -72,7 +72,8 @@ class MongoWriter extends YadamuWriter {
           return (row,idx) => {
             row[idx] = typeof row[idx] === 'string' ? JSON.parse(row[idx]) : row[idx]
 	      }
-		case 'binData':
+
+		case 'bindata':
 		  if ((this.tableInfo.columnNames[idx] === '_id') && (this.tableInfo.sizeConstraints[idx] === '12')) {
   	        return (row,idx) => {
               row[idx] = ObjectID(row[idx])

@@ -2,7 +2,7 @@
     "yadamu": {
         "FILE": "yadamu.json",
         "MODE": "DATA_ONLY",
-        "ON_ERROR": "FLUSH"
+        "ON_ERROR": "FLUSH",
         "PARALLEL": 4,
         "RDBMS": "oracle"
     },

@@ -34,47 +34,74 @@ class StatementGenerator {
         tableInfo._COMMIT_COUNT   = this.dbi.COMMIT_COUNT
         tableInfo._SPATIAL_FORMAT = this.spatialFormat
         tableInfo.insertMode      = 'Batch';
-        
+  
+        /*
+        **
+        ** Avoid use of Iterative Mode where possible due to significant performance impact.
+        **
+        */
+
         const setOperators = tableInfo.targetDataTypes.map((targetDataType,idx) => {
-           switch (targetDataType) {
-             case 'geometry':
-               tableInfo.insertMode = 'Iterative';
-               switch (this.spatialFormat) {
-                 case "WKB":
-                 case "EWKB":
-                   return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromWKB(?)";
-                   break;
-                 case "WKT":
-                 case "EWRT":
-                   return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromText(?)";
-                   break;
-                 case "GeoJSON":
-                   return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromGeoJSON(?)";
-                   break;
-                 default:
-                   return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromWKB(?)";
-               }              
-             /*
-             **
-             ** Avoid use of Iterative Mode where possible due to significant performance impact.
-             **
-             case 'date':
-             case 'time':
-             case 'datetime':
-               tableInfo.insertMode = 'Iterative';
-               return ' "' + tableInfo.columnNames[idx] + '"' + " = str_to_date(?,'%Y-%m-%dT%T.%fZ')"
-            */
-             default:
-               return ' "' + tableInfo.columnNames[idx] + '" = ?'
-           }
+          if (this.dbi.DB_VERSION < '8.0.19' || true) {
+            switch (targetDataType) {
+              case 'geometry':
+                tableInfo.insertMode = 'Iterative'; 
+                switch (this.spatialFormat) {
+                  case "WKB":
+                  case "EWKB":
+                    return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromWKB(?)";
+                    break;
+                  case "WKT":
+                  case "EWRT":
+                    return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromText(?)";
+                    break;
+                  case "GeoJSON":
+                    return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromGeoJSON(?)";
+                    break;
+                  default:
+                    return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromWKB(?)";
+                }              
+              default:
+                return ' "' + tableInfo.columnNames[idx] + '" = ?'
+            }
+          }
+          else {
+            switch (targetDataType) {
+              case 'geometry':
+                tableInfo.insertMode = 'Rows';  
+                switch (this.spatialFormat) {
+                  case "WKB":
+                  case "EWKB":
+                    return 'ST_GeomFromWKB(?)';
+                    break;
+                  case "WKT":
+                  case "EWRT":
+                    return 'ST_GeomFromText(?)';
+                    break;
+                  case "GeoJSON":
+                    return 'ST_GeomFromGeoJSON(?)';
+                    break;
+                  default:
+                    return 'ST_GeomFromWKB(?)';
+                }              
+              default:
+                return '?'
+            }
+          }
         }) 
-        
-        if (tableInfo.insertMode === 'Iterative') {
-          tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('(')) + ` set ` + setOperators.join(',');
+
+        switch (tableInfo.insertMode) {
+          case 'Batch':
+            tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + `  values ?`;
+            break;
+          case 'Rows':
+            tableInfo.rowConstructor = `ROW(${setOperators.join(',')})`
+            tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + `  values `;
+            break;
+          case 'Iterative':
+            tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('(')) + ` set ` + setOperators.join(',');
+            break;
         }
-        else {
-          tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + `  values ?`;
-        } 
         return tableInfo.ddl;
       });
       if (executeDDL === true) {

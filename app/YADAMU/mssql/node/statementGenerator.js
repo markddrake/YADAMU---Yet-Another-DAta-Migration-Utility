@@ -70,7 +70,7 @@ class StatementGenerator {
           break
         case 'decimal':
           // sql.Decimal ([precision], [scale])
-          table.columns.add(columnList[idx],sql.Decimal(dataType.length,dataType.scale), {nullable: true});
+          table.columns.add(columnList[idx],sql.Decimal(length,dataType.scale), {nullable: true});
           break;
         case 'smallint':
           table.columns.add(columnList[idx],sql.SmallInt, {nullable: true});
@@ -84,16 +84,16 @@ class StatementGenerator {
           break;
         case 'numeric':
           // sql.Numeric ([precision], [scale])
-          table.columns.add(columnList[idx],sql.Numeric(dataType.length,dataType.scale), {nullable: true});
+          table.columns.add(columnList[idx],sql.Numeric(length,dataType.scale), {nullable: true});
           break;
         case 'tinyint':
           table.columns.add(columnList[idx],sql.TinyInt, {nullable: true});
           break;
         case 'char':
-          table.columns.add(columnList[idx],sql.Char(dataType.length), {nullable: true});
+          table.columns.add(columnList[idx],sql.Char(length), {nullable: true});
           break;
         case 'nchar':
-          table.columns.add(columnList[idx],sql.NChar(dataType.length), {nullable: true});
+          table.columns.add(columnList[idx],sql.NChar(length), {nullable: true});
           break;
         case 'text':
           table.columns.add(columnList[idx],sql.Text, {nullable: true});
@@ -118,7 +118,7 @@ class StatementGenerator {
         case 'time':
           // sql.Time ([scale])
           // Binding as sql.Time must supply values as type Date. 
-          // table.columns.add(columnList[idx],sql.Time(dataType.length), {nullable: true});
+          // table.columns.add(columnList[idx],sql.Time(length), {nullable: true});
           // Use String to avoid possible loss of precision
           table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
           break;
@@ -144,7 +144,7 @@ class StatementGenerator {
         case 'datetimeoffset':
           // sql.DateTimeOffset ([scale])
           // Binding as sql.DateTime2 must supply values as type Date. 
-          // table.columns.add(columnList[idx],sql.DateTimeOffset(dataType.length), {nullable: true});
+          // table.columns.add(columnList[idx],sql.DateTimeOffset(length), {nullable: true});
           // Use String to avoid possible loss of precision
           table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
           break;
@@ -163,7 +163,7 @@ class StatementGenerator {
           table.columns.add(columnList[idx],sql.Variant, {nullable: true});
           break;
         case 'binary':
-          table.columns.add(columnList[idx],sql.Binary(dataType.length), {nullable: true});
+          table.columns.add(columnList[idx],sql.Binary(length), {nullable: true});
           break;
         case 'varbinary':
           // sql.VarBinary ([length])

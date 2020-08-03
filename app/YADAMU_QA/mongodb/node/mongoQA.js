@@ -50,7 +50,6 @@ class MongoQA extends MongoDBI {
                     hostAndPort : hostList
               }
 		      operation = `mongoClient.db('admin').command(${JSON.stringify(dropConnections)})`
-			  console.log(operation)
    		      const res = await  await dbAdmin.command(dropConnections)
 			  // await dbAdmin.close()
 			} catch (e) {
@@ -91,11 +90,9 @@ class MongoQA extends MongoDBI {
 	  const sourceHash = await this.dbHash()
 	  const sourceCounts = await this.getRowCounts(source)
 	  await this.use(target.schema);
-	  const targetHash = await this.dbHash(source.schema)
+	  const targetHash = await this.dbHash()
       const targetCounts =  await this.getRowCounts(target)
 	  
-	  
-	   
 	  const report = {
         successful : []
        ,failed     : []
@@ -106,7 +103,12 @@ class MongoQA extends MongoDBI {
            report.successful.push([source.schema,target.schema,collectionName,targetCounts.find(element => element[1] === collectionName)[2]])
 		 }
 		 else {
-		   report.failed.push([source.schema,target.schema,collectionName, sourceCounts.find(element => element[1] === collectionName)[2],targetCounts.find(element => element[1] === collectionName)[2],sourceHash.collections[collectionName],targetHash.collections[collectionName],null,null])
+           if (targetHash.collections.hasOwnProperty(collectionName)) {
+		     report.failed.push([source.schema,target.schema,collectionName, sourceCounts.find(element => element[1] === collectionName)[2],targetCounts.find(element => element[1] === collectionName)[2],sourceHash.collections[collectionName],targetHash.collections[collectionName],null,null])
+           }
+           else {
+		     report.failed.push([source.schema,target.schema,collectionName, sourceCounts.find(element => element[1] === collectionName)[2],-1,sourceHash.collections[collectionName],'','Collection Not Found',null])
+           }
 		 }
 	  })
 		   

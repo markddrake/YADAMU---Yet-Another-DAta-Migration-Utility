@@ -31,7 +31,7 @@ class MongoConstants {
   static get DEFAULT_STRING_LENGTH()  { return this.DEFAULT_PARAMETERS.DEFAULT_STRING_LENGTH}
   static get MAX_STRING_LENGTH()      { return this.DEFAULT_PARAMETERS.MAX_STRING_LENGTH}
   static get SPATIAL_FORMAT()         { return this.DEFAULT_PARAMETERS.SPATIAL_FORMAT };
-  static get DATABASE_VENDOR()        { return 'MONGO' };
+  static get DATABASE_VENDOR()        { return 'MongoDB' };
   static get SOFTWARE_VENDOR()        { return 'Mongo Software Inc' };
   static get STATEMENT_TERMINATOR()   { return ';' }
 

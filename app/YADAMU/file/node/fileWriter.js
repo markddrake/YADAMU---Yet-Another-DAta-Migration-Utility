@@ -29,9 +29,7 @@ class FileWriter extends YadamuWriter {
 	
 	  if (YadamuLibrary.isBinaryDataType(dataType.type)) {
 		return (row,idx) =>  {
-		  if (Buffer.isBuffer(row[idx])) {
-		    row[idx] = row[idx].toString('hex')
-		   }
+          row[idx] = row[idx].toString('hex')
 		}
       }
       

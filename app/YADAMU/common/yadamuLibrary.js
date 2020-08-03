@@ -2,7 +2,48 @@
 
 class YadamuLibrary {
 
+  static get BOOLEAN_DATA_TYPES() {
+     this._BOOLEAN_DATA_TYPES = this._BOOLEAN_DATA_TYPES|| Object.freeze([Object.freeze(['BOOLEAN','']),Object.freeze(['BIT','']),Object.freeze(['RAW','1']),Object.freeze(['TINYINT','1'])])
+     return this._BOOLEAN_DATA_TYPES;
+  }
+
+  static get BINARY_DATA_TYPES() {
+     this._BINARY_DATA_TYPES = this._BINARY_DATA_TYPES || Object.freeze(["RAW","BLOB","BINARY","VARBINARY","IMAGE","BYTEA","TINYBLOB","MEDIUMBLOB","LONGBLOB","ROWVERSION","OBJECTID","BINDATA"])
+     return this._BINARY_DATA_TYPES;
+  }
+
+  static get DATE_DATA_TYPES() {
+     this._DATE_DATA_TYPES = this._DATE_DATA_TYPES || Object.freeze(["DATE","TIME","TIMESTAMP","TIMEZONETZ","DATETIME","DATETIME2",,"TIMESTAMP WITH TIME ZONE","TIMESTAMP WITH LOCAL TIME ZONE","TIMESTAMP WITHOUT TIME ZONE","DATETIMEOFFSET","SMALLDATE","TIME WITHOUT TIME ZONE",""])
+     return this._DATE_DATA_TYPES;
+  }
+
+  static get NUMERIC_DATA_TYPES() {
+     this._NUMERIC_DATA_TYPES = this._NUMERIC_DATA_TYPES || Object.freeze(["NUMBER","BINARY_FLOAT","BINARY_DOUBLE","MONEY","SMALLMONEY","TINYINT","SMALLINT","INT","BIGINT","REAL","FLOAT","DOUBLE","DECIMAL","numeric","DOUBLE PRECISION","INTEGER","LONG"])
+     return this._NUMERIC_DATA_TYPES;
+  }
+
+  static get XML_DATA_TYPES() {
+     this._XML_DATA_TYPES = this._XML_DATA_TYPES || Object.freeze(["XML","XMLTYPE"])
+     return this._XML_DATA_TYPES;
+  }
+
+  static get JSON_DATA_TYPES() {
+     this._JSON_DATA_TYPES = this._JSON_DATA_TYPES || Object.freeze(["JSON","JSONB","SET","BFILE"])
+     return this._JSON_DATA_TYPES;
+  }
+
+  static get CLOB_DATA_TYPES() {
+     this._CLOB_DATA_TYPES = this._CLOB_DATA_TYPES || Object.freeze(["CLOB","NCLOB","JAVASCRIPTWITHSCOPE","LONGTEXT","MEDIUMTEXT","TEXT"])
+     return this._CLOB_DATA_TYPES;
+  }
+
+  static get SPATIAL_DATA_TYPES() {
+     this._SPATIAL_DATA_TYPES = this._SPATIAL_DATA_TYPES || Object.freeze(["\"MDSYS\".\"SDO_GEOMETRY\"","GEOGRAPHY","GEOMETRY"])
+     return this._SPATIAL_DATA_TYPES;
+  }
+
   static stringifyDuration(duration) {
+
   
    let milliseconds = 0
    let seconds = 0
@@ -66,40 +107,37 @@ class YadamuLibrary {
   static pathSubstitutions(path) {
     return path.replace(/%date%/g,).replace(/%time%/g,).replace(/%isoDateTime%/,new Date().toISOString().replace(/:/g,'.'))
   }
+
+  static isBooleanType(dataType,size) {
+	return this.BOOLEAN_DATA_TYPES.includes([dataType.toUpperCase(),size]);
+  }
   
   static isBinaryDataType(dataType) {
-    const dataTypes = ["RAW","BLOB","BINARY","VARBINARY","IMAGE","BYTEA","TINYBLOB","MEDIUMBLOB","LONGBLOB","ROWVERSION","OBJECTID","BINDATA"]
-	return dataTypes.includes(dataType.toUpperCase());
+	return this.BINARY_DATA_TYPES.includes(dataType.toUpperCase());
   }
    
   static isDateDataType(dataType) {
-    const dataTypes = ["DATE","TIME","TIMESTAMP","TIMEZONETZ","DATETIME","DATETIME2",,"TIMESTAMP WITH TIME ZONE","TIMESTAMP WITH LOCAL TIME ZONE","TIMESTAMP WITHOUT TIME ZONE","DATETIMEOFFSET","SMALLDATE","TIME WITHOUT TIME ZONE",""]
-	return dataTypes.includes(dataType.toUpperCase());
+	return this.DATE_DATA_TYPES.includes(dataType.toUpperCase());
   }
    
   static isNumericDataType(dataType) {
-    const dataTypes = ["NUMBER","BINARY_FLOAT","BINARY_DOUBLE","MONEY","SMALLMONEY","TINYINT","SMALLINT","INT","BIGINT","REAL","FLOAT","DOUBLE","DECIMAL","numeric","DOUBLE PRECISION","INTEGER","LONG"]
-	return dataTypes.includes(dataType.toUpperCase());
+	return this.NUMERIC_DATA_TYPES.includes(dataType.toUpperCase());
   }
 
   static isXML(dataType) {
-    const dataTypes = ["XML","XMLTYPE"]
-	return dataTypes.includes(dataType.toUpperCase());
+    return this.XML_DATA_TYPES.includes(dataType.toUpperCase());
   }
 
   static isJSON(dataType) {
-    const dataTypes = ["JSON","JSONB","SET","BFILE"]
-	return dataTypes.includes(dataType.toUpperCase());
+    return this.JSON_DATA_TYPES.includes(dataType.toUpperCase());
   }
   
   static isCLOB(dataType) {
-    const dataTypes = ["CLOB","NCLOB","JAVASCRIPTWITHSCOPE","LONGTEXT","MEDIUMTEXT","TEXT"]
-	return dataTypes.includes(dataType.toUpperCase());
+    return this.CLOB_DATA_TYPES.includes(dataType.toUpperCase());
   }
 
   static isSpatialDataType(dataType) {
-    const dataTypes = ["\"MDSYS\".\"SDO_GEOMETRY\"","GEOGRAPHY","GEOMETRY"]
-	return dataTypes.includes(dataType.toUpperCase());
+	return this.SPATIAL_DATA_TYPES.includes(dataType.toUpperCase());
   }
 
   static composeDataType(sourceDataType, sizeConstraint) {

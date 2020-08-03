@@ -264,7 +264,7 @@ class MongoDBI extends YadamuDBI {
   }
 
   async createCollection(collectionName,options) {
-  
+
     // Wrapper for db.createCollection()
 
 	let stack
@@ -749,9 +749,11 @@ class MongoDBI extends YadamuDBI {
    	          const typeInformation = await collection.aggregate(aggPipeline).toArray();
 			  if (typeInformation.length > 0) {
 				tableInfo.COLUMN_NAME_ARRAY.forEach((col,idx) => {
-				  const dataType = typeInformation[0][col].type.length == 1 ? typeInformation[0][col].type[0] : this.normalizeTypeInfo(typeInformation[0][col].type)
+				  let dataType = typeInformation[0][col].type.length == 1 ? typeInformation[0][col].type[0] : this.normalizeTypeInfo(typeInformation[0][col].type)
+                  let size = typeInformation[0][col].size
+                  size = dataType ===  'null' ? MongoConstants.DEFAULT_STRING_LENGTH : size                  
+				  dataType = dataType ===  'null' ? 'string' : dataType                  
 				  tableInfo.DATA_TYPE_ARRAY.push(dataType);
-				  const size = typeInformation[0][col].size
 				  tableInfo.SIZE_CONSTRAINT_ARRAY.push (dataType === 'string' ? this.roundP2(size) : '')
 			    })
               }
