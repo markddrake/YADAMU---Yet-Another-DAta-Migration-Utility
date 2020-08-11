@@ -7,6 +7,11 @@ class MySQLError extends DatabaseError {
   constructor(cause,stack,sql) {
     super(cause,stack,sql);
 	// Abbreviate Long Lists of Place Holders ...
+	if (this.sql.indexOf('),(') > 0) {
+	  const startElipises = this.sql.indexOf('),(') + 2
+	  const endElipises =  this.sql.lastIndexOf('),(') + 2
+	  this.sql = this.sql.substring(0,startElipises) + '(...),' + this.sql.substring(endElipises);
+	}
   }
   
   lostConnection() {

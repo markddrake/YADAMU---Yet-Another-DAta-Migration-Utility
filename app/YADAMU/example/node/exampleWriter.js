@@ -9,8 +9,8 @@ const {BatchInsertError} = require('../../common/yadamuError.js')
 
 class ExampleWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,status,yadamuLogger) {
-    super({objectMode: true},dbi,tableName,status,yadamuLogger)
+  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
+    super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
   }
   
   setTableInfo(tableInfo) {

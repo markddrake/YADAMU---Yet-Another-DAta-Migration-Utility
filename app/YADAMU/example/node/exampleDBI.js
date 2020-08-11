@@ -365,7 +365,7 @@ class ExampleDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : this.EXPORT_VERSION
+     ,exportVersion      : Yadamu.EXPORT_VERSION
      ,softwareVendor     : this.SOFTWARE_VENDOR
      ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
 	 ,sessionUser        : sysInfo.SESSION_USER
@@ -462,9 +462,9 @@ class ExampleDBI extends YadamuDBI {
     await super.generateStatementCache(StatementGenerator, schema, executeDDL)
   }
 
-  getOutputStream(tableName) {
+  getOutputStream(tableName,ddlComplete) {
 	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(ExampleWriter,tableName)
+	 return super.getOutputStream(ExampleWriter,tableName,ddlComplete)
   }
  
   async workerDBI(workerNumber) {

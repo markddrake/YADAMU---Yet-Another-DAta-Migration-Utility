@@ -8,8 +8,8 @@ const YadamuWriter = require('../../common/yadamuWriter.js');
 
 class PostgresWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,status,yadamuLogger) {
-    super({objectMode: true},dbi,tableName,status,yadamuLogger)
+  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
+    super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
   }
   
   setTableInfo(tableInfo) {

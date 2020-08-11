@@ -272,7 +272,7 @@ class OracleDBI extends YadamuDBI {
   }  
 
   async reconnectImpl() {
-    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
   }
 
   async createLob(lobType) {
@@ -602,7 +602,7 @@ class OracleDBI extends YadamuDBI {
 		  // reconnect() throws cause if it cannot reconnect...
           await this.reconnect(cause,'SQL')
           await this.setCurrentSchema(this.parameters.TO_USER)
-		  await this.setDateFormatMask(this.connection,this.status,this.systemInformation.vendor);
+		  await this.setDateFormatMask(this.connection,this.status,this.systemInformation ? this.systemInformation.vendor : "oracle");
 		  continue;
         }
         throw this.captureException(cause)
@@ -1012,7 +1012,7 @@ class OracleDBI extends YadamuDBI {
 	 ,objectFormat       : this.OBJECTS_AS_JSON === true ? 'JSON' : 'NATIVE'
      ,schema             : this.parameters.FROM_USER ? this.parameters.FROM_USER : this.parameters.TO_USER
      ,softwareVendor     : this.SOFTWARE_VENDOR
-     ,exportVersion      : this.EXPORT_VERSION
+     ,exportVersion      : Yadamu.EXPORT_VERSION
      ,nodeClient         : {
         version          : process.version
        ,architecture     : process.arch
@@ -1154,18 +1154,14 @@ class OracleDBI extends YadamuDBI {
   generateQueryInformation(tableMetadata) {
     
     // Generate a conventional relational select statement for this table
-    
-    const tableInfo = Object.assign({},tableMetadata,{jsonColumns : [],rawColumns  : []});   
-    
-    let selectList = '';
+    const tableInfo = super.generateQueryInformation(tableMetadata)    
+
+    tableInfo.jsonColumns = [];           
     tableInfo.DATA_TYPE_ARRAY.forEach((dataType,idx) => {
       switch (dataType) {
         case 'JSON':
           tableInfo.jsonColumns.push(idx);
           break
-        case 'RAW': 
-          tableInfo.rawColumns.push(idx);
-          break;
         case "GEOMETRY":
         case "\"MDSYS\".\"SDO_GEOMETRY\"":
         case "XMLTYPE":
@@ -1183,7 +1179,6 @@ class OracleDBI extends YadamuDBI {
       }
     })
     
-	tableInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
     return tableInfo
   }
   
@@ -1254,8 +1249,8 @@ class OracleDBI extends YadamuDBI {
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
   }
 
-  getOutputStream(tableName) {
-	 return super.getOutputStream(OracleWriter,tableName)
+  getOutputStream(tableName,ddlComplete) {
+	 return super.getOutputStream(OracleWriter,tableName,ddlComplete)
   }
     
   async dropWrappers() {

@@ -333,7 +333,7 @@ class SnowflakeDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.OWNER
-     ,exportVersion      : this.EXPORT_VERSION
+     ,exportVersion      : Yadamu.EXPORT_VERSION
 	 //,sessionUser      : sysInfo.SESSION_USER
 	 //,currentUser      : sysInfo.CURRENT_USER
      ,warehouse          : sysInfo.WAREHOUSE
@@ -463,9 +463,9 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     await super.generateStatementCache(StatementGenerator,schema,executeDDL) 
   }
  
-  getOutputStream(tableName) {
+  getOutputStream(tableName,ddlComplete) {
 	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(SnowflakeWriter,tableName)
+	 return super.getOutputStream(SnowflakeWriter,tableName,ddlComplete)
   }
  
   async workerDBI(workerNumber) {

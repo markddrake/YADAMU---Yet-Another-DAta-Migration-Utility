@@ -14,7 +14,7 @@ const { performance } = require('perf_hooks');const async_hooks = require('async
 const Yadamu = require('./yadamu.js');
 const DBIConstants = require('./dbiConstants.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
-const {YadamuError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError} = require('./yadamuError.js');
+const {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError} = require('./yadamuError.js');
 const DefaultParser = require('./defaultParser.js');
 
 /*
@@ -28,7 +28,7 @@ class YadamuDBI {
 
   get DATABASE_VENDOR()            { return undefined };
   get SOFTWARE_VENDOR()            { return undefined };
-  get EXPORT_VERSION()             { return Yadamu.EXPORT_VERSION }
+
   
   get SAVE_POINT_NAME()            { return 'YADAMU_INSERT' }
   get PASSWORD_KEY_NAME()          { return 'password' };
@@ -204,10 +204,10 @@ class YadamuDBI {
 	  
     switch (logEntry.severity) {
       case 'CONTENT_TOO_LARGE' :
-        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database does not support VARCHAR2 values longer than ${this.maxStringSize} bytes.`)
+        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database does not support VARCHAR2 values longer than ${this.MAX_STRING_SIZE} bytes.`)
         return;
       case 'SQL_TOO_LARGE':
-        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database is not configured for DLL statements longer than ${this.maxStringSize} bytes.`)
+        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database is not configured for DLL statements longer than ${this.MAX_STRING_SIZE} bytes.`)
         return;
       case 'FATAL':
         summary.errors++
@@ -599,7 +599,7 @@ class YadamuDBI {
     throw new Error(`Database Reconnection Not Implimented for ${this.DATABASE_VENDOR}`)
 	
 	// Default code for databases that support reconnection
-    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
 
   }
   
@@ -611,7 +611,7 @@ class YadamuDBI {
     const transactionInProgress = this.transactionInProgress 
     const savePointSet = this.savePointSet
 	
-	this.ATTEMPT_RECONNECTION = false
+	this._ATTEMPT_RECONNECTION = false
     this.reconnectInProgress = true;
 	this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`${operation}`],cause)
 	
@@ -655,7 +655,7 @@ class YadamuDBI {
 		}
         this.reconnectInProgress = false;
         this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`New connection available.`);
-        this.ATTEMPT_RECONNECTION = this.setReconnectionState()
+        this._ATTEMPT_RECONNECTION = undefined
 		return;
       } catch (connectionFailure) {
 		if ((typeof connectionFailure.serverUnavailable == 'function') && connectionFailure.serverUnavailable()) {
@@ -667,14 +667,14 @@ class YadamuDBI {
         else {
    	      this.reconnectInProgress = false;
           this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`RECONNECT`],connectionFailure);
-          this.ATTEMPT_RECONNECTION = this.setReconnectionState()
+          this._ATTEMPT_RECONNECTION = undefined
           throw connectionFailure;
         }
       }
     }
     // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`Unable to re-establish connection.`)
     this.reconnectInProgress = false;
-    this.ATTEMPT_RECONNECTION = this.setReconnectionState()
+    this.ATTEMPT_RECONNECTION = undefined
     throw connectionUnavailable 	
   }
   
@@ -1006,6 +1006,7 @@ class YadamuDBI {
   generateQueryInformation(tableMetadata) {
     const tableInfo = Object.assign({},tableMetadata);   
 	tableInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
+	tableInfo.MAPPED_TABLE_NAME = this.transformTableName(tableInfo.TABLE_NAME,this.getInverseTableMappings())
     return tableInfo
   }   
 
@@ -1069,17 +1070,26 @@ class YadamuDBI {
   
   getTableInfo(tableName) {
 	  
-	 // Statement Cache is keyed by actual table name so we need the mapped name if there is a mapping.
+	// Statement Cache is keyed by actual table name so we need the mapped name if there is a mapping.
+
+    if (this.statementCache === undefined) {
+      this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`Statement Cache undefined. Cannot obtain required information.`)
+	}
+	
+	let mappedTableName = this.transformTableName(tableName,this.tableMappings)
+	const tableInfo = this.statementCache[mappedTableName]
 	 
-	 let mappedTableName = this.transformTableName(tableName,this.tableMappings)
-	 const tableInfo = this.statementCache[mappedTableName]
-	 tableInfo.tableName = mappedTableName
-	 return tableInfo
+	if (tableInfo === undefined) {
+      this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName,mappedTableName],`No Statement Cache entry for "${mappedTableName}". Current entries: ${JSON.stringify(Object.keys(this.statementCache))}`)
+	}
+	
+	tableInfo.tableName = mappedTableName
+	return tableInfo
   }
   
-  getOutputStream(TableWriter,tableName) {
+  getOutputStream(TableWriter,tableName,ddlComplete) {
     // this.yadamuLogger.trace([this.constructor.name,`getOutputStream(${tableName})`],'')
-    return new TableWriter(this,tableName,this.status,this.yadamuLogger)
+    return new TableWriter(this,tableName,ddlComplete,this.status,this.yadamuLogger)
   }
   
   keepAlive(rowCount) {
@@ -1096,8 +1106,16 @@ class YadamuDBI {
       this.setOption('recreateSchema',true);
     }
   }
+
+  reloadStatementCache() {
+    if (!this.isManager()) {
+      this.statementCache = this.manager.statementCache
+	  // this.tableMappings = this.manager.tableMappings
+	  // this.inverseTableMappings = this.manager.inverseTableMappings
+	}	 
+  }
   
-  async cloneManager(dbi) {
+  cloneManager(dbi) {
 	// dbi.master = this
 	dbi.metadata = this.metadata
     dbi.schemaCache = this.schemaCache
@@ -1109,7 +1127,7 @@ class YadamuDBI {
 
   async setWorkerConnection() {
     // DBI implementations that do not use a pool / connection mechansim need to overide this function. eg MSSQLSERVER
-	this.connection = await this.connectionProvider.getConnectionFromPool()	
+	this.connection = await this.manager.getConnectionFromPool()	
   }
 
   isManager() {
@@ -1129,7 +1147,7 @@ class YadamuDBI {
     // Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
       
     dbi.workerNumber = workerNumber
-	dbi.connectionProvider = this
+	dbi.manager = this
 	await dbi.setWorkerConnection()
     dbi.setParameters(this.parameters);
 	this.cloneManager(dbi);

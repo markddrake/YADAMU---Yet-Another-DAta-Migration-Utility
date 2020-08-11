@@ -7,11 +7,14 @@ const YadamuLibrary = require('../../common/yadamuLibrary.js');
 
 class MariadbWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,status,yadamuLogger) {
-    super({objectMode: true},dbi,tableName,status,yadamuLogger)
+  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
+    super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
+  }
   
+  setTableInfo(tableName) {
+	super.setTableInfo(tableName)
+
     this.tableInfo.columnCount = this.tableInfo.columnNames.length;
-    this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + '),';
 	
 	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
@@ -92,19 +95,32 @@ class MariadbWriter extends YadamuWriter {
 	return this.skipTable;
   }
 
+
   async processWarnings(results) {
-   // ### Output Records that generate warnings
-   if (results.warningCount >  0) {
+
+    // ### Output Records that generate warnings
+
+    let badRow = 0;
+
+    if (results.warningCount >  0) {
       const warnings = await this.dbi.executeSQL('show warnings');
-      warnings.forEach((warning,idx) => {
+      // warnings.forEach(async (warning,idx) => {
+      for (const warning of warnings) {
         if (warning.Level === 'Warning') {
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,idx],`${warning.Code} Details: ${warning.Message}.`)
-		  this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,this.batch[idx]);
+          let nextBadRow = warning.Message.split('row')
+          nextBadRow = parseInt(nextBadRow[nextBadRow.length-1])
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
+          if (badRow !== nextBadRow) {
+            const columnOffset = (nextBadRow-1) * this.tableInfo.columnNames.length
+            const row = this.tableInfo.insertMode === 'Batch'  ? this.batch.slice(columnOffset,columnOffset +  this.tableInfo.columnNames.length) : this.batch[nextBadRow-1]
+	  	    await this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,row);
+            badRow = nextBadRow;
+          }
         }
-      })
+      }
     }
   }
-    
+      
   reportBatchError(operation,cause) {
     // Use Slice to add first and last row, rather than first and last value.
 	super.reportBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
@@ -115,43 +131,48 @@ class MariadbWriter extends YadamuWriter {
      // console.log(this.batch.slice(0,this.tableInfo.columnCount))
 
     this.rowCounters.batchCount++; 
-    let repackBatch = false;
+    let repackBatch = false
 
-    if (this.tableInfo.insertMode === 'Batch') {
-      try {    
-        // Slice removes the unwanted last comma from the replicated args list.
-        const args = this.tableInfo.args.repeat(this.rowCounters.cached).slice(0,-1);
-        await this.dbi.createSavePoint();
-        const results = await this.dbi.executeSQL(this.tableInfo.dml.slice(0,-1) + args, this.batch);
-        await this.processWarnings(results);
-        this.endTime = performance.now();
-        await this.dbi.releaseSavePoint();
-		this.batch.length = 0;  
-        this.rowCounters.written += this.rowCounters.cached;
-		this.rowCounters.cached = 0;
-        return this.skipTable
-      } catch (cause) {
-		this.reportBatchError(`INSERT MANY`,cause)
-        await this.dbi.restoreSavePoint(cause);
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
-        this.tableInfo.insertMode = 'Iterative' 
-        this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args.slice(0,-1)
-        repackBatch = true;
-      }
-    }
 
-    for (let row =0; row < this.rowCounters.cached; row++) {
-      const nextRow = repackBatch ?  this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
-      try {
-        const results = await this.dbi.executeSQL(this.tableInfo.dml,nextRow);
-        await this.processWarnings(results);
-		this.rowCounters.written++;
-      } catch (cause) {
-        await this.handleIterativeError(`INSERT ONE`,cause,row,nextRow)
-        if (this.skipTable) {
-          break;
+   this.rowCounters.batchCount++;
+    switch (this.tableInfo.insertMode) {
+      case 'Batch':
+        try {    
+          const args = new Array(this.rowCounters.cached).fill(this.tableInfo.rowConstructor).join(',')
+          await this.dbi.createSavePoint();
+          const sqlStatement = `${this.tableInfo.dml} ${args}`
+          const results = await this.dbi.executeSQL(sqlStatement,this.batch);
+          await this.processWarnings(results);
+          this.endTime = performance.now();
+          await this.dbi.releaseSavePoint();
+		  this.batch.length = 0;  
+          this.rowCounters.written += this.rowCounters.cached;
+		  this.rowCounters.cached = 0;
+          return this.skipTable
+        } catch (cause) {
+  		  this.reportBatchError(`INSERT MANY`,cause)
+          await this.dbi.restoreSavePoint(cause);
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
+          this.tableInfo.insertMode = 'Iterative'
+          repackBatch = true;
         }
-      }
+        break;  
+      case 'Iterative':     
+        for (let row =0; row < this.rowCounters.cached; row++) {
+          const nextRow = repackBatch ?  this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
+          try {
+            const results = await this.dbi.executeSQL(this.tableInfo.dml,nextRow);
+            await this.processWarnings(results);
+		    this.rowCounters.written++;
+          } catch (cause) {
+            await this.handleIterativeError(`INSERT ONE`,cause,row,nextRow)
+            if (this.skipTable) {
+             break;
+           }
+         }
+        }     
+        break;
+      default:
     }     
    
     this.endTime = performance.now();

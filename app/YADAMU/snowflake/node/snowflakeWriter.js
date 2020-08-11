@@ -10,12 +10,13 @@ const {BatchInsertError} = require('../../common/yadamuError.js')
 
 class SnowflakeWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,status,yadamuLogger) {
-    
-	super({objectMode: true},dbi,tableName,status,yadamuLogger)
-    
-    // console.log(this.tableInfo.targetDataTypes);
-    
+  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {  
+	super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
+  }
+  
+  setTableInfo(tableName) {
+	super.setTableInfo(tableName)
+
     this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
 	
@@ -43,6 +44,11 @@ class SnowflakeWriter extends YadamuWriter {
           return (col,idx) => {
             return typeof col === 'object' ? JSON.stringify(col) : col
 		  }
+        case "BOOLEAN" :
+ 		  return (col,idx) => {
+             return YadamuLibrary.toBoolean(col)
+          }
+          break;
         default :
 		  return null
       }

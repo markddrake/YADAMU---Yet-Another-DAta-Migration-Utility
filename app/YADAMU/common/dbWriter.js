@@ -40,13 +40,20 @@ class DBWriter extends Writable {
     this.transactionManager = this.dbi
 	this.currentTable   = undefined;
     this.rowCount       = undefined;
-    this.ddlComplete    = false;
+    this.ddlCompleted   = false;
 
     this.configureFeedback(this.dbi.parameters.FEEDBACK); 
 	this.tableCount = 0;
 
 	this.workerStatus = [];
   	this.timings = {}
+
+	this.ddlComplete = new Promise((resolve,reject) => {
+	  this.once('ddlComplete',() => {
+ 	    // this.yadamuLogger.trace([this.constructor.name],`DDL Complete`)
+		resolve(true);
+	  })
+	})	
 	
   }      
   
@@ -95,8 +102,8 @@ class DBWriter extends Writable {
   
   async generateStatementCache(metadata,ddlRequired) {
     const startTime = performance.now()
-    await this.dbi.setMetadata(metadata)      
-    await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER,!this.ddlComplete)
+    await this.dbi.setMetadata(metadata)     
+    await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER,!this.ddlCompleted)
 	let ddlStatementCount = 0
 	let dmlStatementCount = 0
 	Object.keys(this.dbi.statementCache).forEach((tableName) => {
@@ -131,7 +138,7 @@ class DBWriter extends Writable {
     */ 
 
     if (this.targetSchemaInfo === null) {
-      this.dbi.setMetadata(sourceMetadata)      
+      await this.dbi.setMetadata(sourceMetadata)      
     }
     else {    
     
@@ -204,7 +211,7 @@ class DBWriter extends Writable {
           }
         })
       }    
-	  await this.generateStatementCache(sourceMetadata,!this.ddlComplete)
+	  await this.generateStatementCache(sourceMetadata,!this.ddlCompleted)
     }
   }      
     
@@ -242,7 +249,7 @@ class DBWriter extends Writable {
         case 'ddl':
           if ((this.ddlRequired) && (obj.ddl.length > 0) && (this.dbi.isValidDDL())) { 
             await this.dbi.executeDDL(obj.ddl);
-            this.ddlComplete = true;
+            this.ddlCompleted = true;
           }
           break;
         case 'metadata':

@@ -21,6 +21,9 @@ class FileDBI extends YadamuDBI {
   **
   */
 
+  get DATABASE_VENDOR()    { return 'FILE' };
+  get SOFTWARE_VENDOR()    { return 'YABASC' };
+  
   constructor(yadamu,exportFilePath) {
     super(yadamu)
 	this.exportFilePath = exportFilePath
@@ -105,9 +108,6 @@ class FileDBI extends YadamuDBI {
     await this.writeMetadata(metadata)
   }
  
-  get DATABASE_VENDOR()    { return 'FILE' };
-  get SOFTWARE_VENDOR()    { return 'YABASC' };
-
   async releaseConnection() {
   }
  
@@ -199,7 +199,6 @@ class FileDBI extends YadamuDBI {
   
       
   async generateStatementCache(schema,executeDDL) {
-
     this.statementCache = []
   }
 
@@ -217,15 +216,23 @@ class FileDBI extends YadamuDBI {
 	  // Hack to enable statisticsCollector to use the YadamuWriter interface to collect statistics about the cotnents of a YADAMU export file...
       return {}
     }
-	 
+
+    if (this.metadata === undefined) {
+      this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`Metadata undefined. Cannot obtain required information.`)
+	}
+
+	if (this.metadata[tableName] === undefined) {
+      this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`No metadata entry for "${tableName}". Current entries: ${JSON.stringify(Object.keys(this.metadata))}`)
+	}
+
 	// ### Need to simplify and standardize DataTypes - Data type mapping for Files.. 
 	
 	// Include a dummy dataTypes array of the correct length to ensure the column count assertion does not throw
 	return { 
-	  tableName       : tableName
-	, _SPATIAL_FORMAT : this.systemInformation.spatialFormat
-    , columnNames     : [... this.metadata[tableName].columnNames]
-    , targetDataTypes : [... this.metadata[tableName].dataTypes]
+	  tableName         : tableName
+	, _SPATIAL_FORMAT   : this.systemInformation.spatialFormat
+    , columnNames       : [... this.metadata[tableName].columnNames]
+    , targetDataTypes   : [... this.metadata[tableName].dataTypes]
     }
   }
 
@@ -240,15 +247,23 @@ class FileDBI extends YadamuDBI {
 	return this.eventStream;
   }
     
-  getOutputStream(tableName) {
-    // this.yadamuLogger.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
+  getOutputStream(tableName,ddlComplete) {
     // Override parent method to allow output stream to be passed to worker
-    // return super.getOutputStream(FileWriter,primary)
-	this.outputStream.write(`${this.tableSeperator}"${tableName}":`);
-	const os =  new FileWriter(this,tableName,this.status,this.yadamuLogger,this.outputStream)
-	this.tableSeperator = ',';
+    // this.yadamuLogger.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
+	const os =  new FileWriter(this,tableName,ddlComplete,this.status,this.yadamuLogger)
     return os;
   }
+  
+  getFileOutputStream(tableName) {
+	this.outputStream.write(`${this.tableSeperator}"${tableName}":`);
+	this.tableSeperator = ',';
+    return this.outputStream
+  }
+  
+  getDatabaseConnection() {}
+  
+  closeConnection() {}
+ 
   
 }
 

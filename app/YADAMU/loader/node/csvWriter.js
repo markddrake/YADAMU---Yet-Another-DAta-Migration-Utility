@@ -12,15 +12,16 @@ class CSVWriter extends YadamuWriter {
 
   get SEPERATOR() { return this._SEPERATOR }
 
-  constructor(dbi,tableName,status,yadamuLogger,outputStream) {
+  constructor(dbi,tableName,status,yadamuLogger) {
     super({objectMode: true},dbi,tableName,status,yadamuLogger)
-    this.rowCounters.bytesWritten = 0;
     this._SEPERATOR = ','
-    this.tableName = tableName  
-    this.outputStream = outputStream	
-    this.tableInfo = this.dbi.getTableInfo(tableName)
+  }
+   
+  setTableInfo(tableName) {
 	this.setTableInfo(tableName)
-
+    this.outputStream = this.dbi.getFileOutputStream(tableName);
+    this.rowCounters.bytesWritten = 0;
+    
 	this.insertMode = 'JSON';    
     if (this.dbi.tableMappings && this.dbi.tableMappings.hasOwnProperty(tableName)) {
 	  tableName = this.dbi.tableMappings[tableName].tableName

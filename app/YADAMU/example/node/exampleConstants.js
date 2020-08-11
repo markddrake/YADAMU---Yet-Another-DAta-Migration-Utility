@@ -12,13 +12,15 @@ class ExampleConstants {
   }
 
   static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.EXAMPLE_DEFAULTS,Yadamu.YADAMU_DEFAULTS.example))
+    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.EXAMPLE_DEFAULTS,YadamuConstants.YADAMU_DEFAULTS.example || {}))
     return this._DEFAULT_PARAMETERS
   }
   
-  static get SPATIAL_FORMAT()             { return MariadbDBI.DEFAULT_PARAMETERS.SPATIAL_FORMAT };
+  static get SPATIAL_FORMAT()             { return this.DEFAULT_PARAMETERS.SPATIAL_FORMAT };
   static get DATABASE_VENDOR()            { return 'Vendor' };
   static get SOFTWARE_VENDOR()            { return 'Vendor Corporation' };
   static get STATEMENT_TERMINATOR()       { return ';' }
 
 }
+
+module.exports = ExampleConstants

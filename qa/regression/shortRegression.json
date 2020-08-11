@@ -1,0 +1,141 @@
+{
+  "operation"                         : "dbRoundtrip"
+, "connections"                       : "qa/regression/connections.json"
+, "parameters": {
+    "MODE": "DATA_ONLY"
+  , "FEEDBACK": "COMMIT"
+  , "MONGO_STRIP_ID" : true
+  , "ON_ERROR" : "FLUSH"
+  , "PARALLEL" : 0
+  }
+, "tasks"                             : "qa/regression/dbRoundtripTasks.json"
+, "tests" : [{
+    "source": "oracle19c"
+  , "target": "oracle19c"
+  , "directory" : "tests/fileRoundtrip/%vendor%"
+  , "tasks": [
+       "HR"
+    ]
+  },{
+    "source": "oracle18c"
+  , "target": "oracle18c"
+  , "directory" : "tests/fileRoundtrip/%vendor%"
+  , "tasks": [
+       "HR"
+    ]
+  },{
+    "source": "oracle12c"
+  , "target": "oracle12c"
+  , "directory" : "tests/fileRoundtrip/%vendor%"
+  , "tasks": [
+       "HR"
+    ]
+  },{
+    "source": "oracle11g"
+  , "target": "oracle11g"
+  , "directory" : "tests/fileRoundtrip/%vendor%"
+  , "tasks": [
+       "HR"
+    ]
+  },{
+    "source": "mssql19"
+  , "target": "mssql19"
+  , "directory" : "tests/fileRoundtrip/%vendor%"
+  , "tasks": [
+       "HR"
+    ]
+  },{
+    "source": "mssql17"
+  , "target": "mssql17"
+  , "directory" : "tests/fileRoundtrip/%vendor%"
+  , "tasks": [
+       "HR"
+    ]
+  },{
+    "source": "postgres#1"
+  , "target": "postgres#1"
+  , "directory" : "tests/fileRoundtrip/%vendor%"
+  , "tasks": [
+       "HR"
+    ]
+  },{
+    "source": "mysql#1"
+  , "target": "mysql#1"
+  , "directory" : "tests/fileRoundtrip/%vendor%"
+  , "tasks": [
+       "HR"
+	]
+  },{
+    "source": "mariadb#1"
+  , "target": "mariadb#1"
+  , "directory" : "tests/fileRoundtrip/%vendor%"
+  , "tasks": [
+       "HR"
+	]
+  },{
+    "source": "mongodb#1"
+  , "target": "mongodb#1"
+  , "parameters": {
+      "MONGO_STRIP_ID" : false
+    }
+  , "directory" : "tests/fileRoundtrip/%vendor%"
+  , "tasks": [
+       "HR"
+    ]
+  },{
+    "source": "oracle19c"
+  , "target": "oracle19c"
+  , "directory" : "tests/fileRoundtrip/%vendor%"
+  , "tasks": [
+       "BI"
+    ]
+  },{
+    "source"     : "oracle19c"
+  , "target"     : "file-connection-mode"
+  , "operation"  : "export"
+  , "clone"      : true
+  , "directory"  : "tests/fileRoundtrip/%vendor%"
+  , "parameters" : {
+     "MODE"      : "DDL_ONLY"
+    }
+  , "tasks": [
+       { "source" : {"schema" : "HR"    }, "target" : { "file" : "HR.json"},          "verify" : {"schema" : "HR1"    }}
+    ]
+  },{
+    "source"     : "oracle19c"
+  , "target"     : "file-connection-mode"
+  , "operation"  : "export"
+  , "clone"      : true
+  , "directory"  : "tests/fileRoundtrip/%vendor%"
+  , "parameters" : {
+     "MODE"      : "DATA_ONLY"
+    }
+  , "tasks": [
+       { "source" : {"schema" : "HR"    }, "target" : { "file" : "HR.json"},          "verify" : {"schema" : "HR1"    }}
+    ]
+  },{
+    "source"     : "oracle19c"
+  , "target"     : "file-connection-mode"
+  , "operation"  : "export"
+  , "clone"      : true
+  , "directory"  : "tests/fileRoundtrip/%vendor%"
+  , "parameters" : {
+     "MODE"      : "DDL_AND_DATA"
+    }
+  , "tasks": [
+       { "source" : {"schema" : "HR"    }, "target" : { "file" : "HR.json"},          "verify" : {"schema" : "HR1"    }}
+    ]
+  },{
+    "source"     : "file-JSON-root"
+  , "target"     : "oracle19c"
+  , "operation"  : "fileRoundtrip"
+  , "clone"      : true
+  , "directory"  : "scratch/fileRoundtrip/%vendor%"
+  , "parameters" : {
+     "MODE"      : "DDL_AND_DATA"
+    }
+  , "tasks": [
+       { "source" : { "file" : "HR.json", "directory": "oracle19c/%mode%" },  "target" : {"schema" : "HR"}}
+    ]
+  }]
+}

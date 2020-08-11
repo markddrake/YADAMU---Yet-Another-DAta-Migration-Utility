@@ -34,15 +34,19 @@ class PostgresQA extends PostgresDBI {
 	  const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
 	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
 	  const timer = setTimeout(async (pid) => {
-		   if (this.pool !== undefined && this.pool.end) {
-		     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Killing connection.`);
-	         const conn = await this.getConnectionFromPool();
-		     const res = await conn.query(`select pg_terminate_backend(${pid})`);
-		     await conn.release()
-		   }
-		   else {
-		     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
-		   }
+          try {
+		    if (this.pool !== undefined && this.pool.end) {
+		      this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Killing connection.`);
+	          const conn = await this.getConnectionFromPool();
+		      const res = await conn.query(`select pg_terminate_backend(${pid})`);
+		      await conn.release()
+		    }
+		    else {
+		      this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
+		    }
+           } catch (e) {
+             console.log(e);
+           }
 		},
 		killDelay,
 	    pid

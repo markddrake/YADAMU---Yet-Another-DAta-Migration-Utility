@@ -156,7 +156,7 @@ class MariadbDBI extends YadamuDBI {
   };
    
   async reconnectImpl() {
-    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
   }
 
   async createSchema(schema) {    	
@@ -460,7 +460,7 @@ class MariadbDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : this.EXPORT_VERSION
+     ,exportVersion      : Yadamu.EXPORT_VERSION
      ,sessionUser        : sysInfo.SESSION_USER
      ,dbName             : sysInfo.DATABASE_NAME
      ,serverHostName     : sysInfo.SERVER_HOST
@@ -623,8 +623,8 @@ class MariadbDBI extends YadamuDBI {
     return new MariadbParser(tableInfo,this.yadamuLogger);
   }  
 
-  getOutputStream(tableName) {
-	 return super.getOutputStream(MariadbWriter,tableName)
+  getOutputStream(tableName,ddlComplete) {
+	 return super.getOutputStream(MariadbWriter,tableName,ddlComplete)
   }
 
   async workerDBI(workerNumber) {

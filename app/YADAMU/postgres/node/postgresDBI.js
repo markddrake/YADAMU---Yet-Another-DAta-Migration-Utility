@@ -94,7 +94,7 @@ class PostgresDBI extends YadamuDBI {
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  // const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))
-      // this.yadamuLogger.logException([this.DATABASE_VENDOR,`Client.onError()`],pgErr);
+      this.yadamuLogger.logException([this.DATABASE_VENDOR,`POOL_ON_ERROR`],pgErr);
       // throw pgErr
     })
 
@@ -154,18 +154,23 @@ class PostgresDBI extends YadamuDBI {
 	)
 
     this.connection.on('notice',(n) => { 
-	    const notice = JSON.parse(JSON.stringify(n));
-        switch (notice.code) {
-          case '42P07': // Table exists on Create Table if not exists
-            break;
-          case '00000': // Table not found on Drop Table if exists
-		    break;
-          default:
-            this.yadamuLogger.info([this.DATABASE_VENDOR,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`);
-        }
+      const notice = JSON.parse(JSON.stringify(n));
+      switch (notice.code) {
+        case '42P07': // Table exists on Create Table if not exists
+          break;
+        case '00000': // Table not found on Drop Table if exists
+	      break;
+        default:
+          this.yadamuLogger.info([this.DATABASE_VENDOR,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`);
       }
+    })  
   
-	)  
+	this.connection.on('error',(err, p) => {
+	  // Do not throw errors here.. Node will terminate immediately
+	  // const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))
+      this.yadamuLogger.logException([this.DATABASE_VENDOR,`CONNECTION_ON_ERROR`],pgErr);
+      // throw pgErr
+    })
    
     await this.executeSQL(PostgresDBI.SQL_CONFIGURE_CONNECTION);				
   }
@@ -206,7 +211,7 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async reconnectImpl() {
-    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
     await this.executeSQL('select 1')
   }
   
@@ -524,7 +529,7 @@ class PostgresDBI extends YadamuDBI {
      ,postgisInfo        : postgisInfo
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : this.EXPORT_VERSION
+     ,exportVersion      : Yadamu.EXPORT_VERSION
 	 ,sessionUser        : sysInfo.session_user
      ,dbName             : sysInfo.database_name
      ,databaseVersion    : sysInfo.database_version
@@ -617,8 +622,8 @@ class PostgresDBI extends YadamuDBI {
     await super.generateStatementCache(StatementGenerator, schema, executeDDL)
   }
 
-  getOutputStream(tableName) {
-	 return super.getOutputStream(PostgresWriter,tableName)
+  getOutputStream(tableName,ddlComplete) {
+	 return super.getOutputStream(PostgresWriter,tableName,ddlComplete)
   }
  
   async insertBatch(sqlStatement,batch) {
@@ -635,7 +640,7 @@ class PostgresDBI extends YadamuDBI {
  
   async getConnectionID() {
 	const results = await this.executeSQL(`select pg_backend_pid()`)
-	const pid = results.rows[0].pg_backend_pid;
+	const pid = results.rows[0][0];
     return pid
   }
 	  

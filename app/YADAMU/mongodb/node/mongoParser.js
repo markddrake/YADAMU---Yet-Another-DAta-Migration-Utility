@@ -12,6 +12,10 @@ class MongoParser extends YadamuParser {
 		   return (row,idx)  => {
              row[idx] = row[idx].buffer;
 		   }
+         case 'objectId':
+		   return (row,idx)  => {
+             row[idx] = Buffer.from(row[idx].toHexString(),'hex')
+		   }
         default:
 		  return null;
       }
@@ -33,9 +37,6 @@ class MongoParser extends YadamuParser {
 	this.counter++;
     if (this.tableInfo.ID_TRANSFORMATION === 'STRIP') {
       delete data._id
-    }
-	else {
-	  data._id = data._id.toString()
     }
 	
     switch (this.tableInfo.READ_TRANSFORMATION) {

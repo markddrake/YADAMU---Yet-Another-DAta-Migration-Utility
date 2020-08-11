@@ -8,17 +8,18 @@ const { performance } = require('perf_hooks');
 
 class JSONParser extends Transform {
   
-  constructor(yadamuLogger, mode, options) {
+  constructor(tableName, yadamuLogger, mode, options) {
       
     super({objectMode: true });  
    
-    this.mode = mode;
-  
+    
+    this.currentTable = tableName      
+    this.yadamuLogger = yadamuLogger;
+	this.mode = mode;
+    
 	this.rowsRead = 0;
 	this.startTime = undefined;
 	this.endTime = undefined;
-	
-    this.yadamuLogger = yadamuLogger;
 
     this.parser = clarinet.createStream();
     
@@ -112,7 +113,7 @@ class JSONParser extends Transform {
       this.jDepth--;
 
       let skipObject = false;
-
+    
       switch (this.jDepth){
 		case 0:
    	      this.endTime = performance.now();
@@ -143,10 +144,16 @@ class JSONParser extends Transform {
           }
         }
         this.currentObject = parentObject;
+		
       }   
     });  
-   
-   
+    
+	/*
+    this.parser.on('end',() => {
+	   this.push({end: this.currentTable});
+	})
+	*/
+	
     this.tableList  = new Set();
     this.objectStack = [];
     
@@ -154,6 +161,9 @@ class JSONParser extends Transform {
     this.chunks = [];
 
     this.jDepth = 0; 
+	
+	// Push a table entry before sending data. Ensure that the Writer waits for DDL to complete before writing data.
+	this.push({table: this.currentTable})
   }     
      
 

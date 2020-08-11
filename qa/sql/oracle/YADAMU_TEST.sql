@@ -149,39 +149,52 @@ as
 			 --
 		     $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN     
 			 --
-			 -- 11.x Does not satisfy JSON_PARSING_SUPPORTED
-			 --
-			 $IF DBMS_DB_VERSION.VER_LE_12 $THEN
-			 --
-			 --  JSON Sorting is no supported. No where clause so BLOB and CLOB fall through to the default BLOB and CLOB handlinng below
-			 --
-			 $ELSE		 
+			 -- 11.x  and 12.1 do not satisfy JSON_PARSING_SUPPORTED. 
 			 --
 		     when jc.FORMAT is not NULL then
 			   -- We have a JSON column of type VARCHAR, CLOB or BLOB
 			   case 
 			     when P_ORDER_JSON = 'TRUE' then
-			       $IF DBMS_DB_VERSION.VER_LE_18 $THEN    
-				   -- Order and convert to BLOB using JSON_QUERY
-                   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning BLOB ORDERED),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			       $IF DBMS_DB_VERSION.VER_LE_12_2 $THEN
+			       --
+			       -- Order and convert to VARCHAR2 using JSON_QUERY
+				   --
+			       --  Only order JSON documents < 8K (4K).  Ordering document > 8K may result in ORA-3113
+                   -- 
+                   'case ' || 
+                   '  when t."' || atc.COLUMN_NAME || '" is NULL then ' || 
+                   '    NULL ' || 
+                   '  when LENGTH("' || atc.COLUMN_NAME || '") <= ' || CEIL(YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE/4) || ' then ' ||
+                   '    dbms_crypto.HASH(TO_CLOB(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning VARCHAR2(' || YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE  || ') ORDERED)),' || V_HASH_METHOD || ')' ||
+                   '  when LENGTH("' || atc.COLUMN_NAME || '") <= ' || YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE || ' then ' ||
+                   '    dbms_crypto.HASH(TO_CLOB(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning VARCHAR2(' || YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE  || '))),' || V_HASH_METHOD || ')' ||
+                   '  else ' || 
+                   '    dbms_crypto.HASH("'  || atc.COLUMN_NAME || '",' || V_HASH_METHOD || ')' ||
+                   'end /* JSON 12C ORDERED */ "' || atc.COLUMN_NAME || '"'
+			       $ELSIF DBMS_DB_VERSION.VER_LE_18 $THEN
+                   --				   
+			       -- Order and convert to BLOB using JSON_QUERY
+                   --
+			       -- Disable Ordering in 18c. Ordering documents may result in ORA-3113
+                   -- 
+                   -- 'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning BLOB ORDERED),' || V_HASH_METHOD || ') end /* JSON 18C ORDERED */ "' || atc.COLUMN_NAME || '"'
+				   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning BLOB),' || V_HASH_METHOD || ') end /* JSON 18C ORDERED */ "' || atc.COLUMN_NAME || '"'
 				   $ELSE
 				   -- Order and convert to BLOB using JSON_SERIALIZE
-                   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || atc.COLUMN_NAME || '" returning BLOB ORDERED),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+                   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || atc.COLUMN_NAME || '" returning BLOB ORDERED),' || V_HASH_METHOD || ') end /* JSON 19C ORDERED */"' || atc.COLUMN_NAME || '"'
 				   $END
 			     else 
-                   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning BLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+                   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(t."' || atc.COLUMN_NAME || '",' || V_HASH_METHOD || ') end /* JSON UNORDERED */ "' || atc.COLUMN_NAME || '"'
 			   end
-			 --
-			 $END
 			 --
 			 $END
 			 --
 		     when atc.DATA_TYPE = 'ANYDATA' then
 		       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(OBJECT_SERIALIZATION.SERIALIZE_ANYDATA(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 		     when atc.DATA_TYPE in ('BLOB')  then
-   		       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(t."' || atc.COLUMN_NAME || '",' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+   		       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(t."' || atc.COLUMN_NAME || '",' || V_HASH_METHOD || ') end /* BLOB  */ "' || atc.COLUMN_NAME || '"'
 			 when atc.DATA_TYPE in ('CLOB','NCLOB')  then
-		        'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || atc.COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH(t."' || atc.COLUMN_NAME || '",' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+		        'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || atc.COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH(t."' || atc.COLUMN_NAME || '",' || V_HASH_METHOD || ') end /* CLOB */ "' || atc.COLUMN_NAME || '"'
              else
 	     	   't."' || atc.COLUMN_NAME || '"'
 		   end,
@@ -196,6 +209,9 @@ as
 		   end,
 		',') 
 		 WITHIN GROUP (ORDER BY INTERNAL_COLUMN_ID, atc.COLUMN_NAME) LOB_COLUMN_LIST
+        $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN     
+        ,MAX(case when jc.FORMAT is not NULL then 1 else 0 end)  "HAS_JSON_COLUMNS"
+        $END
   from ALL_ALL_TABLES aat
        inner join ALL_TAB_COLS atc
 	           on atc.OWNER = aat.OWNER
@@ -290,6 +306,13 @@ begin
     else
       -- Not a TYPO: NULL is a string in this case.
       V_SQLERRM := 'NULL';
+      $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
+      $IF DBMS_DB_VERSION.VER_LE_12_2 $THEN     
+      if (t.HAS_JSON_COLUMNS = 1) then
+        V_SQLERRM := '''WARNING: JSON normalization disabled for documents > 8Kb in Oracle12c.''';
+      end if;
+      $END
+      $END
     end if;
 	
 	if (P_STYLESHEET IS NOT NULL) then
@@ -299,39 +322,36 @@ begin
         else
 		  V_STYLESHEET := NULL;
 	  end case;
-	  V_WITH_CLAUSE := 'WITH XSL_TABLE AS (SELECT :1 "XSL" FROM DUAL)';
 	  V_XSL_TABLE_CLAUSE := ', XSL_TABLE X';
 	else
       V_STYLESHEET := NULL;
 	  V_WITH_CLAUSE := '';
 	  V_XSL_TABLE_CLAUSE := '';
 	end if;
-
+    
     V_SQL_STATEMENT := 'insert into SCHEMA_COMPARE_RESULTS ' || YADAMU_UTILITIES.C_NEWLINE
-                    || ' select ''' || P_SOURCE_SCHEMA  || ''' ' || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,''' || P_TARGET_SCHEMA  || ''' ' || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,'''  || t.TABLE_NAME || ''' ' || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,(select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '")'  || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,(' || V_WITH_CLAUSE || ' select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ' MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ')) '  || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,(' || V_WITH_CLAUSE || ' select count(*) from (SELECT ' || t.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ' MINUS SELECT ' || t.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ')) '  || YADAMU_UTILITIES.C_NEWLINE
-                    || '       ,' || V_SQLERRM  || YADAMU_UTILITIES.C_NEWLINE
-					|| '  from dual';
-                    
+                    || 'with ' 
+                    || 'XSL_TABLE as ( ' || YADAMU_UTILITIES.C_NEWLINE
+                    || 'select :1 XSL from dual ' || YADAMU_UTILITIES.C_NEWLINE
+                    || '),' || YADAMU_UTILITIES.C_NEWLINE
+                    || 'TABLE_COMPARE_RESULTS as (' || YADAMU_UTILITIES.C_NEWLINE
+                    || 'select ''' || P_SOURCE_SCHEMA  || ''' "SOURCE_SCHEMA" ' || YADAMU_UTILITIES.C_NEWLINE
+                    || '      ,''' || P_TARGET_SCHEMA  || ''' "TARGET_SCHEMA" ' || YADAMU_UTILITIES.C_NEWLINE
+                    || '      ,'''  || t.TABLE_NAME || '''  "TABLE_NAME" ' || YADAMU_UTILITIES.C_NEWLINE
+                    || '      ,(select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '") "SOURCE_ROWS" '  || YADAMU_UTILITIES.C_NEWLINE
+                    || '      ,(select count(*) from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '") "TARGET_ROWS" '  || YADAMU_UTILITIES.C_NEWLINE
+                    || '      ,(select count(*) from (select ' || t.COLUMN_LIST || ' from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ' MINUS select ' || t.COLUMN_LIST || ' from  "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ')) "MISSING_ROWS"'  || YADAMU_UTILITIES.C_NEWLINE
+                    || '      ,(select count(*) from (select ' || t.COLUMN_LIST || ' from "' || P_TARGET_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ' MINUS select ' || t.COLUMN_LIST || ' from  "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '" t' || V_XSL_TABLE_CLAUSE || ')) "EXTRA_ROWS"'  || YADAMU_UTILITIES.C_NEWLINE
+					|| '  from dual' || YADAMU_UTILITIES.C_NEWLINE
+					|| ')' || YADAMU_UTILITIES.C_NEWLINE
+                    || 'select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROWS, TARGET_ROWS, MISSING_ROWS, EXTRA_ROWS, case when ((EXTRA_ROWS > 0) or (MISSING_ROWS > 0)) then ' || V_SQLERRM || ' else NULL end'  || YADAMU_UTILITIES.C_NEWLINE                    
+                    || '  from TABLE_COMPARE_RESULTS';
+
 	begin
-      -- 
-      
-      
-      
-      DBMS_OUTPUT.PUT_LINE(V_SQL_STATEMENT);
-	  if (V_STYLESHEET is not null) then
-        EXECUTE IMMEDIATE V_SQL_STATEMENT USING V_STYLESHEET, V_STYLESHEET;
-	  else
-	    EXECUTE IMMEDIATE V_SQL_STATEMENT;
-	  end if;
+      EXECUTE IMMEDIATE V_SQL_STATEMENT USING V_STYLESHEET;
     exception 
       when OTHERS then
-        V_SQLERRM := SQLERRM;					  
+        V_SQLERRM := SQLERRM || ' SQL: ' || V_SQL_STATEMENT;					  
         begin 
           V_SQL_STATEMENT := 'select count(*) from "' || P_SOURCE_SCHEMA  || '"."' || t.TABLE_NAME || '"';
 		  execute immediate V_SQL_STATEMENT into P_SOURCE_COUNT;

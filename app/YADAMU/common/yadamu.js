@@ -21,6 +21,8 @@ const YadamuRejectManager = require('./yadamuRejectManager.js');
 
 class Yadamu {
 
+  static get YADAMU_VERSION()         { return YadamuConstants.YADAMU_VERSION }
+  
   get FILE()                          { return this.parameters.FILE     || YadamuConstants.FILE }
   get MODE()                          { return this.parameters.MODE     || YadamuConstants.MODE }
   get ON_ERROR()                      { return this.parameters.ON_ERROR || YadamuConstants.ON_ERROR }

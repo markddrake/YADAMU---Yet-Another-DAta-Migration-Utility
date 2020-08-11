@@ -1,8 +1,6 @@
 "use strict"
 
 const YadamuCLI = require('./yadamuCLI.js')
-const Yadamu = require('./yadamu.js')
-const {CommandLineError} = require('./yadamuError.js');
 
 class Import extends YadamuCLI {}
 

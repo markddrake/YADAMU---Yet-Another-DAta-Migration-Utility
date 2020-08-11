@@ -9,64 +9,57 @@ const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 
 class MySQLWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,status,yadamuLogger) {
-    super({objectMode: true},dbi,tableName,status,yadamuLogger)
+  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
+    super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
+  }
+   
+  setTableInfo(tableName) {
+    super.setTableInfo(tableName)
 
-	this.tableInfo.columnCount = this.tableInfo.columnNames.length;
+    this.tableInfo.columnCount = this.tableInfo.columnNames.length;
     this.tableInfo.args =  '(' + Array(this.tableInfo.columnCount).fill('?').join(',')  + ')'; 
-    
-    if (this.tableInfo.insertMode === 'Rows') {
-	  this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
-        const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-         switch (dataType.type.toLowerCase()) {
-          default :
-            return null
-        }
-      })
-    }
-    else {
-	  this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
-        const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-         switch (dataType.type.toLowerCase()) {
-          case "json" :
-            return (col,idx) => {
-              return typeof col === 'object' ? JSON.stringify(col) : col
-	        }
-            break;
-            case "geometry" :
-              if (this.SPATIAL_FORMAT === 'GeoJSON') {
-                return (col,idx) => {
-                  return typeof col === 'object' ? JSON.stringify(col) : col
-	            }
-              }
-              return null;
-            case "boolean":
-            return (col,idx) => {
-              return YadamuLibrary.booleanToInt(col)
-	        }
-            break; 
-          case "date":
-          case "time":
-          case "datetime":
-          case "timestamp":
-            return (col,idx) => {
-              // If the the input is a string, assume 8601 Format with "T" seperating Date and Time and Timezone specified as 'Z' or +00:00
-              // Neeed to convert it into a format that avoiods use of convert_tz and str_to_date, since using these operators prevents the use of Bulk Insert.
-              // Session is already in UTC so we safely strip UTC markers from timestamps
-              if (typeof col !== 'string') {
-                col = col.toISOString();
-              }             
-              col = col.substring(0,10) + ' '  + (col.endsWith('Z') ? col.substring(11).slice(0,-1) : (col.endsWith('+00:00') ? col.substring(11).slice(0,-6) : col.substring(11)))
-              // Truncate fractional values to 6 digit precision
-              // ### Consider rounding, but what happens at '9999-12-31 23:59:59.999999
-              return col.substring(0,26);
-   		  }
-   		  break;
-          default :
-            return null
-        }
-      })
-    }
+
+    this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
+      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
+       switch (dataType.type.toLowerCase()) {
+        case "json" :
+          return (col,idx) => {
+            return typeof col === 'object' ? JSON.stringify(col) : col
+       }
+          break;
+          case "geometry" :
+            if (this.SPATIAL_FORMAT === 'GeoJSON') {
+              return (col,idx) => {
+                return typeof col === 'object' ? JSON.stringify(col) : col
+           }
+            }
+            return null;
+          case "boolean":
+          return (col,idx) => {
+            return YadamuLibrary.booleanToInt(col)
+       }
+          break; 
+        case "date":
+        case "time":
+        case "datetime":
+        case "timestamp":
+          return (col,idx) => {
+            // If the the input is a string, assume 8601 Format with "T" seperating Date and Time and Timezone specified as 'Z' or +00:00
+            // Neeed to convert it into a format that avoiods use of convert_tz and str_to_date, since using these operators prevents the use of Bulk Insert.
+            // Session is already in UTC so we safely strip UTC markers from timestamps
+            if (typeof col !== 'string') {
+              col = col.toISOString();
+            }             
+            col = col.substring(0,10) + ' '  + (col.endsWith('Z') ? col.substring(11).slice(0,-1) : (col.endsWith('+00:00') ? col.substring(11).slice(0,-6) : col.substring(11)))
+            // Truncate fractional values to 6 digit precision
+            // ### Consider rounding, but what happens at '9999-12-31 23:59:59.999999
+            return col.substring(0,26);
+ 		  }
+ 		  break;
+        default :
+          return null
+      }
+    })
   }
   
   getStatistics()  {
@@ -92,43 +85,55 @@ class MySQLWriter extends YadamuWriter {
 
     // Rows mode requires an array of column values, rather than an array of rows.
 
-    /*
-    if (this.insertMode = 'rows')  {
+    if (this.tableInfo.insertMode === 'Rows')  {
   	  this.batch.push(...row)
     }
     else {
       this.batch.push(row)
     }
-	*/
 
-    this.batch.push(row)
-	this.rowCounters.cached++
+    this.rowCounters.cached++
 	return this.skipTable;
   }  
 
   async processWarnings(results) {
+
     // ### Output Records that generate warnings
+
+    let badRow = 0;
+
     if (results.warningCount >  0) {
       const warnings = await this.dbi.executeSQL('show warnings');
-      warnings.forEach((warning,idx) => {
+      // warnings.forEach(async (warning,idx) => {
+      for (const warning of warnings) {
         if (warning.Level === 'Warning') {
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,idx],`${warning.Code} Details: ${warning.Message}.`)
-		  this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,this.batch[idx]);
+          let nextBadRow = warning.Message.split('row')
+          nextBadRow = parseInt(nextBadRow[nextBadRow.length-1])
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
+          if (badRow !== nextBadRow) {
+            const columnOffset = (nextBadRow-1) * this.tableInfo.columnNames.length
+            const row = this.tableInfo.insertMode === 'Rows'  ? this.batch.slice(columnOffset,columnOffset +  this.tableInfo.columnNames.length) : this.batch[nextBadRow-1]
+	  	    await this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,row);
+            badRow = nextBadRow;
+          }
         }
-      })
+      }
     }
   }
   
-  recodeSpatialColumns(batch,row,msg) {
-      
-    // If MySQL rejects a WKB record recode the entire batch as WKT
-    
-    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`INSERT ONE`,this.batch.length,row,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
-    YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch,true)
-  }
+  
+  recodeSpatialColumns(batch,msg) {
+    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`INSERT ROWS`,this.rowCounters.cached,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
+    YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch,false)
+  }  
   
   reportBatchError(operation,cause) {
-   	super.reportBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+	if (this.tableInfo.insertMode === 'Rows') {
+      super.reportBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
+	}
+	else {
+   	  super.reportBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+	}
   }
  
   async writeBatch() {     
@@ -146,64 +151,65 @@ class MySQLWriter extends YadamuWriter {
           this.rowCounters.written += this.rowCounters.cached;
    		  this.rowCounters.cached = 0;
           return this.skipTable
+          break;  
         } catch (cause) {
-   		  this.reportBatchError(cause,'INSERT MANY')
+   		  this.reportBatchError(cause,'INSERT MANY',true)
           await this.dbi.restoreSavePoint(cause);
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
-          this.tableInfo.insertMode = 'Iterative'   
           this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args
         }
-        break;  
       case 'Rows':
-        try {
-          await this.dbi.createSavePoint();   
-          const sqlStatement = `${this.tableInfo.dml } ${new Array(this.rowCounters.cached).fill(this.tableInfo.rowConstructor).join(',')}`
-          const results = await this.dbi.executeSQL(sqlStatement,[this.batch]);
-          await this.processWarnings(results);
-          this.endTime = performance.now();
-          await this.dbi.releaseSavePoint();
-	   	  this.batch.length = 0;  
-          this.rowCounters.written += this.rowCounters.cached;
-	   	  this.rowCounters.cached = 0;
-          return this.skipTable
-        } catch (cause) {
-	   	  this.reportBatchError(cause,'INSERT MANY')
-          await this.dbi.restoreSavePoint(cause);
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
-          this.tableInfo.insertMode = 'Iterative'   
-          this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args
+	    let recodedBatch = false
+	    while (true) {
+          try {
+            await this.dbi.createSavePoint();    
+            const sqlStatement = `${this.tableInfo.dml} ${new Array(this.rowCounters.cached).fill(this.tableInfo.rowConstructor).join(',')}`
+            const results = await this.dbi.executeSQL(sqlStatement,this.batch);
+            await this.processWarnings(results);
+            this.endTime = performance.now();
+            await this.dbi.releaseSavePoint();
+	   	    this.batch.length = 0;  
+            this.rowCounters.written += this.rowCounters.cached;
+	   	    this.rowCounters.cached = 0;
+            return this.skipTable
+          } catch (cause) {
+            await this.dbi.restoreSavePoint(cause);
+			// If it's a spatial error recode the entire batch and try again.
+            if (cause.spatialInsertFailed() && !recodedBatch) {
+              recodedBatch = true;
+			  this.recodeSpatialColumns(this.batch,cause.message)
+			  this.tableInfo.rowConstructor = this.tableInfo.rowConstructor.replace(/ST_GeomFromWKB\(\?\)/g,'ST_GeomFromText(?)')
+			  continue;
+		    }
+	   	    this.reportBatchError(cause,'INSERT ROWS')
+            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);    
+            break;			
+		  }
         }
-        break
       case 'Iterative':     
-        let batchRecoded = false     
-        let dml = this.tableInfo.dml
-        for (const row in this.batch) {
-          // Enable retry after correcting spatial issues.. Break on successful insert or unfixable error
-          while (true) {      
-            try {
-              const results = await this.dbi.executeSQL(dml,this.batch[row])
-              await this.processWarnings(results);
-    		  this.rowCounters.written++;
-              break;
-            } catch (cause) {
-              if (cause.spatialInsertFailed() && !batchRecoded) {
-    		    this.recodeSpatialColumns(this.batch,row,cause.message)
-                batchRecoded = true;
-                dml = this.tableInfo.dml.replace(/ST_GeomFromWKB\(\?\)/g,'ST_GeomFromText(?)')
-              }
-              else {
-                await this.handleIterativeError(`INSERT ONE`,cause,row,this.batch[row]);
-                break;
-              }
-            }
-          }
-          if (this.skipTable) {
-            break;
-          }
-        }
-        break;
+	    break;
       default:
     }     
+		
+    // Batch or Rows failed, or iterative was selected.
+	
+	const sqlStatement = `${this.tableInfo.dml} ${this.tableInfo.rowConstructor}`
+	for (let row = 0; row < this.rowCounters.cached; row++) {
+      const  nextRow = this.tableInfo.insertMode === "Rows" ? this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
+      if (row === 0) console.log(nextRow);
+      try {
+        const results = await this.dbi.executeSQL(sqlStatement,nextRow)
+        await this.processWarnings(results);
+  	    this.rowCounters.written++;
+      } catch (cause) { 
+        await this.handleIterativeError(`INSERT ONE`,cause,row,nextRow);
+		if (this.skipTable) {
+	      break;
+		}
+      }
+	}
+
+    this.tableInfo.insertMode = 'Iterative'   
     this.endTime = performance.now();
     this.batch.length = 0;  
 	this.rowCounters.cached = 0;

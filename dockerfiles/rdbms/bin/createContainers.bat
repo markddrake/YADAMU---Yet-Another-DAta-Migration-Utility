@@ -13,12 +13,12 @@ docker run --name ORA1220-01 --memory="16g" --shm-size=4g -p 1523:1521 -e ORACLE
 REM Oracle 12.1.0.2.0                                                                                                                                                        
 docker run --name ORA1210-01 --memory="16g" --shm-size=4g -p 1524:1521 -e ORACLE_SID=CDB12100 -e ORACLE_PDB=PDB12100 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1210-01-DATA:/opt/oracle/oradata -vORA1210-01-DIAG:/opt/oracle/diag -vORA1210-01-DIAG:/opt/oracle/admin --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:12.1.0.2-ee 
 REM Fix for Oracle 11.2..0.1.0 persmissions
-set /P DOCKER_USER=docker
+set /P DOCKER_USER=docker 
 ssh %DOCKER_USER%@%DOCKER_IP_ADDR% "sudo chown 54321:54322 /var/lib/docker/volumes/ORA1120-01-DIAG/_data"
 REM Oracle 11.2.0.1.0                                                                                                                                                        
 docker run --name ORA1120-01 --memory="16g" --shm-size=4g -p 1525:1521 -e ORACLE_SID=ORA11200 -e ORACLE_PDB=ORA11200 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1120-01-DATA:/opt/oracle/oradata -vORA1120-01-DIAG:/opt/oracle/diag -vORA1120-01-DIAG:/opt/oracle/admin  --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:11.2.0.1-ee
 REM Oracle MySQL 8.0
-docker run --name MYSQL80-01 --memory="16g" --shm-size=4g -p 3306:3306 -v MYSQL80-01-DATA:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=oracle -d mysql:latest 
+docker run --name MYSQL80-01 --memory="16g" --shm-size=4g -p 3306:3306 -v MYSQL80-01-DATA:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=oracle --cap-add=sys_nice -d mysql:latest 
 REM MaraDB 10.0
 docker run --name MARIA10-01 --memory="16g" --shm-size=4g -p 3307:3306 -v MARIA10-01-DATA:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=oracle -d mariadb:latest  
 REM MsSQL 2017

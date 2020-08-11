@@ -10,10 +10,7 @@ class YadamuParser extends Transform {
     this.tableInfo = tableInfo;
     this.yadamuLogger = yadamuLogger
     this.counter = 0
-    
-    this.columnMetadata = undefined;
-    this.includesLobs = false;
-    
+    this.push({table: tableInfo.MAPPED_TABLE_NAME})
   }
     
   getCounter() {

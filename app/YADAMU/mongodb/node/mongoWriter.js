@@ -36,9 +36,13 @@ class MongoWriter extends YadamuWriter {
   **  
   */
 
-  constructor(dbi,tableName,status,yadamuLogger) {
-    super({objectMode: true},dbi,tableName,status,yadamuLogger)
-
+  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
+    super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
+  }
+  
+  setTableInfo(tableName) {
+	super.setTableInfo(tableName)
+    
     this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
        switch(targetDataType.toLowerCase()){
         case 'objectid':

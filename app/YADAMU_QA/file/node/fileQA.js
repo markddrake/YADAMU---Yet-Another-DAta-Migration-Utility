@@ -185,9 +185,11 @@ class FileQA extends FileDBI {
                                     + ` ${'CHILD BYTES'.padStart(colSizes[9])} |` 
                                     + ` ${'DELTA'.padStart(colSizes[10])} |`
                                     + ` ${'TIMINGS'.padStart(colSizes[11])} |`
-                              + '\n');
+                                    + '\n');
         this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
       }
+      	
+	  if (this.applyTableFilter(table)) {
         this.yadamuLogger.writeDirect(`| ${table.padStart(colSizes[0])} |`
                                     + ` ${gMetadata[table].rowCount.toString().padStart(colSizes[1])} |`
                                     + ` ${pMetadata[table].rowCount.toString().padStart(colSizes[2])} |`
@@ -200,7 +202,8 @@ class FileQA extends FileDBI {
                                     + ` ${cMetadata[table].byteCount.toString().padStart(colSizes[9])} |`
                                     + ` ${(cMetadata[table].byteCount - pMetadata[table].byteCount).toString().padStart(colSizes[10])} |`
                                     + ` ${tableTimings.padStart(colSizes[11])} |`
-                              + '\n')
+                                    + '\n');
+	  }
       if (idx+1 === tables.length) {
           this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
       }

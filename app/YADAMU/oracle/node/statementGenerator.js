@@ -339,6 +339,7 @@ class StatementGenerator {
       const operators = [];
       const variables = []
       const values = []
+	  
       const declarations = tableInfo.columnNames.map((column,idx) => {
         variables.push(`"V_${column}"`);
         let targetDataType = tableInfo.targetDataTypes[idx];

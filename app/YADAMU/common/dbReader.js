@@ -73,7 +73,6 @@ class DBReader extends Readable {
     this.schemaInfo = [];
     
     this.nextPhase = 'systemInformation'
-    this.ddlCompleted = false;
     this.dbWriter = undefined;
   }
  
@@ -84,13 +83,7 @@ class DBReader extends Readable {
   
   pipe(outputStream,options) {
 	this.dbWriter = outputStream
-	this.ddlComplete = new Promise((resolve,reject) => {
-	  this.dbWriter.once('ddlComplete',() => {
- 	    // this.yadamuLogger.trace([this.constructor.name],`DDL Complete`)
-		resolve(true);
-	  })
-	})
-    return super.pipe(outputStream,options);
+	return super.pipe(outputStream,options);
   } 
   
   async initialize() {
@@ -155,13 +148,12 @@ class DBReader extends Readable {
       });
    
       const mappedTableName = writerDBI.transformTableName(task.TABLE_NAME,readerDBI.getInverseTableMappings())
-      const tableOutputStream = writerDBI.getOutputStream(mappedTableName)
+      const tableOutputStream = writerDBI.getOutputStream(mappedTableName,this.dbWriter.ddlComplete)
       transformer.on('error',(err) => { 
         pipeStatistics.parserEndTime = performance.now()
       })
     
    	  try {
-        await tableOutputStream.initialize()
         pipeStatistics.pipeStartTime = performance.now();
         await pipeline(tableInputStream,transformer,tableOutputStream)
         // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',mappedTableName,this.dbi.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],'SUCCESS')
@@ -287,26 +279,26 @@ class DBReader extends Readable {
              })
            } 
            this.push({ddl: ddl});
-		   this.nextPhase = this.dbi.MODE === 'DDL_ONLY' ? 'exportComplete' : 'metadata';
+		   this.nextPhase = 'metadata';
            break;
          case 'metadata' :
            const metadata = await this.getMetadata();
            this.push({metadata: this.dbi.transformMetadata(metadata,this.dbi.inverseTableMappings)});
 		   this.dbi.yadamu.REJECTION_MANAGER.setMetadata(metadata)
 		   this.dbi.yadamu.WARNING_MANAGER.setMetadata(metadata)
-		   this.nextPhase = 'pause';
+		   this.nextPhase = ((this.dbi.MODE === 'DDL_ONLY') || (this.schemaInfo.length === 0)) ? 'exportComplete' : 'pause';
 		   break;
 		 case 'pause':
 	       this.push({pause:true})
 		   this.nextPhase = 'copyData'
 		   break;
 		 case 'copyData':
-		   await this.ddlComplete
 		   await this.pipelineTables(this.dbi,this.dbWriter.dbi);
     	   // this.yadamuLogger.trace([this.constructor.name,,this.dbi.DATABASE_VENDOR,`_READ(${this.nextPhase})`,this.dbi.yadamu.ON_ERROR],'Exeucting Deferred Callback')
 		   this.dbWriter.deferredCallback();
 		   // No 'break' - fall through to 'exportComplete'.
 		 case 'exportComplete':
+		   await this.dbWriter.ddlComplete
 		   this.push(null);
 		   break;
 	    default:

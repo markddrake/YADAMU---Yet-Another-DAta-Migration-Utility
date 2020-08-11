@@ -191,7 +191,7 @@ CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA V
 BEGIN
   declare TABLE_NOT_FOUND CONDITION for 1146; 
 
-  declare C_NEWLINE             VARCHAR(1) DEFAULT CHAR(13);
+  declare C_NEWLINE             VARCHAR(1) DEFAULT CHAR(32);
   
   declare NO_MORE_ROWS          INT DEFAULT FALSE;
   declare MISSING_TABLE         INT DEFAULT FALSE;
@@ -304,16 +304,6 @@ BEGIN
    ,NOTES            VARCHAR(512)
   );
   
-  create temporary table if not exists SOURCE_HASH_TABLE (
-    HASH    CHAR(64) PRIMARY KEY,
-    CNT     INT
-  ) ENGINE=MEMORY;
-
-  create temporary table if not exists TARGET_HASH_TABLE (
-    HASH    CHAR(64) PRIMARY KEY,
-    CNT     INT
-  ) ENGINE=MEMORY;
-  
   TRUNCATE TABLE SCHEMA_COMPARE_RESULTS;
   COMMIT;
   
@@ -326,49 +316,29 @@ BEGIN
     IF NO_MORE_ROWS THEN
       LEAVE PROCESS_TABLE;
     END IF;
-    
-    TRUNCATE TABLE SOURCE_HASH_TABLE;
-    TRUNCATE TABLE TARGET_HASH_TABLE;
-    
-    set V_STATEMENT = CONCAT('insert into SOURCE_HASH_TABLE select SHA2(JSON_ARRAY(',V_SOURCE_COLUMN_LIST,'),256) HASH, COUNT(*) CNT from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'" GROUP BY HASH');
-    
-    set @STATEMENT = V_STATEMENT;
-    PREPARE STATEMENT FROM @STATEMENT;
-    EXECUTE STATEMENT;
-    DEALLOCATE PREPARE STATEMENT;
-    
-    set V_STATEMENT = CONCAT('insert into TARGET_HASH_TABLE select SHA2(JSON_ARRAY(',V_TARGET_COLUMN_LIST,'),256) HASH, COUNT(*) CNT from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'" GROUP BY HASH');
-        
-    set @STATEMENT = V_STATEMENT;
-    PREPARE STATEMENT FROM @STATEMENT;
-    if MISSING_TABLE then
-      ITERATE PROCESS_TABLE;
-    end if;
-    EXECUTE STATEMENT;
-    DEALLOCATE PREPARE STATEMENT;
-
-    select count(*) 
-      into @MISSING_ROWS
-      from SOURCE_HASH_TABLE T1 
-           LEFT JOIN TARGET_HASH_TABLE T2 
-               USING (HASH,CNT) 
-     where T2.HASH is null;
-
-    select count(*) 
-      into @EXTRA_ROWS
-      from TARGET_HASH_TABLE T1 
-           LEFT JOIN SOURCE_HASH_TABLE T2 
-               USING (HASH,CNT) 
-     where T2.HASH is null;
-
-     set V_STATEMENT = CONCAT('insert into SCHEMA_COMPARE_RESULTS ',C_NEWLINE,
+   
+    set V_STATEMENT = CONCAT('insert into SCHEMA_COMPARE_RESULTS ',C_NEWLINE,
+	                         'with ',C_NEWLINE,
+							 'SOURCE_HASH_TABLE as (',C_NEWLINE,
+							 'select UNHEX(SHA2(JSON_ARRAY(',V_SOURCE_COLUMN_LIST,'),256)) HASH, COUNT(*) CNT from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'" GROUP BY HASH',C_NEWLINE,
+	                         '),',C_NEWLINE,
+							 'TARGET_HASH_TABLE as (',C_NEWLINE,
+							 'select UNHEX(SHA2(JSON_ARRAY(',V_TARGET_COLUMN_LIST,'),256)) HASH, COUNT(*) CNT from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'" GROUP BY HASH',C_NEWLINE,
+	                         '),',C_NEWLINE,
+							 'MISSING_ROWS as (',C_NEWLINE,
+							 'select HASH,CNT from SOURCE_HASH_TABLE where (HASH,CNT) not in (select HASH,CNT from TARGET_HASH_TABLE)',C_NEWLINE,
+							 '),',C_NEWLINE,
+							 'EXTRA_ROWS as (',C_NEWLINE,
+							 'select HASH,CNT  from TARGET_HASH_TABLE where (HASH,CNT) not in (select HASH,CNT from SOURCE_HASH_TABLE)',C_NEWLINE,
+							 ')',C_NEWLINE,
+							 
                              ' select ''',P_SOURCE_SCHEMA,''' ',C_NEWLINE,
                              '       ,''',P_TARGET_SCHEMA,''' ',C_NEWLINE,
                              '       ,''',V_TABLE_NAME,''' ',C_NEWLINE,
                              '       ,(select count(*) from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
                              '       ,(select count(*) from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'")',C_NEWLINE,
-                             '       ,',@MISSING_ROWS,C_NEWLINE,
-                             '       ,',@EXTRA_ROWS,
+                             '       ,(select count(*) from MISSING_ROWS) ',C_NEWLINE,
+                             '       ,(select count(*) from EXTRA_ROWS) ',C_NEWLINE,
                              '       ,NULL');   
     
     set @STATEMENT = V_STATEMENT;

@@ -7,12 +7,13 @@ const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 
 class MsSQLWriter extends YadamuWriter {
     
-  constructor(dbi,tableName,status,yadamuLogger) {
-    super({objectMode: true},dbi,tableName,status,yadamuLogger)
+  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
+    super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
   }
   
   setTableInfo(tableName) {
 	super.setTableInfo(tableName)
+    
 	this.insertMode = 'Bulk';
     this.dataTypes  = YadamuLibrary.decomposeDataTypes(this.tableInfo.targetDataTypes)
 

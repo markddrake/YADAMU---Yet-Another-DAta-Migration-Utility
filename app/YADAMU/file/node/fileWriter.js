@@ -10,14 +10,14 @@ class FileWriter extends YadamuWriter {
 
   // Simulate subclass of YadamuWriter. Actaully extending YadamuWriter is problametic. ???
 
-  constructor(dbi,tableName,status,yadamuLogger,outputStream) {
-    super({objectMode: true},dbi,tableName,status,yadamuLogger)
-    this.tableName = tableName  
-    this.outputStream = outputStream	
-    this.tableInfo = this.dbi.getTableInfo(tableName)
-	this.setTableInfo(tableName)
-
-	this.insertMode = 'JSON';    
+  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
+    super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
+  }
+   
+  setTableInfo(tableName) {
+    super.setTableInfo(tableName)
+	this.outputStream = this.dbi.getFileOutputStream(tableName);
+    this.insertMode = 'JSON';    
     if (this.dbi.tableMappings && this.dbi.tableMappings.hasOwnProperty(tableName)) {
 	  tableName = this.dbi.tableMappings[tableName].tableName
 	}
@@ -106,9 +106,6 @@ class FileWriter extends YadamuWriter {
         }
       }) 
     }
-  }
-
-  setTableInfo(tableInfo) {
   }
 
   async initialize() {

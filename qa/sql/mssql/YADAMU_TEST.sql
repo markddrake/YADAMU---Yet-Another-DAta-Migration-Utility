@@ -329,12 +329,13 @@ begin
    ,SQL_STATEMENT    nvarchar(max)
   );
 
-  CREATE TABLE #SOURCE_ROWS (
-    HASH VARBINARY(8000)
+  
+  CREATE TABLE #SOURCE_HASH_BUCKET (
+    HASH BINARY(32)
   )
 
-  CREATE TABLE #TARGET_ROWS (
-    HASH VARBINARY(8000)
+  CREATE TABLE #TARGET_HASH_BUCKET (
+    HASH BINARY(32)
   )
 
   set NOCOUNT ON;
@@ -351,31 +352,31 @@ begin
       set @SOURCE_COUNT = -1;
       set @SQL_STATEMENT = concat('select @SOURCE_COUNT = count(*) from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"')
 	  exec sp_executesql @SQL_STATEMENT,N'@SOURCE_COUNT bigint OUTPUT', @SOURCE_COUNT OUTPUT
-          
+      select @SQL_STATEMENT
+        
       set @TARGET_COUNT = -1;
       set @SQL_STATEMENT = concat('select @TARGET_COUNT = count(*) from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"')
 	  exec sp_executesql @SQL_STATEMENT,N'@TARGET_COUNT bigint OUTPUT', @TARGET_COUNT OUTPUT
-      
+      select @SQL_STATEMENT
+
       if (@MEMORY_OPTIMIZED = 1) begin
-    	truncate table #SOURCE_ROWS;
-		truncate table #TARGET_ROWS;
+    	truncate table #SOURCE_HASH_BUCKET;
+		truncate table #TARGET_HASH_BUCKET;
         
-        -- set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
-        set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
-        insert into #SOURCE_ROWS
+        set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #SOURCE_HASH_BUCKET from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
+        -- select @SQL_STATEMENT
         exec(@SQL_STATEMENT)
 
-        -- set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
-		set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
-		INSERT into #TARGET_ROWS
+ 		set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #TARGET_HASH_BUCKET from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
+        -- select @SQL_STATEMENT
         exec(@SQL_STATEMENT)
         
         set @SQL_STATEMENT = concat('with ',
                                     'MISSING_ROWS as (',
-                                    ' select * from #SOURCE_ROWS EXCEPT select * from #TARGET_ROWS ',
+                                    ' select * from #SOURCE_HASH_BUCKET EXCEPT select * from #TARGET_HASH_BUCKET ',
                                     '),',
                                     'EXTRA_ROWS as (',
-                                   ' select * from #TARGET_ROWS EXCEPT select * from #SOURCE_ROWS ',
+                                   ' select * from #TARGET_HASH_BUCKET EXCEPT select * from #SOURCE_HASH_BUCKET ',
                                    ')',
                                    'select ''',@SOURCE_DATABASE,''' "SOURCE_DATABASE",''',@SOURCE_SCHEMA,''' "SOURCE_SCHEMA",''',@TARGET_DATABASE,'''"TARGET_DATABASE",''',@TARGET_SCHEMA,'''"TARGET_SCHEMA",''',@TABLE_NAME,'''"TABLE_NAME",',
                                                @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ');
@@ -398,6 +399,7 @@ begin
                                                 @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ')
       end
       
+      select @SQL_STATEMENT
       insert into @SCHEMA_COMPARE_RESULTS                  
       exec (@SQL_STATEMENT)
                                         
@@ -407,29 +409,28 @@ begin
       if (ERROR_NUMBER() = 41317) begin
         begin try 
           -- A user transaction that accesses memory optimized tables or natively compiled modules cannot access more than one user database or databases model and msdb, and it cannot write to master
-    	  truncate table #SOURCE_ROWS;
-		  truncate table #TARGET_ROWS;
+    	truncate table #SOURCE_HASH_BUCKET;
+		truncate table #TARGET_HASH_BUCKET;
         
-          -- set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
-          set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
-          insert into #SOURCE_ROWS
+          set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #SOURCE_HASH_BUCKET from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
+          -- select @SQL_STATEMENT
           exec(@SQL_STATEMENT)
 
-          -- set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for XML RAW, ELEMENTS XSINIL, BINARY BASE64, TYPE ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
-		  set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
-		  INSERT into #TARGET_ROWS
+ 		  set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #TARGET_HASH_BUCKET from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
+          -- select @SQL_STATEMENT
           exec(@SQL_STATEMENT)
         
           set @SQL_STATEMENT = concat('with ',
                                       'MISSING_ROWS as (',
-                                      ' select * from #SOURCE_ROWS EXCEPT select * from #TARGET_ROWS ',
+                                      ' select * from #SOURCE_HASH_BUCKET EXCEPT select * from #TARGET_HASH_BUCKET ',
                                       '),',
                                       'EXTRA_ROWS as (',
-                                     ' select * from #TARGET_ROWS EXCEPT select * from #SOURCE_ROWS ',
+                                     ' select * from #TARGET_HASH_BUCKET EXCEPT select * from #SOURCE_HASH_BUCKET ',
                                      ')',
                                      'select ''',@SOURCE_DATABASE,''' "SOURCE_DATABASE",''',@SOURCE_SCHEMA,''' "SOURCE_SCHEMA",''',@TARGET_DATABASE,'''"TARGET_DATABASE",''',@TARGET_SCHEMA,'''"TARGET_SCHEMA",''',@TABLE_NAME,'''"TABLE_NAME",',
-                                               @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ');
+                                                 @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ');
 
+          select @SQL_STATEMENT
           insert into @SCHEMA_COMPARE_RESULTS                  
           exec (@SQL_STATEMENT)
         end try

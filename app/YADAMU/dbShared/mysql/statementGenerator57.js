@@ -301,51 +301,46 @@ class StatementGenerator {
     const setOperators = []
     
     const columnClauses = columnNames.map((columnName,idx) => {    
-    
+	  const dataType = YadamuLibrary.composeDataType(dataTypes[idx],sizeConstraints[idx])       
+      let targetDataType = this.mapForeignDataType(tableMetadata.vendor,dataType.type,dataType.length,dataType.scale);
+      targetDataTypes.push(targetDataType);
 
-	   const dataType = YadamuLibrary.composeDataType(dataTypes[idx],sizeConstraints[idx])       
-       let targetDataType = this.mapForeignDataType(tableMetadata.vendor,dataType.type,dataType.length,dataType.scale);
-       targetDataTypes.push(targetDataType);
-       let ensureNullable = false;
-       switch (targetDataType) {
-         case 'geometry':
-            insertMode = 'Iterative';
-            switch (this.spatialFormat) {
-              case "WKB":
-              case "EWKB":
-                setOperators.push(' "' + columnName + '" = ST_GeomFromWKB(?)');
-                break
-              case "WKT":
-              case "EWRT":
-                setOperators.push(' "' + columnName + '" =  ST_GeomFromText(?)');
-                break;
-              case "GeoJSON":
-                setOperators.push(' "' + columnName + '" =  ST_GeomFromGeoJSON(?)');
-                break;
-              default:
-                setOperators.push(' "' + columnName + '" = ST_GeomFromWKB(?)');
-            }              
-            break;                                                 
-         case 'timestamp':
-            ensureNullable = true;
-         default:
-           setOperators.push(' "' + columnName + '"= ?')
-       }
-       return `"${columnName}" ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)} ${ensureNullable === true ? 'null':''}`
+      let ensureNullable = false;
+      switch (targetDataType) {
+        case 'geometry':
+           switch (this.spatialFormat) {
+             case "WKB":
+             case "EWKB":
+               setOperators.push('ST_GeomFromWKB(?)');
+               break
+             case "WKT":
+             case "EWRT":
+               setOperators.push('ST_GeomFromText(?)');
+               break;
+             case "GeoJSON":
+               setOperators.push('ST_GeomFromGeoJSON(?)');
+               break;
+             default:
+               setOperators.push('ST_GeomFromWKB(?)');
+           }              
+           break;                                                 
+        case 'timestamp':
+           ensureNullable = true;
+        default:
+           setOperators.push('?')
+      }
+      return `"${columnName}" ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)} ${ensureNullable === true ? 'null':''}`
     })
                                        
     const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
-    let insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}"`;
-    if (insertMode === 'Iterative') {
-      insertStatement += ` set` + setOperators.join(',');
-    }
-    else {
-      insertStatement += ` ("${columnNames.join('","')}") values ?`;
-    }
+    const insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values `;
+    const rowConstructor = `(${setOperators.join(',')})`
+    
     return { 
        ddl             : createStatement, 
        dml             : insertStatement, 
 	   columnNames     : columnNames,
+       rowConstructor  : rowConstructor,
        targetDataTypes : targetDataTypes, 
        insertMode      : insertMode,
        _BATCH_SIZE     : this.dbi.BATCH_SIZE,

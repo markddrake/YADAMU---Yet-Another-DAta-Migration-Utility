@@ -6,6 +6,14 @@ class YadamuError extends Error {
   }
 }
 
+class InternalError extends Error {
+  constructor(message,args,info) {
+    super(message);
+	this.args = args
+	this.info = info
+  }
+}
+
 class UserError extends Error {
   constructor(message) {
     super(message);
@@ -110,6 +118,7 @@ class DatabaseError extends Error {
 
 module.exports = {
   YadamuError
+, InternalError
 , UserError
 , BatchInsertError
 , IterativeInsertError

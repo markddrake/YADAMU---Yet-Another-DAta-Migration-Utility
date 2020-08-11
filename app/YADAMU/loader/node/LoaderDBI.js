@@ -8,7 +8,7 @@ const FileDBI = require('../../file/node/FileDBI.js');
 const FileWriter = require('../../file/node/fileWriter.js');
 const CSVWriter = require('./csvWriter.js')
 const JSONParser = require('./jsonParser.js');
-const EventManager = require('../../file/node/eventManager.js')
+
 /*
 **
 ** YADAMU Database Inteface class skeleton
@@ -36,15 +36,17 @@ class LoaderDBI extends FileDBI {
   constructor(yadamu,exportFilePath) {
     // Export File Path is a Directory for in Load/Unload Mode
     super(yadamu,exportFilePath)
-    this.readStreams = []
   }    
 
   isDatabase() {
     return true
   }
   
+  closeInputStream() {      
+  }
+
   async getSystemInformation() {
-    this.yadamuLogger.trace([this.constructor.name,this.exportFilePath],`getSystemInformation()`)     
+    // this.yadamuLogger.trace([this.constructor.name,this.exportFilePath],`getSystemInformation()`)     
 	return this.controlFile.systemInformation
   }
 
@@ -64,22 +66,22 @@ class LoaderDBI extends FileDBI {
 
   async getSchemaInfo() {
     this.yadamuLogger.trace([this.constructor.name,this.exportFilePath],`getSchemaInfo()`)
-    this.metadata = await  this.loadMetadataFiles()
+    this.metadata = await this.loadMetadataFiles()
     return Object.keys(this.metadata).map((tableName) => {
       return {
         TABLE_NAME        : tableName
+      , MAPPED_TABLE_NAME : tableName
       , INCLUDE_TABLE     : this.applyTableFilter(tableName)
       , COLUMN_NAME_ARRAY : this.metadata[tableName].columnNames
+	  , DATA_TYPE_ARRAY       : this.metadata[tableName].dataTypes
+	  , SIZE_CONSTRAINT_ARRAY : this.metadata[tableName].sizeConstraints
       } 
     })
   }
 
-  async generateMetadata(schemaInfo) {
-    return this.metadata;      
-  }    
-  
   async writeMetadata(metadata) {
-    
+    // this.yadamuLogger.trace([this.constructor.name],`writeMetadata()`)
+	
     if (this.outputStream !== undefined) {
   	  this.outputStream.write(',');
       const metadataFileList = {}
@@ -105,14 +107,21 @@ class LoaderDBI extends FileDBI {
 
   } 
   
+  /*
+  **
+  ** For LoaderDBI Import is Writing data to the file system. - Unload
+  **
+  */
+  
   async initializeImport() {
-	this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
-	// For LoaderDBI Import is Writing data to the file system.
+	 
+	// 
+	// this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
     
     // Create the base directory for the unload operation is it does not exists. The Base Directory is dervied from the target schema name specified by the TO_USER parameter
     
-    this.loaderBaseFolder = path.join(this.exportFilePath,this.parameters.TO_USER)
-    fsp.mkdir(this.loaderBaseFolder, { recursive: true });
+	this.loaderBaseFolder = path.join(path.dirname(this.exportFilePath),path.basename(this.exportFilePath,path.extname(this.exportFilePath)),this.parameters.TO_USER)
+    await fsp.mkdir(this.loaderBaseFolder, { recursive: true });
     
     // Update the exportFilePath before calling super().. The exportFilePath is TO_USER\TO_USER.json.
     this.exportFilePath = `${path.join(this.loaderBaseFolder,this.parameters.TO_USER)}.json`
@@ -126,39 +135,46 @@ class LoaderDBI extends FileDBI {
   
   }
  
+  /*
+  **
+  ** For LoaderDBI Export is Reading data from the File System.
+  **
+  */
+
   async initializeExport() {
-	// For LoaderDBI Import is Reading data from the file system.
 	this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
-	super.initializeExport();
-    const controlFilePath = `${path.join(this.exportFilePath,this.parameters.FROM_USER,this.parameters.FROM_USER)}.json`
-    const fileContents = await fsp.readFile(controlFilePath,{encoding: 'utf8'})
+	this.loaderBaseFolder = path.join(path.dirname(this.exportFilePath),path.basename(this.exportFilePath,path.extname(this.exportFilePath)),this.parameters.FROM_USER)
+    this.controlFilePath = `${path.join(this.loaderBaseFolder,this.parameters.FROM_USER)}.json`
+    const fileContents = await fsp.readFile(this.controlFilePath,{encoding: 'utf8'})
     this.controlFile = JSON.parse(fileContents)
   }
 
   createParser(tableInfo,objectMode) {
-    const jsonParser  = new JSONParser(this.yadamuLogger,this.MODE);
+    const jsonParser  = new JSONParser(tableInfo.TABLE_NAME,this.yadamuLogger,this.MODE);
     return jsonParser
   }
 
   async getInputStream(tableInfo) {
-    this.yadamuLogger.trace([this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating input stream on ${this.controlFile.data[tableInfo.TABLE_NAME].file}`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating input stream on ${this.controlFile.data[tableInfo.TABLE_NAME].file}`)
     const inputStream = fs.createReadStream(this.controlFile.data[tableInfo.TABLE_NAME].file);
-    this.readStreams[tableInfo.TABLE_NAME] = await new Promise((resolve,reject) => {inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err)})})
+    await new Promise((resolve,reject) => {inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err)})})
     return inputStream
   }
   
-  getOutputStream(tableName) {
-    const tableOutputStream = fs.createWriteStream(this.dataFileList[tableName].file);
-    const writer = this.JSON_OUTPUT ? FileWriter : CSVWriter
-	const os = new writer(this,tableName,this.status,this.yadamuLogger,tableOutputStream)  
+  getOutputStream(tableName,ddlComplete) {
+	// this.yadamuLogger.trace([this.constructor.name],`getOutputStream()`)
+    const Writer = this.JSON_OUTPUT ? FileWriter : CSVWriter
+	const os = new Writer(this,tableName,ddlComplete,this.status,this.yadamuLogger)  
     return os;
   }
   
-  getDatabaseConnection() {
+  getFileOutputStream(tableName) {
+	return fs.createWriteStream(this.dataFileList[tableName].file)
   }
+
+  getDatabaseConnection() {}
   
-  closeConnection() {
-  }
+  closeConnection() {}
  
   async workerDBI(workerNumber) {
 	return this

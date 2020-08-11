@@ -1,10 +1,8 @@
 "use strict"
 
 const YadamuCLI = require('./yadamuCLI.js')
-const Yadamu = require('./yadamu.js')
 
-class Upload extends YadamuCLI {
-}
+class Upload extends YadamuCLI {}
 
 async function main() {
 

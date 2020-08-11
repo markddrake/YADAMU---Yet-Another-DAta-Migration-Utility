@@ -11,12 +11,13 @@ class StatisticsCollector extends YadamuWriter {
   constructor(dbi,yadamuLogger) {
 	const nulLogger = new YadamuLogger(fs.createWriteStream("\\\\.\\NUL"),{});
 	// nulLogger is used to supress row counting. ### Use of the nulLogger means supresses error reporting as well as row counting
-    super({objectMode: true},dbi,null,{},nulLogger)  
+	const ddlComplete = new Promise((resolve,reject) => {resolve(true)})
+    super({objectMode: true},dbi,ddlComplete,null,{},nulLogger)  
 	this.nulLogger = nulLogger
 	this.tableInfo = {}
   }
   
-  newTable(tableName) {
+  setTableInfo(tableName) {
     
 	this.tableName = tableName;    
     this.tableInfo[tableName] = {

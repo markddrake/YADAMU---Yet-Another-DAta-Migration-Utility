@@ -14,7 +14,7 @@ static get MARIADB_DEFAULTS() {
   }
 
   static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.MARIADB_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.mariadb))
+    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.MARIADB_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.mariadb || {}))
     return this._DEFAULT_PARAMETERS
   }
 

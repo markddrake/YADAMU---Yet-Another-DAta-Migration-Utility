@@ -31,8 +31,11 @@ class OracleWriter extends YadamuWriter {
   **
   */
 
-  constructor(dbi,tableName,status,yadamuLogger) {
-    super({objectMode: true},dbi,tableName,status,yadamuLogger)
+  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
+    super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
+  }
+  
+  setTableInfo(tableName) {
     this.lobList = [];
     this.lobBatch = []
     this.tempLobCount = 0;
@@ -40,6 +43,7 @@ class OracleWriter extends YadamuWriter {
     this.includeTestcase = this.dbi.parameters.EXPORT_TESTCASE === true
     this.lobCumlativeTime = 0;
 	
+    super.setTableInfo(tableName)   
 	// Set up an Array of Transformation functions to be applied to the incoming rows
 
 	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
@@ -108,12 +112,14 @@ class OracleWriter extends YadamuWriter {
           }
           break;
         case "XMLTYPE" :
-          return (col,jdx) =>  { 
-            // Cannot passs XMLTYPE as BUFFER
-            // Reason: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
+          /*
+          // Cannot passs XMLTYPE as BUFFER: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
+		  return (col,jdx) =>  { 
             // bindRow[idx] = Buffer.from(col);
             return col
           }
+		  */
+          return null
           break;
         default :
           return null
@@ -239,8 +245,8 @@ class OracleWriter extends YadamuWriter {
     }
   } 
 
-  cacheRow(row) {
-      
+  cacheRow(row) {  
+	  
     /*
     **
     ** Be careful modifying code inside the map operator, it is executed for every column in every row.
@@ -278,7 +284,7 @@ class OracleWriter extends YadamuWriter {
 		// Bind Ordering and Row Ordering are the probably different. Use map to create a new array in BindOrdering when applying transformations
 	    row = this.transformations.map((transformation,bindIdx) => {
           const rowIdx = this.tableInfo.bindOrdering[bindIdx]
-		  if (row[rowIdx] !== null) {			     
+		  if (row[rowIdx] !== null) {		
             if (transformation !== null) {
 			  row[rowIdx] = transformation(row[rowIdx],rowIdx);
 			}
@@ -297,7 +303,6 @@ class OracleWriter extends YadamuWriter {
           }
 	    })
       }
-	  
 	  // Row is now in bindOrdering. Convert CLOB and BLOB to temporaryLOBs where necessary
       if (this.bindRowAsLOB) {
 	    // Use map combined with Promise.All to convert columns to temporaryLobs
@@ -330,9 +335,8 @@ class OracleWriter extends YadamuWriter {
         this.lobBatch.push(row);
       }
       else {
-        this.batch.push(row);
+	    this.batch.push(row);
       }
-
 	  this.checkBindMappings(row)
       this.rowCounters.cached++
     } catch (cause) {
@@ -501,7 +505,7 @@ end;`
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
     // Infortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
     // So we have to free the current tempLob Cache and create a new one for each batch
-    
+    	
     this.rowCounters.batchCount++;
     let rows = undefined;
     let binds = undefined;

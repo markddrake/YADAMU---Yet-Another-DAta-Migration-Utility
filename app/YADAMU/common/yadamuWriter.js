@@ -13,18 +13,15 @@ class YadamuWriter extends Writable {
   get COMMIT_COUNT()   {  return this.tableInfo._COMMIT_COUNT }
   get SPATIAL_FORMAT() {  return this.tableInfo._SPATIAL_FORMAT}
 
-  constructor(options,dbi,tableName,status,yadamuLogger) {
+  constructor(options,dbi,tableName,ddlComplete,status,yadamuLogger) {
 	super(options)
     this.dbi = dbi;
     this.schema = this.dbi.parameters.TO_USER;
+    this.ddlComplete = ddlComplete;
     this.status = status;
     this.yadamuLogger = yadamuLogger;    
 	this.configureFeedback(this.dbi.parameters.FEEDBACK); 	
 	this.tableName = tableName  
-    this.tableInfo = this.dbi.getTableInfo(tableName)
-	this.supressBatchWriteLogging = (this.BATCH_SIZE === this.COMMIT_COUNT) // Prevent duplicate logging if batchSize and Commit SIze are the same
-	this.setTableInfo(tableName);
-
  	this.rowCounters = {
       received   : 0 // Rows accepted
 	, batchCount : 0 // Batches created
@@ -45,11 +42,10 @@ class YadamuWriter extends Writable {
   }
   
   setTableInfo(tableName) {
-	// In-Lined in constructor
-  }
-   
-  newTable(tableName) { 
-    // Used by statisticsCollector
+    this.skipTable = true
+	this.tableInfo = this.dbi.getTableInfo(tableName)
+    this.skipTable = false;
+	this.supressBatchWriteLogging = (this.BATCH_SIZE === this.COMMIT_COUNT) // Prevent duplicate logging if batchSize and Commit SIze are the same
   }
    
   async initialize() {  
@@ -82,15 +78,13 @@ class YadamuWriter extends Writable {
               
 
   async checkColumnCount(row) {
-     
+    
 	try {
 	  if (!this.skipTable) {
         assert.strictEqual(this.tableInfo.columnNames.length,row.length,`Table ${this.tableName}. Incorrect number of columns supplied.`)
 	  }
 	} catch (cause) {
-	  const info = {
-		columnNames: this.tableInfo.columnNames
-	  }
+	  const info = this.tableInfo === undefined  ? this.tableName : this.tableInfo
 	  await this.handleIterativeError('CACHE',cause,this.rowCounters.received+1,row,info);
 	}
   }
@@ -216,12 +210,17 @@ class YadamuWriter extends Writable {
   
   async handleIterativeError(operation,cause,rowNumber,record,info) {
 	  
-	this.rowCounters.skipped++;
-	await this.rejectRow(this.tableName,record);
+    this.rowCounters.skipped++;
+	
+	try {
+      await this.rejectRow(this.tableName,record);
+      const iterativeError = this.createIterativeException(cause,this.rowCounters.cached,rowNumber,record,info)
+      this.yadamuLogger.logRejected([this.dbi.DATABASE_VENDOR,this.tableName,operation,this.rowCounters.cached,rowNumber],iterativeError);
+    } catch (e) {
+      this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.tableName,this.insertMode],e)
+    }
 
-	const iterativeError = this.createIterativeException(cause,this.rowCounters.cached,rowNumber,record,info)
-    this.yadamuLogger.logRejected([this.dbi.DATABASE_VENDOR,this.tableName,operation,this.rowCounters.cached,rowNumber],iterativeError);
-
+	
     if (this.rowCounters.skipped === this.dbi.TABLE_MAX_ERRORS) {
       this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
       this.skipTable = true;
@@ -279,15 +278,15 @@ class YadamuWriter extends Writable {
   	await this.cacheRow(data)
     this.rowCounters.received++;
     if ((this.rowCounters.received % this.feedbackInterval === 0) & !this.batchComplete()) {
-      this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows Cached: ${this.batchRowCount()}.`);
+      this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows Cached: ${this.rowCounters.cached()}.`);
     }
     if (this.batchComplete()) {
       await this.writeBatch(this.status);
 	  if (this.skipTable) {
         await this.rollbackTransaction();
       }
-      if (this.reportBatchWrites && this.reportBatchWrites() && !this.commitWork(this.rowCounters.received)) {
-        this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows written:  ${this.rowCount}.`);
+      if (this.reportBatchWrites && !this.commitWork(this.rowCounters.received)) {
+        this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows written:  ${this.rowCounters.written}.`);
       }                    
 	}  
     if (this.commitWork(this.rowCounters.received)) {
@@ -298,15 +297,19 @@ class YadamuWriter extends Writable {
       await this.beginTransaction();            
     }
   }
-
   
   async _write(obj, encoding, callback) {
-	const messageType = Object.keys(obj)[0]
+    const messageType = Object.keys(obj)[0]
 	try {
 	  // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),messageType],'_write()')
       switch (messageType) {
 		case 'table':
-	      this.newTable(obj.table)
+          // Do not start processing table until all DDL operations have completed.
+		  await this.ddlComplete;
+		  // Workers need to reload their Statement Cache from the Manager before processing can begin
+		  this.dbi.reloadStatementCache()
+		  this.setTableInfo(obj.table);
+          await this.initialize()
 		  break;  
         case 'data':
           if (this.skipTable === false) {
@@ -335,19 +338,20 @@ class YadamuWriter extends Writable {
 	  */
 	  try {
         switch (this.dbi.yadamu.ON_ERROR) {
-		  case undefined:
-		  case 'ABORT': 
-		    if (this.dbi.transactionInProgress === true) {
-			  // No need to check for lost connction. Rollback will pass through a lost connection error without attempting to perform the rollback operation 
-  		      await this.rollbackTransaction(e)
-			}
-            callback(e);
-		    break;
 		  case 'SKIP':
 		  case 'FLUSH':
             callback();
 		    break;
+		  case 'ABORT': 
+		    // Treat anything but SKIP or FLUSH, including undefined as ABORT
 		  default:
+		    if (this.dbi.transactionInProgress === true) {
+			  // No need to check for lost connction. Rollback will pass through a lost connection error without attempting to perform the rollback operation 
+  		      await this.rollbackTransaction(e)
+			}
+            // Passing the exception to callback triggers the onError() event
+		    callback(e);
+		    break;
 		}
       } catch (e) {
         // Passing the exception to callback triggers the onError() event

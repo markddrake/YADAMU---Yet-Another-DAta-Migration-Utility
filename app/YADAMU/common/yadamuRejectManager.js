@@ -19,12 +19,7 @@ class YadamuRejectManager {
 	// Use a NULL Logger in production.
     // this.logger =  YadamuLogger.consoleLogger();
 	this.logger = YadamuLogger.nulLogger();
-    this.writer = new DBWriter(this.dbi,this.logger);  
-	this.ddlComplete = new Promise((resolve,reject) => {
-	  this.writer.once('ddlComplete',() => {
- 	    resolve(true);
-	  })
-	})
+    this.writer = new DBWriter(this.dbi,this.logger);
 	this.recordCount = 0
 	this.tableWriter = undefined
   }
@@ -42,12 +37,13 @@ class YadamuRejectManager {
 	if (this.recordCount === 0) {
       const errorFolderPath = path.dirname(this.filename);
       fs.mkdirSync(errorFolderPath, { recursive: true });
-      await this.writer.initialize()    
+      await this.writer.initialize()  
       this.writer.write({systemInformation: this.systemInformation})
 	  this.writer.write({metadata: this.metadata})
-	  this.writer.write({pause:true})
-	  await this.ddlComplete
-	  this.tableWriter = this.dbi.getOutputStream(tableName)
+	  await this.writer.ddlComplete;
+	  this.tableWriter = this.dbi.getOutputStream(tableName,this.writer.ddlComplete)
+      this.tableWriter.checkColumnCount = () => {}
+	  this.tableWriter.setTableInfo(tableName);
 	}
 	else {
 	  if (tableName !== this.tableWriter.tableName) {
@@ -57,11 +53,12 @@ class YadamuRejectManager {
           })
         })		
 		this.tableWriter = this.dbi.getOutputStream(tableName)
-		// Disable Column Count Checks
 		this.tableWriter.checkColumnCount = () => {}
+        this.tableWriter.setTableInfo(tableName);
+		// Disable Column Count Checks
 	  }
 	}
-    this.tableWriter.write({data: data})
+    await new Promise((resolve,reject) => {this.tableWriter.write({data: data},null,() => {resolve()})})
     this.recordCount++;
   }
   
@@ -72,7 +69,6 @@ class YadamuRejectManager {
           resolve()
         })
       })		
-	  this.writer.deferredCallback();	
 	  await new Promise((resolve,reject) => {
 	    this.writer.end(null,null,() => {
           resolve()

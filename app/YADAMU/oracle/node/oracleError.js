@@ -45,7 +45,7 @@ class OracleError extends DatabaseError {
             case (Buffer.isBuffer(args[key])):
               args[key] = "Buffer"
               break;
-            case ((typeof args[key] === 'object') && (args[key].constructor !== undefined) && (args[key].constructor.name === 'Lob')):
+            case ((args[key] !== null) && (typeof args[key] === 'object') && (args[key].constructor !== undefined) && (args[key].constructor.name === 'Lob')):
               args[key] = "Lob"
               break;
             default:

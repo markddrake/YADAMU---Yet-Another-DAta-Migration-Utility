@@ -11,7 +11,7 @@ class YadamuConstants {
        "YADAMU_VERSION"            : '1.0'
      , "FILE"                      : "yadamu.json"
      , "MODE"                      : "DATA_ONLY"
-     , "ON_ERROR"                  : "FAIL"
+     , "ON_ERROR"                  : "ABORT"
      , "PARALLEL"                  : 0
      , "RDBMS"                     : "file"
      , "EXCEPTION_FOLDER"          : "exceptions"

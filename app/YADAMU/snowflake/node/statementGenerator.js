@@ -49,11 +49,7 @@ class StatementGenerator {
            case 'NCLOB':                   return SnowflakeConstants.CLOB_TYPE;
            case 'XMLTYPE':                 return SnowflakeConstants.XML_TYPE;
            case 'JSON':                    return SnowflakeConstants.JSON_TYPE;
-           case 'TIMESTAMP':
-             switch (true) {
-               case (dataTypeLength > 6):  return 'datetime(6)';
-               default:                    return 'datetime';
-             }
+           case 'TIMESTAMP':               return 'datetime';
            case 'BFILE':                   return 'VARCHAR(2048)';
            case 'ROWID':                   return 'VARCHAR(32)';
            case 'RAW':                     return 'BINARY';
@@ -65,7 +61,7 @@ class StatementGenerator {
                return 'TIMESTAMP_LTZ'; 
              }
              if (dataType.indexOf('TIME ZONE') > -1) {
-               return 'TIMESTAMP_TZ'; 
+               return 'TIMESTAMP_NTZ'; 
              }
              if (dataType.indexOf('INTERVAL') === 0) {
                return 'VARCHAR(16)'; 
@@ -81,121 +77,72 @@ class StatementGenerator {
          break;
        case 'MSSQLSERVER':
          switch (dataType) {
-           case 'nvarchar':                        return 'VARCHAR';
-           case 'nchar':                           return 'CHAR';
-           case 'ntext':                           return 'VARCHAR';
-           case 'smallmoney':                      return 'DECIMAL(10,4)';
-           case 'money':                           return 'DECIMAL(19,4)';
-           case 'bit':                             return 'BOOLEAN';
-           case 'image':                           return SnowflakeConstants.BLOB_TYPE;
-           case 'uniqueidentifier':                return 'VARCHAR(64)';
-           case 'xml':                             return SnowflakeConstants.XML_TYPE;
-           case 'hierarchyid':                     return 'VARCHAR(4000)';
-           case 'datetime2':                       return 'DATETIME';
-             /*
-           case 'binary':
+           case 'smallmoney':                                        return 'DECIMAL(10,4)';
+           case 'money':                                             return 'DECIMAL(19,4)';
+           case 'real':                                              return 'FLOAT';
+           case 'text': 
+           case 'ntext':                                             return SnowflakeConstants.CLOB_TYPE;
+           case 'image':                                             return SnowflakeConstants.BLOB_TYPE;
+           case 'xml':                                               return SnowflakeConstants.XML_TYPE;
+           case 'datetime':
+           case 'datetime2':                                         return 'TIMESTAMP_NTZ';
+           case 'datetimeoffset':                                    return 'TIMESTAMP_NTZ';
+           case 'geography':
+           case 'geometry':                                          return 'GEOGRAPHY';
+           case 'varchar': 
              switch (true) {
-               case (dataTypeLength > 16777215):   return 'longblob';
-               case (dataTypeLength > 65535):      return 'mediumblob';
-               default:                            return 'binary';
+               case (dataTypeLength === -1):                         return SnowflakeConstants.CLOB_TYPE;
+               case (dataTypeLength > this.dbi.MAX_CHARACTER_SIZE):  return SnowflakeConstants.CLOB_TYPE;
+               default:                                              return 'TEXT';
              }
-           case 'char':
-             switch (true) {
-               case (dataTypeLength === -1):       return 'longtext';
-               case (dataTypeLength > 16777215):   return 'longtext';
-               case (dataTypeLength > 65535):      return 'mediumtext';
-                case (dataTypeLength > 255):       return 'text';
-                default:                           return 'char';
-             }
-           case 'datetime':                        return 'datetime(3)';
-           case 'datetime2':
-             switch (true) {
-                case (dataTypeLength > 6):         return 'datetime(6)';
-                default:                           return 'datetime';
-             }
-           case 'datetimeoffset':                  return 'datetime';
-           case 'geography':                       return 'geometry';
-           case 'geometry':                        return 'geometry';
-           case 'mediumint':                       return 'int';
-           case 'nchar':
-             switch (true) {
-                case (dataTypeLength === -1):      return 'longtext';
-                case (dataTypeLength > 16777215):  return 'longtext';
-                case (dataTypeLength > 65535):     return 'mediumtext';
-                case (dataTypeLength > 255):       return 'text';
-                default:                           return 'char';
-             }
-           case 'ntext':                           return 'longtext';
-           case 'nvarchar':
-             switch (true) {
-               case (dataTypeLength === -1):       return 'longtext';
-               case (dataTypeLength > 16777215):   return 'longtext';
-               case (dataTypeLength > 65535):      return 'mediumtext';
-               default:                            return 'varchar';
-             }             
-           case 'real':                            return 'float';
-           case 'rowversion':                      return 'binary(8)';
-           case 'smalldate':                       return 'datetime';
-           case 'smallmoney':                      return 'decimal(10,4)';
-           case 'text':                            return 'longtext';
-           case 'tinyint':                         return 'smallint';
+           case 'binary':                                           
            case 'varbinary':
-             switch (true) {
-               case (dataTypeLength === -1):       return 'longblob';
-               case (dataTypeLength > 16777215):   return 'longblob';
-               case (dataTypeLength > 65535):      return 'mediumblob';
-               default:                            return 'varbinary';
+             switch (true) {                                        
+               case (dataTypeLength === -1):                         return SnowflakeConstants.BLOB_TYPE;
+               case (dataTypeLength > this.dbi.MAX_BINARY_SIZE):     return SnowflakeConstants.BLOB_TYPE;
+               default:                                              return 'BINARY';
              }
-           case 'varchar':
-             switch (true) {
-               case (dataTypeLength === -1):       return 'longtext';
-               case (dataTypeLength > 16777215):   return 'longtext';
-               case (dataTypeLength > 65535):      return 'mediumtext';
-               default:                            return 'varchar';
-             }
-           case 'xml':                             return 'longtext';
-           */
-           default:                                return dataType.toUpperCase();
+           case 'uniqueidentifier':                                  return 'VARCHAR(64)';
+           case 'hierarchyid':                                       return 'VARCHAR(4000)';
+           case 'rowversion':                                        return 'BINARY(8)';
+           default:                                                  return dataType.toUpperCase();
          }
          break;
        case 'Postgres':                            
          switch (dataType) {
            case 'character varying':       
+           case 'character':
              switch (true) {
-               case (dataTypeLength === undefined): return 'longtext';
-               case (dataTypeLength > 16777215):    return 'longtext';
-               case (dataTypeLength > 65535):       return 'mediumtext';
-               default:                             return 'varchar';
+               case (dataTypeLength === -1):                         return SnowflakeConstants.CLOB_TYPE;
+               case (dataTypeLength > this.dbi.MAX_CHARACTER_SIZE):  return SnowflakeConstants.CLOB_TYPE;
+               default:                                              return 'TEXT';
              }
-           case 'character':                        return 'nchar';
            case 'bytea':
-             switch (true) {
-               case (dataTypeLength === undefined): return 'varbinary(4096)';
-               case (dataTypeLength > 16777215):    return 'longblob';
-               case (dataTypeLength > 65535):       return 'mediumblob';
-               default:                             return 'varbinary';
+             switch (true) {                                        
+               case (dataTypeLength === -1):                         return SnowflakeConstants.BLOB_TYPE;
+               case (dataTypeLength > this.dbi.MAX_BINARY_SIZE):     return SnowflakeConstants.BLOB_TYPE;
+               default:                                              return 'BINARY';
              }
+	       case 'longtext':                                          return SnowflakeConstants.CLOB_TYPE;
+           case 'timestamp with time zone':                          return 'TIMESTAMP_LTZ';
            case 'timestamp': 
-           case 'timestamp with time zone': 
-           case 'timestamp without time zone': 
            case 'time without time zone': 
-             switch (true) {
-               case (dataTypeLength === undefined): return 'datetime(6)';
-               default:                             return 'datetime';
-             }
-           case 'numeric':                          return 'decimal';
-           case 'double precision':                 return 'double';
-           case 'real':                             return 'float';
-           case 'integer':                          return 'int';
-           case 'xml':                              return 'longtext';     
-           case 'text':                             return 'longtext';     
-           case 'geography':       
-           case 'geography':                        return 'geometry';     
+           case 'timestamp without time zone':                       return 'TIMESTAMP_NTZ';
+           case 'numeric':                                           return 'DECIMAL';
+           case 'double precision':                                  return 'DOUBLE';
+           case 'real':                                              return 'FLOAT';
+           case 'integer':                                           return 'INT';
+           case 'jsonb':
+           case 'json':                                              return SnowflakeConstants.JSON_TYPE;
+           case 'xml':                                               return SnowflakeConstants.XML_TYPE;     
+           case 'text':                                              return SnowflakeConstants.CLOB_TYPE;
+           case 'geometry':       
+           case 'geography':                                         return 'GEOGRAPHY';     
            default:
              if (dataType.indexOf('interval') === 0) {
-               return 'varchar(16)'; 
+               return 'TEXT(16)'; 
              }
-             return dataType.toLowerCase();
+             return dataType.toUpperCase();
          }
          break
        case 'MySQL':

@@ -996,7 +996,7 @@ class MsSQLDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : this.EXPORT_VERSION
+     ,exportVersion      : Yadamu.EXPORT_VERSION
 	 ,sessionUser        : sysInfo.SESSION_USER
 	 ,currentUser        : sysInfo.CURRENT_USER
      ,dbName             : sysInfo.DATABASE_NAME
@@ -1072,15 +1072,15 @@ class MsSQLDBI extends YadamuDBI {
     this.statementCache = await statementGenerator.generateStatementCache(executeDDL, this.systemInformation.vendor, this.parameters.MSSQL_SCHEMA_DB ? this.parameters.MSSQL_SCHEMA_DB : this.connectionProperties.database)
   }
 
-  getOutputStream(tableName) {
-	 return super.getOutputStream(MsSQLWriter,tableName)
+  getOutputStream(tableName,ddlComplete) {
+	 return super.getOutputStream(MsSQLWriter,tableName,ddlComplete)
   }
  
  async setWorkerConnection() {
     // Override the default implementation provided by YadamuDBI.
 
     // Use the connection provider (master) pool
-    this.pool = this.connectionProvider.pool;
+    this.pool = this.manager.pool;
 	this.requestProvider = this.pool
 	this.transaction = this.getTransactionManager()	
   }

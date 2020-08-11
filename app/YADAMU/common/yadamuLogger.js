@@ -7,7 +7,7 @@ const util = require('util');
 const DBWriter = require('./dbWriter.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const StringWriter = require('./stringWriter.js')
-const {DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuError.js');
+const {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuError.js');
 const OracleError  = require('../oracle/node/oracleError.js');
 const FileDBI = require('../file/node/fileDBI.js');
 
@@ -266,19 +266,14 @@ class YadamuLogger {
 	  // const logger = this
       const logger = YadamuLogger.nulLogger();
 	  const dbWriter = new DBWriter(dbi,logger);  
-	  const ddlComplete = new Promise((resolve,reject) => {
-	    dbWriter.once('ddlComplete',() => {
- 	      resolve(true);
-	    })
-	  })
 	  await dbWriter.initialize()
       dbWriter.write({systemInformation: currentSettings.systemInformation})
 	  dbWriter.write({metadata: currentSettings.metadata})
-	  dbWriter.write({pause:true})
-	  await ddlComplete
-	  const tableWriter = dbi.getOutputStream(tableName)
+	  await dbWriter.ddlComplete;
+	  const tableWriter = dbi.getOutputStream(tableName,dbWriter.ddlComplete)
 	  // Disable the columnCountCheck when writing an error report
 	  tableWriter.checkColumnCount = () => {}
+	  tableWriter.setTableInfo(tableName);
 	  tableWriter.initialize();
 	  for (const d of data) {
         tableWriter.write({data:d})
@@ -288,7 +283,6 @@ class YadamuLogger {
           resolve()
         })
       })		
-	  dbWriter.deferredCallback();
 	  await new Promise((resolve,reject) => {
 		dbWriter.end(null,null,() => {
           resolve()
@@ -297,7 +291,8 @@ class YadamuLogger {
 	  await dbi.finalize()
       await logger.close();
 	} catch (e) {
-	  console.log(e)
+	 
+	 console.log(e)
 	}
   }
   
@@ -318,8 +313,15 @@ class YadamuLogger {
 	}
   }
 
+  logInternalError(args,msg,info) {
+	args.unshift('INTERNAL')
+	const internalError = new InternalError(msg,args,info)
+	this.handleException(args,internalError)
+	throw internalError
+  }
+
   handleException(args,e) {
-    // Handle Exception does not produce any output if the exception has already been processed by handleException ot logException
+    // Handle Exception does not produce any output if the exception has already been processed by handleException or logException
 
 	if (e.yadamuAlreadyReported !== true) {
 	  if (this.LOG_STACK_TRACE_TO_CONSOLE === true) {

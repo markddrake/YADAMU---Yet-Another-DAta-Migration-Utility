@@ -26,6 +26,7 @@ class MySQLDBI extends YadamuDBI {
 
   static get SQL_CONFIGURE_CONNECTION()                       { return _SQL_CONFIGURE_CONNECTION }
   static get SQL_GET_CONNECTION_INFORMATION()                 { return _SQL_GET_CONNECTION_INFORMATION }
+  static get SQL_SHOW_SYSTEM_VARIABLES()                      { return _SQL_SHOW_SYSTEM_VARIABLES }
   static get SQL_SYSTEM_INFORMATION()                         { return _SQL_SYSTEM_INFORMATION }
   static get SQL_GET_DLL_STATEMENTS()                         { return _SQL_GET_DLL_STATEMENTS }
   static get SQL_CHECK_INFORAMATION_SCHEMA_STATE()            { return _SQL_CHECK_INFORAMATION_SCHEMA_STATE } 
@@ -53,6 +54,10 @@ class MySQLDBI extends YadamuDBI {
   get TABLE_MATCHING()             { return this.parameters.TABLE_MATCHING            || MySQLConstants.TABLE_MATCHING}
   get READ_KEEP_ALIVE()            { return this.parameters.READ_KEEP_ALIVE           || MySQLConstants.READ_KEEP_ALIVE}
   get TREAT_TINYINT1_AS_BOOLEAN()  { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MySQLConstants.TREAT_TINYINT1_AS_BOOLEAN }
+  
+  // Not available until configureConnection() has been called 
+
+  get CASE_SENSITIVE_NAMING()             { return this._CASE_SENSITIVE_NAMING }
   
   constructor(yadamu) {
     super(yadamu,MySQLConstants.DEFAULT_PARAMETERS)
@@ -83,6 +88,15 @@ class MySQLDBI extends YadamuDBI {
     await this.executeSQL(MySQLDBI.SQL_CONFIGURE_CONNECTION);
     let results = await this.executeSQL(MySQLDBI.SQL_GET_CONNECTION_INFORMATION);
     this._DB_VERSION = results[0].DATABASE_VERSION
+    
+	results = await this.executeSQL(MySQLDBI.SQL_SHOW_SYSTEM_VARIABLES);
+	results.forEach((row) => {
+	  switch (row.Variable_name) {
+		case 'lower_case_table_names':
+		  this._CASE_SENSITIVE_NAMING = row.Value  
+	      break;
+	   }
+	})
   }
   
   async checkMaxAllowedPacketSize() {
@@ -135,18 +149,15 @@ class MySQLDBI extends YadamuDBI {
 	
 	const stack = new Error().stack;
     const connection = await new Promise((resolve,reject) => {
-        const sqlStartTime = performance.now();
-        this.pool.getConnection((err,connection) => {
-            this.traceTiming(sqlStartTime,performance.now())
-            if (err) {
-		      reject(this.captureException(new MySQLError(err,stack,'mysql.Pool.getConnection()')))
-            }
-            resolve(connection);
-          }
-		)
-      }
-	)
-	
+      const sqlStartTime = performance.now();
+      this.pool.getConnection((err,connection) => {
+        this.traceTiming(sqlStartTime,performance.now())
+        if (err) {
+		  reject(this.captureException(new MySQLError(err,stack,'mysql.Pool.getConnection()')))
+        }
+        resolve(connection);
+      })
+    })
     return connection
   }
   
@@ -190,7 +201,7 @@ class MySQLDBI extends YadamuDBI {
   };	  
 
   async reconnectImpl() {
-    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
     await this.connection.ping()
   }
 
@@ -199,36 +210,34 @@ class MySQLDBI extends YadamuDBI {
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
     return new Promise((resolve,reject) => {
-                   if (this.status.sqlTrace) {
-                     this.status.sqlTrace.write(this.traceSQL(sqlStatement));
-                   }
-				   const stack = new Error().stack;
-                   const sqlStartTime = performance.now(); 
-				   this.connection.query(
-                     sqlStatement,
-                     args,
-                     async (err,results,fields) => {
-                       const sqlEndTime = performance.now()
-                       if (err) {
-         		         const cause = this.captureException(new MySQLError(err,stack,sqlStatement))
-		                 if (attemptReconnect && cause.lostConnection()) {
-						   attemptReconnect = false
-						   try {
-                             await this.reconnect(cause,'SQL')
-                             results = await this.executeSQL(sqlStatement,args);
-                             resolve(results);
-						   } catch (e) {
-                             reject(e);
-                           }							 
-              1          }
-                         else {
-                           reject(cause);
-                         }
-                       }
-					   this.traceTiming(sqlStartTime,sqlEndTime)
-                       resolve(results);
-                   })
-               })
+      if (this.status.sqlTrace) {
+        this.status.sqlTrace.write(this.traceSQL(sqlStatement));
+      }
+
+      const stack = new Error().stack;
+      const sqlStartTime = performance.now(); 
+	  this.connection.query(sqlStatement,args,async (err,results,fields) => {
+        const sqlEndTime = performance.now()
+        if (err) {
+          const cause = this.captureException(new MySQLError(err,stack,sqlStatement))
+		  if (attemptReconnect && cause.lostConnection()) {
+			attemptReconnect = false
+			try {
+              await this.reconnect(cause,'SQL')
+              results = await this.executeSQL(sqlStatement,args);
+              resolve(results);
+			} catch (e) {
+              reject(e);
+            }							 
+          }
+          else {
+            reject(cause);
+          }
+        }
+		this.traceTiming(sqlStartTime,sqlEndTime)
+        resolve(results);
+      })
+    })
   }  
      
   async createSchema(schema) {    	
@@ -518,7 +527,7 @@ class MySQLDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : this.EXPORT_VERSION
+     ,exportVersion      : Yadamu.EXPORT_VERSION
      ,sessionUser        : sysInfo.SESSION_USER
      ,dbName             : sysInfo.DATABASE_NAME
      ,serverHostName     : sysInfo.SERVER_HOST
@@ -687,8 +696,8 @@ class MySQLDBI extends YadamuDBI {
     }
   }
   
-  getOutputStream(tableName) {
-	 return super.getOutputStream(MySQLWriter,tableName)
+  getOutputStream(tableName,ddlComplete) {
+	 return super.getOutputStream(MySQLWriter,tableName,ddlComplete)
   }
 
   createParser(tableInfo) {
@@ -723,6 +732,8 @@ module.exports = MySQLDBI
 const _SQL_CONFIGURE_CONNECTION       = `SET AUTOCOMMIT = 0, TIME_ZONE = '+00:00',SESSION INTERACTIVE_TIMEOUT = 600000, WAIT_TIMEOUT = 600000, SQL_MODE='ANSI_QUOTES,PAD_CHAR_TO_FULL_LENGTH', GROUP_CONCAT_MAX_LEN = 1024000, GLOBAL LOCAL_INFILE = 'ON'`
 
 const _SQL_GET_CONNECTION_INFORMATION = `select version() "DATABASE_VERSION"`
+
+const _SQL_SHOW_SYSTEM_VARIABLES      = `show variables where Variable_name='lower_case_table_names'`;
 
 const _SQL_SYSTEM_INFORMATION         = `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
 

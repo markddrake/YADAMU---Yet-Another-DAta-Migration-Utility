@@ -15,7 +15,7 @@
     },
     "drivers": {
         "file": "../file/node/fileDBI.js",
-        "loader": "../loader/node/loadereDBI.js",
+        "loader": "../loader/node/loaderDBI.js",
         "oracle": "../oracle/node/oracleDBI.js",
         "postgres": "../postgres/node/postgresDBI.js",
         "mssql": "../mssql/node/mssqlDBI.js",

@@ -45,19 +45,12 @@ class EventManager extends Transform {
 	this.outputStream = outputStream
 	if (this.dbWriter === undefined) {
 	  this.dbWriter = outputStream;
-	  this.ddlComplete = new Promise((resolve,reject) => {
-	    this.dbWriter.once('ddlComplete',() => {
- 	      // this.yadamuLogger.trace([this.constructor.name],`DDL Complete`)
-		  resolve(true);
-		})
-	  })
 	}
 	return super.pipe(outputStream,options);
   } 
 
   async createWorker(tableName) {
-    const worker = this.dbWriter.dbi.getOutputStream(tableName);
-	await worker.initialize()
+    const worker = this.dbWriter.dbi.getOutputStream(tableName,this.dbWriter.ddlComplete)
 	this.copyOperation = new Promise((resolve,reject) => {
 	  worker.once('allDataReceived',async () => {
         // this.yadamuLogger.trace([this.constructor.name,worker.constructor.name,worker.tableName],`All Data Received`)
@@ -141,10 +134,10 @@ class EventManager extends Transform {
         this.push(data)
 		this.yadamu.REJECTION_MANAGER.setMetadata(data.metadata)
 		this.yadamu.WARNING_MANAGER.setMetadata(data.metadata)
-        this.push({pause:true})
- 	    await this.ddlComplete
-		this.unpipe(this.dbWriter)
-		this.dbWriterDetached = true;
+        // this.push({pause:true})
+ 	    // await this.ddlComplete
+		// console.log('ddlComplete')
+		// this.unpipe(this.dbWriter)
 	    break;
       case 'table':
 		// Switch Workers - Couldnot get this work with 'drain' for some reason
@@ -154,6 +147,8 @@ class EventManager extends Transform {
 	    this.pipeStatistics.rowsRead = 0;
 		const worker = await this.createWorker(data.table)
 		this.pipe(worker) 
+		this.dbWriterDetached = true;
+		this.push(data)
 	    break;
       case 'eod':
 	    this.pipeStatistics.readerEndTime =	performance.now()    
@@ -165,7 +160,7 @@ class EventManager extends Transform {
 	    await this.copyOperations
 		if (this.dbWriterDetached) {
 	      this.pipe(this.dbWriter); 
-		  this.dbWriter.deferredCallback()
+		  // this.dbWriter.deferredCallback()
 		}
 	    this.push(data);
 		break;

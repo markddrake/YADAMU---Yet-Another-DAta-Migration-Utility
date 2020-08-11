@@ -42,7 +42,7 @@ class StatementGenerator {
         */
 
         const setOperators = tableInfo.targetDataTypes.map((targetDataType,idx) => {
-          if (this.dbi.DB_VERSION < '8.0.19' || true) {
+          if (this.dbi.DB_VERSION < '8.0.19' || false) {
             switch (targetDataType) {
               case 'geometry':
                 tableInfo.insertMode = 'Iterative'; 
@@ -95,7 +95,7 @@ class StatementGenerator {
             tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + `  values ?`;
             break;
           case 'Rows':
-            tableInfo.rowConstructor = `ROW(${setOperators.join(',')})`
+            tableInfo.rowConstructor = `(${setOperators.join(',')})`
             tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + `  values `;
             break;
           case 'Iterative':

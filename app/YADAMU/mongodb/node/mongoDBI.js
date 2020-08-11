@@ -461,7 +461,7 @@ class MongoDBI extends YadamuDBI {
 
   async reconnectImpl() {
     // Default code for databases that support reconnection
-    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.connectionProvider.getConnectionFromPool()
+    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
 
   }
   
@@ -591,7 +591,7 @@ class MongoDBI extends YadamuDBI {
     ,spatialFormat      : this.SPATIAL_FORMAT 
     ,schema             : this.parameters.FROM_USER
     ,softwareVendor     : this.SOFTWARE_VENDOR
-    ,exportVersion      : this.EXPORT_VERSION
+    ,exportVersion      : Yadamu.EXPORT_VERSION
     ,nodeClient         : {
        version              : process.version
       ,architecture     : process.arch
@@ -787,7 +787,7 @@ class MongoDBI extends YadamuDBI {
   }  
 
   generateQueryInformation(tableMetadata) {
-    const tableInfo = Object.assign({},tableMetadata);   
+    const tableInfo = super.generateQueryInformation(tableMetadata)
 	tableInfo.SQL_STATEMENT = `db.collection(${tableMetadata.TABLE_NAME}.find().stream()`; 
     return tableInfo
   }   
@@ -834,8 +834,8 @@ class MongoDBI extends YadamuDBI {
     await super.generateStatementCache(StatementGenerator,schema,executeDDL) 
   }
   
-  getOutputStream(primary) {
-     return super.getOutputStream(MongoWriter,primary)
+  getOutputStream(collectionName,ddlComplete) {
+     return super.getOutputStream(MongoWriter,collectionName,ddlComplete)
   }
   
   async createSchema(schema) {  

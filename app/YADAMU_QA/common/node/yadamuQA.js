@@ -365,7 +365,6 @@ class YadamuQA {
     const parameterDefaults = defaults[parameter]
     const sourceVersionKey = sourceVendor + "#" + sourceVersion;
     const targetVersionKey = targetVendor + "#" + targetVersion;
-  
     switch (true) {
       case ((parameterDefaults[sourceVersionKey] !== undefined) && (parameterDefaults[sourceVersionKey][targetVersionKey] !== undefined)):
         return { [parameter] : parameterDefaults[sourceVersionKey][targetVersionKey]}
@@ -398,7 +397,7 @@ class YadamuQA {
    
     Object.assign(compareParameters, YadamuTest.TEST_DEFAULTS[targetVendor])
     Object.assign(compareParameters, YadamuTest.TEST_DEFAULTS[versionSpecificKey] ? YadamuTest.TEST_DEFAULTS[versionSpecificKey] : {})
-    
+
     return compareParameters;
   }
   
@@ -805,8 +804,8 @@ class YadamuQA {
     
     operationsList.push(`"${sourceConnectionName}"://${sourceDescription}`)
     operationsList.push(`"${sourceConnectionName}"://${compareDescription}`)
-    let sourceVersion = sourceDBI.dbVersion;
-    let targetVersion = compareDBI.dbVersion;
+    let sourceVersion = sourceDBI.DB_VERSION;
+    let targetVersion = compareDBI.DB_VERSION;
 
     let counters = this.printResults(configuration.operation.toUpperCase(),`"${sourceConnectionName}"://${sourceDescription}`,`"${sourceConnectionName}"://${compareDescription}`,elapsedTime)	
 	this.aggregateCounters(taskCounters,counters);
@@ -840,7 +839,7 @@ class YadamuQA {
       }
       
 	  tableMappings = targetDBI.getTableMappings()
-      targetVersion = targetDBI.dbVersion
+      targetVersion = targetDBI.DB_VERSION
 
       operationsList.push(`"${sourceConnectionName}"://${sourceDescription}`)
       operationsList.push(`"${targetConnectionName}"://${targetDescription}`)
@@ -997,7 +996,7 @@ class YadamuQA {
       return taskCounters;
     }
     
-    let targetVersion = targetDBI.dbVersion
+    let targetVersion = targetDBI.DB_VERSION
 	let tableMappings = targetDBI.getTableMappings();
     let counters = this.printResults(configuration.operation.toUpperCase(),`file://${sourceFile}`,`"${targetConnectionName}"://${targetDescription}`,elapsedTime)
     this.aggregateCounters(taskCounters,counters);
@@ -1019,13 +1018,12 @@ class YadamuQA {
       await compareDBI.finalize();
     }	
     let compareElapsedTime = (performance.now() - compareStartTime);
-	
-	
+
 	sourceParameters  = Object.assign({},parameters)
     this.setUser(sourceParameters,'FROM_USER',targetDatabase, targetSchema1)
-	let sourceDBI = this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,false)
-	// Use the mappings generted during the import to drive the export
-    sourceDBI.setTableMappings(tableMappings)
+	// Use the the mappings generted during the import to drive the export
+    let sourceDBI = this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,false,tableMappings)
+	 // sourceDBI.setTableMappings(tableMappings)
     sourceDescription = this.getDescription(targetDatabase,targetSchema1)
 
 	targetParameters  = Object.assign({},parameters)
@@ -1075,7 +1073,7 @@ class YadamuQA {
       return taskCounters;
     }
 	
-	targetVersion = targetDBI.dbVersion
+	targetVersion = targetDBI.DB_VERSION
 	tableMappings = targetDBI.getTableMappings();
 	counters = this.printResults(configuration.operation.toUpperCase(),`file://${file1}`,`"${targetConnectionName}"://${targetDescription}`,elapsedTime)
     this.aggregateCounters(taskCounters,counters);
@@ -1084,7 +1082,8 @@ class YadamuQA {
 	
 	compareStartTime = performance.now();
     this.fixupTimings(timings);   
-    const testParameters = {} // parameters ? Object.assign({},parameters) : {}
+    // const testParameters = {} 
+	const testParameters = parameters ? Object.assign({},parameters) : {}
 	const compareParams = this.getCompareParameters(targetDatabase,targetVersion,targetDatabase,targetVersion,testParameters)
 	taskCounters.failed += await this.compareSchemas(targetDatabase, targetConnection, compareParams, targetSchema1, targetDatabase, targetSchema2, timings[timings.length-1],false,targetDBI.inverseTableMappings)
 	compareElapsedTime = compareElapsedTime + (performance.now() - compareStartTime);
@@ -1230,7 +1229,7 @@ class YadamuQA {
       return taskCounters;
     }
 
-    const sourceVersion = sourceDBI.dbVersion;
+    const sourceVersion = sourceDBI.DB_VERSION;
 	const opsElapsedTime = performance.now() - startTime
 		
 	if (operation.verify) {
