@@ -12,7 +12,7 @@ class PostgresConstants {
   }
 
   static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.POSTGRES_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.postgres))
+    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.POSTGRES_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.postgres || {}))
     return this._DEFAULT_PARAMETERS
   }
 
@@ -25,7 +25,7 @@ class PostgresConstants {
     return this._FETCH_AS_STRING;
   }
 
-  static get SPATIAL_FORMAT()         { return OracleDBI.DEFAULT_PARAMETERS.SPATIAL_FORMAT };
+  static get SPATIAL_FORMAT()         { return this.DEFAULT_PARAMETERS.SPATIAL_FORMAT };
   static get DATABASE_VENDOR()        { return 'Postgres' };
   static get SOFTWARE_VENDOR()        { return 'The PostgreSQL Global Development Group' };
   static get STATEMENT_TERMINATOR()   { return '/' }

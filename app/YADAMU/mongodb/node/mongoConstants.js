@@ -19,7 +19,7 @@ class MongoConstants {
   }
 
   static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.MONGO_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.mongo))
+    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.MONGO_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.mongo || {}))
     return this._DEFAULT_PARAMETERS
   }
 

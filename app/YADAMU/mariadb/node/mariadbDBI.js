@@ -634,7 +634,7 @@ class MariadbDBI extends YadamuDBI {
   
   async getConnectionID() {
 	const results = await this.executeSQL(`select connection_id() "pid"`)
-	const pid = results[0].pid;
+	const pid = results[0][0];
     return pid
   }
 }

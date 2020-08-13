@@ -81,6 +81,7 @@ class StatementGenerator {
            case 'money':                                             return 'DECIMAL(19,4)';
            case 'real':                                              return 'FLOAT';
            case 'text': 
+           case 'bit':                                               return 'BOOLEAN';
            case 'ntext':                                             return SnowflakeConstants.CLOB_TYPE;
            case 'image':                                             return SnowflakeConstants.BLOB_TYPE;
            case 'xml':                                               return SnowflakeConstants.XML_TYPE;

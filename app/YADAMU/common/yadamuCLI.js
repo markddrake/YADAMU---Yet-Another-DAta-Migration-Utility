@@ -173,31 +173,29 @@ class YadamuCLI {
 	}
   }
 
-  checkFileExists(argument) {
-	const relativePath = this.parameters[argument]
-	const resolvedPath = path.resolve(relativePath);
+  checkFileExists(targetFile,argumentName) {
+	const resolvedPath = path.resolve(targetFile);
 	try {
 	  if (!fs.statSync(resolvedPath).isFile()) {
-	    const err = new CommandLineError(`Found Directory ["${relativePath}"]. The path specified for the ${argument} argument must not resolve to a directory.`)
+	    const err = new CommandLineError(`Found Directory ["${targetFile}"]. The path specified for the ${argumentName} argument must not resolve to a directory.`)
 	    throw err;
 	  }
 	}
     catch (e) {
 	  if (e.code && e.code === 'ENOENT') {
-        const err = new CommandLineError(`File not found ["${relativePath}"]. THe path specified for the ${argument} argument must resolve to existing file.`)
+        const err = new CommandLineError(`File not found ["${targetFile}"]. THe path specified for the ${argumentName} argument must resolve to existing file.`)
 	    throw err
 	  }
       throw e;
     } 
   }
 
-  checkFileDoesNotExist(argument) {
+  checkFileDoesNotExist(targetFile,argumentName) {
 	 
-	const relativePath = this.parameters[argument]
-	const resolvedPath = path.resolve(relativePath);
+	const resolvedPath = path.resolve(targetFile);
 	try {
       if (fs.statSync(resolvedPath)) {
-	    const err = new CommandLineError(`File exists ["${relativePath}"]. The path specified for the ${argument} argument must not resolve to an existing file. Specify OVERWRITE=true to allow the file to be overwritten.`)
+	    const err = new CommandLineError(`File exists ["${targetFile}"]. The path specified for the ${argumentName} argument must not resolve to an existing file. Specify OVERWRITE=true to allow the file to be overwritten.`)
 	    throw err;
 	  }
 	} catch (e) {
@@ -221,15 +219,15 @@ class YadamuCLI {
 	// TODO ### Check for illegal arguments
 
     if (YadamuCLI.CONFIGURATION_REQUIRED.includes(command)) {
-	  this.checkFileExists('CONFIG') 
+	  this.checkFileExists(this.yadamu.CONFIG,'CONFIG') 
     }
 	
 	if (YadamuCLI.FILE_MUST_EXIST.includes(command)) {
-	  this.checkFileExists('FILE')
+	  this.checkFileExists(this.yadamu.FILE,'FILE')
 	}
 	
 	if ((YadamuCLI.FILE_MUST_NOT_EXIST.includes(command)) && (this.yadamu.COMMAND_LINE_PARAMETERS.OVERWRITE !== true)) {
-      this.checkFileDoesNotExist('FILE')
+      this.checkFileDoesNotExist(this.yadamu.FILE,'FILE')
 	}
 
     for (const parameter of Object.keys(this.yadamu.COMMAND_LINE_PARAMETERS)) {
@@ -400,7 +398,7 @@ class YadamuCLI {
   
   loadConfigurationFile() {
 	if (YadamuCLI.CONFIGURATION_REQUIRED.indexOf(this.command) > -1) {
-      const configuration = this.loadJSON(this.parameters.CONFIG);
+      const configuration = this.loadJSON(this.yadamu.CONFIG);
       this.expandConfiguration(configuration);
 	  return configuration;
 	}
@@ -497,7 +495,7 @@ class YadamuCLI {
       this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`);
     }
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete: Configuration:"${this.parameters.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete: Configuration:"${this.yadamu.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doImport() {
@@ -505,7 +503,7 @@ class YadamuCLI {
     const startTime = performance.now();
     await this.yadamu.doImport(dbi);
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`IMPORT`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`YADAMU`,`IMPORT`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doLoad() {
@@ -522,7 +520,7 @@ class YadamuCLI {
     const startTime = performance.now();
     await this.yadamu.doUpload(dbi);
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`UPLOAD`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`YADAMU`,`UPLOAD`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doExport() {
@@ -530,7 +528,7 @@ class YadamuCLI {
     const startTime = performance.now();
     await this.yadamu.doExport(dbi);
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`EXPORT`],`Operation complete: File:"${this.parameters.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`YADAMU`,`EXPORT`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doUnload() {
@@ -550,7 +548,7 @@ class YadamuCLI {
 	const startTime = performance.now();
 	const results = await yadamuQA.doTests(configuration);
 	const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.qa([`YADAMU`,`TEST`,`${this.parameters.CONFIG}`],`${results} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.qa([`YADAMU`,`TEST`,`${this.yadamu.CONFIG}`],`${results} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
 
   }
   

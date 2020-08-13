@@ -15,7 +15,7 @@ class MySQLConstants {
   }
 
   static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.MYSQL_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.mysql))
+    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.MYSQL_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.mysql || {}))
     return this._DEFAULT_PARAMETERS
   }
 

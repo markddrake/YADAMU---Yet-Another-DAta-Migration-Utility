@@ -24,6 +24,7 @@ class Yadamu {
   static get YADAMU_VERSION()         { return YadamuConstants.YADAMU_VERSION }
   
   get FILE()                          { return this.parameters.FILE     || YadamuConstants.FILE }
+  get CONFIG()                        { return this.parameters.CONFIG   || YadamuConstants.CONFIG }
   get MODE()                          { return this.parameters.MODE     || YadamuConstants.MODE }
   get ON_ERROR()                      { return this.parameters.ON_ERROR || YadamuConstants.ON_ERROR }
   get PARALLEL()                      { return this.parameters.PARALLEL || YadamuConstants.PARALLEL }
@@ -281,13 +282,15 @@ class Yadamu {
   readCommandLineParameters() {
    
     const parameters = {}
- 
+
+    const allowAnyParameter = process.argv.some((currentValue) => {return ((typeof  currentValue === 'string') && (currentValue.toUpperCase() === 'ALLOW_ANY_PARAMETER=TRUE'))})
+
     process.argv.forEach((arg) => {
      
       if (arg.indexOf('=') > -1) {
-        const parameterName = arg.substring(0,arg.indexOf('='));
+        const parameterName = arg.substring(0,arg.indexOf('=')).toUpperCase();
         const parameterValue = arg.substring(arg.indexOf('=')+1);
-        switch (parameterName.toUpperCase()) {
+        switch (parameterName) {
 	      case 'INIT':		  
 	      case '--INIT':
 	      case 'COPY':		  
@@ -461,7 +464,20 @@ class Yadamu {
             parameters.OUTPUT_FORMAT = parameterValue.toUpperCase();
             break;
           default:
-            console.log(`${new Date().toISOString()}[WARNING][this.constructor.name]: Unknown parameter: "${parameterName}". See yadamu --help for supported command line switches and arguments` )          
+		    if (allowAnyParameter) {
+              try {
+				parameters[parameterName] = JSON.parse(parameterValue.toLowerCase());
+				if (typeof parameters[parameterName] === 'string') {
+				  parameters[parameterName]	= parameterValue
+				}
+			  } catch (e) {
+                parameters[parameterName] = parameterValue;
+			  }
+			  console.log(`${new Date().toISOString()}[WARNING][YADAMU][PARAMETERS]: Adding parameter: "${parameterName}" with value ${parameters[parameterName]} to parameter list.`) 
+			}
+			else {
+              console.log(`${new Date().toISOString()}[WARNING][YADAMU][PARAMETERS]: Unknown parameter: "${parameterName}". See yadamu --help for supported command line switches and arguments` )          
+		    }
         }
       }
     })

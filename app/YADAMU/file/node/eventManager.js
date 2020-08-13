@@ -49,30 +49,7 @@ class EventManager extends Transform {
 	return super.pipe(outputStream,options);
   } 
 
-  async createWorker(tableName) {
-    const worker = this.dbWriter.dbi.getOutputStream(tableName,this.dbWriter.ddlComplete)
-	this.copyOperation = new Promise((resolve,reject) => {
-	  worker.once('allDataReceived',async () => {
-        // this.yadamuLogger.trace([this.constructor.name,worker.constructor.name,worker.tableName],`All Data Received`)
-  	    this.pipeStatistics.parserEndTime = performance.now()    
-	    this.unpipe(this.outputStream);
-		const currentStats = Object.assign({},this.pipeStatistics)
-		const reportComplete = new Promise((resolve,reject) => {
-		  worker.end(null,null,() => {
-		    const timings = worker.reportPerformance(currentStats);
-		    worker.removeAllListeners('end');
-	        this.dbWriter.recordTimings(timings);
-		    resolve(worker.tableName)
-	     })
-	   })
-	   resolve(reportComplete)
-	 })
-   })
-   // Copy error events from dbWriter to worker
-   this.dbWriter.listeners('error').forEach((f) => {worker.on('error',f)});
-   return worker
-  }
-    
+
   async createTransformations(tableName) {
 	  
 	const tableMetadata = this.metadata[tableName]
@@ -113,6 +90,31 @@ class EventManager extends Transform {
 	  
 	  
   }
+  
+  async createWorker(tableName) {
+    const worker = this.dbWriter.dbi.getOutputStream(tableName,this.dbWriter.ddlComplete)
+	this.copyOperation = new Promise((resolve,reject) => {
+	  worker.once('allDataReceived',async () => {
+        // this.yadamuLogger.trace([this.constructor.name,worker.constructor.name,worker.tableName],`All Data Received`)
+  	    this.pipeStatistics.parserEndTime = performance.now()    
+	    this.unpipe(this.outputStream);
+		const currentStats = Object.assign({},this.pipeStatistics)
+		const reportComplete = new Promise((resolve,reject) => {
+		  worker.end(null,null,() => {
+		    const timings = worker.reportPerformance(currentStats);
+		    worker.removeAllListeners('end');
+	        this.dbWriter.recordTimings(timings);
+		    resolve(worker.tableName)
+	      })
+	    })
+	    resolve(reportComplete)
+	  })
+    })
+    // Copy error events from dbWriter to worker
+    this.dbWriter.listeners('error').forEach((f) => {worker.on('error',f)});
+    return worker
+  }
+    
 	
   async _transform (data,encoding,callback)  {
 	const messageType = Object.keys(data)[0]
@@ -134,10 +136,9 @@ class EventManager extends Transform {
         this.push(data)
 		this.yadamu.REJECTION_MANAGER.setMetadata(data.metadata)
 		this.yadamu.WARNING_MANAGER.setMetadata(data.metadata)
-        // this.push({pause:true})
- 	    // await this.ddlComplete
-		// console.log('ddlComplete')
-		// this.unpipe(this.dbWriter)
+		// Wait for DDL Complete and then release the DBWriter by invoking the deferredCallback
+		await this.dbWriter.ddlComplete
+		this.dbWriter.deferredCallback()
 	    break;
       case 'table':
 		// Switch Workers - Couldnot get this work with 'drain' for some reason
@@ -160,7 +161,6 @@ class EventManager extends Transform {
 	    await this.copyOperations
 		if (this.dbWriterDetached) {
 	      this.pipe(this.dbWriter); 
-		  // this.dbWriter.deferredCallback()
 		}
 	    this.push(data);
 		break;

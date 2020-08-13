@@ -14,7 +14,7 @@ class MsSQLConstants {
   }
 
   static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.MsSQL_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.mssql))
+    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.MsSQL_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.mssql || {}))
     return this._DEFAULT_PARAMETERS
   }
 

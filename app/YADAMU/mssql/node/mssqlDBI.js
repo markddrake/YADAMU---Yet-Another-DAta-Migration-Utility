@@ -87,7 +87,7 @@ class MsSQLDBI extends YadamuDBI {
       this.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`mssql.onError()`],err);
       throw err
     })
-    
+    	
   }
 
   /*
@@ -778,10 +778,11 @@ class MsSQLDBI extends YadamuDBI {
     , options         : {
         encrypt: false // Use this if you're on Windows Azure
       , abortTransactionOnError : false
-      }
+      , enableArithAbort : true
+	  }
     }
   }
-
+      
   /*
   **
   **  Gracefully close down the database connection and pool

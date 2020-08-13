@@ -28,7 +28,6 @@ class YadamuDBI {
 
   get DATABASE_VENDOR()            { return undefined };
   get SOFTWARE_VENDOR()            { return undefined };
-
   
   get SAVE_POINT_NAME()            { return 'YADAMU_INSERT' }
   get PASSWORD_KEY_NAME()          { return 'password' };

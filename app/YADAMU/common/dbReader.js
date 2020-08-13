@@ -286,19 +286,14 @@ class DBReader extends Readable {
            this.push({metadata: this.dbi.transformMetadata(metadata,this.dbi.inverseTableMappings)});
 		   this.dbi.yadamu.REJECTION_MANAGER.setMetadata(metadata)
 		   this.dbi.yadamu.WARNING_MANAGER.setMetadata(metadata)
-		   this.nextPhase = ((this.dbi.MODE === 'DDL_ONLY') || (this.schemaInfo.length === 0)) ? 'exportComplete' : 'pause';
-		   break;
-		 case 'pause':
-	       this.push({pause:true})
-		   this.nextPhase = 'copyData'
+		   this.nextPhase = ((this.dbi.MODE === 'DDL_ONLY') || (this.schemaInfo.length === 0)) ? 'exportComplete' : 'copyData';
 		   break;
 		 case 'copyData':
 		   await this.pipelineTables(this.dbi,this.dbWriter.dbi);
-    	   // this.yadamuLogger.trace([this.constructor.name,,this.dbi.DATABASE_VENDOR,`_READ(${this.nextPhase})`,this.dbi.yadamu.ON_ERROR],'Exeucting Deferred Callback')
-		   this.dbWriter.deferredCallback();
 		   // No 'break' - fall through to 'exportComplete'.
 		 case 'exportComplete':
 		   await this.dbWriter.ddlComplete
+		   this.dbWriter.deferredCallback()
 		   this.push(null);
 		   break;
 	    default:

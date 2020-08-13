@@ -348,7 +348,7 @@ BEGIN
                           concat('hex("',column_name,'")') 
                         when data_type in ('set') then
 						  -- Set is stored as a JSON_ARRAY in the target...
-                          concat('concat(''["'',replace("',column_name,'",'','',''","''),''"]'')') 
+                          concat('json_query(concat(''["'',replace("',column_name,'",'','',''","''),''"]''),''$'')') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
                           case
                             when P_MAP_EMPTY_STRING_TO_NULL then

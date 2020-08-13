@@ -4,8 +4,6 @@
 , "connections"                       : "qa/regression/connections.json"
 , "parameters": {
     "MODE": "DATA_ONLY"
-  , "FEEDBACK": "COMMIT"
-  , "XML_STORAGE_FORMAT": "CLOB"
   }
 , "tasks"                             : "qa/regression/dbRoundtripTasks.json"
 , "tests"                  : [{
