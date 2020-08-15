@@ -269,29 +269,18 @@ class YadamuLogger {
 	  await dbWriter.initialize()
       dbWriter.write({systemInformation: currentSettings.systemInformation})
 	  dbWriter.write({metadata: currentSettings.metadata})
-	  await dbWriter.ddlComplete;
 	  const tableWriter = dbi.getOutputStream(tableName,dbWriter.ddlComplete)
 	  // Disable the columnCountCheck when writing an error report
 	  tableWriter.checkColumnCount = () => {}
-	  tableWriter.setTableInfo(tableName);
-	  tableWriter.initialize();
+	  await new Promise((resolve,reject) => {tableWriter.write({table: tableName},null,() => {resolve()})})
 	  for (const d of data) {
         tableWriter.write({data:d})
 	  }
-	  await new Promise((resolve,reject) => {
-		tableWriter.end(null,null,() => {
-          resolve()
-        })
-      })		
-	  await new Promise((resolve,reject) => {
-		dbWriter.end(null,null,() => {
-          resolve()
-        })
-      })		
+	  await new Promise((resolve,reject) => {tableWriter.end(null,null,() => {resolve()})})
+      dbWriter.deferredCallback();
 	  await dbi.finalize()
-      await logger.close();
-	} catch (e) {
-	 
+	  await logger.close();
+	} catch (e) {	 
 	 console.log(e)
 	}
   }
@@ -362,13 +351,6 @@ class YadamuLogger {
   logRejected(args,e) {
 	args.unshift('REJECTED')
 	this.handleException(args,e);
-    /*
-	const largs = [...args]
-	const ts = this.warning(args,e.message);
-    const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
-    this.writeExceptionToFile(exceptionFile,ts,args,e)
-	this.warning(largs,`Details logged to "${exceptionFile}".`)
-	*/
   }
 
   trace(args,msg) {

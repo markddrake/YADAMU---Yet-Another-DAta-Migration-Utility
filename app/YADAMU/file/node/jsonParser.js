@@ -8,7 +8,7 @@ const { performance } = require('perf_hooks');
 
 class JSONParser extends Transform {
   
-  constructor(yadamuLogger, mode, options) {
+  constructor(yadamuLogger, mode, path, options) {
 
     super({objectMode: true });  
    
@@ -22,8 +22,14 @@ class JSONParser extends Transform {
 
     this.parser = clarinet.createStream();
     
-    this.parser.on('error',(err) => {
-      yadamuLogger.handleException([`${this.constructor.name}.onError()`],err)
+    this.parser.once('error',(err) => {
+      yadamuLogger.handleException([`JSON_PARSER`,`Invalid JSON Document`,`"${path}"`],err)
+	  // How to stop the parser..
+	  // this.parser.destroy(err)  
+	  this.destroy(err);
+  	  this.unpipe() 
+	  // Swallow any further errors raised by the Parser
+	  this.parser.on('error',(err) => {});
     })
     
     this.parser.on('key',(key) => {

@@ -1262,9 +1262,12 @@ class OracleDBI extends YadamuDBI {
 
   }    
     	  
+  classFactory(yadamu) {
+	return new OracleDBI(yadamu)
+  }
+  		  
   async workerDBI(workerNumber) {
-	const dbi = new OracleDBI(this.yadamu)
-    await super.workerDBI(workerNumber,dbi)
+    const dbi = await super.workerDBI(workerNumber)
     await dbi.setCurrentSchema(this.currentSchema);
     await dbi.setDateFormatMask(dbi.connection,this.status,this.systemInformation.vendor);
     return dbi;

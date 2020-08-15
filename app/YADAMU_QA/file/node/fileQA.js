@@ -37,7 +37,7 @@ class FileQA extends FileDBI {
 
   async getContentMetadata(file,sort) {
       
-    const jsonParser  = new JSONParser(this.yadamuLogger)
+    const jsonParser  = new JSONParser(this.yadamuLogger, 'COMPARE', file)
     let readStream
     try {
       readStream = fs.createReadStream(file);         

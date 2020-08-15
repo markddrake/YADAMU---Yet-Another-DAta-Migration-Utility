@@ -715,9 +715,8 @@ class MySQLDBI extends YadamuDBI {
 	}
   }
 
-  async workerDBI(workerNumber) {
-	const dbi = new MySQLDBI(this.yadamu)
-	return await super.workerDBI(workerNumber,dbi)
+  classFactory(yadamu) {
+	return new MySQLDBI(yadamu)
   }
   
   async getConnectionID() {

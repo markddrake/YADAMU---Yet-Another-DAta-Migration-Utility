@@ -632,12 +632,10 @@ class PostgresDBI extends YadamuDBI {
     return result;
   }
 
-  async workerDBI(workerNumber) {
-	const dbi = new PostgresDBI(this.yadamu)
-	await super.workerDBI(workerNumber,dbi)
-    return dbi;
+  classFactory(yadamu) {
+	return new PostgresDBI(yadamu)
   }
- 
+  
   async getConnectionID() {
 	const results = await this.executeSQL(`select pg_backend_pid()`)
 	const pid = results.rows[0][0];

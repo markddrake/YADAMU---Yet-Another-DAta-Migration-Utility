@@ -1085,11 +1085,9 @@ class MsSQLDBI extends YadamuDBI {
 	this.requestProvider = this.pool
 	this.transaction = this.getTransactionManager()	
   }
-  
-  async workerDBI(workerNumber) {
-	const dbi = new MsSQLDBI(this.yadamu)
-	await super.workerDBI(workerNumber,dbi)
-	return dbi
+
+  classFactory(yadamu) {
+	return new MsSQLDBI(yadamu)
   }
   
   async getConnectionID() {

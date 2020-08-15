@@ -43,7 +43,7 @@
     },
     "mssql": {
         "DEFAULT_USER": "dbo",
-        "SPATIAL_MAKE_VALID": true
+        "SPATIAL_MAKE_VALID": false
     },
     "mysql": {
         "TABLE_MATCHING": "INSENSITIVE",

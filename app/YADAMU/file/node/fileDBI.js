@@ -241,7 +241,7 @@ class FileDBI extends YadamuDBI {
     const stats = fs.statSync(this.exportFilePath)
     const fileSizeInBytes = stats.size
     this.yadamuLogger.info([this.DATABASE_VENDOR],`Processing file "${this.exportFilePath}". Size ${fileSizeInBytes} bytes.`)
-    const jsonParser  = new JSONParser(this.yadamuLogger,this.MODE);
+    const jsonParser  = new JSONParser(this.yadamuLogger,this.MODE,this.exportFilePath);
     const eventManager = new EventManager(this.yadamu)
 	this.eventStream = this.inputStream.pipe(jsonParser).pipe(eventManager)
 	return this.eventStream;

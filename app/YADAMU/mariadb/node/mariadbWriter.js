@@ -60,10 +60,6 @@ class MariadbWriter extends YadamuWriter {
 	
   }
 
-  async initialize() {
-	await super.initialize()
-  }
-  
   getStatistics() {
     const results = super.getStatistics()
     results.insertMode = this.tableInfo.insertMode

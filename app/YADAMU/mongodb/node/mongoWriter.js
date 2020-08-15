@@ -107,13 +107,12 @@ class MongoWriter extends YadamuWriter {
     }
   }
   
-  async initialize() {
-      
+  async initialize(obj) {      
+    await super.initialize(obj);
     this.collection = await this.dbi.collection(this.tableInfo.tableName)
     if (this.tableInfo.insertMode === 'ARRAY') {
       const result = await this.dbi.insertOne('yadamuMetadata',this.tableInfo);
     }
-    super.initialize();
   }
 
   cacheRow(row) {

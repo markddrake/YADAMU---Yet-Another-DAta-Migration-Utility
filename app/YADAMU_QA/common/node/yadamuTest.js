@@ -11,7 +11,7 @@ class YadamuTest extends Yadamu {
     
     
   static get TEST_DEFAULTS()      { return YadamuDefaults };    
-  static get YADAMU_DRIVERS()         { return YadamuTest.TEST_DEFAULTS.drivers }
+  static get YADAMU_DRIVERS()     { return YadamuTest.TEST_DEFAULTS.drivers }
 
   constructor(mode) {
     super(mode)
@@ -25,7 +25,7 @@ class YadamuTest extends Yadamu {
 	 return this.teradateWorker
   }
   
-  reset() {
+  reset(testParameters) {
     this._REJECTION_MANAGER = undefined;
     this._WARNING_MANAGER = undefined;
     this.STATUS.startTime     = performance.now()
@@ -36,6 +36,9 @@ class YadamuTest extends Yadamu {
     if (this.parameters.SQL_TRACE) {
 	  this.STATUS.sqlTrace = fs.createWriteStream(this.parameters.SQL_TRACE,{flags : "a"});
     }
+	
+	this.reloadParameters(testParameters)
+	
   }
   
   async doExport(dbi,file) {

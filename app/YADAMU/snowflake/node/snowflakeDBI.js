@@ -467,12 +467,9 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	 // Get an instance of the YadamuWriter implementation associated for this database
 	 return super.getOutputStream(SnowflakeWriter,tableName,ddlComplete)
   }
- 
-  async workerDBI(workerNumber) {
-	// Create a worker DBI that has it's own connection to the database (eg can begin and end transactions of it's own. 
-	// Ideally the connection should come from the same connection pool that provided the connection to this DBI.
-	const dbi = new SnowflakeDBI(this.yadamu)
-	return await super.workerDBI(workerNumber,dbi)
+  
+  classFactory(yadamu) {
+	return new SnowflakeDBI(yadamu)
   }
  
 }

@@ -8,12 +8,11 @@ const { performance } = require('perf_hooks');
 
 class JSONParser extends Transform {
   
-  constructor(tableName, yadamuLogger, mode, options) {
+  get MAX_ERRORS() { return 10 }
+  
+  constructor(yadamuLogger, mode, path, options) {
       
     super({objectMode: true });  
-   
-    
-    this.currentTable = tableName      
     this.yadamuLogger = yadamuLogger;
 	this.mode = mode;
     
@@ -23,8 +22,14 @@ class JSONParser extends Transform {
 
     this.parser = clarinet.createStream();
     
-    this.parser.on('error',(err) => {
-      yadamuLogger.handleException([`${this.constructor.name}.onError()`],err)
+    this.parser.once('error',(err) => {
+      yadamuLogger.handleException([`JSON_PARSER`,`Invalid JSON Document`,`"${path}"`],err)
+	  // How to stop the parser..
+	  // this.parser.destroy(err)  
+	  this.destroy(err);
+  	  this.unpipe() 
+	  // Swallow any further errors raised by the Parser
+	  this.parser.on('error',(err) => {});
     })
     
     this.parser.on('key',(key) => {
@@ -117,9 +122,7 @@ class JSONParser extends Transform {
       switch (this.jDepth){
 		case 0:
    	      this.endTime = performance.now();
-		  const tableReadStatistics =  {tableName: this.currentTable, rowsRead: this.rowsRead, pipeStartTime: this.startTime, readerEndTime: this.endTime, parserEndTime: this.endTime, copyFailed: false}
-		  this.push({eod: tableReadStatistics})
-          this.tableList.delete(this.currentTable);
+		  this.push(null);
           break;
         case 1:
           this.push({ data : this.currentObject});
@@ -148,11 +151,6 @@ class JSONParser extends Transform {
       }   
     });  
     
-	/*
-    this.parser.on('end',() => {
-	   this.push({end: this.currentTable});
-	})
-	*/
 	
     this.tableList  = new Set();
     this.objectStack = [];
@@ -163,10 +161,9 @@ class JSONParser extends Transform {
     this.jDepth = 0; 
 	
 	// Push a table entry before sending data. Ensure that the Writer waits for DDL to complete before writing data.
-	this.push({table: this.currentTable})
+	// this.push({table: this.currentTable})
   }     
      
-
   checkState() {
     if (this.tableList.size === 0) {
       return false;
@@ -180,7 +177,7 @@ class JSONParser extends Transform {
   };
    
   _transform(data,enc,callback) {
-    this.parser.write(data);
+	this.parser.write(data);
     callback();
   };
   

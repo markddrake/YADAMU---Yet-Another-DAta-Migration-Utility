@@ -48,8 +48,13 @@ class YadamuWriter extends Writable {
 	this.supressBatchWriteLogging = (this.BATCH_SIZE === this.COMMIT_COUNT) // Prevent duplicate logging if batchSize and Commit SIze are the same
   }
    
-  async initialize() {  
-     await this.beginTransaction()
+  async initialize(tableName) {  
+    // Do not start processing table until all DDL operations have completed.
+	await this.ddlComplete;
+	// Workers need to reload their Statement Cache from the Manager before processing can begin
+	this.dbi.reloadStatementCache()
+	this.setTableInfo(tableName);
+    await this.beginTransaction()
   }
   
   abortWriter() {
@@ -243,10 +248,12 @@ class YadamuWriter extends Writable {
     }    
   }
 
+  /*
   async finalize() {
     return !this.skipTable
   }
-
+  */
+  
   configureFeedback(feedbackModel) {
       
     this.reportCommits      = false;
@@ -304,12 +311,7 @@ class YadamuWriter extends Writable {
 	  // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),messageType],'_write()')
       switch (messageType) {
 		case 'table':
-          // Do not start processing table until all DDL operations have completed.
-		  await this.ddlComplete;
-		  // Workers need to reload their Statement Cache from the Manager before processing can begin
-		  this.dbi.reloadStatementCache()
-		  this.setTableInfo(obj.table);
-          await this.initialize()
+          await this.initialize(obj.table)
 		  break;  
         case 'data':
           if (this.skipTable === false) {
@@ -360,7 +362,7 @@ class YadamuWriter extends Writable {
     }
   }
   
-  async flushCache(cause) {
+  async finalize(cause) {
     // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.hasPendingRows(),this.skipTable,this.rowCounters.received,this.rowCounters.committed,this.rowCounters.written,this.rowCounters.cached],'_flushCahce()')
     if (this.hasPendingRows() && !this.skipTable) {
       this.skipTable = await this.writeBatch();   
@@ -380,7 +382,7 @@ class YadamuWriter extends Writable {
     // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],'_final()')
 	this.endTime = performance.now();
 	try {
-	  await this.flushCache()
+	  await this.finalize()
       callback();
     } catch (e) {
       this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`"${this.tableName}"`],e);
@@ -393,7 +395,7 @@ class YadamuWriter extends Writable {
 	// Called when a writer fails. Once a writer has emitted an 'error' event calling the end() method does not appear to invoke that the _final() method.
 	// this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],'forcedEnd()')
 	try {
-	  await this.flushCache(cause);
+	  await this.finalize(cause);
     } catch (e) {
       this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`"${this.tableName}"`],e);
     } 

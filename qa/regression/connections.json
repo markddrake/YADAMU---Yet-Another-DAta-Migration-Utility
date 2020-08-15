@@ -99,6 +99,20 @@
         }
       }
     },
+    "minio#1"                           : {
+	  "awsS3"                           : {
+          "accessKeyId"                 : "AKIAIOSFODNN7EXAMPLE" ,
+          "secretAccessKey"             : "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" ,
+          "endpoint"                    : "http://yadamu-db1:9000" ,
+          "s3ForcePathStyle"            : true,
+          "signatureVersion"            : "v4"
+      }
+	},
+    "load-scratch"                            : {
+	  "loader"                          : {
+		"directory"                     : "scratch" 
+      }
+	},
     "file-connection"                   : {
       "file"                            : {
 		"directory"                     : "JSON/%connection%" 

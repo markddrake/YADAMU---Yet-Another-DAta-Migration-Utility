@@ -428,6 +428,14 @@ BEGIN
    ,NOTES            VARCHAR(512)
   );
   
+  create temporary table if not exists SOURCE_HASH_TABLE (
+    HASH    BINARY(32)
+  ) ENGINE=MEMORY;
+
+  create temporary table if not exists TARGET_HASH_TABLE (
+    HASH    BINARY(32)
+  ) ENGINE=MEMORY;
+  
   TRUNCATE TABLE SCHEMA_COMPARE_RESULTS;
   COMMIT;
   
@@ -440,22 +448,30 @@ BEGIN
     IF NO_MORE_ROWS THEN
       LEAVE PROCESS_TABLE;
     END IF;
-   
+
+    TRUNCATE TABLE SOURCE_HASH_TABLE;
+    TRUNCATE TABLE TARGET_HASH_TABLE;
+	
+	SET V_STATEMENT = CONCAT('insert into SOURCE_HASH_TABLE select UNHEX(SHA2(JSON_ARRAY(',V_SOURCE_COLUMN_LIST,'),256)) HASH from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'"');
+    SET @STATEMENT = V_STATEMENT;
+    PREPARE STATEMENT FROM @STATEMENT;
+    EXECUTE STATEMENT;
+    DEALLOCATE PREPARE STATEMENT;
+    
+	SET V_STATEMENT = CONCAT('insert into TARGET_HASH_TABLE select UNHEX(SHA2(JSON_ARRAY(',V_TARGET_COLUMN_LIST,'),256)) HASH from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'"');
+    SET @STATEMENT = V_STATEMENT;
+    PREPARE STATEMENT FROM @STATEMENT;
+    EXECUTE STATEMENT;
+    DEALLOCATE PREPARE STATEMENT;
+
     set V_STATEMENT = CONCAT('insert into SCHEMA_COMPARE_RESULTS ',C_NEWLINE,
 	                         'with ',C_NEWLINE,
-							 'SOURCE_HASH_TABLE as (',C_NEWLINE,
-							 'select UNHEX(SHA2(JSON_ARRAY(',V_SOURCE_COLUMN_LIST,'),256)) HASH, COUNT(*) CNT from "',P_SOURCE_SCHEMA,'"."',V_TABLE_NAME,'" GROUP BY HASH',C_NEWLINE,
-	                         '),',C_NEWLINE,
-							 'TARGET_HASH_TABLE as (',C_NEWLINE,
-							 'select UNHEX(SHA2(JSON_ARRAY(',V_TARGET_COLUMN_LIST,'),256)) HASH, COUNT(*) CNT from "',P_TARGET_SCHEMA,'"."',V_TABLE_NAME,'" GROUP BY HASH',C_NEWLINE,
-	                         '),',C_NEWLINE,
 							 'MISSING_ROWS as (',C_NEWLINE,
-							 'select HASH,CNT from SOURCE_HASH_TABLE where (HASH,CNT) not in (select HASH,CNT from TARGET_HASH_TABLE)',C_NEWLINE,
+							 'select HASH from SOURCE_HASH_TABLE where (HASH) not in (select HASH from TARGET_HASH_TABLE)',C_NEWLINE,
 							 '),',C_NEWLINE,
 							 'EXTRA_ROWS as (',C_NEWLINE,
-							 'select HASH,CNT  from TARGET_HASH_TABLE where (HASH,CNT) not in (select HASH,CNT from SOURCE_HASH_TABLE)',C_NEWLINE,
-							 ')',C_NEWLINE,
-							 
+							 'select HASH from TARGET_HASH_TABLE where (HASH) not in (select HASH from SOURCE_HASH_TABLE)',C_NEWLINE,
+							 ')',C_NEWLINE,							 
                              ' select ''',P_SOURCE_SCHEMA,''' ',C_NEWLINE,
                              '       ,''',P_TARGET_SCHEMA,''' ',C_NEWLINE,
                              '       ,''',V_TABLE_NAME,''' ',C_NEWLINE,

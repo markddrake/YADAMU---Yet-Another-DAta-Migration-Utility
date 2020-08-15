@@ -466,14 +466,13 @@ class ExampleDBI extends YadamuDBI {
 	 // Get an instance of the YadamuWriter implementation associated for this database
 	 return super.getOutputStream(ExampleWriter,tableName,ddlComplete)
   }
- 
-  async workerDBI(workerNumber) {
+
+  classFactory(yadamu) {
 	// Create a worker DBI that has it's own connection to the database (eg can begin and end transactions of it's own. 
 	// Ideally the connection should come from the same connection pool that provided the connection to this DBI.
-	const dbi = new ExampleDBI(this.yadamu)
-	return await super.workerDBI(workerNumber,dbi)
+	return new ExampleDBI(yadamu)
   }
- 
+  
   async getConnectionID() {
 	// Get a uniqueID for the current connection
     throw new Error('Unimplemented Method')

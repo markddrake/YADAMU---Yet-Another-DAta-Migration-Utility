@@ -27,7 +27,8 @@ class Yadamu {
   get CONFIG()                        { return this.parameters.CONFIG   || YadamuConstants.CONFIG }
   get MODE()                          { return this.parameters.MODE     || YadamuConstants.MODE }
   get ON_ERROR()                      { return this.parameters.ON_ERROR || YadamuConstants.ON_ERROR }
-  get PARALLEL()                      { return this.parameters.PARALLEL || YadamuConstants.PARALLEL }
+  get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || YadamuConstants.PARALLEL) }
+  get PARALLEL_PROCESSING()           { return this.PARALLEL > 0 } // Parellel 1 is Parallel processing logic with a single worker.
   get RDBMS()                         { return this.parameters.RDBMS    || YadamuConstants.RDBMS }  
 
   get EXCEPTION_FOLDER()              { return this.parameters.EXCEPTION_FOLDER       || YadamuConstants.EXCEPTION_FOLDER }
@@ -41,13 +42,12 @@ class Yadamu {
   get OPERATION()                     { return this._OPERATION }
   
   get LOG_FILE()                      { return this.parameters.LOG_FILE }
-  get OPERATION()                     { return this._OPERATION }
 
-  get CONFIGURATION_FILE_PATH()       { return this.COMMAND_LIST_PARAMETERS.CONFIG }
+  get CONFIGURATION_FILE_PATH()       { return this.COMMAND_LINE_PARAMETERS.CONFIG }
   
   get COMMAND_LINE_PARAMETERS()       { 
-    this._COMMAND_LIST_PARAMETERS = this._COMMAND_LIST_PARAMETERS || this.readCommandLineParameters();
-	return this._COMMAND_LIST_PARAMETERS
+    this._COMMAND_LINE_PARAMETERS = this._COMMAND_LINE_PARAMETERS || this.readCommandLineParameters();
+	return this._COMMAND_LINE_PARAMETERS
   }
   
   get STATUS() {   
@@ -518,8 +518,7 @@ class Yadamu {
 	  let cause = undefined;
       await source.initialize();
       await target.initialize();
-	  let parallel = ((this.PARALLEL) && (this.PARALLEL > 1))
-	  parallel = (parallel && source.isDatabase() && target.isDatabase());
+	  const parallel = (this.PARALLEL_PROCESSING && source.isDatabase() && target.isDatabase());
 
       dbReader = await this.getDBReader(source,parallel)
       dbWriter = await this.getDBWriter(target,parallel) 

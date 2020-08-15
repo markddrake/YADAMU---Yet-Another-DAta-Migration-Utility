@@ -627,9 +627,8 @@ class MariadbDBI extends YadamuDBI {
 	 return super.getOutputStream(MariadbWriter,tableName,ddlComplete)
   }
 
-  async workerDBI(workerNumber) {
-	const dbi = new MariadbDBI(this.yadamu)
-	return await super.workerDBI(workerNumber,dbi)
+  classFactory(yadamu) {
+	return new MariadbDBI(yadamu)
   }
   
   async getConnectionID() {

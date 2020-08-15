@@ -42,20 +42,17 @@ class YadamuRejectManager {
 	  this.writer.write({metadata: this.metadata})
 	  await this.writer.ddlComplete;
 	  this.tableWriter = this.dbi.getOutputStream(tableName,this.writer.ddlComplete)
+	  // Disable the columnCountCheck when writing an error report
       this.tableWriter.checkColumnCount = () => {}
-	  this.tableWriter.setTableInfo(tableName);
+	  await new Promise((resolve,reject) => {this.tableWriter.write({table: tableName},null,() => {resolve()})})
 	}
 	else {
 	  if (tableName !== this.tableWriter.tableName) {
-    	await new Promise((resolve,reject) => {
-		  this.tableWriter.end(null,null,() => {
-            resolve()
-          })
-        })		
-		this.tableWriter = this.dbi.getOutputStream(tableName)
-		this.tableWriter.checkColumnCount = () => {}
-        this.tableWriter.setTableInfo(tableName);
-		// Disable Column Count Checks
+    	await new Promise((resolve,reject) => {this.tableWriter.end(null,null,() => {resolve()})})		
+		this.tableWriter = this.dbi.getOutputStream(tableName,this.writer.ddlComplete)
+        // Disable the columnCountCheck when writing an error report
+	    this.tableWriter.checkColumnCount = () => {}
+	    await new Promise((resolve,reject) => {this.tableWriter.write({table: tableName},null,() => {resolve()})})
 	  }
 	}
     await new Promise((resolve,reject) => {this.tableWriter.write({data: data},null,() => {resolve()})})
@@ -64,16 +61,7 @@ class YadamuRejectManager {
   
   async close() {
 	if (this.recordCount > 0) {
-      await new Promise((resolve,reject) => {
-		this.tableWriter.end(null,null,() => {
-          resolve()
-        })
-      })		
-	  await new Promise((resolve,reject) => {
-	    this.writer.end(null,null,() => {
-          resolve()
-        })
-      })		
+      await new Promise((resolve,reject) => {this.tableWriter.end(null,null,() => {resolve()})})		
 	  await this.dbi.finalize()    
       await this.logger.close()
       this.yadamu.LOGGER.info([this.usage],`${this.recordCount} records written to "${this.filename}"`)

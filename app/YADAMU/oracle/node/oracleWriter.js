@@ -190,10 +190,10 @@ class OracleWriter extends YadamuWriter {
     }
   }
 
-  async initialize() {
+  async initialize(tableName) {
+    await super.initialize(tableName)
     await this.disableTriggers()
-    await super.initialize()
-  }
+ }
 
   async disableTriggers() {
   

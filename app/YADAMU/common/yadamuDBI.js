@@ -1141,10 +1141,11 @@ class YadamuDBI {
 
   }
   
-  async workerDBI(workerNumber,dbi) {
+  async workerDBI(workerNumber) {
       
     // Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
-      
+	
+	const dbi = this.classFactory(this.yadamu)  
     dbi.workerNumber = workerNumber
 	dbi.manager = this
 	await dbi.setWorkerConnection()

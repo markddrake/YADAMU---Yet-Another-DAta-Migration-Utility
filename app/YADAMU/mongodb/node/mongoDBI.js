@@ -843,12 +843,10 @@ class MongoDBI extends YadamuDBI {
     await this.use(schema)
   }
 
-  async workerDBI(workerNumber) {
-    const dbi = new MongoDBI(this.yadamu)
-    return await super.workerDBI(workerNumber,dbi)
-    dbi.db(this.stats.db);
+  classFactory(yadamu) {
+	return new MongoDBI(yadamu)
   }
-
+  
 }
 
 module.exports = MongoDBI

@@ -23,7 +23,8 @@ class YadamuQA {
   getDatabaseInterface(driver,testConnection,testParameters,recreateSchema,tableMappings) {
     
     let dbi = undefined
-    this.yadamu.reset();
+    const parameters = testParameters ? Object.assign({},testParameters) : {}
+	this.yadamu.reset(parameters);
     
     if (YadamuTest.YADAMU_DRIVERS.hasOwnProperty(driver)) { 
 	  const DBI = require(YadamuTest.YADAMU_DRIVERS[driver]);
@@ -35,8 +36,7 @@ class YadamuQA {
     }
 
     const connectionProperties = Object.assign({},testConnection)
-    const parameters = testParameters ? Object.assign({},testParameters) : {}
-	dbi.setConnectionProperties(connectionProperties);
+    dbi.setConnectionProperties(connectionProperties);
     dbi.setParameters(parameters);
 	dbi.setTableMappings(tableMappings);
 	dbi.configureTest(recreateSchema);
