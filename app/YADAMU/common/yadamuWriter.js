@@ -2,18 +2,21 @@
 
 const assert = require('assert').strict;
 const Writable = require('stream').Writable
+const Transform = require('stream').Transform
 const { performance } = require('perf_hooks');
 
 const YadamuLibrary = require('./yadamuLibrary.js');
 const {BatchInsertError, IterativeInsertError, DatabaseError} = require('./yadamuError.js')
 
-class YadamuWriter extends Writable {
+class YadamuWriter extends Transform {
 
   get BATCH_SIZE()     {  return this.tableInfo._BATCH_SIZE }
   get COMMIT_COUNT()   {  return this.tableInfo._COMMIT_COUNT }
   get SPATIAL_FORMAT() {  return this.tableInfo._SPATIAL_FORMAT}
 
+  
   constructor(options,dbi,tableName,ddlComplete,status,yadamuLogger) {
+	options.highWaterMark = 64
 	super(options)
     this.dbi = dbi;
     this.schema = this.dbi.parameters.TO_USER;
@@ -25,7 +28,7 @@ class YadamuWriter extends Writable {
  	this.rowCounters = {
       received   : 0 // Rows accepted
 	, batchCount : 0 // Batches created
-	, cached     : 0 // Rows recieved and cached by appendRow(). Reset every time a batch of cached rows is written to disk
+	, cached     : 0 // Rows received and cached by appendRow(). Reset every time a batch of cached rows is written to disk
 	, written    : 0 // Rows written to disk in the current transaction
 	, committed  : 0 // Rows successfully committed to disk
 	, skipped    : 0 // Rows not written to disk due to unrecoverable write errors
@@ -39,10 +42,13 @@ class YadamuWriter extends Writable {
     this.skipTable = this.dbi.MODE === 'DDL_ONLY';
     this.sqlInitialTime = this.dbi.sqlCumlativeTime
 	this.startTime = performance.now();
+	
+	// this.on('pipe',(src)=>{console.log('pipe',src.constructor.name)})
+	// this.on('unpipe',(src)=>{console.log('unpipe',src.constructor.name)})
   }
   
   setTableInfo(tableName) {
-    this.skipTable = true
+	this.skipTable = true
 	this.tableInfo = this.dbi.getTableInfo(tableName)
     this.skipTable = false;
 	this.supressBatchWriteLogging = (this.BATCH_SIZE === this.COMMIT_COUNT) // Prevent duplicate logging if batchSize and Commit SIze are the same
@@ -51,13 +57,15 @@ class YadamuWriter extends Writable {
   async initialize(tableName) {  
     // Do not start processing table until all DDL operations have completed.
 	await this.ddlComplete;
-	// Workers need to reload their Statement Cache from the Manager before processing can begin
+	// Workers need to reload their copy of the Statement Cache from the Manager before processing can begin
 	this.dbi.reloadStatementCache()
 	this.setTableInfo(tableName);
-    await this.beginTransaction()
+	await this.beginTransaction()
   }
   
-  abortWriter() {
+  abortTable() {
+	// Disable the processRow() function.
+	this.processRow = async () => {}
 	this.skipTable = true;
   }
  
@@ -83,7 +91,7 @@ class YadamuWriter extends Writable {
               
 
   async checkColumnCount(row) {
-    
+	  
 	try {
 	  if (!this.skipTable) {
         assert.strictEqual(this.tableInfo.columnNames.length,row.length,`Table ${this.tableName}. Incorrect number of columns supplied.`)
@@ -160,7 +168,7 @@ class YadamuWriter extends Writable {
   }
   
   async commitTransaction() {
-    if (!this.skipTable) {
+	if (!this.skipTable) {
       await this.dbi.commitTransaction()
 	  this.rowCounters.committed += this.rowCounters.written;
 	  this.rowCounters.written = 0;
@@ -228,7 +236,26 @@ class YadamuWriter extends Writable {
 	
     if (this.rowCounters.skipped === this.dbi.TABLE_MAX_ERRORS) {
       this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
-      this.skipTable = true;
+	  this.abortTable()
+    }
+  }
+
+  async handleSpatialError(operation,cause,rowNumber,record,info) {
+	  
+    this.rowCounters.skipped++;
+	
+	try {
+      await this.rejectRow(this.tableName,record);
+      const iterativeError = this.createIterativeException(cause,this.rowCounters.cached,rowNumber,record,info)
+      this.yadamuLogger.logRejectedAsWarning([this.dbi.DATABASE_VENDOR,this.tableName,operation,this.rowCounters.cached,rowNumber],iterativeError);
+    } catch (e) {
+      this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.tableName,this.insertMode],e)
+    }
+
+	
+    if (this.rowCounters.skipped === this.dbi.TABLE_MAX_ERRORS) {
+      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
+	  this.abortTable()
     }
   }
 
@@ -306,24 +333,23 @@ class YadamuWriter extends Writable {
   }
   
   async _write(obj, encoding, callback) {
-    const messageType = Object.keys(obj)[0]
+	const messageType = Object.keys(obj)[0]
 	try {
-	  // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),messageType],'_write()')
+	  // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),messageType,this.rowCounters.received,this.writableLength,this.writableHighWaterMark],'_write()')
       switch (messageType) {
-		case 'table':
-          await this.initialize(obj.table)
-		  break;  
         case 'data':
-          if (this.skipTable === false) {
-			await this.processRow(obj.data)
-          }
-		  // ### Else Throw an Error to stop the reader ????
+		  // processRow() becomes a No-op after calling abortTable()
+          await this.processRow(obj.data)
 		  break;
+		case 'table':
+		  await this.initialize(obj.table)
+		  // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),messageType,this.rowCounters.received],'initialized')
+		  break;  
 	  case 'eod':
         // Used when processing serial data sources such as files to indicate that all records have been processed by the writer
-	    // this.yadamuLogger.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType],`Emit "allDataReceived"`)  
+	    // this.yadamuLogger.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType,this.tableName,'EMIT'],`"allDataReceived"`)  
 	    this.emit('allDataReceived')
-		break;
+		break;	
   	  default:
       }
       callback();
@@ -363,7 +389,7 @@ class YadamuWriter extends Writable {
   }
   
   async finalize(cause) {
-    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.hasPendingRows(),this.skipTable,this.rowCounters.received,this.rowCounters.committed,this.rowCounters.written,this.rowCounters.cached],'_flushCahce()')
+    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.skipTable,this.dbi.transactionInProgress,this.hasPendingRows(),this.rowCounters.received,this.rowCounters.committed,this.rowCounters.written,this.rowCounters.cached],'finalize()')
     if (this.hasPendingRows() && !this.skipTable) {
       this.skipTable = await this.writeBatch();   
     }
@@ -383,7 +409,7 @@ class YadamuWriter extends Writable {
 	this.endTime = performance.now();
 	try {
 	  await this.finalize()
-      callback();
+	  callback();
     } catch (e) {
       this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`"${this.tableName}"`],e);
 	  // Passing the exception to callback triggers the onError() event
@@ -401,47 +427,52 @@ class YadamuWriter extends Writable {
     } 
   }
   
-  reportPerformance(readerStatistics) {
-	  	  
-	const writerStatistics = this.getStatistics();
-	const readerElapsedTime = readerStatistics.readerEndTime - readerStatistics.pipeStartTime;
-    const writerElapsedTime = writerStatistics.endTime - writerStatistics.startTime;        
-	const pipeElapsedTime = writerStatistics.endTime - readerStatistics.pipeStartTime;
-	const readerThroughput = isNaN(readerElapsedTime) ? 'N/A' : Math.round((readerStatistics.rowsRead/readerElapsedTime) * 1000)
-    const writerThroughput = isNaN(writerElapsedTime) ? 'N/A' : Math.round((writerStatistics.counters.committed/writerElapsedTime) * 1000)
+  reportPerformance(readTimings) {
+	const writeTimingss = this.getStatistics();
+	const readElapsedTime = readTimings.parserEndTime - readTimings.readerStartTime;
+    const writerElapsedTime = writeTimingss.endTime - writeTimingss.startTime;        
+	const pipeElapsedTime = writeTimingss.endTime - readTimings.pipeStartTime;
+	const readThroughput = isNaN(readElapsedTime) ? 'N/A' : Math.round((readTimings.rowsRead/readElapsedTime) * 1000)
+    const writerThroughput = isNaN(writerElapsedTime) ? 'N/A' : Math.round((writeTimingss.counters.committed/writerElapsedTime) * 1000)
 	
-	let readerStatus = ''
+	let readStatus = ''
 	let rowCountSummary = ''
 	
-    const readerTimings = `Reader Elapsed Time: ${YadamuLibrary.stringifyDuration(readerElapsedTime)}s. Throughput ${Math.round(readerThroughput)} rows/s.`
-	const writerTimings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(writerElapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(writerStatistics.sqlTime))}s. Throughput: ${Math.round(writerThroughput)} rows/s.`
+    const readerTimings = `Reader Elapsed Time: ${YadamuLibrary.stringifyDuration(readElapsedTime)}s. Throughput ${Math.round(readThroughput)} rows/s.`
+	const writerTimings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(writerElapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(writeTimingss.sqlTime))}s. Throughput: ${Math.round(writerThroughput)} rows/s.`
     
-	if ((readerStatistics.rowsRead === 0) || (readerStatistics.rowsRead === writerStatistics.counters.committed)) {
-      rowCountSummary = `Rows ${readerStatistics.rowsRead}.`
+	if ((readTimings.rowsRead === 0) || (readTimings.rowsRead === writeTimingss.counters.committed)) {
+      rowCountSummary = `Rows ${readTimings.rowsRead}.`
     }
 	else {
-      rowCountSummary = `Read ${readerStatistics.rowsRead}. Written ${writerStatistics.counters.committed}.`
+      rowCountSummary = `Read ${readTimings.rowsRead}. Written ${writeTimingss.counters.committed}.`
     }
 
-	rowCountSummary = writerStatistics.counters.skipped > 0 ? `${rowCountSummary} Skipped ${writerStatistics.counters.skipped}.` : rowCountSummary
+	rowCountSummary = writeTimingss.counters.skipped > 0 ? `${rowCountSummary} Skipped ${writeTimingss.counters.skipped}.` : rowCountSummary
    
-	if (readerStatistics.copyFailed) {
-	  rowCountSummary = readerStatistics.tableNotFound === true ? `Table not found.` : `Read operation failed. ${rowCountSummary} `  
-      this.yadamuLogger.error([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+	if (readTimings.failed) {
+	  rowCountSummary = readTimings.tableNotFound === true ? `Table not found.` : `Read operation failed. ${rowCountSummary} `  
+      this.yadamuLogger.error([`${this.tableName}`,`${writeTimingss.insertMode}`],`${rowCountSummary} ${readTimings} ${writerTimings}`)  
 	}
 	else {
-	  if (readerStatistics.rowsRead !== writerStatistics.counters.committed) {
-        this.yadamuLogger.error([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+	  if (readTimings.rowsRead !== writeTimingss.counters.committed) {
+        this.yadamuLogger.error([`${this.tableName}`,`${writeTimingss.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
       }
 	  else {
-        this.yadamuLogger.info([`${this.tableName}`,`${writerStatistics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+        this.yadamuLogger.info([`${this.tableName}`,`${writeTimingss.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
 	  }
     }	  
 	
-    const timings = {[this.tableName] : {rowCount: writerStatistics.counters.committed, insertMode: writerStatistics.insertMode,  rowsSkipped: writerStatistics.counters.skipped, elapsedTime: Math.round(writerElapsedTime).toString() + "ms", throughput: Math.round(writerThroughput).toString() + "/s", sqlExecutionTime: Math.round(writerStatistics.sqlTime)}};
+    const timings = {[this.tableName] : {rowCount: writeTimingss.counters.committed, insertMode: writeTimingss.insertMode,  rowsSkipped: writeTimingss.counters.skipped, elapsedTime: Math.round(writerElapsedTime).toString() + "ms", throughput: Math.round(writerThroughput).toString() + "/s", sqlExecutionTime: Math.round(writeTimingss.sqlTime)}};
+    this.dbi.yadamu.recordTimings(timings);   
     return timings;
   }
   
+  async _transform (data,encoding,callback)  {
+    this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],'_transform()')
+	callback()
+  }
+	 
 }
 
 module.exports = YadamuWriter;

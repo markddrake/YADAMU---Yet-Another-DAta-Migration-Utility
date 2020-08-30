@@ -3,6 +3,7 @@ const fs = require('fs');
 const Readable = require('stream').Readable;
 const Writable = require('stream').Writable;
 const Transform = require('stream').Transform;
+const PassThrough = require('stream').PassThrough
 const { performance } = require('perf_hooks');
 
 const util = require('util')
@@ -19,6 +20,7 @@ const oracledb = require('oracledb');
 oracledb.fetchAsString = [ oracledb.DATE ]
 
 const Yadamu = require('../../common/yadamu.js')
+const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const StringWriter = require('../../common/stringWriter.js');
@@ -131,8 +133,8 @@ class OracleDBI extends YadamuDBI {
 	this.oracledb = oracledb
 	
     this.ddl = [];
+	this.dropWrapperStatements = []
     this.systemInformation = undefined;
-	this.wrapperList = [];
 	
 	// Oracle always has a transaction in progress, so beginTransaction is a no-op
 	
@@ -207,9 +209,7 @@ class OracleDBI extends YadamuDBI {
 	//  Do not Configure Connection here. 
 	
 	let stack;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
-    }
+    this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
 	try {
       stack = new Error().stack
       const sqlStartTime = performance.now();
@@ -440,9 +440,7 @@ class OracleDBI extends YadamuDBI {
 
     const SQL_SET_DATE_FORMAT = `ALTER SESSION SET NLS_DATE_FORMAT = '${this.getDateFormatMask(vendor)}' NLS_TIMESTAMP_FORMAT = '${this.getTimeStampFormatMask(vendor)}' NLS_TIMESTAMP_TZ_FORMAT = '${this.getTimeStampFormatMask(vendor)}'`
 
-    if (status.sqlTrace) {
-      status.sqlTrace.write(this.traceSQL(SQL_SET_DATE_FORMAT));
-    }
+    status.sqlTrace.write(this.traceSQL(SQL_SET_DATE_FORMAT));
     let result = await conn.execute(SQL_SET_DATE_FORMAT);
   }
    
@@ -543,11 +541,9 @@ class OracleDBI extends YadamuDBI {
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
     if (rows.length > 0) {
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceComment(`Bulk Operation: ${rows.length} records.`))
-		this.status.sqlTrace.write(this.traceSQL(sqlStatement));
-      }
-	  
+      this.status.sqlTrace.write(this.traceComment(`Bulk Operation: ${rows.length} records.`))
+      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
+      
   	  let stack
 	  let results;
       while (true) {
@@ -580,13 +576,11 @@ class OracleDBI extends YadamuDBI {
 
 	args = args === undefined ? {} : args
 	outputFormat = outputFormat === undefined ? {} : outputFormat
-	
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
-    }    
-	
+		
     let stack
 	let results
+    this.status.sqlTrace.write(this.traceSQL(sqlStatement));
+
     while (true) {
       // Exit with result or exception.  
       try {
@@ -749,9 +743,7 @@ class OracleDBI extends YadamuDBI {
   */
     
   async initialize() {
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR],`Initialize()`);
     await super.initialize(true);
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Initialize Complete');
   }
     
   /*
@@ -766,9 +758,6 @@ class OracleDBI extends YadamuDBI {
 
   async finalizeExport() {
 	this.checkConnectionState(this.fatalError) 
-	if (this.DB_VERSION < 12) {
-      await this.dropWrappers();
-    }      
     await this.setCurrentSchema(this.connectionProperties.user);
   }
 
@@ -800,6 +789,10 @@ class OracleDBI extends YadamuDBI {
   */
   
   async finalize() {
+	// Oracle11g: Drop any wrappers that were created
+	await Promise.all(this.dropWrapperStatements.map((sqlStatement) => {
+	  return this.executeSQL(sqlStatement,{})
+	}))
     await super.finalize();
   }
 
@@ -826,9 +819,7 @@ class OracleDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
-    }    
+    this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
 
 	let stack
     const sqlStartTime = performance.now();
@@ -857,9 +848,7 @@ class OracleDBI extends YadamuDBI {
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
 	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(`rollback transaction`));
-    }    
+    this.status.sqlTrace.write(this.traceSQL(`rollback transaction`));
 
 	let stack
     const sqlStartTime = performance.now();
@@ -918,27 +907,32 @@ class OracleDBI extends YadamuDBI {
        return json;
      }
      else {
-         
-       // Need to cature the SystemInformation and DDL objects of the export file to make sure the DDL can be processed on the RDBMS.
+		 
+       // Need to capture the SystemInformation and DDL objects of the export file to make sure the DDL can be processed on the RDBMS.
        // If any DDL statement exceeds MAX_STRING_SIZE then DDL will have to executed statement by statement from the client
        // 'Tee' the input stream used to create the temporary lob that contains the export file and pass it through the JSON Parser.
        // If any of the DDL operations exceed the maximum string size supported by server side JSON operations cache the ddl statements on the client
        
-       const jsonParser  = new JSONParser(this.yadamuLogger)  
-       const ddlCache = new DDLCache();
-       jsonParser.pipe(ddlCache);
+	   
        const inputStream = await new Promise((resolve,reject) => {
-        const inputStream = fs.createReadStream(importFilePath);
+         const inputStream = fs.createReadStream(importFilePath);
          inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err)})
        })
-       const multiplexor = new Multiplexor(jsonParser,ddlCache)
-       const jsonTempLob = await this.streamToBlob(inputStream.pipe(multiplexor))
+      
+	   const multiplexor = new PassThrough();
+       const jsonParser = new JSONParser(this.yadamuLogger,'DDL_ONLY',importFilePath);
+	   const ddlCache = new DDLCache(this.yadamuLogger,multiplexor,jsonParser);
+	   multiplexor.pipe(jsonParser).pipe(ddlCache)
+	   
+       const blob = await this.createLob(oracledb.BLOB);
+       await pipeline(inputStream,multiplexor,blob)
+
        const ddl = ddlCache.getDDL();
        if ((ddl.length > 0) && this.statementTooLarge(ddl)) {
          this.ddl = ddl
          this.systemInformation = ddlCache.getSystemInformation();
        }
-       return jsonTempLob
+       return blob
      }
   }
 
@@ -1092,13 +1086,6 @@ class OracleDBI extends YadamuDBI {
     )
 	
     const schemaInformation = results.rows
-
-    // 11.2 Build a list of PL/SQL Wrapper functions that need to be dropped when the export operation is complete.
-	schemaInformation.forEach((table,idx) => {
-      if ((this.DB_VERSION < 12)  && (table.WITH_CLAUSE !== null)) {
-        this.wrapperList.push(table.WITH_CLAUSE.substring(table.WITH_CLAUSE.indexOf('"."')+3,table.WITH_CLAUSE.indexOf('"(')))
-	  }
-    })  
     return schemaInformation;
   }
 
@@ -1183,39 +1170,43 @@ class OracleDBI extends YadamuDBI {
   }
   
   createParser(tableInfo) {
-    return new OracleParser(tableInfo,this.yadamuLogger); 
+	const parser = new OracleParser(tableInfo,this.yadamuLogger); 
+    this.inputStream.on('metadata',(metadata) => {parser.setColumnMetadata(metadata)})
+	return parser;
   }  
   
   streamingError(cause,sqlStatement) {
 	return this.captureException(new OracleError(cause,this.streamingStackTrace,sqlStatement))
   }
   
-  async getInputStream(tableInfo,parser) {
+  async getInputStream(tableInfo) {
 
     if (tableInfo.WITH_CLAUSE !== null) {
       if (this.DB_VERSION < 12) {
+		// The "WITH_CLAUSE" is a create procedure statement that creates a stored procedure that wraps the required conversions
         await this.executeSQL(tableInfo.WITH_CLAUSE,{})
+		// The procedure needs to be dropped once the operation is complete.
+		const wrapperName = tableInfo.WITH_CLAUSE.substring(tableInfo.WITH_CLAUSE.indexOf('"."')+3,tableInfo.WITH_CLAUSE.indexOf('"('))
+		const sqlStatement = OracleDBI.SQL_DROP_WRAPPERS_11G.replace(':1:',this.parameters.FROM_USER).replace(':2:',wrapperName);
+		this.dropWrapperStatements.push(sqlStatement);
       }
       else {
-        tableInfo.SQL_STATEMENT = `with\n${tableInfo.WITH_CLAUSE}\n${tableInfo.SQL_STATEMENT}`;
+	   tableInfo.SQL_STATEMENT = `with\n${tableInfo.WITH_CLAUSE}\n${tableInfo.SQL_STATEMENT}`;
       }
 	}
 
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
-    }
+    this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
 
     while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
-        this.streamingStackTrace = new Error().stack
-        const is = await this.connection.queryStream(tableInfo.SQL_STATEMENT,[],{extendedMetaData: true})
-        this.traceTiming(sqlStartTime,performance.now())
-	    is.on('metadata',(metadata) => {parser.setColumnMetadata(metadata)})
-	    return is;
+		this.streamingStackTrace = new Error().stack
+        this.inputStream = await this.connection.queryStream(tableInfo.SQL_STATEMENT,[],{extendedMetaData: true}) 
+	    this.traceTiming(sqlStartTime,performance.now())
+	    return this.inputStream
 	  } catch (e) {
 		const cause = OracleError(e,this.streamingStackTrace ,tableInfo.SQL_STATEMENT,{},{})
         if (attemptReconnect && cause.lostConnection()) {
@@ -1252,16 +1243,7 @@ class OracleDBI extends YadamuDBI {
   getOutputStream(tableName,ddlComplete) {
 	 return super.getOutputStream(OracleWriter,tableName,ddlComplete)
   }
-    
-  async dropWrappers() {
-
-    for (const functionName of this.wrapperList) {
-      const sqlStatment = OracleDBI.SQL_DROP_WRAPPERS_11G.replace(':1:',this.parameters.FROM_USER).replace(':2:',functionName);
-      await this.executeSQL(sqlStatment,{})
-    }
-
-  }    
-    	  
+ 
   classFactory(yadamu) {
 	return new OracleDBI(yadamu)
   }
@@ -1279,30 +1261,40 @@ class OracleDBI extends YadamuDBI {
   }
 }
 
-class DDLCache extends Writable {
+class DDLCache extends Transform {
   
-  constructor() {
+  constructor(yadamuLogger, passThrough, jsonParser) {
     super({objectMode: true });
+	this.yadamuLogger = yadamuLogger
     this.systemInformation = undefined;
-    this.ddl = undefined 
+	this.passThrough = passThrough;
+	this.jsonParser = jsonParser;
+    this.ddl = [] 
+   
   }
 
-  async _write(obj, encoding, callback) {
+  async _transform(obj, encoding, callback) {
     try {
       switch (Object.keys(obj)[0]) {
-        case 'systemInformation':
+		case 'systemInformation':
           this.systemInformation = obj.systemInformation
+          callback();
           break;
         case 'ddl':
           this.ddl = obj.ddl;
-          break;
+		  this.passThrough.unpipe(this.jsonParser);
+		  this.jsonParser.destroy()
+		  callback();
         case 'metadata':
-          this.ddl = []
+		case 'table':
+		default:
+		  this.passThrough.unpipe(this.jsonParser);
+		  this.jsonParser.destroy()
+		  callback();
           break;
       }
-      callback();
     } catch (e) {
-      this.yadamuLogger.logException([`${this.constructor.name}._write()`,`"${this.tableInfo.tableName}"`],e);
+      this.yadamuLogger.logException([`${this.constructor.name}._transform()`],e);
       callback(e);
     }
   }
@@ -1316,30 +1308,6 @@ class DDLCache extends Writable {
   }
 }
  
-class Multiplexor extends Transform {
-  
-  constructor(jsonParser,ddlWriter) {
-    super();   
-    this.jsonParser = jsonParser;
-    this.ddlWriter = ddlWriter;  
-  }
-
-  // Push Data to jsonParser to find ddl object.
-  
-  async _transform (data,encoding,callback) {
-    this.push(data)
-    if (this.ddlWriter.getDDL() === undefined) {
-      // ### Shouldn't be calling transform directly ?????
-      // Rely on callback() being invoked by the jsonParser.
-      this.jsonParser._transform(data,encoding,callback)
-    }
-    else {
-      callback();
-    }
-  }
-
-}
-
 module.exports = OracleDBI
 
 // SQL Statements
@@ -1695,8 +1663,8 @@ end;`
 
 const _SQL_SCHEMA_INFORMATION = `select * from table(YADAMU_EXPORT.GET_DML_STATEMENTS(:schema,:spatialFormat,:objectsAsJSON,:raw1AsBoolean))`;
 
-const _SQL_CREATE_SAVE_POINT  = `SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_CREATE_SAVE_POINT  = `SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
-const _SQL_RESTORE_SAVE_POINT = `ROLLBACK TO ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_RESTORE_SAVE_POINT = `ROLLBACK TO ${YadamuConstants.SAVE_POINT_NAME}`;
 
   

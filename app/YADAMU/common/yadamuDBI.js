@@ -13,7 +13,7 @@ const { performance } = require('perf_hooks');const async_hooks = require('async
 
 const Yadamu = require('./yadamu.js');
 const DBIConstants = require('./dbiConstants.js');
-const YadamuLibrary = require('./yadamuLibrary.js');
+const YadamuLibrary = require('./yadamuLibrary.js')
 const {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError} = require('./yadamuError.js');
 const DefaultParser = require('./defaultParser.js');
 
@@ -29,7 +29,6 @@ class YadamuDBI {
   get DATABASE_VENDOR()            { return undefined };
   get SOFTWARE_VENDOR()            { return undefined };
   
-  get SAVE_POINT_NAME()            { return 'YADAMU_INSERT' }
   get PASSWORD_KEY_NAME()          { return 'password' };
   get STATEMENT_TERMINATOR()       { return '' }
 
@@ -73,6 +72,8 @@ class YadamuDBI {
   get WARNING_FILE_PREFIX()           { return this.parameters.FILE     || this.yadamu.WARNING_FILE_PREFIX }
 
   get TABLE_FILTER()                  { return this.parameters.TABLES || [] }
+  
+  get INPUT_TIMINGS()                 { return this._INPUT_TIMINGS }
   
   get ATTEMPT_RECONNECTION() {
     this._ATTEMPT_RECONNECTION = this._ATTEMPT_RECONNECTION || (() => {
@@ -137,6 +138,15 @@ class YadamuDBI {
 	this.firstError = undefined
 	this.latestError = undefined    
 
+    this._INPUT_TIMINGS = {
+      rowsRead        : 0
+    , pipeStartTime   : undefined
+    , readerStartTime : undefined
+    , readerEndTime   : undefined
+	, parserStartTime : undefined
+    , parserEndTime   : undefined
+    }
+    
   }
   
   applyTableFilter(tableName) { 
@@ -150,9 +160,7 @@ class YadamuDBI {
   
   traceTiming(startTime,endTime) {      
     const sqlOperationTime = endTime - startTime;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(`--\n-- ${this.sqlTraceTag} Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlOperationTime)}s.\n--\n`);
-    }
+    this.status.sqlTrace.write(`--\n-- ${this.sqlTraceTag} Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlOperationTime)}s.\n--\n`);
     this.sqlCumlativeTime = this.sqlCumlativeTime + sqlOperationTime
   }
  
@@ -294,7 +302,7 @@ class YadamuDBI {
         case (logEntryType === "error"):
 		  this.processError(yadamuLogger,logEntry,summary,logDDLMsgs);
       } 
-      if ((status.sqlTrace) && (logEntry.sqlStatement)) { 
+      if (logEntry.sqlStatement) { 
         status.sqlTrace.write(this.traceSQL(logEntry.sqlStatement))
       }
     }) 
@@ -308,19 +316,15 @@ class YadamuDBI {
   }    
 
   logDisconnect() {
-    if (this.status.sqlTrace) {
-      const pwRedacted = Object.assign({},this.connectionProperties)
-      delete pwRedacted.password
-      this.status.sqlTrace.write(this.traceComment(`DISCONNECT : Properies: ${JSON.stringify(pwRedacted)}`))
-    }
+    const pwRedacted = Object.assign({},this.connectionProperties)
+    delete pwRedacted.password
+    this.status.sqlTrace.write(this.traceComment(`DISCONNECT : Properies: ${JSON.stringify(pwRedacted)}`))
   }
   
   logConnectionProperties() {    
-    if (this.status.sqlTrace) {
-      const pwRedacted = Object.assign({},this.connectionProperties)
-      delete pwRedacted.password
-      this.status.sqlTrace.write(this.traceComment(`CONNECT : Properies: ${JSON.stringify(pwRedacted)}`))
-    }
+    const pwRedacted = Object.assign({},this.connectionProperties)
+    delete pwRedacted.password
+    this.status.sqlTrace.write(this.traceComment(`CONNECT : Properies: ${JSON.stringify(pwRedacted)}`))
   }
      
   setConnectionProperties(connectionProperties) {
@@ -390,7 +394,7 @@ class YadamuDBI {
     // ### TODO Improve logic for merging generatedMappings with existing tableMappings - Make sure column mappings are merged correctly
     this.setTableMappings((this.tableMappings || generatedMappings) ? Object.assign({},this.tableMappings,generatedMappings) : undefined)
 	this.metadata = this.tableMappings ? this.applyTableMappings(patchedMetadata,this.tableMappings) : patchedMetadata
-	
+
   }
   
   setParameters(parameters) {
@@ -524,9 +528,7 @@ class YadamuDBI {
     await Promise.all(ddl.map(async (ddlStatement) => {
       try {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(this.traceSQL(ddlStatement));
-        }
+        this.status.sqlTrace.write(this.traceSQL(ddlStatement));
         this.executeSQL(ddlStatement,{});
       } catch (e) {
         this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
@@ -725,12 +727,7 @@ class YadamuDBI {
 
   async initialize(requirePassword) {
 
-    if (this.status.sqlTrace) {
-       if (this.status.sqlTrace._writableState.ended === true) {
-         this.status.sqlTrace = fs.createWriteStream(this.status.sqlTrace.path,{"flags":"a"})
-       }
-    }
-    
+    this.yadamu.initializeSQLTrace();  
     /*
     **
     ** Calculate CommitSize
@@ -942,7 +939,7 @@ class YadamuDBI {
   }
   
   generateSchemaInfo(schemaInfo) {
-    return schemaInfo.map((table) => {
+	this.schemaInfo = schemaInfo.map((table) => {
 	  return {
 	    TABLE_SCHEMA          : table[0]
 	  , TABLE_NAME            : table[1]
@@ -952,6 +949,7 @@ class YadamuDBI {
 	  , CLIENT_SELECT_LIST    : table[5]
 	  }
     })
+	return this.schemaInfo;
   }
   
   generateMetadata(schemaInformation) {   
@@ -1001,30 +999,7 @@ class YadamuDBI {
     throw new Error('Unimplemented Method')
     return []
   }
-   
-  generateQueryInformation(tableMetadata) {
-    const tableInfo = Object.assign({},tableMetadata);   
-	tableInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
-	tableInfo.MAPPED_TABLE_NAME = this.transformTableName(tableInfo.TABLE_NAME,this.getInverseTableMappings())
-    return tableInfo
-  }   
-
-  createParser(tableInfo,objectMode) {
-    return new DefaultParser(tableInfo,this.yadamuLogger);      
-  }
- 
-  streamingError(cause,sqlStatement) {
-    return this.captureException(new DatabaseError(cause,this.streamingStackTrace,sqlStatement))
-  }
-  
-  async getInputStream(tableInfo,parser) {
-	this.streamingStackTrace = new Error().stack;
-    throw new Error('Unimplemented Method')
-  }      
-
-  freeInputStream(inputStream){
-  }
-
+     
   /*
   **
   ** The following methods are used by the YADAMU DBwriter class
@@ -1062,10 +1037,6 @@ class YadamuDBI {
 
   async finalizeRead(tableInfo) {
   }
-
-  getTableWriter(TableWriter,table) {
-    return new TableWriter(this,this.statementCache[tableName],this.status,this.yadamuLogger);
-  }
   
   getTableInfo(tableName) {
 	  
@@ -1085,10 +1056,71 @@ class YadamuDBI {
 	tableInfo.tableName = mappedTableName
 	return tableInfo
   }
+
+  generateQueryInformation(tableMetadata) {
+    const tableInfo = Object.assign({},tableMetadata);   
+	tableInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
+	
+    // ### TESTING ONLY: Uncomment folllowing line to force Table Not Found condition
+    // tableInfo.SQL_STATEMENT = tableInfo.SQL_STATEMENT.replace(tableInfo.TABLE_NAME,tableInfo.TABLE_NAME + "1")
+
+	tableInfo.MAPPED_TABLE_NAME = this.transformTableName(tableInfo.TABLE_NAME,this.getInverseTableMappings())
+    return tableInfo
+  }   
+
+  createParser(tableInfo) {
+    return new DefaultParser(tableInfo,this.yadamuLogger);      
+  }
+ 
+  streamingError(cause,sqlStatement) {
+    return this.captureException(new DatabaseError(cause,this.streamingStackTrace,sqlStatement))
+  }
+  
+  async getInputStream(tableInfo) {
+	throw new Error('Unimplemented Method')
+	this.streamingStackTrace = new Error().stack;
+	return inputStream;
+  }      
+
+  async getInputStreams(tableInfo) {
+	const streams = []
+	const inputStream = await this.getInputStream(tableInfo)
+    inputStream.once('readable',() => {
+	  this.INPUT_TIMINGS.readerStartTime = performance.now()
+	}).on('error',(err) => { 
+      this.INPUT_TIMINGS.readerEndTime = performance.now()
+	  this.INPUT_TIMINGS.readerError = err
+	  this.INPUT_TIMINGS.failed = true;
+    }).on('end',() => {
+      this.INPUT_TIMINGS.readerEndTime = performance.now()
+    })
+	streams.push(inputStream)
+	
+	const parser = this.createParser(tableInfo)
+	parser.once('readable',() => {
+	  this.INPUT_TIMINGS.parserStartTime = performance.now()
+	}).on('end',() => {
+	  this.INPUT_TIMINGS.parserEndTime = performance.now()
+	  this.INPUT_TIMINGS.rowsRead = parser.getRowCount()
+	}).on('error',(err) => {
+	  this.INPUT_TIMINGS.parserEndTime = performance.now()
+	  this.INPUT_TIMINGS.rowsRead = parser.getRowCount()
+	  this.INPUT_TIMINGS.parserError = err
+	  this.INPUT_TIMINGS.failed = true;
+	})
+	
+	streams.push(parser)
+    return streams;
+  }
   
   getOutputStream(TableWriter,tableName,ddlComplete) {
     // this.yadamuLogger.trace([this.constructor.name,`getOutputStream(${tableName})`],'')
-    return new TableWriter(this,tableName,ddlComplete,this.status,this.yadamuLogger)
+    const os = new TableWriter(this,tableName,ddlComplete,this.status,this.yadamuLogger)
+	return os;
+  }
+  
+  getOutputStreams(tableName,ddlComplete) {
+	return [this.getOutputStream(tableName,ddlComplete)]
   }
   
   keepAlive(rowCount) {
@@ -1098,9 +1130,6 @@ class YadamuDBI {
     if (this.parameters.MAPPINGS) {
       this.loadTableMappings(this.parameters.MAPPINGS);
     }  
-    if (this.parameters.SQL_TRACE) {
-      this.status.sqlTrace = fs.createWriteStream(this.parameters.SQL_TRACE,{flags : "a"});
-    }
     if (recreateSchema === true) {
       this.setOption('recreateSchema',true);
     }

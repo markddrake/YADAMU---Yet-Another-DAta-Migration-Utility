@@ -13,9 +13,7 @@ class MongoQA extends MongoDBI {
       const operation = this.traceMongo(`dropDatabase()`)
       try {
         await this.use(this.parameters.TO_USER)
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(operation)      
-        }
+        this.status.sqlTrace.write(operation)      
         await this.dropDatabase()
         await this.use(this.parameters.TO_USER)
       } catch (e) {

@@ -5,7 +5,7 @@ const YadamuParser = require('../../common/yadamuParser.js')
 class PostgresParser extends YadamuParser {
   
   constructor(tableInfo,yadamuLogger) {
-    super(tableInfo,yadamuLogger);      
+    super(tableInfo,yadamuLogger);     
     
     /*
     this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType) => {
@@ -26,10 +26,10 @@ class PostgresParser extends YadamuParser {
   }
     
   async _transform (data,encoding,callback) {
-    this.counter++;
+    this.rowCount++;
     data = Object.values(data)
     // this.rowTransformation(data)
-    // if (this.counter===1) console.log(data)
+    // if (this.rowCount===1) console.log(data)
     this.push({data:data})
     callback();
   }

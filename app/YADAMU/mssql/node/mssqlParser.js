@@ -5,13 +5,13 @@ const YadamuParser = require('../../common/yadamuParser.js')
 class MsSQLParser extends YadamuParser {
   
   constructor(tableInfo,yadamuLogger) {
-    super(tableInfo,yadamuLogger);      
+    super(tableInfo,yadamuLogger);   
   }
 
   async _transform (data,encoding,callback) {
-  	this.counter++
+  	this.rowCount++
     data = Object.values(data)    
-    // if (this.counter === 1) console.log(data)
+    // if (this.rowCount === 1) console.log(data)
     this.push({data: data})
     callback();
   }

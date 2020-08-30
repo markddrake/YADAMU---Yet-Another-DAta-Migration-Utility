@@ -4,6 +4,7 @@ const { performance } = require('perf_hooks');
 
 const Yadamu = require('../../common/yadamu.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const DummyOutputStream = require('../../common/dummyOutputStream.js');
 const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 const {BatchInsertError} = require('../../common/yadamuError.js')
@@ -171,16 +172,21 @@ class SnowflakeWriter extends YadamuWriter {
           // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,'BINARY',this.tableInfo.parserRequired,rowNumbers[0],rowNumbers[rowNumbers.length-1],batchRowCount],`Operation ${operationCount}`)
           const result = await this.dbi.executeSQL(sqlStatement,nextBatch);
 		  sqlExectionTime+= performance.now() - opStartTime
-          this.status.sqlTrace = undefined
+          this.status.sqlTrace = DummyOutputStream.DUMMY_OUTPUT_STREAM
 	      this.rowCounters.written += batchRowCount
 	    } catch (cause) {
-		  this.status.sqlTrace = undefined
+		  this.status.sqlTrace = DummyOutputStream.DUMMY_OUTPUT_STREAM
 	      if (batchRowCount > 1) {
             batches.push(nextBatch.splice(0,(Math.ceil(batchRowCount/2)*columnCount)),nextBatch)			  
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
 		  }
 		  else {
-            await this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch)
+			if (cause.spatialInsertFailed()) {
+		      await this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch)
+			}
+			else {
+              await this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch)
+			}
             if (this.skipTable) {
               break;
 			}
@@ -199,16 +205,21 @@ class SnowflakeWriter extends YadamuWriter {
        	  sqlStatement = this.tableInfo.dml
 		  const result = await this.dbi.executeSQL(sqlStatement,nextBatch)
 		  sqlExectionTime+= performance.now() - opStartTime
-          this.status.sqlTrace = undefined
+          this.status.sqlTrace = DummyOutputStream.DUMMY_OUTPUT_STREAM
 	      this.rowCounters.written += nextBatch.length
         } catch (cause) {
-          this.status.sqlTrace = undefined
+          this.status.sqlTrace = DummyOutputStream.DUMMY_OUTPUT_STREAM
 	      if (nextBatch.length > 1) {
             batches.push(nextBatch.splice(0,Math.ceil(nextBatch.length/2)),nextBatch)
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
 		  }
 		  else {
-            await this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch[0]);
+			if (cause.spatialInsertFailed()) {
+		      await this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch)
+			}
+			else {
+              await this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch)
+			}
             if (this.skipTable) {
               break;
 			}

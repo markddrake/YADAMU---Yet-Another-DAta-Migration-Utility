@@ -35,7 +35,7 @@ class SnowflakeParser extends YadamuParser {
   
   async _transform (data,encoding,callback) {
     // Snowflake generates object based output, not array based outout. Transform object to array based on columnList
-    this.counter++;
+    this.rowCount++;
     data = Object.values(data)
 	data.forEach((val,idx) => {
 	   if (data[idx] === 'NULL') {

@@ -14,8 +14,8 @@ const { performance } = require('perf_hooks');
 const MongoClient = require('mongodb').MongoClient
 
 const Yadamu = require('../../common/yadamu.js');
-const YadamuDBI =  require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
+const YadamuDBI =  require('../../common/yadamuDBI.js');
 const MongoConstants = require('./mongoConstants.js')
 const MongoError = require('./mongoError.js')
 const MongoWriter = require('./mongoWriter.js');
@@ -138,9 +138,7 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `new MongoClient.connect ${this.getMongoURL()}))\n`
     try {   
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(operation)
-      }
+      this.status.sqlTrace.write(operation)
       let sqlStartTime = performance.now();
 	  stack = new Error().stack
       this.client = new MongoClient(this.getMongoURL(),options);
@@ -160,9 +158,7 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `client.db(${dbname})\n`
     try {   
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(operation)
-      }
+      this.status.sqlTrace.write(operation)
       options = options === undefined ? {returnNonCachedInstance:true} : (options.returnNonCachedInstance === undefined ? Object.assign (options, {returnNonCachedInstance:true} ) : options)
       let sqlStartTime = performance.now();
 	  stack =  new Error().stack
@@ -184,9 +180,7 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `command(${JSON.stringify(command)})`
     try {   
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceMongo(operation)) 
-      }
+      this.status.sqlTrace.write(this.traceMongo(operation)) 
       let sqlStartTime = performance.now();
 	  stack =  new Error().stack
       const results = await this.connection.command(command,options);    
@@ -210,9 +204,7 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `dropDatabase()`
     try {   
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceMongo(operation)) 
-      }
+      this.status.sqlTrace.write(this.traceMongo(operation)) 
       let sqlStartTime = performance.now();
    	  stack =  new Error().stack
       await this.connection.dropDatabase() 
@@ -230,9 +222,7 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `admin().buildInfo()`
     try {
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceMongo(operation))    
-      }
+      this.status.sqlTrace.write(this.traceMongo(operation))    
       const sqlStartTime = performance.now();
       
       const results = await this.connection.admin().buildInfo()
@@ -251,9 +241,7 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `stats()`
     try {  
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceMongo(operation)) 
-      }
+      this.status.sqlTrace.write(this.traceMongo(operation)) 
       let sqlStartTime = performance.now();
 	  stack =  new Error().stack      
       this.stats = await this.connection.stats(options);    
@@ -270,9 +258,7 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `createCollection(${collectionName})`
     try {       
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceMongo(operation))    
-      }      
+      this.status.sqlTrace.write(this.traceMongo(operation))    
       let sqlStartTime = performance.now();
 	  stack =  new Error().stack
       const collection = await this.connection.createCollection(collectionName);
@@ -290,9 +276,7 @@ class MongoDBI extends YadamuDBI {
     let stack   
     const operation = `collection(${collectionName})`
     try {       
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceMongo(operation))    
-      }      
+      this.status.sqlTrace.write(this.traceMongo(operation))    
       let sqlStartTime = performance.now();
 	  stack =  new Error().stack
       const collection = await this.connection.collection(collectionName,options);
@@ -312,9 +296,7 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `collection.count(${collection.namespace})`
     try {
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceMongo(operation))    
-      }      
+      this.status.sqlTrace.write(this.traceMongo(operation))    
       let sqlStartTime = performance.now();
   	  stack =  new Error().stack    
       const count = await collection.count(query,options)
@@ -333,9 +315,7 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `collections()`
     try {
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceMongo(operation))    
-      }
+      this.status.sqlTrace.write(this.traceMongo(operation))    
       let sqlStartTime = performance.now();
 	  stack =  new Error().stack      
       const collections = await this.connection.collections(options)
@@ -354,9 +334,7 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `collection(${collectionName}).insertOne()`
     try {
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceMongo(operation))    
-      }
+      this.status.sqlTrace.write(this.traceMongo(operation))    
       options = options === undefined ? {w:1} : (options.w === undefined ? Object.assign (options, {w:1} ) : options)
       let sqlStartTime = performance.now();
 	  stack =  new Error().stack      
@@ -375,9 +353,7 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `collection(${collectionName}).insertMany(${array.length})`
     try {
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceMongo(operation))    
-      }
+      this.status.sqlTrace.write(this.traceMongo(operation))    
       options = options === undefined ? {w:1} : (options.w === undefined ? Object.assign (options, {w:1} ) : options)
       let sqlStartTime = performance.now();
 	  stack =  new Error().stack
@@ -536,20 +512,15 @@ class MongoDBI extends YadamuDBI {
 
   // ### ToDO Support Mongo Transactions
   
-  async commitTransaction() {
-  }
+  async commitTransaction() { /* OVERRIDE */ }
     
-  async rollbackTransaction(cause) {
-  }
+  async rollbackTransaction(cause)  { /* OVERRIDE */ }
 
-  async createSavePoint() {
-  }
+  async createSavePoint()  { /* OVERRIDE */ }
   
-  async restoreSavePoint(cause) {
-  }  
+  async restoreSavePoint(cause)  { /* OVERRIDE */ }
 
-  async releaseSavePoint(cause) {
-  } 
+  async releaseSavePoint(cause)  { /* OVERRIDE */ }
 
   /*
   **
@@ -664,9 +635,7 @@ class MongoDBI extends YadamuDBI {
 		let aggPipeline
         try {
           operation = `db(${this.connection.databaseName}).collection(${collection.collectionName}.mapReduce()`;
-          if (this.status.sqlTrace) {
-            this.status.sqlTrace.write(this.traceMongo(operation))    
-          }
+          this.status.sqlTrace.write(this.traceMongo(operation))    
           let sqlStartTime = performance.now();
     	  stack =  new Error().stack
           const collectionMetadata = await collection.mapReduce(
@@ -741,9 +710,7 @@ class MongoDBI extends YadamuDBI {
                 }           
               }
               operation = `db(${this.connection.databaseName}).collection(${collection.collectionName}.aggregate(${JSON.stringify(aggPipeline," ",2)})`
-              if (this.status.sqlTrace) {
-                this.status.sqlTrace.write(this.traceMongo(operation))    
-              }
+              this.status.sqlTrace.write(this.traceMongo(operation))    
               let sqlStartTime = performance.now();
     	      stack =  new Error().stack
    	          const typeInformation = await collection.aggregate(aggPipeline).toArray();
@@ -805,9 +772,7 @@ class MongoDBI extends YadamuDBI {
     let stack
     const operation = `collection(${collectionName}).find().stream()`
     try {
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceMongo(operation))
-      }
+      this.status.sqlTrace.write(this.traceMongo(operation))
       let sqlStartTime = performance.now();
       stack =  new Error().stack
       const mongoStream = await this.connection.collection(collectionName).find().stream();

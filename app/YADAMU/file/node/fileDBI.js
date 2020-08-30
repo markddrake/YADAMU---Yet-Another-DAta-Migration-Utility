@@ -1,17 +1,46 @@
 "use strict" 
 const fs = require('fs');
 const path = require('path');
+const { performance } = require('perf_hooks');
+
+const {pipeline, Readable} = require('stream')
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
-const FileWriter = require('./fileWriter.js');
 const JSONParser = require('./jsonParser.js');
-const EventManager = require('./eventManager.js')
+const EventStream = require('./eventStream.js');
+const TableManager = require('./tableManager.js');
+const JSONWriter = require('./jsonWriter.js');
+
+const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
+
 /*
 **
 ** YADAMU Database Inteface class skeleton
 **
 */
+
+class PipeOnce extends Readable {
+
+  constructor(metadata,endOption) {
+	 super();
+	 this.metadata = metadata
+	 this.endOption = endOption
+  }
+  
+  pipe(os,options) {
+	options = options || {}
+	options.end = this.endOption;
+	return super.pipe(os,options);
+  }  
+  
+  _read() {
+	 this.push(this.metadata)
+	 this.metadata = null
+  }
+  
+}
 
 class FileDBI extends YadamuDBI {
  
@@ -24,13 +53,23 @@ class FileDBI extends YadamuDBI {
   get DATABASE_VENDOR()    { return 'FILE' };
   get SOFTWARE_VENDOR()    { return 'YABASC' };
   
+  get COMPRESSED_OUTPUT()  { return this.yadamu.COMPRESSION !== 'NONE' }
+  
+  set PIPELINE_ENTRY_POINT(v) { this._PIPELINE_ENTRY_POINT = v }
+  get PIPELINE_ENTRY_POINT()  { return this._PIPELINE_ENTRY_POINT }
+  
+  set START_EXPORT_FILE(v)    { this._START_EXPORT_FILE = new PipeOnce(v,false) }
+  get START_EXPORT_FILE()     { return this._START_EXPORT_FILE }
+  
+  set END_EXPORT_FILE(v)      { this._END_EXPORT_FILE =  new PipeOnce(v,true) }
+  get END_EXPORT_FILE()       { return this._END_EXPORT_FILE }
+  
   constructor(yadamu,exportFilePath) {
     super(yadamu)
 	this.exportFilePath = exportFilePath
     this.outputStream = undefined;
     this.inputStream = undefined;
 	this.ddl = undefined;
-    this.tableSeperator = '';
   }
 
   generateStatementCache() {
@@ -38,8 +77,7 @@ class FileDBI extends YadamuDBI {
   }
       
   async executeDDL(ddl) {
-    this.outputStream.write(',');
-    this.outputStream.write(`"ddl":${JSON.stringify(ddl)}`);
+	this.ddl = ddl
   }
   
   getConnectionProperties() {
@@ -55,11 +93,7 @@ class FileDBI extends YadamuDBI {
   }
 
   closeOutputStream() {
-     return new Promise((resolve,reject) => {
-      this.outputStream.on('finish',() => { resolve() });
-      this.outputStream.close();
-    })
-
+    this.outputStream.close();
   }
   
   // Override YadamuDBI - Any DDL is considered valid and written to the export file.
@@ -90,22 +124,11 @@ class FileDBI extends YadamuDBI {
 
   async setSystemInformation(systemInformation) {
 	super.setSystemInformation(systemInformation) 
-    if (this.outputStream !== undefined) {
-      this.outputStream.write(`"systemInformation":${JSON.stringify(this.systemInformation)}`);
-	}
   }
-  
-  async writeMetadata(metadata) {
-     if (this.outputStream !== undefined) {
- 	  this.outputStream.write(',');
-      this.outputStream.write(`"metadata":${JSON.stringify(this.metadata)}`);
-	}
-  }
-  
+    
   async setMetadata(metadata) {
-    Object.values(metadata).forEach((table) => {delete table.source})
+    // Object.values(metadata).forEach((table) => {delete table.source})
 	super.setMetadata(metadata)
-    await this.writeMetadata(metadata)
   }
  
   async releaseConnection() {
@@ -115,6 +138,7 @@ class FileDBI extends YadamuDBI {
     super.initialize(false);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
 	this.exportFilePath = this.exportFilePath === undefined ? this.parameters.FILE : this.exportFilePath
+	this.exportFilePath = this.COMPRESSED_OUTPUT ? `${this.exportFilePath}.gz` : this.exportFilePath
 	this.exportFilePath =  path.resolve(this.exportFilePath)
   }
 
@@ -136,32 +160,61 @@ class FileDBI extends YadamuDBI {
 	// For FileDBI Import is Writing data to the file system.
     // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
 	super.initializeImport()
-    this.outputStream = fs.createWriteStream(this.exportFilePath);
+	this.outputStream = fs.createWriteStream(this.exportFilePath,{flags :"w"})
     this.yadamuLogger.info([this.DATABASE_VENDOR],`Writing file "${this.exportFilePath}".`)
-	this.outputStream.write(`{`)
   }
   
   async initializeData() {
-    this.outputStream.write(',');
-    this.outputStream.write('"data":{'); 
-  }
   
-  async finalizeData() {
-	// this.yadamuLogger.trace([this.constructor.name],`finalizeData()`)
-	this.outputStream.write('}');
-  }  
-  
-  async finalizeImport() {
-    // this.yadamuLogger.trace([this.constructor.name],`finalizeImport()`)
-	this.outputStream.write('}');
+	// Set up the pipeline and write the system information, ddl and metadata sections to the pipe...
+    // this.yadamuLogger.trace([this.constructor.name],`initializeData()`)
+
+    // Remove the source structure from each metadata object prior to serializing it. Put it back after the serialization has been completed.
+
+    const sourceInfo = {}
+    Object.keys(this.metadata).forEach((key) => {if (this.metadata[key].source) sourceInfo[key] = this.metadata[key].source; delete this.metadata[key].source})
+    let startJSON = `{"systemInformation":${JSON.stringify(this.systemInformation)}${this.ddl ? `,"ddl":${JSON.stringify(this.ddl)}` : ''},"metadata":${JSON.stringify(this.metadata)}`
+	Object.keys(sourceInfo).forEach((key) => {this.metadata[key].source = sourceInfo[key]})
+
+	let endJSON = undefined
+    if ((this.yadamu.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata))) {
+	  endJSON = '}'
+	}
+    else {
+	  startJSON = `${startJSON},"data":{` 
+	  endJSON = '}}'
+	} 
+	 
+	this.START_EXPORT_FILE = startJSON
+	this.END_EXPORT_FILE  = endJSON
+	 
+	const outputStreams = this.getOutputStreams()
+	// this.yadamuLogger.trace([this.constructor.name,'EXPORT',this.DATABASE_VENDOR,this.parameters.TO_USER],`${outputStreams.map((proc) => { return proc.constructor.name }).join(' => ')}`)
+	this.PIPELINE_ENTRY_POINT = outputStreams[0]
+	
+	outputStreams.unshift(this.START_EXPORT_FILE)
+	// this.yadamuLogger.trace([this.constructor.name,'EXPORT',this.DATABASE_VENDOR,this.parameters.TO_USER],`${outputStreams.map((proc) => { return proc.constructor.name }).join(' => ')}`)
+	 
+	this.pipelineComplete = new Promise((resolve,reject) => {
+	  pipeline(outputStreams,(err) => {
+	    if (err) reject(err);
+	    resolve()
+      })
+	})
+	 
+	if ((this.yadamu.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata)))  {
+	  pipeline([this.END_EXPORT_FILE,this.PIPELINE_ENTRY_POINT],(err) => {
+	    if (err) throw(err);
+	  })
+    }
+	 
   }
+    
+  async finalizeImport() {}
     
   async finalize() {
     if (this.inputStream !== undefined) {
       await this.closeInputStream()
-    }
-    if (this.outputStream !== undefined) {
-      await this.closeOutputStream()
     }
   }
 
@@ -237,32 +290,78 @@ class FileDBI extends YadamuDBI {
   }
 
   getInputStream() {  
-    // Return an Event Stream based on processing the inputStream with the JSONParser class
+    // Return the inputStream and the transform streams required to process it.
     const stats = fs.statSync(this.exportFilePath)
     const fileSizeInBytes = stats.size
     this.yadamuLogger.info([this.DATABASE_VENDOR],`Processing file "${this.exportFilePath}". Size ${fileSizeInBytes} bytes.`)
-    const jsonParser  = new JSONParser(this.yadamuLogger,this.MODE,this.exportFilePath);
-    const eventManager = new EventManager(this.yadamu)
-	this.eventStream = this.inputStream.pipe(jsonParser).pipe(eventManager)
-	return this.eventStream;
+	return this.inputStream
+  }
+  
+  getInputStreams() {
+    
+	const streams = []
+	const is = this.getInputStream();
+	is.once('readable',() => {
+	  this.INPUT_TIMINGS.readerStartTime = performance.now()
+	}).on('error',(err) => { 
+      this.INPUT_TIMINGS.readerEndTime = performance.now()
+	  this.INPUT_TIMINGS.readerError = err
+	  this.INPUT_TIMINGS.failed = true
+    }).on('end',() => {
+      this.INPUT_TIMINGS.readerEndTime = performance.now()
+    })
+	streams.push(is)
+	
+	if (this.COMPRESSED_OUTPUT) {
+      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
+	}
+	
+	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.exportFilePath)
+	jsonParser.once('readable',() => {
+	  this.INPUT_TIMINGS.parserStartTime = performance.now()
+	}).on('error',(err) => { 
+      this.INPUT_TIMINGS.parserEndTime = performance.now()
+	  this.INPUT_TIMINGS.parserError = err
+	  this.INPUT_TIMINGS.failed = true
+    })
+	streams.push(jsonParser);
+	
+	const eventStream = new EventStream(this.yadamu,this.INPUT_TIMINGS)
+	eventStream.on('error',(err) => { 
+      this.INPUT_TIMINGS.parserEndTime = performance.now()
+	  this.INPUT_TIMINGS.parserError = err
+	  this.INPUT_TIMINGS.failed = true
+    }).on('end',() => {
+      this.INPUT_TIMINGS.parserEndTime = performance.now()
+    })
+	streams.push(eventStream)
+	return streams;
   }
     
-  getOutputStream(tableName,ddlComplete) {
+  getOutputStream(tableName,ddlComplete,idx) {
     // Override parent method to allow output stream to be passed to worker
     // this.yadamuLogger.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
-	const os =  new FileWriter(this,tableName,ddlComplete,this.status,this.yadamuLogger)
-    return os;
+	const os =  new JSONWriter(this,tableName,ddlComplete,idx,this.status,this.yadamuLogger)
+    return os
   }
   
   getFileOutputStream(tableName) {
-	this.outputStream.write(`${this.tableSeperator}"${tableName}":`);
-	this.tableSeperator = ',';
     return this.outputStream
   }
+
+  getOutputStreams(tableName) {
+    const streams = []
+	if (this.COMPRESSED_OUTPUT) {
+      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
+    }
+	streams.push(this.getFileOutputStream(tableName))
+	
+	return streams;
+  }
+    
+  getDatabaseConnection() { /* OVERRIDE */ }
   
-  getDatabaseConnection() {}
-  
-  closeConnection() {}
+  closeConnection() { /* OVERRIDE */ }
  
   
 }

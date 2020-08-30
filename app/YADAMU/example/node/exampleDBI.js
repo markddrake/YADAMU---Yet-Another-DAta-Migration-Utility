@@ -9,6 +9,7 @@ const { performance } = require('perf_hooks');
 */
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
 const ExampleConstants = require('./ExampleConstants.js');

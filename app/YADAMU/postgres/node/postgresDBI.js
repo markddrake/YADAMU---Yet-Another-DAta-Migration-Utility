@@ -20,6 +20,7 @@ const QueryStream = require('pg-query-stream')
 const types = require('pg').types;
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
 const PostgresConstants = require('./postgresConstants.js')
@@ -93,7 +94,7 @@ class PostgresDBI extends YadamuDBI {
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  // const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))
+	  const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))
       this.yadamuLogger.logException([this.DATABASE_VENDOR,`POOL_ON_ERROR`],pgErr);
       // throw pgErr
     })
@@ -104,11 +105,10 @@ class PostgresDBI extends YadamuDBI {
 
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
-    }
 	
 	let stack
+    this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
+
 	try {
       const sqlStartTime = performance.now();
 	  stack = new Error().stack;
@@ -144,15 +144,7 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async configureConnection() {
-       
-    this.connection.on('error',(err, p) => {
-        // this.yadamuLogger.info([this.DATABASE_VENDOR,`Connection.onError()`],err.message);
-   	    // Do not throw errors here.. Node will terminate immediately
-   	    // const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))  
-        // throw pgErr
-      }
-	)
-
+     
     this.connection.on('notice',(n) => { 
       const notice = JSON.parse(JSON.stringify(n));
       switch (notice.code) {
@@ -167,7 +159,7 @@ class PostgresDBI extends YadamuDBI {
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  // const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))
+	  const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))
       this.yadamuLogger.logException([this.DATABASE_VENDOR,`CONNECTION_ON_ERROR`],pgErr);
       // throw pgErr
     })
@@ -415,9 +407,7 @@ class PostgresDBI extends YadamuDBI {
   async loadStagingTable(importFilePath) {
 
     const copyStatement = `copy "YADAMU_STAGING" from STDIN csv quote e'\x01' delimiter e'\x02'`;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(copyStatement))
-    }    
+    this.status.sqlTrace.write(this.traceSQL(copyStatement))
 
     const inputStream = await new Promise((resolve,reject) => {
       const inputStream = fs.createReadStream(importFilePath);
@@ -569,9 +559,7 @@ class PostgresDBI extends YadamuDBI {
   async getInputStream(tableInfo) {        
 
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
-    }
+    this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
 
     while (true) {
       // Exit with result or exception.  
@@ -652,11 +640,11 @@ const _SQL_SCHEMA_INFORMATION   = `select * from EXPORT_JSON($1,$2)`;
  
 const _SQL_SYSTEM_INFORMATION   = `select current_database() database_name,current_user,session_user,current_setting('server_version_num') database_version`;					   
 
-const _SQL_CREATE_SAVE_POINT    = `SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_CREATE_SAVE_POINT    = `SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
-const _SQL_RESTORE_SAVE_POINT   = `ROLLBACK TO SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_RESTORE_SAVE_POINT   = `ROLLBACK TO SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
-const _SQL_RELEASE_SAVE_POINT   = `RELEASE SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_RELEASE_SAVE_POINT   = `RELEASE SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
 const _PGOID_DATE         = 1082; 
 const _PGOID_TIMESTAMP    = 1114;

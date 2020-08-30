@@ -98,7 +98,7 @@ class StatementGenerator {
     
     const statementCache = {}
     const tables = Object.keys(this.metadata); 
-    
+	
     const collectionList = tables.map((table,idx) => {
       const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);

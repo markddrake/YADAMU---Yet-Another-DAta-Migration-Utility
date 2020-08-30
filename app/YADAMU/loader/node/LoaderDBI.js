@@ -3,11 +3,15 @@
 const fs = require('fs');
 const fsp = require('fs').promises;
 const path = require('path');
+const { performance } = require('perf_hooks');
+
+const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
 
 const YadamuDBI = require('../../common/YadamuDBI.js');
 const JSONParser = require('./jsonParser.js');
-const DatafileParser = require('./datafileParser.js');
-const FileWriter = require('../../file/node/fileWriter.js');
+const EventStream = require('./eventStream.js');
+const JSONWriter = require('./jsonWriter.js');
+const ArrayWriterWriter = require('./arrayWriter.js');
 const CSVWriter = require('./csvWriter.js');
 
 /*
@@ -30,6 +34,7 @@ class LoaderDBI extends YadamuDBI {
   */
   
   get JSON_OUTPUT()    { return this.OUTPUT_FORMAT === 'JSON' }
+  get ARRAY_OUTPUT()   { return this.OUTPUT_FORMAT === 'ARRAY' }
   get CSV_OUTPUT()     { return this.OUTPUT_FORMAT === 'CSV'  }
     
   get DATABASE_VENDOR()     { return 'LOADER' };
@@ -37,14 +42,49 @@ class LoaderDBI extends YadamuDBI {
   get EXPORT_FOLDER()       { return this.parameters.FILE ? path.join(path.dirname(this.parameters.FILE),path.basename(this.parameters.FILE,path.extname(this.parameters.FILE))) : undefined }
   get EXPORT_PATH()         { return (this._EXPORT_PATH || this.EXPORT_FOLDER || `/yadamu/${new Date().toISOString().replace(/:/g,'.')}`)}  
   
-  get WRITER() {
-	return this.JSON_OUTPUT ? FileWriter : CSVWriter
-  }
-  
   get OUTPUT_FORMAT() { 
-    this._OUTPUT_FORMAT = this._OUTPUT_FORMAT || ((this.parameters.OUTPUT_FORMAT  && this.parameters.OUTPUT_FORMAT.toUpperCase() === 'CSV') ? 'CSV' : 'JSON')
+    this._OUTPUT_FORMAT = this._OUTPUT_FORMAT || (() => {
+	  switch (this.parameters.OUTPUT_FORMAT ? this.parameters.OUTPUT_FORMAT.toUpperCase() : 'JSON') {
+        case 'ARRAY':
+          this._FILE_EXTENSION = 'data'
+          this._OUTPUT_FORMAT = 'ARRAY'
+		  this._WRITER = ArrayWriter
+          break;
+        case 'CSV':
+          this._FILE_EXTENSION = 'csv'
+          this._OUTPUT_FORMAT = 'CSV'
+		  this._WRITER = CSVWriter
+          break;
+        case JSON:
+        default:
+          this._FILE_EXTENSION = 'json'
+          this._OUTPUT_FORMAT = 'JSON'
+		  this._WRITER = JSONWriter
+	  }
+	  return this._OUTPUT_FORMAT
+	})();
     return this._OUTPUT_FORMAT
   }
+
+  get WRITER() {
+    this._WRITER = this._WRITER || (() => { 
+	  // Referencing OUTPUT_FORAMT sets _WRITER
+	  const outputformat = this.OUTPUT_FORMAT; 
+	  return this._WRITER
+	})();
+	return this._WRITER
+  }
+  
+  get FILE_EXTENSION() {
+    this._FILE_EXTENSION = this._FILE_EXTENSION || (() => { 
+	  // Referencing OUTPUT_FORAMT sets _FILE_EXTENSION
+	  const outputformat = this.OUTPUT_FORMAT; 
+	  return this._FILE_EXTENSION
+	})();
+	return this._FILE_EXTENSION
+  }
+
+  get COMPRESSED_OUTPUT()  { return this.yadamu.COMPRESSION !== 'NONE' }
   
   constructor(yadamu,exportFilePath) {
     // Export File Path is a Directory for in Load/Unload Mode
@@ -115,7 +155,9 @@ class LoaderDBI extends YadamuDBI {
     }))
     const dataFileList = {}
     Object.values(this.metadata).forEach((tableMetadata) =>  {
-      dataFileList[tableMetadata.tableName] = {file: `${path.join(this.dataFolderPath,tableMetadata.tableName)}.${this.OUTPUT_FORMAT.toLowerCase()}`}
+	  let filename = `${path.join(this.dataFolderPath,tableMetadata.tableName)}.${this.OUTPUT_FORMAT.toLowerCase()}`
+	  filename = this.COMPRESSED_OUTPUT ? `${filename}.gz` : filename
+      dataFileList[tableMetadata.tableName] = {file: filename}
     })
 	this.controlFile = { systemInformation : this.systemInformation, metadata : metadataFileList, data: dataFileList}
 	await fsp.writeFile(this.controlFilePath,JSON.stringify(this.controlFile))
@@ -144,7 +186,7 @@ class LoaderDBI extends YadamuDBI {
     await fsp.mkdir(this.metadataFolderPath, { recursive: true });
     await fsp.mkdir(this.dataFolderPath, { recursive: true });
     
-	this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Using control file "${this.controlFilePath}"`);
+	this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Created control file "${this.controlFilePath}"`);
 
   }
 
@@ -155,10 +197,24 @@ class LoaderDBI extends YadamuDBI {
   }
   
   getFileOutputStream(tableName) {
-    // this.yadamuLogger.trace([this.constructor.name],`getFileOutputStream(${this.dataFileList[tableName].file})`)
+    // this.yadamuLogger.trace([this.constructor.name],`getFileOutputStream(${this.controlFile.data[tableName].file})`)
   	return fs.createWriteStream(this.controlFile.data[tableName].file)
   }
 
+  async getOutputStreams(tableName,ddlComplete) {
+	await ddlComplete;
+    const streams = []
+	
+	const writer = this.getOutputStream(tableName,ddlComplete)
+	streams.push(writer)
+	
+	if (this.COMPRESSED_OUTPUT) {
+      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
+    }
+	streams.push(this.getFileOutputStream(tableName))
+	
+	return streams;
+  }
   /*
   **
   ** !!! Remember: Export is Reading data from the local file system - Load
@@ -196,18 +252,58 @@ class LoaderDBI extends YadamuDBI {
     }
   }
 
-  createParser(tableInfo,objectMode) {
-    const datafileParser = new DatafileParser(tableInfo,this.yadamuLogger,this.MODE)
-	return datafileParser
-  }
-
   async getInputStream(tableInfo) {
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating input stream on ${this.controlFile.data[tableInfo.TABLE_NAME].file}`)
     const stream = fs.createReadStream(this.controlFile.data[tableInfo.TABLE_NAME].file);
     await new Promise((resolve,reject) => {stream.on('open',() => {resolve(stream)}).on('error',(err) => {reject(err)})})
-    const jsonParser  = new JSONParser(this.yadamuLogger,this.MODE,this.controlFile.data[tableInfo.TABLE_NAME].file);
-    return stream.pipe(jsonParser)
+    return stream
   }
+
+  async getInputStreams(tableInfo) {
+    
+	const streams = []
+	const is = await this.getInputStream(tableInfo);
+	is.once('readable',() => {
+	  this.INPUT_TIMINGS.readerStartTime = performance.now()
+	}).on('error',(err) => { 
+      this.INPUT_TIMINGS.readerEndTime = performance.now()
+	  this.INPUT_TIMINGS.readerError = err
+	  this.INPUT_TIMINGS.failed = true
+    }).on('end',() => {
+      this.INPUT_TIMINGS.readerEndTime = performance.now()
+    })
+	streams.push(is)
+	
+	if (this.COMPRESSED_OUTPUT) {
+      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
+	}
+	
+	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.controlFile.data[tableInfo.TABLE_NAME].file)
+	jsonParser.once('readable',() => {
+	  this.INPUT_TIMINGS.parserStartTime = performance.now()
+	}).on('error',(err) => { 
+      this.INPUT_TIMINGS.parserEndTime = performance.now()
+	  this.INPUT_TIMINGS.parserError = err
+	  this.INPUT_TIMINGS.failed = true
+    })
+	streams.push(jsonParser);
+	
+	const eventStream = new EventStream(tableInfo,this.yadamuLogger)
+	eventStream.once('readable',() => {
+	  this.INPUT_TIMINGS.parserStartTime = performance.now()
+	}).on('end',() => {
+	  this.INPUT_TIMINGS.parserEndTime = performance.now()
+	  this.INPUT_TIMINGS.rowsRead = eventStream.getRowCount()
+	}).on('error',(err) => {
+	  this.INPUT_TIMINGS.parserEndTime = performance.now()
+	  this.INPUT_TIMINGS.rowsRead = eventStream.getRowCount()
+	  this.INPUT_TIMINGS.parserError = err
+	  this.INPUT_TIMINGS.failed = true;
+	})
+	streams.push(eventStream)
+	return streams;
+  }
+ 
 
   generateStatementCache() {
 	this.statementCache = {}
@@ -228,17 +324,17 @@ class LoaderDBI extends YadamuDBI {
 	return new LoaderDBI(yadamu)
   }
   
-  async getConnectionID() {}
+  async getConnectionID() { /* OVERRIDE */ }
   
-  createConnectionPool() {}
+  createConnectionPool() { /* OVERRIDE */ }
   
-  getConnectionFromPool() {}
+  getConnectionFromPool() { /* OVERRIDE */ }
   
-  configureConnection() {}
+  configureConnection() { /* OVERRIDE */ }
   
-  closeConnection() {}
+  closeConnection() { /* OVERRIDE */ }
 
-  closePool() {}
+  closePool() { /* OVERRIDE */ }
 
 }
 

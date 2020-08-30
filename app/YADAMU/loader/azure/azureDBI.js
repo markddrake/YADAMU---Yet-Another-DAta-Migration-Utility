@@ -1,19 +1,19 @@
 "use strict" 
 
-const AWS = require('aws-sdk');
+const { BlobServiceClient } = require('@azure/storage-blob');
 const path = require('path')
 const Stream = require('stream')
 
 const LoaderDBI = require('../node/LoaderDBI.js');
-const S3Constants = require('./s3Constants.js');
-const S3IO = require('./s3IO.js');
+const AzureConstants = require('./azureConstants.js');
+const AzureIO = require('./azureIO.js');
 /*
 **
 ** YADAMU Database Inteface class skeleton
 **
 */
 
-class S3DBI extends LoaderDBI {
+class AzureDBI extends LoaderDBI {
  
   /*
   **
@@ -26,20 +26,21 @@ class S3DBI extends LoaderDBI {
   **
   */
 
-  get DATABASE_VENDOR()     { return S3Constants.DATABASE_VENDOR};
-  get SOFTWARE_VENDOR()     { return S3Constants.SOFTWARE_VENDOR};
+  get DATABASE_VENDOR()     { return AzureConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()     { return AzureConstants.SOFTWARE_VENDOR};
   
-  get BUCKET_NAME()  { return this.parameters.BUCKET_NAME || S3Constants.BUCKET_NAME }
+  get CONTAINER_NAME()      { return this.parameters.CONTAINER_NAME || AzureConstants.CONTAINER_NAME }
   
   constructor(yadamu,exportFilePath) {
     // Export File Path is a Directory for in Load/Unload Mode
-    super(yadamu,exportFilePath)
+	super(yadamu,exportFilePath)
+	this.connectionProperties = AzureConstants.AZURITE
   }    
   
   async createConnectionPool() {
 	// this.yadamuLogger.trace([this.constructor.name],`new AWS.S3()`)
-	this.s3 = await new AWS.S3(this.connectionProperties)
-	this.ioManager = new S3IO(this.s3,{},this.yadamuLogger)
+    this.azure = BlobServiceClient.fromConnectionString(this.connectionProperties);
+	this.ioManager = new AzureIO(this.azure,{},this.yadamuLogger)
   }
   
   async loadMetadataFiles() {
@@ -50,7 +51,7 @@ class S3DBI extends LoaderDBI {
 		return this.ioManager.getObject(this.controlFile.metadata[tableName].file)
       }))
 	  metdataRecords.forEach((content) =>  {
-        const json = JSON.parse(content.Body.toString())
+        const json = JSON.parse(content)
         metadata[json.tableName] = json;
       })
     }
@@ -85,13 +86,13 @@ class S3DBI extends LoaderDBI {
 	 
     // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
       	
-	await this.ioManager.verifyBucket()	
+	await this.ioManager.verifyContainer()	
 
 	this.uploadFolder = path.join(this.EXPORT_PATH,this.parameters.TO_USER).split(path.sep).join(path.posix.sep) 
 	this.controlFilePath = `${path.join(this.uploadFolder,this.parameters.TO_USER)}.json`.split(path.sep).join(path.posix.sep) 
     this.metadataFolderPath = path.join(this.uploadFolder,'metadata').split(path.sep).join(path.posix.sep) 
     this.dataFolderPath = path.join(this.uploadFolder,'data').split(path.sep).join(path.posix.sep) 
-    this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Using control file "${this.BUCKET_NAME}/${this.controlFilePath}"`);
+    this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Using control file "${this.CONTAINER_NAME}/${this.controlFilePath}"`);
 
   }
 
@@ -108,9 +109,9 @@ class S3DBI extends LoaderDBI {
 	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
 	this.uploadFolder = path.join(this.EXPORT_PATH,this.parameters.FROM_USER).split(path.sep).join(path.posix.sep) 
     this.controlFilePath = `${path.join(this.uploadFolder,this.parameters.FROM_USER)}.json`.split(path.sep).join(path.posix.sep) 
-    this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using control file "${this.BUCKET_NAME}/${this.controlFilePath}"`);
+    this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using control file "${this.CONTAINER_NAME}/${this.controlFilePath}"`);
     const fileContents = await this.ioManager.getObject(this.controlFilePath)
-    this.controlFile = JSON.parse(fileContents.Body.toString())
+    this.controlFile = JSON.parse(fileContents)
   }
 
   async getInputStream(tableInfo) {
@@ -131,4 +132,4 @@ class S3DBI extends LoaderDBI {
     
 }
 
-module.exports = S3DBI
+module.exports = AzureDBI

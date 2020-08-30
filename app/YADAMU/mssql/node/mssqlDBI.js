@@ -26,6 +26,7 @@ const sql = require('mssql');
 */
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
 const {ConnectionError} = require('../../common/yadamuError.js')
@@ -508,13 +509,10 @@ class MsSQLDBI extends YadamuDBI {
   
   async executeBatch(sqlStatment) {
 
-    let attemptReconnect = this.ATTEMPT_RECONNECTION;
-
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(sqlStatment))
-    }  
-
     let stack
+    let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    this.status.sqlTrace.write(this.traceSQL(sqlStatment))
+
     while (true) {
       // Exit with result or exception.  
       try {
@@ -539,14 +537,11 @@ class MsSQLDBI extends YadamuDBI {
 
   async execute(procedure,args,output) {
      
+    let stack
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
     const psuedoSQL = `SET @RESULTS = '{}';CALL ${procedure}(${this.getArgNameList(args)}); SELECT @RESULTS "${output}";`
+    this.status.sqlTrace.write(this.traceSQL(psuedoSQL))
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(psuedoSQL))
-    }  
-
-    let stack
     while (true) {
       // Exit with result or exception.  
       try {
@@ -580,13 +575,10 @@ class MsSQLDBI extends YadamuDBI {
  
   async executeCachedStatement(args) {
 	
-    let attemptReconnect = this.ATTEMPT_RECONNECTION;
-
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(this.preparedStatement.sqlStatement))
-    }  
-
     let stack
+    let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    this.status.sqlTrace.write(this.traceSQL(this.preparedStatement.sqlStatement))
+
     while (true) {
       // Exit with result or exception.  
       try {
@@ -629,13 +621,11 @@ class MsSQLDBI extends YadamuDBI {
 	
   async bulkInsert(bulkOperation) {
      
+    let stack
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 	let operation = `Bulk Operation: ${bulkOperation.path}. [${bulkOperation.rows.length}] rows.`
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceComment(operation))
-    }
+    this.status.sqlTrace.write(this.traceComment(operation))
    
-    let stack
     while (true) {
       // Exit with result or exception.  
       try {
@@ -660,12 +650,10 @@ class MsSQLDBI extends YadamuDBI {
 
   async executeSQL(sqlStatement,args,noReconnect) {
 
-    let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(sqlStatement))
-    }  
-
 	let stack
+    let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    this.status.sqlTrace.write(this.traceSQL(sqlStatement))
+	
     while (true) {
       // Exit with result or exception.  
       try {
@@ -813,12 +801,10 @@ class MsSQLDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
     	  
-    const psuedoSQL = 'begin transaction'
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
-    }
-	  
-	let stack
+    let stack
+	const psuedoSQL = 'begin transaction'
+    this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
+      
 	try {
       const sqlStartTime = performance.now();
       stack = new Error().stack;
@@ -842,12 +828,10 @@ class MsSQLDBI extends YadamuDBI {
 	  
     // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
-    const psuedoSQL = 'commit transaction'
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
-    }
-	  
 	let stack
+    const psuedoSQL = 'commit transaction'
+    this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
+	  
 	try {
 	  super.commitTransaction()
       const sqlStartTime = performance.now();
@@ -880,12 +864,10 @@ class MsSQLDBI extends YadamuDBI {
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
 	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 
-    const psuedoSQL = 'rollback transaction'
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
-    }
-	  
 	let stack
+    const psuedoSQL = 'rollback transaction'
+    this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
+	  
 	try {
 	  super.rollbackTransaction()
       const sqlStartTime = performance.now();
@@ -1036,9 +1018,7 @@ class MsSQLDBI extends YadamuDBI {
       
   async getSchemaInfo(keyName) {
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceComment(`@SCHEMA="${this.parameters[keyName]}"`))
-    }
+    this.status.sqlTrace.write(this.traceComment(`@SCHEMA="${this.parameters[keyName]}"`))
       
     const statement = this.SQL_SCHEMA_INFORMATION()
     const results = await this.executeSQL(statement, { inputs: [{name: "SCHEMA", type: sql.VarChar, value: this.parameters[keyName]}]})
@@ -1200,6 +1180,6 @@ const _SQL_SYSTEM_INFORMATION =
           FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
 		) "DATABASE_PROPERTIES"`;
 	   
-const _SQL_CREATE_SAVE_POINT  = `SAVE TRANSACTION ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_CREATE_SAVE_POINT  = `SAVE TRANSACTION ${YadamuConstants.SAVE_POINT_NAME}`;
 
-const _SQL_RESTORE_SAVE_POINT = `ROLLBACK TRANSACTION ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_RESTORE_SAVE_POINT = `ROLLBACK TRANSACTION ${YadamuConstants.SAVE_POINT_NAME}`;

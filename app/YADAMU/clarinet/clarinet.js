@@ -170,7 +170,7 @@ else env = window;
     //var Buffer = this.Buffer || function Buffer () {}; // if we don't have Buffers, fake it so we can do `var instanceof Buffer` and not throw an error
     this.bytes_remaining = 0; // number of bytes remaining in multi byte utf8 char to read after split boundary
     this.bytes_in_sequence = 0; // bytes in multi byte utf8 char to read
-    this.temp_buffs = { "2": new Buffer(2), "3": new Buffer(3), "4": new Buffer(4) }; // for rebuilding chars split before boundary is reached
+    this.temp_buffs = { "2": new Buffer.alloc(2), "3": new Buffer.alloc(3), "4": new Buffer.alloc(4) }; // for rebuilding chars split before boundary is reached
     this.string = '';
 
     var me = this;
@@ -203,7 +203,7 @@ else env = window;
     { constructor: { value: CStream } });
 
   CStream.prototype.write = function (data) {
-    data = new Buffer(data);
+    data = new Buffer.from(data);
     for (var i = 0; i < data.length; i++) {
       var n = data[i];
 

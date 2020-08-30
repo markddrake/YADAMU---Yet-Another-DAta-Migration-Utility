@@ -11,6 +11,7 @@ const { performance } = require('perf_hooks');
 const mysql = require('mysql');
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const MySQLConstants = require('./mysqlConstants.js')
@@ -143,10 +144,8 @@ class MySQLDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
 	
-	if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
-    }
-	
+	this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
+    
 	const stack = new Error().stack;
     const connection = await new Promise((resolve,reject) => {
       const sqlStartTime = performance.now();
@@ -210,9 +209,7 @@ class MySQLDBI extends YadamuDBI {
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
     return new Promise((resolve,reject) => {
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceSQL(sqlStatement));
-      }
+      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
 
       const stack = new Error().stack;
       const sqlStartTime = performance.now(); 
@@ -359,11 +356,9 @@ class MySQLDBI extends YadamuDBI {
 	  
     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(`begin transaction`));
-    }    
-
     let stack
+    this.status.sqlTrace.write(this.traceSQL(`begin transaction`));
+
 	try {
 	  stack = new Error().stack
       await this.connection.beginTransaction();
@@ -384,11 +379,9 @@ class MySQLDBI extends YadamuDBI {
 	
     // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
-    }    
-
 	let stack
+    this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
+
 	try {
 	  super.commitTransaction();
 	  stack = new Error().stack
@@ -414,11 +407,8 @@ class MySQLDBI extends YadamuDBI {
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
 	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 			
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(`rollback transaction`));
-    }    
+    this.status.sqlTrace.write(this.traceSQL(`rollback transaction`));
 	
-	let stack
 	try {
 	  super.rollbackTransaction();
 	  stack = new Error().stack
@@ -651,10 +641,7 @@ class MySQLDBI extends YadamuDBI {
 	}
 
 	let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
-    }
+    this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
 
     while (true) {
       // Exit with result or exception.  
@@ -773,8 +760,8 @@ const _SQL_INFORMATION_SCHEMA_FROM_CLAUSE_DUPLICATES  =
    ) c
   group by c.table_schema, c.table_name`;
 
-const _SQL_CREATE_SAVE_POINT  = `SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_CREATE_SAVE_POINT  = `SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
-const _SQL_RESTORE_SAVE_POINT = `ROLLBACK TO SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_RESTORE_SAVE_POINT = `ROLLBACK TO SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
-const _SQL_RELEASE_SAVE_POINT = `RELEASE SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_RELEASE_SAVE_POINT = `RELEASE SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;

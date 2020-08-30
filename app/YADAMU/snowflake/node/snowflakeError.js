@@ -14,7 +14,8 @@ class SnowflakeError extends DatabaseError {
   }
 
   spatialInsertFailed() {
-    return ((this.cause.code && this.cause.code === '100205') )
+	const spatialErrorCodes = Object.freeze(['100217','100205'])
+    return (this.cause.code && spatialErrorCodes.includes(this.cause.code))
   }
 
 }

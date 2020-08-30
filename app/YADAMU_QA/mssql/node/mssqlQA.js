@@ -112,9 +112,7 @@ class MsSQLQA extends MsSQLDBI {
 -- declare @DATE_TIME_PRECISION    varchar(128)  = ${this.parameters.TIMESTAMP_PRECISION};
 --`;
             
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION,@DATE_TIME_PRECISION)\ngo\n`)
-      }
+      this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION,@DATE_TIME_PRECISION)\ngo\n`)
 
       const request = this.getRequest();
       let results = await request

@@ -15,6 +15,7 @@ class OracleParser extends YadamuParser {
   
   constructor(tableInfo,yadamuLogger) {
     super(tableInfo,yadamuLogger); 
+	// console.log(tableInfo)
   }
   
   async closeLob(lob) {
@@ -108,11 +109,11 @@ class OracleParser extends YadamuParser {
   
   async _transform (data,encoding,callback) {
 	try {
-      this.counter++;
+      this.rowCount++;
 	  this.rowTransformation(data)
 	  const row = await Promise.all(data)
 	  this.jsonTransformation(row)
-      // if (this.counter === 1) console.log(row)
+      // if (this.rowCount === 1) console.log(row)
 	  this.push({data:row})
       callback();
 	} catch (e) {

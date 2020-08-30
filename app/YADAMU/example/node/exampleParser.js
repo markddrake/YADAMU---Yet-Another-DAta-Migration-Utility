@@ -28,7 +28,7 @@ class ExampleParser extends YadamuParser {
   }
     
   async _transform (data,encoding,callback) {
-    this.counter++;
+    this.rowCount++;
 	if (!Array.isArray(data)) {
 	  data = Object.values(data)
 	}

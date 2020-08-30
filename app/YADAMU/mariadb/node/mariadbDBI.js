@@ -13,6 +13,7 @@ const { performance } = require('perf_hooks');
 const mariadb = require('mariadb');
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const MariadbConstants = require('./mariadbConstants.js')
@@ -103,11 +104,8 @@ class MariadbDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
-    }
-	
     let stack
+    this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
 	try {
       const sqlStartTime = performance.now();
 	  stack = new Error().stack
@@ -169,14 +167,12 @@ class MariadbDBI extends YadamuDBI {
   
   async executeSQL(sqlStatement,args) {
      
-	let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
-    }
-   
+	
     let stack
-    while (true) {
+    let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    this.status.sqlTrace.write(this.traceSQL(sqlStatement));
+    
+	while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
@@ -288,13 +284,10 @@ class MariadbDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
-    let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(`begin transaction`));
-    }    
-   
     let stack
+    let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    this.status.sqlTrace.write(this.traceSQL(`begin transaction`));
+    
     while (true) {
       // Exit with result or exception.  
       try {
@@ -328,11 +321,9 @@ class MariadbDBI extends YadamuDBI {
 	    
     // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
-    }    
-   
     let stack
+    this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
+   
     try {
 	  super.commitTransaction()
       const sqlStartTime = performance.now();
@@ -368,11 +359,8 @@ class MariadbDBI extends YadamuDBI {
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
 	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(`rollback transaction`));
-    }    
-   
     let stack
+    this.status.sqlTrace.write(this.traceSQL(`rollback transaction`));
     try {
 	  super.rollbackTransaction()
       const sqlStartTime = performance.now();
@@ -576,7 +564,7 @@ class MariadbDBI extends YadamuDBI {
             group by t.table_schema, t.table_name`;
 
     const results = await this.executeSQL(SQL_SCHEMA_INFORMATION,[this.parameters[keyName]]);
-    const schemaInfo = this.generateSchemaInfo(results)    
+    const schemaInfo = this.generateSchemaInfo(results) 
     return schemaInfo
 
   }
@@ -588,11 +576,8 @@ class MariadbDBI extends YadamuDBI {
   async getInputStream(tableInfo) {
     
 	let attemptReconnect = this.ATTEMPT_RECONNECTION;
+    this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT));
     
-    if (this.status.sqlTrace) {
-      this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT));
-    }
-   
     while (true) {
       // Exit with result or exception.  
       try {
@@ -644,8 +629,8 @@ const _SQL_CONFIGURE_CONNECTION = `SET AUTOCOMMIT = 0, TIME_ZONE = '+00:00',SESS
 
 const _SQL_SYSTEM_INFORMATION   = `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
  
-const _SQL_CREATE_SAVE_POINT    = `SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_CREATE_SAVE_POINT    = `SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
-const _SQL_RESTORE_SAVE_POINT   = `ROLLBACK TO SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_RESTORE_SAVE_POINT   = `ROLLBACK TO SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
-const _SQL_RELEASE_SAVE_POINT   = `RELEASE SAVEPOINT ${YadamuDBI.SAVE_POINT_NAME}`;
+const _SQL_RELEASE_SAVE_POINT   = `RELEASE SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;

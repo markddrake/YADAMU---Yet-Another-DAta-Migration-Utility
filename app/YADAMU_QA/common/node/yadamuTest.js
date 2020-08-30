@@ -32,11 +32,8 @@ class YadamuTest extends Yadamu {
     this.STATUS.warningRaised = false;
     this.STATUS.errorRaised   = false;
     this.STATUS.statusMsg     = 'successfully'
-    
-    if (this.parameters.SQL_TRACE) {
-	  this.STATUS.sqlTrace = fs.createWriteStream(this.parameters.SQL_TRACE,{flags : "a"});
-    }
-	
+	this.timings = {}
+    	
 	this.reloadParameters(testParameters)
 	
   }

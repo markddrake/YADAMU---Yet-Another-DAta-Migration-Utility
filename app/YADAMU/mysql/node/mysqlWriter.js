@@ -196,7 +196,6 @@ class MySQLWriter extends YadamuWriter {
 	const sqlStatement = `${this.tableInfo.dml} ${this.tableInfo.rowConstructor}`
 	for (let row = 0; row < this.rowCounters.cached; row++) {
       const  nextRow = this.tableInfo.insertMode === "Rows" ? this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
-      if (row === 0) console.log(nextRow);
       try {
         const results = await this.dbi.executeSQL(sqlStatement,nextRow)
         await this.processWarnings(results);

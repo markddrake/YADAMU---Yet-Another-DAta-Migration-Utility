@@ -3,7 +3,7 @@
 const YadamuParser = require('../../common/yadamuParser.js')
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
 
-class DatafileParser extends YadamuParser {
+class EventStream extends YadamuParser {
   
   constructor(tableInfo,yadamuLogger) {
   
@@ -48,10 +48,10 @@ class DatafileParser extends YadamuParser {
 
   async _transform (data,encoding,callback) {
 	try {
-      this.counter++
-      // if (this.counter === 1) console.log('_transform',data)	
+      this.rowCount++
+      // if (this.rowCount === 1) console.log('_transform',data)	
       this.rowTransformation(data.data)
-      // if (this.counter === 1) console.log('Push',data)
+      // if (this.rowCount === 1) console.log('Push',data)
       this.push(data)
       callback();  
 	} catch (e) {
@@ -60,4 +60,4 @@ class DatafileParser extends YadamuParser {
   }
 }
 
-module.exports = DatafileParser
+module.exports = EventStream

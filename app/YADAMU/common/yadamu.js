@@ -4,16 +4,19 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { performance } = require('perf_hooks');
-const FileDBI = require('../file/node/fileDBI.js');
-const DBReader = require('./dbReader.js');
-const DBWriter = require('./dbWriter.js');
-const DBReaderParallel = require('./dbReaderParallel.js');
+const assert = require('assert');
 
 const util = require('util')
 const stream = require('stream')
 const pipeline = util.promisify(stream.pipeline);
 
+const FileDBI = require('../file/node/fileDBI.js');
+const DBReader = require('./dbReader.js');
+const DBWriter = require('./dbWriter.js');
+const DBReaderParallel = require('./dbReaderParallel.js');
+
 const YadamuConstants = require('./yadamuConstants.js');
+const DummyOutputStream = require('./dummyOutputStream.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const {YadamuError, UserError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
@@ -30,6 +33,7 @@ class Yadamu {
   get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || YadamuConstants.PARALLEL) }
   get PARALLEL_PROCESSING()           { return this.PARALLEL > 0 } // Parellel 1 is Parallel processing logic with a single worker.
   get RDBMS()                         { return this.parameters.RDBMS    || YadamuConstants.RDBMS }  
+  get COMPRESSION()                   { return this.parameters.COMPRESSION || 'NONE' }
 
   get EXCEPTION_FOLDER()              { return this.parameters.EXCEPTION_FOLDER       || YadamuConstants.EXCEPTION_FOLDER }
   get EXCEPTION_FILE_PREFIX()         { return this.parameters.EXCEPTION_FILE_PREFIX  || YadamuConstants.EXCEPTION_FILE_PREFIX }
@@ -86,7 +90,7 @@ class Yadamu {
   }
 
   constructor(operation,parameters) {
-      
+	  
     this._OPERATION = operation
     
 	process.on('unhandledRejection', (err, p) => {
@@ -99,6 +103,8 @@ class Yadamu {
     // Read Command Line Parameters
     this.loadParameters(parameters)
     this.processParameters();    
+	
+	this.timings = {}
 	
 	// Use an object to pass the prompt to ensure changes to prompt are picked up insde the writeToOutput function closure()
 
@@ -116,6 +122,10 @@ class Yadamu {
       }
     };	
 
+  }
+  
+  recordTimings(timings) {
+	Object.assign(this.timings,timings)
   }
   
   reportStatus(status,yadamuLogger) {
@@ -155,6 +165,12 @@ class Yadamu {
       console.log(`${new Date().toISOString()} [ERROR][YADAMU][${status.operation}]: Operation Failed:`);
       console.dir(e,{depth:null});
     }
+  }
+
+  isSupportedValue(parameterName,parameterValue,validValues) {
+	 const testValue = parameterValue.toUpperCase()
+	 assert(validValues.includes(testValue),`Invalid value "${testValue}" specified for parameter "${parameterName}". Valid values are ${JSON.stringify(validValues)}.`)
+	 return testValue;
   }
 
   processValue(parameterValue) {
@@ -204,10 +220,7 @@ class Yadamu {
 
     this.commandPrompt.close();
     await yadamuLogger.close();
-
-    if (status.sqlTrace) {
-      status.sqlTrace.close();
-    }
+    status.sqlTrace.end();
   }
   
   async close() {
@@ -233,14 +246,19 @@ class Yadamu {
 
   }
 
+  initializeSQLTrace() {
+	const options = {
+	  flags : (this.STATUS.sqlTrace && this.STATUS.sqlTrace.writableEnded) ? "a" : "w"
+	}
+	this.STATUS.sqlTrace = this.STATUS.sqlTrace || (this.parameters.SQL_TRACE ? fs.createWriteStream(this.parameters.SQL_TRACE,options) : DummyOutputStream.DUMMY_OUTPUT_STREAM )
+  }
+  
   processParameters() {
 
     // this.LOGGER = this.setYadamuLogger(this.parameters,this.STATUS);
 
-    if (this.parameters.SQL_TRACE) {
-	  this.STATUS.sqlTrace = fs.createWriteStream(this.parameters.SQL_TRACE);
-    }
-
+    this.initializeSQLTrace() 
+	
     if (this.parameters.LOG_FILE) {
       this.STATUS.logFileName = this.parameters.LOG_FILE;
     }
@@ -461,8 +479,16 @@ class Yadamu {
             break;
           case 'OUTPUT_FORMAT':
           case '--OUTPUT_FORMAT':
-            parameters.OUTPUT_FORMAT = parameterValue.toUpperCase();
+            parameters.OUTPUT_FORMAT = this.isSupportedValue('OUTPUT_FORMAT',parameterValue,YadamuConstants.SUPPORTED_OUTPUT_FORMAT);
             break;
+          case 'COMPRESSION':
+          case '--COMPRESSION':
+            parameters.COMPRESSION = this.isSupportedValue('COMPRESSION',parameterValue,YadamuConstants.SUPPORTED_COMPRESSION)
+            break
+          case 'ENCRYPT':
+          case '--ENCRYPT':
+            parameters.ENCRYPT = null;
+            break
           default:
 		    if (allowAnyParameter) {
               try {
@@ -506,9 +532,7 @@ class Yadamu {
   }
 
   async doPumpOperation(source,target) {
-	  
-    const timings = {}
-    
+	     
 	let dbReader
 	let dbWriter
 
@@ -523,21 +547,23 @@ class Yadamu {
       dbReader = await this.getDBReader(source,parallel)
       dbWriter = await this.getDBWriter(target,parallel) 
 
-      // dbReader.getInputStream() returns itself (this) for d1atabases...	  
-	  const is = dbReader.getInputStream();
-	  await pipeline(is,dbWriter)
-      // this.LOGGER.trace([this.constructor.name,'pipeline()','finished'],'Success')
+      const yadamuPipeline = []
+	  // dbReader.getInputStream() returns itself (this) for databases...	  
+	  yadamuPipeline.push(...dbReader.getInputStreams())
+	  yadamuPipeline.push(dbWriter)
+	  // this.LOGGER.trace([this.constructor.name,'COPY'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
+	  await pipeline(yadamuPipeline)
+      // this.LOGGER.trace([this.constructor.name,'COPY'],'Success')
 
       this.STATUS.operationSuccessful = false;
       await source.finalize();
       await target.finalize();
       await this.REJECTION_MANAGER.close();
 	  await this.WARNING_MANAGER.close();
-	  const timings = dbWriter.getTimings();
 	  this.STATUS.operationSuccessful = true;
-      return timings
+      return this.timings
     } catch (e) {
-      // this.LOGGER.trace([this.constructor.name,'pipeline()','finished'],'Failed')
+      // this.LOGGER.trace([this.constructor.name,'COPY'],'Failed')
 	  // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
 	
 	  if ((e.code === 'ERR_STREAM_PREMATURE_CLOSE') && (dbReader.underlyingError instanceof Error)) {
@@ -556,7 +582,7 @@ class Yadamu {
 		throw e
 	  }
     }
-    return timings
+    return this.timings
   }
     
   async pumpData(source,target) {
@@ -624,9 +650,7 @@ class Yadamu {
     this.LOGGER.info([`${dbi.DATABASE_VENDOR}`,`UPLOAD`],`File "${importFilePath}". Size ${fileSizeInBytes}. Elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
     return json;
   }
-  
-  
-    
+   
   getTimings(log) {
       
      const timings = {}

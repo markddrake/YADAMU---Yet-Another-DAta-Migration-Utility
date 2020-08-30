@@ -4,11 +4,17 @@ const fs = require('fs');
 const path = require('path');
 const util = require('util');
 
+const {Readable, pipeline} = require('stream')
+
 const DBWriter = require('./dbWriter.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const StringWriter = require('./stringWriter.js')
+const DummyOutputStream = require('./dummyOutputStream.js');
+const PassThrough = require('./yadamuPassThrough.js');
+const SimpleArrayReadable = require('./simpleArrayReadable.js');
 const {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuError.js');
 const OracleError  = require('../oracle/node/oracleError.js');
+const JSONWriter = require('../file/node/jsonWriter.js');
 const FileDBI = require('../file/node/fileDBI.js');
 
 class YadamuLogger {
@@ -35,6 +41,11 @@ class YadamuLogger {
   static  get EXCEPTION_FOLDER() { return this.LOGGER_DEFAULTS.EXCEPTION_FOLDER }
   static  get EXCEPTION_FILE_PREFIX() { return this.LOGGER_DEFAULTS.EXCEPTION_FILE_PREFIX }
   
+  static get NUL_LOGGER() {
+	this._NUL_LOGGER = this._NUL_LOGGER || new YadamuLogger(DummyOutputStream.DUMMY_OUTPUT_STREAM,{})
+	return this._NUL_LOGGER;
+  }
+
   /*
   **
   ** _EXCEPTION_FOLDER_PATH contains the path passed to createYadamuLogger or the default value for the location of the exception folder.
@@ -93,7 +104,7 @@ class YadamuLogger {
   get IS_CONSOLE_LOGGER() {
     return this.os === process.stdout;
   }
-
+  
   static fileLogger(logFilePath,state,exceptionFolder,exceptionFilePrefix) {
     const os = ((logFilePath === undefined) || (logFilePath === '') || (logFilePath === null)) ? process.stdout : (() => {
     try {
@@ -104,12 +115,6 @@ class YadamuLogger {
     }
     })();   
     return new YadamuLogger(os,state,exceptionFolder,exceptionFilePrefix)
-  }
-    
-  static nulLogger() {
-    // TODO : Create a subclass that actually does not write stuff to NUL
-    const nul = fs.createWriteStream("\\\\.\\NUL",{flags : "a"})
-    return new YadamuLogger(nul,{})
   }
   
   static consoleLogger(state,exceptionFolder,exceptionFilePrefix) {
@@ -262,28 +267,53 @@ class YadamuLogger {
   async writeDataFile(dataFilePath,tableName,currentSettings,data) {
 	try {
 	  const dbi = new FileDBI(currentSettings.yadamu,dataFilePath)
-	  await dbi.initialize()
+      await dbi.initialize()
+	  
 	  // const logger = this
-      const logger = YadamuLogger.nulLogger();
-	  const dbWriter = new DBWriter(dbi,logger);  
-	  await dbWriter.initialize()
-      dbWriter.write({systemInformation: currentSettings.systemInformation})
-	  dbWriter.write({metadata: currentSettings.metadata})
-	  const tableWriter = dbi.getOutputStream(tableName,dbWriter.ddlComplete)
+	  const logger = YadamuLogger.NUL_LOGGER;
+	  const fileWriter = new DBWriter(dbi,logger);  
+	  
+	  dbi.setSystemInformation(currentSettings.systemInformation)
+	  dbi.setMetadata(currentSettings.metadata)
+	  
+	  await fileWriter.initialize()
+   	  await dbi.initializeData()
+
+	  const dataObjects = data.map((d) => { return {data: d}})
+	  dataObjects.unshift({table: tableName})
+      // const dataStream = Readable.from(dataObjects);
+	  const dataStream = new SimpleArrayReadable(dataObjects,{objectMode: true },true);
+
+	  const jsonWriter = new JSONWriter(dbi,tableName,undefined,0,{},logger)
 	  // Disable the columnCountCheck when writing an error report
-	  tableWriter.checkColumnCount = () => {}
-	  await new Promise((resolve,reject) => {tableWriter.write({table: tableName},null,() => {resolve()})})
-	  for (const d of data) {
-        tableWriter.write({data:d})
-	  }
-	  await new Promise((resolve,reject) => {tableWriter.end(null,null,() => {resolve()})})
-      dbWriter.deferredCallback();
-	  await dbi.finalize()
+	  jsonWriter.checkColumnCount = () => {}
+	  
+	  const passThrough = new PassThrough({objectMode: false},false);
+      passThrough.on('end',async () => {
+   	    // console.log('JSON Writer: finish',dbi.PIPELINE_ENTRY_POINT.writableEnded)
+		passThrough.unpipe();
+		dataStream.destroy();
+		jsonWriter.destroy();
+		passThrough.destroy();
+        pipeline([dbi.END_EXPORT_FILE,dbi.PIPELINE_ENTRY_POINT],(err) => {
+   		  // console.log('EOF Pipeline: Finish',dbi.PIPELINE_ENTRY_POINT.writableEnded,err)
+          if (err) {throw(err)}
+		})
+	  })
+
+	  const errorPipeline = [dataStream,jsonWriter,passThrough,dbi.PIPELINE_ENTRY_POINT]
+ 	  pipeline(errorPipeline,(err) => {
+        if (err) {throw(err)}
+	  }); 
+	  await dbi.pipelineComplete;
+      await dbi.finalize()
 	  await logger.close();
 	} catch (e) {	 
-	 console.log(e)
+	  console.log(e)
 	}
   }
+
+  // async writeDataFile(dataFilePath,tableName,currentSettings,data) {}
   
   generateDataFile(exceptionFile,e) {
     if (e instanceof IterativeInsertError) {
@@ -297,6 +327,7 @@ class YadamuLogger {
 	  // Write the row information a seperate file and replace the row tag with a reference to the file
 	  e.dataFilePath = path.resolve(`${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`);
 	  this.writeDataFile(e.dataFilePath,e.tableName,e.currentSettings,e.rows)
+	  delete e.currentSettings
 	  delete e.currentSettings
 	  delete e.rows
 	}
@@ -351,6 +382,11 @@ class YadamuLogger {
   logRejected(args,e) {
 	args.unshift('REJECTED')
 	this.handleException(args,e);
+  }
+
+  logRejectedAsWarning(args,e) {
+	args.unshift('REJECTED')
+	this.handleWarning(args,e);
   }
 
   trace(args,msg) {

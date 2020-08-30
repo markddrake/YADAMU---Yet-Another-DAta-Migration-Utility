@@ -6,6 +6,7 @@ class MongoParser extends YadamuParser {
   
   constructor(tableInfo,yadamuLogger) {
     super(tableInfo,yadamuLogger); 
+	
     this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType) => {
 	  switch (dataType) {
 		 case 'binData':
@@ -34,7 +35,7 @@ class MongoParser extends YadamuParser {
   }
   
   async _transform (data,encoding,callback) {
-	this.counter++;
+	this.rowCount++;
     if (this.tableInfo.ID_TRANSFORMATION === 'STRIP') {
       delete data._id
     }

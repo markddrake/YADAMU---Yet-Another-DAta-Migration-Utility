@@ -9,18 +9,20 @@ class YadamuParser extends Transform {
     super({objectMode: true });  
     this.tableInfo = tableInfo;
     this.yadamuLogger = yadamuLogger
-    this.counter = 0
+    this.rowCount = 0
+	
+	// Push the table name into the stream before sending the data.
     this.push({table: tableInfo.MAPPED_TABLE_NAME})
   }
     
-  getCounter() {
-    return this.counter;
+  getRowCount() {
+    return this.rowCount;
   }
 
   // For use in cases where the database generates a single column containing a serialized JSON reprensentation of the row.
   
   async _transform (data,encoding,callback) {
-    this.counter++;
+    this.rowCount++;
 	if (!Array.isArray(data)) {
 	  data = Object.values(data)
 	}

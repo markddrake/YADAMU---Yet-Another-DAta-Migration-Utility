@@ -5,22 +5,21 @@ const { performance } = require('perf_hooks');
 const Yadamu = require('../../common/yadamu.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
-const {BatchInsertError} = require('../../common/yadamuError.js')
 
-class S3Writer extends YadamuWriter {
+class JSONWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
-    super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
-	this.buffer = Buffer.allocUnsafe(this.dbi.CHUNK_SIZE);
+  constructor(dbi,tableName,ddlComplete,tableIdx,status,yadamuLogger) {
+	super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
+	this.startTable = tableIdx === 0 ? `"${tableName}":[` :  `,"${tableName}":[`
+	this.rowSeperator = '';
   }
-  
+        
   setTableInfo(tableName) {
-    super.setTableInfo(tableName)
+	super.setTableInfo(tableName)
     this.insertMode = 'JSON';    
     if (this.dbi.tableMappings && this.dbi.tableMappings.hasOwnProperty(tableName)) {
 	  tableName = this.dbi.tableMappings[tableName].tableName
 	}
-	this.offset = 0;
 
     this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
@@ -39,6 +38,15 @@ class S3Writer extends YadamuWriter {
             return (row,idx)  => {
 			  if (Buffer.isBuffer(row[idx])) {
 			    row[idx] = row[idx].toString('hex')
+			  }
+			}
+          }
+          if (this.SPATIAL_FORMAT.endsWith('GeoJSON')) {
+            return (row,idx)  => {
+			  if (typeof row[idx] === 'string') {
+				try {
+			      row[idx] = JSON.parse(row[idx])
+				} catch(e) {}
 			  }
 			}
           }
@@ -106,83 +114,49 @@ class S3Writer extends YadamuWriter {
     }
   }
   
-  startOuterArray() {
-    this.startChar = '['
-  }  
-  
+  beginTable() {
+	this.push(this.startTable)  
+  }
+
   async initialize(tableName) {
 	await super.initialize(tableName)
-	this.outputStream = this.dbi.getFileOutputStream(tableName);
-	this.startOuterArray();
+	this.beginTable();
   }
-	   
+  
+  batchComplete() {
+    return false
+  }
+  
+  commitWork(rowCount) {
+    return false;
+  }
+  
+  formatRow(row) {
+    return `${this.rowSeperator}${JSON.stringify(row)}`
+  }
+
   cacheRow(row) {
-	  
     this.rowTransformation(row)
-	this.batch.push(row);	
-	this.rowCounters.cached++
-	return this.skipTable;
+    this.push(this.formatRow(row));
+	this.rowSeperator = ','
+    this.rowCounters.committed++;
   }
 
-  async writeBatch() {
-	  
-	// Write Batch in 5MB Chunks
-    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],`writeBatch(${this.batch.length})`)
-	
-	for (const row of this.batch) {
-	  const chunk = Buffer.from(this.startChar + JSON.stringify(row))
-      if (this.offset + chunk.length < this.dbi.CHUNK_SIZE) {
-        this.offset+= chunk.copy(this.buffer,this.offset,0)
-  	    this.rowCounters.written++
-		this.startChar = ','
-	  }
-      else {
-        // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),this.rowCounters.written],`upload(${this.offset})`)
-		this.outputStream.write(this.buffer.slice(0,this.offset),undefined,() => {
-		  this.rowCounters.committed = this.rowCounters.written;
-		  if (this.reportCommits) {
-	        this.yadamuLogger.info([`${this.tableInfo.tableName}`],`Rows uploaded: ${this.rowCounters.committed}.`);
-		  }
-	    })
-    	this.buffer = Buffer.allocUnsafe(this.dbi.CHUNK_SIZE);	
-  	    this.offset = 0
-		this.offset+= chunk.copy(this.buffer,this.offset,0)
-  	    this.rowCounters.written++
-		this.startChar = ','
-	  }
-    }
-	
-	this.batch.length = 0;
-    this.rowCounters.cached = 0;
-	return this.skipTable;
+  endTable() {
+	this.push(']')
+  }
+  
+  finalize(callback) {
+	this.endTable();
+    super.finalize();	
+  }
 
-  }
-    
-  // Define dummy transaction Management functions to prevent counters from begin reset. 
-  
-  async beginTransaction() {}
-  async commitTransaction() {}
-  async rollbackTransaction() {}
-  
-  async finalizeBatch() {
-  	if (this.rowCounters.received === 0) {
-      this.offset+= this.buffer.write('[',this.offset);
-    }	  
-    this.offset+= this.buffer.write(']',this.offset)
-  } 
-  
-  async finalize() {
-	await super.finalize();
-	this.finalizeBatch()
-    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),this.rowCounters.written],`upload(${this.offset})`)
-	await new Promise((resolve,reject) => {
-      this.outputStream.end(this.buffer.slice(0,this.offset),undefined,() => {
-		this.rowCounters.committed = this.rowCounters.written;
-		resolve() })
-	})
-	this.offset = 0
-    this.endTime = performance.now()
-  }
+  async writeBatch /* OVERRIDE */ () {}
+
+  async commitTransaction() { /* OVERRIDE */ }
+
+  async rollbackTransaction() { /* OVERRIDE */ }
+
 }
 
-module.exports = S3Writer;
+module.exports = JSONWriter;

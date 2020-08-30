@@ -1,29 +1,41 @@
-"use strict" 
+"use strict"
 
 const { Transform } = require('stream');
-const Readable = require('stream').Readable;
-// const clarinet = require('clarinet');
-const clarinet = require('../../clarinet/clarinet.js');
 const { performance } = require('perf_hooks');
 
+const Parser = require('../../clarinet/clarinet.js');
+
 class JSONParser extends Transform {
-  
-  constructor(yadamuLogger, mode, path, options) {
+ 
+  constructor(yadamuLogger, mode, exportFilePath) {
 
     super({objectMode: true });  
-   
-    this.mode = mode;
-  
-	this.rowsRead = 0;
-	this.startTime = undefined;
-	this.endTime = undefined;
-	
-    this.yadamuLogger = yadamuLogger;
 
-    this.parser = clarinet.createStream();
+    this.yadamuLogger = yadamuLogger;
+    this.mode = mode;
+	this.exportFilePath = exportFilePath
+	
+	this.parser = Parser.createStream()
+  
+    this.tableList  = new Set();
+    this.objectStack = [];
+    this.dataPhase = false;     
     
-    this.parser.once('error',(err) => {
-      yadamuLogger.handleException([`JSON_PARSER`,`Invalid JSON Document`,`"${path}"`],err)
+    this.currentObject = undefined;
+    this.chunks = [];
+
+    this.jDepth = 0; 
+	
+	// Register for Parser Events.. The Parser events are used to create the objects that are 'pushed' out of this stream.
+	
+    this.registerEvents(this.parser)
+	
+  }
+
+  registerEvents(parser) {
+	
+    parser.once('error',(err) => {
+      this.yadamuLogger.handleException([`JSON_PARSER`,`JSON Parsing Error`,`"${this.exportFilePath}"`],err)
 	  // How to stop the parser..
 	  // this.parser.destroy(err)  
 	  this.destroy(err);
@@ -31,8 +43,13 @@ class JSONParser extends Transform {
 	  // Swallow any further errors raised by the Parser
 	  this.parser.on('error',(err) => {});
     })
+
+    parser.on('end',(key) => {
+	  console.log('That\'s all folks');
+	  this.endOfFile();
+	})
     
-    this.parser.on('key',(key) => {
+    parser.on('key',(key) => {
       // this.yadamuLogger.trace([`${this.constructor.name}.onKey()`,`${this.jDepth}`,`"${key}"`],``);
       
       switch (this.jDepth){
@@ -43,10 +60,7 @@ class JSONParser extends Transform {
           break;
         case 2:
           if (this.dataPhase) {
-            this.currentTable = key;                
-            this.push({ table : key});
-			this.startTime = performance.now();
-			this.rowsRead = 0;
+			this.startTable(key)
           }
           break;
         default:
@@ -56,7 +70,7 @@ class JSONParser extends Transform {
       this.currentObject = key;
     });
 
-    this.parser.on('openobject',(key) => {
+    parser.on('openobject',(key) => {
       // this.yadamuLogger.trace([`${this.constructor.name}.onOpenObject()`,`${this.jDepth}`,`"${key}"`],`ObjectStack:${this.objectStack}\n`);      
       
       if (this.jDepth > 0) {
@@ -75,10 +89,7 @@ class JSONParser extends Transform {
           break;
         case 1:
           if ((this.dataPhase) && (key != undefined)) {
-            this.currentTable = key; 
-            this.push({ table : key});
-			this.startTime = performance.now();
-			this.rowsRead = 0;
+   			this.startTable(key)
           }
           break;
         default:
@@ -92,7 +103,7 @@ class JSONParser extends Transform {
       }
     });
 
-    this.parser.on('openarray',() => {
+    parser.on('openarray',() => {
       // this.yadamuLogger.trace([`${this.constructor.name}.onOpenArray()`,`${this.jDepth}`],'ObjectStack: ${this.objectStack}`);
       if (this.jDepth > 0) {
         this.objectStack.push(this.currentObject);
@@ -102,11 +113,11 @@ class JSONParser extends Transform {
     });
 
 
-    this.parser.on('valuechunk',(v) => {
+    parser.on('valuechunk',(v) => {
       this.chunks.push(v);  
     });
        
-    this.parser.on('value',(v) => {
+    parser.on('value',(v) => {
       // this.yadamuLogger.trace([`${this.constructor.name}.onvalue()`,`${this.jDepth}`],`ObjectStack: ${this.objectStack}\n`);        
       if (this.chunks.length > 0) {
         this.chunks.push(v);
@@ -126,13 +137,13 @@ class JSONParser extends Transform {
       }
     });
       
-    this.parser.on('closeobject',() => {
+    parser.on('closeobject',() => {
       // this.yadamuLogger.trace([`${this.constructor.name}.onCloseObject()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}\nCurrentObject: ${this.currentObject}`);           
       this.jDepth--;
 
       switch (this.jDepth){
 		case 0:
-          this.push({eof:true});
+          this.endOfFile();
           break;
         case 1:
           // Push the completed first level object/array downstream. Replace the current top level object with an empty object of the same type.
@@ -146,7 +157,7 @@ class JSONParser extends Transform {
           }
           else {
 		    if ((this.mode !== 'DATA_ONLY') || (key !== 'ddl')) {
- 		      this.push({[key]: this.currentObject});
+		      this.nextObject(key)
 		    }
           }
           this.currentObject = {};
@@ -171,7 +182,7 @@ class JSONParser extends Transform {
       }
     });
    
-    this.parser.on('closearray',() => {
+    parser.on('closearray',() => {
       // this.yadamuLogger.trace([`${this.constructor.name}.onclosearray()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}.\nCurrentObject:${this.currentObject}`);          
       this.jDepth--;
 
@@ -179,7 +190,7 @@ class JSONParser extends Transform {
 
       switch (this.jDepth){
 		case 0:
-          this.push({eof:true});
+          this.endOfFile()
 		  break;
         case 1:
           // Push the completed first level object/array downstream. Replace the current top level object with an empty object of the same type.
@@ -192,17 +203,14 @@ class JSONParser extends Transform {
           break;
         case 2:
           if (this.dataPhase) {
-			this.endTime = performance.now();
-			const tableReadStatistics =  {tableName: this.currentTable, rowsRead: this.rowsRead, pipeStartTime: this.startTime, readerEndTime: this.endTime, parserEndTime: this.endTime, copyFailed: false}
-		    this.push({eod: tableReadStatistics})
-            this.tableList.delete(this.currentTable);
+			this.endTable()
           }
           break;
         case 3:
           if (this.dataPhase) {
-            this.push({ data : this.currentObject});
-			this.rowsRead++;
-            skipObject = true;
+            // this.push({ data : this.currentObject});
+			this.nextRow(this.currentObject)
+			skipObject = true;
           }
       }
 
@@ -224,37 +232,51 @@ class JSONParser extends Transform {
         }
         this.currentObject = parentObject;
       }   
-    });  
-   
-   
-    this.tableList  = new Set();
-    this.objectStack = [];
-    this.dataPhase = false;     
-    
-    this.currentObject = undefined;
-    this.chunks = [];
-
-    this.jDepth = 0; 
+    });     
   }     
-     
 
-  checkState() {
-    if (this.tableList.size === 0) {
-      return false;
-    }
-    else {
-      this.tableList.forEach((table) => {
-        this.yadamuLogger.warning([`${this.constructor.name}`,`"${table}"`],`No records found - Possible corrupt or truncated import file.\n`);
-      })
-      return true;
-    }
-  };
-   
   _transform(data,enc,callback) {
     this.parser.write(data);
     callback();
   };
 
+  async nextObject(name) {
+    // this.yadamuLogger.trace([this.constructor.name,name],'nextObject()')
+    this.push({[name]: this.currentObject})
+  }
+  
+  async startTable(tableName) {
+    try {
+      // this.yadamuLogger.trace([this.constructor.name,tableName],'startTable()')
+	  this.currentTable = tableName
+	  this.readerStartTime = performance.now();
+	  this.push({table: tableName})
+    } catch(e) {
+	  this.yadamuLogger.handleException(['JSONParser','START_TABLE',tableName],e)
+	}
+  }
+  
+  endTable() {
+    // this.yadamuLogger.trace([this.constructor.name,this.currentTable],'endTable()')
+    this.tableList.delete(this.currentTable);
+	this.push({
+      eod: {
+	    startTime : this.readerStartTime
+	  , endTime   : performance.now()
+	  }
+	})
+  } 
+  
+  nextRow(data) {
+	// this.yadamuLogger.trace([this.constructor.name,this.currentTable],'nextRow()')
+    this.push({data:data});
+  }
+  
+  endOfFile() {
+	// this.yadamuLogger.trace([this.constructor.name],'eof()')
+	this.push({eof: true})
+  }
+  
 }
-
-module.exports = JSONParser;
+   
+module.exports = JSONParser

@@ -16,9 +16,7 @@ class PostgresQA extends PostgresDBI {
     async recreateSchema() {
       try {
         const dropSchema = `drop schema if exists "${this.parameters.TO_USER}" cascade`;
-        if (this.status.sqlTrace) {
-          this.status.sqlTrace.write(`${dropSchema};\n--\n`)
-        }
+        this.status.sqlTrace.write(`${dropSchema};\n--\n`)
         await this.executeSQL(dropSchema);      
       } catch (e) {
         if (e.errorNum && (e.errorNum === 1918)) {

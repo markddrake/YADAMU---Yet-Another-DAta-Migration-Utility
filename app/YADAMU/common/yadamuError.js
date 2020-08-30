@@ -37,7 +37,7 @@ class ConnectionError extends UserError {
     super(cause.message);
 	this.cause = cause;
 	this.stack = cause.stack
-	this.connectionProperties = Object.assign({},connectionProperties,{password: "************"})
+	this.connectionProperties = typeof connectionProperties === 'object' ? Object.assign({},connectionProperties,{password: "************"}) : connectionProperties
   }
 }
 

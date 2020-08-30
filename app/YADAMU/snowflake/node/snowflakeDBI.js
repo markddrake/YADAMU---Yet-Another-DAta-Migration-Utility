@@ -10,6 +10,7 @@ const { performance } = require('perf_hooks');
 const snowflake = require('snowflake-sdk');
 
 const Yadamu = require('../../common/yadamu.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
 const SnowflakeConstants = require('./snowflakeConstants.js');
@@ -143,9 +144,7 @@ class SnowflakeDBI extends YadamuDBI {
 
     return new Promise((resolve,reject) => {
 
-      if (this.status.sqlTrace) {
-        this.status.sqlTrace.write(this.traceSQL(sqlStatement));
-      }
+      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
 
 	  const stack = new Error().stack;
       const sqlStartTime = performance.now();
