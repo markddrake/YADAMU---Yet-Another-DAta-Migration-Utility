@@ -8,9 +8,9 @@ const {pipeline, Readable} = require('stream')
 const Yadamu = require('../../common/yadamu.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
+const DBIConstants = require('../../common/dbiConstants.js');
 const JSONParser = require('./jsonParser.js');
 const EventStream = require('./eventStream.js');
-const TableManager = require('./tableManager.js');
 const JSONWriter = require('./jsonWriter.js');
 
 const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
@@ -161,7 +161,7 @@ class FileDBI extends YadamuDBI {
     // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
 	super.initializeImport()
 	this.outputStream = fs.createWriteStream(this.exportFilePath,{flags :"w"})
-    this.yadamuLogger.info([this.DATABASE_VENDOR],`Writing file "${this.exportFilePath}".`)
+    this.yadamuLogger.info([this.DATABASE_VENDOR],`Data written to "${this.exportFilePath}".`)
   }
   
   async initializeData() {
@@ -298,17 +298,17 @@ class FileDBI extends YadamuDBI {
   }
   
   getInputStreams() {
-    
 	const streams = []
+	this.INPUT_METRICS = DBIConstants.NEW_TIMINGS
 	const is = this.getInputStream();
 	is.once('readable',() => {
-	  this.INPUT_TIMINGS.readerStartTime = performance.now()
+	  this.INPUT_METRICS.readerStartTime = performance.now()
 	}).on('error',(err) => { 
-      this.INPUT_TIMINGS.readerEndTime = performance.now()
-	  this.INPUT_TIMINGS.readerError = err
-	  this.INPUT_TIMINGS.failed = true
+      this.INPUT_METRICS.readerEndTime = performance.now()
+	  this.INPUT_METRICS.readerError = err
+	  this.INPUT_METRICS.failed = true
     }).on('end',() => {
-      this.INPUT_TIMINGS.readerEndTime = performance.now()
+      this.INPUT_METRICS.readerEndTime = performance.now()
     })
 	streams.push(is)
 	
@@ -318,21 +318,21 @@ class FileDBI extends YadamuDBI {
 	
 	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.exportFilePath)
 	jsonParser.once('readable',() => {
-	  this.INPUT_TIMINGS.parserStartTime = performance.now()
+	  this.INPUT_METRICS.parserStartTime = performance.now()
 	}).on('error',(err) => { 
-      this.INPUT_TIMINGS.parserEndTime = performance.now()
-	  this.INPUT_TIMINGS.parserError = err
-	  this.INPUT_TIMINGS.failed = true
+      this.INPUT_METRICS.parserEndTime = performance.now()
+	  this.INPUT_METRICS.parserError = err
+	  this.INPUT_METRICS.failed = true
     })
 	streams.push(jsonParser);
 	
-	const eventStream = new EventStream(this.yadamu,this.INPUT_TIMINGS)
+	const eventStream = new EventStream(this.yadamu)
 	eventStream.on('error',(err) => { 
-      this.INPUT_TIMINGS.parserEndTime = performance.now()
-	  this.INPUT_TIMINGS.parserError = err
-	  this.INPUT_TIMINGS.failed = true
+      this.INPUT_METRICS.parserEndTime = performance.now()
+	  this.INPUT_METRICS.parserError = err
+	  this.INPUT_METRICS.failed = true
     }).on('end',() => {
-      this.INPUT_TIMINGS.parserEndTime = performance.now()
+      this.INPUT_METRICS.parserEndTime = performance.now()
     })
 	streams.push(eventStream)
 	return streams;

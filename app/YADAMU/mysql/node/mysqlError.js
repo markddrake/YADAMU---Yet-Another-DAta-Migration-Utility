@@ -1,6 +1,7 @@
 "use strict"
 
 const {DatabaseError} = require('../../common/yadamuError.js')
+const MySQLConstants = require('./mysqlConstants.js')
 
 class MySQLError extends DatabaseError {
   //  const err = new MySQLError(cause,stack,sql)
@@ -15,23 +16,32 @@ class MySQLError extends DatabaseError {
   }
   
   lostConnection() {
-	const knownErrors = ['ECONNRESET','PROTOCOL_CONNECTION_LOST','ER_CMD_CONNECTION_CLOSED','ER_SOCKET_UNEXPECTED_CLOSE','ER_GET_CONNECTION_TIMEOUT','PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR']
+    return (this.cause.code && MySQLConstants.LOST_CONNECTION_ERROR.includes(this.cause.code))
     return (this.cause.code && (knownErrors.indexOf(this.cause.code) > -1))
   }
   
   serverUnavailable() {
-	const knownErrors = ['ECONNREFUSED','ER_GET_CONNECTION_TIMEOUT']
-    return (this.cause.code && (knownErrors.indexOf(this.cause.code) > -1))
+    return (this.cause.code && MySQLConstants.SERVER_UNAVAILABLE_ERROR.includes(this.cause.code))
   }
     	     
   missingTable() {
-    return ((this.cause.code && (this.cause.code === 'ER_NO_SUCH_TABLE')) && (this.cause.errno && (this.cause.errno === 1146)) && (this.cause.sqlState && (this.cause.sqlState === '42S02')))
+    return ((this.cause.code && MySQLConstants.MISSING_TABLE_ERROR.includes(this.cause.code)) && ((this.cause.errno && (this.cause.errno === 1146)) && (this.cause.sqlState && (this.cause.sqlState === '42S02'))))
   }
 
-  spatialInsertFailed() {
+  spatialError() {
 	// MySQL could not decode spatial data in WKB format
-    return (this.cause.code && (this.cause.code === 'ER_GIS_INVALID_DATA'))
+    return (this.cause.code && MySQLConstants.SPATIAL_ERROR.includes(this.cause.code))
   }
+
+  unknownCodeError() {
+	// MySQL could not decode spatial data in WKB format
+    return (this.cause.code && MySQLConstants.UNKNOWN_CODE_ERROR.includes(this.cause.code))
+  }
+  
+  spatialErrorGeoJSON() {
+	return ((this.spatialError() || this.unknownCodeError()) && (this.cause.message.indexOf(' st_geomfromgeojson.') > -1))
+  }
+
 }
 
 module.exports = MySQLError

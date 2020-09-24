@@ -108,7 +108,7 @@ class MongoDBI extends YadamuDBI {
     super(yadamu,MongoConstants.DEFAULT_PARAMETERS)
   }
                                                              ;
-  async executeDDLImpl(collectionList) {
+  async _executeDDL(collectionList) {
     const results = await Promise.all(collectionList.map(async (collectionName) => {
       await this.createCollection(collectionName)
     }));
@@ -435,7 +435,7 @@ class MongoDBI extends YadamuDBI {
     }
   }
 
-  async reconnectImpl() {
+  async _reconnect() {
     // Default code for databases that support reconnection
     this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
 
@@ -617,7 +617,7 @@ class MongoDBI extends YadamuDBI {
   }	  
 
   roundP2(s) {
-    let result = s === 0 ? this.MIN_STRING_LENGTH :  Math.pow(2, Math.ceil(Math.log(s)/Math.log(2)));
+    let result = s === 0 ? MongoConstants.DEFAULT_STRING_LENGTH :  Math.pow(2, Math.ceil(Math.log(s)/Math.log(2)));
     result = ((result === 4096) && (s < 4001)) ? 4000 : result
     result = ((result === 32768) && (s < 32768)) ? 32767 : result
     return result
@@ -715,6 +715,7 @@ class MongoDBI extends YadamuDBI {
     	      stack =  new Error().stack
    	          const typeInformation = await collection.aggregate(aggPipeline).toArray();
 			  if (typeInformation.length > 0) {
+				// console.dir(typeInformation,{depth:null})
 				tableInfo.COLUMN_NAME_ARRAY.forEach((col,idx) => {
 				  let dataType = typeInformation[0][col].type.length == 1 ? typeInformation[0][col].type[0] : this.normalizeTypeInfo(typeInformation[0][col].type)
                   let size = typeInformation[0][col].size

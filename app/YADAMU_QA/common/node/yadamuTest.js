@@ -32,7 +32,7 @@ class YadamuTest extends Yadamu {
     this.STATUS.warningRaised = false;
     this.STATUS.errorRaised   = false;
     this.STATUS.statusMsg     = 'successfully'
-	this.timings = {}
+	this.metrics = {}
     	
 	this.reloadParameters(testParameters)
 	
@@ -40,23 +40,23 @@ class YadamuTest extends Yadamu {
   
   async doExport(dbi,file) {
     this.parameters.FILE = file
-    const timings = await super.doExport(dbi);
+    const metrics = await super.doExport(dbi);
     delete this.parameters.FILE
-    return timings;
+    return metrics;
   }
  
   async doImport(dbi,file) {
     this.parameters.FILE = file
-    const timings = await super.doImport(dbi);
+    const metrics = await super.doImport(dbi);
     delete this.parameters.FILE
-    return timings;
+    return metrics;
   }
 
   async doServerImport(dbi,file) {    
     dbi.parameters.FILE = file
-    const timings = await super.doServerImport(dbi);
+    const metrics = await super.doServerImport(dbi);
     delete this.parameters.FILE
-    return timings;
+    return metrics;
   }
 
 }  

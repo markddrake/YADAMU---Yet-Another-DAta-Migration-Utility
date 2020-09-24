@@ -472,7 +472,7 @@ class YadamuCLI {
 	  
       switch (sourceDatabase) {
          case 'mssql':
-           sourceParameters.MSSQL_SCHEMA_DB = sourceSchema.database
+           sourceParameters.YADAMU_DATABASE = sourceSchema.database
            break;
          default:
       }
@@ -482,7 +482,7 @@ class YadamuCLI {
 	  }
       switch (targetDatabase) {
          case 'mssql':
-           targetParameters.MSSQL_SCHEMA_DB = targetSchema.database
+           targetParameters.YADAMU_DATABASE = targetSchema.database
            break;
          default:
       }

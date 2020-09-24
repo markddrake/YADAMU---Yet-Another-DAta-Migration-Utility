@@ -45,7 +45,6 @@ class JSONParser extends Transform {
     })
 
     parser.on('end',(key) => {
-	  console.log('That\'s all folks');
 	  this.endOfFile();
 	})
     

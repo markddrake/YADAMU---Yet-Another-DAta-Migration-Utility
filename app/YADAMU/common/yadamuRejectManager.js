@@ -11,7 +11,7 @@ const YadamuLogger = require('./yadamuLogger.js');
 const Pushable = require('./pushable.js');
 const PassThrough = require('./yadamuPassThrough.js');
 const FileDBI = require('../file/node/fileDBI.js');
-const JSONWriter = require('../file/node/jsonWriter.js');
+const ErrorWriter = require('../file/node/errorWriter.js');
 
 class YadamuRejectManager {
   
@@ -25,11 +25,11 @@ class YadamuRejectManager {
 	
 	// Use a NULL Logger in production.
     // this.logger =  YadamuLogger.consoleLogger();
-	this.logger = YadamuLogger.NUL_LOGGER;
+	this.logger = YadamuLogger.NULL_LOGGER;
     this.fileWriter = new DBWriter(this.dbi,this.logger);
 	
 	this.recordCount = 0
-	this.jsonWriter = undefined
+	this.errorWriter = undefined
 	this.dataStream = new Pushable({objectMode: true },true);
 	this.tableIdx = 0;
   }
@@ -45,32 +45,29 @@ class YadamuRejectManager {
   buildPipeline(tableName) {
 	// console.log('buildPipeline()',tableName,this.dbi.PIPELINE_ENTRY_POINT.writableEnded)
    	this.dataStream = new Pushable({objectMode: true },true);
-    this.jsonWriter = new JSONWriter(this.dbi,tableName,undefined,this.tableIdx,{},this.logger)
-    // Disable the columnCountCheck when writing an error report
-    this.jsonWriter.checkColumnCount = () => {}
+    this.errorWriter = new ErrorWriter(this.dbi,tableName,undefined,this.tableIdx,{},this.logger)
 	this.tableIdx++
     const passThrough = new PassThrough({objectMode: false},false);
     this.currentPipeline = new Promise((resolve,reject) => {
 	  passThrough.on('end',async () => {
-  	    // console.log('PassThrough.end()',this.jsonWriter.tableName,this.dbi.PIPELINE_ENTRY_POINT.writableEnded)
+  	    // console.log('PassThrough.end()',this.errorWriter.tableName,this.dbi.PIPELINE_ENTRY_POINT.writableEnded)
    	    passThrough.unpipe(this.dbi.PIPELINE_ENTRY_POINT);
 	    this.dataStream.destroy();
-	    this.jsonWriter.destroy();
+	    this.errorWriter.destroy();
 	    passThrough.destroy();
 		resolve()
 	  })
 	}) 	
-    const newPipeline = [this.dataStream,this.jsonWriter,passThrough,this.dbi.PIPELINE_ENTRY_POINT]
+    const newPipeline = [this.dataStream,this.errorWriter,passThrough,this.dbi.PIPELINE_ENTRY_POINT]
     pipeline(newPipeline,(err,data) => {
-	  if (err) reject(err)
+	  throw err
     })
     this.dataStream.pump({table: tableName})
   }
   
-  async demolishPipeline() {
-    // console.log('demolishPipeline()',this.jsonWriter.tableName,this.dbi.PIPELINE_ENTRY_POINT.writableEnded)
+  demolishPipeline() {
+    // console.log('demolishPipeline()',this.errorWriter.tableName,this.dbi.PIPELINE_ENTRY_POINT.writableEnded)
    	this.dataStream.pump(null);
-	await this.currentPipeline;
   }
   
   async rejectRow(tableName,data) {
@@ -83,7 +80,7 @@ class YadamuRejectManager {
 	  this.buildPipeline(tableName)
     }
 	
-	if (this.jsonWriter && (tableName !== this.jsonWriter.tableName)) {
+	if (this.errorWriter && (tableName !== this.errorWriter.tableName)) {
 	  await this.demolishPipeline();
 	  this.buildPipeline(tableName)
 	}
@@ -96,8 +93,7 @@ class YadamuRejectManager {
   async close() {
 	
 	if (this.recordCount > 0) {
-	  this.demolishPipeline();
-	  await this.currentPipeline;
+	  this.dataStream.unpipe();
 	  await new Promise((resolve,reject) => {
 	    pipeline([this.dbi.END_EXPORT_FILE,this.dbi.PIPELINE_ENTRY_POINT],(err,data) => {
 		  if (err) reject(err)

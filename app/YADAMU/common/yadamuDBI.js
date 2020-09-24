@@ -16,6 +16,7 @@ const DBIConstants = require('./dbiConstants.js');
 const YadamuLibrary = require('./yadamuLibrary.js')
 const {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError} = require('./yadamuError.js');
 const DefaultParser = require('./defaultParser.js');
+const DummyWritable = require('./nullWritable.js')
 
 /*
 **
@@ -73,7 +74,10 @@ class YadamuDBI {
 
   get TABLE_FILTER()                  { return this.parameters.TABLES || [] }
   
-  get INPUT_TIMINGS()                 { return this._INPUT_TIMINGS }
+  get INPUT_METRICS()                 { return this._INPUT_METRICS }
+  set INPUT_METRICS(v) {
+	this._INPUT_METRICS =  Object.assign({},v);
+  }
   
   get ATTEMPT_RECONNECTION() {
     this._ATTEMPT_RECONNECTION = this._ATTEMPT_RECONNECTION || (() => {
@@ -113,7 +117,8 @@ class YadamuDBI {
     this.metadata = undefined;
     this.connectionProperties = this.getConnectionProperties()   
     this.connection = undefined;
-
+    this.reconnectInProgress = false
+	
     this.statementCache = undefined;
 	
 	// Track Transaction and Savepoint state.
@@ -137,15 +142,6 @@ class YadamuDBI {
     this.sqlTerminator = `\n${this.STATEMENT_TERMINATOR}\n`
 	this.firstError = undefined
 	this.latestError = undefined    
-
-    this._INPUT_TIMINGS = {
-      rowsRead        : 0
-    , pipeStartTime   : undefined
-    , readerStartTime : undefined
-    , readerEndTime   : undefined
-	, parserStartTime : undefined
-    , parserEndTime   : undefined
-    }
     
   }
   
@@ -356,9 +352,9 @@ class YadamuDBI {
 	return ((this.latestError instanceof DatabaseError) && (this.latestError.lostConnection() || this.latestError.serverUnavailable()))
   }
   
-  setCounters(counters) {
-	// Share counteres with the Writer so adjustments can be made if the connection is lost.
-    this.counters = counters
+  setMetrics(metrics) {
+	// Share metrics with the Writer so adjustments can be made if the connection is lost.
+    this.metrics = metrics
   }
   
   trackLostConnection() {
@@ -369,9 +365,9 @@ class YadamuDBI {
     **
     */
 
-  	if ((this.counters !== undefined) && (this.counters.lost  !== undefined) && (this.counters.written  !== undefined)) {
-      this.counters.lost += this.counters.written;
-	  this.counters.written = 0;
+  	if ((this.metrics !== undefined) && (this.metrics.lost  !== undefined) && (this.metrics.written  !== undefined)) {
+      this.metrics.lost += this.metrics.written;
+	  this.metrics.written = 0;
 	}
   }	  
   
@@ -524,7 +520,7 @@ class YadamuDBI {
 	}
   }
 	  
-  async executeDDLImpl(ddl) {
+  async _executeDDL(ddl) {
     await Promise.all(ddl.map(async (ddlStatement) => {
       try {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
@@ -540,7 +536,7 @@ class YadamuDBI {
   async executeDDL(ddl) {
 	if (ddl.length > 0) {
       const startTime = performance.now();
-      await this.executeDDLImpl(ddl);
+      await this._executeDDL(ddl);
       this.yadamuLogger.ddl([`${this.DATABASE_VENDOR}`],`Executed ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
 	}
   }
@@ -574,7 +570,7 @@ class YadamuDBI {
      fs.writeFileSync(this.parameters.PERFORMANCE_TRACE, `${util.format(...args)}\n`, { flag: 'a' });
   }
   
-  async getDatabaseConnectionImpl() {
+  async _getDatabaseConnection() {
     try {
       await this.createConnectionPool();
       this.connection = await this.getConnectionFromPool();
@@ -596,7 +592,7 @@ class YadamuDBI {
 	return !this.ATTEMPT_RECONNECTION
   }
     
-  async reconnectImpl() {
+  async _reconnect() {
     throw new Error(`Database Reconnection Not Implimented for ${this.DATABASE_VENDOR}`)
 	
 	// Default code for databases that support reconnection
@@ -646,12 +642,12 @@ class YadamuDBI {
 		 
 	  try {
         this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`Attemping reconnection.`);
-        await this.reconnectImpl()
+        await this._reconnect()
 	    await this.configureConnection();
 		if (transactionInProgress) {
 		  await this.beginTransaction()
 		}
-		if (savePointSet) {
+		if (this.savePointSet) {
 		  await this.createSavePoint()
 		}
         this.reconnectInProgress = false;
@@ -673,7 +669,7 @@ class YadamuDBI {
         }
       }
     }
-    // this.yadamuLogger.trace([`${this.constructor.name}.reconnectImpl()`],`Unable to re-establish connection.`)
+    // this.yadamuLogger.trace([`${this.constructor.name}._reconnect()`],`Unable to re-establish connection.`)
     this.reconnectInProgress = false;
     this.ATTEMPT_RECONNECTION = undefined
     throw connectionUnavailable 	
@@ -692,7 +688,7 @@ class YadamuDBI {
         this.connectionProperties[this.PASSWORD_KEY_NAME] = password;
       }
       try {
-        await this.getDatabaseConnectionImpl()  
+        await this._getDatabaseConnection()  
         return;
       } catch (e) {     
         switch (retryCount) {
@@ -786,7 +782,7 @@ class YadamuDBI {
 	// this.yadamuLogger.trace([this.constructor.name,`abort(${poolOptions})`],'')
 
 	// Log all errors other than lost connection errors. Do not throw otherwise underlying cause of the abort will be lost. 
-	
+				
     try {
       await this.closeConnection();
 	} catch (e) {
@@ -1084,29 +1080,30 @@ class YadamuDBI {
 
   async getInputStreams(tableInfo) {
 	const streams = []
+	this.INPUT_METRICS = DBIConstants.NEW_TIMINGS
 	const inputStream = await this.getInputStream(tableInfo)
     inputStream.once('readable',() => {
-	  this.INPUT_TIMINGS.readerStartTime = performance.now()
+	  this.INPUT_METRICS.readerStartTime = performance.now()
 	}).on('error',(err) => { 
-      this.INPUT_TIMINGS.readerEndTime = performance.now()
-	  this.INPUT_TIMINGS.readerError = err
-	  this.INPUT_TIMINGS.failed = true;
+      this.INPUT_METRICS.readerEndTime = performance.now()
+	  this.INPUT_METRICS.readerError = err
+	  this.INPUT_METRICS.failed = true;
     }).on('end',() => {
-      this.INPUT_TIMINGS.readerEndTime = performance.now()
+      this.INPUT_METRICS.readerEndTime = performance.now()
     })
 	streams.push(inputStream)
 	
 	const parser = this.createParser(tableInfo)
 	parser.once('readable',() => {
-	  this.INPUT_TIMINGS.parserStartTime = performance.now()
+	  this.INPUT_METRICS.parserStartTime = performance.now()
 	}).on('end',() => {
-	  this.INPUT_TIMINGS.parserEndTime = performance.now()
-	  this.INPUT_TIMINGS.rowsRead = parser.getRowCount()
+	  this.INPUT_METRICS.parserEndTime = performance.now()
+	  this.INPUT_METRICS.rowsRead = parser.getRowCount()
 	}).on('error',(err) => {
-	  this.INPUT_TIMINGS.parserEndTime = performance.now()
-	  this.INPUT_TIMINGS.rowsRead = parser.getRowCount()
-	  this.INPUT_TIMINGS.parserError = err
-	  this.INPUT_TIMINGS.failed = true;
+	  this.INPUT_METRICS.parserEndTime = performance.now()
+	  this.INPUT_METRICS.rowsRead = parser.getRowCount()
+	  this.INPUT_METRICS.parserError = err
+	  this.INPUT_METRICS.failed = true;
 	})
 	
 	streams.push(parser)
@@ -1121,6 +1118,7 @@ class YadamuDBI {
   
   getOutputStreams(tableName,ddlComplete) {
 	return [this.getOutputStream(tableName,ddlComplete)]
+    // return [this.getOutputStream(tableName,ddlComplete),new DummyWritable()]
   }
   
   keepAlive(rowCount) {
@@ -1138,8 +1136,6 @@ class YadamuDBI {
   reloadStatementCache() {
     if (!this.isManager()) {
       this.statementCache = this.manager.statementCache
-	  // this.tableMappings = this.manager.tableMappings
-	  // this.inverseTableMappings = this.manager.inverseTableMappings
 	}	 
   }
   

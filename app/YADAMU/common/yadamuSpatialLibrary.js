@@ -75,7 +75,7 @@ class YadamuSpatialLibrary {
     **
     ** The batch can be in one of two formats
     **
-    **   Array of Rows.Each Element in the Batch represents one row. The element consists of an array of column values.
+    **   Array of Rows. Each Element in the Batch represents one row. The element consists of an array of column values.
     **   Array of Columns  The batch consists of a single flat array of values. The first 'n' elements, map to the first row, the next 'n' elements map to the second row.
     **
     */

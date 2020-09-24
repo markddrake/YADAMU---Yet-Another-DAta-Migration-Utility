@@ -2,11 +2,11 @@
 
 const path=require('path');
 
-class DummyOutputStream {
+class NullWriter {
 
-  static get DUMMY_OUTPUT_STREAM() {
-    this._DUMMY_OUTPUT_STREAM = this._DUMMY_OUTPUT_STREAM || new DummyOutputStream()
-	return this._DUMMY_OUTPUT_STREAM;
+  static get NULL_WRITER() {
+    this._NULL_WRITER = this._NULL_WRITER || new NullWriter()
+	return this._NULL_WRITER;
   }
 
   constructor() {
@@ -23,4 +23,4 @@ class DummyOutputStream {
  
 }
 
-module.exports = DummyOutputStream
+module.exports = NullWriter

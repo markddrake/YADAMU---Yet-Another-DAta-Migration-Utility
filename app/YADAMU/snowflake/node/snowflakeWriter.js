@@ -4,7 +4,7 @@ const { performance } = require('perf_hooks');
 
 const Yadamu = require('../../common/yadamu.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
-const DummyOutputStream = require('../../common/dummyOutputStream.js');
+const NullWriter = require('../../common/nullWriter.js');
 const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 const {BatchInsertError} = require('../../common/yadamuError.js')
@@ -75,52 +75,51 @@ class SnowflakeWriter extends YadamuWriter {
   	  this.batch.push(row);
     }
 	
-    this.rowCounters.cached++
+    this.metrics.cached++
 	return this.skipTable
 	
   }
   
-  reportBatchError(operation,cause) {
+  reportBatchError(batch,operation,cause) {
 	if (this.tableInfo.parserRequired) {
-      super.reportBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
+      super.reportBatchError(operation,cause,batch.slice(0,this.tableInfo.columnCount),batch.slice(batch.length-this.tableInfo.columnCount,batch.length))
 	}
 	else {
-   	  super.reportBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+   	  super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
 	}
   }
   
   recodeSpatialColumns(batch,msg) {
-    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`INSERT MANY`,this.tableInfo.parserRequired,this.rowCounters.cached,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
+    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`INSERT MANY`,this.tableInfo.parserRequired,this.metrics.cached,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
     YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch,!this.tableInfo.parserRequired)
   }  
 
-  async writeBatch() {
+  async _writeBatch(batch,rowCount) {
 
     // Snowflake's handling of WKB appears a little 'flaky' :)
     if (this.tableInfo.targetDataTypes.includes('GEOGRAPHY')) {
-      this.recodeSpatialColumns(this.batch,`Avoiding known 'WKB' issues.`)
+      this.recodeSpatialColumns(batch,`Avoiding known 'WKB' issues.`)
     }
       
 	let sqlStatement
-    this.rowCounters.batchCount++;
+    this.metrics.batchCount++;
     if (this.tableInfo.insertMode === 'Batch') {
       try {
 		sqlStatement = this.tableInfo.dml
 		if (this.tableInfo.parserRequired) {
-		  sqlStatement = `${sqlStatement}  ${new Array(this.rowCounters.cached).fill(0).map(() => {return this.tableInfo.valuesBlock}).join(',')}`
+		  sqlStatement = `${sqlStatement}  ${new Array(rowCount).fill(0).map(() => {return this.tableInfo.valuesBlock}).join(',')}`
 		}
-		const result = await this.dbi.executeSQL(sqlStatement,this.batch);
+		const result = await this.dbi.executeSQL(sqlStatement,batch);
         this.endTime = performance.now();
-        this.batch.length = 0;
-        this.rowCounters.written += this.rowCounters.cached;
-        this.rowCounters.cached = 0;
+        this.metrics.written += rowCount;
+        this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
 		this.reportBatchError(`INSERT MANY`,cause)
 		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
         /*
         if (cause.spatialInsertFailed()) {	
-		  this.recodeSpatialColumns(this.batch,cause.message)
+		  this.recodeSpatialColumns(batch,cause.message)
 		}
         */
 		this.tableInfo.insertMode = 'BinarySplit'   
@@ -153,12 +152,12 @@ class SnowflakeWriter extends YadamuWriter {
 
     let nextBatch
     let rowNumbers
-    const batches = [this.batch]
-    const rowTracking = [Array.from(Array(this.rowCounters.cached).keys())]
+    const batches = [batch]
+    const rowTracking = [Array.from(Array(rowCount).keys())]
     let operationCount = 0
 		
 	if (this.tableInfo.parserRequired) {
-	  // console.log('Snowflake Writer','Variant',this.batch.slice(0,this.tableInfo.columnNames.length))
+	  // console.log('Snowflake Writer','Variant',batch.slice(0,this.tableInfo.columnNames.length))
       let batchRowCount
 	  const columnCount = this.tableInfo.columnNames.length
 	  while (batches.length > 0) {
@@ -172,20 +171,20 @@ class SnowflakeWriter extends YadamuWriter {
           // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,'BINARY',this.tableInfo.parserRequired,rowNumbers[0],rowNumbers[rowNumbers.length-1],batchRowCount],`Operation ${operationCount}`)
           const result = await this.dbi.executeSQL(sqlStatement,nextBatch);
 		  sqlExectionTime+= performance.now() - opStartTime
-          this.status.sqlTrace = DummyOutputStream.DUMMY_OUTPUT_STREAM
-	      this.rowCounters.written += batchRowCount
+          this.status.sqlTrace = NullWriter.NULL_WRITER
+	      this.metrics.written += batchRowCount
 	    } catch (cause) {
-		  this.status.sqlTrace = DummyOutputStream.DUMMY_OUTPUT_STREAM
+		  this.status.sqlTrace = NullWriter.NULL_WRITER
 	      if (batchRowCount > 1) {
             batches.push(nextBatch.splice(0,(Math.ceil(batchRowCount/2)*columnCount)),nextBatch)			  
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
 		  }
 		  else {
 			if (cause.spatialInsertFailed()) {
-		      await this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch)
+		      this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch)
 			}
 			else {
-              await this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch)
+              this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch)
 			}
             if (this.skipTable) {
               break;
@@ -205,20 +204,20 @@ class SnowflakeWriter extends YadamuWriter {
        	  sqlStatement = this.tableInfo.dml
 		  const result = await this.dbi.executeSQL(sqlStatement,nextBatch)
 		  sqlExectionTime+= performance.now() - opStartTime
-          this.status.sqlTrace = DummyOutputStream.DUMMY_OUTPUT_STREAM
-	      this.rowCounters.written += nextBatch.length
+          this.status.sqlTrace = NullWriter.NULL_WRITER
+	      this.metrics.written += nextBatch.length
         } catch (cause) {
-          this.status.sqlTrace = DummyOutputStream.DUMMY_OUTPUT_STREAM
+          this.status.sqlTrace = NullWriter.NULL_WRITER
 	      if (nextBatch.length > 1) {
             batches.push(nextBatch.splice(0,Math.ceil(nextBatch.length/2)),nextBatch)
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
 		  }
 		  else {
 			if (cause.spatialInsertFailed()) {
-		      await this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch)
+		      this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch)
 			}
 			else {
-              await this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch)
+              this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch)
 			}
             if (this.skipTable) {
               break;
@@ -228,13 +227,11 @@ class SnowflakeWriter extends YadamuWriter {
       }
     }
 
-    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,'BINARY',this.tableInfo.parserRequired,this.rowCounters.cached,this.rowCounters.skipped],`Binary insert required ${operationCount} operations`)
-	this.status.sqlTrace = sqlTrace
-    
+    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,'BINARY',this.tableInfo.parserRequired,rowCount,this.metrics.skipped],`Binary insert required ${operationCount} operations`)
+	this.status.sqlTrace = sqlTrace    
     this.endTime = performance.now();
-    this.batch.length = 0;
-    this.rowCounters.cached = 0;
-	return this.skipTable
+    this.releaseBatch(batch)
+    return this.skipTable
   }
 }
 

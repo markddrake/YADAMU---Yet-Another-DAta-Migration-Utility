@@ -1,5 +1,7 @@
 "use strict"
 
+const oracledb = require('oracledb');
+
 const YadamuConstants = require('../../common/yadamuConstants.js');
 
 class OracleConstants {
@@ -86,7 +88,55 @@ class OracleConstants {
     })
     return this._DATA_TYPE_STRING_LENGTH
   }
+
+
   
+  static get BIND_TYPES() {
+    this._BIND_TYPES = this._BIND_TYPES || Object.freeze({
+                                             [oracledb.BLOB]    : "BLOB"
+                                           , [oracledb.BUFFER]  : "BUFFER"
+                                           , [oracledb.CLOB]    : "CLOB"
+                                           , [oracledb.CURSOR]  : "CURSOR"
+                                           , [oracledb.DATE]    : "DATE"
+                                           , [oracledb.DEFAULT] : "DEFAULT"
+                                           , [oracledb.NCLOB]   : "NCLOB"
+                                           , [oracledb.NUMBER]  : "NUMBER"
+                                           , [oracledb.STRING]  : "STRING"
+                                           })
+    return this._BIND_TYPES
+  }
+  
+  static NOT_CONNECTED()       { return 'DPI-1010:' }
+  
+  static INVALID_POOL()        { return 'NJS-002:' }
+  
+  static INVALID_CONNECTION()  { return 'NJS-003:' }
+  
+  static get MISSING_TABLE_ERROR() {
+    this._MISSING_TABLE_ERROR = this._MISSING_TABLE_ERROR || Object.freeze([942])
+    return this._MISSING_TABLE_ERROR
+  }
+
+  static get LOST_CONNECTION_ERROR() {
+    this._LOST_CONNECTION_ERROR = this._LOST_CONNECTION_ERROR || Object.freeze([3113,3114,3135,28,1012])
+    return this._LOST_CONNECTION_ERROR
+  }
+
+  static get SERVER_UNAVAILABLE_ERROR() {
+    this._SERVER_UNAVAILABLE_ERROR = this._SERVER_UNAVAILABLE_ERROR || Object.freeze([1109,12514,12528,12537,12541])
+    return this._SERVER_UNAVAILABLE_ERROR
+  }
+
+  static get SPATIAL_ERROR() {
+    this._SPATIAL_ERROR = this._SPATIAL_ERROR || Object.freeze([29532])
+    return this._SPATIAL_ERROR
+  }
+
+  static get JSON_PARSING_ERROR() {
+    this._JSON_PARSING_ERROR = this._JSON_PARSING_ERROR || Object.freeze([40441])
+    return this._JSON_PARSING_ERROR
+  }
+
 }
 
 module.exports = OracleConstants// Driver defined constants

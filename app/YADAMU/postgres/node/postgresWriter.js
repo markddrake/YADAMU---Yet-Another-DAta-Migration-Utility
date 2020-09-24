@@ -86,18 +86,19 @@ class PostgresWriter extends YadamuWriter {
 	
     this.batch.push(...row);
 	
-    this.rowCounters.cached++
+    this.metrics.cached++
 	return this.skipTable
   }
     
-  reportBatchError(operation,cause) {
+  reportBatchError(batch,operation,cause) {
     // Use Slice to add first and last row, rather than first and last value.
-	super.reportBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
+	super.reportBatchError(operation,cause,batch.slice(0,this.tableInfo.columnCount),batch.slice(batch.length-this.tableInfo.columnCount,batch.length))
   }
       
-  async writeBatch() {
+  async _writeBatch(batch,rowCount) {
 
-    this.rowCounters.batchCount++;
+
+    this.metrics.batchCount++;
     let repackBatch = false;
 
     if (this.insertMode === 'Batch') {
@@ -105,17 +106,16 @@ class PostgresWriter extends YadamuWriter {
       try {
         await this.dbi.createSavePoint();
         let argNumber = 1;
-        const args = Array(this.rowCounters.cached).fill(0).map(() => {return `(${this.tableInfo.insertOperators.map((operator) => {return operator.replace('$%',`$${argNumber++}`)}).join(',')})`}).join(',');
+        const args = Array(rowCount).fill(0).map(() => {return `(${this.tableInfo.insertOperators.map((operator) => {return operator.replace('$%',`$${argNumber++}`)}).join(',')})`}).join(',');
         const sqlStatement = this.tableInfo.dml + args
-		const results = await this.dbi.insertBatch(sqlStatement,this.batch);
+		const results = await this.dbi.insertBatch(sqlStatement,batch);
         this.endTime = performance.now();
         await this.dbi.releaseSavePoint();
-        this.batch.length = 0;
-		this.rowCounters.written += this.rowCounters.cached;
-        this.rowCounters.cached = 0;
+        this.metrics.written += rowCount;
+        this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
-        this.reportBatchError(`INSERT MANY`,cause)
+        this.reportBatchError(batch,`INSERT MANY`,cause)
         await this.dbi.restoreSavePoint(cause);
 		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
@@ -126,16 +126,17 @@ class PostgresWriter extends YadamuWriter {
     let argNumber = 1;
     const args = Array(1).fill(0).map(() => {return `(${this.tableInfo.insertOperators.map((operator) => {return operator.replace('$%',`$${argNumber++}`)}).join(',')})`}).join(',');
     const sqlStatement = this.tableInfo.dml + args
-    for (let row =0; row < this.rowCounters.cached; row++) {
-      const nextRow = repackBatch ?  this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
+	for (let row = 0; row < rowCount; row++) {
+	  const offset = row * this.tableInfo.columnCount
+      const nextRow  = repackBatch ? batch.slice(offset,offset + this.tableInfo.columnCount) : batch[row]
       try {
         this.dbi.createSavePoint();
         const results = await this.dbi.insertBatch(sqlStatement,nextRow);
         this.dbi.releaseSavePoint();
-		this.rowCounters.written++;
+		this.metrics.written++;
       } catch(cause) {
         this.dbi.restoreSavePoint(cause);
-        await this.handleIterativeError(`INSERT ONE`,cause,row,nextRow);
+        this.handleIterativeError(`INSERT ONE`,cause,row,nextRow);
         if (this.skipTable) {
           break;
         }
@@ -143,8 +144,7 @@ class PostgresWriter extends YadamuWriter {
     }
 
     this.endTime = performance.now();
-    this.batch.length = 0;
-	this.rowCounters.cached = 0;
+    this.releaseBatch(batch)
     return this.skipTable   
   }
 }

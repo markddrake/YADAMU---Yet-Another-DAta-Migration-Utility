@@ -4,26 +4,26 @@ const { Transform } = require('stream');
 const { performance } = require('perf_hooks');
 
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const DBIConstants = require('../../common/dbiConstants.js');
 
 class EventStream extends Transform {
   
-  get INPUT_TIMINGS()                 { return this._INPUT_TIMINGS }
-
-  constructor(yadamu,inputTimings) {
+  get INPUT_METRICS()                 { return this._INPUT_METRICS }
+  set INPUT_METRICS(v) {
+	this._INPUT_METRICS =  Object.assign({},v);
+  }
+  constructor(yadamu) {
 
     super({objectMode: true });  
 	this.yadamu = yadamu
     this.yadamuLogger = this.yadamu.LOGGER
 	this.writerComplete = true
 	this.rowsRead = 0
-	this._INPUT_TIMINGS = inputTimings
-		
   }
 
   pipe(outputStream,options) {
 	// Cache the target outputStream
   	// this.yadamuLogger.trace([this.constructor.name,outputStream.constructor.name,outputStream.tableName],'Attaching pipe')
-	this.INPUT_TIMINGS.pipeStartTime = performance.now();
 	this.outputStream = outputStream
 	if (this.dbWriter === undefined) {
 	  this.dbWriter = outputStream;
@@ -34,7 +34,7 @@ class EventStream extends Transform {
   createWriter(tableName) {
     const writer = this.dbWriter.dbi.getOutputStream(tableName,this.dbWriter.ddlComplete)
     // Propigate Error event Handlers from dbWriter to writer
-    this.dbWriter.listeners('error').forEach((f) => {writer.on('error',f)});
+    this.dbWriter.listeners('error').forEach((f) => {writer.on('error',f)});	
 	return writer
   }
   
@@ -112,17 +112,25 @@ class EventStream extends Transform {
         case 'table':
 	  	  // Attach new Writer - Couldnot get this work with 'drain' for some reason
 		  this.unpipe(this.outputStream);
+		  this.INPUT_METRICS = DBIConstants.NEW_TIMINGS
 	  	  const writer = await this.createWriter(data.table)
+		  writer.setReaderMetrics(this.INPUT_METRICS)
 	  	  this.pipe(writer) 
 	  	  this.push(data)
-   	      this.INPUT_TIMINGS.parserStartTime = performance.now();
+   	      this.INPUT_METRICS.parserStartTime = performance.now();
 	      this.rowsRead = 0;
 	  	  this.createTransformations(data.table)
 	      break;
         case 'eod':
 		  // Simulate an 'end' condition and report results for the current table.
 		  const outputStream = this.outputStream
-	      const allDataReceived = new Promise((resolve,reject) => {
+          outputStream.on('error',(err) => { console.log(err) })
+          this.INPUT_METRICS.rowsRead = this.rowsRead;
+		  this.INPUT_METRICS.pipeStartTime = data.eod.startTime
+		  this.INPUT_METRICS.readerStartTime = data.eod.startTime;
+		  this.INPUT_METRICS.readerEndTime = data.eod.endTime;
+	      this.INPUT_METRICS.parserEndTime = performance.now();
+      	  const allDataReceived = new Promise((resolve,reject) => {
 	        outputStream.once('allDataReceived',() => {
 	          // this.yadamuLogger.trace([this.constructor.name,outputStream.constructor.name,outputStream.tableName,'ON'],'allDataReceived')
 			  resolve()
@@ -134,22 +142,12 @@ class EventStream extends Transform {
 	  	  await allDataReceived;
   		  // this.yadamuLogger.trace([this.constructor.name,outputStream.constructor.name,outputStream.tableName],'Drained')
 
-          // Once the writer acknowledges receipt of all data it can be closed.
-		  const writerComplete = new Promise((resolve,reject) => {
-            outputStream.on('close',() => {
-		      // Get the Reader Start and End Time from the EOD message.
-              this.INPUT_TIMINGS.rowsRead = this.rowsRead;
-			  this.INPUT_TIMINGS.readerStartTime = data.eod.startTime;
-			  this.INPUT_TIMINGS.readerEndTime = data.eod.endTime;
-			  this.INPUT_TIMINGS.parserEndTime = performance.now();
-			  outputStream.reportPerformance(this.INPUT_TIMINGS);
-      		  // this.yadamuLogger.trace([this.constructor.name,outputStream.constructor.name,outputStream.tableName],'Closed')		
-			  resolve()
-			})
-          })
-	  	  outputStream.end(null,null,() => {outputStream.destroy()})
-          // Ensure all records from current table have been written and committed before starting next table. This prevents transaction logic from getting out of Sync.
-		  await writerComplete
+          await new Promise((resolve,reject) => {
+	        outputStream.end(undefined,undefined,(err) => {
+	          resolve()
+	        })
+	      })
+          outputStream.destroy()
 		  break;
 	    case 'eof':
 		  this.pipe(this.dbWriter); 

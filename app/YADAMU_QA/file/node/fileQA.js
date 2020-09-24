@@ -80,12 +80,12 @@ class FileQA extends FileDBI {
     })
   }
    
-  remapTableNames(timings,mappings) {
+  remapTableNames(metrics,mappings) {
         
     Object.keys(mappings).forEach((table) => {
-      if (timings[table] && (mappings[table].tableName != table)) {
-        timings[mappings[table].tableName] =  Object.assign({}, timings[table])
-        delete timings[table]
+      if (metrics[table] && (mappings[table].tableName != table)) {
+        metrics[mappings[table].tableName] =  Object.assign({}, metrics[table])
+        delete metrics[table]
       }
     })
   }
@@ -93,7 +93,7 @@ class FileQA extends FileDBI {
   async recreateSchema(target,password) {
   }        
   
-  async compareFiles(yadamuLogger,grandparent,parent,child,timings) {
+  async compareFiles(yadamuLogger,grandparent,parent,child,metrics) {
     let colSizes = [48, 18, 12, 12, 12, 12]
  
     let seperatorSize = (colSizes.length * 3) - 1;
@@ -152,7 +152,7 @@ class FileQA extends FileDBI {
     const cMetadata = await this.getContentMetadata(child);
 		
     if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
-      timings = timings.map((t) => {
+      metrics = metrics.map((t) => {
         this.makeLowerCase(t)
         return t
       });
@@ -166,10 +166,10 @@ class FileQA extends FileDBI {
 
     tables.forEach((table,idx) => {
 	  const tableName = table;
-      const tableTimings = timings[0][tableName].elapsedTime.padStart(10) 
-                         + (timings[1][tableName] ? timings[1][tableName].elapsedTime : "-1").padStart(10)
-                         + (timings[2][tableName] ? timings[2][tableName].elapsedTime : "-1").padStart(10) 
-                         + (timings[3][tableName] ? timings[3][tableName].elapsedTime : "-1").padStart(10);
+      const tableTimings = metrics[0][tableName].elapsedTime.padStart(10) 
+                         + (metrics[1][tableName] ? metrics[1][tableName].elapsedTime : "-1").padStart(10)
+                         + (metrics[2][tableName] ? metrics[2][tableName].elapsedTime : "-1").padStart(10) 
+                         + (metrics[3][tableName] ? metrics[3][tableName].elapsedTime : "-1").padStart(10);
  
       if (idx === 0) {                            
         this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 

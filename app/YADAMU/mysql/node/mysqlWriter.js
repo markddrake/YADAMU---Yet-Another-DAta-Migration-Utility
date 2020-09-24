@@ -62,8 +62,8 @@ class MySQLWriter extends YadamuWriter {
     })
   }
   
-  getStatistics()  {
-	const results = super.getStatistics()
+  getMetrics()  {
+	const results = super.getMetrics()
     results.insertMode = this.tableInfo.insertMode
  	return results;
   }
@@ -75,7 +75,7 @@ class MySQLWriter extends YadamuWriter {
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 
-    // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.rowCounters.cached],'cacheRow()')    
+    // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.metrics.cached],'cacheRow()')    
 	  
 	this.transformations.forEach((transformation,idx) => {
       if ((transformation !== null) && (row[idx] !== null)) {
@@ -92,11 +92,11 @@ class MySQLWriter extends YadamuWriter {
       this.batch.push(row)
     }
 
-    this.rowCounters.cached++
+    this.metrics.cached++
 	return this.skipTable;
   }  
 
-  async processWarnings(results) {
+  async processWarnings(batch, results) {
 
     // ### Output Records that generate warnings
 
@@ -112,7 +112,7 @@ class MySQLWriter extends YadamuWriter {
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
           if (badRow !== nextBadRow) {
             const columnOffset = (nextBadRow-1) * this.tableInfo.columnNames.length
-            const row = this.tableInfo.insertMode === 'Rows'  ? this.batch.slice(columnOffset,columnOffset +  this.tableInfo.columnNames.length) : this.batch[nextBadRow-1]
+            const row = this.tableInfo.insertMode === 'Rows'  ? batch.slice(columnOffset,columnOffset +  this.tableInfo.columnNames.length) : batch[nextBadRow-1]
 	  	    await this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,row);
             badRow = nextBadRow;
           }
@@ -121,39 +121,49 @@ class MySQLWriter extends YadamuWriter {
     }
   }
   
-  
   recodeSpatialColumns(batch,msg) {
-    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`INSERT ROWS`,this.rowCounters.cached,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
+    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`INSERT ROWS`,this.metrics.cached,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
     YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch,false)
   }  
   
-  reportBatchError(operation,cause) {
+  async retryGeoJSONAsWKT(sqlStatement,rowNumber,row) {
+    YadamuSpatialLibrary.recodeSpatialColumns('GeoJSON','WKT',this.tableInfo.targetDataTypes,row,false)
+    try {
+	  // Create a bound row by cloning the current set of binds and adding the column value.
+      sqlStatement = sqlStatement.replace(/ST_GeomFromGeoJSON\(\?\)/g,'ST_GeomFromText(?)')
+      const results = await this.dbi.executeSQL(sqlStatement,row)
+      this.metrics.written++
+    } catch (cause) {
+	  this.handleIterativeError('INSERT ONE',cause,rowNumber,row);
+    }
+  }
+  
+  reportBatchError(batch, operation,cause) {
 	if (this.tableInfo.insertMode === 'Rows') {
-      super.reportBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
+      super.reportBatchError(operation,cause,batch.slice(0,this.tableInfo.columnCount),batch.slice(batch.length-this.tableInfo.columnCount,batch.length))
 	}
 	else {
-   	  super.reportBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+   	  super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
 	}
   }
- 
-  async writeBatch() {     
   
-    this.rowCounters.batchCount++;
+  async _writeBatch(batch,rowCount) {     
+  
+    this.metrics.batchCount++;
     switch (this.tableInfo.insertMode) {
       case 'Batch':
         try {
           await this.dbi.createSavePoint();
-          const results = await this.dbi.executeSQL(this.tableInfo.dml,[this.batch]);
-          await this.processWarnings(results);
+          const results = await this.dbi.executeSQL(this.tableInfo.dml,[batch]);
+          await this.processWarnings(batch,results);
           this.endTime = performance.now();
           await this.dbi.releaseSavePoint();
-   		  this.batch.length = 0;  
-          this.rowCounters.written += this.rowCounters.cached;
-   		  this.rowCounters.cached = 0;
+   		  this.metrics.written += rowCount;
+          this.releaseBatch(batch)
           return this.skipTable
           break;  
         } catch (cause) {
-   		  this.reportBatchError(cause,'INSERT MANY',true)
+   		  this.reportBatchError(batch,'INSERT MANY',cause)
           await this.dbi.restoreSavePoint(cause);
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
           this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args
@@ -163,25 +173,24 @@ class MySQLWriter extends YadamuWriter {
 	    while (true) {
           try {
             await this.dbi.createSavePoint();    
-            const sqlStatement = `${this.tableInfo.dml} ${new Array(this.rowCounters.cached).fill(this.tableInfo.rowConstructor).join(',')}`
-            const results = await this.dbi.executeSQL(sqlStatement,this.batch);
-            await this.processWarnings(results);
+            const sqlStatement = `${this.tableInfo.dml} ${new Array(rowCount).fill(this.tableInfo.rowConstructor).join(',')}`
+            const results = await this.dbi.executeSQL(sqlStatement,batch);
+            await this.processWarnings(batch,results);
             this.endTime = performance.now();
             await this.dbi.releaseSavePoint();
-	   	    this.batch.length = 0;  
-            this.rowCounters.written += this.rowCounters.cached;
-	   	    this.rowCounters.cached = 0;
+	   	    this.metrics.written += rowCount;
+            this.releaseBatch(batch)
             return this.skipTable
           } catch (cause) {
             await this.dbi.restoreSavePoint(cause);
 			// If it's a spatial error recode the entire batch and try again.
-            if (cause.spatialInsertFailed() && !recodedBatch) {
+            if (cause.spatialError() && !recodedBatch) {
               recodedBatch = true;
-			  this.recodeSpatialColumns(this.batch,cause.message)
+			  this.recodeSpatialColumns(batch,cause.message)
 			  this.tableInfo.rowConstructor = this.tableInfo.rowConstructor.replace(/ST_GeomFromWKB\(\?\)/g,'ST_GeomFromText(?)')
 			  continue;
 		    }
-	   	    this.reportBatchError(cause,'INSERT ROWS')
+	   	    this.reportBatchError(batch,'INSERT ROWS',cause)
             this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);    
             break;			
 		  }
@@ -192,26 +201,29 @@ class MySQLWriter extends YadamuWriter {
     }     
 		
     // Batch or Rows failed, or iterative was selected.
-	
 	const sqlStatement = `${this.tableInfo.dml} ${this.tableInfo.rowConstructor}`
-	for (let row = 0; row < this.rowCounters.cached; row++) {
-      const  nextRow = this.tableInfo.insertMode === "Rows" ? this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
+	for (let row = 0; row < rowCount; row++) {
+	  const offset = row * this.tableInfo.columnCount
+      const nextRow  = batch.length > rowCount ? batch.slice(offset,offset + this.tableInfo.columnCount) : batch[row]
       try {
-        const results = await this.dbi.executeSQL(sqlStatement,nextRow)
-        await this.processWarnings(results);
-  	    this.rowCounters.written++;
+		const results = await this.dbi.executeSQL(sqlStatement,nextRow)
+        await this.processWarnings(batch,results);
+  	    this.metrics.written++;
       } catch (cause) { 
-        await this.handleIterativeError(`INSERT ONE`,cause,row,nextRow);
+	    if (cause.spatialErrorGeoJSON()) {
+		  await this.retryGeoJSONAsWKT(sqlStatement,row,nextRow)
+	    }
+		else {
+          this.handleIterativeError(`INSERT ONE`,cause,row,nextRow);
+		}
 		if (this.skipTable) {
 	      break;
 		}
       }
 	}
 
-    this.tableInfo.insertMode = 'Iterative'   
     this.endTime = performance.now();
-    this.batch.length = 0;  
-	this.rowCounters.cached = 0;
+    this.releaseBatch(batch)
     return this.skipTable 
   }
 }

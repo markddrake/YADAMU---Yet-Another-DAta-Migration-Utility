@@ -53,7 +53,7 @@ class ExampleWriter extends YadamuWriter {
 	** The default implimentation is shown below. It applies any transformation functions that have were defiend in setTableInfo andt
 	** pushes the row into an array or rows waiting to fed to a batch insert mechanism
 	**
-	** If your override this function you must ensure that this.rowCounters.cached is incremented once for each call to cache row.
+	** If your override this function you must ensure that this.metrics.cached is incremented once for each call to cache row.
 	** 
 	** Also if your solution does not cache one row in this.batch for each row processed you will probably need to override the following 
 	** functions in addtion to cache row.
@@ -71,7 +71,7 @@ class ExampleWriter extends YadamuWriter {
 	
     this.batch.push(row);
 	
-	this.rowCounters.cached++
+	this.metrics.cached++
 	return this.skipTable;
 	
 	**
@@ -81,35 +81,35 @@ class ExampleWriter extends YadamuWriter {
 
   }
     
-  reportBatchError(operation,cause) {
-   	super.reportBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+  reportBatchError(batch,operation,cause) {
+   	super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
   }
        
-  async writeBatch() {
+
+  /*
+  **
+  ** Establish a Savepoint
+  ** Attempt a batch insert operation
+  ** If the batch insert fails restore to save point and attempt an iterative (row by row) insert
+  **
+  ** The code for a simplified implementation is shown below. Is is extremely unlikely that this code would be sufficient
+  ** for a the real-world. It is important that any implementation handles incrementing and resetting metrics correctly.
+  **	
+  
+  async _writeBatch(batch,rowCount) {
 	  
-	/*
-	**
-	** Establish a Savepoint
-	** Attempt a batch insert operation
-	** If the batch insert fails restore to save point and attempt an iterative (row by row) insert
-	**
-	** The code for a simplified implementation is shown below. Is is extremely unlikely that this code would be sufficient
-	** for a the real-world. It is important that any implementation handles incrementing and resetting counters correctly.
-	**
-		
     if (this.tableInfo.insertMode === 'Batch') {
       try {    
         await this.dbi.createSavePoint();
-        const results = await this.dbi.executeSQL(this.tableInfo.dml,this.batch);
+        const results = await this.dbi.executeSQL(this.tableInfo.dml,batch);
         this.endTime = performance.now();
         await this.dbi.releaseSavePoint();
-		this.batch.length = 0;  
-        this.rowCounters.written += this.rowCounters.cached;
-		this.rowCounters.cached = 0;
+		this.metrics.written += rowCount;
+        this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
         await this.dbi.restoreSavePoint(cause);
-		this.handleBatchException(`INSERT MANY`,cause)
+		this.handleBatchException(batch,`INSERT MANY`,cause)
         this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
         
@@ -119,10 +119,10 @@ class ExampleWriter extends YadamuWriter {
     for (const row in batch) {
       try {
         const results = await this.dbi.executeSQL(this.tableInfo.dml,batch[row]);
-   	    this.rowCounters.written++
+   	    this.metrics.written++
       } catch (cause) {
         const errInfo = {}
-        await this.handleIterativeError(`INSERT ONE`,cause,row,batch[row],errInfo);
+        this.handleIterativeError(`INSERT ONE`,cause,row,batch[row],errInfo);
         if (this.skipTable) {
           break;
         }
@@ -130,14 +130,12 @@ class ExampleWriter extends YadamuWriter {
     }     
    
     this.endTime = performance.now();
-    this.batch.length = 0;
-    this.rowCounters.cached = 0;
+    this.releaseBatch(batch)
     return this.skipTable     
-	
-	*/
-	
-	return super.writeBatch)()
   }
+  
+  */
+  
 }
 
 module.exports = ExampleWriter;

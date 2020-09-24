@@ -16,7 +16,7 @@ const DBWriter = require('./dbWriter.js');
 const DBReaderParallel = require('./dbReaderParallel.js');
 
 const YadamuConstants = require('./yadamuConstants.js');
-const DummyOutputStream = require('./dummyOutputStream.js');
+const NullWriter = require('./nullWriter.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const {YadamuError, UserError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
@@ -104,7 +104,7 @@ class Yadamu {
     this.loadParameters(parameters)
     this.processParameters();    
 	
-	this.timings = {}
+	this.metrics = {}
 	
 	// Use an object to pass the prompt to ensure changes to prompt are picked up insde the writeToOutput function closure()
 
@@ -124,17 +124,17 @@ class Yadamu {
 
   }
   
-  recordTimings(timings) {
-	Object.assign(this.timings,timings)
+  recordMetrics(metrics) {
+	Object.assign(this.metrics,metrics)
   }
   
   reportStatus(status,yadamuLogger) {
 
     const endTime = performance.now();
       
-	const counters = yadamuLogger.getCounters();
-    status.statusMsg = status.warningRaised === true ? `with ${counters.warnings} warnings` : status.statusMsg;
-    status.statusMsg = status.errorRaised === true ? `with ${counters.errors} errors and ${counters.warnings} warnings`  : status.statusMsg;  
+	const metrics = yadamuLogger.getMetrics();
+    status.statusMsg = status.warningRaised === true ? `with ${metrics.warnings} warnings` : status.statusMsg;
+    status.statusMsg = status.errorRaised === true ? `with ${metrics.errors} errors and ${metrics.warnings} warnings`  : status.statusMsg;  
   
     const terminationArgs = [`YADAMU`,`${status.operation}`]
     const terminationMessage = `Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}.`
@@ -150,14 +150,14 @@ class Yadamu {
         yadamuLogger.info(terminationArgs,terminationMessage)
     }
 
-    if (!yadamuLogger.IS_CONSOLE_LOGGER) {
+    if (yadamuLogger.FILE_LOGGER) {
       console.log(`${new Date().toISOString()}[YADAMU][${status.operation}]: Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(endTime - status.startTime)}. See "${status.logFileName}" for details.`);  
     }
   }
   
   reportError(e,parameters,status,yadamuLogger) {
     
-    if (!yadamuLogger.IS_CONSOLE_LOGGER) {
+    if (yadamuLogger.FILE_LOGGER) {
       yadamuLogger.logException([`${this.constructor.name}`,`"${status.operation}"`],e);
       console.log(`${new Date().toISOString()} [ERROR][YADAMU][${status.operation}]: Operation failed: See "${parameters.LOG_FILE ? parameters.LOG_FILE  : 'above'}" for details.`);
     }
@@ -250,7 +250,7 @@ class Yadamu {
 	const options = {
 	  flags : (this.STATUS.sqlTrace && this.STATUS.sqlTrace.writableEnded) ? "a" : "w"
 	}
-	this.STATUS.sqlTrace = this.STATUS.sqlTrace || (this.parameters.SQL_TRACE ? fs.createWriteStream(this.parameters.SQL_TRACE,options) : DummyOutputStream.DUMMY_OUTPUT_STREAM )
+	this.STATUS.sqlTrace = this.STATUS.sqlTrace || (this.parameters.SQL_TRACE ? fs.createWriteStream(this.parameters.SQL_TRACE,options) : NullWriter.NULL_WRITER )
   }
   
   processParameters() {
@@ -554,21 +554,21 @@ class Yadamu {
 	  // this.LOGGER.trace([this.constructor.name,'COPY'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
 	  await pipeline(yadamuPipeline)
       // this.LOGGER.trace([this.constructor.name,'COPY'],'Success')
-
       this.STATUS.operationSuccessful = false;
       await source.finalize();
-      await target.finalize();
+	  await target.finalize();
       await this.REJECTION_MANAGER.close();
 	  await this.WARNING_MANAGER.close();
 	  this.STATUS.operationSuccessful = true;
-      return this.timings
+      return this.metrics
     } catch (e) {
-      // this.LOGGER.trace([this.constructor.name,'COPY'],'Failed')
+      // this.LOGGER.trace([this.constructor.name,'COPY'],'Pipeline Failed')
+	  
 	  // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
-	
 	  if ((e.code === 'ERR_STREAM_PREMATURE_CLOSE') && (dbReader.underlyingError instanceof Error)) {
 		e = dbReader.underlyingError
 	  }
+	  
 	  this.STATUS.operationSuccessful = false;
 	  this.STATUS.err = e;
       await source.abort(e);
@@ -582,62 +582,62 @@ class Yadamu {
 		throw e
 	  }
     }
-    return this.timings
+    return this.metrics
   }
     
   async pumpData(source,target) {
      
-	this.setDefaultParameter(source.parameters,'DEFAULT_USER','FROM_USER')
+	this.setDefaultParameter(source.parameters,'YADAMU_USER','FROM_USER')
     if ((source.isDatabase() === true) && (source.parameters.FROM_USER === undefined)) {
       throw new Error('Missing mandatory parameter FROM_USER');
     }
 
-	this.setDefaultParameter(source.parameters,'DEFAULT_USER','TO_USER')
+	this.setDefaultParameter(source.parameters,'YADAMU_USER','TO_USER')
     if ((target.isDatabase() === true) && (target.parameters.TO_USER === undefined)) {
       throw new Error('Missing mandatory parameter TO_USER');
     }
-    let timings = await this.doPumpOperation(source,target)
+    let metrics = await this.doPumpOperation(source,target)
     
 	switch (this.STATUS.operationSuccessful) {
       case true:
         this.reportStatus(this.STATUS,this.LOGGER)
 		break;
 	  case false:
-        timings = this.STATUS.err
+        metrics = this.STATUS.err
         this.reportError(this.STATUS.err,this.parameters,this.STATUS,this.LOGGER);
 		break;
 	  default:
 	}
-    return timings
+    return metrics
   }
   
   async doImport(dbi) {
     const fileReader = new FileDBI(this)
-    const timings = await this.pumpData(fileReader,dbi);
+    const metrics = await this.pumpData(fileReader,dbi);
     await this.close();
-    return timings
+    return metrics
   }  
  
   async doExport(dbi) {
     const fileWriter = new FileDBI(this)
-    const timings = await this.pumpData(dbi,fileWriter);
+    const metrics = await this.pumpData(dbi,fileWriter);
     await this.close();
-    return timings
+    return metrics
   }  
   
   async doCopy(source,target) {
-    const timings = await this.pumpData(source,target);
+    const metrics = await this.pumpData(source,target);
     await this.close();
-    return timings
+    return metrics
   }  
   
   async cloneFile(pathToFile) {
 
     const fileReader = new FileDBI(this)
     const fileWriter = new fileDBI(this)
-    const timings = await this.pumpData(fileReader,fileWriter);
+    const metrics = await this.pumpData(fileReader,fileWriter);
     await this.close();
-    return timings
+    return metrics
   }
   
   async uploadFile(dbi,importFilePath) {
@@ -651,27 +651,27 @@ class Yadamu {
     return json;
   }
    
-  getTimings(log) {
+  getMetrics(log) {
       
-     const timings = {}
+     const metrics = {}
      log.forEach((entry) => {
        switch (Object.keys(entry)[0]) {
          case 'dml' :
-           timings[entry.dml.tableName] = {rowCount : entry.dml.rowCount, insertMode : "SQL", elapsedTime : entry.dml.elapsedTime + "ms", throughput: Math.round((entry.dml.rowCount/Math.round(entry.dml.elapsedTime)) * 1000).toString() + "/s"}
+           metrics[entry.dml.tableName] = {rowCount : entry.dml.rowCount, insertMode : "SQL", elapsedTime : entry.dml.elapsedTime + "ms", throughput: Math.round((entry.dml.rowCount/Math.round(entry.dml.elapsedTime)) * 1000).toString() + "/s"}
            break;
          case 'error' :
-           timings[entry.error.tableName] = {rowCount : -1, insertMode : "SQL", elapsedTime : "NaN", throughput: "NaN"}
+           metrics[entry.error.tableName] = {rowCount : -1, insertMode : "SQL", elapsedTime : "NaN", throughput: "NaN"}
            break;
          default:
        }
      })
-     return timings
+     return metrics
   }
 
   
   async doUploadOperation(dbi) {
 
-    const timings = {}
+    const metrics = {}
 
     try {
       await dbi.initialize();
@@ -681,15 +681,15 @@ class Yadamu {
       const log = await dbi.processFile(hndl)
 	  await dbi.releasePrimaryConnection()
       await dbi.finalize();
-	  const timings = this.getTimings(log);  
+	  const metrics = this.getMetrics(log);  
 	  this.STATUS.operationSuccessful = true;
-      return timings
+      return metrics
     } catch (e) {
 	  this.STATUS.operationSuccessful = false;
 	  this.STATUS.err = e;
       await dbi.abort(e)
     }
-    return timings;
+    return metrics;
   }
 
   async uploadData(dbi) {
@@ -702,26 +702,26 @@ class Yadamu {
       throw new Error('Missing mandatory parameter FILE');
     }
    
-    let timings = await this.doUploadOperation(dbi)
+    let metrics = await this.doUploadOperation(dbi)
 	
 	switch (this.STATUS.operationSuccessful) {
       case true:
         this.reportStatus(this.STATUS,this.LOGGER)
 		break;
 	  case false:
-        timings = this.STATUS.err
+        metrics = this.STATUS.err
         this.reportError(this.STATUS.err,this.parameters,this.STATUS,this.LOGGER);
 		break;
 	  default:
 	}
 	
-    return timings;
+    return metrics;
   } 
   
   async doUpload(dbi) {
-    const timings = await this.uploadData(dbi);
+    const metrics = await this.uploadData(dbi);
     await this.close();
-    return timings
+    return metrics
   }  
 
 }  

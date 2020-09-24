@@ -51,9 +51,11 @@ class StatisticsCollector extends YadamuWriter {
 	return this.tableInfo
   }
   
-   async flushCache() {
+  async flushCache() {
 	this.nulLogger.close();
   }
+  
+  reportPerformance() { /* OVERRIDE */ }
   
 }
 

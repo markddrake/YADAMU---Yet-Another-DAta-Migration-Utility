@@ -35,11 +35,24 @@ class OracleWriter extends YadamuWriter {
     super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
   }
   
+  resetBatch() {
+	super.resetBatch()
+	this.batch = {
+	  rows           : []
+	, lobRows        : []
+	, tempLobCount   : 0
+	, cachedLobCount : 0
+    }
+  }
+  
+  releaseBatch(batch) {
+	batch.rows.length = 0;
+	batch.lobRows.length = 0;
+  }
+  
   setTableInfo(tableName) {
-    this.lobList = [];
-    this.lobBatch = []
-    this.tempLobCount = 0;
-    this.cachedLobCount = 0;
+    this.resetBatch();
+	this.lobList = []
     this.includeTestcase = this.dbi.parameters.EXPORT_TESTCASE === true
     this.lobCumlativeTime = 0;
 	
@@ -145,7 +158,7 @@ class OracleWriter extends YadamuWriter {
               if (typeof col !== "string") {
                 col = JSON.stringify(col);
               }
-              this.cachedLobCount++
+              this.batch.cachedLobCount++
               this.bindRowAsLOB = this.bindRowAsLOB || (Buffer.byteLength(col,'utf8') > this.dbi.LOB_MIN_SIZE) || Buffer.byteLength(col,'utf8') === 0
 			  return col;
 		    }
@@ -177,7 +190,7 @@ class OracleWriter extends YadamuWriter {
 				  col = Buffer.from(col,'hex')
 				}
               }
-		      this.cachedLobCount++
+		      this.batch.cachedLobCount++
 			  // If col ia still a string at this point the string is too large to be stored in the client side cache
               this.bindRowAsLOB = this.bindRowAsLOB || (col.length > this.dbi.LOB_MIN_SIZE) 
 			  return col
@@ -210,13 +223,21 @@ class OracleWriter extends YadamuWriter {
   }
 
   trackStringToClob(s) {
-    const clob = this.dbi.stringToClob(s)
+    const clob = this.dbi.stringToClob(s).catch((err) => { 
+      // Suppress Unhandled Rejections that can arise if the pipeline aborts while a LOB operation is in progress.
+	  if (this.destroyed) return; 
+	  throw err
+	})
 	this.lobList.push(clob);
 	return clob
   }
   
   trackBufferToBlob(b) {
-	const blob = this.dbi.blobFromBuffer(b)
+	const blob = this.dbi.blobFromBuffer(b).catch((err) => { 
+      // Suppress Unhandled Rejections that can arise if the pipeline aborts while a LOB operation is in progress.
+	  if (this.destroyed) return; 
+	  throw err
+	})
 	this.lobList.push(blob);
 	return blob;
   }
@@ -275,8 +296,8 @@ class OracleWriter extends YadamuWriter {
     */
           
 
-    // this.yadamuLogger.trace([this.constructor.name,this.tableInfo.lobColumns,this.rowCounters.cached],'cacheRow()')
-    // if (this.rowCounters.received === 1) {console.log(row)}
+    // this.yadamuLogger.trace([this.constructor.name,this.tableInfo.lobColumns,this.metrics.cached],'cacheRow()')
+    // if (this.metrics.received === 1) {console.log(row)}
 		
     try {          
       this.bindRowAsLOB = false;
@@ -311,13 +332,13 @@ class OracleWriter extends YadamuWriter {
           if (row[idx] !== null) {
             switch (bind.type) {
               case oracledb.CLOB:
-                this.templobCount++
-                this.cachedLobCount--
+                this.batch.tempLobCount++
+                this.batch.cachedLobCount--
                 return this.trackStringToClob(row[idx])                                                                    
                 break;
               case oracledb.BLOB:
-                this.templobCount++  
-                this.cachedLobCount--
+                this.batch.tempLobCount++  
+                this.batch.cachedLobCount--
 				if (typeof row[idx] === 'string') {
                   return this.trackBufferToBlob(Buffer.from(row[idx],'hex'))                                                                    
                 }
@@ -332,15 +353,15 @@ class OracleWriter extends YadamuWriter {
           return null;
         })
 		this.lobCumlativeTime = this.lobCumlativeTime + (performance.now() - lobStartTime);
-        this.lobBatch.push(row);
+        this.batch.lobRows.push(row);
       }
       else {
-	    this.batch.push(row);
+	    this.batch.rows.push(row);
       }
 	  this.checkBindMappings(row)
-      this.rowCounters.cached++
+      this.metrics.cached++
     } catch (cause) {
-	  this.handleIterativeError('CACHE ONE',cause,this.rowCounters.cached+1,row);
+	  this.handleIterativeError('CACHE ONE',cause,this.metrics.cached+1,row);
     }
 	
 	return this.skipTable
@@ -388,7 +409,7 @@ end;`
   }
  
   batchComplete() {
-    return ((this.rowCounters.cached === this.BATCH_SIZE) || (this.tempLobCount >= this.dbi.BATCH_LOB_COUNT) || (this.cachedLobCount > this.dbi.LOB_CACHE_COUNT))
+    return ((this.metrics.cached === this.BATCH_SIZE) || (this.batch.tempLobCount >= this.dbi.BATCH_LOB_COUNT) || (this.batch.cachedLobCount > this.dbi.LOB_CACHE_COUNT))
   }
 
   async serializeLob(lob) {
@@ -451,6 +472,21 @@ end;`
     }))
   }
 	 
+  async retryGeoJSONAsWKT(sqlStatement,binds,rowNumber,row) {
+    const batch = [await this.serializeLobColumns(row)]
+	YadamuSpatialLibrary.recodeSpatialColumns('GeoJSON','WKT',this.tableInfo.targetDataTypes,batch,true)
+    try {
+	  // Create a bound row by cloning the current set of binds and adding the column value.
+	  const boundRow = batch[0].map((col,idx) => {return Object.assign({},binds[idx],{val: col})})
+	  sqlStatement = sqlStatement.replace(/DESERIALIZE_GEOJSON/g,'DESERIALIZE_WKTGEOMETRY')
+      const results = await this.dbi.executeSQL(sqlStatement,boundRow)
+      this.metrics.written++
+    } catch (cause) {
+	  this.handleIterativeError('INSERT ONE',cause,rowNumber,batch[0]);
+    }
+  }
+  
+	 
   async handleIterativeException(operation,cause,batchSize,rowNumber,record) {
 	
      // If cause is generated by the SQL layer it alreadys contain SQL and bind information.
@@ -491,48 +527,45 @@ end;`
   
   freeLobList() {
   }
-      
-  resetBatch() {
-	this.batch.length = 0;
-	this.lobBatch.length = 0;   
-    this.cachedLobCount = 0;
-    this.tempLobCount = 0;
-	this.rowCounters.cached = 0;
+     
+  getMetrics() {
+	const tableStats = super.getMetrics()
+	tableStats.sqlTime = tableStats.sqlTime + this.lobCumlativeTime;
+    return tableStats;  
   }
-    
-  async writeBatch() {
+  
+  async _writeBatch(batch,rowCount) {
       
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
     // Infortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
     // So we have to free the current tempLob Cache and create a new one for each batch
     	
-    this.rowCounters.batchCount++;
+    this.metrics.batchCount++;
     let rows = undefined;
     let binds = undefined;
-
-    let lobInsert = false
-    if (this.lobBatch.length > 0) {
-      lobInsert = true
-	   // lobBatch contains arrays of pending promises that need to be resolved.
-	  this.lobBatch = await Promise.all(this.lobBatch.map(async (row) => { return await Promise.all(row.map((col) => {return col}))})) 
+    
+    const lobInsert = (batch.lobRows.length > 0)
+    if (lobInsert) {
+	   // this.batch.lobRows constists of a an array of arrays of pending promises that need to be resolved.
+	  batch.lowRows = await Promise.all(batch.lobRows.map(async (row) => { return await Promise.all(row.map((col) => {return col}))})) 
 	}
 	
     if (this.insertMode === 'Batch') {
       try {
-        rows = this.batch
+        rows = batch.rows
         binds = this.tableInfo.binds
         await this.dbi.createSavePoint()
         const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds});
 		if (lobInsert) {
-          rows = this.lobBatch
+          rows = batch.lowRows
           binds = this.tableInfo.lobBinds
           const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds});
           // await Promise.all(this.freeLobList());
           this.freeLobList();
         }         
         this.endTime = performance.now();
-        this.rowCounters.written += this.rowCounters.cached;
-        this.resetBatch();
+        this.metrics.written += rowCount;
+        this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
 	    await this.reportBatchError(`INSERT MANY`,cause,rows) 
@@ -542,23 +575,23 @@ end;`
           this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to PL/SQL Block.`);          
           this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
           try {
-            rows = this.batch
+            rows = batch.rows
             binds = this.tableInfo.binds
             await this.dbi.createSavePoint()
             const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds});
             if (lobInsert) {
-              rows = this.lobBatch
+              rows = batch.lobRows
               binds = this.tableInfo.lobBinds
               const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds});
               // await Promise.all(this.freeLobList());
               this.freeLobList();
             }         
             this.endTime = performance.now();
-            this.rowCounters.written += this.rowCounters.cached
-            this.resetBatch();
+            this.metrics.written += rowCount
+            this.releaseBatch(batch)
             return this.skipTable
           } catch (cause) {
-  		    await this.reportBatchError(`INSERT MANY [PL/SQL]`,cause,rows) 
+  		    await this.reportBatchError(batch,`INSERT MANY [PL/SQL]`,cause,rows) 
             await this.dbi.restoreSavePoint(cause);
             this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
             this.insertMode = 'Iterative';
@@ -571,7 +604,7 @@ end;`
       }
     }
 
-    const allRows  = [this.batch,this.lobBatch]
+    const allRows  = [batch.rows,batch.lobRows]
 	const allBinds = [this.tableInfo.binds,this.tableInfo.lobBinds]
     while (allRows.length > 0) {
 	  const rows = allRows.shift();
@@ -582,14 +615,19 @@ end;`
 		  // boundRow = await Promise.all([... new Array(rows[row].length).keys()].map(async (i) => {const bind = Object.assign({},binds[i]); bind.val=await rows[row][i]; return bind}))
 		  const boundRow = rows[row].map((col,idx) => {return Object.assign({},binds[idx],{val: col})})
           const results = await this.dbi.executeSQL(this.tableInfo.dml,boundRow)
-		  this.rowCounters.written++
+		  this.metrics.written++
         } catch (cause) {
-          await this.handleIterativeError('INSERT ONE',cause,row,await this.serializeLobColumns(rows[row]));
-          if (this.skipTable) {
-			// Truncate the allRows array to terminate the outer loop as well
-			allRows.length = 0
-            break;
-          }
+		  if (cause.jsonParsingFailed() && cause.includesSpatialOperation()) {
+			this.retryGeoJSONAsWKT(this.tableInfo.dml,binds,row,rows[row])
+		  }
+		  else {
+            this.handleIterativeError('INSERT ONE',cause,row,await this.serializeLobColumns(rows[row]));
+		  }
+        }
+        if (this.skipTable) {
+  		  // Truncate the allRows array to terminate the outer loop as well
+		  allRows.length = 0
+          break;
         }
 	  }
     } 
@@ -597,21 +635,19 @@ end;`
     this.endTime = performance.now();
     // await Promise.all(this.freeLobList());
     this.freeLobList();
-    this.resetBatch();
+    this.releaseBatch(batch)
     return this.skipTable     
   }
   
-  getStatistics() {
-	const tableStats = super.getStatistics()
-	tableStats.sqlTime = tableStats.sqlTime + this.lobCumlativeTime;
-    return tableStats;  
-  }
-  
-  async finalize() {
-    const status = await super.finalize();
-    await this.enableTriggers();
+  async finalize(cause) {
+    const status = await super.finalize(cause);
+	// Skip calling enableTriggers if tableInfo is not available. If tableInfo is not available an exception must have prevented initialize() from completing successfully. 
+	if (this.tableInfo) {
+      await this.enableTriggers();
+	}
 	return status;
   }
+  
 }
 
 module.exports = OracleWriter;

@@ -177,7 +177,7 @@ class SnowflakeDBI extends YadamuDBI {
     })
   }  
 
-  async executeDDLImpl(ddl) {
+  async _executeDDL(ddl) {
     const results = await Promise.all(ddl.map(async (ddlStatement) => {
       try {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
@@ -191,8 +191,8 @@ class SnowflakeDBI extends YadamuDBI {
   }
 
   setDatabase() {  
-    if ((this.parameters.SNOWFLAKE_SCHEMA_DB) && (this.parameters.SNOWFLAKE_SCHEMA_DB !== this.connectionProperties.database)) {
-      this.connectionProperties.database = this.parameters.SNOWFLAKE_SCHEMA_DB
+    if ((this.parameters.YADAMU_DATABASE) && (this.parameters.YADAMU_DATABASE !== this.connectionProperties.database)) {
+      this.connectionProperties.database = this.parameters.YADAMU_DATABASE
     }
   }  
   

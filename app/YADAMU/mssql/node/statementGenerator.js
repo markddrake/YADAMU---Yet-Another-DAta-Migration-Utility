@@ -300,11 +300,17 @@ class StatementGenerator {
       tableInfo.bulkSupported = this.bulkSupported(dataTypes);
       try {
         if (tableInfo.bulkSupported) {
-          tableInfo.bulkOperation = this.createBulkOperation(database, tableName, tableMetadata.columnNames, dataTypes);
+		  tableInfo.bulkOperations = [
+		    this.createBulkOperation(database, tableName, tableMetadata.columnNames, dataTypes)
+          , this.createBulkOperation(database, tableName, tableMetadata.columnNames, dataTypes)
+		  ]
         }
         else {
           // Place holder for caching rows.
-          tableInfo.bulkOperation = new sql.Table()                                            
+          tableInfo.bulkOperations = [
+		    new sql.Table()                                            
+          , new sql.Table()                                            
+		  ]
         }
         return tableInfo.ddl;
       } catch (e) {

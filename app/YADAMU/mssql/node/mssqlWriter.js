@@ -3,6 +3,7 @@
 const { performance } = require('perf_hooks');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const NullWriter = require('../../common/nullWriter.js');
 const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 
 class MsSQLWriter extends YadamuWriter {
@@ -13,7 +14,9 @@ class MsSQLWriter extends YadamuWriter {
   
   setTableInfo(tableName) {
 	super.setTableInfo(tableName)
-    
+	this.useNext = 0;
+	this.resetBatch()
+    	
 	this.insertMode = 'Bulk';
     this.dataTypes  = YadamuLibrary.decomposeDataTypes(this.tableInfo.targetDataTypes)
 
@@ -67,18 +70,22 @@ class MsSQLWriter extends YadamuWriter {
 
   }
       
-  getStatistics()  {
-	const results = super.getStatistics()
-	results.insertMode = this.tableInfo.bulkSupported === true ? 'Bulk' : 'Iterative'
-	return results;
+  resetBatch() {
+	super.resetBatch();
+	// console.log('resetBatch(): Using Operation',this.useNext)
+	this.batch = this.tableInfo.bulkOperations[this.useNext]
+	// Exclusive OR (XOR) operator 1 becomes 0, 0 becomes 1.
+	this.useNext ^= 1;
   }
   
-  async finalize() {
-    await super.finalize()
-    if (this.dbi.preparedStatement !== undefined){
-      await this.dbi.preparedStatement.unprepare();
-	  this.dbi.preparedStatement = undefined;
-    }
+  releaseBatch(batch) {
+	batch.rows.length = 0;
+  }
+
+  getMetrics()  {
+	const results = super.getMetrics()
+	results.insertMode = this.tableInfo.bulkSupported === true ? 'Bulk' : 'Iterative'
+	return results;
   }
   
   cacheRow(row) {
@@ -92,42 +99,40 @@ class MsSQLWriter extends YadamuWriter {
       }
 	})
 	
-    this.tableInfo.bulkOperation.rows.add(...row);
+    this.batch.rows.add(...row);
 
-	this.rowCounters.cached++;
+	this.metrics.cached++;
 	return this.skipTable;
   }
 
-  reportBatchError(operation,cause) {
+  reportBatchError(batch,operation,cause) {
    
     const additionalInfo = {
-      columnDefinitions: this.tableInfo.bulkOperation.columns
+      columnDefinitions: batch.columns
 	}
 
-    super.reportBatchError(operation,cause,this.tableInfo.bulkOperation.rows[0],this.tableInfo.bulkOperation.rows[this.tableInfo.bulkOperation.rows.length-1],additionalInfo)
+    super.reportBatchError(operation,cause,batch.rows[0],batch.rows[batch.rows.length-1],additionalInfo)
   }
   
-  async writeBatch() {
-
-    this.rowCounters.batchCount++;
+  async _writeBatch(batch,rowCount) {
+    this.metrics.batchCount++;
     
     if (this.SPATIAL_FORMAT === 'GeoJSON') {
-      YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,this.tableInfo.bulkOperation.rows,true)
+      YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch.rows,true)
     } 
 
     if (this.tableInfo.bulkSupported) {
       try {        
         await this.dbi.createSavePoint();
-        const results = await this.dbi.bulkInsert(this.tableInfo.bulkOperation);
-        this.endTime = performance.now();
-        this.tableInfo.bulkOperation.rows.length = 0;
-		this.rowCounters.written += this.rowCounters.cached;
-		this.rowCounters.cached = 0;
-        return this.skipTable
+        const results = await this.dbi.bulkInsert(batch);
+		this.endTime = performance.now();
+        this.metrics.written += rowCount;
+		this.releaseBatch(batch)
+		return this.skipTable
       } catch (cause) {
-        this.reportBatchError(`INSERT MANY`,cause)
+        this.reportBatchError(batch,`INSERT MANY`,cause)
         await this.dbi.restoreSavePoint(cause);
-		this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Switching to Iterative mode.`);          
+	  	this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Switching to Iterative mode.`);          
         this.tableInfo.bulkSupported = false;
       }
     }
@@ -135,30 +140,38 @@ class MsSQLWriter extends YadamuWriter {
     // Cannot process table using BULK Mode. Prepare a statement use with record by record processing.
  
     await this.dbi.cachePreparedStatement(this.tableInfo.dml, this.dataTypes,this.SPATIAL_FORMAT) 
+	const sqlTrace = this.status.sqlTrace
 
-    for (const row in this.tableInfo.bulkOperation.rows) {
+    for (const row in batch.rows) {
       try {
         const args = {}
-        for (const col in this.tableInfo.bulkOperation.rows[0]){
-           args['C'+col] = this.tableInfo.bulkOperation.rows[row][col]
+        for (const col in batch.rows[0]){
+           args['C'+col] = batch.rows[row][col]
         }
         const results = await this.dbi.executeCachedStatement(args);
-		this.rowCounters.written++
+		this.metrics.written++
+        this.status.sqlTrace = NullWriter.NULL_WRITER;
       } catch (cause) {
-        await this.handleIterativeError(`INSERT ONE`,cause,row,this.tableInfo.bulkOperation.rows[row]);
+        this.handleIterativeError(`INSERT ONE`,cause,row,batch.rows[row]);
         if (this.skipTable) {
           break;
-        }
+		}
       }
     }       
       
-    await this.dbi.clearCachedStatement();   
-	
+	this.status.sqlTrace = sqlTrace
+	this.status.sqlTrace.write(this.dbi.traceComment(`Previous Statement repeated ${rowCount} times.`))
+	await this.dbi.clearCachedStatement();   
     this.endTime = performance.now();
-    this.tableInfo.bulkOperation.rows.length = 0;
-	this.rowCounters.cached = 0;
+    this.releaseBatch(batch)
     return this.skipTable
   }
+
+  async finalize(cause) {
+	await super.finalize(cause)
+    await this.dbi.clearCachedStatement()
+  }
+  
 }
 
 module.exports = MsSQLWriter;

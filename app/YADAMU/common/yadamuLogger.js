@@ -9,12 +9,12 @@ const {Readable, pipeline} = require('stream')
 const DBWriter = require('./dbWriter.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const StringWriter = require('./stringWriter.js')
-const DummyOutputStream = require('./dummyOutputStream.js');
+const NullWriter = require('./nullWriter.js');
 const PassThrough = require('./yadamuPassThrough.js');
 const SimpleArrayReadable = require('./simpleArrayReadable.js');
 const {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuError.js');
 const OracleError  = require('../oracle/node/oracleError.js');
-const JSONWriter = require('../file/node/jsonWriter.js');
+const ErrorWriter = require('../file/node/errorWriter.js');
 const FileDBI = require('../file/node/fileDBI.js');
 
 class YadamuLogger {
@@ -41,9 +41,9 @@ class YadamuLogger {
   static  get EXCEPTION_FOLDER() { return this.LOGGER_DEFAULTS.EXCEPTION_FOLDER }
   static  get EXCEPTION_FILE_PREFIX() { return this.LOGGER_DEFAULTS.EXCEPTION_FILE_PREFIX }
   
-  static get NUL_LOGGER() {
-	this._NUL_LOGGER = this._NUL_LOGGER || new YadamuLogger(DummyOutputStream.DUMMY_OUTPUT_STREAM,{})
-	return this._NUL_LOGGER;
+  static get NULL_LOGGER() {
+    this._NULL_LOGGGER = this._NULL_LOGGGER || new YadamuLogger(NullWriter.NULL_WRITER,{})
+	return this._NULL_LOGGGER;
   }
 
   /*
@@ -68,7 +68,7 @@ class YadamuLogger {
     **
     */
     let exceptionFolderPath = value
-    let exceptionFolderRoot = this.IS_CONSOLE_LOGGER ? process.cwd() : path.dirname(this.os.path);
+    let exceptionFolderRoot = this.FILE_LOGGER ? path.dirname(this.os.path) : process.cwd() 
     
     exceptionFolderPath = ((exceptionFolderPath === null) || (exceptionFolderPath === undefined)) ? YadamuLogger.EXCEPTION_FOLDER : exceptionFolderPath
     exceptionFolderPath = YadamuLibrary.pathSubstitutions(exceptionFolderPath)
@@ -100,11 +100,15 @@ class YadamuLogger {
   get LOG_STACK_TRACE_TO_CONSOLE() {
      return process.env.YADAMU_PRINT_STACK && process.env.YADAMU_PRINT_STACK.toUpperCase() === 'TRUE' 
   }
- 
-  get IS_CONSOLE_LOGGER() {
-    return this.os === process.stdout;
+  
+  get FILE_LOGGER() {
+	 return this._FILE_LOGGER
   }
   
+  set FILE_LOGGER(v) {
+	 this._FILE_LOGGER = v;
+  }
+   
   static fileLogger(logFilePath,state,exceptionFolder,exceptionFilePrefix) {
     const os = ((logFilePath === undefined) || (logFilePath === '') || (logFilePath === null)) ? process.stdout : (() => {
     try {
@@ -127,13 +131,17 @@ class YadamuLogger {
     this.state = state;
 	this.EXCEPTION_FOLDER_PATH = exceptionFolder
     this.EXCEPTION_FILE_PREFIX = exceptionFilePrefix
-    this.resetCounters();
+    this.resetMetrics();
+    switch (true) {
+	  case (this.os === NullWriter.NULL_WRITER):
+	  case (this.os === process.stdout):
+		 this.FILE_LOGGER = false;
+	     break;
+	  default:
+	    this.FILE_LOGGER = true;
+	}
   }
-
-  switchOutputStream(os) {
-	this.os = os;
-  }
-
+  
   write(msg) {
     this.os.write('**'+msg);
   }
@@ -179,14 +187,14 @@ class YadamuLogger {
 
   warning(args,msg) {
     this.state.warningRaised = true;
-	this.counters.warnings++
+	this.metrics.warnings++
     args.unshift('WARNING')
 	return this.log(args,msg)
   }
 
   error(args,msg) {
     this.state.errorRaised = true;
-	this.counters.errors++
+	this.metrics.errors++
     args.unshift('ERROR')
     return this.log(args,msg)
   }
@@ -270,7 +278,8 @@ class YadamuLogger {
       await dbi.initialize()
 	  
 	  // const logger = this
-	  const logger = YadamuLogger.NUL_LOGGER;
+	  const logger = YadamuLogger.NULL_LOGGER;
+	  
 	  const fileWriter = new DBWriter(dbi,logger);  
 	  
 	  dbi.setSystemInformation(currentSettings.systemInformation)
@@ -283,17 +292,13 @@ class YadamuLogger {
 	  dataObjects.unshift({table: tableName})
       // const dataStream = Readable.from(dataObjects);
 	  const dataStream = new SimpleArrayReadable(dataObjects,{objectMode: true },true);
-
-	  const jsonWriter = new JSONWriter(dbi,tableName,undefined,0,{},logger)
-	  // Disable the columnCountCheck when writing an error report
-	  jsonWriter.checkColumnCount = () => {}
-	  
+	  const errorWriter = new ErrorWriter(dbi,tableName,undefined,0,{},logger)
 	  const passThrough = new PassThrough({objectMode: false},false);
       passThrough.on('end',async () => {
    	    // console.log('JSON Writer: finish',dbi.PIPELINE_ENTRY_POINT.writableEnded)
 		passThrough.unpipe();
 		dataStream.destroy();
-		jsonWriter.destroy();
+		errorWriter.destroy();
 		passThrough.destroy();
         pipeline([dbi.END_EXPORT_FILE,dbi.PIPELINE_ENTRY_POINT],(err) => {
    		  // console.log('EOF Pipeline: Finish',dbi.PIPELINE_ENTRY_POINT.writableEnded,err)
@@ -301,7 +306,7 @@ class YadamuLogger {
 		})
 	  })
 
-	  const errorPipeline = [dataStream,jsonWriter,passThrough,dbi.PIPELINE_ENTRY_POINT]
+	  const errorPipeline = [dataStream,errorWriter,passThrough,dbi.PIPELINE_ENTRY_POINT]
  	  pipeline(errorPipeline,(err) => {
         if (err) {throw(err)}
 	  }); 
@@ -327,7 +332,6 @@ class YadamuLogger {
 	  // Write the row information a seperate file and replace the row tag with a reference to the file
 	  e.dataFilePath = path.resolve(`${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`);
 	  this.writeDataFile(e.dataFilePath,e.tableName,e.currentSettings,e.rows)
-	  delete e.currentSettings
 	  delete e.currentSettings
 	  delete e.rows
 	}
@@ -394,18 +398,18 @@ class YadamuLogger {
     this.log(args,msg)
   }
   
-  resetCounters() {
-	this.counters = {
+  resetMetrics() {
+	this.metrics = {
 	  errors   : 0
     , warnings : 0
 	, failed   : 0
 	}
   }
   
-  getCounters(reset) {
-	const counters = Object.assign({},this.counters)
-    if (reset) this.resetCounters();
-	return counters
+  getMetrics(reset) {
+	const metrics = Object.assign({},this.metrics)
+    if (reset) this.resetMetrics();
+	return metrics
   }
   
   closeStream() {
@@ -421,7 +425,7 @@ class YadamuLogger {
   
   async close() {
 
-    if (!this.IS_CONSOLE_LOGGER) {
+    if (this.FILE_LOGGER) {
       await this.closeStream()
       this.os = process.stdout
     }    

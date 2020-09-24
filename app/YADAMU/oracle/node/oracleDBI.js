@@ -235,6 +235,8 @@ class OracleDBI extends YadamuDBI {
 	  
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && (typeof this.connection.close === 'function'))})`)
 	
+	// console.log(new Error().stack)
+	
 	if (this.connection !== undefined && (typeof this.connection.close === 'function')) {
       let stack;
       try {
@@ -271,7 +273,7 @@ class OracleDBI extends YadamuDBI {
     }
   }  
 
-  async reconnectImpl() {
+  async _reconnect() {
     this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
   }
 
@@ -356,7 +358,7 @@ class OracleDBI extends YadamuDBI {
       // this.yadamuLogger.trace([this.DATABASE_VENDOR,'WRITE TO BLOB'],`Bytes Written: ${blob.offset-1}.`)
 	  return blob
 	} catch(e) {
-	  throw new OracleError(e,stack,operation)
+	  throw e instanceof OracleError ? e : new OracleError(e,stack,operation)
 	}
   };
 
@@ -397,7 +399,7 @@ class OracleDBI extends YadamuDBI {
       // this.yadamuLogger.trace([this.DATABASE_VENDOR,'WRITE TO CLOB'],`Characters Written: ${clob.offset-1}.`)
 	  return clob
 	} catch(e) {
-	  throw new OracleError(e,stack,operation)
+	  throw e instanceof OracleError ? e : new OracleError(e,stack,operation)
 	}
   };
 
@@ -695,7 +697,7 @@ class OracleDBI extends YadamuDBI {
 	 return ddl;
   }		   
 	    
-  async executeDDLImpl(ddl) {
+  async _executeDDL(ddl) {
 	const jsonColumns = JSON.parse(ddl.shift())
 	
 	// Replace \r with \n.. Earlier database versions generate ddl statements with \r characters.
@@ -844,7 +846,6 @@ class OracleDBI extends YadamuDBI {
     // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
 
 	this.checkConnectionState(cause)
-	
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
 	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 
@@ -1208,7 +1209,7 @@ class OracleDBI extends YadamuDBI {
 	    this.traceTiming(sqlStartTime,performance.now())
 	    return this.inputStream
 	  } catch (e) {
-		const cause = OracleError(e,this.streamingStackTrace ,tableInfo.SQL_STATEMENT,{},{})
+		const cause = new OracleError(e,this.streamingStackTrace ,tableInfo.SQL_STATEMENT,{},{})
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

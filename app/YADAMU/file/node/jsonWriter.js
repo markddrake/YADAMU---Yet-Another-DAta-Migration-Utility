@@ -139,7 +139,7 @@ class JSONWriter extends YadamuWriter {
     this.rowTransformation(row)
     this.push(this.formatRow(row));
 	this.rowSeperator = ','
-    this.rowCounters.committed++;
+    this.metrics.committed++;
   }
 
   endTable() {
@@ -151,7 +151,7 @@ class JSONWriter extends YadamuWriter {
     super.finalize();	
   }
 
-  async writeBatch /* OVERRIDE */ () {}
+  async _writeBatch /* OVERRIDE */ () {}
 
   async commitTransaction() { /* OVERRIDE */ }
 

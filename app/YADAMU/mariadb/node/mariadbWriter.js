@@ -60,8 +60,8 @@ class MariadbWriter extends YadamuWriter {
 	
   }
 
-  getStatistics() {
-    const results = super.getStatistics()
+  getMetrics() {
+    const results = super.getMetrics()
     results.insertMode = this.tableInfo.insertMode
     return results;
   }
@@ -87,12 +87,12 @@ class MariadbWriter extends YadamuWriter {
     
 	}
     
-    this.rowCounters.cached++
+    this.metrics.cached++
 	return this.skipTable;
   }
 
 
-  async processWarnings(results) {
+  async processWarnings(batch,results) {
 
     // ### Output Records that generate warnings
 
@@ -108,7 +108,7 @@ class MariadbWriter extends YadamuWriter {
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
           if (badRow !== nextBadRow) {
             const columnOffset = (nextBadRow-1) * this.tableInfo.columnNames.length
-            const row = this.tableInfo.insertMode === 'Batch'  ? this.batch.slice(columnOffset,columnOffset +  this.tableInfo.columnNames.length) : this.batch[nextBadRow-1]
+            const row = this.tableInfo.insertMode === 'Batch'  ? batch.slice(columnOffset,columnOffset +  this.tableInfo.columnNames.length) : batch[nextBadRow-1]
 	  	    await this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,row);
             badRow = nextBadRow;
           }
@@ -117,36 +117,34 @@ class MariadbWriter extends YadamuWriter {
     }
   }
       
-  reportBatchError(operation,cause) {
+  reportBatchError(batch,operation,cause) {
     // Use Slice to add first and last row, rather than first and last value.
-	super.reportBatchError(operation,cause,this.batch.slice(0,this.tableInfo.columnCount),this.batch.slice(this.batch.length-this.tableInfo.columnCount,this.batch.length))
+	super.reportBatchError(operation,cause,batch.slice(0,this.tableInfo.columnCount),batch.slice(batch.length-this.tableInfo.columnCount,batch.length))
   }
   	
-  async writeBatch() {
+  async _writeBatch(batch,rowCount) {
 
-     // console.log(this.batch.slice(0,this.tableInfo.columnCount))
+     // console.log(batch.slice(0,this.tableInfo.columnCount))
 
-    this.rowCounters.batchCount++; 
-    let repackBatch = false
+   this.metrics.batchCount++; 
+   let repackBatch = false
 
-
-   this.rowCounters.batchCount++;
+   this.metrics.batchCount++;
     switch (this.tableInfo.insertMode) {
       case 'Batch':
         try {    
-          const args = new Array(this.rowCounters.cached).fill(this.tableInfo.rowConstructor).join(',')
+          const args = new Array(rowCount).fill(this.tableInfo.rowConstructor).join(',')
           await this.dbi.createSavePoint();
           const sqlStatement = `${this.tableInfo.dml} ${args}`
-          const results = await this.dbi.executeSQL(sqlStatement,this.batch);
-          await this.processWarnings(results);
+          const results = await this.dbi.executeSQL(sqlStatement,batch);
+          await this.processWarnings(batch,results);
           this.endTime = performance.now();
           await this.dbi.releaseSavePoint();
-		  this.batch.length = 0;  
-          this.rowCounters.written += this.rowCounters.cached;
-		  this.rowCounters.cached = 0;
-          return this.skipTable
+		  this.metrics.written += rowCount;
+	      this.releaseBatch(batch)
+		  return this.skipTable
         } catch (cause) {
-  		  this.reportBatchError(`INSERT MANY`,cause)
+  		  this.reportBatchError(batch,`INSERT MANY`,cause)
           await this.dbi.restoreSavePoint(cause);
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
           this.tableInfo.insertMode = 'Iterative'
@@ -154,26 +152,25 @@ class MariadbWriter extends YadamuWriter {
         }
         break;  
       case 'Iterative':     
-        for (let row =0; row < this.rowCounters.cached; row++) {
-          const nextRow = repackBatch ?  this.batch.splice(0,this.tableInfo.columnCount) : this.batch[row]
+        for (let row =0; row < rowCount; row++) {
+          const nextRow = repackBatch ?  batch.splice(0,this.tableInfo.columnCount) : batch[row]
           try {
             const results = await this.dbi.executeSQL(this.tableInfo.dml,nextRow);
-            await this.processWarnings(results);
-		    this.rowCounters.written++;
+            await this.processWarnings(batch,results);
+		    this.metrics.written++;
           } catch (cause) {
-            await this.handleIterativeError(`INSERT ONE`,cause,row,nextRow)
+            this.handleIterativeError(`INSERT ONE`,cause,row,nextRow)
             if (this.skipTable) {
-             break;
-           }
-         }
+              break;
+            }
+          }
         }     
         break;
       default:
     }     
    
     this.endTime = performance.now();
-    this.batch.length = 0;
-    this.rowCounters.cached = 0;
+    this.releaseBatch(batch)
     return this.skipTable          
   }
 

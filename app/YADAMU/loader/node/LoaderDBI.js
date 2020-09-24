@@ -264,13 +264,13 @@ class LoaderDBI extends YadamuDBI {
 	const streams = []
 	const is = await this.getInputStream(tableInfo);
 	is.once('readable',() => {
-	  this.INPUT_TIMINGS.readerStartTime = performance.now()
+	  this.INPUT_METRICS.readerStartTime = performance.now()
 	}).on('error',(err) => { 
-      this.INPUT_TIMINGS.readerEndTime = performance.now()
-	  this.INPUT_TIMINGS.readerError = err
-	  this.INPUT_TIMINGS.failed = true
+      this.INPUT_METRICS.readerEndTime = performance.now()
+	  this.INPUT_METRICS.readerError = err
+	  this.INPUT_METRICS.failed = true
     }).on('end',() => {
-      this.INPUT_TIMINGS.readerEndTime = performance.now()
+      this.INPUT_METRICS.readerEndTime = performance.now()
     })
 	streams.push(is)
 	
@@ -280,25 +280,25 @@ class LoaderDBI extends YadamuDBI {
 	
 	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.controlFile.data[tableInfo.TABLE_NAME].file)
 	jsonParser.once('readable',() => {
-	  this.INPUT_TIMINGS.parserStartTime = performance.now()
+	  this.INPUT_METRICS.parserStartTime = performance.now()
 	}).on('error',(err) => { 
-      this.INPUT_TIMINGS.parserEndTime = performance.now()
-	  this.INPUT_TIMINGS.parserError = err
-	  this.INPUT_TIMINGS.failed = true
+      this.INPUT_METRICS.parserEndTime = performance.now()
+	  this.INPUT_METRICS.parserError = err
+	  this.INPUT_METRICS.failed = true
     })
 	streams.push(jsonParser);
 	
 	const eventStream = new EventStream(tableInfo,this.yadamuLogger)
 	eventStream.once('readable',() => {
-	  this.INPUT_TIMINGS.parserStartTime = performance.now()
+	  this.INPUT_METRICS.parserStartTime = performance.now()
 	}).on('end',() => {
-	  this.INPUT_TIMINGS.parserEndTime = performance.now()
-	  this.INPUT_TIMINGS.rowsRead = eventStream.getRowCount()
+	  this.INPUT_METRICS.parserEndTime = performance.now()
+	  this.INPUT_METRICS.rowsRead = eventStream.getRowCount()
 	}).on('error',(err) => {
-	  this.INPUT_TIMINGS.parserEndTime = performance.now()
-	  this.INPUT_TIMINGS.rowsRead = eventStream.getRowCount()
-	  this.INPUT_TIMINGS.parserError = err
-	  this.INPUT_TIMINGS.failed = true;
+	  this.INPUT_METRICS.parserEndTime = performance.now()
+	  this.INPUT_METRICS.rowsRead = eventStream.getRowCount()
+	  this.INPUT_METRICS.parserError = err
+	  this.INPUT_METRICS.failed = true;
 	})
 	streams.push(eventStream)
 	return streams;

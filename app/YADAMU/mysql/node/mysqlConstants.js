@@ -39,6 +39,36 @@ class MySQLConstants {
    return this._CONNECTION_PROPERTY_DEFAULTS;
   }
 
+  static get MISSING_TABLE_ERROR() {
+    this._MISSING_TABLE_ERROR = this._MISSING_TABLE_ERROR || Object.freeze(['ER_NO_SUCH_TABLE'])
+    return this._MISSING_TABLE_ERROR
+  }
+
+  static get LOST_CONNECTION_ERROR() {
+    this._LOST_CONNECTION_ERROR = this._LOST_CONNECTION_ERROR || Object.freeze(['ECONNRESET','PROTOCOL_CONNECTION_LOST','ER_CMD_CONNECTION_CLOSED','ER_SOCKET_UNEXPECTED_CLOSE','ER_GET_CONNECTION_TIMEOUT','PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR'])
+    return this._LOST_CONNECTION_ERROR
+  }
+
+  static get SERVER_UNAVAILABLE_ERROR() {
+    this._SERVER_UNAVAILABLE_ERROR = this._SERVER_UNAVAILABLE_ERROR || Object.freeze(['ECONNREFUSED','ER_GET_CONNECTION_TIMEOUT'])
+    return this._SERVER_UNAVAILABLE_ERROR
+  }
+
+  static get SPATIAL_ERROR() {
+    this._SPATIAL_ERROR = this._SPATIAL_ERROR || Object.freeze(['ER_GIS_INVALID_DATA'])
+    return this._SPATIAL_ERROR
+  }
+
+  static get UNKNOWN_CODE_ERROR() {
+    this._UNKNOWN_CODE_ERROR = this._UNKNOWN_CODE_ERROR || Object.freeze(['UNKNOWN_CODE_PLEASE_REPORT'])
+    return this._UNKNOWN_CODE_ERROR
+  }
+
+  static get JSON_PARSING_ERROR() {
+    this._JSON_PARSING_ERROR = this._JSON_PARSING_ERROR || Object.freeze([])
+    return this._JSON_PARSING_ERROR
+  }
+
 }
 
 module.exports = MySQLConstants

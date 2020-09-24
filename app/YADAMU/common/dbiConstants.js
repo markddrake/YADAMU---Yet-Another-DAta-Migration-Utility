@@ -15,6 +15,19 @@ class DBIConstants {
     return this._YADAMU_DBI_DEFAULTS;
   }
 
+  static get NEW_TIMINGS() {
+    this._NEW_TIMINGS = this._NEW_TIMINGS || Object.freeze({
+      rowsRead        : 0
+    , pipeStartTime   : undefined
+    , readerStartTime : undefined
+    , readerEndTime   : undefined
+	, parserStartTime : undefined
+    , parserEndTime   : undefined
+	, failed          : false
+    })
+    return this._NEW_TIMINGS;
+  }
+
   static get DEFAULT_PARAMETERS() { 
     this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.YADAMU_DBI_DEFAULTS, YadamuConstants.EXTERNAL_DEFAULTS.yadamuDBI))
     return this._DEFAULT_PARAMETERS

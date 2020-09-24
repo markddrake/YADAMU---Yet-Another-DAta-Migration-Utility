@@ -145,34 +145,32 @@ class MongoWriter extends YadamuWriter {
         // ### Exception - Unknown Mode
     }
 	
-    this.rowCounters.cached++
+    this.metrics.cached++
     return this.skipTable
 
   }
   
-  
-  reportBatchError(operation,cause) {
-   	super.reportBatchError(operation,cause,this.batch[0],this.batch[this.batch.length-1])
+  reportBatchError(batch,operation,cause) {
+   	super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
   }
- 
-  async writeBatch() {
+   
+  getMetrics() {
+	const tableStats = super.getMetrics()
+	tableStats.insertMode = this.tableInfo.insertMode
+    return tableStats;  
+  }
+  
+  async _writeBatch(batch,rowCount) {
     
     // ### Todo: ERROR HANDLING and Iterative Mode.
 	
-    this.rowCounters.batchCount++
-	const results = await this.dbi.insertMany(this.tableInfo.tableName,this.batch);
+    this.metrics.batchCount++
+	const results = await this.dbi.insertMany(this.tableInfo.tableName,batch);
 	
     this.endTime = performance.now();
-    this.batch.length = 0;
-    this.rowCounters.written += this.rowCounters.cached;
-    this.rowCounters.cached = 0;
-    return this.skipTable
-  }
-  
-  getStatistics() {
-	const tableStats = super.getStatistics()
-	tableStats.insertMode = this.tableInfo.insertMode
-    return tableStats;  
+    this.metrics.written += rowCount;
+    this.releaseBatch(batch)
+	return this.skipTable
   }
 }
 

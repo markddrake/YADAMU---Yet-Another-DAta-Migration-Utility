@@ -20,8 +20,8 @@ class SnowflakeQA extends SnowflakeDBI {
     async recreateSchema() {
 		
 	  const database = this.connectionProperties.database;
-      const SNOWFLAKE_SCHEMA_DB = this.parameters.SNOWFLAKE_SCHEMA_DB;
-      delete this.parameters.SNOWFLAKE_SCHEMA_DB;
+      const YADAMU_DATABASE = this.parameters.YADAMU_DATABASE;
+      delete this.parameters.YADAMU_DATABASE;
       
 	  this.connectionProperties.database = '';
       await this.createConnectionPool(); 
@@ -29,13 +29,13 @@ class SnowflakeQA extends SnowflakeDBI {
 		
 	  let results
       try {
-        const createDatabase = `create transient database if not exists "${SNOWFLAKE_SCHEMA_DB}" DATA_RETENTION_TIME_IN_DAYS = 0;`;
+        const createDatabase = `create transient database if not exists "${YADAMU_DATABASE}" DATA_RETENTION_TIME_IN_DAYS = 0;`;
         results =  await this.executeSQL(createDatabase,[]);      
-        const useDatabase = `USE DATABASE "${SNOWFLAKE_SCHEMA_DB}";`;
+        const useDatabase = `USE DATABASE "${YADAMU_DATABASE}";`;
         results =  await this.executeSQL(useDatabase,[]);      
-        const dropSchema = `drop schema if exists "${SNOWFLAKE_SCHEMA_DB}"."${this.parameters.TO_USER}";`;
+        const dropSchema = `drop schema if exists "${YADAMU_DATABASE}"."${this.parameters.TO_USER}";`;
         results =  await this.executeSQL(dropSchema,[]);      
-        const createSchema = `create transient schema "${SNOWFLAKE_SCHEMA_DB}"."${this.parameters.TO_USER}" DATA_RETENTION_TIME_IN_DAYS=0;`;
+        const createSchema = `create transient schema "${YADAMU_DATABASE}"."${this.parameters.TO_USER}" DATA_RETENTION_TIME_IN_DAYS=0;`;
         results =  await this.executeSQL(createSchema,[]);      
       } catch (e) {
 		console.log(e)
@@ -47,7 +47,7 @@ class SnowflakeQA extends SnowflakeDBI {
       }
 	  
 	  await this.finalize()
-	  this.parameters.SNOWFLAKE_SCHEMA_DB = SNOWFLAKE_SCHEMA_DB
+	  this.parameters.YADAMU_DATABASE = YADAMU_DATABASE
 	  this.connectionProperties.database = database;
     }   
 

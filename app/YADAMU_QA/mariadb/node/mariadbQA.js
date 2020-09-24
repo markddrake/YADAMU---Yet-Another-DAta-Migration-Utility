@@ -35,7 +35,11 @@ class MariadbQA extends MariadbDBI {
           if (this.pool !== undefined && this.pool.end) {
 		    this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Killing connection.`);
 	        const conn = await this.getConnectionFromPool();
-		    const res = await conn.query(`kill ${pid}`);
+			const sqlStatement = `kill hard ${pid}`
+		    const res = await conn.query(sqlStatement);
+			if (res.affectedRows === 0) {
+ 		      this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Results sent prior to termination.`)
+            }
 		    await conn.release()
 		  }
 		  else {

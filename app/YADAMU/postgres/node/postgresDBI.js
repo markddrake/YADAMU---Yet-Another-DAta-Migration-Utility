@@ -95,7 +95,7 @@ class PostgresDBI extends YadamuDBI {
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))
-      this.yadamuLogger.logException([this.DATABASE_VENDOR,`POOL_ON_ERROR`],pgErr);
+      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`POOL_ON_ERROR`],pgErr);
       // throw pgErr
     })
 
@@ -160,7 +160,7 @@ class PostgresDBI extends YadamuDBI {
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))
-      this.yadamuLogger.logException([this.DATABASE_VENDOR,`CONNECTION_ON_ERROR`],pgErr);
+      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`CONNECTION_ON_ERROR`],pgErr);
       // throw pgErr
     })
    
@@ -202,7 +202,7 @@ class PostgresDBI extends YadamuDBI {
 	}
   }
   
-  async reconnectImpl() {
+  async _reconnect() {
     this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
     await this.executeSQL('select 1')
   }
@@ -228,7 +228,13 @@ class PostgresDBI extends YadamuDBI {
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
 	if (this.status.sqlTrace  &&(typeof sqlStatement === 'string')){
-      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
+	  let sql = sqlStatement
+	  if (sql.indexOf('),($') > 0) {
+	    const startElipises = sql.indexOf('),($') + 2 
+	    const endElipises =  sql.lastIndexOf('),($') + 2
+	    sql = sql.substring(0,startElipises) + '(...),' + sql.substring(endElipises);
+	  }
+      this.status.sqlTrace.write(this.traceSQL(sql));
     }
 
     let stack
@@ -593,15 +599,15 @@ class PostgresDBI extends YadamuDBI {
 	await this.executeSQL(createSchema);   
   }
   
-  async executeDDLImpl(ddl) {
+  async _executeDDL(ddl) {
     await this.createSchema(this.parameters.TO_USER);
     await Promise.all(ddl.map(async (ddlStatement) => {
       try {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
         return await this.executeSQL(ddlStatement);
       } catch (e) {
-        this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
-        this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
+        this.yadamuLogger.info([this.DATABASE_VENDOR,'DDL'],`${ddlStatement}\n`)
+        this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
       }
     }))
   }

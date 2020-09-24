@@ -55,12 +55,13 @@
    ,{"source":   "oracle19c",  "target": "oracle19c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_WRITER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_WRITER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_WRITER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
-   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_WRITER_AFTER" : 15000}, "tasks": ["WWI_Warehouse"]}
+   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_WRITER_AFTER" : 35000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "mssql19",    "target": "mssql19",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_WRITER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "mssql17",    "target": "mssql17",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_WRITER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_WRITER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_WRITER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_WRITER_AFTER" : 10000}, "tasks": ["WWI_Warehouse"]}  
+   ,{"source":   "oracle11g",  "target": "oracle11g",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_WRITER_AFTER" : 15000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "oracle19c",  "target": "oracle19c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP",  "KILL_READER_AFTER" : 1000, "KILL_WORKER_NUMBER": 0}, "tasks": ["SH"]}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP",  "KILL_READER_AFTER" : 1000, "KILL_WORKER_NUMBER": 0}, "tasks": ["SH"]}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 2, "ON_ERROR" : "SKIP",  "KILL_READER_AFTER" : 1000, "KILL_WORKER_NUMBER": 0}, "tasks": ["SH"]}

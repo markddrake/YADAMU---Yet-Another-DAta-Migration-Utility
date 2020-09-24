@@ -153,7 +153,7 @@ class MariadbDBI extends YadamuDBI {
 	
   };
    
-  async reconnectImpl() {
+  async _reconnect() {
     this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
   }
 
@@ -193,7 +193,7 @@ class MariadbDBI extends YadamuDBI {
     } 
   }  
 
-  async executeDDLImpl(ddl) {
+  async _executeDDL(ddl) {
     await this.createSchema(this.parameters.TO_USER);
     const ddlResults = await Promise.all(ddl.map((ddlStatement) => {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
@@ -342,18 +342,16 @@ class MariadbDBI extends YadamuDBI {
 	
   }  
 
-
   /*
   **
   ** Abort the current transaction
   **
   */
-  
     
   async rollbackTransaction(cause) {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
-
+	
 	this.checkConnectionState(cause)
 	
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
@@ -377,7 +375,6 @@ class MariadbDBI extends YadamuDBI {
   async createSavePoint() {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
-
     await this.executeSQL(MariadbDBI.SQL_CREATE_SAVE_POINT);
 	super.createSavePoint()
   }

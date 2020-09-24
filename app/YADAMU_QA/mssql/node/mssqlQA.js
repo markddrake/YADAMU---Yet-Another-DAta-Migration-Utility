@@ -22,25 +22,25 @@ class MsSQLQA extends MsSQLDBI {
       // Connect to 'master', drop and recreate the target database before establishing the connection pool;
 
 	  const database = this.connectionProperties.database;
-      const MSSQL_SCHEMA_DB = this.parameters.MSSQL_SCHEMA_DB;
-      delete this.parameters.MSSQL_SCHEMA_DB;
+      const YADAMU_DATABASE = this.parameters.YADAMU_DATABASE;
+      delete this.parameters.YADAMU_DATABASE;
       
 	  this.connectionProperties.database = 'master';
       await this.createConnectionPool(); 
 
       try {
         let results;       
-        const dropDatabase = `drop database if exists "${MSSQL_SCHEMA_DB}"`;
+        const dropDatabase = `drop database if exists "${YADAMU_DATABASE}"`;
         results =  await this.executeSQL(dropDatabase);      
       
-        const createDatabase = `create database "${MSSQL_SCHEMA_DB}" COLLATE ${this.defaultCollation}`;
+        const createDatabase = `create database "${YADAMU_DATABASE}" COLLATE ${this.defaultCollation}`;
         results =  await this.executeSQL(createDatabase);      
         await this.finalize()
 	  } catch (e) {
 		this.yadamuLogger.qa([this.DATABASE_VENDOR,'recreateDatabase()'],e.message);
 	  }
 	  
-	  this.parameters.MSSQL_SCHEMA_DB = MSSQL_SCHEMA_DB
+	  this.parameters.YADAMU_DATABASE = YADAMU_DATABASE
 	  this.connectionProperties.database = database;
 	  
     }

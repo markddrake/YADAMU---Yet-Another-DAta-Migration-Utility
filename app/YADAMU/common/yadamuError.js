@@ -98,7 +98,7 @@ class DatabaseError extends Error {
 	return false;
   } 
 
- invalidConnection() {
+  invalidConnection() {
 	return false;
   } 
  

@@ -199,7 +199,7 @@ class MySQLDBI extends YadamuDBI {
 	
   };	  
 
-  async reconnectImpl() {
+  async _reconnect() {
     this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
     await this.connection.ping()
   }
@@ -264,7 +264,7 @@ class MySQLDBI extends YadamuDBI {
 	return results;
   }
   
-  async executeDDLImpl(ddl) {
+  async _executeDDL(ddl) {
     await this.createSchema(this.parameters.TO_USER);
     const ddlResults = await Promise.all(ddl.map((ddlStatement) => {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
@@ -407,6 +407,7 @@ class MySQLDBI extends YadamuDBI {
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
 	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 			
+	let stack;		 
     this.status.sqlTrace.write(this.traceSQL(`rollback transaction`));
 	
 	try {

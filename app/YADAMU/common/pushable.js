@@ -23,6 +23,7 @@ class Pushable extends Readable {
 	   this.pendingRead = true;
      }
 	 else {
+	   // if (this.data[0] === null) console.log('Push NULL')
 	   this.push(this.data.shift())
 	 }
   }

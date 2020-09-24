@@ -29,11 +29,11 @@ class DBWriter extends Writable {
   constructor(dbi,yadamuLogger,options) {
 
     super({objectMode: true});
-	
     this.dbi = dbi;
     this.ddlRequired = (this.dbi.MODE !== 'DATA_ONLY');    
     this.status = dbi.yadamu.STATUS
     this.yadamuLogger = yadamuLogger;
+	// console.log(yadamuLogger.os.constructor.name)
     this.yadamuLogger.info([`Writer`,dbi.DATABASE_VENDOR,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
         
     this.transactionManager = this.dbi
@@ -43,8 +43,9 @@ class DBWriter extends Writable {
     this.configureFeedback(this.dbi.parameters.FEEDBACK); 
 
 	this.ddlComplete = new Promise((resolve,reject) => {
-	  this.once('ddlComplete',() => {
+	  this.once('ddlComplete',(status) => {
  	    // this.yadamuLogger.trace([this.constructor.name],`DDL Complete`)
+		if (status instanceof Error) reject(status)
 		resolve(true);
 	  })
 	})	
@@ -255,7 +256,7 @@ class DBWriter extends Writable {
 		  // This allows the DBWriter to sleep, while the workers do the heavy lifting.
 		  this.deferredCallback = callback
           // this.yadamuLogger.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType],`Emit "ddlComplete"`)  
-          this.emit('ddlComplete');
+          this.emit('ddlComplete',null);
 		  return;
   	    case 'eof':		 
           this.emit('dataComplete',true);
@@ -265,19 +266,14 @@ class DBWriter extends Writable {
       callback();
     } catch (e) {
 	  this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_WRITE(${messageType})`,this.dbi.yadamu.ON_ERROR],e);
-	  this.transactionManager.skipTable = true;
-	  try {
+      this.emit('ddlComplete',e);
+      // Any errors that occur while processing metadata are fatal.
+      // Passing the exception to callback triggers the onError() event
+      try {
         await this.transactionManager.rollbackTransaction(e)
-		if ((['systemInformation','ddl','metadata'].indexOf(messageType) > -1) || this.dbi.abortOnError()){
-	      // Errors prior to processing rows are considered fatal
-		  callback(e);
-		}
-		else {
-          callback();
-		}
-	  } catch (e) {
-        // Passing the exception to callback triggers the onError() event
-        callback(e); 
+  	    callback(e);
+	  } catch (rollbackError) {
+		callback(e); 
       }
     }
   }
@@ -290,7 +286,7 @@ class DBWriter extends Writable {
       }
       else {
         await this.dbi.finalizeData();
-		if (YadamuLibrary.isEmpty(this.dbi.yadamu.timings)) {
+		if (YadamuLibrary.isEmpty(this.dbi.yadamu.metrics)) {
 		  this.yadamuLogger.info([`${this.dbi.DATABASE_VENDOR}`],`No tables found.`);
 		}
 	  }

@@ -43,7 +43,7 @@
         "MAX_STRING_LENGTH": "16777216"
     },
     "mssql": {
-        "DEFAULT_USER": "dbo",
+        "YADAMU_USER": "dbo",
         "SPATIAL_MAKE_VALID": false
     },
     "mysql": {
@@ -67,7 +67,7 @@
         "SPATIAL_FORMAT": "WKB"
     },
     "snowflake": {
-        "DEFAULT_USER": "public",
+        "YADAMU_USER": "public",
         "MAX_CHARACTER_SIZE": 16777216,
         "MAX_BINARY_SIZE": 8388608,
         "TRANSIENT_TABLES": true,
