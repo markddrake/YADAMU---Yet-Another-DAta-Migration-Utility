@@ -10,12 +10,12 @@ const DBWriter = require('./dbWriter.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const StringWriter = require('./stringWriter.js')
 const NullWriter = require('./nullWriter.js');
-const PassThrough = require('./yadamuPassThrough.js');
-const SimpleArrayReadable = require('./simpleArrayReadable.js');
 const {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuError.js');
 const OracleError  = require('../oracle/node/oracleError.js');
-const ErrorWriter = require('../file/node/errorWriter.js');
-const FileDBI = require('../file/node/fileDBI.js');
+
+const PassThrough = require('./yadamuPassThrough.js');
+const SimpleArrayReadable = require('./simpleArrayReadable.js');
+const ErrorDBI = require('../file/node/errorDBI.js');
 
 class YadamuLogger {
   
@@ -274,7 +274,7 @@ class YadamuLogger {
 
   async writeDataFile(dataFilePath,tableName,currentSettings,data) {
 	try {
-	  const dbi = new FileDBI(currentSettings.yadamu,dataFilePath)
+	  const dbi = new ErrorDBI(currentSettings.yadamu,dataFilePath)
       await dbi.initialize()
 	  
 	  // const logger = this
@@ -287,12 +287,11 @@ class YadamuLogger {
 	  
 	  await fileWriter.initialize()
    	  await dbi.initializeData()
-
 	  const dataObjects = data.map((d) => { return {data: d}})
 	  dataObjects.unshift({table: tableName})
       // const dataStream = Readable.from(dataObjects);
 	  const dataStream = new SimpleArrayReadable(dataObjects,{objectMode: true },true);
-	  const errorWriter = new ErrorWriter(dbi,tableName,undefined,0,{},logger)
+	  const errorWriter = dbi.getOutputStream()
 	  const passThrough = new PassThrough({objectMode: false},false);
       passThrough.on('end',async () => {
    	    // console.log('JSON Writer: finish',dbi.PIPELINE_ENTRY_POINT.writableEnded)

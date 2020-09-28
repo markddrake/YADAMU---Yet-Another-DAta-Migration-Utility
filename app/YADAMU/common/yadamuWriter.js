@@ -1,4 +1,4 @@
-                                          "use strict"
+"use strict"
 
 const assert = require('assert').strict;
 const Writable = require('stream').Writable
@@ -43,6 +43,8 @@ class YadamuWriter extends Transform {
     this.skipTable = this.dbi.MODE === 'DDL_ONLY';
     this.sqlInitialTime = this.dbi.sqlCumlativeTime
     this.startTime = performance.now();
+	this.endTime = undefined
+	this.writableFinalized = false;
     
     // this.on('pipe',(src)=>{console.log('pipe',src.constructor.name)})
     // this.on('unpipe',(src)=>{console.log('unpipe',src.constructor.name)})
@@ -143,7 +145,6 @@ class YadamuWriter extends Transform {
   }
   
   handleIterativeError(operation,cause,rowNumber,record,info) {
-      
     this.metrics.skipped++;
     
     try {
@@ -413,7 +414,8 @@ class YadamuWriter extends Transform {
       }
       callback();
     } catch (e) {
-      this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.yadamu.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);    
+	   console.log(e)
+	   this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.yadamu.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);    
       try {
         switch (messageType) {
           case 'data':
@@ -501,11 +503,15 @@ class YadamuWriter extends Transform {
     
     const metrics = {[this.tableName] : {rowCount: writerMetrics.metrics.committed, insertMode: writerMetrics.insertMode,  rowsSkipped: writerMetrics.metrics.skipped, elapsedTime: Math.round(writerElapsedTime).toString() + "ms", throughput: Math.round(writerThroughput).toString() + "/s", sqlExecutionTime: Math.round(writerMetrics.sqlTime)}};
     this.dbi.yadamu.recordMetrics(metrics);   
-    return (this.readerMetrics.failed || (this.readerMetrics.rowsRead !== writerMetrics.metrics.committed))
+    return (this.readerMetrics.failed || (this.readerMetrics.rowsRead !== (writerMetrics.metrics.committed + writerMetrics.metrics.skipped)))
   }
     
   async finalize(cause) {
-    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.skipTable,this.dbi.transactionInProgress,this.hasPendingRows(),this.metrics.received,this.metrics.committed,this.metrics.written,this.metrics.cached],'finalize()')
+    //  this.yadamuLogger.trace([this.constructor.name,this.tableName,this.skipTable,this.dbi.transactionInProgress,,this.writableEnded,this.writableFinished,this.destroyed,this.writableFinalized,this.hasPendingRows(),this.metrics.received,this.metrics.committed,this.metrics.written,this.metrics.cached],'finalize()')
+	
+    if (this.writableFinalized === true) return
+    this.writableFinalized = true;
+	
     if (this.hasPendingRows() && !this.skipTable) {
 	  const nextBatch = this.batch;
 	  const rowsReceived = this.metrics.received
@@ -530,21 +536,21 @@ class YadamuWriter extends Transform {
   }   
           
   async _final(callback) {
-    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),this.writableEnded,this.writableFinished,this.destroyed,this.batch.length,this.metrics.received,this.metrics.cached],'_final()')
-    try {
-      const failed = await this.finalize()
-	  if (failed && this.dbi.latestError) {  
-  	    this.emit('error',this.dbi.latestError)
-	  } 
-	  callback()
-    } catch (e) {
-	  // console.log(e)
-	  this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`"${this.tableName}"`],e);
-      // Passing the exception to callback from _final() does not seem to trigger the 'error' event
-	  this.emit('error',e)
-      callback(e);
-    } 
-	
+    // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),this.writableEnded,this.writableFinished,this.destroyed,this.metrics.received,this.metrics.cached],'_final()')
+    if (!this.writableFinished) {
+      try {
+        const failed = await this.finalize()
+	    if (failed && this.dbi.latestError) {  
+  	      this.emit('error',this.dbi.latestError)
+	    } 
+	    callback()
+      } catch (e) {
+	    this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`"${this.tableName}"`],e);
+        // Passing the exception to callback from _final() does not seem to trigger the 'error' event
+	    this.emit('error',e)
+        callback(e);
+      } 
+	}
   } 
  
   async forcedEnd() {

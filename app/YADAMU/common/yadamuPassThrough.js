@@ -14,7 +14,7 @@ class YadamuPassThrough extends PassThrough {
 	options.end = this.endOnEnd;
 	return super.pipe(os,options);
   }  
- 
+  
 }
 
 module.exports = YadamuPassThrough

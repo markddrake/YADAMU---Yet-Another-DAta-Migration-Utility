@@ -74,7 +74,7 @@ class MongoWriter extends YadamuWriter {
 	      }
         case 'object':
           return (row,idx) => {
-            row[idx] = typeof row[idx] === 'string' ? JSON.parse(row[idx]) : row[idx]
+            row[idx] = typeof row[idx] === 'string' && (row[idx].length > 0) ? JSON.parse(row[idx]) : row[idx]
 	      }
 
 		case 'bindata':

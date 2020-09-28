@@ -1,14 +1,11 @@
 "use strict"
 
 const Transform = require('stream').Transform
-const { performance } = require('perf_hooks');
-
 const pipeline = require('stream').pipeline;
-const DBIConstants = require('../../common/dbiConstants.js');
+const { performance } = require('perf_hooks');
 
 class TableManager extends Transform {
 
-    
   constructor(readerDBI,writerDBI,schemaInfo,tableIdx,yadamuLogger,inputTimings,currentPipeline) {
     super({objectMode: false})
 	this.schemaInfo = schemaInfo
@@ -60,7 +57,7 @@ class TableManager extends Transform {
 	components.push(outputStream);
 	idx++
 	const currentPipeline = [...components]
-    const tableManager = new TableManager(this.readerDBI,this.writerDBI,this.schemaInfo,idx,this.yadamuLogger,this.readerDBI.INPUT_METRICS,currentPipeline,)		
+    const tableManager = new TableManager(this.readerDBI,this.writerDBI,this.schemaInfo,idx,this.yadamuLogger,this.readerDBI.INPUT_METRICS,currentPipeline)		
 	components.push(tableManager);
 	return components;
   }

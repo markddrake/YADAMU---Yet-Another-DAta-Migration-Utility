@@ -115,7 +115,7 @@ class SnowflakeWriter extends YadamuWriter {
         this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
-		this.reportBatchError(`INSERT MANY`,cause)
+		this.reportBatchError(batch,`INSERT MANY`,cause)
 		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
         /*
         if (cause.spatialInsertFailed()) {	
@@ -181,10 +181,10 @@ class SnowflakeWriter extends YadamuWriter {
 		  }
 		  else {
 			if (cause.spatialInsertFailed()) {
-		      this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch)
+		      this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch[0])
 			}
 			else {
-              this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch)
+              this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch[0])
 			}
             if (this.skipTable) {
               break;
@@ -214,10 +214,10 @@ class SnowflakeWriter extends YadamuWriter {
 		  }
 		  else {
 			if (cause.spatialInsertFailed()) {
-		      this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch)
+		      this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch[0])
 			}
 			else {
-              this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch)
+              this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch[0])
 			}
             if (this.skipTable) {
               break;

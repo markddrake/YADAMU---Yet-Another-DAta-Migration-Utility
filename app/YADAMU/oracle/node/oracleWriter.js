@@ -427,6 +427,7 @@ end;`
    
   async serializeLobColumns(row) {
 	// Convert Lobs back to Strings or Buffers
+	// row = await Promise.all(row);
     const newRow = await Promise.all(row.map((col,idx) => {
       if (col instanceof oracledb.Lob) {
 	    return this.serializeLob(col)
@@ -547,7 +548,7 @@ end;`
     const lobInsert = (batch.lobRows.length > 0)
     if (lobInsert) {
 	   // this.batch.lobRows constists of a an array of arrays of pending promises that need to be resolved.
-	  batch.lowRows = await Promise.all(batch.lobRows.map(async (row) => { return await Promise.all(row.map((col) => {return col}))})) 
+	  batch.lobRows = await Promise.all(batch.lobRows.map(async (row) => { return await Promise.all(row.map((col) => {return col}))})) 
 	}
 	
     if (this.insertMode === 'Batch') {
@@ -557,7 +558,7 @@ end;`
         await this.dbi.createSavePoint()
         const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds});
 		if (lobInsert) {
-          rows = batch.lowRows
+          rows = batch.lobRows
           binds = this.tableInfo.lobBinds
           const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds});
           // await Promise.all(this.freeLobList());
@@ -618,7 +619,7 @@ end;`
 		  this.metrics.written++
         } catch (cause) {
 		  if (cause.jsonParsingFailed() && cause.includesSpatialOperation()) {
-			this.retryGeoJSONAsWKT(this.tableInfo.dml,binds,row,rows[row])
+			await this.retryGeoJSONAsWKT(this.tableInfo.dml,binds,row,rows[row])
 		  }
 		  else {
             this.handleIterativeError('INSERT ONE',cause,row,await this.serializeLobColumns(rows[row]));

@@ -8,7 +8,6 @@ class Pushable extends Readable {
 	 super(options);
 	 this.data = []
 	 this.endOnEnd = endOnEnd
-	 this.pendingRead = false;
   }
   
   pipe(os,options) {
@@ -20,22 +19,21 @@ class Pushable extends Readable {
   _read() {
 	 if (this.data.length === 0) {
 	   this.pause()
-	   this.pendingRead = true;
      }
 	 else {
-	   // if (this.data[0] === null) console.log('Push NULL')
+       console.log('_read()',this.data.length,this.data[0] === null ? ' END' : Object.keys(this.data[0])[0])
 	   this.push(this.data.shift())
 	 }
   }
   
   pump(data) {
-	this.data.push(data)
+    // console.log('pump()',this.data.length,data === null ? 'NULL' : Object.keys(data)[0])
+    this.data.push(data)
     if (this.paused) {
-	  this.resume();
-      if (this.pendingRead) {
-	    this.push(this.data.shift())
-		this.pendingRead = false;
-	  }
+       // console.log('_read()',this.data.length,this.data[0] === null ? ' END' : Object.keys(this.data[0])[0])
+	   this.push(this.data.shift())
+	   this.resume();
+	   this
 	}
   }
 }
