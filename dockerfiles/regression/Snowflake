@@ -1,0 +1,4 @@
+FROM yadamu/regression:latest
+WORKDIR /usr/src/YADAMU
+COPY dockerfiles/regression/secure/connections.json qa/regression
+ENTRYPOINT ["/bin/bash", "/usr/src/YADAMU/bin/chooseTest.sh", "$YADAMU_TEST_NAME"]

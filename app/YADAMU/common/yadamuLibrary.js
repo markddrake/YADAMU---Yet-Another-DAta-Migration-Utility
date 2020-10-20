@@ -3,10 +3,14 @@
 class YadamuLibrary {
 
   static get BOOLEAN_DATA_TYPES() {
-     this._BOOLEAN_DATA_TYPES = this._BOOLEAN_DATA_TYPES|| Object.freeze([Object.freeze(['BOOLEAN','']),Object.freeze(['BIT','']),Object.freeze(['RAW','1']),Object.freeze(['TINYINT','1'])])
-     return this._BOOLEAN_DATA_TYPES;
+     this._BOOLEAN_DATA_TYPES = this._BOOLEAN_DATA_TYPES || Object.freeze(['BOOLEAN','BIT','RAW','TINYINT'])
+	 return this._BOOLEAN_DATA_TYPES;
   }
 
+  static get BOOLEAN_SIZE_CONSTRAINTS() {
+     this._BOOLEAN_SIZE_CONSTRAINTS = this._BOOLEAN_SIZE_CONSTRAINTS || Object.freeze(['','','1','1'])
+     return this._BOOLEAN_SIZE_CONSTRAINTS;
+  }
   static get BINARY_DATA_TYPES() {
      this._BINARY_DATA_TYPES = this._BINARY_DATA_TYPES || Object.freeze(["RAW","BLOB","BINARY","VARBINARY","IMAGE","BYTEA","TINYBLOB","MEDIUMBLOB","LONGBLOB","ROWVERSION","OBJECTID","BINDATA"])
      return this._BINARY_DATA_TYPES;
@@ -108,8 +112,9 @@ class YadamuLibrary {
     return path.replace(/%date%/g,).replace(/%time%/g,).replace(/%isoDateTime%/,new Date().toISOString().replace(/:/g,'.'))
   }
 
-  static isBooleanType(dataType,size) {
-	return this.BOOLEAN_DATA_TYPES.includes([dataType.toUpperCase(),size]);
+  static isBooleanType(dataType,sizeConstraint) {
+	const idx = this.BOOLEAN_DATA_TYPES.indexOf(dataType.toUpperCase())
+	return ((idx > -1) && (this.BOOLEAN_SIZE_CONSTRAINTS[idx] === sizeConstraint))
   }
   
   static isBinaryDataType(dataType) {

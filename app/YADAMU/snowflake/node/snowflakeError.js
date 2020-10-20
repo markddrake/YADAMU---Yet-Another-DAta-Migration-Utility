@@ -1,6 +1,7 @@
 "use strict"
 
 const {DatabaseError} = require('../../common/yadamuError.js')
+const SnowflakeConstants = require('./snowflakeConstants.js')
 
 class SnowflakeError extends DatabaseError {
   
@@ -13,6 +14,14 @@ class SnowflakeError extends DatabaseError {
 	}
   }
 
+  lostConnection() {
+    return (this.cause.isFatal && (this.cause.code && SnowflakeConstants.LOST_CONNECTION_ERROR.includes(this.cause.code)) && (this.cause.sqlState && SnowflakeConstants.LOST_CONNECTION_STATE.includes(this.cause.sqlState)))
+  }
+
+  serverUnavailable() {
+    return this.lostConnection()
+  }
+  
   spatialInsertFailed() {
 	const spatialErrorCodes = Object.freeze(['100217','100205'])
     return (this.cause.code && spatialErrorCodes.includes(this.cause.code))

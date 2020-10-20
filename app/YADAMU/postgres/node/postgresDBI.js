@@ -165,7 +165,13 @@ class PostgresDBI extends YadamuDBI {
     })
    
     await this.executeSQL(PostgresDBI.SQL_CONFIGURE_CONNECTION);				
+	
+    const results = await this.executeSQL(PostgresDBI.SQL_SYSTEM_INFORMATION)
+	this._DB_VERSION = results.rows[0][3];
+
   }
+  
+  
 
   async closeConnection() {
 
@@ -520,15 +526,16 @@ class PostgresDBI extends YadamuDBI {
     return {
       date               : new Date().toISOString()
      ,timeZoneOffset     : new Date().getTimezoneOffset()                      
-     ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
+     ,sessionTimeZone    : sysInfo[4]
      ,vendor             : this.DATABASE_VENDOR
      ,postgisInfo        : postgisInfo
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
      ,exportVersion      : Yadamu.EXPORT_VERSION
-	 ,sessionUser        : sysInfo.session_user
-     ,dbName             : sysInfo.database_name
-     ,databaseVersion    : sysInfo.database_version
+	 ,currentUser        : sysInfo[1]
+     ,sessionUser        : sysInfo[2]
+	 ,dbName             : sysInfo[0]
+     ,databaseVersion    : sysInfo[3]
      ,softwareVendor     : this.SOFTWARE_VENDOR
      ,nodeClient         : {
         version          : process.version
@@ -640,11 +647,11 @@ class PostgresDBI extends YadamuDBI {
 
 module.exports = PostgresDBI
 
-const _SQL_CONFIGURE_CONNECTION = `set timezone to 'UTC'; SET extra_float_digits to 3;SET Intervalstyle = 'iso_8601'`
+const _SQL_CONFIGURE_CONNECTION = `set timezone to 'UTC'; SET extra_float_digits to 3; SET Intervalstyle = 'iso_8601'`
 
 const _SQL_SCHEMA_INFORMATION   = `select * from EXPORT_JSON($1,$2)`;
  
-const _SQL_SYSTEM_INFORMATION   = `select current_database() database_name,current_user,session_user,current_setting('server_version_num') database_version`;					   
+const _SQL_SYSTEM_INFORMATION   = `select current_database() database_name,current_user, session_user, current_setting('server_version_num') database_version, right(to_char(current_timestamp,'YYYY-MM-DD"T"Hh24:MI:SSTZH:TZM'),6) timezone`;
 
 const _SQL_CREATE_SAVE_POINT    = `SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 

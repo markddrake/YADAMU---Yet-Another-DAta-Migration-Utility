@@ -123,9 +123,7 @@ class MariadbWriter extends YadamuWriter {
   }
   	
   async _writeBatch(batch,rowCount) {
-
-     // console.log(batch.slice(0,this.tableInfo.columnCount))
-
+   // console.log(batch.slice(0,this.tableInfo.columnCount))
    this.metrics.batchCount++; 
    let repackBatch = false
 

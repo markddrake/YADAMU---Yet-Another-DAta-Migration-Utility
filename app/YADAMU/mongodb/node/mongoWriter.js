@@ -92,6 +92,19 @@ class MongoWriter extends YadamuWriter {
           }			
 		  return null
 		default:
+		  if (YadamuLibrary.isNumericDataType(targetDataType)) {
+			return (row,idx) => {
+			  if (typeof row[idx] === 'string') {
+			    row[idx] = Number(row[idx])
+			    this.transformations[idx] = (row,idx) => {
+				  row[idx] = Number(row[idx])
+				}
+			  }
+			  else {
+                this.transformations[idx] = null
+			  }
+			}
+          }			
 		  return null
 	  }
 	})
@@ -131,12 +144,18 @@ class MongoWriter extends YadamuWriter {
         }
         break;
       case 'BSON':
-      case 'OBJECT' :
-        const mDocument = {}
+        const bsonDocument = {}
         this.tableInfo.columnNames.forEach((key,idx) => {
-           mDocument[key] = row[idx]
+           bsonDocument[key] = row[idx]
         });
-        this.batch.push(mDocument);
+        this.batch.push(bsonDocument);
+        break;
+      case 'OBJECT' :
+        const jsonDocument = {}
+        this.tableInfo.columnNames.forEach((key,idx) => {
+           jsonDocument[key] = row[idx]
+        });
+        this.batch.push(jsonDocument);
         break;
       case 'ARRAY' :
         this.batch.push({ row : row });

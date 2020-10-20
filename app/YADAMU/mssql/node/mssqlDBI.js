@@ -76,19 +76,19 @@ class MsSQLDBI extends YadamuDBI {
   constructor(yadamu) {
     super(yadamu,MsSQLConstants.DEFAULT_PARAMETERS);
     this.requestProvider = undefined;
-	this.transaction = undefined;
+    this.transaction = undefined;
     this.pool = undefined;
     this.yadamuRollack = false
+    this.tediousTransactionError = false;
+    // Allow subclasses to access constants defined by the sql object. Redeclaring the SQL object in a subclass causes strange behavoir
     
-	// Allow subclasses to access constants defined by the sql object. Redeclaring the SQL object in a subclass causes strange behavoir
-	
-	this.sql = sql
+    this.sql = sql
     
     sql.on('error',(err, p) => {
       this.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`mssql.onError()`],err);
       throw err
     })
-    	
+        
   }
 
   /*
@@ -99,12 +99,18 @@ class MsSQLDBI extends YadamuDBI {
   
   SQL_SCHEMA_INFORMATION() {
      
-    const spatialClause = this.SPATIAL_MAKE_VALID === true ? `concat('case when "',"COLUMN_NAME",'".STIsValid() = 0 then "',"COLUMN_NAME",'".MakeValid().${this.spatialSerializer} else "',"COLUMN_NAME",'".${this.spatialSerializer} end "',"COLUMN_NAME",'"')` : `concat('"',"COLUMN_NAME",'".${this.spatialSerializer} "',"COLUMN_NAME",'"')`
+    const spatialClause = this.SPATIAL_MAKE_VALID === true ? `concat('case when "',c."COLUMN_NAME",'".STIsValid() = 0 then "',c."COLUMN_NAME",'".MakeValid().${this.spatialSerializer} else "',c."COLUMN_NAME",'".${this.spatialSerializer} end "',c."COLUMN_NAME",'"')` : `concat('"',c."COLUMN_NAME",'".${this.spatialSerializer} "',c."COLUMN_NAME",'"')`
     
     return `select t."TABLE_SCHEMA" "TABLE_SCHEMA"
                   ,t."TABLE_NAME"   "TABLE_NAME"
                   ,concat('[',string_agg(concat('"',c."COLUMN_NAME",'"'),',') within group (order by "ORDINAL_POSITION"),']') "COLUMN_NAME_ARRAY"
-                  ,concat('[',string_agg(concat('"',"DATA_TYPE",'"'),',') within group (order by "ORDINAL_POSITION"),']') "DATA_TYPE_ARRAY"
+                  ,concat('[',string_agg(case
+                                           when cc."CONSTRAINT_NAME" is not NULL then 
+                                             '"JSON"'
+                                           else 
+                                             concat('"',"DATA_TYPE",'"')
+                                           end
+                                         ,',') within group (order by "ORDINAL_POSITION"),']') "DATA_TYPE_ARRAY"
                   ,concat('[',string_agg(concat('"',"COLLATION_NAME",'"'),',') within group (order by "ORDINAL_POSITION"),']') "COLLATION_NAME_ARRAY"
                   ,concat('[',string_agg(case
                                  when ("NUMERIC_PRECISION" is not null) and ("NUMERIC_SCALE" is not null) 
@@ -123,26 +129,40 @@ class MsSQLDBI extends YadamuDBI {
                     within group (order by "ORDINAL_POSITION"),']') "SIZE_CONSTRAINT_ARRAY"
                    ,string_agg(case 
                                                   when "DATA_TYPE" = 'hierarchyid' then
-                                                    concat('cast("',"COLUMN_NAME",'" as NVARCHAR(4000)) "',"COLUMN_NAME",'"') 
+                                                    concat('cast("',c."COLUMN_NAME",'" as NVARCHAR(4000)) "',c."COLUMN_NAME",'"') 
                                                   when "DATA_TYPE" in ('geometry','geography') then
                                                     ${spatialClause}
                                                   when "DATA_TYPE" = 'datetime2' then
-                                                    concat('convert(VARCHAR(33),"',"COLUMN_NAME",'",127) "',"COLUMN_NAME",'"') 
+                                                    concat('convert(VARCHAR(33),"',c."COLUMN_NAME",'",127) "',c."COLUMN_NAME",'"') 
                                                   when "DATA_TYPE" = 'datetimeoffset' then
-                                                    concat('convert(VARCHAR(33),"',"COLUMN_NAME",'",127) "',"COLUMN_NAME",'"') 
+                                                    concat('convert(VARCHAR(33),"',c."COLUMN_NAME",'",127) "',c."COLUMN_NAME",'"') 
                                                   when "DATA_TYPE" = 'xml' then
-                                                    concat('replace(replace(convert(NVARCHAR(MAX),"',"COLUMN_NAME",'"),''&#x0A;'',''\n''),''&#x20;'','' '') "',"COLUMN_NAME",'"') 
+                                                    concat('replace(replace(convert(NVARCHAR(MAX),"',c."COLUMN_NAME",'"),''&#x0A;'',''\n''),''&#x20;'','' '') "',c."COLUMN_NAME",'"') 
                                                   else 
-                                                    concat('"',"COLUMN_NAME",'"') 
+                                                    concat('"',c."COLUMN_NAME",'"') 
                                                 end
                                                ,','
                                                ) 
                               within group (order by "ORDINAL_POSITION"
                              ) "CLIENT_SELECT_LIST"
-              from "INFORMATION_SCHEMA"."COLUMNS" c, "INFORMATION_SCHEMA"."TABLES" t
-             where t."TABLE_NAME" = c."TABLE_NAME"
-               and t."TABLE_SCHEMA" = c."TABLE_SCHEMA"
-               and t."TABLE_TYPE" = 'BASE TABLE'
+              from "INFORMATION_SCHEMA"."COLUMNS" c
+                   left join "INFORMATION_SCHEMA"."TABLES" t
+                       on t."TABLE_CATALOG" = c."TABLE_CATALOG"
+                      and t."TABLE_SCHEMA" = c."TABLE_SCHEMA"
+                      and t."TABLE_NAME" = c."TABLE_NAME"
+                    left outer join (
+                       "INFORMATION_SCHEMA"."CONSTRAINT_COLUMN_USAGE" ccu
+                       left join "INFORMATION_SCHEMA"."CHECK_CONSTRAINTS" cc
+                         on cc."CONSTRAINT_CATALOG" = ccu."CONSTRAINT_CATALOG"
+                        and cc."CONSTRAINT_SCHEMA" = ccu."CONSTRAINT_SCHEMA"
+                        and cc."CONSTRAINT_NAME" = ccu."CONSTRAINT_NAME"
+                       )
+                       on ccu."TABLE_CATALOG" = c."TABLE_CATALOG"
+                      and ccu."TABLE_SCHEMA" = c."TABLE_SCHEMA"
+                      and ccu."TABLE_NAME" = c."TABLE_NAME"
+                      and ccu."COLUMN_NAME" = c."COLUMN_NAME"
+                      and UPPER("CHECK_CLAUSE") like '(ISJSON(%)>(0))'
+             where t."TABLE_TYPE" = 'BASE TABLE'
                and t."TABLE_SCHEMA" = @SCHEMA
              group by t."TABLE_SCHEMA", t."TABLE_NAME"`;  
   }    
@@ -153,36 +173,36 @@ class MsSQLDBI extends YadamuDBI {
       this.setTargetDatabase();
       const connection = await sql.connect(this.connectionProperties);
       await sql.close();
-	  super.setParameters(parameters)
-	} catch (e) {
+      super.setParameters(parameters)
+    } catch (e) {
       await sql.close();
-	  throw (e)
-	} 
+      throw (e)
+    } 
   }
 
   getArgNameList(args) {
 
-	if (args !== undefined) {
+    if (args !== undefined) {
       if (args.inputs) {
-	    const argList = args.inputs.map((input) => {
-		  return `@${input.name}`
-	    }).join(',')
-		return argList
-	  }
-	}
+        const argList = args.inputs.map((input) => {
+          return `@${input.name}`
+        }).join(',')
+        return argList
+      }
+    }
     return ''
-  }		
+  }     
 
   async configureConnection() {
 
     let statement = `SET QUOTED_IDENTIFIER ON`
-	let results = await this.executeSQL(statement)
+    let results = await this.executeSQL(statement)
     
     statement = `select CONVERT(NVARCHAR(20),SERVERPROPERTY('ProductVersion')) "DATABASE_VERSION", CONVERT(NVARCHAR(32),DATABASEPROPERTYEX(DB_NAME(),'collation')) "DB_COLLATION"`
     results = await this.executeSQL(statement)
     this._DB_VERSION =  parseInt(results.recordsets[0][0].DATABASE_VERSION)
-	this._DB_COLLATION = results.recordsets[0][0].DB_COLLATION
-	
+    this._DB_COLLATION = results.recordsets[0][0].DB_COLLATION
+    
     this.defaultCollation = this.DB_VERSION < 15 ? 'Latin1_General_100_CS_AS_SC' : 'Latin1_General_100_CS_AS_SC_UTF8';
   }
   
@@ -193,57 +213,64 @@ class MsSQLDBI extends YadamuDBI {
   }
   
   reportTransactionState(operation) {
-	const e = new Error(`Unexpected ${operation} operation`)
-	this.yadamuLogger.handleException([this.DATABASE_VENDOR,'TRANSACTION MANAGER',operation],new MsSQLError(e,e.stack,this.constructor.name))
+    const e = new Error(`Unexpected ${operation} operation`)
+    this.yadamuLogger.handleException([this.DATABASE_VENDOR,'TRANSACTION MANAGER',operation],new MsSQLError(e,e.stack,this.constructor.name))
+    
   }
   
   getTransactionManager() {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.getTransactionManager()`,this.getWorkerNumber()],``)
 
-	this.transactionInProgress = false;
-  	const transaction = new sql.Transaction(this.pool)
-    transaction.on('rollback',() => { if (!this.yadamuRollback) {this.reportTransactionState('ROLLBACK')}});
+    this.transactionInProgress = false;
+    const transaction = new sql.Transaction(this.pool)
+    transaction.on('rollback',async () => { 
+      if (!this.yadamuRollback) {
+        this.transactionInProgress = false;
+        this.tediousTransactionError = true;
+        this.reportTransactionState('ROLLBACK')
+      }
+    });
     return transaction
   }
 
   getRequest() {
-	let stack
-	try {
-	  stack = new Error().stack;
-	  const request = new sql.Request(this.requestProvider)
+    let stack
+    try {
+      stack = new Error().stack;
+      const request = new sql.Request(this.requestProvider)
       request.on('info',(infoMsg) => { 
         this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`MESSAGE`],`${infoMsg.message}`);
       })
-	  return request;
-	} catch (e) {
-	  throw this.captureException(new MsSQLError(e,stack,`sql.Request(${this.requestProvider.constuctor.name})`))
+      return request;
+    } catch (e) {
+      throw this.captureException(new MsSQLError(e,stack,`sql.Request(${this.requestProvider.constuctor.name})`))
     }
   }
   
   getRequestWithArgs(args) {
-	 
-	const request = this.getRequest();
-	
-	if (args !== undefined) {
+     
+    const request = this.getRequest();
+    
+    if (args !== undefined) {
       if (args.inputs) {
-	    args.inputs.forEach((input) => {
-		  request.input(input.name,input.type,input.value)
-	    })
-	  }
-	}
-	
-	return request;
+        args.inputs.forEach((input) => {
+          request.input(input.name,input.type,input.value)
+        })
+      }
+    }
+    
+    return request;
   }
   
   async getPreparedStatement(sqlStatement, dataTypes, rowSpatialFormat) {
-	  
+      
     // this.yadamuLogger.trace([`${this.constructor.name}.getPreparedStatement()`,this.getWorkerNumber()],sqlStatement);
 
-	const spatialFormat = rowSpatialFormat === undefined ? this.SPATIAL_FORMAT : rowSpatialFormat
-	let stack
-	let statement
-	try {
+    const spatialFormat = rowSpatialFormat === undefined ? this.SPATIAL_FORMAT : rowSpatialFormat
+    let stack
+    let statement
+    try {
       stack = new Error().stack;
       statement = new sql.PreparedStatement(this.requestProvider)
       dataTypes.forEach((dataType,idx) => {
@@ -350,7 +377,7 @@ class MsSQLDBI extends YadamuDBI {
             statement.input(column,sql.Binary(dataType.length));
             break;
           case 'varbinary':
-  	        // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
+            // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
             // sql.VarBinary ([length])
              statement.input(column,sql.VarBinary(length));
             break;
@@ -363,27 +390,27 @@ class MsSQLDBI extends YadamuDBI {
             break;
           case 'geography':
             // statement.input(column,sql.Geography)
-	        // Upload Geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
-	   	    switch (spatialFormat) {
-	   		  case "WKB":
+            // Upload Geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
+            switch (spatialFormat) {
+              case "WKB":
               case "EWKB":
                 statement.input(column,sql.VarBinary(sql.MAX));
-	     	   break;
-	     	  default:
-	   	        statement.input(column,sql.VarChar(sql.MAX));
-	   	    }
+               break;
+              default:
+                statement.input(column,sql.VarChar(sql.MAX));
+            }
             break;
           case 'geometry':
             // statement.input(column,sql.Geometry);
-	   	    // Upload Geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
-	   	    switch (spatialFormat) {
-	   		  case "WKB":
+            // Upload Geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
+            switch (spatialFormat) {
+              case "WKB":
               case "EWKB":
                 statement.input(column,sql.VarBinary(sql.MAX));
-	   	  	    break;
-	   		  default:
-	   	        statement.input(column,sql.VarChar(sql.MAX));
-	   	    }
+                break;
+              default:
+                statement.input(column,sql.VarChar(sql.MAX));
+            }
             break;
           case 'hierarchyid':
             statement.input(column,sql.VarChar(4000));
@@ -392,75 +419,74 @@ class MsSQLDBI extends YadamuDBI {
             this.yadamuLogger.warning([this.DATABASE_VENDOR,`PREPARED STATEMENT`],`Unmapped data type [${dataType.type}].`);
         }
       })
-	  
-	  stack = new Error().stack;
-	  await statement.prepare(sqlStatement);
-	  return statement;
-	} catch (e) {
-	  try {
+      
+      stack = new Error().stack;
+      await statement.prepare(sqlStatement);
+      return statement;
+    } catch (e) {
+      try {
         await statement.unprepare();
-	  } catch (e) {}
-	  throw this.captureException(new MsSQLError(e,stack,`sql.PreparedStatement(${sqlStatement}`))
+      } catch (e) {}
+      throw this.captureException(new MsSQLError(e,stack,`sql.PreparedStatement(${sqlStatement}`))
     }
   }
 
   async createConnectionPool() {
-	  
+      
     // this.yadamuLogger.trace([this.DATABASE_VENDOR],`createConnectionPool()`)
   
-	this.setTargetDatabase();
+    this.setTargetDatabase();
     this.logConnectionProperties();
 
-	let stack
-	let operation                                                                        
+    let stack
+    let operation                                                                        
     try {
       const sqlStartTime = performance.now();
       stack = new Error().stack;
-	  operation = 'sql.connectionPool()'
-	  this.pool = new sql.ConnectionPool(this.connectionProperties)
+      operation = 'sql.connectionPool()'
+      this.pool = new sql.ConnectionPool(this.connectionProperties)
       this.pool.on('error',(err, p) => {
-		const cause = err instanceof MsSQLError ? err : this.captureException(new MsSQLError(err,stack,`${operation}.onError()`))
-		if (!cause.suppressedError())  {
+        const cause = err instanceof MsSQLError ? err : this.captureException(new MsSQLError(err,stack,`${operation}.onError()`))
+        if (!cause.suppressedError())  {
           this.yadamuLogger.handleException([this.DATABASE_VENDOR,`sql.ConnectionPool.onError()`],cause);
-		  if (!this.reconnectInProgress) {
+          if (!this.reconnectInProgress) {
             throw cause
-		  }
-		}
+          }
+        }
       })
-	  
+      
       stack = new Error().stack;
-	  operation = 'sql.ConnectionPool.connect()'
-	  await this.pool.connect();
+      operation = 'sql.ConnectionPool.connect()'
+      await this.pool.connect();
       this.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.pool;
-	  this.transaction = this.getTransactionManager()
-	  
-	} catch (e) {
-	  throw this.captureException(new MsSQLError(e,stack,operation))
-    }		
+      this.transaction = this.getTransactionManager()
+      
+    } catch (e) {
+      throw this.captureException(new MsSQLError(e,stack,operation))
+    }       
 
-	await this.configureConnection();
+    await this.configureConnection();
   }
 
   async _getDatabaseConnection() {
-	try {
-   	  // this.yadamuLogger.trace(this.DATABASE_VENDOR,this.getWorkerNumber()],`_getDatabaseConnection()`)
+    try {
+      // this.yadamuLogger.trace(this.DATABASE_VENDOR,this.getWorkerNumber()],`_getDatabaseConnection()`)
       await this.createConnectionPool();
-	} catch (e) {
+    } catch (e) {
       const err = new ConnectionError(e,this.connectionProperties);
-	  throw err
-	}
+      throw err
+    }
   } 
   
   async closeConnection() {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.preparedStatement !== undefined)},${this.transactionInProgress})`)
-	// console.log(new Error().stack);
-	
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.preparedStatement !== undefined)},${this.transactionInProgress})`)
+    
     if (this.preparedStatement !== undefined ) {
       await this.clearCachedStatement()
-    }	
-	
+    }   
+    
     if (this.transactionInProgress === true) {
       try {
         await this.rollbackTransaction()
@@ -471,25 +497,25 @@ class MsSQLDBI extends YadamuDBI {
   }
   
   async closePool() {
-  	
+    
     // this.yadamuLogger.trace([this.DATABASE_VENDOR],`closePool(${(this.pool !== undefined)})`)
 
-	if (this.pool !== undefined) {
-	  let stack
-	  let psudeoSQL
+    if (this.pool !== undefined) {
+      let stack
+      let psudeoSQL
       try {
-		stack = new Error().stack
-		psudeoSQL = 'MsSQL.Pool.close()'
+        stack = new Error().stack
+        psudeoSQL = 'MsSQL.Pool.close()'
         await this.pool.close();
-		stack = new Error().stack
-		psudeoSQL = 'MsSQL.close()'
-		await sql.close();
-		// Setting pool to undefined seems to cause Error: No connection is specified for that request if a new pool is created.. ### Makes no sense
-	    // this.pool = undefined;
+        stack = new Error().stack
+        psudeoSQL = 'MsSQL.close()'
+        await sql.close();
+        // Setting pool to undefined seems to cause Error: No connection is specified for that request if a new pool is created.. ### Makes no sense
+        // this.pool = undefined;
       } catch(e) {
-	    // this.pool = undefined
-	    throw this.captureException(new MsSQLError(e,stack,psudeoSQL))
-	  }
+        // this.pool = undefined
+        throw this.captureException(new MsSQLError(e,stack,psudeoSQL))
+      }
     }
   }
  
@@ -501,13 +527,13 @@ class MsSQLDBI extends YadamuDBI {
   }
   
   setConnectionProperties(connectionProperties) {
-	if (Object.getOwnPropertyNames(connectionProperties).length > 0) {	  
+    if (Object.getOwnPropertyNames(connectionProperties).length > 0) {    
       if (!connectionProperties.options) {
         connectionProperties.options = {}
-	  }
+      }
       connectionProperties.options.abortTransactionOnError = false
       connectionProperties.options.enableArithAbort = true;
-	}
+    }
     super.setConnectionProperties(connectionProperties)
   }
   
@@ -521,16 +547,16 @@ class MsSQLDBI extends YadamuDBI {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
-		stack = new Error().stack
-		const request = this.getRequest();
+        stack = new Error().stack
+        const request = this.getRequest();
         const results = await request.batch(sqlStatment);  
         this.traceTiming(sqlStartTime,performance.now())
-		return results;
+        return results;
       } catch (e) {
-		const cause = this.captureException(new MsSQLError(e,stack,sqlStatment))
-		if (attemptReconnect && cause.lostConnection()) {
+        const cause = this.captureException(new MsSQLError(e,stack,sqlStatment))
+        if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
-		  // reconnect() throws cause if it cannot reconnect...
+          // reconnect() throws cause if it cannot reconnect...
           await this.reconnect(cause,'BATCH OPERATION')
           continue;
         }
@@ -550,16 +576,16 @@ class MsSQLDBI extends YadamuDBI {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
-		stack = new Error().stack
-		const request = this.getRequestWithArgs(args);
-		const results = await request.execute(procedure);
+        stack = new Error().stack
+        const request = this.getRequestWithArgs(args);
+        const results = await request.execute(procedure);
         this.traceTiming(sqlStartTime,performance.now())
-		return results;
+        return results;
       } catch (e) {
-		const cause = this.captureException(new MsSQLError(e,stack,psuedoSQL))
-		if (attemptReconnect && cause.lostConnection()) {
+        const cause = this.captureException(new MsSQLError(e,stack,psuedoSQL))
+        if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
-		  // reconnect() throws cause if it cannot reconnect...
+          // reconnect() throws cause if it cannot reconnect...
           await this.reconnect(cause,'EXECUTE')
           continue;
         }
@@ -569,16 +595,16 @@ class MsSQLDBI extends YadamuDBI {
   }
   
   async cachePreparedStatement(sqlStatement,dataTypes,spatialFormat) {
-	 const statement = await this.getPreparedStatement(sqlStatement,dataTypes,spatialFormat)
-	 this.preparedStatement = {
-	   statement         : statement
-	 , sqlStatement      : sqlStatement
-	 , dataTypes         : dataTypes
-	 }
+     const statement = await this.getPreparedStatement(sqlStatement,dataTypes,spatialFormat)
+     this.preparedStatement = {
+       statement         : statement
+     , sqlStatement      : sqlStatement
+     , dataTypes         : dataTypes
+     }
   }
  
   async executeCachedStatement(args) {
-	
+    
     let stack
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
     this.status.sqlTrace.write(this.traceSQL(this.preparedStatement.sqlStatement))
@@ -587,16 +613,16 @@ class MsSQLDBI extends YadamuDBI {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
-		stack = new Error().stack
-	    const results = await this.preparedStatement.statement.execute(args);
+        stack = new Error().stack
+        const results = await this.preparedStatement.statement.execute(args);
         this.traceTiming(sqlStartTime,performance.now())
-		return results;
+        return results;
       } catch (e) {
-		const cause = this.captureException(new MsSQLError(e,stack,this.preparedStatement.sqlStatement))
-		if (attemptReconnect && cause.lostConnection()) {
-	      this.preparedStatement === undefined;
+        const cause = this.captureException(new MsSQLError(e,stack,this.preparedStatement.sqlStatement))
+        if (attemptReconnect && cause.lostConnection()) {
+          this.preparedStatement === undefined;
           attemptReconnect = false;
-		  // reconnect() throws cause if it cannot reconnect...
+          // reconnect() throws cause if it cannot reconnect...
           await this.reconnect(cause,'PREPARED STATEMENT')
           this.cachePreparedStatement(this.preparedStatement.sqlStatement,this.preparedStatement.dataTypes);
           continue;
@@ -608,9 +634,9 @@ class MsSQLDBI extends YadamuDBI {
 
   async clearCachedStatement() {
      // this.yadamuLogger.trace([`${this.constructor.name}.clearCachedStatement()`,this.getWorkerNumber()],`clearCachedStatement(${this.preparedStatement ? this.preparedStatement.sqlStatement : undefined})`)
-	 if (this.preparedStatement !== undefined) {
-	   await this.preparedStatement.statement.unprepare()
-	 }
+     if (this.preparedStatement !== undefined) {
+       await this.preparedStatement.statement.unprepare()
+     }
      this.preparedStatement = undefined;
   }
 
@@ -618,32 +644,32 @@ class MsSQLDBI extends YadamuDBI {
 
     await this.cachePreparedStatement(sqlStatement,dataTypes)
     const results = await this.dbi.executeCachedStatement(args);
-	await this.clearCachedStatement()
-	return results;
-	
+    await this.clearCachedStatement()
+    return results;
+    
   }
-	
+    
   async bulkInsert(bulkOperation) {
      
     let stack
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-	let operation = `Bulk Operation: ${bulkOperation.path}. [${bulkOperation.rows.length}] rows.`
+    let operation = `Bulk Operation: ${bulkOperation.path}. [${bulkOperation.rows.length}] rows.`
     this.status.sqlTrace.write(this.traceComment(operation))
    
     while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
-		stack = new Error().stack
-		const request = this.getRequest();
+        stack = new Error().stack
+        const request = this.getRequest();
         const results = await request.bulk(bulkOperation);
         this.traceTiming(sqlStartTime,performance.now())
-		return results;
+        return results;
       } catch (e) {
-		const cause = this.captureException(new MsSQLError(e,stack,operation))
-		if (attemptReconnect && cause.lostConnection()) {
+        const cause = this.captureException(new MsSQLError(e,stack,operation))
+        if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
-		  // reconnect() throws cause if it cannot reconnect...
+          // reconnect() throws cause if it cannot reconnect...
           await this.reconnect(cause,'BULK INSERT')
           continue;
         }
@@ -654,24 +680,24 @@ class MsSQLDBI extends YadamuDBI {
 
   async executeSQL(sqlStatement,args,noReconnect) {
 
-	let stack
+    let stack
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
     this.status.sqlTrace.write(this.traceSQL(sqlStatement))
-	
+    
     while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
-		stack = new Error().stack
-		const request = this.getRequestWithArgs(args)
+        stack = new Error().stack
+        const request = this.getRequestWithArgs(args)
         const results = await request.query(sqlStatement);  
         this.traceTiming(sqlStartTime,performance.now())
-		return results;
+        return results;
       } catch (e) {
-		const cause = new  MsSQLError(e,stack,sqlStatement);
-		if (attemptReconnect && cause.lostConnection()) {
+        const cause = new  MsSQLError(e,stack,sqlStatement);
+        if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
-		  // reconnect() throws cause if it cannot reconnect...
+          // reconnect() throws cause if it cannot reconnect...
           await this.reconnect(cause,'SQL')
           continue;
         }
@@ -689,7 +715,7 @@ class MsSQLDBI extends YadamuDBI {
     for (let ddlStatement of ddl) {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
       try {
-		// May need to use executeBatch if we support SQL Server 2000.
+        // May need to use executeBatch if we support SQL Server 2000.
         const results = await this.executeSQL(ddlStatement);
       } catch (e) {
         this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
@@ -713,7 +739,7 @@ class MsSQLDBI extends YadamuDBI {
     if (schema !== 'dbo') {
       const createSchema = `if not exists (select 1 from sys.schemas where name = N'${schema}') exec('create schema "${schema}"')`;
       try {
-		const results = await this.executeSQL(createSchema)
+        const results = await this.executeSQL(createSchema)
       } catch (e) {
         this.yadamuLogger.logException([`${this.constructor.name}.createSchema()`],e)
       }
@@ -771,7 +797,7 @@ class MsSQLDBI extends YadamuDBI {
         encrypt: false // Use this if you're on Windows Azure
       , abortTransactionOnError : false
       , enableArithAbort : true
-	  }
+      }
     }
   }
       
@@ -782,7 +808,7 @@ class MsSQLDBI extends YadamuDBI {
   */
 
   async finalize(poolOptions) {
-	await super.finalize(poolOptions)
+    await super.finalize(poolOptions)
   }
 
   /*
@@ -804,27 +830,28 @@ class MsSQLDBI extends YadamuDBI {
   async beginTransaction() {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
-    	  
-	let stack
+          
+    let stack
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-	const psuedoSQL = 'begin transaction'
+    const psuedoSQL = 'begin transaction'
     this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
-	
+    
     while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
-		stack = new Error().stack
+        stack = new Error().stack
         await this.transaction.begin();
-	    this.traceTiming(sqlStartTime,performance.now())
+        this.traceTiming(sqlStartTime,performance.now())
+        this.tediousTransactionError = false;
         this.requestProvider = this.transaction
-	    super.beginTransaction()
-		break;
+        super.beginTransaction()
+        break;
       } catch (e) {
-		const cause = this.captureException(new MsSQLError(e,stack,'sql.Transaction.begin()'))
-		if (attemptReconnect && cause.lostConnection()) {
+        const cause = this.captureException(new MsSQLError(e,stack,'sql.Transaction.begin()'))
+        if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
-		  // reconnect() throws cause if it cannot reconnect...
+          // reconnect() throws cause if it cannot reconnect...
           await this.reconnect(cause,'SQL')
           continue;
         }
@@ -835,37 +862,36 @@ class MsSQLDBI extends YadamuDBI {
 
   /*
   ** Commit the current transaction
-  **Can't rollback transaction. There is a request in progress.
   **
   */
   
   async commitTransaction() {
-	  
+      
     // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
-	let stack
+    let stack
     const psuedoSQL = 'commit transaction'
     this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
-	  
-	try {
-	  super.commitTransaction()
+      
+    try {
+      super.commitTransaction()
       const sqlStartTime = performance.now();
       stack = new Error().stack;
       await this.transaction.commit();
-	  this.traceTiming(sqlStartTime,performance.now())
+      this.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.pool
-	} catch (e) {
-	  const cause = this.captureException(new MsSQLError(e,stack,'sql.Transaction.commit()'))
-  	  if (attemptReconnect && cause.lostConnection()) {
+    } catch (e) {
+      const cause = this.captureException(new MsSQLError(e,stack,'sql.Transaction.commit()'))
+      if (attemptReconnect && cause.lostConnection()) {
         attemptReconnect = false;
-		// reconnect() throws cause if it cannot reconnect...
+        // reconnect() throws cause if it cannot reconnect...
         await this.reconnect(cause,'Commit')
       }
-	  throw this.captureException(new MsSQLError(e,stack,'sql.Transaction.commit()'))
+      throw this.captureException(new MsSQLError(e,stack,'sql.Transaction.commit()'))
     }
-	
+    
   }
 
   /*
@@ -878,34 +904,38 @@ class MsSQLDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),(this.preparedStatement !== undefined)],`${this.cause ? this.cause.message : undefined}`)
 
-	this.checkConnectionState(cause)
+    this.checkConnectionState(cause)
+    
+    if (this.tediousTransactionError) {
+      return
+    }
 
     // Clear any Prepared Statements associated with the transaction otherwise rollback will result in "Can't rollback transaction. There is a request in progress."
 
     await this.clearCachedStatement()
-	
-	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
-	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
+    
+    // If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
+    // Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 
-	let stack
+    let stack
     const psuedoSQL = 'rollback transaction'
     this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
-	  
-	try {
+      
+    try {
       super.rollbackTransaction()
       const sqlStartTime = performance.now();
       stack = new Error().stack;
-	  this.yadamuRollback = true;
+      this.yadamuRollback = true;
       await this.transaction.rollback();
-	  this.yadamuRollback = false;
-	  this.traceTiming(sqlStartTime,performance.now())
+      this.yadamuRollback = false;
+      this.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.pool
-	} catch (e) {
-	  this.yadamuRollback = false;
-	  let newIssue = this.captureException(new MsSQLError(e,stack,'sql.Transaction.rollback()'))
-	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
-    }	
-	
+    } catch (e) {
+      this.yadamuRollback = false;
+      let newIssue = this.captureException(new MsSQLError(e,stack,'sql.Transaction.rollback()'))
+      this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
+    }   
+    
   }
   
   async createSavePoint() {
@@ -920,17 +950,21 @@ class MsSQLDBI extends YadamuDBI {
     // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 
     this.checkConnectionState(cause)
-	
-	// If restoreSavePoint was invoked due to encounterng an error and the restore operation results in a second exception being raised, log the exception raised by the restore operation and throw the original error.
-	// Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
-	
-   	try {
+    
+    if (this.tediousTransactionError) {
+      return
+    }
+
+    // If restoreSavePoint was invoked due to encounterng an error and the restore operation results in a second exception being raised, log the exception raised by the restore operation and throw the original error.
+    // Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
+    
+    try {
       await this.executeSQL(MsSQLDBI.SQL_RESTORE_SAVE_POINT);
       super.restoreSavePoint()
-	} catch (newIssue) {
-	  this.checkCause('RESTORE SAVPOINT',cause,newIssue)
-	}
-	
+    } catch (newIssue) {
+      this.checkCause('RESTORE SAVPOINT',cause,newIssue)
+    }
+    
   }
   
   /*
@@ -960,17 +994,17 @@ class MsSQLDBI extends YadamuDBI {
 
 
   async processFile(hndl) {
-	 
-	 const args = { 
-	         inputs: [{
-				name: 'TARGET_DATABASE', type: sql.VarChar,  value: this.parameters.TO_USER
-			 },{
-				name: 'DB_COLLATION',    type: sql.VarChar,  value: this.DB_COLLATION  
-		     }]
-	       }	
+     
+     const args = { 
+             inputs: [{
+                name: 'TARGET_DATABASE', type: sql.VarChar,  value: this.parameters.TO_USER
+             },{
+                name: 'DB_COLLATION',    type: sql.VarChar,  value: this.DB_COLLATION  
+             }]
+           }    
 
-     let results = await this.execute('sp_IMPORT_JSON',args,'')		              
-	 results = results.recordset;
+     let results = await this.execute('sp_IMPORT_JSON',args,'')                   
+     results = results.recordset;
      const log = JSON.parse(results[0][Object.keys(results[0])[0]])
      super.processLog(log,'OPENJSON',this.status, this.yadamuLogger)
      return log
@@ -992,9 +1026,9 @@ class MsSQLDBI extends YadamuDBI {
   
     const results = await this.executeSQL(MsSQLDBI.SQL_SYSTEM_INFORMATION)
     const sysInfo =  results.recordsets[0][0];
-    const serverProperties = JSON.parse(sysInfo.SERVER_PROPERTIES)	
-	const dbProperties = JSON.parse(sysInfo.DATABASE_PROPERTIES)	
-	
+    const serverProperties = JSON.parse(sysInfo.SERVER_PROPERTIES)  
+    const dbProperties = JSON.parse(sysInfo.DATABASE_PROPERTIES)    
+    
     return {
       date               : new Date().toISOString()
      ,timeZoneOffset     : new Date().getTimezoneOffset()                      
@@ -1003,8 +1037,8 @@ class MsSQLDBI extends YadamuDBI {
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
      ,exportVersion      : Yadamu.EXPORT_VERSION
-	 ,sessionUser        : sysInfo.SESSION_USER
-	 ,currentUser        : sysInfo.CURRENT_USER
+     ,sessionUser        : sysInfo.SESSION_USER
+     ,currentUser        : sysInfo.CURRENT_USER
      ,dbName             : sysInfo.DATABASE_NAME
      ,databaseVersion    : serverProperties.ProductVersion
      ,softwareVendor     : this.SOFTWARE_VENDOR
@@ -1015,7 +1049,7 @@ class MsSQLDBI extends YadamuDBI {
        ,platform         : process.platform
       }
     ,serverProperties    : serverProperties
-	,databaseProperties  : dbProperties
+    ,databaseProperties  : dbProperties
     }
   }
 
@@ -1036,7 +1070,7 @@ class MsSQLDBI extends YadamuDBI {
         metadata[table.TABLE_NAME].collationNames = JSON.parse(table.COLLATION_NAME_ARRAY)
      }
     }) 
-	return metadata
+    return metadata
   }  
       
   async getSchemaInfo(keyName) {
@@ -1045,6 +1079,7 @@ class MsSQLDBI extends YadamuDBI {
       
     const statement = this.SQL_SCHEMA_INFORMATION()
     const results = await this.executeSQL(statement, { inputs: [{name: "SCHEMA", type: sql.VarChar, value: this.parameters[keyName]}]})
+    
     return results.recordsets[0]
   
   }
@@ -1054,14 +1089,14 @@ class MsSQLDBI extends YadamuDBI {
   }  
   
   streamingError(err,sqlStatement) {
-	 return this.captureException(new MsSQLError(err,this.streamingStackTrace,sqlStatement))
+     return this.captureException(new MsSQLError(err,this.streamingStackTrace,sqlStatement))
   }
 
   async getInputStream(tableInfo) {
     // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
     const request = this.getRequest();
-	return new MsSQLReader(request,tableInfo.SQL_STATEMENT);
+    return new MsSQLReader(request,tableInfo.SQL_STATEMENT);
   }      
 
   /*
@@ -1077,7 +1112,7 @@ class MsSQLDBI extends YadamuDBI {
   }
 
   getOutputStream(tableName,ddlComplete) {
-	 return super.getOutputStream(MsSQLWriter,tableName,ddlComplete)
+     return super.getOutputStream(MsSQLWriter,tableName,ddlComplete)
   }
  
  async setWorkerConnection() {
@@ -1085,17 +1120,17 @@ class MsSQLDBI extends YadamuDBI {
 
     // Use the connection provider (master) pool
     this.pool = this.manager.pool;
-	this.requestProvider = this.pool
-	this.transaction = this.getTransactionManager()	
+    this.requestProvider = this.pool
+    this.transaction = this.getTransactionManager() 
   }
 
   classFactory(yadamu) {
-	return new MsSQLDBI(yadamu)
+    return new MsSQLDBI(yadamu)
   }
   
   async getConnectionID() {
-	const results = await this.executeSQL(`select @@SPID "SPID"`)
-	const pid = results.recordset[0].SPID
+    const results = await this.executeSQL(`select @@SPID "SPID"`)
+    const pid = results.recordset[0].SPID
     return pid
 }  
   
@@ -1106,9 +1141,9 @@ module.exports = MsSQLDBI
 const _SQL_SYSTEM_INFORMATION = 
 `select db_Name() "DATABASE_NAME", 
        current_user "CURRENT_USER", 
-	   session_user "SESSION_USER", 
-	   (
-	     select
+       session_user "SESSION_USER", 
+       (
+         select
            SERVERPROPERTY('BuildClrVersion') AS "BuildClrVersion"
           ,SERVERPROPERTY('Collation') AS "Collation"
           ,SERVERPROPERTY('CollationID') AS "CollationID"
@@ -1155,9 +1190,9 @@ const _SQL_SYSTEM_INFORMATION =
           ,SERVERPROPERTY('FilestreamConfiguredLevel') AS "FilestreamConfiguredLevel"
           ,SERVERPROPERTY('FilestreamEffectiveLevel') AS "FilestreamEffectiveLevel"
          FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-	   ) "SERVER_PROPERTIES",
-	   (
-	     select
+       ) "SERVER_PROPERTIES",
+       (
+         select
            DATABASEPROPERTYEX(DB_NAME(),'Collation') AS "Collation"
           ,DATABASEPROPERTYEX(DB_NAME(),'ComparisonStyle') AS "ComparisonStyle"
           ,DATABASEPROPERTYEX(DB_NAME(),'Edition') AS "Edition"
@@ -1201,8 +1236,8 @@ const _SQL_SYSTEM_INFORMATION =
           ,DATABASEPROPERTYEX(DB_NAME(),'UserAccess') AS "UserAccess"
           ,DATABASEPROPERTYEX(DB_NAME(),'Version') AS "Version"
           FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-		) "DATABASE_PROPERTIES"`;
-	   
+        ) "DATABASE_PROPERTIES"`;
+       
 const _SQL_CREATE_SAVE_POINT  = `SAVE TRANSACTION ${YadamuConstants.SAVE_POINT_NAME}`;
 
 const _SQL_RESTORE_SAVE_POINT = `ROLLBACK TRANSACTION ${YadamuConstants.SAVE_POINT_NAME}`;

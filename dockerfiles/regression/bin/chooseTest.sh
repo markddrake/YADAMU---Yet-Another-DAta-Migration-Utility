@@ -1,10 +1,10 @@
 export YADAMU_HOME=`pwd`
 export YADAMU_QA_HOME=$YADAMU_HOME/qa
 export YADAMU_SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
-source qa/bin/createOutputFolders.sh mnt
 export YADAMU_TEST_NAME=${YADAMU_TEST_NAME:-all}
 case $YADAMU_TEST_NAME  in
   export)
+    source qa/bin/createOutputFolders.sh mnt
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
   ;;
   
@@ -44,7 +44,12 @@ case $YADAMU_TEST_NAME  in
     sleep 365d
   ;; 
   
+  snowflake)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeImport
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeRoundtrip
+  ;;  
+  
   *)
-    echo "valid values are export, import, fileRoundtrip, dbRoundtrip, lostConnection,  mongoImport, mongoRoundtrip, cmdLine, interactive or all (default)"
+    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are export, import, fileRoundtrip, dbRoundtrip, lostConnection,  mongoImport, mongoRoundtrip, snowflake, cmdLine, interactive or all (default)"
   ;;
 esac

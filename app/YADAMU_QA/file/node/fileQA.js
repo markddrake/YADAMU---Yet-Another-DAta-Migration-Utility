@@ -164,6 +164,8 @@ class FileQA extends FileDBI {
 
     const tables = Object.keys(gMetadata).sort();     
 
+    const failedOperations = []
+
     tables.forEach((table,idx) => {
 	  const tableName = table;
       const tableTimings = metrics[0][tableName].elapsedTime.padStart(10) 
@@ -204,10 +206,21 @@ class FileQA extends FileDBI {
                                     + ` ${tableTimings.padStart(colSizes[11])} |`
                                     + '\n');
 	  }
+	  
+	  if (gMetadata[table].rowCount !== pMetadata[table].rowCount) {
+		failedOperations.push(['','',table,gMetadata[table].rowCount,pMetadata[table].rowCount,gMetadata[table].rowCount > pMetadata[table].rowCount ? gMetadata[table].rowCount - pMetadata[table].rowCount : '' ,gMetadata[table].rowCount < pMetadata[table].rowCount ? pMetadata[table].rowCount - gMetadata[table].rowCount : '','Import #1'])
+	  }
+	  
+	  if (pMetadata[table].rowCount !== cMetadata[table].rowCount) {
+   	    failedOperations.push(['','',table,pMetadata[table].rowCount,cMetadata[table].rowCount,pMetadata[table].rowCount > cMetadata[table].rowCount ? pMetadata[table].rowCount - cMetadata[table].rowCount : '' ,pMetadata[table].rowCount < cMetadata[table].rowCount ? cMetadata[table].rowCount - pMetadata[table].rowCount : '','Import #2'])
+      }
+	  
       if (idx+1 === tables.length) {
           this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
       }
     })
+	
+	return failedOperations;
   }
   
 }

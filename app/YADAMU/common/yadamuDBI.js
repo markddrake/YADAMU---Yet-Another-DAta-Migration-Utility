@@ -107,7 +107,7 @@ class YadamuDBI {
       recreateTargetSchema : false
     }
     
-        
+    this._DB_VERSION = 'N/A'    
     this.yadamu = yadamu;
     this.sqlTraceTag = '';
     this.status = yadamu.STATUS
@@ -157,6 +157,7 @@ class YadamuDBI {
   traceTiming(startTime,endTime) {      
     const sqlOperationTime = endTime - startTime;
     this.status.sqlTrace.write(`--\n-- ${this.sqlTraceTag} Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlOperationTime)}s.\n--\n`);
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,'SQL'],`${this.sqlTraceTag} Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlOperationTime)}s`)
     this.sqlCumlativeTime = this.sqlCumlativeTime + sqlOperationTime
   }
  
@@ -665,7 +666,7 @@ class YadamuDBI {
    	      this.reconnectInProgress = false;
           this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`RECONNECT`],connectionFailure);
           this._ATTEMPT_RECONNECTION = undefined
-          throw connectionFailure;
+          throw cause;
         }
       }
     }

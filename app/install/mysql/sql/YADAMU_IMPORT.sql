@@ -647,6 +647,7 @@ BEGIN
   END LOOP;
  
   CLOSE TABLE_METADATA;
+  COMMIT;
 end;
 $$
 --

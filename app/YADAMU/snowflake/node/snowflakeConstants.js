@@ -8,7 +8,7 @@ class SnowflakeConstants {
     this._SNOWFLAKE_DEFAULTS = this._SNOWFLAKE_DEFAULTS || Object.freeze({
       "YADAMU_USER"              : "public"
     , "MAX_CHARACTER_SIZE"        : 16777216
-    , "MAX_BINARY_SIZE"           : 8388608 
+	, "MAX_BINARY_SIZE"           : 8388608 
     , "TRANSIENT_TABLES"          : true
     , "DATA_RETENTION_TIME"       : 0
     , "SPATIAL_FORMAT"            : "WKB"
@@ -36,6 +36,25 @@ class SnowflakeConstants {
   static get JSON_TYPE()              { return this.VARIANT_DATA_TYPE }
   static get CLOB_TYPE()              { return `VARCHAR(${this.MAX_CHARACTER_SIZE})`}
   static get BLOB_TYPE()              { return `BINARY(${this.MAX_BINARY_SIZE})`}
+  
+  static get LOST_CONNECTION_ERROR() {
+    this._LOST_CONNECTION_ERROR = this._LOST_CONNECTION_ERROR || Object.freeze([407002])
+    return this._LOST_CONNECTION_ERROR
+  }
+
+  static get LOST_CONNECTION_STATE() {
+    this._LOST_CONNECTION_STATE = this._LOST_CONNECTION_STATE || Object.freeze(['08003',])
+    return this._LOST_CONNECTION_STATE
+  }
+
+  static get SERVER_UNAVAILABLE_ERROR() {
+	return this.LOST_CONNECTION_ERROR()
+  }
+
+  static get SERVER_UNAVAILABLE_STATE() {
+	return this.LOST_CONNECTION_STATE()
+  }
+
 
 }
 

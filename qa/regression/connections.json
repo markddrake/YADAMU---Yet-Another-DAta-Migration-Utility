@@ -99,6 +99,16 @@
         }
       }
     },
+    "snow#1" : {
+      "snowflake"                       : {
+  	    "account"                       : "snowflake_account"
+      , "username"                      : "snowflake_username"
+      , "password"                      : "snowflake_password"
+	  , "warehouse"                     : "snowflake_warehouse"
+      , "database"                      : "snowflake_detatabase"
+	  , "schema"                        : "PUBLIC"	
+      }
+    },
     "minio#1"                           : {
 	  "awsS3"                           : {
           "accessKeyId"                 : "AKIAIOSFODNN7EXAMPLE" ,
@@ -107,6 +117,9 @@
           "s3ForcePathStyle"            : true,
           "signatureVersion"            : "v4"
       }
+	},
+    "azurite#1": {
+		"azure"                         : "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://yadamu-db1:10000/devstoreaccount1"
 	},
     "load-scratch"                            : {
 	  "loader"                          : {

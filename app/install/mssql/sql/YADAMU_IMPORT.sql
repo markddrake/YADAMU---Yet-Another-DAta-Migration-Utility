@@ -1,5 +1,11 @@
 use master
 go
+drop function sp_MAP_FOREIGN_DATATYPE
+go
+drop function sp_GENERATE_STATEMENTS
+go
+drop procedure sp_IMPORT_JSON
+go
 create OR ALTER FUNCTION sp_MAP_FOREIGN_DATATYPE(@VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT, @DB_COLLATION NVARCHAR(32)) 
 returns VARCHAR(128) 
 as
@@ -164,7 +170,7 @@ begin
             when @DATA_TYPE_LENGTH > 4000 then
               'nvarchar(max)'
             else
-              'nvarchar(max)'
+              'nvarchar'
           end
         when @DATA_TYPE = 'object' then 
           'json'          
@@ -295,7 +301,7 @@ begin
                              when "TARGET_DATA_TYPE" = 'boolean' then
                                'bit'
                              when "TARGET_DATA_TYPE" = 'json' then
-                               'nvarchar(max)'
+                               CONCAT('nvarchar(max) CHECK(ISJSON("',"COLUMN_NAME",'") > 0)')
                              when TARGET_DATA_TYPE LIKE '%(%)%' then
                                "TARGET_DATA_TYPE"
                              when "TARGET_DATA_TYPE" in('text','ntext')  then

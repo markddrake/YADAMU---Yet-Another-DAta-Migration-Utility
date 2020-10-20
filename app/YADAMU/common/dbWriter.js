@@ -34,7 +34,7 @@ class DBWriter extends Writable {
     this.status = dbi.yadamu.STATUS
     this.yadamuLogger = yadamuLogger;
 	// console.log(yadamuLogger.os.constructor.name)
-    this.yadamuLogger.info([`Writer`,dbi.DATABASE_VENDOR,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
+    this.yadamuLogger.info([`Writer`,dbi.DATABASE_VENDOR,dbi.DB_VERSION,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
         
     this.transactionManager = this.dbi
 	this.currentTable   = undefined;
@@ -45,7 +45,7 @@ class DBWriter extends Writable {
 	this.ddlComplete = new Promise((resolve,reject) => {
 	  this.once('ddlComplete',(status) => {
  	    // this.yadamuLogger.trace([this.constructor.name],`DDL Complete`)
-		if (status instanceof Error) reject(status)
+		if (status instanceof Error) resolve(status)
 		resolve(true);
 	  })
 	})	
@@ -265,7 +265,7 @@ class DBWriter extends Writable {
       }    
       callback();
     } catch (e) {
-	  this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_WRITE(${messageType})`,this.dbi.yadamu.ON_ERROR],e);
+	  this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_write()`,messageType,this.dbi.yadamu.ON_ERROR],e);
       this.emit('ddlComplete',e);
       // Any errors that occur while processing metadata are fatal.
       // Passing the exception to callback triggers the onError() event

@@ -45,6 +45,7 @@ class YadamuWriter extends Transform {
     this.startTime = performance.now();
 	this.endTime = undefined
 	this.writableFinalized = false;
+    this.batchOperations = []
     
     // this.on('pipe',(src)=>{console.log('pipe',src.constructor.name)})
     // this.on('unpipe',(src)=>{console.log('unpipe',src.constructor.name)})
@@ -59,7 +60,11 @@ class YadamuWriter extends Transform {
    
   async initialize(tableName) {  
     // Do not start processing table until all DDL operations have completed.
-    await this.ddlComplete;
+    const status = await this.ddlComplete;
+	if (status instanceof Error) {
+	  // DDL Error is handled in dbReader
+	  throw status
+	}
     // Workers need to reload their copy of the Statement Cache from the Manager before processing can begin
     this.dbi.reloadStatementCache()
     this.setTableInfo(tableName);
@@ -73,7 +78,9 @@ class YadamuWriter extends Transform {
   }
   
   releaseBatch(batch) {
-	batch.length = 0;
+	if (Array.isArray(batch)) {
+	  batch.length = 0;
+	}
   }
   
   abortTable() {
@@ -309,14 +316,17 @@ class YadamuWriter extends Transform {
 
   getBatchWritten() {
   
-   return new Promise((resolve,reject) => {
+   const batchWritten = new Promise((resolve,reject) => {
+     // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'writeBatch()',this.metrics.batchCount],'new batchWritten')
 	 this.once('batchWritten',(err,result) => {
-	   // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'writeBatch()',err,result],'batchWritten')
+	   // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'writeBatch()',err,result,this.metrics.batchCount],'batchWritten')
 	   this.batchWritten = undefined;
 	   if (err) reject(err)
 		 resolve(result);
 	   })
 	})
+	this.batchOperations.push(batchWritten)
+    return batchWritten
   }
   
   uncork(expected) {
@@ -351,7 +361,9 @@ class YadamuWriter extends Transform {
       this.resetBatch()
  	  this.uncork(true)
 	  this.batchWritten = this.getBatchWritten(nextBatch)
-	  this.writeBatch(nextBatch,rowsReceived,rowsCached);
+	  if (!this.skipTable) {
+	    this.writeBatch(nextBatch,rowsReceived,rowsCached);
+  	  }
     }
   }
   
@@ -414,8 +426,7 @@ class YadamuWriter extends Transform {
       }
       callback();
     } catch (e) {
-	   console.log(e)
-	   this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.yadamu.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);    
+	  this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.yadamu.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);    
       try {
         switch (messageType) {
           case 'data':
@@ -449,10 +460,11 @@ class YadamuWriter extends Transform {
               callback(e)   
             } 
           case 'table':
+          case 'metadata':
           case 'eod':
           default:
 		    this.abortTable()
-            callback(e)
+			callback(e)
         }
       } catch (err) {
 		err.cause = e
@@ -508,31 +520,37 @@ class YadamuWriter extends Transform {
     
   async finalize(cause) {
     //  this.yadamuLogger.trace([this.constructor.name,this.tableName,this.skipTable,this.dbi.transactionInProgress,,this.writableEnded,this.writableFinished,this.destroyed,this.writableFinalized,this.hasPendingRows(),this.metrics.received,this.metrics.committed,this.metrics.written,this.metrics.cached],'finalize()')
+
+
+    // Wait for any pending writeBatch operations to complete before proceeding 
+    let result = await this.batchWritten;
 	
     if (this.writableFinalized === true) return
     this.writableFinalized = true;
-	
+    
     if (this.hasPendingRows() && !this.skipTable) {
 	  const nextBatch = this.batch;
 	  const rowsReceived = this.metrics.received
       const rowsCached = this.metrics.cached
-      // Wait for any pending writeBatch operations to complete
-      await this.batchWritten;
       // Since there are no more rows to write wait for the final writeBatch() opersation to complete
 	  // The batchWritten promise is needed to release memeory used by the batch once the writeBatch operation is complete - particular with MsSQL
   	  this.batchWritten = this.getBatchWritten(nextBatch)
-	  await this.writeBatch(nextBatch,rowsReceived,rowsCached);
+	  this.writeBatch(nextBatch,rowsReceived,rowsCached);
+      // Wait for any pending writeBatch operations to complete before comitting final changes
+      result = await this.batchWritten;
+ 
  	}
-    if (this.dbi.transactionInProgress === true) {
+    await Promise.all(this.batchOperations)
+	if (this.dbi.transactionInProgress === true) {
       if (this.skipTable === true) {
-        await this.rollbackTransaction(cause)
+		await this.rollbackTransaction(cause)
       }
       else {
         await this.commitTransaction()
       }
     }
     this.endTime = performance.now()
-    return this.reportPerformance()
+	return this.reportPerformance()
   }   
           
   async _final(callback) {

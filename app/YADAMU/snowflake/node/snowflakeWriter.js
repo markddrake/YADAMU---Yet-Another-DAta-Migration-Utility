@@ -90,15 +90,16 @@ class SnowflakeWriter extends YadamuWriter {
   }
   
   recodeSpatialColumns(batch,msg) {
-    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`INSERT MANY`,this.tableInfo.parserRequired,this.metrics.cached,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
-    YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch,!this.tableInfo.parserRequired)
+	const targetFormat = 'WKT'
+    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`INSERT MANY`,this.tableInfo.parserRequired,this.metrics.cached,this.SPATIAL_FORMAT],`${msg} Converting to "${targetFormat}".`);
+    YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,targetFormat,this.tableInfo.targetDataTypes,batch,!this.tableInfo.parserRequired)
   }  
 
   async _writeBatch(batch,rowCount) {
 
     // Snowflake's handling of WKB appears a little 'flaky' :)
     if (this.tableInfo.targetDataTypes.includes('GEOGRAPHY')) {
-      this.recodeSpatialColumns(batch,`Avoiding known 'WKB' issues.`)
+      this.recodeSpatialColumns(batch,`Detected 'WKB' encoded spatial data.`)
     }
       
 	let sqlStatement
@@ -117,11 +118,6 @@ class SnowflakeWriter extends YadamuWriter {
       } catch (cause) {
 		this.reportBatchError(batch,`INSERT MANY`,cause)
 		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
-        /*
-        if (cause.spatialInsertFailed()) {	
-		  this.recodeSpatialColumns(batch,cause.message)
-		}
-        */
 		this.tableInfo.insertMode = 'BinarySplit'   
       }
     }
@@ -175,7 +171,7 @@ class SnowflakeWriter extends YadamuWriter {
 	      this.metrics.written += batchRowCount
 	    } catch (cause) {
 		  this.status.sqlTrace = NullWriter.NULL_WRITER
-	      if (batchRowCount > 1) {
+	      if ((batchRowCount > 1 ) && (!cause.lostConnection())){
             batches.push(nextBatch.splice(0,(Math.ceil(batchRowCount/2)*columnCount)),nextBatch)			  
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
 		  }
@@ -208,7 +204,7 @@ class SnowflakeWriter extends YadamuWriter {
 	      this.metrics.written += nextBatch.length
         } catch (cause) {
           this.status.sqlTrace = NullWriter.NULL_WRITER
-	      if (nextBatch.length > 1) {
+	      if ((nextBatch.length > 1) && (!cause.lostConnection())){
             batches.push(nextBatch.splice(0,Math.ceil(nextBatch.length/2)),nextBatch)
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
 		  }

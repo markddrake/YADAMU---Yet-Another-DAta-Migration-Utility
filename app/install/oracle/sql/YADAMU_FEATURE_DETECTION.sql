@@ -229,14 +229,6 @@ $END
     into V_RDBMS_VERSION
     from product_component_version 
    where product like '%Oracle%Database%';
-	
-  if V_RDBMS_VERSION < '11.2.0.4.0' then	
-    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                     || '  TABLE_FUNCTION_OPTIMIZER_ISSUE  CONSTANT BOOLEAN := TRUE;';
-  else 					    
-	V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
-	                     || '  TABLE_FUNCTION_OPTIMIZER_ISSUE  CONSTANT BOOLEAN := FALSE;';
-  end if;
 --
 --  Default XML Storage Mode
 --

@@ -17,7 +17,6 @@ class MySQLError extends DatabaseError {
   
   lostConnection() {
     return (this.cause.code && MySQLConstants.LOST_CONNECTION_ERROR.includes(this.cause.code))
-    return (this.cause.code && (knownErrors.indexOf(this.cause.code) > -1))
   }
   
   serverUnavailable() {

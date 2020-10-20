@@ -151,7 +151,15 @@ class StatementGenerator {
          switch (dataType.toLowerCase()) {
            case 'mediumint':                      return 'INT';
            case 'year':                           return 'NUMBER(4)';
-           case 'blob':                           return SnowflakeConstants.BLOB_TYPE;;
+           case 'longblob':                     
+           case 'mediumblob':                     return SnowflakeConstants.BLOB_TYPE;
+           case 'blob':                           return 'BINARY(65535)';
+		   case 'tinyblob':                       return 'BINARY(256)';
+           case 'longtext':                       return SnowflakeConstants.CLOB_TYPE;
+           case 'mediumtext':                     return 'TEXT(16777215)'
+           case 'text':                           return 'TEXT(65535)'
+           case 'tinytext':                       return 'TEXT(256)'
+		   case 'varchar':                        return 'TEXT'
            case 'geometry':                       return 'GEOGRAPHY';
            case 'set':                            return SnowflakeConstants.JSON_TYPE;
            case 'enum':                           return 'VARCHAR(512)';

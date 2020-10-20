@@ -1,0 +1,10 @@
+app
+bin
+dist
+log
+JSON
+md
+results
+scratch
+tests
+work

@@ -1,4 +1,4 @@
-"use strict"
+  "use strict"
 
 const { performance } = require('perf_hooks');
 const util = require('util');
@@ -148,8 +148,11 @@ class MySQLWriter extends YadamuWriter {
   }
   
   async _writeBatch(batch,rowCount) {     
-  
+    
+	let recodedBatch = false;
     this.metrics.batchCount++;
+    // this.yadamuLogger.trace([this.constructor.name,'_writeBatch',this.tableName,this.tableInfo.insertMode,this.metrics.batchCount,rowCount,batch.length],'Start')    
+	
     switch (this.tableInfo.insertMode) {
       case 'Batch':
         try {
@@ -161,7 +164,6 @@ class MySQLWriter extends YadamuWriter {
    		  this.metrics.written += rowCount;
           this.releaseBatch(batch)
           return this.skipTable
-          break;  
         } catch (cause) {
    		  this.reportBatchError(batch,'INSERT MANY',cause)
           await this.dbi.restoreSavePoint(cause);
@@ -169,7 +171,11 @@ class MySQLWriter extends YadamuWriter {
           this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args
         }
       case 'Rows':
-	    let recodedBatch = false
+	    if (this.SPATIAL_FORMAT === 'GeoJSON') {
+	      recodedBatch = true
+          this.recodeSpatialColumns(batch,'Recoding GeoJSON as WKT')
+		  this.tableInfo.rowConstructor = this.tableInfo.rowConstructor.replace(/ST_GeomFromGeoJSON\(\?\)/g,'ST_GeomFromText(?)')
+		}
 	    while (true) {
           try {
             await this.dbi.createSavePoint();    

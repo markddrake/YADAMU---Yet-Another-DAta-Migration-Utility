@@ -1,7 +1,9 @@
 "use strict";
 
+const { performance } = require('perf_hooks');
+
 const oracledb = require('oracledb');
-oracledb.fetchAsString = [ oracledb.DATE ]
+oracledb.fetchAsString = [ oracledb.DATE, oracledb.NUMBER ]
 
 const Yadamu = require('../../common/yadamu.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
@@ -272,7 +274,9 @@ class StatementGenerator {
     const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :schema, :spatialFormat, :JSON_DATA_TYPE, :XML_STORAGE_CLAUSE);\nend;`;
 
     const metadataLob = await this.getMetadataLob()
+	const startTime = performance.now()
     const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:this.targetSchema, spatialFormat:this.spatialFormat, JSON_DATA_TYPE: this.dbi.JSON_DATA_TYPE, XML_STORAGE_CLAUSE: this.dbi.XML_STORAGE_CLAUSE});
+	// this.dbi.yadamuLogger.trace([this.constructor.name],`${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
     await metadataLob.close();
     const statementCache = JSON.parse(results.outBinds.sql);
     const ddlStatements = [JSON.stringify({jsonColumns:null})];  

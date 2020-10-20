@@ -15,7 +15,7 @@
    ,{"source":   "mssql17",    "target": "mssql17",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT", "KILL_READER_AFTER" : 15000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT", "KILL_READER_AFTER" : 15000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT", "KILL_READER_AFTER" : 15000}, "tasks": ["WWI_Warehouse"]}
-   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT", "KILL_READER_AFTER" : 10000}, "tasks": ["WWI_Warehouse"]}  
+   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT", "KILL_READER_AFTER" : 5000},  "tasks": ["WWI_Warehouse"]}  
    ,{"source":   "oracle19c",  "target": "oracle19c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP",  "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP",  "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP",  "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
@@ -24,7 +24,7 @@
    ,{"source":   "mssql17",    "target": "mssql17",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP",  "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP",  "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP",  "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
-   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP",  "KILL_READER_AFTER" : 10000}, "tasks": ["WWI_Warehouse"]}  
+   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "SKIP",  "KILL_READER_AFTER" : 5000}, "tasks": ["WWI_Warehouse"]}  
    ,{"source":   "oracle19c",  "target": "oracle19c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
@@ -33,7 +33,7 @@
    ,{"source":   "mssql17",    "target": "mssql17",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "postgres#1", "target": "postgres#1",  "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "mysql#1",    "target": "mysql#1",     "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_READER_AFTER" : 25000}, "tasks": ["WWI_Warehouse"]}
-   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_READER_AFTER" : 10000}, "tasks": ["WWI_Warehouse"]}  
+   ,{"source":   "mariadb#1",  "target": "mariadb#1",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "FLUSH", "KILL_READER_AFTER" : 5000}, "tasks": ["WWI_Warehouse"]}  
    ,{"source":   "oracle19c",  "target": "oracle19c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT", "KILL_WRITER_AFTER" : 15000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT", "KILL_WRITER_AFTER" : 15000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "oracle12c",  "target": "oracle12c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT", "KILL_WRITER_AFTER" : 15000}, "tasks": ["WWI_Warehouse"]}

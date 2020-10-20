@@ -79,7 +79,9 @@ class MsSQLWriter extends YadamuWriter {
   }
   
   releaseBatch(batch) {
-	batch.rows.length = 0;
+	if (Array.isArray(batch.rows)) {
+	  batch.rows.length = 0;
+	}
   }
 
   getMetrics()  {
@@ -139,7 +141,16 @@ class MsSQLWriter extends YadamuWriter {
     
     // Cannot process table using BULK Mode. Prepare a statement use with record by record processing.
  
-    await this.dbi.cachePreparedStatement(this.tableInfo.dml, this.dataTypes,this.SPATIAL_FORMAT) 
+    try {
+      await this.dbi.cachePreparedStatement(this.tableInfo.dml, this.dataTypes,this.SPATIAL_FORMAT) 
+    } catch (cause) {
+      this.abortTable()
+      this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`INSERT ONE`,`"${this.tableInfo.tableName}"`],cause);
+      this.endTime = performance.now();
+      this.releaseBatch(batch)
+      return this.skipTable          
+    }	
+	
 	const sqlTrace = this.status.sqlTrace
 
     for (const row in batch.rows) {

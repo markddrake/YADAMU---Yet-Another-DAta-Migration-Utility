@@ -1,5 +1,24 @@
 use master
 go
+create or alter function sp_showText(@INPUT NVARCHAR(MAX), @MAX_LINES BIGINT = 32)
+returns @RESULTS table (
+  LINE NVARCHAR(256)
+) 
+as
+begin
+  declare @LINE   BIGINT = 0
+  declare @LENGTH BIGINT = len(@INPUT)
+  while ((@LINE * 256 <= @LENGTH) and (@LINE <= @MAX_LINES)) begin
+    insert into @RESULTS  values (substring(@INPUT,(@LINE*256)+1,256))
+	set @LINE+=1;
+ end
+ return
+end
+go
+--
+execute sp_ms_marksystemobject 'sp_showText'
+go
+--
 create or alter function fudgeCoordinate(@COORDINATE float, @SPATIAL_PRECISION int)
 returns NUMERIC(28,18)
 as
@@ -216,6 +235,213 @@ go
 execute sp_ms_marksystemobject 'sp_geographyAsBinaryZM'
 go
 --
+/*
+**
+** THere are Multiple ways of skinning the JSON_COMPACT cat...
+**
+*/
+--
+/*
+create or alter function sp_jsonCompact(@JSON_INPUT NVARCHAR(MAX))
+--
+-- SPLIT_STRING, UPDATE: 00:05:05.274
+--
+returns NVARCHAR(MAX)
+as
+begin
+  declare @TRUE                  BIT = 1;
+  declare @FALSE                 BIT = 0;
+  declare @JSON_OUTPUT NVARCHAR(MAX)
+  
+  declare @IN_STRING             BIT = @FALSE
+  declare @FRAGMENT     NVARCHAR(MAX);
+  declare @DUMMY        TABLE (
+     DOC NVARCHAR(MAX)
+  );
+  
+  DECLARE FIND_DOUBLE_QUOTES
+  CURSOR FOR 
+  select x.* 
+    from string_split(@JSON_INPUT,'"') x;
+    
+  insert into @DUMMY values ('');
+	
+  open FIND_DOUBLE_QUOTES;
+  fetch FIND_DOUBLE_QUOTES into @FRAGMENT
+  while (@@FETCH_STATUS = 0) begin
+    if (@IN_STRING = @FALSE) begin
+      update @DUMMY set doc .write(replace(@FRAGMENT,' ',''),NULL,NULL)
+	  set @IN_STRING = @TRUE
+	end
+	else begin
+	  if (right(@FRAGMENT,1) = '\\') begin
+	    update @DUMMY set doc .write(concat('"',@FRAGMENT),NULL,NULL)
+      end
+	  else begin
+	    update @DUMMY set doc .write(concat('"',@FRAGMENT,'"'),NULL,NULL)
+		set @IN_STRING = @FALSE
+      end
+	end
+	fetch FIND_DOUBLE_QUOTES into @FRAGMENT
+  end
+  
+  select @JSON_OUTPUT = DOC from @DUMMY;
+  return @JSON_OUTPUT
+
+end
+go
+*/
+--
+/*
+create or alter function sp_jsonCompact(@JSON_INPUT NVARCHAR(MAX))
+--
+-- CHARINDEX LOOP, UPDATE DOC: 00:04:18.629
+--
+returns NVARCHAR(MAX)
+as
+begin
+  declare @TRUE                  BIT = 1;
+  declare @FALSE                 BIT = 0;
+
+  declare @IN_STRING             BIT = @FALSE
+
+  declare @JSON_OUTPUT TABLE (
+     DOC  NVARCHAR(MAX)
+  );
+  
+  declare @OFFSET                BIGINT = 1;
+  declare @NEXT_QUOTE            BIGINT = CHARINDEX('"',@JSON_INPUT,@OFFSET);
+  declare @FRAGMENT              NVARCHAR(MAX)
+ 
+  insert into @JSON_OUTPUT values ('');
+  while (@NEXT_QUOTE > 0) begin
+    set @FRAGMENT = substring(@JSON_INPUT,@OFFSET,1+@NEXT_QUOTE-@OFFSET)
+    if (@IN_STRING = @FALSE) begin
+      set @FRAGMENT = replace(@FRAGMENT,' ','')
+      set @IN_STRING = @TRUE
+	end
+	else begin
+  	  if (right(@FRAGMENT,1) != '\\') begin
+        set @IN_STRING = @FALSE
+      end
+	end
+    update @JSON_OUTPUT set DOC .write(@FRAGMENT,NULL,NULL)
+    set @OFFSET = @NEXT_QUOTE + 1
+	set @NEXT_QUOTE = CHARINDEX('"',@JSON_INPUT,@OFFSET);
+	
+  end
+  
+  set @FRAGMENT = substring(@JSON_INPUT,@OFFSET,LEN(@JSON_INPUT))
+  set @FRAGMENT = replace(@FRAGMENT,' ','')
+  update @JSON_OUTPUT set DOC .write(@FRAGMENT,NULL,NULL)  
+
+  select @FRAGMENT = DOC from @JSON_OUTPUT;
+  return @FRAGMENT
+
+end
+go
+*/
+--
+/*
+create or alter function sp_jsonCompact(@INPUT_JSON NVARCHAR(MAX))
+--
+-- CHAR BY CHAR: STUFF : 00:04:22.742
+--
+returns NVARCHAR(MAX)
+as
+begin
+  declare @TRUE                  BIT = 1;
+  declare @FALSE                 BIT = 0;
+  declare @INPUT_LENGTH       BIGINT = len(@INPUT_JSON);
+  declare @OUTPUT_JSON NVARCHAR(MAX) = replicate(' ',@INPUT_LENGTH);
+  declare @I_OFFSET           BIGINT = 1
+  declare @O_OFFSET           BIGINT = 1
+  declare @NEXT_CHAR     NVARCHAR(1)
+  declare @prev_char     NVARCHAR(1) = ''
+  declare @IN_STRING             BIT = @FALSE
+  while @INPUT_LENGTH >= @I_OFFSET begin
+    set @NEXT_CHAR = substring(@INPUT_JSON,@I_OFFSET,1);
+	set @I_OFFSET += 1;
+    if ((@IN_STRING = @TRUE) OR (@NEXT_CHAR <> ' ')) begin
+      set @OUTPUT_JSON = stuff(@OUTPUT_JSON,@O_OFFSET,1,@NEXT_CHAR)
+	  set @O_OFFSET += 1
+	end
+	if (@NEXT_CHAR = '"') begin
+	  if (@IN_STRING = @TRUE) begin
+   	    set @IN_STRING = case 
+		                   when ((@IN_STRING = @TRUE) and (@PREV_CHAR = '\\')) then 
+						     @TRUE
+		                   else 
+						     @FALSE
+	                     end
+      end 						 
+	  else begin
+	    set @IN_STRING = @TRUE
+      end
+	end
+	set @PREV_CHAR = @NEXT_CHAR
+  end
+  return rtrim(@OUTPUT_JSON)
+end
+go
+*/
+--
+create or alter function sp_jsonCompact(@JSON_INPUT NVARCHAR(MAX))
+returns NVARCHAR(MAX)
+--
+-- CHARINDEX LOOP, STUFF: 00:00:25.192
+--
+as
+begin
+  declare @TRUE                  BIT = 1;
+  declare @FALSE                 BIT = 0;
+
+  declare @IN_STRING             BIT = @FALSE
+
+  declare @INPUT_LENGTH          BIGINT = len(@JSON_INPUT);
+  declare @JSON_OUTPUT           NVARCHAR(MAX) = replicate(' ',@INPUT_LENGTH);
+    
+  declare @OFFSET                BIGINT = 1;
+  declare @NEXT_QUOTE            BIGINT = CHARINDEX('"',@JSON_INPUT,@OFFSET);
+  declare @LAST_QUOTE            BIGINT = 1;
+  
+  declare @FRAGMENT              NVARCHAR(MAX)
+  declare @FRAGMENT_LENGTH       BIGINT;
+ 
+  while (@NEXT_QUOTE > 0) begin
+    set @FRAGMENT_LENGTH = 1+@NEXT_QUOTE-@LAST_QUOTE
+    set @FRAGMENT = substring(@JSON_INPUT,@LAST_QUOTE,@FRAGMENT_LENGTH)
+    if (@IN_STRING = @FALSE) begin
+      set @FRAGMENT = replace(@FRAGMENT,' ','')
+	  set @FRAGMENT_LENGTH = len(@FRAGMENT);
+      set @IN_STRING = @TRUE
+	end
+	else begin
+  	  if (right(@FRAGMENT,2) != '\"') begin
+        set @IN_STRING = @FALSE
+      end
+	end
+
+    set @JSON_OUTPUT = stuff(@JSON_OUTPUT,@OFFSET,@FRAGMENT_LENGTH,@FRAGMENT)
+	set @OFFSET += @FRAGMENT_LENGTH
+	set @LAST_QUOTE = @NEXT_QUOTE+1;
+    set @NEXT_QUOTE = CHARINDEX('"',@JSON_INPUT,@LAST_QUOTE);
+	
+  end
+  
+  set @FRAGMENT = substring(@JSON_INPUT,@LAST_QUOTE,LEN(@JSON_INPUT))
+  set @FRAGMENT = replace(@FRAGMENT,' ','')
+  set @FRAGMENT_LENGTH = len(@FRAGMENT);
+  set @JSON_OUTPUT = stuff(@JSON_OUTPUT,@OFFSET,@FRAGMENT_LENGTH,@FRAGMENT)
+
+  return rtrim(@JSON_OUTPUT)
+
+end
+go
+--
+execute sp_ms_marksystemobject 'sp_jsonCompact'
+go
+--
 create or alter procedure sp_COMPARE_SCHEMA(@FORMAT_RESULTS bit,@SOURCE_DATABASE nvarchar(128), @SOURCE_SCHEMA nvarchar(128), @TARGET_DATABASE nvarchar(128), @TARGET_SCHEMA nvarchar(128), @COMMENT nvarchar(2048), @EMPTY_STRING_IS_NULL bit, @SPATIAL_PRECISION int, @DATE_TIME_PRECISION int) 
 as
 begin
@@ -239,6 +465,8 @@ begin
   select t.TABLE_NAME
         ,st.is_memory_optimized
         ,string_agg(case 
+	                  when cc."CONSTRAINT_NAME" is not NULL then 
+					     concat('master.dbo.sp_jsonCompact("',c.COLUMN_NAME,'") "',c.COLUMN_NAME,'"')
                       when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @DATE_TIME_PRECISION)) then
                         -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@DATE_TIME_PRECISION,')) "',c.COLUMN_NAME,'"')
                         concat('convert(datetime2(',@DATE_TIME_PRECISION,'),convert(varchar(',@DATE_TIME_PRECISION+20,'),"',c.COLUMN_NAME,'"),126) "',c.COLUMN_NAME,'"')
@@ -278,6 +506,8 @@ begin
                    ,',') 
          within group (order by ordinal_position) "COLUMN_LIST"
         ,string_agg(case 
+	                  when cc."CONSTRAINT_NAME" is not NULL then 
+					     concat('master.dbo.sp_jsonCompact("',c.COLUMN_NAME,'") "',c.COLUMN_NAME,'"') 
                       when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @DATE_TIME_PRECISION)) then
                         -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@DATE_TIME_PRECISION,')) "',c.COLUMN_NAME,'"')
                         concat('convert(datetime2(',@DATE_TIME_PRECISION,'),convert(varchar(',@DATE_TIME_PRECISION+20,'),"',c.COLUMN_NAME,'"),126) "',c.COLUMN_NAME,'"')
@@ -303,15 +533,29 @@ begin
                       end
                    ,',') 
          within group (order by ordinal_position) "ALT_COLUMN_LIST"
-   from INFORMATION_SCHEMA.COLUMNS c, INFORMATION_SCHEMA.TABLES t, sys.tables st
-  where t.TABLE_NAME = c.TABLE_NAME
-    and t.TABLE_SCHEMA = c.TABLE_SCHEMA
-    and t.TABLE_NAME = st.name
-    and SCHEMA_ID(t.TABlE_SCHEMA) = st.SCHEMA_ID
-    and t.TABLE_TYPE = 'BASE TABLE'
-    and t.TABLE_SCHEMA = @SOURCE_SCHEMA
-    -- and t.table_catalog = @SOURCE_DATABASE
-  group by t.TABLE_SCHEMA, t.TABLE_NAME, st.is_memory_optimized;
+   from "INFORMATION_SCHEMA"."COLUMNS" c
+        left join "INFORMATION_SCHEMA"."TABLES" t
+               on t."TABLE_CATALOG" = c."TABLE_CATALOG"
+              and t."TABLE_SCHEMA" = c."TABLE_SCHEMA"
+              and t."TABLE_NAME" = c."TABLE_NAME"
+	    left join sys.tables st
+		       on SCHEMA_ID(t.TABLE_SCHEMA) = st.SCHEMA_ID
+			  and st.name = t.TABLE_NAME
+        left outer join (
+                          "INFORMATION_SCHEMA"."CONSTRAINT_COLUMN_USAGE" ccu
+                          left join "INFORMATION_SCHEMA"."CHECK_CONSTRAINTS" cc
+                              on cc."CONSTRAINT_CATALOG" = ccu."CONSTRAINT_CATALOG"
+                             and cc."CONSTRAINT_SCHEMA" = ccu."CONSTRAINT_SCHEMA"
+                             and cc."CONSTRAINT_NAME" = ccu."CONSTRAINT_NAME"
+                        )
+                     on ccu."TABLE_CATALOG" = c."TABLE_CATALOG"
+                    and ccu."TABLE_SCHEMA" = c."TABLE_SCHEMA"
+                    and ccu."TABLE_NAME" = c."TABLE_NAME"
+                    and ccu."COLUMN_NAME" = c."COLUMN_NAME"
+                    and UPPER("CHECK_CLAUSE") like '(ISJSON(%)>(0))'
+  where t."TABLE_TYPE" = 'BASE TABLE'
+    and t."TABLE_SCHEMA" = @SOURCE_SCHEMA
+  group by t.TABLE_SCHEMA, t.TABLE_NAME, st.is_memory_optimized
  
   set QUOTED_IDENTIFIER ON; 
   
@@ -351,35 +595,40 @@ begin
     
       set @SOURCE_COUNT = -1;
       set @SQL_STATEMENT = concat('select @SOURCE_COUNT = count(*) from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"')
+	  -- select @SQL_STATEMENT
+      
 	  exec sp_executesql @SQL_STATEMENT,N'@SOURCE_COUNT bigint OUTPUT', @SOURCE_COUNT OUTPUT
-      select @SQL_STATEMENT
         
       set @TARGET_COUNT = -1;
       set @SQL_STATEMENT = concat('select @TARGET_COUNT = count(*) from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"')
-	  exec sp_executesql @SQL_STATEMENT,N'@TARGET_COUNT bigint OUTPUT', @TARGET_COUNT OUTPUT
-      select @SQL_STATEMENT
-
+	  -- select @SQL_STATEMENT
+	  
+      exec sp_executesql @SQL_STATEMENT,N'@TARGET_COUNT bigint OUTPUT', @TARGET_COUNT OUTPUT
+      
       if (@MEMORY_OPTIMIZED = 1) begin
     	truncate table #SOURCE_HASH_BUCKET;
 		truncate table #TARGET_HASH_BUCKET;
         
         set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #SOURCE_HASH_BUCKET from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
         -- select @SQL_STATEMENT
-        exec(@SQL_STATEMENT)
+
+        exec(@SQL_STATEMENT);
 
  		set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #TARGET_HASH_BUCKET from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
         -- select @SQL_STATEMENT
-        exec(@SQL_STATEMENT)
+
+        exec(@SQL_STATEMENT);
         
-        set @SQL_STATEMENT = concat('with ',
-                                    'MISSING_ROWS as (',
-                                    ' select * from #SOURCE_HASH_BUCKET EXCEPT select * from #TARGET_HASH_BUCKET ',
-                                    '),',
-                                    'EXTRA_ROWS as (',
-                                   ' select * from #TARGET_HASH_BUCKET EXCEPT select * from #SOURCE_HASH_BUCKET ',
-                                   ')',
-                                   'select ''',@SOURCE_DATABASE,''' "SOURCE_DATABASE",''',@SOURCE_SCHEMA,''' "SOURCE_SCHEMA",''',@TARGET_DATABASE,'''"TARGET_DATABASE",''',@TARGET_SCHEMA,'''"TARGET_SCHEMA",''',@TABLE_NAME,'''"TABLE_NAME",',
-                                               @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ');
+        with
+        MISSING_ROWS as (
+          select * from #SOURCE_HASH_BUCKET EXCEPT select * from #TARGET_HASH_BUCKET
+        ),
+        EXTRA_ROWS as (
+          select * from #TARGET_HASH_BUCKET EXCEPT select * from #SOURCE_HASH_BUCKET
+        )
+		insert into @SCHEMA_COMPARE_RESULTS                  
+        select @SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@TABLE_NAME, @SOURCE_COUNT,@TARGET_COUNT,(select count(*) from MISSING_ROWS),(select count(*) from EXTRA_ROWS), NULL, NULL;
+		
       end
       else begin
         set @SQL_STATEMENT = concat('with ',
@@ -396,44 +645,42 @@ begin
                                     ' select * from TARGET_ROWS EXCEPT select * from SOURCE_ROWS ',
                                     ')',
                                     'select ''',@SOURCE_DATABASE,''' "SOURCE_DATABASE",''',@SOURCE_SCHEMA,''' "SOURCE_SCHEMA",''',@TARGET_DATABASE,'''"TARGET_DATABASE",''',@TARGET_SCHEMA,'''"TARGET_SCHEMA",''',@TABLE_NAME,'''"TABLE_NAME",',
-                                                @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ')
-      end
-      
-      select @SQL_STATEMENT
-      insert into @SCHEMA_COMPARE_RESULTS                  
-      exec (@SQL_STATEMENT)
-                                        
+                                                @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ')   
+        -- select @SQL_STATEMENT
+
+        insert into @SCHEMA_COMPARE_RESULTS                  
+        exec (@SQL_STATEMENT)
+      end                                  
     end try
     begin catch
       -- This should not happend but it does.. 
       if (ERROR_NUMBER() = 41317) begin
         begin try 
           -- A user transaction that accesses memory optimized tables or natively compiled modules cannot access more than one user database or databases model and msdb, and it cannot write to master
-    	truncate table #SOURCE_HASH_BUCKET;
-		truncate table #TARGET_HASH_BUCKET;
+    	  truncate table #SOURCE_HASH_BUCKET;
+		  truncate table #TARGET_HASH_BUCKET;
         
           set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #SOURCE_HASH_BUCKET from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
           -- select @SQL_STATEMENT
-          exec(@SQL_STATEMENT)
+          
+		  exec(@SQL_STATEMENT);
 
  		  set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #TARGET_HASH_BUCKET from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
           -- select @SQL_STATEMENT
-          exec(@SQL_STATEMENT)
         
-          set @SQL_STATEMENT = concat('with ',
-                                      'MISSING_ROWS as (',
-                                      ' select * from #SOURCE_HASH_BUCKET EXCEPT select * from #TARGET_HASH_BUCKET ',
-                                      '),',
-                                      'EXTRA_ROWS as (',
-                                     ' select * from #TARGET_HASH_BUCKET EXCEPT select * from #SOURCE_HASH_BUCKET ',
-                                     ')',
-                                     'select ''',@SOURCE_DATABASE,''' "SOURCE_DATABASE",''',@SOURCE_SCHEMA,''' "SOURCE_SCHEMA",''',@TARGET_DATABASE,'''"TARGET_DATABASE",''',@TARGET_SCHEMA,'''"TARGET_SCHEMA",''',@TABLE_NAME,'''"TABLE_NAME",',
-                                                 @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ');
-
-          select @SQL_STATEMENT
-          insert into @SCHEMA_COMPARE_RESULTS                  
-          exec (@SQL_STATEMENT)
-        end try
+		  exec(@SQL_STATEMENT);
+        
+		  with
+          MISSING_ROWS as (
+            select * from #SOURCE_HASH_BUCKET EXCEPT select * from #TARGET_HASH_BUCKET
+          ),
+          EXTRA_ROWS as (
+            select * from #TARGET_HASH_BUCKET EXCEPT select * from #SOURCE_HASH_BUCKET
+          )
+		  insert into @SCHEMA_COMPARE_RESULTS                  
+          select @SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@TABLE_NAME, @SOURCE_COUNT,@TARGET_COUNT,(select count(*) from MISSING_ROWS),(select count(*) from EXTRA_ROWS), NULL, NULL;
+		
+		end try
         begin catch 
           set @BAD_STATEMENT = @SQL_STATEMENT
           set @SQLERRM = concat(ERROR_NUMBER(),': ',ERROR_MESSAGE())

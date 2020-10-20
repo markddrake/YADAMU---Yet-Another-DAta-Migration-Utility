@@ -197,7 +197,7 @@ PIPELINED
 as
   V_SQL_FRAGMENT  VARCHAR2(32767);
   
-  V_SCHEMA_LIST T_VC4000_TABLE;
+  V_SCHEMA_LIST   T_VC4000_TABLE;
 
    -- ### Do not use JSON_ARRAYAGG for DATE_TYPE_LIST, SIZE_CONSTRAINTS dir to lack of CLOB support prior to release 18c.
   
@@ -241,6 +241,8 @@ as
                    '"' || DATA_SCALE || '"'
                  when atc.DATA_TYPE in ('NVARCHAR2', 'NCHAR') then
                    '"' || CHAR_LENGTH || '"'
+                 when (atc.DATA_TYPE = 'RAW' and atc.DATA_LENGTH = 1 and P_TREAT_RAW1_AS_BOOLEAN = 'TRUE') then
+				   '""'
                  when atc.DATA_TYPE in ('UROWID', 'RAW') or  atc.DATA_TYPE LIKE 'INTERVAL%' then
                    '"' || DATA_LENGTH || '"'
                  when atc.DATA_TYPE = 'NUMBER' then
@@ -569,24 +571,14 @@ as
            ((TABLE_TYPE is not NULL) and (atc.COLUMN_NAME in ('SYS_NC_ROWINFO$','SYS_NC_OID$','ACLOID','OWNERID')))
          )        
 	 and amv.MVIEW_NAME is NULL
-$IF YADAMU_FEATURE_DETECTION.TABLE_FUNCTION_OPTIMIZER_ISSUE $THEN               
---
--- 11.2.0.1.0 It appears that using table functions, such as in the clause "aat.OWNER in (select COLUMN_VALUE from TABLE(V_SCHEMA_LIST))", causes severe performance problems.
--- For the moment work around the problem using an equality, and only support one schema at a time. Long term when supporting multi-schema exports, if support for releases earlier than
--- 11.2.0.4.0  is required add an outer loop that loops over the set of schemas. Similar logic may also be required when supporting a filtering by table name.
---
-     and aat.OWNER  =  P_OWNER_LIST
-$ELSE
-     and aat.OWNER in (select COLUMN_VALUE from TABLE(V_SCHEMA_LIST))
-$END
-/*
-     -- Table Name Filtering impliemented in YadamuDBI so it is done in one place
-	 and case
-    	   when P_TABLE_NAME is NULL then 1
-	       when P_TABLE_NAME is not NULL and aat.TABLE_NAME = P_TABLE_NAME then 1
-		   else 0
-  		 end = 1
-*/
+	 and aat.OWNER = V_SCHEMA_LIST(1)
+     /*
+     ** 
+	 ** Multiple Schema support has significant performance implications, particularly in 11.2.x
+	 **
+	 ** and aat.OWNER in (select COLUMN_VALUE from TABLE(V_SCHEMA_LIST)))
+	 **
+	 */
    group by aat.OWNER, aat.TABLE_NAME;
    
   V_FIRST_ROW BOOLEAN := TRUE;
@@ -610,14 +602,16 @@ begin
   select SCHEMA
     bulk collect into V_SCHEMA_LIST
 	from JSON_TABLE( P_OWNER_LIST,'$[*]' columns (SCHEMA VARCHAR(128) PATH '$'));
---    
+-- 
+-- TODO - Support Multiple Schemas in 11.2.x
+--   
   $END 
 --
 -- If P_OWNER_LIST is not a valid JSON_ARRAY the previous statement will generate an empty set, in which case assume SCHEMA_LIST contains the name of a single schema.
 -- 
-   if ((V_SCHEMA_LIST is NULL) or (V_SCHEMA_LIST.count = 0)) then 
-     V_SCHEMA_LIST := T_VC4000_TABLE(P_OWNER_LIST);
-	end if;
+  if ((V_SCHEMA_LIST is NULL) or (V_SCHEMA_LIST.count = 0)) then 
+    V_SCHEMA_LIST := T_VC4000_TABLE(P_OWNER_LIST);
+  end if;
 
   /* Create a  SQL statement for each of the tables in the schema */
   declare

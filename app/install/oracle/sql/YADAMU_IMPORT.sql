@@ -951,7 +951,18 @@ begin
               return 'CLOB';
           end case;         
         when P_DATA_TYPE = 'BINARY' then
-           return 'RAW';
+          case
+            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH is NULL then
+              return 'RAW(32767)';
+            when P_DATA_TYPE_LENGTH is NULL then
+              return 'RAW(4000)';
+            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH < 32768 then
+              return 'RAW';
+            when P_DATA_TYPE_LENGTH < 4001 then
+              return 'RAW';
+            else
+              return 'BLOB';
+          end case;         
         when P_DATA_TYPE = 'XML' then
            return 'XMLTYPE';
         when P_DATA_TYPE = 'TIMESTAMP_LTZ' then

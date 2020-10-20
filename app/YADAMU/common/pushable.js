@@ -21,15 +21,15 @@ class Pushable extends Readable {
 	   this.pause()
      }
 	 else {
-       console.log('_read()',this.data.length,this.data[0] === null ? ' END' : Object.keys(this.data[0])[0])
+       // console.log('_read()',this.data.length,this.data[0] === null ? ' END' : Object.keys(this.data[0])[0])
 	   this.push(this.data.shift())
 	 }
   }
   
   pump(data) {
-    // console.log('pump()',this.data.length,data === null ? 'NULL' : Object.keys(data)[0])
+    // console.log('pump()',this.isPaused(),this.readableFlowing,this.data.length,data === null ? 'NULL' : Object.keys(data)[0])
     this.data.push(data)
-    if (this.paused) {
+    if (this.isPaused()) {
        // console.log('_read()',this.data.length,this.data[0] === null ? ' END' : Object.keys(this.data[0])[0])
 	   this.push(this.data.shift())
 	   this.resume();

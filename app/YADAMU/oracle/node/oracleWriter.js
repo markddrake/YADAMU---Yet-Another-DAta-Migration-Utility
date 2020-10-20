@@ -46,8 +46,10 @@ class OracleWriter extends YadamuWriter {
   }
   
   releaseBatch(batch) {
-	batch.rows.length = 0;
-	batch.lobRows.length = 0;
+	if (Array.isArray(batch.rows)) {
+	  batch.rows.length = 0;
+	  batch.lobRows.length = 0;
+	}
   }
   
   setTableInfo(tableName) {

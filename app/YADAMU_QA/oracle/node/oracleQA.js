@@ -79,11 +79,6 @@ class OracleQA extends OracleDBI {
 	
 	async compareSchemas(source,target) {
         
-      if (this.DB_VERSION === 12.2){
-          
-        this.yadamu.LOGGER.qa([`COMPARE`,this.DATABASE_VENDOR,this.DB_VERSION],`JSON normalization disabled for documents > 8Kb.`);
-      }
-      
       const report = {
         successful : []
        ,failed     : []

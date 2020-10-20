@@ -109,7 +109,10 @@ class SnowflakeDBI extends YadamuDBI {
   async configureConnection() {    
     // Perform connection specific configuration such as setting sesssion time zone to UTC...
 	//  await this.useDatabase(this.connectionProperties.database);
-	const results = await this.executeSQL(SnowflakeDBI.SQL_CONFIGURE_CONNECTION);
+	let results = await this.executeSQL(SnowflakeDBI.SQL_CONFIGURE_CONNECTION);
+    results = await this.executeSQL(SnowflakeDBI.SQL_SYSTEM_INFORMATION,[]);    
+    this._DB_VERSION = results[0].DATABASE_VERSION
+
   }
 
   async closeConnection() {
@@ -469,6 +472,12 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   
   classFactory(yadamu) {
 	return new SnowflakeDBI(yadamu)
+  }
+  
+  async getConnectionID() {
+    const results = await this.executeSQL(`select CURRENT_SESSION() "pid"`)
+    const pid = results[0].pid;
+    return pid
   }
  
 }

@@ -28,6 +28,7 @@ class YadamuRejectManager {
 	this.logger = YadamuLogger.NULL_LOGGER;
     this.fileWriter = new DBWriter(this.dbi,this.logger);
 	
+	this.initialzied = false;
 	this.recordCount = 0
   	this.dataStream = new Pushable({objectMode: true},true);
 	
@@ -47,6 +48,8 @@ class YadamuRejectManager {
     this.errorPipeline = [this.dataStream,errorWriter,passThrough]
  	  
     this.currentTable = undefined
+    const errorFolderPath = path.dirname(this.filename);
+    fs.mkdirSync(errorFolderPath, { recursive: true });
   }	
   
   setSystemInformation(systemInformation) {
@@ -59,31 +62,28 @@ class YadamuRejectManager {
 
   async rejectRow(tableName,data) {
 	 
-	if (this.recordCount === 0) {
-	  const errorFolderPath = path.dirname(this.filename);
-      fs.mkdirSync(errorFolderPath, { recursive: true });
+	if (this.currentTable === undefined) {
+	  this.currentTable = tableName
+      this.dataStream.pump({table:tableName})
       await this.fileWriter.initialize()  
    	  await this.dbi.initializeData()
-	  this.errorPipeline.push(this.dbi.PIPELINE_ENTRY_POINT)
-	  pipeline(this.errorPipeline,(err) => {
+      this.errorPipeline.push(this.dbi.PIPELINE_ENTRY_POINT)
+      pipeline(this.errorPipeline,(err) => {
         if (err) { console.log(err) } else { console.log('Pipe operation #1 complete') }
       })  
-      this.dataStream.pump({table:tableName})
-	  this.currentTable = tableName
     }
 	
 	if (this.currentTable !== tableName) {
       this.dataStream.pump({table:tableName})
 	  this.currentTable = tableName
 	}
-	
-    this.dataStream.pump({data:data})
+
     this.recordCount++;
+    this.dataStream.pump({data:data})
 
   }
   
   async close() {
- 
 	if (this.recordCount > 0) {
       this.dataStream.pump(null)
   	  await this.dbi.pipelineComplete;

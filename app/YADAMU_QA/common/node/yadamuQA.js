@@ -18,6 +18,7 @@ class YadamuQA {
 
 	this.expandedTaskList = []
 	this.operationsList = []
+	this.failedOperations = {}
   }
   
   getDatabaseInterface(driver,testConnection,testParameters,recreateSchema,tableMappings) {
@@ -54,7 +55,6 @@ class YadamuQA {
 	
   }
 
-  
   getPrefixedSchema(prefix,schema) {
 	  
 	 return prefix ? `${prefix}_${schema}` : schema
@@ -262,10 +262,27 @@ class YadamuQA {
 	    return schemaInfo.database === undefined ? schemaInfo.schema : (schemaInfo.owner === 'dbo' ? `"${schemaInfo.database}"` : `"${this.getPrefixedSchema(schemaPrefix,schemaInfo.owner)}"` )
     }
   }   
+
+  getDescription(vendor,connectionName,parameters,key) {
+	  
+	// MsSQL     : "Database"."Owner"
+	// Snowflake : "Database"."Schema"
+	// Default   : "Schema"
+
+	switch (vendor) {
+	  case "mssql":
+	  case "snowflake":	    
+	    return `${connectionName}://"${parameters.YADAMU_DATABASE}"."${parameters[key]}"`
+	  case "file":
+	    return `file://"${parameters.FILE}"`;
+      default:
+	    return `${connectionName}://"${parameters[key]}"`
+    }
+  }   
   
-  setUser(parameters,key,db,schemaInfo,operation) {
-	
-    switch (db) {
+  setUser(parameters,key,db,schemaInfo,database) {
+	  
+	switch (db) {
       case 'mssql':
 	    if (schemaInfo.schema) {
 		  parameters.YADAMU_DATABASE = schemaInfo.schema
@@ -277,14 +294,13 @@ class YadamuQA {
 		}
         break;
       case 'snowflake':
-	    parameters.YADAMU_DATABASE = schemaInfo.database ? schemaInfo.database : operation.rdbms
+	    parameters.YADAMU_DATABASE = schemaInfo.database ? schemaInfo.database : database
 		parameters[key] = schemaInfo.schema ? schemaInfo.schema : schemaInfo.owner
 		// ### Force Database name to uppercase otherwise queries against INFORMATION_SCHEMA fail
 	    parameters.YADAMU_DATABASE = parameters.YADAMU_DATABASE.toUpperCase();
 	    break;
       default:
 	    parameters[key] = schemaInfo.schema !== undefined ? schemaInfo.schema : (schemaInfo.owner === 'dbo' ? schemaInfo.database : schemaInfo.owner)
-		// parameters[key] = operation ? this.getPrefixedSchema(operation.schemaPrefix,parameters[key]) : parameters[key]
     }
 	return parameters
 
@@ -422,6 +438,8 @@ class YadamuQA {
       seperatorSize += size;
     });
    
+    this.yadamu.LOGGER.writeDirect(`\n`)
+
     rowCounts.sort().forEach((row,idx) => {          
       if (idx === 0) {
         this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
@@ -482,11 +500,7 @@ class YadamuQA {
     if (compareDBI.parameters.XSL_TRANSFORMATION !== null) {
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`XSL Transformation ${compareDBI.parameters.XSL_TRANSFORMATION} applied when performing XML comparisons.`);
     }
-	
-	let startTime
-	let elapsedTime
-	
-	let report
+
 	try {
       await compareDBI.initialize();
 	  // Always use source schema mapping logic for export..
@@ -495,40 +509,49 @@ class YadamuQA {
       if (reportRowCounts) {
         this.reportRowCounts(await compareDBI.getRowCounts(targetSchemaInfo),metrics,parameters,tableMappings) 
       }	
-	  startTime = performance.now();
-	  report = await compareDBI.compareSchemas(sourceSchemaInfo,targetSchemaInfo);
-	  elapsedTime = performance.now() - startTime;
+	  const startTime = performance.now();
+	  const compareResults = await compareDBI.compareSchemas(sourceSchemaInfo,targetSchemaInfo);
+	  compareResults.elapsedTime = performance.now() - startTime;
+      // this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Elapsed Time: ${YadamuLibrary.stringifyDuration(compareResults.elapsedTime)}s`);
 	  await compareDBI.releasePrimaryConnection()
       await compareDBI.finalize();
+
+      compareResults.successful.forEach((row,idx) => {          
+        const tableName = (parameters.TABLE_MATCHING === 'INSENSITIVE') ? row[2].toLowerCase() : row[2];
+        const tableMetrics = (metrics[tableName] === undefined) ? { elapsedTime : 'N/A', throughput : "-1ms" } : metrics[tableName]
+        row.push(tableMetrics.elapsedTime,tableMetrics.throughput)
+      })	 
+	
+      if (parameters.TABLE_MATCHING === 'INSENSITIVE') {
+        Object.keys(metrics).forEach((tableName)  => {
+          if (tableName !== tableName.toLowerCase()) {
+            metrics[tableName.toLowerCase()] = Object.assign({}, metrics[tableName])
+            delete metrics[tableName]
+          }
+        })
+      }
+
+	  return compareResults;
+
     } catch (e) {
       this.yadamu.LOGGER.logException([`COMPARE`],e)
       await compareDBI.abort();
       throw e
     } 
+  }
+  
+  printCompareResults(sourceConnectionName,targetConnectionName,testId,results) {
 	
-    if (parameters.TABLE_MATCHING === 'INSENSITIVE') {
-      Object.keys(metrics).forEach((tableName)  => {
-        if (tableName !== tableName.toLowerCase()) {
-        metrics[tableName.toLowerCase()] = Object.assign({}, metrics[tableName])
-        delete metrics[tableName]
-      }
-      })
-    }
-
-    report.successful.forEach((row,idx) => {          
-      const tableName = (parameters.TABLE_MATCHING === 'INSENSITIVE') ? row[2].toLowerCase() : row[2];
-      const tableMetrics = (metrics[tableName] === undefined) ? { elapsedTime : 'N/A', throughput : "-1ms" } : metrics[tableName]
-      row.push(tableMetrics.elapsedTime,tableMetrics.throughput)
-    })	 
-	 	 
     let colSizes = [12, 32, 32, 48, 14, 14, 14]
     
     let seperatorSize = (colSizes.length *3) - 1
     colSizes.forEach((size)  => {
       seperatorSize += size;
     });
-    
-    report.successful.sort().forEach((row,idx) => {
+	
+    this.yadamu.LOGGER.writeDirect(`\n`)
+	
+    results.successful.sort().forEach((row,idx) => {
       if (idx === 0) {
         this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
         this.yadamu.LOGGER.writeDirect(`|`
@@ -560,7 +583,7 @@ class YadamuQA {
                          + '\n');
     })
         
-    if (report.successful.length > 0) {
+    if (results.successful.length > 0) {
       this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }
 
@@ -574,7 +597,7 @@ class YadamuQA {
     const notesIdx = colSizes.length-2
     const lineSize = colSizes[notesIdx+1]
 
-    report.failed.forEach((row,idx) => {
+    results.failed.forEach((row,idx) => {
       const lines = []
       if ((row[notesIdx] !== null) && ((row[notesIdx].length > lineSize) || (row[notesIdx].indexOf('\r\n') > -1))) {
         const blocks = row[7].split('\r\n')
@@ -664,13 +687,17 @@ class YadamuQA {
 
     })
       
-    if (report.failed.length > 0) {
+    if (results.failed.length > 0) {
+	  this.failedOperations[sourceConnectionName] = Object.assign({},this.failedOperations[sourceConnectionName])
+	  this.failedOperations[sourceConnectionName][targetConnectionName] = Object.assign({},this.failedOperations[sourceConnectionName][targetConnectionName])
+	  results.failed.forEach((failed,idx) => {
+	    this.failedOperations[sourceConnectionName][targetConnectionName][testId] = Object.assign({},this.failedOperations[sourceConnectionName][targetConnectionName][testId])
+        this.failedOperations[sourceConnectionName][targetConnectionName][testId][failed[2]] = results.failed[idx]
+	  })
       this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }
 	
-    this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
-	stepMetrics.push[elapsedTime]
-	return report.failed.length
+	// stepMetrics[stepMetrics.length-1].push(YadamuLibrary.stringifyDuration(results.elapsedTime))
 
   }
     
@@ -686,9 +713,35 @@ class YadamuQA {
     return sourceDB.parameters.TABLE_MATCHING
   }
 
-  dbRoundtripResults(operationsList,elapsedTime,metrics) {
+  taskSummary(stepMetrics) {
+	
+	stepMetrics.unshift(['Data Set','Step','Mode','Source','Target','Elapsed Time'])
+	 
+	const colSizes = this.calculateColumnSizes(stepMetrics)      
+    let seperatorSize = (colSizes.length * 3) - 1;
+    colSizes.forEach((size)  => {
+      seperatorSize += size;
+    });
+
+    this.yadamu.LOGGER.writeDirect(`\n`)
+   
+    stepMetrics.forEach((row,idx) => {          
+      if (idx < 2) {
+        this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+      }
+      this.yadamu.LOGGER.writeDirect(`|`)
+	  row.forEach((col,idx) => {this.yadamu.LOGGER.writeDirect(` ${col.padStart(colSizes[idx])} |`)});
+      this.yadamu.LOGGER.writeDirect(`\n`)
+    })
+
+    if (stepMetrics.length > 1) {
+      this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+    }     
+  }
   
-    if (this.yadamu.LOGGER.FILE_LOGGER) {
+  dbRoundtripResults(operationsList,elapsedTime,metrics) {
+	
+	if (this.yadamu.LOGGER.FILE_LOGGER) {
       
       const colSizes = [24,128,14]
       let seperatorSize = (colSizes.length * 3) - 1;
@@ -715,10 +768,11 @@ class YadamuQA {
       this.yadamu.LOGGER.qa([`DBROUNDTRIP`,`STEP`].concat(operationsList),`${this.formatMetrics(metrics)} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
     }
   
+    this.taskSummary(metrics.stepMetrics)
+    
   }
 
-  async dbRoundtrip(configuration,test,targetConnectionName,parameters,operation) {
-
+  async dbRoundtrip(task,configuration,test,targetConnectionName,parameters,operation) {
   /*
   **
   ** QA Test 
@@ -776,17 +830,15 @@ class YadamuQA {
     const targetSchema  = this.getTargetSchema(targetDatabase,operation.target,operation);
     const compareSchema = this.getTargetSchema(sourceDatabase,operation.target,operation);
 	    
-	const sourceDescription = this.getDescription(sourceDatabase,sourceSchema, operation)  
-    const targetDescription = this.getDescription(targetDatabase,targetSchema, operation)
-	const compareDescription = this.getDescription(sourceDatabase,targetSchema)
-
     const sourceParameters  = Object.assign({},parameters)
     const compareParameters = Object.assign({},parameters)
 	
     this.setUser(sourceParameters,'FROM_USER',sourceDatabase, sourceSchema)
-    // this.setUser(compareParameters,'TO_USER', sourceDatabase, targetSchema)
     this.setUser(compareParameters,'TO_USER', sourceDatabase, compareSchema)
 	
+	const sourceDescription = this.getDescription(sourceDatabase,sourceConnectionName,sourceParameters,'FROM_USER')  
+	const compareDescription = this.getDescription(sourceDatabase,sourceConnectionName,compareParameters,'TO_USER')  
+
 	// If the source connection and target connection reference the same server perform a single DDL_AND_DATA copy between the source schema and target schema.
   	
 	const mode =  (sourceConnection === targetConnection) ? "DDL_AND_DATA" : "DDL_ONLY"
@@ -797,21 +849,23 @@ class YadamuQA {
 	  
 	let sourceDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
 	let compareDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,true) 
-    const startTime = performance.now();
+    const taskStartTime = performance.now();
+	let stepStartTime = taskStartTime
     metrics.push(await this.yadamu.pumpData(sourceDBI,compareDBI));
-    const elapsedTime = performance.now() - startTime
-    stepMetrics.push[elapsedTime]	
+    let stepElapsedTime = performance.now() - stepStartTime
+    stepMetrics.push([task,'COPY',compareParameters.MODE,sourceConnectionName,sourceConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
       taskMetrics.errors++
       return taskMetrics;
     }
     
-    operationsList.push(`"${sourceConnectionName}"://${sourceDescription}`)
-    operationsList.push(`"${sourceConnectionName}"://${compareDescription}`)
+    operationsList.push(sourceDescription)
+    operationsList.push(compareDescription)
     let sourceVersion = sourceDBI.DB_VERSION;
     let targetVersion = compareDBI.DB_VERSION;
 
-    let results = this.printResults(configuration.operation.toUpperCase(),`"${sourceConnectionName}"://${sourceDescription}`,`"${sourceConnectionName}"://${compareDescription}`,elapsedTime)	
+	let results = this.printResults(configuration.operation.toUpperCase(),sourceDescription,compareDescription,stepElapsedTime)	
+	
 	this.aggregateMetrics(taskMetrics,results);
 	
 	// Test the current value of MODE. 
@@ -829,16 +883,16 @@ class YadamuQA {
       sourceParameters.MODE = "DATA_ONLY"
   	  targetParameters.MODE = "DATA_ONLY"
 	  compareParameters.MODE = "DATA_ONLY"
-      const targetDescription = this.getDescription(targetDatabase,targetSchema, operation)
-  	  
+      const targetDescription = this.getDescription(targetDatabase,targetConnectionName,targetParameters,'TO_USER')  
+ 
 	  sourceDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
       let targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,true) 
       this.propogateTableMatching(sourceDBI,targetDBI);
-      let startTime = performance.now();
+      let stepStartTime = performance.now();
       metrics.push(await this.yadamu.pumpData(sourceDBI,targetDBI));
-      let elapsedTime = performance.now() - startTime
-      stepMetrics.push[elapsedTime]	
-      if (metrics[metrics.length-1] instanceof Error) {
+      stepElapsedTime = performance.now() - stepStartTime
+      stepMetrics.push([task,'COPY',targetDBI.MODE,sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
+	  if (metrics[metrics.length-1] instanceof Error) {
         taskMetrics.errors++
         return taskMetrics;
       }
@@ -846,9 +900,9 @@ class YadamuQA {
 	  tableMappings = targetDBI.getTableMappings()
       targetVersion = targetDBI.DB_VERSION
 
-      operationsList.push(`"${sourceConnectionName}"://${sourceDescription}`)
-      operationsList.push(`"${targetConnectionName}"://${targetDescription}`)
-      results = this.printResults(configuration.operation.toUpperCase(),`"${sourceConnectionName}"://${sourceDescription}`,`"${targetConnectionName}"://${targetDescription}`,elapsedTime)
+      operationsList.push(sourceDescription)
+      operationsList.push(targetDescription)
+      results = this.printResults(configuration.operation.toUpperCase(),sourceDescription,targetDescription,stepElapsedTime)
   	  this.aggregateMetrics(taskMetrics,results);
 
 	  // The second copies the DATA from source to the target. 
@@ -867,28 +921,35 @@ class YadamuQA {
 	  targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,false,tableMappings)
       compareDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,false)
       
-      startTime = performance.now();
+      stepStartTime = performance.now();
       metrics.push(await this.yadamu.pumpData(targetDBI,compareDBI));
-      elapsedTime = performance.now() - startTime
-      stepMetrics.push[elapsedTime]	
+      stepElapsedTime = performance.now() - stepStartTime
+      stepMetrics.push([task,'COPY',compareDBI.MODE,targetConnectionName,sourceConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
       if (metrics[metrics.length-1] instanceof Error) {
         taskMetrics.errors++
         return taskMetrics;
       }
       
-      operationsList.push(`"${sourceConnectionName}"://${compareDescription}`)
-      results = this.printResults(configuration.operation.toUpperCase(),`"${targetConnectionName}"://${targetDescription}`,`"${sourceConnectionName}"://${compareDescription}`,elapsedTime)
+      operationsList.push(compareDescription)
+      results = this.printResults(configuration.operation.toUpperCase(),targetDescription,compareDescription,stepElapsedTime)
   	  this.aggregateMetrics(taskMetrics,results);
+
+      const taskElapsedTime =  performance.now() - taskStartTime
+	  stepMetrics.push([task,'TASK','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(taskElapsedTime)])
 
     }    
 	
-    const opsElapsedTime =  performance.now() - startTime
-
+    
     this.fixupMetrics(metrics);   
     const compareParms = this.getCompareParameters(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
-	taskMetrics.failed += await this.compareSchemas(sourceDatabase, sourceConnection, compareParms, sourceSchema, targetDatabase, compareSchema, metrics[metrics.length-1], false, undefined, stepMetrics)
-    this.dbRoundtripResults(operationsList,opsElapsedTime,taskMetrics)
-	taskMetrics.stepMetrics = stepMetrics
+	const compareResults = await this.compareSchemas(sourceDatabase, sourceConnection, compareParms, sourceSchema, targetDatabase, compareSchema, metrics[metrics.length-1], false, undefined)
+    taskMetrics.failed += compareResults.failed.length;
+	stepMetrics.push([task,'COMPARE','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
+	this.printCompareResults(sourceConnectionName,targetConnectionName,task,compareResults)
+	const elapsedTime =  performance.now() - taskStartTime
+	stepMetrics.push([task,'TOTAL','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])
+    taskMetrics.stepMetrics = stepMetrics
+    this.dbRoundtripResults(operationsList,elapsedTime,taskMetrics)
 	return taskMetrics;
 	
   }
@@ -899,7 +960,7 @@ class YadamuQA {
 	} while ((instance = Object.getPrototypeOf(instance)))
   }
   
-  async fileRoundtrip(mode,configuration,test,targetConnectionName,parameters,operation) {
+  async fileRoundtrip(task,mode,configuration,test,targetConnectionName,parameters,operation) {
   
   /*
   **
@@ -919,7 +980,6 @@ class YadamuQA {
   
     const fileInterface = mode === 'FILEROUNDTRIP' ? 'file' : 'loader'
 
-  
     const metrics = []
 	const stepMetrics = []
 	const taskMetrics = this.initializeMetrics();
@@ -975,22 +1035,21 @@ class YadamuQA {
 	    targetSchema2.schema = targetSchema2.schema + "2" 
     }
 
-	const opsStartTime = performance.now();
+	const taskStartTime = performance.now();
 
 	// Source File to Target Schema #1
 	
 	let sourceParameters  = Object.assign({},parameters)
 	sourceParameters.FILE = sourceFile
-	// fileReader.setParameters(sourceParameters);
 	let fileReader = this.getDatabaseInterface(fileInterface,sourceConnection,sourceParameters,true)
-    let sourceDescription = this.getDescription(sourceDatabase,operation.source)  
-
+    let sourceDescription = this.getDescription(sourceDatabase,'file',sourceParameters,'FILE')
+	
     let targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema1)
-    let targetDescription = this.getDescription(targetDatabase,targetSchema1)
+    let targetDescription = this.getDescription(targetDatabase,targetConnectionName,targetParameters,'TO_USER')
 	let targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,true)
 	
-	let startTime = opsStartTime	
+	let stepStartTime = taskStartTime	
 	if (test.parser === 'SQL') {
 	  targetDBI.setParameters({"FILE" : sourceFile})
 	  metrics.push(await this.yadamu.uploadData(targetDBI))
@@ -998,8 +1057,10 @@ class YadamuQA {
 	else {
   	  metrics.push(await this.yadamu.pumpData(fileReader,targetDBI))
     }
-    let elapsedTime = performance.now() - startTime
-    stepMetrics.push[elapsedTime]	
+    let stepElapsedTime = performance.now() - stepStartTime
+	
+	
+	stepMetrics.push([task,'IMPORT',targetDBI.MODE,sourceDatabase,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
       taskMetrics.errors++
       return taskMetrics;
@@ -1007,69 +1068,47 @@ class YadamuQA {
     
     let targetVersion = targetDBI.DB_VERSION
 	let tableMappings = targetDBI.getTableMappings();
-    let counters = this.printResults(configuration.operation.toUpperCase(),`file://${sourceFile}`,`"${targetConnectionName}"://${targetDescription}`,elapsedTime)
+    let counters = this.printResults(configuration.operation.toUpperCase(),sourceDescription,targetDescription,stepElapsedTime)
     this.aggregateMetrics(taskMetrics,counters);
-
-	
-	// If the source schema for the export file came from the target database compare the imported schema with the source schema.
-    let compareStartTime = performance.now();
-    if (operation.source.directory.indexOf(targetConnectionName) === 0) {
-      this.fixupMetrics(metrics);   
-      const testParameters = {} // parameters ? Object.assign({},parameters) : {}
-	  const compareParms = this.getCompareParameters(targetDatabase,targetVersion,targetDatabase,targetVersion,testParameters)
-	  taskMetrics.failed += await this.compareSchemas(targetDatabase, targetConnection, compareParms, operation.target, targetDatabase, targetSchema1, metrics[metrics.length-1],false,targetDBI.inverseTableMappings, stepMetrics)
-    }
-	else {
-	  const compareDBI = this.getDatabaseInterface(targetDatabase,targetConnection,{},false)
-      await compareDBI.initialize();
-	  this.reportRowCounts(await compareDBI.getRowCounts(targetSchema1),metrics[metrics.length-1],parameters,targetDBI.inverseTableMappings) 
-	  await compareDBI.releasePrimaryConnection()
-      await compareDBI.finalize();
-    }	
-    let compareElapsedTime = (performance.now() - compareStartTime);
-    stepMetrics.push[compareElapsedTime]	
+	sourceDescription = targetDescription
 
 	sourceParameters  = Object.assign({},parameters)
     this.setUser(sourceParameters,'FROM_USER',targetDatabase, targetSchema1)
 	// Use the the mappings generted during the import to drive the export
+
     let sourceDBI = this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,false,tableMappings)
-	 // sourceDBI.setTableMappings(tableMappings)
-    sourceDescription = this.getDescription(targetDatabase,targetSchema1)
 
 	targetParameters  = Object.assign({},parameters)
 	targetParameters.FILE = file1;
-    // let fileWriter = new FileDBI(this.yadamu);
-	// fileWriter.setParameters(targetParameters);
   	let fileWriter = this.getDatabaseInterface(fileInterface,sourceConnection,targetParameters,true)
-    targetDescription = this.getDescription(sourceDatabase,{"file" : filename1})  
+    targetDescription = this.getDescription(sourceDatabase,sourceConnectionName,targetParameters,'FILE')  
 
-	startTime = performance.now();
+	stepStartTime = performance.now();
   	metrics.push(await this.yadamu.pumpData(sourceDBI,fileWriter))
-    elapsedTime = performance.now() - startTime
-    stepMetrics.push[elapsedTime]	
+	
+	stepElapsedTime = performance.now() - stepStartTime
+    stepMetrics.push([task,'EXPORT',fileWriter.MODE,targetConnectionName,sourceDatabase,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
       taskMetrics.errors++
       return taskMetrics;
     }
 	
-    counters = this.printResults(configuration.operation.toUpperCase(),`"${targetConnectionName}"://${sourceDescription}`,`file://${file1}`,elapsedTime)
+    counters = this.printResults(configuration.operation.toUpperCase(),sourceDescription,targetDescription,stepElapsedTime)
     this.aggregateMetrics(taskMetrics,counters);
-
-	// File#1 to Target Schema #2
+	sourceDescription = targetDescription
 	
+	// File#1 to Target Schema #2
+
 	sourceParameters  = Object.assign({},parameters)
 	sourceParameters.FILE = file1;
-    // fileReader = new FileDBI(this.yadamu);
-    // fileReader.setParameters(sourceParameters);
     fileReader = this.getDatabaseInterface(fileInterface,sourceConnection,sourceParameters,true)
-    sourceDescription = this.getDescription(sourceDatabase,{"file" : filename1})  
-
+    
     targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema2)
 	targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,true)
-    targetDescription = this.getDescription(targetDatabase,targetSchema2)
+    targetDescription = this.getDescription(targetDatabase,targetConnectionName,targetParameters,'TO_USER')
 	
-	startTime = performance.now();
+	stepStartTime = performance.now();
 	
   	if (test.parser === 'SQL') {
 	  targetDBI.setParameters({"FILE" : file1})
@@ -1078,8 +1117,8 @@ class YadamuQA {
 	else {
 	  metrics.push(await this.yadamu.pumpData(fileReader,targetDBI))
     }
-    elapsedTime = performance.now() - startTime	
-    stepMetrics.push[elapsedTime]	
+    stepElapsedTime = performance.now() - stepStartTime	
+    stepMetrics.push([task,'EXPORT',targetDBI.MODE,sourceDatabase,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
       taskMetrics.errors++
       return taskMetrics;
@@ -1087,18 +1126,9 @@ class YadamuQA {
 	
 	targetVersion = targetDBI.DB_VERSION
 	tableMappings = targetDBI.getTableMappings();
-	counters = this.printResults(configuration.operation.toUpperCase(),`file://${file1}`,`"${targetConnectionName}"://${targetDescription}`,elapsedTime)
+	counters = this.printResults(configuration.operation.toUpperCase(),sourceDescription,targetDescription,stepElapsedTime)
     this.aggregateMetrics(taskMetrics,counters);
-
-    // Compare Target Schema #1 and Target Schema #2
-	
-	compareStartTime = performance.now();
-    this.fixupMetrics(metrics);   
-    // const testParameters = {} 
-	const testParameters = parameters ? Object.assign({},parameters) : {}
-	const compareParams = this.getCompareParameters(targetDatabase,targetVersion,targetDatabase,targetVersion,testParameters)
-	taskMetrics.failed += await this.compareSchemas(targetDatabase, targetConnection, compareParams, targetSchema1, targetDatabase, targetSchema2, metrics[metrics.length-1],false,targetDBI.inverseTableMappings, stepMetrics)
-	compareElapsedTime = compareElapsedTime + (performance.now() - compareStartTime);
+	sourceDescription = targetDescription
 
 	// Target Schema #2 to File#2
 	
@@ -1107,45 +1137,102 @@ class YadamuQA {
 	sourceDBI = this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,false)
 	// Use the mappings generted during the import to drive the export
     sourceDBI.setTableMappings(tableMappings)
-    sourceDescription = this.getDescription(targetDatabase,targetSchema2)
 
 	targetParameters  = Object.assign({},parameters)
 	targetParameters.FILE = file2;
-    // fileWriter = new FileDBI(this.yadamu);
-	// fileWriter.setParameters(targetParameters);
     fileWriter = this.getDatabaseInterface(fileInterface,sourceConnection,targetParameters,true)
-    targetDescription = this.getDescription(sourceDatabase,{"file" : filename2})  
+    targetDescription = this.getDescription(targetDatabase,targetConnectionName,targetParameters,'FILE')
 
-	startTime = performance.now();
+	stepStartTime = performance.now();
   	metrics.push(await this.yadamu.pumpData(sourceDBI,fileWriter))
-    elapsedTime = performance.now() - startTime
-    stepMetrics.push[elapsedTime]	
+    stepElapsedTime = performance.now() - stepStartTime
+    stepMetrics.push([task,'IMPORT',fileWriter.MODE,targetConnectionName,sourceDatabase,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
       taskMetrics.errors++
       return taskMetrics;
     }
-    
-    counters = this.printResults(configuration.operation.toUpperCase(),`"${targetConnectionName}"://${sourceDescription}`,`file://${file2}`,elapsedTime)
-    this.aggregateMetrics(taskMetrics,counters);
 
-	this.operationsList.push(`file://${file2}`);
+    counters = this.printResults(configuration.operation.toUpperCase(),sourceDescription,targetDescription,stepElapsedTime)
+    this.aggregateMetrics(taskMetrics,counters);
+	this.operationsList.push(targetDescription);
+    this.fixupMetrics(metrics);   
+
+	const taskElapsedTime =  performance.now() - taskStartTime
+    stepMetrics.push([task,'TASK','',sourceDatabase,targetConnectionName,YadamuLibrary.stringifyDuration(taskElapsedTime)])
+   
+	// Compare Results
+
 	
-	const opsElapsedTime =  performance.now() - opsStartTime - compareElapsedTime
+	/*
+	**
+	** Import #1: Array Size Vs Rows Imported
+	** Import #2: Array Size Vs Rows Imported
+	**
+	*/
 	
-	startTime = performance.now
+	let compareDBI = this.getDatabaseInterface(targetDatabase,targetConnection,{},false)
+    await compareDBI.initialize();
+	
+    stepStartTime = performance.now();
+	this.reportRowCounts(await compareDBI.getRowCounts(targetSchema1),metrics[0],parameters,targetDBI.inverseTableMappings) 
+	stepElapsedTime = performance.now() - stepStartTime 
+	stepMetrics.push([task,'COUNT','',targetConnectionName,'',YadamuLibrary.stringifyDuration(stepElapsedTime)])
+
+    stepStartTime = performance.now();
+	this.reportRowCounts(await compareDBI.getRowCounts(targetSchema2),metrics[2],parameters,targetDBI.inverseTableMappings) 
+	stepElapsedTime = performance.now() - stepStartTime 
+	stepMetrics.push([task,'COUNT','',targetConnectionName,'',YadamuLibrary.stringifyDuration(stepElapsedTime)])
+   
+    await compareDBI.releasePrimaryConnection()
+    await compareDBI.finalize();
+	
+	// If the content of the export file originated in the target database compare the imported schema with the source schema.
+		
+    if (operation.source.directory.indexOf(targetConnectionName) === 0) {
+      const testParameters = {} // parameters ? Object.assign({},parameters) : {}
+	  const compareParms = this.getCompareParameters(targetDatabase,targetVersion,targetDatabase,targetVersion,testParameters)
+	  const compareResults = await this.compareSchemas(targetDatabase, targetConnection, compareParms, operation.target, targetDatabase, targetSchema1, metrics[1],false,targetDBI.inverseTableMappings)
+	  taskMetrics.failed += compareResults.failed.length;
+	  stepMetrics.push([task,'COMPARE','',targetConnectionName,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
+	  this.printCompareResults('File',targetConnectionName,task,compareResults)
+    }
+
+    // Compare Target Schema #1 and Target Schema #2
+
+	const testParameters = parameters ? Object.assign({},parameters) : {}
+	const compareParams = this.getCompareParameters(targetDatabase,targetVersion,targetDatabase,targetVersion,testParameters)
+	const compareResults = await this.compareSchemas(targetDatabase, targetConnection, compareParams, targetSchema1, targetDatabase, targetSchema2, metrics[3],false,targetDBI.inverseTableMappings)
+	taskMetrics.failed += compareResults.failed.length;
+	stepMetrics.push([task,'COMPARE','',targetConnectionName,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
+	this.printCompareResults('File',targetConnectionName,task,compareResults)
+    
+	stepStartTime = performance.now();
 	const fileCompareParms = this.getCompareParameters(targetDatabase,targetVersion,'file',0,testParameters)
     const fileCompare = this.getDatabaseInterface('file',{},fileCompareParms,false,tableMappings)
-	await fileCompare.compareFiles(this.yadamuLoggger,sourceFile,file1, file2, metrics)
-    elapsedTime = performance.now() - startTime
-    stepMetrics.push[elapsedTime]	
+	const fileCompareResults = await fileCompare.compareFiles(this.yadamuLoggger, sourceFile, file1, file2, metrics)
 
-    this.yadamu.LOGGER.qa([mode,`${test.parser === 'SQL' ? 'SQL' : 'CLARINET'}`].concat(this.operationsList),`Elapsed Time: ${YadamuLibrary.stringifyDuration(opsElapsedTime)}s.`);
+	if (fileCompareResults.length > 0) {
+	  this.failedOperations[sourceConnectionName] = Object.assign({},this.failedOperations[sourceConnectionName])
+	  this.failedOperations[sourceConnectionName][targetConnectionName] = Object.assign({},this.failedOperations[sourceConnectionName][targetConnectionName])
+	  fileCompareResults.forEach((failed,idx) => {
+	    this.failedOperations[sourceConnectionName][targetConnectionName][task] = Object.assign({},this.failedOperations[sourceConnectionName][targetConnectionName][task])
+        this.failedOperations[sourceConnectionName][targetConnectionName][task][failed[2]] = failed
+	  })
+	}
+	
+    stepElapsedTime = performance.now() - stepStartTime
+    stepMetrics.push([task,'COMPARE','',sourceDatabase,'',YadamuLibrary.stringifyDuration(stepElapsedTime)])
+
+    const elapsedTime = performance.now() - taskStartTime
+    this.yadamu.LOGGER.qa([mode,`${test.parser === 'SQL' ? 'SQL' : 'CLARINET'}`].concat(this.operationsList),`Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    stepMetrics.push([task,'TOTAL','','file',targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])
+    this.taskSummary(stepMetrics)
 	taskMetrics.stepMetrics = stepMetrics
 	return taskMetrics
 
   }
 
-  async import(mode,configuration,test,targetConnectionName,parameters,operation) {
+  async import(task,mode,configuration,test,targetConnectionName,parameters,operation) {
 	
 	const stepMetrics = []
     const fileInterface = mode === 'IMPORT' ? 'file' : 'loader'
@@ -1164,21 +1251,22 @@ class YadamuQA {
 
     const targetSchema  = this.getTargetSchema(targetDatabase,operation.target,operation); 
 	
-    const sourceDescription = this.getDescription(sourceDatabase,operation.source,operation)  
-    const targetDescription = this.getDescription(targetDatabase,targetSchema, operation)
      
 	const sourceParameters  = Object.assign({},parameters)
     const sourceFile = path.join(sourceConnection.directory.replace(/%connection%/g,targetConnectionName).replace(/%vendor%/g,targetDatabase).replace(/%mode%/g,this.yadamu.MODE),operation.source.file)
 	sourceParameters.FILE = sourceFile
-    // const fileReader = new FileDBI(this.yadamu);
-	// fileReader.setParameters(sourceParameters);
 
     const fileReader = this.getDatabaseInterface(fileInterface,sourceConnection,sourceParameters,true)
     
     const targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase,targetSchema)
+	
+    const sourceDescription = this.getDescription(sourceDatabase,'file', sourceParameters,'FILE')  
+    const targetDescription = this.getDescription(targetDatabase,targetConnectionName, targetParameters,'TO_USER')
+    
 	const targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,(operation.recreateTarget || test.recreateSchemas))
-	const startTime = performance.now();
+    const taskStartTime = performance.now();
+	let stepStartTime = taskStartTime
 	
 	let metrics
 	if (test.parser === 'SQL') {
@@ -1189,25 +1277,31 @@ class YadamuQA {
   	  metrics = await this.yadamu.pumpData(fileReader,targetDBI)
     }
 	
-    const opsElapsedTime = performance.now() - startTime
-    stepMetrics.push[opsElapsedTime]	
+    let stepElapsedTime = performance.now() - stepStartTime
+    stepMetrics.push([task,'IMPORT',targetDBI.MODE,sourceDatabase,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
 	
 	if ((operation.hasOwnProperty('verify')) && (this.yadamu.MODE !== 'DDL_ONLY')) {
 	  const compareDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,false)
       await compareDBI.initialize();
+	  stepStartTime = performance.now()
 	  this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),metrics,parameters,targetDBI.inverseTableMappings) 
+	  stepElapsedTime = performance.now() - stepStartTime 
 	  await compareDBI.releasePrimaryConnection()
       await compareDBI.finalize();
+      stepMetrics.push([task,'COUNT','',targetConnectionName,'',YadamuLibrary.stringifyDuration(stepElapsedTime)])
     }		
 
-    const counters = this.printResults(mode,`"file://${sourceFile}`,`"${targetConnectionName}"://${targetDescription}`,opsElapsedTime)
-	counters.path = path.dirname(sourceFile);
+    const elapsedTime = performance.now() - taskStartTime
+    const counters = this.printResults(mode,sourceDescription,targetDescription,elapsedTime)
+	stepMetrics.push([task,'TOTAL','',sourceDatabase,targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])
+	this.taskSummary(stepMetrics)
+    counters.path = path.dirname(sourceFile);
 	counters.stepMetrics = stepMetrics
 	return counters
       
   }
  
-  async export(mode,configuration,test,targetConnectionName,parameters,operation) {
+  async export(task,mode,configuration,test,targetConnectionName,parameters,operation) {
       
     const fileInterface = mode === 'EXPORT' ? 'file' : 'loader'
 
@@ -1228,34 +1322,37 @@ class YadamuQA {
     const sourceConnection = sourceConnectionInfo[sourceDatabase]
 	const targetConnection = targetConnectionInfo[targetDatabase]
  
-    const sourceDescription = this.getDescription(sourceDatabase,operation.source)  
-    const targetDescription = this.getDescription(targetDatabase,operation.target)
-
     const sourceParameters  = Object.assign({},parameters)
-    this.setUser(sourceParameters,'FROM_USER',sourceDatabase, operation.source)
+    this.setUser(sourceParameters,'FROM_USER',sourceDatabase, operation.source, operation.rdbms)
     const sourceDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
     
 	const targetParameters  = Object.assign({},parameters)
-    this.setUser(targetParameters,'TO_USER',sourceDatabase, operation.source)
+    this.setUser(targetParameters,'TO_USER',sourceDatabase, operation.source, operation.rdbms)
     
     const targetDirectory = targetConnection.directory.replace(/%connection%/g,sourceConnectionName).replace(/%vendor%/g,sourceDatabase).replace(/%mode%/g,this.yadamu.MODE)
     const targetFile =  fileInterface === "file" ? path.join(targetDirectory,operation.target.file) : targetDirectory
 	targetParameters.FILE = targetFile
+
+    let sourceDescription = this.getDescription(sourceDatabase,sourceConnectionName,sourceParameters,'FROM_USER')  
+    let targetDescription = this.getDescription(targetDatabase,'file',targetParameters,'FILE')
+
     const fileWriter = this.getDatabaseInterface(fileInterface,targetConnection,targetParameters,true)
 
-	const startTime = performance.now();
+	const taskStartTime = performance.now();
+	let stepStartTime = taskStartTime;
   	metrics.push(await this.yadamu.pumpData(sourceDBI,fileWriter));
-	const elapsedTime = performance.now() - startTime
-    stepMetrics.push[elapsedTime]	
+	let stepElapsedTime = performance.now() - stepStartTime
+    this.printResults(configuration.operation.toUpperCase(),sourceDescription,targetDescription,stepElapsedTime)
+    stepMetrics.push([task,'EXPORT',fileWriter.MODE,sourceConnectionName,targetDatabase,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
       taskMetrics.errors++
       return taskMetrics;
     }
 
     const sourceVersion = sourceDBI.DB_VERSION;
-	const opsElapsedTime = performance.now() - startTime
 		
-	if (operation.verify) {
+	if (operation.hasOwnProperty('verify')) {
+	  sourceDescription = targetDescription
       const sourceParameters  = Object.assign({},parameters)
       if (fileInterface === "file") { 
         sourceParameters.FILE = targetFile
@@ -1268,30 +1365,37 @@ class YadamuQA {
       const fileReader = this.getDatabaseInterface(fileInterface,sourceConnection,sourceParameters,true)
 	  
   	  const targetParameters  = Object.assign({},parameters)
-      this.setUser(targetParameters,'TO_USER', sourceDatabase, operation.verify)
+      this.setUser(targetParameters,'TO_USER', sourceDatabase, operation.verify, operation.rdbms)
 	  const targetDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,true)
 
-      const startTime = performance.now();
+      stepStartTime = performance.now();
   	  metrics.push(await this.yadamu.pumpData(fileReader,targetDBI));
-      const elapsedTime = performance.now() - startTime
-      stepMetrics.push[elapsedTime]	
+      stepElapsedTime = performance.now() - stepStartTime
+      stepMetrics.push([task,'IMPORT',fileReader.MODE,targetDatabase,sourceConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
       if (metrics[metrics.length-1] instanceof Error) {
         taskMetrics.errors++
         return taskMetrics;
       }
       
-	  const verifyDescription = this.getDescription(sourceDatabase,operation.verify) 
-      counters  = this.printResults('VERIFY',`file://${targetFile}`,`"${sourceConnectionName}"://${verifyDescription}`,elapsedTime)
+      const taskElapsedTime =  performance.now() - taskStartTime
+   	  stepMetrics.push([task,'TASK','',sourceConnectionName,targetDatabase,YadamuLibrary.stringifyDuration(taskElapsedTime)])
+
+	  
+	  const verifyDescription = this.getDescription(sourceDatabase,sourceConnectionName,targetParameters,'TO_USER') 
+      counters  = this.printResults('VERIFY',sourceDescription,verifyDescription,taskElapsedTime)
       this.aggregateMetrics(taskMetrics,counters);
       if (this.yadamu.MODE !== 'DDL_ONLY') {
 		// Report rows Imported and Compare Schemas..
         const compareParms = this.getCompareParameters(sourceDatabase,sourceVersion,targetDatabase,0,parameters)
-  	    taskMetrics.failed += await this.compareSchemas(sourceDatabase, sourceConnection, compareParms, operation.source, sourceDatabase, operation.verify, metrics[metrics.length-1],true,undefined,stepMetrics)
+        const compareResults = await this.compareSchemas(sourceDatabase, sourceConnection, compareParms, operation.source, sourceDatabase, operation.verify, metrics[metrics.length-1],true,undefined)
+	    taskMetrics.failed += compareResults.failed.length;
+	    stepMetrics.push([task,'COMPARE','',sourceConnectionName,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
+	    this.printCompareResults(sourceConnectionName,targetConnectionName,task,compareResults)
       } 
     }
       
-    counters = this.printResults(mode,`"${sourceConnectionName}"://${sourceDescription}`,`file://${targetFile}`,opsElapsedTime)
-    this.aggregateMetrics(taskMetrics,counters);
+    stepMetrics.push([task,'TOTAL','',sourceConnectionName,targetDatabase,YadamuLibrary.stringifyDuration(performance.now() - taskStartTime)])
+    this.taskSummary(stepMetrics)
 	taskMetrics.path = path.dirname(targetFile);
 	taskMetrics.stepMetrics = stepMetrics
     return taskMetrics
@@ -1303,7 +1407,11 @@ class YadamuQA {
         this.expandedTaskList[task] = []
 	    if (Array.isArray(configuration.tasks[task])) {
 		  for (const subTask of configuration.tasks[task]) {
-	        this.expandedTaskList[task] = this.expandedTaskList[task].concat(this.getTaskList(configuration,subTask))
+			const newTask = this.getTaskList(configuration,subTask)
+			if (newTask.length === 1) {
+			  newTask[0].taskName = subTask
+			}
+	        this.expandedTaskList[task] = this.expandedTaskList[task].concat(newTask)
 		  }
 	    }
 	    else {
@@ -1311,6 +1419,7 @@ class YadamuQA {
 	 	  if (taskList === undefined) {
 		    throw new ConfigurationFileError(`Named task "${task}" not defined. Valid values: "${Object.keys(configuration.tasks)}".`);
 	      }
+		  taskList.taskName = task
 		  this.expandedTaskList[task] = [taskList]
 	    }
 	  }
@@ -1321,6 +1430,7 @@ class YadamuQA {
 	  return taskList
     }
     else {
+	  task.taskName = 'Anonymous'
       return [task]
     }
   }
@@ -1355,6 +1465,7 @@ class YadamuQA {
   formatArray(v) {
     
   }
+  
   calculateColumnSizes(tabularResults) {
 	
 	const colSizes = new Array(tabularResults[0].length).fill(0)
@@ -1406,8 +1517,7 @@ class YadamuQA {
   }
   
   formatSummary(summary) {
-	this.formatArrays(summary)
-	
+
 	const colSizes = this.calculateColumnSizes(summary)      
     let seperatorSize = (colSizes.length * 3) - 1;
     colSizes.forEach((size)  => {
@@ -1427,6 +1537,102 @@ class YadamuQA {
       this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
     }     
   }
+  
+  printTargetSummary(summary) {
+	
+	const colSizes = this.calculateColumnSizes(summary)      
+    let seperatorSize = (colSizes.length * 3) - 1;
+    colSizes.forEach((size)  => {
+      seperatorSize += size;
+    });
+
+    summary.forEach((row,idx) => {          
+      if (idx < 2) {
+        this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+      }
+      this.yadamu.LOGGER.writeDirect(`|`)
+	  row.forEach((col,idx) => {this.yadamu.LOGGER.writeDirect(` ${col.padStart(colSizes[idx])} |`)});
+      this.yadamu.LOGGER.writeDirect(`\n`)
+	  if (row[3] === '') {
+        this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+	  }
+    })
+
+
+    if (summary.length > 1) {
+      this.yadamu.LOGGER.writeDirect('\n') 
+    }     
+	
+  }
+  
+  printSourceSummary(summary) {
+	
+	const colSizes = this.calculateColumnSizes(summary)      
+    let seperatorSize = (colSizes.length * 3) - 1;
+    colSizes.forEach((size)  => {
+      seperatorSize += size;
+    });
+   
+    this.yadamu.LOGGER.writeDirect(`\n`)
+
+    summary.filter((r,idx) => {return ((idx ===0) || ((r[2] !== '') && (r[3] === '')))}).forEach((row,idx) => {          
+      if (idx < 2) {
+        this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+      }
+      this.yadamu.LOGGER.writeDirect(`|`)
+	  row.forEach((col,idx) => {this.yadamu.LOGGER.writeDirect(` ${col.padStart(colSizes[idx])} |`)});
+      this.yadamu.LOGGER.writeDirect(`\n`)
+    })
+
+    if (summary.length > 1) {
+      this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n\n') 
+    }     
+  }
+  
+  printFailedSummary() {
+	 
+	if (YadamuLibrary.isEmpty(this.failedOperations)) return
+	  
+    this.yadamu.LOGGER.writeDirect(`\n`)
+	  
+  	const failed = [['Source','Target','Data Set','Table','Source Rows','Target Rows','Missing Rows','Extra Rows','Cause']]
+    Object.keys(this.failedOperations).forEach((source) => {
+	  let col1 = source
+	  Object.keys(this.failedOperations[source]).forEach((target) => {
+		let col2 = target
+	    Object.keys(this.failedOperations[source][target]).forEach((test) => {
+		  let col3 = test
+	      Object.keys(this.failedOperations[source][target][test]).forEach((table) => {
+		    const info = this.failedOperations[source][target][test][table]
+			failed.push([col1,col2,col3,table,info[3],info[4],info[5],info[6],info[7] === null ? '' : info[7]])
+			col1 = ''
+			col2 = ''
+			col3 = ''
+		  })
+	    })
+	  })
+	})
+
+	const colSizes = this.calculateColumnSizes(failed)      
+    let seperatorSize = (colSizes.length * 3) - 1;
+    colSizes.forEach((size)  => {
+      seperatorSize += size;
+    });
+
+    failed.forEach((row,idx) => {          
+      if (idx < 2) {
+        this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+      }
+      this.yadamu.LOGGER.writeDirect(`|`)
+	  row.forEach((col,idx) => {this.yadamu.LOGGER.writeDirect(` ${col.padStart(colSizes[idx])} |`)});
+      this.yadamu.LOGGER.writeDirect(`\n`)
+    })
+
+    if (failed.length > 1) {
+      this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
+    }   
+  }
+
 	  
   async doTests(configuration) {
 
@@ -1439,6 +1645,7 @@ class YadamuQA {
     const taskMetrics = this.initializeMetrics()
     const targetMetrics = this.initializeMetrics()
     const sourceMetrics = this.initializeMetrics()
+	const sourceSummary = []
 	const testMetrics = this.initializeMetrics()
 
     const summary = [['End Time','Test','Source','Target','Results','Memory Usage','ElapsedTime']]
@@ -1459,36 +1666,36 @@ class YadamuQA {
         for (const target of targets) {
 		  let targetDescription = target
           const targetConnection = configuration.connections[target]
-		  const startTime = performance.now()
+		  const startTime = performance.now()		      
 	      for (const task of test.tasks) {
-        	let metrics = this.initializeMetrics()
+         	let metrics = this.initializeMetrics()
 	        try {
 		      const operations = this.getTaskList(configuration,task)
 		      const startTime = performance.now()
-		      for (const operation of operations) {
+			  for (const operation of operations) {
                 mode = (test.operation ? test.operation : configuration.operation).toUpperCase()
 			    switch (mode) {
  		          case 'EXPORT':
                   case 'UNLOAD':
-				    metrics = await this.export(mode,configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
+				    metrics = await this.export(operation.taskName,mode,configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
 					targetDescription = 'file://' + metrics.path
 					delete metrics.path
   				    break;
  		          case 'IMPORT':
                   case 'LOAD':
-    		        metrics = await this.import(mode,configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
+    		        metrics = await this.import(operation.taskName,mode,configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
 					sourceDescription = 'file://' + metrics.path
 					delete metrics.path
 				    break;
 			      case 'FILEROUNDTRIP':
                   case 'LOADERROUNDTRIP':
-			        metrics = await this.fileRoundtrip(mode,configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
+			        metrics = await this.fileRoundtrip(operation.taskName,mode,configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
 			        break;
 			      case 'DBROUNDTRIP':
-  			        metrics = await this.dbRoundtrip(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
+  			        metrics = await this.dbRoundtrip(operation.taskName,configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
 			        break;
 			      case 'LOSTCONNECTION':
-			        metrics = await this.dbRoundtrip(configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
+			        metrics = await this.dbRoundtrip(operation.taskName,configuration,test,target,testParameters,test.reverseOperations ? this.reverseOperation(operation) : operation)
 			        break;
 			    }
 				this.aggregateMetrics(operationMetrics,metrics)
@@ -1515,7 +1722,9 @@ class YadamuQA {
         }		 
         const elapsedTime = performance.now() - startTime;
         this.yadamu.LOGGER.qa([mode,`SOURCE`,`${sourceDescription}`],`${this.formatMetrics(targetMetrics)} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+		
         summary.push([new Date().toISOString(),mode,sourceDescription,'',Object.values(taskMetrics),Object.values(process.memoryUsage()),YadamuLibrary.stringifyDuration(elapsedTime)])
+		
         this.aggregateMetrics(sourceMetrics,targetMetrics)
       }
       const elapsedTime = performance.now() - startTime;
@@ -1530,7 +1739,10 @@ class YadamuQA {
 	}  
     const elapsedTime = performance.now() - startTime;
     summary.push([new Date().toISOString(),'','','',Object.values(taskMetrics),Object.values(process.memoryUsage()),YadamuLibrary.stringifyDuration(elapsedTime)])
-	this.formatSummary(summary)
+	this.formatArrays(summary)
+	this.printFailedSummary()
+	this.printSourceSummary(summary)
+	this.printTargetSummary(summary)
     return this.formatMetrics(testMetrics)
   } 
 }

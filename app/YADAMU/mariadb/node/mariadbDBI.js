@@ -27,6 +27,7 @@ class MariadbDBI extends YadamuDBI {
   // Until we have static constants
 
   static get SQL_CONFIGURE_CONNECTION()                       { return _SQL_CONFIGURE_CONNECTION }
+  static get SQL_GET_CONNECTION_INFORMATION()                 { return _SQL_GET_CONNECTION_INFORMATION }
   static get SQL_SYSTEM_INFORMATION()                         { return _SQL_SYSTEM_INFORMATION }
   static get SQL_GET_DLL_STATEMENTS()                         { return _SQL_GET_DLL_STATEMENTS }
   static get SQL_CREATE_SAVE_POINT()                          { return _SQL_CREATE_SAVE_POINT }  
@@ -48,7 +49,7 @@ class MariadbDBI extends YadamuDBI {
   // Enable configuration via command line parameters
 
   get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT            || MariadbConstants.SPATIAL_FORMAT }
-  get TABLE_MATCHING()             { return this.parameters.TABLE_MATCHING            || MySQLDBI.TABLE_MATCHING}
+  get TABLE_MATCHING()             { return this.parameters.TABLE_MATCHING            || MariadbDBI.TABLE_MATCHING}
   get TREAT_TINYINT1_AS_BOOLEAN()  { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MariadbConstants.TREAT_TINYINT1_AS_BOOLEAN }
   
   constructor(yadamu) {
@@ -71,6 +72,10 @@ class MariadbDBI extends YadamuDBI {
   async configureConnection() {  
 
     await this.executeSQL(MariadbDBI.SQL_CONFIGURE_CONNECTION);
+
+    let results = await this.executeSQL(MariadbDBI.SQL_GET_CONNECTION_INFORMATION);
+    this._DB_VERSION = results[0][0]
+
  
   }
 
@@ -438,23 +443,23 @@ class MariadbDBI extends YadamuDBI {
   
     const results = await this.executeSQL(MariadbDBI.SQL_SYSTEM_INFORMATION); 
     const sysInfo = results[0];
-    return {
+	return {
       date               : new Date().toISOString()
      ,timeZoneOffset     : new Date().getTimezoneOffset()                      
-     ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
+     ,sessionTimeZone    : sysInfo[5]
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
      ,exportVersion      : Yadamu.EXPORT_VERSION
-     ,sessionUser        : sysInfo.SESSION_USER
-     ,dbName             : sysInfo.DATABASE_NAME
-     ,serverHostName     : sysInfo.SERVER_HOST
-     ,databaseVersion    : sysInfo.DATABASE_VERSION
-     ,serverVendor       : sysInfo.SERVER_VENDOR_ID
+     ,currentUser        : sysInfo[1]
+     ,sessionUser        : sysInfo[2]
+     ,dbName             : sysInfo[0]
+     ,databaseVersion    : sysInfo[3]
+     ,serverVendor       : sysInfo[4]
      ,softwareVendor     : this.SOFTWARE_VENDOR
      ,nls_parameters     : {
-        serverCharacterSet   : sysInfo.SERVER_CHARACTER_SET,
-        databaseCharacterSet : sysInfo.DATABASE_CHARACTER_SET
+        serverCharacterSet   : sysInfo[6],
+        databaseCharacterSet : sysInfo[7]
       }
      ,nodeClient         : {
         version          : process.version
@@ -502,7 +507,9 @@ class MariadbDBI extends YadamuDBI {
                '[',
                group_concat(
                  json_quote(case 
-                              when (numeric_precision is not null) and (numeric_scale is not null) then
+                              when column_type = 'tinyint(1)' then
+                                ${this.TREAT_TINYINT1_AS_BOOLEAN ? "''" : "'3'"}
+						      when (numeric_precision is not null) and (numeric_scale is not null) then
                                 concat(numeric_precision,',',numeric_scale) 
                               when (numeric_precision is not null) then 
                                 case
@@ -623,6 +630,8 @@ class MariadbDBI extends YadamuDBI {
 module.exports = MariadbDBI
 
 const _SQL_CONFIGURE_CONNECTION = `SET AUTOCOMMIT = 0, TIME_ZONE = '+00:00',SESSION INTERACTIVE_TIMEOUT = 600000, WAIT_TIMEOUT = 600000, SQL_MODE='ANSI_QUOTES,PAD_CHAR_TO_FULL_LENGTH', GROUP_CONCAT_MAX_LEN = 1024000, GLOBAL LOCAL_INFILE = 'ON'`
+
+const _SQL_GET_CONNECTION_INFORMATION = `select substring(version(),1,instr(version(),'-Maria')-1) "DATABASE_VERSION"`
 
 const _SQL_SYSTEM_INFORMATION   = `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
  

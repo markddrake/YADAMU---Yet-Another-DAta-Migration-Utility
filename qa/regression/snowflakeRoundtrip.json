@@ -5,13 +5,12 @@
 , "parameters": {
     "MODE": "DATA_ONLY"
   , "FEEDBACK": "COMMIT"
-  , "MONGO_STRIP_ID": true
   }
 , "tasks"                             : "qa/regression/dbRoundtripTasks.json"
 , "tests"                  : [{
     "source": "oracle19c"
   , "targets": [
-	  "mongodb#1"
+	  "snow#1"
     ]
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -19,7 +18,7 @@
   },{
     "source": "oracle18c"
   , "targets": [
-	  "mongodb#1"
+	  "snow#1"
     ]
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -27,7 +26,7 @@
   },{
     "source": "oracle12c"
   , "targets": [
-	  "mongodb#1"
+	  "snow#1"
     ]
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -35,7 +34,7 @@
   },{
     "source": "oracle11g"
   , "targets": [
-	  "mongodb#1"
+	  "snow#1"
     ]
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -43,7 +42,7 @@
   },{
     "source": "mssql19"
   , "targets": [
-	  "mongodb#1"
+	  "snow#1"
     ]
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -51,7 +50,7 @@
   },{
     "source": "postgres#1"
   , "targets": [
-	  "mongodb#1"
+	  "snow#1"
     ]
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -59,7 +58,7 @@
   },{
     "source": "mysql#1"
   , "targets": [
-	  "mongodb#1"
+	  "snow#1"
     ]
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -67,7 +66,7 @@
   },{
     "source": "mariadb#1"
   , "targets": [
-	  "mongodb#1"
+	  "snow#1"
     ]
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -75,7 +74,16 @@
   },{
     "source": "mongodb#1"
   , "targets": [
-	  "mongodb#1","oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1","mysql#1","mariadb#1"
+	  "snow#1"
+    ]
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source": "snow#1"
+  , "targets": [
+	  "snow#1","oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+	  
     ]
   , "parameters" : {
       "MONGO_STRIP_ID": false

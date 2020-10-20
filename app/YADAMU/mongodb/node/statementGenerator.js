@@ -20,7 +20,7 @@ class StatementGenerator {
       }
       
       switch (true) {
-        case (YadamuLibrary.isBooleanType(dataType)):
+		case (YadamuLibrary.isBooleanType(dataType,sizeConstraint)):
           return 'boolean'
         case (YadamuLibrary.isNumericDataType(dataType)):
           return 'number'
@@ -42,11 +42,12 @@ class StatementGenerator {
     let insertMode = 'DOCUMENT';
 
     let vendor = tableMetadata.vendor
+
     let columnNames = tableMetadata.columnNames
     let dataTypes = tableMetadata.dataTypes
     let sizeConstraints = tableMetadata.sizeConstraints
-
-    /*
+	
+	/*
     **
     ** ARRAY_TO_DOCUMENT uses the column name, data types and size constraint information from the source database to set up 
     ** the transformations required to convert the incoming array into a document. 
@@ -58,8 +59,8 @@ class StatementGenerator {
       columnNames = tableMetadata.source.columnNames 
       dataTypes = tableMetadata.source.dataTypes;
       sizeConstraints = tableMetadata.source.sizeConstraints 
-    }
-
+	}
+	
     const targetDataTypes = columnNames.map((columnName,idx) => { return this.mapForeignDataType(vendor,columnName,dataTypes[idx],sizeConstraints[idx])})
  
     if ((tableMetadata.columnNames.length === 1) && (dataTypes[0] === 'JSON')) {
@@ -91,8 +92,6 @@ class StatementGenerator {
        _SPATIAL_FORMAT : this.spatialFormat
     }
   }
-    
-    
     
   async generateStatementCache(executeDDL) {
     

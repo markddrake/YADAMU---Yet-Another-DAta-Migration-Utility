@@ -7,4 +7,4 @@ COPY dockerfiles/regression/yadamuTestDefaults.json app/YADAMU/common/yadamuDefa
 COPY dockerfiles/regression/tnsnames.ora .
 COPY dockerfiles/regression/connections.json qa/regression
 ENV TNS_ADMIN=/usr/src/YADAMU
-cmd /bin/bash bin/chooseTest.sh 
+ENTRYPOINT ["/bin/bash", "/usr/src/YADAMU/bin/chooseTest.sh", "$YADAMU_TEST_NAME"]

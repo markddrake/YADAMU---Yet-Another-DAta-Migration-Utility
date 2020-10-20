@@ -17,7 +17,7 @@ const pipeline = util.promisify(stream.pipeline);
 */
 
 const oracledb = require('oracledb');
-oracledb.fetchAsString = [ oracledb.DATE ]
+oracledb.fetchAsString = [ oracledb.DATE, oracledb.NUMBER ]
 
 const Yadamu = require('../../common/yadamu.js')
 const YadamuConstants = require('../../common/yadamuConstants.js');
@@ -728,7 +728,7 @@ class OracleDBI extends YadamuDBI {
      
       const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH} , ddl:ddlLob, sourceSchema:this.systemInformation.schema, targetSchema:this.parameters.TO_USER};
       const results = await this.executeSQL(sqlStatement,args);
-      await ddlLob.close();
+	  await ddlLob.close();
       const log = this.processLog(results,'DDL Execution')
     }
 	

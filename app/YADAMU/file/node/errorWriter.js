@@ -20,6 +20,16 @@ class ErrorWriter extends JSONWriter {
   
   //   Disable the columnCountCheck when writing an error report
   
+  cacheRow(row) {
+	try {
+      super.cacheRow(row)
+	} catch (e) {
+	  this.push(this.formatRow(row))
+	  this.rowSeperator = ','
+    }
+  }
+
+  
   checkColumnCount() { /* OVERRRIDE */ }
   
   reportPerformance() { /* OVERRRIDE */ }

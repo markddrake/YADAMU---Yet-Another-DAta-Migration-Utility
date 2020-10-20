@@ -1,0 +1,37 @@
+{
+  "operation"                         : "import"
+, "connections"                       : "qa/regression/connections.json"
+, "parameters": {
+    "ON_ERROR": "FLUSH"
+  , "PARALLEL": 4
+  , "COMMIT_RATIO": 5
+  , "FEEDBACK": "COMMIT"
+  , "XML_STORAGE_FORMAT": "CLOB"
+  }
+, "tasks"                             : "qa/regression/exportTasks.json"
+, "tests" : [{
+    "source":  "file-oracle19c-mode"
+  , "targets": ["snow#1"]
+  , "reverseOperations" : true
+  , "recreateSchemas"   : true
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "file-mysql"
+  , "targets": ["snow#1"]
+  , "reverseOperations" : true
+  , "recreateSchemas"   : true
+  , "tasks": [
+      "mysql"
+    ]
+  },{
+    "source": "file-mssql19"
+  , "targets": ["snow#1"]
+  , "reverseOperations" : true
+  , "recreateSchemas"   : true
+  , "tasks": [
+      "mssql"
+    ]
+  }]
+}  

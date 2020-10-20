@@ -72,7 +72,7 @@ class DBReader extends Readable {
     this.dbi = dbi;
     this.status = dbi.yadamu.STATUS
     this.yadamuLogger = yadamuLogger;
-    this.yadamuLogger.info([`Reader`,dbi.DATABASE_VENDOR,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
+    this.yadamuLogger.info([`Reader`,dbi.DATABASE_VENDOR,dbi.DB_VERSION,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
        
     this.schemaInfo = [];
     
@@ -103,7 +103,7 @@ class DBReader extends Readable {
 	const startTime = performance.now();
     const ddl = await this.dbi.getDDLOperations()
 	if (ddl !== undefined) {
-      this.yadamuLogger.ddl([`${this.dbi.DATABASE_VENDOR}`],`Generated ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+      this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`Generated ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
 	}
 	return ddl
   }
@@ -112,7 +112,7 @@ class DBReader extends Readable {
       
      const startTime = performance.now();
      this.schemaInfo = await this.dbi.getSchemaInfo('FROM_USER')
-     this.yadamuLogger.ddl([`${this.dbi.DATABASE_VENDOR}`],`Generated metadata for ${this.schemaInfo.length} tables. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+     this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`Generated metadata for ${this.schemaInfo.length} tables. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
      return this.dbi.generateMetadata(this.schemaInfo)
   }
  
@@ -224,7 +224,8 @@ class DBReader extends Readable {
 	  // ABORT processing of all tables if the ddl phase did not complete successfully
 	  const ddlStatus = await this.dbWriter.ddlComplete
 	  if (ddlStatus instanceof Error) {
-		throw this.dbWriter.ddlComplete
+		console.log('Throwing', new Error().stack)
+		throw ddlStatus
 	  }
 	  // Clean up the current table. Among other things this will flush any pending records. Note if abortTable() has been called there are no pending records but there is still housekeeping required
 	  await tableOutputStream.forcedEnd();

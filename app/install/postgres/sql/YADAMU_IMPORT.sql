@@ -1,5 +1,28 @@
 /*
 **
+** Drop functions regardless of signatute
+**
+*/
+do 
+$$
+declare
+   _count numeric;
+   _sql text;
+begin
+   SELECT count(*)::int
+        , 'DROP FUNCTION ' || string_agg(oid::regprocedure::text, '; DROP FUNCTION ')
+   FROM   pg_proc
+   WHERE  UPPER(proname) in ('EXPORT_JSON','MAP_FOREIGN_DATA_TYPE','GENERATE_STATEMENTS','IMPORT_JSON','IMPORT_JSONB','GENERATE_SQL')
+   INTO   _count, _sql;  -- only returned if trailing DROPs succeed
+
+   if _count > 0 then
+     execute _sql;
+   end if;
+end
+$$ 
+language plpgsql;
+/*
+**
 ** Postgress EXPORT_JSON Function.
 **
 */
@@ -451,7 +474,7 @@ begin
 end;
 $$ LANGUAGE plpgsql;
 --
-create or replace function GENERATE_STATEMENTS(P_SOURCE_VENDOR VARCHAR, P_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_SPATIAL_FORMAT VARCHAR, P_COLUMN_NAME_ARRAY JSONB, P_DATA_TYPE_ARRAY JSONB, P_SIZE_CONSTRAINT_ARRAY JSONB,P_BINARY_JSON BOOLEAN)
+create or replace function GENERATE_STATEMENTS(P_SOURCE_VENDOR VARCHAR, P_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_SPATIAL_FORMAT VARCHAR, P_COLUMN_NAME_ARRAY JSONB, P_DATA_TYPE_ARRAY JSONB, P_SIZE_CONSTRAINT_ARRAY JSONB, P_BINARY_JSON BOOLEAN)
 returns JSONB
 as $$
 declare
@@ -569,7 +592,7 @@ begin
 end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function IMPORT_JSONB(P_JSON jsonb,P_SCHEMA VARCHAR) 
+create or replace function IMPORT_JSONB(P_JSON jsonb, P_SCHEMA VARCHAR) 
 returns JSONB
 as $$
 declare
