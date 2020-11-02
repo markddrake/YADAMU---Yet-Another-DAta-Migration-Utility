@@ -9,9 +9,9 @@ REM append MODE to YADAMU_SOURCE if it was not set when calling initialize (eg Y
 @set YADAMU_TESTNAME=%4
 for %%I in (%~dp1..) do set YADAMU_TARGET=%%~nxI
 for %%I in (%~dp2..) do set YADAMU_DB=%%~nxI
-@set YADAMU_BIN=%YADAMU_HOME%\app\YADAMU\common
-@set YADAMU_QA_BIN=%YADAMU_HOME%\app\YADAMU_QA\utilities\node
-@set YADAMU_ENV_PATH=%YADAMU_HOME%\app\install\%YADAMU_TARGET%
+@set YADAMU_BIN=%YADAMU_HOME%\src\YADAMU\common
+@set YADAMU_QA_BIN=%YADAMU_HOME%\src\YADAMU_QA\utilities\node
+@set YADAMU_ENV_PATH=%YADAMU_HOME%\src\install\%YADAMU_TARGET%
 @set YADAMU_SQL_PATH=%YADAMU_HOME%\qa\sql\%YADAMU_DB%
 @set YADAMU_SCRIPT_PATH=%~dp2
 @set YADAMU_SCRIPT_PATH=%YADAMU_SCRIPT_PATH:~0,-1%

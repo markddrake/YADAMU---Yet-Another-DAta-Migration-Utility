@@ -1,6 +1,10 @@
 {
-  "operation"                         : "dbRoundtrip"
-, "connections"                       : "qa/regression/connections.json"
+  "connections"                       : "connections.json"
+, "operation"                         : "dbRoundtrip"
+, "tasks"                             : "tasks.json"
+, "recreateSchema"                    : true
+, "createDirectory"                   : true
+, "verifyOperation"                   : true
 , "parameters": {
     "MODE": "DATA_ONLY"
   , "FEEDBACK": "COMMIT"
@@ -8,69 +12,59 @@
   , "ON_ERROR" : "FLUSH"
   , "PARALLEL" : 0
   }
-, "tasks"                             : "qa/regression/dbRoundtripTasks.json"
 , "tests" : [{
     "source": "oracle19c"
   , "target": "oracle19c"
-  , "directory" : "tests/fileRoundtrip/%vendor%"
   , "tasks": [
-       "HR"
+       "HR","BI"
     ]
   },{
     "source": "oracle18c"
   , "target": "oracle18c"
-  , "directory" : "tests/fileRoundtrip/%vendor%"
   , "tasks": [
-       "HR"
+       "HR","BI"
     ]
   },{
     "source": "oracle12c"
   , "target": "oracle12c"
-  , "directory" : "tests/fileRoundtrip/%vendor%"
   , "tasks": [
-       "HR"
+       "HR","BI"
     ]
   },{
     "source": "oracle11g"
   , "target": "oracle11g"
-  , "directory" : "tests/fileRoundtrip/%vendor%"
   , "tasks": [
-       "HR"
+       "HR","BI"
     ]
   },{
     "source": "mssql19"
   , "target": "mssql19"
-  , "directory" : "tests/fileRoundtrip/%vendor%"
   , "tasks": [
-       "HR"
+       "HR","BI"
     ]
   },{
     "source": "mssql17"
   , "target": "mssql17"
-  , "directory" : "tests/fileRoundtrip/%vendor%"
   , "tasks": [
-       "HR"
+       "HR","BI"
     ]
   },{
     "source": "postgres#1"
   , "target": "postgres#1"
-  , "directory" : "tests/fileRoundtrip/%vendor%"
   , "tasks": [
-       "HR"
+       "HR","BI"
     ]
   },{
     "source": "mysql#1"
   , "target": "mysql#1"
-  , "directory" : "tests/fileRoundtrip/%vendor%"
   , "tasks": [
-       "HR"
+       "HR","BI"
 	]
   },{
     "source": "mariadb#1"
   , "target": "mariadb#1"
-  , "directory" : "tests/fileRoundtrip/%vendor%"
   , "tasks": [
-       "HR"
+       "HR","BI"
 	]
   },{
     "source": "mongodb#1"
@@ -78,64 +72,53 @@
   , "parameters": {
       "MONGO_STRIP_ID" : false
     }
-  , "directory" : "tests/fileRoundtrip/%vendor%"
   , "tasks": [
-       "HR"
+       "HR","BI"
     ]
   },{
-    "source": "oracle19c"
-  , "target": "oracle19c"
-  , "directory" : "tests/fileRoundtrip/%vendor%"
-  , "tasks": [
-       "BI"
-    ]
-  },{
-    "source"     : "oracle19c"
-  , "target"     : "file-connection-mode"
-  , "operation"  : "export"
-  , "clone"      : true
-  , "directory"  : "tests/fileRoundtrip/%vendor%"
+    "operation"        : "export"
+  , "source"           : "oracle19c"
+  , "target"           : "scratch"
+  , "exportPath"       : "%operation%/%connection%/%mode%"
   , "parameters" : {
      "MODE"      : "DDL_ONLY"
     }
   , "tasks": [
-       { "source" : {"schema" : "HR"    }, "target" : { "file" : "HR.json"},          "verify" : {"schema" : "HR1"    }}
+       "HR","BI"
     ]
   },{
-    "source"     : "oracle19c"
-  , "target"     : "file-connection-mode"
-  , "operation"  : "export"
-  , "clone"      : true
-  , "directory"  : "tests/fileRoundtrip/%vendor%"
+    "operation"        : "export"
+  , "source"           : "oracle19c"
+  , "target"           : "scratch"
+  , "exportPath"       : "%operation%/%connection%/%mode%"
   , "parameters" : {
      "MODE"      : "DATA_ONLY"
     }
   , "tasks": [
-       { "source" : {"schema" : "HR"    }, "target" : { "file" : "HR.json"},          "verify" : {"schema" : "HR1"    }}
+       "HR","BI"
     ]
   },{
-    "source"     : "oracle19c"
-  , "target"     : "file-connection-mode"
-  , "operation"  : "export"
-  , "clone"      : true
-  , "directory"  : "tests/fileRoundtrip/%vendor%"
+    "operation"        : "export"
+  , "source"           : "oracle19c"
+  , "target"           : "scratch"
+  , "exportPath"       : "%operation%/%connection%/%mode%"
   , "parameters" : {
      "MODE"      : "DDL_AND_DATA"
     }
   , "tasks": [
-       { "source" : {"schema" : "HR"    }, "target" : { "file" : "HR.json"},          "verify" : {"schema" : "HR1"    }}
+       "HR","BI"
     ]
   },{
-    "source"     : "file-JSON-root"
-  , "target"     : "oracle19c"
-  , "operation"  : "fileRoundtrip"
-  , "clone"      : true
-  , "directory"  : "scratch/fileRoundtrip/%vendor%"
+    "operation"       : "fileRoundtrip"
+  , "source"          : "scratch-export"
+  , "target"          : "oracle19c"
+  , "importPath"      : "oracle19c/DATA_ONLY"
+  , "exportPath"      : "output/%operation%/%connection%/%mode%/%importPath%"
   , "parameters" : {
      "MODE"      : "DDL_AND_DATA"
     }
   , "tasks": [
-       { "source" : { "file" : "HR.json", "directory": "oracle19c/%mode%" },  "target" : {"schema" : "HR"}}
-    ]
+       "HR","BI"
+  ]
   }]
 }

@@ -1,0 +1,114 @@
+{
+  "operation"         : "dbRoundTrip"
+, "connections"       : "connections.json"
+, "tasks"             : "tasks.json"
+, "recreateSchema"    : true
+, "createFolders"     : true
+, "parameters": {
+    "MODE"            : "DATA_ONLY"
+  , "FEEDBACK"        : "COMMIT"
+  , "MONGO_STRIP_ID"  : true
+  , "ROOT_FOLDER"     : "yadamuAzure/%connection%/%mode%"
+  }
+, "tests"             : [{
+    "operation"       : "import"
+  , "source"          : "file-JSON"
+  , "target"          : "azurite#1"
+  , "importPath"      : "%location%"
+  , "parameters"      : {
+      "ROOT_FOLDER"   : "yadamuAzure"
+	}
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "oracle19c"
+  , "target"          : "azurite#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "oracle18c"
+  , "target"          : "azurite#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "oracle12c"
+  , "target"          : "azurite#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "oracle11g"
+  , "target"          : "azurite#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "mssql19"
+  , "target"          : "azurite#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "postgres#1"
+  , "target"          : "azurite#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "mysql#1"
+  , "target"          : "azurite#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "mariadb#1"
+  , "target"          : "azurite#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "mongodb#1"
+  , "target"          : "azurite#1"
+  , "parameters" : {
+      "MONGO_STRIP_ID": false
+	}
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "azurite#1"
+  , "targets": [
+	  "oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+	  
+    ]
+  , "parameters": {
+      "ROOT_FOLDER"  : "yadamuAzure"
+	}
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "mssql19"
+  , "target"          : "azurite#1"
+  , "parameters" : {
+      "ROOT_FOLDER"   : "yadamuAzure/compressed/%connection%/%mode%"
+	, "COMPRESSION"   : "GZIP"
+	}
+  , "tasks": [ 
+      "HR","sakila","Northwind","WWI_Warehouse"
+	]
+  },{
+    "source"          : "mssql19"
+  , "target"          : "azurite#1"
+  , "parameters" : {
+      "ROOT_FOLDER"   : "yadamuAzure/csv/%connection%/%mode%"
+	, "OUTPUT_FORMAT" : "CSV"
+	}
+  , "tasks": [ 
+      "HR","sakila","Northwind","WWI_Warehouse"
+	]
+  }]
+}

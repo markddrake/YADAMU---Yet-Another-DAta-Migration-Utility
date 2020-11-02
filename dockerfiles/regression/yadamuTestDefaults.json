@@ -15,18 +15,18 @@
         "COMMIT_RATIO": 5
     },
     "drivers": {
-        "file": "../file/node/fileDBI.js",
-        "loader": "../loader/node/loaderDBI.js",
-        "awsS3": "../loader/s3/s3DBI.js",
-        "azure": "../loader/s3/azureDBI.js",
-        "oracle": "../oracle/node/oracleDBI.js",
-        "postgres": "../postgres/node/postgresDBI.js",
-        "mssql": "../mssql/node/mssqlDBI.js",
-        "mysql": "../mysql/node/mysqlDBI.js",
-        "mariadb": "../mariadb/node/mariadbDBI.js",
-        "mongodb": "../mongodb/node/mongoDBI.js",
-        "snowflake": "../snowflake/node/snowflakeDBI.js",
-        "teradata": "../teradata/worker/teradataDBI.js"
+        "file"       : "../file/node/fileDBI.js",
+        "loader"     : "../loader/node/loaderDBI.js",
+        "awsS3"      : "../loader/s3/awss3DBI.js",
+        "azure"      : "../loader/s3/azureDBI.js",
+        "oracle"     : "../oracle/node/oracleDBI.js",
+        "postgres"   : "../postgres/node/postgresDBI.js",
+        "mssql"      : "../mssql/node/mssqlDBI.js",
+        "mysql"      : "../mysql/node/mysqlDBI.js",
+        "mariadb"    : "../mariadb/node/mariadbDBI.js",
+        "mongodb"    : "../mongodb/node/mongoDBI.js",
+        "snowflake"  : "../snowflake/node/snowflakeDBI.js",
+        "teradata"   : "../teradata/worker/teradataDBI.js"
     },
     "mariadb": {
         "TABLE_MATCHING": "INSENSITIVE",

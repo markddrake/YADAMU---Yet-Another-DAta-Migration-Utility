@@ -109,54 +109,28 @@
 	  , "schema"                        : "PUBLIC"	
       }
     },
-    "minio#1"                           : {
-	  "awsS3"                           : {
-          "accessKeyId"                 : "AKIAIOSFODNN7EXAMPLE" ,
-          "secretAccessKey"             : "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" ,
-          "endpoint"                    : "http://yadamu-db1:9000" ,
-          "s3ForcePathStyle"            : true,
-          "signatureVersion"            : "v4"
-      }
+	"minio#1": {
+		"awsS3": {
+			"accessKeyId": "AKIAIOSFODNN7EXAMPLE",
+			"secretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+			"endpoint": "http://yadamu-db1:9000",
+			"s3ForcePathStyle": true,
+			"signatureVersion": "v4",
+			"yadamuProperties" : {
+			  "bucketName" : "Bucket1"
+			, "rootFolder" : "yadamu"
+			}
+		}
 	},
-    "azurite#1": {
-		"azure"                         : "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://yadamu-db1:10000/devstoreaccount1"
+	"azurite#1": {
+		"azure": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://yadamu-db1:10000/devstoreaccount1"
 	},
-    "load-scratch"                            : {
-	  "loader"                          : {
-		"directory"                     : "scratch" 
-      }
-	},
-    "file-connection"                   : {
+    "file-YADAMU_HOME"                  : {
       "file"                            : {
-		"directory"                     : "JSON/%connection%" 
+		"directory"                     : "" 
       }
     },
-    "file-connection-mode"              : {
-      "file"                            : {
-		"directory"                     : "JSON/%connection%/%mode%" 
-      }
-    },
-    "file-vendor"                       : {
-      "file"                            : {
-		"directory"                     : "JSON/%vendor%" 
-      }
-    },
-    "file-oracle19c-mode"               : {
-      "file"                            : {
-		"directory"                     : "JSON/oracle19c/%mode%" 
-      }
-    },
-    "file-mssql19"                      : {
-      "file"                            : {
-		"directory"                     : "JSON/mssql19" 
-      }
-    },
-    "file-mysql"                       : {
-      "file"                            : {
-		"directory"                     : "JSON/mysql" 
-      }
-    },
-    "file-JSON-root"                    : {
+    "file-JSON"                         : {
       "file"                            : {
 		"directory"                     : "JSON" 
       }
@@ -165,4 +139,20 @@
       "file"                            : {
 		"directory"                     : "scratch" 
       }
-    }}
+    },
+    "scratch-export"                    : {
+      "file"                            : {
+		"directory"                     : "scratch/export" 
+      }
+    },
+     "loader#1"                : {
+      "loader"                          : {
+		"rootFolder" : "loader" 
+      }
+    },
+	"loader-scratch": {
+      "loader": {
+		"rootFolder": "scratch/loader"
+	  }
+	}
+}

@@ -2,9 +2,24 @@ FROM yadamu/base:latest
 WORKDIR /usr/src/YADAMU
 COPY qa/bin qa/bin
 COPY qa/regression qa/regression
-COPY dockerfiles/regression/bin  bin
-COPY dockerfiles/regression/yadamuTestDefaults.json app/YADAMU/common/yadamuDefaults.json
+COPY qa/mappings qa/mappings
+COPY dockerfiles/regression/bin bin
+COPY dockerfiles/regression/yadamuTestDefaults.json src/YADAMU/common/yadamuDefaults.json
 COPY dockerfiles/regression/tnsnames.ora .
 COPY dockerfiles/regression/connections.json qa/regression
+RUN mkdir -p mnt/log \
+ &&	mkdir -p mnt/JSON \
+ && mkdir -p mnt/tests \ 
+ &&	mkdir -p mnt/work \	
+ &&	mkdir -p mnt/output \	
+ &&	mkdir -p mnt/loader \	
+ &&	mkdir -p mnt/local \	
+ && ln -sfn mnt/log \
+ && ln -sfn mnt/JSON \
+ && ln -sfn mnt/tests \
+ && ln -sfn mnt/work \
+ && ln -sfn mnt/output \
+ && ln -sfn mnt/loader \
+ && ln -sfn mnt/local 
 ENV TNS_ADMIN=/usr/src/YADAMU
 ENTRYPOINT ["/bin/bash", "/usr/src/YADAMU/bin/chooseTest.sh", "$YADAMU_TEST_NAME"]

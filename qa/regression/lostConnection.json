@@ -1,11 +1,11 @@
 {
-  "operation"                         : "lostConnection"
-, "clone"                             : true
-, "connections"                       : "qa/regression/connections.json"
+  "operation"         : "lostConnection"
+, "connections"       : "connections.json"
+, "tasks"             : "tasks.json"
+, "recreateSchema"    : true
 , "parameters": {
     "MODE": "DATA_ONLY"
   }
-, "tasks"                             : "qa/regression/dbRoundtripTasks.json"
 , "tests"                  : [
     {"source":   "oracle19c",  "target": "oracle19c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT", "KILL_READER_AFTER" : 20000}, "tasks": ["WWI_Warehouse"]}
    ,{"source":   "oracle18c",  "target": "oracle18c",   "parameters" : { "PARALLEL" : 0, "ON_ERROR" : "ABORT", "KILL_READER_AFTER" : 20000}, "tasks": ["WWI_Warehouse"]}

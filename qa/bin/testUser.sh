@@ -1,6 +1,6 @@
 export SCHEMAID=$1
 if [ -z ${YADAMU_HOME+x} ]; then export YADAMU_HOME=`pwd`; fi
-if [ -z ${YADAMU_INSTALL+x} ]$; then export YADAMU_INSTALL=$YADAMU_HOME/app/install/; fi
+if [ -z ${YADAMU_INSTALL+x} ]$; then export YADAMU_INSTALL=$YADAMU_HOME/src/install/; fi
 if [ -z ${YADAMU_QA_SQL+x} ]$; then export YADAMU_QA_SQL=$YADAMU_HOME/qa/sql; fi
 export YADAMU_DB=oracle19c
 source $YADAMU_INSTALL/$YADAMU_DB/env/dbConnection.sh

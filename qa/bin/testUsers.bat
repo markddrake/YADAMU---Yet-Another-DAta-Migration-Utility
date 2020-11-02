@@ -1,6 +1,6 @@
 set SCHEMAID=%1
 if not defined YADAMU_HOME set YADAMU_HOME=%CD%
-if not defined YADAMU_INSTALL set YADAMU_INSTALL=%YADAMU_HOME%\app\install
+if not defined YADAMU_INSTALL set YADAMU_INSTALL=%YADAMU_HOME%\src\install
 if not defined YADAMU_QA_SQL set YADAMU_QA_SQL=%YADAMU_HOME%\qa\sql
 set YADAMU_DB=oracle19c
 call %YADAMU_INSTALL%\%YADAMU_DB%\env\dbConnection.bat

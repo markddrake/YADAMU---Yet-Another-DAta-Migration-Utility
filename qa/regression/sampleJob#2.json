@@ -3,7 +3,7 @@
     "sourceDB"                        : {
 	  "mssql"                         : {
 	     
- ,"schemas"                           : "qa/regression/schemas.json"
+ ,"schemas"                           : "schemas.json"
  ,"jobs"                            : [{
      "source"                       : {
         "connection"                : "oracle19c"

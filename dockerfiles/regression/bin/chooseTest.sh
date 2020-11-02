@@ -20,22 +20,34 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
   ;;
     
+  mongo)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoTestSuite
+  ;;
+
   lostConnection)
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
-  ;;
-
-  mongoImport)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoImport
-  ;;
-
-  mongoRoundtrip)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoRoundtrip
   ;;
 
   all)
     source $YADAMU_SCRIPT_DIR/runRegressionTests.sh 
   ;;	
   
+  snowflake)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeTestSuite
+  ;;
+
+  loader)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh loaderTestSuite
+  ;;
+
+  aws)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh awsTestSuite
+  ;;
+
+  azure)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh azureTestSuite
+  ;;
+
   cmdLine) 
     source  $YADAMU_SCRIPT_DIR/runCmdTests.sh
   ;;
@@ -44,12 +56,11 @@ case $YADAMU_TEST_NAME  in
     sleep 365d
   ;; 
   
-  snowflake)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeImport
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeRoundtrip
-  ;;  
+  local)
+    source $YADAMU_SCRIPT_DIR/runLocalTest.sh $TESTNAME
+  ;; 
   
   *)
-    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are export, import, fileRoundtrip, dbRoundtrip, lostConnection,  mongoImport, mongoRoundtrip, snowflake, cmdLine, interactive or all (default)"
+    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are export, import, fileRoundtrip, dbRoundtrip, lostConnection, mongo, snowflake, loader, aws, azure, cmdLine, interactive or all (default)"
   ;;
 esac

@@ -1,0 +1,86 @@
+{
+  "operation"         : "dbRoundTrip"
+, "connections"       : "connections.json"
+, "tasks"             : "tasks.json"
+, "recreateSchema"    : true
+, "parameters": {
+    "MODE"            : "DATA_ONLY"
+  , "FEEDBACK"        : "COMMIT"
+  , "MONGO_STRIP_ID"  : true
+  }
+, "tests"             : [{
+    "operation"       : "import"
+    "source"          : "file-JSON"
+  , "target"          : "snow#1"
+  , "importPath"      : "%location%"
+  , "tasks": [
+      "oracle","mysql","mssql"
+    ]
+  },{
+    "source"          : "oracle19c"
+  , "target"          : "snow#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "oracle18c"
+  , "target"          : "snow#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "oracle12c"
+  , "target"          : "snow#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "oracle11g"
+  , "target"          : "snow#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "mssql19"
+  , "target"          : "snow#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "postgres#1"
+  , "target"          : "snow#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "mysql#1"
+  , "target"          : "snow#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "mariadb#1"
+  , "target"          : "snow#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "mongodb#1"
+  , "target"          : "snow#1"
+  , "parameters" : {
+      "MONGO_STRIP_ID": false
+	}
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "snow#1"
+  , "targets": [
+	  "snow#1","oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+	  
+    ]
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  }]
+}

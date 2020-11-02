@@ -1,12 +1,16 @@
 {
-  "operation"                         : "fileRoundtrip"
-, "connections"                       : "qa/regression/connections.json"
+  "operation"         : "fileRoundtrip"
+, "connections"       : "connections.json"
+, "tasks"             : "tasks.json"
+, "importPath"        : "JSON/%location%"
+, "exportPath"        : "output/%operation%/%connection%/%mode%/%location%"
+, "recreateSchema"    : true
+, "createDirectory"   : true
 , "parameters": {
     "MODE": "DATA_ONLY"
   }
-, "tasks"                             : "qa/regression/fileRoundtripTasks.json"
 , "tests" : [{
-    "source": "file-JSON-root"
+    "source": "file-YADAMU_HOME"
   , "targets": [
       "oracle19c"
     , "oracle18c"
@@ -19,12 +23,11 @@
     , "mariadb#1"
     ]
   , "parser" : "CLARINET"
-  , "directory" : "tests/fileRoundtrip/%connection%/%sourceDirectory%"
   , "tasks": [
        "oracle", "mysql", "mssql"
     ]
   },{
-    "source": "file-JSON-root"
+    "source": "file-YADAMU_HOME"
   , "targets": [
       "oracle19c"
     , "oracle18c"
@@ -35,9 +38,9 @@
     , "mysql#1"
     ]
   , "parser" : "SQL"
-  , "directory" : "tests/fileRoundtrip/%connection%/%sourceDirectory%"
+  , "exportPath"                      : "output/%operation%/SQL/%connection%/%mode%/%location%"
   , "tasks": [
-       "oracle", "mysql", "mssql"
+       "oracle", "mysql", "mssql-fileRoundtrip"
     ]
   }]
 }

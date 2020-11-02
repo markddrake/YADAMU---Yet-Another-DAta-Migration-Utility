@@ -1,6 +1,6 @@
 REM If running manally run from the YADAMU 'home' folder.
 if not defined YADAMU_HOME @set YADAMU_HOME=%CD%
-@set YADAMU_INSTALL=%YADAMU_HOME%\app\install
+@set YADAMU_INSTALL=%YADAMU_HOME%\src\install
 @set YADAMU_QA=%YADAMU_HOME%\qa
 @set YADAMU_QA_SQL=%YADAMU_QA%\sql
 @set YADAMU_LOG_PATH=%YADAMU_HOME%\log

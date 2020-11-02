@@ -1,5 +1,5 @@
 {
-  "connections"                       : "qa/regression/noPasswords.json"
+  "connections"                       : "noPasswords.json"
  ,"schemas"                           : {
     "sourceSchema"                    : {
        "schema"                       : "Northwind"

@@ -1,11 +1,11 @@
 {
-  "operation"                         : "dbRoundTrip"
-, "clone"                             : true
-, "connections"                       : "qa/regression/connections.json"
+  "operation"         : "dbRoundTrip"
+, "connections"       : "connections.json"
+, "tasks"             : "tasks.json"
+, "recreateSchema"    : true
 , "parameters": {
     "MODE": "DATA_ONLY"
   }
-, "tasks"                             : "qa/regression/dbRoundtripTasks.json"
 , "tests"                  : [{
     "source": "oracle19c"
   , "targets": [

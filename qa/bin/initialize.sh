@@ -12,9 +12,9 @@ export YADAMU_SOURCE=$3
 if [ "${YADAMU_SOURCE: -1}" == "/" ]; then export YADAMU_SOURCE=$YADAMU_SOURCE$MODE; fi;
 export YADAMU_TESTNAME=$4
 export YADAMU_SHARED_DIR=$(dirname "${BASH_SOURCE[0]}") 
-export YADAMU_BIN=$YADAMU_HOME/app/YADAMU/common
-export YADAMU_QA_BIN=$YADAMU_HOME/app/YADAMU_QA/utilities/node
-export YADAMU_ENV_PATH=$YADAMU_HOME/app/install/$YADAMU_TARGET
+export YADAMU_BIN=$YADAMU_HOME/src/YADAMU/common
+export YADAMU_QA_BIN=$YADAMU_HOME/src/YADAMU_QA/utilities/node
+export YADAMU_ENV_PATH=$YADAMU_HOME/src/install/$YADAMU_TARGET
 export YADAMU_SQL_PATH=$YADAMU_HOME/qa/sql/$YADAMU_DB
 export YADAMU_SCRIPT_PATH=$(dirname "$2")
 # JSON Files are in {YADAMU_HOME}/JSON/{RDBMS} or for Oracle {YADAMU_HOME/JSON/{SOURCE}/{MODE}

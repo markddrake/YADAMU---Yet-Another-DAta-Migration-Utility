@@ -1,52 +1,38 @@
 {
-  "operation"                         : "import"
-, "connections"                       : "qa/regression/connections.json"
+  "operation"         : "import"
+, "connections"       : "connections.json"
+, "tasks"             : "tasks.json"
+, "importPath"        : "%location%"
+, "recreateSchema"    : true
+, "reverseOperations" : true
+, "verifyOperation"   : true
 , "parameters": {
     "MODE": "DATA_ONLY"
   }
-, "tasks"                             : "qa/regression/exportTasks.json"
 , "tests" : [{
-    "source":  "file-oracle19c-mode"
-  , "targets": ["mssql17","mssql19","postgres#1","mysql#1","mariadb#1"]
-  , "parameters": {
-      "MODE": "DATA_ONLY"
-    }
-  , "reverseOperations" : true
-  , "recreateSchemas"   : true
+    "source"      : "file-JSON"
+  , "targets"     : ["mssql17","mssql19","postgres#1","mysql#1","mariadb#1"]
   , "tasks": [
       "oracle"
     ]
   },{
-    "source": "file-mysql"
-  , "targets": ["oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1"]
-  , "parameters": {
-      "MODE": "DATA_ONLY"
-    }
-  , "reverseOperations" : true
-  , "recreateSchemas"   : true
+    "source"      : "file-JSON"
+  , "targets"     : ["oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1"]
   , "tasks": [
       "mysql"
     ]
   },{
-    "source": "file-mssql19"
-  , "targets": ["oracle19c","oracle18c","oracle12c","postgres#1","mysql#1","mariadb#1"]
-  , "parameters": {
-      "MODE": "DATA_ONLY"
-    }
-  , "reverseOperations" : true
-  , "recreateSchemas"   : true
+    "source"      : "file-JSON"
+  , "targets"     : ["oracle19c","oracle18c","oracle12c","postgres#1","mysql#1","mariadb#1"]
   , "tasks": [
       "mssql"
     ]
   },{
-    "source": "file-mssql19"
-  , "targets": ["oracle11g"]
-  , "parameters": {
-      "MODE": "DATA_ONLY"
-    , "MAPPINGS": "qa/regression/mappingsOracle11g.json"
+    "source"      : "file-JSON"
+  , "targets"     : ["oracle11g"]
+  , "parameters"  : {
+      "MAPPINGS"  : "qa/mappings/Oracle11gAdventureWorks.json"
 	}
-  , "reverseOperations" : true
-  , "recreateSchemas"   : true
   , "tasks": [
       "mssql"
     ]

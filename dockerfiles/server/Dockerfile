@@ -7,5 +7,5 @@ COPY dockerfiles/server/configuration.json .
 ENV PORT 3000
 EXPOSE 3000
 ENV TNS_ADMIN=/usr/src/YADAMU/mnt
-ENTRYPOINT ["node", "/usr/src/YADAMU/app/YADAMU_SVR/node/main.js", "/usr/src/YADAMU/mnt/configuration.json"]
+ENTRYPOINT ["node", "/usr/src/YADAMU/src/YADAMU_SVR/node/main.js", "/usr/src/YADAMU/mnt/configuration.json"]
 CMD []

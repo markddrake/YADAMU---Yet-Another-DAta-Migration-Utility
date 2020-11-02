@@ -1,3 +1,3 @@
 REM Run from YADAMU_HOME
 @set YADAMU_HOME=%CD%
-node %YADAMU_HOME%\app\YADAMU\common\import.js %*
+node %YADAMU_HOME%\src\YADAMU\common\import.js %*

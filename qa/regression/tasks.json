@@ -1,0 +1,45 @@
+{
+  "all"                  : [ "oracle", "mysql", "mssql"]
+, "oracle"               : [ "HR","SH","OE","PM","IX","BI"]
+, "mysql"                : [ "sakila", "jsonExample"]
+, "mssql"                : [ "Northwind", "HumanResources", "Person", "Production", "Purchasing", "Sales", "AdventureWorksDW", "WWI_Application", "WWI_Purchasing", "WWI_Sales", "WWI_Warehouse", "WWI_Dimension", "WWI_Fact", "WWI_Integration"]
+, "mssql-fileRoundtrip"  : [ "Northwind", "HumanResources", "Person", "Production", "Purchasing", "Sales", "AdventureWorksDW", "AdventureWorksAll"]
+, "HR"                   : { "vendor": "oracle",  "file" : "HR.json",                "source" : {"schema" : "HR"    }}
+, "SH"                   : { "vendor": "oracle",  "file" : "SH.json",                "source" : {"schema" : "SH"    }}
+, "OE"                   : { "vendor": "oracle",  "file" : "OE.json",                "source" : {"schema" : "OE"    }}
+, "PM"                   : { "vendor": "oracle",  "file" : "PM.json",                "source" : {"schema" : "PM"    }}
+, "IX"                   : { "vendor": "oracle",  "file" : "IX.json",                "source" : {"schema" : "IX"    }}
+, "BI"                   : { "vendor": "oracle",  "file" : "BI.json",                "source" : {"schema" : "BI"    }}
+, "sakila"               : { "vendor": "mysql",   "file" : "sakila.json",            "source" : {"schema" : "sakila"}}
+, "jsonExample"          : { "vendor": "mysql",   "file" : "jsonExample.json",       "source" : {"schema" : "jtest" }}
+, "Northwind"            : { "vendor": "mssql",   "file" : "Northwind.json",         "source" : {"database": "Northwind",            "owner": "dbo"            }}
+, "HumanResources"       : { "vendor": "mssql",   "file" : "HumanResources.json",    "source" : {"database": "AdventureWorks",       "owner": "HumanResources" }}
+, "Person"               : { "vendor": "mssql",   "file" : "Person.json",            "source" : {"database": "AdventureWorks",       "owner": "Person"         }}
+, "Production"           : { "vendor": "mssql",   "file" : "Production.json",        "source" : {"database": "AdventureWorks",       "owner": "Production"     }}
+, "Purchasing"           : { "vendor": "mssql",   "file" : "Purchasing.json",        "source" : {"database": "AdventureWorks",       "owner": "Purchasing"     }}
+, "Sales"                : { "vendor": "mssql",   "file" : "Sales.json",             "source" : {"database": "AdventureWorks",       "owner": "Sales"          }}
+, "AdventureWorksDW"     : { "vendor": "mssql",   "file" : "AdventureWorksDW.json",  "source" : {"database": "AdventureWorksDW",     "owner": "dbo"            }}
+, "AdventureWorksAll"    : { "vendor": "mssql",   "file" : "AdventureWorksAll.json", "source" : {"database": "AdventureWorksAll",    "owner": "dbo"            }}
+, "WWI_Application"      : { "vendor": "mssql",   "file" : "Application.json",       "source" : {"database": "WorldWideImporters",   "owner": "Application"    }, "schemaPrefix": "WWI"}
+, "WWI_Purchasing"       : { "vendor": "mssql",   "file" : "Purchasing.json",        "source" : {"database": "WorldWideImporters",   "owner": "Purchasing"     }, "schemaPrefix": "WWI"}
+, "WWI_Sales"            : { "vendor": "mssql",   "file" : "Sales.json",             "source" : {"database": "WorldWideImporters",   "owner": "Sales"          }, "schemaPrefix": "WWI"}
+, "WWI_Warehouse"        : { "vendor": "mssql",   "file" : "Warehouse.json",         "source" : {"database": "WorldWideImporters",   "owner": "Warehouse"      }, "schemaPrefix": "WWI"}
+, "WWI_Dimension"        : { "vendor": "mssql",   "file" : "Dimension.json",         "source" : {"database": "WorldWideImportersDW", "owner": "Dimension"      }, "schemaPrefix": "WWI"}
+, "WWI_Fact"             : { "vendor": "mssql",   "file" : "Fact.json",              "source" : {"database": "WorldWideImportersDW", "owner": "Fact"           }, "schemaPrefix": "WWI"}
+, "WWI_Integration"      : { "vendor": "mssql",   "file" : "Integration.json",       "source" : {"database": "WorldWideImportersDW", "owner": "Integration"    }, "schemaPrefix": "WWI"}
+, "AdventureWorks_AWA"   : ["HumanResources_AWA","Person_AWA","Production_AWA","Purchaseing_AWA","Sales_AWA","AdventureWorksDW_AWA"]
+, "Northwind_AWA"        : { "vendor": "mssql",   "file" : "Northwind.json",         "source" : {"database": "AdventureWorksAll",    "owner": "dbo"}}
+, "HumanResources_AWA"   : { "vendor": "mssql",   "file" : "HumanResources.json",    "source" : {"database": "AdventureWorksAll",    "owner": "dbo"}}
+, "Person_AWA"           : { "vendor": "mssql",   "file" : "Person.json",            "source" : {"database": "AdventureWorksAll",    "owner": "dbo"}}
+, "Production_AWA"       : { "vendor": "mssql",   "file" : "Production.json",        "source" : {"database": "AdventureWorksAll",    "owner": "dbo"}}
+, "Purchaseing_AWA"      : { "vendor": "mssql",   "file" : "Purchasing.json",        "source" : {"database": "AdventureWorksAll",    "owner": "dbo"}}
+, "Sales_AWA"            : { "vendor": "mssql",   "file" : "Sales.json",             "source" : {"database": "AdventureWorksAll",    "owner": "dbo"}}
+, "AdventureWorksDW_AWA" : { "vendor": "mssql",   "file" : "AdventureWorksDW.json",  "source" : {"database": "AdventureWorksAll",    "owner": "dbo"}}
+, "datasetLocation" : {
+    "oracle"    : "oracle19c/DATA_ONLY"
+  , "mysql"     : "mysql"
+  , "mssql"     : "mssql19"
+  } 
+}                   
+
+      
