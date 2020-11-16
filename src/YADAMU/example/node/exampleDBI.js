@@ -17,6 +17,7 @@ const ExampleError = require('./exampleError.js')
 const ExampleParser = require('./exampleParser.js');
 const ExampleWriter = require('./exampleWriter.js');
 const ExampleReader = require('./exampleReader.js');
+const ExampleStatementLibrary = require('./exampleStatementLibrary.js')
 const StatementGenerator = require('./statementGenerator.js');
 
 class ExampleDBI extends YadamuDBI {
@@ -50,6 +51,7 @@ class ExampleDBI extends YadamuDBI {
 
   constructor(yadamu) {
     super(yadamu,ExampleConstants.DEFAULT_PARAMETERS);
+	this.StatementLibary = StatementLibary
   }
 
   /*
@@ -83,12 +85,12 @@ class ExampleDBI extends YadamuDBI {
 	throw new Error('Unimplemented Method')
   }
 
-  async closeConnection() {
+  async closeConnection(options) {
     // Close a connection and return it to the connection pool
 	throw new Error('Unimplemented Method')
   }
 	
-  async closePool() {
+  async closePool(options) {
     // Close the connection pool
 	throw new Error('Unimplemented Method')
   }
@@ -153,8 +155,8 @@ class ExampleDBI extends YadamuDBI {
   **
   */
 
-  async abort() {
-    await super.abort();
+  async abort(e) {
+    await super.abort(e);
   }
 
   /*
@@ -459,8 +461,8 @@ class ExampleDBI extends YadamuDBI {
     throw new Error('Unimplemented Method')
   }
   
-  async generateStatementCache(schema,executeDDL) {
-    await super.generateStatementCache(StatementGenerator, schema, executeDDL)
+  async generateStatementCache(schema) {
+    return await super.generateStatementCache(StatementGenerator, schema)
   }
 
   getOutputStream(tableName,ddlComplete) {

@@ -109,10 +109,21 @@ class MongoDBI extends YadamuDBI {
   }
                                                              ;
   async _executeDDL(collectionList) {
-    const results = await Promise.all(collectionList.map(async (collectionName) => {
-      await this.createCollection(collectionName)
-    }));
-
+	  
+	const existingCollections = await this.listCollections({},{nameOnly: true})
+	const existsingCollectionList = Object.values(existingCollections).map((c) => { return c.name })
+    const newCollectionList = collectionList.filter((collection) => {return existsingCollectionList.indexOf(collection) < 0})
+	
+	let results = []
+	try {
+      results = await Promise.all(newCollectionList.map(async (collectionName) => {
+        return this.createCollection(collectionName)
+      }))
+    } catch (e) { 
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	  results = e
+    }
+    return results;
   }    
    
    traceMongo(apiCall) {
@@ -326,6 +337,25 @@ class MongoDBI extends YadamuDBI {
     }
   }
   
+  async listCollections(filter,options)  {
+  
+    // Wrapper for db.collections()
+
+    
+	let stack
+    const operation = `listCollections()`
+    try {
+      this.status.sqlTrace.write(this.traceMongo(operation))    
+      let sqlStartTime = performance.now();
+	  stack =  new Error().stack      
+      const collectionList = await this.connection.listCollections(filter,options).toArray()
+      this.traceTiming(sqlStartTime,performance.now())
+      return collectionList;
+    } catch (e) {
+      throw this.captureException(new MongoError(e,stack,operation))
+    }
+  }
+  
   async insertOne(collectionName,doc,options) {
 
     // Wrapper for db.collection().insertOne()
@@ -475,9 +505,9 @@ class MongoDBI extends YadamuDBI {
   **
   */
 
-  async abort() {
+  async abort(e) {
                                        
-    await super.abort();
+    await super.abort(e);
       
   }
 
@@ -796,8 +826,8 @@ class MongoDBI extends YadamuDBI {
   **
   */
     
-  async generateStatementCache(schema,executeDDL) {
-    await super.generateStatementCache(StatementGenerator,schema,executeDDL) 
+  async generateStatementCache(schema) {
+    return await super.generateStatementCache(StatementGenerator,schema) 
   }
   
   getOutputStream(collectionName,ddlComplete) {

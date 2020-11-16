@@ -17,31 +17,45 @@ class MsSQLQA extends MsSQLDBI {
       const results = await this.executeSQL(statement);
     } 
 	
+    /*
+    **
+    ** The "Recreate Schema" option is problematic with SQL Server. 
+    ** In SQL Server testing Schemas are mapped to databases, since there is no simple mechanism for dropping a schema cleanly in SQL Server.
+	** This means we have to deal with two scenarios when recreating a schema. First the required database may not exist, second it exists and needs to be dropped and recreated.
+    ** Connect attempts fail if the target database does exist. This means that it necessary to connect to a known good database while the target database is recreated.
+	** After creating the database the connection must be closed and a new connection opened to the target database.
+    **
+    */	  
+	
 	async recreateDatabase() {
-		
-      // Connect to 'master', drop and recreate the target database before establishing the connection pool;
-
-	  const database = this.connectionProperties.database;
-      const YADAMU_DATABASE = this.parameters.YADAMU_DATABASE;
-      delete this.parameters.YADAMU_DATABASE;
-      
-	  this.connectionProperties.database = 'master';
-      await this.createConnectionPool(); 
-
+	
       try {
+
+        // Cache the current value of YADAMU_DATABASE and remove it from this.parameters. This prevents the call to setTargetDatabase() from overriding the value of this.connectionProperties.database in createConnectionPool()
+		
+  	    const YADAMU_DATABASE = this.parameters.YADAMU_DATABASE;
+		const database = this.connectionProperties.database
+        delete this.parameters.YADAMU_DATABASE;
+      
+	    // Create a connection pool using a well known database that must exist	  
+	    this.connectionProperties.database = 'master';
+        await super.initialize();
+
+	    this.parameters.YADAMU_DATABASE = YADAMU_DATABASE
+	    this.connectionProperties.database = database;
+
         let results;       
-        const dropDatabase = `drop database if exists "${YADAMU_DATABASE}"`;
+        const dropDatabase = this.statementLibrary.DROP_DATABASE
         results =  await this.executeSQL(dropDatabase);      
       
-        const createDatabase = `create database "${YADAMU_DATABASE}" COLLATE ${this.defaultCollation}`;
+        const createDatabase = `create database "${this.parameters.YADAMU_DATABASE}" COLLATE ${this.DB_COLLATION}`;
         results =  await this.executeSQL(createDatabase);      
+
         await this.finalize()
 	  } catch (e) {
 		this.yadamuLogger.qa([this.DATABASE_VENDOR,'recreateDatabase()'],e.message);
+		throw e
 	  }
-	  
-	  this.parameters.YADAMU_DATABASE = YADAMU_DATABASE
-	  this.connectionProperties.database = database;
 	  
     }
 	
@@ -78,11 +92,14 @@ class MsSQLQA extends MsSQLDBI {
       )
 	  timer.unref()
 	}
+
 	
 	async initialize() {
+				
 	  if (this.options.recreateSchema === true) {
 		await this.recreateDatabase();
 	  }
+
 	  await super.initialize();
 	  if (this.testLostConnection()) {
         const dbiID = await this.getConnectionID();

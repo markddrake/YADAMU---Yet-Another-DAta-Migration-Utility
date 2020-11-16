@@ -11,7 +11,7 @@ class StatementGenerator {
   }
   
 
-  async generateStatementCache (executeDDL, vendor) {    
+  async generateStatementCache () {    
 
     /*
     **
@@ -25,11 +25,6 @@ class StatementGenerator {
     let statementCache = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, this.targetSchema, this.spatialFormat])
     if (statementCache === null) {
       statementCache = {}
-    }
-    else {	  	  
-      if (executeDDL === true) {
-        await this.dbi.executeDDL(ddlStatements);
-      }
     }
     return statementCache;
   }

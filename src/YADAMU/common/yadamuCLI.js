@@ -11,7 +11,7 @@ const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuError.js');
 
-const FileDBI = require('../file/node/fileDBI.js');
+const {FileNotFound} = require('../file/node/fileError.js');
 
 /*
 **
@@ -127,7 +127,7 @@ class YadamuCLI {
   }
 
   static reportError(e) {
-	if (e instanceof UserError) {
+	if ((e instanceof UserError) || (e instanceof FileNotFound)) {
       console.log(e.message);
 	  if (process.env.YADAMU_SHOW_CAUSE === 'TRUE') {	  
 	    console.log(e); 

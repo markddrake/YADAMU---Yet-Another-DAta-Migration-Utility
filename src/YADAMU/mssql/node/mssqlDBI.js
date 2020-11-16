@@ -37,22 +37,9 @@ const MsSQLWriter = require('./mssqlWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const StagingTable = require('./stagingTable.js');
 const MsSQLReader = require('./mssqlReader.js');
+const StatementLibrary = require('./mssqlStatementLibrary.js')
 
 class MsSQLDBI extends YadamuDBI {
-
-  static get SQL_SET_CURRENT_SCHEMA()         { return _SQL_SET_CURRENT_SCHEMA }
-  static get SQL_DISABLE_CONSTRAINTS()        { return _SQL_DISABLE_CONSTRAINTS }
-  static get SQL_ENABLE_CONSTRAINTS()         { return _SQL_ENABLE_CONSTRAINTS }
-  static get SQL_REFRESH_MATERIALIZED_VIEWS() { return _SQL_REFRESH_MATERIALIZED_VIEWS }
-  static get SQL_CONFIGURE_CONNECTION()       { return _SQL_CONFIGURE_CONNECTION }
-  static get SQL_SYSTEM_INFORMATION()         { return _SQL_SYSTEM_INFORMATION }
-  static get SQL_GET_DLL_STATEMENTS()         { return _SQL_GET_DLL_STATEMENTS }
-  static get SQL_GET_DLL_STATEMENTS_19C()     { return _SQL_GET_DLL_STATEMENTS_19C }
-  static get SQL_GET_DLL_STATEMENTS_11G()     { return _SQL_GET_DLL_STATEMENTS_11G }
-  static get SQL_DROP_WRAPPERS_11G()          { return _SQL_DROP_WRAPPERS_11G } 
-  static get SQL_SCHEMA_INFORMATION()         { return _SQL_SCHEMA_INFORMATION } 
-  static get SQL_CREATE_SAVE_POINT()          { return _SQL_CREATE_SAVE_POINT }  
-  static get SQL_RESTORE_SAVE_POINT()         { return _SQL_RESTORE_SAVE_POINT }
 
   // Instance level getters.. invoke as this.METHOD
 
@@ -70,9 +57,7 @@ class MsSQLDBI extends YadamuDBI {
 
   get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT        || MsSQLConstants.SPATIAL_FORMAT }
   get SPATIAL_MAKE_VALID()     { return this.parameters.SPATIAL_MAKE_VALID    || MsSQLConstants.SPATIAL_MAKE_VALID }
-  get OBJECTS_AS_JSON()        { return this.parameters.OBJECTS_AS_JSON       || MsSQLConstants.OBJECTS_AS_JSON }
-  get TREAT_RAW1_AS_BOOLEAN()  { return this.parameters.TREAT_RAW1_AS_BOOLEAN || MsSQLConstants.TREAT_RAW1_AS_BOOLEAN }
-  
+ 
   constructor(yadamu) {
     super(yadamu,MsSQLConstants.DEFAULT_PARAMETERS);
     this.requestProvider = undefined;
@@ -81,91 +66,23 @@ class MsSQLDBI extends YadamuDBI {
     this.yadamuRollack = false
     this.tediousTransactionError = false;
     // Allow subclasses to access constants defined by the sql object. Redeclaring the SQL object in a subclass causes strange behavoir
-    
     this.sql = sql
+	this.StatementGenerator = StatementGenerator
+	this.StatementLibrary = StatementLibrary
+    this.statementLibrary = undefined
     
     sql.on('error',(err, p) => {
-      this.yadamuLogger.logException([`${this.DATABASE_VENDOR}`,`mssql.onError()`],err);
+      this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`mssql.onError()`],err);
       throw err
     })
         
   }
-
+  
   /*
   **
   ** Local methods 
   **
   */
-  
-  SQL_SCHEMA_INFORMATION() {
-     
-    const spatialClause = this.SPATIAL_MAKE_VALID === true ? `concat('case when "',c."COLUMN_NAME",'".STIsValid() = 0 then "',c."COLUMN_NAME",'".MakeValid().${this.spatialSerializer} else "',c."COLUMN_NAME",'".${this.spatialSerializer} end "',c."COLUMN_NAME",'"')` : `concat('"',c."COLUMN_NAME",'".${this.spatialSerializer} "',c."COLUMN_NAME",'"')`
-    
-    return `select t."TABLE_SCHEMA" "TABLE_SCHEMA"
-                  ,t."TABLE_NAME"   "TABLE_NAME"
-                  ,concat('[',string_agg(concat('"',c."COLUMN_NAME",'"'),',') within group (order by "ORDINAL_POSITION"),']') "COLUMN_NAME_ARRAY"
-                  ,concat('[',string_agg(case
-                                           when cc."CONSTRAINT_NAME" is not NULL then 
-                                             '"JSON"'
-                                           else 
-                                             concat('"',"DATA_TYPE",'"')
-                                           end
-                                         ,',') within group (order by "ORDINAL_POSITION"),']') "DATA_TYPE_ARRAY"
-                  ,concat('[',string_agg(concat('"',"COLLATION_NAME",'"'),',') within group (order by "ORDINAL_POSITION"),']') "COLLATION_NAME_ARRAY"
-                  ,concat('[',string_agg(case
-                                 when ("NUMERIC_PRECISION" is not null) and ("NUMERIC_SCALE" is not null) 
-                                   then concat('"',"NUMERIC_PRECISION",',',"NUMERIC_SCALE",'"')
-                                 when ("NUMERIC_PRECISION" is not null) 
-                                   then concat('"',"NUMERIC_PRECISION",'"')
-                                 when ("DATETIME_PRECISION" is not null)
-                                   then concat('"',"DATETIME_PRECISION",'"')
-                                 when ("CHARACTER_MAXIMUM_LENGTH" is not null)
-                                   then concat('"',"CHARACTER_MAXIMUM_LENGTH",'"')
-                                 else
-                                   '""'
-                               end
-                              ,','
-                             )
-                    within group (order by "ORDINAL_POSITION"),']') "SIZE_CONSTRAINT_ARRAY"
-                   ,string_agg(case 
-                                                  when "DATA_TYPE" = 'hierarchyid' then
-                                                    concat('cast("',c."COLUMN_NAME",'" as NVARCHAR(4000)) "',c."COLUMN_NAME",'"') 
-                                                  when "DATA_TYPE" in ('geometry','geography') then
-                                                    ${spatialClause}
-                                                  when "DATA_TYPE" = 'datetime2' then
-                                                    concat('convert(VARCHAR(33),"',c."COLUMN_NAME",'",127) "',c."COLUMN_NAME",'"') 
-                                                  when "DATA_TYPE" = 'datetimeoffset' then
-                                                    concat('convert(VARCHAR(33),"',c."COLUMN_NAME",'",127) "',c."COLUMN_NAME",'"') 
-                                                  when "DATA_TYPE" = 'xml' then
-                                                    concat('replace(replace(convert(NVARCHAR(MAX),"',c."COLUMN_NAME",'"),''&#x0A;'',''\n''),''&#x20;'','' '') "',c."COLUMN_NAME",'"') 
-                                                  else 
-                                                    concat('"',c."COLUMN_NAME",'"') 
-                                                end
-                                               ,','
-                                               ) 
-                              within group (order by "ORDINAL_POSITION"
-                             ) "CLIENT_SELECT_LIST"
-              from "INFORMATION_SCHEMA"."COLUMNS" c
-                   left join "INFORMATION_SCHEMA"."TABLES" t
-                       on t."TABLE_CATALOG" = c."TABLE_CATALOG"
-                      and t."TABLE_SCHEMA" = c."TABLE_SCHEMA"
-                      and t."TABLE_NAME" = c."TABLE_NAME"
-                    left outer join (
-                       "INFORMATION_SCHEMA"."CONSTRAINT_COLUMN_USAGE" ccu
-                       left join "INFORMATION_SCHEMA"."CHECK_CONSTRAINTS" cc
-                         on cc."CONSTRAINT_CATALOG" = ccu."CONSTRAINT_CATALOG"
-                        and cc."CONSTRAINT_SCHEMA" = ccu."CONSTRAINT_SCHEMA"
-                        and cc."CONSTRAINT_NAME" = ccu."CONSTRAINT_NAME"
-                       )
-                       on ccu."TABLE_CATALOG" = c."TABLE_CATALOG"
-                      and ccu."TABLE_SCHEMA" = c."TABLE_SCHEMA"
-                      and ccu."TABLE_NAME" = c."TABLE_NAME"
-                      and ccu."COLUMN_NAME" = c."COLUMN_NAME"
-                      and UPPER("CHECK_CLAUSE") like '(ISJSON(%)>(0))'
-             where t."TABLE_TYPE" = 'BASE TABLE'
-               and t."TABLE_SCHEMA" = @SCHEMA
-             group by t."TABLE_SCHEMA", t."TABLE_NAME"`;  
-  }    
 
   async testConnection(connectionProperties,parameters) {   
     try {
@@ -192,7 +109,7 @@ class MsSQLDBI extends YadamuDBI {
     }
     return ''
   }     
-
+  
   async configureConnection() {
 
     let statement = `SET QUOTED_IDENTIFIER ON`
@@ -232,6 +149,10 @@ class MsSQLDBI extends YadamuDBI {
       }
     });
     return transaction
+  }
+  
+  recoverTransactionState() {
+	this.transaction = this.getTransactionManager()
   }
 
   getRequest() {
@@ -479,7 +400,7 @@ class MsSQLDBI extends YadamuDBI {
     }
   } 
   
-  async closeConnection() {
+  async closeConnection(options) {
 
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.preparedStatement !== undefined)},${this.transactionInProgress})`)
     
@@ -496,17 +417,34 @@ class MsSQLDBI extends YadamuDBI {
     }
   }
   
-  async closePool() {
+  unhandledRejectionHandler(err,p) {
+    if (err.code  === 'ENOTOPEN') {
+	  err.ignoreUnhandledRejection = true
+	}
+  }
+  
+  async closePool(options) {
     
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR],`closePool(${(this.pool !== undefined)})`)
-
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closePool(${(this.pool !== undefined)})`)
+	
     if (this.pool !== undefined) {
       let stack
       let psudeoSQL
       try {
         stack = new Error().stack
         psudeoSQL = 'MsSQL.Pool.close()'
-        await this.pool.close();
+		
+		/*
+		**
+		** pool.close() results in an unhandledRejection "ConnectionError: Connection not yet open." 
+		**
+		*/
+		process.prependOnceListener('unhandledRejection',this.unhandledRejectionHandler)		
+        // this.yadamuLogger.trace([this.DATABASE_VENDOR],`Attempting to close pool`)
+		await this.pool.close();
+		// this.yadamuLogger.trace([this.DATABASE_VENDOR],`Pool Closed`)
+		process.removeListener('unhandledRejection',this.unhandledRejectionHandler)
+
         stack = new Error().stack
         psudeoSQL = 'MsSQL.close()'
         await sql.close();
@@ -514,6 +452,7 @@ class MsSQLDBI extends YadamuDBI {
         // this.pool = undefined;
       } catch(e) {
         // this.pool = undefined
+        this.yadamuLogger.trace([this.DATABASE_VENDOR],`Error Closing Pool`)
         throw this.captureException(new MsSQLError(e,stack,psudeoSQL))
       }
     }
@@ -712,19 +651,19 @@ class MsSQLDBI extends YadamuDBI {
 
     await this.createSchema(this.parameters.TO_USER);
     // Cannot use Promise.all with mssql Transaction class
+	let results = []
     for (let ddlStatement of ddl) {
       ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
       try {
         // May need to use executeBatch if we support SQL Server 2000.
-        const results = await this.executeSQL(ddlStatement);
+        results.push(await this.executeSQL(ddlStatement))
       } catch (e) {
-        this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
-        this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
+  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	    return e
       } 
     }
-
-    await this.commitTransaction()      
-
+    await this.commitTransaction()   
+	return results;
   }
     
   async verifyDataLoad(request,tableSpec) {    
@@ -763,27 +702,35 @@ class MsSQLDBI extends YadamuDBI {
   setSpatialSerializer(spatialFormat) {      
     switch (spatialFormat) {
       case "WKB":
-        this.spatialSerializer = "STAsBinary()";
+        this.SPATIAL_SERIALIZER = "STAsBinary()";
         break;
       case "EWKB":
-        this.spatialSerializer = "AsBinaryZM()";
+        this.SPATIAL_SERIALIZER = "AsBinaryZM()";
         break;
       case "WKT":
-        this.spatialSerializer = "STAsText()";
+        this.SPATIAL_SERIALIZER = "STAsText()";
         break;
       case "EWKT":
-        this.spatialSerializer = "AsTextZM()";
+        this.SPATIAL_SERIALIZER = "AsTextZM()";
         break;
      default:
-        this.spatialSerializer = "AsBinaryZM()";
+        this.SPATIAL_SERIALIZER = "AsBinaryZM()";
     }  
     
   }   
   
   async initialize() {
     await super.initialize(true);   
-    this.setSpatialSerializer(this.spatialFormat);
-  }
+	switch (this.DB_VERSION) {
+	  case 12:
+	    this.StatementLibrary = require('./2014/mssqlStatementLibrary.js')
+		this.StatementGenerator = require('./2014/statementGenerator.js');
+	    break;
+      default:
+	}
+	this.setSpatialSerializer(this.SPATIAL_FORMAT);
+	this.statementLibrary = new this.StatementLibrary(this)
+  }    
 
   getConnectionProperties() {
     return {
@@ -807,8 +754,8 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
 
-  async finalize(poolOptions) {
-    await super.finalize(poolOptions)
+  async finalize(options) {
+    await super.finalize(options)
   }
 
   /*
@@ -817,8 +764,8 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
 
-  async abort() {
-    await super.abort(true);
+  async abort(e) {
+    await super.abort(e);
   }
 
   /*
@@ -941,7 +888,7 @@ class MsSQLDBI extends YadamuDBI {
   async createSavePoint() {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber(),this.metrics.written,this.metrics.cached],``)
-    await this.executeSQL(MsSQLDBI.SQL_CREATE_SAVE_POINT);
+    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT);
     super.createSavePoint()
   }
   
@@ -959,7 +906,7 @@ class MsSQLDBI extends YadamuDBI {
     // Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
     
     try {
-      await this.executeSQL(MsSQLDBI.SQL_RESTORE_SAVE_POINT);
+      await this.executeSQL(this.StatementLibrary.SQL_RESTORE_SAVE_POINT);
       super.restoreSavePoint()
     } catch (newIssue) {
       this.checkCause('RESTORE SAVPOINT',cause,newIssue)
@@ -1024,7 +971,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async getSystemInformation() {     
   
-    const results = await this.executeSQL(MsSQLDBI.SQL_SYSTEM_INFORMATION)
+    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
     const sysInfo =  results.recordsets[0][0];
     const serverProperties = JSON.parse(sysInfo.SERVER_PROPERTIES)  
     const dbProperties = JSON.parse(sysInfo.DATABASE_PROPERTIES)    
@@ -1077,7 +1024,7 @@ class MsSQLDBI extends YadamuDBI {
 
     this.status.sqlTrace.write(this.traceComment(`@SCHEMA="${this.parameters[keyName]}"`))
       
-    const statement = this.SQL_SCHEMA_INFORMATION()
+    const statement = this.statementLibrary.SQL_SCHEMA_INFORMATION
     const results = await this.executeSQL(statement, { inputs: [{name: "SCHEMA", type: sql.VarChar, value: this.parameters[keyName]}]})
     
     return results.recordsets[0]
@@ -1096,6 +1043,8 @@ class MsSQLDBI extends YadamuDBI {
     // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
     const request = this.getRequest();
+	// request.query(this.sqlStatement);
+    // return request
     return new MsSQLReader(request,tableInfo.SQL_STATEMENT);
   }      
 
@@ -1105,10 +1054,11 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
     
-  async generateStatementCache(schema, executeDDL) {
+  async generateStatementCache(schema) {
     /* ### OVERRIDE ### Pass additional parameter Database Name */
-    const statementGenerator = new StatementGenerator(this, schema, this.metadata, this.systemInformation.spatialFormat ,this.yadamuLogger);
-    this.statementCache = await statementGenerator.generateStatementCache(executeDDL, this.systemInformation.vendor, this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.connectionProperties.database)
+    const statementGenerator = new this.StatementGenerator(this, schema, this.metadata, this.systemInformation.spatialFormat ,this.yadamuLogger);
+    this.statementCache = await statementGenerator.generateStatementCache(this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.connectionProperties.database)
+	return this.statementCache
   }
 
   getOutputStream(tableName,ddlComplete) {
@@ -1138,106 +1088,3 @@ class MsSQLDBI extends YadamuDBI {
 
 module.exports = MsSQLDBI
 
-const _SQL_SYSTEM_INFORMATION = 
-`select db_Name() "DATABASE_NAME", 
-       current_user "CURRENT_USER", 
-       session_user "SESSION_USER", 
-       (
-         select
-           SERVERPROPERTY('BuildClrVersion') AS "BuildClrVersion"
-          ,SERVERPROPERTY('Collation') AS "Collation"
-          ,SERVERPROPERTY('CollationID') AS "CollationID"
-          ,SERVERPROPERTY('ComparisonStyle') AS "ComparisonStyle"
-          ,SERVERPROPERTY('ComputerNamePhysicalNetBIOS') AS "ComputerNamePhysicalNetBIOS"
-          ,SERVERPROPERTY('Edition') AS "Edition"
-          ,SERVERPROPERTY('EditionID') AS "EditionID"
-          ,SERVERPROPERTY('EngineEdition') AS "EngineEdition"
-          ,SERVERPROPERTY('HadrManagerStatus') AS "HadrManagerStatus"
-          ,SERVERPROPERTY('InstanceDefaultDataPath') AS "InstanceDefaultDataPath"
-          ,SERVERPROPERTY('InstanceDefaultLogPath') AS "InstanceDefaultLogPath"
-          ,SERVERPROPERTY('InstanceName') AS "InstanceName"
-          ,SERVERPROPERTY('IsAdvancedAnalyticsInstalled') AS "IsAdvancedAnalyticsInstalled"
-          ,SERVERPROPERTY('IsBigDataCluster') AS "IsBigDataCluster"
-          ,SERVERPROPERTY('IsClustered') AS "IsClustered"
-          ,SERVERPROPERTY('IsFullTextInstalled') AS "IsFullTextInstalled"
-          ,SERVERPROPERTY('IsHadrEnabled') AS "IsHadrEnabled"
-          ,SERVERPROPERTY('IsIntegratedSecurityOnly') AS "IsIntegratedSecurityOnly"
-          ,SERVERPROPERTY('IsLocalDB') AS "IsLocalDB"
-          ,SERVERPROPERTY('IsPolyBaseInstalled') AS "IsPolyBaseInstalled"
-          ,SERVERPROPERTY('IsSingleUser') AS "IsSingleUser"
-          ,SERVERPROPERTY('IsXTPSupported') AS "IsXTPSupported"
-          ,SERVERPROPERTY('LCID') AS "LCID"
-          ,SERVERPROPERTY('LicenseType') AS "LicenseType"
-          ,SERVERPROPERTY('MachineName') AS "MachineName"
-          ,SERVERPROPERTY('NumLicenses') AS "NumLicenses"
-          ,SERVERPROPERTY('ProcessID') AS "ProcessID"
-          ,SERVERPROPERTY('ProductBuild') AS "ProductBuild"
-          ,SERVERPROPERTY('ProductBuildType') AS "ProductBuildType"
-          ,SERVERPROPERTY('ProductLevel') AS "ProductLevel"
-          ,SERVERPROPERTY('ProductMajorVersion') AS "ProductMajorVersion"
-          ,SERVERPROPERTY('ProductMinorVersion') AS "ProductMinorVersion"
-          ,SERVERPROPERTY('ProductUpdateLevel') AS "ProductUpdateLevel"
-          ,SERVERPROPERTY('ProductUpdateReference') AS "ProductUpdateReference"
-          ,SERVERPROPERTY('ProductVersion') AS "ProductVersion"
-          ,SERVERPROPERTY('ResourceLastUpdateDateTime') AS "ResourceLastUpdateDateTime"
-          ,SERVERPROPERTY('ResourceVersion') AS "ResourceVersion"
-          ,SERVERPROPERTY('ServerName') AS "ServerName"
-          ,SERVERPROPERTY('SqlCharSet') AS "SqlCharSet"
-          ,SERVERPROPERTY('SqlCharSetName') AS "SqlCharSetName"
-          ,SERVERPROPERTY('SqlSortOrder') AS "SqlSortOrder"
-          ,SERVERPROPERTY('SqlSortOrderName') AS "SqlSortOrderName"
-          ,SERVERPROPERTY('FilestreamShareName') AS "FilestreamShareName"
-          ,SERVERPROPERTY('FilestreamConfiguredLevel') AS "FilestreamConfiguredLevel"
-          ,SERVERPROPERTY('FilestreamEffectiveLevel') AS "FilestreamEffectiveLevel"
-         FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-       ) "SERVER_PROPERTIES",
-       (
-         select
-           DATABASEPROPERTYEX(DB_NAME(),'Collation') AS "Collation"
-          ,DATABASEPROPERTYEX(DB_NAME(),'ComparisonStyle') AS "ComparisonStyle"
-          ,DATABASEPROPERTYEX(DB_NAME(),'Edition') AS "Edition"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsAnsiNullDefault') AS "IsAnsiNullDefault"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsAnsiNullsEnabled') AS "IsAnsiNullsEnabled"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsAnsiPaddingEnabled') AS "IsAnsiPaddingEnabled"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsAnsiWarningsEnabled') AS "IsAnsiWarningsEnabled"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsArithmeticAbortEnabled') AS "IsArithmeticAbortEnabled"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsAutoClose') AS "IsAutoClose"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsAutoCreateStatistics') AS "IsAutoCreateStatistics"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsAutoCreateStatisticsIncremental') AS "IsAutoCreateStatisticsIncremental"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsAutoShrink') AS "IsAutoShrink"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsAutoUpdateStatistics') AS "IsAutoUpdateStatistics"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsClone') AS "IsClone"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsCloseCursorsOnCommitEnabled') AS "IsCloseCursorsOnCommitEnabled"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsFulltextEnabled') AS "IsFulltextEnabled"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsInStandBy') AS "IsInStandBy"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsLocalCursorsDefault') AS "IsLocalCursorsDefault"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsMemoryOptimizedElevateToSnapshotEnabled') AS "IsMemoryOptimizedElevateToSnapshotEnabled"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsMergePublished') AS "IsMergePublished"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsNullConcat') AS "IsNullConcat"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsNumericRoundAbortEnabled') AS "IsNumericRoundAbortEnabled"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsParameterizationForced') AS "IsParameterizationForced"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsQuotedIdentifiersEnabled') AS "IsQuotedIdentifiersEnabled"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsPublished') AS "IsPublished"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsRecursiveTriggersEnabled') AS "IsRecursiveTriggersEnabled"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsSubscribed') AS "IsSubscribed"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsSyncWithBackup') AS "IsSyncWithBackup"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsTornPageDetectionEnabled') AS "IsTornPageDetectionEnabled"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsVerifiedClone') AS "IsVerifiedClone"
-          ,DATABASEPROPERTYEX(DB_NAME(),'IsXTPSupported') AS "IsXTPSupported"
-          ,DATABASEPROPERTYEX(DB_NAME(),'LastGoodCheckDbTime') AS "LastGoodCheckDbTime"
-          ,DATABASEPROPERTYEX(DB_NAME(),'LCID') AS "LCID"
-          ,DATABASEPROPERTYEX(DB_NAME(),'MaxSizeInBytes') AS "MaxSizeInBytes"
-          ,DATABASEPROPERTYEX(DB_NAME(),'Recovery') AS "Recovery"
-          ,DATABASEPROPERTYEX(DB_NAME(),'ServiceObjective') AS "ServiceObjective"
-          ,DATABASEPROPERTYEX(DB_NAME(),'ServiceObjectiveId') AS "ServiceObjectiveId"
-          ,DATABASEPROPERTYEX(DB_NAME(),'SQLSortOrder') AS "SQLSortOrder"
-          ,DATABASEPROPERTYEX(DB_NAME(),'Status') AS "Status"
-          ,DATABASEPROPERTYEX(DB_NAME(),'Updateability') AS "Updateability"
-          ,DATABASEPROPERTYEX(DB_NAME(),'UserAccess') AS "UserAccess"
-          ,DATABASEPROPERTYEX(DB_NAME(),'Version') AS "Version"
-          FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        ) "DATABASE_PROPERTIES"`;
-       
-const _SQL_CREATE_SAVE_POINT  = `SAVE TRANSACTION ${YadamuConstants.SAVE_POINT_NAME}`;
-
-const _SQL_RESTORE_SAVE_POINT = `ROLLBACK TRANSACTION ${YadamuConstants.SAVE_POINT_NAME}`;

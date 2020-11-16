@@ -46,6 +46,12 @@
       "oracle","mysql","mssql"
 	]
   },{
+    "source"          : "mssql17"
+  , "target"          : "azurite#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
     "source"          : "mssql19"
   , "target"          : "azurite#1"
   , "tasks": [ 

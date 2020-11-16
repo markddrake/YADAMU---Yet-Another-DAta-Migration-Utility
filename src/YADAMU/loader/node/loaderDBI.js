@@ -137,7 +137,7 @@ class LoaderDBI extends YadamuDBI {
       }))
       metdataRecords.forEach((content) =>  {
         const json = JSON.parse(content)
-        metadata[json.tableName] = json;
+		metadata[json.tableName] = json;
       })
     }
     return metadata;      
@@ -148,7 +148,8 @@ class LoaderDBI extends YadamuDBI {
     this.metadata = await this.loadMetadataFiles()
     return Object.keys(this.metadata).map((tableName) => {
       return {
-        TABLE_NAME            : tableName
+		TABLE_SCHEMA          : this.metadata[tableName].tableSchema
+      , TABLE_NAME            : tableName
       , MAPPED_TABLE_NAME     : tableName
       , INCLUDE_TABLE         : this.applyTableFilter(tableName)
       , COLUMN_NAME_ARRAY     : this.metadata[tableName].columnNames
@@ -356,21 +357,22 @@ class LoaderDBI extends YadamuDBI {
  
   generateStatementCache() {
 	this.statementCache = {}
+	return this.statementCache
+  }
+    
+  classFactory(yadamu) {
+	return new LoaderDBI(yadamu)
+  }
+  
+  async cloneCurrentSettings(manager) {
+    super.cloneCurrentSettings(manager)
+	this.controlFile = manager.controlFile
   }
   
   reloadStatementCache() {
     if (!this.isManager()) {
       this.controlFile = this.manager.controlFile
 	}	 
-  }
-  
-  cloneManager(dbi) {
-	super.cloneManager(dbi)
-	dbi.controlFile = this.controlFile
-  }
-  
-  classFactory(yadamu) {
-	return new LoaderDBI(yadamu)
   }
   
   async getConnectionID() { /* OVERRIDE */ }
@@ -381,9 +383,9 @@ class LoaderDBI extends YadamuDBI {
   
   configureConnection() { /* OVERRIDE */ }
   
-  closeConnection() { /* OVERRIDE */ }
+  closeConnection(options) { /* OVERRIDE */ }
 
-  closePool() { /* OVERRIDE */ }
+  closePool(options) { /* OVERRIDE */ }
 
 }
 

@@ -134,6 +134,11 @@ class MsSQLWriter extends YadamuWriter {
       } catch (cause) {
         this.reportBatchError(batch,`INSERT MANY`,cause)
         await this.dbi.restoreSavePoint(cause);
+		if (!this.dbi.transactionInProgress && this.dbi.tediousTransactionError) {
+	  	  this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Transaction aborted following BCP operation failure. Starting new Transaction`);          
+		  await this.dbi.recoverTransactionState()
+		  await this.beginTransaction()
+		}	
 	  	this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Switching to Iterative mode.`);          
         this.tableInfo.bulkSupported = false;
       }

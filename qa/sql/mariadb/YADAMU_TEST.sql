@@ -14,22 +14,31 @@ DELIMITER $$
 CREATE FUNCTION FUDGE_COORDINATE(P_COORDINATE DOUBLE PRECISION,P_SPATIAL_PRECISION int)
 RETURNS DOUBLE PRECISION DETERMINISTIC
 BEGIN
-  DECLARE DRIFT           DOUBLE PRECISION;
-  DECLARE RESULT          DOUBLE PRECISION;
-  DECLARE FUDGE_FACTOR    DOUBLE PRECISION DEFAULT 5e-12;
+  declare DRIFT           DOUBLE PRECISION;
+  declare RESULT          DOUBLE PRECISION;
+  declare FUDGE_FACTOR    DOUBLE PRECISION DEFAULT 5e-12;
   
-  SET DRIFT = round((P_COORDINATE-truncate(P_COORDINATE,10))*1e10);
-  case
-    when (DRIFT = -1) then
-      SET RESULT = P_COORDINATE - FUDGE_FACTOR;
-    when (DRIFT = 1) then
-      SET RESULT = P_COORDINATE + FUDGE_FACTOR;
-    else
-      SET RESULT = P_COORDINATE;
-   end case;
-   SET RESULT = truncate(RESULT,10);
-   SET RESULT = truncate(RESULT,P_SPATIAL_PRECISION);
-   return RESULT;
+  if (P_SPATIAL_PRECISION = -18) then
+    if (P_COORDINATE = 180.00000000000003) then
+	  -- Postgres Specific Fix.
+      set RESULT = 180.0;
+	else 
+	  set RESULT  = P_COORDINATE;
+	end if;
+  else  
+    set DRIFT = round((P_COORDINATE-truncate(P_COORDINATE,10))*1e10);
+    case
+      when (DRIFT = -1) then
+        set RESULT = P_COORDINATE - FUDGE_FACTOR;
+      when (DRIFT = 1) then
+        set RESULT = P_COORDINATE + FUDGE_FACTOR;
+      else
+        set RESULT = P_COORDINATE;
+     end case;
+     set RESULT = truncate(RESULT,10);
+     set RESULT = truncate(RESULT,P_SPATIAL_PRECISION);
+  end if;
+  return RESULT;
 END
 $$
 --

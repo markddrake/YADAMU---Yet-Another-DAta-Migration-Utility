@@ -69,7 +69,10 @@ class MsSQLReader extends Readable {
 	
 	_destroy(cause,callback) {
 	   if (!this.streamComplete) {
-		 this.request.cancel();
+		 try {
+		   this.request.cancel();
+		 } catch (e) {
+	     }
 	   }
 	   callback()
 	}

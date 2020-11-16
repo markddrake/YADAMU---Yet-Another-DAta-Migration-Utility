@@ -2,8 +2,11 @@
   "all"                  : [ "oracle", "mysql", "mssql"]
 , "oracle"               : [ "HR","SH","OE","PM","IX","BI"]
 , "mysql"                : [ "sakila", "jsonExample"]
-, "mssql"                : [ "Northwind", "HumanResources", "Person", "Production", "Purchasing", "Sales", "AdventureWorksDW", "WWI_Application", "WWI_Purchasing", "WWI_Sales", "WWI_Warehouse", "WWI_Dimension", "WWI_Fact", "WWI_Integration"]
-, "mssql-fileRoundtrip"  : [ "Northwind", "HumanResources", "Person", "Production", "Purchasing", "Sales", "AdventureWorksDW", "AdventureWorksAll"]
+, "AdventureWorks"       : [ "HumanResources", "Person", "Production", "Purchasing", "Sales"]
+, "WorldWideImporters"   : [ "WWI_Application", "WWI_Purchasing", "WWI_Sales"]
+, "WorldWideImportersDW" : [ "WWI_Warehouse", "WWI_Dimension", "WWI_Fact", "WWI_Integration"]
+, "mssql"                : [ "Northwind", "AdventureWorks", "AdventureWorksDW", "WorldWideImporters", "WorldWideImportersDW"]
+, "mssql-fileRoundtrip"  : [ "Northwind", "AdventureWorks", "AdventureWorksDW", "AdventureWorksAll"]
 , "HR"                   : { "vendor": "oracle",  "file" : "HR.json",                "source" : {"schema" : "HR"    }}
 , "SH"                   : { "vendor": "oracle",  "file" : "SH.json",                "source" : {"schema" : "SH"    }}
 , "OE"                   : { "vendor": "oracle",  "file" : "OE.json",                "source" : {"schema" : "OE"    }}

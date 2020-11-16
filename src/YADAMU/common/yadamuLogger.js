@@ -43,7 +43,7 @@ class YadamuLogger {
   
   static get NULL_LOGGER() {
     this._NULL_LOGGGER = this._NULL_LOGGGER || new YadamuLogger(NullWriter.NULL_WRITER,{})
-	return this._NULL_LOGGGER;
+    return this._NULL_LOGGGER;
   }
 
   /*
@@ -97,16 +97,16 @@ class YadamuLogger {
   
   get EXCEPTION_FILE_PREFIX() { return this._EXCEPTION_FILE_PREFIX || YadamuLibrary.pathSubstitutions(YadamuLogger.EXCEPTION_FILE_PREFIX) }
   
-  get LOG_STACK_TRACE_TO_CONSOLE() {
-     return process.env.YADAMU_PRINT_STACK && process.env.YADAMU_PRINT_STACK.toUpperCase() === 'TRUE' 
+  get YADAMU_TRACE_ERRORS() {
+     return process.env.YADAMU_TRACE_ERRORS && process.env.YADAMU_TRACE_ERRORS.trim().toUpperCase() === 'TRUE' 
   }
   
   get FILE_LOGGER() {
-	 return this._FILE_LOGGER
+     return this._FILE_LOGGER
   }
   
   set FILE_LOGGER(v) {
-	 this._FILE_LOGGER = v;
+     this._FILE_LOGGER = v;
   }
    
   static fileLogger(logFilePath,state,exceptionFolder,exceptionFilePrefix) {
@@ -129,21 +129,21 @@ class YadamuLogger {
    
     this.os = outputStream;
     this.state = state;
-	this.EXCEPTION_FOLDER_PATH = exceptionFolder
+    this.EXCEPTION_FOLDER_PATH = exceptionFolder
     this.EXCEPTION_FILE_PREFIX = exceptionFilePrefix
     this.resetMetrics();
     switch (true) {
-	  case (this.os === NullWriter.NULL_WRITER):
-	  case (this.os === process.stdout):
-		 this.FILE_LOGGER = false;
-	     break;
-	  default:
-	    this.FILE_LOGGER = true;
-	}
+      case (this.os === NullWriter.NULL_WRITER):
+      case (this.os === process.stdout):
+         this.FILE_LOGGER = false;
+         break;
+      default:
+        this.FILE_LOGGER = true;
+    }
   }
   
   switchOutputStream(os) {
-	this.os = os;
+    this.os = os;
   }
   
   write(msg) {
@@ -159,9 +159,9 @@ class YadamuLogger {
   }
   
   log(args,msg) {
-	const ts = new Date().toISOString()
+    const ts = new Date().toISOString()
     this.os.write(`${ts} ${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${msg}\n`)
-	return ts
+    return ts
   }
   
   qa(args,msg) {
@@ -191,14 +191,14 @@ class YadamuLogger {
 
   warning(args,msg) {
     this.state.warningRaised = true;
-	this.metrics.warnings++
+    this.metrics.warnings++
     args.unshift('WARNING')
-	return this.log(args,msg)
+    return this.log(args,msg)
   }
 
   error(args,msg) {
     this.state.errorRaised = true;
-	this.metrics.errors++
+    this.metrics.errors++
     args.unshift('ERROR')
     return this.log(args,msg)
   }
@@ -208,51 +208,51 @@ class YadamuLogger {
   }
 
   serializeException1(e) {
- 	try {
-	  const out = new StringWriter();
-	  const err = new StringWriter();
-	  const con = new console.Console(out,err);
-	  con.dir(e, { depth: null });
-	  const serialization = out.toString();
-	  return serialization
-	  this.os.write(`cause: ${strCause}\n`)
-	} catch (e) {
+    try {
+      const out = new StringWriter();
+      const err = new StringWriter();
+      const con = new console.Console(out,err);
+      con.dir(e, { depth: null });
+      const serialization = out.toString();
+      return serialization
+      this.os.write(`cause: ${strCause}\n`)
+    } catch (e) {
       console.log(e);
-	}
+    }
   }
 
   logDatabaseError(e) {
     this.os.write(`${e.message}\n`);
-	this.os.write(`${e.stack}\n`)
-	this.os.write(`SQL: ${e.sql}\n`);
+    this.os.write(`${e.stack}\n`)
+    this.os.write(`SQL: ${e.sql}\n`);
     if (e instanceof OracleError) {
-	  this.logOracleError(e)
-	}
-	if (e.cause instanceof Error) {
+      this.logOracleError(e)
+    }
+    if (e.cause instanceof Error) {
       this.os.write(`cause: ${this.serializeException(e.cause)}\n`)
-	}
+    }
   }
   
   logOracleError(e) {
-	this.os.write(`Args/Binds: ${JSON.stringify(e.args)}\n`);
-	this.os.write(`OutputFormat/Rows: ${JSON.stringify(e.outputFormat)}\n`);
+    this.os.write(`Args/Binds: ${JSON.stringify(e.args)}\n`);
+    this.os.write(`OutputFormat/Rows: ${JSON.stringify(e.outputFormat)}\n`);
   } 
   
   logException(args,e) {
 
-	if (e.yadamuAlreadyReported) {
+    if (e.yadamuAlreadyReported) {
       this.info(args,`Processed exception: "${e.message}"`);
-	  return
-   	}
+      return
+    }
 
     this.error(args,`Caught exception`);
-	if (e instanceof DatabaseError) {
-	  this.logDatabaseError(e);
-	}
-	else {
-	  this.os.write(`${this.serializeException(e)}\n`)
-	}
-	e.yadamuAlreadyReported = true;
+    if (e instanceof DatabaseError) {
+      this.logDatabaseError(e);
+    }
+    else {
+      this.os.write(`${this.serializeException(e)}\n`)
+    }
+    e.yadamuAlreadyReported = true;
   }
 
   createLogFile(filename) {
@@ -261,169 +261,195 @@ class YadamuLogger {
   }
   
   writeLogToFile(args,log) {
-	const ts = new Date().toISOString()
+    const ts = new Date().toISOString()
     const logFile = path.resolve(`${this.EXCEPTION_FOLDER_PATH}${path.sep}${this.LOG_FILE_PREFIX}_${ts.replace(/:/g,'.')}.json`);
-	const errorLog = this.createLogFile(logFile)
+    const errorLog = this.createLogFile(logFile)
     fs.writeSync(errorLog,JSON.stringify(log));
-	fs.closeSync(errorLog)	
+    fs.closeSync(errorLog)  
     this.info(args,`Server Log written to "${logFile}".`)
   }
   
   writeExceptionToFile(exceptionFile,ts,args,e) {
-	const errorLog = this.createLogFile(exceptionFile)
-	fs.writeSync(errorLog,`${ts} ${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${e.message}\n`)
-	fs.writeSync(errorLog,this.serializeException(e));
-	fs.closeSync(errorLog)
+    if (this.YADAMU_TRACE_ERRORS === true) {
+      console.dir(e,{depth: null})
+    }
+
+    const errorLog = this.createLogFile(exceptionFile)
+    fs.writeSync(errorLog,`${ts} ${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${e.message}\n`)
+    fs.writeSync(errorLog,this.serializeException(e));
+    fs.closeSync(errorLog)
   }
+  
+  reportLoggerError(loggerError) {
+    try {
+	  this.handleException(['LOGGER','DATA_FILE'],loggerError);
+	} catch (e) {
+	  console.log(loggerError)
+	}
+  }	  
+	  
 
   async writeDataFile(dataFilePath,tableName,currentSettings,data) {
-	try {
-	  const dbi = new ErrorDBI(currentSettings.yadamu,dataFilePath)
+	let errorPipeline
+    try {
+      const dbi = new ErrorDBI(currentSettings.yadamu,dataFilePath)
       await dbi.initialize()
-	  
-	  // const logger = this
-	  const logger = YadamuLogger.NULL_LOGGER;
-	  
-	  const fileWriter = new DBWriter(dbi,logger);  
-	  
-	  dbi.setSystemInformation(currentSettings.systemInformation)
-	  dbi.setMetadata(currentSettings.metadata)
-	  
+      
+      // const logger = this
+      const logger = YadamuLogger.NULL_LOGGER;
+      
+      const fileWriter = new DBWriter(dbi,logger);  
+      dbi.setSystemInformation(currentSettings.systemInformation)
+      dbi.setMetadata(currentSettings.metadata)
+      
 	  await fileWriter.initialize()
-   	  await dbi.initializeData()
-	  const dataObjects = data.map((d) => { return {data: d}})
-	  dataObjects.unshift({table: tableName})
+	  await dbi.initializeData()
+      const dataObjects = data.map((d) => { return {data: d}})
+      dataObjects.unshift({table: tableName})
       // const dataStream = Readable.from(dataObjects);
-	  const dataStream = new SimpleArrayReadable(dataObjects,{objectMode: true },true);
-	  const errorWriter = dbi.getOutputStream()
-	  const passThrough = new PassThrough({objectMode: false},false);
+      const dataStream = new SimpleArrayReadable(dataObjects,{objectMode: true },true);
+      const errorWriter = dbi.getOutputStream()
+      const passThrough = new PassThrough({objectMode: false},false);
       passThrough.on('end',async () => {
-   	    // console.log('JSON Writer: finish',dbi.PIPELINE_ENTRY_POINT.writableEnded)
-		passThrough.unpipe();
-		dataStream.destroy();
-		errorWriter.destroy();
-		passThrough.destroy();
+        // console.log('JSON Writer: finish',dbi.PIPELINE_ENTRY_POINT.writableEnded)
+        passThrough.unpipe();
+        dataStream.destroy();
+        errorWriter.destroy();
+        passThrough.destroy();
         pipeline([dbi.END_EXPORT_FILE,dbi.PIPELINE_ENTRY_POINT],(err) => {
-   		  // console.log('EOF Pipeline: Finish',dbi.PIPELINE_ENTRY_POINT.writableEnded,err)
           if (err) {throw(err)}
-		})
-	  })
+        })
+      })
 
-	  const errorPipeline = [dataStream,errorWriter,passThrough,dbi.PIPELINE_ENTRY_POINT]
- 	  pipeline(errorPipeline,(err) => {
-        if (err) {throw(err)}
-	  }); 
-	  await dbi.pipelineComplete;
+      errorPipeline = [dataStream,errorWriter,passThrough,dbi.PIPELINE_ENTRY_POINT]
+      pipeline(errorPipeline,(err) => {
+		if (err) {
+          throw(err)
+		}
+      }); 
+      await dbi.pipelineComplete;
       await dbi.finalize()
-	  await logger.close();
-	} catch (e) {	 
-	  console.log(e)
-	}
+      await logger.close();
+    } catch (err) {    
+	  const loggerError = new Error(`Error creating data file "${dataFilePath}".`)
+	  loggerError.cause = err
+	  loggerError.systemInformation = currentSettings.systemInformation
+      loggerError.metadata = currentSettings.metadataings
+	  loggerError.data = currentSettings.data
+      if (err.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+        errorPipeline.forEach((stream) => {
+  		  if (stream.underlyingError instanceof Error) {
+		    loggerError.cause[stream.constructor.name] = stream.underlyingError
+		   }
+	    })
+      }
+	  this.reportLoggerError(loggerError)
+    }
   }
 
   // async writeDataFile(dataFilePath,tableName,currentSettings,data) {}
   
   generateDataFile(exceptionFile,e) {
     if (e instanceof IterativeInsertError) {
-	  // Write the row information a seperate file and replace the row tag with a reference to the file
-	  e.dataFilePath = path.resolve(`${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`);
-	  this.writeDataFile(e.dataFilePath,e.tableName,e.currentSettings,[e.row])
-	  delete e.currentSettings
-	  delete e.row
-	}
-	if (e instanceof BatchInsertError) {
-	  // Write the row information a seperate file and replace the row tag with a reference to the file
-	  e.dataFilePath = path.resolve(`${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`);
-	  this.writeDataFile(e.dataFilePath,e.tableName,e.currentSettings,e.rows)
-	  delete e.currentSettings
-	  delete e.rows
-	}
+      // Write the row information a seperate file and replace the row tag with a reference to the file
+      e.dataFilePath = path.resolve(`${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`);
+      this.writeDataFile(e.dataFilePath,e.tableName,e.currentSettings,[e.row])
+      delete e.currentSettings
+      delete e.row
+    }
+    if (e instanceof BatchInsertError) {
+      // Write the row information a seperate file and replace the row tag with a reference to the file
+      e.dataFilePath = path.resolve(`${path.dirname(exceptionFile)}${path.sep}${path.basename(exceptionFile,'.trace')}.data`);
+      this.writeDataFile(e.dataFilePath,e.tableName,e.currentSettings,e.rows)
+      delete e.currentSettings
+      delete e.rows
+    }
   }
 
   logInternalError(args,msg,info) {
-	args.unshift('INTERNAL')
-	const internalError = new InternalError(msg,args,info)
-	this.handleException(args,internalError)
-	throw internalError
+    args.unshift('INTERNAL')
+    const internalError = new InternalError(msg,args,info)
+    this.handleException(args,internalError)
+    throw internalError
   }
 
   handleException(args,e) {
     // Handle Exception does not produce any output if the exception has already been processed by handleException or logException
 
-	if (e.yadamuAlreadyReported !== true) {
-	  if (this.LOG_STACK_TRACE_TO_CONSOLE === true) {
-		this.logException(args,e)
-	  }
-	  else {
-		const largs = [...args]
-		const ts = this.error(args,e.message);
-        const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
-		this.generateDataFile(exceptionFile,e);
-		this.writeExceptionToFile(exceptionFile,ts,args,e)
-	    this.info(largs,`Exception logged to "${exceptionFile}".`)
-		e.yadamuAlreadyReported = true;
-	  }
-	}
+    if (e.yadamuAlreadyReported === true) {
+      if (this.YADAMU_TRACE_ERRORS === true) {
+        this.trace(args,e)
+      }
+    }
+    else {
+      const largs = [...args]
+      const ts = this.error(args,e.message);
+       const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
+      this.generateDataFile(exceptionFile,e);
+      this.writeExceptionToFile(exceptionFile,ts,args,e)
+      this.info(largs,`Exception logged to "${exceptionFile}".`)
+      e.yadamuAlreadyReported = true;
+    }
   }
   
   handleWarning(args,e) {
-	 
+     
     // Handle Exception does not produce any output if the exception has already been processed by handleException ot logException
 
-	if (e.yadamuAlreadyReported !== true) {
-	  if (this.LOG_STACK_TRACE_TO_CONSOLE === true) {
-		this.logException(args,e)
-	  }
-	  else {
-		const largs = [...args]
-		const ts = this.warning(args,e.message);
-        const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
-		this.generateDataFile(exceptionFile,e);
-		this.writeExceptionToFile(exceptionFile,ts,args,e)
-	    this.info(largs,`Exception logged to "${exceptionFile}".`)
-		e.yadamuAlreadyReported = true;
-	  }
-	}
+    if (e.yadamuAlreadyReported === true) {
+      if (this.YADAMU_TRACE_ERRORS === true) {
+        this.trace(args,e)
+      }
+    }
+    else {
+      const largs = [...args]
+      const ts = this.warning(args,e.message);
+      const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
+      this.generateDataFile(exceptionFile,e);
+      this.writeExceptionToFile(exceptionFile,ts,args,e)
+      this.info(largs,`Exception logged to "${exceptionFile}".`)
+      e.yadamuAlreadyReported = true;
+    }
   }
 
   logRejected(args,e) {
-	args.unshift('REJECTED')
-	this.handleException(args,e);
+    args.unshift('REJECTED')
+    this.handleException(args,e);
   }
 
   logRejectedAsWarning(args,e) {
-	args.unshift('REJECTED')
-	this.handleWarning(args,e);
+    args.unshift('REJECTED')
+    this.handleWarning(args,e);
   }
-
+  
   trace(args,msg) {
     args.unshift('TRACE')
-    this.log(args,msg)
+    this.log(args,msg instanceof Error ? msg.message : msg)
   }
   
   resetMetrics() {
-	this.metrics = {
-	  errors   : 0
+    this.metrics = {
+      errors   : 0
     , warnings : 0
-	, failed   : 0
-	}
+    , failed   : 0
+    }
   }
   
   getMetrics(reset) {
-	const metrics = Object.assign({},this.metrics)
+    const metrics = Object.assign({},this.metrics)
     if (reset) this.resetMetrics();
-	return metrics
+    return metrics
   }
   
   closeStream() {
   
-	if (this.os.close) { 
+    if (this.os.close) { 
       return new Promise((resolve,reject) => {
         this.os.on('finish',() => { resolve() });
         this.os.close();
       })
-	}
-	
+    }
+    
   }
   
   async close() {

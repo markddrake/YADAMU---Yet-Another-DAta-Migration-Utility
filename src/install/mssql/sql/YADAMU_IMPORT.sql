@@ -214,10 +214,14 @@ begin
           'nvarchar'
         when @DATA_TYPE = 'BINARY' and (@DATA_TYPE_LENGTH is null or @DATA_TYPE_LENGTH > 8000)  then 
           'varbinary(max)'
+        when @DATA_TYPE = 'BOOLEAN' then
+          'bit'
         when @DATA_TYPE = 'BINARY' then
           'varbinary'
         when @DATA_TYPE = 'VARIANT' then
           'varbinary(max)'
+        when @DATA_TYPE = 'TIMESTAMP_NTZ' and (@DATA_TYPE_LENGTH > 7) then
+          'datetimeoffset(7)'
         when @DATA_TYPE = 'TIMESTAMP_NTZ' then
           'datetimeoffset'
         when @DATA_TYPE = 'NUMBER' then
@@ -595,7 +599,7 @@ begin
 
   WHILE @@FETCH_STATUS = 0 
   begin 
-    SET @RESULTS = JSON_MODIFY(@RESULTS,concat('lax $."',@TABLE_NAME,'"'),@STATEMENTS)
+    SET @RESULTS = JSON_MODIFY(@RESULTS,concat('lax $."',@TABLE_NAME,'"'),JSON_Query(@STATEMENTS))
     FETCH FETCH_METADATA INTO @TABLE_NAME, @STATEMENTS
   end;
    

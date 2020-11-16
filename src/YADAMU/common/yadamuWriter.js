@@ -15,6 +15,35 @@ class YadamuWriter extends Transform {
   get COMMIT_COUNT()   {  return this.tableInfo._COMMIT_COUNT }
   get SPATIAL_FORMAT() {  return this.tableInfo._SPATIAL_FORMAT}
   
+  get FEEDBACK_MODEL()     { return this._FEEDBACK_MODEL }
+  get FEEDBACK_INTERVAL()  { return this._FEEDBACK_INTERVAL }
+  get FEEDBACK_DISABLED()  { return this.FEEDBACK_MODEL === undefined }
+  
+  get REPORT_COMMITS()     { 
+    return this._REPORT_COMMITS || (() => { 
+	  this._REPORT_COMMITS = ((this._FEEDBACK_MODEL === 'COMMIT') || (this._FEEDBACK_MODEL === 'ALL')); 
+	  return this._REPORT_COMMITS
+	})() 
+  }
+  
+  get REPORT_BATCHES()     { 
+     return this._REPORT_BATCHES || (() => { 
+	   this._REPORT_BATCHES = (((this._FEEDBACK_MODEL === 'BATCH') || (this._FEEDBACK_MODEL === 'ALL')) && (this.BATCH_SIZE === this.COMMIT_COUNT)); 
+	   return this._REPORT_BATCHES
+	 })() 
+  }
+  
+  set FEEDBACK_MODEL(feedback)  {
+    if (!isNaN(feedback)) {
+	  this._FEEDBACK_MODEL    = 'ALL'
+	  this._FEEDBACK_INTERVAL = parseInt(feedback)
+	}
+	else {
+	  this._FEEDBACK_MODEL    = feedback
+	  this._FEEDBACK_INTERVAL = 0
+    }
+  } 
+  
   constructor(options,dbi,tableName,ddlComplete,status,yadamuLogger) {
     options.highWaterMark = 64
     super(options)
@@ -23,7 +52,9 @@ class YadamuWriter extends Transform {
     this.ddlComplete = ddlComplete;
     this.status = status;
     this.yadamuLogger = yadamuLogger;    
-    this.configureFeedback(this.dbi.parameters.FEEDBACK);   
+    
+	this.FEEDBACK_MODEL = this.dbi.parameters.FEEDBACK
+	
     this.tableName = tableName  
     this.metrics = {
       received   : 0 // Rows accepted
@@ -55,17 +86,14 @@ class YadamuWriter extends Transform {
     this.skipTable = true
     this.tableInfo = this.dbi.getTableInfo(tableName)
     this.skipTable = false;
-    this.supressBatchWriteLogging = (this.BATCH_SIZE === this.COMMIT_COUNT) // Prevent duplicate logging if batchSize and Commit Size are the same
   }
    
   async initialize(tableName) {  
     // Do not start processing table until all DDL operations have completed.
-	const status = await this.ddlComplete;
-	if (status instanceof Error) {
-	  // DDL Error is handled in dbReader
-	  throw status
-	}
-    // Workers need to reload their copy of the Statement Cache from the Manager before processing can begin
+    // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'WAITING')
+	await this.ddlComplete
+    // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'PROCESSING')
+	// Workers need to reload their copy of the Statement Cache from the Manager before processing can begin
     this.dbi.reloadStatementCache()
     this.setTableInfo(tableName);
     await this.beginTransaction()
@@ -97,10 +125,6 @@ class YadamuWriter extends Transform {
   
   batchRowCount() {
     return this.metrics.cached
-  }
-  
-  reportBatchWrites() {
-    return !this.supressBatchWriteLogging
   }
   
   commitWork() {
@@ -298,13 +322,13 @@ class YadamuWriter extends Transform {
       if (this.skipTable) {
         await this.rollbackTransaction();
       }	  
-      if (this.reportBatchWrites && !this.commitWork(rowsReceived)) {
+      if (this.REPORT_BATCHES && !this.commitWork(rowsReceived)) {
         this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows written:  ${this.metrics.written}.`);
       }                   
 	  // Commit is only done after a writing a batch
       if (this.commitWork(rowsReceived)) {
         await this.commitTransaction()
-        if (this.reportCommits) {
+        if (this.REPORT_COMMITS) {
           this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows commited: ${this.metrics.committed}.`);
         }          
         await this.beginTransaction();            
@@ -343,8 +367,8 @@ class YadamuWriter extends Transform {
     this.checkColumnCount(data)
     this.cacheRow(data)
     this.metrics.received++;
-    if ((this.metrics.received % this.feedbackInterval === 0) & !this.flushBatch()) {
-      this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows Cached: ${this.metrics.cached()}.`);
+    if ((this.metrics.received % this.FEEDBACK_INTERVAL === 0) & !this.flushBatch()) {
+      this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows Cached: ${this.metrics.cached}.`);
     }
 	if (this.flushBatch()) {
       this.cork()
@@ -378,33 +402,7 @@ class YadamuWriter extends Transform {
     , metrics      : this.metrics
     }    
   }
-  
-  configureFeedback(feedbackModel) {
-      
-    this.reportCommits      = false;
-    this.reportBatchWrites  = false;
-    this.feedbackCounter    = 0;
     
-    if (feedbackModel !== undefined) {
-        
-      if (feedbackModel === 'COMMIT') {
-        this.reportCommits = true;
-        return;
-      }
-  
-      if (feedbackModel === 'BATCH') {
-        this.reportCommits = true;
-        this.reportBatchWrites = true;
-        return;
-      }
-      if (!isNaN(feedbackModel)) {
-        this.reportCommits = true;
-        this.reportBatchWrites = true;
-        this.feedbackInterval = parseInt(feedbackModel)
-      }
-    }      
-  }
-  
   async _write(obj, encoding, callback) {
     const messageType = Object.keys(obj)[0]
     try {
@@ -415,7 +413,7 @@ class YadamuWriter extends Transform {
           this.processRow(obj.data)
           break;
         case 'table':
-          await this.initialize(obj.table)
+	      await this.initialize(obj.table)
           // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),messageType,this.metrics.received],'initialized')
           break;  
       case 'eod':
@@ -428,7 +426,8 @@ class YadamuWriter extends Transform {
       callback();
     } catch (e) {
 	  this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.yadamu.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);    
-      try {
+      // this.yadamuLogger.trace([`WRITER`,this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.yadamu.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);    
+	  try {
         switch (messageType) {
           case 'data':
             /*
@@ -461,10 +460,19 @@ class YadamuWriter extends Transform {
               callback(e)   
             } 
           case 'table':
-          case 'metadata':
           case 'eod':
           default:
+		    /*
+			**
+			** The pipeline operation does not appear to terminate after invoking the callback and passing an exception
+		    ** emitting 'end' or 'finish' does not terminate the pipeline and causes the operation to hang.
+			** emitting 'error' results in 'UNHANDLED REJECTION' conditions coming from each stream bit does cause the stream to stop
+			** emitting 'close' results in 'PREMATURE CLOSE' getting thrown by the pipeline operation, so we need to make the underlying cause availalbe.
+			**
+			*/
 		    this.abortTable()
+			this.underlyingError = e;
+			this.emit('close',e)
 			callback(e)
         }
       } catch (err) {

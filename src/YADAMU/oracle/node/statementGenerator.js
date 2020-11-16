@@ -242,7 +242,7 @@ class StatementGenerator {
 	// Only Required with release 11.2.
   }
 
-  async generateStatementCache(executeDDL, vendor) {
+  async generateStatementCache(vendor) {
 	  
      /*
      **
@@ -279,8 +279,7 @@ class StatementGenerator {
 	// this.dbi.yadamuLogger.trace([this.constructor.name],`${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
     await metadataLob.close();
     const statementCache = JSON.parse(results.outBinds.sql);
-    const ddlStatements = [JSON.stringify({jsonColumns:null})];  
-
+    
     const tables = Object.keys(this.metadata); 
     tables.forEach((table,idx) => {
       const tableMetadata = this.metadata[table];
@@ -407,17 +406,8 @@ class StatementGenerator {
       }
       else  {
         tableInfo.dml = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" (${tableInfo.columnNames.map((col) => {return `"${col}"`}).join(',')}) values (${values.join(',')})`;
-      }
-      
-	  if (tableInfo.ddl !== null) {
-        ddlStatements.push(tableInfo.ddl);
-      }
-	  
+      }	  
     });
-    
-    if (executeDDL === true) {
-      await this.dbi.executeDDL(ddlStatements);
-    }
 	return statementCache
   }  
 }

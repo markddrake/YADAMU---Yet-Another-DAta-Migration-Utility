@@ -12,7 +12,7 @@ class StatementGenerator {
   }
   
 
-  async generateStatementCache(executeDDL) {    
+  async generateStatementCache() {    
     const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,@RESULTS); SELECT @RESULTS "INSERT_INFORMATION"`;                       
     let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),this.targetSchema,this.spatialFormat]);
     results = results.pop();
@@ -104,9 +104,6 @@ class StatementGenerator {
         }
         return tableInfo.ddl;
       });
-      if (executeDDL === true) {
-        await this.dbi.executeDDL(ddlStatements);
-      }
     }
     return statementCache;
   }

@@ -23,7 +23,6 @@ class JSONWriter extends YadamuWriter {
 
     this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-	
 	  if (YadamuLibrary.isBinaryDataType(dataType.type)) {
 		return (row,idx) =>  {
           row[idx] = row[idx].toString('hex')
@@ -135,11 +134,20 @@ class JSONWriter extends YadamuWriter {
     return `${this.rowSeperator}${JSON.stringify(row)}`
   }
 
-  cacheRow(row) {
-    this.rowTransformation(row)
+  async processRow(row) {
+    // Be very careful about adding unecessary code here. This is executed once for each row processed by YADAMU. Keep it as lean as possible.
+    this.checkColumnCount(row)
+	this.transformations.forEach((transformation,idx) => {
+      if ((transformation !== null) && (row[idx] !== null)) {
+        transformation(row,idx)
+      }
+    })
     this.push(this.formatRow(row));
 	this.rowSeperator = ','
     this.metrics.committed++;
+    if ((this.FEEDBACK_INTERVAL > 0) && ((this.metrics.committed % this.FEEDBACK_INTERVAL) === 0)) {
+      this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.dbi.OUTPUT_FORMAT],`Rows Written: ${this.metrics.committed}.`);
+    }
   }
 
   endTable() {

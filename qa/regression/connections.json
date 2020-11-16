@@ -3,34 +3,34 @@
       "oracle"                          : {
         "user"                          : "SYSTEM"
       , "password"                      : "oracle"
-      , "connectString"                 : "ORCL19c"
+      , "connectString"                 : "ORA1903"
       }
     },
     "oracle18c"                         : {
       "oracle"                          : {
         "user"                          : "SYSTEM"
       , "password"                      : "oracle"
-      , "connectString"                 : "ORCL18c"
+      , "connectString"                 : "ORA1803"
       }
     },
     "oracle12c"           : {
       "oracle"                          : {
         "user"                          : "SYSTEM"
       , "password"                      : "oracle"
-      , "connectString"                 : "ORCL12c"
+      , "connectString"                 : "ORA1220"
       }
     },
     "oracle11g"           : {
       "oracle"                          : {
         "user"                          : "SYSTEM"
       , "password"                      : "oracle"
-      , "connectString"                 : "ORCL11g"
+      , "connectString"                 : "ORA1120"
       }
     },
     "mssql17"                           : {
       "mssql"                           : {  
         "user"                          : "sa"
-      , "server"                        : "yadamu-db1"
+      , "server"                        : "MSSQL17-01"
       , "database"                      : "master"
       , "password"                      : "oracle#1"
       , "requestTimeout"                : 360000000
@@ -43,7 +43,7 @@
     "mssql19"                           : {
       "mssql"                           : {  
         "user"                          : "sa"
-      , "server"                        : "yadamu-db1"
+      , "server"                        : "MSSQL19-01"
       , "database"                      : "master"
       , "password"                      : "oracle#1"
       , "requestTimeout"                : 360000000
@@ -56,16 +56,17 @@
     "postgres#1"                        : {
       "postgres"                        : {
         "user"                          : "postgres"
-      , "host"                          : "yadamu-db1"
+      , "host"                          : "PGSQL13-01"
       , "database"                      : "yadamu"
       , "password"                      : "oracle"
       , "port"                          : 5432
       }
+    , "pathPrefix"                      : "JSON/postgres"
     },
     "mysql#1"                           : {
       "mysql"                           : {          
         "user"                          : "root"
-      , "host"                          : "yadamu-db1"
+      , "host"                          : "MYSQL80-01"
       , "database"                      : "sys"
       , "password"                      : "oracle"
       , "port"                          : 3306
@@ -79,10 +80,10 @@
     "mariadb#1"                         : {
       "mariadb"                         : {
         "user"                          : "root"
-      , "host"                          : "yadamu-db1"
+      , "host"                          : "MARIA10-01"
       , "database"                      : "mysql"
       , "password"                      : "oracle"
-      , "port"                          : 3307
+      , "port"                          : 3306
       , "multipleStatements"            : true
       , "typeCast"                      : true
       , "supportBigNumbers"             : true
@@ -92,7 +93,7 @@
     },
     "mongodb#1"                         : {
       "mongodb"                         : {
-        "host"                          : "yadamu-db1"
+        "host"                          : "MONGO40-01"
       , "port"                          : 27017
       , "options"                       : {
            "socketTimeoutMS"            : 900000
@@ -118,9 +119,8 @@
 			"signatureVersion": "v4",
 			"yadamuProperties" : {
 			  "bucketName" : "Bucket1"
-			, "rootFolder" : "yadamu"
-			}
-		}
+			, "rootFolder" : "Yadamu"
+			}		}
 	},
 	"azurite#1": {
 		"azure": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://yadamu-db1:10000/devstoreaccount1"
@@ -145,7 +145,7 @@
 		"directory"                     : "scratch/export" 
       }
     },
-     "loader#1"                : {
+    "loader#1"                : {
       "loader"                          : {
 		"rootFolder" : "loader" 
       }

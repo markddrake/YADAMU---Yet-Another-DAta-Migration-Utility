@@ -219,7 +219,7 @@ class StatementGenerator {
     return JSON.stringify({metadata : this.metadata})
   }
 
-  async generateStatementCache (executeDDL, vendor, database) {
+  async generateStatementCache (database) {
 
     const args = { 
 	        inputs: [{
@@ -236,11 +236,11 @@ class StatementGenerator {
     let results = await this.dbi.execute('master.dbo.sp_GENERATE_SQL',args,'SQL_STATEMENTS')
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
-    const tables = Object.keys(this.metadata); 
+	const tables = Object.keys(this.metadata); 
     const ddlStatements = tables.map((table,idx) => {
       const tableMetadata = this.metadata[table];
       const tableName = tableMetadata.tableName;
-      statementCache[tableName] = JSON.parse(statementCache[tableName])
+      statementCache[tableName] = statementCache[tableName]
       const tableInfo = statementCache[tableName]; 
 
       tableInfo.columnNames = tableMetadata.columnNames
@@ -322,10 +322,6 @@ class StatementGenerator {
         this.yadamuLogger.writeDirect(`${tableInfo.ddl}`)
       } 
     });
-    
-    if (executeDDL === true) {
-      await this.dbi.executeDDL(ddlStatements);
-    }
     return statementCache;
   }
 }

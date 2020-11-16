@@ -27,8 +27,8 @@ begin
   declare @RESULT          NUMERIC(28,18)
   declare @FUDGE_FACTOR    float = 5e-12;
   
-  if (@SPATIAL_PRECISION = 180) begin 
-    if (@COORDINATE in (180.00000000000003)) begin
+  if (@SPATIAL_PRECISION = -18) begin 
+    if (@COORDINATE = 180.00000000000003) begin
 	  -- Postgres Specific Fix.
       set @result = 180.0
 	end
@@ -449,7 +449,6 @@ begin
   declare @TABLE_NAME       varchar(128);
   declare @MEMORY_OPTIMIZED bit;
   declare @COLUMN_LIST      nvarchar(max);
-  declare @ALT_COLUMN_LIST  nvarchar(max);
   declare @SQL_STATEMENT    nvarchar(max);
   declare @BAD_STATEMENT    nvarchar(max);
   declare @C_NEWLINE        char(1) = char(10);
@@ -505,34 +504,6 @@ begin
                       end
                    ,',') 
          within group (order by ordinal_position) "COLUMN_LIST"
-        ,string_agg(case 
-	                  when cc."CONSTRAINT_NAME" is not NULL then 
-					     concat('master.dbo.sp_jsonCompact("',c.COLUMN_NAME,'") "',c.COLUMN_NAME,'"') 
-                      when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @DATE_TIME_PRECISION)) then
-                        -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@DATE_TIME_PRECISION,')) "',c.COLUMN_NAME,'"')
-                        concat('convert(datetime2(',@DATE_TIME_PRECISION,'),convert(varchar(',@DATE_TIME_PRECISION+20,'),"',c.COLUMN_NAME,'"),126) "',c.COLUMN_NAME,'"')
-                      when c.DATA_TYPE in ('varchar','nvarchar') then
-                        case 
-                          when @EMPTY_STRING_IS_NULL = 1 then
-                            concat('case when "',c.COLUMN_NAME,'" = '''' then NULL else "',c.COLUMN_NAME,'" end collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
-                          else
-                            concat('"',c.COLUMN_NAME,'" collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
-                        end
-                      when c.DATA_TYPE in ('char','nchar') then
-                        concat('"',c.COLUMN_NAME,'" collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')					  
-                      when c.DATA_TYPE in ('geography') then
-                        concat('master.dbo.sp_geographyAsBinaryZM("',c.COLUMN_NAME,'",180) "',c.COLUMN_NAME,'"')
-                      when c.DATA_TYPE in ('geometry') then
-                        concat('master.dbo.sp_geometryAsBinaryZM("',c.COLUMN_NAME,'",180) "',c.COLUMN_NAME,'"')
-                      when c.DATA_TYPE in ('xml','text','ntext') then
-                        concat('HASHBYTES(''SHA2_256'',CAST("',c.COLUMN_NAME,'" as nvarchar(max))) "',c.COLUMN_NAME,'"')
-                      when c.DATA_TYPE in ('image') then
-                        concat('HASHBYTES(''SHA2_256'',CAST("',c.COLUMN_NAME,'" as varbinary(max))) "',c.COLUMN_NAME,'"')
-				      else  
-                        concat('"',c.COLUMN_NAME,'"')
-                      end
-                   ,',') 
-         within group (order by ordinal_position) "ALT_COLUMN_LIST"
    from "INFORMATION_SCHEMA"."COLUMNS" c
         left join "INFORMATION_SCHEMA"."TABLES" t
                on t."TABLE_CATALOG" = c."TABLE_CATALOG"
@@ -585,14 +556,10 @@ begin
   set NOCOUNT ON;
 
   open FETCH_METADATA;
-  fetch FETCH_METADATA into @TABLE_NAME, @MEMORY_OPTIMIZED, @COLUMN_LIST, @ALT_COLUMN_LIST
+  fetch FETCH_METADATA into @TABLE_NAME, @MEMORY_OPTIMIZED, @COLUMN_LIST
   while @@FETCH_STATUS = 0 
   begin    
     begin try 
-      if (@SPATIAL_PRECISION = 18) begin
-        set @COLUMN_LIST = @ALT_COLUMN_LIST
-      end;
-    
       set @SOURCE_COUNT = -1;
       set @SQL_STATEMENT = concat('select @SOURCE_COUNT = count(*) from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"')
 	  -- select @SQL_STATEMENT
@@ -708,7 +675,7 @@ begin
 	-- DBCC FREESESSIONCACHE WITH NO_INFOMSGS
 	-- DBCC FREEPROCCACHE WITH NO_INFOMSGS
 	
-    fetch FETCH_METADATA into @TABLE_NAME, @MEMORY_OPTIMIZED, @COLUMN_LIST, @ALT_COLUMN_LIST
+    fetch FETCH_METADATA into @TABLE_NAME, @MEMORY_OPTIMIZED, @COLUMN_LIST
   end
    
   close FETCH_METADATA;

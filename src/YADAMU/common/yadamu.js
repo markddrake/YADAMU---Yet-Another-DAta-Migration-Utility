@@ -19,7 +19,8 @@ const YadamuConstants = require('./yadamuConstants.js');
 const NullWriter = require('./nullWriter.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
-const {YadamuError, UserError, CommandLineError, ConfigurationFileError} = require('./yadamuError.js');
+const {YadamuError, UserError, CommandLineError, ConfigurationFileError, DatabaseError} = require('./yadamuError.js');
+const {FileNotFound} = require('../file/node/fileError.js');
 const YadamuRejectManager = require('./yadamuRejectManager.js');
 
 class Yadamu {
@@ -95,12 +96,22 @@ class Yadamu {
 	  
     this._OPERATION = operation
     
-	process.on('unhandledRejection', (err, p) => {
-      this.LOGGER.logException([`${this.constructor.name}`,`${this.STATUS.operation}`,`UNHANDLED REJECTION`],err);
-      this.STATUS.errorRaised = true;
-      this.reportStatus(this.STATUS,this.LOGGER)
-      process.exit()
-    })
+	if (process.listenerCount('unhandledRejection') === 0) {
+	  process.on('unhandledRejection', (err, p) => {
+		
+  	    if (err.ignoreUnhandledRejection === true) {
+	       // this.LOGGER.trace(['YADAMU',this.STATUS.operation,'UHANDLED REJECTION','IGNORED'],err);
+		   return;
+	    }
+	  
+	    this.LOGGER.handleException(['YADAMU',this.STATUS.operation,'UHANDLED REJECTION'],err);
+        this.LOGGER.error(['YADAMU',this.STATUS.operation,'UHANDLED REJECTION'],err.message);
+        console.log(err)
+        this.STATUS.errorRaised = true;
+        this.reportStatus(this.STATUS,this.LOGGER)
+        process.exit()
+      })
+	}
 
     // Read Command Line Parameters
     this.loadParameters(parameters)
@@ -160,7 +171,7 @@ class Yadamu {
   reportError(e,parameters,status,yadamuLogger) {
     
     if (yadamuLogger.FILE_LOGGER) {
-      yadamuLogger.logException([`${this.constructor.name}`,`"${status.operation}"`],e);
+      yadamuLogger.handleException([`${this.constructor.name}`,`"${status.operation}"`],e);
       console.log(`${new Date().toISOString()} [ERROR][YADAMU][${status.operation}]: Operation failed: See "${parameters.LOG_FILE ? parameters.LOG_FILE  : 'above'}" for details.`);
     }
     else {
@@ -544,59 +555,85 @@ class Yadamu {
     await dbWriter.initialize();
     return dbWriter;
   }
-
+  
   async doPumpOperation(source,target) {
 	     
-	let dbReader
+	let results;
+    let dbReader
 	let dbWriter
 
-	let error;
-    try {
+	const parallel = (this.PARALLEL_PROCESSING && source.isDatabase() && target.isDatabase());
+    
+	try {
 	  let failed = false;
 	  let cause = undefined;
+
       await source.initialize();
       await target.initialize();
-	  const parallel = (this.PARALLEL_PROCESSING && source.isDatabase() && target.isDatabase());
-
-      dbReader = await this.getDBReader(source,parallel)
-      dbWriter = await this.getDBWriter(target,parallel) 
-
-      const yadamuPipeline = []
-	  // dbReader.getInputStream() returns itself (this) for databases...	  
-	  yadamuPipeline.push(...dbReader.getInputStreams())
-	  yadamuPipeline.push(dbWriter)
-	  // this.LOGGER.trace([this.constructor.name,'COPY'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
-	  await pipeline(yadamuPipeline)
-      // this.LOGGER.trace([this.constructor.name,'COPY'],'Success')
+		
       this.STATUS.operationSuccessful = false;
-      await source.finalize();
-	  await target.finalize();
-      await this.REJECTION_MANAGER.close();
-	  await this.WARNING_MANAGER.close();
-	  this.STATUS.operationSuccessful = true;
-      return this.metrics
-    } catch (e) {
-      // this.LOGGER.trace([this.constructor.name,'COPY'],'Pipeline Failed')
-	  
-	  // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
-	  if ((e.code === 'ERR_STREAM_PREMATURE_CLOSE') && (dbReader.underlyingError instanceof Error)) {
-		e = dbReader.underlyingError
+      try {
+        dbReader = await this.getDBReader(source,parallel)
+        dbWriter = await this.getDBWriter(target,parallel) 
+
+        const yadamuPipeline = []
+	    // dbReader.getInputStream() returns itself (this) for databases...	  
+	    yadamuPipeline.push(...dbReader.getInputStreams())
+	    yadamuPipeline.push(dbWriter)
+
+	    // this.LOGGER.trace([this.constructor.name,'PIPELINE'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
+	    await pipeline(yadamuPipeline)
+        this.STATUS.operationSuccessful = true;
+        // this.LOGGER.trace([this.constructor.name,'PIPELINE'],'Success')
+   	    /*
+	    if (source.isDatabase()) {
+		  this.LOGGER.trace([this.constructor.name,'PIPELINE',performance.now()],'Waiting on Data Complete')
+	      await dbReader.dataComplete
+		  this.LOGGER.trace([this.constructor.name,'PIPELINE',performance.now()],'DataComplete')
+	    }
+	    */
+        await source.finalize();
+   	    await target.finalize();
+        this.reportStatus(this.STATUS,this.LOGGER)
+	    results = this.metrics
+      } catch (e) {
+	    // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
+	    if (e.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+		  e = dbReader.underlyingError instanceof Error ? dbReader.underlyingError : (dbWriter.underlyingError instanceof Error ? dbWriter.underlyingError : e)
+	    }
+	    this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
+  	    // this.LOGGER.trace([this.constructor.name,'PIPELINE','FAILED'],e)
+
+        if (source.isDatabase() && ((e instanceof DatabaseError) && !e.lostConnection())) {
+		  if (dbReader.copyInProgress()) {
+			const startTime = performance.now()
+	        this.LOGGER.info(['YADAMU','PIPELINE'],`Copy operation failed. Clean-up in progress ...`)
+            try {
+  	          await dbReader.dataComplete
+			} catch(e) {
+              // this.yadamuLogger.trace([this.constructor.name],'DATA_COMPLETE'],e)
+            }
+	        this.LOGGER.info(['YADAMU','PIPELINE'],`Copy operation failed. Clean-up completed. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`)
+		  }
+	    }
+		throw e;
 	  }
-	  
+	} catch (e) {		  
 	  this.STATUS.operationSuccessful = false;
 	  this.STATUS.err = e;
+      results = e;
+   
       await source.abort(e);
       await target.abort(e);
-      await this.REJECTION_MANAGER.close();
-	  await this.WARNING_MANAGER.close();
-
-	  if (e instanceof UserError) {
-		await this.close();
-	    // Prevent reportError from being called for User Errors
-		throw e
+    
+	  if (!((e instanceof UserError) && (e instanceof FileNotFound))) {
+        this.reportError(e,this.parameters,this.STATUS,this.LOGGER);
 	  }
     }
-    return this.metrics
+
+    await this.REJECTION_MANAGER.close();
+    await this.WARNING_MANAGER.close();
+    return results;
   }
     
   async pumpData(source,target) {
@@ -610,19 +647,8 @@ class Yadamu {
     if ((target.isDatabase() === true) && (target.parameters.TO_USER === undefined)) {
       throw new Error('Missing mandatory parameter TO_USER');
     }
-    let metrics = await this.doPumpOperation(source,target)
-    
-	switch (this.STATUS.operationSuccessful) {
-      case true:
-        this.reportStatus(this.STATUS,this.LOGGER)
-		break;
-	  case false:
-        metrics = this.STATUS.err
-        this.reportError(this.STATUS.err,this.parameters,this.STATUS,this.LOGGER);
-		break;
-	  default:
-	}
-    return metrics
+	
+    return await this.doPumpOperation(source,target)    
   }
   
   async doImport(dbi) {

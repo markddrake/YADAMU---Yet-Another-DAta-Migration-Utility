@@ -12,6 +12,7 @@ const DBIConstants = require('../../common/dbiConstants.js');
 const JSONParser = require('./jsonParser.js');
 const EventStream = require('./eventStream.js');
 const JSONWriter = require('./jsonWriter.js');
+const {FileError, FileNotFound} = require('./fileError.js');
 
 const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
 
@@ -78,6 +79,7 @@ class FileDBI extends YadamuDBI {
       
   async executeDDL(ddl) {
 	this.ddl = ddl
+    return ddl
   }
   
   getConnectionProperties() {
@@ -147,7 +149,8 @@ class FileDBI extends YadamuDBI {
 	super.initializeExport();
     await new Promise((resolve,reject) => {
       this.inputStream = fs.createReadStream(this.exportFilePath);
-      this.inputStream.on('open',() => {resolve()}).on('error',(err) => {reject(err)})
+	  const stack = new Error().stack
+      this.inputStream.on('open',() => {resolve()}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,this.exportFilePath) : new FileError(err,stack,this.exportFilePath) )})
     })
   }
 
@@ -225,7 +228,7 @@ class FileDBI extends YadamuDBI {
   **
   */
 
-  async abort() {
+  async abort(e) {
 
     try {
       if (this.inputStream !== undefined) {
@@ -253,6 +256,7 @@ class FileDBI extends YadamuDBI {
       
   async generateStatementCache(schema,executeDDL) {
     this.statementCache = []
+	return this.statementCache
   }
 
   async getDDLOperations() {

@@ -13,7 +13,7 @@ class StatementGenerator {
   }
   
 
-  async generateStatementCache (executeDDL, vendor) {    
+  async generateStatementCache () {    
   
     const sqlStatement = `select GENERATE_SQL($1,$2,$3)`
     const results = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, this.targetSchema, this.spatialFormat])
@@ -68,10 +68,6 @@ class StatementGenerator {
         })
         return tableInfo.ddl
       });
-	  	  
-      if (executeDDL === true) {
-        await this.dbi.executeDDL(ddlStatements);
-      }
     }
     return statementCache;
   }

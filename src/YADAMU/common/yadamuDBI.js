@@ -27,6 +27,8 @@ const DummyWritable = require('./nullWritable.js')
 
 class YadamuDBI {
 
+  // Instance level getters.. invoke as this.METHOD
+
   get PIPELINE_OPERATION_HANGS()   {return false }
 
   get DATABASE_VENDOR()            { return undefined };
@@ -97,12 +99,13 @@ class YadamuDBI {
     return this._ATTEMPT_RECONNECTION
   }
 
-  // Instance level getters.. invoke as this.METHOD
-
   // Not available until configureConnection() has been called 
 
   get DB_VERSION()             { return this._DB_VERSION }
 
+  get SPATIAL_SERIALIZER()                    { return this._SPATIAL_SERIALIZER }
+  set SPATIAL_SERIALIZER(v)                   { this._SPATIAL_SERIALIZER = v }
+   
   constructor(yadamu,parameters) {
   
     this.options = {
@@ -528,24 +531,31 @@ class YadamuDBI {
   }
 	  
   async _executeDDL(ddl) {
-    await Promise.all(ddl.map(async (ddlStatement) => {
-      try {
+	let results
+	try {
+      results = await Promise.all(ddl.map((ddlStatement) => {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
 		this.status.sqlTrace.write(this.traceSQL(ddlStatement));
-        this.executeSQL(ddlStatement,{});
-      } catch (e) {
-        this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
-        this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
-      } 
-    }))
+        return this.executeSQL(ddlStatement,{});
+      }))
+    } catch (e) {
+	 this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	 results = e;
+    }
+    return results;
+  }
+  
+  prepareDDLStatements(ddlStatements) {
+	return ddlStatements
   }
   
   async executeDDL(ddl) {
 	if (ddl.length > 0) {
       const startTime = performance.now();
-      await this._executeDDL(ddl);
-      this.yadamuLogger.ddl([`${this.DATABASE_VENDOR}`],`Executed ${ddl.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+      const results = await this._executeDDL(ddl);
+	  return results
 	}
+	return []
   }
   
   setOption(name,value) {
@@ -765,10 +775,11 @@ class YadamuDBI {
 	// await this.closeConnection()
   }
   
-  async finalize(poolOptions) {
+  async finalize(options) {
 	// this.yadamuLogger.trace([this.constructor.name,`finalize(${poolOptions})`],'')
-    await this.closeConnection(false)
-    await this.closePool(poolOptions);
+	options = options === undefined ? {abort: false} : Object.assign(options,{abort:false})
+    await this.closeConnection(options)
+    await this.closePool(options);
 	this.logDisconnect();
   }
 
@@ -784,14 +795,17 @@ class YadamuDBI {
 	
   }
 
-  async abort(poolOptions) {
+  async abort(e,options) {
 	
 	// this.yadamuLogger.trace([this.constructor.name,`abort(${poolOptions})`],'')
 
 	// Log all errors other than lost connection errors. Do not throw otherwise underlying cause of the abort will be lost. 
 				
+	options = options === undefined ? {abort: true} : Object.assign(options,{abort:true})
+    options.err = e
+				
     try {
-      await this.closeConnection();
+      await this.closeConnection(options);
 	} catch (e) {
 	  if (!this.lostConnection(e)) {
         this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','Connection'],e);
@@ -800,7 +814,7 @@ class YadamuDBI {
 	
     try {
 	  // Force Termnination of All Current Connections.
-	  await this.closePool(poolOptions);
+	  await this.closePool(options);
 	} catch (e) {
 	  if (!this.lostConnection(e)) {
         this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','Pool'],e);
@@ -1033,9 +1047,10 @@ class YadamuDBI {
   async finalizeImport() {
   }
     
-  async generateStatementCache(StatementGenerator,schema,executeDDL) {
+  async generateStatementCache(StatementGenerator,schema) {
 	const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.systemInformation.spatialFormat,this.yadamuLogger);
-    this.statementCache = await statementGenerator.generateStatementCache(executeDDL,this.systemInformation.vendor)
+    this.statementCache = await statementGenerator.generateStatementCache()
+	return this.statementCache
   }
 
   async finalizeRead(tableInfo) {
@@ -1146,20 +1161,6 @@ class YadamuDBI {
 	}	 
   }
   
-  cloneManager(dbi) {
-	// dbi.master = this
-	dbi.metadata = this.metadata
-    dbi.schemaCache = this.schemaCache
-    dbi.statementCache = this.statementCache
-    dbi.systemInformation = this.systemInformation
-	dbi.setTableMappings(this.tableMappings)
-    dbi.sqlTraceTag = ` /* Worker [${dbi.getWorkerNumber()}] */`;
-  }   
-
-  async setWorkerConnection() {
-    // DBI implementations that do not use a pool / connection mechansim need to overide this function. eg MSSQLSERVER
-	this.connection = await this.manager.getConnectionFromPool()	
-  }
 
   isManager() {
 
@@ -1173,17 +1174,39 @@ class YadamuDBI {
 
   }
   
+  classFactory() {
+	 throw new Error(` Parallel operations not supported. Class Factory implementation not provided for "${this.constructor.name}". Cannot create worker.`)
+  }
+  
+  async setWorkerConnection() {
+    // DBI implementations that do not use a pool / connection mechansim need to overide this function. eg MSSQLSERVER
+	this.connection = await this.manager.getConnectionFromPool()	
+  }
+
+  async cloneCurrentSettings(manager) {
+	this.StatementLibrary   = manager.StatementLibrary
+	this.StatementGenerator = manager.StatementGenerator
+	
+	this.systemInformation  = manager.systemInformation
+    this.metadata           = manager.metadata
+    this.schemaCache        = manager.schemaCache
+    this.statementGenerator = manager.statementGenerator
+    
+    this.setParameters(manager.parameters);
+	this.setTableMappings(manager.tableMappings)
+  }   
+
   async workerDBI(workerNumber) {
       
     // Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
 	
 	const dbi = this.classFactory(this.yadamu)  
-    dbi.workerNumber = workerNumber
 	dbi.manager = this
+    dbi.workerNumber = workerNumber
+    dbi.sqlTraceTag = ` /* Worker [${dbi.getWorkerNumber()}] */`;
 	await dbi.setWorkerConnection()
-    dbi.setParameters(this.parameters);
-	this.cloneManager(dbi);
 	await dbi.configureConnection();
+	await dbi.cloneCurrentSettings(this);
 	return dbi
   }
   

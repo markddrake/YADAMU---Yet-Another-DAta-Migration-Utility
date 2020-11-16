@@ -1,0 +1,99 @@
+{
+  "operation"         : "dbRoundTrip"
+, "connections"       : "qa/regression/connections.json"
+, "tasks"             : "qa/regression/tasks.json"
+, "recreateSchema"    : true
+, "parameters": {
+    "MODE"            : "DATA_ONLY"
+  , "FEEDBACK"        : "COMMIT"
+  , "MONGO_STRIP_ID"  : true
+  }
+, "tests"               : [{
+    "operation"         : "import"
+  , "source"            : "file-JSON"
+  , "target"            : "mssql14"
+  , "importPath"        : "%location%"
+  , "reverseOperations" : true
+  , "verifyOperation"   : true
+  , "tasks": [
+      "oracle","mysql","mssql"
+    ]
+  },{
+    "source"            : "oracle19c"
+  , "target"            : "mssql14"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "oracle18c"
+  , "target"            : "mssql14"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "oracle12c"
+  , "target"            : "mssql14"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "oracle11g"
+  , "target"            : "mssql14"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mssql19"
+  , "target"            : "mssql14"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mssql17"
+  , "target"            : "mssql14"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mssql14"
+  , "target"            : "mssql14"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "postgres#1"
+  , "target"            : "mssql14"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mysql#1"
+  , "target"            : "mssql14"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mariadb#1"
+  , "target"            : "mssql14"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mongodb#1"
+  , "target"            : "mssql14"
+  , "parameters" : {
+      "MONGO_STRIP_ID": false
+	}
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mssql14"
+  , "targets": [
+	  "mssql14","oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","mssql14","postges#1","mysql#1","mariadb#1","mongodb#1"
+    ]
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  }]
+}

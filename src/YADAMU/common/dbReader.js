@@ -3,7 +3,7 @@ const Readable = require('stream').Readable;
 const Yadamu = require('./yadamu.js')
 const YadamuLibrary = require('./yadamuLibrary.js')
 const YadamuWriter = require('./yadamuWriter.js')
-const {DatabaseError} = require('./yadamuError.js')
+const {DatabaseError, IterativeInsertError} = require('./yadamuError.js')
 const { performance } = require('perf_hooks');
 
 const util = require('util')
@@ -73,14 +73,23 @@ class DBReader extends Readable {
     this.status = dbi.yadamu.STATUS
     this.yadamuLogger = yadamuLogger;
     this.yadamuLogger.info([`Reader`,dbi.DATABASE_VENDOR,dbi.DB_VERSION,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
-       
+  
+    this.metadata = undefined
     this.schemaInfo = [];
-    
+  
     this.nextPhase = 'systemInformation'
     this.dbWriter = undefined;
 	
+	this.dataComplete = undefined;
+    this.copyStarted = false
+    this.copyComplete = false
+	
   }
- 
+
+  copyInProgress() {
+	return this.copyStarted && !this.copyComplete
+  }
+
   isDatabase() {
     return this.dbi.isDatabase()
   }
@@ -117,18 +126,11 @@ class DBReader extends Readable {
   }
  
   async pipelineTable(task,readerDBI,writerDBI) {
-	  
-	/*
-	**
-	** InputStream.Error - end()   : false, false, false
-	** InputStream.Error - error() : true,  true,  false
-	**
-	*/
 	 
     let tableInfo
 	let mappedTableName
 	let tableOutputStream
-	let writerComplete
+	let copyComplete
 
 	const yadamuPipeline = []
 	let streamEnded
@@ -139,7 +141,6 @@ class DBReader extends Readable {
   
 	  const inputStreams = await readerDBI.getInputStreams(tableInfo)
       yadamuPipeline.push(...inputStreams)
-	  // const parser = inputStreams[inputStreams.length-1]
       mappedTableName = writerDBI.transformTableName(task.TABLE_NAME,readerDBI.getInverseTableMappings())
 	  const outputStreams = await writerDBI.getOutputStreams(mappedTableName,this.dbWriter.ddlComplete)
 	  yadamuPipeline.push(...outputStreams)
@@ -148,7 +149,7 @@ class DBReader extends Readable {
 	  **
 	  **  Event Tracing
 	  **
-
+	  
 	  streamEnded = new Array(yadamuPipeline.length).fill(false);
       streamFailed = new Array(yadamuPipeline.length).fill(undefined);
       yadamuPipeline.forEach((s,idx) => {
@@ -161,17 +162,18 @@ class DBReader extends Readable {
 	    }).once('close', (err) => {
 		  console.log(s.constructor.name,'close')
 	    }).once('error', (err) => {
-		  console.log(s.constructor.name,'error',err)
+		  // console.log(s.constructor.name,'error',err)
+		  console.log(s.constructor.name,'error',err.message)
 		  streamFailed[idx] = err
 		})
 	  })
 
-	  **
+      **
 	  */
-	  
+
       tableOutputStream = outputStreams[0]
       tableOutputStream.setReaderMetrics(readerDBI.INPUT_METRICS)
-	  writerComplete = new Promise((resolve,reject) => {
+	  copyComplete = new Promise((resolve,reject) => {
 		const target = outputStreams[outputStreams.length-1]
 	    target.once('finish',() => {
 		  resolve(true)
@@ -217,16 +219,21 @@ class DBReader extends Readable {
 	  }	  
 	  
 	  readerDBI.INPUT_METRICS.pipeEndTime = performance.now();
-      // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'SUCCESS'],writerComplete)
-      return writerComplete
+      // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,'SUCCESS'],copyComplete)
+      return copyComplete
     } catch (e) {
+	  // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the outputStream;
+  	  if ((e.code === 'ERR_STREAM_PREMATURE_CLOSE') && (tableOutputStream.underlyingError instanceof Error)) {
+		e = tableOutputStream.underlyingError
+	  }
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
-      // this.yadamuLogger.logException([this.constructor.name,'PIPELINE',mappedTableName,this.dbi.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],e)
+      this.yadamuLogger.handleException(['PIPELINE',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],e)
+
       cause = e
 	  stream = 'WRITER'
       errorDBI = writerDBI
        
-      if (!(e instanceof DatabaseError)) {
+      if (!((e instanceof DatabaseError) || (e instanceof IterativeInsertError))) {
 		// yadamuPipeline.forEach((s,i) => { console.log(i,s.constructor.name); if (s.dbi ) console.log(s.dbi.firstError, s.dbi.latestError)})
         // ### "Quack Quack" ### Need a better method to determine whether the reader or writer is responsible for the error.. 
         // When an error occurs pipeline activates the on error events for all of the streams in the pipline
@@ -247,15 +254,14 @@ class DBReader extends Readable {
 		tableOutputStream.abortTable();
       } 
 	  // ABORT processing of all tables if the ddl phase did not complete successfully
-	  const ddlStatus = await this.dbWriter.ddlComplete
-	  if (ddlStatus instanceof Error) {
-		throw ddlStatus
-	  }
+	  // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'WAITING')
+	  await this.dbWriter.ddlComplete
+      // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'PROCESSING')
 	  // Clean up the current table. Among other things this will flush any pending records. Note if abortTable() has been called there are no pending records but there is still housekeeping required
 	  await tableOutputStream.forcedEnd();
 	  // Throw the error if ON_ERROR handling is ABORT
       if (YadamuConstants.CONTINUE_PROCESSING.includes(errorDBI.yadamu.ON_ERROR)) {
-		return writerComplete
+		return copyComplete
       }
 	  throw cause;
     }
@@ -269,9 +275,10 @@ class DBReader extends Readable {
 	      try {
             await this.pipelineTable(task,readerDBI,writerDBI)
 	      } catch (cause) {
-			this.underlyingError = cause;
+	        // this.yadamuLogger.trace(['PIPELINE','SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
 	        this.yadamuLogger.handleException(['PIPELINE','SEQUENTIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
 		    // Throwing here raises 'ERR_STREAM_PREMATURE_CLOSE' on the Writer. Cache the cause 
+			this.underlyingError = cause;
             throw(cause)
           }
 	    }
@@ -353,24 +360,33 @@ class DBReader extends Readable {
            if (ddl === undefined) {
              // Database does not provide mechansim to retrieve DDL statements used to create a schema (eg Oracle's DBMS_METADATA package)
              // Reverse Engineer DDL from metadata.
-             const metadata = await this.getMetadata();
-             await this.generateStatementCache(metadata)
-             ddl = Object.keys(this.dbi.statementCache).map((table) => {
-               return this.dbi.statementCache[table].ddl
+             this.metadata = await this.getMetadata();
+             await this.generateStatementCache(this.metadata)
+             ddl = Object.values(this.dbi.statementCache).map((table) => {
+               return table.ddl
              })
            } 
            this.push({ddl: ddl});
 		   this.nextPhase = 'metadata';
            break;
          case 'metadata' :
-           const metadata = await this.getMetadata();
-           this.push({metadata: this.dbi.transformMetadata(metadata,this.dbi.inverseTableMappings)});
-		   this.dbi.yadamu.REJECTION_MANAGER.setMetadata(metadata)
-		   this.dbi.yadamu.WARNING_MANAGER.setMetadata(metadata)
+           this.metadata = this.metadata ? this.metadata : await this.getMetadata();
+           this.push({metadata: this.dbi.transformMetadata(this.metadata,this.dbi.inverseTableMappings)});
+		   this.dbi.yadamu.REJECTION_MANAGER.setMetadata(this.metadata)
+		   this.dbi.yadamu.WARNING_MANAGER.setMetadata(this.metadata)
 		   this.nextPhase = ((this.dbi.MODE === 'DDL_ONLY') || (this.schemaInfo.length === 0)) ? 'exportComplete' : 'copyData';
 		   break;
 		 case 'copyData':
-		   if (this.dbWriter.dbi.isDatabase()) {
+   	 	   this.copyStarted = true;
+           this.dataComplete = new Promise((resolve,reject) => {
+             this.once('dataComplete',(status) => {
+               // this.yadamuLogger.trace([this.constructor.name],`${this.constructor.name}.on(dataComplete): (${status instanceof Error}) "${status ? `${status.constructor.name}(${status.message})` : status}"`)
+               this.copyComplete = true
+           	   if (status instanceof Error) reject(status)
+           	   resolve(true);
+             })
+           })	
+           if (this.dbWriter.dbi.isDatabase()) {
 		     await this.pipelineTables(this.dbi,this.dbWriter.dbi);
 	       }
 	       else {
@@ -379,17 +395,21 @@ class DBReader extends Readable {
 		   this.emit('dataComplete')
 		   // No 'break' - fall through to 'exportComplete'.
 		 case 'exportComplete':
-		   await this.dbWriter.ddlComplete
-		   this.dbWriter.deferredCallback()
+	       // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'WAITING')
+	       await this.dbWriter.ddlComplete
+           // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'PROCESSING')
+		   this.dbWriter.callDeferredCallback()
 		   this.push(null);
 		   break;
 	    default:
       }
-    } catch (e) {
-	  this.yadamuLogger.handleException([`READER`,this.dbi.DATABASE_VENDOR,`_READ(${this.nextPhase})`,this.dbi.yadamu.ON_ERROR],e);
-	  this.underlyingError = e;
+    } catch (cause) {
+	  // Don't pass the error to dataComplete or we get unhandled exceptions from the throw...
+  	  this.emit('dataComplete');
+	  this.yadamuLogger.handleException([`READER`,this.dbi.DATABASE_VENDOR,`_READ(${this.nextPhase})`,this.dbi.yadamu.ON_ERROR],cause);
+	  this.underlyingError = cause;
 	  await this.dbi.releasePrimaryConnection();
-      this.destroy(e)
+      this.destroy(cause)
     }
   }  
    

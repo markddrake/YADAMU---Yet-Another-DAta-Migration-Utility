@@ -93,20 +93,17 @@ class StatementGenerator {
     }
   }
     
-  async generateStatementCache(executeDDL) {
+  async generateStatementCache() {
     
     const statementCache = {}
     const tables = Object.keys(this.metadata); 
-	
-    const collectionList = tables.map((table,idx) => {
+		
+    tables.forEach((table,idx) => {
       const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);
       statementCache[tableMetadata.tableName] = tableInfo;
       return tableMetadata.tableName;
     })
-    if (executeDDL === true) {
-      await this.dbi.executeDDL(collectionList)
-    }
     return statementCache;
   }  
 

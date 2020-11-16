@@ -75,7 +75,7 @@ class StatementGenerator {
          }
          break;
        case 'MSSQLSERVER':
-         switch (dataType) {
+         switch (dataType.toLowerCase()) {
            case 'smallmoney':                                        return 'DECIMAL(10,4)';
            case 'money':                                             return 'DECIMAL(19,4)';
            case 'real':                                              return 'FLOAT';
@@ -110,7 +110,7 @@ class StatementGenerator {
          }
          break;
        case 'Postgres':                            
-         switch (dataType) {
+         switch (dataType.toLowerCase()) {
            case 'character varying':       
            case 'character':
              switch (true) {
@@ -333,7 +333,7 @@ class StatementGenerator {
     }
   }
   
-  async generateStatementCache(executeDDL,vendor) {
+  async generateStatementCache() {
       
     const statementCache = {}
     const tables = Object.keys(this.metadata); 
@@ -344,9 +344,6 @@ class StatementGenerator {
       statementCache[this.metadata[table].tableName] = tableInfo;
       return tableInfo.ddl;
     })
-    if (executeDDL === true) {
-      await this.dbi.executeDDL(ddlStatements)
-    }
     return statementCache;
   }
 }

@@ -19,16 +19,10 @@ const SnowflakeReader = require('./snowflakeReader.js');
 const SnowflakeParser = require('./snowflakeParser.js');
 const SnowflakeWriter = require('./snowflakeWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
+const SnowflakeStatementLibrary = require('./snowflakeStatementLibrary.js');
 
 class SnowflakeDBI extends YadamuDBI {
 
-  static get SQL_CONFIGURE_CONNECTION()                       { return _SQL_CONFIGURE_CONNECTION }
-  static get SQL_SYSTEM_INFORMATION()                         { return _SQL_SYSTEM_INFORMATION }
-  static get SQL_GET_DLL_STATEMENTS()                         { return _SQL_GET_DLL_STATEMENTS }
-  static get SQL_BEGIN_TRANSACTION()                          { return _SQL_BEGIN_TRANSACTION }  
-  static get SQL_COMMIT_TRANSACTION()                         { return _SQL_COMMIT_TRANSACTION }
-  static get SQL_ROLLBACK_TRANSACTION()                       { return _SQL_ROLLBACK_TRANSACTION }
- 
   // Instance level getters.. invoke as this.METHOD
 
   // Not available until configureConnection() has been called 
@@ -45,45 +39,10 @@ class SnowflakeDBI extends YadamuDBI {
 
   get SPATIAL_FORMAT()        { return this.parameters.SPATIAL_FORMAT || SnowflakeConstants.SPATIAL_FORMAT };
   
-  get SQL_SCHEMA_INFORMATION()  { return `select t.table_schema   "TABLE_SCHEMA"
-         ,t.table_name   "TABLE_NAME"
-         ,concat('[',listagg(concat('"',c.column_name,'"'),',') within group (order by ordinal_position),']') "COLUMN_NAME_ARRAY"
-         ,concat('[',listagg(concat('"',data_type,'"'),',') within group (order by ordinal_position),']') "DATA_TYPE_ARRAY"
-         ,concat('[',listagg(case
-                       when (numeric_precision is not null) and (numeric_scale is not null) 
-                         then concat('"',numeric_precision,',',numeric_scale,'"')
-                       when (numeric_precision is not null) 
-                         then concat('"',numeric_precision,'"')
-                       when (datetime_precision is not null)
-                         then concat('"',datetime_precision,'"')
-                       when (character_maximum_length is not null)
-                         then concat('"',character_maximum_length,'"')
-                       else
-                         '""'
-                     end
-                    ,','                   
-                   ) within group (order by ordinal_position)
-                 ,']') "SIZE_CONSTRAINT_ARRAY"
-         ,listagg(case
-                   when c.data_type = 'VARIANT' then
-                     concat('TO_VARCHAR("',column_name,'") "',column_name,'"')
-                   when c.data_type = 'TIME' then
-                     concat('cast(concat(''1971-01-01T'',','"',column_name,'"',') as Timestamp)')
-                   else
-                     concat('"',column_name,'"')
-                   end
-                  ,','
-                 ) within group (order by ordinal_position) "CLIENT_SELECT_LIST"
-     from "${this.parameters.YADAMU_DATABASE}"."INFORMATION_SCHEMA"."COLUMNS" c, "${this.parameters.YADAMU_DATABASE}"."INFORMATION_SCHEMA"."TABLES" t
-    where t.table_name = c.table_name
-      and t.table_schema = c.table_schema
-      and t.table_type = 'BASE TABLE'
-      and t.table_schema = ?
-    group by t.table_schema, t.table_name`;
-  }
-  
   constructor(yadamu) {	  
     super(yadamu,SnowflakeConstants.DEFAULT_PARAMETERS);
+	this.StatementLibrary = SnowflakeStatementLibrary
+	this.statementLibrary = undefined
   }
 
   /*
@@ -128,6 +87,7 @@ class SnowflakeDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
   	// Snowflake-SDK does not support connection pooling
+  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
     this.setDatabase();
     this.logConnectionProperties();
     let connection = snowflake.createConnection(this.connectionProperties);
@@ -144,16 +104,15 @@ class SnowflakeDBI extends YadamuDBI {
   
   async configureConnection() {    
     // Perform connection specific configuration such as setting sesssion time zone to UTC...
-	//  await this.useDatabase(this.connectionProperties.database);
-	let results = await this.executeSQL(SnowflakeDBI.SQL_CONFIGURE_CONNECTION);
-    results = await this.executeSQL(SnowflakeDBI.SQL_SYSTEM_INFORMATION,[]);    
+	let results = await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION);
+    results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[]);    
     this._DB_VERSION = results[0].DATABASE_VERSION
 
   }
 
-  async closeConnection() {
+  async closeConnection(options) {
 	  
-  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getSlaveNumber()],`closeConnection(${(this.connection !== undefined && this.connection.destroy)})`)
+  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection()`)
 	  
     if (this.connection !== undefined && this.connection.destroy) {
       await this.connection.destroy();
@@ -161,7 +120,7 @@ class SnowflakeDBI extends YadamuDBI {
 	
   }
 	
-  async closePool() {
+  async closePool(options) {
   	// Snowflake-SDK does not support connection pooling
   }
     
@@ -204,30 +163,33 @@ class SnowflakeDBI extends YadamuDBI {
 						       } catch (e) {
                                  reject(e);
                                } 							 
-                  1          }
+                             }
                              else {
                                reject(cause);
                              }
-                           }
-					       // this.traceTiming(sqlStartTime,sqlEndTime)
-                           resolve(rows);
+						   }
+						   else {
+					         // this.traceTiming(sqlStartTime,sqlEndTime)
+                             resolve(rows);
+						   }
 				         }    
       })
     })
   }  
 
   async _executeDDL(ddl) {
-    const results = await Promise.all(ddl.map(async (ddlStatement) => {
-      try {
+	let results = []
+	try {
+      results = await Promise.all(ddl.map((ddlStatement) => {
         ddlStatement = ddlStatement.replace(/%%YADAMU_DATABASE%%/g,this.parameters.YADAMU_DATABASE);
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
-        const result = this.executeSQL(ddlStatement,[]);
-        return result;
-      } catch (e) {
-        this.yadamuLogger.logException([`${this.constructor.name}.executeDDL()`],e)
-        this.yadamuLogger.writeDirect(`${ddlStatement}\n`)
-      } 
-    }))
+        return this.executeSQL(ddlStatement,[]);
+      }))
+    } catch (e) { 
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	  results = e
+    }
+    return results;
   }
 
   setDatabase() {  
@@ -238,6 +200,7 @@ class SnowflakeDBI extends YadamuDBI {
   
   async initialize() {
     await super.initialize(true);   
+	this.statementLibrary = new this.StatementLibrary(this)
   }
     
   /*
@@ -256,8 +219,8 @@ class SnowflakeDBI extends YadamuDBI {
   **
   */
 
-  async abort() {
-    await super.abort();
+  async abort(e) {
+    await super.abort(e);
   }
 
   /*
@@ -277,7 +240,7 @@ class SnowflakeDBI extends YadamuDBI {
 	**
 	*/
 	
-     await this.executeSQL(SnowflakeDBI.SQL_BEGIN_TRANSACTION,[]);
+     await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION,[]);
      super.beginTransaction();
 
   }
@@ -300,7 +263,7 @@ class SnowflakeDBI extends YadamuDBI {
 	*/
 
 	 super.commitTransaction();
-     await this.executeSQL(SnowflakeDBI.SQL_COMMIT_TRANSACTION,[]);
+     await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION,[]);
 	
   }
 
@@ -329,7 +292,7 @@ class SnowflakeDBI extends YadamuDBI {
      
 	try {
       super.rollbackTransaction()
-      await this.executeSQL(SnowflakeDBI.SQL_ROLLBACK_TRANSACTION,[]);
+      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION,[]);
     } catch (newIssue) {
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue);								   
 	}
@@ -361,7 +324,7 @@ class SnowflakeDBI extends YadamuDBI {
 	
   
     
-    const results = await this.executeSQL(SnowflakeDBI.SQL_SYSTEM_INFORMATION,[]);
+    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[]);
     
     const sysInfo = results[0];
 
@@ -465,7 +428,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 
   async getSchemaInfo(keyName) {
 	  
-	let schemaInfo = await this.executeSQL(this.SQL_SCHEMA_INFORMATION,[this.parameters[keyName]])
+	let schemaInfo = await this.executeSQL(this.statementLibrary.SQL_SCHEMA_INFORMATION,[this.parameters[keyName]])
     schemaInfo = await this.describeVariantColumns(schemaInfo)
     return schemaInfo
   }
@@ -503,8 +466,8 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     throw new Error('Unimplemented Method')
   }
    
-  async generateStatementCache(schema,executeDDL) {
-    await super.generateStatementCache(StatementGenerator,schema,executeDDL) 
+  async generateStatementCache(schema) {
+    return await super.generateStatementCache(StatementGenerator,schema) 
   }
  
   getOutputStream(tableName,ddlComplete) {
@@ -525,16 +488,3 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 }
 
 module.exports = SnowflakeDBI
-
-const _SQL_CONFIGURE_CONNECTION = `alter session set autocommit=false timezone='UTC' TIMESTAMP_OUTPUT_FORMAT='YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM' TIMESTAMP_NTZ_OUTPUT_FORMAT='YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM' TIME_INPUT_FORMAT='YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM' GEOGRAPHY_OUTPUT_FORMAT ='WKB'`
-
-const _SQL_SYSTEM_INFORMATION   = `select CURRENT_WAREHOUSE() WAREHOUSE, CURRENT_DATABASE() DATABASE_NAME, CURRENT_SCHEMA() SCHEMA, CURRENT_ACCOUNT() ACCOUNT, CURRENT_VERSION() DATABASE_VERSION, CURRENT_CLIENT() CLIENT`
-    
-
-
-const _SQL_BEGIN_TRANSACTION    = `begin`;
-
-const _SQL_COMMIT_TRANSACTION   = `commit`;
-
-const _SQL_ROLLBACK_TRANSACTION = `rollback`;
-

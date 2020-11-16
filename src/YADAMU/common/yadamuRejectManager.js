@@ -69,7 +69,16 @@ class YadamuRejectManager {
    	  await this.dbi.initializeData()
       this.errorPipeline.push(this.dbi.PIPELINE_ENTRY_POINT)
       pipeline(this.errorPipeline,(err) => {
-        if (err) { console.log(err) } else { console.log('Pipe operation #1 complete') }
+		if (err.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+		  errorPipeline.forEach((stream) => {
+			if (stream.underlyingError instanceof Error) {
+		      console.log(stream.constructor.name,stream.underlyingError)
+			}
+	      })
+	    }
+        else { 
+		  console.log('Pipe operation #1 complete') 
+		}
       })  
     }
 	

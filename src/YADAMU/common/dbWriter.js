@@ -25,7 +25,7 @@ class DBWriter extends Writable {
   ** When the DBWriter receives an 'exportComplete' message the writer will invoke it's end() method which causes the _finish() method to execute and
   ** a 'finish' or 'close' event to be emitted.
   */
- 
+      
   constructor(dbi,yadamuLogger,options) {
 
     super({objectMode: true});
@@ -33,63 +33,43 @@ class DBWriter extends Writable {
     this.ddlRequired = (this.dbi.MODE !== 'DATA_ONLY');    
     this.status = dbi.yadamu.STATUS
     this.yadamuLogger = yadamuLogger;
-	// console.log(yadamuLogger.os.constructor.name)
     this.yadamuLogger.info([`Writer`,dbi.DATABASE_VENDOR,dbi.DB_VERSION,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
         
     this.transactionManager = this.dbi
 	this.currentTable   = undefined;
     this.ddlCompleted   = false;
-
-    this.configureFeedback(this.dbi.parameters.FEEDBACK); 
+    this.deferredCallback = () => {}
 
 	this.ddlComplete = new Promise((resolve,reject) => {
-	  this.once('ddlComplete',(status) => {
- 	    // this.yadamuLogger.trace([this.constructor.name],`DDL Complete`)
-		if (status instanceof Error) resolve(status)
-		resolve(true);
+	  this.once('ddlComplete',(status,startTime) => {
+	    try {
+ 	      // this.yadamuLogger.trace([this.constructor.name],`${this.constructor.name}.on(ddlComplete): (${status instanceof Error}) "${status ? `${status.constructor.name}(${status.message})` : status}"`)
+		  if (status instanceof Error) {
+	        this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`DDL Failure. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+		    status.ignoreUnhandledRejection = true;
+            reject (status)
+          }
+		  else {
+  	        this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`Executed ${Array.isArray(status) ? status.length : undefined} DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+		    resolve(true);
+	      }
+		} catch (e) {
+		  reject (e)
+		}
 	  })
-	})	
-
-	this.dataComplete = new Promise((resolve,reject) => {
-	  this.once('dataComplete',() => {
- 	    // this.yadamuLogger.trace([this.constructor.name],`DDL Complete`)
-		resolve(true);
-	  })
-	})	
+	})		
 	
   }      
+                                                                                             
+  callDeferredCallback() {
+	this.deferredCallback();
+	this.deferredCallback = undefined
+  }
   
   getOutputStream() {
 	  
     return [this]
 
-  }
-
-  configureFeedback(feedbackModel) {
-      
-    this.reportCommits      = false;
-    this.reportBatchWrites  = false;
-    this.feedbackCounter    = 0;
-    
-    if (feedbackModel !== undefined) {
-        
-      if (feedbackModel === 'COMMIT') {
-        this.reportCommits = true;
-        return;
-      }
-  
-      if (feedbackModel === 'BATCH') {
-        this.reportCommits = true;
-        this.reportBatchWrites = true;
-        return;
-      }
-    
-      if (!isNaN(feedbackModel)) {
-        this.reportCommits = true;
-        this.reportBatchWrites = true;
-        this.feedbackInterval = parseInt(feedbackModel)
-      }
-    }      
   }
   
   setInputStreamType(ist) {
@@ -104,22 +84,42 @@ class DBWriter extends Writable {
     return metadata
   }
   
-  async generateStatementCache(metadata,ddlRequired) {
+  async executeDDL(ddlStatements) {
+	const startTime = performance.now()
+	// this.yadamuLogger.trace([this.constructor.name,`executeDDL()`,this.dbi.DATABASE_VENDOR],`Executing DLL statements)`) 
+    ddlStatements = this.dbi.prepareDDLStatements(ddlStatements)	
+    const results = await this.dbi.executeDDL(ddlStatements) 
+    this.emit('ddlComplete',results,startTime);	 
+  }
+  
+  async generateStatementCache(metadata) {
     const startTime = performance.now()
+    // console.log(metadata)
     await this.dbi.setMetadata(metadata)     
-
-    await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER,!this.ddlCompleted)
+    // console.log(metadata)
+    const statementCache = await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER)
+	// console.log(statementCache)
 	let ddlStatementCount = 0
 	let dmlStatementCount = 0
-	Object.keys(this.dbi.statementCache).forEach((tableName) => {
-	  if (this.dbi.statementCache[tableName].ddl !== null) {
-		ddlStatementCount++;
+	const ddlStatements = []
+	Object.values(statementCache).forEach((tableInfo) => {
+	  if (tableInfo.ddl !== null) {
+		ddlStatements.push(tableInfo.ddl)
 	  }
-	  if (this.dbi.statementCache[tableName].dml !== null) {
+	  if (tableInfo.dml !== null) {
 		dmlStatementCount++;
       }
-    })	  
-	this.yadamuLogger.ddl([`${this.dbi.DATABASE_VENDOR}`],`Generated ${ddlStatementCount === 0 ? 'no' : ddlStatementCount} DDL and ${dmlStatementCount === 0 ? 'no' : dmlStatementCount} DML statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+    })	 
+	this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`Generated ${ddlStatements.length === 0 ? 'no' : ddlStatements.length} "Create Table" statements and ${dmlStatementCount === 0 ? 'no' : dmlStatementCount} DML statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+	// console.log(this.ddlCompleted)
+	// Execute DDL Statements Asynchronously - Emit dllComplete when ddl execution is finished. 
+	if (this.ddlCompleted) {
+      // this.yadamuLogger.trace([this.constructor.name,`generateStatementCache()`,this.dbi.DATABASE_VENDOR,],`DDL already completed. Emit ddlComplete(SUCCESS))`)  
+	  this.emit('ddlComplete',[],performance.now());
+	}
+	else {
+      this.executeDDL(ddlStatements)
+    }
   }   
 
   async getTargetSchemaInfo() {
@@ -216,7 +216,7 @@ class DBWriter extends Writable {
           }
         })
       }    
-	  await this.generateStatementCache(sourceMetadata,!this.ddlCompleted)
+	  await this.generateStatementCache(sourceMetadata)
     }
   }      
     
@@ -245,19 +245,19 @@ class DBWriter extends Writable {
           break;
         case 'ddl':
           if ((this.ddlRequired) && (obj.ddl.length > 0) && (this.dbi.isValidDDL())) { 
-            await this.dbi.executeDDL(obj.ddl);
-            this.ddlCompleted = true;
+		    const startTime = performance.now()
+            const results = await this.dbi.executeDDL(obj.ddl);
+	        this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`Executed ${results.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+			this.ddlCompleted = true
           }
           break;
         case 'metadata':
-          await this.setMetadata(obj.metadata);
-		  await this.dbi.initializeData();
-		  // The deferred callback is invoked by the DBReader when all data has been processed.
+		  // Cache the callback. The deferred callback is invoked by the DBReader when all DDL and DML operations are complete.
 		  // This allows the DBWriter to sleep, while the workers do the heavy lifting.
 		  this.deferredCallback = callback
-          // this.yadamuLogger.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType],`Emit "ddlComplete"`)  
-          this.emit('ddlComplete',null);
-		  return;
+          this.setMetadata(obj.metadata);
+		  await this.dbi.initializeData();
+		  return
   	    case 'eof':		 
           this.emit('dataComplete',true);
 		  break;
@@ -266,15 +266,21 @@ class DBWriter extends Writable {
       callback();
     } catch (e) {
 	  this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_write()`,messageType,this.dbi.yadamu.ON_ERROR],e);
-      this.emit('ddlComplete',e);
-      // Any errors that occur while processing metadata are fatal.
-      // Passing the exception to callback triggers the onError() event
+      // Any errors that occur while processing metadata are fatal.Passing the exception to callback triggers the onError() event
+	  // Attempt a rollback, however if the rollback fails invoke the callback with the origianal exception.
       try {
         await this.transactionManager.rollbackTransaction(e)
   	    callback(e);
 	  } catch (rollbackError) {
 		callback(e); 
       }
+	  switch (messageType) {
+        case 'ddl':
+          this.emit('ddlComplete',e)
+		  break;
+        default:
+      }		
+      this.underlyingError = e;
     }
   }
  
@@ -282,7 +288,7 @@ class DBWriter extends Writable {
     // this.yadamuLogger.trace([this.constructor.name],'final()')
     try {
 	  if (this.dbi.MODE === "DDL_ONLY") {
-        this.yadamuLogger.info([`${this.dbi.DATABASE_VENDOR}`],`DDL only export. No data written.`);
+        this.yadamuLogger.info([`${this.dbi.DATABASE_VENDOR}`],`DDL only operation. No data written.`);
       }
       else {
         await this.dbi.finalizeData();

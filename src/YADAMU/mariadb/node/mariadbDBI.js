@@ -20,7 +20,8 @@ const MariadbConstants = require('./mariadbConstants.js')
 const MariadbError = require('./mariadbError.js')
 const MariadbParser = require('./mariadbParser.js');
 const MariadbWriter = require('./mariadbWriter.js');
-const StatementGenerator = require('../../dbShared/mysql/statementGenerator57.js');
+const StatementGenerator = require('../../dbShared/mysql/57/statementGenerator.js');
+const MariadbStatementLibrary = require('./mariadbStatementLibrary.js');
 
 class MariadbDBI extends YadamuDBI {
     
@@ -56,6 +57,9 @@ class MariadbDBI extends YadamuDBI {
 
     super(yadamu,MariadbConstants.DEFAULT_PARAMETERS);
     this.pool = undefined;
+	
+    this.StatementLibrary = MariadbStatementLibrary
+    this.statementLibrary = undefined
   }
   
   async testConnection(connectionProperties,parameters) {   
@@ -71,14 +75,13 @@ class MariadbDBI extends YadamuDBI {
 	     
   async configureConnection() {  
 
-    await this.executeSQL(MariadbDBI.SQL_CONFIGURE_CONNECTION);
+    await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION);
 
-    let results = await this.executeSQL(MariadbDBI.SQL_GET_CONNECTION_INFORMATION);
+    let results = await this.executeSQL(this.StatementLibrary.SQL_GET_CONNECTION_INFORMATION);
     this._DB_VERSION = results[0][0]
 
  
   }
-
 
   async checkMaxAllowedPacketSize() {
 	  
@@ -123,7 +126,7 @@ class MariadbDBI extends YadamuDBI {
 	}
   }
 
-  async closeConnection() {
+  async closeConnection(options) {
 	  
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && this.connection.end)})`)
 	  
@@ -140,7 +143,7 @@ class MariadbDBI extends YadamuDBI {
 	}
   };
    
-  async closePool() {
+  async closePool(options) {
 	  
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR],`closePool(${(this.pool !== undefined && this.pool.end)})`)
 	  
@@ -230,28 +233,29 @@ class MariadbDBI extends YadamuDBI {
   setSpatialSerializer(spatialFormat) {      
     switch (spatialFormat) {
       case "WKB":
-        this.spatialSerializer = "ST_AsBinary(";
+        this.SPATIAL_SERIALIZER = "ST_AsBinary(";
         break;
       case "EWKB":
-        this.spatialSerializer = "ST_AsBinary(";
+        this.SPATIAL_SERIALIZER = "ST_AsBinary(";
         break;
       case "WKT":
-        this.spatialSerializer = "ST_AsText(";
+        this.SPATIAL_SERIALIZER = "ST_AsText(";
         break;
       case "EWKT":
-        this.spatialSerializer = "ST_AsText(";
+        this.SPATIAL_SERIALIZER = "ST_AsText(";
         break;
        case "GeoJSON":
-	     this.spatialSerializer = "ST_AsGeoJSON("
+	     this.SPATIAL_SERIALIZER = "ST_AsGeoJSON("
 		 break;
      default:
-        this.spatialSerializer = "ST_AsBinary(";
+        this.SPATIAL_SERIALIZER = "ST_AsBinary(";
     }  
   }  
     
   async initialize() {
     await super.initialize(true);
     this.setSpatialSerializer(this.SPATIAL_FORMAT);
+	this.statementLibrary = new this.StatementLibrary(this)
   }
 
   async finalizeRead(tableInfo) {
@@ -275,8 +279,8 @@ class MariadbDBI extends YadamuDBI {
   **
   */
 
-  async abort() {
-	await super.abort()
+  async abort(e) {
+	await super.abort(e)
   }
 
   /*
@@ -380,7 +384,7 @@ class MariadbDBI extends YadamuDBI {
   async createSavePoint() {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
-    await this.executeSQL(MariadbDBI.SQL_CREATE_SAVE_POINT);
+    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT);
 	super.createSavePoint()
   }
   
@@ -394,7 +398,7 @@ class MariadbDBI extends YadamuDBI {
 	// Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
 
 	try {
-      await this.executeSQL(MariadbDBI.SQL_RESTORE_SAVE_POINT);
+      await this.executeSQL(this.StatementLibrary.SQL_RESTORE_SAVE_POINT);
 	  super.restoreSavePoint();
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVPOINT',cause,newIssue)
@@ -405,7 +409,7 @@ class MariadbDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
-    await this.executeSQL(MariadbDBI.SQL_RELEASE_SAVE_POINT);    
+    await this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT);    
 	super.releaseSavePoint();
   } 
 
@@ -441,7 +445,7 @@ class MariadbDBI extends YadamuDBI {
   
   async getSystemInformation() {     
   
-    const results = await this.executeSQL(MariadbDBI.SQL_SYSTEM_INFORMATION); 
+    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION); 
     const sysInfo = results[0];
 	return {
       date               : new Date().toISOString()
@@ -483,91 +487,7 @@ class MariadbDBI extends YadamuDBI {
 
     // Cannot use JSON_ARRAYAGG for DATA_TYPES and SIZE_CONSTRAINTS beacuse MYSQL implementation of JSON_ARRAYAGG does not support ordering
 
-	const SQL_SCHEMA_INFORMATION = 
-     `select c.table_schema "TABLE_SCHEMA"   
-             ,c.table_name "TABLE_NAME"
-             ,concat('[',group_concat(concat('"',column_name,'"') order by ordinal_position separator ','),']')  "COLUMN_NAME_ARRAY"
-             ,concat(
-               '[',
-                group_concat(
-                  json_quote(case 
-                               when cc.check_clause is not null then 
-                                 'json'
-                               when c.column_type = 'tinyint(1)' then 
-                                 '${this.TREAT_TINYINT1_AS_BOOLEAN ? 'boolean' : 'tinyint(1)'}'
-                               else 
-                                 data_type
-                             end
-                            ) 
-                   order by ordinal_position separator ','
-                ),
-                ']'
-              ) "DATA_TYPE_ARRAY"
-             ,concat(
-               '[',
-               group_concat(
-                 json_quote(case 
-                              when column_type = 'tinyint(1)' then
-                                ${this.TREAT_TINYINT1_AS_BOOLEAN ? "''" : "'3'"}
-						      when (numeric_precision is not null) and (numeric_scale is not null) then
-                                concat(numeric_precision,',',numeric_scale) 
-                              when (numeric_precision is not null) then 
-                                case
-                                  when column_type like '%unsigned' then
-                                    numeric_precision
-                                  else
-                                    numeric_precision + 1
-                                end
-                              when (datetime_precision is not null) then 
-                                datetime_precision
-                              when (character_maximum_length is not null) then
-                                character_maximum_length
-                              else   
-                                ''   
-                            end
-                           ) 
-                 order by ordinal_position separator ','
-               ),
-               ']'
-              ) "SIZE_CONSTRAINT_ARRAY"
-             ,group_concat(
-                   case 
-                     when data_type in ('date','time','datetime','timestamp') then
-                       -- Force ISO 8601 rendering of value 
-                       concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')',' "',column_name,'"')
-                     when data_type = 'year' then
-                       -- Prevent rendering of value as base64:type13: 
-                       concat('CAST("', column_name, '"as DECIMAL) "',column_name,'"')
-                     when data_type = 'geometry' then
-                       -- Force ${this.spatialFormat} rendering of value
-                       concat('${this.spatialSerializer}"', column_name, '") "',column_name,'"')
-                     when data_type in ('float') then
-                       -- Render Floats with greatest possible precision 
-                       -- Risk of Overflow ????
-                       -- concat('(floor(1e15*"',column_name,'")/1e15) "',column_name,'"')                                      
-                       -- Render Floats and Double as String ???
-                       concat('cast((floor(1e15*"',column_name,'")/1e15) as varchar(64)) "',column_name,'"')
-                     when data_type = 'double' then
-                       concat('CAST("', column_name, '"as VARCHAR(128)) "',column_name,'"')
-                     else
-                       concat('"',column_name,'"')
-                   end
-                   order by ordinal_position separator ','
-              ) "CLIENT_SELECT_LIST"
-               from information_schema.columns c
-                    left join information_schema.tables t
-                       on t.table_name = c.table_name 
-                      and t.table_schema = c.table_schema
-                    left outer join information_schema.check_constraints cc
-                       on cc.table_name = c.table_name 
-                      and cc.constraint_schema = c.table_schema
-                      and check_clause = concat('json_valid("',column_name,'")')  
-              where c.extra <> 'VIRTUAL GENERATED'
-                and t.table_type = 'BASE TABLE'
-                and t.table_schema = ?
-            group by t.table_schema, t.table_name`;
-
-    const results = await this.executeSQL(SQL_SCHEMA_INFORMATION,[this.parameters[keyName]]);
+    const results = await this.executeSQL(this.statementLibrary.SQL_SCHEMA_INFORMATION,[this.parameters[keyName]]);
     const schemaInfo = this.generateSchemaInfo(results) 
     return schemaInfo
 
@@ -604,8 +524,8 @@ class MariadbDBI extends YadamuDBI {
 	
   }
   
-  async generateStatementCache(schema,executeDDL) {
-    await super.generateStatementCache(StatementGenerator,schema,executeDDL) 
+  async generateStatementCache(schema) {
+    return await super.generateStatementCache(StatementGenerator,schema) 
   }
 
   createParser(tableInfo) {

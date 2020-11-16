@@ -10,7 +10,7 @@
   }
 , "tests"             : [{
     "operation"       : "import"
-    "source"          : "file-JSON"
+  , "source"          : "file-JSON"
   , "target"          : "snow#1"
   , "importPath"      : "%location%"
   , "tasks": [
@@ -36,6 +36,12 @@
 	]
   },{
     "source"          : "oracle11g"
+  , "target"          : "snow#1"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"          : "mssql17"
   , "target"          : "snow#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
