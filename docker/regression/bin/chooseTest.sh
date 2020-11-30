@@ -53,7 +53,7 @@ case $YADAMU_TEST_NAME  in
   ;;
 
   cmdLine) 
-    source  $YADAMU_SCRIPT_DIR/runCmdTests.sh
+    source  $YADAMU_SCRIPT_DIR/runCmdLineTests.sh
   ;;
 
   interactive)

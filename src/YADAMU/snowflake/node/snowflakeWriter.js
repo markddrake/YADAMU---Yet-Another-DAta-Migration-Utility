@@ -57,7 +57,10 @@ class SnowflakeWriter extends YadamuWriter {
             if (typeof col === 'string') {
               let components = col.split('T')
               col = components.length === 1 ? components[0] : components[1]
-			  return col.split('Z')[0]
+			  col = col.split('Z')[0]
+			  col = col.split('+')[0]
+			  col = col.split('-')[0]
+			  return col
             }
             else {
               return col.getUTCHours() + ':' + col.getUTCMinutes() + ':' + col.getUTCSeconds() + '.' + col.getUTCMilliseconds();  

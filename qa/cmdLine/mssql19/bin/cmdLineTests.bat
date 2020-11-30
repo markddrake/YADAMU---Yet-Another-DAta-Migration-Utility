@@ -1,0 +1,1 @@
+@call %~dp0..\..\bin\cmdLineTests.bat %0

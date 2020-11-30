@@ -20,7 +20,7 @@ BEGIN
   
   if (P_SPATIAL_PRECISION = -18) then
     if (P_COORDINATE = 180.00000000000003) then
-	  -- Postgres Specific Fix.
+	 -- Postgres Specific Fix.
       set RESULT = 180.0;
 	else 
 	  set RESULT  = P_COORDINATE;
@@ -82,7 +82,7 @@ BEGIN
     return WKT;
   end if;
   
-  -- Iterative the component geograpjys and points for LINE, POLYGON, MULTIPOLYGON etc
+ -- Iterative the component geograpjys and points for LINE, POLYGON, MULTIPOLYGON etc
 
   if (ST_GeometryType(P_GEOMETRY) = 'POLYGON') then   
     SET WKT = concat(WKT,'(');
@@ -356,7 +356,7 @@ BEGIN
                         when data_type in ('blob', 'varbinary', 'binary') then
                           concat('hex("',column_name,'")') 
                         when data_type in ('set') then
-						  -- Set is stored as a JSON_ARRAY in the target...
+						 -- Set is stored as a JSON_ARRAY in the target...
                           concat('json_compact(concat(''["'',replace("',column_name,'",'','',''","''),''"]''))') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
                           case
@@ -379,7 +379,7 @@ BEGIN
                         when data_type in ('blob', 'varbinary', 'binary') then
                           concat('hex("',column_name,'")') 
                         when data_type in ('set') then
-						  -- Set is stored as a JSON_ARRAY in the target...
+						 -- Set is stored as a JSON_ARRAY in the target...
                           concat('json_compact("',column_name,'")') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
                           case
@@ -505,7 +505,7 @@ BEGIN
  
   CLOSE TABLE_METADATA;
   
-  -- Avoid Running out of OS Memory
+ -- Avoid Running out of OS Memory
   FLUSH TABLES;
 end;
 $$

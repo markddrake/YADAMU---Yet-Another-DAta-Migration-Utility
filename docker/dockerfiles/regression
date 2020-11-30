@@ -1,8 +1,10 @@
 FROM yadamu/base:latest
 WORKDIR /usr/src/YADAMU
 COPY qa/bin qa/bin
-COPY qa/regression qa/regression
 COPY qa/mappings qa/mappings
+COPY qa/regression qa/regression
+COPY qa/sql qa/sql
+COPY qa/cmdLine qa/cmdLine
 COPY docker/regression/bin bin
 COPY docker/regression/yadamuTestDefaults.json src/YADAMU/common/yadamuDefaults.json
 COPY docker/regression/tnsnames.ora .

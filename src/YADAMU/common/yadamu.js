@@ -20,7 +20,7 @@ const NullWriter = require('./nullWriter.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const {YadamuError, UserError, CommandLineError, ConfigurationFileError, DatabaseError} = require('./yadamuError.js');
-const {FileNotFound} = require('../file/node/fileError.js');
+const {FileNotFound, FileError} = require('../file/node/fileError.js');
 const YadamuRejectManager = require('./yadamuRejectManager.js');
 
 class Yadamu {
@@ -681,14 +681,20 @@ class Yadamu {
   }
   
   async uploadFile(dbi,importFilePath) {
-    const stats = fs.statSync(importFilePath)
-    const fileSizeInBytes = stats.size
+	let stack 
+	try {
+      stack = new Error().stack		
+      const stats = fs.statSync(importFilePath)
+      const fileSizeInBytes = stats.size    
 
-    const startTime = performance.now();
-    const json = await dbi.uploadFile(importFilePath);
-    const elapsedTime = performance.now() - startTime;
-    this.LOGGER.info([`${dbi.DATABASE_VENDOR}`,`UPLOAD`],`File "${importFilePath}". Size ${fileSizeInBytes}. Elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
-    return json;
+      const startTime = performance.now();
+      const json = await dbi.uploadFile(importFilePath);
+      const elapsedTime = performance.now() - startTime;
+      this.LOGGER.info([`${dbi.DATABASE_VENDOR}`,`UPLOAD`],`File "${importFilePath}". Size ${fileSizeInBytes}. Elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
+      return json;
+    } catch (err) {
+      throw err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath)
+	}
   }
    
   getMetrics(log) {

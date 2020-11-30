@@ -224,10 +224,14 @@ begin
           'datetimeoffset(7)'
         when @DATA_TYPE = 'TIMESTAMP_NTZ' then
           'datetimeoffset'
+        when @DATA_TYPE = 'TIMESTAMP_LTZ' and (@DATA_TYPE_LENGTH > 7) then
+          'datetime2(7)'
+        when @DATA_TYPE = 'TIMESTAMP_LTZ' then
+          'datetime2'
         when @DATA_TYPE = 'NUMBER' then
           'decimal'
         else 
-           lower(@DATA_TYPE)
+          lower(@DATA_TYPE)
       end
     else 
       lower(@DATA_TYPE)

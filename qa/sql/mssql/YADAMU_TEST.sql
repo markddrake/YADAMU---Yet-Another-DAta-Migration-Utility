@@ -29,7 +29,7 @@ begin
   
   if (@SPATIAL_PRECISION = -18) begin 
     if (@COORDINATE = 180.00000000000003) begin
-	  -- Postgres Specific Fix.
+	 -- Postgres Specific Fix.
       set @result = 180.0
 	end
 	else 
@@ -96,7 +96,7 @@ begin
     set @WKT = concat('POINT(',@LONG,' ',@LAT,' ',@Z,' ',@M,')')
     return @WKT   
   end;
-  -- Iterative the component geograpjys and points for LINE, POLYGON, MULTIPOLYGON etc
+ -- Iterative the component geograpjys and points for LINE, POLYGON, MULTIPOLYGON etc
   if @geography.InstanceOf('POLYGON') = 1 begin   
     set @WKT = 'POLYGON(';
     set @RING_NUMBER = 0;
@@ -192,7 +192,7 @@ begin
     set @POINT = geometry::STGeomFromText(concat('POINT(',@X,' ',@Y,' ',@Z,' ',@M,')'),0);      
     return @POINT.AsBinaryZM();
   end;
-  -- Iterative the component geometry and points
+ -- Iterative the component geometry and points
   return @geometry.AsBinaryZM();
 end
 --
@@ -467,7 +467,7 @@ begin
 	                  when cc."CONSTRAINT_NAME" is not NULL then 
 					     concat('master.dbo.sp_jsonCompact("',c.COLUMN_NAME,'") "',c.COLUMN_NAME,'"')
                       when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @DATE_TIME_PRECISION)) then
-                        -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@DATE_TIME_PRECISION,')) "',c.COLUMN_NAME,'"')
+                       -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@DATE_TIME_PRECISION,')) "',c.COLUMN_NAME,'"')
                         concat('convert(datetime2(',@DATE_TIME_PRECISION,'),convert(varchar(',@DATE_TIME_PRECISION+20,'),"',c.COLUMN_NAME,'"),126) "',c.COLUMN_NAME,'"')
                       when c.DATA_TYPE in ('varchar','nvarchar') then
                         case 
@@ -482,16 +482,16 @@ begin
                         case 
                           when @SPATIAL_PRECISION = 18 then
                             concat('"',c.COLUMN_NAME,'".AsBinaryZM() "',c.COLUMN_NAME,'"')
-                            -- concat('"',c.COLUMN_NAME,'".AsTextZM() "',c.COLUMN_NAME,'"')
+                           -- concat('"',c.COLUMN_NAME,'".AsTextZM() "',c.COLUMN_NAME,'"')
                           else
                             concat('master.dbo.sp_geographyAsBinaryZM("',c.COLUMN_NAME,'",',@SPATIAL_PRECISION,') "',c.COLUMN_NAME,'"')
                         end
                       when c.DATA_TYPE in ('geometry') then
-                        -- concat('CONVERT(varchar(max), "',c.COLUMN_NAME,'".AsBinaryZM(),2) "',c.COLUMN_NAME,'"')
+                       -- concat('CONVERT(varchar(max), "',c.COLUMN_NAME,'".AsBinaryZM(),2) "',c.COLUMN_NAME,'"')
                         case 
                           when @SPATIAL_PRECISION = 18 then
                             concat('"',c.COLUMN_NAME,'".AsBinaryZM() "',c.COLUMN_NAME,'"')
-                            -- concat('"',c.COLUMN_NAME,'".AsTextZM() "',c.COLUMN_NAME,'"')
+                           -- concat('"',c.COLUMN_NAME,'".AsTextZM() "',c.COLUMN_NAME,'"')
                           else
                             concat('master.dbo.sp_geometryAsBinaryZM("',c.COLUMN_NAME,'",',@SPATIAL_PRECISION,') "',c.COLUMN_NAME,'"')
                         end
@@ -562,13 +562,13 @@ begin
     begin try 
       set @SOURCE_COUNT = -1;
       set @SQL_STATEMENT = concat('select @SOURCE_COUNT = count(*) from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"')
-	  -- select @SQL_STATEMENT
+	 -- select @SQL_STATEMENT
       
 	  exec sp_executesql @SQL_STATEMENT,N'@SOURCE_COUNT bigint OUTPUT', @SOURCE_COUNT OUTPUT
         
       set @TARGET_COUNT = -1;
       set @SQL_STATEMENT = concat('select @TARGET_COUNT = count(*) from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"')
-	  -- select @SQL_STATEMENT
+	 -- select @SQL_STATEMENT
 	  
       exec sp_executesql @SQL_STATEMENT,N'@TARGET_COUNT bigint OUTPUT', @TARGET_COUNT OUTPUT
       
@@ -577,12 +577,12 @@ begin
 		truncate table #TARGET_HASH_BUCKET;
         
         set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #SOURCE_HASH_BUCKET from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
-        -- select @SQL_STATEMENT
+       -- select @SQL_STATEMENT
 
         exec(@SQL_STATEMENT);
 
  		set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #TARGET_HASH_BUCKET from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
-        -- select @SQL_STATEMENT
+       -- select @SQL_STATEMENT
 
         exec(@SQL_STATEMENT);
         
@@ -613,27 +613,27 @@ begin
                                     ')',
                                     'select ''',@SOURCE_DATABASE,''' "SOURCE_DATABASE",''',@SOURCE_SCHEMA,''' "SOURCE_SCHEMA",''',@TARGET_DATABASE,'''"TARGET_DATABASE",''',@TARGET_SCHEMA,'''"TARGET_SCHEMA",''',@TABLE_NAME,'''"TABLE_NAME",',
                                                 @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ')   
-        -- select @SQL_STATEMENT
+       -- select @SQL_STATEMENT
 
         insert into @SCHEMA_COMPARE_RESULTS                  
         exec (@SQL_STATEMENT)
       end                                  
     end try
     begin catch
-      -- This should not happend but it does.. 
+     -- This should not happend but it does.. 
       if (ERROR_NUMBER() = 41317) begin
         begin try 
-          -- A user transaction that accesses memory optimized tables or natively compiled modules cannot access more than one user database or databases model and msdb, and it cannot write to master
+         -- A user transaction that accesses memory optimized tables or natively compiled modules cannot access more than one user database or databases model and msdb, and it cannot write to master
     	  truncate table #SOURCE_HASH_BUCKET;
 		  truncate table #TARGET_HASH_BUCKET;
         
           set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #SOURCE_HASH_BUCKET from "',@SOURCE_DATABASE,'"."',@SOURCE_SCHEMA,'"."',@TABLE_NAME,'"');
-          -- select @SQL_STATEMENT
+         -- select @SQL_STATEMENT
           
 		  exec(@SQL_STATEMENT);
 
  		  set @SQL_STATEMENT = concat('select HASHBYTES(''SHA2_256'',cast((select ',@COLUMN_LIST,' for JSON PATH, INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER ) as nvarchar(max))) HASH into #TARGET_HASH_BUCKET from "',@TARGET_DATABASE,'"."',@TARGET_SCHEMA,'"."',@TABLE_NAME,'"');
-          -- select @SQL_STATEMENT
+         -- select @SQL_STATEMENT
         
 		  exec(@SQL_STATEMENT);
         
@@ -666,12 +666,12 @@ begin
 	-- Probably Overkill: Workaround for 
 	--
 	-- 2019-10-14 06:17:11.47 spid22s     AppDomain 10 (master.sys[runtime].9) is marked for unload due to memory pressure.
-    -- 2019-10-14 06:17:12.42 spid22s     AppDomain 10 (master.sys[runtime].9) unloaded.
-    --
+   -- 2019-10-14 06:17:12.42 spid22s     AppDomain 10 (master.sys[runtime].9) unloaded.
+   --
 	-- When comparing rows containing complex spatial data.
 	--
 	
-    -- DBCC FREESYSTEMCACHE ('ALL') WITH NO_INFOMSGS
+   -- DBCC FREESYSTEMCACHE ('ALL') WITH NO_INFOMSGS
 	-- DBCC FREESESSIONCACHE WITH NO_INFOMSGS
 	-- DBCC FREEPROCCACHE WITH NO_INFOMSGS
 	

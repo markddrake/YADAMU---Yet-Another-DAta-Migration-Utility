@@ -29,6 +29,7 @@ const PostgresParser = require('./postgresParser.js');
 const PostgresWriter = require('./postgresWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const PostgresStatementLibrary = require('./postgresStatementLibrary.js');
+const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileError.js');
 
 class PostgresDBI extends YadamuDBI {
     
@@ -420,7 +421,7 @@ class PostgresDBI extends YadamuDBI {
 
     const inputStream = await new Promise((resolve,reject) => {
       const inputStream = fs.createReadStream(importFilePath);
-      inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err)})
+      inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
     })
     const outputStream = await this.executeSQL(CopyFrom(copyStatement));    
     const startTime = performance.now();

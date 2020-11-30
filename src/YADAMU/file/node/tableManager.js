@@ -4,15 +4,21 @@ const Transform = require('stream').Transform
 const pipeline = require('stream').pipeline;
 const { performance } = require('perf_hooks');
 
+const YadamuLibrary = require('../../common/yadamuLibrary.js')
+
 class TableManager extends Transform {
 
-  constructor(readerDBI,writerDBI,schemaInfo,tableIdx,yadamuLogger,inputTimings,currentPipeline) {
+  constructor(readerDBI,writerDBI,schemaInfo,tableIdx,yadamuLogger,inputTimings,currentPipeline,listenerList) {
     super({objectMode: false})
 	this.schemaInfo = schemaInfo
 	this.readerDBI = readerDBI
 	this.writerDBI = writerDBI
 	this.yadamuLogger = yadamuLogger;
-	
+	this.listenerList = listenerList
+	if (YadamuLibrary.isEmpty(this.listenerList)) {
+	  writerDBI.PIPELINE_ENTRY_POINT.eventNames().forEach((en) => {this.listenerList[en] = writerDBI.PIPELINE_ENTRY_POINT.rawListeners(en)})
+	}
+		
 	// All streams must close for the pipeline to complete and resolve.
 	// When a table finishes create the input streams required to process the next table. 
     // If there are not more tables use the stream that geneerates the '}}' characters required to ensure a valid JSON document.
@@ -21,6 +27,12 @@ class TableManager extends Transform {
 	// Create a new pipeline operation that pipes the next set of input streams into the existing output stream.
 	
     this.on('end', async () => {
+      // Reset the Listeners on the Output Stream
+	  Object.keys(listenerList).forEach((en) => {
+	    writerDBI.PIPELINE_ENTRY_POINT.removeAllListeners(en)
+		this.listenerList[en].forEach((l) => { writerDBI.PIPELINE_ENTRY_POINT.addListener(en,l)})
+	  })
+
       const nexttStep = (tableIdx < this.schemaInfo.length) ? await this.constructPipline(tableIdx) : [writerDBI.END_EXPORT_FILE]
       inputTimings.pipeEndTime = performance.now();
 	  this.unpipe()
@@ -57,7 +69,7 @@ class TableManager extends Transform {
 	components.push(outputStream);
 	idx++
 	const currentPipeline = [...components]
-    const tableManager = new TableManager(this.readerDBI,this.writerDBI,this.schemaInfo,idx,this.yadamuLogger,this.readerDBI.INPUT_METRICS,currentPipeline)		
+    const tableManager = new TableManager(this.readerDBI,this.writerDBI,this.schemaInfo,idx,this.yadamuLogger,this.readerDBI.INPUT_METRICS,currentPipeline,this.listenerList)		
 	components.push(tableManager);
 	return components;
   }

@@ -1,5 +1,5 @@
-@set DB_USER=root
-@set DB_PWD=oracle
-@set DB_HOST=%MARIADB_HOST%
-@set DB_PORT=3307
-@set DB_DBNAME=mysql
+@if defined MARIADB_USER (set DB_USER=%MARIADB_USER%) else (set DB_USER=root)
+@if defined MARIADB_PWD (set DB_PWD=%MARIADB_PWD%) else (set DB_PWD=oracle)
+@if defined MARIADB_HOST (set DB_HOST=%MARIADB_HOST%) else (set DB_HOST=localhost)
+@if defined MARIADB_PORT (set DB_PORT=%MARIADB_PORT%) else (set DB_PORT=3306)
+@if defined MARIADB_DBNAME (set DB_DBNAME=%MARIADB_DBNAME%) else (set DB_DBNAME=mysql)

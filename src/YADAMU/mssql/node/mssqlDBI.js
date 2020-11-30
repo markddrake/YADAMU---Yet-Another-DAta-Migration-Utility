@@ -1045,6 +1045,7 @@ class MsSQLDBI extends YadamuDBI {
     const request = this.getRequest();
 	// request.query(this.sqlStatement);
     // return request
+	this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT));
     return new MsSQLReader(request,tableInfo.SQL_STATEMENT);
   }      
 

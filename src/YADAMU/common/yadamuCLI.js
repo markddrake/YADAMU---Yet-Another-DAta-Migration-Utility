@@ -38,7 +38,7 @@ const {FileNotFound} = require('../file/node/fileError.js');
 ** The INIT command line switch is only valid with the Elecron app.
 ** The values supplied using the command line switch is the path to the file to be processed
 ** Command Line Switches are not valid when using the Import, Export, Upload, Copy and Test clases.
-** THe Command line argument file must be specified when using the Import, Export, Upload Copy and Test classes.
+** The Command line argument file must be specified when using the Import, Export, Upload Copy and Test classes.
 ** 
 ** IMPORT, UPLOAD, COPY, TEST and INIT operaitons require that the file exists
 ** EXPORT operations require that the file does not exists unless the command line argument OVERWRITE=YES is specified
@@ -183,7 +183,7 @@ class YadamuCLI {
 	}
     catch (e) {
 	  if (e.code && e.code === 'ENOENT') {
-        const err = new CommandLineError(`File not found ["${targetFile}"]. THe path specified for the ${argumentName} argument must resolve to existing file.`)
+        const err = new CommandLineError(`File not found ["${targetFile}"]. The path specified for the ${argumentName} argument must resolve to existing file.`)
 	    throw err
 	  }
       throw e;

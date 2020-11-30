@@ -12,7 +12,7 @@ const DBIConstants = require('../../common/dbiConstants.js');
 const JSONParser = require('./jsonParser.js');
 const EventStream = require('./eventStream.js');
 const JSONWriter = require('./jsonWriter.js');
-const {FileError, FileNotFound} = require('./fileError.js');
+const {FileError, FileNotFound, DirectoryNotFound} = require('./fileError.js');
 
 const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
 
@@ -163,7 +163,11 @@ class FileDBI extends YadamuDBI {
 	// For FileDBI Import is Writing data to the file system.
     // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
 	super.initializeImport()
-	this.outputStream = fs.createWriteStream(this.exportFilePath,{flags :"w"})
+    await new Promise((resolve,reject) => {
+      this.outputStream = fs.createWriteStream(this.exportFilePath,{flags :"w"})
+	  const stack = new Error().stack
+      this.outputStream.on('open',() => {resolve()}).on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(err,stack,this.exportFilePath) : new FileError(err,stack,this.exportFilePath) )})
+	})
     this.yadamuLogger.info([this.DATABASE_VENDOR],`Data written to "${this.exportFilePath}".`)
   }
   

@@ -1,3 +1,4 @@
+set termout off
 set echo on
 def LOGDIR = "&1"
 --

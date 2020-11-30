@@ -1,4 +1,4 @@
 --
-source sql/SCHEMA_COMPARE.sql
+source qa/sql/mysql/SCHEMA_COMPARE.sql
 --
 quit

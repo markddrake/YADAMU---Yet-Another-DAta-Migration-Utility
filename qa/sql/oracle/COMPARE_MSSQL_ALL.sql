@@ -1,3 +1,4 @@
+set termout off
 set echo off
 set feedback off
 set heading off

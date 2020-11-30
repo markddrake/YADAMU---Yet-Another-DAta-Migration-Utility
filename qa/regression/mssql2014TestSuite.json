@@ -90,7 +90,7 @@
   },{
     "source"            : "mssql14"
   , "targets": [
-	  "mssql14","oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","mssql14","postges#1","mysql#1","mariadb#1","mongodb#1"
+	  "mssql14","oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","mssql14","postgres#1","mysql#1","mariadb#1","mongodb#1"
     ]
   , "tasks": [ 
       "oracle","mysql","mssql"

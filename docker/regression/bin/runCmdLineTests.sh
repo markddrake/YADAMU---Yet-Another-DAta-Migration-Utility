@@ -1,0 +1,1 @@
+source qa/cmdLine/bin/runTests.sh docker

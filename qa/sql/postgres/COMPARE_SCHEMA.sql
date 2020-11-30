@@ -1,6 +1,6 @@
 --
 \set ECHO errors
 --
-\include sql/SCHEMA_COMPARE.sql
+\include qa/sql/postgres/SCHEMA_COMPARE.sql
 --
 \quit

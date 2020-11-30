@@ -287,9 +287,11 @@ class DBReader extends Readable {
   }
   	
   async pipelineTablesToFile(readerDBI,writerDBI) {
+	
 
     try {
-      const tableManager = new TableManager(readerDBI,writerDBI,this.schemaInfo,0,this.yadamuLogger,readerDBI.INPUT_METRICS,[])
+  	  await this.dbWriter.ddlComplete
+  	  const tableManager = new TableManager(readerDBI,writerDBI,this.schemaInfo,0,this.yadamuLogger,readerDBI.INPUT_METRICS,[],{})
       this.yadamuLogger.info(['RECURSIVE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`Processing Tables`);
 	  const yadamuPipeline = await tableManager.constructPipline(0);
 	  yadamuPipeline.push(writerDBI.PIPELINE_ENTRY_POINT)

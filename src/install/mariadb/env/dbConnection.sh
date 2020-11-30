@@ -1,5 +1,5 @@
-export DB_USER=root
-export DB_PWD=oracle
-export DB_HOST=$MARIADB_HOST
-export DB_PORT=3307
-export DB_DBNAME=mysql
+export DB_USER="${MARIADB_USER:-root}"
+export DB_PWD="${MARIADB_PWD:-oracle}"
+export DB_HOST="${MARIADB_HOST:-localhost}"
+export DB_PORT="${MARIADB_PORT:-3306}"
+export DB_DBNAME="${MARIADB_DBNAME:-mysql}"

@@ -1,5 +1,5 @@
-export DB_USER=root
-export DB_PWD=oracle
-export DB_HOST=$MYSQL_HOST
-export DB_PORT=3306
-export DB_DBNAME=sys
+export DB_USER="${MYSQL_USER:-root}"
+export DB_PWD="${MYSQL_PWD:-oracle}"
+export DB_HOST="${MYSQL_HOST:-localhost}"
+export DB_PORT="${MYSQL_PORT:-3306}"
+export DB_DBNAME="${MYSQL_DBNAME:-sys}"

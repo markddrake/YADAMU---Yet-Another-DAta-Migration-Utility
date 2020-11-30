@@ -87,14 +87,38 @@
   },{
     "source"          : "loader#1"
   , "targets": [
-	  "oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+	  "oracle19c","oracle18c","oracle12c","oracle11g"
 	  
     ]
   , "parameters": {
       "ROOT_FOLDER"  : "loader"
 	}
   , "tasks": [ 
-      "oracle","mysql","mssql"
+      "oracle"
+	]
+  },{
+    "source"          : "loader#1"
+  , "targets": [
+	   "mssql17","mssql19"
+	  
+    ]
+  , "parameters": {
+      "ROOT_FOLDER"  : "loader"
+	}
+  , "tasks": [ 
+      "mssql"
+	]
+  },{
+    "source"          : "loader#1"
+  , "targets": [
+	  "mysql#1","mariadb#1"
+	  
+    ]
+  , "parameters": {
+      "ROOT_FOLDER"  : "loader"
+	}
+  , "tasks": [ 
+      "mysql"
 	]
   },{
     "source"          : "mssql19"

@@ -1,4 +1,5 @@
 FROM yadamu/environment:latest
 WORKDIR /usr/src/YADAMU
 COPY src src
+COPY bin bin
 RUN mkdir mnt 

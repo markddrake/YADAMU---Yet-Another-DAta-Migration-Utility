@@ -749,11 +749,12 @@ as
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
   cursor getDDLStatements is
-  select DDL_STATEMENT
+  select STATEMENT_NUMBER, DDL_STATEMENT
     from JSON_TABLE(
            P_DDL_STATEMENTS,
            '$.ddl[*]'
            columns(
+             STATEMENT_NUMBER              FOR ORDINALITY,
              $IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
              DDL_STATEMENT            CLOB PATH '$'
              $ELSIF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
@@ -767,11 +768,12 @@ $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 $ELSE
 --
   cursor getDDLStatements is
-  select DDL_STATEMENT
+  select STATEMENT_NUMBER, DDL_STATEMENT
     from XMLTABLE(
            '/ddlStatements/ddl'
            passing XMLTYPE(P_DDL_STATEMENTS,nls_charset_id('AL32UTF8'))
            columns
+		     STATEMENT_NUMBER              FOR ORDINALITY,
              DDL_STATEMENT            CLOB PATH 'text()'
          );
 --
@@ -794,7 +796,9 @@ begin
   --
   for s in getDDLStatements loop
     exit when G_ABORT_PROCESSING;
+	continue when ((s.STATEMENT_NUMBER = 1 ) and (s.DDL_STATEMENT like '{"jsonColumns":%}'));
     V_DDL_STATEMENT := s.DDL_STATEMENT;
+	-- Skip a json_columns object 
     V_ABORT_DDL_OPERATIONS := APPLY_DDL_STATEMENT(V_DDL_STATEMENT,P_SOURCE_SCHEMA,P_TARGET_SCHEMA);
   end loop;
   SET_CURRENT_SCHEMA(V_CURRENT_SCHEMA);

@@ -3,7 +3,7 @@ select :'SCHEMA' || :'ID' "SCHEMA" \gset
 --
 \echo :SCHEMA
 --
-drop schema :"SCHEMA" cascade;
+drop schema if exists :"SCHEMA" cascade;
 --
 create schema :"SCHEMA";
 --

@@ -14,7 +14,14 @@ class FileNotFound extends FileError {
   }
 }
 
+class DirectoryNotFound extends FileError {
+  constructor(cause,stack,path) {
+    super(cause,stack,path);
+  }
+}
+
 module.exports = {
   FileError
 , FileNotFound
+, DirectoryNotFound
 }

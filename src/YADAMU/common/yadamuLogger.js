@@ -110,15 +110,18 @@ class YadamuLogger {
   }
    
   static fileLogger(logFilePath,state,exceptionFolder,exceptionFilePrefix) {
-    const os = ((logFilePath === undefined) || (logFilePath === '') || (logFilePath === null)) ? process.stdout : (() => {
+	if ((logFilePath === undefined) || (logFilePath === '') || (logFilePath === null)) {
+	  console.log(`${new Date().toISOString()}[YADAMU][LOGGER]: Invalid value supplied for parameter LOG_FILE (${logFilePath}). Logging to console`); 
+      return this.consoleLogger(state,exceptionFolder,exceptionFilePrefix)
+	} 
+    const absolutePath = path.resolve(logFilePath);	
     try {
-      const absolutePath = path.resolve(logFilePath);
-      return fs.createWriteStream(this.parameters.LOG_FILE,{flags : "a"})
+      const os = fs.createWriteStream(absolutePath,{flags : "a"})
+      return new YadamuLogger(os,state,exceptionFolder,exceptionFilePrefix)
     } catch (e) {
-      return process.out;
+	  console.log(`${new Date().toISOString()}[YADAMU][LOGGER]: Unable to create log file "${absolutePath}". Logging to console`); 
+      return this.console.Logger(state,exceptionFolder,exceptionFilePrefix)
     }
-    })();   
-    return new YadamuLogger(os,state,exceptionFolder,exceptionFilePrefix)
   }
   
   static consoleLogger(state,exceptionFolder,exceptionFilePrefix) {
@@ -127,7 +130,7 @@ class YadamuLogger {
   
   constructor(outputStream,state,exceptionFolder,exceptionFilePrefix) {
    
-    this.os = outputStream;
+    this.os = outputStream !== undefined ? outputStream : process.out
     this.state = state;
     this.EXCEPTION_FOLDER_PATH = exceptionFolder
     this.EXCEPTION_FILE_PREFIX = exceptionFilePrefix
@@ -143,7 +146,9 @@ class YadamuLogger {
   }
   
   switchOutputStream(os) {
-    this.os = os;
+	if (this.os !== undefined) {
+      this.os = os;
+	}
   }
   
   write(msg) {
@@ -155,12 +160,27 @@ class YadamuLogger {
   }
 
   logNoTimestamp(args,msg) {
-    this.os.write(`${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+	try {
+      this.os.write(`${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+	} catch (e) {
+	  if (e.message === `TypeError: Cannot read property 'write' of undefined`) {
+        this.os = process.out
+        this.os.write(`${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+	  }
+	}
   }
   
   log(args,msg) {
+
     const ts = new Date().toISOString()
-    this.os.write(`${ts} ${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+    try {
+      this.os.write(`${ts} ${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+	} catch (e) {
+	  if (e.message === `TypeError: Cannot read property 'write' of undefined`) {
+        this.os = process.out
+	    this.os.write(`${ts} ${args.map((arg) => { return '[' + arg + ']'}).join('')}: ${msg}\n`)
+	  }
+	}    
     return ts
   }
   

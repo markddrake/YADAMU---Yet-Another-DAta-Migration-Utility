@@ -33,6 +33,7 @@ const OracleParser = require('./oracleParser.js');
 const OracleWriter = require('./oracleWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const OracleStatementLibrary = require('./oracleStatementLibrary.js');
+const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileError.js');
 
 class OracleDBI extends YadamuDBI {
 
@@ -918,7 +919,7 @@ class OracleDBI extends YadamuDBI {
 	   
        const inputStream = await new Promise((resolve,reject) => {
          const inputStream = fs.createReadStream(importFilePath);
-         inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err)})
+         inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
        })
       
 	   const multiplexor = new PassThrough();
@@ -951,8 +952,8 @@ class OracleDBI extends YadamuDBI {
     ** If the ddl array is populdated DDL operations have to be executed from the client.
     **
     */
-
-    let settings = '';
+	
+	let settings = '';
     switch (this.MODE) {
 	   case 'DDL_AND_DATA':
          if (this.ddl.length > 0) {
@@ -978,7 +979,6 @@ class OracleDBI extends YadamuDBI {
          }
 	     break;
     }	 
-	 
 	const sqlStatement = `begin\n  ${settings}\n  :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema, :JSON_STORAGE_MODEL, :XML_STORAGE_MODEL);\nend;`;
 	const results = await this.executeSQL(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH}, json:hndl, schema:this.parameters.TO_USER, JSON_STORAGE_MODEL: this.JSON_STORAGE_MODEL, XML_STORAGE_MODEL: this.XML_STORAGE_CLAUSE})
     return this.processLog(results,'JSON_TABLE');  
@@ -1275,21 +1275,17 @@ class DDLCache extends Transform {
       switch (Object.keys(obj)[0]) {
 		case 'systemInformation':
           this.systemInformation = obj.systemInformation
-          callback();
           break;
         case 'ddl':
           this.ddl = obj.ddl;
-		  this.passThrough.unpipe(this.jsonParser);
-		  this.jsonParser.destroy()
-		  callback();
         case 'metadata':
 		case 'table':
 		default:
 		  this.passThrough.unpipe(this.jsonParser);
 		  this.jsonParser.destroy()
-		  callback();
           break;
       }
+      callback();
     } catch (e) {
       this.yadamuLogger.logException([`${this.constructor.name}._transform()`],e);
       callback(e);

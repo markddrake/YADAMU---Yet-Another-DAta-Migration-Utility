@@ -69,7 +69,7 @@ class MsSQLStatementLibrary extends DefaultStatmentLibrary {
                                    when "DATA_TYPE" = 'datetimeoffset' then
                                      concat('convert(VARCHAR(33),"',c."COLUMN_NAME",'",127) "',c."COLUMN_NAME",'"') 
                                    when "DATA_TYPE" = 'xml' then
-                                     concat('replace(replace(convert(NVARCHAR(MAX),"',c."COLUMN_NAME",'"),''&#x0A;'',''''),''&#x20;'','' '') "',c."COLUMN_NAME",'"') 
+                                                     concat('replace(replace(convert(NVARCHAR(MAX),"',c."COLUMN_NAME",'"),concat(char(38),''#x0A;''),''\n''),concat(char(38),''#x20;''),'' '') "',c."COLUMN_NAME",'"') 
                                    else 
                                     concat('"',c."COLUMN_NAME",'"') 
                                 end

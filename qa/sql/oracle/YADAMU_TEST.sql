@@ -117,7 +117,7 @@ as
   V_ORDERING_CLAUSE   VARCHAR2(16) := '';
 
   
-  -- Compensate for Snowflake's XML Fidelity issues, including alphabetical ordering of attributes and removal of trailing whitespace on text nodes.
+ -- Compensate for Snowflake's XML Fidelity issues, including alphabetical ordering of attributes and removal of trailing whitespace on text nodes.
   
   V_SNOWFLAKE_XSL XMLTYPE := XMLTYPE(
 '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
@@ -172,7 +172,7 @@ as
 		     when (atc.DATA_TYPE = 'SDO_GEOMETRY') then
                'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.TO_WKBGEOMETRY(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
              when atc.DATA_TYPE = 'XMLTYPE' then
-    		   -- 'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || atc.COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+    		  -- 'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || atc.COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 			   case 
 			     when (P_STYLESHEET is null) then
      		       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || atc.COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
@@ -195,16 +195,16 @@ as
 			 -- 11.x  and 12.1 do not satisfy JSON_PARSING_SUPPORTED. 
 			 --
 		     when atc.DATA_TYPE = 'JSON' then
-               -- Oracle20c and Later
+              -- Oracle20c and Later
 	           'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || atc.COLUMN_NAME || '" returning BLOB ' || V_ORDERING_CLAUSE || '),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
   		     when jc.FORMAT is not NULL then
-			   -- JSON column of type VARCHAR, CLOB or BLOB
+			  -- JSON column of type VARCHAR, CLOB or BLOB
     	       $IF DBMS_DB_VERSION.VER_LE_12_2 $THEN
-      	       --
-		       -- Ordering is not supported in 12.2 x as ORDERING may cause 3113 if any document in the table exceeds 8K
-			   -- Cannot reliably order docments < 8K as JSON formatting may change the size of the source and target documents.
-			   -- Use JSON_COMPACT to remove insignifcant whitespace and compare results.
-			   --
+      	      --
+		      -- Ordering is not supported in 12.2 x as ORDERING may cause 3113 if any document in the table exceeds 8K
+			  -- Cannot reliably order docments < 8K as JSON formatting may change the size of the source and target documents.
+			  -- Use JSON_COMPACT to remove insignifcant whitespace and compare results.
+			  --
                'case ' || 
                '  when t."' || atc.COLUMN_NAME || '" is NULL then ' || 
                '    NULL ' || 
@@ -216,15 +216,15 @@ as
 				 '    dbms_crypto.HASH(YADAMU_TEST.JSON_COMPACT(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end /* JSON 12C CLOB/VARCHAR2 NO ORDERING */ "'
 		       end  || atc.COLUMN_NAME || '"'
                $ELSIF DBMS_DB_VERSION.VER_LE_18 $THEN
-               --				   
-			   -- Order and convert to BLOB using JSON_QUERY. Ordering disabled in Oracle 18c
-               -- 
+              --				   
+			  -- Order and convert to BLOB using JSON_QUERY. Ordering disabled in Oracle 18c
+              -- 
 			   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning BLOB),' || V_HASH_METHOD || ') end /* JSON 18C NO ORDERING */ "' || atc.COLUMN_NAME || '"'
-			   --
+			  --
 			   $ELSE /* 19c */
-			   -- Order and convert to BLOB using JSON_SERIALIZE
+			  -- Order and convert to BLOB using JSON_SERIALIZE
 	           'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || atc.COLUMN_NAME || '" returning BLOB  ' || V_ORDERING_CLAUSE || '),' || V_HASH_METHOD || ') end /* JSON 19C ORDERED */"' || atc.COLUMN_NAME || '"'
-			   --
+			  --
 			   $END
 			 --
 			 $END
@@ -315,20 +315,20 @@ begin
     V_ORDERING_CLAUSE := 'ORDERED';
   end if;
 
-  -- Use EXECUTE IMMEDIATE to get the HASH Method Code so we do not get a compile error if accesss has not been granted to DBMS_CRYPTO
+ -- Use EXECUTE IMMEDIATE to get the HASH Method Code so we do not get a compile error if accesss has not been granted to DBMS_CRYPTO
 
   begin
-    --
+   --
     $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
-    --
+   --
     execute immediate 'begin :1 := DBMS_CRYPTO.HASH_SH256; end;'  using OUT V_HASH_METHOD;
-    --
+   --
     $ELSE
-    --
+   --
     execute immediate 'begin :1 := DBMS_CRYPTO.HASH_MD5; end;'  using OUT  V_HASH_METHOD;
-    --
+   --
     $END
-    --
+   --
   exception
     when OTHERS then
       V_HASH_METHOD := -1;
@@ -349,7 +349,7 @@ begin
     if ((V_HASH_METHOD < 0) and (t.LOB_COLUMN_LIST is not NULL)) then
       V_SQLERRM := '''Warning : Package DBMS_CRYPTO is required to compare the following columns: ' || t.LOB_COLUMN_LIST || '.''';
     else
-      -- Not a TYPO: NULL is a string in this case.
+     -- Not a TYPO: NULL is a string in this case.
       V_SQLERRM := 'NULL';
     end if;
 	
@@ -405,7 +405,7 @@ begin
           when others then
             V_SQLERRM := SQLERRM;            
             $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
-            -- Check if the ORA-xxxxx message appears twice in SQLERRM.
+           -- Check if the ORA-xxxxx message appears twice in SQLERRM.
             if (INSTR(SUBSTR(V_SQLERRM,11),SUBSTR(V_SQLERRM,1,10)) > 0) then
               V_SQLERRM := SUBSTR(V_SQLERRM,1,INSTR(SUBSTR(V_SQLERRM,11),SUBSTR(V_SQLERRM,1,10))+8);         
             end if;

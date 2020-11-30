@@ -1,3 +1,4 @@
+set termout off
 set echo on
 --
 select '' "1", '' "2", '' "3"  from dual where rownum = 0
@@ -55,17 +56,17 @@ drop user "WWI_Warehouse&ID" cascade
 /
 grant connect, resource, unlimited tablespace to "WWI_Warehouse&ID" identified by oracle
 /
-drop user "WWI_DW_Dimension&ID" cascade
+drop user "WWI_Dimension&ID" cascade
 /
-grant connect, resource, unlimited tablespace to "WWI_DW_Dimension&ID" identified by oracle
+grant connect, resource, unlimited tablespace to "WWI_Dimension&ID" identified by oracle
 /
-drop user "WWI_DW_Fact&ID" cascade
+drop user "WWI_Fact&ID" cascade
 /
-grant connect, resource, unlimited tablespace to "WWI_DW_Fact&ID" identified by oracle
+grant connect, resource, unlimited tablespace to "WWI_Fact&ID" identified by oracle
 /
-drop user "WWI_DW_Integration&ID" cascade
+drop user "WWI_Integration&ID" cascade
 /
-grant connect, resource, unlimited tablespace to "WWI_DW_Integration&ID" identified by oracle
+grant connect, resource, unlimited tablespace to "WWI_Integration&ID" identified by oracle
 /
 
 quit

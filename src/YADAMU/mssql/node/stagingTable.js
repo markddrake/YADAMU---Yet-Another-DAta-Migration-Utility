@@ -6,6 +6,7 @@ const { performance } = require('perf_hooks');
 const sql = require('mssql');
 
 const DBFileLoader = require('./dbFileLoader');
+const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileError.js')
 
 class StagingTable {
 
@@ -35,7 +36,7 @@ class StagingTable {
 	
     const inputStream = await new Promise((resolve,reject) => {
       const inputStream = fs.createReadStream(this.filePath);
-      inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err)})
+      inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
     })
 
     const loader = new DBFileLoader(this.dbi,this.status);
