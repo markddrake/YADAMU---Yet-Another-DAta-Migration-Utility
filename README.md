@@ -11,12 +11,10 @@ For homogeneous Postgres, MySQL and SQL Server migrations, or hetrogeneous migra
 
 Supported Databases :
 * Oracle 11.2.x and later
-* Microsoft SQL Server 2017 and later
+* Microsoft SQL Server 2014 and later
 * Postgres 11 and later
 * MySQL 8.0.12 and later
 * MariaDB 5.5 and later
-
-Experimenal support is available for
 * MongoDB 4.0 and later
 * Snowflake Data Warehouse
 
