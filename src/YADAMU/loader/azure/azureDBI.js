@@ -56,6 +56,11 @@ class AzureDBI extends CloudDBI {
     return JSON.parse(fileContents.toString())
   }
   
+  async finalize() {
+	await Promise.all(this.cloudService.writeOperations);
+	super.finalize()
+  }
+  
   classFactory(yadamu) {
 	return new AzureDBI(yadamu)
   }
@@ -63,3 +68,4 @@ class AzureDBI extends CloudDBI {
 }
 
 module.exports = AzureDBI
+ 

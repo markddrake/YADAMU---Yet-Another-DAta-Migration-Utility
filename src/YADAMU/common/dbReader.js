@@ -227,7 +227,6 @@ class DBReader extends Readable {
 		e = tableOutputStream.underlyingError
 	  }
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
-      this.yadamuLogger.handleException(['PIPELINE',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],e)
 
       cause = e
 	  stream = 'WRITER'
@@ -243,22 +242,30 @@ class DBReader extends Readable {
         stream = 'READER'
     	errorDBI = readerDBI
         cause = readerDBI.streamingError(e,tableInfo.SQL_STATEMENT)
+		// Ensure original error is processed before attempting reconection.
         this.yadamuLogger.handleException(['PIPELINE','STREAM READER',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
         if ((YadamuConstants.CONTINUE_PROCESSING.includes(readerDBI.yadamu.ON_ERROR))  && cause.lostConnection()) {
           // Re-establish the input stream connection 
    		  await readerDBI.reconnect(cause,'READER')
         }
       }		
+	  else {		  
+        this.yadamuLogger.handleException(['PIPELINE','STREAM READER',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
+	  }
+	  
       // ABORT processing of the current table if ON_ERROR handling is ABORT or SKIP 
       if (YadamuConstants.ABORT_CURRENT_TABLE.includes(writerDBI.yadamu.ON_ERROR)) {
 		tableOutputStream.abortTable();
       } 
+	  
 	  // ABORT processing of all tables if the ddl phase did not complete successfully
 	  // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'WAITING')
 	  await this.dbWriter.ddlComplete
       // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'PROCESSING')
+	
 	  // Clean up the current table. Among other things this will flush any pending records. Note if abortTable() has been called there are no pending records but there is still housekeeping required
 	  await tableOutputStream.forcedEnd();
+	  
 	  // Throw the error if ON_ERROR handling is ABORT
       if (YadamuConstants.CONTINUE_PROCESSING.includes(errorDBI.yadamu.ON_ERROR)) {
 		return copyComplete

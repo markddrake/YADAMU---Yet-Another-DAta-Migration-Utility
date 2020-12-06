@@ -4,19 +4,19 @@ const Stream = require('stream');
 const util = require('util')
 const pipeline = util.promisify(Stream.pipeline);
 
-const Transform = require('stream').Transform
+// const Transform = require('stream').Transform
 const PassThrough = require('stream').PassThrough;
-const StringWriter = require('../../common/StringWriter.js');
+const StringWriter = require('../../common/stringWriter.js');
 const AzureConstants = require('./azureConstants.js');
 const AzureError = require('./azureError.js')
 
-class AzureStorageService extends Transform{
+class AzureStorageService {
 
   get CHUNK_SIZE()     { return this.parameters.CHUNK_SIZE  || AzureConstants.CHUNK_SIZE }  
   get CONTAINER() { return this._CONTAINER }
   
   constructor(blobServiceClient,container,parameters,yadamuLogger) {
-	super()
+	// super()
     this.blobServiceClient = blobServiceClient
 	this._CONTAINER = container
 	this.parameters = parameters || {}
@@ -25,23 +25,37 @@ class AzureStorageService extends Transform{
 	this.containerClient = blobServiceClient.getContainerClient(this.CONTAINER);
 	this.buffer = Buffer.allocUnsafe(this.CHUNK_SIZE);
 	this.offset = 0;
+	this.writeOperations = []
   }
   
   createWriteStream(key) {
 	// this.yadamuLogger.trace([this.constructor.name],`createWriteStream(${key})`)
 	const passThrough = new PassThrough();
+	// passThrough.on('finish',()=>{console.log('PassThrough.on(finish)')})
     const blockBlobClient = this.containerClient.getBlockBlobClient(key);
-	blockBlobClient.uploadStream(passThrough);
+	this.writeOperations.push(blockBlobClient.uploadStream(passThrough));
     return passThrough;
   }
   
-  async verifyStorageTarget() {
+  async createStorageTarget() {
 	 
 	let stack;
     try {
       stack = new Error().stack
 	  const createContainerResponse = await this.containerClient.createIfNotExists();
       return createContainerResponse
+	} catch (e) { 
+      throw new AzureError(e,stack,`Azure.containerClient.createIfNotExists(${this.CONTAINER})`)
+	}
+  }
+
+  async verifyStorageTarget() {
+	 
+	let stack;
+    try {
+      stack = new Error().stack
+	  const exists = await this.containerClient.getProperties();
+      return exists
 	} catch (e) { 
       throw new AzureError(e,stack,`Azure.containerClient.createIfNotExists(${this.CONTAINER})`)
 	}
@@ -71,6 +85,20 @@ class AzureStorageService extends Transform{
 	}
   }
   
+  async getObjectProps(key,params) {
+	let operation
+	const stack = new Error().stack
+    try {
+  	  operation = `Azure.containerClient.getBlockBlobClient(${key})`
+      const blockBlobClient = this.containerClient.getBlockBlobClient(key);
+  	  operation = `Azure.blockBlobClient.getProperties(${key})`
+      const properties = await blockBlobClient.getProperties();
+	  return properties
+	} catch (e) {
+      throw new AzureError(e,stack,operation)
+	}
+  }
+
   async getObject(key,params) {
      const is = await this.createReadStream(key,params) 
 	 const sw = new StringWriter();
@@ -108,7 +136,7 @@ class AzureStorageService extends Transform{
 	  throw new AzureError(e,stack,operation)
     }
   }
-	    
+  /*
   _transform(data,enc,callback) {
     if (this.offset + data.length > this.CHUNK_SIZE) {
       this.push(this.buffer.slice(0,this.offset),undefined,() => {
@@ -121,7 +149,7 @@ class AzureStorageService extends Transform{
   }
 
   async _final() {
-	// this.yadamuLogger.trace([this.constructor.name],`_final(${this.offset})`)
+	this.yadamuLogger.trace([this.constructor.name],`_final(${this.offset})`)
 	await new Promise((resolve,reject) => {
       this.push(this.buffer.slice(0,this.offset),undefined,() => {
         this.emit('bufferWrite')
@@ -129,6 +157,7 @@ class AzureStorageService extends Transform{
 	})
 	this.offset = 0
   }
+  */
 }
 
 module.exports = AzureStorageService;

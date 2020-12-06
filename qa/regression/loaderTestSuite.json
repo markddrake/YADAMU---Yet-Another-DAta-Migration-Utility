@@ -130,15 +130,5 @@
   , "tasks": [ 
       "HR","sakila","Northwind","WWI_Warehouse"
 	]
-  },{
-    "source"          : "mssql19"
-  , "target"          : "loader#1"
-  , "parameters" : {
-      "ROOT_FOLDER"   : "loader/csv/%connection%/%mode%"
-	, "OUTPUT_FORMAT" : "CSV"
-	}
-  , "tasks": [ 
-      "HR","sakila","Northwind","WWI_Warehouse"
-	]
   }]
 }

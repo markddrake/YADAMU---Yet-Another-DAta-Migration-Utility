@@ -98,15 +98,12 @@ class Yadamu {
     
 	if (process.listenerCount('unhandledRejection') === 0) {
 	  process.on('unhandledRejection', (err, p) => {
-		
-  	    if (err.ignoreUnhandledRejection === true) {
+		if (err.ignoreUnhandledRejection === true) {
 	       // this.LOGGER.trace(['YADAMU',this.STATUS.operation,'UHANDLED REJECTION','IGNORED'],err);
 		   return;
 	    }
 	  
 	    this.LOGGER.handleException(['YADAMU',this.STATUS.operation,'UHANDLED REJECTION'],err);
-        this.LOGGER.error(['YADAMU',this.STATUS.operation,'UHANDLED REJECTION'],err.message);
-        console.log(err)
         this.STATUS.errorRaised = true;
         this.reportStatus(this.STATUS,this.LOGGER)
         process.exit()
@@ -559,9 +556,7 @@ class Yadamu {
   async doPumpOperation(source,target) {
 	     
 	let results;
-    let dbReader
-	let dbWriter
-
+    
 	const parallel = (this.PARALLEL_PROCESSING && source.isDatabase() && target.isDatabase());
     
 	try {
@@ -572,16 +567,16 @@ class Yadamu {
       await target.initialize();
 		
       this.STATUS.operationSuccessful = false;
-      try {
-        dbReader = await this.getDBReader(source,parallel)
-        dbWriter = await this.getDBWriter(target,parallel) 
+      const dbReader = await this.getDBReader(source,parallel)
+      const dbWriter = await this.getDBWriter(target,parallel) 
 
+	  // this.LOGGER.trace([this.constructor.name,'PIPELINE'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
+      try {
         const yadamuPipeline = []
-	    // dbReader.getInputStream() returns itself (this) for databases...	  
+        // dbReader.getInputStream() returns itself (this) for databases...	  
 	    yadamuPipeline.push(...dbReader.getInputStreams())
 	    yadamuPipeline.push(dbWriter)
 
-	    // this.LOGGER.trace([this.constructor.name,'PIPELINE'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
 	    await pipeline(yadamuPipeline)
         this.STATUS.operationSuccessful = true;
         // this.LOGGER.trace([this.constructor.name,'PIPELINE'],'Success')

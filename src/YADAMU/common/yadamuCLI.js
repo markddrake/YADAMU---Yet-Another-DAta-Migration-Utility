@@ -517,7 +517,7 @@ class YadamuCLI {
 	const startTime = performance.now();
 	const results = await yadamuQA.doTests(configuration);
 	const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.qa([`YADAMU`,`TEST`,`${this.yadamu.CONFIG}`],`${results} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.qa([`YADAMU`,`REGRESSION`,`${this.yadamu.CONFIG}`],`${results} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
 
   }
   

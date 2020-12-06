@@ -5,6 +5,7 @@ const path = require('path');
 const { performance } = require('perf_hooks');
 
 const Yadamu = require('../../../YADAMU/common/yadamu.js');
+const YadamuMetrics = require('./yadamuMetrics.js');
 const YadamuDefaults = require('./yadamuDefaults.json')
 
 class YadamuTest extends Yadamu {
@@ -18,6 +19,7 @@ class YadamuTest extends Yadamu {
   	 
   constructor(mode) {
     super(mode)
+	this.testMetrics = new YadamuMetrics();
   }
   
   setTeradataWorker(worker) {

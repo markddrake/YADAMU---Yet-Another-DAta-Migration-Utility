@@ -97,7 +97,7 @@ class OracleQA extends OracleDBI {
       report.failed = failed.rows.map((row,idx) => {
         return [row[0],row[1],row[2],row[4],row[5],row[6],row[7],row[8]]
       })
-      
+	  
       return report
     }
       

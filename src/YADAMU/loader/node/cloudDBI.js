@@ -74,7 +74,7 @@ class CloudDBI extends LoaderDBI {
   }
 
   writeFile(filename,metadata) {
-    return this.cloudService.putObject( filename,metadata)
+    return this.cloudService.putObject(filename,metadata)
   }
   
   async initializeImport() {

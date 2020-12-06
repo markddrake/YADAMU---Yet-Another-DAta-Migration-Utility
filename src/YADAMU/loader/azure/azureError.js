@@ -8,6 +8,10 @@ class AzureError extends DatabaseError {
     super(cause,stack,sql);
   }
 
+  possibleConsistencyError() {
+	return ((this.cause.statusCode === 404) && (this.cause.details.errorCode = 'BlobNotFound'))
+  }
+
 }
 
 module.exports = AzureError

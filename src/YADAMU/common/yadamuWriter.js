@@ -333,23 +333,25 @@ class YadamuWriter extends Transform {
         }          
         await this.beginTransaction();            
       }
-      this.emit('batchWritten',undefined,this.skipTable);
-	} catch (e) {
-      this.emit('batchWritten',e,this.skipTable);
+	} catch (err) {	
+	  this.dbi.latestError = err
+	  this.emit('error',err)
 	}
+    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,rowsReceived,rowsCached],'writeBatch(): emit('batchWritten')`)
+	this.emit('batchWritten');
   }
 
   getBatchWritten() {
   
-   const batchWritten = new Promise((resolve,reject) => {
-     // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'writeBatch()',this.metrics.batchCount],'new batchWritten')
+    const batchWritten = new Promise((resolve,reject) => {
+      // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'writeBatch()',this.metrics.batchCount],'new batchWritten')
 	 this.once('batchWritten',(err,result) => {
 	   // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'writeBatch()',err,result,this.metrics.batchCount],'batchWritten')
 	   this.batchWritten = undefined;
 	   if (err) reject(err)
 		 resolve(result);
 	   })
-	})
+    })
 	this.batchOperations.push(batchWritten)
     return batchWritten
   }
@@ -385,8 +387,8 @@ class YadamuWriter extends Transform {
 	  }
       this.resetBatch()
  	  this.uncork(true)
-	  this.batchWritten = this.getBatchWritten(nextBatch)
 	  if (!this.skipTable) {
+	    this.batchWritten = this.getBatchWritten()
 	    this.writeBatch(nextBatch,rowsReceived,rowsCached);
   	  }
     }
@@ -399,7 +401,7 @@ class YadamuWriter extends Transform {
     , sqlTime       : this.dbi.sqlCumlativeTime - this.sqlInitialTime
     , insertMode    : this.insertMode
     , skipTable     : this.skipTable
-    , metrics      : this.metrics
+    , metrics       : this.metrics
     }    
   }
     
@@ -432,7 +434,7 @@ class YadamuWriter extends Transform {
           case 'data':
             /*
             **
-            ** Error Handling. 
+            ** Read Error Handling. 
             **   ABORT: Rollback the current transaction. Pass the error to the cllback function, which should propogate the error.
             **   SKIP:  
             **   FLUSH: 
@@ -534,7 +536,7 @@ class YadamuWriter extends Transform {
   async finalize(cause) {
     // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.skipTable,this.dbi.transactionInProgress,,this.writableEnded,this.writableFinished,this.destroyed,this.writableFinalized,this.hasPendingRows(),this.metrics.received,this.metrics.committed,this.metrics.written,this.metrics.cached],'finalize()')
     // Wait for any pending writeBatch operations to complete before proceeding 
-    let result = await this.batchWritten;
+    await this.batchWritten;
 	
     if (this.writableFinalized === true) return
     this.writableFinalized = true;
@@ -545,14 +547,19 @@ class YadamuWriter extends Transform {
       const rowsCached = this.metrics.cached
       // Since there are no more rows to write wait for the final writeBatch() opersation to complete
 	  // The batchWritten promise is needed to release memeory used by the batch once the writeBatch operation is complete - particular with MsSQL
-  	  this.batchWritten = this.getBatchWritten(nextBatch)
+	  /*
+	  this.batchWritten = this.getBatchWritten()
 	  this.writeBatch(nextBatch,rowsReceived,rowsCached);
       // Wait for any pending writeBatch operations to complete before comitting final changes
-      result = await this.batchWritten;
- 
+      await this.batchWritten
+	  */
+	  await this.writeBatch(nextBatch,rowsReceived,rowsCached)
  	}
+
+    // Ensure all batchOperations are complete
     await Promise.all(this.batchOperations)
-	if (this.dbi.transactionInProgress === true) {
+
+    if (this.dbi.transactionInProgress === true) {
       if (this.skipTable === true) {
 		await this.rollbackTransaction(cause)
       }
@@ -589,7 +596,7 @@ class YadamuWriter extends Transform {
       try {
         await new Promise((resolve,reject) => {
 	      this.end(undefined,undefined,() => {
-	        resolve()
+            resolve()
 	      })
 	    })
         await this.finalize(this.dbi.firstError);

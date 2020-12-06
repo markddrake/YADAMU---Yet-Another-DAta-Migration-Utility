@@ -1,10 +1,15 @@
 "use strict" 
 
+const path=require('path')
+const crypto = require('crypto');
+const { pipeline } = require('stream');
+
 const AWSS3DBI = require('../../../YADAMU//loader/awsS3/awsS3DBI.js');
 
 class AWSS3QA extends AWSS3DBI {
   
   async recreateSchema() {
+	await this.cloudService.createStorageTarget()
 	await this.cloudService.deleteFolder(this.IMPORT_FOLDER)
   }
 	
@@ -27,10 +32,12 @@ class AWSS3QA extends AWSS3DBI {
     super.setConnectionProperties(connectionProperties)
   }
   
-  calculateSortedHash(file) {
+  async calculateSortedHash(file) {
   
-    const array =  YadamuLibrary.loadJSON(file,this.yadamuLogger) 
-	array.sort((r1,r2) => {
+    const fileContents = await this.cloudService.getObject(file)		
+    const array = this.parseContents(fileContents)
+
+    array.sort((r1,r2) => {
 	  for (const i in r1) {
         if (r1[i] < r2[i]) return -1
         if (r1[i] > r2[i]) return 1;
@@ -40,11 +47,11 @@ class AWSS3QA extends AWSS3DBI {
     return crypto.createHash('sha256').update(JSON.stringify(array)).digest('hex');
   } 
   
-  calculateHash(file) {
+  async calculateHash(file) {
 	  
-	return new Promise((resolve,reject) => {
+	return new Promise(async (resolve,reject) => {
 	  const hash = crypto.createHash('sha256');
-	  const is = fs.createReadStream(file)
+	  const is = await this.cloudService.createReadStream(file)
 	  pipeline([is,hash],(err) => {
 		if (err) reject(err)
 		hash.end();
@@ -58,17 +65,19 @@ class AWSS3QA extends AWSS3DBI {
 	return 0
   }
 
-  compareFiles(sourceFile,targetFile) {
-	const sourceFileSize = fs.statSync(sourceFile).size
-	const targetFileSize = fs.statSync(targetFile).size
+  async compareFiles(sourceFile,targetFile) {
+	let props = await this.cloudService.getObjectProps(sourceFile)
+	const sourceFileSize = props.ContentLength
+	props = await this.cloudService.getObjectProps(targetFile)
+	const targetFileSize = props.ContentLength
 	let sourceHash = ''
 	let targetHash = ''
     if (sourceFileSize === targetFileSize) {
-      sourceHash = this.calculateHash(sourceFile)
-	  targetHash = this.calculateHash(targetFile)
+      sourceHash = await this.calculateHash(sourceFile)
+	  targetHash = await this.calculateHash(targetFile)
 	  if (sourceHash !== targetHash) {
-		sourceHash = this.calculateSortedHash(sourceFile);
-		targetHash = this.calculateSortedHash(targetFile)
+		sourceHash = await this.calculateSortedHash(sourceFile);
+		targetHash = await this.calculateSortedHash(targetFile)
 	  }
 	}
     return [sourceFileSize,targetFileSize,sourceHash,targetHash]
@@ -81,15 +90,16 @@ class AWSS3QA extends AWSS3DBI {
     , failed     : []
     }
 	
-	let controlFilePath = path.join(this.ROOT_FOLDER,source.schema,`${source.schema}.json`);
-	let fileContents = await fsp.readFile(controlFilePath,{encoding: 'utf8'})
-    const sourceControlFile = JSON.parse(fileContents)
-
-	controlFilePath = path.join(this.ROOT_FOLDER,target.schema,`${target.schema}.json`);
-	fileContents = await fsp.readFile(controlFilePath,{encoding: 'utf8'})
-    const targetControlFile = JSON.parse(fileContents)
-
-    let results = Object.keys(sourceControlFile.data).map((tableName) => {return this.compareFiles( sourceControlFile.data[tableName].file, targetControlFile.data[tableName].file)})
+	// Load the Control File...
+    let controlFilePath = `${path.join(this.ROOT_FOLDER,source.schema,source.schema)}.json`.split(path.sep).join(path.posix.sep) 
+    let fileContents = await this.cloudService.getObject(controlFilePath)		
+    const sourceControlFile = this.parseContents(fileContents)
+	
+    controlFilePath = `${path.join(this.ROOT_FOLDER,target.schema,target.schema)}.json`.split(path.sep).join(path.posix.sep) 
+    fileContents = await this.cloudService.getObject(controlFilePath)		
+    const targetControlFile = this.parseContents(fileContents)
+	
+    let results = await Promise.all(Object.keys(sourceControlFile.data).map(async (tableName) => {return await this.compareFiles( sourceControlFile.data[tableName].file, targetControlFile.data[tableName].file)}))
     results = await Promise.all(results.map(async(result) => { return await Promise.all(result)}))
 	
     Object.keys(sourceControlFile.data).map((tableName,idx) => {
@@ -101,8 +111,9 @@ class AWSS3QA extends AWSS3DBI {
 		report.failed.push([source.schema,target.schema,tableName,result[0],result[1],result[2],result[3],null])
 	  }
     })
+	
 	return report
-  }1
+  }
 	        
   async getRowCounts(target) {
 	

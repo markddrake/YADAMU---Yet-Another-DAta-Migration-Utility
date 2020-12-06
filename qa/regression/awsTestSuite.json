@@ -87,14 +87,38 @@
   },{
     "source"          : "minio#1"
   , "targets": [
-	  "oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+	  "oracle19c","oracle18c","oracle12c","oracle11g"
 	  
     ]
   , "parameters": {
       "ROOT_FOLDER"  : "yadamuS3"
 	}
   , "tasks": [ 
-      "oracle","mysql","mssql"
+      "oracle"
+	]
+  },{
+    "source"          : "minio#1"
+  , "targets": [
+	   "mssql17","mssql19"
+	  
+    ]
+  , "parameters": {
+      "ROOT_FOLDER"  : "yadamuS3"
+	}
+  , "tasks": [ 
+      "mssql"
+	]
+  },{
+    "source"          : "minio#1"
+  , "targets": [
+	  "mysql#1","mariadb#1"
+	  
+    ]
+  , "parameters": {
+      "ROOT_FOLDER"  : "yadamuS3"
+	}
+  , "tasks": [ 
+      "mysql"
 	]
   },{
     "source"          : "mssql19"
@@ -102,16 +126,6 @@
   , "parameters" : {
       "ROOT_FOLDER"   : "yadamuS3/compressed/%connection%/%mode%"
 	, "COMPRESSION"   : "GZIP"
-	}
-  , "tasks": [ 
-      "HR","sakila","Northwind","WWI_Warehouse"
-	]
-  },{
-    "source"          : "mssql19"
-  , "target"          : "minio#1"
-  , "parameters" : {
-      "ROOT_FOLDER"   : "yadamuS3/csv/%connection%/%mode%"
-	, "OUTPUT_FORMAT" : "CSV"
 	}
   , "tasks": [ 
       "HR","sakila","Northwind","WWI_Warehouse"

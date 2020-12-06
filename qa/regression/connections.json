@@ -114,7 +114,7 @@
 		"awsS3": {
 			"accessKeyId": "AKIAIOSFODNN7EXAMPLE",
 			"secretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-			"endpoint": "http://yadamu-db1:9000",
+			"endpoint": "http://MINIO-01:9000",
 			"s3ForcePathStyle": true,
 			"signatureVersion": "v4",
 			"yadamuProperties" : {
@@ -123,7 +123,7 @@
 			}		}
 	},
 	"azurite#1": {
-		"azure": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://yadamu-db1:10000/devstoreaccount1"
+		"azure": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://AZURE-01:10000/devstoreaccount1"
 	},
     "file-YADAMU_HOME"                  : {
       "file"                            : {

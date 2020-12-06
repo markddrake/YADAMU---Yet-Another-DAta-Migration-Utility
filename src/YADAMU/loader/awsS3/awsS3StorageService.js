@@ -2,18 +2,17 @@
 
 const Stream = require('stream');
 const path = require('path')
-const Transform = require('stream').Transform
 
 const AWSS3Constants = require('./awsS3Constants.js');
 const AWSS3Error = require('./awsS3Error.js')
 
-class AWSS3StorageService extends Transform {
+class AWSS3StorageService {
 
   get CHUNK_SIZE()   { return this.parameters.CHUNK_SIZE  || AWSS3Constants.CHUNK_SIZE }  
   get BUCKET()       { return this._BUCKET }
+  get RETRY_COUNT()  { return this.parameters.RETRY_COUNT ||  AWSS3Constants.RETRY_COUNT }
   
   constructor(s3Connection,bucket,parameters,yadamuLogger) {
-	super()
     this.s3Connection = s3Connection
 	this._BUCKET = bucket
 	this.parameters = parameters || {}
@@ -22,6 +21,10 @@ class AWSS3StorageService extends Transform {
 	this.offset = 0;
   }
   
+  retryOperation(retryCount) {
+	return retryCount < this.RETRY_COUNT 
+  }
+	   
   createWriteStream(key) {
 	// this.yadamuLogger.trace([this.constructor.name],`createWriteStream(${key})`)
   
@@ -42,22 +45,35 @@ class AWSS3StorageService extends Transform {
     }) 
 	return params.Body
   }
-  
-  async verifyStorageTarget() {
-	 
-	let stack;
+
+  async createStorageTarget() {
+    let stack;
+	let operation
     try {
       stack = new Error().stack
+	  operation = `AWS.S3.headBucket(${this.BUCKET})`
 	  try {
 	    let results = await this.s3Connection.headBucket({Bucket : this.BUCKET}).promise();
       } catch (e) {
 		if (e.statusCode === AWSS3Constants.HTTP_NAMED_STATUS_CODES.NOT_FOUND) {
           stack = new Error().stack
+	      operation = `AWS.S3.createBucket(${this.BUCKET})`
     	  await this.s3Connection.createBucket({Bucket: this.BUCKET}).promise()
 		  return
         } 
 		throw e
 	  }
+	} catch (e) { 
+      throw new AWSS3Error(e,stack,operation)
+	}
+  }
+
+  async verifyStorageTarget() {
+	 
+	let stack;
+    try {
+      stack = new Error().stack
+      let results = await this.s3Connection.headBucket({Bucket : this.BUCKET}).promise();
 	} catch (e) { 
       throw new AWSS3Error(e,stack,`AWS.S3.headBucket(${this.BUCKET})`)
 	}
@@ -97,6 +113,32 @@ class AWSS3StorageService extends Transform {
 	  return results;
     } catch (e) {
       throw new AWSS3Error(e,stack,`AWS.S3.getObject(s3://${this.BUCKET}/${params.Key})`)
+	}
+  }
+
+  async getObjectProps(key,params) {
+	 
+	params = params || {}
+	params.Bucket = this.BUCKET
+	params.Key = key
+
+	let retryCount =  0
+    const stack = new Error().stack
+
+	while (true) {
+      try {
+        return await this.s3Connection.headObject(params).promise()
+	  } catch (e) {
+	    const awsError = new AWSS3Error(e,stack,`AWS.S3.headObject(s3://${this.BUCKET}/${params.Key})`)
+        if (awsError.possibleConsistencyError() && this.retryOperation(retryCount)) { 
+		  await new Promise((resolve,reject) => {
+		    setTimeout(() => {resolve()},e.retryDelay)
+	      })
+		  retryCount++
+		  continue
+		}
+	    throw awsError	  
+      }
 	}
   }
 
@@ -143,27 +185,7 @@ class AWSS3StorageService extends Transform {
 	  }
 	} while (folder.IsTruncated);
   }
-	       
-  _transform(data,enc,callback) {
-    if (this.offset + data.length > this.CHUNK_SIZE) {
-      this.push.write(this.buffer.slice(0,this.offset),undefined,() => {
-        this.emit('bufferWrite')
-	  })
-  	  this.buffer = Buffer.allocUnsafe(this.CHUNK_SIZE);
-      this.offset = 0
-	}
-	this.offset+= chunk.copy(this.buffer,this.offset,0)
-  }
-	  
-  async _final() {
-	// this.yadamuLogger.trace([this.constructor.name],`_final(${this.offset})`)
-	await new Promise((resolve,reject) => {
-      this.push(this.buffer.slice(0,this.offset),undefined,() => {
-        this.emit('bufferWrite')
-		resolve() })
-	})
-	this.offset = 0
-  }
+
 }
 
 module.exports = AWSS3StorageService;

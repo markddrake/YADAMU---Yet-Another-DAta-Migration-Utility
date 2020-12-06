@@ -573,7 +573,7 @@ end;`
       } catch (cause) {
 	    await this.reportBatchError(`INSERT MANY`,cause,rows) 
         await this.dbi.restoreSavePoint(cause);
-        if (cause.errorNum && (cause.errorNum === 4091)) {
+		if (cause.errorNum && (cause.errorNum === 4091)) {
           // Mutating Table - Convert to Cursor based PL/SQL Block
           this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to PL/SQL Block.`);          
           this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);

@@ -16,6 +16,7 @@ const ArrayWriterWriter = require('./arrayWriter.js');
 const CSVWriter = require('./csvWriter.js');
 const DBIConstants = require('../../common/dbiConstants.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
+const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileError.js');
 
 /*
 **
@@ -272,11 +273,18 @@ class LoaderDBI extends YadamuDBI {
 	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
     this.controlFilePath = `${path.join(this.EXPORT_FOLDER,this.parameters.FROM_USER)}.json`
 	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using control file "${this.controlFilePath}"`);
-    const fileContents = await fsp.readFile(this.controlFilePath,{encoding: 'utf8'})
-    this.controlFile = JSON.parse(fileContents)
-	if (this.controlFile.yadamuOptions.contentType === 'CSV') {
-	  throw new YadamuError('Loading of CSV formatted data sets is not supported')
-    }
+	let stack
+	try {
+	  stack = new Error().stack;
+      const fileContents = await fsp.readFile(this.controlFilePath,{encoding: 'utf8'})
+      this.controlFile = JSON.parse(fileContents)
+	  if (this.controlFile.yadamuOptions.contentType === 'CSV') {
+  	    throw new YadamuError('Loading of CSV formatted data sets is not supported')
+      }
+	} catch (err) {
+      throw err.code === 'ENOENT' ? new FileNotFound(err,stack,this.controlFilePath) : new FileError(err,stack,this.controlFilePath)
+	}
+
   }
 
   getTableInfo(tableName) {
@@ -303,8 +311,11 @@ class LoaderDBI extends YadamuDBI {
 
   async getInputStream(tableInfo) {
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating input stream on ${this.controlFile.data[tableInfo.TABLE_NAME].file}`)
-    const stream = fs.createReadStream(this.controlFile.data[tableInfo.TABLE_NAME].file);
-    await new Promise((resolve,reject) => {stream.on('open',() => {resolve(stream)}).on('error',(err) => {reject(err)})})
+	const filename = this.controlFile.data[tableInfo.TABLE_NAME].file
+    const stream = fs.createReadStream(filename);
+    await new Promise((resolve,reject) => {
+	  stream.on('open',() => {resolve(stream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,filename) : new FileError(err,stack,filename))})
+	})
     return stream
   }
 

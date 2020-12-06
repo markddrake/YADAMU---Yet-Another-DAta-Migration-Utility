@@ -10,6 +10,7 @@ class AWSS3Constants {
     this._S3_DEFAULTS = this._S3_DEFAULTS || Object.freeze({
       "BUCKET"                 : "yadamu"
     , "CHUNK_SIZE"             : 5 * 1024 * 1024
+	, "RETRY_COUNT"            : 5
     })
     return this._S3_DEFAULTS;
   }
@@ -21,6 +22,7 @@ class AWSS3Constants {
   
   static get BUCKET()                     { return this.DEFAULT_PARAMETERS.BUCKET }
   static get CHUNK_SIZE()                 { return this.DEFAULT_PARAMETERS.CHUNK_SIZE }
+  static get RETRY_COUNT()                { return this.DEFAULT_PARAMETERS.RETRY_COUNT }
   static get DATABASE_VENDOR()            { return 'AWSS3' };
   static get SOFTWARE_VENDOR()            { return 'Amazon Web Services LLC' };
   
