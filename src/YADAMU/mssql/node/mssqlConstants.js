@@ -43,9 +43,9 @@ class MsSQLConstants {
     return this._LOST_CONNECTION_ERROR
   }
 
-  static get INVALID_CONNECTION_ERROR() {
-    this._INVALID_CONNECTION_ERROR = this._INVALID_CONNECTION_ERROR || Object.freeze(['EINVALIDSTATE'])
-    return this._INVALID_CONNECTION_ERROR
+  static get INVALID_STATE_ERROR() {
+    this.INVALID_STATE_ERROR = this.INVALID_STATE_ERROR || Object.freeze(['EINVALIDSTATE'])
+    return this.INVALID_STATE_ERROR
   }
 
   static get SERVER_UNAVAILABLE_ERROR() {

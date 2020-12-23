@@ -15,7 +15,7 @@ class MsSQLWriter extends YadamuWriter {
   setTableInfo(tableName) {
 	super.setTableInfo(tableName)
 	this.useNext = 0;
-	this.resetBatch()
+	this.newBatch()
     	
 	this.insertMode = 'Bulk';
     this.dataTypes  = YadamuLibrary.decomposeDataTypes(this.tableInfo.targetDataTypes)
@@ -70,9 +70,9 @@ class MsSQLWriter extends YadamuWriter {
 
   }
       
-  resetBatch() {
-	super.resetBatch();
-	// console.log('resetBatch(): Using Operation',this.useNext)
+  newBatch() {
+	super.newBatch();
+	// console.log('newBatch(): Using Operation',this.useNext)
 	this.batch = this.tableInfo.bulkOperations[this.useNext]
 	// Exclusive OR (XOR) operator 1 becomes 0, 0 becomes 1.
 	this.useNext ^= 1;
@@ -83,6 +83,7 @@ class MsSQLWriter extends YadamuWriter {
 	  batch.rows.length = 0;
 	}
   }
+  
 
   getMetrics()  {
 	const results = super.getMetrics()
@@ -134,7 +135,7 @@ class MsSQLWriter extends YadamuWriter {
       } catch (cause) {
         this.reportBatchError(batch,`INSERT MANY`,cause)
         await this.dbi.restoreSavePoint(cause);
-		if (!this.dbi.transactionInProgress && this.dbi.tediousTransactionError) {
+		if (!this.dbi.TRANSACTION_IN_PROGRESS && this.dbi.tediousTransactionError) {
 	  	  this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Transaction aborted following BCP operation failure. Starting new Transaction`);          
 		  await this.dbi.recoverTransactionState()
 		  await this.beginTransaction()

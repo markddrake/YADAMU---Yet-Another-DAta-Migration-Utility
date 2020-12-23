@@ -24,12 +24,12 @@ const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
 const PostgresConstants = require('./postgresConstants.js')
-const PostgresError = require('./postgresError.js')
+const PostgresError = require('./postgresException.js')
 const PostgresParser = require('./postgresParser.js');
 const PostgresWriter = require('./postgresWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const PostgresStatementLibrary = require('./postgresStatementLibrary.js');
-const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileError.js');
+const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
 
 class PostgresDBI extends YadamuDBI {
     
@@ -61,7 +61,8 @@ class PostgresDBI extends YadamuDBI {
 	
     this.StatementLibrary = PostgresStatementLibrary
     this.statementLibrary = undefined
-
+    this.pipelineAborted = false;
+   
   }
 
   /*
@@ -92,7 +93,7 @@ class PostgresDBI extends YadamuDBI {
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))
+	  const pgErr = this.trackExceptions(new PostgresError(err,this.postgresStack,this.postgressOperation))
       this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`POOL_ON_ERROR`],pgErr);
       // throw pgErr
     })
@@ -114,7 +115,7 @@ class PostgresDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
-	  throw this.captureException(new PostgresError(e,stack,'pg.Pool.connect()'))
+	  throw this.trackExceptions(new PostgresError(e,stack,'pg.Pool.connect()'))
 	}
   }
 
@@ -136,7 +137,7 @@ class PostgresDBI extends YadamuDBI {
     
 	  this.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
-      throw this.captureException(new PostgresException(e,stack,operation))
+      throw this.trackExceptions(new PostgresException(e,stack,operation))
 	}
     await configureConnection();
   }
@@ -157,7 +158,7 @@ class PostgresDBI extends YadamuDBI {
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const pgErr = this.captureException(new PostgresError(err,this.postgresStack,this.postgressOperation))
+	  const pgErr = this.trackExceptions(new PostgresError(err,this.postgresStack,this.postgressOperation))
       this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`CONNECTION_ON_ERROR`],pgErr);
       // throw pgErr
     })
@@ -169,11 +170,9 @@ class PostgresDBI extends YadamuDBI {
 
   }
   
-  
-
   async closeConnection(options) {
 
-  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && this.connection.release)})`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection()`)
 	  
     if (this.connection !== undefined && this.connection.release) {
 	  let stack
@@ -183,7 +182,7 @@ class PostgresDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-		const err = this.captureException(new PostgresError(e,stack,'Client.release()'))
+		const err = this.trackExceptions(new PostgresError(e,stack,'Client.release()'))
 		throw err
       }
 	}
@@ -201,7 +200,7 @@ class PostgresDBI extends YadamuDBI {
         this.pool = undefined
   	  } catch (e) {
         this.pool = undefined
-	    throw this.captureException(new PostgresError(e,stack,'pg.Pool.close()'))
+	    throw this.trackExceptions(new PostgresError(e,stack,'pg.Pool.close()'))
 	  }
 	}
   }
@@ -252,7 +251,7 @@ class PostgresDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.captureException(new PostgresError(e,stack,sqlStatement))
+		const cause = this.trackExceptions(new PostgresError(e,stack,sqlStatement))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -265,33 +264,6 @@ class PostgresDBI extends YadamuDBI {
 	
   }
   
-  async initialize() {
-    await super.initialize(true);   
-  }
-    
-  /*
-  **
-  **  Gracefully close down the database connection and pool.
-  **
-  */
-  
-  async finalize() {
-	await super.finalize()
-  } 
-
-  /*
-  **
-  **  Abort the database connection and pool.
-  **
-  */
-
-  async abort(e) {
-									   
-    await super.abort(e);
-	  
-  }
-
-
   /*
   **
   ** Begin a transaction
@@ -302,8 +274,7 @@ class PostgresDBI extends YadamuDBI {
 
      // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
-     const sqlStatement =  `begin transaction`
-     await this.executeSQL(sqlStatement);
+     await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION);
 	 super.beginTransaction();
 
   }
@@ -319,8 +290,7 @@ class PostgresDBI extends YadamuDBI {
     // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
 	super.commitTransaction()
-    const sqlStatement =  `commit transaction`
-    await this.executeSQL(sqlStatement);
+    await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION);
 	
   }
 
@@ -339,11 +309,10 @@ class PostgresDBI extends YadamuDBI {
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
 	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 	
-    const sqlStatement =  `rollback transaction`
 	 
 	try {
       super.rollbackTransaction()
-      await this.executeSQL(sqlStatement);
+      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION);
 	} catch (newIssue) {
 	  this.checkCause('ROLBACK TRANSACTION',cause,newIssue);								   
 	}
@@ -566,12 +535,23 @@ class PostgresDBI extends YadamuDBI {
     return new PostgresParser(tableInfo,this.yadamuLogger);
   }  
   
-  streamingError(e,sqlStatement) {
-    return this.captureException(new PostgresError(e,this.streamingStackTrace,sqlStatement))
+  inputStreamError(e,sqlStatement) {
+    return this.trackExceptions(new PostgresError(e,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(tableInfo) {        
-
+  
+  
+    // if the previous pipleline operation failed, it appears that the postgres driver will hang when creating a new QueryStream...
+  
+    if (this.pipelineAborted) {
+	  // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,'STREAMING READER','GET_INPUT_STREAM'],'Previous Pipeline Aborted. Switching database connection')
+	  await this.closeConnection()
+	  await this.getDatabaseConnection(false)
+	}
+	 
+    this.pipelineAborted = false;
+   			
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
     this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
     while (true) {
@@ -581,9 +561,14 @@ class PostgresDBI extends YadamuDBI {
 		this.streamingStackTrace = new Error().stack
         const queryStream = new QueryStream(tableInfo.SQL_STATEMENT)
         this.traceTiming(sqlStartTime,performance.now())
-        return await this.connection.query(queryStream)   
+        const inputStream = await this.connection.query(queryStream)   
+		inputStream.on('error',async (err) => {
+	      this.pipelineAborted = true;
+  	    })
+		
+		return inputStream
       } catch (e) {
-		const cause = this.captureException(new PostgresError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
+		const cause = this.trackExceptions(new PostgresError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -621,7 +606,7 @@ class PostgresDBI extends YadamuDBI {
 	 this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
 	 results = e;
     }
-    return results;
+	return results;
   }
    
   async generateStatementCache(schema) {

@@ -16,6 +16,8 @@ class DBReaderParallel extends DBReader {
   async pipelineTables(readerManagerDBI,writerManagerDBI) {
 	 
     if (this.schemaInfo.length > 0) {
+		
+      this.activePipelines = new Set()
 
       const maxWorkerCount = parseInt(this.dbi.yadamu.PARALLEL)
   	  const workerCount = this.schemaInfo.length < maxWorkerCount ? this.schemaInfo.length : maxWorkerCount
@@ -35,17 +37,25 @@ class DBReaderParallel extends DBReader {
           // ### Await inside a Promise is an anti-pattern ???
 		  const writerDBI = await worker.writerDBI
 		  const readerDBI = await worker.readerDBI
-          let result
+          let result = undefined
           try {
      	    while (tasks.length > 0) {
 	          const task = tasks.shift();
               if (task.INCLUDE_TABLE === true) {
-  		          result = await this.pipelineTable(task,readerDBI,writerDBI)
+  		        await this.pipelineTable(task,readerDBI,writerDBI)
 			  }
             }
 		  } catch (cause) {
 		    result = cause
     	    this.yadamuLogger.handleException(['PARALLEL','PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,this.dbi.getWorkerNumber()],cause)
+			if (this.dbi.ON_ERROR === 'ABORT') {
+			  tasks.length = 0;
+  			  this.activePipelines.forEach(async (reader) => {
+				this.activePipelines.delete(reader)
+				// console.log('Killing',reader.constructor.name)
+	            reader.destroy()
+			  })
+            }
     	    // this.yadamuLogger.trace(['PARALLEL','PIPELINE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,this.dbi.getWorkerNumber()],cause)
 		  }		  
 		  worker.writerDBI  = writerDBI

@@ -9,7 +9,7 @@ const YadamuParser = require('../../common/yadamuParser.js')
 const StringWriter = require('../../common/stringWriter.js');
 const BufferWriter = require('../../common/bufferWriter.js');
 
-const OracleError = require('./oracleError.js');
+const OracleError = require('./oracleException.js');
 
 class OracleParser extends YadamuParser {
   

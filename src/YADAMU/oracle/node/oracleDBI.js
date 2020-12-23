@@ -28,12 +28,12 @@ const BufferWriter = require('../../common/bufferWriter.js');
 const HexBinToBinary = require('../../common/hexBinToBinary.js');
 const JSONParser = require('../../file/node/jsonParser.js');
 const OracleConstants = require('./oracleConstants.js');
-const OracleError = require('./oracleError.js')
+const OracleError = require('./oracleException.js')
 const OracleParser = require('./oracleParser.js');
 const OracleWriter = require('./oracleWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const OracleStatementLibrary = require('./oracleStatementLibrary.js');
-const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileError.js');
+const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
 
 class OracleDBI extends YadamuDBI {
 
@@ -128,7 +128,7 @@ class OracleDBI extends YadamuDBI {
 	
 	// Oracle always has a transaction in progress, so beginTransaction is a no-op
 	
-	this.transactionInProgress = true;
+	this.TRANSACTION_IN_PROGRESS = true;
 	
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Constructor Complete');
   }
@@ -188,7 +188,7 @@ class OracleDBI extends YadamuDBI {
       // this.yadamuLogger.trace([this.DATABASE_VENDOR],'Pool Created');
       this.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
-	  throw this.captureException(new OracleError(e,stack,'Oracledb.createPool()'))
+	  throw this.trackExceptions(new OracleError(e,stack,'Oracledb.createPool()'))
 	}
   }
   
@@ -209,7 +209,7 @@ class OracleDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
 	  return connection
     } catch (e) {
-	  throw this.captureException(new OracleError(e,stack,'Oracledb.Pool.getConnection()'))
+	  throw this.trackExceptions(new OracleError(e,stack,'Oracledb.Pool.getConnection()'))
 	}
 	
   }
@@ -222,8 +222,8 @@ class OracleDBI extends YadamuDBI {
   }
   
   async closeConnection(options) {
-	  
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && (typeof this.connection.close === 'function'))})`)
+
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && (typeof this.connection.close === 'function'))})`)
 	
 	if (this.connection !== undefined && (typeof this.connection.close === 'function')) {
       let stack;
@@ -233,7 +233,7 @@ class OracleDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-  	    throw this.captureException(new OracleError(e,stack,'Oracledb.Connection.close()'))
+  	    throw this.trackExceptions(new OracleError(e,stack,'Oracledb.Connection.close()'))
 	  }
 	}
   };
@@ -256,7 +256,7 @@ class OracleDBI extends YadamuDBI {
         this.pool = undefined
       } catch (e) {
         this.pool = undefined
-	    throw this.captureException(new OracleError(e,stack,'Oracledb.Pool.close()'))
+	    throw this.trackExceptions(new OracleError(e,stack,'Oracledb.Pool.close()'))
       }
     }
   }  
@@ -275,7 +275,7 @@ class OracleDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
 	  return lob;
    	} catch (e) {
-	  throw this.captureException(new OracleError(e,stack,`Oracledb.Connection.createLob()`))
+	  throw this.trackExceptions(new OracleError(e,stack,`Oracledb.Connection.createLob()`))
     }
   }
 
@@ -292,11 +292,12 @@ class OracleDBI extends YadamuDBI {
   async blobToBuffer(blob) {
 	  
 	let stack
-	const operation = 'oracledb.BLOB.pipe(Buffer)'
+	let operation = 'oracledb.BLOB.pipe(Buffer)'
     try {
       const bufferWriter = new BufferWriter();
 	  stack = new Error().stack
   	  await pipeline(blob,bufferWriter)
+	  operation = 'oracledb.LOB.close(BLOB)'
   	  await this.closeLob(blob)
       return bufferWriter.toBuffer()
 	} catch(e) {
@@ -308,11 +309,13 @@ class OracleDBI extends YadamuDBI {
   async clobToString(clob) {
      
     let stack
-	const operation = 'oracledb.CLOB.pipe(String)'
+	let operation = 'oracledb.CLOB.pipe(String)'
 	try {
       const stringWriter = new  StringWriter();
       clob.setEncoding('utf8');  // set the encoding so we get a 'string' not a 'buffer'
+	  stack = new Error().stack
   	  await pipeline(clob,stringWriter)
+	  operation = 'oracledb.LOB.close(CLOB)'
 	  await this.closeLob(clob)
 	  return stringWriter.toString()
 	} catch(e) {
@@ -509,23 +512,35 @@ class OracleDBI extends YadamuDBI {
     
   async enableConstraints() {
 	  
-    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH} , schema:this.parameters.TO_USER} 
-    const results = await this.executeSQL(this.StatementLibrary.SQL_ENABLE_CONSTRAINTS,args)
-    this.processLog(results,'Enable Constraints')
+	try  {
+      this.checkConnectionState(this.latestError) 
+      const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH} , schema:this.parameters.TO_USER} 
+      const results = await this.executeSQL(this.StatementLibrary.SQL_ENABLE_CONSTRAINTS,args)
+      this.processLog(results,'Enable Constraints')
+	} catch (e) {
+      this.yadamuLogger.error(['DBA',this.DATABASE_VENDOR,'CONSTRAINTS'],`Unable to re-enable constraints.`);          
+      this.yadamuLogger.handleException(['MATERIALIZED VIEWS',this.DATABASE_VENDOR,],e);          
+    } 
     
   }
   
   async refreshMaterializedViews() {
-      
-    const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH} , schema:this.parameters.TO_USER}     
-    const results = await this.executeSQL(this.StatementLibrary.SQL_REFRESH_MATERIALIZED_VIEWS,args)
-    this.processLog(results,'Materialized View Refresh')
 
-  }
-    
+    try  {
+      this.checkConnectionState(this.latestError) 
+	  const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH} , schema:this.parameters.TO_USER}     
+      const results = await this.executeSQL(this.StatementLibrary.SQL_REFRESH_MATERIALIZED_VIEWS,args)
+      this.processLog(results,'Materialized View Refresh')
+    } catch (e) {
+      this.yadamuLogger.error(['DBA',this.DATABASE_VENDOR,'MATERIALIZED VIEWS'],`Unable to refresh materialzied views.`);          
+      this.yadamuLogger.handleException(['MATERIALIZED VIEWS',this.DATABASE_VENDOR,],e);          
+    } 
+	
+  } 
+  
   async executeMany(sqlStatement,rows,binds) {
- 
-    let attemptReconnect = this.ATTEMPT_RECONNECTION;
+	   
+    let attemptReconnect = (this.ATTEMPT_RECONNECTION)
 
     if (rows.length > 0) {
       this.status.sqlTrace.write(this.traceComment(`Bulk Operation: ${rows.length} records.`))
@@ -549,9 +564,12 @@ class OracleDBI extends YadamuDBI {
             await this.reconnect(cause,'BATCH')
             await this.setCurrentSchema(this.parameters.TO_USER)
 		    await this.setDateFormatMask(this.systemInformation.vendor);
-		    continue;
+   		    // Only retry the operation if COMMIT_RATIO = 1. If COMMIT_RATIO > 1 all batches written since last commit must be assumed to be have been lost.
+			if (this.COMMIT_RATIO === 1) {
+              continue		  
+		    }
           }		  	  
-		  throw this.captureException(cause)
+		  throw this.trackExceptions(cause)
         }      
       } 
 	}
@@ -586,7 +604,7 @@ class OracleDBI extends YadamuDBI {
 		  await this.setDateFormatMask(this.systemInformation ? this.systemInformation.vendor : "oracle");
 		  continue;
         }
-        throw this.captureException(cause)
+        throw this.trackExceptions(cause)
       }      
     } 
   }  
@@ -761,7 +779,7 @@ class OracleDBI extends YadamuDBI {
   }
 
   async finalizeExport() {
-	this.checkConnectionState(this.fatalError) 
+	this.checkConnectionState(this.latestError) 
     await this.setCurrentSchema(this.connectionProperties.user);
   }
 
@@ -776,13 +794,12 @@ class OracleDBI extends YadamuDBI {
   
   async finalizeData() {
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR],`finalizeData()`);
-    this.checkConnectionState(this.fatalError) 
-	await this.refreshMaterializedViews();
+    await this.refreshMaterializedViews();
     await this.enableConstraints();
   }  
 
   async finalizeImport() {
-    this.checkConnectionState(this.fatalError) 
+    this.checkConnectionState(this.latestError) 
 	await this.setCurrentSchema(this.connectionProperties.user);
   }
 
@@ -833,7 +850,7 @@ class OracleDBI extends YadamuDBI {
       await this.connection.commit();
   	  this.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
-	  throw this.captureException(new OracleError(e,stack,`Oracledb.Transaction.commit()`))
+	  throw this.trackExceptions(new OracleError(e,stack,`Oracledb.Transaction.commit()`))
 	}
   }
 
@@ -861,7 +878,7 @@ class OracleDBI extends YadamuDBI {
       await this.connection.rollback();
   	  this.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
-	  const newIssue = this.captureException(new OracleError(e,stack,`Oracledb.Transaction.rollback()`))
+	  const newIssue = this.trackExceptions(new OracleError(e,stack,`Oracledb.Transaction.rollback()`))
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
 	}	
   }
@@ -1177,8 +1194,8 @@ class OracleDBI extends YadamuDBI {
 	return parser;
   }  
   
-  streamingError(cause,sqlStatement) {
-	return this.captureException(new OracleError(cause,this.streamingStackTrace,sqlStatement))
+  inputStreamError(cause,sqlStatement) {
+	return this.trackExceptions(new OracleError(cause,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(tableInfo) {

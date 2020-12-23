@@ -9,7 +9,7 @@ const ObjectID = require('mongodb').ObjectID
 const Yadamu = require('../../common/yadamu.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
-const {BatchInsertError} = require('../../common/yadamuError.js')
+const {BatchInsertError} = require('../../common/yadamuException.js')
 
 class MongoWriter extends YadamuWriter {
 
@@ -185,7 +185,6 @@ class MongoWriter extends YadamuWriter {
 	
     this.metrics.batchCount++
 	const results = await this.dbi.insertMany(this.tableInfo.tableName,batch);
-	
     this.endTime = performance.now();
     this.metrics.written += rowCount;
     this.releaseBatch(batch)

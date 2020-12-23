@@ -14,7 +14,7 @@ const YadamuTest = require('./yadamuTest.js');
 const LoaderDBI = require('../../../YADAMU/loader/node/loaderDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
 const JSONParser = require('../../../YADAMU/file/node/jsonParser.js');
-const {ConfigurationFileError} = require('../../../YADAMU/common/yadamuError.js');
+const {ConfigurationFileError} = require('../../../YADAMU/common/yadamuException.js');
 
 class YadamuQA {
 
@@ -729,7 +729,7 @@ class YadamuQA {
       const compareResults = await this.compareSchemas(sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, compareParms, this.yadamu.metrics, false, undefined)
       this.printCompareResults(sourceConnectionName,targetConnectionName,task.taskName,compareResults)
       this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
-      this.metrics.recordError()
+	  this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
       return
     }
     
@@ -767,7 +767,7 @@ class YadamuQA {
         const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, compareParms, this.yadamu.metrics, false, undefined)
         this.printCompareResults(sourceConnectionName,targetConnectionName,task.taskName,compareResults)
         this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
-        this.metrics.recordError()
+        this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
         return;
       }
       
@@ -803,7 +803,7 @@ class YadamuQA {
         const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, compareParms,  this.yadamu.metrics, false, undefined)
         this.printCompareResults(sourceConnectionName,targetConnectionName,task.taskName,compareResults)
         this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
-        this.metrics.recordError()
+        this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
         return;
       }
       
@@ -942,7 +942,7 @@ class YadamuQA {
     
     this.metrics.recordTaskTimings([task.taskName,'IMPORT',targetDBI.MODE,sourceDatabase,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
-      this.metrics.recordError()
+      this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
       return;
     }
     
@@ -968,7 +968,7 @@ class YadamuQA {
     stepElapsedTime = performance.now() - stepStartTime
     this.metrics.recordTaskTimings([task.taskName,'EXPORT',fileWriter.MODE,targetConnectionName,sourceDatabase,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
-      this.metrics.recordError()
+      this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
       return;
     }
     
@@ -998,7 +998,7 @@ class YadamuQA {
     stepElapsedTime = performance.now() - stepStartTime 
     this.metrics.recordTaskTimings([task.taskName,'EXPORT',targetDBI.MODE,sourceDatabase,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
-      this.metrics.recordError()
+      this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
       return;
     }
     
@@ -1025,7 +1025,7 @@ class YadamuQA {
     stepElapsedTime = performance.now() - stepStartTime
     this.metrics.recordTaskTimings([task.taskName,'IMPORT',fileWriter.MODE,targetConnectionName,sourceDatabase,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
-      this.metrics.recordError()
+      this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
       return;
     }
 
@@ -1251,7 +1251,7 @@ class YadamuQA {
     this.printResults(this.OPERATION_NAME,sourceDescription,targetDescription,stepElapsedTime)
     this.metrics.recordTaskTimings([task.taskName,this.OPERATION_NAME,fileWriter.MODE,sourceConnectionName,targetDatabase,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
-      this.metrics.recordError()
+      this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
       return;
     }
 
@@ -1281,7 +1281,7 @@ class YadamuQA {
       stepElapsedTime = performance.now() - stepStartTime
       this.metrics.recordTaskTimings([task.taskName,'IMPORT',fileReader.MODE,targetDatabase,sourceConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
       if (metrics[metrics.length-1] instanceof Error) {
-        this.metrics.recordError()
+        this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
         return;
       }
       
@@ -1543,7 +1543,7 @@ class YadamuQA {
     const sourceSummary = []
     const startTime = performance.now()
     
-    const summary = [['End Time','Operation','Source','Target','Task','Results','Memory Usage','ElapsedTime']]
+    const summary = [['End Time','Operation','Source','Target','Task','Results','Memory Usage','Elapsed Time']]
     try {    
       for (this.test of configuration.tests) {
         this.metrics.newTest()
@@ -1609,7 +1609,7 @@ class YadamuQA {
                     }
                   } 
                   const elapsedTime = performance.now() - startTime;
-                  this.yadamu.LOGGER.qa([this.OPERATION_NAME,`TASK`,sourceDescription,targetDescription,typeof task === 'string' ? task : `Anonymous`],`${this.metrics.formatMetrics(this.metrics.subTask)} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
+                  this.yadamu.LOGGER.qa([this.OPERATION_NAME,`TASK`,sourceDescription,targetDescription,typeof task === 'string' ? task : `Anonymous`],`${this.metrics.formatMetrics(this.metrics.task)} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s`);
                   summary.push([new Date().toISOString(),this.OPERATION_NAME,sourceDescription,targetDescription,typeof task === 'string' ? task : `Anonymous`,Object.values(this.metrics.task),Object.values(process.memoryUsage()),YadamuLibrary.stringifyDuration(elapsedTime)])
                   this.metrics.aggregateTarget()
                 } catch (e) {

@@ -1,6 +1,6 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuError.js')
+const {DatabaseError} = require('../../common/yadamuException.js')
 
 class PostgresError extends DatabaseError {
   //  const err = new PostgresError(cause,stack,sql)

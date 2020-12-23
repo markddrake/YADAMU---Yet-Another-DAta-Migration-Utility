@@ -14,7 +14,7 @@ const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
 const SnowflakeConstants = require('./snowflakeConstants.js');
-const SnowflakeError = require('./snowflakeError.js')
+const SnowflakeError = require('./snowflakeException.js')
 const SnowflakeReader = require('./snowflakeReader.js');
 const SnowflakeParser = require('./snowflakeParser.js');
 const SnowflakeWriter = require('./snowflakeWriter.js');
@@ -57,7 +57,7 @@ class SnowflakeDBI extends YadamuDBI {
 	  const stack = new Error().stack
       connection.connect((err,connection) => {
         if (err) {
-          reject(this.captureException(new SnowflakeError(err,stack,`snowflake-sdk.Connection.connect()`)))
+          reject(this.trackExceptions(new SnowflakeError(err,stack,`snowflake-sdk.Connection.connect()`)))
         }
         resolve(connection);
       })
@@ -73,7 +73,7 @@ class SnowflakeDBI extends YadamuDBI {
       connection.destroy()
 	  super.setParameters(parameters)
 	} catch (e) {
-      throw this.captureException(new SnowflakeError(e,'Snowflake-SDK.connection.connect()'))
+      throw this.trackExceptions(new SnowflakeError(e,'Snowflake-SDK.connection.connect()'))
 	}
   }
   
@@ -153,7 +153,7 @@ class SnowflakeDBI extends YadamuDBI {
       , complete       : async (err,statement,rows) => {
 		                   const sqlEndTime = performance.now()
                            if (err) {
-              		         const cause = this.captureException(new SnowflakeError(err,stack,sqlStatement))
+              		         const cause = this.trackExceptions(new SnowflakeError(err,stack,sqlStatement))
     		                 if (attemptReconnect && cause.lostConnection()) {
 	      				       attemptReconnect = false
 			   			       try {
@@ -203,26 +203,6 @@ class SnowflakeDBI extends YadamuDBI {
 	this.statementLibrary = new this.StatementLibrary(this)
   }
     
-  /*
-  **
-  **  Gracefully close down the database connection and pool.
-  **
-  */
-  
-  async finalize() {
-	await super.finalize()
-  } 
-
-  /*
-  **
-  **  Abort the database connection and pool.
-  **
-  */
-
-  async abort(e) {
-    await super.abort(e);
-  }
-
   /*
   **
   ** Begin a transaction
@@ -437,8 +417,8 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     return new SnowflakeParser(tableInfo,this.yadamuLogger);
   }  
   
-  streamingError(e,sqlStatement) {
-    return this.captureException(new SnowflakeError(e,this.streamingStackTrace,sqlStatement))
+  inputStreamError(e,sqlStatement) {
+    return this.trackExceptions(new SnowflakeError(e,this.streamingStackTrace,sqlStatement))
   }
   
   generateQueryInformation(tableMetadata) { 

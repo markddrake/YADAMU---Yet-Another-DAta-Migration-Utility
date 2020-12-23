@@ -1,6 +1,6 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuError.js')
+const {DatabaseError} = require('../../common/yadamuException.js')
 const SnowflakeConstants = require('./snowflakeConstants.js')
 
 class SnowflakeError extends DatabaseError {

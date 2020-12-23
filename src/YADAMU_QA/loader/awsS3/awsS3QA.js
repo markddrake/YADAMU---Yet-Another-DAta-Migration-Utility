@@ -4,12 +4,12 @@ const path=require('path')
 const crypto = require('crypto');
 const { pipeline } = require('stream');
 
-const AWSS3DBI = require('../../../YADAMU//loader/awsS3/awsS3DBI.js');
+const AWSS3DBI = require('../../../YADAMU//loader/awss3/awsS3DBI.js');
 
 class AWSS3QA extends AWSS3DBI {
   
   async recreateSchema() {
-	await this.cloudService.createStorageTarget()
+	await this.cloudService.createBucketContainer()
 	await this.cloudService.deleteFolder(this.IMPORT_FOLDER)
   }
 	

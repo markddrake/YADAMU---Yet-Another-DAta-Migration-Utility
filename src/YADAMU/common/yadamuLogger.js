@@ -10,8 +10,8 @@ const DBWriter = require('./dbWriter.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const StringWriter = require('./stringWriter.js')
 const NullWriter = require('./nullWriter.js');
-const {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuError.js');
-const OracleError  = require('../oracle/node/oracleError.js');
+const {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuException.js');
+const OracleError  = require('../oracle/node/oracleException.js');
 
 const PassThrough = require('./yadamuPassThrough.js');
 const SimpleArrayReadable = require('./simpleArrayReadable.js');

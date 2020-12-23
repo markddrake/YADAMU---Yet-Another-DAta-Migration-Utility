@@ -13,7 +13,7 @@ const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
 const ExampleConstants = require('./ExampleConstants.js');
-const ExampleError = require('./exampleError.js')
+const ExampleError = require('./exampleException.js')
 const ExampleParser = require('./exampleParser.js');
 const ExampleWriter = require('./exampleWriter.js');
 const ExampleReader = require('./exampleReader.js');
@@ -122,7 +122,7 @@ class ExampleDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.captureException(this.captureException(new ExampleError(e,stack,sqlStatement))
+		const cause = this.trackExceptions(this.trackExceptions(new ExampleError(e,stack,sqlStatement))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -133,31 +133,40 @@ class ExampleDBI extends YadamuDBI {
       }      
     } 
 	
+  }
   
+  /*
+  **
+  **  Open the Database connection 
+  **
   
   async initialize() {
     await super.initialize(true);   
   }
-    
+   
+  */   
+  
   /*
   **
   **  Gracefully close down the database connection and pool.
   **
-  */
   
   async finalize() {
 	await super.finalize()
   } 
 
+  */
+
   /*
   **
   **  Abort the database connection and pool.
   **
-  */
-
+ 
   async abort(e) {
     await super.abort(e);
   }
+
+  */
 
   /*
   **
@@ -176,8 +185,7 @@ class ExampleDBI extends YadamuDBI {
 	**
 	*/
 	
-    const sqlStatement =  `begin transaction`
-    await this.executeSQL(sqlStatement);
+    await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION);
 	super.beginTransaction();
 
   }
@@ -200,8 +208,7 @@ class ExampleDBI extends YadamuDBI {
 	*/
 	
 	super.commitTransaction()
-    const sqlStatement =  `commit transaction`
-    await this.executeSQL(sqlStatement);
+    await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION);
 	
   }
 
@@ -227,11 +234,10 @@ class ExampleDBI extends YadamuDBI {
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
 	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 	
-    const sqlStatement =  `rollback transaction`
-	 
+     
 	try {
       super.rollbackTransaction()
-      await this.executeSQL(sqlStatement);
+      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION);
 	} catch (newIssue) {
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue);								   
 	}
@@ -248,7 +254,7 @@ class ExampleDBI extends YadamuDBI {
 	**
 	*/
 	 
-    await this.executeSQL('create savepoint YADAMU_INSERT);
+    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT);
     super.createSavePoint();
   }
   
@@ -272,7 +278,7 @@ class ExampleDBI extends YadamuDBI {
 		
     let stack
     try {
-      await this.executeSQL(SQL_RESTORE_SAVE_POINT);
+      await this.executeSQL(his.StatementLibrary.SQL_RESTORE_SAVE_POINT);
       super.restoreSavePoint();
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVPOINT',cause,newIssue);
@@ -432,8 +438,8 @@ class ExampleDBI extends YadamuDBI {
     return new ExampleParser(tableInfo,this.yadamuLogger);
   }  
   
-  streamingError(e,sqlStatement) {
-    return this.captureException(new ExampleError(e,this.streamingStackTrace,sqlStatement))
+  inputStreamError(e,sqlStatement) {
+    return this.trackExceptions(new ExampleError(e,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(tableInfo) {

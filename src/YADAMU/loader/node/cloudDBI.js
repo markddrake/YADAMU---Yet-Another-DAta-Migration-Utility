@@ -81,7 +81,7 @@ class CloudDBI extends LoaderDBI {
 	 
     // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
       	
-	await this.cloudService.verifyStorageTarget()	
+	await this.cloudService.verifyBucketContainer()	
 
 	this.controlFilePath = `${path.join(this.IMPORT_FOLDER,this.parameters.TO_USER)}.json`.split(path.sep).join(path.posix.sep) 
     this.metadataFolderPath = path.join(this.IMPORT_FOLDER,'metadata').split(path.sep).join(path.posix.sep) 

@@ -1,10 +1,9 @@
 "use strict"
 
-const Stream = require('stream');
+const {PassThrough, finished} = require('stream');
 const path = require('path')
-
 const AWSS3Constants = require('./awsS3Constants.js');
-const AWSS3Error = require('./awsS3Error.js')
+const AWSS3Error = require('./awsS3Exception.js')
 
 class AWSS3StorageService {
 
@@ -19,6 +18,7 @@ class AWSS3StorageService {
 	this.yadamuLogger = yadamuLogger
 	this.buffer = Buffer.allocUnsafe(this.CHUNK_SIZE);
 	this.offset = 0;
+	this.writeOperations = new Set();
   }
   
   retryOperation(retryCount) {
@@ -31,22 +31,28 @@ class AWSS3StorageService {
     const params = { 
 	  Bucket : this.BUCKET
 	, Key    : key
-	, Body   : new Stream.PassThrough()
+	, Body   : new PassThrough()
     }	
-	
-	this.s3Connection.upload(params).send((err, data) => {
-      if (err) {
-		params.Body.destroy(err);
-      } 
-	  else {
-        // console.log(`File uploaded and available at ${data.Location}`);
-        params.Body.destroy();
-      }
-    }) 
+    
+	const streamFinished = new Promise((resolve,reject) => {
+	  this.s3Connection.upload(params).send((err, data) => {
+ 	    if (err) {
+          this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',key],`FAILED`);
+		  reject(err)
+	    } 
+	    else {
+          // this.yadamuLogger.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',key],`SUCCESS : File uploaded to "${data.Location}"`);
+		  resolve(params.Key)
+	      this.writeOperations.delete(streamFinished)
+	    }
+	    params.Body.destroy(err);
+      })
+    })	  
+	this.writeOperations.add(streamFinished)
 	return params.Body
   }
 
-  async createStorageTarget() {
+  async createBucketContainer() {
     let stack;
 	let operation
     try {
@@ -68,7 +74,7 @@ class AWSS3StorageService {
 	}
   }
 
-  async verifyStorageTarget() {
+  async verifyBucketContainer() {
 	 
 	let stack;
     try {

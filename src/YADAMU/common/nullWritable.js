@@ -22,13 +22,10 @@ class NullWritable extends Writable {
 	callback()
   }
 	
-  _destroy(err, callback) {
+  _final(err, callback) {
 	 callback()
   }
-  
-  _final(callback) {
-	callback()
-  }
+
 }
 
 module.exports = NullWritable

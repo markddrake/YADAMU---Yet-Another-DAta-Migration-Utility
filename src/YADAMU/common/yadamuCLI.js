@@ -9,9 +9,9 @@ const Yadamu = require('./yadamu.js');
 const YadamuConstants = require('./yadamuConstants.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuLogger = require('./yadamuLogger.js');
-const {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuError.js');
+const {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuException.js');
 
-const {FileNotFound} = require('../file/node/fileError.js');
+const {FileNotFound} = require('../file/node/fileException.js');
 
 /*
 **

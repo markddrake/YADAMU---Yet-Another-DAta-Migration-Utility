@@ -28,19 +28,19 @@ class PostgresQA extends PostgresDBI {
       await this.createSchema(this.parameters.TO_USER);    
     }      
 
-	async scheduleTermination(pid) {
+	async scheduleTermination(pid,workerId) {
 	  const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
 	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
 	  const timer = setTimeout(async (pid) => {
           try {
 		    if (this.pool !== undefined && this.pool.end) {
-		      this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Killing connection.`);
+		      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Killing connection.`);
 	          const conn = await this.getConnectionFromPool();
 		      const res = await conn.query(`select pg_terminate_backend(${pid})`);
 		      await conn.release()
 		    }
 		    else {
-		      this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
+		      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
 		    }
            } catch (e) {
              console.log(e);
@@ -57,9 +57,9 @@ class PostgresQA extends PostgresDBI {
 	  if (this.options.recreateSchema === true) {
 		await this.recreateSchema();
 	  }
-	  if (this.testLostConnection()) {
+	  if (this.enableLostConnectionTest()) {
 		const dbiID = await this.getConnectionID();
-		this.scheduleTermination(dbiID);
+		this.scheduleTermination(dbiID,this.getWorkerNumber());
 	  }
 	}
 	
@@ -89,9 +89,9 @@ class PostgresQA extends PostgresDBI {
 	
   async workerDBI(idx)  {
 	const workerDBI = await super.workerDBI(idx);
-	if (workerDBI.testLostConnection()) {
+	if (workerDBI.enableLostConnectionTest()) {
 	  const dbiID = await workerDBI.getConnectionID();
-	  this.scheduleTermination(dbiID);
+	  this.scheduleTermination(dbiID,workerDBI.getWorkerNumber());
     }
 	return workerDBI
   }

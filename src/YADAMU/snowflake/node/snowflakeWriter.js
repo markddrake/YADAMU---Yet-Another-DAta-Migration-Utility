@@ -7,7 +7,7 @@ const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const NullWriter = require('../../common/nullWriter.js');
 const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
-const {BatchInsertError} = require('../../common/yadamuError.js')
+const {BatchInsertError} = require('../../common/yadamuException.js')
 
 class SnowflakeWriter extends YadamuWriter {
 

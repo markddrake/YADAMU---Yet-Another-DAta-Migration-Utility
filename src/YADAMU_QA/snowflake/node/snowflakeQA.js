@@ -25,7 +25,7 @@ class SnowflakeQA extends SnowflakeDBI {
 	  , fetchAsString  : ['Number','Date','JSON']
       , complete       : async (err,statement,rows) => {
 		                   if (err) {
-              		         const cause = this.captureException(new SnowflakeError(err,stack,sqlStatement))
+              		         const cause = this.trackExceptions(new SnowflakeError(err,stack,sqlStatement))
     		                 reject(cause);
                            }
 					       // this.traceTiming(sqlStartTime,sqlEndTime)
@@ -36,11 +36,11 @@ class SnowflakeQA extends SnowflakeDBI {
   }  
 
     
-    async scheduleTermination(pid) {
+    async scheduleTermination(pid,workerId) {
       const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
       const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
       const timer = setTimeout(async (pid) => {
-          this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Killing connection.`);
+          this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Killing connection.`);
           const conn = await this.getConnectionFromPool();
           const sqlStatement = `select SYSTEM$ABORT_SESSION( ${pid} );`
           let stack
@@ -50,7 +50,7 @@ class SnowflakeQA extends SnowflakeDBI {
             await conn.destroy()
           } catch (e) {
             const cause = new SnowflakeError(e,stack,sqlStatement)
-            this.yadamuLogger.handleException(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],cause)
+            this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],cause)
           }
 	    },
         killDelay,
@@ -65,9 +65,9 @@ class SnowflakeQA extends SnowflakeDBI {
         await this.recreateSchema();
       }
       await super.initialize();
-      if (this.testLostConnection()) {
+      if (this.enableLostConnectionTest()) {
         const dbiID = await this.getConnectionID();
-        this.scheduleTermination(dbiID);
+        this.scheduleTermination(dbiID,this.getWorkerNumber());
       }
     }
 

@@ -5,7 +5,7 @@ const { performance } = require('perf_hooks');
 const Yadamu = require('../../common/yadamu.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
-const {BatchInsertError} = require('../../common/yadamuError.js')
+const {BatchInsertError} = require('../../common/yadamuException.js')
 
 class ExampleWriter extends YadamuWriter {
 

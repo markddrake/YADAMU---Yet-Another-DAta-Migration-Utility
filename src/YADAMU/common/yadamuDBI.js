@@ -14,7 +14,7 @@ const { performance } = require('perf_hooks');const async_hooks = require('async
 const Yadamu = require('./yadamu.js');
 const DBIConstants = require('./dbiConstants.js');
 const YadamuLibrary = require('./yadamuLibrary.js')
-const {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError} = require('./yadamuError.js');
+const {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError, BatchInsertError, IterativeInsertError, InputStreamError} =  require('./yadamuException.js');
 const DefaultParser = require('./defaultParser.js');
 const DummyWritable = require('./nullWritable.js')
 
@@ -28,8 +28,6 @@ const DummyWritable = require('./nullWritable.js')
 class YadamuDBI {
 
   // Instance level getters.. invoke as this.METHOD
-
-  get PIPELINE_OPERATION_HANGS()   {return false }
 
   get DATABASE_VENDOR()            { return undefined };
   get SOFTWARE_VENDOR()            { return undefined };
@@ -83,6 +81,15 @@ class YadamuDBI {
 	this._INPUT_METRICS =  Object.assign({},v);
   }
   
+  get TRANSACTION_IN_PROGRESS()       { return this._TRANSACTION_IN_PROGRESS === true }
+  set TRANSACTION_IN_PROGRESS(v)      { this._TRANSACTION_IN_PROGRESS = v }
+  
+  get RECONNECT_IN_PROGRESS()         { return this._RECONNECT_IN_PROGRESS === true }
+  set RECONNECT_IN_PROGRESS(v)        { this._RECONNECT_IN_PROGRESS = v }
+  
+  get SAVE_POINT_SET()                { return this._SAVE_POINT_SET === true }
+  set SAVE_POINT_SET(v)               { this._SAVE_POINT_SET = v }
+
   get ATTEMPT_RECONNECTION() {
     this._ATTEMPT_RECONNECTION = this._ATTEMPT_RECONNECTION || (() => {
       switch (this.ON_ERROR) {
@@ -91,14 +98,14 @@ class YadamuDBI {
   		  return false;
 	    case 'SKIP':
 	    case 'FLUSH':
-	      return true;
+		  return (!this.TRANSACTION_IN_PROGRESS)
 	    default:
 	      return false;
       }
     })();
     return this._ATTEMPT_RECONNECTION
   }
-
+  
   // Not available until configureConnection() has been called 
 
   get DB_VERSION()             { return this._DB_VERSION }
@@ -122,15 +129,15 @@ class YadamuDBI {
     this.metadata = undefined;
     this.connectionProperties = this.getConnectionProperties()   
     this.connection = undefined;
-    this.reconnectInProgress = false
 	
     this.statementCache = undefined;
 	
 	// Track Transaction and Savepoint state.
 	// Needed to restore transacation state when reconnecting.
 	
-	this.transactionInProgress = false;
-	this.savePointSet = false;
+    this.RECONNECT_IN_PROGRESS = false
+	this.TRANSACTION_IN_PROGRESS = false;
+	this.SAVE_POINT_SET = false;
  
     this.tableName  = undefined;
     this.tableInfo  = undefined;
@@ -347,17 +354,18 @@ class YadamuDBI {
     return true;
   }
   
-  captureException(err) {
+  trackExceptions(err) {
     // Reset by passing undefined 
     this.firstError = this.firstError === undefined ? err : this.firstError
 	this.latestError = err
     return err
   }	
-   
-  invalidConnection() {
-	return ((this.latestError instanceof DatabaseError) && (this.latestError.lostConnection() || this.latestError.serverUnavailable()))
-  }
   
+  resetExceptionTracking() {
+    this.firstError = undefined
+	this.latestError = undefined
+  }
+   
   setMetrics(metrics) {
 	// Share metrics with the Writer so adjustments can be made if the connection is lost.
     this.metrics = metrics
@@ -620,13 +628,13 @@ class YadamuDBI {
   async reconnect(cause,operation) {
 
     let retryCount = 0;
-    let connectionUnavailable 
+    let connectionUnavailable
     
-    const transactionInProgress = this.transactionInProgress 
-    const savePointSet = this.savePointSet
+    const transactionInProgress = this.TRANSACTION_IN_PROGRESS 
+    const SAVE_POINT_SET = this.SAVE_POINT_SET
 	
 	this._ATTEMPT_RECONNECTION = false
-    this.reconnectInProgress = true;
+    this.RECONNECT_IN_PROGRESS = true;
 	this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`${operation}`],cause)
 	
 	/*
@@ -651,7 +659,7 @@ class YadamuDBI {
 	  try {
         await this.closeConnection()
       } catch (e) {
-	    if (!e.invalidConnection()) {
+	    if (!YadamuError.closedConnection(e)) {
           this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`Error closing existing connection.`);
 		  this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`RECONNECT`],e)
 	    }
@@ -664,10 +672,10 @@ class YadamuDBI {
 		if (transactionInProgress) {
 		  await this.beginTransaction()
 		}
-		if (this.savePointSet) {
+		if (this.SAVE_POINT_SET) {
 		  await this.createSavePoint()
 		}
-        this.reconnectInProgress = false;
+        this.RECONNECT_IN_PROGRESS = false;
         this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`New connection available.`);
         this._ATTEMPT_RECONNECTION = undefined
 		return;
@@ -679,7 +687,7 @@ class YadamuDBI {
           retryCount++;
         }
         else {
-   	      this.reconnectInProgress = false;
+   	      this.RECONNECT_IN_PROGRESS = false;
           this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`RECONNECT`],connectionFailure);
           this._ATTEMPT_RECONNECTION = undefined
           throw cause;
@@ -687,7 +695,7 @@ class YadamuDBI {
       }
     }
     // this.yadamuLogger.trace([`${this.constructor.name}._reconnect()`],`Unable to re-establish connection.`)
-    this.reconnectInProgress = false;
+    this.RECONNECT_IN_PROGRESS = false;
     this.ATTEMPT_RECONNECTION = undefined
     throw connectionUnavailable 	
   }
@@ -789,12 +797,6 @@ class YadamuDBI {
   **
   */
   
-  lostConnection(e) {
-	
-	return((e instanceof DatabaseError) && e.lostConnection())
-	
-  }
-
   async abort(e,options) {
 	
 	// this.yadamuLogger.trace([this.constructor.name,`abort(${poolOptions})`],'')
@@ -807,7 +809,7 @@ class YadamuDBI {
     try {
       await this.closeConnection(options);
 	} catch (e) {
-	  if (!this.lostConnection(e)) {
+	  if (!YadamuError.closedConnection(e)) {
         this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','Connection'],e);
 	  }
 	}
@@ -816,7 +818,7 @@ class YadamuDBI {
 	  // Force Termnination of All Current Connections.
 	  await this.closePool(options);
 	} catch (e) {
-	  if (!this.lostConnection(e)) {
+	  if (!YadamuError.closedConnection(e)) {
         this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','Pool'],e);
 	  }
 	}
@@ -828,8 +830,12 @@ class YadamuDBI {
   checkConnectionState(cause) {
 	 
 	// Throw cause if cause is a lost connection. Used by drivers to prevent attempting rollback or restore save point operations when the connection is lost.
+	
+    if ((cause instanceof BatchInsertError)  || (cause instanceof IterativeInsertError)) {
+	  cause = cause.cause
+    }
 	  
-  	if ((cause instanceof DatabaseError) && cause.lostConnection()) {
+  	if (YadamuError.closedConnection(cause)) {
       throw cause;
 	}
   }
@@ -852,8 +858,8 @@ class YadamuDBI {
   */
   
   beginTransaction() {
-    this.transactionInProgress = true;  
-	this.savePointSet = false;
+    this.TRANSACTION_IN_PROGRESS = true;  
+	this.SAVE_POINT_SET = false;
   }
 
   /*
@@ -863,8 +869,8 @@ class YadamuDBI {
   */
     
   commitTransaction() {
-	this.transactionInProgress = false;  
-	this.savePointSet = false;
+	this.TRANSACTION_IN_PROGRESS = false;  
+	this.SAVE_POINT_SET = false;
   }
 
   /*
@@ -874,8 +880,8 @@ class YadamuDBI {
   */
   
   rollbackTransaction(cause) {
-	this.transactionInProgress = false;  
-	this.savePointSet = false;
+	this.TRANSACTION_IN_PROGRESS = false;  
+	this.SAVE_POINT_SET = false;
   }
   
   /*
@@ -885,7 +891,7 @@ class YadamuDBI {
   */
     
   createSavePoint() {
-	this.savePointSet = true;
+	this.SAVE_POINT_SET = true;
   }
 
   /*
@@ -895,11 +901,11 @@ class YadamuDBI {
   */
 
   restoreSavePoint(cause) {
-	this.savePointSet = false;
+	this.SAVE_POINT_SET = false;
   }
 
   releaseSavePoint(cause) {
-	this.savePointSet = false;
+	this.SAVE_POINT_SET = false;
   }
 
   /*
@@ -1090,8 +1096,8 @@ class YadamuDBI {
     return new DefaultParser(tableInfo,this.yadamuLogger);      
   }
  
-  streamingError(cause,sqlStatement) {
-    return this.captureException(new DatabaseError(cause,this.streamingStackTrace,sqlStatement))
+  inputStreamError(cause,sqlStatement) {
+    return this.trackExceptions(new InputStreamError(cause,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(tableInfo) {
@@ -1103,15 +1109,17 @@ class YadamuDBI {
   async getInputStreams(tableInfo) {
 	const streams = []
 	this.INPUT_METRICS = DBIConstants.NEW_TIMINGS
+	this.INPUT_METRICS.DATABASE_VENDOR = this.DATABASE_VENDOR
 	const inputStream = await this.getInputStream(tableInfo)
     inputStream.once('readable',() => {
 	  this.INPUT_METRICS.readerStartTime = performance.now()
 	}).on('error',(err) => { 
+	  this.underlyingCause = this.inputStreamError(err,tableInfo.SQL_STATEMENT)
       this.INPUT_METRICS.readerEndTime = performance.now()
-	  this.INPUT_METRICS.readerError = err
+	  this.INPUT_METRICS.readerError = this.underlyingCause
 	  this.INPUT_METRICS.failed = true;
     }).on('end',() => {
-      this.INPUT_METRICS.readerEndTime = performance.now()
+	  this.INPUT_METRICS.readerEndTime = performance.now()
     })
 	streams.push(inputStream)
 	
@@ -1210,26 +1218,24 @@ class YadamuDBI {
 	return dbi
   }
   
-  testLostConnection() {
-	const supportedModes = ['DATA_ONLY','DDL_AND_DATA']
-    return (
-	         (supportedModes.indexOf(this.MODE) > -1)
-	         && 
-			 (
-			   ((this.PARALLEL === undefined) || (this.PARALLEL < 1))
-			   ||
-			   ((this.PARALLEL > 1) && (this.workerNumber !== undefined) && (this.workerNumber === this.parameters.KILL_WORKER_NUMBER))
-			 )
-			 && 
-			 (
-		       (this.parameters.FROM_USER && this.parameters.KILL_READER_AFTER && (this.parameters.KILL_READER_AFTER > 0)) 
-		       || 
-			   (this.parameters.TO_USER && this.parameters.KILL_WRITER_AFTER && (this.parameters.KILL_WRITER_AFTER > 0))
-		     )
-		   ) === true
-  }
-
-  
+  enableLostConnectionTest() {
+	
+     switch (true) {
+	   // KILL_READER_AFTER is specified and a FROM_USER was specified. This is a reader DBI and we are killing the Reader
+	   case (this.parameters.FROM_USER && Number.isInteger(this.parameters.KILL_READER_AFTER)):
+	   // KILL_WRITER_AFTER is specified and a TO_USER was specified. This is a wrier DBI and we are killing the Writer
+	   case (this.parameters.TO_USER && Number.isInteger(this.parameters.KILL_WRITER_AFTER)):
+         switch (true) {
+		   // This is the manager and we are  testing killing the manager
+           case (this.isManager() && (this.parameters.KILL_WORKER_NUMBER === undefined)):
+		   // This is a worker and it is the worker are looking for ...
+           case ((this.PARALLEL > 0 ) && (this.getWorkerNumber() === this.parameters.KILL_WORKER_NUMBER)):
+	         return true;			   
+		 }
+     }
+	 return false
+  }	
+	  
   async getConnectionID() {
 	// ### Get a Unique ID for the connection
     throw new Error('Unimplemented Method')

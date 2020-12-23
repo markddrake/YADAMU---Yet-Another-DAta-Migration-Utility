@@ -6,7 +6,7 @@ const { performance } = require('perf_hooks');
 const sql = require('mssql');
 
 const DBFileLoader = require('./dbFileLoader');
-const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileError.js')
+const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js')
 
 class StagingTable {
 

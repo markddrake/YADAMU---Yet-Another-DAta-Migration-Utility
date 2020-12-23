@@ -1,6 +1,6 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuError.js')
+const {DatabaseError} = require('../../common/yadamuException.js')
 
 const OracleConstants = require('./oracleConstants.js')
 
@@ -58,7 +58,7 @@ class OracleError extends DatabaseError {
     return this.cause.message.startsWith(OracleConstants.INVALID_POOL)
   } 
 
-  invalidConnection() {
+  closedConnection() {
     return this.cause.message.startsWith(OracleConstants.INVALID_CONNECTION)
   } 
   

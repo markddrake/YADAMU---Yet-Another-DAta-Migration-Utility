@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const {ConfigurationFileError} = require('./yadamuError.js');
+const {ConfigurationFileError} = require('./yadamuException.js');
 
 class YadamuLibrary {
 

@@ -29,9 +29,9 @@ const Yadamu = require('../../common/yadamu.js');
 const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
-const {ConnectionError} = require('../../common/yadamuError.js')
+const {ConnectionError} = require('../../common/yadamuException.js')
 const MsSQLConstants = require('./mssqlConstants.js')
-const MsSQLError = require('./mssqlError.js')
+const MsSQLError = require('./mssqlException.js')
 const MsSQLParser = require('./mssqlParser.js');
 const MsSQLWriter = require('./mssqlWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
@@ -139,11 +139,11 @@ class MsSQLDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.getTransactionManager()`,this.getWorkerNumber()],``)
 
-    this.transactionInProgress = false;
+    this.TRANSACTION_IN_PROGRESS = false;
     const transaction = new sql.Transaction(this.pool)
     transaction.on('rollback',async () => { 
       if (!this.yadamuRollback) {
-        this.transactionInProgress = false;
+        this.TRANSACTION_IN_PROGRESS = false;
         this.tediousTransactionError = true;
         this.reportTransactionState('ROLLBACK')
       }
@@ -165,7 +165,7 @@ class MsSQLDBI extends YadamuDBI {
       })
       return request;
     } catch (e) {
-      throw this.captureException(new MsSQLError(e,stack,`sql.Request(${this.requestProvider.constuctor.name})`))
+      throw this.trackExceptions(new MsSQLError(e,stack,`sql.Request(${this.requestProvider.constuctor.name})`))
     }
   }
   
@@ -348,7 +348,7 @@ class MsSQLDBI extends YadamuDBI {
       try {
         await statement.unprepare();
       } catch (e) {}
-      throw this.captureException(new MsSQLError(e,stack,`sql.PreparedStatement(${sqlStatement}`))
+      throw this.trackExceptions(new MsSQLError(e,stack,`sql.PreparedStatement(${sqlStatement}`))
     }
   }
 
@@ -367,7 +367,7 @@ class MsSQLDBI extends YadamuDBI {
       operation = 'sql.connectionPool()'
       this.pool = new sql.ConnectionPool(this.connectionProperties)
       this.pool.on('error',(err, p) => {
-        const cause = err instanceof MsSQLError ? err : this.captureException(new MsSQLError(err,stack,`${operation}.onError()`))
+        const cause = err instanceof MsSQLError ? err : this.trackExceptions(new MsSQLError(err,stack,`${operation}.onError()`))
         if (!cause.suppressedError())  {
           this.yadamuLogger.handleException([this.DATABASE_VENDOR,`sql.ConnectionPool.onError()`],cause);
           if (!this.reconnectInProgress) {
@@ -384,7 +384,7 @@ class MsSQLDBI extends YadamuDBI {
       this.transaction = this.getTransactionManager()
       
     } catch (e) {
-      throw this.captureException(new MsSQLError(e,stack,operation))
+      throw this.trackExceptions(new MsSQLError(e,stack,operation))
     }       
 
     await this.configureConnection();
@@ -402,13 +402,13 @@ class MsSQLDBI extends YadamuDBI {
   
   async closeConnection(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.preparedStatement !== undefined)},${this.transactionInProgress})`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.preparedStatement !== undefined)},${this.TRANSACTION_IN_PROGRESS})`)
     
     if (this.preparedStatement !== undefined ) {
       await this.clearCachedStatement()
     }   
     
-    if (this.transactionInProgress === true) {
+    if (this.TRANSACTION_IN_PROGRESS) {
       try {
         await this.rollbackTransaction()
       } catch (e) {
@@ -453,7 +453,7 @@ class MsSQLDBI extends YadamuDBI {
       } catch(e) {
         // this.pool = undefined
         this.yadamuLogger.trace([this.DATABASE_VENDOR],`Error Closing Pool`)
-        throw this.captureException(new MsSQLError(e,stack,psudeoSQL))
+        throw this.trackExceptions(new MsSQLError(e,stack,psudeoSQL))
       }
     }
   }
@@ -492,7 +492,7 @@ class MsSQLDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = this.captureException(new MsSQLError(e,stack,sqlStatment))
+        const cause = this.trackExceptions(new MsSQLError(e,stack,sqlStatment))
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -521,7 +521,7 @@ class MsSQLDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = this.captureException(new MsSQLError(e,stack,psuedoSQL))
+        const cause = this.trackExceptions(new MsSQLError(e,stack,psuedoSQL))
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -557,7 +557,7 @@ class MsSQLDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = this.captureException(new MsSQLError(e,stack,this.preparedStatement.sqlStatement))
+        const cause = this.trackExceptions(new MsSQLError(e,stack,this.preparedStatement.sqlStatement))
         if (attemptReconnect && cause.lostConnection()) {
           this.preparedStatement === undefined;
           attemptReconnect = false;
@@ -605,14 +605,14 @@ class MsSQLDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = this.captureException(new MsSQLError(e,stack,operation))
+        const cause = this.trackExceptions(new MsSQLError(e,stack,operation))
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
           await this.reconnect(cause,'BULK INSERT')
-          continue;
+          continue		  
         }
-        throw cause
+		throw this.trackExceptions(cause)
       }      
     } 
   }
@@ -795,7 +795,7 @@ class MsSQLDBI extends YadamuDBI {
         super.beginTransaction()
         break;
       } catch (e) {
-        const cause = this.captureException(new MsSQLError(e,stack,'sql.Transaction.begin()'))
+        const cause = this.trackExceptions(new MsSQLError(e,stack,'sql.Transaction.begin()'))
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -830,13 +830,13 @@ class MsSQLDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.pool
     } catch (e) {
-      const cause = this.captureException(new MsSQLError(e,stack,'sql.Transaction.commit()'))
+      const cause = this.trackExceptions(new MsSQLError(e,stack,'sql.Transaction.commit()'))
       if (attemptReconnect && cause.lostConnection()) {
         attemptReconnect = false;
         // reconnect() throws cause if it cannot reconnect...
         await this.reconnect(cause,'Commit')
       }
-      throw this.captureException(new MsSQLError(e,stack,'sql.Transaction.commit()'))
+      throw this.trackExceptions(new MsSQLError(e,stack,'sql.Transaction.commit()'))
     }
     
   }
@@ -850,8 +850,8 @@ class MsSQLDBI extends YadamuDBI {
   async rollbackTransaction(cause) {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),(this.preparedStatement !== undefined)],`${this.cause ? this.cause.message : undefined}`)
-
-    this.checkConnectionState(cause)
+    
+	this.checkConnectionState(cause)
     
     if (this.tediousTransactionError) {
       return
@@ -879,7 +879,7 @@ class MsSQLDBI extends YadamuDBI {
       this.requestProvider = this.pool
     } catch (e) {
       this.yadamuRollback = false;
-      let newIssue = this.captureException(new MsSQLError(e,stack,'sql.Transaction.rollback()'))
+      let newIssue = this.trackExceptions(new MsSQLError(e,stack,'sql.Transaction.rollback()'))
       this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
     }   
     
@@ -1035,17 +1035,20 @@ class MsSQLDBI extends YadamuDBI {
     return new MsSQLParser(tableInfo,this.yadamuLogger);
   }  
   
-  streamingError(err,sqlStatement) {
-     return this.captureException(new MsSQLError(err,this.streamingStackTrace,sqlStatement))
+  inputStreamError(err,sqlStatement) {
+     return this.trackExceptions(new MsSQLError(err,this.streamingStackTrace,sqlStatement))
   }
 
   async getInputStream(tableInfo) {
     // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
     const request = this.getRequest();
-	// request.query(this.sqlStatement);
-    // return request
 	this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT));
+	if (typeof request.toReadableStream === 'function') {
+  	  const stream = request.toReadableStream();
+      request.query(this.sqlStatement);
+      return stream
+	}
     return new MsSQLReader(request,tableInfo.SQL_STATEMENT);
   }      
 

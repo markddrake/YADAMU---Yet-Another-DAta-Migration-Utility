@@ -101,10 +101,10 @@ class PostgresWriter extends YadamuWriter {
   }
       
   async _writeBatch(batch,rowCount) {
-
-
+   
     this.metrics.batchCount++;
     let repackBatch = false;
+	
 
     if (this.insertMode === 'Batch') {
                
@@ -120,7 +120,7 @@ class PostgresWriter extends YadamuWriter {
         this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
-        this.reportBatchError(batch,`INSERT MANY`,cause)
+		this.reportBatchError(batch,`INSERT MANY`,cause)
         await this.dbi.restoreSavePoint(cause);
 		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
@@ -152,6 +152,7 @@ class PostgresWriter extends YadamuWriter {
     this.releaseBatch(batch)
     return this.skipTable   
   }
+  
 }
 
 module.exports = PostgresWriter;

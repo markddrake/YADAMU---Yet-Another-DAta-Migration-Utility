@@ -1,7 +1,9 @@
 "use strict" 
 
+const oracledb = require('oracledb');
+
 const OracleDBI = require('../../../YADAMU/oracle/node/oracleDBI.js');
-const OracleError = require('../../../YADAMU/oracle/node/oracleError.js')
+const OracleError = require('../../../YADAMU/oracle/node/oracleException.js')
 
 class OracleQA extends OracleDBI {
     
@@ -15,12 +17,12 @@ class OracleQA extends OracleDBI {
        super(yadamu)
     }
 
-	async scheduleTermination(pid) {
-      const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
-	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
+	async scheduleTermination(pid,workerId) {
+	  const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
+	  const killDelay = this.parameters.KILL_READER_AFTER  || this.parameters.KILL_WRITER_AFTER
 	  const timer = setTimeout(async (pid) => {
 		   if ((this.pool instanceof this.oracledb.Pool) && (this.pool.status === this.oracledb.POOL_STATUS_OPEN)) {
-		     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],`Killing connection.`);
+		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,`${pid.sid},${pid.serial}`],`Killing connection.`);
 			 const conn = await this.getConnectionFromPool();
 			 const sqlStatement = `ALTER SYSTEM KILL SESSION '${pid.sid}, ${pid.serial}'`
 			 let stack
@@ -31,16 +33,16 @@ class OracleQA extends OracleDBI {
 			 } catch (e) {
 			   if ((e.errorNum && ((e.errorNum === 27) || (e.errorNum === 31))) || (e.message.startsWith('DPI-1010'))) {
 				 // The Worker has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourself (Error 27)
-			     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],`Worker finished prior to termination.`)
+			     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,`${pid.sid},${pid.serial}`],`Worker finished prior to termination.`)
  			   }
 			   else {
 				 const cause = new OracleError(e,stack,sqlStatement)
-			     this.yadamuLogger.handleException(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial,this.getWorkerNumber()],cause)
+			     this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,`${pid.sid},${pid.serial}`],cause)
 			   }
 			 }
 		   }
 		   else {
-		     this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid.sid,pid.serial],`Unable to Kill Connection: Connection Pool no longer available.`);
+		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,`${pid.sid},${pid.serial}`],`Unable to Kill Connection: Connection Pool no longer available.`);
 		   }
 		},
 		killDelay,
@@ -68,12 +70,12 @@ class OracleQA extends OracleDBI {
 
 	async initialize() {
 	  await super.initialize();
-	  if (this.options.recreateSchema === true) {
+      if (this.options.recreateSchema === true) {
 		await this.recreateSchema();
 	  }
-	  if (this.testLostConnection()) {
+	  if (this.enableLostConnectionTest()) {
 		const dbiID = await this.getConnectionID();
-		this.scheduleTermination(dbiID);
+		this.scheduleTermination(dbiID,this.getWorkerNumber());
 	  }
 	}
 	
@@ -92,11 +94,14 @@ class OracleQA extends OracleDBI {
         return [row[0],row[1],row[2],row[4]]
       })
         
-      const failed = await this.executeSQL(OracleQA.SQL_FAILED,{})
-      
-      report.failed = failed.rows.map((row,idx) => {
-        return [row[0],row[1],row[2],row[4],row[5],row[6],row[7],row[8]]
-      })
+	  
+	  const options = {fetchInfo:[{type: oracledb.STRING, maxSize: 128},{type: oracledb.STRING, maxSize: 128},{type: oracledb.STRING, maxSize: 128},{type: oracledb.STRING, maxSize: 12},{type: oracledb.NUMBER},{type: oracledb.NUMBER},{type: oracledb.NUMBER},{type: oracledb.NUMBER},{type: oracledb.STRING, maxSize: 16*1024*1024}]}
+      // const failed = await this.executeSQL(OracleQA.SQL_FAILED,{},options)      
+      const failed = await this.executeSQL(OracleQA.SQL_FAILED,{})      
+      report.failed = await Promise.all(failed.rows.map(async (row,idx) => {
+		const result = [row[0],row[1],row[2],row[4],row[5],row[6],row[7],row[8] === null ? row[8] : this.clobToString(row[8])]
+		return await Promise.all(result)
+      }))
 	  
       return report
     }
@@ -117,10 +122,10 @@ class OracleQA extends OracleDBI {
 
   async workerDBI(idx)  {
 	const workerDBI = await super.workerDBI(idx);
-	if (workerDBI.testLostConnection()) {
-	  const dbiID = await workerDBI.getConnectionID();
-	  this.scheduleTermination(dbiID);
-    }
+	if (workerDBI.enableLostConnectionTest()) {
+      const dbiID = await workerDBI.getConnectionID();
+	  this.scheduleTermination(dbiID,workerDBI.getWorkerNumber());
+	}
 	return workerDBI
   }
 
@@ -130,7 +135,7 @@ class OracleQA extends OracleDBI {
 module.exports = OracleQA
 
 const _SQL_SUCCESS =
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL' "RESULTS", TARGET_ROW_COUNT
+`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL', TARGET_ROW_COUNT
   from SCHEMA_COMPARE_RESULTS 
  where SOURCE_ROW_COUNT = TARGET_ROW_COUNT
    and MISSING_ROWS = 0
@@ -139,7 +144,7 @@ const _SQL_SUCCESS =
 order by TABLE_NAME`;
 
 const _SQL_FAILED = 
-`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'FAILED' "RESULTS", SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, SQLERRM "NOTES"
+`select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'FAILED', SOURCE_ROW_COUNT, TARGET_ROW_COUNT, MISSING_ROWS, EXTRA_ROWS, SQLERRM
   from SCHEMA_COMPARE_RESULTS 
  where SOURCE_ROW_COUNT <> TARGET_ROW_COUNT
     or MISSING_ROWS <> 0

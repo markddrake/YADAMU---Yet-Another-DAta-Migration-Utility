@@ -142,7 +142,7 @@ class JSONWriter extends YadamuWriter {
         transformation(row,idx)
       }
     })
-    this.push(this.formatRow(row));
+    const x = this.push(this.formatRow(row));
 	this.rowSeperator = ','
     this.metrics.committed++;
     if ((this.FEEDBACK_INTERVAL > 0) && ((this.metrics.committed % this.FEEDBACK_INTERVAL) === 0)) {
@@ -150,21 +150,31 @@ class JSONWriter extends YadamuWriter {
     }
   }
 
-  endTable() {
+  async endTable() {
+    // Called from YadamuWriter when 'eod' is recieved during import or from _final during direct copy
 	this.push(']')
   }
-  
-  finalize(callback) {
-	this.endTable();
-    super.finalize();	
-  }
 
+  async _final(callback) {
+	 /* OVERRIDE */ 
+	await this.endTable()
+    callback()
+  }	  
+  
+  async _destroy(err,callback) {
+	 /* OVERRIDE */ 
+	this.endTime = performance.now()
+    this.reportPerformance()
+ 	this.emit('writerComplete')
+	callback()
+  }	  
+  
   async _writeBatch /* OVERRIDE */ () {}
 
   async commitTransaction() { /* OVERRIDE */ }
 
   async rollbackTransaction() { /* OVERRIDE */ }
-
+  
 }
 
 module.exports = JSONWriter;

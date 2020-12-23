@@ -28,22 +28,22 @@ class MariadbQA extends MariadbDBI {
       await this.executeSQL(createUser,{});      
     }   
 	
-	async scheduleTermination(pid) {
+	async scheduleTermination(pid,workerId) {
 	  const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
 	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
 	  const timer = setTimeout(async (pid) => {
           if (this.pool !== undefined && this.pool.end) {
-		    this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Killing connection.`);
+		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Killing connection.`);
 	        const conn = await this.getConnectionFromPool();
 			const sqlStatement = `kill hard ${pid}`
 		    const res = await conn.query(sqlStatement);
 			if (res.affectedRows === 0) {
- 		      this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Results sent prior to termination.`)
+ 		      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Results sent prior to termination.`)
             }
 		    await conn.release()
 		  }
 		  else {
-		    this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
+		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
 		  }
 		},
 		killDelay,
@@ -57,9 +57,9 @@ class MariadbQA extends MariadbDBI {
 	  if (this.options.recreateSchema === true) {
 		await this.recreateSchema();
 	  }
-	  if (this.testLostConnection()) {
+	  if (this.enableLostConnectionTest()) {
 		const dbiID = await this.getConnectionID();
-		this.scheduleTermination(dbiID);
+		this.scheduleTermination(dbiID,this.getWorkerNumber());
 	  }
 	}
  
@@ -90,9 +90,9 @@ class MariadbQA extends MariadbDBI {
     
   async workerDBI(idx)  {
 	const workerDBI = await super.workerDBI(idx);
-	if (workerDBI.testLostConnection()) {
+	if (workerDBI.enableLostConnectionTest()) {
 	  const dbiID = await workerDBI.getConnectionID();
-	  this.scheduleTermination(dbiID);
+	  this.scheduleTermination(dbiID,workerDBI.getWorkerNumber());
     }
 	return workerDBI
   }

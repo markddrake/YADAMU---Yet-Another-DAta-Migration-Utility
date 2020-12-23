@@ -1,6 +1,6 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuError.js')
+const {DatabaseError} = require('../../common/yadamuException.js')
 const MySQLConstants = require('./mysqlConstants.js')
 
 class MySQLError extends DatabaseError {

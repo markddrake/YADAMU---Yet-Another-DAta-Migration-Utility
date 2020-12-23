@@ -85,11 +85,11 @@ class DBWriter extends Writable {
   }
   
   async executeDDL(ddlStatements) {
-	const startTime = performance.now()
 	// this.yadamuLogger.trace([this.constructor.name,`executeDDL()`,this.dbi.DATABASE_VENDOR],`Executing DLL statements)`) 
-    ddlStatements = this.dbi.prepareDDLStatements(ddlStatements)	
+    const startTime = performance.now()
+	ddlStatements = this.dbi.prepareDDLStatements(ddlStatements)	
     const results = await this.dbi.executeDDL(ddlStatements) 
-    this.emit('ddlComplete',results,startTime);	 
+	this.emit('ddlComplete',results,startTime);	 
   }
   
   async generateStatementCache(metadata) {
@@ -224,16 +224,6 @@ class DBWriter extends Writable {
     await this.dbi.initializeImport();
 	this.targetSchemaInfo = await this.getTargetSchemaInfo()
   }
-  
-  abortTable() {
-
-    // this.yadamuLogger.trace([`${this.constructor.name}.abortTable`],``);
-	  
-	// Set skipTable TRUE. No More rows will be cached for writing. No more batches will be written. Batches that have been written but not commited will be rollbed back.
-	// ### Not this may set it on the DBI rather than than the current table is the abort is raised when the current table is not defined (eg before the first table, or between tables, or after the last table.
-
-    this.transactionManager.skipTable = true;
-  }
  
   async _write(obj, encoding, callback) {
 	const messageType = Object.keys(obj)[0]
@@ -247,7 +237,10 @@ class DBWriter extends Writable {
           if ((this.ddlRequired) && (obj.ddl.length > 0) && (this.dbi.isValidDDL())) { 
 		    const startTime = performance.now()
             const results = await this.dbi.executeDDL(obj.ddl);
-	        this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`Executed ${results.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+			if (results instanceof Error) {
+			  throw results;
+			}
+			this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`Executed ${results.length} DDL statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
 			this.ddlCompleted = true
           }
           break;
@@ -265,7 +258,7 @@ class DBWriter extends Writable {
       }    
       callback();
     } catch (e) {
-	  this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_write()`,messageType,this.dbi.yadamu.ON_ERROR],e);
+	  // this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_write()`,messageType,this.dbi.yadamu.ON_ERROR],e);
       // Any errors that occur while processing metadata are fatal.Passing the exception to callback triggers the onError() event
 	  // Attempt a rollback, however if the rollback fails invoke the callback with the origianal exception.
       try {

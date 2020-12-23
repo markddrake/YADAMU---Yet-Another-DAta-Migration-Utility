@@ -1,6 +1,6 @@
 "use strict" 
 
-const { Transform } = require('stream');
+const { Transform, PassThrough } = require('stream');
 const { performance } = require('perf_hooks');
 
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
@@ -36,8 +36,9 @@ class EventStream extends Transform {
   
   async createWriter(tableName) {
     // const writer = this.dbWriter.dbi.getOutputStream(tableName,this.dbWriter.ddlComplete)
-	const writers = await this.dbWriter.dbi.getOutputStreams(tableName,this.dbWriter.ddlComplete)
+	const writers = await this.dbWriter.dbi.getOutputStreams(tableName,this.dbWriter.ddlComplete)	
 	const writer = writers[0]
+	this.terminalStream = writers[writers.length-1]
 	let nextStream = writers.shift()
 	while (writers.length > 0) {
 	  nextStream = nextStream.pipe(writers.pop());
@@ -173,35 +174,49 @@ class EventStream extends Transform {
 		    this.INPUT_METRICS.readerStartTime = data.eod.startTime;
 		    this.INPUT_METRICS.readerEndTime = data.eod.endTime;
 	        this.INPUT_METRICS.parserEndTime = performance.now();
-      	    const allDataReceived = new Promise((resolve,reject) => {
+      	    
+			const allDataReceived = new Promise((resolve,reject) => {
 	          outputStream.once('allDataReceived',() => {
 	            // this.yadamuLogger.trace([this.constructor.name,outputStream.constructor.name,outputStream.tableName,'ON'],'allDataReceived')
 			    resolve()
 	  	      })
 	        })
+			
             this.push(data);
 
             // this.yadamuLogger.trace([this.constructor.name,outputStream.constructor.name,outputStream.tableName],`Waiting for 'allDataReceived'`)
 	  	    await allDataReceived;
   		    // this.yadamuLogger.trace([this.constructor.name,outputStream.constructor.name,outputStream.tableName],`allDataReceived'`)
-
-            await new Promise((resolve,reject) => {
+			
+			const writerComplete = new Promise((resolve,reject) => {
+	          outputStream.on('writerComplete',(err) => {
+		        resolve(err)
+              })
+            })
+			
+			outputStream.destroy()	
+			await writerComplete
+			await new Promise((resolve,reject) => {
 	          outputStream.end(undefined,undefined,(err) => {
 	            resolve()
 	          })
 	        })
-            outputStream.destroy()
+			if ((this.terminalStream instanceof PassThrough) && !this.terminalStream.ended) {
+	          // Pipelines that terminate in a PassThrough stream seem not to destroy all of the components correctly when the data has been proceseds. This causes the operation to hang. 
+	          // Explicitly end such a stream
+			  this.terminalStream.end()
+			}
 		  }
 		  break;
 	    case 'eof':
 		  this.pipe(this.dbWriter); 
 	  	  this.dbWriter.deferredCallback()
 	      this.push(data);
-	  	  break;
+      	  break;
 	    default:
-         this.push(data);
+          this.push(data);
 	  }
-      callback();	
+	  callback();	
     } catch(e) { 
 	  this.yadamuLogger.handleException(['FILE','EVENT STREAM',`_TRANSFORM(${messageType})`],e);
       this.destroy(e)

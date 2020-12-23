@@ -17,8 +17,8 @@
     "drivers": {
         "file"       : "../file/node/fileDBI.js",
         "loader"     : "../loader/node/loaderDBI.js",
-        "awsS3"      : "../loader/s3/awss3DBI.js",
-        "azure"      : "../loader/s3/azureDBI.js",
+        "awsS3"      : "../loader/awss3/awsS3DBI.js",
+        "azure"      : "../loader/azure/azureDBI.js",
         "oracle"     : "../oracle/node/oracleDBI.js",
         "postgres"   : "../postgres/node/postgresDBI.js",
         "mssql"      : "../mssql/node/mssqlDBI.js",

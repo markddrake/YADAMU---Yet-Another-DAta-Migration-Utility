@@ -8,3 +8,6 @@ source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoTestSuite
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
+source $YADAMU_SCRIPT_DIR/runRegressionTest.sh loaderTestSuite
+source $YADAMU_SCRIPT_DIR/runRegressionTest.sh awsTestSuite
+source $YADAMU_SCRIPT_DIR/runRegressionTest.sh azureTestSuite

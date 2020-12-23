@@ -8,7 +8,7 @@ const pipeline = util.promisify(Stream.pipeline);
 const PassThrough = require('stream').PassThrough;
 const StringWriter = require('../../common/stringWriter.js');
 const AzureConstants = require('./azureConstants.js');
-const AzureError = require('./azureError.js')
+const AzureError = require('./azureException.js')
 
 class AzureStorageService {
 
@@ -25,19 +25,21 @@ class AzureStorageService {
 	this.containerClient = blobServiceClient.getContainerClient(this.CONTAINER);
 	this.buffer = Buffer.allocUnsafe(this.CHUNK_SIZE);
 	this.offset = 0;
-	this.writeOperations = []
+	
+	this.writeOperations = new Set()
   }
   
   createWriteStream(key) {
 	// this.yadamuLogger.trace([this.constructor.name],`createWriteStream(${key})`)
 	const passThrough = new PassThrough();
-	// passThrough.on('finish',()=>{console.log('PassThrough.on(finish)')})
-    const blockBlobClient = this.containerClient.getBlockBlobClient(key);
-	this.writeOperations.push(blockBlobClient.uploadStream(passThrough));
+	const blockBlobClient = this.containerClient.getBlockBlobClient(key);
+	const writeOperation = blockBlobClient.uploadStream(passThrough)
+	writeOperation.then(() => {this.writeOperations.delete(writeOperation)})    
+	this.writeOperations.add(writeOperation);
     return passThrough;
   }
   
-  async createStorageTarget() {
+  async createBucketContainer() {
 	 
 	let stack;
     try {
@@ -49,13 +51,12 @@ class AzureStorageService {
 	}
   }
 
-  async verifyStorageTarget() {
+  async verifyBucketContainer() {
 	 
 	let stack;
     try {
       stack = new Error().stack
-	  const exists = await this.containerClient.getProperties();
-      return exists
+	  return await this.containerClient.exists()
 	} catch (e) { 
       throw new AzureError(e,stack,`Azure.containerClient.createIfNotExists(${this.CONTAINER})`)
 	}
@@ -136,28 +137,7 @@ class AzureStorageService {
 	  throw new AzureError(e,stack,operation)
     }
   }
-  /*
-  _transform(data,enc,callback) {
-    if (this.offset + data.length > this.CHUNK_SIZE) {
-      this.push(this.buffer.slice(0,this.offset),undefined,() => {
-        this.emit('bufferWrite')
-	  })
-  	  this.buffer = Buffer.allocUnsafe(this.CHUNK_SIZE);
-      this.offset = 0
-	}
-	this.offset+= chunk.copy(this.buffer,this.offset,0)
-  }
 
-  async _final() {
-	this.yadamuLogger.trace([this.constructor.name],`_final(${this.offset})`)
-	await new Promise((resolve,reject) => {
-      this.push(this.buffer.slice(0,this.offset),undefined,() => {
-        this.emit('bufferWrite')
-		resolve() })
-	})
-	this.offset = 0
-  }
-  */
 }
 
 module.exports = AzureStorageService;

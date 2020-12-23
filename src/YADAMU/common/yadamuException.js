@@ -4,6 +4,10 @@ class YadamuError extends Error {
   constructor(message) {
     super(message);
   }
+  
+  static closedConnection(e) {
+	return ((e instanceof DatabaseError) && e.lostConnection())
+  }
 }
 
 class InternalError extends Error {
@@ -68,7 +72,7 @@ class IterativeInsertError extends Error {
 }
 
 class DatabaseError extends Error {
-  constructor(cause,stack,sql,) {
+  constructor(cause,stack,sql) {
 	let oneLineMessage = cause.message.indexOf('\r') > 0 ? cause.message.substr(0,cause.message.indexOf('\r')) : cause.message 
 	oneLineMessage = oneLineMessage.indexOf('\n') > 0 ? oneLineMessage.substr(0,oneLineMessage.indexOf('\n')) : oneLineMessage
     super(oneLineMessage);
@@ -98,7 +102,7 @@ class DatabaseError extends Error {
 	return false;
   } 
 
-  invalidConnection() {
+  closedConnection() {
 	return false;
   } 
  
@@ -116,6 +120,12 @@ class DatabaseError extends Error {
   
 }
 
+class InputStreamError extends DatabaseError {
+  constructor(cause,stack,sql) {
+    super(cause,stack,sql)
+  }
+}
+	
 module.exports = {
   YadamuError
 , InternalError
@@ -123,7 +133,9 @@ module.exports = {
 , BatchInsertError
 , IterativeInsertError
 , DatabaseError
+, InputStreamError
 , CommandLineError  
 , ConfigurationFileError
 , ConnectionError
 }
+

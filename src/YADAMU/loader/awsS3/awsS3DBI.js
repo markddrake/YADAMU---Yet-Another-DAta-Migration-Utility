@@ -45,6 +45,11 @@ class AWSS3DBI extends CloudDBI {
 	this.s3Options = {}
   }    
   
+  async finalize() {
+	await Promise.all(Array.from(this.cloudService.writeOperations))
+	super.finalize()
+  }
+  
   getConnectionProperties() {
 	  
     return {

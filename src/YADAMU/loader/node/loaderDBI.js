@@ -8,7 +8,7 @@ const { performance } = require('perf_hooks');
 const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
 
 const YadamuDBI = require('../../common/yadamuDBI.js');
-const {YadamuError} = require('../../common/yadamuError.js');
+const {YadamuError} = require('../../common/yadamuException.js');
 const JSONParser = require('./jsonParser.js');
 const EventStream = require('./eventStream.js');
 const JSONWriter = require('./jsonWriter.js');
@@ -16,7 +16,7 @@ const ArrayWriterWriter = require('./arrayWriter.js');
 const CSVWriter = require('./csvWriter.js');
 const DBIConstants = require('../../common/dbiConstants.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
-const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileError.js');
+const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
 
 /*
 **
@@ -36,8 +36,6 @@ class LoaderDBI extends YadamuDBI {
   ** An Import operation involves writing data to the local file system.
   **
   */
-  
-  get PIPELINE_OPERATION_HANGS() {return true }
   
   get JSON_OUTPUT()              { return this.OUTPUT_FORMAT === 'JSON' }
   get ARRAY_OUTPUT()             { return this.OUTPUT_FORMAT === 'ARRAY' }
@@ -250,7 +248,7 @@ class LoaderDBI extends YadamuDBI {
 
   async getOutputStreams(tableName,ddlComplete) {
 	await ddlComplete;
-    this.reloadStatementCache()
+	this.reloadStatementCache()
 	const streams = []
 	
 	const writer = this.getOutputStream(tableName,ddlComplete)
@@ -323,7 +321,8 @@ class LoaderDBI extends YadamuDBI {
     
 	const streams = []
     this.INPUT_METRICS = DBIConstants.NEW_TIMINGS
-	
+	this.INPUT_METRICS.DATABASE_VENDOR = this.DATABASE_VENDOR
+
 	const is = await this.getInputStream(tableInfo);
 	is.once('readable',() => {
 	  this.INPUT_METRICS.readerStartTime = performance.now()

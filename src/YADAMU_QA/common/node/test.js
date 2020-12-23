@@ -12,6 +12,7 @@ async function main() {
       await yadamuTest.doTests();
     } catch (e) {
       Test.reportError(e)
+
     }
     await yadamuTest.close();
   } catch (e) {

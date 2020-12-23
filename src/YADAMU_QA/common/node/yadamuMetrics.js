@@ -72,8 +72,8 @@ class YadamuMetrics {
 	this.timings = []
   }
   
-  recordError() {
-	this.task.errors++
+  recordError(metrics) {
+	this.aggregateMetrics(this.task,metrics)
   }
 
   recordFailed(failed) {

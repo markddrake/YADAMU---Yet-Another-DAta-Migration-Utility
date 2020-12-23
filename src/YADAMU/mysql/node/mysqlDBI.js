@@ -15,7 +15,7 @@ const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const MySQLConstants = require('./mysqlConstants.js')
-const MySQLError = require('./mysqlError.js')
+const MySQLError = require('./mysqlException.js')
 const MySQLParser = require('./mysqlParser.js');
 const MySQLWriter = require('./mysqlWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
@@ -53,6 +53,8 @@ class MySQLDBI extends YadamuDBI {
 	this.StatementGenerator = StatementGenerator
     this.StatementLibrary = MySQLStatementLibrary
     this.statementLibrary = undefined
+	
+	this.activeInputStream = false;
 
   }
 
@@ -124,7 +126,7 @@ class MySQLDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       await this.checkMaxAllowedPacketSize()
     } catch (e) {
-      throw this.captureException(new MySQLError(e,stack,operation))
+      throw this.trackExceptions(new MySQLError(e,stack,operation))
     }
     
     
@@ -142,7 +144,7 @@ class MySQLDBI extends YadamuDBI {
       this.pool.getConnection((err,connection) => {
         this.traceTiming(sqlStartTime,performance.now())
         if (err) {
-          reject(this.captureException(new MySQLError(err,stack,'mysql.Pool.getConnection()')))
+          reject(this.trackExceptions(new MySQLError(err,stack,'mysql.Pool.getConnection()')))
         }
         resolve(connection);
       })
@@ -162,11 +164,16 @@ class MySQLDBI extends YadamuDBI {
       let stack;
       try {
         stack = new Error().stack
-        await this.connection.release();
+		if (this.activeInputStream) {
+          await this.connection.destroy();
+	    }
+		else {
+          await this.connection.release();
+		}
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-        throw this.captureException(new MySQLError(e,stack,'MySQL.Connection.release()'))
+        throw this.trackExceptions(new MySQLError(e,stack,'MySQL.Connection.end()'))
       }
     }
   };
@@ -175,7 +182,7 @@ class MySQLDBI extends YadamuDBI {
       
     // this.yadamuLogger.trace([this.DATABASE_VENDOR],`closePool(${(this.pool !== undefined && this.pool.end)})`)
       
-    if (this.pool !== undefined && this.pool.end) {
+    if ((this.pool !== undefined) && (typeof this.pool.end === 'function')) {
       let stack;
       try {
         stack = new Error().stack
@@ -183,7 +190,7 @@ class MySQLDBI extends YadamuDBI {
         this.pool = undefined;
       } catch (e) {
         this.pool = undefined;
-        throw new MariadbError(e,stack,'Mariadb.Pool.end()')
+        throw this.trackExceptions(new MySQLError(e,stack,'MySQL.Pool.end()'))
       }
     }
     
@@ -206,7 +213,7 @@ class MySQLDBI extends YadamuDBI {
       this.connection.query(sqlStatement,args,async (err,results,fields) => {
         const sqlEndTime = performance.now()
         if (err) {
-          const cause = this.captureException(new MySQLError(err,stack,sqlStatement))
+          const cause = this.trackExceptions(new MySQLError(err,stack,sqlStatement))
           if (attemptReconnect && cause.lostConnection()) {
             attemptReconnect = false
             try {
@@ -322,30 +329,10 @@ class MySQLDBI extends YadamuDBI {
   }
 
   async finalizeRead(tableInfo) {
-    this.checkConnectionState(this.fatalError)    
+    this.checkConnectionState(this.latestError)    
     await this.executeSQL(`FLUSH TABLE "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}"`)
   }
 
-  /*
-  **
-  **  Gracefully close down the database connection and pool
-  **
-  */
-
-  async finalize() {
-    await super.finalize()
-  }
-  
-
-  /*
-  **
-  **  Abort the database connection and pool
-  **
-  */
-
-  async abort(e) {
-    await super.abort(e)
-  }
 
   /*
   **
@@ -365,7 +352,7 @@ class MySQLDBI extends YadamuDBI {
       await this.connection.beginTransaction();
       super.beginTransaction();
     } catch (e) {
-      throw this.captureException(new MySQLError(e,stack,'mysql.Connection.beginTransaction()'))
+      throw this.trackExceptions(new MySQLError(e,stack,'mysql.Connection.beginTransaction()'))
     } 
 
   }
@@ -388,7 +375,7 @@ class MySQLDBI extends YadamuDBI {
       stack = new Error().stack
       await this.connection.commit();
     } catch (e) {
-      throw this.captureException(new MySQLError(e,stack,'mysql.Connection.commit()'))
+      throw this.trackExceptions(new MySQLError(e,stack,'mysql.Connection.commit()'))
     } 
 
   }
@@ -416,7 +403,7 @@ class MySQLDBI extends YadamuDBI {
       stack = new Error().stack
       await this.connection.rollback();
     } catch (e) {
-      const newIssue = this.captureException(new MySQLError(e,stack,'mysql.Connection.rollback()'))
+      const newIssue = this.trackExceptions(new MySQLError(e,stack,'mysql.Connection.rollback()'))
       this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
     }
   }
@@ -553,8 +540,8 @@ class MySQLDBI extends YadamuDBI {
 
   }
   
-  streamingError(err,sqlStatement) {
-     return this.captureException(new MySQLError(err,this.streamingStackTrace,sqlStatement))
+  inputStreamError(err,sqlStatement) {
+     return this.trackExceptions(new MySQLError(err,this.streamingStackTrace,sqlStatement))
   }
 
   async getInputStream(tableInfo) {
@@ -586,8 +573,10 @@ class MySQLDBI extends YadamuDBI {
       try {
         const sqlStartTime = performance.now();
         this.streamingStackTrace = new Error().stack
+        this.activeInputStream = true;
         const is = this.connection.query(tableInfo.SQL_STATEMENT).stream();
-        is.on('end', async () => {
+        is.on('end',() => {
+		  this.activeInputStream = false;
           // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,`${is.constructor.name}.onEnd()`,`${tableInfo.TABLE_NAME}`],``); 
           if (keepAliveHdl !== undefined) {
             clearInterval(keepAliveHdl);
@@ -596,7 +585,7 @@ class MySQLDBI extends YadamuDBI {
         })
         return is;
       } catch (e) {
-        const cause = this.captureException(new MySQLError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
+        const cause = this.trackExceptions(new MySQLError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...

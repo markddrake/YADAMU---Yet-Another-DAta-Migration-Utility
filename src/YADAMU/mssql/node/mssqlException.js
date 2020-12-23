@@ -1,6 +1,6 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuError.js')
+const {DatabaseError} = require('../../common/yadamuException.js')
 const MsSQLConstants = require('./mssqlConstants.js')
 
 class MsSQLError extends DatabaseError {
@@ -30,9 +30,9 @@ class MsSQLError extends DatabaseError {
 	return ((cause.code &&  MsSQLConstants.LOST_CONNECTION_ERROR.includes(cause.code)) || ((this.cause.number) && (this.cause.number === 596)))
   }
 
-  invalidConnection() {
+  closedConnection() {
     let cause = this.getUnderlyingError()
-    return (cause.code &&  MsSQLConstants.INVALID_CONNECTION_ERROR.includes(cause.code))
+    return (cause.code &&  MsSQLConstants.INVALID_STATE_ERROR.includes(cause.code))
   }
 
   missingTable() {

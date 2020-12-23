@@ -41,7 +41,7 @@ class EventStream extends YadamuParser {
         }
       }) 
     }
-
+    
   }
 
   async _transform (data,encoding,callback) {

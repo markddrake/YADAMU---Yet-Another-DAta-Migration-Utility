@@ -9,6 +9,7 @@ const AzureDBI = require('../../../YADAMU//loader/azure/azureDBI.js');
 class AzureQA extends AzureDBI {
   
   async recreateSchema() {
+	await this.cloudService.createBucketContainer()
 	await this.cloudService.deleteFolder(this.IMPORT_FOLDER)
   }    
 	

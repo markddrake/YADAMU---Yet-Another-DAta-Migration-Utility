@@ -7,6 +7,7 @@ const oracledb = require('oracledb');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
+const {DatabaseError} = require('../../common/yadamuException.js');
 
 class OracleWriter extends YadamuWriter {
 
@@ -35,8 +36,8 @@ class OracleWriter extends YadamuWriter {
     super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
   }
   
-  resetBatch() {
-	super.resetBatch()
+  newBatch() {
+	super.newBatch()
 	this.batch = {
 	  rows           : []
 	, lobRows        : []
@@ -53,7 +54,7 @@ class OracleWriter extends YadamuWriter {
   }
   
   setTableInfo(tableName) {
-    this.resetBatch();
+    this.newBatch();
 	this.lobList = []
     this.includeTestcase = this.dbi.parameters.EXPORT_TESTCASE === true
     this.lobCumlativeTime = 0;
@@ -218,10 +219,15 @@ class OracleWriter extends YadamuWriter {
   }
 
   async enableTriggers() {
-    
-    const sqlStatement = `ALTER TABLE "${this.schema}"."${this.tableInfo.tableName}" ENABLE ALL TRIGGERS`;
-    return await this.dbi.executeSQL(sqlStatement,[]);
-    
+   
+	try {
+  	  this.dbi.checkConnectionState(this.dbi.latestError) 
+      const sqlStatement = `ALTER TABLE "${this.schema}"."${this.tableInfo.tableName}" ENABLE ALL TRIGGERS`;
+      return await this.dbi.executeSQL(sqlStatement,[]);
+	} catch (e) {
+      this.yadamuLogger.error(['DBA',this.dbi.DATABASE_VENDOR,'TRIGGERS',this.tableInfo.tableName],`Unable to re-enable triggers.`);          
+      this.yadamuLogger.handleException(['TRIGGERS',this.dbi.DATABASE_VENDOR,],e);          
+    } 
   }
 
   trackStringToClob(s) {
@@ -620,7 +626,7 @@ end;`
           const results = await this.dbi.executeSQL(this.tableInfo.dml,boundRow)
 		  this.metrics.written++
         } catch (cause) {
-		  if (cause.jsonParsingFailed() && cause.includesSpatialOperation()) {
+		  if ((cause instanceof DatabaseError) && cause.jsonParsingFailed() && cause.includesSpatialOperation()) {
 			await this.retryGeoJSONAsWKT(this.tableInfo.dml,binds,row,rows[row])
 		  }
 		  else {
@@ -641,16 +647,15 @@ end;`
     this.releaseBatch(batch)
     return this.skipTable     
   }
-  
+   
   async finalize(cause) {
-    const status = await super.finalize(cause);
-	// Skip calling enableTriggers if tableInfo is not available. If tableInfo is not available an exception must have prevented initialize() from completing successfully. 
+    await super.finalize(cause);
+	// Re-enable triggers on the current table
+	// Skip enablling enableTriggers if tableInfo is not available. If tableInfo is not available an exception must have prevented initialize() from completing successfully. 
 	if (this.tableInfo) {
       await this.enableTriggers();
 	}
-	return status;
   }
-  
 }
 
 module.exports = OracleWriter;

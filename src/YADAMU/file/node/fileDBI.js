@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { performance } = require('perf_hooks');
 
-const {pipeline, Readable} = require('stream')
+const {pipeline, Readable, PassThrough} = require('stream')
 
 const Yadamu = require('../../common/yadamu.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
@@ -12,7 +12,7 @@ const DBIConstants = require('../../common/dbiConstants.js');
 const JSONParser = require('./jsonParser.js');
 const EventStream = require('./eventStream.js');
 const JSONWriter = require('./jsonWriter.js');
-const {FileError, FileNotFound, DirectoryNotFound} = require('./fileError.js');
+const {FileError, FileNotFound, DirectoryNotFound} = require('./fileException.js');
 
 const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
 
@@ -28,6 +28,7 @@ class PipeOnce extends Readable {
 	 super();
 	 this.metadata = metadata
 	 this.endOption = endOption
+  	 // this.pause();
   }
   
   pipe(os,options) {
@@ -308,6 +309,7 @@ class FileDBI extends YadamuDBI {
   getInputStreams() {
 	const streams = []
 	this.INPUT_METRICS = DBIConstants.NEW_TIMINGS
+	this.INPUT_METRICS.DATABASE_VENDOR = this.DATABASE_VENDOR
 	const is = this.getInputStream();
 	is.once('readable',() => {
 	  this.INPUT_METRICS.readerStartTime = performance.now()

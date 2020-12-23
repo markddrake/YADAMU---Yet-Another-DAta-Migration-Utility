@@ -57,7 +57,7 @@ class AzureDBI extends CloudDBI {
   }
   
   async finalize() {
-	await Promise.all(this.cloudService.writeOperations);
+	await Promise.all(Array.from(this.cloudService.writeOperations));
 	super.finalize()
   }
   

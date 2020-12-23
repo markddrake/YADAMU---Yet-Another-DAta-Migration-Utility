@@ -17,7 +17,7 @@ const Yadamu = require('../../common/yadamu.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
 const YadamuDBI =  require('../../common/yadamuDBI.js');
 const MongoConstants = require('./mongoConstants.js')
-const MongoError = require('./mongoError.js')
+const MongoError = require('./mongoException.js')
 const MongoWriter = require('./mongoWriter.js');
 const MongoParser = require('./mongoParser.js');
 const StatementGenerator = require('./statementGenerator.js');
@@ -156,7 +156,7 @@ class MongoDBI extends YadamuDBI {
       await this.client.connect();   
       this.traceTiming(sqlStartTime,performance.now())
      } catch (e) {
-       throw this.captureException(new MongoError(e,stack,operation))
+       throw this.trackExceptions(new MongoError(e,stack,operation))
      }
   }
 
@@ -178,7 +178,7 @@ class MongoDBI extends YadamuDBI {
       this.dbname = dbname;
       return this.connection
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
 
@@ -198,7 +198,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
 
@@ -221,7 +221,7 @@ class MongoDBI extends YadamuDBI {
       await this.connection.dropDatabase() 
       this.traceTiming(sqlStartTime,performance.now())
      } catch (e) {
-       throw this.captureException(new MongoError(e,stack,operation))
+       throw this.trackExceptions(new MongoError(e,stack,operation))
      }
   }
 
@@ -240,7 +240,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
   
@@ -258,7 +258,7 @@ class MongoDBI extends YadamuDBI {
       this.stats = await this.connection.stats(options);    
       this.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
 
@@ -276,7 +276,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return collection
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
 
@@ -294,7 +294,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return collection
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
 
@@ -314,7 +314,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return count
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
 
@@ -333,7 +333,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return collections;
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
   
@@ -352,7 +352,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return collectionList;
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
   
@@ -372,7 +372,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
 
@@ -391,7 +391,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
 
@@ -461,7 +461,7 @@ class MongoDBI extends YadamuDBI {
       await this.client.close();   
       this.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
 
@@ -495,22 +495,6 @@ class MongoDBI extends YadamuDBI {
     this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Write Tranformation: ${this.WRITE_TRANSFORMATION}.`)    
   }
 
-  async finalize() {
-    await super.finalize()
-  } 
-
-  /*
-  **
-  **  Abort the database connection and pool.
-  **
-  */
-
-  async abort(e) {
-                                       
-    await super.abort(e);
-      
-  }
-
   /*
   **
   ** Begin the current transaction
@@ -525,19 +509,6 @@ class MongoDBI extends YadamuDBI {
   async initializeImport() {
      super.initializeImport();
      await this.use(this.parameters.TO_USER);
-  }
-  
-  /*
-  **
-  ** Begin a transaction
-  **
-  */
-  
-  async beginTransaction() {
-
-     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
-     super.beginTransaction();
-                            
   }
 
   // ### ToDO Support Mongo Transactions
@@ -761,7 +732,7 @@ class MongoDBI extends YadamuDBI {
             }
           }
         } catch(e) {		
-          throw this.captureException(new MongoError(e,stack,operation))
+          throw this.trackExceptions(new MongoError(e,stack,operation))
         }
       }
       if (this.ID_TRANSFORMATION === 'STRIP') {
@@ -790,8 +761,8 @@ class MongoDBI extends YadamuDBI {
     return tableInfo
   }   
   
-  streamingError(cause,sqlStatement) {
-    return this.captureException(new MongoError(cause,this.streamingStackTrace,sqlStatement))
+  inputStreamError(cause,sqlStatement) {
+    return this.trackExceptions(new MongoError(cause,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(collectionInfo,parser) {
@@ -816,7 +787,7 @@ class MongoDBI extends YadamuDBI {
       });
       return readStream;      
     } catch (e) {
-      throw this.captureException(new MongoError(e,stack,operation))
+      throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }      
    

@@ -1,6 +1,6 @@
 "use strict" 
 const MongoDBI = require('../../../YADAMU/mongodb/node/mongoDBI.js');
-const {ConnectionError, MongodbError, DatabaseError} = require('../../../YADAMU/common/yadamuError.js')
+const {ConnectionError, MongodbError, DatabaseError} = require('../../../YADAMU/common/yadamuException.js')
 
 class MongoQA extends MongoDBI {
     
@@ -21,7 +21,7 @@ class MongoQA extends MongoDBI {
       }
     }
 
-	async scheduleTermination() {
+	async scheduleTermination(workerId) {
       const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
 	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
 	  const timer = setTimeout(async () => {
@@ -31,7 +31,7 @@ class MongoQA extends MongoDBI {
 			  , $all      : false
 			  , $ownOps   : true
 			}
-		    this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,null,this.getWorkerNumber()],`Killing connection.`);
+		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,null,this.getWorkerNumber()],`Killing connection.`);
 			let operation
 			try {
 	          const dbAdmin = await this.client.db('admin',{returnNonCachedInstance:true});	 
@@ -55,7 +55,7 @@ class MongoQA extends MongoDBI {
 			}
 	      }
 		  else {
-		    this.yadamuLogger.qa(['KILL',this.yadamu.parameters.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,pid,this.getWorkerNumber()],`Unable to Kill Connection: Connection Pool no longer available.`);
+		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
 		  }
 		},
 		killDelay
@@ -68,8 +68,8 @@ class MongoQA extends MongoDBI {
 	  if (this.options.recreateSchema === true) {
 		await this.recreateDatabase();
 	  }
-	  if (this.testLostConnection()) {
-		this.scheduleTermination();
+	  if (this.enableLostConnectionTest()) {
+		this.scheduleTermination(this.getWorkerNumber());
 	  }
 	}
 

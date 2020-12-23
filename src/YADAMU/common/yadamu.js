@@ -19,8 +19,8 @@ const YadamuConstants = require('./yadamuConstants.js');
 const NullWriter = require('./nullWriter.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
-const {YadamuError, UserError, CommandLineError, ConfigurationFileError, DatabaseError} = require('./yadamuError.js');
-const {FileNotFound, FileError} = require('../file/node/fileError.js');
+const {YadamuError, UserError, CommandLineError, ConfigurationFileError, DatabaseError} = require('./yadamuException.js');
+const {FileNotFound, FileError} = require('../file/node/fileException.js');
 const YadamuRejectManager = require('./yadamuRejectManager.js');
 
 class Yadamu {
@@ -99,16 +99,24 @@ class Yadamu {
 	if (process.listenerCount('unhandledRejection') === 0) {
 	  process.on('unhandledRejection', (err, p) => {
 		if (err.ignoreUnhandledRejection === true) {
-	       // this.LOGGER.trace(['YADAMU',this.STATUS.operation,'UHANDLED REJECTION','IGNORED'],err);
+	       // this.LOGGER.trace(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],'IGNORED'],err);
 		   return;
 	    }
-	  
-	    this.LOGGER.handleException(['YADAMU',this.STATUS.operation,'UHANDLED REJECTION'],err);
+
+	    this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
+	    this.LOGGER.handleException(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
         this.STATUS.errorRaised = true;
         this.reportStatus(this.STATUS,this.LOGGER)
-        process.exit()
-      })
-	}
+		this.terminator = setTimeout(
+		  () => {
+   	        this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation,'TIMEOUT'],'Process aborted.')
+			this.terminator = undefined
+            process.exit()
+          },
+		  5000
+	    )
+	  }) 
+	}  
 
     // Read Command Line Parameters
     this.loadParameters(parameters)
@@ -598,8 +606,7 @@ class Yadamu {
 	    }
 	    this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
   	    // this.LOGGER.trace([this.constructor.name,'PIPELINE','FAILED'],e)
-
-        if (source.isDatabase() && ((e instanceof DatabaseError) && !e.lostConnection())) {
+        if (source.isDatabase() && (YadamuError.closedConnection(e))) {
 		  if (dbReader.copyInProgress()) {
 			const startTime = performance.now()
 	        this.LOGGER.info(['YADAMU','PIPELINE'],`Copy operation failed. Clean-up in progress ...`)
@@ -613,7 +620,7 @@ class Yadamu {
 	    }
 		throw e;
 	  }
-	} catch (e) {		  
+	} catch (e) {		
 	  this.STATUS.operationSuccessful = false;
 	  this.STATUS.err = e;
       results = e;
