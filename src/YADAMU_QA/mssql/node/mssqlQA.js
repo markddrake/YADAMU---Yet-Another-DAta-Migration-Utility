@@ -60,13 +60,14 @@ class MsSQLQA extends MsSQLDBI {
     }
 	
 	async scheduleTermination(pid,workerId) {
-	  const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
-	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
-	  const timer = setTimeout(async (pid) => {
+      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
+      const timer = setTimeout(
+        async (pid) => {
 		  if (this.pool !== undefined) {
-		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Killing connection.`);
-			 // Do not use getRequest() as it will fail with "There is a request in progress during write opeations. Get a new Request directly using the current pool
-		     const request = new this.sql.Request(this.pool);
+		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
+			 // Do not use getRequest() as it will fail with "There is a request in progress during write opeations. Get a non pooled request
+		     // const request = new this.sql.Request(this.pool);
+			 const request = await this.sql.connect(this.connectionProperties);
 			 let stack
 			 const sqlStatement = `kill ${pid}`
 			 try {
@@ -74,26 +75,29 @@ class MsSQLQA extends MsSQLDBI {
   		       const res = await request.query(sqlStatement);
 			 } catch (e) {
 			   if (e.number && (e.number === 6104)) {
-				 // The Worker has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourthis (Error 27)
-			     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Worker finished prior to termination.`)
+				 // Msg 6104, Level 16, State 1, Line 1 Cannot use KILL to kill your own process
+			     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Worker finished prior to termination.`)
+ 			   }
+			   else if (e.number && (e.number === 6106)) {
+				 // Msg 6106, Level 16, State 2, Line 1 Process ID 54 is not an active process ID.
+			     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Worker finished prior to termination.`)
  			   }
 			   else {
 				 const cause = new MsSQLError(e,stack,sqlStatement)
-			     this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],cause)
+			     this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],cause)
 			   }
 			 } 
 		   }
 		   else {
-		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
 		   }
 		},
-		killDelay,
+		this.killConfiguration.delay,
 	    pid
       )
 	  timer.unref()
 	}
 
-	
 	async initialize() {
 				
 	  if (this.options.recreateSchema === true) {
@@ -101,9 +105,9 @@ class MsSQLQA extends MsSQLDBI {
 	  }
 
 	  await super.initialize();
-	  if (this.enableLostConnectionTest()) {
-        const dbiID = await this.getConnectionID();
-		this.scheduleTermination(dbiID,this.getWorkerNumber());
+	  if (this.terminateConnection()) {
+        const pid = await this.getConnectionID();
+	    this.scheduleTermination(pid,this.getWorkerNumber());
 	  }
     }
 	   
@@ -169,15 +173,15 @@ class MsSQLQA extends MsSQLDBI {
       })
     }
 	
-  async workerDBI(idx)  {
-	const workerDBI = await super.workerDBI(idx);
-	if (workerDBI.enableLostConnectionTest()) {
-	  const dbiID = await workerDBI.getConnectionID();
-	  this.scheduleTermination(dbiID,workerDBI.getWorkerNumber());
+    async workerDBI(idx)  {
+	  const workerDBI = await super.workerDBI(idx);
+      // Manager needs to schedule termination of worker.
+	  if (this.terminateConnection(idx)) {
+        const pid = await workerDBI.getConnectionID();
+	    this.scheduleTermination(pid,idx);
+	  }
+	  return workerDBI
     }
-	return workerDBI
-  }
-    
 }
 module.exports = MsSQLQA
 

@@ -217,8 +217,9 @@ class OracleDBI extends YadamuDBI {
   async getConnection() {
     this.logConnectionProperties();
 	const sqlStartTime = performance.now();
-	this.connection = await oracledb.getConnection(this.connectionProperties);
+	const connection = await oracledb.getConnection(this.connectionProperties);
 	this.traceTiming(sqlStartTime,performance.now())
+    return connection
   }
   
   async closeConnection(options) {
@@ -513,7 +514,7 @@ class OracleDBI extends YadamuDBI {
   async enableConstraints() {
 	  
 	try  {
-      this.checkConnectionState(this.latestError) 
+      // this.checkConnectionState(this.latestError) 
       const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH} , schema:this.parameters.TO_USER} 
       const results = await this.executeSQL(this.StatementLibrary.SQL_ENABLE_CONSTRAINTS,args)
       this.processLog(results,'Enable Constraints')
@@ -527,7 +528,7 @@ class OracleDBI extends YadamuDBI {
   async refreshMaterializedViews() {
 
     try  {
-      this.checkConnectionState(this.latestError) 
+      // this.checkConnectionState(this.latestError) 
 	  const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH} , schema:this.parameters.TO_USER}     
       const results = await this.executeSQL(this.StatementLibrary.SQL_REFRESH_MATERIALIZED_VIEWS,args)
       this.processLog(results,'Materialized View Refresh')
@@ -560,14 +561,11 @@ class OracleDBI extends YadamuDBI {
 		  const cause = new OracleError(e,stack,sqlStatement,binds,{rows : rows.length})
 		  if (attemptReconnect && cause.lostConnection()) {
             attemptReconnect = false;
-		    // reconnect() throws cause if it cannot reconnect...
-            await this.reconnect(cause,'BATCH')
+		    // reconnect() throws cause if it cannot reconnect or if rows are lost (ABORT, SKIP)
+            await this.reconnect(cause,'EXECUTE MANY')
             await this.setCurrentSchema(this.parameters.TO_USER)
 		    await this.setDateFormatMask(this.systemInformation.vendor);
-   		    // Only retry the operation if COMMIT_RATIO = 1. If COMMIT_RATIO > 1 all batches written since last commit must be assumed to be have been lost.
-			if (this.COMMIT_RATIO === 1) {
-              continue		  
-		    }
+			continue;
           }		  	  
 		  throw this.trackExceptions(cause)
         }      
@@ -1195,7 +1193,7 @@ class OracleDBI extends YadamuDBI {
   }  
   
   inputStreamError(cause,sqlStatement) {
-	return this.trackExceptions(new OracleError(cause,this.streamingStackTrace,sqlStatement))
+	return this.trackExceptions(cause instanceof OracleError ? cause : new OracleError(cause,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(tableInfo) {
@@ -1231,7 +1229,7 @@ class OracleDBI extends YadamuDBI {
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
-          await this.reconnect(cause,'SQL')
+          await this.reconnect(cause,'INPUT STREAM')
           await this.setCurrentSchema(this.parameters.TO_USER)
 		  await this.setDateFormatMask(this.systemInformation.vendor);
 		  continue;

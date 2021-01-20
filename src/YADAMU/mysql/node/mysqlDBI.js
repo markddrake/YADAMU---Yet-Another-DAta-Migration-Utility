@@ -546,6 +546,14 @@ class MySQLDBI extends YadamuDBI {
 
   async getInputStream(tableInfo) {
 
+
+    // if the previous pipleline operation failed, it appears that the postgres driver will hang when creating a new QueryStream...
+    
+    if (this.failedPrematureClose) {
+	  await this.reconnect(new Error('Previous Pipeline Aborted. Switching database connection'),'INPUT STREAM')
+	}
+
+  
     /*
     **
     ** Intermittant Timeout problem with MySQL causes premature abort on Input Stream
@@ -567,8 +575,7 @@ class MySQLDBI extends YadamuDBI {
 
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
     this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
-
-    while (true) {
+  while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();

@@ -111,7 +111,6 @@ class JSONParser extends FileJSONParser {
     
       switch (this.jDepth){
 		case 0:
-		  this.push(null);
           break;
         case 1:
 		  this.nextRow(this.currentObject)

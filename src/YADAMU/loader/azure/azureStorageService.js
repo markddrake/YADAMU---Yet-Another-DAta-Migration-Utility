@@ -1,12 +1,14 @@
 "use strict"
 
 const Stream = require('stream');
+const PassThrough = Stream.PassThrough;
 const util = require('util')
 const pipeline = util.promisify(Stream.pipeline);
 
-// const Transform = require('stream').Transform
-const PassThrough = require('stream').PassThrough;
+
 const StringWriter = require('../../common/stringWriter.js');
+const StringDecoderStream = require('../../common/stringDecoderStream.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
 const AzureConstants = require('./azureConstants.js');
 const AzureError = require('./azureException.js')
 
@@ -14,7 +16,7 @@ class AzureStorageService {
 
   get CHUNK_SIZE()     { return this.parameters.CHUNK_SIZE  || AzureConstants.CHUNK_SIZE }  
   get CONTAINER() { return this._CONTAINER }
-  
+   
   constructor(blobServiceClient,container,parameters,yadamuLogger) {
 	// super()
     this.blobServiceClient = blobServiceClient
@@ -29,11 +31,15 @@ class AzureStorageService {
 	this.writeOperations = new Set()
   }
   
-  createWriteStream(key) {
+  isTextContent(contentType) {
+    return contentType.startsWith('text/') || YadamuConstants.TEXTUAL_MIME_TYPES.includes(contentType)
+  }
+   
+  createWriteStream(key,contentType) {
 	// this.yadamuLogger.trace([this.constructor.name],`createWriteStream(${key})`)
 	const passThrough = new PassThrough();
 	const blockBlobClient = this.containerClient.getBlockBlobClient(key);
-	const writeOperation = blockBlobClient.uploadStream(passThrough)
+	const writeOperation = blockBlobClient.uploadStream(passThrough, undefined, undefined, { blobHTTPHeaders: { blobContentType: contentType}})
 	writeOperation.then(() => {this.writeOperations.delete(writeOperation)})    
 	this.writeOperations.add(writeOperation);
     return passThrough;
@@ -114,9 +120,12 @@ class AzureStorageService {
     try {
   	  operation = `Azure.containerClient.getBlockBlobClient(${key})`
       const blockBlobClient = this.containerClient.getBlockBlobClient(key);
+  	  operation = `Azure.blockBlobClient.getProperties(${key})`
+	  const props = await blockBlobClient.getProperties()
   	  operation = `Azure.blockBlobClient.download(${key})`
-      const downloadBlockBlobResponse = await blockBlobClient.download(0);
-	  return downloadBlockBlobResponse.readableStreamBody
+	  const downloadBlockBlobResponse = await blockBlobClient.download(0);
+	  return downloadBlockBlobResponse.readableStreamBody.pipe(this.isTextContent(props.contentType) ? new StringDecoderStream() : new PassThrough())
+	  return downloadBlockBlobResponse.readableStreamBody.pipe(new PassThrough())
 	} catch (e) {
       throw new AzureError(e,stack,operation)
 	}

@@ -1,7 +1,7 @@
 "use strict" 
 
 const SnowflakeDBI = require('../../../YADAMU/snowflake/node/snowflakeDBI.js');
-const SnowflakeError = require('../../../YADAMU/snowflake/node/snowflakeError.js')
+const SnowflakeException = require('../../../YADAMU/snowflake/node/snowflakeException.js')
 
 class SnowflakeQA extends SnowflakeDBI {
     
@@ -25,7 +25,7 @@ class SnowflakeQA extends SnowflakeDBI {
 	  , fetchAsString  : ['Number','Date','JSON']
       , complete       : async (err,statement,rows) => {
 		                   if (err) {
-              		         const cause = this.trackExceptions(new SnowflakeError(err,stack,sqlStatement))
+              		         const cause = this.trackExceptions(new SnowflakeException(err,stack,sqlStatement))
     		                 reject(cause);
                            }
 					       // this.traceTiming(sqlStartTime,sqlEndTime)
@@ -37,10 +37,9 @@ class SnowflakeQA extends SnowflakeDBI {
 
     
     async scheduleTermination(pid,workerId) {
-      const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
-      const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
+      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
       const timer = setTimeout(async (pid) => {
-          this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Killing connection.`);
+          this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
           const conn = await this.getConnectionFromPool();
           const sqlStatement = `select SYSTEM$ABORT_SESSION( ${pid} );`
           let stack
@@ -49,11 +48,11 @@ class SnowflakeQA extends SnowflakeDBI {
             const res = await this.execute(conn,sqlStatement)
             await conn.destroy()
           } catch (e) {
-            const cause = new SnowflakeError(e,stack,sqlStatement)
-            this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],cause)
+            const cause = new SnowflakeException(e,stack,sqlStatement)
+            this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],cause)
           }
 	    },
-        killDelay,
+        this.killConfiguration.delay,
         pid
       )
       timer.unref()
@@ -65,10 +64,10 @@ class SnowflakeQA extends SnowflakeDBI {
         await this.recreateSchema();
       }
       await super.initialize();
-      if (this.enableLostConnectionTest()) {
-        const dbiID = await this.getConnectionID();
-        this.scheduleTermination(dbiID,this.getWorkerNumber());
-      }
+	  if (this.terminateConnection()) {
+        const pid = await this.getConnectionID();
+	    this.scheduleTermination(pid,this.getWorkerNumber());
+	  }
     }
 
     async recreateSchema() {
@@ -138,7 +137,16 @@ class SnowflakeQA extends SnowflakeDBI {
       // console.log(report);
       return report
     }
-      
+
+   async workerDBI(idx)  {
+	  const workerDBI = await super.workerDBI(idx);
+      // Manager needs to schedule termination of worker.
+	  if (this.terminateConnection(idx)) {
+        const pid = await workerDBI.getConnectionID();
+	    this.scheduleTermination(pid,idx);
+	  }
+	  return workerDBI
+    }      
 }
 
 module.exports = SnowflakeQA

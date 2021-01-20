@@ -31,9 +31,9 @@ class MySQLParser extends YadamuParser {
   }
 
   async _transform (data,encoding,callback) {
-   this.rowCount++
-   data = Object.values(data)    
-   this.rowTransformation(data)
+    this.rowCount++
+    data = Object.values(data)    
+    this.rowTransformation(data)
     // if (this.rowCount === 1) console.log(data)
     this.push({data:data})
     callback();

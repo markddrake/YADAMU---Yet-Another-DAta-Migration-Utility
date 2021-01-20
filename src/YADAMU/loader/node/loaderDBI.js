@@ -355,9 +355,11 @@ class LoaderDBI extends YadamuDBI {
 	}).on('end',() => {
 	  this.INPUT_METRICS.parserEndTime = performance.now()
 	  this.INPUT_METRICS.rowsRead = eventStream.getRowCount()
+      this.INPUT_METRICS.lost = eventStream.writableLength
 	}).on('error',(err) => {
 	  this.INPUT_METRICS.parserEndTime = performance.now()
 	  this.INPUT_METRICS.rowsRead = eventStream.getRowCount()
+      this.INPUT_METRICS.lost = eventStream.writableLength
 	  this.INPUT_METRICS.parserError = err
 	  this.INPUT_METRICS.failed = true;
 	})

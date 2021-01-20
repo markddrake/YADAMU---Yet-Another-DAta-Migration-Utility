@@ -22,16 +22,16 @@ class MongoQA extends MongoDBI {
     }
 
 	async scheduleTermination(workerId) {
-      const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
-	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
-	  const timer = setTimeout(async () => {
+	  this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay],`Termination Scheduled.`);
+	  const timer = setTimeout(
+        async () => {
     	  if (this.client !== undefined) {
 			const currentOp = {
 				currentOp : true
 			  , $all      : false
 			  , $ownOps   : true
 			}
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,killDelay,null,this.getWorkerNumber()],`Killing connection.`);
+		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,this.killConfiguration.delay,null,this.getWorkerNumber()],`Killing connection.`);
 			let operation
 			try {
 	          const dbAdmin = await this.client.db('admin',{returnNonCachedInstance:true});	 
@@ -55,10 +55,10 @@ class MongoQA extends MongoDBI {
 			}
 	      }
 		  else {
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
 		  }
 		},
-		killDelay
+		this.killConfiguration.delay
       )
 	  timer.unref()
 	}
@@ -68,8 +68,8 @@ class MongoQA extends MongoDBI {
 	  if (this.options.recreateSchema === true) {
 		await this.recreateDatabase();
 	  }
-	  if (this.enableLostConnectionTest()) {
-		this.scheduleTermination(this.getWorkerNumber());
+	  if (this.terminateConnection()) {
+	    this.scheduleTermination(this.getWorkerNumber());
 	  }
 	}
 

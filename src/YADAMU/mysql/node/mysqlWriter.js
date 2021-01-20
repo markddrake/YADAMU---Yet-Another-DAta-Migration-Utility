@@ -6,6 +6,7 @@ const util = require('util');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
+const {DatabaseError} = require('../../common/yadamuException.js');
 
 class MySQLWriter extends YadamuWriter {
 
@@ -64,7 +65,7 @@ class MySQLWriter extends YadamuWriter {
   
   getMetrics()  {
 	const results = super.getMetrics()
-    results.insertMode = this.tableInfo.insertMode
+    results.insertMode = this.tableInfo ? this.tableInfo.insertMode : 'Batch'
  	return results;
   }
 
@@ -157,7 +158,8 @@ class MySQLWriter extends YadamuWriter {
       case 'Batch':
         try {
           await this.dbi.createSavePoint();
-          const results = await this.dbi.executeSQL(this.tableInfo.dml,[batch]);
+		  const bulkInsertStatement =  `${this.tableInfo.dml} ?`
+          const results = await this.dbi.executeSQL(bulkInsertStatement,[batch]);
           await this.processWarnings(batch,results);
           this.endTime = performance.now();
           await this.dbi.releaseSavePoint();
@@ -167,8 +169,8 @@ class MySQLWriter extends YadamuWriter {
         } catch (cause) {
    		  this.reportBatchError(batch,'INSERT MANY',cause)
           await this.dbi.restoreSavePoint(cause);
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
-          this.tableInfo.dml = this.tableInfo.dml.slice(0,-1) + this.tableInfo.args
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Multi-row insert mode.`);     
+          batch = batch.flat()
         }
       case 'Rows':
 	    if (this.SPATIAL_FORMAT === 'GeoJSON') {
@@ -179,18 +181,20 @@ class MySQLWriter extends YadamuWriter {
 	    while (true) {
           try {
             await this.dbi.createSavePoint();    
-            const sqlStatement = `${this.tableInfo.dml} ${new Array(rowCount).fill(this.tableInfo.rowConstructor).join(',')}`
-            const results = await this.dbi.executeSQL(sqlStatement,batch);
+            const multiRowInsert = `${this.tableInfo.dml} ${new Array(rowCount).fill(this.tableInfo.rowConstructor).join(',')}`
+            const results = await this.dbi.executeSQL(multiRowInsert,batch);
             await this.processWarnings(batch,results);
             this.endTime = performance.now();
             await this.dbi.releaseSavePoint();
+
+
 	   	    this.metrics.written += rowCount;
             this.releaseBatch(batch)
             return this.skipTable
           } catch (cause) {
             await this.dbi.restoreSavePoint(cause);
 			// If it's a spatial error recode the entire batch and try again.
-            if (cause.spatialError() && !recodedBatch) {
+            if ((cause instanceof DatabaseError) && cause.spatialError() && !recodedBatch) {
               recodedBatch = true;
 			  this.recodeSpatialColumns(batch,cause.message)
 			  this.tableInfo.rowConstructor = this.tableInfo.rowConstructor.replace(/ST_GeomFromWKB\(\?\)/g,'ST_GeomFromText(?)')
@@ -207,17 +211,17 @@ class MySQLWriter extends YadamuWriter {
     }     
 		
     // Batch or Rows failed, or iterative was selected.
-	const sqlStatement = `${this.tableInfo.dml} ${this.tableInfo.rowConstructor}`
+	const singleRowInsert = `${this.tableInfo.dml} ${this.tableInfo.rowConstructor}`
 	for (let row = 0; row < rowCount; row++) {
 	  const offset = row * this.tableInfo.columnCount
       const nextRow  = batch.length > rowCount ? batch.slice(offset,offset + this.tableInfo.columnCount) : batch[row]
       try {
-		const results = await this.dbi.executeSQL(sqlStatement,nextRow)
+		const results = await this.dbi.executeSQL(singleRowInsert,nextRow)
         await this.processWarnings(batch,results);
   	    this.metrics.written++;
       } catch (cause) { 
 	    if (cause.spatialErrorGeoJSON()) {
-		  await this.retryGeoJSONAsWKT(sqlStatement,row,nextRow)
+		  await this.retryGeoJSONAsWKT(singleRowInsert,row,nextRow)
 	    }
 		else {
           this.handleIterativeError(`INSERT ONE`,cause,row,nextRow);

@@ -1,6 +1,7 @@
 "use strict" 
 
 const path = require('path')
+const mime = require('mime-types');
 
 const LoaderDBI = require('../node/loaderDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
@@ -89,10 +90,13 @@ class CloudDBI extends LoaderDBI {
     this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Using control file "${this.STORAGE_ID}/${this.controlFilePath}"`);
 
   }
-
+  
   getFileOutputStream(tableName) {
     // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,tableName],`Creating readable stream on getFileOutputStream(${this.controlFile.data[tableName].file})`)
-	return this.cloudService.createWriteStream(this.controlFile.data[tableName].file)
+	const file = this.controlFile.data[tableName].file
+	const extension = path.extname(file);
+	const contentType = mime.lookup(extension) || 'application/octet-stream'
+	return this.cloudService.createWriteStream(file,contentType)
   }  
   
   /*

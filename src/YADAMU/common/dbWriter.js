@@ -10,20 +10,6 @@ class DBWriter extends Writable {
   **
   ** The DB Writer should always be invoked with the option {end: false}. 
   ** 
-  ** If one or more workers are used to process data these should be registered with the DBWriter by calling the DBWriter's registerWorker()
-  ** function. Once a worker has completed all of it's tasks it must send a 'workerComplete' message to the DBWriter. Thw worker complete message
-  ** must be sent via the same pipe that is sending information to the DBWriter. Typically this is done by invoking the DBWriter's write()  method.
-  ** When all workers have trasnmitted "workerComplete" messages the DBWriter sends itsef a 'dataComplete' message. This allows the worker to work 
-  ** independantly of each other, and ensures the writer does not receive the 'dataCompete' message until all workers have terminated.
-  **
-  ** If no workers are instantiated then the DBReader is repsonsible for sending the 'dataComplete' message directory to the DBWriter.
-  **
-  ** When the DBWriter receieves the 'dataComplete' message it emits a 'dataComplete' event'. The DBReader listens for this event, performs 
-  ** any necessary clean-up, such as closing database connections or releasing other resources, and then sends an 'exportComplete' message
-  ** back to the DBWriter.
-  **
-  ** When the DBWriter receives an 'exportComplete' message the writer will invoke it's end() method which causes the _finish() method to execute and
-  ** a 'finish' or 'close' event to be emitted.
   */
       
   constructor(dbi,yadamuLogger,options) {
@@ -252,13 +238,13 @@ class DBWriter extends Writable {
 		  await this.dbi.initializeData();
 		  return
   	    case 'eof':		 
-          this.emit('dataComplete',true);
+          // this.emit('dataComplete',true);
 		  break;
         default:
       }    
       callback();
     } catch (e) {
-	  // this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_write()`,messageType,this.dbi.yadamu.ON_ERROR],e);
+	  this.yadamuLogger.handleException([`WRITER`,`_WRITE`,messageType,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],e);
       // Any errors that occur while processing metadata are fatal.Passing the exception to callback triggers the onError() event
 	  // Attempt a rollback, however if the rollback fails invoke the callback with the origianal exception.
       try {
@@ -293,7 +279,7 @@ class DBWriter extends Writable {
       await this.dbi.releasePrimaryConnection()
       callback();
     } catch (e) {
-      this.yadamuLogger.handleException([`WRITER`,this.dbi.DATABASE_VENDOR,`_FINAL()`,this.dbi.yadamu.ON_ERROR],e);
+      this.yadamuLogger.handleException([`WRITER`,`FINAL`,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],e);
 	  // Passing the exception to callback triggers the onError() event
       callback(e);
     } 

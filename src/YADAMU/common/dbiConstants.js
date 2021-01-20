@@ -23,6 +23,7 @@ class DBIConstants {
     , readerEndTime   : undefined
 	, parserStartTime : undefined
     , parserEndTime   : undefined
+	, lost            : 0
 	, failed          : false
     })
     return this._NEW_TIMINGS;

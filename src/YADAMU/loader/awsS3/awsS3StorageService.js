@@ -25,13 +25,14 @@ class AWSS3StorageService {
 	return retryCount < this.RETRY_COUNT 
   }
 	   
-  createWriteStream(key) {
+  createWriteStream(key,contentType) {
 	// this.yadamuLogger.trace([this.constructor.name],`createWriteStream(${key})`)
   
     const params = { 
-	  Bucket : this.BUCKET
-	, Key    : key
-	, Body   : new PassThrough()
+	  Bucket      : this.BUCKET
+	, Key         : key
+	, ContentType : contentType
+	, Body        : new PassThrough()
     }	
     
 	const streamFinished = new Promise((resolve,reject) => {

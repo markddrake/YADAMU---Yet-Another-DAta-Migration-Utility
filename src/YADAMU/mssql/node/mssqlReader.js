@@ -3,17 +3,18 @@ const Readable = require('stream').Readable;
 
 class MsSQLReader extends Readable {
       
-    constructor(request,sqlStatement) {
+    constructor(request,sqlStatement,tableName,yadamuLogger) {
 	  super({objectMode:true}) 
 	  this.request = request
-	  this.sqlStatement = sqlStatement
-	  
-      this.stagingArea = []
+	  this.tableName = tableName
+      this.yadamuLogger = yadamuLogger
+	  this.stagingArea = []
       this.highWaterMark = 1024
 	  this.lowWaterMark = 512
 	  
 	  this.streamPaused = false;
 	  this.streamFailed = false;
+	  this.streamCanceled = false;
 	  this.streamComplete = false;
 	  
 	  this.request.stream = true
@@ -31,21 +32,24 @@ class MsSQLReader extends Readable {
 		  }
 		}
 	  }).on('error',(err, p) => {
-        if (!this.streamFailed) {
-          // Destroy should emit the error but doesn't seem too? 
-          this.destroy(err);
-		  this.emit('error',err)
+        // this.yadamuLogger.trace([this.constructor.name,this.tableName,`sql.Request(stream).error()`],err)
+		if (this.streamCanceled && (err.code && (err.code === 'ECANCEL'))) {
+		  this.destroy();
+		  return;
 		}
-		this.streamFailed = true;
+        if (!this.streamFailed) {
+		  this.streamFailed = true;
+          // Passing the exception to destroy() should emit the error but doesn't always seem too? 
+		  this.emit('error',err)
+          this.destroy(err);
+		}
       }).on('done',(result) => {
 	    if (this.pendingRead) {
 	      this.push(null)
 		}
 	    this.streamComplete = true;
 	  })
-	    
-      request.query(this.sqlStatement); 
-	
+      request.query(sqlStatement); 
 	}
 	
 	_read() {
@@ -67,14 +71,16 @@ class MsSQLReader extends Readable {
 	  }
 	}
 	
-	_destroy(cause,callback) {
+	async _destroy(cause,callback) {
+       // this.yadamuLogger.trace([this.constructor.name,this.tableName],`_destroy(${cause ? cause.message : 'Normal'})`)
 	   if (!this.streamComplete) {
 		 try {
-		   this.request.cancel();
+		   await this.request.cancel();
+		   this.streamCanceled = true;
 		 } catch (e) {
 	     }
 	   }
-	   callback()
+	   callback(cause)
 	}
 	
 }

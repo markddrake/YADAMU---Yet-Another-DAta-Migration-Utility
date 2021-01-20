@@ -87,7 +87,7 @@ class MsSQLWriter extends YadamuWriter {
 
   getMetrics()  {
 	const results = super.getMetrics()
-	results.insertMode = this.tableInfo.bulkSupported === true ? 'Bulk' : 'Iterative'
+	results.insertMode = this.tableInfo ? (this.tableInfo.bulkSupported === true ? 'Bulk' : 'Iterative' ) : 'Bulk'
 	return results;
   }
   
@@ -133,7 +133,7 @@ class MsSQLWriter extends YadamuWriter {
 		this.releaseBatch(batch)
 		return this.skipTable
       } catch (cause) {
-        this.reportBatchError(batch,`INSERT MANY`,cause)
+	    this.reportBatchError(batch,`INSERT MANY`,cause)
         await this.dbi.restoreSavePoint(cause);
 		if (!this.dbi.TRANSACTION_IN_PROGRESS && this.dbi.tediousTransactionError) {
 	  	  this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Transaction aborted following BCP operation failure. Starting new Transaction`);          
@@ -150,7 +150,9 @@ class MsSQLWriter extends YadamuWriter {
     try {
       await this.dbi.cachePreparedStatement(this.tableInfo.dml, this.dataTypes,this.SPATIAL_FORMAT) 
     } catch (cause) {
-      this.abortTable()
+      if (this.rowsLost()) {
+		throw cause
+      }
       this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`INSERT ONE`,`"${this.tableInfo.tableName}"`],cause);
       this.endTime = performance.now();
       this.releaseBatch(batch)

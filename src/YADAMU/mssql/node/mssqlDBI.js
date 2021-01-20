@@ -57,7 +57,10 @@ class MsSQLDBI extends YadamuDBI {
 
   get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT        || MsSQLConstants.SPATIAL_FORMAT }
   get SPATIAL_MAKE_VALID()     { return this.parameters.SPATIAL_MAKE_VALID    || MsSQLConstants.SPATIAL_MAKE_VALID }
- 
+
+  get TRANSACTION_IN_PROGRESS()       { return super.TRANSACTION_IN_PROGRESS ||this.tediousTransactionError  }
+  set TRANSACTION_IN_PROGRESS(v)      { super.TRANSACTION_IN_PROGRESS = v }
+
   constructor(yadamu) {
     super(yadamu,MsSQLConstants.DEFAULT_PARAMETERS);
     this.requestProvider = undefined;
@@ -65,6 +68,7 @@ class MsSQLDBI extends YadamuDBI {
     this.pool = undefined;
     this.yadamuRollack = false
     this.tediousTransactionError = false;
+	this.beginTransactionError = false;
     // Allow subclasses to access constants defined by the sql object. Redeclaring the SQL object in a subclass causes strange behavoir
     this.sql = sql
 	this.StatementGenerator = StatementGenerator
@@ -131,7 +135,7 @@ class MsSQLDBI extends YadamuDBI {
   
   reportTransactionState(operation) {
     const e = new Error(`Unexpected ${operation} operation`)
-    this.yadamuLogger.handleException([this.DATABASE_VENDOR,'TRANSACTION MANAGER',operation],new MsSQLError(e,e.stack,this.constructor.name))
+    this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,'TRANSACTION MANAGER',operation],new MsSQLError(e,e.stack,this.constructor.name))
     
   }
   
@@ -370,7 +374,7 @@ class MsSQLDBI extends YadamuDBI {
         const cause = err instanceof MsSQLError ? err : this.trackExceptions(new MsSQLError(err,stack,`${operation}.onError()`))
         if (!cause.suppressedError())  {
           this.yadamuLogger.handleException([this.DATABASE_VENDOR,`sql.ConnectionPool.onError()`],cause);
-          if (!this.reconnectInProgress) {
+          if (!this.RECONNECT_IN_PROGRESS) {
             throw cause
           }
         }
@@ -409,11 +413,7 @@ class MsSQLDBI extends YadamuDBI {
     }   
     
     if (this.TRANSACTION_IN_PROGRESS) {
-      try {
-        await this.rollbackTransaction()
-      } catch (e) {
-        throw e
-     }
+      await this.rollbackTransaction()
     }
   }
   
@@ -425,37 +425,73 @@ class MsSQLDBI extends YadamuDBI {
   
   async closePool(options) {
     
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closePool(${(this.pool !== undefined)})`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,'CLOSE POOL'],`closePool(${(this.pool !== undefined)})`)
+	
+	/*
+	**
+	** ### It appears closePool() can hang if a BEGIN TRANSACTiON operation failed due to a lost connection error
+	**
+	*/
 	
     if (this.pool !== undefined) {
-      let stack
-      let psudeoSQL
-      try {
-        stack = new Error().stack
-        psudeoSQL = 'MsSQL.Pool.close()'
+      await new Promise(async(resolve,reject) => {
+		  
+		  /*
+		  **
+ 		  ** Set a timer to deal with pool.close() hanging
+		  **
+		  */
+		  
+          const timer = setTimeout(
+		    () => {
+              this.yadamuLogger.warning([this.DATABASE_VENDOR,'CLOSE POOL',this.beginTransactionError],`Close pool operation timed out`)
+		      resolve()
+	        }
+		   ,1000
+		  )
+		 		  
+         let stack
+         let psudeoSQL
+         try {
+           stack = new Error().stack
+           psudeoSQL = 'MsSQL.Pool.close()'
 		
-		/*
-		**
-		** pool.close() results in an unhandledRejection "ConnectionError: Connection not yet open." 
-		**
-		*/
-		process.prependOnceListener('unhandledRejection',this.unhandledRejectionHandler)		
-        // this.yadamuLogger.trace([this.DATABASE_VENDOR],`Attempting to close pool`)
-		await this.pool.close();
-		// this.yadamuLogger.trace([this.DATABASE_VENDOR],`Pool Closed`)
-		process.removeListener('unhandledRejection',this.unhandledRejectionHandler)
+		   /*
+		   **
+           ** Sometimes pool.close() results in an unhandledRejection "ConnectionError: Connection not yet open." 
+		   ** Add an unhandledRejection listener to catch this and prevent it from terminating the process.
+		   ** Remove the listener if no exception is thrown when closing the pool.
+		   **
+		   */
+		   
+		   process.prependOnceListener('unhandledRejection',this.unhandledRejectionHandler)		
+           // this.yadamuLogger.trace([this.DATABASE_VENDOR,'CLOSE POOL'],`Closing pool`)
+		   await this.pool.close();
+		   clearTimeout(timer)
+           // this.yadamuLogger.trace([this.DATABASE_VENDOR,'CLOSE POOL'],`Pool Closed`)
+		   process.removeListener('unhandledRejection',this.unhandledRejectionHandler)
 
-        stack = new Error().stack
-        psudeoSQL = 'MsSQL.close()'
-        await sql.close();
-        // Setting pool to undefined seems to cause Error: No connection is specified for that request if a new pool is created.. ### Makes no sense
-        // this.pool = undefined;
-      } catch(e) {
-        // this.pool = undefined
-        this.yadamuLogger.trace([this.DATABASE_VENDOR],`Error Closing Pool`)
-        throw this.trackExceptions(new MsSQLError(e,stack,psudeoSQL))
-      }
-    }
+          stack = new Error().stack
+          psudeoSQL = 'MsSQL.close()'
+          await sql.close();
+        
+		  /*
+		  **
+		  ** Setting pool to undefined seems to cause Error: No connection is specified for that request if a new pool is created.. ### Makes no sense
+          
+		  this.pool = undefined;
+		  
+		  **
+		  */
+		  resolve()
+        } catch(e) {
+		  clearTimeout(timer)
+          // this.pool = undefined
+          this.yadamuLogger.trace([this.DATABASE_VENDOR],`Error Closing Pool`)
+          reject(this.trackExceptions(new MsSQLError(e,stack,psudeoSQL)))
+        }
+	  })
+	} 
   }
  
   async _reconnect() {
@@ -464,6 +500,8 @@ class MsSQLDBI extends YadamuDBI {
     await this.executeSQL('select 1');
     this.transaction = this.getTransactionManager()
   }
+  
+  
   
   setConnectionProperties(connectionProperties) {
     if (Object.getOwnPropertyNames(connectionProperties).length > 0) {    
@@ -496,7 +534,7 @@ class MsSQLDBI extends YadamuDBI {
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
-          await this.reconnect(cause,'BATCH OPERATION')
+          await this.reconnect(cause,'EXECUTE BATCH')
           continue;
         }
         throw cause
@@ -562,7 +600,7 @@ class MsSQLDBI extends YadamuDBI {
           this.preparedStatement === undefined;
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
-          await this.reconnect(cause,'PREPARED STATEMENT')
+          await this.reconnect(cause,'PREPARE STATEMENT')
           this.cachePreparedStatement(this.preparedStatement.sqlStatement,this.preparedStatement.dataTypes);
           continue;
         }
@@ -633,7 +671,7 @@ class MsSQLDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = new  MsSQLError(e,stack,sqlStatement);
+        const cause = this.trackExceptions(new MsSQLError(e,stack,sqlStatement));
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -796,10 +834,24 @@ class MsSQLDBI extends YadamuDBI {
         break;
       } catch (e) {
         const cause = this.trackExceptions(new MsSQLError(e,stack,'sql.Transaction.begin()'))
+		
         if (attemptReconnect && cause.lostConnection()) {
+
+  	      /*
+	      **
+	      ** ### A Lost connection error during a BEGIN TRANSACTION operation can cause the closePool() operation to hang.
+	      */
+
+	      try {
+	        this.beginTransactionError = true
+	        await this.transaction.rollback()
+	      } catch (e) {
+  		    console.log(e)
+	      }
+
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
-          await this.reconnect(cause,'SQL')
+          await this.reconnect(cause,'BEGIN TRANSACTION')
           continue;
         }
         throw cause
@@ -834,7 +886,7 @@ class MsSQLDBI extends YadamuDBI {
       if (attemptReconnect && cause.lostConnection()) {
         attemptReconnect = false;
         // reconnect() throws cause if it cannot reconnect...
-        await this.reconnect(cause,'Commit')
+        await this.reconnect(cause,'COMMIT TRANSACTION')
       }
       throw this.trackExceptions(new MsSQLError(e,stack,'sql.Transaction.commit()'))
     }
@@ -1049,7 +1101,7 @@ class MsSQLDBI extends YadamuDBI {
       request.query(this.sqlStatement);
       return stream
 	}
-    return new MsSQLReader(request,tableInfo.SQL_STATEMENT);
+    return new MsSQLReader(request,tableInfo.SQL_STATEMENT,tableInfo.TABLE_NAME,this.yadamuLogger);
   }      
 
   /*

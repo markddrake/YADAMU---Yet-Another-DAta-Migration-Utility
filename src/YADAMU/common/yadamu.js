@@ -9,6 +9,7 @@ const assert = require('assert');
 const util = require('util')
 const stream = require('stream')
 const pipeline = util.promisify(stream.pipeline);
+const finished = stream.finished
 
 const FileDBI = require('../file/node/fileDBI.js');
 const DBReader = require('./dbReader.js');
@@ -47,6 +48,8 @@ class Yadamu {
 
   set OPERATION(value)                { this._OPERATION = value }
   get OPERATION()                     { return this._OPERATION }
+  
+  get YADAMU_QA()                     { return false }
   
   get LOG_FILE()                      { return this.parameters.LOG_FILE }
 
@@ -564,7 +567,8 @@ class Yadamu {
   async doPumpOperation(source,target) {
 	     
 	let results;
-    
+    let streamsCompleted
+	
 	const parallel = (this.PARALLEL_PROCESSING && source.isDatabase() && target.isDatabase());
     
 	try {
@@ -585,39 +589,32 @@ class Yadamu {
 	    yadamuPipeline.push(...dbReader.getInputStreams())
 	    yadamuPipeline.push(dbWriter)
 
+	    streamsCompleted = yadamuPipeline.map((s) => { 
+	      return new Promise((resolve,reject) => {
+		    finished(s,(err) => {
+		      if (err) {reject(err)} else {resolve()}
+		    })
+          })
+        })
+	
 	    await pipeline(yadamuPipeline)
         this.STATUS.operationSuccessful = true;
+   	    await Promise.allSettled(streamsCompleted)
+
         // this.LOGGER.trace([this.constructor.name,'PIPELINE'],'Success')
-   	    /*
-	    if (source.isDatabase()) {
-		  this.LOGGER.trace([this.constructor.name,'PIPELINE',performance.now()],'Waiting on Data Complete')
-	      await dbReader.dataComplete
-		  this.LOGGER.trace([this.constructor.name,'PIPELINE',performance.now()],'DataComplete')
-	    }
-	    */
+
         await source.finalize();
    	    await target.finalize();
         this.reportStatus(this.STATUS,this.LOGGER)
 	    results = this.metrics
       } catch (e) {
+   	    await Promise.allSettled(streamsCompleted)
 	    // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
 	    if (e.code === 'ERR_STREAM_PREMATURE_CLOSE') {
 		  e = dbReader.underlyingError instanceof Error ? dbReader.underlyingError : (dbWriter.underlyingError instanceof Error ? dbWriter.underlyingError : e)
 	    }
-	    this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
   	    // this.LOGGER.trace([this.constructor.name,'PIPELINE','FAILED'],e)
-        if (source.isDatabase() && (YadamuError.closedConnection(e))) {
-		  if (dbReader.copyInProgress()) {
-			const startTime = performance.now()
-	        this.LOGGER.info(['YADAMU','PIPELINE'],`Copy operation failed. Clean-up in progress ...`)
-            try {
-  	          await dbReader.dataComplete
-			} catch(e) {
-              // this.yadamuLogger.trace([this.constructor.name],'DATA_COMPLETE'],e)
-            }
-	        this.LOGGER.info(['YADAMU','PIPELINE'],`Copy operation failed. Clean-up completed. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`)
-		  }
-	    }
+	    this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
 		throw e;
 	  }
 	} catch (e) {		

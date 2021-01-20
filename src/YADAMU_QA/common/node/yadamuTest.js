@@ -16,7 +16,9 @@ class YadamuTest extends Yadamu {
 
   get MACROS()             { this._MACROS = this._MACROS || { timestamp: new Date().toISOString().replace(/:/g,'.')}; return this._MACROS }
   set MACROS(v)            { this._MACROS = v }
-  	 
+
+  get YADAMU_QA()                     { return true }
+  
   constructor(mode) {
     super(mode)
 	this.testMetrics = new YadamuMetrics();

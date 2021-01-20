@@ -225,7 +225,7 @@ class OracleWriter extends YadamuWriter {
       const sqlStatement = `ALTER TABLE "${this.schema}"."${this.tableInfo.tableName}" ENABLE ALL TRIGGERS`;
       return await this.dbi.executeSQL(sqlStatement,[]);
 	} catch (e) {
-      this.yadamuLogger.error(['DBA',this.dbi.DATABASE_VENDOR,'TRIGGERS',this.tableInfo.tableName],`Unable to re-enable triggers.`);          
+	  this.yadamuLogger.error(['DBA',this.dbi.DATABASE_VENDOR,'TRIGGERS',this.tableInfo.tableName],`Unable to re-enable triggers.`);          
       this.yadamuLogger.handleException(['TRIGGERS',this.dbi.DATABASE_VENDOR,],e);          
     } 
   }
@@ -546,7 +546,7 @@ end;`
   async _writeBatch(batch,rowCount) {
       
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
-    // Infortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
+    // Unfortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
     // So we have to free the current tempLob Cache and create a new one for each batch
     	
     this.metrics.batchCount++;

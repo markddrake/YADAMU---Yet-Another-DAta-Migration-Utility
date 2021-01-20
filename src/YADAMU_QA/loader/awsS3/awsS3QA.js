@@ -4,7 +4,7 @@ const path=require('path')
 const crypto = require('crypto');
 const { pipeline } = require('stream');
 
-const AWSS3DBI = require('../../../YADAMU//loader/awss3/awsS3DBI.js');
+const AWSS3DBI = require('../../../YADAMU//loader/awsS3/awsS3DBI.js');
 
 class AWSS3QA extends AWSS3DBI {
   

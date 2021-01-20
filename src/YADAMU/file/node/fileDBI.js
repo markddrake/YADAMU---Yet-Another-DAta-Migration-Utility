@@ -71,6 +71,7 @@ class FileDBI extends YadamuDBI {
 	this.exportFilePath = exportFilePath
     this.outputStream = undefined;
     this.inputStream = undefined;
+	this.firstTable = true;
 	this.ddl = undefined;
   }
 
@@ -348,10 +349,11 @@ class FileDBI extends YadamuDBI {
 	return streams;
   }
     
-  getOutputStream(tableName,ddlComplete,idx) {
+  getOutputStream(tableName,ddlComplete) {
     // Override parent method to allow output stream to be passed to worker
     // this.yadamuLogger.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
-	const os =  new JSONWriter(this,tableName,ddlComplete,idx,this.status,this.yadamuLogger)
+	const os =  new JSONWriter(this,tableName,ddlComplete,this.firstTable,this.status,this.yadamuLogger)
+	this.firstTable = false;
     return os
   }
   

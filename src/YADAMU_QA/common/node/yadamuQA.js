@@ -27,6 +27,12 @@ class YadamuQA {
   get OPERATION()                                 { return this.test.hasOwnProperty('operation') ? this.test.operation : this.configuration.operation}
   get OPERATION_NAME()                            { return this.OPERATION.toUpperCase() }
 
+  get KILL_CONNECTION()                           { return this.test.hasOwnProperty('kill') ? this.test.kill : this.configuration.hasOwnProperty('kill') ? this.configuration.kill : false }
+  get KILL_READER()                               { return this.KILL_CONNECTION.process  === 'READER' }
+  get KILL_WRITER()                               { return this.KILL_CONNECTION.process  === 'WRITER' }
+  get KILL_WORKER()                               { return this.KILL_CONNECTION.worker }
+  get KILL_DELAY()                                { return this.KILL_CONNECTION.delay }
+
   constructor(configuration) {
       
     this.configuration = configuration
@@ -55,12 +61,16 @@ class YadamuQA {
       throw err
     }
 
-    
     const connectionProperties = typeof testConnection === 'object' ? Object.assign({},testConnection) : testConnection
     dbi.setConnectionProperties(connectionProperties);
     dbi.setParameters(parameters);
     dbi.setTableMappings(tableMappings);
     dbi.configureTest(recreateSchema);
+ 
+    if (this.KILL_CONNECTION) {
+      this.configureTermination(dbi,parameters)
+    }
+
     return dbi;
   }
 
@@ -371,11 +381,10 @@ class YadamuQA {
 
   async compareSchemas(sourceVendor,targetVendor,sourceSchema,targetSchema,connectionProperties,parameters,metrics,reportRowCounts,tableMappings) {
       
-    // Make sure compare operations do not get terminated during KILL tests  
+    // Make sure compare operations do not get terminated during KILL tests. Remove FROM_USER and TO_USER from the parameters passed to the connection used to perform the compare operation.  
+    delete parameters.FROM_USER
+    delete parameters.TO_USER
       
-    delete parameters.KILL_READER_AFTER
-    delete parameters.KILL_WRITER_AFTER
-
     const compareDBI = this.getDatabaseInterface(sourceVendor,connectionProperties,parameters,false,tableMappings)
 
     if (compareDBI.parameters.SPATIAL_PRECISION !== 18) {
@@ -781,13 +790,6 @@ class YadamuQA {
       // The second copies the DATA from source to the target. 
       
       this.setUser(sourceParameters,'FROM_USER', targetDatabase, targetSchema)
-      
-      // Make sure that we don't terminate the READER or WRITER when copying data back.
-      
-      delete sourceParameters.KILL_READER_AFTER
-      delete sourceParameters.KILL_WRITER_AFTER
-      delete compareParameters.KILL_READER_AFTER
-      delete compareParameters.KILL_WRITER_AFTER
       
       // Apply any table mappings used by target of the the first copy operation to the source of the second copy operation.
       
@@ -1649,6 +1651,14 @@ class YadamuQA {
     this.printTargetSummary(summary)
     return this.metrics.formatMetrics(this.metrics.suite)
   } 
+
+  configureTermination(dbi,parameters) {
+
+    if ((this.KILL_READER && parameters.FROM_USER) || (this.KILL_WRITER && parameters.TO_USER)) {
+      dbi.configureTermination(this.KILL_CONNECTION)
+    }       
+  }	
+
 }
 
 class YadamuExportParser extends Transform {

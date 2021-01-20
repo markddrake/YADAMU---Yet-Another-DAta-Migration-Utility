@@ -17,7 +17,7 @@
     "drivers": {
         "file"       : "../file/node/fileDBI.js",
         "loader"     : "../loader/node/loaderDBI.js",
-        "awsS3"      : "../loader/awss3/awsS3DBI.js",
+        "awsS3"      : "../loader/awsS3/awsS3DBI.js",
         "azure"      : "../loader/azure/azureDBI.js",
         "oracle"     : "../oracle/node/oracleDBI.js",
         "postgres"   : "../postgres/node/postgresDBI.js",
@@ -25,6 +25,9 @@
         "mysql"      : "../mysql/node/mysqlDBI.js",
         "mariadb"    : "../mariadb/node/mariadbDBI.js",
         "mongodb"    : "../mongodb/node/mongoDBI.js",
+		
+		
+		
         "snowflake"  : "../snowflake/node/snowflakeDBI.js",
         "teradata"   : "../teradata/worker/teradataDBI.js"
     },

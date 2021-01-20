@@ -71,7 +71,12 @@ class YadamuConstants {
   static get YADAMU_DRIVERS()         { return this.EXTERNAL_DEFAULTS.drivers }
   
   static get SAVE_POINT_NAME()        { return 'YADAMU_INSERT' }
-  
+
+  static get TEXTUAL_MIME_TYPES() { 
+    this._TEXTUAL_MIME_TYPES = this._TEXTUAL_MIME_TYPES || Object.freeze(["application/json","application/csv"])
+    return this._TEXTUAL_MIME_TYPES
+  }
+    
   static get SUPPORTED_COMPRESSION() {
     this._SUPPORTED_COMPRESSION = this._SUPPORTED_COMPRESSION || Object.freeze(["GZIP","INFLATE"])
 	return this._SUPPORTED_COMPRESSION

@@ -1,6 +1,7 @@
 "use strict" 
 
 const path=require('path')
+const fs=require('fs')
 const crypto = require('crypto');
 const { pipeline } = require('stream');
 
@@ -32,6 +33,13 @@ class AzureQA extends AzureDBI {
     super.setConnectionProperties(connectionProperties)
   }
   
+  async saveSortedFile(file,content) {
+     const savePath = path.join(process.platform === 'win32' ? 'c:\\temp\\yadamu\\compare' : '/tmp/yadamu/compare',file.split(path.posix.sep).join(path.sep))
+     fs.mkdirSync(path.dirname(savePath),{recursive:true})
+     fs.writeFileSync(savePath,JSON.stringify(content))
+  }
+
+
   async calculateSortedHash(file) {
   
     const fileContents = await this.cloudService.getObject(file)		
@@ -44,6 +52,7 @@ class AzureQA extends AzureDBI {
       }
 	  return 0
     })
+    // this.saveSortedFile(file,array)
     return crypto.createHash('sha256').update(JSON.stringify(array)).digest('hex');
   } 
   

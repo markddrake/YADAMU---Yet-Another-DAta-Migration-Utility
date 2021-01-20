@@ -31,11 +31,11 @@ const _SQL_COMMIT_TRANSACTION   = `commit transaction`
 
 const _SQL_ROLLBACK_TRANSACTION = `rollback transaction`
 
-const _SQL_CREATE_SAVE_POINT    = `SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
+const _SQL_CREATE_SAVE_POINT    = `savepoint "${YadamuConstants.SAVE_POINT_NAME}"`;
 
-const _SQL_RESTORE_SAVE_POINT   = `ROLLBACK TO SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
+const _SQL_RESTORE_SAVE_POINT   = `rollback to savepoint "${YadamuConstants.SAVE_POINT_NAME}"`;
 
-const _SQL_RELEASE_SAVE_POINT   = `RELEASE SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
+const _SQL_RELEASE_SAVE_POINT   = `release savepoint "${YadamuConstants.SAVE_POINT_NAME}"`;
 
 const _PGOID_DATE         = 1082; 
 const _PGOID_TIMESTAMP    = 1114;

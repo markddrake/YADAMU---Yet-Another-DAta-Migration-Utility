@@ -90,12 +90,12 @@ class StatementGenerator {
           }
         }) 
 
+        tableInfo.rowConstructor = `(${setOperators.join(',')})`
         switch (tableInfo.insertMode) {
           case 'Batch':
-            tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + `  values ?`;
+            tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + `  values `;
             break;
           case 'Rows':
-            tableInfo.rowConstructor = `(${setOperators.join(',')})`
             tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + `  values `;
             break;
           case 'Iterative':

@@ -29,24 +29,24 @@ class PostgresQA extends PostgresDBI {
     }      
 
 	async scheduleTermination(pid,workerId) {
-	  const killOperation = this.parameters.KILL_READER_AFTER ? 'Reader'  : 'Writer'
-	  const killDelay = this.parameters.KILL_READER_AFTER ? this.parameters.KILL_READER_AFTER  : this.parameters.KILL_WRITER_AFTER
-	  const timer = setTimeout(async (pid) => {
+      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
+	  const timer = setTimeout(
+        async (pid) => {
           try {
 		    if (this.pool !== undefined && this.pool.end) {
-		      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Killing connection.`);
+		      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
 	          const conn = await this.getConnectionFromPool();
 		      const res = await conn.query(`select pg_terminate_backend(${pid})`);
 		      await conn.release()
 		    }
 		    else {
-		      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,killOperation,workerId,killDelay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+		      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
 		    }
            } catch (e) {
              console.log(e);
            }
 		},
-		killDelay,
+		this.killConfiguration.delay,
 	    pid
       )
 	  timer.unref()
@@ -57,9 +57,9 @@ class PostgresQA extends PostgresDBI {
 	  if (this.options.recreateSchema === true) {
 		await this.recreateSchema();
 	  }
-	  if (this.enableLostConnectionTest()) {
-		const dbiID = await this.getConnectionID();
-		this.scheduleTermination(dbiID,this.getWorkerNumber());
+	  if (this.terminateConnection()) {
+        const pid = await this.getConnectionID();
+	    this.scheduleTermination(pid,this.getWorkerNumber());
 	  }
 	}
 	
@@ -87,14 +87,15 @@ class PostgresQA extends PostgresDBI {
       return results.rows
     }    
 	
-  async workerDBI(idx)  {
-	const workerDBI = await super.workerDBI(idx);
-	if (workerDBI.enableLostConnectionTest()) {
-	  const dbiID = await workerDBI.getConnectionID();
-	  this.scheduleTermination(dbiID,workerDBI.getWorkerNumber());
+    async workerDBI(idx)  {
+	  const workerDBI = await super.workerDBI(idx);
+      // Manager needs to schedule termination of worker.
+	  if (this.terminateConnection(idx)) {
+        const pid = await workerDBI.getConnectionID();
+	    this.scheduleTermination(pid,idx);
+	  }
+	  return workerDBI
     }
-	return workerDBI
-  }
 }
 
 module.exports = PostgresQA

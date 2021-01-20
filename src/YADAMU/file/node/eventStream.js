@@ -1,6 +1,6 @@
 "use strict" 
 
-const { Transform, PassThrough } = require('stream');
+const { Transform, PassThrough, finished } = require('stream');
 const { performance } = require('perf_hooks');
 
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
@@ -20,7 +20,6 @@ class EventStream extends Transform {
     super({objectMode: true });  
 	this.yadamu = yadamu
     this.yadamuLogger = this.yadamu.LOGGER
-	this.writerComplete = true
 	this.rowsRead = 0
   }
 
@@ -146,6 +145,7 @@ class EventStream extends Transform {
 	      break;
         case 'table':
           if (this.metadata.hasOwnProperty(data.table)) {
+            // Table is in the list of tables to be processed.
 			this.skipTable = false;
   		    this.processRow = this.forwardRow
 		    // Attach new Writer - Couldnot get this work with 'drain' for some reason
@@ -189,18 +189,12 @@ class EventStream extends Transform {
   		    // this.yadamuLogger.trace([this.constructor.name,outputStream.constructor.name,outputStream.tableName],`allDataReceived'`)
 			
 			const writerComplete = new Promise((resolve,reject) => {
-	          outputStream.on('writerComplete',(err) => {
-		        resolve(err)
-              })
+			  finished(outputStream,(err) => {resolve(err)})
             })
 			
 			outputStream.destroy()	
 			await writerComplete
-			await new Promise((resolve,reject) => {
-	          outputStream.end(undefined,undefined,(err) => {
-	            resolve()
-	          })
-	        })
+		
 			if ((this.terminalStream instanceof PassThrough) && !this.terminalStream.ended) {
 	          // Pipelines that terminate in a PassThrough stream seem not to destroy all of the components correctly when the data has been proceseds. This causes the operation to hang. 
 	          // Explicitly end such a stream

@@ -90,22 +90,8 @@ class YadamuDBI {
   get SAVE_POINT_SET()                { return this._SAVE_POINT_SET === true }
   set SAVE_POINT_SET(v)               { this._SAVE_POINT_SET = v }
 
-  get ATTEMPT_RECONNECTION() {
-    this._ATTEMPT_RECONNECTION = this._ATTEMPT_RECONNECTION || (() => {
-      switch (this.ON_ERROR) {
-	    case undefined:
-	    case 'ABORT':
-  		  return false;
-	    case 'SKIP':
-	    case 'FLUSH':
-		  return (!this.TRANSACTION_IN_PROGRESS)
-	    default:
-	      return false;
-      }
-    })();
-    return this._ATTEMPT_RECONNECTION
-  }
-  
+  get ATTEMPT_RECONNECTION()          { return !this.RECONNECT_IN_PROGRESS }
+
   // Not available until configureConnection() has been called 
 
   get DB_VERSION()             { return this._DB_VERSION }
@@ -155,6 +141,10 @@ class YadamuDBI {
 	this.firstError = undefined
 	this.latestError = undefined    
     
+	this.failedPrematureClose = false;
+	
+	// Used in testing
+    this.killConfiguration = {}
   }
   
   applyTableFilter(tableName) { 
@@ -211,9 +201,7 @@ class YadamuDBI {
        )
      })  
   }
-  
-
-  
+    
   processError(yadamuLogger,logEntry,summary,logDDL) {
 	 
 	let warning = true;
@@ -371,19 +359,7 @@ class YadamuDBI {
     this.metrics = metrics
   }
   
-  trackLostConnection() {
-   
-    /*
-    **
-    ** Invoked by the DBI when the connection is lost. Assume a rollback took place. Any rows written but not committed are lost. 
-    **
-    */
 
-  	if ((this.metrics !== undefined) && (this.metrics.lost  !== undefined) && (this.metrics.written  !== undefined)) {
-      this.metrics.lost += this.metrics.written;
-	  this.metrics.written = 0;
-	}
-  }	  
   
   setSystemInformation(systemInformation) {
     this.systemInformation = systemInformation
@@ -409,8 +385,6 @@ class YadamuDBI {
   
   setParameters(parameters) {
     Object.assign(this.parameters, parameters ? parameters : {})
-    // Force ATTEMPT_RECONNECTION to be re-evaluated next time it is used.
-    this._ATTEMPT_RECONNECTION = undefined
     this._COMMIT_COUNT = undefined
   }
   
@@ -612,10 +586,6 @@ class YadamuDBI {
         setTimeout(resolve, delayms);
     });
   }
-  
-  abortOnError() {
-	return !this.ATTEMPT_RECONNECTION
-  }
     
   async _reconnect() {
     throw new Error(`Database Reconnection Not Implimented for ${this.DATABASE_VENDOR}`)
@@ -624,30 +594,52 @@ class YadamuDBI {
     this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
 
   }
+
+  trackLostConnection() {
+   
+    /*
+    **
+    ** Invoked when the connection is lost. Assume a rollback took place. Any rows written but not committed are lost. 
+    **
+    */
+
+  	if ((this.metrics !== undefined) && (this.metrics.lost  !== undefined) && (this.metrics.written  !== undefined)) {
+      if (this.metrics.written > 0) {
+        this.yadamuLogger.error([`RECONNECT`,this.DATABASE_VENDOR],`${this.metrics.written} uncommitted rows discarded when connection lost.`);
+        this.metrics.lost += this.metrics.written;
+	    this.metrics.written = 0;
+      }
+	}
+  }	  
   
   async reconnect(cause,operation) {
 
-    let retryCount = 0;
-    let connectionUnavailable
     
-    const transactionInProgress = this.TRANSACTION_IN_PROGRESS 
-    const SAVE_POINT_SET = this.SAVE_POINT_SET
-	
-	this._ATTEMPT_RECONNECTION = false
+    cause.yadamuReconnected = false;
+
     this.RECONNECT_IN_PROGRESS = true;
-	this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`${operation}`],cause)
+    const TRANSACTION_IN_PROGRESS = this.TRANSACTION_IN_PROGRESS 
+    const SAVE_POINT_SET = this.SAVE_POINT_SET
+
+    this.yadamuLogger.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`Connection Lost: Attemping reconnection.`);
+	
+    if (cause instanceof Error) {
+  	  this.yadamuLogger.handleWarning([`RECONNECT`,this.DATABASE_VENDOR,operation],cause)
+    }
 	
 	/*
 	**
 	** If a connection is lost while performing batched insert operatons using a table writer, adjust the table writers running total of records written but not committed. 
 	** When a connection is lost records that have written but not committed will be lost (rolled back by the database) when cleaning up after the lost connection.
-	** Table Writers invoke trackCounters and pass a counter object to the database interface before consuming rows in order for this to work correctly.
+	** Writers must invoke setMetrics() passing the writer's counter object to the database interface before consuming rows. 
 	** To avoid the possibility of lost batches set COMMIT_RATIO to 1, so each batch is committed as soon as it is written.
 	**
 	*/
 	
     this.trackLostConnection();
 	
+    let retryCount = 0;
+    let connectionUnavailable
     while (retryCount < 10) {
 		
       /*
@@ -659,44 +651,50 @@ class YadamuDBI {
 	  try {
         await this.closeConnection()
       } catch (e) {
-	    if (!YadamuError.closedConnection(e)) {
-          this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`Error closing existing connection.`);
-		  this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`RECONNECT`],e)
+	    if (!YadamuError.lostConnection(e)) {
+          this.yadamuLogger.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`Error closing existing connection.`);
+		  this.yadamuLogger.handleException([`RECONNECT`,this.DATABASE_VENDOR,operation],e)
 	    }
 	  }	 
 		 
 	  try {
-        this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`Attemping reconnection.`);
         await this._reconnect()
 	    await this.configureConnection();
-		if (transactionInProgress) {
+		if (TRANSACTION_IN_PROGRESS) {
 		  await this.beginTransaction()
+		  if (SAVE_POINT_SET) {
+		    await this.createSavePoint()
+		  }
 		}
-		if (this.SAVE_POINT_SET) {
-		  await this.createSavePoint()
-		}
-        this.RECONNECT_IN_PROGRESS = false;
-        this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`New connection available.`);
-        this._ATTEMPT_RECONNECTION = undefined
-		return;
+
+        this.yadamuLogger.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`New connection available.`);
+	    this.failedPrematureClose = false;
+        cause.yadamuReconnected = true;
       } catch (connectionFailure) {
-		if ((typeof connectionFailure.serverUnavailable == 'function') && connectionFailure.serverUnavailable()) {
+        // Reconnection failed. If cause is "server unavailable" wait 0.5 seconds and retry (up to 10 times)
+		if (YadamuError.serverUnavailable(connectionFailure)) {
 		  connectionUnavailable = connectionFailure;
-          this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`RECONNECT`],`Waiting for restart.`)
+          this.yadamuLogger.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`Waiting for restart.`)
           await this.waitForRestart(5000);
           retryCount++;
+          continue;
         }
         else {
+          // Reconnectiona attempt failed for some other reason. Throws the error
    	      this.RECONNECT_IN_PROGRESS = false;
-          this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`RECONNECT`],connectionFailure);
-          this._ATTEMPT_RECONNECTION = undefined
+          this.yadamuLogger.handleException([`RECONNECT`,this.DATABASE_VENDOR,operation],connectionFailure);
           throw cause;
         }
       }
+      // Sucessfully reonnected. Throw the original error if rows were lost as a result of the lost connection
+      this.RECONNECT_IN_PROGRESS = false;
+      if ((this.metrics !== undefined) && (this.metrics.lost > 0)) { 
+        throw cause
+      }
+      return
     }
-    // this.yadamuLogger.trace([`${this.constructor.name}._reconnect()`],`Unable to re-establish connection.`)
+    // Unable to reconnect after 10 attempts
     this.RECONNECT_IN_PROGRESS = false;
-    this.ATTEMPT_RECONNECTION = undefined
     throw connectionUnavailable 	
   }
   
@@ -809,7 +807,7 @@ class YadamuDBI {
     try {
       await this.closeConnection(options);
 	} catch (e) {
-	  if (!YadamuError.closedConnection(e)) {
+	  if (!YadamuError.lostConnection(e)) {
         this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','Connection'],e);
 	  }
 	}
@@ -818,7 +816,7 @@ class YadamuDBI {
 	  // Force Termnination of All Current Connections.
 	  await this.closePool(options);
 	} catch (e) {
-	  if (!YadamuError.closedConnection(e)) {
+	  if (!YadamuError.lostConnection(e)) {
         this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','Pool'],e);
 	  }
 	}
@@ -835,7 +833,7 @@ class YadamuDBI {
 	  cause = cause.cause
     }
 	  
-  	if (YadamuError.closedConnection(cause)) {
+  	if (YadamuError.lostConnection(cause) && !cause.yadamuReconnected) {
       throw cause;
 	}
   }
@@ -1114,10 +1112,11 @@ class YadamuDBI {
     inputStream.once('readable',() => {
 	  this.INPUT_METRICS.readerStartTime = performance.now()
 	}).on('error',(err) => { 
-	  this.underlyingCause = this.inputStreamError(err,tableInfo.SQL_STATEMENT)
+	  this.underlyingCause = YadamuError.prematureClose(err) ? null : this.inputStreamError(err,tableInfo.SQL_STATEMENT)
       this.INPUT_METRICS.readerEndTime = performance.now()
 	  this.INPUT_METRICS.readerError = this.underlyingCause
 	  this.INPUT_METRICS.failed = true;
+	  this.failedPrematureClose = err.code === 'ERR_STREAM_PREMATURE_CLOSE'
     }).on('end',() => {
 	  this.INPUT_METRICS.readerEndTime = performance.now()
     })
@@ -1129,10 +1128,12 @@ class YadamuDBI {
 	}).on('end',() => {
 	  this.INPUT_METRICS.parserEndTime = performance.now()
 	  this.INPUT_METRICS.rowsRead = parser.getRowCount()
+      this.INPUT_METRICS.lost = parser.writableLength
 	}).on('error',(err) => {
 	  this.INPUT_METRICS.parserEndTime = performance.now()
 	  this.INPUT_METRICS.rowsRead = parser.getRowCount()
-	  this.INPUT_METRICS.parserError = err
+      this.INPUT_METRICS.lost = parser.writableLength
+	  this.INPUT_METRICS.parserError = YadamuError.prematureClose(err) ? null : err
 	  this.INPUT_METRICS.failed = true;
 	})
 	
@@ -1202,6 +1203,7 @@ class YadamuDBI {
     
     this.setParameters(manager.parameters);
 	this.setTableMappings(manager.tableMappings)
+
   }   
 
   async workerDBI(workerNumber) {
@@ -1217,31 +1219,21 @@ class YadamuDBI {
 	await dbi.cloneCurrentSettings(this);
 	return dbi
   }
-  
-  enableLostConnectionTest() {
-	
-     switch (true) {
-	   // KILL_READER_AFTER is specified and a FROM_USER was specified. This is a reader DBI and we are killing the Reader
-	   case (this.parameters.FROM_USER && Number.isInteger(this.parameters.KILL_READER_AFTER)):
-	   // KILL_WRITER_AFTER is specified and a TO_USER was specified. This is a wrier DBI and we are killing the Writer
-	   case (this.parameters.TO_USER && Number.isInteger(this.parameters.KILL_WRITER_AFTER)):
-         switch (true) {
-		   // This is the manager and we are  testing killing the manager
-           case (this.isManager() && (this.parameters.KILL_WORKER_NUMBER === undefined)):
-		   // This is a worker and it is the worker are looking for ...
-           case ((this.PARALLEL > 0 ) && (this.getWorkerNumber() === this.parameters.KILL_WORKER_NUMBER)):
-	         return true;			   
-		 }
-     }
-	 return false
-  }	
-	  
+ 
   async getConnectionID() {
 	// ### Get a Unique ID for the connection
     throw new Error('Unimplemented Method')
   }
-  
-  
+
+  configureTermination(configuration) {
+    // Kill Configuration is added to the MasterDBI by YADAMU-QA
+    this.killConfiguration = configuration
+  }
+
+  terminateConnection(idx) {
+    return (!YadamuLibrary.isEmpty(this.killConfiguration) && ((this.isManager() && this.killConfiguration.worker === undefined) || (this.killConfiguration.worker === idx)))
+  }
+ 
 }
 
 module.exports = YadamuDBI

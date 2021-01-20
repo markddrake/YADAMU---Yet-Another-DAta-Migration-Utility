@@ -11,8 +11,6 @@ const pipeline = util.promisify(stream.pipeline);
 **
 ** Require Database Vendors API 
 **
-** ### pg_query-stream 3.x is not supported as it does not emit error events when the connection is lost: https://github.com/brianc/node-postgres/issues/2187
-**
 */
 const {Client,Pool} = require('pg')
 const CopyFrom = require('pg-copy-streams').from;
@@ -20,6 +18,7 @@ const QueryStream = require('pg-query-stream')
 const types = require('pg').types;
 
 const Yadamu = require('../../common/yadamu.js');
+const {YadamuError} = require('../../common/yadamuException.js');
 const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
@@ -207,7 +206,7 @@ class PostgresDBI extends YadamuDBI {
   
   async _reconnect() {
     this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
-    await this.executeSQL('select 1')
+    const results = await this.executeSQL('select now()')
   }
   
   getConnectionProperties() {
@@ -264,6 +263,12 @@ class PostgresDBI extends YadamuDBI {
 	
   }
   
+  async insertBatch(sqlStatement,batch) {
+	 
+    const result = await this.executeSQL(sqlStatement,batch)
+    return result;
+  }
+
   /*
   **
   ** Begin a transaction
@@ -302,14 +307,13 @@ class PostgresDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-   // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber()],``)
+   // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),YadamuError.lostConnection(cause)],``)
 
     this.checkConnectionState(cause)
 
 	// If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
 	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
-	
-	 
+
 	try {
       super.rollbackTransaction()
       await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION);
@@ -321,9 +325,7 @@ class PostgresDBI extends YadamuDBI {
   async createSavePoint() {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
-																
-	 
-
+															
     await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT);
     super.createSavePoint();
   }
@@ -332,11 +334,8 @@ class PostgresDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 																 
-	 
-
     this.checkConnectionState(cause)
 	 
-	
 	// If restoreSavePoint was invoked due to encounterng an error and the restore operation results in a second exception being raised, log the exception raised by the restore operation and throw the original error.
 	// Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
 		
@@ -372,14 +371,8 @@ class PostgresDBI extends YadamuDBI {
 
   async createStagingTable() {
   	let sqlStatement = `drop table if exists "YADAMU_STAGING"`;		
-							   
-														   
-		 
   	await this.executeSQL(sqlStatement);
   	sqlStatement = `create temporary table if not exists "YADAMU_STAGING" (data ${this.useBinaryJSON === true ? 'jsonb' : 'json'}) on commit preserve rows`;					   
-							   
-														   
-		 
   	await this.executeSQL(sqlStatement);
   }
   
@@ -538,20 +531,25 @@ class PostgresDBI extends YadamuDBI {
   inputStreamError(e,sqlStatement) {
     return this.trackExceptions(new PostgresError(e,this.streamingStackTrace,sqlStatement))
   }
+
+  terminateInputStream(is) {
+	is.destroy()
+  }
   
   async getInputStream(tableInfo) {        
   
+    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,tableInfo.TABLE_NAME],'')
+    
+    /*
+    **
+    **	If the previous pipleline operation failed, it appears that the postgres driver will hang when creating a new QueryStream...
+	**
+	*/
   
-    // if the previous pipleline operation failed, it appears that the postgres driver will hang when creating a new QueryStream...
-  
-    if (this.pipelineAborted) {
-	  // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,'STREAMING READER','GET_INPUT_STREAM'],'Previous Pipeline Aborted. Switching database connection')
-	  await this.closeConnection()
-	  await this.getDatabaseConnection(false)
+    if (this.failedPrematureClose) {
+	  await this.reconnect(new Error('Previous Pipeline Aborted. Switching database connection'),'INPUT STREAM')
 	}
-	 
-    this.pipelineAborted = false;
-   			
+ 		
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
     this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
     while (true) {
@@ -562,17 +560,29 @@ class PostgresDBI extends YadamuDBI {
         const queryStream = new QueryStream(tableInfo.SQL_STATEMENT)
         this.traceTiming(sqlStartTime,performance.now())
         const inputStream = await this.connection.query(queryStream)   
-		inputStream.on('error',async (err) => {
-	      this.pipelineAborted = true;
-  	    })
 		
+		/*
+		**
+		** After Upgrading to pg-query-stream 4.0.0 the query-stream does terminate when the connection is lost.
+		** This causes the pipeline operation to hang. The following code adds an event listener to the connection that will
+		** terminate the query-stream when a connection error occurs, and removes it when the input stream terminates`
+		**
+		** In theory the listener should call destroy(err) on the input stream, but this does not appear to work. The workaround
+		** is to call streams destroy(err) method and then have the stream emit the error...
+		**
+		*/
+		
+        const handleConnectionError = (err) => {inputStream.destroy(err); inputStream.emit('error',err)}
+	    this.connection.on('error',handleConnectionError)
+        inputStream.on('end',() => { this.connection.removeListener('end',handleConnectionError)}).on('error',() => { this.connection.removeListener('error',handleConnectionError)})  
+  		
 		return inputStream
       } catch (e) {
 		const cause = this.trackExceptions(new PostgresError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
-          await this.reconnect(cause,'READER')
+          await this.reconnect(cause,'CREATE INPUT STREAM')
           continue;
         }
         throw cause
@@ -617,12 +627,6 @@ class PostgresDBI extends YadamuDBI {
 	 return super.getOutputStream(PostgresWriter,tableName,ddlComplete)
   }
  
-  async insertBatch(sqlStatement,batch) {
-	 
-    const result = await this.executeSQL(sqlStatement,batch)
-    return result;
-  }
-
   classFactory(yadamu) {
 	return new PostgresDBI(yadamu)
   }

@@ -30,11 +30,6 @@ class MsSQLError extends DatabaseError {
 	return ((cause.code &&  MsSQLConstants.LOST_CONNECTION_ERROR.includes(cause.code)) || ((this.cause.number) && (this.cause.number === 596)))
   }
 
-  closedConnection() {
-    let cause = this.getUnderlyingError()
-    return (cause.code &&  MsSQLConstants.INVALID_STATE_ERROR.includes(cause.code))
-  }
-
   missingTable() {
 	return ((this.cause.name === 'RequestError') && ((this.cause.code && (this.cause.code === 'EREQUEST'))) && ((this.cause.number && (this.cause.number === 208))))
   }

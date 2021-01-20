@@ -404,7 +404,7 @@ class YadamuLogger {
     else {
       const largs = [...args]
       const ts = this.error(args,e.message);
-       const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
+      const exceptionFile = path.resolve(`${this.EXCEPTION_FOLDER}${path.sep}${this.EXCEPTION_FILE_PREFIX}_${ts.replace(/:/g,'.')}.trace`);
       this.generateDataFile(exceptionFile,e);
       this.writeExceptionToFile(exceptionFile,ts,args,e)
       this.info(largs,`Exception logged to "${exceptionFile}".`)

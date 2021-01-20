@@ -57,10 +57,6 @@ class OracleError extends DatabaseError {
   invalidPool() {
     return this.cause.message.startsWith(OracleConstants.INVALID_POOL)
   } 
-
-  closedConnection() {
-    return this.cause.message.startsWith(OracleConstants.INVALID_CONNECTION)
-  } 
   
   lostConnection() {
     return ((this.cause.errorNum && OracleConstants.LOST_CONNECTION_ERROR.includes(this.cause.errorNum)) || ((this.cause.errorNum === 0) && (this.cause.message.startsWith(OracleConstants.NOT_CONNECTED) || this.cause.message.startsWith(OracleConstants.INVALID_CONNECTION))))

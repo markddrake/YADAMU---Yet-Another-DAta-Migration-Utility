@@ -7,10 +7,10 @@ const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 
 class JSONWriter extends YadamuWriter {
-
-  constructor(dbi,tableName,ddlComplete,tableIdx,status,yadamuLogger) {
+	     
+  constructor(dbi,tableName,ddlComplete,firstTable,status,yadamuLogger) {
 	super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
-	this.startTable = tableIdx === 0 ? `"${tableName}":[` :  `,"${tableName}":[`
+	this.startTable = firstTable ? `"${tableName}":[` :  `,"${tableName}":[`
 	this.rowSeperator = '';
   }
         
@@ -164,8 +164,8 @@ class JSONWriter extends YadamuWriter {
   async _destroy(err,callback) {
 	 /* OVERRIDE */ 
 	this.endTime = performance.now()
-    this.reportPerformance()
- 	this.emit('writerComplete')
+    this.reportPerformance(err)
+ 	// this.emit('writerComplete')
 	callback()
   }	  
   

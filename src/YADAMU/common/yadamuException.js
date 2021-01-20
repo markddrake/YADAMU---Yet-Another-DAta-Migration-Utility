@@ -5,9 +5,23 @@ class YadamuError extends Error {
     super(message);
   }
   
-  static closedConnection(e) {
+  static lostConnection(e) {
 	return ((e instanceof DatabaseError) && e.lostConnection())
   }
+
+  static serverUnavailable(e) {
+	return ((e instanceof DatabaseError) && e.serverUnavailable())
+  }
+  
+  static prematureClose(e) {
+	return (e.code && e.code === 'ERR_STREAM_PREMATURE_CLOSE')
+  }
+
+  static missingTable(e) {
+	return ((e instanceof DatabaseError) && e.missingTable())
+  }
+  
+
 }
 
 class InternalError extends Error {
@@ -102,7 +116,7 @@ class DatabaseError extends Error {
 	return false;
   } 
 
-  closedConnection() {
+  lostConnection() {
 	return false;
   } 
  

@@ -102,6 +102,10 @@ class YadamuWriter extends Transform {
     this.setTableInfo(tableName);
     await this.beginTransaction()
   }
+  
+  rowsLost() {
+	return this.metrics.lost > 0
+  }
         
   newBatch() {
 	// this.batch.length = 0;
@@ -117,10 +121,20 @@ class YadamuWriter extends Transform {
   
   abortTable() {
     // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],'abortTable()')
+	
+   
     this.skipTable = true;
+	
+	// Abort means that records written but not committed are lost
+	// If rollback occurs prior to abort, written is already added to lost and set to zero.
+	// If abort occurs prior to rollback or abort is called multiple times written is already zeroed out.
+
+    this.metrics.lost += this.metrics.written;
+    this.metrics.written = 0;
+	// this.releaseBatch(this.batch)	  
+
     // Disable the processRow() function.
     this.processRow = async () => {}
-	this.releaseBatch(this.batch)
   }
  
   flushBatch() {
@@ -180,6 +194,11 @@ class YadamuWriter extends Transform {
   }
   
   handleIterativeError(operation,cause,rowNumber,record,info) {
+	  
+	if (this.rowsLost()) {
+	  throw cause
+	}
+
     this.metrics.skipped++;
     
     try {
@@ -219,7 +238,7 @@ class YadamuWriter extends Transform {
 
   reportBatchError(operation,cause,firstRow,lastRow,info) {
 	 
-    if ((cause instanceof DatabaseError) && cause.missingTable()) {
+    if (this.rowsLost() || YadamuError.missingTable(cause)) {
 	  throw cause
     }
     const batchException = this.createBatchException(cause,this.metrics.cached,firstRow,lastRow,info)
@@ -276,8 +295,13 @@ class YadamuWriter extends Transform {
   }
   
   async rollbackTransaction(cause) {
+	  // Rollback means that records written but not committed are lost
+	  // Accounting for in-flight records is dependant on the value of ON_ERROR.
+
       // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],'rollbackTransaction()')
-      this.metrics.lost += this.metrics.written;
+	  
+      
+	  this.metrics.lost += this.metrics.written;
       this.metrics.written = 0;
       await this.dbi.rollbackTransaction(cause)
   }
@@ -321,9 +345,9 @@ class YadamuWriter extends Transform {
 	*/
   }
       
-  async writeBatch(batch,rowsReceived,rowsCached) {
+  async processBatch(batch,rowsReceived,rowsCached) {
 
-    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,rowsReceived,rowsCached],'writeBatch()')
+    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,rowsReceived,rowsCached],'processBatch()')
 	
 	if (!this.skipTable) {
 	  try {
@@ -343,45 +367,50 @@ class YadamuWriter extends Transform {
           }          
           await this.beginTransaction();            
         }
-	  } catch (err) {
-  
-	    /*
+	  } catch (err) { 
+
+  	    /*
 	    **
-	    ** We only get here if an unrecoverable error occurs while writing a batch. Examples of unrecoverable errors include lost connections, missing tables, too many errors during iterative inserts
+	    ** An unrecoverable error occured while writing a batch. Examples of unrecoverable errors include lost connections, missing tables, too many errors during iterative inserts
 	    ** or anything else that causes the _writeBach implementation to throw an error. 
         **
-	    ** Need to handle errors here as writeBatch() is typically executed outside of 'try', 'await', 'catch' block, so that we don't have to wait for each batch
-	    ** to complete before starting the next one.
+	    ** processBatch() is typically executed outside of 'try', 'await', 'catch' block, so that Yadamu can prepare the next batch of rows while the current batch of rows in being written.
 	    **
-	    ** Emitting 'close' here will terminate the current pipeline operation. 
-	    ** Thowing an error or a rejection will cause "Unhandled Exception" or "UnhandledRejection" error.
+	    ** Emit 'close' here to terminate the current pipeline operation. Thowing an exception or a rejection will cause "Unhandled Exception" or "UnhandledRejection" errors.
 	    **
 	    */
-	    if (YadamuConstants.ABORT_CURRENT_TABLE.includes(this.dbi.ON_ERROR)) {
-		  this.abortTable()
-		}
-        this.underlyingError = err
-	    this.readerMetrics.rowsRead = this.eventSource.getRowCount()
-	    this.metrics.lost = 0
-	    // Emit an explicit 'close' event. This will terminate the pipeline operation which will trigger 'error' and 'close' events on all of the upstream components.
-	    this.emit('close')
+
+        if (this.metrics.lost > 0) {
+   	      this.underlyingError = err
+          // ### Need to caculate lost rows correctly when TABLE_MAX_ERRORS exceeded
+          if (YadamuConstants.ABORT_CURRENT_TABLE.includes(this.dbi.ON_ERROR)) {
+	        // Aborting the current table (ABORT,SKIP) means that no more rows will be read and any records cached but not written will be lost. 
+	        this.readerMetrics.rowsRead = this.eventSource.getRowCount()
+			this.readerMetrics.lost = this.eventSource.writableLength
+	        this.metrics.lost+= rowsCached
+   	        this.releaseBatch(batch)
+      	    this.abortTable()
+      	    // Emit an explicit 'close' event. This will terminate the pipeline operation which will trigger 'error' and 'close' events on all of the upstream components.
+    	    this.emit('close')
+		  }
+        }
 	  }
 	}
     else {
-	  this.metrics.skipped+= this.metrics.cached
-	  this.metrics.cached = 0
-      this.releaseBatch(batch)
+	  // Entire Batch is skipped ### Log the batch ???
+	  this.metrics.lost+= rowsCached
+	  this.releaseBatch(batch)
 	}
-    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,rowsReceived,rowsCached],'writeBatch(): emit('batchWritten')`)
+    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,rowsReceived,rowsCached],'processBatch(): emit('batchWritten')`)
 	this.emit('batchWritten');
   }
 
   getBatchWritten(batchNumber) {
   
     const batchWritten = new Promise((resolve,reject) => {
-      // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'writeBatch()',batchNumber],'new batchWritten')
+      // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'getBatchWritten()',batchNumber],'new batchWritten')
 	  this.once('batchWritten',() => {
-	    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'writeBatch()',batchNumber,err ? err.message : 'OK'],'batchWritten')
+	    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'getBatchWritten()',batchNumber,err ? err.message : 'OK'],'batchWritten')
 	    this.batchOperations.delete(this.batchWritten)
 	    resolve();
 	  })
@@ -412,7 +441,7 @@ class YadamuWriter extends Transform {
 	  const nextBatch = this.batch;
 	  const rowsReceived = this.metrics.received
       const rowsCached = this.metrics.cached
-      // Wait for any pending writeBatch operations to complete
+      // Wait for any pending processBatch operations to complete
 	  if (this.batchWritten) {
 	    const startTime = performance.now()
 	    await this.batchWritten;
@@ -421,10 +450,8 @@ class YadamuWriter extends Transform {
 	  }
       this.newBatch()
  	  this.uncork(true)
-	  if (!this.skipTable) {
-	    this.batchWritten = this.getBatchWritten(this.metrics.batchCount)
-	    this.writeBatch(nextBatch,rowsReceived,rowsCached);
-  	  }
+      this.batchWritten = this.getBatchWritten(this.metrics.batchCount)
+	  this.processBatch(nextBatch,rowsReceived,rowsCached);
     }
   }
   
@@ -466,14 +493,14 @@ class YadamuWriter extends Transform {
       callback();
     } catch (e) {
       // this.yadamuLogger.trace([`WRITER`,this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);    
-	  this.yadamuLogger.handleException(['WRITER',this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);    
+	  this.yadamuLogger.handleException([`PIPELINE`,`WRITER0`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,messageType,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);    
 	  try {
         switch (messageType) {
           case 'data':
             /*
             **
             ** Read Error Handling. 
-            **   ABORT: Rollback the current transaction. Pass the error to the cllback function, which should propogate the error.
+            **   ABORT: Rollback the current transaction. Pass the exception to the callback function, which should propogate the exception.
             **   SKIP:  
             **   FLUSH: 
             **
@@ -512,7 +539,7 @@ class YadamuWriter extends Transform {
 			*/
 		    // this.abortTable()
 			this.underlyingError = e;
-			this.emit('close')
+			// this.emit('close')
 			callback(e)
         }
       } catch (err) {
@@ -526,8 +553,10 @@ class YadamuWriter extends Transform {
     this.readerMetrics = readerMetrics
   }
   
-  reportPerformance() {
+  reportPerformance(err) {
+	
 	const writerMetrics = this.getMetrics();
+    writerMetrics.metrics.lost+= this.readerMetrics.lost + this.writableLength
 	const readElapsedTime = this.readerMetrics.parserEndTime - this.readerMetrics.readerStartTime;
     const writerElapsedTime = writerMetrics.endTime - writerMetrics.startTime;        
     const pipeElapsedTime = writerMetrics.endTime - this.readerMetrics.pipeStartTime;
@@ -550,6 +579,12 @@ class YadamuWriter extends Transform {
     rowCountSummary = writerMetrics.metrics.skipped > 0 ? `${rowCountSummary} Skipped ${writerMetrics.metrics.skipped}.` : rowCountSummary
     rowCountSummary = writerMetrics.metrics.lost > 0 ? `${rowCountSummary} Lost ${writerMetrics.metrics.lost}.` : rowCountSummary
     
+    const cause = this.readerMetrics.readerError || this.readerMetrics.parserError ||  this.underlyingError || err
+	if (cause) {
+      const source = this.readerMetrics.readerError || this.readerMetrics.parserError ? 'STREAM READER' : 'STREAM WRITER'
+ 	  this.yadamuLogger.handleException(['PIPELINE',source,this.tableName,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],cause)
+	}
+
 	// console.log(writerMetrics.metrics)
 	
 	if (this.readerMetrics.failed) {
@@ -572,6 +607,10 @@ class YadamuWriter extends Transform {
       }
     }     
     
+    if (this.dbi.yadamu.YADAMU_QA && ((this.readerMetrics.rowsRead - (writerMetrics.metrics.committed + writerMetrics.metrics.lost + writerMetrics.metrics.skipped))!== 0)) {
+      this.yadamuLogger.qa([`${this.tableName}`,`${writerMetrics.insertMode}`,this.readerMetrics.rowsRead,writerMetrics.metrics.committed,writerMetrics.metrics.lost,writerMetrics.metrics.skipped,this.writableLength,this.readerMetrics.lost],`Inconsistent Metrics detected.`)  
+    } 
+
     const metrics = {[this.tableName] : {rowCount: writerMetrics.metrics.committed, insertMode: writerMetrics.insertMode,  rowsSkipped: writerMetrics.metrics.skipped, elapsedTime: Math.round(writerElapsedTime).toString() + "ms", throughput: Math.round(writerThroughput).toString() + "/s", sqlExecutionTime: Math.round(writerMetrics.sqlTime)}};
     this.dbi.yadamu.recordMetrics(metrics);  
     return (this.readerMetrics.failed || (this.readerMetrics.rowsRead !== (writerMetrics.metrics.committed + writerMetrics.metrics.skipped)))
@@ -587,27 +626,23 @@ class YadamuWriter extends Transform {
 	  const rowsReceived = this.metrics.received
       const rowsCached = this.metrics.cached
       this.batchWritten = this.getBatchWritten(this.metrics.batchCount)
-	  this.writeBatch(nextBatch,rowsReceived,rowsCached)
+	  this.processBatch(nextBatch,rowsReceived,rowsCached)
  	}
 	else {
-	  this.metrics.skipped+= this.metrics.cached
+	  this.metrics.lost+= this.metrics.cached
 	  this.releaseBatch(this.batch)
 	}
 
     // Ensure all batchOperations are complete
-    await Promise.all(Array.from(this.batchOperations))
+    await Promise.allSettled(Array.from(this.batchOperations))
 	
 	/*
 	**
-	** Handle any errors raised during the final writeBatch() operations.
+	** Handle any errors raised during the final processBatch() operations.
 	**
 	*/
 	
 	this.underlyingError = this.underlyingError || cause
-	if (this.underlyingError) {
-	  this.yadamuLogger.handleException(['PIPELINE','STREAM WRITER',this.tableName,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],this.underlyingError)
-    }
-	
     if (this.dbi.TRANSACTION_IN_PROGRESS === true) {
       if (this.skipTable === true) {
 		await this.rollbackTransaction(this.underlyingError)
@@ -621,41 +656,23 @@ class YadamuWriter extends Transform {
   async __destroy() { /* Proivde implementation where nescessary * */  }
     
   async _destroy (err,callback)  {
+
+	/*
+	**
+	** _destroy is called when the stream terminates as a result of an error
+	**
+	** The pipeline operation may terminate and throw an exception before _destroy has completed....
+	**
+	*/
 	  
-	// The pipeline terminates and throws an exception before _destroy has completed....
-	// Invoking the callback with an error seems to result in an uncatchable error
-	
 	// this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],`_destroy(${err ? err.message : 'Normal'})`)
-    
+
+    if (err && YadamuConstants.ABORT_CURRENT_TABLE.includes(this.dbi.ON_ERROR)) {
+      this.abortTable()
+	}	
     let source
-	let dllFailure = false;
+
 	try {
-	  if (err) {
-   		if (YadamuConstants.ABORT_CURRENT_TABLE.includes(this.dbi.ON_ERROR)) {
-		  this.abortTable()
-		}
-        source = (!(err instanceof YadamuError) && (this.underlyingError === undefined)) ? 'STREAM READER' : 'STREAM WRITER'
-	    switch (true) {
-		  case ((source === 'STREAM READER')):
-		    err = this.readerMetrics.readerError || err
-			// If the ON_ERROR handling is set to ABORT or SKIP abort processing of the current table. This should prevent additional rows being written to the target database.
-			break
-		  case ((source === 'STREAM WRITER')):
-		    err = this.underlyingError || err
-			break
-		}
-		// Check if DDL was successful.
-		try {
-		  await this.ddlComplete
-	    } catch (e) {
-		  dllFailure = true;
-		}
-    	this.yadamuLogger.handleException(['PIPELINE',source,this.tableName,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],err)
-      }	 
-      if (YadamuError.closedConnection(this.underlyingError)) {
-	    // Re-establish the input stream connection 
-   	    await this.dbi.reconnect(this.underlyingError,'WRITER')
-      }
       await this.__destroy()
       await this.finalize(err)
 	} catch (e) {
@@ -663,27 +680,35 @@ class YadamuWriter extends Transform {
 	  source = 'STREAM WRITER'
 	  err = e 
 	  this.underlyingError = e
-	  this.yadamuLogger.handleException(['PIPELINE',source,this.tableName,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],e);
+	  this.yadamuLogger.handleException([`PIPELINE`,`STREAM WRITER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);
     }
     this.endTime = performance.now()
-	if (!dllFailure) {
-      this.reportPerformance()
+	try {
+	  await this.ddlComplete
+	  this.reportPerformance(err)
+    } catch (ddlFailure) {
+	  err = ddlFailure
 	}
-    this.emit('writerComplete',err || this.underlyingError)
-	callback()
-	// this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],`_destroy(callback() complete})`)
+	callback(err)
   } 
 
   async __final() { /* Proivde implementation where nescessary * */  }
  
   async _final(callback) {
+	  
+	/*
+	**
+	** _final is called when the stream terminates without an error
+	**
+	*/
+	
     // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber(),,this.metrics.received,this.metrics.cached],'_final()')
 	await this.__final()
 	let exception
 	try {
       await this.destroy()
 	} catch (err) {
-      this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`"${this.tableName}"`],err);
+      this.yadamuLogger.handleException([`PIPELINE`,`WRITER`,`FINAL`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],err);
 	  exception = err
     } 
 	callback(exception)
