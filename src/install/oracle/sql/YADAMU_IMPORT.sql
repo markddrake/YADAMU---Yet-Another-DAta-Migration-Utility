@@ -1233,6 +1233,8 @@ $END
            when TARGET_DATA_TYPE = 'JSON' then
 		     $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
 			 -- No JSON Type: JSON data stored as CLOB
+			 
+			 
              '"' || COLUMN_NAME || '"'
 			 $ELSIF DBMS_DB_VERSION.VER_LE_12 $THEN
 			 -- JSON Stored as BLOB needs explict conversion

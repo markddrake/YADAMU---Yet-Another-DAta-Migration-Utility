@@ -36,6 +36,7 @@ class Yadamu {
   get PARALLEL_PROCESSING()           { return this.PARALLEL > 0 } // Parellel 1 is Parallel processing logic with a single worker.
   get RDBMS()                         { return this.parameters.RDBMS    || YadamuConstants.RDBMS }  
   get COMPRESSION()                   { return this.parameters.COMPRESSION || 'NONE' }
+  get INTERACTIVE()                   { return this.STATUS.operation === 'YADAMUGUI' }
 
   get EXCEPTION_FOLDER()              { return this.parameters.EXCEPTION_FOLDER       || YadamuConstants.EXCEPTION_FOLDER }
   get EXCEPTION_FILE_PREFIX()         { return this.parameters.EXCEPTION_FILE_PREFIX  || YadamuConstants.EXCEPTION_FILE_PREFIX }
@@ -107,17 +108,19 @@ class Yadamu {
 	    }
 
 	    this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
-	    this.LOGGER.handleException(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
-        this.STATUS.errorRaised = true;
+        this.LOGGER.handleException(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
+	    this.STATUS.errorRaised = true;
         this.reportStatus(this.STATUS,this.LOGGER)
-		this.terminator = setTimeout(
-		  () => {
-   	        this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation,'TIMEOUT'],'Process aborted.')
-			this.terminator = undefined
-            process.exit()
-          },
-		  5000
-	    )
+		if (!this.INTERACTIVE) {
+  		  this.terminator = setTimeout(
+		    () => {
+   	          this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation,'TIMEOUT'],'Process aborted.')
+			  this.terminator = undefined
+              process.exit()
+            },
+		    5000
+	      )
+		}
 	  }) 
 	}  
 

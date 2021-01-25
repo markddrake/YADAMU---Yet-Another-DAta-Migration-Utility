@@ -269,6 +269,58 @@ ipcMain.on('target-mariadb', async function (event, connectionProps, parameters)
   }
 })
 
+async function validatesnowflake(connectionProps,parameters) {
+
+  const SnowflakeDBI = require('./YADAMU/snowflake/node/snowflakeDBI')
+  const snowflakeDBI = new SnowflakeDBI(yadamu);
+  await snowflakeDBI.testConnection(connectionProps,parameters)
+  return snowflakeDBI
+}
+
+ipcMain.on('source-snowflake', async function (event, connectionProps, parameters) {
+  try{
+	sourceDBI = await validatesnowflake(connectionProps,parameters);
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
+
+ipcMain.on('target-snowflake', async function (event, connectionProps, parameters) {
+  try{
+	targetDBI = await validatesnowflake(connectionProps,parameters);
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
+
+async function validateMongoDB(connectionProps,parameters) {
+
+  const MongoDBI = require('./YADAMU/mongodb/node/mongoDBI')
+  const mongoDBI = new MongoDBI(yadamu);
+  await mongoDBI.testConnection(connectionProps,parameters)
+  return mongoDBI
+}
+
+ipcMain.on('source-mongodb', async function (event, connectionProps, parameters) {
+  try{
+	sourceDBI = await validateMongoDB(connectionProps,parameters);
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
+
+ipcMain.on('target-mongodb', async function (event, connectionProps, parameters) {
+  try{
+	targetDBI = await validateMongoDB(connectionProps,parameters);
+    event.returnValue = 'success'
+  } catch (e) {
+	event.returnValue = e.message
+  }
+})
+
 function setFileReader(parameters) {
   const fileReader = new FileDBI(yadamu);
   fileReader.setParameters(parameters);
@@ -295,7 +347,7 @@ ipcMain.on('copy', async function (event) {
 	  const startTime = new Date().getTime();
       await yadamu.doPumpOperation(sourceDBI,targetDBI)
 	  const elapsedTime = new Date().getTime() - startTime;
-	  const status = yadamu.getStatus()
+	  const status = yadamu.STATUS
 	  switch (status.operationSuccessful) {
         case true:
 	      yadamuLogger.info([`YadamuUI.onCopy()`,`${status.operation}`],`Operation completed ${status.statusMsg}. Elapsed time: ${YadamuLibrary.stringifyDuration(elapsedTime)}.`);

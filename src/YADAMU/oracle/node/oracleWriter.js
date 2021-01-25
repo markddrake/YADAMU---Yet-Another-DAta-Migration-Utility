@@ -24,8 +24,8 @@ class OracleWriter extends YadamuWriter {
   ** Binding LOBS requires less client side memory than binding Strings and Buffers
   **
   ** The Yadamu Oracle interface allows you to optimize LOB usage via the following parameters
-  **    LOB_BATCH_COUNT : A Batch will be regarded as complete when it uses more LOBS than LOB_BATCH_COUNT
-  **    LOB_MIN_SIZE    : If a String or Buffer is mapped to a CLOB or a BLOB then it will be inserted using a LOB if it exceeeds this value.
+  **    LOB_BATCH_COUNT  : A Batch will be regarded as complete when it uses more LOBS than LOB_BATCH_COUNT
+  **    LOB_MIN_SIZE     : If a String or Buffer is mapped to a CLOB or a BLOB then it will be inserted using a LOB if it exceeeds this value.
   **    LOB_CACHE_COUNT  : A Batch will be regarded as complete when the number of CACHED (String & Buffer) LOBs exceeds this value.
   **
   ** The amount of client side memory required to manage the LOB Cache is approx LOB_MIN_SIZE * LOB_CACHE_COUNT
@@ -61,7 +61,7 @@ class OracleWriter extends YadamuWriter {
 	
     super.setTableInfo(tableName)   
 	// Set up an Array of Transformation functions to be applied to the incoming rows
-
+	
 	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
       switch (dataType.type.toUpperCase()) {
@@ -173,19 +173,19 @@ class OracleWriter extends YadamuWriter {
 			  ** At this point we can have one of the following to deal with:
 			  ** 
 			  ** 1. A Buffer
-			  ** 2. A string containing HexBinary encodedd content
-			  ** 3. A JSON Objct
+			  ** 2. A string containing HexBinary encoded content
+			  ** 3. A JSON Object
 			  **
 			  ** If we have a JSON object stringify it.
 			  ** If we have a HexBinary representation of a Buffer convert it into a Buffer unless the resuling buffer would exceed the maximu size defined for a client cached object.
 			  ** the maximum size of a client cached LOB.
-			  ** If we have an ojbect we need to serialize it and convert the serialization into a Buffer
+			  ** If we have an object we need to serialize it and convert the serialization into a Buffer
 			  */
               // Determine whether to bind content as Buffer or temporary BLOB
 			  if ((typeof col === "object") && (!Buffer.isBuffer(col))) {
 				col = Buffer.from(JSON.stringify(col),'utf-8')
 			  }
-              if ((typeof col === "string") && (col.length/2) <= this.dbi.LOB_MIN_SIZE) {
+              if ((typeof col === "string") /* && ((col.length/2) <= this.dbi.LOB_MIN_SIZE) */) {
 				if (YadamuLibrary.decomposeDataType(this.tableInfo.targetDataTypes[idx]).type === 'JSON') {
 				  col = Buffer.from(col,'utf-8')
 				}
@@ -194,8 +194,7 @@ class OracleWriter extends YadamuWriter {
 				}
               }
 		      this.batch.cachedLobCount++
-			  // If col ia still a string at this point the string is too large to be stored in the client side cache
-              this.bindRowAsLOB = this.bindRowAsLOB || (col.length > this.dbi.LOB_MIN_SIZE) 
+			  this.bindRowAsLOB = this.bindRowAsLOB || (col.length > this.dbi.LOB_MIN_SIZE) 
 			  return col
 			}
             break
@@ -548,7 +547,7 @@ end;`
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
     // Unfortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
     // So we have to free the current tempLob Cache and create a new one for each batch
-    	
+
     this.metrics.batchCount++;
     let rows = undefined;
     let binds = undefined;
@@ -558,7 +557,7 @@ end;`
 	   // this.batch.lobRows constists of a an array of arrays of pending promises that need to be resolved.
 	  batch.lobRows = await Promise.all(batch.lobRows.map(async (row) => { return await Promise.all(row.map((col) => {return col}))})) 
 	}
-	
+
     if (this.insertMode === 'Batch') {
       try {
         rows = batch.rows

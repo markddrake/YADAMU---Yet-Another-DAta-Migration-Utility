@@ -441,6 +441,7 @@ class YadamuCLI {
 	  
       switch (sourceDatabase) {
          case 'mssql':
+		 case 'snowflake':
            sourceParameters.YADAMU_DATABASE = sourceSchema.database
            break;
          default:
@@ -451,6 +452,7 @@ class YadamuCLI {
 	  }
       switch (targetDatabase) {
          case 'mssql':
+		 case 'snowflake':
            targetParameters.YADAMU_DATABASE = targetSchema.database
            break;
          default:

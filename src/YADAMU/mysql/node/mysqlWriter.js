@@ -22,23 +22,23 @@ class MySQLWriter extends YadamuWriter {
 
     this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-       switch (dataType.type.toLowerCase()) {
+      switch (dataType.type.toLowerCase()) {
         case "json" :
           return (col,idx) => {
             return typeof col === 'object' ? JSON.stringify(col) : col
-       }
+          }
           break;
-          case "geometry" :
-            if (this.SPATIAL_FORMAT === 'GeoJSON') {
-              return (col,idx) => {
-                return typeof col === 'object' ? JSON.stringify(col) : col
-           }
+        case "geometry" :
+          if (this.SPATIAL_FORMAT === 'GeoJSON') {
+            return (col,idx) => {
+              return typeof col === 'object' ? JSON.stringify(col) : col
             }
-            return null;
-          case "boolean":
+          }
+          return null;
+        case "boolean":
           return (col,idx) => {
             return YadamuLibrary.booleanToInt(col)
-       }
+          }
           break; 
         case "date":
         case "time":

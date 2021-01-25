@@ -10,7 +10,7 @@ class LogWriter extends Writable {
    }
 
   _write(chunk, encoding, done) {
-    this.logWindow.webContents.send('write-log',chunk)
+	this.logWindow.webContents.send('write-log',chunk.toString('utf8'))
     done();
   }
 

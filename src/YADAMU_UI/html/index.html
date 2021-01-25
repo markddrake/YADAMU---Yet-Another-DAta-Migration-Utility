@@ -32,6 +32,12 @@
           <li class="nav-item">
             <a class="nav-link" id="source-tab-mariadb" data-toggle="pill" href="#source-mariadb" role="tab" aria-controls="source-pane-mariadb" aria-selected="false">MariaDB</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link" id="source-tab-snowflake" data-toggle="pill" href="#source-snowflake" role="tab" aria-controls="source-pane-snowflake" aria-selected="false">SnowFlake</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" id="source-tab-mongodb" data-toggle="pill" href="#source-mongodb" role="tab" aria-controls="source-pane-mongodb" aria-selected="false">MongoDB</a>
+          </li>
         </ul>
         <div class="tab-content" id="source-tab-content">
           <div class="tab-pane fade show active" id="source-file" role="tabpanel" aria-labelledby="source-tab-file">
@@ -143,7 +149,7 @@
             </div>
             </form>
           </div>
-           <div class="tab-pane fade" id="source-mariadb" role="tabpanel" aria-labelledby="source-tab-mariadb">
+          <div class="tab-pane fade" id="source-mariadb" role="tabpanel" aria-labelledby="source-tab-mariadb">
             <form id="source-mariadb" oninput="resetSourceState('source-mariadb-status')">
             <div class="input-group mb-3">
                 <input type="text" id="source-mariadb-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
@@ -170,6 +176,52 @@
             </div>
             </form>
           </div>
+          <div class="tab-pane fade" id="source-snowflake" role="tabpanel" aria-labelledby="source-tab-snowflake">
+            <form id="source-snowflake" oninput="resetSourceState('source-snowflake-status')">
+            <div class="input-group mb-3">
+                <input type="text" id="source-snowflake-account" class="form-control" placeholder="Account" aria-label="Account" aria-describedby="basic-addon1">
+            </div>
+            <div class="input-group mb-3">
+                <input type="text" id="source-snowflake-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+            </div>
+            <div class="input-group mb-3">
+               <input type="password" id="source-snowflake-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+            </div>
+            <div class="input-group mb-3">
+               <input type="text" id="source-snowflake-warehouse" class="form-control" placeholder="Warehouse" aria-label="Warehouse" aria-describedby="basic-addon1" value = "DEMO_WH">
+            </div>
+            <div class="input-group mb-3">
+                <input type="text" id="source-snowflake-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="DEMO_DB">
+            </div>
+            <div class="input-group mb-3">
+                <input type="text" id="source-snowflake-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1" value="PUBLIC">
+            </div>
+			<div class="float-right">
+            <button id="source-snowflake-testConnection"  type="button" onclick="validatesnowflakeSource(this)" class="btn btn-primary">Test Connection
+			  <span id="source-snowflake-status" class="fas fa-question-circle"></span>
+			</button>
+            </div>
+            </form>
+          </div>
+		            <div class="tab-pane fade" id="source-mongodb" role="tabpanel" aria-labelledby="source-tab-mongodb">
+            <form id="source-mongodb" oninput="resetSourceState('source-mongodb-status')">
+            <div class="input-group mb-3">
+                <input type="text" id="source-mongodb-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+            </div>
+            <div class="input-group mb-3">
+                <input type="number" min="0" step="1" id="source-mongodb-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="27017">
+            </div>
+            <div class="input-group mb-3">
+                <input type="text" id="source-mongodb-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
+            </div>
+			<div class="float-right">
+            <button id="source-mongodb-testConnection"  type="button" onclick="validateMongoDBSource(this)" class="btn btn-primary">Test Connection
+			  <span id="source-mongodb-status" class="fas fa-question-circle"></span>
+			</button>
+            </div>
+            </form>
+          </div>
+
         </div>
 	  </div>
     </div>
@@ -194,6 +246,12 @@
           </li>
           <li class="nav-item">
             <a class="nav-link" id="target-tab-oracle" data-toggle="pill" href="#target-mariadb" role="tab" aria-controls="target-pane-mariadb" aria-selected="false">MariaDB</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" id="target-tab-snowflake" data-toggle="pill" href="#target-snowflake" role="tab" aria-controls="target-pane-snowflake" aria-selected="false">SnowFlake</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" id="target-tab-mongodb" data-toggle="pill" href="#target-mongodb" role="tab" aria-controls="target-pane-mongodb" aria-selected="false">MongoDB</a>
           </li>
         </ul>
         <div class="tab-content" id="target-tab-content">
@@ -306,7 +364,7 @@
             </div>
             </form>
           </div>
-           <div class="tab-pane fade" id="target-mariadb" role="tabpanel" aria-labelledby="target-tab-mariadb">
+          <div class="tab-pane fade" id="target-mariadb" role="tabpanel" aria-labelledby="target-tab-mariadb">
             <form id="target-mariadb" oninput="resetTargetState('target-mariadb-status')">
             <div class="input-group mb-3">
                 <input type="text" id="target-mariadb-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
@@ -329,6 +387,51 @@
 			<div class="float-right">
             <button id="target-mariadb-testConnection" type="button" onclick="validateMariaDBTarget(this)" class="btn btn-primary">Test Connection
 			  <span id="target-mariadb-status" class="fas fa-question-circle"></span>
+			</button>
+            </div>
+            </form>
+          </div>
+          <div class="tab-pane fade" id="target-snowflake" role="tabpanel" aria-labelledby="target-tab-snowflake">
+            <form id="target-snowflake" oninput="resetTargetState('target-snowflake-status')">
+            <div class="input-group mb-3">
+                <input type="text" id="target-snowflake-account" class="form-control" placeholder="Account" aria-label="Account" aria-describedby="basic-addon1">
+            </div>
+            <div class="input-group mb-3">
+                <input type="text" id="target-snowflake-user" class="form-control" placeholder="User" aria-label="Username" aria-describedby="basic-addon1">
+            </div>
+            <div class="input-group mb-3">
+               <input type="password" id="target-snowflake-password" class="form-control" placeholder="Password" aria-label="Password" aria-describedby="basic-addon1">
+            </div>
+            <div class="input-group mb-3">
+               <input type="text" id="target-snowflake-warehouse" class="form-control" placeholder="Warehouse" aria-label="Warehouse" aria-describedby="basic-addon1" value="DEMO_WH">
+            </div>
+            <div class="input-group mb-3">
+                <input type="text" id="target-snowflake-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1" value="DEMO_DB">
+            </div>
+            <div class="input-group mb-3">
+                <input type="text" id="target-snowflake-schema" class="form-control" placeholder="Schema" aria-label="Schema" aria-describedby="basic-addon1" value="PUBLIC">
+            </div>
+			<div class="float-right">
+            <button id="target-snowflake-testConnection" type="button" onclick="validatesnowflakeTarget(this)" class="btn btn-primary">Test Connection
+			  <span id="target-snowflake-status" class="fas fa-question-circle"></span>
+			</button>
+            </div>
+            </form>
+          </div>
+          <div class="tab-pane fade" id="target-mongodb" role="tabpanel" aria-labelledby="target-tab-mongodb">
+            <form id="target-mongodb" oninput="resetTargetState('target-mongodb-status')">
+            <div class="input-group mb-3">
+                <input type="text" id="target-mongodb-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
+            </div>
+            <div class="input-group mb-3">
+                <input type="number" min="0" step="1" id="target-mongodb-port" class="form-control" placeholder="Port" aria-label="Port" aria-describedby="basic-addon1" value="27017">
+            </div>
+            <div class="input-group mb-3">
+                <input type="text" id="target-mongodb-database" class="form-control" placeholder="Database" aria-label="Database" aria-describedby="basic-addon1">
+            </div>
+			<div class="float-right">
+            <button id="target-mongodb-testConnection" type="button" onclick="validateMongoDBTarget(this)" class="btn btn-primary">Test Connection
+			  <span id="target-mongodb-status" class="fas fa-question-circle"></span>
 			</button>
             </div>
             </form>

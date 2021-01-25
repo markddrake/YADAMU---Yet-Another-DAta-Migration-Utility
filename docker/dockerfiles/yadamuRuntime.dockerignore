@@ -1,0 +1,11 @@
+src/node_modules
+dist
+docker
+JSON
+log
+md
+qa
+results
+scratch
+tests
+work

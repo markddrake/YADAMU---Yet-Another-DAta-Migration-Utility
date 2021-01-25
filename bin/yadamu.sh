@@ -1,3 +1,3 @@
 # Run from YADAMU_HOME
-export YADAMU_HOME=`pwd`
+export YADAMU_HOME="${YADAMU_HOME:=`pwd`}"
 npm --prefix ./src start "$@"

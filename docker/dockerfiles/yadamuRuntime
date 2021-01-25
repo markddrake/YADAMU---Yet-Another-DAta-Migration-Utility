@@ -1,0 +1,17 @@
+FROM yadamu/environment:latest
+WORKDIR /usr/src/YADAMU
+COPY src src
+COPY bin bin
+ENV YADAMU_HOME=/usr/src/YADAMU
+ENV YADAMU_BIN=/usr/src/YADAMU/bin
+ENV YADAMU_SRC=$YADAMU_HOME/src
+ENV PATH=$PATH:$YADAMU_BIN
+RUN cd bin \
+ &&	ln -s $YADAMU_BIN/export.sh yadamuExport \
+ &&	ln -s $YADAMU_BIN/import.sh yadamuImport \
+ &&	ln -s $YADAMU_BIN/upload.sh yadamuUpload \
+ &&	ln -s $YADAMU_BIN/copy.sh yadamuCopy \
+ &&	ln -s $YADAMU_BIN/load.sh yadamuLoad \
+ &&	ln -s $YADAMU_BIN/unload.sh yadamuUnload \
+ &&	ln -s $YADAMU_BIN/yadamu.sh yadamu 
+ENTRYPOINT ["sleep","365d"]

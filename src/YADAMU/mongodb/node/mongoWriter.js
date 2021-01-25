@@ -105,7 +105,28 @@ class MongoWriter extends YadamuWriter {
 			  }
 			}
           }			
+		  // ### Disable automatic conversion of serialized JSON to JSON objects. This causes problems when attempting to load data back into NON JSON columns..
 		  return null
+          // First time through test if data is string and first character is '[' or ']'
+		  // TODO ### Trim and test last character is matching ']' or '}'
+		  return (row,idx) => {
+			if (typeof row[idx] === 'string' && ((row[idx].indexOf('[') === 0) || (row[idx].indexOf('{') === 0))) {
+			  try {
+			    row[idx] = JSON.parse(row[idx])
+				// If the parse succeeds remove the test for the remaining records.
+				this.transformations[idx] = (row,idx) => {
+				  try {
+			        row[idx] = JSON.parse(row[idx])
+				  } catch (e) {
+		            this.transformations[idx] = null
+			      }
+				}	  
+			  } catch (e) {
+				// If the parse fails remove the parse 
+		        this.transformations[idx] = null
+			}
+		  }
+		}
 	  }
 	})
 
@@ -118,6 +139,49 @@ class MongoWriter extends YadamuWriter {
         }
       }) 
     }
+	
+	// Set up the batchRow() function used by cacheRow...
+	
+	switch (this.tableInfo.insertMode) {
+      case 'DOCUMENT' :
+	    this.batchRow = (row) => {
+          if (Array.isArray(row[0])) {
+            this.batch.push({array : row[0]})
+          }
+          else {
+            this.batch.push(row[0]);
+          }
+		}
+        break;
+      case 'BSON':
+	    this.batchRow = (row) => {
+          const bsonDocument = {}
+          this.tableInfo.columnNames.forEach((key,idx) => {
+             bsonDocument[key] = row[idx]
+          });
+          this.batch.push(bsonDocument);
+		}
+        break;
+      case 'OBJECT' :
+	    this.batchRow = (row) => {
+          const jsonDocument = {}
+          this.tableInfo.columnNames.forEach((key,idx) => {
+             jsonDocument[key] = row[idx]
+          });
+          this.batch.push(jsonDocument);
+		}
+        break;
+      case 'ARRAY' :
+ 	    this.batchRow = (row) => {
+          this.batch.push({ row : row });
+		}
+        break;
+      default:
+ 	    this.batchRow = (row) => {
+          this.batch.push({ row : row });
+		}
+    }
+	
   }
   
   async initialize(obj) {      
@@ -130,40 +194,10 @@ class MongoWriter extends YadamuWriter {
 
   cacheRow(row) {
       
-    // Apply transformation
+    // Apply the row transformation and add row to the current batch.
     
     this.rowTransformation(row)
-
-    switch (this.tableInfo.insertMode) {
-      case 'DOCUMENT' :
-        if (Array.isArray(row[0])) {
-          this.batch.push({array : row[0]})
-        }
-        else {
-          this.batch.push(row[0]);
-        }
-        break;
-      case 'BSON':
-        const bsonDocument = {}
-        this.tableInfo.columnNames.forEach((key,idx) => {
-           bsonDocument[key] = row[idx]
-        });
-        this.batch.push(bsonDocument);
-        break;
-      case 'OBJECT' :
-        const jsonDocument = {}
-        this.tableInfo.columnNames.forEach((key,idx) => {
-           jsonDocument[key] = row[idx]
-        });
-        this.batch.push(jsonDocument);
-        break;
-      case 'ARRAY' :
-        this.batch.push({ row : row });
-        break;
-      default:
-        // ### Exception - Unknown Mode
-    }
-	
+	this.batchRow(row)
     this.metrics.cached++
     return this.skipTable
 

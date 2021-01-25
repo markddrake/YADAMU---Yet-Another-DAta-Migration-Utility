@@ -294,12 +294,15 @@ class YadamuQA {
   } 
   
   getCompareParameters(sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters) {
-        
-    const compareParameters = Object.assign({}, testParameters)
     
+	const compareParameters = Object.assign({}, testParameters)
+    
+    Object.assign(compareParameters, this.getDefaultValue('DOUBLE_PRECISION',YadamuTest.TEST_DEFAULTS,sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
     Object.assign(compareParameters, this.getDefaultValue('SPATIAL_PRECISION',YadamuTest.TEST_DEFAULTS,sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
     Object.assign(compareParameters, this.getDefaultValue('XSL_TRANSFORMATION',YadamuTest.TEST_DEFAULTS,sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
     Object.assign(compareParameters, this.getDefaultValue('ORDERED_JSON',YadamuTest.TEST_DEFAULTS,sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
+	Object.assign(compareParameters, this.getDefaultValue('SERIALIZED_JSON',YadamuTest.TEST_DEFAULTS,sourceVendor,sourceVersion,targetVendor,targetVersion,testParameters))
+	
    
     let versionSpecificKey = sourceVendor + "#" + sourceVersion;
     Object.assign(compareParameters, YadamuTest.TEST_DEFAULTS[sourceVendor])
@@ -387,20 +390,36 @@ class YadamuQA {
       
     const compareDBI = this.getDatabaseInterface(sourceVendor,connectionProperties,parameters,false,tableMappings)
 
+    if (compareDBI.parameters.DOUBLE_PRECISION !== null) {
+      this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Double precision limited to ${compareDBI.parameters.DOUBLE_PRECISION} digits`);
+    }
+	
     if (compareDBI.parameters.SPATIAL_PRECISION !== 18) {
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Spatial precision limited to ${compareDBI.parameters.SPATIAL_PRECISION} digits`);
     }
+	
     if (compareDBI.parameters.EMPTY_STRING_IS_NULL === true) {
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Empty Strings treated as NULL`);
     }
+	
     if (compareDBI.parameters.STRIP_XML_DECLARATION === true) {
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`XML Declartion ignored when comparing XML content`);
     }
+	
     if (compareDBI.parameters.TIMESTAMP_PRECISION && (compareDBI.parameters.TIMESTAMP_PRECISION < 9)){
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Timestamp precision limited to ${compareDBI.parameters.TIMESTAMP_PRECISION} digits`);
     }
+	
     if (compareDBI.parameters.XSL_TRANSFORMATION !== null) {
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`XSL Transformation ${compareDBI.parameters.XSL_TRANSFORMATION} applied when performing XML comparisons.`);
+    }
+
+    if (compareDBI.parameters.ORDERED_JSON === true) {
+      this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Using "Ordered JSON" when performing JSON comparisons.`);
+    }
+
+    if (compareDBI.parameters.SERIALIZED_JSON === true) {
+      this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Target does not support JSON data. Using JSON Parser when comparing JSON values.`);
     }
 
     try {

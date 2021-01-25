@@ -64,7 +64,7 @@ class SnowflakeDBI extends YadamuDBI {
     })
   } 
 
-  async testConnection(connectionProperties) {   
+  async testConnection(connectionProperties,parameters) {   
     super.setConnectionProperties(connectionProperties);
 	this.setDatabase();
 	try {
@@ -73,7 +73,7 @@ class SnowflakeDBI extends YadamuDBI {
       connection.destroy()
 	  super.setParameters(parameters)
 	} catch (e) {
-      throw this.trackExceptions(new SnowflakeError(e,'Snowflake-SDK.connection.connect()'))
+	  throw e
 	}
   }
   
@@ -126,6 +126,9 @@ class SnowflakeDBI extends YadamuDBI {
     
   getConnectionProperties() {
 	// Convert supplied parameters to format expected by connection mechansim
+	
+   this.parameters.YADAMU_DATABASE = this.parameters.YADAMU_DATABASE || this.parameters.DATABASE
+	
     return {
       account           : this.parameters.ACCOUNT
     , username          : this.parameters.USERNAME

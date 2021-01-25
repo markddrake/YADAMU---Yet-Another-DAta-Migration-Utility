@@ -1,4 +1,4 @@
-export YADAMU_HOME=`pwd`
+export YADAMU_HOME="${YADAMU_HOME:=`pwd`}"
 export YADAMU_QA_HOME=$YADAMU_HOME/qa
 export YADAMU_SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 export YADAMU_TEST_NAME=${YADAMU_TEST_NAME:-all}

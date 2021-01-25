@@ -164,6 +164,10 @@ function updateConfiguration(connectionType,connectionProperties,parameters) {
 	  switch (db) {
 		case 'mssql' :
 		  schemaInfo.database = connectionProperties.database
+		  schemaInfo.schema = parameters.FROM_USER;
+	      break; 
+	    case 'snowflake':
+		  schemaInfo.database = connectionProperties.database
 		  schemaInfo.owner = parameters.FROM_USER;
 	      break; 
         default:
@@ -176,6 +180,10 @@ function updateConfiguration(connectionType,connectionProperties,parameters) {
 		case 'mssql' :
 		  schemaInfo.database = connectionProperties.database
 		  schemaInfo.owner = parameters.TO_USER;
+	      break; 
+	    case 'snowflake':
+		  schemaInfo.database = connectionProperties.database
+		  schemaInfo.schema = parameters.TO_USER;
 	      break; 
         default:
 		  schemaInfo.schema = parameters.TO_USER;
@@ -452,6 +460,86 @@ function validateMariaDBTarget(button) {
   }
  
   window.validTarget = testConnection(button,status,'target-mariadb',connectionProperties,parameters)  
+  setCopyState()
+
+}
+
+function validatesnowflakeSource(button) {
+
+  button.disabled = true;
+  const status = document.getElementById('source-snowflake-status')
+  const connectionProperties = {
+    account                    : document.getElementById('source-snowflake-account').value
+  , username                   : document.getElementById('source-snowflake-user').value
+  , password                   : document.getElementById('source-snowflake-password').value
+  , warehouse                  : document.getElementById('source-snowflake-warehouse').value
+  , database                   : document.getElementById('source-snowflake-database').value
+  };
+  
+  const parameters = {
+	YADAMU_DATABASE : connectionProperties.database 
+  , FROM_USER : document.getElementById('source-snowflake-schema').value
+  }
+ 
+  window.validSource = testConnection(button,status,'source-snowflake',connectionProperties,parameters)  
+  setCopyState()
+
+}
+
+function validatesnowflakeTarget(button) {
+
+  button.disabled = true;
+  const status = document.getElementById('target-snowflake-status')
+  const connectionProperties = {
+    account                    : document.getElementById('target-snowflake-account').value
+  , username                   : document.getElementById('target-snowflake-user').value
+  , password                   : document.getElementById('target-snowflake-password').value
+  , warehouse                  : document.getElementById('target-snowflake-warehouse').value
+  , database                   : document.getElementById('target-snowflake-database').value
+  };
+  
+  const parameters = {
+	YADAMU_DATABASE : connectionProperties.database 
+  , TO_USER : document.getElementById('target-snowflake-schema').value
+  }
+ 
+  window.validTarget = testConnection(button,status,'target-snowflake',connectionProperties,parameters)  
+  setCopyState()
+
+}
+
+function validateMongoDBSource(button) {
+
+  button.disabled = true;
+  const status = document.getElementById('source-mongodb-status')
+  const connectionProperties = {
+    host                       : document.getElementById('source-mongodb-host').value
+  , port                       : document.getElementById('source-mongodb-port').value
+  , database                   : document.getElementById('source-mongodb-database').value
+  };
+  
+  const parameters = {
+  }
+  
+  window.validSource = testConnection(button,status,'source-mongodb',connectionProperties,parameters)  
+  setCopyState()
+
+}
+
+function validateMongoDBTarget(button) {
+
+  button.disabled = true;
+  const status = document.getElementById('target-mongodb-status')
+  const connectionProperties = {
+    host                       : document.getElementById('target-mongodb-host').value
+  , port                       : document.getElementById('target-mongodb-port').value
+  , database                   : document.getElementById('target-mongodb-database').value
+  };
+  
+  const parameters = {
+  }
+
+  window.validTarget = testConnection(button,status,'target-mongodb',connectionProperties,parameters)  
   setCopyState()
 
 }

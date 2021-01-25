@@ -35,8 +35,6 @@ class YadamuParser extends Transform {
 	// this.yadamuLogger.trace([this.constructor.name,this.tableInfo.TABLE_NAME],'_final()');
 	this.endTime = performance.now();
 	callback()
-	// Force invoking end() to Emit 'end'. Since parser i
-	// this.emit('end');
   } 
 }
 

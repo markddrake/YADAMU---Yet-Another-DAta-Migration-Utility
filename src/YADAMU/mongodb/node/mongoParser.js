@@ -17,8 +17,15 @@ class MongoParser extends YadamuParser {
 		   return (row,idx)  => {
              row[idx] = Buffer.from(row[idx].toHexString(),'hex')
 		   }
-        default:
-		  return null;
+		 /*
+		 case "object":
+		 case "array":
+		    return (row,idx) => {
+		      row[idx] = JSON.stringify(row[idx])
+			}
+	     */
+         default:
+		   return null;
       }
     })
 	
@@ -36,17 +43,19 @@ class MongoParser extends YadamuParser {
   
   async _transform (data,encoding,callback) {
 	this.rowCount++;
-    if (this.tableInfo.ID_TRANSFORMATION === 'STRIP') {
+	if (this.tableInfo.ID_TRANSFORMATION === 'STRIP') {
       delete data._id
     }
 	
     switch (this.tableInfo.READ_TRANSFORMATION) {
 	  case 'DOCUMENT_TO_ARRAY' :
-	    data = Object.values(data)
-        this.rowTransformation(data)
+	    // Need to assemble array in correct order.
+	    data = this.tableInfo.COLUMN_NAME_ARRAY.map((c) => { return data[c] })
+      	this.rowTransformation(data)
 		break;
       default:
     }
+	// if (this.rowCount === 1) console.log(data)
     this.push({data:data})
     callback();
   }
