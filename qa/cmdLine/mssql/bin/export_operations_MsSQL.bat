@@ -1,10 +1,10 @@
-@SET TGT=%~1
-@SET FILEVER=%~2
-@SET SCHEMAVER=%~3
-node %YADAMU_BIN%\export --rdbms=%YADAMU_DB% --username=%DB_USER% --HOSTNAME=%DB_HOST% --password=%DB_PWD% --database=Northwind%SCHEMAVER%         overwrite=yes from_user=dbo            file=%TGT%\Northwind%FILEVER%.json        mode=%MODE% log_file=%YADAMU_EXPORT_LOG%
-node %YADAMU_BIN%\export --rdbms=%YADAMU_DB% --username=%DB_USER% --HOSTNAME=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHEMAVER%    overwrite=yes from_user=Sales          file=%TGT%\Sales%FILEVER%.json            mode=%MODE% log_file=%YADAMU_EXPORT_LOG%
-node %YADAMU_BIN%\export --rdbms=%YADAMU_DB% --username=%DB_USER% --HOSTNAME=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHEMAVER%    overwrite=yes from_user=Person         file=%TGT%\Person%FILEVER%.json           mode=%MODE% log_file=%YADAMU_EXPORT_LOG%
-node %YADAMU_BIN%\export --rdbms=%YADAMU_DB% --username=%DB_USER% --HOSTNAME=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHEMAVER%    overwrite=yes from_user=Production     file=%TGT%\Production%FILEVER%.json       mode=%MODE% log_file=%YADAMU_EXPORT_LOG%
-node %YADAMU_BIN%\export --rdbms=%YADAMU_DB% --username=%DB_USER% --HOSTNAME=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHEMAVER%    overwrite=yes from_user=Purchasing     file=%TGT%\Purchasing%FILEVER%.json       mode=%MODE% log_file=%YADAMU_EXPORT_LOG%
-node %YADAMU_BIN%\export --rdbms=%YADAMU_DB% --username=%DB_USER% --HOSTNAME=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHEMAVER%    overwrite=yes from_user=HumanResources file=%TGT%\HumanResources%FILEVER%.json   mode=%MODE% log_file=%YADAMU_EXPORT_LOG%
-node %YADAMU_BIN%\export --rdbms=%YADAMU_DB% --username=%DB_USER% --HOSTNAME=%DB_HOST% --password=%DB_PWD% --database=AdventureWorksDW%SCHEMAVER%  overwrite=yes from_user=dbo            file=%TGT%\AdventureWorksDW%FILEVER%.json mode=%MODE% log_file=%YADAMU_EXPORT_LOG%
+set TGT=%~1
+set FILEVER=%~2
+set SCHEMA_VERSION=%~3
+call %YADAMU_BIN%\export.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=Northwind%SCHEMA_VERSION%         FROM_USER=dbo             FILE=%TGT%\Northwind%FILEVER%.json         MODE=%MODE% LOG_FILE=%YADAMU_EXPORT_LOG%  EXCEPTION_FOLDER=%YADAMU_LOG_PATH%
+call %YADAMU_BIN%\export.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorks%SCHEMA_VERSION%    FROM_USER=Sales           FILE=%TGT%\Sales%FILEVER%.json             MODE=%MODE% LOG_FILE=%YADAMU_EXPORT_LOG%  EXCEPTION_FOLDER=%YADAMU_LOG_PATH%
+call %YADAMU_BIN%\export.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorks%SCHEMA_VERSION%    FROM_USER=Person          FILE=%TGT%\Person%FILEVER%.json            MODE=%MODE% LOG_FILE=%YADAMU_EXPORT_LOG%  EXCEPTION_FOLDER=%YADAMU_LOG_PATH%
+call %YADAMU_BIN%\export.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorks%SCHEMA_VERSION%    FROM_USER=Production      FILE=%TGT%\Production%FILEVER%.json        MODE=%MODE% LOG_FILE=%YADAMU_EXPORT_LOG%  EXCEPTION_FOLDER=%YADAMU_LOG_PATH%
+call %YADAMU_BIN%\export.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorks%SCHEMA_VERSION%    FROM_USER=Purchasing      FILE=%TGT%\Purchasing%FILEVER%.json        MODE=%MODE% LOG_FILE=%YADAMU_EXPORT_LOG%  EXCEPTION_FOLDER=%YADAMU_LOG_PATH%
+call %YADAMU_BIN%\export.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorks%SCHEMA_VERSION%    FROM_USER=HumanResources  FILE=%TGT%\HumanResources%FILEVER%.json    MODE=%MODE% LOG_FILE=%YADAMU_EXPORT_LOG%  EXCEPTION_FOLDER=%YADAMU_LOG_PATH%
+call %YADAMU_BIN%\export.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorksDW%SCHEMA_VERSION%  FROM_USER=dbo             FILE=%TGT%\AdventureWorksDW%FILEVER%.json  MODE=%MODE% LOG_FILE=%YADAMU_EXPORT_LOG%  EXCEPTION_FOLDER=%YADAMU_LOG_PATH%

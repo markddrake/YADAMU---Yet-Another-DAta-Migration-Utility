@@ -4,8 +4,12 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 const path = require('path')
 const Stream = require('stream')
 
+
 const CloudDBI = require('../node/cloudDBI.js');
-const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
+const DBIConstants = require('../../common/dbiConstants.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js')
+
 const AzureConstants = require('./azureConstants.js');
 const AzureStorageService = require('./azureStorageService.js');
 
@@ -28,8 +32,20 @@ class AzureDBI extends CloudDBI {
   **
   */
 
-  get DATABASE_VENDOR()     { return AzureConstants.DATABASE_VENDOR};
-  get SOFTWARE_VENDOR()     { return AzureConstants.SOFTWARE_VENDOR};
+  static #_YADAMU_DBI_PARAMETERS
+
+  static get YADAMU_DBI_PARAMETERS()  { 
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,AzureConstants.DBI_PARAMETERS))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+	return AzureDBI.YADAMU_DBI_PARAMETERS
+  }
+
+  get DATABASE_KEY()          { return AzureConstants.DATABASE_KEY};
+  get DATABASE_VENDOR()       { return AzureConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()       { return AzureConstants.SOFTWARE_VENDOR};
 
   get STORAGE_ID() {
     this._CONTAINER = this._CONTAINER || (() => { 

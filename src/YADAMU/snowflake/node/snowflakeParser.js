@@ -9,7 +9,7 @@ class SnowflakeParser extends YadamuParser {
     this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 	  switch (dataType) {
 		 case 'XML':
-		    // Replace xsl:preserve with xml:preserve
+		    // Replace xsl:space with xml:space
 		   return (row,idx)  => {
              row[idx] = row[idx].replace(/xsl:space/g,'xml:space')
 		   }     

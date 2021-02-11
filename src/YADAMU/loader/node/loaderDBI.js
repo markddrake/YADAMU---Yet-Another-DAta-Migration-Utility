@@ -8,14 +8,16 @@ const { performance } = require('perf_hooks');
 const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
 
 const YadamuDBI = require('../../common/yadamuDBI.js');
-const {YadamuError} = require('../../common/yadamuException.js');
+const DBIConstants = require('../../common/dbiConstants.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js')
+
 const JSONParser = require('./jsonParser.js');
 const EventStream = require('./eventStream.js');
 const JSONWriter = require('./jsonWriter.js');
 const ArrayWriterWriter = require('./arrayWriter.js');
 const CSVWriter = require('./csvWriter.js');
-const DBIConstants = require('../../common/dbiConstants.js');
-const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
+const {YadamuError} = require('../../common/yadamuException.js');
 const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
 
 /*
@@ -36,13 +38,33 @@ class LoaderDBI extends YadamuDBI {
   ** An Import operation involves writing data to the local file system.
   **
   */
+
+  static get DATABASE_KEY()      { return 'loader' };
+  static get DATABASE_VENDOR()   { return 'LOADER' };
+
+  static #_YADAMU_DBI_PARAMETERS
+
+  static get YADAMU_DBI_PARAMETERS()  { 
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+	return LoaderDBI.YADAMU_DBI_PARAMETERS
+  }
+    
+  get DATABASE_KEY()             { return LoaderDBI.DATABASE_KEY };
+  get DATABASE_VENDOR()          { return LoaderDBI.DATABASE_VENDOR };
+
+  get YADAMU_DBI_PARAMETERS()    { 
+	this._YADAMU_DBI_PARAMETERS = this._YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},super.YADAMU_DBI_PARAMETERS,{}))
+	return this._YADAMU_DBI_PARAMETERS
+  }
   
   get JSON_OUTPUT()              { return this.OUTPUT_FORMAT === 'JSON' }
   get ARRAY_OUTPUT()             { return this.OUTPUT_FORMAT === 'ARRAY' }
   get CSV_OUTPUT()               { return this.OUTPUT_FORMAT === 'CSV'  }
     
-  get DATABASE_VENDOR()          { return 'LOADER' };
-  get SOFTWARE_VENDOR()          { return 'YABASC'};
   
   get ROOT_FOLDER()              { 
     return this._ROOT_FOLDER || (() => { 

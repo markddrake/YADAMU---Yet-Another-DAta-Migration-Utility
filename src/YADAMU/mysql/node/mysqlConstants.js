@@ -4,27 +4,31 @@ const YadamuConstants = require('../../common/yadamuConstants.js');
 
 class MySQLConstants {
 
-  static get MYSQL_DEFAULTS() { 
-    this._MYSQL_DEFAULTS = this._MYSQL_DEFAULTS || Object.freeze({
+  static get DATABASE_KEY()               { return 'mysql' };
+  static get DATABASE_VENDOR()            { return 'MySQL' };
+  static get SOFTWARE_VENDOR()            { return 'Oracle Corporation (MySQL)' };
+
+  static get STATIC_PARAMETERS() { 
+    this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "TABLE_MATCHING"            : "INSENSITIVE"
     , "READ_KEEP_ALIVE"           : 0
     , "TREAT_TINYINT1_AS_BOOLEAN" : true    
     , "SPATIAL_FORMAT"            : "WKB"
     })
-    return this._MYSQL_DEFAULTS;
+    return this._STATIC_PARAMETERS;
   }
 
-  static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.MYSQL_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.mysql || {}))
-    return this._DEFAULT_PARAMETERS
+  static #_DBI_PARAMETERS
+
+  static get DBI_PARAMETERS() { 
+  this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    return this.#_DBI_PARAMETERS
   }
 
-  static get TABLE_MATCHING()             { return this.DEFAULT_PARAMETERS.TABLE_MATCHING}
-  static get READ_KEEP_ALIVE()            { return this.DEFAULT_PARAMETERS.READ_KEEP_ALIVE}
-  static get TREAT_TINYINT1_AS_BOOLEAN()  { return this.DEFAULT_PARAMETERS.TREAT_TINYINT1_AS_BOOLEAN}
-  static get SPATIAL_FORMAT()             { return this.DEFAULT_PARAMETERS.SPATIAL_FORMAT };
-  static get DATABASE_VENDOR()            { return 'MySQL' };
-  static get SOFTWARE_VENDOR()            { return 'Oracle Corporation (MySQL)' };
+  static get TABLE_MATCHING()             { return this.DBI_PARAMETERS.TABLE_MATCHING}
+  static get READ_KEEP_ALIVE()            { return this.DBI_PARAMETERS.READ_KEEP_ALIVE}
+  static get TREAT_TINYINT1_AS_BOOLEAN()  { return this.DBI_PARAMETERS.TREAT_TINYINT1_AS_BOOLEAN}
+  static get SPATIAL_FORMAT()             { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get STATEMENT_TERMINATOR()       { return ';' }
  
   static get CONNECTION_PROPERTY_DEFAULTS() { 

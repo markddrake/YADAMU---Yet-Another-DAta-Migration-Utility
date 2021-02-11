@@ -5,7 +5,7 @@ const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const SnowflakeConstants = require('./snowflakeConstants.js');
 
 class StatementGenerator {
-  
+	
   static get UNBOUNDED_TYPES() { 
     StatementGenerator._UNBOUNDED_TYPES = StatementGenerator._UNBOUNDED_TYPES || Object.freeze([SnowflakeConstants.VARIANT_DATA_TYPE,'GEOGRAPHY','DOUBLE','FLOAT','BOOLEAN'])
     return this._UNBOUNDED_TYPES;
@@ -25,7 +25,7 @@ class StatementGenerator {
     StatementGenerator._STRONGLY_TYPED_VARIANTS = StatementGenerator._STRONGLY_TYPED_VARIANTS || Object.freeze(['XML','XMLTYPE','JSON','JSONB','SET','OBJECT','ARRAY'])
     return this._STRONGLY_TYPED_VARIANTS;
   }
-
+  
   constructor(dbi, targetSchema, metadata, spatialFormat) {
     this.dbi = dbi;
     this.targetSchema = targetSchema
@@ -46,7 +46,7 @@ class StatementGenerator {
            case 'CLOB':                    return SnowflakeConstants.CLOB_TYPE;
            case 'BLOB':                    return SnowflakeConstants.BLOB_TYPE;
            case 'NCLOB':                   return SnowflakeConstants.CLOB_TYPE;
-           case 'XMLTYPE':                 return SnowflakeConstants.XML_TYPE;
+           case 'XMLTYPE':                 return this.dbi.XML_TYPE;
            case 'JSON':                    return SnowflakeConstants.JSON_TYPE;
            case 'TIMESTAMP':               return 'datetime';
            case 'BFILE':                   return 'VARCHAR(2048)';
@@ -83,7 +83,7 @@ class StatementGenerator {
            case 'bit':                                               return 'BOOLEAN';
            case 'ntext':                                             return SnowflakeConstants.CLOB_TYPE;
            case 'image':                                             return SnowflakeConstants.BLOB_TYPE;
-           case 'xml':                                               return SnowflakeConstants.XML_TYPE;
+           case 'xml':                                               return this.dbi.XML_TYPE;
            case 'json':                                              return SnowflakeConstants.JSON_TYPE;
            case 'datetime':
            case 'datetime2':                                         return 'TIMESTAMP_NTZ';
@@ -135,7 +135,7 @@ class StatementGenerator {
            case 'integer':                                           return 'INT';
            case 'jsonb':
            case 'json':                                              return SnowflakeConstants.JSON_TYPE;
-           case 'xml':                                               return SnowflakeConstants.XML_TYPE;     
+           case 'xml':                                               return this.dbi.XML_TYPE;;     
            case 'text':                                              return SnowflakeConstants.CLOB_TYPE;
            case 'geometry':       
            case 'geography':                                         return 'GEOGRAPHY';     
@@ -164,7 +164,7 @@ class StatementGenerator {
            case 'set':                            return SnowflakeConstants.JSON_TYPE;
            case 'enum':                           return 'TEXT(512)';
            case 'json':                           return SnowflakeConstants.JSON_TYPE;
-           case 'xml':                            return SnowflakeConstants.XML_TYPE;
+           case 'xml':                            return this.dbi.XML_TYPE;
            default:                               return dataType.toUpperCase();
          }
          break;
@@ -214,7 +214,6 @@ class StatementGenerator {
        return targetDataType
      }
   
-  
      if (StatementGenerator.SPATIAL_TYPES.includes(targetDataType)) {
        return targetDataType
      }
@@ -226,7 +225,7 @@ class StatementGenerator {
      if (length) {
        return targetDataType + '(' + length + ')';
      }
-  
+	
      return targetDataType;     
   }
   
@@ -236,10 +235,13 @@ class StatementGenerator {
     const columnNames = tableMetadata.columnNames
     const dataTypes = tableMetadata.dataTypes
     const sizeConstraints = tableMetadata.sizeConstraints
-    const selectList = Object.keys(new Array(dataTypes.length).fill(null)).map((idx) => {return(`column${parseInt(idx)+1}`)})
+	// Fill with Column Numbers (1..n)
+    const selectList = Object.keys(new Array(dataTypes.length).fill(null)).map((idx) => {return(`COLUMN${parseInt(idx)+1}`)})
+	const columnClause = new Array(dataTypes.length).fill('')
     const targetDataTypes = [];
-
-    const columnClauses = columnNames.map((columnName,idx) => {    
+	
+	
+	const columnClauses = columnNames.map((columnName,idx) => {    
         
        // If the 'class' of a VARIANT datatype cannot be determned by insepecting the information available from Snowflake type it based on the incoming data stream 
        
@@ -252,13 +254,23 @@ class StatementGenerator {
        const dataType = {
          type : dataTypes[idx]
        }
-       
+	   
        if ((StatementGenerator.STRONGLY_TYPED_VARIANTS.includes(dataType.type.toUpperCase())) || (dataType.type.toUpperCase() === 'VARIANT')) {
          parserRequired =  true;
+	     tableMetadata.storageTypes = tableMetadata.storageTypes || tableMetadata.dataTypes
 		 switch (dataType.type.toUpperCase()) {
 		   case 'XML':
 		   case 'XMLTYPE':
-		     selectList[idx] = `PARSE_XML(${selectList[idx]})` 
+		     switch (true) {
+			   case (this.dbi.XML_TYPE === SnowflakeConstants.XML_TYPE): 
+			   case (tableMetadata.storageTypes[idx] === SnowflakeConstants.XML_TYPE):
+			     selectList[idx] = `PARSE_XML("${selectList[idx]}")`
+				 columnClause[idx] = ''
+				 break
+			   default:
+			     selectList[idx] = `case when check_xml("${selectList[idx]}") is NULL then "${selectList[idx]}" else NULL end`
+			     columnClause[idx] = `check((CHECK_XML("${columnNames[idx]}") is NULL)) COMMENT 'CHECK(CHECK_XML("${columnNames[idx]}") IS NULL)'`
+		     } 
 			 break
 		   case 'JSON':
 		   case 'JSONB':
@@ -290,10 +302,11 @@ class StatementGenerator {
           }
        }
            
-       let targetDataType = this.mapForeignDataType(tableMetadata.vendor,dataType.type,dataType.length,dataType.scale);
+       let targetDataType = this.mapForeignDataType(tableMetadata.vendor,tableMetadata.vendor === 'SNOWFLAKE' ? tableMetadata.storageTypes[idx] : dataType.type,dataType.length,dataType.scale);
+	   
       
        targetDataTypes.push(targetDataType);
-       return `"${columnName}" ${this.columnDataType(targetDataType,dataType.length,dataType.scale)}`
+       return `"${columnName}" ${this.columnDataType(targetDataType,dataType.length,dataType.scale)} ${columnClause[idx]}`
     })
 	
     const createStatement = `create ${this.dbi.TRANSIENT_TABLES ? 'transient ' : ''}table if not exists "%%YADAMU_DATABASE%%"."${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')}) ${this.dbi.DATA_RETENTION_TIME !== undefined ? `DATA_RETENTION_TIME_IN_DAYS=${this.dbi.DATA_RETENTION_TIME}` : ''} `;
@@ -305,7 +318,7 @@ class StatementGenerator {
       // Cannot pass JSON or XML (There is no JavaScript XML object) directly to an insert
       // Cannot pass strings (Expression type does not match column data type, expecting VARIANT but got VARCHAR(236) for column data',)
       // Cannot use JSON_PARSE or XML_PARSE directly in the bind list.
-      // Array Binds are no support with simple insert ... select ?, JSON_PARSE(?) (QL compilation error: Array bind currently not supported for this query type)
+      // Array Binds are not supported with simple insert ... select ?, JSON_PARSE(?) (QL compilation error: Array bind currently not supported for this query type)
       
       // Benoit Dageville's solution using "INSERT ... SELECT JSON_PARSE() FROM VALUES (?,?,...),..."
              

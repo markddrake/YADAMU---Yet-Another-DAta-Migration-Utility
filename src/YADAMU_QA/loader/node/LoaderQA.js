@@ -1,14 +1,29 @@
 "use strict" 
+
 const fs = require('fs')
 const fsp = require('fs').promises
 const path = require('path')
 const crypto = require('crypto');
 const { pipeline } = require('stream');
-const LoaderDBI = require('../../../YADAMU/loader/node/loaderDBI.js');
+
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
+const LoaderDBI = require('../../../YADAMU/loader/node/loaderDBI.js');
+
+const YadamuTest = require('../../common/node/yadamuTest.js');
 
 class LoaderQA extends LoaderDBI {
 
+  static #_YADAMU_DBI_PARAMETERS
+	
+  static get YADAMU_DBI_PARAMETERS()  { 
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,LoaderDBI.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[LoaderDBI.DATABASE_KEY] || {},{RDBMS: LoaderDBI.DATABASE_KEY}))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+    return LoaderQA.YADAMU_DBI_PARAMETERS
+  }	
+			
   async recreateSchema() {
 	 await fsp.rmdir(this.IMPORT_FOLDER,{recursive: true})
   }

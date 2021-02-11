@@ -1,6 +1,11 @@
 "use strict" 
 
 const PostgresDBI = require('../../../YADAMU/postgres/node/postgresDBI.js');
+const PostgresError = require('../../../YADAMU/postgres/node/postgresException.js')
+const PostgresConstants = require('../../../YADAMU/postgres/node/postgresConstants.js');
+
+const YadamuTest = require('../../common/node/yadamuTest.js');
+
 
 class PostgresQA extends PostgresDBI {
     
@@ -9,6 +14,17 @@ class PostgresQA extends PostgresDBI {
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
     static get SQL_FAILED()                { return _SQL_FAILED }
 
+	static #_YADAMU_DBI_PARAMETERS
+	
+	static get YADAMU_DBI_PARAMETERS()  { 
+	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,PostgresConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[PostgresConstants.DATABASE_KEY] || {},{RDBMS: PostgresConstants.DATABASE_KEY}))
+	   return this.#_YADAMU_DBI_PARAMETERS
+    }
+   
+    get YADAMU_DBI_PARAMETERS() {
+      return PostgresQA.YADAMU_DBI_PARAMETERS
+    }	
+		
     constructor(yadamu) {
        super(yadamu);
     }
@@ -63,14 +79,14 @@ class PostgresQA extends PostgresDBI {
 	  }
 	}
 	
-    async compareSchemas(source,target) {
+    async compareSchemas(source,target,rules) {
 
       const report = {
         successful : []
        ,failed     : []
       }
 
-      await this.executeSQL(PostgresQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.STRIP_XML_DECLARATION === true, this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18])      
+      await this.executeSQL(PostgresQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,rules.EMPTY_STRING_IS_NULL === true,rules.SPATIAL_PRECISION || 18,rules.XML_COMPARISSON_RULES])      
       
       const successful = await this.executeSQL(PostgresQA.SQL_SUCCESS)            
       report.successful = successful.rows

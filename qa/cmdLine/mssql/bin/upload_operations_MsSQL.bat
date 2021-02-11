@@ -1,10 +1,10 @@
-@set SRC=%~1
-@set SCHEMAVER=%~2
-@set VER=%~3
-node %YADAMU_BIN%\upload --rdbms=%YADAMU_DB% --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD% --database=Northwind%SCHEMAVER%        file=%SRC%\Northwind%VER%.json        to_user=dbo            mode=%MODE% log_file=%YADAMU_IMPORT_LOG% 
-node %YADAMU_BIN%\upload --rdbms=%YADAMU_DB% --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHEMAVER%   file=%SRC%\Sales%VER%.json            to_user=Sales          mode=%MODE% log_file=%YADAMU_IMPORT_LOG% 
-node %YADAMU_BIN%\upload --rdbms=%YADAMU_DB% --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHEMAVER%   file=%SRC%\Person%VER%.json           to_user=Person         mode=%MODE% log_file=%YADAMU_IMPORT_LOG% 
-node %YADAMU_BIN%\upload --rdbms=%YADAMU_DB% --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHEMAVER%   file=%SRC%\Production%VER%.json       to_user=Production     mode=%MODE% log_file=%YADAMU_IMPORT_LOG% 
-node %YADAMU_BIN%\upload --rdbms=%YADAMU_DB% --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHEMAVER%   file=%SRC%\Purchasing%VER%.json       to_user=Purchasing     mode=%MODE% log_file=%YADAMU_IMPORT_LOG% 
-node %YADAMU_BIN%\upload --rdbms=%YADAMU_DB% --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD% --database=AdventureWorks%SCHEMAVER%   file=%SRC%\HumanResources%VER%.json   to_user=HumanResources mode=%MODE% log_file=%YADAMU_IMPORT_LOG% 
-node %YADAMU_BIN%\upload --rdbms=%YADAMU_DB% --username=%DB_USER% --hostname=%DB_HOST% --password=%DB_PWD% --database=AdventureWorksDW%SCHEMAVER% file=%SRC%\AdventureWorksDW%VER%.json to_user=dbo            mode=%MODE% log_file=%YADAMU_IMPORT_LOG% 
+set SRC=%~1
+set SCHEMA_VERSION=%~2
+set VER=%~3
+call %YADAMU_BIN%\upload.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=Northwind%SCHEMA_VERSION%         FILE=%SRC%\Northwind%VER%.json        TO_USER=dbo             MODE=%MODE% LOG_FILE=%YADAMU_IMPORT_LOG% 
+call %YADAMU_BIN%\upload.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorks%SCHEMA_VERSION%    FILE=%SRC%\Sales%VER%.json            TO_USER=Sales           MODE=%MODE% LOG_FILE=%YADAMU_IMPORT_LOG% 
+call %YADAMU_BIN%\upload.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorks%SCHEMA_VERSION%    FILE=%SRC%\Person%VER%.json           TO_USER=Person          MODE=%MODE% LOG_FILE=%YADAMU_IMPORT_LOG% 
+call %YADAMU_BIN%\upload.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorks%SCHEMA_VERSION%    FILE=%SRC%\Production%VER%.json       TO_USER=Production      MODE=%MODE% LOG_FILE=%YADAMU_IMPORT_LOG% 
+call %YADAMU_BIN%\upload.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorks%SCHEMA_VERSION%    FILE=%SRC%\Purchasing%VER%.json       TO_USER=Purchasing      MODE=%MODE% LOG_FILE=%YADAMU_IMPORT_LOG% 
+call %YADAMU_BIN%\upload.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorks%SCHEMA_VERSION%    FILE=%SRC%\HumanResources%VER%.json   TO_USER=HumanResources  MODE=%MODE% LOG_FILE=%YADAMU_IMPORT_LOG% 
+call %YADAMU_BIN%\upload.bat --RDBMS=%YADAMU_VENDOR% --USERNAME=%DB_USER% --HOSTNAME=%DB_HOST% --PASSWORD=%DB_PWD% --DATABASE=AdventureWorksDW%SCHEMA_VERSION%  FILE=%SRC%\AdventureWorksDW%VER%.json TO_USER=dbo             MODE=%MODE% LOG_FILE=%YADAMU_IMPORT_LOG%

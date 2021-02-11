@@ -4,21 +4,25 @@ const YadamuConstants = require('../../common/yadamuConstants.js');
 
 class ExampleConstants {
 
-  static get EXAMPLE_DEFAULTS() { 
-    this._EXAMPLE_DEFAULTS = this._EXAMPLE_DEFAULTS || Object.freeze({
+  static get DATABASE_KEY()               { return 'example' };
+  static get DATABASE_VENDOR()            { return 'Example' };
+  static get SOFTWARE_VENDOR()            { return 'Example Corporation' };
+
+  static get STATIC_PARAMETERS() { 
+    this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "SPATIAL_FORMAT"            : "WKB"
     })
-    return this._EXAMPLE_DEFAULTS;
+    return this._STATIC_PARAMETERS;
   }
 
-  static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.EXAMPLE_DEFAULTS,YadamuConstants.YADAMU_DEFAULTS.example || {}))
-    return this._DEFAULT_PARAMETERS
+  static #_DBI_PARAMETERS
+
+  static get DBI_PARAMETERS() { 
+    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    return this.#_DBI_PARAMETERS
   }
   
-  static get SPATIAL_FORMAT()             { return this.DEFAULT_PARAMETERS.SPATIAL_FORMAT };
-  static get DATABASE_VENDOR()            { return 'Vendor' };
-  static get SOFTWARE_VENDOR()            { return 'Vendor Corporation' };
+  static get SPATIAL_FORMAT()             { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get STATEMENT_TERMINATOR()       { return ';' }
 
 }

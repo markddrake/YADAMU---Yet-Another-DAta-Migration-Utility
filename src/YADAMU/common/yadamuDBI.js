@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const Readable = require('stream').Readable;
 const util = require('util')
-const { performance } = require('perf_hooks');const async_hooks = require('async_hooks');
+const { performance } = require('perf_hooks');
 
 /* 
 **
@@ -13,6 +13,7 @@ const { performance } = require('perf_hooks');const async_hooks = require('async
 
 const Yadamu = require('./yadamu.js');
 const DBIConstants = require('./dbiConstants.js');
+const YadamuConstants = require('./yadamuConstants.js');
 const YadamuLibrary = require('./yadamuLibrary.js')
 const {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError, BatchInsertError, IterativeInsertError, InputStreamError} =  require('./yadamuException.js');
 const DefaultParser = require('./defaultParser.js');
@@ -29,9 +30,10 @@ class YadamuDBI {
 
   // Instance level getters.. invoke as this.METHOD
 
-  get DATABASE_VENDOR()            { return undefined };
-  get SOFTWARE_VENDOR()            { return undefined };
-  
+  get DATABASE_KEY()          { return 'yadamu' };
+  get DATABASE_VENDOR()       { return 'YADAMU' };
+  get SOFTWARE_VENDOR()       { return 'YABASC - Yet Another Bay Area Software Company'};
+    
   get PASSWORD_KEY_NAME()          { return 'password' };
   get STATEMENT_TERMINATOR()       { return '' }
 
@@ -39,11 +41,13 @@ class YadamuDBI {
   get TABLE_MAX_ERRORS()           { return this.parameters.TABLE_MAX_ERRORS || DBIConstants.TABLE_MAX_ERRORS };
   get TOTAL_MAX_ERRORS()           { return this.parameters.TOTAL_MAX_ERRORS || DBIConstants.TOTAL_MAX_ERRORS };
   get COMMIT_RATIO()               { return this.parameters.COMMIT_RATIO     || DBIConstants.COMMIT_RATIO };
+  get MODE()                       { return this.parameters.MODE             || DBIConstants.MODE }
+  get ON_ERROR()                   { return this.parameters.ON_ERROR         || DBIConstants.ON_ERROR }
 
   get BATCH_SIZE() {
     this._BATCH_SIZE = this._BATCH_SIZE || (() => {
       let batchSize =  this.parameters.BATCH_SIZE || DBIConstants.BATCH_SIZE
-      batchSize = isNaN(batchSize) ? this.this.BATCH_SIZE : batchSize
+      batchSize = isNaN(batchSize) ? this.parameters.BATCH_SIZE : batchSize
       batchSize = Math.abs(Math.ceil(batchSize))
       return batchSize
     })();
@@ -63,8 +67,6 @@ class YadamuDBI {
   // Override based on local parameters object ( which under the test harnesss may differ from the one obtained from yadamu in the constructor).
   
   get FILE()                          { return this.parameters.FILE     || this.yadamu.FILE }
-  get MODE()                          { return this.parameters.MODE     || this.yadamu.MODE }
-  get ON_ERROR()                      { return this.parameters.ON_ERROR || this.yadamu.ON_ERROR }
   get PARALLEL()                      { return this.parameters.PARALLEL || this.yadamu.PARALLEL }
   
   get EXCEPTION_FOLDER()              { return this.parameters.FILE     || this.yadamu.EXCEPTION_FOLDER }
@@ -100,7 +102,7 @@ class YadamuDBI {
   set SPATIAL_SERIALIZER(v)                   { this._SPATIAL_SERIALIZER = v }
    
   constructor(yadamu,parameters) {
-  
+    
     this.options = {
       recreateTargetSchema : false
     }
@@ -145,6 +147,26 @@ class YadamuDBI {
 	
 	// Used in testing
     this.killConfiguration = {}
+  }
+
+  setOption(name,value) {
+    this.options[name] = value;
+  }
+      
+  initializeParameters(parameters){
+
+    this.parameters = Object.assign({}, this.YADAMU_DBI_PARAMETERS);
+
+	// Merge parameters from configuration files
+    Object.assign(this.parameters, parameters);
+    // Merge parameters provided via command line arguments
+    Object.assign(this.parameters,this.yadamu.COMMAND_LINE_PARAMETERS)
+
+  }
+
+  setParameters(parameters) {
+	Object.assign(this.parameters, parameters || {})
+	this._COMMIT_COUNT = undefined
   }
   
   applyTableFilter(tableName) { 
@@ -383,10 +405,6 @@ class YadamuDBI {
 
   }
   
-  setParameters(parameters) {
-    Object.assign(this.parameters, parameters ? parameters : {})
-    this._COMMIT_COUNT = undefined
-  }
   
   /*
   **
@@ -538,35 +556,6 @@ class YadamuDBI {
 	  return results
 	}
 	return []
-  }
-  
-  setOption(name,value) {
-    this.options[name] = value;
-  }
-    
-  initializeParameters(parameters) {
-    
-    // In production mode the Databae default parameters are merged with the command Line Parameters loaded by YADAMU.
-
-    this.parameters = this.yadamu.cloneDefaultParameters();
-    
-    // Merge parameters from configuration files
-    Object.assign(this.parameters, parameters ? parameters : {})
-
-    // Merge Command line arguments
-    Object.assign(this.parameters, this.yadamu.COMMAND_LINE_PARAMETERS);
-    
-  }
-  
-  enablePerformanceTrace() { 
-    const self = this;
-    this.asyncHook = async_hooks.createHook({
-      init(asyncId, type, triggerAsyncId, resource) {self.reportAsyncOperation(asyncId, type, triggerAsyncId, resource)}
-    }).enable();
-  }
-
-  reportAsyncOperation(...args) {
-     fs.writeFileSync(this.parameters.PERFORMANCE_TRACE, `${util.format(...args)}\n`, { flag: 'a' });
   }
   
   async _getDatabaseConnection() {
@@ -755,10 +744,6 @@ class YadamuDBI {
     
     if (this.parameters.PARAMETER_TRACE === true) {
       this.yadamuLogger.writeDirect(`${util.inspect(this.parameters,{colors:true})}\n`);
-    }
-    
-    if (this.parameters.PERFORMANCE_TRACE) {
-      this.enablePerformanceTrace();
     }
     
     if (this.isDatabase()) {
@@ -983,6 +968,7 @@ class YadamuDBI {
     schemaInformation.forEach((table,idx) => {
       table.COLUMN_NAME_ARRAY     = typeof table.COLUMN_NAME_ARRAY     === 'string' ? JSON.parse(table.COLUMN_NAME_ARRAY)     : table.COLUMN_NAME_ARRAY
       table.DATA_TYPE_ARRAY       = typeof table.DATA_TYPE_ARRAY       === 'string' ? JSON.parse(table.DATA_TYPE_ARRAY)       : table.DATA_TYPE_ARRAY
+      table.STORAGE_TYPE_ARRAY    = typeof table.STORAGE_TYPE_ARRAY    === 'string' ? JSON.parse(table.STORAGE_TYPE_ARRAY)    : table.STORAGE_TYPE_ARRAY || table.DATA_TYPE_ARRAY
       table.SIZE_CONSTRAINT_ARRAY = typeof table.SIZE_CONSTRAINT_ARRAY === 'string' ? JSON.parse(table.SIZE_CONSTRAINT_ARRAY) : table.SIZE_CONSTRAINT_ARRAY
       table.INCLUDE_TABLE = this.applyTableFilter(table.TABLE_NAME)
       if (table.INCLUDE_TABLE) {
@@ -991,6 +977,7 @@ class YadamuDBI {
          ,tableName                : table.TABLE_NAME
          ,columnNames              : table.COLUMN_NAME_ARRAY
          ,dataTypes                : table.DATA_TYPE_ARRAY
+         ,storageTypes             : table.STORAGE_TYPE_ARRAY
          ,sizeConstraints          : table.SIZE_CONSTRAINT_ARRAY
         }
         metadata[table.TABLE_NAME] = tableMetadata

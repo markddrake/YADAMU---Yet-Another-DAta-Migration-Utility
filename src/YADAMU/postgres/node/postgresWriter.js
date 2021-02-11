@@ -79,10 +79,12 @@ class PostgresWriter extends YadamuWriter {
   }
   
   cacheRow(row) {
-	  
+	
+    // if (this.metrics.cached === 1) console.log('postgresWriter',row)
+		
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
-	  
+
 	this.transformations.forEach((transformation,idx) => {
       if ((transformation !== null) && (row[idx] !== null)) {
 	    row[idx] = transformation(row[idx])
@@ -105,7 +107,6 @@ class PostgresWriter extends YadamuWriter {
     this.metrics.batchCount++;
     let repackBatch = false;
 	
-
     if (this.insertMode === 'Batch') {
                
       try {

@@ -66,7 +66,7 @@ begin
 	             ,string_agg(case 
                                when data_type = 'xml' then
                                   '"' || column_name || '"' || '::text'
-                               when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography'))) then
+                               when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography')))  then
                                   case 
                                     when P_SPATIAL_FORMAT = 'WKB' then
                                       'ST_AsBinary("' || column_name || '") "' || COLUMN_NAME || '"'
@@ -79,9 +79,94 @@ begin
                                     when P_SPATIAL_FORMAT = 'GeoJSON' then
                                       'ST_AsGeoJSON("' || column_name || '") "' || COLUMN_NAME || '"'
                                     else
-                                      'ST_AsEWKB("' || column_name || '")) "' || COLUMN_NAME || '"'
+                                      'ST_AsEWKB("' || column_name || '") "' || COLUMN_NAME || '"'
                                   end
-                               when data_type like 'interval%' then
+                               when (data_type in ('point','path','polygon')) then
+                                  case 
+                                    when P_SPATIAL_FORMAT = 'WKB' then
+                                      'ST_AsBinary("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'WKT' then
+                                      'ST_AsText("' || column_name || '"::geometry,18) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'EWKB' then
+                                      'ST_AsEWKB("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'EWKT' then
+                                      'ST_AsEWKT("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                      'ST_AsGeoJSON("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'Native' then
+                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
+                                    else
+                                      'ST_AsEWKB("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
+                                  end
+                               when (data_type = 'line') then
+                                  case 
+                                    when P_SPATIAL_FORMAT = 'WKB' then
+                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'WKT' then
+                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'EWKB' then
+                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'EWKT' then
+                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'Native' then
+                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
+                                    else
+                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
+                                  end
+  							    when (data_type = 'lseg') then
+                                  case 
+                                    when P_SPATIAL_FORMAT = 'WKB' then
+                                      'case when "' || column_name || '" is NULL then NULL else ST_AsBinary(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'WKT' then
+                                      'case when "' || column_name || '" is NULL then NULL else ST_AsText((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry,18) end "' || COLUMN_NAME || '"' 
+                                    when P_SPATIAL_FORMAT = 'EWKB' then
+                                      'case when "' || column_name || '" is NULL then NULL else ST_AsEWKB((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'EWKT' then
+                                      'case when "' || column_name || '" is NULL then NULL else ST_AsEWKT((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                      'case when "' || column_name || '" is NULL then NULL else ST_AsGeoJSON((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'Native' then
+                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
+                                    else
+                                      'case when "' || column_name || '" is NULL then NULL else ST_AsEWKB((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                  end
+                               when (data_type = 'box') then
+                                  case 
+                                    when P_SPATIAL_FORMAT = 'WKB' then
+                                      'ST_AsBinary(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'WKT' then
+                                      'ST_AsText(polygon("' || column_name || '")::geometry,18) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'EWKB' then
+                                      'ST_AsEWKB(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'EWKT' then
+                                      'ST_AsEWKT(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                      'ST_AsGeoJSON(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'Native' then
+                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
+                                    else
+                                      'ST_AsEWKB(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                  end
+                               when (data_type = 'circle') then
+                                  case 
+                                    when P_SPATIAL_FORMAT = 'WKB' then
+                                      'ST_AsBinary(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'WKT' then
+                                      'ST_AsText(polygon(32,"' || column_name || '")::geometry,18) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'EWKB' then
+                                      'ST_AsEWKB(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'EWKT' then
+                                      'ST_AsEWKT(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                      'ST_AsGeoJSON(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                    when P_SPATIAL_FORMAT = 'Native' then
+                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
+                                    else
+                                      'ST_AsEWKB(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                  end
+							   when data_type like 'interval%' then
                                   '"' || COLUMN_NAME ||'"::varchar "' || COLUMN_NAME || '"'
                                when data_type in ('date','timestamp without time zone') then
                                   'to_char ("' || COLUMN_NAME ||'" at time zone ''UTC'', ''YYYY-MM-DD"T"HH24:MI:SS.US"Z"'') "' || COLUMN_NAME || '"'
@@ -263,9 +348,21 @@ begin
            return 'varchar(255)';   
         when 'float' then
            return 'real';
+        when 'point' then
+           return 'point';
+        when 'linestring' then
+           return 'path';
+        when 'polygon' then
+           return 'polygon';
         when 'geometry' then
            return P_GEOMETRY_TYPE;
-        when 'geography' then
+        when 'mulitpoint' then
+           return P_GEOMETRY_TYPE;
+        when 'multilinestring' then
+           return P_GEOMETRY_TYPE;
+        when 'multipolygon' then
+           return P_GEOMETRY_TYPE;
+        when 'geometrycollection' then
            return P_GEOMETRY_TYPE;
         when 'tinyint' then
            return 'smallint';
@@ -317,6 +414,12 @@ begin
            return P_GEOMETRY_TYPE;
         when 'geography' then
            return P_GEOMETRY_TYPE;
+        when 'point' then
+           return  'point';
+        when 'linestring' then
+           return 'path';
+        when 'polygon' then
+           return 'polygon';
         when 'tinyint' then
            return 'smallint';
         when 'mediumint' then

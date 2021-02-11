@@ -1,0 +1,5 @@
+@if defined MSSQL19_USER (set DB_USER=%MSSQL19_USER%) else (set DB_USER=sa)
+@if defined MSSQL19_PWD (set DB_PWD=%MSSQL19_PWD%) else (set DB_PWD=oracle#1)
+@if defined MSSQL19_HOST (set DB_HOST=%MSSQL19_HOST%) else (set DB_HOST=localhost)
+@if defined MSSQL19_PORT (set DB_PORT=%MSSQL19_PORT%) else (set DB_PORT=1433)
+@if defined MSSQL19_DBNAME (set DB_DBNAME=%MSSQL19_DBNAME%) else (set DB_DBNAME=master)

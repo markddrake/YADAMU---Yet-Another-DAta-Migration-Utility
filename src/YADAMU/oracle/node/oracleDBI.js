@@ -19,23 +19,36 @@ const pipeline = util.promisify(stream.pipeline);
 const oracledb = require('oracledb');
 oracledb.fetchAsString = [ oracledb.DATE, oracledb.NUMBER ]
 
-const Yadamu = require('../../common/yadamu.js')
+const YadamuDBI = require('../../common/yadamuDBI.js');
+const DBIConstants = require('../../common/dbiConstants.js');
 const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
-const YadamuDBI = require('../../common/yadamuDBI.js');
-const StringWriter = require('../../common/stringWriter.js');
-const BufferWriter = require('../../common/bufferWriter.js');
-const HexBinToBinary = require('../../common/hexBinToBinary.js');
-const JSONParser = require('../../file/node/jsonParser.js');
+
 const OracleConstants = require('./oracleConstants.js');
 const OracleError = require('./oracleException.js')
 const OracleParser = require('./oracleParser.js');
 const OracleWriter = require('./oracleWriter.js');
-const StatementGenerator = require('./statementGenerator.js');
 const OracleStatementLibrary = require('./oracleStatementLibrary.js');
+const StatementGenerator = require('./statementGenerator.js');
+
+const StringWriter = require('../../common/stringWriter.js');
+const BufferWriter = require('../../common/bufferWriter.js');
+const HexBinToBinary = require('../../common/hexBinToBinary.js');
+const JSONParser = require('../../file/node/jsonParser.js');
 const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
 
 class OracleDBI extends YadamuDBI {
+
+  static #_YADAMU_DBI_PARAMETERS
+
+  static get YADAMU_DBI_PARAMETERS()  { 
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,OracleConstants.DBI_PARAMETERS))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+	return OracleDBI.YADAMU_DBI_PARAMETERS
+  }	 
 
   // Instance level getters.. invoke as this.METHOD
 
@@ -46,12 +59,15 @@ class OracleDBI extends YadamuDBI {
   get XML_STORAGE_MODEL()      { return this._XML_STORAGE_MODEL }
   get NATIVE_DATA_TYPE()       { return this._NATIVE_DATA_TYPE }
   get JSON_PARSING_SUPPORTED() { return this._JSON_PARSER }
-    
+    	
   // Override YadamuDBI
 
+  get DATABASE_KEY()           { return OracleConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return OracleConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return OracleConstants.SOFTWARE_VENDOR};
   get STATEMENT_TERMINATOR()   { return OracleConstants.STATEMENT_TERMINATOR };
+  get DBI_PARAMETERS()         { return OracleConstants.DBI_PARAMETERS }
+
  
   // Enable configuration via command line parameters
  
@@ -62,6 +78,7 @@ class OracleDBI extends YadamuDBI {
   get XML_STORAGE_FORMAT()     { return this.parameters.XML_STORAGE_FORMAT     || OracleConstants.XML_STORAGE_FORMAT}
   get TREAT_RAW1_AS_BOOLEAN()  { return this.parameters.TREAT_RAW1_AS_BOOLEAN  || OracleConstants.TREAT_RAW1_AS_BOOLEAN }  
   get LOB_MAX_SIZE()           { return this.parameters.LOB_MAX_SIZE           || OracleConstants.LOB_MAX_SIZE}
+
   get LOB_MIN_SIZE() { 
     // Set with anonymous function to enforce 4K limit in Oracle11g
     this._LOB_MIN_SIZE = this._LOB_MIN_SIZE ||(() => { let lobMinSize = this.parameters.LOB_MIN_SIZE || OracleConstants.LOB_MIN_SIZE; lobMinSize = ((this.DB_VERSION < 12) && (lobMinSize > 4000)) ? 4000 : lobMinSize; return lobMinSize})()
@@ -112,10 +129,9 @@ class OracleDBI extends YadamuDBI {
   
   constructor(yadamu) {
 	  
-    super(yadamu,OracleConstants.DEFAULT_PARAMETERS);
-
-	// make oracledb constants available to decendants of OracleDBI
+    super(yadamu);
 	
+	// make oracledb constants available to decendants of OracleDBI	
 	this.oracledb = oracledb
 	
     this.ddl = [];
@@ -131,6 +147,7 @@ class OracleDBI extends YadamuDBI {
 	this.TRANSACTION_IN_PROGRESS = true;
 	
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Constructor Complete');
+
   }
 
   getConnectionProperties() {
@@ -1023,7 +1040,7 @@ class OracleDBI extends YadamuDBI {
 	 ,objectFormat       : this.OBJECTS_AS_JSON === true ? 'JSON' : 'NATIVE'
      ,schema             : this.parameters.FROM_USER ? this.parameters.FROM_USER : this.parameters.TO_USER
      ,softwareVendor     : this.SOFTWARE_VENDOR
-     ,exportVersion      : Yadamu.YADAMU_VERSION
+     ,exportVersion      : YadamuConstants.YADAMU_VERSION
      ,nodeClient         : {
         version          : process.version
        ,architecture     : process.arch
@@ -1079,7 +1096,7 @@ class OracleDBI extends YadamuDBI {
         results = await this.executeSQL(this.StatementLibrary.SQL_GET_DLL_STATEMENTS,bindVars)
         ddl = JSON.parse(results.outBinds.v2);
     }
-    return ddl;    
+	return ddl;    
 
   }
 
@@ -1246,7 +1263,6 @@ class OracleDBI extends YadamuDBI {
   */
   
   async generateStatementCache(schema) {
-
     const statementGenerator = new this.StatementGenerator(this,schema,this.metadata,this.systemInformation.spatialFormat)
     this.statementCache = await statementGenerator.generateStatementCache(this.systemInformation.vendor)
 	return this.statementCache

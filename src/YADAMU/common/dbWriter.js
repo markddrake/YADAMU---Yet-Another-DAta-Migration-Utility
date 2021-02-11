@@ -144,6 +144,7 @@ class DBWriter extends Writable {
           vendor          : tableMetadata.vendor
          ,columnNames     : tableMetadata.columnNames
          ,dataTypes       : tableMetadata.dataTypes
+		 ,storageTypes    : tableMetadata.storageTypes
          ,sizeConstraints : tableMetadata.sizeConstraints
         }
       })

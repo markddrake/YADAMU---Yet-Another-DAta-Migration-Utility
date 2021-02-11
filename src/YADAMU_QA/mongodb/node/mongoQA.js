@@ -1,12 +1,27 @@
 "use strict" 
+
 const MongoDBI = require('../../../YADAMU/mongodb/node/mongoDBI.js');
-const {ConnectionError, MongodbError, DatabaseError} = require('../../../YADAMU/common/yadamuException.js')
+const {MongodbError, ConnectionError, DatabaseError} = require('../../../YADAMU/mongodb/node/mongoException.js')
+const MongoConstants = require('../../../YADAMU/mongodb/node/mongoConstants.js');
+
+const YadamuTest = require('../../common/node/yadamuTest.js');
 
 class MongoQA extends MongoDBI {
 	
-	get QA_COMPARE_DBNAME() { return 'YADAMU_QA' }
+    get QA_COMPARE_DBNAME() { return 'YADAMU_QA' }
     
-    constructor(yadamu) {
+	static #_YADAMU_DBI_PARAMETERS
+	
+	static get YADAMU_DBI_PARAMETERS()  { 
+	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,MongoConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[MongoConstants.DATABASE_KEY] || {},{RDBMS: MongoConstants.DATABASE_KEY}))
+	   return this.#_YADAMU_DBI_PARAMETERS
+    }
+   
+    get YADAMU_DBI_PARAMETERS() {
+      return MongoQA.YADAMU_DBI_PARAMETERS
+    }	
+		
+	constructor(yadamu) {
        super(yadamu)
     }
 
@@ -84,7 +99,7 @@ class MongoQA extends MongoDBI {
 	   return results;
     }
 	
-	async compareCollections(sourceDB,targetDB,collectionName) {
+	async compareCollections(sourceDB,targetDB,collectionName,rules) {
 			
 		const comparePipeline = [{
 		  "$replaceRoot": { 
@@ -127,7 +142,7 @@ class MongoQA extends MongoDBI {
 		  }
         }]
      
-        if ( this.parameters.EMPTY_STRING_IS_NULL === true) {
+        if ( rules.EMPTY_STRING_IS_NULL === true) {
 		  comparePipeline.push({
 			"$match" : { 
 		      "$expr": { 
@@ -142,7 +157,7 @@ class MongoQA extends MongoDBI {
 		  })
 		}
 		
-		if ( this.parameters.DOUBLE_PRECISION !== null) {		
+		if ( rules.DOUBLE_PRECISION !== null) {		
 		  comparePipeline.push({
 		    "$match": { 
 		      "$expr": { 
@@ -151,8 +166,8 @@ class MongoQA extends MongoDBI {
 			        { "$eq": ["$sType","double"]}, 
 			        { "$eq": ["$tType","double"]},
 				    { "$eq": [
-				         {"$round": ["$source",this.parameters.DOUBLE_PRECISION]},
-					     {"$round": ["$target",this.parameters.DOUBLE_PRECISION]} 
+				         {"$round": ["$source",rules.DOUBLE_PRECISION]},
+					     {"$round": ["$target",rules.DOUBLE_PRECISION]} 
 				    ]}
 			      ]
 			    }
@@ -161,7 +176,7 @@ class MongoQA extends MongoDBI {
 		  })
 		}
        
-		if ( this.parameters.ORDERED_JSON === true) {		
+		if ( rules.ORDERED_JSON === true) {		
 		  comparePipeline.push({
 		    "$match": { 
 		      "$expr": { 
@@ -177,7 +192,7 @@ class MongoQA extends MongoDBI {
 	      })
         }		  
 		
-		if ( this.parameters.SERIALIZED_JSON === true) {		
+		if ( rules.SERIALIZED_JSON === true) {		
 		  comparePipeline.push({
 		    "$match": { 
 		      "$expr": { 
@@ -227,7 +242,7 @@ class MongoQA extends MongoDBI {
 	      })
 		}
 
-		if ( this.parameters.SPATIAL_PRECISION !== 18) {		
+		if ( rules.SPATIAL_PRECISION !== 18) {		
 		  comparePipeline.push({
             "$project" : {
 		      _id    : 1,
@@ -258,7 +273,7 @@ class MongoQA extends MongoDBI {
                              }
 				   	 	     return geomRound(obj,precision)
 					      }`,
-                          args: [ "$source",this.parameters.SPATIAL_PRECISION],
+                          args: [ "$source",rules.SPATIAL_PRECISION],
                           lang: "js"
                        }},
 		      target : { $function : {
@@ -285,7 +300,7 @@ class MongoQA extends MongoDBI {
                              }
 							 return geomRound(obj,precision)
 						   }`,
-                           args: [ "$target",this.parameters.SPATIAL_PRECISION],
+                           args: [ "$target",rules.SPATIAL_PRECISION],
                            lang: "js"
 					   }}                           
 		    }
@@ -324,7 +339,7 @@ class MongoQA extends MongoDBI {
 	}
 	
 	
-    async compareSchemas(source,target) {
+    async compareSchemas(source,target,rules) {
 
       await this.use(source.schema);
 	  const sourceHash = await this.dbHash()
@@ -354,9 +369,9 @@ class MongoQA extends MongoDBI {
 		 }
 	  })
 	  
-	  if ((this.parameters.EMPTY_STRING_IS_NULL === true) || (this.parameters.DOUBLE_PRECISION !== null) || (this.parameters.ORDERED_JSON === true)) {		
+	  if ((rules.EMPTY_STRING_IS_NULL === true) || (rules.DOUBLE_PRECISION !== null) || (rules.ORDERED_JSON === true)) {		
         for (const collectionName of mismatchedHashList) {
-		  const results = await this.compareCollections(source.schema,target.schema,collectionName)
+		  const results = await this.compareCollections(source.schema,target.schema,collectionName,rules)
 		  if (results.length === 0) {
 		    report.successful.push([source.schema,target.schema,collectionName,sourceCounts.find(element => element[1] === collectionName)[2]])
 		  }
@@ -368,7 +383,7 @@ class MongoQA extends MongoDBI {
 	  }
 	  else {
         for (const collectionName of mismatchedHashList) {
-  		  const results = await this.compareCollections(source.schema,target.schema,collectionName)
+  		  const results = await this.compareCollections(source.schema,target.schema,collectionName,rules)
  	      report.failed.push([source.schema,target.schema,collectionName, sourceCounts.find(element => element[1] === collectionName)[2],targetCounts.find(element => element[1] === collectionName)[2],results.length,results.length,null,null])
 		}
 	  }1

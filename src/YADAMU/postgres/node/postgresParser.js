@@ -29,7 +29,7 @@ class PostgresParser extends YadamuParser {
     this.rowCount++;
 	data = Object.values(data)
     // this.rowTransformation(data)
-    // if (this.rowCount===1) console.log(data)
+    // if (this.rowCount===1) console.log('postgresParser',data)
     this.push({data:data})
     callback();
   }

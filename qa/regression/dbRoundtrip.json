@@ -4,7 +4,6 @@
 , "tasks"             : "tasks.json"
 , "recreateSchema"    : true
 , "parameters": {
-    "MODE": "DATA_ONLY"
   }
 , "tests"                  : [{
     "source": "oracle19c"

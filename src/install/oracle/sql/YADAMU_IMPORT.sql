@@ -805,7 +805,7 @@ begin
            return 'XMLTYPE';
         when P_DATA_TYPE = 'jsonb' then
            return 'JSON';
-        when P_DATA_TYPE in ('geography','geometry') then
+        when P_DATA_TYPE in ('geography','geometry','point','line','lseg','box','path','polygon','circle') then
            return 'GEOMETRY';
         when P_DATA_TYPE = 'numeric' then
            return 'NUMBER';
@@ -869,7 +869,7 @@ begin
         -- Special Data Types   
         when P_DATA_TYPE = 'enum' then
            return 'VARCHAR2(512)';
-        when P_DATA_TYPE in ('geography','geometry')  then
+        when P_DATA_TYPE in ('geometry','point','polygon','linestring','multipoint','multilinestring','multipolyon','geometrycollection')  then
            return 'GEOMETRY';
         when P_DATA_TYPE = 'set' then
            return 'JSON';

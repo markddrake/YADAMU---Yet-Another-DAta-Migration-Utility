@@ -10,10 +10,11 @@ const { performance } = require('perf_hooks');
 */
 const mysql = require('mysql');
 
-const Yadamu = require('../../common/yadamu.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const DBIConstants = require('../../common/dbiConstants.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js')
+
 const MySQLConstants = require('./mysqlConstants.js')
 const MySQLError = require('./mysqlException.js')
 const MySQLParser = require('./mysqlParser.js');
@@ -23,6 +24,17 @@ const MySQLStatementLibrary = require('./mysqlStatementLibrary.js');
 
 class MySQLDBI extends YadamuDBI {
    
+  static #_YADAMU_DBI_PARAMETERS
+
+  static get YADAMU_DBI_PARAMETERS()  { 
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,MySQLConstants.DBI_PARAMETERS))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+	return MySQLDBI.YADAMU_DBI_PARAMETERS
+  }
+
   // Instance level getters.. invoke as this.METHOD
 
   // Not available until configureConnection() has been called 
@@ -31,9 +43,10 @@ class MySQLDBI extends YadamuDBI {
  
   // Override YadamuDBI
 
-  get DATABASE_VENDOR()            { return MySQLConstants.DATABASE_VENDOR};
-  get SOFTWARE_VENDOR()            { return MySQLConstants.SOFTWARE_VENDOR};
-  get STATEMENT_TERMINATOR()       { return MySQLConstants.STATEMENT_TERMINATOR };
+  get DATABASE_KEY()           { return MySQLConstants.DATABASE_KEY};
+  get DATABASE_VENDOR()        { return MySQLConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()        { return MySQLConstants.SOFTWARE_VENDOR};
+  get STATEMENT_TERMINATOR()   { return MySQLConstants.STATEMENT_TERMINATOR };
   
   // Enable configuration via command line parameters
   get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT            || MySQLConstants.SPATIAL_FORMAT }
@@ -46,7 +59,7 @@ class MySQLDBI extends YadamuDBI {
   get CASE_SENSITIVE_NAMING()             { return this._CASE_SENSITIVE_NAMING }
   
   constructor(yadamu) {
-    super(yadamu,MySQLConstants.DEFAULT_PARAMETERS)
+    super(yadamu)
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
     this.keepAliveHdl = undefined
 	
@@ -506,7 +519,7 @@ class MySQLDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : Yadamu.YADAMU_VERSION
+     ,exportVersion      : YadamuConstants.YADAMU_VERSION
      ,sessionUser        : sysInfo.SESSION_USER
      ,dbName             : sysInfo.DATABASE_NAME
      ,serverHostName     : sysInfo.SERVER_HOST

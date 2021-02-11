@@ -3,26 +3,31 @@
 const YadamuConstants = require('../../common/yadamuConstants.js');
 
 class MsSQLConstants {
+
+  static get DATABASE_KEY()           { return 'mssql' };
+  static get DATABASE_VENDOR()        { return 'MSSQLSERVER' };
+  static get SOFTWARE_VENDOR()        { return 'Microsoft Corporation' };
+
     
-  static get MsSQL_DEFAULTS() { 
-    this._MsSQL_DEFAULTS = this._MsSQL_DEFAULTS || Object.freeze({
+  static get STATIC_PARAMETERS() { 
+    this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "YADAMU_USER"              : "dbo"
     , "SPATIAL_MAKE_VALID"        : false
     , "SPATIAL_FORMAT"            : "WKB"
     })
-    return this._MsSQL_DEFAULTS;
+    return this._STATIC_PARAMETERS;
   }
 
-  static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.MsSQL_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.mssql || {}))
-    return this._DEFAULT_PARAMETERS
+  static #_DBI_PARAMETERS
+
+  static get DBI_PARAMETERS() { 
+    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    return this.#_DBI_PARAMETERS
   }
 
-  static get YADAMU_USER()           { return this.DEFAULT_PARAMETERS.YADAMU_USER}
-  static get SPATIAL_FORMAT()         { return this.DEFAULT_PARAMETERS.SPATIAL_FORMAT };
-  static get SPATIAL_MAKE_VALID()     { return this.DEFAULT_PARAMETERS.SPATIAL_MAKE_VALID };
-  static get DATABASE_VENDOR()        { return 'MSSQLSERVER' };
-  static get SOFTWARE_VENDOR()        { return 'Microsoft Corporation' };
+  static get YADAMU_USER()            { return this.DBI_PARAMETERS.YADAMU_USER}
+  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
+  static get SPATIAL_MAKE_VALID()     { return this.DBI_PARAMETERS.SPATIAL_MAKE_VALID };
   static get STATEMENT_TERMINATOR()   { return 'go' }
  
   static get STAGING_TABLE () { 

@@ -33,10 +33,10 @@ docker run --name MYSQL80-01 --memory="16g" --shm-size=4g -p 3306:3306 -v MYSQL8
 REM
 REM MaraDB 10.0
 docker run --name MARIA10-01 --memory="16g" --shm-size=4g -p 3307:3306 -v MARIA10-01-DATA:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=oracle -d mariadb:latest  
-REMREM
- MsSQL 2019
+REM
+REM MsSQL 2019
 docker run --name MSSQL19-01 --memory="48g" --shm-size=4g -p 1434:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -e "MSSQL_MEMORY_LIMIT_MB=16384" -v MSSQL19-01-DATA:/var/opt/mssql -d mcr.microsoft.com/mssql/server:2019-latest
-REMREM
+REM
 REM MsSQL 2017
 docker run --name MSSQL17-01 --memory="48g" --shm-size=4g -p 1433:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -e "MSSQL_MEMORY_LIMIT_MB=16384" -v MSSQL17-01-DATA:/var/opt/mssql -d mcr.microsoft.com/mssql/server:2017-latest
 REM

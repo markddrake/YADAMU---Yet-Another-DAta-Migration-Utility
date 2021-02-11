@@ -6,11 +6,6 @@
 , "createDirectory"                   : true
 , "verifyOperation"                   : true
 , "parameters": {
-    "MODE": "DATA_ONLY"
-  , "FEEDBACK": "COMMIT"
-  , "MONGO_STRIP_ID" : true
-  , "ON_ERROR" : "FLUSH"
-  , "PARALLEL" : 0
   }
 , "tests" : [{
     "source": "oracle19c"

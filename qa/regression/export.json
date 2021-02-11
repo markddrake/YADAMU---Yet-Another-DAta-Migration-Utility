@@ -6,7 +6,6 @@
 , "exportPath"                        : "%connection%/%mode%"
 , "createFolders"                     : true
 , "parameters": {
-    "MODE": "DATA_ONLY"
   }
 , "tasks"                             : "tasks.json"
 , "tests" : [{

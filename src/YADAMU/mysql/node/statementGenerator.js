@@ -42,9 +42,17 @@ class StatementGenerator {
         */
 
         const setOperators = tableInfo.targetDataTypes.map((targetDataType,idx) => {
-          if (this.dbi.DB_VERSION < '8.0.19' || false) {
+	      if (this.dbi.DB_VERSION < '8.0.19' || false) {
             switch (targetDataType) {
               case 'geometry':
+			  case 'point':
+			  case 'line':
+			  case 'lseg':
+			  case 'linestring':
+			  case 'box':
+			  case 'path':
+			  case 'polygon':
+			  case 'circle':
                 tableInfo.insertMode = 'Iterative'; 
                 switch (this.spatialFormat) {
                   case "WKB":
@@ -68,6 +76,14 @@ class StatementGenerator {
           else {
             switch (targetDataType) {
               case 'geometry':
+			  case 'point':
+			  case 'line':
+			  case 'lseg':
+			  case 'linestring':
+			  case 'box':
+			  case 'path':
+			  case 'polygon':
+			  case 'circle':
                 tableInfo.insertMode = 'Rows';  
                 switch (this.spatialFormat) {
                   case "WKB":

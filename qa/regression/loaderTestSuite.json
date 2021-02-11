@@ -5,10 +5,7 @@
 , "recreateSchema"    : true
 , "createFolders"     : true
 , "parameters": {
-    "MODE"            : "DATA_ONLY"
-  , "FEEDBACK"        : "COMMIT"
-  , "MONGO_STRIP_ID"  : true
-  , "ROOT_FOLDER"     : "loader/%connection%/%mode%"
+    "ROOT_FOLDER"     : "loader/%connection%/%mode%"
   }
 , "tests"             : [{
     "operation"       : "import"

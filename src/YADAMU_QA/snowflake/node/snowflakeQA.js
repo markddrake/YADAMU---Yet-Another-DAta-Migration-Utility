@@ -1,13 +1,27 @@
 "use strict" 
 
 const SnowflakeDBI = require('../../../YADAMU/snowflake/node/snowflakeDBI.js');
+const SnowflakeConstants = require('../../../YADAMU/snowflake/node/snowflakeConstants.js');
 const SnowflakeException = require('../../../YADAMU/snowflake/node/snowflakeException.js')
+
+const YadamuTest = require('../../common/node/yadamuTest.js');
 
 class SnowflakeQA extends SnowflakeDBI {
     
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
 
+	static #_YADAMU_DBI_PARAMETERS
+	
+	static get YADAMU_DBI_PARAMETERS()  { 
+	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,SnowflakeConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[SnowflakeConstants.DATABASE_KEY] || {},{RDBMS: SnowflakeConstants.DATABASE_KEY}))
+	   return this.#_YADAMU_DBI_PARAMETERS
+    }
+   
+    get YADAMU_DBI_PARAMETERS() {
+      return SnowflakeQA.YADAMU_DBI_PARAMETERS
+    }	
+		
     constructor(yadamu) {
        super(yadamu)
     }
@@ -112,7 +126,7 @@ class SnowflakeQA extends SnowflakeDBI {
       })
     }
     
-    async compareSchemas(source,target) {
+    async compareSchemas(source,target,rules) {
      
       const useDatabase = `USE DATABASE "${source.database}";`;
       let results =  await this.executeSQL(useDatabase,[]);      
@@ -121,9 +135,9 @@ class SnowflakeQA extends SnowflakeDBI {
         successful : []
        ,failed     : []
       }
-     
-      results = await this.executeSQL(SnowflakeQA.SQL_COMPARE_SCHEMAS,[source.database,source.schema,target.schema]);
-      
+
+      results = await this.executeSQL(SnowflakeQA.SQL_COMPARE_SCHEMAS,[source.database,source.schema,target.schema,rules.EMPTY_STRING_IS_NULL === true,rules.TIMESTAMP_PRECISION || 9]);
+	 
       let compare = JSON.parse(results[0].COMPARE_SCHEMAS)
       compare.forEach((result) => {
         if ((result[3] === result[4]) && (result[5] === 0) && (result[6] === 0)) {
@@ -151,6 +165,6 @@ class SnowflakeQA extends SnowflakeDBI {
 
 module.exports = SnowflakeQA
 
-const _SQL_COMPARE_SCHEMAS = `call YADAMU_SYSTEM.PUBLIC.COMPARE_SCHEMAS(:1,:2,:3);`
+const _SQL_COMPARE_SCHEMAS = `call YADAMU_SYSTEM.PUBLIC.COMPARE_SCHEMAS(:1,:2,:3,:4,:5);`
 const _SQL_SCHEMA_TABLE_ROWS = `select TABLE_NAME, ROW_COUNT from INFORMATION_SCHEMA.TABLES where TABLE_TYPE = 'BASE TABLE' and TABLE_SCHEMA = ?`;
 

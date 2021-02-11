@@ -216,6 +216,14 @@ BEGIN
          return 'geometry';
        when P_DATA_TYPE = 'geography'then
          return 'geometry';
+       when P_DATA_TYPE = 'point'then
+         return 'point';
+       when P_DATA_TYPE in ('lseg','path') then
+         return 'linestring';
+       when P_DATA_TYPE in ('box','polygon','circle') then
+         return 'polygon';
+       when P_DATA_TYPE = 'line' then
+         return 'json';		 
        when P_DATA_TYPE = 'integer' then
          return 'int';
        when P_DATA_TYPE = 'text' then

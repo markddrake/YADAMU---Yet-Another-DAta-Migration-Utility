@@ -25,6 +25,13 @@ class MariadbWriter extends YadamuWriter {
 	      }
           break;
         case "geometry" :
+  	    case 'point':
+		case 'lseg':
+		case 'linestring':
+		case 'box':
+		case 'path':
+		case 'polygon':
+		case 'circle':
           if (this.SPATIAL_FORMAT === 'GeoJSON') {
             return (col,idx) => {
               return typeof col === 'object' ? JSON.stringify(col) : col

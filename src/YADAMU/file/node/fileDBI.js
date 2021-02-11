@@ -5,7 +5,18 @@ const { performance } = require('perf_hooks');
 
 const {pipeline, Readable, PassThrough} = require('stream')
 
+/*
+**
+** Obtain YADAMU_DBI_PARAMETERS and YADAMU_CONFIGURATION directly from YadamuConstants to avoid circular depandancy between FileDBI.js and Yadamu.js. 
+** Importing Yadamu into FileDBI sets up a circular dependancy that causes deferred resolution of Yadamu class. This means attempts to refereence
+** static GETTER methods result in undefined values.
+**
+
 const Yadamu = require('../../common/yadamu.js');
+
+**
+*/
+const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
 const DBIConstants = require('../../common/dbiConstants.js');
@@ -52,10 +63,24 @@ class FileDBI extends YadamuDBI {
   **
   */
 
-  get DATABASE_VENDOR()    { return 'FILE' };
-  get SOFTWARE_VENDOR()    { return 'YABASC' };
+  static get DATABASE_KEY()          { return 'file' };
+  static get DATABASE_VENDOR()       { return 'FILE' };
+
+  static #_YADAMU_DBI_PARAMETERS
+
+  static get YADAMU_DBI_PARAMETERS()  {
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+    return FileDBI.YADAMU_DBI_PARAMETERS
+  }
+
+  get DATABASE_KEY()          { return FileDBI.DATABASE_KEY };
+  get DATABASE_VENDOR()       { return FileDBI.DATABASE_VENDOR };
   
-  get COMPRESSED_OUTPUT()  { return this.yadamu.COMPRESSION !== 'NONE' }
+  get COMPRESSED_OUTPUT()     { return this.yadamu.COMPRESSION !== 'NONE' }
   
   set PIPELINE_ENTRY_POINT(v) { this._PIPELINE_ENTRY_POINT = v }
   get PIPELINE_ENTRY_POINT()  { return this._PIPELINE_ENTRY_POINT }
@@ -101,7 +126,7 @@ class FileDBI extends YadamuDBI {
   }
   
   // Override YadamuDBI - Any DDL is considered valid and written to the export file.
-  
+ 
   isValidDDL() {
     return true;
   }
@@ -186,7 +211,7 @@ class FileDBI extends YadamuDBI {
 	Object.keys(sourceInfo).forEach((key) => {this.metadata[key].source = sourceInfo[key]})
 
 	let endJSON = undefined
-    if ((this.yadamu.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata))) {
+    if ((this.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata))) {
 	  endJSON = '}'
 	}
     else {
@@ -211,7 +236,7 @@ class FileDBI extends YadamuDBI {
       })
 	})
 	 
-	if ((this.yadamu.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata)))  {
+	if ((this.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata)))  {
 	  pipeline([this.END_EXPORT_FILE,this.PIPELINE_ENTRY_POINT],(err) => {
 	    if (err) throw(err);
 	  })

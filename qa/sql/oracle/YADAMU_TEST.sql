@@ -43,8 +43,18 @@ ON COMMIT PRESERVE  ROWS
 create or replace package YADAMU_TEST
 AUTHID CURRENT_USER
 as
-  procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9, P_STYLESHEET VARCHAR2 DEFAULT NULL, P_ORDER_JSON VARCHAR2 DEFAULT 'FALSE', P_EXCLUDE_MVIEWS VARCHAR2 DEFAULT 'TRUE');
+  procedure COMPARE_SCHEMAS(
+    P_SOURCE_SCHEMA        VARCHAR2, 
+	P_TARGET_SCHEMA        VARCHAR2, 
+	P_DOUBLE_PRECISION     NUMBER DEFAULT NULL, 
+	P_TIMESTAMP_PRECISION  NUMBER DEFAULT 9, 
+	P_ORDERED_JSON         VARCHAR2 DEFAULT 'FALSE', 
+    P_XML_RULE             VARCHAR2 DEFAULT NULL,
+    P_OBJECTS_RULE         VARCHAR2 DEFAULT NULL,
+    P_EXCLUDE_MVIEWS       VARCHAR2 DEFAULT 'TRUE'
+  );
   function JSON_COMPACT(P_JSON_INPUT CLOB) return CLOB;
+  function APPLY_XML_RULE(P_XML_RULE VARCHAR2, P_XML XMLTYPE) return XMLTYPE;
 end;
 /
 --
@@ -107,7 +117,181 @@ begin
 
 end;
 --
-procedure COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR2, P_TARGET_SCHEMA VARCHAR2, P_TIMESTAMP_PRECISION NUMBER DEFAULT 9, P_STYLESHEET VARCHAR2 DEFAULT NULL, P_ORDER_JSON VARCHAR2 DEFAULT 'FALSE', P_EXCLUDE_MVIEWS VARCHAR2 DEFAULT 'TRUE')
+function APPLY_XML_RULE(P_XML_RULE VARCHAR2,P_XML XMLTYPE)
+return XMLTYPE
+as
+  V_ORDERED_ATTRIBUTES   VARCHAR2(4000);
+  V_UNORDERED_ATTRIBUTES VARCHAR2(4000);
+  V_ROOT_NAME            VARCHAR2(128);
+  V_ROOT_NMSPC           VARCHAR2(4000);
+  
+  V_SERIALIZED_XML       CLOB;
+  V_XML                  XMLType;
+
+  V_FIRST_SPACE          PLS_INTEGER;
+  V_END_OPEN_TAG         PLS_INTEGER;
+  
+  XSL_SNOWFLAKE_VARIANT    XMLTYPE := XMLTYPE(
+'<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+	<xsl:template match="node()">
+		<xsl:copy>
+			<xsl:for-each select="@*[name() != ''xml:space'']">
+				<xsl:sort order="ascending" select="name()"/>
+				<xsl:attribute name="{name(.)}" namespace="{namespace-uri(.)}">
+     	          <xsl:choose>
+				    <xsl:when test="number(.) = number(.)">
+			          <xsl:value-of select="number(.)"/>
+		            </xsl:when>
+		            <xsl:otherwise>
+			          <xsl:value-of select="."/>
+		            </xsl:otherwise>
+		          </xsl:choose>
+				</xsl:attribute>
+			</xsl:for-each>
+			<xsl:apply-templates select="node()"/>
+		</xsl:copy>
+	</xsl:template>
+	<xsl:template match="comment()"/>
+	<xsl:template match="processing-instruction()" />
+	<xsl:template match="text()">
+		<xsl:choose>
+			<xsl:when test="string-length(normalize-space(.))=0">
+				<xsl:value-of select="."/>
+			</xsl:when>
+			<xsl:otherwise>
+				<xsl:call-template name="trim">
+					<xsl:with-param name="str" select="."/>
+				</xsl:call-template>
+			</xsl:otherwise>
+		</xsl:choose>
+	</xsl:template>
+	<xsl:template name="trim">
+		<xsl:param name="str"/>
+	    <xsl:variable name="leftTrim" select="string-length(normalize-space(substring($str,1,1)))=0"/>
+	    <xsl:variable name="rightTrim" select="string-length(normalize-space(substring($str,string-length($str),1)))=0"/>
+	    <xsl:choose>
+	      <xsl:when test="$leftTrim and $rightTrim">
+			<xsl:call-template name="trim">
+				<xsl:with-param name="str" select="substring($str,2,string-length($str)-1)"/>
+			</xsl:call-template>
+	      </xsl:when>
+	      <xsl:when test="$leftTrim">
+			<xsl:call-template name="trim">
+				<xsl:with-param name="str" select="substring($str,2,string-length($str))"/>
+			</xsl:call-template>
+	      </xsl:when>
+	      <xsl:when test="$rightTrim">
+			<xsl:call-template name="trim">
+				<xsl:with-param name="str" select="substring($str,1,string-length($str)-1)"/>
+			</xsl:call-template>
+	      </xsl:when>
+     	  <xsl:when test="number($str) = number($str)">
+			<xsl:value-of select="number($str)"/>
+		  </xsl:when>
+		  <xsl:otherwise>
+			 <xsl:value-of select="$str"/>
+		  </xsl:otherwise>
+		</xsl:choose>
+	</xsl:template>
+</xsl:stylesheet>'
+);
+
+  XSL_STRIP_XML_DECLARATION   XMLTYPE := XMLTYPE(
+'<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <xsl:output method="xml" omit-xml-declaration="no" />
+  <xsl:template match="@*|node()">
+    <xsl:copy>
+      <xsl:apply-templates select="@*|node()"/>
+    </xsl:copy>
+  </xsl:template>
+</xsl:stylesheet>'
+);
+
+begin
+  V_XML := P_XML;
+  case 
+    when (P_XML_RULE = 'SNOWFLAKE_VARIANT') then
+
+      -- Compensate for Snowflake's XML Fidelity issues including:
+	  --   alphabetical ordering of attributes, including namespace definitions
+	  --   removal of XML declaration
+	  --   removal of leading & trailing whitespace from text() nodes
+	  --   removal of trailing zeroes in from text() nodes
+      --   removal of comments
+      --   removal processing instructions. 
+	  --   addition of trailing zeroes in numeric fractional attribute values
+	  --   addition of xml:space="preserve" attributes
+	  --   strips all insignificant whitespace
+
+	  begin
+  		select ROOT_NAME, ROOT_NMSPC, ' ' || LISTAGG(ATTR_NAME || '="' || ATTR_VALUE || '"',' ')  WITHIN GROUP (ORDER BY ATTR_NAME) 
+	      into V_ROOT_NAME, V_ROOT_NMSPC, V_ORDERED_ATTRIBUTES
+	      from XMLTABLE(
+		         '/*' passing V_XML
+		  	     columns
+			       ROOT_NAME   VARCHAR2(128) path 'fn:name(.)'
+			      ,ROOT_NMSPC VARCHAR2(4000) path 'fn:namespace-uri(.)'
+				  ,DOCUMENT          XMLTYPE path '.'
+			   ) x,
+		       XMLTABLE(
+				 '/*/@*' passing x.DOCUMENT
+		         columns 
+				   ATTR_NAME  VARCHAR2(128)  path 'fn:name(.)',
+				   ATTR_VALUE VARCHAR2(4000) path '.'
+		       )
+		 group by ROOT_NAME, ROOT_NMSPC;
+
+        select XMLSERIALIZE(DOCUMENT V_XML as CLOB)
+		  into V_SERIALIZED_XML 
+		  from dual;
+
+		V_FIRST_SPACE :=  INSTR(V_SERIALIZED_XML,' ');
+		V_END_OPEN_TAG := INSTR(V_SERIALIZED_XML,'>');
+		V_UNORDERED_ATTRIBUTES := SUBSTR(V_SERIALIZED_XML,V_FIRST_SPACE,V_END_OPEN_TAG-V_FIRST_SPACE);
+
+		if (SUBSTR(V_UNORDERED_ATTRIBUTES,LENGTH(V_UNORDERED_ATTRIBUTES),1) = '/') then           
+		  V_ORDERED_ATTRIBUTES := V_ORDERED_ATTRIBUTES + '/';
+		end if;
+		
+		V_SERIALIZED_XML := REPLACE(V_SERIALIZED_XML,V_UNORDERED_ATTRIBUTES,V_ORDERED_ATTRIBUTES);
+		V_XML := XMLTYPE(V_SERIALIZED_XML);
+	    
+      exception
+		when NO_DATA_FOUND then
+		  -- No attributes to normalize
+		  NULL;
+	    when OTHERS then 
+		  DBMS_OUTPUT.PUT_LINE(V_SERIALIZED_XML);
+		  RAISE;
+	  end;
+	  V_XML := P_XML.transform(XSL_SNOWFLAKE_VARIANT);		
+	when (P_XML_RULE = 'STRIP_XML_DECLARATION') then
+	  V_XML := P_XML.transform(XSL_SNOWFLAKE_VARIANT);		
+	when (P_XML_RULE = 'SERIALIZE_AS_BLOB') then
+	  --
+	  -- Serialize the XML as a BLOB and generate a new XML from the result.
+	  -- This will add an XML Declaration if the document does not alreay have one. 
+	  -- It may also change the value of any existing XML declaration in the source document
+	  -- Used in 11.2 in place of STRIP_XML_DECLARATION to avoid ORA-03113
+	  --
+	  select XMLTYPE(XMLSERIALIZE(CONTENT P_XML AS BLOB ENCODING 'UTF-8'),NLS_CHARSET_ID('AL32UTF8'))
+	    into V_XML 
+		from dual;
+	  --
+  end case;		  
+  return V_XML;
+end;
+--  
+procedure COMPARE_SCHEMAS(
+  P_SOURCE_SCHEMA       VARCHAR2, 
+  P_TARGET_SCHEMA       VARCHAR2, 
+  P_DOUBLE_PRECISION    NUMBER DEFAULT NULL, 
+  P_TIMESTAMP_PRECISION NUMBER DEFAULT 9, 
+  P_ORDERED_JSON        VARCHAR2 DEFAULT 'FALSE', 
+  P_XML_RULE            VARCHAR2 DEFAULT NULL,
+  P_OBJECTS_RULE        VARCHAR2 DEFAULT NULL,
+  P_EXCLUDE_MVIEWS      VARCHAR2 DEFAULT 'TRUE'
+)
 as
   TABLE_NOT_FOUND EXCEPTION;
   PRAGMA EXCEPTION_INIT( TABLE_NOT_FOUND , -00942 );
@@ -117,47 +301,7 @@ as
   V_ORDERING_CLAUSE   VARCHAR2(16) := '';
 
   
- -- Compensate for Snowflake's XML Fidelity issues, including alphabetical ordering of attributes and removal of trailing whitespace on text nodes.
   
-  V_SNOWFLAKE_XSL XMLTYPE := XMLTYPE(
-'<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-	<xsl:template match="node()">
-		<xsl:copy>
-			<xsl:for-each select="@*">
-				<xsl:sort order="ascending" select="name()"/>
-				<xsl:copy/>
-			</xsl:for-each>
-			<xsl:apply-templates select="node()"/>
-		</xsl:copy>
-	</xsl:template>
-	<xsl:template match="text()">
-		<xsl:choose>
-			<xsl:when test="normalize-space(.) = ''''">
-				<xsl:value-of select="."/>
-			</xsl:when>
-			<xsl:otherwise>
-				<xsl:call-template name="rtrim">
-					<xsl:with-param name="arg" select="."/>
-				</xsl:call-template>
-			</xsl:otherwise>
-		</xsl:choose>
-	</xsl:template>
-	<xsl:template name="rtrim">
-		<xsl:param name="arg"/>
-		<xsl:choose>
-			<xsl:when test="substring($arg,string-length($arg),1)= '' ''">
-				<xsl:call-template name="rtrim">
-					<xsl:with-param name="arg" select="substring($arg,0,string-length($arg))"/>
-				</xsl:call-template>
-			</xsl:when>
-			<xsl:otherwise>
-				<xsl:value-of select="$arg"/>
-			</xsl:otherwise>
-		</xsl:choose>
-	</xsl:template>
-</xsl:stylesheet>
-');
-
   cursor getTableList
   is
   select aat.TABLE_NAME
@@ -167,18 +311,47 @@ as
     		   NULL
              when ((atc.DATA_TYPE like 'TIMESTAMP(%)') and (DATA_SCALE > P_TIMESTAMP_PRECISION)) then
                'substr(to_char(t."' || atc.COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FF9''),1,' || V_TIMESTAMP_LENGTH || ') "' || atc.COLUMN_NAME || '"'
+			 when ((atc.DATA_TYPE in ('BINARY_DOUBLE')) and (P_DOUBLE_PRECISION is not NULL)) then
+			   '(t."' || atc.COLUMN_NAME || '",' || P_DOUBLE_PRECISION || ') "' || atc.COLUMN_NAME || '"'
              when atc.DATA_TYPE = 'BFILE' then
 	           'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE(t."' || atc.COLUMN_NAME || '") end "' || atc.COLUMN_NAME || '"'
 		     when (atc.DATA_TYPE = 'SDO_GEOMETRY') then
-               'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(SDO_UTIL.TO_WKBGEOMETRY(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			   /*
+			   **
+			   ** Avoid performance issue with SDO_GEOMETRY operators used in 12.2 and earlier. Skip generation of spatial value.
+			   **
+			   */
+			   --
+			   $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+			   --
+			   'NULL "' || atc.COLUMN_NAME || '"'
+			   --
+			   $ELSIF DBMS_DB_VERSION.VER_LE_12_2 $THEN
+			   --
+			   'NULL "' || atc.COLUMN_NAME || '"'
+			   --
+			   $ELSE
+			   --
+			   'case '||
+   			     'when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                 'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then dbms_crypto.HASH(t."' ||  atc.COLUMN_NAME || '".get_WKB(),' || V_HASH_METHOD || ') ' ||
+                 'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                 'else dbms_crypto.HASH(t."' || atc.COLUMN_NAME || '".get_WKB(),' || V_HASH_METHOD || ')  ' ||
+               'end "' || atc.COLUMN_NAME || '"'
+			   --
+			   $END
+			   --
              when atc.DATA_TYPE = 'XMLTYPE' then
-    		  -- 'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || atc.COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+    		   -- 'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || atc.COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT '  ||
 			   case 
-			     when (P_STYLESHEET is null) then
-     		       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || atc.COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			     when (P_XML_RULE is NULL) then
+				   't."' || atc.COLUMN_NAME || '"'
 				 else 
-				   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT XMLTRANSFORM(t."' || atc.COLUMN_NAME || '", X.XSL) as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+				   'YADAMU_TEST.APPLY_XML_RULE(''' || P_XML_RULE || ''',t."' || atc.COLUMN_NAME || '")'
 			   end
+			   || '  AS CLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+			 
 			 /*
 			 **
 			 ** Order JSON when required. Ordering is typically required when the JSON has been stored in an engine that uses a binary format which does not preserve the order of the keys inside an object
@@ -190,7 +363,8 @@ as
 			 ** Oracle19c supports JSON Ordering using JSON_SERIALIZE
 			 **
 			 */
-		     $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN     
+		     
+			 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN     
 			 --
 			 -- 11.x  and 12.1 do not satisfy JSON_PARSING_SUPPORTED. 
 			 --
@@ -230,11 +404,25 @@ as
 			 $END
 			 --
 		     when atc.DATA_TYPE = 'ANYDATA' then
-		       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(OBJECT_SERIALIZATION.SERIALIZE_ANYDATA(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
+		       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT XMLTYPE(t."' || atc.COLUMN_NAME || '") AS BLOB encoding ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 		     when atc.DATA_TYPE in ('BLOB')  then
    		       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(t."' || atc.COLUMN_NAME || '",' || V_HASH_METHOD || ') end /* BLOB  */ "' || atc.COLUMN_NAME || '"'
 			 when atc.DATA_TYPE in ('CLOB','NCLOB')  then
 		        'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || atc.COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH(t."' || atc.COLUMN_NAME || '",' || V_HASH_METHOD || ') end /* CLOB */ "' || atc.COLUMN_NAME || '"'
+		     when ((TYPECODE  = 'OBJECT') and (atc.DATA_TYPE not in ('XMLTYPE','ANYDATA','RAW'))) then
+			   case 
+			     when (P_OBJECTS_RULE = 'OMIT_OBJECTS') then
+				   'NULL "' || atc.COLUMN_NAME || '"'	
+				 else 
+			       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT XMLTYPE(t."' || atc.COLUMN_NAME || '")  AS CLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'			    
+			   end
+		     when ((TYPECODE  = 'COLLECTION') and (atc.DATA_TYPE not in ('XMLTYPE','ANYDATA','RAW'))) then
+			   case
+  		         when (P_OBJECTS_RULE = 'OMIT_OBJECTS') then
+				   'NULL "' || atc.COLUMN_NAME || '"'	
+				 else 
+  			       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT XMLTYPE(ANYDATA.convertCollection(t."' || atc.COLUMN_NAME || '"))  AS CLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'			    
+			   end 
              else
 	     	   't."' || atc.COLUMN_NAME || '"'
 		   end,
@@ -292,7 +480,7 @@ $END
 		((aat.TABLE_TYPE = 'XMLTYPE') and (atc.COLUMN_NAME in ('ACLOID', 'OWNERID')))
        )
 	and aat.OWNER = P_SOURCE_SCHEMA
-    and ((TYPECODE is NULL) or (at.TYPE_NAME = 'XMLTYPE'))
+    --  and ((TYPECODE is NULL) or (at.TYPE_NAME = 'XMLTYPE') or (at.TYPE_NAME = 'SDO_GEOMETRY'))
 	and case
          when P_EXCLUDE_MVIEWS = 'FALSE' then 1
 	       when P_EXCLUDE_MVIEWS = 'TRUE' and amv.MVIEW_NAME is NULL then 1
@@ -311,7 +499,7 @@ $END
   
 begin
 
-  if (P_ORDER_JSON = 'TRUE') then 
+  if (P_ORDERED_JSON = 'TRUE') then 
     V_ORDERING_CLAUSE := 'ORDERED';
   end if;
 
@@ -352,26 +540,9 @@ begin
      -- Not a TYPO: NULL is a string in this case.
       V_SQLERRM := 'NULL';
     end if;
-	
-	if (P_STYLESHEET IS NOT NULL) then
-	  case 
-	    when P_STYLESHEET = 'SNOWFLAKE.XSL' then
-		  V_STYLESHEET := V_SNOWFLAKE_XSL;
-        else
-		  V_STYLESHEET := NULL;
-	  end case;
-	  V_XSL_TABLE_CLAUSE := ', XSL_TABLE X';
-	else
-      V_STYLESHEET := NULL;
-	  V_WITH_CLAUSE := '';
-	  V_XSL_TABLE_CLAUSE := '';
-	end if;
     
     V_SQL_STATEMENT := 'insert into SCHEMA_COMPARE_RESULTS ' || YADAMU_UTILITIES.C_NEWLINE
                     || 'with ' 
-                    || 'XSL_TABLE as ( ' || YADAMU_UTILITIES.C_NEWLINE
-                    || 'select :1 XSL from dual ' || YADAMU_UTILITIES.C_NEWLINE
-                    || '),' || YADAMU_UTILITIES.C_NEWLINE
                     || 'TABLE_COMPARE_RESULTS as (' || YADAMU_UTILITIES.C_NEWLINE
                     || 'select ''' || P_SOURCE_SCHEMA  || ''' "SOURCE_SCHEMA" ' || YADAMU_UTILITIES.C_NEWLINE
                     || '      ,''' || P_TARGET_SCHEMA  || ''' "TARGET_SCHEMA" ' || YADAMU_UTILITIES.C_NEWLINE
@@ -386,7 +557,7 @@ begin
                     || '  from TABLE_COMPARE_RESULTS';
 
 	begin
-      EXECUTE IMMEDIATE V_SQL_STATEMENT USING V_STYLESHEET;
+      EXECUTE IMMEDIATE V_SQL_STATEMENT;
     exception 
       when OTHERS then
         V_SQLERRM := SQLERRM || ' SQL: ' || V_SQL_STATEMENT;					  

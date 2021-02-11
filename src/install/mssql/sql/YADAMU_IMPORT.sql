@@ -106,6 +106,8 @@ begin
           'varbinary(max)'
         when @DATA_TYPE = 'mediumblob' then
           'varbinary(max)'
+		 when @DATA_TYPE in ('geometry','point','linestring','polygon','geometrycollection','multipoint','multilinestring','multipolygon') then
+          'geometry'
         else
           lower(@DATA_TYPE)
       end
@@ -143,6 +145,8 @@ begin
           'geometry'
         when @DATA_TYPE = 'geography'then
           'geography'
+        when @DATA_TYPE in ('point','line','lseg','box','path','polygon','circle') then
+          'geometry'
         when @DATA_TYPE = 'jsonb'then
           'json'
         when @DATA_TYPE = 'integer' then

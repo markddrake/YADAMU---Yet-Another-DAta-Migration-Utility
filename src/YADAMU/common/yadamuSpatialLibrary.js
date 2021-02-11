@@ -87,6 +87,13 @@ class YadamuSpatialLibrary {
       switch (dataType.toUpperCase()){
         case 'GEOGRAPHY':
         case 'GEOMETRY':
+  	    case 'POINT':
+		case 'LSEG':
+		case 'LINESTRING':
+		case 'BOX':
+		case 'PATH':
+		case 'POLYGON':
+		case 'CIRCLE':
         case '"MDSYS"."SDO_GEOMETRY"':
           spatialColumnList.push(idx)
           break;

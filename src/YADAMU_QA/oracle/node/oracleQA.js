@@ -4,15 +4,29 @@ const oracledb = require('oracledb');
 
 const OracleDBI = require('../../../YADAMU/oracle/node/oracleDBI.js');
 const OracleError = require('../../../YADAMU/oracle/node/oracleException.js')
+const OracleConstants = require('../../../YADAMU/oracle/node/oracleConstants.js');
+
+const YadamuTest = require('../../common/node/yadamuTest.js');
 
 class OracleQA extends OracleDBI {
-    
+    			
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
     static get SQL_FAILED()                { return _SQL_FAILED }
     static get SQL_GATHER_SCHEMA_STATS()   { return _SQL_GATHER_SCHEMA_STATS }
-    
+
+	static #_YADAMU_DBI_PARAMETERS
+	
+	static get YADAMU_DBI_PARAMETERS()  { 
+	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,OracleConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[OracleConstants.DATABASE_KEY] || {},{RDBMS: OracleConstants.DATABASE_KEY}))
+	   return this.#_YADAMU_DBI_PARAMETERS
+    }
+   
+    get YADAMU_DBI_PARAMETERS() {
+      return OracleQA.YADAMU_DBI_PARAMETERS
+    }	
+	
     constructor(yadamu) {
        super(yadamu)
     }
@@ -87,14 +101,25 @@ class OracleQA extends OracleDBI {
 	  }
 	}
 	
-	async compareSchemas(source,target) {
-        
+	async compareSchemas(source,target,rules) {
+				
+      const args = {
+		P_SOURCE_SCHEMA        : source.schema,
+		P_TARGET_SCHEMA        : target.schema,
+		P_DOUBLE_PRECISION     : rules.DOUBLE_PRECISION || null,
+		P_TIMESTAMP_PRECISION  : rules.TIMESTAMP_PRECISION || null,
+		P_ORDERED_JSON         : rules.ORDERED_JSON.toString().toUpperCase(),
+		P_XML_RULE             : rules.XML_COMPARISSON_RULES || null,
+		P_OBJECTS_RULE         : this.MODE === 'DATA_ONLY' ? 'OMIT_OBJECTS' : null,
+		P_EXCLUDE_MVIEWS       : Boolean(rules.MODE === 'DATA_ONLY').toString().toUpperCase()
+	  }
+	        
       const report = {
         successful : []
        ,failed     : []
       }
-      const args = {source:source.schema,target:target.schema,maxTimestampPrecision:this.parameters.TIMESTAMP_PRECISION,xslTransformation:this.parameters.XSL_TRANSFORMATION,useOrderedJSON:this.parameters.ORDERED_JSON.toString().toUpperCase(),excludeMaterialzedViews:Boolean(this.parameters.MODE === 'DATA_ONLY').toString().toUpperCase()}
-      await this.executeSQL(OracleQA.SQL_COMPARE_SCHEMAS,args)      
+
+	  await this.executeSQL(OracleQA.SQL_COMPARE_SCHEMAS,args)      
 
       const successful = await this.executeSQL(OracleQA.SQL_SUCCESS,{})
             
@@ -147,6 +172,8 @@ class OracleQA extends OracleDBI {
 
 module.exports = OracleQA
 
+const _SQL_COMPARE_SCHEMAS = `begin YADAMU_TEST.COMPARE_SCHEMAS(:P_SOURCE_SCHEMA, :P_TARGET_SCHEMA, :P_DOUBLE_PRECISION, :P_TIMESTAMP_PRECISION, :P_ORDERED_JSON, :P_XML_RULE, :P_OBJECTS_RULE, :P_EXCLUDE_MVIEWS); end;`;
+
 const _SQL_SUCCESS =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL', TARGET_ROW_COUNT
   from SCHEMA_COMPARE_RESULTS 
@@ -182,6 +209,5 @@ const _SQL_SCHEMA_TABLE_ROWS = `select att.TABLE_NAME, NUM_ROWS
 						  and (att.IOT_TYPE is NULL or att.IOT_TYPE = 'IOT')`;
 						  
 
-const _SQL_COMPARE_SCHEMAS = `begin YADAMU_TEST.COMPARE_SCHEMAS(:source,:target,:maxTimestampPrecision,:xslTransformation,:useOrderedJSON,:excludeMaterialzedViews); end;`;
 
 

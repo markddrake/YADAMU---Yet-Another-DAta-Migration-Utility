@@ -7,7 +7,6 @@
 , "reverseOperations" : true
 , "verifyOperation"   : true
 , "parameters": {
-    "MODE": "DATA_ONLY"
   }
 , "tests" : [{
     "source"      : "file-JSON"

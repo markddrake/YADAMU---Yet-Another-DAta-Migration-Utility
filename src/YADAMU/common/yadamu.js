@@ -17,6 +17,7 @@ const DBWriter = require('./dbWriter.js');
 const DBReaderParallel = require('./dbReaderParallel.js');
 
 const YadamuConstants = require('./yadamuConstants.js');
+const DBIConstants = require('./dbiConstants.js');
 const NullWriter = require('./nullWriter.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
@@ -26,7 +27,20 @@ const YadamuRejectManager = require('./yadamuRejectManager.js');
 
 class Yadamu {
 
+  static #_YADAMU_PARAMETERS
+  static #_YADAMU_DBI_PARAMETERS
+
   static get YADAMU_VERSION()         { return YadamuConstants.YADAMU_VERSION }
+
+  static get YADAMU_CONFIGURATION()   { return YadamuConstants.YADAMU_CONFIGURATION };    
+
+  static get YADAMU_PARAMETERS()      { return YadamuConstants.YADAMU_PARAMETERS }  
+
+  static get YADAMU_DBI_PARAMETERS()  { return DBIConstants.YADAMU_DBI_PARAMETERS }  
+
+  get YADAMU_PARAMETERS()             { return Yadamu.YADAMU_PARAMETERS }
+
+  get YADAMU_DBI_PARAMETERS()         { return Yadamu.YADAMU_DBI_PARAMETERS }
   
   get FILE()                          { return this.parameters.FILE     || YadamuConstants.FILE }
   get CONFIG()                        { return this.parameters.CONFIG   || YadamuConstants.CONFIG }
@@ -96,8 +110,13 @@ class Yadamu {
     return this._WARNING_MANAGER
   }
 
-  constructor(operation,parameters) {
-	  
+  constructor(operation,configParameters) {
+	 
+	// console.log('Yadamu.YADAMU_PARAMETERS:',Yadamu.YADAMU_PARAMETERS)
+	// console.log('Yadamu this.YADAMU_PARAMETERS:',this.YADAMU_PARAMETERS)
+	// console.log('Yadamu.YADAMU_DBI_PARAMETERS:',Yadamu.YADAMU_DBI_PARAMETERS)
+	// console.log('Yadamu this.YADAMU_DBI_PARAMETERS:',this.YADAMU_DBI_PARAMETERS)
+	
     this._OPERATION = operation
     
 	if (process.listenerCount('unhandledRejection') === 0) {
@@ -124,8 +143,8 @@ class Yadamu {
 	  }) 
 	}  
 
-    // Read Command Line Parameters
-    this.loadParameters(parameters)
+    // Configure Paramters
+    this.initializeParameters(configParameters || {})
     this.processParameters();    
 	
 	this.metrics = {}
@@ -147,6 +166,48 @@ class Yadamu {
     };	
 
   }
+  
+  initializeParameters(configParameters) {
+
+    // Start with Yadamu Defaults
+    this.parameters = Object.assign({}, this.YADAMU_PARAMETERS);
+
+    // Merge parameters from configuration files
+    Object.assign(this.parameters, configParameters);
+
+    // Merge parameters provided via command line arguments
+    Object.assign(this.parameters,this.COMMAND_LINE_PARAMETERS)
+    
+  }
+  
+  processParameters() {
+
+    // this.LOGGER = this.setYadamuLogger(this.parameters,this.STATUS);
+
+    this.initializeSQLTrace() 
+	
+    if (this.parameters.LOG_FILE) {
+      this.STATUS.logFileName = this.parameters.LOG_FILE;
+    }
+
+    if (this.parameters.DUMP_FILE) {
+      this.STATUS.dumpFileName = this.parameters.DUMP_FILE
+    }
+
+    if (this.parameters.LOG_LEVEL) {
+      this.STATUS.loglevel = this.parameters.LOG_LEVEL;
+    }
+    	
+  }	  
+  
+  setDefaultParameter(parameters,defaultName,parameterName) {	 
+    
+     // Set default value is parameter is not defined and default is defined.	
+ 
+	 if ((parameters.defaultName !== undefined) && (parameters.parameterName === undefined)) {
+		paramteres[parameterName] = parameters[defaultName]
+	 }
+  } 
   
   recordMetrics(metrics) {
 	Object.assign(this.metrics,metrics)
@@ -250,61 +311,13 @@ class Yadamu {
   async close() {
     await this.finalize(this.STATUS,this.LOGGER);
   }
-  
-  reloadParameters(parameters) {
-	 
-	this.loadParameters(parameters)
-    this.processParameters();    
-  }
-  
-  loadParameters(suppliedParameters) {
-
-    // Start with Yadamu Defaults
-    this.parameters = Object.assign({}, YadamuConstants.YADAMU_DEFAULTS.yadamu);
-
-    // Merge parameters read from configuration files
-    Object.assign(this.parameters, suppliedParameters ? suppliedParameters : {});
-
-    // Merge parameters provided via command line arguments
-    Object.assign(this.parameters,this.COMMAND_LINE_PARAMETERS)
-
-  }
-
+    
   initializeSQLTrace() {
 	const options = {
 	  flags : (this.STATUS.sqlTrace && this.STATUS.sqlTrace.writableEnded) ? "a" : "w"
 	}
 	this.STATUS.sqlTrace = this.STATUS.sqlTrace || (this.parameters.SQL_TRACE ? fs.createWriteStream(this.parameters.SQL_TRACE,options) : NullWriter.NULL_WRITER )
   }
-  
-  processParameters() {
-
-    // this.LOGGER = this.setYadamuLogger(this.parameters,this.STATUS);
-
-    this.initializeSQLTrace() 
-	
-    if (this.parameters.LOG_FILE) {
-      this.STATUS.logFileName = this.parameters.LOG_FILE;
-    }
-
-    if (this.parameters.DUMP_FILE) {
-      this.STATUS.dumpFileName = this.parameters.DUMP_FILE
-    }
-
-    if (this.parameters.LOG_LEVEL) {
-      this.STATUS.loglevel = this.parameters.LOG_LEVEL;
-    }
-    	
-  }	  
-  
-  setDefaultParameter(parameters,defaultName,parameterName) {	 
-    
-     // Set default value is parameter is not defined and default is defined.	
- 
-	 if ((parameters.defaultName !== undefined) && (parameters.parameterName === undefined)) {
-		paramteres[parameterName] = parameters[defaultName]
-	 }
-  } 
   
   createQuestion(prompt) {	
 	this.cli.prompt = prompt;
@@ -315,12 +328,6 @@ class Yadamu {
 	})
   }
   
-  cloneDefaultParameters() {
-     const parameters = Object.assign({},YadamuConstants.EXTERNAL_DEFAULTS.yadamu)
-     Object.assign(parameters, YadamuConstants.EXTERNAL_DEFAULTS.yadamuDBI)
-     return parameters
-  }
-
   readCommandLineParameters() {
    
     const parameters = {}
@@ -645,7 +652,7 @@ class Yadamu {
       throw new Error('Missing mandatory parameter FROM_USER');
     }
 
-	this.setDefaultParameter(source.parameters,'YADAMU_USER','TO_USER')
+	this.setDefaultParameter(target.parameters,'YADAMU_USER','TO_USER')
     if ((target.isDatabase() === true) && (target.parameters.TO_USER === undefined)) {
       throw new Error('Missing mandatory parameter TO_USER');
     }

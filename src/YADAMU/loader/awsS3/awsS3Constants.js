@@ -6,25 +6,29 @@ const YadamuConstants = require('../../common/yadamuConstants.js');
 
 class AWSS3Constants {
 
-  static get S3_DEFAULTS() { 
-    this._S3_DEFAULTS = this._S3_DEFAULTS || Object.freeze({
+  static get DATABASE_KEY()               { return 's3' };
+  static get DATABASE_VENDOR()            { return 'AWSS3' };
+  static get SOFTWARE_VENDOR()            { return 'Amazon Web Services LLC' };
+
+  static get STATIC_PARAMETERS() { 
+    this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "BUCKET"                 : "yadamu"
     , "CHUNK_SIZE"             : 5 * 1024 * 1024
 	, "RETRY_COUNT"            : 5
     })
-    return this._S3_DEFAULTS;
+    return this._STATIC_PARAMETERS;
   }
 
-  static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.S3_DEFAULTS,YadamuConstants.YADAMU_DEFAULTS.s3 || {}))
-    return this._DEFAULT_PARAMETERS
+  static #_DBI_PARAMETERS
+
+  static get DBI_PARAMETERS() { 
+    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    return this.#_DBI_PARAMETERS
   }
   
-  static get BUCKET()                     { return this.DEFAULT_PARAMETERS.BUCKET }
-  static get CHUNK_SIZE()                 { return this.DEFAULT_PARAMETERS.CHUNK_SIZE }
-  static get RETRY_COUNT()                { return this.DEFAULT_PARAMETERS.RETRY_COUNT }
-  static get DATABASE_VENDOR()            { return 'AWSS3' };
-  static get SOFTWARE_VENDOR()            { return 'Amazon Web Services LLC' };
+  static get BUCKET()                     { return this.DBI_PARAMETERS.BUCKET }
+  static get CHUNK_SIZE()                 { return this.DBI_PARAMETERS.CHUNK_SIZE }
+  static get RETRY_COUNT()                { return this.DBI_PARAMETERS.RETRY_COUNT }
   
   static get HTTP_NAMED_STATUS_CODES()       {
 	 this._HTTP_NAMED_STATUS_CODES = this._HTTP_NAMED_STATUS_CODES || (() => {

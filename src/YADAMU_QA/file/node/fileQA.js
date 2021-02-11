@@ -12,8 +12,21 @@ const FileDBI = require('../../../YADAMU/file/node/fileDBI.js');
 const JSONParser = require('../../../YADAMU/file/node/jsonParser.js');
 const StatisticsCollector = require('./statisticsCollector.js');
 
+const YadamuTest = require('../../common/node/yadamuTest.js');
+
 class FileQA extends FileDBI {
-  
+   
+  static #_YADAMU_DBI_PARAMETERS
+	
+  static get YADAMU_DBI_PARAMETERS()  { 
+	 this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,FileDBI.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[FileDBI.DATABASE_KEY] || {},{RDBMS: FileDBI.DATABASE_KEY}))
+	 return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+    return FileQA.YADAMU_DBI_PARAMETERS
+  }	
+		
   sortRows(array) {
      
     array.sort((a,b) => {

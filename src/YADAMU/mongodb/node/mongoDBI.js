@@ -13,9 +13,11 @@ const { performance } = require('perf_hooks');
 
 const MongoClient = require('mongodb').MongoClient
 
-const Yadamu = require('../../common/yadamu.js');
+const YadamuDBI = require('../../common/yadamuDBI.js');
+const DBIConstants = require('../../common/dbiConstants.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
-const YadamuDBI =  require('../../common/yadamuDBI.js');
+
 const MongoConstants = require('./mongoConstants.js')
 const MongoError = require('./mongoException.js')
 const MongoWriter = require('./mongoWriter.js');
@@ -53,6 +55,17 @@ const StatementGenerator = require('./statementGenerator.js');
 
 class MongoDBI extends YadamuDBI {
     
+  static #_YADAMU_DBI_PARAMETERS
+
+  static get YADAMU_DBI_PARAMETERS()  { 
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,MongoConstants.DBI_PARAMETERS))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+	return MongoDBI.YADAMU_DBI_PARAMETERS
+  }
+
   // Instance level getters.. invoke as this.METHOD
 
   // Not available until configureConnection() has been called 
@@ -61,6 +74,7 @@ class MongoDBI extends YadamuDBI {
 
   // Override YadamuDBI
 
+  get DATABASE_KEY()           { return MongoConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return MongoConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return MongoConstants.SOFTWARE_VENDOR};
   get STATEMENT_TERMINATOR()   { return MongoConstants.STATEMENT_TERMINATOR };
@@ -103,9 +117,8 @@ class MongoDBI extends YadamuDBI {
     return this._WRITE_TRANSFORMATION 
   }
     
-
   constructor(yadamu) {	  
-    super(yadamu,MongoConstants.DEFAULT_PARAMETERS)
+    super(yadamu)
   }
                                                              ;
   async _executeDDL(collectionList) {
@@ -570,7 +583,7 @@ class MongoDBI extends YadamuDBI {
     ,spatialFormat      : this.SPATIAL_FORMAT 
     ,schema             : this.parameters.FROM_USER
     ,softwareVendor     : this.SOFTWARE_VENDOR
-    ,exportVersion      : Yadamu.YADAMU_VERSION
+    ,exportVersion      : YadamuConstants.YADAMU_VERSION
     ,nodeClient         : {
        version              : process.version
       ,architecture     : process.arch

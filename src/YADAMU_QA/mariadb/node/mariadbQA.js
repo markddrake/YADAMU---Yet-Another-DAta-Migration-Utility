@@ -1,13 +1,29 @@
 "use strict" 
+
 const MariadbDBI = require('../../../YADAMU/mariadb/node/mariadbDBI.js');
+const MariadbError = require('../../../YADAMU/mariadb/node/mariadbException.js')
+const MariadbConstants = require('../../../YADAMU/mariadb/node/mariadbConstants.js');
+
+const YadamuTest = require('../../common/node/yadamuTest.js');
 
 class MariadbQA extends MariadbDBI {
-    
+
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
     static get SQL_FAILED()                { return _SQL_FAILED }
 
+	static #_YADAMU_DBI_PARAMETERS
+	
+	static get YADAMU_DBI_PARAMETERS()  { 
+	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,MariadbConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[MariadbConstants.DATABASE_KEY] || {},{RDBMS: MariadbConstants.DATABASE_KEY}))
+	   return this.#_YADAMU_DBI_PARAMETERS
+    }
+   
+    get YADAMU_DBI_PARAMETERS() {
+      return MariadbQA.YADAMU_DBI_PARAMETERS
+    }	
+			    
 	constructor(yadamu) {
        super(yadamu)
     }
@@ -60,14 +76,14 @@ class MariadbQA extends MariadbDBI {
 	  }
 	}
  
-    async compareSchemas(source,target) {
+    async compareSchemas(source,target,rules) {
 
       const report = {
         successful : []
        ,failed     : []
       }
 
-      let results = await this.executeSQL(MariadbQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true, this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18]);
+      let results = await this.executeSQL(MariadbQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,rules.EMPTY_STRING_IS_NULL === true, rules.SPATIAL_PRECISION || 18]);
 
       const successful = await this.executeSQL(MariadbQA.SQL_SUCCESS,{})
       report.successful = successful

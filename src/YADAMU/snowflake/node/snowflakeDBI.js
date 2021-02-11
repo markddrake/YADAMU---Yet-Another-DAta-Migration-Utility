@@ -9,10 +9,12 @@ const { performance } = require('perf_hooks');
 */
 const snowflake = require('snowflake-sdk');
 
-const Yadamu = require('../../common/yadamu.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
+
 const YadamuDBI = require('../../common/yadamuDBI.js');
-const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
+const DBIConstants = require('../../common/dbiConstants.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js')
+
 const SnowflakeConstants = require('./snowflakeConstants.js');
 const SnowflakeError = require('./snowflakeException.js')
 const SnowflakeReader = require('./snowflakeReader.js');
@@ -23,6 +25,17 @@ const SnowflakeStatementLibrary = require('./snowflakeStatementLibrary.js');
 
 class SnowflakeDBI extends YadamuDBI {
 
+  static #_YADAMU_DBI_PARAMETERS
+
+  static get YADAMU_DBI_PARAMETERS()  { 
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,SnowflakeConstants.DBI_PARAMETERS))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+	return SnowflakeDBI.YADAMU_DBI_PARAMETERS
+  }
+
   // Instance level getters.. invoke as this.METHOD
 
   // Not available until configureConnection() has been called 
@@ -31,16 +44,18 @@ class SnowflakeDBI extends YadamuDBI {
  
   // Override YadamuDBI
 
-  get DATABASE_VENDOR()      { return SnowflakeConstants.DATABASE_VENDOR};
-  get SOFTWARE_VENDOR()      { return SnowflakeConstants.SOFTWARE_VENDOR};
-  get STATEMENT_TERMINATOR() { return SnowflakeConstants.STATEMENT_TERMINATOR };
+  get DATABASE_KEY()           { return SnowflakeConstants.DATABASE_KEY};
+  get DATABASE_VENDOR()        { return SnowflakeConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()        { return SnowflakeConstants.SOFTWARE_VENDOR};
+  get STATEMENT_TERMINATOR()   { return SnowflakeConstants.STATEMENT_TERMINATOR };
 
   // Enable configuration via command line parameters
 
   get SPATIAL_FORMAT()        { return this.parameters.SPATIAL_FORMAT || SnowflakeConstants.SPATIAL_FORMAT };
-  
+  get XML_TYPE()              { return this.parameters.XML_STORAGE_FORMAT || SnowflakeConstants.XML_TYPE }
+
   constructor(yadamu) {	  
-    super(yadamu,SnowflakeConstants.DEFAULT_PARAMETERS);
+    super(yadamu);
 	this.StatementLibrary = SnowflakeStatementLibrary
 	this.statementLibrary = undefined
   }
@@ -103,10 +118,16 @@ class SnowflakeDBI extends YadamuDBI {
   }
   
   async configureConnection() {    
+
     // Perform connection specific configuration such as setting sesssion time zone to UTC...
 	let results = await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION);
     results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[]);    
     this._DB_VERSION = results[0].DATABASE_VERSION
+
+    if ((this.isManager()) && (this.XML_TYPE !== SnowflakeConstants.XML_TYPE )) {
+       this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`${this.DB_VERSION}`,`Configuration`],`XMLType storage model is ${this.XML_TYPE}.`)
+    }	
+
 
   }
 
@@ -318,7 +339,7 @@ class SnowflakeDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.OWNER
-     ,exportVersion      : Yadamu.YADAMU_VERSION
+     ,exportVersion      : YadamuConstants.YADAMU_VERSION
 	 //,sessionUser      : sysInfo.SESSION_USER
 	 //,currentUser      : sysInfo.CURRENT_USER
      ,warehouse          : sysInfo.WAREHOUSE

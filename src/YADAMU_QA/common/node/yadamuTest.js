@@ -5,23 +5,52 @@ const path = require('path');
 const { performance } = require('perf_hooks');
 
 const Yadamu = require('../../../YADAMU/common/yadamu.js');
+const DBIConstants = require('../../../YADAMU/common/dbiConstants.js');
 const YadamuMetrics = require('./yadamuMetrics.js');
 const YadamuDefaults = require('./yadamuDefaults.json')
+const CompareRules = require('./compareRules.json')
 
 class YadamuTest extends Yadamu {
-    
-    
-  static get TEST_DEFAULTS()      { return YadamuDefaults };    
-  static get YADAMU_DRIVERS()     { return YadamuTest.TEST_DEFAULTS.drivers }
 
+  static #_YADAMU_PARAMETERS
+  static #_YADAMU_DBI_PARAMETERS
+    
+  static get QA_CONFIGURATION()   { return YadamuDefaults };    
+  static get QA_DRIVER_MAPPINGS() { return this.QA_CONFIGURATION.drivers }
+  static get COMPARE_RULES()      { return CompareRules };    
+  
+  static get YADAMU_PARAMETERS() { 
+    this.#_YADAMU_PARAMETERS = this.#_YADAMU_PARAMETERS || Object.freeze(Object.assign({},{MODE: DBIConstants.MODE},Yadamu.YADAMU_PARAMETERS,this.QA_CONFIGURATION.yadamu))
+    return this.#_YADAMU_PARAMETERS
+  }
+  
+  // YADAMU_PARAMETERS merged with the yadamuDBI section of the Master Configuration File and the yadamuDBI section of the QA Master Configuration File
+  static get YADAMU_DBI_PARAMETERS()  {
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},this.YADAMU_PARAMETERS,DBIConstants.YADAMU_DBI_PARAMETERS,this.QA_CONFIGURATION.yadamuDBI))
+    return this.#_YADAMU_DBI_PARAMETERS
+  }
+
+  get YADAMU_PARAMETERS()             { return YadamuTest.YADAMU_PARAMETERS }
+  get YADAMU_DBI_PARAMETERS()         { return YadamuTest.YADAMU_DBI_PARAMETERS }
+
+  get YADAMU_QA()          { return true }
+  
   get MACROS()             { this._MACROS = this._MACROS || { timestamp: new Date().toISOString().replace(/:/g,'.')}; return this._MACROS }
   set MACROS(v)            { this._MACROS = v }
-
-  get YADAMU_QA()                     { return true }
   
+  get MODE()               { return this.parameters.MODE  || this.YADAMU_DBI_PARAMETERS.MODE }
+
   constructor(mode) {
+	  
+	
     super(mode)
-	this.testMetrics = new YadamuMetrics();
+    this.testMetrics = new YadamuMetrics();
+    
+	// console.log('YadamuTest.YADAMU_PARAMETERS:',YadamuTest.YADAMU_PARAMETERS)
+	// console.log('YadamuTest this.YADAMU_PARAMETERS:',this.YADAMU_PARAMETERS)
+	// console.log('YadamuTest.YADAMU_DBI_PARAMETERS:',YadamuTest.YADAMU_DBI_PARAMETERS)
+	// console.log('YadamuTest this.YADAMU_DBI_PARAMETERS:',this.YADAMU_DBI_PARAMETERS)
+	
   }
   
   setTeradataWorker(worker) {
@@ -33,6 +62,7 @@ class YadamuTest extends Yadamu {
   }
   
   reset(testParameters) {
+	  
     this._REJECTION_MANAGER = undefined;
     this._WARNING_MANAGER = undefined;
     this.STATUS.startTime     = performance.now()
@@ -41,7 +71,8 @@ class YadamuTest extends Yadamu {
     this.STATUS.statusMsg     = 'successfully'
 	this.metrics = {}
     	
-	this.reloadParameters(testParameters)
+	this.initializeParameters(testParameters)
+	this.processParameters();
 	
   }
   

@@ -2,12 +2,26 @@
 
 const MsSQLDBI = require('../../../YADAMU/mssql/node/mssqlDBI.js');
 const MsSQLError = require('../../../YADAMU/mssql/node/mssqlException.js')
+const MsSQLConstants = require('../../../YADAMU/mssql/node/mssqlConstants.js');
+
+const YadamuTest = require('../../common/node/yadamuTest.js');
 
 class MsSQLQA extends MsSQLDBI {
     
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
 
+	static #_YADAMU_DBI_PARAMETERS
+	
+	static get YADAMU_DBI_PARAMETERS()  { 
+	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[MsSQLConstants.DATABASE_KEY] || {},{RDBMS: MsSQLConstants.DATABASE_KEY}))
+	   return this.#_YADAMU_DBI_PARAMETERS
+    }
+   
+    get YADAMU_DBI_PARAMETERS() {
+      return MsSQLQA.YADAMU_DBI_PARAMETERS
+    }	
+		
     constructor(yadamu) {
        super(yadamu)
     }
@@ -111,7 +125,7 @@ class MsSQLQA extends MsSQLDBI {
 	  }
     }
 	   
-   async compareSchemas(source,target) {
+   async compareSchemas(source,target,rules) {
 	   
       const report = {
         successful : []
@@ -128,9 +142,9 @@ class MsSQLQA extends MsSQLDBI {
 -- declare @TARGET_DATABASE        varchar(128)  = '${target.database}';
 -- declare @TARGET_SCHEMA          varchar(128) = '${target.owner}';
 -- declare @COMMENT                varchar(128) = '';
--- declare @EMPTY_STRING_IS_NULL   bit = ${this.parameters.EMPTY_STRING_IS_NULL === true};
--- declare @SPATIAL_PRECISION      varchar(128) = ${this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18};
--- declare @DATE_TIME_PRECISION    varchar(128)  = ${this.parameters.TIMESTAMP_PRECISION};
+-- declare @EMPTY_STRING_IS_NULL   bit = ${rules.EMPTY_STRING_IS_NULL === true};
+-- declare @SPATIAL_PRECISION      varchar(128) = ${rules.SPATIAL_PRECISION || 18};
+-- declare @DATE_TIME_PRECISION    varchar(128)  = ${rules.TIMESTAMP_PRECISION || null};
 --`;
             
       this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION,@DATE_TIME_PRECISION)\ngo\n`)
@@ -143,9 +157,9 @@ class MsSQLQA extends MsSQLDBI {
                           .input('TARGET_DATABASE',this.sql.VarChar,target.database)
                           .input('TARGET_SCHEMA',this.sql.VarChar,target.owner)
                           .input('COMMENT',this.sql.VarChar,'')
-                          .input('EMPTY_STRING_IS_NULL',this.sql.Bit,(this.parameters.EMPTY_STRING_IS_NULL === true ? 1 : 0))
-                          .input('SPATIAL_PRECISION',this.sql.Int,(this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18))
-                          .input('DATE_TIME_PRECISION',this.sql.Int,this.parameters.TIMESTAMP_PRECISION)
+                          .input('EMPTY_STRING_IS_NULL',this.sql.Bit,(rules.EMPTY_STRING_IS_NULL === true ? 1 : 0))
+                          .input('SPATIAL_PRECISION',this.sql.Int,rules.SPATIAL_PRECISION || 18)
+                          .input('DATE_TIME_PRECISION',this.sql.Int,rules.TIMESTAMP_PRECISION || null)
                           .execute(MsSQLQA.SQL_COMPARE_SCHEMAS,{},{resultSet: true});
 
       // Use length-2 and length-1 to allow Debugging info to be included in the output

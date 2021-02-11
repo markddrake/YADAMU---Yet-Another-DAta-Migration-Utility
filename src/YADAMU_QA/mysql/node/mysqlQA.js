@@ -1,6 +1,10 @@
 "use strict" 
 
 const MySQLDBI = require('../../../YADAMU/mysql/node/mysqlDBI.js');
+const MySQLError = require('../../../YADAMU/mysql/node/mysqlException.js')
+const MySQLConstants = require('../../../YADAMU/mysql/node/mysqlConstants.js');
+
+const YadamuTest = require('../../common/node/yadamuTest.js');
 
 class MySQLQA extends MySQLDBI {
 
@@ -9,6 +13,17 @@ class MySQLQA extends MySQLDBI {
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
     static get SQL_FAILED()                { return _SQL_FAILED }
 
+	static #_YADAMU_DBI_PARAMETERS
+	
+	static get YADAMU_DBI_PARAMETERS()  { 
+	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,MySQLConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[MySQLConstants.DATABASE_KEY] || {},{RDBMS: MySQLConstants.DATABASE_KEY}))
+	   return this.#_YADAMU_DBI_PARAMETERS
+    }
+   
+    get YADAMU_DBI_PARAMETERS() {
+      return MySQLQA.YADAMU_DBI_PARAMETERS
+    }	
+			
     constructor(yadamu) {
        super(yadamu)
     }
@@ -78,14 +93,14 @@ class MySQLQA extends MySQLDBI {
 	  await this.doTimeout(100);
 	}
 	
-    async compareSchemas(source,target) {     
+    async compareSchemas(source,target,rules) {     
 
       const report = {
         successful : []
        ,failed     : []
       }
 
-      let results = await this.executeSQL(MySQLQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,this.parameters.EMPTY_STRING_IS_NULL === true,this.parameters.hasOwnProperty('SPATIAL_PRECISION') ? this.parameters.SPATIAL_PRECISION : 18]);
+      let results = await this.executeSQL(MySQLQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,rules.EMPTY_STRING_IS_NULL === true,rules.SPATIAL_PRECISION|| 18]);
 
       const successful = await this.executeSQL(MySQLQA.SQL_SUCCESS,{})
           

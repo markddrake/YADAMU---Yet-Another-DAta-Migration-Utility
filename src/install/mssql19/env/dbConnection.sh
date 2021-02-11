@@ -1,0 +1,5 @@
+export DB_USER="${MSSQL19_USER:-sa}"
+export DB_PWD="${MSSQL19_PWD:-oracle#1}"
+export DB_HOST="${MSSQL19_HOST:-localhost}"
+export DB_PORT="${MSSQL19_PORT:-1433}"
+export DB_DBNAME="${MSSQL19_DBNAME:-master}"

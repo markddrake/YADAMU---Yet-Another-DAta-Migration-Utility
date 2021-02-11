@@ -181,6 +181,13 @@ class StatementGenerator {
            case 'text':                             return 'longtext';     
            case 'geography':       
            case 'geography':                        return 'geometry';     
+           case 'point':                            return 'point';     
+           case 'lseg':       
+           case 'path':                             return 'linestring';     
+           case 'box':       
+           case 'polygon':       
+           case 'circle':                           return 'polygon';     
+           case 'line':                             return 'json';     
            default:
              if (dataType.indexOf('interval') === 0) {
                return 'varchar(16)'; 
@@ -337,7 +344,15 @@ class StatementGenerator {
       let ensureNullable = false;
       switch (targetDataType) {
         case 'geometry':
-           switch (this.spatialFormat) {
+        case 'point':
+        case 'line':
+		case 'lseg':
+        case 'linestring':
+		case 'box':
+		case 'path':
+		case 'polygon':
+		case 'circle':
+          switch (this.spatialFormat) {
              case "WKB":
              case "EWKB":
                setOperators.push('ST_GeomFromWKB(?)');

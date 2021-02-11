@@ -1,5 +1,11 @@
 apt update
-apt install -y postgis postgresql-12-postgis-3
+apt install -y postgis postgresql-13-postgis-3
+apt-get update
+apt install -y postgresql-plpython3-13
+apt install -y python
+apt install -y python3-pip
+apt-get install python3-lxml
+pip3 install lxml
 cd /var/lib/postgresql/data
 psql -Upostgres  -f setup/configure.sql
 export DB_USER=postgres

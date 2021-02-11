@@ -17,27 +17,41 @@ const CopyFrom = require('pg-copy-streams').from;
 const QueryStream = require('pg-query-stream')
 const types = require('pg').types;
 
-const Yadamu = require('../../common/yadamu.js');
-const {YadamuError} = require('../../common/yadamuException.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
-const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
+const DBIConstants = require('../../common/dbiConstants.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js')
+
 const PostgresConstants = require('./postgresConstants.js')
 const PostgresError = require('./postgresException.js')
 const PostgresParser = require('./postgresParser.js');
 const PostgresWriter = require('./postgresWriter.js');
 const StatementGenerator = require('./statementGenerator.js');
 const PostgresStatementLibrary = require('./postgresStatementLibrary.js');
+
+const {YadamuError} = require('../../common/yadamuException.js');
 const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
 
 class PostgresDBI extends YadamuDBI {
     
+  static #_YADAMU_DBI_PARAMETERS
+
+  static get YADAMU_DBI_PARAMETERS()  { 
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,PostgresConstants.DBI_PARAMETERS))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+	return PostgresDBI.YADAMU_DBI_PARAMETERS
+  }
+
   // Instance level getters.. invoke as this.METHOD
 
   // Not available until configureConnection() has been called 
  
   // Define Getters based on configuration settings here
  
+  get DATABASE_KEY()           { return PostgresConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return PostgresConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return PostgresConstants.SOFTWARE_VENDOR};
   get STATEMENT_TERMINATOR()   { return PostgresConstants.STATEMENT_TERMINATOR };
@@ -45,9 +59,18 @@ class PostgresDBI extends YadamuDBI {
   // Enable configuration via command line parameters
   
   get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT || PostgresConstants.SPATIAL_FORMAT }
+  
+  get POSTGIS_VERSION()        { return this._POSTGIS_VERSION || "Not Installed" }
+  set POSTGIS_VERSION(v)       { this._POSTGIS_VERSION = v }
+  
+  get POSTGIS_INSTALLED()      { return this.POSTGIS_VERSION !== "Not Installed" }
+
+  // Standard Spatial formatting only available when PostGIS is installed.
+
+  get SPATIAL_FORMAT()         { return this.POSTGIS_INSTALLED === true ? this.parameters.SPATIAL_FORMAT || DBIConstants.SPATIAL_FORMAT :  "Native" };
 
   constructor(yadamu) {
-    super(yadamu,PostgresConstants.DEFAULT_PARAMETERS);
+    super(yadamu);
        
     this.pgClient = undefined;
     this.useBinaryJSON = false
@@ -105,7 +128,7 @@ class PostgresDBI extends YadamuDBI {
 
 	
 	let stack
-    this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
+    this.status.sqlTrace.write(this.traceComment(`Getting Connection From Pool.`));
 
 	try {
       const sqlStartTime = performance.now();
@@ -141,6 +164,22 @@ class PostgresDBI extends YadamuDBI {
     await configureConnection();
   }
   
+  async getPostgisInfo() {
+  
+    try {
+      const results = await this.executeSQL(this.StatementLibrary.SQL_POSTGIS_INFO)
+	  return results.rows[0][0];
+	} catch (e) {
+      if ((e instanceof PostgresError) && e.postgisUnavailable()) {
+        // ### What to do about SystemInfo.SPATIAL_FORMAT There can be no Geography or Geometry columns without POSTGIS
+        return "Not Installed"
+      }
+      else {
+        throw e;
+      }
+    }
+  }
+
   async configureConnection() {
      
     this.connection.on('notice',(n) => { 
@@ -166,7 +205,12 @@ class PostgresDBI extends YadamuDBI {
 	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
 	this._DB_VERSION = results.rows[0][3];
-
+	
+	this.POSTGIS_VERSION = await this.getPostgisInfo();
+	
+	if (this.isManager()) {
+      this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`${this.DB_VERSION}`,`Configuration`],`PostGIS Version: ${this.POSTGIS_VERSION}.`)
+	}
   }
   
   async closeConnection(options) {
@@ -269,6 +313,10 @@ class PostgresDBI extends YadamuDBI {
     return result;
   }
 
+  async initialize() {
+    await super.initialize(true);
+  }
+  
   /*
   **
   ** Begin a transaction
@@ -457,29 +505,8 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
-  async getPostgisInfo() {
-
-    let postgis = undefined    
-    const sqlStatement  =  `SELECT PostGIS_full_version() "POSTGIS"`;
-
-    try {
-      const results = await this.executeSQL(sqlStatement)
-      return results.rows[0].POSTGIS;
-	} catch (e) {
-      if (e.code && (e.code === '42883')) {
-        // ### What to do about SystemInfo.SPATIAL_FORMAT There can be no Geography or Geometry columns without POSTGIS
-        return "Not Installed"
-      }
-      else {
-        throw e;
-      }
-    }
-  }
-
   async getSystemInformation() {     
   
-    const postgisInfo = await this.getPostgisInfo();
-   
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
     const sysInfo = results.rows[0];
 	
@@ -488,10 +515,10 @@ class PostgresDBI extends YadamuDBI {
      ,timeZoneOffset     : new Date().getTimezoneOffset()                      
      ,sessionTimeZone    : sysInfo[4]
      ,vendor             : this.DATABASE_VENDOR
-     ,postgisInfo        : postgisInfo
+     ,postgisInfo        : this.POSTGIS_VERSION
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : Yadamu.YADAMU_VERSION
+     ,exportVersion      : YadamuConstants.YADAMU_VERSION
 	 ,currentUser        : sysInfo[1]
      ,sessionUser        : sysInfo[2]
 	 ,dbName             : sysInfo[0]

@@ -44,7 +44,7 @@ class MongoWriter extends YadamuWriter {
 	super.setTableInfo(tableName)
     
     this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
-       switch(targetDataType.toLowerCase()){
+	   switch(targetDataType.toLowerCase()){
         case 'objectid':
 	      return (row,idx) => {
 			row[idx] = ObjectID(row[idx])
@@ -52,6 +52,14 @@ class MongoWriter extends YadamuWriter {
           break;
         case 'geometry':
         case 'geography':
+		case 'point':
+        case 'line':
+		case 'lseg':
+        case 'linestring':
+		case 'box':
+		case 'path':
+		case 'polygon':
+		case 'circle':
         case '"MDSYS"."SDO_GEOMETRY"':
           switch (this.dbi.systemInformation.spatialFormat) {
             case "WKB":

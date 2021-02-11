@@ -32,6 +32,14 @@ class JSONWriter extends YadamuWriter {
 	  switch (dataType.type.toUpperCase()) {
         case "GEOMETRY":
         case "GEOGRAPHY":
+        case "POINT":
+        case "LINE":
+        case "LSEG":
+        case "BOX":
+        case "PATH":
+        case "POLYGON":
+        case "CIRCLE":
+        case "MULTIPOLYGON":
         case '"MDSYS"."SDO_GEOMETRY"':
           if (this.SPATIAL_FORMAT.endsWith('WKB')) {
             return (row,idx)  => {

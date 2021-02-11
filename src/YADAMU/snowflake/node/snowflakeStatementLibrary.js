@@ -16,7 +16,7 @@ class SnowflakeStatementLibrary {
        return `select t.table_schema   "TABLE_SCHEMA"
                      ,t.table_name   "TABLE_NAME"
                      ,concat('[',listagg(concat('"',c.column_name,'"'),',') within group (order by ordinal_position),']') "COLUMN_NAME_ARRAY"
-                     ,concat('[',listagg(concat('"',data_type,'"'),',') within group (order by ordinal_position),']') "DATA_TYPE_ARRAY"
+                     ,concat('[',listagg(concat('"',case when c.comment = concat('CHECK(CHECK_XML("',c.column_name,'") IS NULL)') then 'XML' else data_type end,'"'),',') within group (order by ordinal_position),']') "DATA_TYPE_ARRAY"
                      ,concat('[',listagg(case
                                    when (numeric_precision is not null) and (numeric_scale is not null) 
                                      then concat('"',numeric_precision,',',numeric_scale,'"')
@@ -37,11 +37,14 @@ class SnowflakeStatementLibrary {
                                  concat('TO_VARCHAR("',column_name,'") "',column_name,'"')
                                when c.data_type = 'TIME' then
                                  concat('cast(concat(''1971-01-01T'',','"',column_name,'"',') as Timestamp)')
+							   when c.data_type in ('FLOAT','FLOAT4','FLOAT8','DOUBLE','DOUBLE PRECISION','REAL') then
+							     concat('TO_VARCHAR("',column_name,'",''TME'') "',column_name,'"')
                                else
                                  concat('"',column_name,'"')
                                end
                               ,','
                              ) within group (order by ordinal_position) "CLIENT_SELECT_LIST"
+                     ,concat('[',listagg(concat('"',data_type,'"'),',') within group (order by ordinal_position),']') "STORAGE_TYPE_ARRAY"
                  from "${this.dbi.parameters.YADAMU_DATABASE}"."INFORMATION_SCHEMA"."COLUMNS" c, "${this.dbi.parameters.YADAMU_DATABASE}"."INFORMATION_SCHEMA"."TABLES" t
                 where t.table_name = c.table_name
                   and t.table_schema = c.table_schema

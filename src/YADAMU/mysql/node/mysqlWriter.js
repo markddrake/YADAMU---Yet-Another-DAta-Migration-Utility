@@ -29,7 +29,10 @@ class MySQLWriter extends YadamuWriter {
           }
           break;
         case "geometry" :
-          if (this.SPATIAL_FORMAT === 'GeoJSON') {
+  	    case 'point':
+		case 'linestring':
+		case 'polygon':
+		  if (this.SPATIAL_FORMAT === 'GeoJSON') {
             return (col,idx) => {
               return typeof col === 'object' ? JSON.stringify(col) : col
             }

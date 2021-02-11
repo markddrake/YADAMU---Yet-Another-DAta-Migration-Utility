@@ -4,9 +4,6 @@
 , "tasks"             : "tasks.json"
 , "recreateSchema"    : true
 , "parameters": {
-    "MODE"            : "DATA_ONLY"
-  , "FEEDBACK"        : "COMMIT"
-  , "MONGO_STRIP_ID"  : true
   }
 , "tests"               : [{
     "operation"         : "import"

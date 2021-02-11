@@ -6,8 +6,13 @@ const YadamuConstants = require('../../common/yadamuConstants.js');
 
 class OracleConstants {
 
-  static get ORACLE_DEFAULTS() { 
-    this._ORACLE_DEFAULTS = this._ORACLE_DEFAULTS || Object.freeze({
+  static get DATABASE_KEY()           { return 'oracle' };
+  static get DATABASE_VENDOR()        { return 'Oracle' };
+  static get SOFTWARE_VENDOR()        { return 'Oracle Corporation' };
+  static get STATEMENT_TERMINATOR()   { return '/' }
+
+  static get STATIC_DEFAULTS() { 
+    this._STATIC_DEFAULTS = this._STATIC_DEFAULTS || Object.freeze({
       "BATCH_LOB_COUNT"           : 1024
     , "LOB_MIN_SIZE"              : 32768
     , "LOB_MAX_SIZE"              : 16777216
@@ -19,27 +24,26 @@ class OracleConstants {
     , "TREAT_RAW1_AS_BOOLEAN"     : true
     , "SPATIAL_FORMAT"            : "WKB"
     })
-    return this._ORACLE_DEFAULTS;
+    return this._STATIC_DEFAULTS;
   }
 
-  static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.ORACLE_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.oracle || {}))
-    return this._DEFAULT_PARAMETERS
+  static #_DBI_PARAMETERS
+
+  static get DBI_PARAMETERS() { 
+    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_DEFAULTS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    return this.#_DBI_PARAMETERS
   }
 
-  static get BATCH_LOB_COUNT()        { return this.DEFAULT_PARAMETERS.BATCH_LOB_COUNT}
-  static get LOB_MIN_SIZE()           { return this.DEFAULT_PARAMETERS.LOB_MIN_SIZE}
-  static get LOB_MAX_SIZE()           { return this.DEFAULT_PARAMETERS.LOB_MAX_SIZE}
-  static get LOB_CACHE_COUNT()        { return this.DEFAULT_PARAMETERS.LOB_CACHE_COUNT}
-  static get XML_STORAGE_FORMAT()     { return this.DEFAULT_PARAMETERS.XML_STORAGE_FORMAT}
-  static get JSON_STORAGE_FORMAT()    { return this.DEFAULT_PARAMETERS.JSON_STORAGE_FORMAT}
-  static get MIGRATE_JSON_STORAGE()   { return this.DEFAULT_PARAMETERS.MIGRATE_JSON_STORAGE}
-  static get OBJECTS_AS_JSON()        { return this.DEFAULT_PARAMETERS.OBJECTS_AS_JSON}
-  static get TREAT_RAW1_AS_BOOLEAN()  { return this.DEFAULT_PARAMETERS.TREAT_RAW1_AS_BOOLEAN}
-  static get SPATIAL_FORMAT()         { return this.DEFAULT_PARAMETERS.SPATIAL_FORMAT };
-  static get DATABASE_VENDOR()        { return 'Oracle' };
-  static get SOFTWARE_VENDOR()        { return 'Oracle Corporation' };
-  static get STATEMENT_TERMINATOR()   { return '/' }
+  static get BATCH_LOB_COUNT()        { return this.DBI_PARAMETERS.BATCH_LOB_COUNT}
+  static get LOB_MIN_SIZE()           { return this.DBI_PARAMETERS.LOB_MIN_SIZE}
+  static get LOB_MAX_SIZE()           { return this.DBI_PARAMETERS.LOB_MAX_SIZE}
+  static get LOB_CACHE_COUNT()        { return this.DBI_PARAMETERS.LOB_CACHE_COUNT}
+  static get XML_STORAGE_FORMAT()     { return this.DBI_PARAMETERS.XML_STORAGE_FORMAT}
+  static get JSON_STORAGE_FORMAT()    { return this.DBI_PARAMETERS.JSON_STORAGE_FORMAT}
+  static get MIGRATE_JSON_STORAGE()   { return this.DBI_PARAMETERS.MIGRATE_JSON_STORAGE}
+  static get OBJECTS_AS_JSON()        { return this.DBI_PARAMETERS.OBJECTS_AS_JSON}
+  static get TREAT_RAW1_AS_BOOLEAN()  { return this.DBI_PARAMETERS.TREAT_RAW1_AS_BOOLEAN}
+  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
  
   // Until we have static constants
 

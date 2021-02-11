@@ -17,5 +17,6 @@ class ErrorDBI extends FileDBI {
   }
   
 }
-module.exports =ErrorDBI
+
+module.exports = ErrorDBI
 

@@ -6,9 +6,24 @@ const crypto = require('crypto');
 const { pipeline } = require('stream');
 
 const AzureDBI = require('../../../YADAMU//loader/azure/azureDBI.js');
+const AzureError = require('../../../YADAMU/loader/azure/azureException.js')
+const AzureConstants = require('../../../YADAMU/loader/azure/azureConstants.js');
+
+const YadamuTest = require('../../common/node/yadamuTest.js');
 
 class AzureQA extends AzureDBI {
   
+  static #_YADAMU_DBI_PARAMETERS
+	
+  static get YADAMU_DBI_PARAMETERS()  { 
+    this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,AzureConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[AzureConstants.DATABASE_KEY] || {},{RDBMS: AzureConstants.DATABASE_KEY}))
+    return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+    return AzureQA.YADAMU_DBI_PARAMETERS
+  }	
+		
   async recreateSchema() {
 	await this.cloudService.createBucketContainer()
 	await this.cloudService.deleteFolder(this.IMPORT_FOLDER)
@@ -92,7 +107,7 @@ class AzureQA extends AzureDBI {
     return [sourceFileSize,targetFileSize,sourceHash,targetHash]
   }
   
-  async compareSchemas(source,target) {
+  async compareSchemas(source,target,rules) {
 	 
     const report = {
       successful : []

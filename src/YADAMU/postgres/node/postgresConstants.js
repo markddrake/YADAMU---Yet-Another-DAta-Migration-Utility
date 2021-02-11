@@ -4,16 +4,22 @@ const YadamuConstants = require('../../common/yadamuConstants.js');
 
 class PostgresConstants {
 
-  static get POSTGRES_DEFAULTS() { 
-    this._POSTGRES_DEFAULTS = this._POSTGRES_DEFAULTS || Object.freeze({
+  static get DATABASE_KEY()           { return 'postgres' };
+  static get DATABASE_VENDOR()        { return 'Postgres' };
+  static get SOFTWARE_VENDOR()        { return 'The PostgreSQL Global Development Group' };
+
+  static get STATIC_PARAMETERS() { 
+    this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "SPATIAL_FORMAT"            : "WKB"
     })
-    return this._POSTGRES_DEFAULTS;
+    return this._STATIC_PARAMETERS;
   }
 
-  static get DEFAULT_PARAMETERS() { 
-    this._DEFAULT_PARAMETERS = this._DEFAULT_PARAMETERS || Object.freeze(Object.assign({},this.POSTGRES_DEFAULTS,YadamuConstants.EXTERNAL_DEFAULTS.postgres || {}))
-    return this._DEFAULT_PARAMETERS
+  static #_DBI_PARAMETERS
+
+  static get DBI_PARAMETERS() { 
+    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({RDBMS: this.DATABASE_KEY},this.STATIC_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+    return this.#_DBI_PARAMETERS
   }
 
   static get PGOID_DATE()          { return _PGOID_DATE }
@@ -25,9 +31,7 @@ class PostgresConstants {
     return this._FETCH_AS_STRING;
   }
 
-  static get SPATIAL_FORMAT()         { return this.DEFAULT_PARAMETERS.SPATIAL_FORMAT };
-  static get DATABASE_VENDOR()        { return 'Postgres' };
-  static get SOFTWARE_VENDOR()        { return 'The PostgreSQL Global Development Group' };
+  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get STATEMENT_TERMINATOR()   { return '/' }
 
 }

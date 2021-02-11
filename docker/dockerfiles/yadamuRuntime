@@ -7,11 +7,18 @@ ENV YADAMU_BIN=/usr/src/YADAMU/bin
 ENV YADAMU_SRC=$YADAMU_HOME/src
 ENV PATH=$PATH:$YADAMU_BIN
 RUN cd bin \
+ && chmod +x $YADAMU_BIN/export.sh \
  &&	ln -s $YADAMU_BIN/export.sh yadamuExport \
+ && chmod +x $YADAMU_BIN/import.sh \
  &&	ln -s $YADAMU_BIN/import.sh yadamuImport \
+ && chmod +x $YADAMU_BIN/upload.sh \
  &&	ln -s $YADAMU_BIN/upload.sh yadamuUpload \
+ && chmod +x $YADAMU_BIN/copy.sh \
  &&	ln -s $YADAMU_BIN/copy.sh yadamuCopy \
+ && chmod +x $YADAMU_BIN/load.sh \
  &&	ln -s $YADAMU_BIN/load.sh yadamuLoad \
+ && chmod +x $YADAMU_BIN/unload.sh \
  &&	ln -s $YADAMU_BIN/unload.sh yadamuUnload \
+ && chmod +x $YADAMU_BIN/yadamu.sh \
  &&	ln -s $YADAMU_BIN/yadamu.sh yadamu 
 ENTRYPOINT ["sleep","365d"]

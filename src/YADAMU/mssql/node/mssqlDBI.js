@@ -25,11 +25,11 @@ const sql = require('mssql');
 **
 */
 
-const Yadamu = require('../../common/yadamu.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
+const DBIConstants = require('../../common/dbiConstants.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
-const {ConnectionError} = require('../../common/yadamuException.js')
+
 const MsSQLConstants = require('./mssqlConstants.js')
 const MsSQLError = require('./mssqlException.js')
 const MsSQLParser = require('./mssqlParser.js');
@@ -39,7 +39,21 @@ const StagingTable = require('./stagingTable.js');
 const MsSQLReader = require('./mssqlReader.js');
 const StatementLibrary = require('./mssqlStatementLibrary.js')
 
+const {ConnectionError} = require('../../common/yadamuException.js')
+
+
 class MsSQLDBI extends YadamuDBI {
+
+  static #_YADAMU_DBI_PARAMETERS
+
+  static get YADAMU_DBI_PARAMETERS()  { 
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+	return MsSQLDBI.YADAMU_DBI_PARAMETERS
+  }
 
   // Instance level getters.. invoke as this.METHOD
 
@@ -49,6 +63,7 @@ class MsSQLDBI extends YadamuDBI {
     
   // Override YadamuDBI
 
+  get DATABASE_KEY()           { return MsSQLConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return MsSQLConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return MsSQLConstants.SOFTWARE_VENDOR};
   get STATEMENT_TERMINATOR()   { return MsSQLConstants.STATEMENT_TERMINATOR };
@@ -62,7 +77,7 @@ class MsSQLDBI extends YadamuDBI {
   set TRANSACTION_IN_PROGRESS(v)      { super.TRANSACTION_IN_PROGRESS = v }
 
   constructor(yadamu) {
-    super(yadamu,MsSQLConstants.DEFAULT_PARAMETERS);
+    super(yadamu);
     this.requestProvider = undefined;
     this.transaction = undefined;
     this.pool = undefined;
@@ -79,7 +94,7 @@ class MsSQLDBI extends YadamuDBI {
       this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`mssql.onError()`],err);
       throw err
     })
-        
+	        
   }
   
   /*
@@ -195,13 +210,13 @@ class MsSQLDBI extends YadamuDBI {
     const spatialFormat = rowSpatialFormat === undefined ? this.SPATIAL_FORMAT : rowSpatialFormat
     let stack
     let statement
-    try {
+	try {
       stack = new Error().stack;
       statement = new sql.PreparedStatement(this.requestProvider)
       dataTypes.forEach((dataType,idx) => {
         const length = dataType.length > 0 && dataType.length < 65535 ? dataType.length : sql.MAX
         const column = 'C' + idx;
-        switch (dataType.type.toLowerCase()) {
+		switch (dataType.type.toLowerCase()) {
           case 'bit':
             statement.input(column,sql.Bit);
             break;
@@ -259,6 +274,7 @@ class MsSQLDBI extends YadamuDBI {
             break;
           case 'json':
             statement.input(column,sql.NVarChar(sql.MAX));
+			break;
           case 'xml':
             // statement.input(column,sql.Xml);
             statement.input(column,sql.NVarChar(sql.MAX));
@@ -1035,7 +1051,7 @@ class MsSQLDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : Yadamu.YADAMU_VERSION
+     ,exportVersion      : YadamuConstants.YADAMU_VERSION
      ,sessionUser        : sysInfo.SESSION_USER
      ,currentUser        : sysInfo.CURRENT_USER
      ,dbName             : sysInfo.DATABASE_NAME

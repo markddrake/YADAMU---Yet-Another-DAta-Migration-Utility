@@ -7,7 +7,6 @@
 , "recreateSchema"    : true
 , "createDirectory"   : true
 , "parameters": {
-    "MODE": "DATA_ONLY"
   }
 , "tests" : [{
     "source": "file-YADAMU_HOME"

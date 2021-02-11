@@ -1,0 +1,5 @@
+@if defined MSSQL17_USER (set DB_USER=%MSSQL17_USER%) else (set DB_USER=sa)
+@if defined MSSQL17_PWD (set DB_PWD=%MSSQL17_PWD%) else (set DB_PWD=oracle#1)
+@if defined MSSQL17_HOST (set DB_HOST=%MSSQL17_HOST%) else (set DB_HOST=localhost)
+@if defined MSSQL17_PORT (set DB_PORT=%MSSQL17_PORT%) else (set DB_PORT=1433)
+@if defined MSSQL17_DBNAME (set DB_DBNAME=%MSSQL17_DBNAME%) else (set DB_DBNAME=master)

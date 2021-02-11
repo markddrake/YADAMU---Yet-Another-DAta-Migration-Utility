@@ -1,76 +1,79 @@
 {
-    "yadamu": {
-        "FILE": "yadamu.json",
-        "MODE": "DATA_ONLY",
-        "ON_ERROR": "SKIP",
-        "PARALLEL": 0,
-        "RDBMS": "oracle"
-    },
-    "yadamuDBI": {
-        "SPATIAL_FORMAT": "WKB",
-        "TABLE_MAX_ERRORS": 10,
-        "TOTAL_MAX_ERRORS": 100,
-        "BATCH_SIZE": 10000,
-        "COMMIT_RATIO": 1
-    },
-    "drivers": {
-        "file"       : "../file/node/fileDBI.js",
-        "loader"     : "../loader/node/loaderDBI.js",
-        "awsS3"      : "../loader/s3/awss3DBI.js",
-        "azure"      : "../loader/s3/azureDBI.js",
-        "oracle"     : "../oracle/node/oracleDBI.js",
-        "postgres"   : "../postgres/node/postgresDBI.js",
-        "mssql"      : "../mssql/node/mssqlDBI.js",
-        "mysql"      : "../mysql/node/mysqlDBI.js",
-        "mariadb"    : "../mariadb/node/mariadbDBI.js",
-        "mongodb"    : "../mongodb/node/mongoDBI.js",
-        "snowflake"  : "../snowflake/node/snowflakeDBI.js",
-        "teradata"   : "../teradata/worker/teradataDBI.js"
-    },
-    "mariadb": {
-        "TABLE_MATCHING": "INSENSITIVE",
-        "TREAT_TINYINT1_AS_BOOLEAN": true
-    },
-    "mongodb": {
-        "PORT": 27017,
-        "MONGO_SAMPLE_LIMIT": 1000,
-        "MONGO_STORAGE_FORMAT": "DOCUMENT",
-        "MONGO_EXPORT_FORMAT": "ARRAY",
-        "MONGO_STRIP_ID": false,
-        "SPATIAL_FORMAT": "GeoJSON",
-        "DEFAULT_STRING_LENGTH": "32",
-        "MAX_STRING_LENGTH": "16777216"
-    },
-    "mssql": {
-        "YADAMU_USER": "dbo",
-        "SPATIAL_MAKE_VALID": false
-    },
-    "mysql": {
-        "TABLE_MATCHING": "INSENSITIVE",
-        "READ_KEEP_ALIVE": 0,
-        "TREAT_TINYINT1_AS_BOOLEAN": true
-    },
-    "oracle": {
-        "BATCH_LOB_COUNT": 1024,
-        "LOB_MIN_SIZE": 32768,
-        "LOB_MAX_SIZE": 16777216,
-        "LOB_CACHE_COUNT": 50000,
-        "XML_STORAGE_FORMAT": "XML",
-        "OBJECTS_AS_JSON": false,
-        "MIGRATE_JSON_STORAGE": false,
-        "JSON_STORAGE_FORMAT": "JSON",
-        "TREAT_RAW1_AS_BOOLEAN": true,
-        "SPATIAL_FORMAT": "WKB"
-    },
-    "postgres": {
-        "SPATIAL_FORMAT": "WKB"
-    },
-    "snowflake": {
-        "YADAMU_USER": "public",
-        "MAX_CHARACTER_SIZE": 16777216,
-        "MAX_BINARY_SIZE": 8388608,
-        "TRANSIENT_TABLES": true,
-        "DATA_RETENTION_TIME": 0,
-        "SPATIAL_FORMAT": "WKB"
-    }
+	"yadamu": {
+		"FILE": "yadamu.json",
+		"PARALLEL": 0
+	},
+	"yadamuDBI": {
+		"MODE": "DATA_ONLY",
+		"ON_ERROR": "SKIP",
+		"SPATIAL_FORMAT": "WKB",
+		"TABLE_MAX_ERRORS": 10,
+		"TOTAL_MAX_ERRORS": 100,
+		"BATCH_SIZE": 10000,
+		"COMMIT_RATIO": 1
+	},
+	"drivers": {
+		"file": "../file/node/fileDBI.js",
+		"loader": "../loader/node/loaderDBI.js",
+		"awsS3": "../loader/s3/awss3DBI.js",
+		"azure": "../loader/s3/azureDBI.js",
+		"oracle": "../oracle/node/oracleDBI.js",
+		"postgres": "../postgres/node/postgresDBI.js",
+		"mssql": "../mssql/node/mssqlDBI.js",
+		"mysql": "../mysql/node/mysqlDBI.js",
+		"mariadb": "../mariadb/node/mariadbDBI.js",
+		"mongodb": "../mongodb/node/mongoDBI.js",
+		"snowflake": "../snowflake/node/snowflakeDBI.js",
+		"teradata": "../teradata/worker/teradataDBI.js"
+	},
+	"ddlEnabled": [
+		"oracle"
+	],
+	"mariadb": {
+		"TABLE_MATCHING": "INSENSITIVE",
+		"TREAT_TINYINT1_AS_BOOLEAN": true
+	},
+	"mongodb": {
+		"PORT": 27017,
+		"MONGO_SAMPLE_LIMIT": 1000,
+		"MONGO_STORAGE_FORMAT": "DOCUMENT",
+		"MONGO_EXPORT_FORMAT": "ARRAY",
+		"MONGO_STRIP_ID": false,
+		"SPATIAL_FORMAT": "GeoJSON",
+		"DEFAULT_STRING_LENGTH": "32",
+		"MAX_STRING_LENGTH": "16777216"
+	},
+	"mssql": {
+		"YADAMU_USER": "dbo",
+		"SPATIAL_MAKE_VALID": false
+	},
+	"mysql": {
+		"TABLE_MATCHING": "INSENSITIVE",
+		"READ_KEEP_ALIVE": 0,
+		"TREAT_TINYINT1_AS_BOOLEAN": true
+	},
+	"oracle": {
+		"BATCH_LOB_COUNT": 1024,
+		"LOB_MIN_SIZE": 32768,
+		"LOB_MAX_SIZE": 16777216,
+		"LOB_CACHE_COUNT": 50000,
+		"XML_STORAGE_FORMAT": "XML",
+		"JSON_STORAGE_FORMAT": "JSON",
+		"OBJECTS_AS_JSON": false,
+		"MIGRATE_JSON_STORAGE": false,
+		"TREAT_RAW1_AS_BOOLEAN": true,
+		"SPATIAL_FORMAT": "WKB"
+	},
+	"postgres": {
+		"SPATIAL_FORMAT": "WKB"
+	},
+	"snowflake": {
+		"YADAMU_USER": "public",
+		"MAX_CHARACTER_SIZE": 16777216,
+		"MAX_BINARY_SIZE": 8388608,
+		"TRANSIENT_TABLES": true,
+		"DATA_RETENTION_TIME": 0,
+		"SPATIAL_FORMAT": "WKB",
+		"XML_STORAGE_FORMAT": "VARIANT"
+	}
 }

@@ -309,26 +309,20 @@ as
                      when P_SPATIAL_FORMAT in ('WKB','EWKB') then
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
                             'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB()' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''NULL'' then NULL ' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) <> ''13032'' then t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
-                            'else NULL ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKB()' ||
                        'end "' || atc.COLUMN_NAME || '"'
                      when P_SPATIAL_FORMAT in ('WKT','EWKT') then                   
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
                             'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT()' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''NULL'' then NULL ' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) <> ''13032'' then t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
-                           'else NULL ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKT()' ||
                        'end "' || atc.COLUMN_NAME || '"'
-                   when P_SPATIAL_FORMAT in ('GeoJSON') then                   
+                     when P_SPATIAL_FORMAT in ('GeoJSON') then                   
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
                             'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_GeoJSON()' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' || atc.COLUMN_NAME || '".get_GeoJSON() ' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''NULL'' then NULL ' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) <> ''13032'' then t."' || atc.COLUMN_NAME || '".get_GeoJSON() ' ||
-                           'else NULL ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_GeoJSON()' ||
                        'end "' || atc.COLUMN_NAME || '"'
                    end
                  when atc.DATA_TYPE = 'XMLTYPE' then -- Can be owned by SYS or PUBLIC
@@ -437,18 +431,20 @@ as
                      when P_SPATIAL_FORMAT in ('WKB','EWKB') then
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
                             'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB()' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''NULL'' then NULL ' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) <> ''13032'' then t."' || atc.COLUMN_NAME || '".get_WKB() ' ||
-                            'else NULL ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKB()' ||
                        'end "' || atc.COLUMN_NAME || '"'
-                     when P_SPATIAL_FORMAT in ('WKT','EWKB') then                   
+                     when P_SPATIAL_FORMAT in ('WKT','EWKT') then                   
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
                             'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT()' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''NULL'' then NULL ' ||
-                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) <> ''13032'' then t."' || atc.COLUMN_NAME || '".get_WKT() ' ||
-                           'else NULL ' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_WKT()' ||
+                       'end "' || atc.COLUMN_NAME || '"'
+                     when P_SPATIAL_FORMAT in ('GeoJSON') then                   
+                       'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
+                            'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_GeoJSON()' ||
+                            'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
+                            'else t."' || atc.COLUMN_NAME || '".get_GeoJSON()' ||
                        'end "' || atc.COLUMN_NAME || '"'
                    end
                  when atc.DATA_TYPE = 'XMLTYPE' then  -- Can be owned by SYS or PUBLIC

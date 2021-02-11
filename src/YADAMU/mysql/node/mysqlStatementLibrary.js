@@ -58,7 +58,7 @@ class MySQLStatementLibrary {
                             when data_type = 'year' then
                               -- Prevent rendering of value as base64:type13: 
                               concat('CAST("', column_name, '"as DECIMAL) "',column_name,'"')
-                            when data_type = 'geometry' then
+                            when data_type in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection') then
                               -- Force ${this.spatialFormat} rendering of value
                               concat('${this.dbi.SPATIAL_SERIALIZER}"', column_name, '") "',column_name,'"')
                             when data_type = 'float' then

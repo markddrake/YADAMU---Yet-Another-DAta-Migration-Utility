@@ -12,10 +12,11 @@ const { performance } = require('perf_hooks');
 
 const mariadb = require('mariadb');
 
-const Yadamu = require('../../common/yadamu.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const DBIConstants = require('../../common/dbiConstants.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js')
+
 const MariadbConstants = require('./mariadbConstants.js')
 const MariadbError = require('./mariadbException.js')
 const MariadbParser = require('./mariadbParser.js');
@@ -35,6 +36,17 @@ class MariadbDBI extends YadamuDBI {
   static get SQL_RESTORE_SAVE_POINT()                         { return _SQL_RESTORE_SAVE_POINT }
   static get SQL_RELEASE_SAVE_POINT()                         { return _SQL_RELEASE_SAVE_POINT }
 
+  static #_YADAMU_DBI_PARAMETERS
+
+  static get YADAMU_DBI_PARAMETERS()  { 
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,MariadbConstants.DBI_PARAMETERS))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+	return MariadbDBI.YADAMU_DBI_PARAMETERS
+  }
+
   // Instance level getters.. invoke as this.METHOD
 
   // Not available until configureConnection() has been called 
@@ -43,9 +55,10 @@ class MariadbDBI extends YadamuDBI {
  
   // Override YadamuDBI
 
-  get DATABASE_VENDOR()            { return MariadbConstants.DATABASE_VENDOR};
-  get SOFTWARE_VENDOR()            { return MariadbConstants.SOFTWARE_VENDOR};
-  get STATEMENT_TERMINATOR()       { return MariadbConstants.STATEMENT_TERMINATOR };
+  get DATABASE_KEY()           { return MariadbConstants.DATABASE_KEY};
+  get DATABASE_VENDOR()        { return MariadbConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()        { return MariadbConstants.SOFTWARE_VENDOR};
+  get STATEMENT_TERMINATOR()   { return MariadbConstants.STATEMENT_TERMINATOR };
 
   // Enable configuration via command line parameters
 
@@ -55,7 +68,7 @@ class MariadbDBI extends YadamuDBI {
   
   constructor(yadamu) {
 
-    super(yadamu,MariadbConstants.DEFAULT_PARAMETERS);
+    super(yadamu);
     this.pool = undefined;
 	
     this.StatementLibrary = MariadbStatementLibrary
@@ -434,7 +447,7 @@ class MariadbDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : Yadamu.YADAMU_VERSION
+     ,exportVersion      : YadamuConstants.YADAMU_VERSION
      ,currentUser        : sysInfo[1]
      ,sessionUser        : sysInfo[2]
      ,dbName             : sysInfo[0]

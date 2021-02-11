@@ -8,10 +8,11 @@ const { performance } = require('perf_hooks');
 **
 */
 
-const Yadamu = require('../../common/yadamu.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuDBI = require('../../common/yadamuDBI.js');
-const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
+const DBIConstants = require('../../common/dbiConstants.js');
+const YadamuConstants = require('../../common/yadamuConstants.js');
+const YadamuLibrary = require('../../common/yadamuLibrary.js')
+
 const ExampleConstants = require('./ExampleConstants.js');
 const ExampleError = require('./exampleException.js')
 const ExampleParser = require('./exampleParser.js');
@@ -33,6 +34,17 @@ class ExampleDBI extends YadamuDBI {
   static get SQL_RESTORE_SAVE_POINT()                         { return _SQL_RESTORE_SAVE_POINT }
   static get SQL_RELEASE_SAVE_POINT()                         { return _SQL_RELEASE_SAVE_POINT }
     
+  static #_YADAMU_DBI_PARAMETERS
+
+  static get YADAMU_DBI_PARAMETERS()  { 
+	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,ExampleConstants.DBI_PARAMETERS))
+	return this.#_YADAMU_DBI_PARAMETERS
+  }
+   
+  get YADAMU_DBI_PARAMETERS() {
+	return ExampleDBI.YADAMU_DBI_PARAMETERS
+  }
+
   // Instance level getters.. invoke as this.METHOD
 
   // Not available until configureConnection() has been called 
@@ -41,6 +53,7 @@ class ExampleDBI extends YadamuDBI {
  
   // Override YadamuDBI
 
+  get DATABASE_KEY()           { return ExampleConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return ExampleConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return ExampleConstants.SOFTWARE_VENDOR};
   get STATEMENT_TERMINATOR()   { return ExampleConstants.STATEMENT_TERMINATOR };
@@ -50,7 +63,7 @@ class ExampleDBI extends YadamuDBI {
   get SPATIAL_FORMAT()        { return this.parameters.SPATIAL_FORMAT || ExampleConstants.SPATIAL_FORMAT };
 
   constructor(yadamu) {
-    super(yadamu,ExampleConstants.DEFAULT_PARAMETERS);
+    super(yadamu);
 	this.StatementLibary = StatementLibary
   }
 
@@ -374,7 +387,7 @@ class ExampleDBI extends YadamuDBI {
      ,vendor             : this.DATABASE_VENDOR
      ,spatialFormat      : this.SPATIAL_FORMAT
      ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : Yadamu.YADAMU_VERSION
+     ,exportVersion      : YadamuConstants.YADAMU_VERSION
      ,softwareVendor     : this.SOFTWARE_VENDOR
      ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
 	 ,sessionUser        : sysInfo.SESSION_USER

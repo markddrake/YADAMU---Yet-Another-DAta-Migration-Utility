@@ -66,6 +66,14 @@ class EventStream extends Transform {
 	  switch (dataType.type.toUpperCase()) {
         case "GEOMETRY":
         case "GEOGRAPHY":
+		case "POINT":
+        case "LINE":
+        case "LSEG":
+        case "BOX":
+        case "PATH":
+        case "POLYGON":
+        case "CIRCLE":
+        case "MULTIPOLYGON":
         case '"MDSYS"."SDO_GEOMETRY"':
           if (this.spatialFormat.endsWith('WKB')) {
             return (row,idx)  => {
