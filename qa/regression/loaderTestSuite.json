@@ -5,7 +5,7 @@
 , "recreateSchema"    : true
 , "createFolders"     : true
 , "parameters": {
-    "ROOT_FOLDER"     : "loader/%connection%/%mode%"
+    "ROOT_FOLDER"     : "yadamu/RTS/%sourceConnection%/%mode%"
   }
 , "tests"             : [{
     "operation"       : "import"
@@ -13,7 +13,7 @@
   , "target"          : "loader#1"
   , "importPath"      : "%location%"
   , "parameters"      : {
-      "ROOT_FOLDER"   : "loader"
+      "ROOT_FOLDER"   : "yadamu/RTS"
 	}
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -88,7 +88,7 @@
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "loader"
+      "ROOT_FOLDER"  : "yadamu/RTS"
 	}
   , "tasks": [ 
       "oracle"
@@ -100,7 +100,7 @@
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "loader"
+      "ROOT_FOLDER"  : "yadamu/RTS"
 	}
   , "tasks": [ 
       "mssql"
@@ -112,7 +112,7 @@
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "loader"
+      "ROOT_FOLDER"  : "yadamu/RTS"
 	}
   , "tasks": [ 
       "mysql"
@@ -121,7 +121,7 @@
     "source"          : "mssql19"
   , "target"          : "loader#1"
   , "parameters" : {
-      "ROOT_FOLDER"   : "loader/compressed/%connection%/%mode%"
+      "ROOT_FOLDER"   : "yadamu/RTS/zip/%sourceConnection%/%mode%"
 	, "COMPRESSION"   : "GZIP"
 	}
   , "tasks": [ 

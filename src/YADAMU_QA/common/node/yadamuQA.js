@@ -428,11 +428,12 @@ class YadamuQA {
 
   }
 
-  async compareSchemas(sourceVendor,targetVendor,sourceSchema,targetSchema,connectionProperties,rules,metrics,reportRowCounts,tableMappings) {
+  async compareSchemas(sourceVendor,targetVendor,sourceSchema,targetSchema,connectionProperties,testParameters,rules,metrics,reportRowCounts,tableMappings) {
       
     const compareDBI = this.getDatabaseInterface(sourceVendor,connectionProperties,{},false,tableMappings)
 
     try {
+      compareDBI.setParameters(testParameters);
       await compareDBI.initialize();
       if (reportRowCounts) {
         this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),metrics,rules,tableMappings) 
@@ -771,7 +772,7 @@ class YadamuQA {
     this.metrics.recordTaskTimings([task.taskName,'COPY',compareParameters.MODE,sourceConnectionName,sourceConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (metrics[metrics.length-1] instanceof Error) {
       const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
-      const compareResults = await this.compareSchemas(sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, compareRules, this.yadamu.metrics, false, undefined)
+      const compareResults = await this.compareSchemas(sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules, this.yadamu.metrics, false, undefined)
       this.printCompareResults(sourceConnectionName,targetConnectionName,task.taskName,compareResults)
       this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
 	  this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
@@ -810,7 +811,7 @@ class YadamuQA {
       this.metrics.recordTaskTimings([task.taskName,'COPY',targetDBI.MODE,sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
       if (metrics[metrics.length-1] instanceof Error) {
         const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
-        const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, compareRules, this.yadamu.metrics, false, undefined)
+        const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules, this.yadamu.metrics, false, undefined)
         this.printCompareResults(sourceConnectionName,targetConnectionName,task.taskName,compareResults)
         this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
         this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
@@ -841,7 +842,7 @@ class YadamuQA {
       this.metrics.recordTaskTimings([task.taskName,'COPY',compareDBI.MODE,targetConnectionName,sourceConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
       if (metrics[metrics.length-1] instanceof Error) {
         const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
-        const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, compareRules,  this.yadamu.metrics, false, undefined)
+        const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules,  this.yadamu.metrics, false, undefined)
         this.printCompareResults(sourceConnectionName,targetConnectionName,task.taskName,compareResults)
         this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
         this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
@@ -859,7 +860,7 @@ class YadamuQA {
     this.fixupMetrics(metrics);   
     if (this.yadamu.MODE !== 'DDL_ONLY') {
       const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
-      const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, compareRules, metrics[metrics.length-1], false, undefined)
+      const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules, metrics[metrics.length-1], false, undefined)
       this.printCompareResults(sourceConnectionName,targetConnectionName,task.taskName,compareResults)
       this.metrics.recordFailed(compareResults.failed.length)
       this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
@@ -1110,7 +1111,7 @@ class YadamuQA {
     if (sourceAndTargetMatch) {
       const testParameters = {} // parameters ? Object.assign({},parameters) : {}
       const compareRules = this.getCompareRules(targetDatabase,targetVersion,targetDatabase,targetVersion,testParameters)
-      const compareResults = await this.compareSchemas( targetDatabase, targetDatabase, sourceSchema, targetSchema1, targetConnection, compareRules, metrics[1],false,targetDBI.inverseTableMappings)
+      const compareResults = await this.compareSchemas( targetDatabase, targetDatabase, sourceSchema, targetSchema1, targetConnection, parameters, compareRules, metrics[1],false,targetDBI.inverseTableMappings)
       this.metrics.recordFailed(compareResults.failed.length)
       this.metrics.recordTaskTimings([task.taskName,'COMPARE','',targetConnectionName,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
       this.printCompareResults('File',targetConnectionName,task.taskName,compareResults)
@@ -1119,8 +1120,8 @@ class YadamuQA {
     // Compare Target Schema #1 and Target Schema #2
 
     const testParameters = parameters ? Object.assign({},parameters) : {}
-    const compareParams = this.getCompareRules(targetDatabase,targetVersion,targetDatabase,targetVersion,testParameters)
-    const compareResults = await this.compareSchemas( targetDatabase, targetDatabase, targetSchema1, targetSchema2, targetConnection, compareParams, metrics[3],false,targetDBI.inverseTableMappings)
+    const compareRules = this.getCompareRules(targetDatabase,targetVersion,targetDatabase,targetVersion,testParameters)
+    const compareResults = await this.compareSchemas( targetDatabase, targetDatabase, targetSchema1, targetSchema2, targetConnection, parameters, compareRules, metrics[3],false,targetDBI.inverseTableMappings)
     this.metrics.recordFailed(compareResults.failed.length)
     this.metrics.recordTaskTimings([task.taskName,'COMPARE','',targetConnectionName,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
     this.printCompareResults('File',targetConnectionName,task.taskName,compareResults)
@@ -1335,7 +1336,7 @@ class YadamuQA {
       if (this.yadamu.MODE !== 'DDL_ONLY') {
         // Report rows Imported and Compare Schemas..
         const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,0,parameters)
-        const compareResults = await this.compareSchemas( sourceDatabase, sourceDatabase, sourceSchema, targetSchema, sourceConnection, compareRules, metrics[metrics.length-1], true, undefined)
+        const compareResults = await this.compareSchemas( sourceDatabase, sourceDatabase, sourceSchema, targetSchema, sourceConnection, parameters, compareRules, metrics[metrics.length-1], true, undefined)
         this.metrics.recordFailed(compareResults.failed.length)
         this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
         this.printCompareResults(sourceConnectionName,targetConnectionName,task.taskName,compareResults)

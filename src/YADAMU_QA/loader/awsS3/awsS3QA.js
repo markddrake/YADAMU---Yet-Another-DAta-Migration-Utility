@@ -1,6 +1,7 @@
 "use strict" 
 
-const path=require('path')
+const assert = require('assert');
+const path = require('path')
 const crypto = require('crypto');
 const { pipeline } = require('stream');
 
@@ -104,15 +105,37 @@ class AWSS3QA extends AWSS3DBI {
       successful : []
     , failed     : []
     }
+
+    let sourceControlFile
+	let targetControlFile
+
+  	const sourceControlPath = `${path.join(this.ROOT_FOLDER,source.schema,source.schema)}.json`.split(path.sep).join(path.posix.sep) 
+    const targetControlPath = `${path.join(this.ROOT_FOLDER,target.schema,target.schema)}.json`.split(path.sep).join(path.posix.sep) 
 	
-	// Load the Control File...
-    let controlFilePath = `${path.join(this.ROOT_FOLDER,source.schema,source.schema)}.json`.split(path.sep).join(path.posix.sep) 
-    let fileContents = await this.cloudService.getObject(controlFilePath)		
-    const sourceControlFile = this.parseContents(fileContents)
+    try {
+	  assert.notEqual(sourceControlPath,targetControlPath,`Source & Target control files are identical: "${sourceControlPath}"`);
+	} catch(e) {
+	  report.failed.push([source.schema,target.schema,'',0,0,0,0,e.message])
+      return report	 
+	}
 	
-    controlFilePath = `${path.join(this.ROOT_FOLDER,target.schema,target.schema)}.json`.split(path.sep).join(path.posix.sep) 
-    fileContents = await this.cloudService.getObject(controlFilePath)		
-    const targetControlFile = this.parseContents(fileContents)
+	// Load the Control Files..
+    
+    try {
+      const fileContents = await this.cloudService.getObject(sourceControlPath)		
+      sourceControlFile = this.parseContents(fileContents)
+	} catch(e) {
+	  report.failed.push([source.schema,target.schema,sourceControlPath,0,0,0,0,`Error reading source control file: ${e.message}`])
+      return report	 
+	}
+
+    try {
+      const fileContents = await this.cloudService.getObject(targetControlPath)		
+      targetControlFile = this.parseContents(fileContents)
+	} catch(e) {
+	  report.failed.push([source.schema,target.schema,targetControlPath,0,0,0,0,`Error reading target control file: ${e.messge}`])
+      return report	 
+	}
 	
     let results = await Promise.all(Object.keys(sourceControlFile.data).map(async (tableName) => {return await this.compareFiles( sourceControlFile.data[tableName].file, targetControlFile.data[tableName].file)}))
     results = await Promise.all(results.map(async(result) => { return await Promise.all(result)}))

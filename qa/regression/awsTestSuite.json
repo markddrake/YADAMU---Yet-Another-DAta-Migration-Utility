@@ -5,7 +5,7 @@
 , "recreateSchema"    : true
 , "createFolders"     : true
 , "parameters": {
-    "ROOT_FOLDER"     : "yadamuS3/%connection%/%mode%"
+    "ROOT_FOLDER"     : "yadamu/RTS/%sourceConnection%/%mode%"
   }
 , "tests"             : [{
     "operation"       : "import"
@@ -13,7 +13,7 @@
   , "target"          : "minio#1"
   , "importPath"      : "%location%"
   , "parameters"      : {
-      "ROOT_FOLDER"   : "yadamuS3"
+      "ROOT_FOLDER"   : "yadamu/RTS"
 	}
   , "tasks": [ 
       "oracle","mysql","mssql"
@@ -88,7 +88,7 @@
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "yadamuS3"
+      "ROOT_FOLDER"  : "yadamu/RTS"
 	}
   , "tasks": [ 
       "oracle"
@@ -100,7 +100,7 @@
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "yadamuS3"
+      "ROOT_FOLDER"  : "yadamu/RTS"
 	}
   , "tasks": [ 
       "mssql"
@@ -112,7 +112,7 @@
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "yadamuS3"
+      "ROOT_FOLDER"  : "yadamu/RTS"
 	}
   , "tasks": [ 
       "mysql"
@@ -121,7 +121,7 @@
     "source"          : "mssql19"
   , "target"          : "minio#1"
   , "parameters" : {
-      "ROOT_FOLDER"   : "yadamuS3/compressed/%connection%/%mode%"
+      "ROOT_FOLDER"   : "yadamu/RTS/gzip/%sourceConnection%/%mode%"
 	, "COMPRESSION"   : "GZIP"
 	}
   , "tasks": [ 

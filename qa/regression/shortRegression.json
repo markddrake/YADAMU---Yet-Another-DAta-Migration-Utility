@@ -6,6 +6,7 @@
 , "createDirectory"                   : true
 , "verifyOperation"                   : true
 , "parameters": {
+    "ROOT_FOLDER"     : "yadamu/RTS/%sourceConnection%/%mode%"
   }
 , "tests" : [{
     "source": "oracle19c"
@@ -115,5 +116,78 @@
   , "tasks": [
        "HR","BI"
   ]
+  },{
+    "operation"       : "import"
+  , "source"          : "file-JSON"
+  , "target"          : "minio#1"
+  , "importPath"      : "%location%"
+  , "parameters"      : {
+      "ROOT_FOLDER"   : "yadamu/RTS"
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
+    "source"          : "oracle19c"
+  , "target"          : "minio#1"
+  , "parameters"      : {
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
+    "source"          : "minio#1"
+  , "targets": [
+	  "oracle19c"	  
+    ]
+  , "parameters"      : {
+      "ROOT_FOLDER"   : "yadamu/RTS"
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
+    "source"          : "oracle19c"
+  , "target"          : "minio#1"
+  , "parameters" : {
+      "ROOT_FOLDER"   : "yadamu/RTS/gzip/%sourceConnection%/%mode%"
+	, "COMPRESSION"   : "GZIP"
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
+    "operation"       : "import"
+  , "source"          : "file-JSON"
+  , "target"          : "azurite#1"
+  , "importPath"      : "%location%"
+  , "parameters"      : {
+      "ROOT_FOLDER"   : "yadamu/RTS"
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
+    "source"          : "azurite#1"
+  , "targets": [
+	  "oracle19c"
+	  
+    ]
+  , "parameters": {
+      "ROOT_FOLDER"  : "yadamu/RTS"
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
+    "source"          : "oracle19c"
+  , "target"          : "azurite#1"
+  , "parameters" : {
+      "ROOT_FOLDER"   : "yadamu/RTS/gzip/%sourceConnection%/%mode%"
+	, "COMPRESSION"   : "GZIP"
+	}
+  , "tasks": [ 
+      "HR"
+	]
   }]
 }
