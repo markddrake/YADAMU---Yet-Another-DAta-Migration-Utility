@@ -167,6 +167,12 @@ class Yadamu {
 
   }
   
+  reloadParameters(parameters) {
+  
+    this.initializeParameters(parameters || {})
+    this.processParameters();    
+  }
+  
   initializeParameters(configParameters) {
 
     // Start with Yadamu Defaults
