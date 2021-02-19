@@ -528,7 +528,7 @@ class Yadamu {
             break;
           case 'OUTPUT_FORMAT':
           case '--OUTPUT_FORMAT':
-            parameters.OUTPUT_FORMAT = this.isSupportedValue('OUTPUT_FORMAT',parameterValue,YadamuConstants.SUPPORTED_OUTPUT_FORMAT);
+            parameters.OUTPUT_FORMAT = this.isSupportedValue('OUTPUT_FORMAT',parameterValue,YadamuConstants.OUTPUT_FORMATS);
             break;
           case 'COMPRESSION':
           case '--COMPRESSION':

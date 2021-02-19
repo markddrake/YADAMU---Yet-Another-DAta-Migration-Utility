@@ -78,9 +78,9 @@ class YadamuConstants {
 	return this._SUPPORTED_COMPRESSION
   }
   
-  static get SUPPORTED_OUTPUT_FORMAT() {
-    this._SUPPORTED_OUTPUT_FORMAT = this._SUPPORTED_OUTPUT_FORMAT || Object.freeze(["JSON","CSV","ARRAY"])
-	return this._OUTPUT_FORMAT
+  static get OUTPUT_FORMATS() {
+    this._OUTPUT_FORMATS = this._OUTPUT_FORMATS || Object.freeze(["JSON","CSV","ARRAY"])
+	return this._OUTPUT_FORMATS
   }
   
   static get MACROS() {
