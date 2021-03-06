@@ -11,7 +11,7 @@ class EventStream extends YadamuParser {
 
 	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 
-      if (YadamuLibrary.isBinaryDataType(dataType)) {
+      if (YadamuLibrary.isBinaryType(dataType)) {
         return (row,idx) =>  {
   		  row[idx] = Buffer.from(row[idx],'hex')
 		}

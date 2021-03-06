@@ -148,7 +148,10 @@ class FileDBI extends YadamuDBI {
   }
   
   async getSystemInformation() {
-	return {}
+	return Object.assign(
+	  super.getSystemInformation()
+	, {}
+    )
   }
 
   async setSystemInformation(systemInformation) {
@@ -165,8 +168,8 @@ class FileDBI extends YadamuDBI {
  
   async initialize() {
     super.initialize(false);
-    this.spatialFormat = this.parameters.SPATIAL_FORMAT ? this.parameters.SPATIAL_FORMAT : super.SPATIAL_FORMAT
-	this.exportFilePath = this.exportFilePath === undefined ? this.parameters.FILE : this.exportFilePath
+    this.spatialFormat = this.parameters.SPATIAL_FORMAT || super.SPATIAL_FORMAT
+	this.exportFilePath = this.exportFilePath || this.parameters.FILE
 	this.exportFilePath = this.COMPRESSED_OUTPUT ? `${this.exportFilePath}.gz` : this.exportFilePath
 	this.exportFilePath =  path.resolve(this.exportFilePath)
   }
@@ -318,7 +321,7 @@ class FileDBI extends YadamuDBI {
 	// Include a dummy dataTypes array of the correct length to ensure the column count assertion does not throw
 	return { 
 	  tableName         : tableName
-	, _SPATIAL_FORMAT   : this.systemInformation.spatialFormat
+	, _SPATIAL_FORMAT   : this.systemInformation.typeMappings.spatialFormat 
     , columnNames       : [... this.metadata[tableName].columnNames]
     , targetDataTypes   : [... this.metadata[tableName].dataTypes]
     }

@@ -97,8 +97,8 @@ class YadamuLogger {
   
   get EXCEPTION_FILE_PREFIX() { return this._EXCEPTION_FILE_PREFIX || YadamuLibrary.pathSubstitutions(YadamuLogger.EXCEPTION_FILE_PREFIX) }
   
-  get YADAMU_TRACE_ERRORS() {
-     return process.env.YADAMU_TRACE_ERRORS && process.env.YADAMU_TRACE_ERRORS.trim().toUpperCase() === 'TRUE' 
+  get YADAMU_STACK_TRACE() {
+     return process.env.YADAMU_STACK_TRACE && process.env.YADAMU_STACK_TRACE.trim().toUpperCase() === 'TRUE' 
   }
   
   get FILE_LOGGER() {
@@ -290,7 +290,7 @@ class YadamuLogger {
   }
   
   writeExceptionToFile(exceptionFile,ts,args,e) {
-    if (this.YADAMU_TRACE_ERRORS === true) {
+    if (this.YADAMU_STACK_TRACE === true) {
       console.dir(e,{depth: null})
     }
 
@@ -397,7 +397,7 @@ class YadamuLogger {
     // Handle Exception does not produce any output if the exception has already been processed by handleException or logException
 
     if (e.yadamuAlreadyReported === true) {
-      if (this.YADAMU_TRACE_ERRORS === true) {
+      if (this.YADAMU_STACK_TRACE === true) {
         this.trace(args,e)
       }
     }
@@ -417,7 +417,7 @@ class YadamuLogger {
     // Handle Exception does not produce any output if the exception has already been processed by handleException ot logException
 
     if (e.yadamuAlreadyReported === true) {
-      if (this.YADAMU_TRACE_ERRORS === true) {
+      if (this.YADAMU_STACK_TRACE === true) {
         this.trace(args,e)
       }
     }

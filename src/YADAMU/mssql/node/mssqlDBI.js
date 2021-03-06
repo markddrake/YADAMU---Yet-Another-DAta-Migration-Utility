@@ -160,18 +160,24 @@ class MsSQLDBI extends YadamuDBI {
 
     this.TRANSACTION_IN_PROGRESS = false;
     const transaction = new sql.Transaction(this.pool)
-    transaction.on('rollback',async () => { 
+    transaction.on('rollback',() => { 
       if (!this.yadamuRollback) {
-        this.TRANSACTION_IN_PROGRESS = false;
         this.tediousTransactionError = true;
         this.reportTransactionState('ROLLBACK')
+		// await this.recoverTransactionState()
       }
     });
     return transaction
   }
   
-  recoverTransactionState() {
+  async recoverTransactionState(newTransaction) {
 	this.transaction = this.getTransactionManager()
+    if (newTransaction) {
+	  // Error Recovery if Rows are lost
+	  //
+      await this.beginTransaction()
+	};
+
   }
 
   getRequest() {
@@ -210,6 +216,7 @@ class MsSQLDBI extends YadamuDBI {
     const spatialFormat = rowSpatialFormat === undefined ? this.SPATIAL_FORMAT : rowSpatialFormat
     let stack
     let statement
+	let precision
 	try {
       stack = new Error().stack;
       statement = new sql.PreparedStatement(this.requestProvider)
@@ -221,7 +228,8 @@ class MsSQLDBI extends YadamuDBI {
             statement.input(column,sql.Bit);
             break;
           case 'bigint':
-            statement.input(column,sql.BigInt);
+            // statement.input(column,sql.BigInt);
+			statement.input(column,sql.VarChar(20))
             break;
           case 'float':
             statement.input(column,sql.Float);
@@ -235,7 +243,21 @@ class MsSQLDBI extends YadamuDBI {
             break
           case 'decimal':
             // sql.Decimal ([precision], [scale])
-            statement.input(column,sql.Decimal(dataType.length,dataType.scale));
+			precision = dataType.length || 18;
+		    if ((precision) > 15) {
+   			  statement.input(column,sql.VarChar(precision + 2))
+			  break;
+			}
+            statement.input(column,sql.Decimal(dataType.length || 15,dataType.scale || 0));
+            break;
+          case 'numeric':
+            // sql.Numeric ([precision], [scale])
+			precision = dataType.length || 18;
+		    if ((precision) > 15) {
+   			  statement.input(column,sql.VarChar(precision + 2))
+			  break;
+			}
+            statement.input(column,sql.Numeric(dataType.length || 15,dataType.scale || 0));
             break;
           case 'smallint':
             statement.input(column,sql.SmallInt);
@@ -246,10 +268,6 @@ class MsSQLDBI extends YadamuDBI {
             break;
           case 'real':
             statement.input(column,sql.Real);
-            break;
-          case 'numeric':
-            // sql.Numeric ([precision], [scale])
-            statement.input(column,sql.Numeric(dataType.length,dataType.scale));
             break;
           case 'tinyint':
             statement.input(column,sql.TinyInt);
@@ -884,6 +902,11 @@ class MsSQLDBI extends YadamuDBI {
       
     // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
+    if (this.tediousTransactionError) {
+	  this.yadamuLogger.warning([this.DATABASE_VENDOR,'TRANSACTION MANAGER','COMMIT'],`Unable to COMMIT following TEDIOUS FORCED ROLLBACK operation.`)
+	  return;
+	}
+
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
     let stack
@@ -917,7 +940,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),(this.preparedStatement !== undefined)],`${this.cause ? this.cause.message : undefined}`)
+    this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),(this.preparedStatement !== undefined)],`${this.cause ? this.cause.message : undefined}`)
     
 	this.checkConnectionState(cause)
     
@@ -1018,7 +1041,7 @@ class MsSQLDBI extends YadamuDBI {
              }]
            }    
 
-     let results = await this.execute('sp_IMPORT_JSON',args,'')                   
+     let results = await this.execute('sp_YADAMU_IMPORT',args,'')                   
      results = results.recordset;
      const log = JSON.parse(results[0][Object.keys(results[0])[0]])
      super.processLog(log,'OPENJSON',this.status, this.yadamuLogger)
@@ -1044,28 +1067,20 @@ class MsSQLDBI extends YadamuDBI {
     const serverProperties = JSON.parse(sysInfo.SERVER_PROPERTIES)  
     const dbProperties = JSON.parse(sysInfo.DATABASE_PROPERTIES)    
     
-    return {
-      date               : new Date().toISOString()
-     ,timeZoneOffset     : new Date().getTimezoneOffset()                      
-     ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
-     ,vendor             : this.DATABASE_VENDOR
-     ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : YadamuConstants.YADAMU_VERSION
-     ,sessionUser        : sysInfo.SESSION_USER
-     ,currentUser        : sysInfo.CURRENT_USER
-     ,dbName             : sysInfo.DATABASE_NAME
-     ,databaseVersion    : serverProperties.ProductVersion
-     ,softwareVendor     : this.SOFTWARE_VENDOR
-     ,hostname           : serverProperties.MachineName
-     ,nodeClient         : {
-        version          : process.version
-       ,architecture     : process.arch
-       ,platform         : process.platform
+	return Object.assign(
+	  super.getSystemInformation()
+	, {
+        sessionUser                 : sysInfo.SESSION_USER
+      , currentUser                 : sysInfo.CURRENT_USER
+      , dbName                      : sysInfo.DATABASE_NAME
+      , databaseVersion             : serverProperties.ProductVersion
+      , hostname                    : serverProperties.MachineName
+      , serverProperties            : serverProperties
+      , databaseProperties          : dbProperties
+	  , yadamuInstanceID            : sysInfo.YADAMU_INSTANCE_ID
+	  , yadamuInstallationTimestamp : sysInfo.YADAMU_INSTALLATION_TIMESTAMP
       }
-    ,serverProperties    : serverProperties
-    ,databaseProperties  : dbProperties
-    }
+	)
   }
 
   /*
@@ -1081,11 +1096,10 @@ class MsSQLDBI extends YadamuDBI {
   generateMetadata(schemaInformation) {    
     const metadata = super.generateMetadata(schemaInformation) 
     schemaInformation.forEach((table,idx) => {
-     if (this.applyTableFilter(table.TABLE_NAME)) {
-        metadata[table.TABLE_NAME].collationNames = JSON.parse(table.COLLATION_NAME_ARRAY)
-     }
+       metadata[table.TABLE_NAME].collationNames = JSON.parse(table.COLLATION_NAME_ARRAY)
     }) 
     return metadata
+
   }  
       
   async getSchemaInfo(keyName) {
@@ -1094,7 +1108,6 @@ class MsSQLDBI extends YadamuDBI {
       
     const statement = this.statementLibrary.SQL_SCHEMA_INFORMATION
     const results = await this.executeSQL(statement, { inputs: [{name: "SCHEMA", type: sql.VarChar, value: this.parameters[keyName]}]})
-    
     return results.recordsets[0]
   
   }
@@ -1114,7 +1127,7 @@ class MsSQLDBI extends YadamuDBI {
 	this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT));
 	if (typeof request.toReadableStream === 'function') {
   	  const stream = request.toReadableStream();
-      request.query(this.sqlStatement);
+      request.query(tableInfo.SQL_STATEMENT);
       return stream
 	}
     return new MsSQLReader(request,tableInfo.SQL_STATEMENT,tableInfo.TABLE_NAME,this.yadamuLogger);
@@ -1128,7 +1141,7 @@ class MsSQLDBI extends YadamuDBI {
     
   async generateStatementCache(schema) {
     /* ### OVERRIDE ### Pass additional parameter Database Name */
-    const statementGenerator = new this.StatementGenerator(this, schema, this.metadata, this.systemInformation.spatialFormat ,this.yadamuLogger);
+    const statementGenerator = new this.StatementGenerator(this, schema, this.metadata ,this.yadamuLogger);
     this.statementCache = await statementGenerator.generateStatementCache(this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.connectionProperties.database)
 	return this.statementCache
   }

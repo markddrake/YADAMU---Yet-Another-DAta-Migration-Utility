@@ -17,7 +17,7 @@ const EventStream = require('./eventStream.js');
 const JSONWriter = require('./jsonWriter.js');
 const ArrayWriterWriter = require('./arrayWriter.js');
 const CSVWriter = require('./csvWriter.js');
-const {YadamuError} = require('../../common/yadamuException.js');
+const {YadamuError, CommandLineError} = require('../../common/yadamuException.js');
 const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
 
 /*
@@ -34,8 +34,8 @@ class LoaderDBI extends YadamuDBI {
   ** 
   ** !!! Make sure your head is wrapped around the following statements before touching this code.
   **
-  ** An Export operaton involves reading data from the local file systems
-  ** An Import operation involves writing data to the local file system.
+  ** An Export\load operaton involves reading data from the local file systems 
+  ** An Import\UnLoad operation involves writing data to the local file system.
   **
   */
 
@@ -147,6 +147,19 @@ class LoaderDBI extends YadamuDBI {
 
   async getSystemInformation() {
     // this.yadamuLogger.trace([this.constructor.name,this.exportFilePath],`getSystemInformation()`)     
+	
+	/*
+	**
+	** The Loader always returns the data that was generated when the directory structure was created..
+	
+	return Object.assign(
+	  super.getSystemInformation()
+	, {}
+    )
+	
+	**
+	*/
+	
 	return this.controlFile.systemInformation
   }
 
@@ -166,19 +179,52 @@ class LoaderDBI extends YadamuDBI {
 
   async getSchemaInfo() {
     // this.yadamuLogger.trace([this.constructor.name,this.EXPORT_PATH],`getSchemaInfo()`)
-    this.metadata = await this.loadMetadataFiles()
+	
+	this.metadata = await this.loadMetadataFiles()
+
+    /*
+    **
+	
+    if (this.TABLE_FILTER.length > 0) {
+
+      const sourceMetadata = metadata;
+	  
+	  // Check table names are valid.
+	  // For each name in the Table Filter check there is a corresponding entry in the schemaInfoormation collection
+	  
+	  const tableNames = Object.keys(sourceMetadata)
+
+	  const invalidTableNames = this.TABLE_FILTER.filter((tableName) => {
+		 // Return true if the table does not have an entry in the schemaInformstion collection
+		 return !tableNames.includes(tableName)
+	  })
+	  
+	  if (invalidTableNames.length > 0) {
+        throw new CommandLineError(`Could not resolve the following table names : "${invalidTableNames}".`)
+      }
+	
+      this.yadamuLogger.info(['FILE'],`Operations restricted to the following tables: ${JSON.stringify(this.TABLE_FILTER)}.`)
+	  
+	  metadata = {}
+	  this.TABLE_FILTER.forEach((table) => {
+         metadata[table] = sourceMetadata[table]
+	  })
+	}
+	
+	**
+	*/
+	
     return Object.keys(this.metadata).map((tableName) => {
       return {
 		TABLE_SCHEMA          : this.metadata[tableName].tableSchema
       , TABLE_NAME            : tableName
-      , MAPPED_TABLE_NAME     : tableName
-      , INCLUDE_TABLE         : this.applyTableFilter(tableName)
       , COLUMN_NAME_ARRAY     : this.metadata[tableName].columnNames
 	  , DATA_TYPE_ARRAY       : this.metadata[tableName].dataTypes
 	  , SIZE_CONSTRAINT_ARRAY : this.metadata[tableName].sizeConstraints
-	  , SPATIAL_FORMAT        : this.systemInformation.spatialFormat
+	  , SPATIAL_FORMAT        : this.systemInformation.typeMappings.spatialFormat 
       } 
     })
+
   }
    
   /*
@@ -322,7 +368,7 @@ class LoaderDBI extends YadamuDBI {
 	// Include a dummy dataTypes array of the correct length to ensure the column count assertion does not throw
 	return { 
 	  tableName         : tableName
-	, _SPATIAL_FORMAT   : this.systemInformation.spatialFormat
+	, _SPATIAL_FORMAT   : this.systemInformation.typeMappings.spatialFormat 
 	, _BATCH_SIZE       : this.BATCH_SIZE
     , columnNames       : [... this.metadata[tableName].columnNames]
     , targetDataTypes   : [... this.metadata[tableName].dataTypes]

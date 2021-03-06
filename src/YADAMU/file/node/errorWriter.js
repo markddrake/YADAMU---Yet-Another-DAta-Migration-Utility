@@ -23,7 +23,7 @@ class ErrorWriter extends JSONWriter {
   cacheRow(row) {
 	try {
       super.cacheRow(row)
-	} catch (e) {
+	} catch (e) {  
 	  this.push(this.formatRow(row))
 	  this.rowSeperator = ','
     }

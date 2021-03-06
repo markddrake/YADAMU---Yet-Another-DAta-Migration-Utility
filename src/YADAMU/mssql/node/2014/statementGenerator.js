@@ -4,8 +4,8 @@ const StatementGenerator = require('../statementGenerator.js');
 
 class StatementGenerator2014 extends StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata,  spatialFormat, yadamuLogger) {
-    super(dbi, targetSchema, metadata,  spatialFormat, yadamuLogger)
+  constructor(dbi, targetSchema, metadata, yadamuLogger) {
+    super(dbi, targetSchema, metadata, yadamuLogger)
   }
 
  getMetadata() {

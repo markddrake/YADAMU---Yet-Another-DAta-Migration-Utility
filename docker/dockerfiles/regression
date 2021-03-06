@@ -15,12 +15,14 @@ RUN mkdir -p mnt/log \
  &&	mkdir -p mnt/output \	
  &&	mkdir -p mnt/loader \	
  &&	mkdir -p mnt/local \	
+ &&	mkdir -p mnt/yadamu \	
  && ln -sfn mnt/log \
  && ln -sfn mnt/JSON \
  && ln -sfn mnt/tests \
  && ln -sfn mnt/work \
  && ln -sfn mnt/output \
  && ln -sfn mnt/loader \
- && ln -sfn mnt/local 
+ && ln -sfn mnt/local \
+ && ln -sfn mnt/yadamu 
 ENV TNS_ADMIN=/usr/src/YADAMU
 ENTRYPOINT ["/bin/bash", "/usr/src/YADAMU/bin/chooseTest.sh", "$YADAMU_TEST_NAME"]

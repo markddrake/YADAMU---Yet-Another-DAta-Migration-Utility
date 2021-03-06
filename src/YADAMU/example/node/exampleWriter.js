@@ -19,7 +19,7 @@ class ExampleWriter extends YadamuWriter {
 	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {        
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
       /*	
-	  if (YadamuLibrary.isBinaryDataType(dataType.type)){
+	  if (YadamuLibrary.isBinaryType(dataType.type)){
         // For Interfaces that what Binary content rendered as hexBinary string 
         return (col,idx) => {
 		  return (Buffer.isBuffer(col)) return col.toString('hex') : col

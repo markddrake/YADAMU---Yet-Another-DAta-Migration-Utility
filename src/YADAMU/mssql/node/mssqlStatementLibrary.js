@@ -39,23 +39,42 @@ class MsSQLStatementLibrary {
                               )
                      within group (order by "ORDINAL_POSITION"),']') "SIZE_CONSTRAINT_ARRAY"
                     ,string_agg(case 
-                                                   when "DATA_TYPE" = 'hierarchyid' then
-                                                     concat('cast("',c."COLUMN_NAME",'" as NVARCHAR(4000)) "',c."COLUMN_NAME",'"') 
-                                                   when "DATA_TYPE" in ('geometry','geography') then
-                                                     ${spatialClause}
-                                                   when "DATA_TYPE" = 'datetime2' then
-                                                     concat('convert(VARCHAR(33),"',c."COLUMN_NAME",'",127) "',c."COLUMN_NAME",'"') 
-                                                   when "DATA_TYPE" = 'datetimeoffset' then
-                                                     concat('convert(VARCHAR(33),"',c."COLUMN_NAME",'",127) "',c."COLUMN_NAME",'"') 
-                                                   when "DATA_TYPE" = 'xml' then
-                                                     concat('replace(replace(convert(NVARCHAR(MAX),"',c."COLUMN_NAME",'"),''&#x0A;'',''\n''),''&#x20;'','' '') "',c."COLUMN_NAME",'"') 
-                                                   else 
-                                                     concat('"',c."COLUMN_NAME",'"') 
-                                                 end
-                                                ,','
-                                                ) 
-                               within group (order by "ORDINAL_POSITION"
-                              ) "CLIENT_SELECT_LIST"
+                                  when "DATA_TYPE" = 'hierarchyid' then
+                                    concat('cast("',c."COLUMN_NAME",'" as NVARCHAR(4000)) "',c."COLUMN_NAME",'"') 
+                                  when "DATA_TYPE" in ('geometry','geography') then
+                                    ${spatialClause}
+                                  when "DATA_TYPE" = 'time' then
+                                    concat('convert(VARCHAR(33),dateadd(year,70,convert(datetime2,"',c."COLUMN_NAME",'")),127) "',c."COLUMN_NAME",'"') 
+                                  when "DATA_TYPE" = 'datetime2' then
+                                    concat('convert(VARCHAR(33),"',c."COLUMN_NAME",'",127) "',c."COLUMN_NAME",'"') 
+                                  when "DATA_TYPE" = 'datetimeoffset' then
+                                    concat('convert(VARCHAR(33),"',c."COLUMN_NAME",'",127) "',c."COLUMN_NAME",'"') 
+                                  when "DATA_TYPE" = 'xml' then
+                                    concat('replace(replace(convert(NVARCHAR(MAX),"',c."COLUMN_NAME",'"),''&#x0A;'',''\n''),''&#x20;'','' '') "',c."COLUMN_NAME",'"') 
+                                  when "DATA_TYPE" in ('numeric','decimal') and ("NUMERIC_PRECISION" > 15) then
+                                    -- Force Results to be returned as String
+                                    case 
+                                      when "NUMERIC_SCALE" > 0 then
+                                        -- Retrieve as Text with Trailing Zeros: 
+                                        -- WorldWideImportersDW.Fact.Order: Rows 231412. Reader Elapsed Time: 00:00:05.113s. 
+                                        -- concat('concat('''',"',c."COLUMN_NAME",'") "',c."COLUMN_NAME",'"')
+                                        -- Replace all zeros with spaces, remove trailing spaces and convert remaining spaces back to zeros.
+                                        -- WorldWideImportersDW.Fact.Order: Rows 231412. Reader Elapsed Time: 00:00:05.064s. 
+                                      concat('replace(rtrim(replace("',c."COLUMN_NAME",'",''0'','' '')),'' '',''0'') "',c."COLUMN_NAME",'"')
+                                        -- Use SQL Format operator - Format is painfully slow
+                                        -- WorldWideImportersDW.Fact.Order: Rows 231412. Reader Elapsed Time: 00:03:24.503s. 
+                                        -- concat('format("',c."COLUMN_NAME",'",''g',"NUMERIC_PRECISION",''') "',c."COLUMN_NAME",'"') 
+                                      else 
+                                        concat('concat('''',"',c."COLUMN_NAME",'") "',c."COLUMN_NAME",'"')
+                                    end 
+                                  when "DATA_TYPE" in ('money') and ("NUMERIC_PRECISION" > 15) then
+                                    concat('replace(rtrim(replace(convert(DECIMAL(19,4),"',c."COLUMN_NAME",'"),''0'','' '')),'' '',''0'') "',c."COLUMN_NAME",'"')
+                                  else 
+                                    concat('"',c."COLUMN_NAME",'"') 
+                                end
+                               ,','
+                               ) 
+                      within group (order by "ORDINAL_POSITION") "CLIENT_SELECT_LIST"
                from "INFORMATION_SCHEMA"."COLUMNS" c
                     left join "INFORMATION_SCHEMA"."TABLES" t
                         on t."TABLE_CATALOG" = c."TABLE_CATALOG"
@@ -76,8 +95,8 @@ class MsSQLStatementLibrary {
               where t."TABLE_TYPE" = 'BASE TABLE'
                 and t."TABLE_SCHEMA" = @SCHEMA
               group by t."TABLE_SCHEMA", t."TABLE_NAME"`;  
-	})();
-	return this._SQL_SCHEMA_INFORMATION
+    })();
+    return this._SQL_SCHEMA_INFORMATION
   }     
   
   get DROP_DATABASE() { return `drop database if exists "${this.dbi.parameters.YADAMU_DATABASE}"` }
@@ -188,7 +207,9 @@ const _SQL_SYSTEM_INFORMATION =
           ,DATABASEPROPERTYEX(DB_NAME(),'UserAccess') AS "UserAccess"
           ,DATABASEPROPERTYEX(DB_NAME(),'Version') AS "Version"
           FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        ) "DATABASE_PROPERTIES"`;
+        ) "DATABASE_PROPERTIES",
+        master.dbo.sp_YADAMU_INSTANCE_ID() "YADAMU_INSTANCE_ID",
+        master.dbo.sp_YADAMU_INSTALLATION_TIMESTAMP() "YADAMU_INSTALLATION_TIMESTAMP"`;
        
 const _SQL_CREATE_SAVE_POINT  = `SAVE TRANSACTION ${YadamuConstants.SAVE_POINT_NAME}`;
 

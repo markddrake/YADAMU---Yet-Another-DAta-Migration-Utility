@@ -85,6 +85,13 @@ class IterativeInsertError extends Error {
   }
 }
 
+class RejectedColumnValue extends Error {
+  constructor (columnName, value) {
+	super(`Column "${columnName}" contains unsupported value "${value}". Row Rejected.`);
+  }
+}
+  
+
 class DatabaseError extends Error {
   constructor(cause,stack,sql) {
 	let oneLineMessage = cause.message.indexOf('\r') > 0 ? cause.message.substr(0,cause.message.indexOf('\r')) : cause.message 
@@ -146,6 +153,7 @@ module.exports = {
 , UserError
 , BatchInsertError
 , IterativeInsertError
+, RejectedColumnValue
 , DatabaseError
 , InputStreamError
 , CommandLineError  

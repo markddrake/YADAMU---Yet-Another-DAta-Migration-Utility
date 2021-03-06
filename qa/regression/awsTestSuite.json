@@ -3,7 +3,6 @@
 , "connections"       : "connections.json"
 , "tasks"             : "tasks.json"
 , "recreateSchema"    : true
-, "createFolders"     : true
 , "parameters": {
     "ROOT_FOLDER"     : "yadamu/RTS/%sourceConnection%/%mode%"
   }

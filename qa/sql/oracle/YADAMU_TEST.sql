@@ -44,14 +44,9 @@ create or replace package YADAMU_TEST
 AUTHID CURRENT_USER
 as
   procedure COMPARE_SCHEMAS(
-    P_SOURCE_SCHEMA        VARCHAR2, 
-	P_TARGET_SCHEMA        VARCHAR2, 
-	P_DOUBLE_PRECISION     NUMBER DEFAULT NULL, 
-	P_TIMESTAMP_PRECISION  NUMBER DEFAULT 9, 
-	P_ORDERED_JSON         VARCHAR2 DEFAULT 'FALSE', 
-    P_XML_RULE             VARCHAR2 DEFAULT NULL,
-    P_OBJECTS_RULE         VARCHAR2 DEFAULT NULL,
-    P_EXCLUDE_MVIEWS       VARCHAR2 DEFAULT 'TRUE'
+    P_SOURCE_SCHEMA       VARCHAR2, 
+    P_TARGET_SCHEMA       VARCHAR2, 
+    P_RULES               CLOB
   );
   function JSON_COMPACT(P_JSON_INPUT CLOB) return CLOB;
   function APPLY_XML_RULE(P_XML_RULE VARCHAR2, P_XML XMLTYPE) return XMLTYPE;
@@ -285,23 +280,39 @@ end;
 procedure COMPARE_SCHEMAS(
   P_SOURCE_SCHEMA       VARCHAR2, 
   P_TARGET_SCHEMA       VARCHAR2, 
-  P_DOUBLE_PRECISION    NUMBER DEFAULT NULL, 
-  P_TIMESTAMP_PRECISION NUMBER DEFAULT 9, 
-  P_ORDERED_JSON        VARCHAR2 DEFAULT 'FALSE', 
-  P_XML_RULE            VARCHAR2 DEFAULT NULL,
-  P_OBJECTS_RULE        VARCHAR2 DEFAULT NULL,
-  P_EXCLUDE_MVIEWS      VARCHAR2 DEFAULT 'TRUE'
+  P_RULES               CLOB
 )
 as
   TABLE_NOT_FOUND EXCEPTION;
   PRAGMA EXCEPTION_INIT( TABLE_NOT_FOUND , -00942 );
-    
+      
+$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
+--
+  V_DOUBLE_PRECISION    NUMBER         := case when JSON_EXISTS(P_RULES, '$.doublePrecision')    then JSON_VALUE(P_RULES, '$.doublePrecision')       else NULL end;
+  V_TIMESTAMP_PRECISION NUMBER         := case when JSON_EXISTS(P_RULES, '$.timestampPrecision') then JSON_VALUE(P_RULES, '$.timestampPrecision')    else 9 end; 
+  V_ORDERED_JSON        BOOLEAN        := case when JSON_EXISTS(P_RULES, '$.orderedJSON')        then JSON_VALUE(P_RULES, '$.orderedJSON') = 'TRUE'  else FALSE end; 
+  V_XML_RULE            VARCHAR2(128)  := case when JSON_EXISTS(P_RULES, '$.xmlRule')            then JSON_VALUE(P_RULES, '$.xmlRule')               else NULL end;
+  V_OBJECTS_RULE        VARCHAR2(128)  := case when JSON_EXISTS(P_RULES, '$.objectsRule')        then JSON_VALUE(P_RULES, '$.objectsRule')           else NULL end;
+  V_EXCLUDE_MVIEWS      VARCHAR2(5)    := case when JSON_EXISTS(P_RULES, '$.excludeMViews')      then JSON_VALUE(P_RULES, '$.excludeMViews')         else 'TRUE' end;
+  V_INFINITY_IS_NULL    VARCHAR2(5)    := case when JSON_EXISTS(P_RULES, '$.infinityIsNull')     then JSON_VALUE(P_RULES, '$.infinityIsNull')        else 'FALSE' end;
+--
+$ELSE
+--
+  V_RULES                XMLTYPE       := XMLTYPE(P_RULES);
+  V_DOUBLE_PRECISION     NUMBER        := case when V_RULES.EXISTSNODE('/rules/doublePrecision')    = 1 then V_RULES.extract('/rules/doublePrecision/text()').getStringVal()       else NULL end;
+  V_TIMESTAMP_PRECISION  NUMBER        := case when V_RULES.EXISTSNODE('/rules/timestampPrecision') = 1 then V_RULES.extract('/rules/timestampPrecision/text()').getNumberVal()    else 9 end; 
+  V_ORDERED_JSON         BOOLEAN       := case when V_RULES.EXISTSNODE('/rules/orderedJSON')        = 1 then V_RULES.extract('/rules/orderedJSON/text()').getStringVal() = 'TRUE'  else FALSE end; 
+  V_XML_RULE             VARCHAR2(128) := case when V_RULES.EXISTSNODE('/rules/xmlRule/text()')     = 1 then V_RULES.extract('/rules/xmlRule/text()').getStringVal()               else NULL end;
+  V_OBJECTS_RULE         VARCHAR2(128) := case when V_RULES.EXISTSNODE('/rules/objectsRule')        = 1 then V_RULES.extract('/rules/objectsRule/text()').getStringVal()           else 'SKIP' end;
+  V_EXCLUDE_MVIEWS       VARCHAR2(5)   := case when V_RULES.EXISTSNODE('/rules/excludeMViews')      = 1 then V_RULES.extract('/rules/excludeMViews/text()').getStringVal()         else 'TRUE' end;
+  V_INFINITY_IS_NULL     VARCHAR2(5)   := case when V_RULES.EXISTSNODE('/rules/infinityIsNull')     = 1 then V_RULES.extract('/rules/infinityIsNull/text()').getStringVal()        else 'FALSE' end;
+--
+$END  
+  
   V_HASH_METHOD      NUMBER := 0;
-  V_TIMESTAMP_LENGTH NUMBER := 20 + P_TIMESTAMP_PRECISION;
+  V_TIMESTAMP_LENGTH NUMBER := 20 + V_TIMESTAMP_PRECISION;
   V_ORDERING_CLAUSE   VARCHAR2(16) := '';
 
-  
-  
   cursor getTableList
   is
   select aat.TABLE_NAME
@@ -309,10 +320,25 @@ as
            case 
              when ((V_HASH_METHOD < 0) and atc.DATA_TYPE in ('SDO_GEOMETRY','XMLTYPE','ANYDATA','BLOB','CLOB','NCLOB','JSON')) then
     		   NULL
-             when ((atc.DATA_TYPE like 'TIMESTAMP(%)') and (DATA_SCALE > P_TIMESTAMP_PRECISION)) then
+             when ((atc.DATA_TYPE like 'TIMESTAMP(%)') and (DATA_SCALE > V_TIMESTAMP_PRECISION)) then
                'substr(to_char(t."' || atc.COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS.FF9''),1,' || V_TIMESTAMP_LENGTH || ') "' || atc.COLUMN_NAME || '"'
-			 when ((atc.DATA_TYPE in ('BINARY_DOUBLE')) and (P_DOUBLE_PRECISION is not NULL)) then
-			   '(t."' || atc.COLUMN_NAME || '",' || P_DOUBLE_PRECISION || ') "' || atc.COLUMN_NAME || '"'
+			 when (atc.DATA_TYPE in ('BINARY_FLOAT','BINARY_DOUBLE')) then
+			   case 
+			     when (V_INFINITY_IS_NULL = 'TRUE') then
+				   case 
+					 when ((atc.DATA_TYPE in ('BINARY_DOUBLE')) and (V_DOUBLE_PRECISION < 18)) then
+					   'case when "' || atc.COLUMN_NAME || '" in (''Infinity'',''-Infinity'',''NaN'') then NULL else round(t."' || atc.COLUMN_NAME || '",' || V_DOUBLE_PRECISION || ') end "' || atc.COLUMN_NAME || '"'
+                     else 			 		  
+					   'case when "' || atc.COLUMN_NAME || '" in (''Infinity'',''-Infinity'',''NaN'') then NULL else "' || atc.COLUMN_NAME || '" end "' || atc.COLUMN_NAME || '"'
+				   end
+				 else 
+				   case 
+					 when ((atc.DATA_TYPE in ('BINARY_DOUBLE')) and (V_DOUBLE_PRECISION < 18)) then
+					   'round(t."' || atc.COLUMN_NAME || '",' || V_DOUBLE_PRECISION || ') "' || atc.COLUMN_NAME || '"'
+                     else 			 		  
+					   '"' || atc.COLUMN_NAME || '"'
+				   end
+               end
              when atc.DATA_TYPE = 'BFILE' then
 	           'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else OBJECT_SERIALIZATION.SERIALIZE_BFILE(t."' || atc.COLUMN_NAME || '") end "' || atc.COLUMN_NAME || '"'
 		     when (atc.DATA_TYPE = 'SDO_GEOMETRY') then
@@ -345,10 +371,10 @@ as
     		   -- 'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT t."' || atc.COLUMN_NAME || '" as  BLOB ENCODING ''UTF-8''),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 			   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT '  ||
 			   case 
-			     when (P_XML_RULE is NULL) then
+			     when (V_XML_RULE is NULL) then
 				   't."' || atc.COLUMN_NAME || '"'
 				 else 
-				   'YADAMU_TEST.APPLY_XML_RULE(''' || P_XML_RULE || ''',t."' || atc.COLUMN_NAME || '")'
+				   'YADAMU_TEST.APPLY_XML_RULE(''' || V_XML_RULE || ''',t."' || atc.COLUMN_NAME || '")'
 			   end
 			   || '  AS CLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
 			 
@@ -411,14 +437,14 @@ as
 		        'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL when DBMS_LOB.GETLENGTH("' || atc.COLUMN_NAME || '") = 0 then NULL else dbms_crypto.HASH(t."' || atc.COLUMN_NAME || '",' || V_HASH_METHOD || ') end /* CLOB */ "' || atc.COLUMN_NAME || '"'
 		     when ((TYPECODE  = 'OBJECT') and (atc.DATA_TYPE not in ('XMLTYPE','ANYDATA','RAW'))) then
 			   case 
-			     when (P_OBJECTS_RULE = 'OMIT_OBJECTS') then
+			     when (V_OBJECTS_RULE = 'SKIP') then
 				   'NULL "' || atc.COLUMN_NAME || '"'	
 				 else 
 			       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT XMLTYPE(t."' || atc.COLUMN_NAME || '")  AS CLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'			    
 			   end
 		     when ((TYPECODE  = 'COLLECTION') and (atc.DATA_TYPE not in ('XMLTYPE','ANYDATA','RAW'))) then
 			   case
-  		         when (P_OBJECTS_RULE = 'OMIT_OBJECTS') then
+  		         when (V_OBJECTS_RULE = 'SKIP') then
 				   'NULL "' || atc.COLUMN_NAME || '"'	
 				 else 
   			       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(XMLSERIALIZE(CONTENT XMLTYPE(ANYDATA.convertCollection(t."' || atc.COLUMN_NAME || '"))  AS CLOB),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'			    
@@ -482,9 +508,9 @@ $END
 	and aat.OWNER = P_SOURCE_SCHEMA
     --  and ((TYPECODE is NULL) or (at.TYPE_NAME = 'XMLTYPE') or (at.TYPE_NAME = 'SDO_GEOMETRY'))
 	and case
-         when P_EXCLUDE_MVIEWS = 'FALSE' then 1
-	       when P_EXCLUDE_MVIEWS = 'TRUE' and amv.MVIEW_NAME is NULL then 1
-		   else 0
+          when V_EXCLUDE_MVIEWS = 'FALSE' then 1
+	      when V_EXCLUDE_MVIEWS = 'TRUE' and amv.MVIEW_NAME is NULL then 1
+		  else 0
   		 end = 1 
   group by aat.TABLE_NAME;
   
@@ -499,7 +525,7 @@ $END
   
 begin
 
-  if (P_ORDERED_JSON = 'TRUE') then 
+  if (V_ORDERED_JSON) then 
     V_ORDERING_CLAUSE := 'ORDERED';
   end if;
 

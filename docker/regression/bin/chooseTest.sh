@@ -3,6 +3,15 @@ export YADAMU_QA_HOME=$YADAMU_HOME/qa
 export YADAMU_SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 export YADAMU_TEST_NAME=${YADAMU_TEST_NAME:-all}
 case $YADAMU_TEST_NAME  in
+  shortRegression)
+    source qa/bin/createOutputFolders.sh mnt
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
+  ;;
+
+  dataTypes)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
+	;;
+  
   export)
     source qa/bin/createOutputFolders.sh mnt
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
@@ -11,7 +20,6 @@ case $YADAMU_TEST_NAME  in
   import)
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
   ;;
-  
   fileRoundtrip)
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
 	;;
@@ -65,6 +73,6 @@ case $YADAMU_TEST_NAME  in
   ;; 
   
   *)
-    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are export, import, fileRoundtrip, dbRoundtrip, lostConnection, mongo, snowflake, loader, aws, azure, cmdLine, interactive or all (default)"
+    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, import, fileRoundtrip, dbRoundtrip, lostConnection, mongo, snowflake, loader, aws, azure, cmdLine, interactive or all (default)"
   ;;
 esac

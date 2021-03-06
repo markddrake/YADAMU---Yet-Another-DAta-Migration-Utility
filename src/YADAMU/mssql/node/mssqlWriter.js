@@ -5,6 +5,7 @@ const YadamuWriter = require('../../common/yadamuWriter.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const NullWriter = require('../../common/nullWriter.js');
 const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
+const {DatabaseError,RejectedColumnValue} = require('../../common/yadamuException.js');
 
 class MsSQLWriter extends YadamuWriter {
     
@@ -19,7 +20,7 @@ class MsSQLWriter extends YadamuWriter {
     	
 	this.insertMode = 'Bulk';
     this.dataTypes  = YadamuLibrary.decomposeDataTypes(this.tableInfo.targetDataTypes)
-
+	
 	this.transformations = this.dataTypes.map((dataType,idx) => {      
 	  switch (dataType.type.toLowerCase()) {
         case "json":
@@ -27,7 +28,7 @@ class MsSQLWriter extends YadamuWriter {
             return typeof col === 'object' ? JSON.stringify(col) : col
 		  }
           break;
-        case 'bit':
+		case 'bit':
         case 'boolean':
 		  return (col,idx) => {
             return YadamuLibrary.toBoolean(col)
@@ -63,7 +64,32 @@ class MsSQLWriter extends YadamuWriter {
 			return col;
 		  }
           break;
-        default :
+ 		case "real":
+        case "float":
+		case "double":
+		case "double precision":
+		case "binary_float":
+		case "binary_double":
+		  switch (this.dbi.INFINITY_MANAGEMENT) {
+		    case 'REJECT':
+              return (col, idx) => {
+			    if (!isFinite(col)) {
+			      throw new RejectedColumnValue(this.tableInfo.columnNames[idx],col);
+			    }
+				return col;
+		      }
+		    case 'NULLIFY':
+			  return (col, idx) => {
+			    if (!isFinite(col)) {
+                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
+	  		      return null;
+				}
+			    return col
+		      }   
+			default:
+			  return null;
+	      }
+		default :
 		  return null
       }
     })
@@ -95,17 +121,27 @@ class MsSQLWriter extends YadamuWriter {
       
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
-	  
-	this.transformations.forEach((transformation,idx) => {
-      if ((transformation !== null) && (row[idx] !== null)) {
-	    row[idx] = transformation(row[idx])
-      }
-	})
 	
-    this.batch.rows.add(...row);
-
-	this.metrics.cached++;
-	return this.skipTable;
+	try {
+	  this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+	      row[idx] = transformation(row[idx],idx)
+        }
+	  })
+	
+      this.batch.rows.add(...row);
+ 
+  	  this.metrics.cached++;
+	  return this.skipTable;
+	} catch (e) {
+  	  if (e instanceof RejectedColumnValue) {
+        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],e.message);
+        this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableInfo.tableName,row);
+		this.metrics.skipped++
+        return
+	  }
+	  throw e
+	}
   }
 
   reportBatchError(batch,operation,cause) {
@@ -118,7 +154,11 @@ class MsSQLWriter extends YadamuWriter {
   }
   
   async _writeBatch(batch,rowCount) {
+	  	  
     this.metrics.batchCount++;
+  
+    // console.log(this.tableInfo.bulkSupported,)
+    // console.dir(batch,{depth:null})
     
     if (this.SPATIAL_FORMAT === 'GeoJSON') {
       YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch.rows,true)
@@ -135,10 +175,9 @@ class MsSQLWriter extends YadamuWriter {
       } catch (cause) {
 	    this.reportBatchError(batch,`INSERT MANY`,cause)
         await this.dbi.restoreSavePoint(cause);
-		if (!this.dbi.TRANSACTION_IN_PROGRESS && this.dbi.tediousTransactionError) {
-	  	  this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Transaction aborted following BCP operation failure. Starting new Transaction`);          
-		  await this.dbi.recoverTransactionState()
-		  await this.beginTransaction()
+		if (this.dbi.TRANSACTION_IN_PROGRESS && this.dbi.tediousTransactionError) {
+		  // this.yadamuLogger.trace([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Unexpected ROLLBACK during BCP Operation. Starting new Transaction`);          
+		  await this.dbi.recoverTransactionState(true)
 		}	
 	  	this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Switching to Iterative mode.`);          
         this.tableInfo.bulkSupported = false;

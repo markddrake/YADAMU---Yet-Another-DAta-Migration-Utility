@@ -285,6 +285,8 @@ class YadamuQA {
         return { [parameter] : parameterDefaults[sourceVersionKey][targetVersionKey]}
       case ((parameterDefaults[sourceVersionKey] !== undefined) && (parameterDefaults[sourceVersionKey][targetVendor] !== undefined)):
         return { [parameter] : parameterDefaults[sourceVersionKey][targetVendor]}
+      case ((parameterDefaults[sourceVersionKey] !== undefined) && (parameterDefaults[sourceVersionKey].default !== undefined)):
+        return { [parameter] : parameterDefaults[sourceVersionKey].default}
       case ((parameterDefaults[sourceVendor] !== undefined) && (parameterDefaults[sourceVendor][targetVersionKey] !== undefined)):
         return { [parameter] : parameterDefaults[sourceVendor][targetVersionKey]}
       case ((parameterDefaults[sourceVendor] !== undefined) && (parameterDefaults[sourceVendor][targetVendor] !== undefined)):
@@ -313,22 +315,26 @@ class YadamuQA {
     Object.assign(compareRules, this.getDefaultValue('ORDERED_JSON',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
 	Object.assign(compareRules, this.getDefaultValue('SERIALIZED_JSON',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
 	Object.assign(compareRules, this.getDefaultValue('EMPTY_STRING_IS_NULL',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
+	Object.assign(compareRules, this.getDefaultValue('INFINITY_IS_NULL',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
+	Object.assign(compareRules, this.getDefaultValue('OBJECTS_COMPARISSON_RULE',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
 	
 	if (YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[sourceVendor] > YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[targetVendor]) {
 	  compareRules.TIMESTAMP_PRECISION = YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[targetVendor]
     }
 	
-    compareRules.XML_COMPARISSON_RULES = null
+    compareRules.XML_COMPARISSON_RULE = null
 	versionSpecificKey = targetVendor + "#" + targetVersion;
-	let xmlCompareRule =  YadamuTest.COMPARE_RULES.XML_COMPARISSON_RULES[versionSpecificKey] ||  YadamuTest.COMPARE_RULES.XML_COMPARISSON_RULES[targetVendor]
+	let xmlCompareRule =  YadamuTest.COMPARE_RULES.XML_COMPARISSON_RULE[versionSpecificKey] ||  YadamuTest.COMPARE_RULES.XML_COMPARISSON_RULE[targetVendor]
 	if (xmlCompareRule) {
 	  versionSpecificKey = sourceVendor + "#" + sourceVersion;
 	  xmlCompareRule = xmlCompareRule[versionSpecificKey] || xmlCompareRule[sourceVendor]
 	  if (xmlCompareRule) {
-		compareRules.XML_COMPARISSON_RULES = (typeof xmlCompareRule === 'object') ? xmlCompareRule[targetParameters.XML_STORAGE_MODEL] || null : xmlCompareRule
+		compareRules.XML_COMPARISSON_RULE = (typeof xmlCompareRule === 'object') ? xmlCompareRule[targetParameters.XML_STORAGE_MODEL] || null : xmlCompareRule
 	  }
 	}
-	    
+	
+
+    
 	// Object.assign(compareRules, testParameters)
     
 	if (compareRules.DOUBLE_PRECISION !== null) {
@@ -343,8 +349,12 @@ class YadamuQA {
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Empty Strings treated as NULL`);
     }
 	
-    if (compareRules.XML_COMPARISSON_RULES !== null) {
-      this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Target XML storage model: "${targetParameters.XML_STORAGE_MODEL || 'XML'}". Using comparission rule "${compareRules.XML_COMPARISSON_RULES}".`);
+    if (compareRules.INFINITY_IS_NULL === true) {
+      this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Infinity, -Infinity and NaN treated as NULL`);
+    }
+	
+    if (compareRules.XML_COMPARISSON_RULE !== null) {
+      this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Target XML storage model: "${targetParameters.XML_STORAGE_MODEL || 'XML'}". Using comparission rule "${compareRules.XML_COMPARISSON_RULE}".`);
     }
 	
     if (compareRules.TIMESTAMP_PRECISION) {
@@ -357,6 +367,10 @@ class YadamuQA {
 
     if (compareRules.SERIALIZED_JSON === true) {
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Target does not support JSON data. Using JSON Parser when comparing JSON values.`);
+    }
+
+    if (compareRules.OBJECTS_COMPARISSON_RULE !== null) {
+      this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Comapring Oracle Objects using ${compareRules.OBJECTS_COMPARISSON_RULE}.`);
     }
 
     return compareRules;
@@ -1236,7 +1250,7 @@ class YadamuQA {
   async export(task,configuration,test,targetConnectionName,parameters) {
       
     const metrics = []
-    this.metrics.newTask();
+    // this.metrics.newTask();
     
     const sourceConnectionName = test.source
     

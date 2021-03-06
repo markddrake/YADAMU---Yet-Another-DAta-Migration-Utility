@@ -22,8 +22,8 @@ class StatementGenerator extends DefaultStatementGenerator {
   // 11.x does not support GeoJSON. We need to use WKX to convert GeoJSON to WKT
   get GEOJSON_FUNCTION() { return 'DESERIALIZE_WKTGEOMETRY' }
   
-  constructor(dbi, targetSchema, metadata, spatialFormat) {
-    super(dbi, targetSchema, metadata, spatialFormat)
+  constructor(dbi, targetSchema, metadata, yadamuLogger) {
+    super(dbi, targetSchema, metadata, yadamuLogger)
   }
 
   // In 11g the seperator character appears to be \r rather than \n
@@ -31,7 +31,6 @@ class StatementGenerator extends DefaultStatementGenerator {
   getPLSQL(dml) {
     return dml.substring(dml.indexOf('\rWITH\r')+5,dml.indexOf('\rselect'));
   }
- 
     
   metadataToXML() {
             
@@ -48,6 +47,16 @@ class StatementGenerator extends DefaultStatementGenerator {
     
   }
   
+  getTypeMappings() {
+    return `<typeMappings>
+	           <spatialFormat>${this.dbi.INBOUND_SPATIAL_FORMAT}</spatialFormat>
+	           <raw1AsBoolean>${new Boolean(this.dbi.TREAT_RAW1_AS_BOOLEAN).toString().toLowerCase()}</raw1AsBoolean>
+			   <jsonDataType>${this.dbi.JSON_DATA_TYPE}</jsonDataType>
+			   <xmlStorageModel>${this.dbi.XML_STORAGE_CLAUSE}</xmlStorageModel>
+			   <circleFormat>${this.dbi.INBOUND_CIRCLE_FORMAT}</circleFormat>
+			 </typeMappings>`;
+  }
+	
   async getMetadataLob() {
     const metadataXML = this.metadataToXML();    
     return await this.dbi.stringToBlob(metadataXML);

@@ -302,11 +302,10 @@ class OracleWriter extends YadamuWriter {
 	** If talbeInfo.lobColuns = false then there are no lobs so there is no need to re-order the row.
     */
           
-
     // this.yadamuLogger.trace([this.constructor.name,this.tableInfo.lobColumns,this.metrics.cached],'cacheRow()')
     // if (this.metrics.received === 1) {console.log(row)}
-		
-    try {          
+	
+	try {          
       this.bindRowAsLOB = false;
 	  if (this.tableInfo.lobColumns) {
 		// Bind Ordering and Row Ordering are the probably different. Use map to create a new array in BindOrdering when applying transformations

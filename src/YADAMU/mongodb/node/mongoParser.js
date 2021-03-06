@@ -7,16 +7,21 @@ class MongoParser extends YadamuParser {
   constructor(tableInfo,yadamuLogger) {
     super(tableInfo,yadamuLogger); 
 	
-    this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType) => {
+	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType) => {
 	  switch (dataType) {
 		 case 'binData':
 		   return (row,idx)  => {
              row[idx] = row[idx].buffer;
 		   }
-         case 'objectId':
+         case 'objectId':0
 		   return (row,idx)  => {
              row[idx] = Buffer.from(row[idx].toHexString(),'hex')
 		   }
+		 case 'long':
+		 case 'decimal':
+		   return (row,idx)  => {
+  		     row[idx] = row[idx].toString()
+           }
 		 /*
 		 case "object":
 		 case "array":

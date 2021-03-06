@@ -576,22 +576,14 @@ class MongoDBI extends YadamuDBI {
   async getSystemInformation() {     
  
    const stats = await this.stats();
-   return {
-     date               : new Date().toISOString()
-    ,timeZoneOffset     : new Date().getTimezoneOffset()
-    ,vendor             : this.DATABASE_VENDOR
-    ,spatialFormat      : this.SPATIAL_FORMAT 
-    ,schema             : this.parameters.FROM_USER
-    ,softwareVendor     : this.SOFTWARE_VENDOR
-    ,exportVersion      : YadamuConstants.YADAMU_VERSION
-    ,nodeClient         : {
-       version              : process.version
-      ,architecture     : process.arch
-      ,platform         : process.platform
-     }
-    ,buildInfo          : this.buildInformation
-    ,stats              : stats
-  }
+
+	return Object.assign(
+	  super.getSystemInformation()
+	, {
+        buildInfo          : this.buildInformation
+      , stats              : stats
+      }
+	)
   }
 
   /*
@@ -796,6 +788,7 @@ class MongoDBI extends YadamuDBI {
             let sqlStartTime = performance.now();
     	    stack =  new Error().stack
    	        const typeInformation = await collection.aggregate(dataTypePipeline).toArray();
+			// console.dir(typeInformation,{depth:null})
 			if (typeInformation.length > 0) {
 			  tableInfo.COLUMN_NAME_ARRAY.forEach((col,idx) => {
 			    let dataType = typeInformation[0][col].type.length == 1 ? typeInformation[0][col].type[0] : this.normalizeTypeInfo(typeInformation[0][col].type)

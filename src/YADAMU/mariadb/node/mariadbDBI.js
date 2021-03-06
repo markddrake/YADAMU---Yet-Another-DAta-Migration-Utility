@@ -105,8 +105,7 @@ class MariadbDBI extends YadamuDBI {
     const sqlSetPacketSize = `SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`
     
     let results = await this.executeSQL(sqlQueryPacketSize);
-    
-    if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
+    if (parseInt(results[0][0]) <  maxAllowedPacketSize) {
       this.yadamuLogger.info([`${this.constructor.name}.setMaxAllowedPacketSize()`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
       results = await this.executeSQL(sqlSetPacketSize);
     }    
@@ -440,30 +439,21 @@ class MariadbDBI extends YadamuDBI {
   
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION); 
     const sysInfo = results[0];
-	return {
-      date               : new Date().toISOString()
-     ,timeZoneOffset     : new Date().getTimezoneOffset()                      
-     ,sessionTimeZone    : sysInfo[5]
-     ,vendor             : this.DATABASE_VENDOR
-     ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : YadamuConstants.YADAMU_VERSION
-     ,currentUser        : sysInfo[1]
-     ,sessionUser        : sysInfo[2]
-     ,dbName             : sysInfo[0]
-     ,databaseVersion    : sysInfo[3]
-     ,serverVendor       : sysInfo[4]
-     ,softwareVendor     : this.SOFTWARE_VENDOR
-     ,nls_parameters     : {
-        serverCharacterSet   : sysInfo[6],
-        databaseCharacterSet : sysInfo[7]
-      }
-     ,nodeClient         : {
-        version          : process.version
-       ,architecture     : process.arch
-       ,platform         : process.platform
-      }                                                                     
-    } 
+	
+	return Object.assign(
+	  super.getSystemInformation()
+	, {
+        currentUser        : sysInfo[1]
+      , sessionUser        : sysInfo[2]
+      , dbName             : sysInfo[0]
+      , databaseVersion    : sysInfo[3]
+      , serverVendor       : sysInfo[4]
+      , nls_parameters     : {
+          serverCharacterSet   : sysInfo[6]
+        , databaseCharacterSet : sysInfo[7]
+        }
+      } 
+	)
   }
 
   /*

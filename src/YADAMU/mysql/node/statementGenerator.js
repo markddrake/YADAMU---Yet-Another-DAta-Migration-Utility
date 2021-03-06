@@ -4,20 +4,27 @@ const YadamuLibrary = require('../../common/yadamuLibrary.js');
 
 class StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, spatialFormat) {    
+  constructor(dbi, targetSchema, metadata, yadamuLogger) {    
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
-    this.spatialFormat = spatialFormat
+    this.yadamuLogger = yadamuLogger;
   }
   
 
   async generateStatementCache() {    
+  
+    const typeMappings = {
+	  spatialFormat    : this.dbi.INBOUND_SPATIAL_FORMAT
+	, circleFormat     : this.dbi.INBOUND_CIRCLE_FORMAT
+	}
+
     const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,@RESULTS); SELECT @RESULTS "INSERT_INFORMATION"`;                       
-    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),this.targetSchema,this.spatialFormat]);
+    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),this.targetSchema, JSON.stringify(typeMappings)]);
+	
     results = results.pop();
     let statementCache = JSON.parse(results[0].INSERT_INFORMATION)
-    if (statementCache === null) {
+	if (statementCache === null) {
       statementCache = {}      
     }
     else {
@@ -29,10 +36,10 @@ class StatementGenerator {
         tableInfo.columnNames = tableMetadata.columnNames
 
         const dataTypes = YadamuLibrary.decomposeDataTypes(tableInfo.targetDataTypes)
-
+		
         tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
         tableInfo._COMMIT_COUNT   = this.dbi.COMMIT_COUNT
-        tableInfo._SPATIAL_FORMAT = this.spatialFormat
+        tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
         tableInfo.insertMode      = 'Batch';
   
         /*
@@ -40,21 +47,23 @@ class StatementGenerator {
         ** Avoid use of Iterative Mode where possible due to significant performance impact.
         **
         */
-
-        const setOperators = tableInfo.targetDataTypes.map((targetDataType,idx) => {
+        const setOperators = dataTypes.map((dataType,idx) => {
 	      if (this.dbi.DB_VERSION < '8.0.19' || false) {
-            switch (targetDataType) {
+            switch (dataType.type) {
               case 'geometry':
 			  case 'point':
-			  case 'line':
 			  case 'lseg':
 			  case 'linestring':
 			  case 'box':
 			  case 'path':
 			  case 'polygon':
-			  case 'circle':
+			  case 'multipoint':
+			  case 'multilinestring':
+			  case 'multipolygon':
+			  case 'geomcollection':
+			  case 'geometrycollection':
                 tableInfo.insertMode = 'Iterative'; 
-                switch (this.spatialFormat) {
+                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
                   case "WKB":
                   case "EWKB":
                     return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromWKB(?)";
@@ -69,23 +78,30 @@ class StatementGenerator {
                   default:
                     return ' "' + tableInfo.columnNames[idx] + '"' + " = ST_GeomFromWKB(?)";
                 }              
+			  case 'bit':
+                this.tableInfo.insertMode = 'Iterative';
+      	        return 'conv(?,2,10)+0';
               default:
                 return ' "' + tableInfo.columnNames[idx] + '" = ?'
             }
           }
           else {
-            switch (targetDataType) {
+            switch (dataType.type) {
               case 'geometry':
 			  case 'point':
-			  case 'line':
+			  
 			  case 'lseg':
 			  case 'linestring':
 			  case 'box':
 			  case 'path':
 			  case 'polygon':
-			  case 'circle':
+			  case 'multipoint':
+			  case 'multilinestring':
+			  case 'multipolygon':
+			  case 'geomcollection':
+			  case 'geometrycollection':
                 tableInfo.insertMode = 'Rows';  
-                switch (this.spatialFormat) {
+                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
                   case "WKB":
                   case "EWKB":
                     return 'ST_GeomFromWKB(?)';
@@ -100,6 +116,9 @@ class StatementGenerator {
                   default:
                     return 'ST_GeomFromWKB(?)';
                 }              
+			  case 'bit':
+                tableInfo.insertMode = 'Rows';  
+      	        return `conv(rpad(?,${dataType.length},'0'),2,10)+0`;
               default:
                 return '?'
             }

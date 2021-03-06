@@ -2,52 +2,64 @@
 
 const fs = require('fs');
 const path = require('path');
-const {ConfigurationFileError} = require('./yadamuException.js');
+const {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuException.js');
+const {FileNotFound} = require('../file/node/fileException.js');
 
 class YadamuLibrary {
 
-  static get BOOLEAN_DATA_TYPES() {
-     this._BOOLEAN_DATA_TYPES = this._BOOLEAN_DATA_TYPES || Object.freeze(['BOOLEAN','BIT','RAW','TINYINT'])
-	 return this._BOOLEAN_DATA_TYPES;
+  static get BOOLEAN_TYPES() {
+     this._BOOLEAN_TYPES = this._BOOLEAN_TYPES || Object.freeze(['BOOLEAN','BIT','RAW','TINYINT'])
+	 return this._BOOLEAN_TYPES;
   }
 
   static get BOOLEAN_SIZE_CONSTRAINTS() {
      this._BOOLEAN_SIZE_CONSTRAINTS = this._BOOLEAN_SIZE_CONSTRAINTS || Object.freeze(['','','1','1'])
      return this._BOOLEAN_SIZE_CONSTRAINTS;
   }
-  static get BINARY_DATA_TYPES() {
-     this._BINARY_DATA_TYPES = this._BINARY_DATA_TYPES || Object.freeze(["RAW","BLOB","BINARY","VARBINARY","IMAGE","BYTEA","TINYBLOB","MEDIUMBLOB","LONGBLOB","ROWVERSION","OBJECTID","BINDATA"])
-     return this._BINARY_DATA_TYPES;
+  static get BINARY_TYPES() {
+     this._BINARY_TYPES = this._BINARY_TYPES || Object.freeze(["RAW","BLOB","BINARY","VARBINARY","IMAGE","BYTEA","TINYBLOB","MEDIUMBLOB","LONGBLOB","ROWVERSION","OBJECTID","BINDATA"])
+     return this._BINARY_TYPES;
   }
 
-  static get DATE_DATA_TYPES() {
-     this._DATE_DATA_TYPES = this._DATE_DATA_TYPES || Object.freeze(["DATE","TIME","TIMESTAMP","TIMEZONETZ","DATETIME","DATETIME2",,"TIMESTAMP WITH TIME ZONE","TIMESTAMP WITH LOCAL TIME ZONE","TIMESTAMP WITHOUT TIME ZONE","DATETIMEOFFSET","SMALLDATE","TIME WITHOUT TIME ZONE",""])
-     return this._DATE_DATA_TYPES;
+  static get DATE_TIME_TYPES() {
+     this._DATE_TIME_TYPES = this._DATE_TIME_TYPES || Object.freeze(["DATE","TIME","TIMESTAMP","TIMEZONETZ","DATETIME","DATETIME2",,"TIMESTAMP WITH TIME ZONE","TIMESTAMP WITH LOCAL TIME ZONE","TIMESTAMP WITHOUT TIME ZONE","DATETIMEOFFSET","SMALLDATE","TIME WITHOUT TIME ZONE",""])
+     return this._DATE_TIME_TYPES;
   }
 
-  static get NUMERIC_DATA_TYPES() {
-     this._NUMERIC_DATA_TYPES = this._NUMERIC_DATA_TYPES || Object.freeze(["NUMBER","BINARY_FLOAT","BINARY_DOUBLE","MONEY","SMALLMONEY","TINYINT","SMALLINT","INT","BIGINT","REAL","FLOAT","DOUBLE","DECIMAL","numeric","DOUBLE PRECISION","INTEGER","LONG"])
-     return this._NUMERIC_DATA_TYPES;
+  static get FLOATING_POINT_TYPES() {
+     this._FLOATING_POINT_TYPES = this._FLOATING_POINT_TYPES || Object.freeze(["BINARY_FLOAT","BINARY_DOUBLE","REAL","FLOAT","DOUBLE","DOUBLE PRECISION"])
+     return this._FLOATING_POINT_TYPES;
   }
 
-  static get XML_DATA_TYPES() {
-     this._XML_DATA_TYPES = this._XML_DATA_TYPES || Object.freeze(["XML","XMLTYPE"])
-     return this._XML_DATA_TYPES;
+  static get INTEGER_TYPES() {
+     this._INTEGER_TYPES = this._INTEGER_TYPES || Object.freeze(["TINYINT","SMALLINT","INT","BIGINT","INTEGER","LONG"])
+     return this._INTEGER_TYPES;
   }
 
-  static get JSON_DATA_TYPES() {
-     this._JSON_DATA_TYPES = this._JSON_DATA_TYPES || Object.freeze(["JSON","JSONB","SET","BFILE"])
-     return this._JSON_DATA_TYPES;
+
+  static get NUMERIC_TYPES() {
+     this._NUMERIC_TYPES = this._NUMERIC_TYPES || Object.freeze([...this.FLOATING_POINT_TYPES,...this.INTEGER_TYPES,"NUMERIC","DECIMAL","NUMBER","MONEY","SMALLMONEY"])
+     return this._NUMERIC_TYPES;
   }
 
-  static get CLOB_DATA_TYPES() {
-     this._CLOB_DATA_TYPES = this._CLOB_DATA_TYPES || Object.freeze(["CLOB","NCLOB","JAVASCRIPTWITHSCOPE","LONGTEXT","MEDIUMTEXT","TEXT"])
-     return this._CLOB_DATA_TYPES;
+  static get XML_TYPES() {
+     this._XML_TYPES = this._XML_TYPES || Object.freeze(["XML","XMLTYPE"])
+     return this._XML_TYPES;
   }
 
-  static get SPATIAL_DATA_TYPES() {
-     this._SPATIAL_DATA_TYPES = this._SPATIAL_DATA_TYPES || Object.freeze(["\"MDSYS\".\"SDO_GEOMETRY\"","GEOGRAPHY","GEOMETRY","POINT","LSEG","BOX","PATH","POLYGON","CIRCLE","LINESTRING","GEOMETRYCOLLECTION","MULTIPOINT","MULTILINESTRING","MULTIPOLYGON"])
-     return this._SPATIAL_DATA_TYPES;
+  static get JSON_TYPES() {
+     this._JSON_TYPES = this._JSON_TYPES || Object.freeze(["JSON","JSONB","SET","BFILE"])
+     return this._JSON_TYPES;
+  }
+
+  static get CLOB_TYPES() {
+     this._CLOB_TYPES = this._CLOB_TYPES || Object.freeze(["CLOB","NCLOB","JAVASCRIPTWITHSCOPE","LONGTEXT","MEDIUMTEXT","TEXT"])
+     return this._CLOB_TYPES;
+  }
+
+  static get SPATIAL_TYPES() {
+     this._SPATIAL_TYPES = this._SPATIAL_TYPES || Object.freeze(["\"MDSYS\".\"SDO_GEOMETRY\"","GEOGRAPHY","GEOMETRY","POINT","LSEG","BOX","PATH","POLYGON","CIRCLE","LINESTRING","GEOMCOLLECTION","GEOMETRYCOLLECTION","MULTIPOINT","MULTILINESTRING","MULTIPOLYGON"])
+     return this._SPATIAL_TYPES;
   }
 
   static stringifyDuration(duration) {
@@ -117,36 +129,44 @@ class YadamuLibrary {
   }
 
   static isBooleanType(dataType,sizeConstraint) {
-	const idx = this.BOOLEAN_DATA_TYPES.indexOf(dataType.toUpperCase())
+	const idx = this.BOOLEAN_TYPES.indexOf(dataType.toUpperCase())
 	return ((idx > -1) && (this.BOOLEAN_SIZE_CONSTRAINTS[idx] === sizeConstraint))
   }
   
-  static isBinaryDataType(dataType) {
-	return this.BINARY_DATA_TYPES.includes(dataType.toUpperCase());
+  static isBinaryType(dataType) {
+	return this.BINARY_TYPES.includes(dataType.toUpperCase());
   }
    
-  static isDateDataType(dataType) {
-	return this.DATE_DATA_TYPES.includes(dataType.toUpperCase());
+  static isDateTimeType(dataType) {
+	return this.DATE_TIME_TYPES.includes(dataType.toUpperCase());
   }
    
-  static isNumericDataType(dataType) {
-	return this.NUMERIC_DATA_TYPES.includes(dataType.toUpperCase());
+  static isFloatingPointType(dataType) {
+	return this.FLOATING_POINT_TYPES.includes(dataType.toUpperCase());
+  }
+
+  static isIntegerType(dataType) {
+	return this.INTEGER_TYPES.includes(dataType.toUpperCase());
+  }
+
+  static isNumericType(dataType) {
+	return this.NUMERIC_TYPES.includes(dataType.toUpperCase());
   }
 
   static isXML(dataType) {
-    return this.XML_DATA_TYPES.includes(dataType.toUpperCase());
+    return this.XML_TYPES.includes(dataType.toUpperCase());
   }
 
   static isJSON(dataType) {
-    return this.JSON_DATA_TYPES.includes(dataType.toUpperCase());
+    return this.JSON_TYPES.includes(dataType.toUpperCase());
   }
   
   static isCLOB(dataType) {
-    return this.CLOB_DATA_TYPES.includes(dataType.toUpperCase());
+    return this.CLOB_TYPES.includes(dataType.toUpperCase());
   }
 
-  static isSpatialDataType(dataType) {
-	return this.SPATIAL_DATA_TYPES.includes(dataType.toUpperCase());
+  static isSpatialType(dataType) {
+	return this.SPATIAL_TYPES.includes(dataType.toUpperCase());
   }
 
   static composeDataType(sourceDataType, sizeConstraint) {
@@ -170,7 +190,9 @@ class YadamuLibrary {
     
     const results = {};
     let components = targetDataType.split('(');
-    results.type = components[0].split(' ')[0];
+	let typeNameComponents = components[0].split(' ')
+    results.type = typeNameComponents.shift();
+	results.typeQualifier = typeNameComponents.length > 0 ? typeNameComponents.join(' ') : null
     if (components.length > 1 ) {
       components = components[1].split(')');
       if (components.length > 1 ) {
@@ -328,7 +350,19 @@ class YadamuLibrary {
 	return string
   }
   
-}
 
+  static reportError(e) {
+	if ((e instanceof UserError) || (e instanceof FileNotFound) || (e instanceof CommandLineError)) {
+      console.log(e.message);
+	  if (process.env.YADAMU_SHOW_CAUSE === 'TRUE') {	  
+	    console.log(e); 
+      }
+  	}
+	else {
+      console.log(e);
+  	}
+  }
+  
+}
 
 module.exports = YadamuLibrary

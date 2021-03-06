@@ -118,9 +118,9 @@
   ]
   },{
     "operation"       : "import"
-  , "source"          : "file-JSON"
+  , "source"          : "scratch-export"
   , "target"          : "minio#1"
-  , "importPath"      : "%location%"
+  , "importPath"      : "oracle19c/DATA_ONLY"
   , "parameters"      : {
       "ROOT_FOLDER"   : "yadamu/RTS"
 	}
@@ -158,9 +158,9 @@
 	]
   },{
     "operation"       : "import"
-  , "source"          : "file-JSON"
+  , "source"          : "scratch-export"
   , "target"          : "azurite#1"
-  , "importPath"      : "%location%"
+  , "importPath"      : "oracle19c/DATA_ONLY"
   , "parameters"      : {
       "ROOT_FOLDER"   : "yadamu/RTS"
 	}

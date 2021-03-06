@@ -20,7 +20,7 @@ class OracleConstants {
     , "XML_STORAGE_FORMAT"        : "XML"
     , "JSON_STORAGE_FORMAT"       : "JSON"
     , "MIGRATE_JSON_STORAGE"      : false
-    , "OBJECTS_AS_JSON"           : false
+    , "OBJECT_FORMAT"             : "NATIVE"
     , "TREAT_RAW1_AS_BOOLEAN"     : true
     , "SPATIAL_FORMAT"            : "WKB"
     })
@@ -41,7 +41,7 @@ class OracleConstants {
   static get XML_STORAGE_FORMAT()     { return this.DBI_PARAMETERS.XML_STORAGE_FORMAT}
   static get JSON_STORAGE_FORMAT()    { return this.DBI_PARAMETERS.JSON_STORAGE_FORMAT}
   static get MIGRATE_JSON_STORAGE()   { return this.DBI_PARAMETERS.MIGRATE_JSON_STORAGE}
-  static get OBJECTS_AS_JSON()        { return this.DBI_PARAMETERS.OBJECTS_AS_JSON}
+  static get OBJECT_FORMAT()          { return this.DBI_PARAMETERS.OBJECT_FORMAT}
   static get TREAT_RAW1_AS_BOOLEAN()  { return this.DBI_PARAMETERS.TREAT_RAW1_AS_BOOLEAN}
   static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
  

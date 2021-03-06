@@ -102,16 +102,38 @@ class OracleQA extends OracleDBI {
 	}
 	
 	async compareSchemas(source,target,rules) {
-				
-      const args = {
+
+	  let compareParams		
+		
+      if (this.JSON_PARSING_SUPPORTED) {
+		
+	    compareParams = JSON.stringify({
+	   	  doublePrecision      : rules.DOUBLE_PRECISION || 18
+	    , timestampPrecision   : rules.TIMESTAMP_PRECISION || 9
+	    , orderedJSON          : Boolean(rules.ORDERED_JSON).toString().toUpperCase()
+	    , xmlRule              : rules.XML_COMPARISSON_RULE || null
+	    , objectsRule          : rules.OBJECTS_COMPARISSON_RULE || 'SKIP'
+	    , excludeMViews        : Boolean(rules.MODE === 'DATA_ONLY').toString().toUpperCase()
+	    , infinityIsNull       : Boolean(rules.INFINITY_IS_NULL).toString().toUpperCase()
+        });
+	  }  
+	  else {
+	    compareParams = 
+`<rules>
+   <doublePrecision>${rules.DOUBLE_PRECISION || 18}</doublePrecision>
+   <timestampPrecision>${rules.TIMESTAMP_PRECISION || 9}</timestampPrecision>
+   <orderedJSON>${Boolean(rules.ORDERED_JSON).toString().toUpperCase()}</orderedJSON>
+   <xmlRule>${rules.XML_COMPARISSON_RULE || ''}</xmlRule>
+   <objectsRule>${rules.OBJECTS_COMPARISSON_RULE || 'SKIP'}</objectsRule>
+   <excludeMViews>${Boolean(rules.MODE === 'DATA_ONLY').toString().toUpperCase()}</excludeMViews>
+   <infinityIsNull>${Boolean(rules.INFINITY_IS_NULL).toString().toUpperCase()}</infinityIsNull>
+</rules>`;
+	  }
+
+	  const args = {
 		P_SOURCE_SCHEMA        : source.schema,
 		P_TARGET_SCHEMA        : target.schema,
-		P_DOUBLE_PRECISION     : rules.DOUBLE_PRECISION || null,
-		P_TIMESTAMP_PRECISION  : rules.TIMESTAMP_PRECISION || null,
-		P_ORDERED_JSON         : rules.ORDERED_JSON.toString().toUpperCase(),
-		P_XML_RULE             : rules.XML_COMPARISSON_RULES || null,
-		P_OBJECTS_RULE         : this.MODE === 'DATA_ONLY' ? 'OMIT_OBJECTS' : null,
-		P_EXCLUDE_MVIEWS       : Boolean(rules.MODE === 'DATA_ONLY').toString().toUpperCase()
+		P_RULES                : compareParams
 	  }
 	        
       const report = {
@@ -172,7 +194,7 @@ class OracleQA extends OracleDBI {
 
 module.exports = OracleQA
 
-const _SQL_COMPARE_SCHEMAS = `begin YADAMU_TEST.COMPARE_SCHEMAS(:P_SOURCE_SCHEMA, :P_TARGET_SCHEMA, :P_DOUBLE_PRECISION, :P_TIMESTAMP_PRECISION, :P_ORDERED_JSON, :P_XML_RULE, :P_OBJECTS_RULE, :P_EXCLUDE_MVIEWS); end;`;
+const _SQL_COMPARE_SCHEMAS = `begin YADAMU_TEST.COMPARE_SCHEMAS(:P_SOURCE_SCHEMA, :P_TARGET_SCHEMA, :P_RULES); end;`;
 
 const _SQL_SUCCESS =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL', TARGET_ROW_COUNT

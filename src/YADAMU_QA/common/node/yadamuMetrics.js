@@ -77,7 +77,7 @@ class YadamuMetrics {
   }
 
   recordFailed(failed) {
-	this.task.failed += failed
+	this.subTask.failed += failed
   }
 
   adjust(metrics) {

@@ -89,11 +89,16 @@ class YadamuSpatialLibrary {
         case 'GEOMETRY':
   	    case 'POINT':
 		case 'LSEG':
-		case 'LINESTRING':
 		case 'BOX':
 		case 'PATH':
 		case 'POLYGON':
 		case 'CIRCLE':
+		case 'LINESTRING':
+		case 'MULTIPOINT':
+		case 'MULTILINESTRING':
+		case 'MULTIPOLYGON':
+		case 'GEOMCOLLECTION':
+		case 'GEOMETRYCOLLECTION':
         case '"MDSYS"."SDO_GEOMETRY"':
           spatialColumnList.push(idx)
           break;

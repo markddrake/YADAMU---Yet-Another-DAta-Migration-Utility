@@ -19,13 +19,13 @@ class PostgresWriter extends YadamuWriter {
 	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
       switch (dataType.type.toLowerCase()) {
+		case "tsvector":
         case "json" :
 		case "jsonb":
 	      // https://github.com/brianc/node-postgres/issues/442
 	      return (col,idx) => {
             return typeof col === 'object' ? JSON.stringify(col) : col
           }
-		case "bit" :
         case "boolean" :
  		  return (col,idx) => {
              return YadamuLibrary.toBoolean(col)
@@ -79,12 +79,12 @@ class PostgresWriter extends YadamuWriter {
   }
   
   cacheRow(row) {
-	
+	  
     // if (this.metrics.cached === 1) console.log('postgresWriter',row)
 		
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
-
+  	
 	this.transformations.forEach((transformation,idx) => {
       if ((transformation !== null) && (row[idx] !== null)) {
 	    row[idx] = transformation(row[idx])
@@ -107,7 +107,7 @@ class PostgresWriter extends YadamuWriter {
     this.metrics.batchCount++;
     let repackBatch = false;
 	
-    if (this.insertMode === 'Batch') {
+	if (this.insertMode === 'Batch') {
                
       try {
         await this.dbi.createSavePoint();

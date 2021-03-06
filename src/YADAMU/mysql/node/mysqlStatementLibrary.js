@@ -35,6 +35,8 @@ class MySQLStatementLibrary {
                                                             concat(numeric_precision,',',numeric_scale) 
                                                           when (numeric_precision is not null) then
                                                             case
+                                                              when data_type = 'bit' then
+                                                                numeric_precision                                  
                                                               when column_type like '%unsigned' then 
                                                                 numeric_precision
                                                               else
@@ -55,16 +57,17 @@ class MySQLStatementLibrary {
                             when data_type in ('date','time','datetime','timestamp') then
                               -- Force ISO 8601 rendering of value 
                               concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')',' "',column_name,'"')
+                            when data_type = 'bit' then 
+                              concat('conv("', column_name, '",10,2) "',column_name,'"')
                             when data_type = 'year' then
                               -- Prevent rendering of value as base64:type13: 
                               concat('CAST("', column_name, '"as DECIMAL) "',column_name,'"')
-                            when data_type in ('geometry','point','linestring','polygon','multipoint','multilinestring','multipolygon','geometrycollection') then
+                            when data_type in ('point','linestring','polygon','geometry','multipoint','multilinestring','multipolygon','geomcollection') then
                               -- Force ${this.spatialFormat} rendering of value
                               concat('${this.dbi.SPATIAL_SERIALIZER}"', column_name, '") "',column_name,'"')
                             when data_type = 'float' then
                               -- Render Floats with greatest possible precision 
-                              -- Risk of Overflow ????
-                              concat('(floor(1e15*"',column_name,'")/1e15) "',column_name,'"')                                      
+                             concat('cast("',column_name,'" as DOUBLE) "',column_name,'"')
                             else
                               concat('"',column_name,'"')
                           end

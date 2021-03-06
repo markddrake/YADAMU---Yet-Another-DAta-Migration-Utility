@@ -381,24 +381,10 @@ class ExampleDBI extends YadamuDBI {
 	
 	const sysInfo = await this.executeSQL('SELECT SYSTEM INFORMATION')
     
-    return {
-      date               : new Date().toISOString()
-     ,timeZoneOffset     : new Date().getTimezoneOffset()                      
-     ,vendor             : this.DATABASE_VENDOR
-     ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : YadamuConstants.YADAMU_VERSION
-     ,softwareVendor     : this.SOFTWARE_VENDOR
-     ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
-	 ,sessionUser        : sysInfo.SESSION_USER
-     ,dbName             : sysInfo.DATABASE_NAME
-     ,databaseVersion    : sysInfo.DATABASE_VERSION
-     ,nodeClient         : {
-        version          : process.version
-       ,architecture     : process.arch
-       ,platform         : process.platform
-      }      
-    }
+	return Object.assign(
+	  super.getSystemInformation()
+	, {}
+    )
   }
 
   /*

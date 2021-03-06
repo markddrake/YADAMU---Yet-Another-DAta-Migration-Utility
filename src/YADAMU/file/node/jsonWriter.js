@@ -23,7 +23,7 @@ class JSONWriter extends YadamuWriter {
 
     this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-	  if (YadamuLibrary.isBinaryDataType(dataType.type)) {
+	  if (YadamuLibrary.isBinaryType(dataType.type)) {
 		return (row,idx) =>  {
           row[idx] = row[idx].toString('hex')
 		}
@@ -33,13 +33,17 @@ class JSONWriter extends YadamuWriter {
         case "GEOMETRY":
         case "GEOGRAPHY":
         case "POINT":
-        case "LINE":
         case "LSEG":
         case "BOX":
         case "PATH":
         case "POLYGON":
         case "CIRCLE":
+        case "LINESTRING":
+        case "MULTIPOINT":
+        case "MULTILINESTRING":
         case "MULTIPOLYGON":
+		case "GEOMCOLLECTION":
+		case "GEOMETRYCOLLECTION":
         case '"MDSYS"."SDO_GEOMETRY"':
           if (this.SPATIAL_FORMAT.endsWith('WKB')) {
             return (row,idx)  => {
@@ -58,6 +62,28 @@ class JSONWriter extends YadamuWriter {
 			}
           }
 		  return null;
+		case "REAL":
+        case "FLOAT":
+		case "DOUBLE":
+		case "DOUBLE PRECISION":
+		case "BINARY_FLOAT":
+		case "BINARY_DOUBLE":
+		   return (row, idx) => {
+			 if (!isFinite(row[idx])) {
+			   switch (true) {
+		         case isNaN(row[idx]): 
+		   	       row[idx] = "NaN"
+				   break;
+			     case (row[idx] === Infinity):
+				   row[idx] = "Infinity"
+				   break;
+				 case (row[idx] === -Infinity):
+				   row[idx] = "-Infinity"
+				   break;
+				 default:
+			   }   
+		     }
+		   }			 
         case "JSON":
           return (row,idx) =>  {
             if (typeof row[idx] === 'string') {
@@ -144,7 +170,7 @@ class JSONWriter extends YadamuWriter {
 
   async processRow(row) {
     // Be very careful about adding unecessary code here. This is executed once for each row processed by YADAMU. Keep it as lean as possible.
-    this.checkColumnCount(row)
+	this.checkColumnCount(row)
 	this.transformations.forEach((transformation,idx) => {
       if ((transformation !== null) && (row[idx] !== null)) {
         transformation(row,idx)

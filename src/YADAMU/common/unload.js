@@ -1,6 +1,7 @@
 "use strict"
 
 const YadamuCLI = require('./yadamuCLI.js')
+const YadamuLibrary = require('./yadamuLibrary.js')
 
 class Unload extends YadamuCLI {}
 
@@ -11,11 +12,11 @@ async function main() {
     try {
       await yadamuUnload.doUnload();
     } catch (e) {
-      Unload.reportError(e)
+      yadamuUnload.reportError(e)
 	}
     await yadamuUnload.close();
   } catch (e) {
-	Unload.reportError(e)
+	YadamuLibrary.reportError(e)
   }
 
 }

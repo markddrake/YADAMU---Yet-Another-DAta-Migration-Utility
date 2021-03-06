@@ -74,8 +74,12 @@ class DBWriter extends Writable {
 	// this.yadamuLogger.trace([this.constructor.name,`executeDDL()`,this.dbi.DATABASE_VENDOR],`Executing DLL statements)`) 
     const startTime = performance.now()
 	ddlStatements = this.dbi.prepareDDLStatements(ddlStatements)	
-    const results = await this.dbi.executeDDL(ddlStatements) 
-	this.emit('ddlComplete',results,startTime);	 
+	try {
+      const results = await this.dbi.executeDDL(ddlStatements) 
+  	  this.emit('ddlComplete',results,startTime);	 
+	} catch (e) {
+  	  this.emit('ddlComplete',e,startTime);	 
+    }	
   }
   
   async generateStatementCache(metadata) {

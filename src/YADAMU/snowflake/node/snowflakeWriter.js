@@ -21,7 +21,7 @@ class SnowflakeWriter extends YadamuWriter {
     this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
 	
-	  if (YadamuLibrary.isBinaryDataType(dataType.type)) {
+	  if (YadamuLibrary.isBinaryType(dataType.type)) {
 		return (col,idx) =>  {
           return col.toString('hex')
 		}
@@ -67,7 +67,34 @@ class SnowflakeWriter extends YadamuWriter {
             }
 		  }
           break;
-                default :
+        /*
+        **
+        ** Snowflake-sdk appears to have some issues around Infinity, -Infinity and NaN.
+        **
+        ** Convert Infinity, -Infinity and NaN to 'Inf', '-Inf' & 'NaN'
+        ** However this seems to then require all finite values be passed as strings.
+        **
+        */
+ 		case "REAL":
+        case "FLOAT":
+		case "DOUBLE":
+		case "DOUBLE PRECISION":
+		case "BINARY_FLOAT":
+		case "BINARY_DOUBLE":
+		  return (col, idx) => {
+	        if (!isFinite(col)) {
+			  switch(col) {
+			    case Infinity:
+			      return 'Inf'
+		     	case -Infinity:
+				  return '-Inf'
+			    default:
+				  return 'NaN'
+			  }
+		    }
+            return col.toString()
+	      }
+        default :
 		  return null
       }
     })
@@ -78,9 +105,7 @@ class SnowflakeWriter extends YadamuWriter {
 	  
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
-	      
-	// console.log(row)
-		  
+
     this.transformations.forEach((transformation,idx) => {
       if ((transformation !== null) && (row[idx] !== null)) {			
         row[idx] = transformation(row[idx],idx)
@@ -171,7 +196,7 @@ class SnowflakeWriter extends YadamuWriter {
     const batches = [batch]
     const rowTracking = [Array.from(Array(rowCount).keys())]
     let operationCount = 0
-		
+	
 	if (this.tableInfo.parserRequired) {
 	  // console.log('Snowflake Writer','Variant',batch.slice(0,this.tableInfo.columnNames.length))
       let batchRowCount

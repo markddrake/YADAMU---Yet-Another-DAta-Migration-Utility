@@ -9,11 +9,8 @@ class MsSQLParser extends YadamuParser {
   }
 
   async _transform (data,encoding,callback) {
-	if (data === null) {
-      console.log('NULL')
-	}
   	this.rowCount++
-    data = Object.values(data)    
+	data = Object.values(data)    
     // if (this.rowCount === 1) console.log(data)
     this.push({data: data})
     callback();

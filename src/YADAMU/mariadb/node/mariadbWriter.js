@@ -4,6 +4,8 @@ const { performance } = require('perf_hooks');
 
 const YadamuWriter = require('../../common/yadamuWriter.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const {DatabaseError,RejectedColumnValue} = require('../../common/yadamuException.js');
+																				   
 
 class MariadbWriter extends YadamuWriter {
 
@@ -13,7 +15,7 @@ class MariadbWriter extends YadamuWriter {
   
   setTableInfo(tableName) {
 	super.setTableInfo(tableName)
-
+	
     this.tableInfo.columnCount = this.tableInfo.columnNames.length;
 	
 	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
@@ -26,13 +28,13 @@ class MariadbWriter extends YadamuWriter {
           break;
         case "geometry" :
   	    case 'point':
-		case 'lseg':
 		case 'linestring':
-		case 'box':
-		case 'path':
 		case 'polygon':
-		case 'circle':
-          if (this.SPATIAL_FORMAT === 'GeoJSON') {
+		case 'multipoint':
+		case 'multilinestring':
+		case 'multipolygon':
+		case 'geometrycollection':
+		  if (this.SPATIAL_FORMAT === 'GeoJSON') {
             return (col,idx) => {
               return typeof col === 'object' ? JSON.stringify(col) : col
 	        }
@@ -60,6 +62,31 @@ class MariadbWriter extends YadamuWriter {
             return col.substring(0,26);
 		  }
 		  break;
+ 		case "real":
+        case "float":
+		case "double":
+		case "double precision":
+		case "binary_float":
+		case "binary_double":
+		  switch (this.dbi.INFINITY_MANAGEMENT) {
+		    case 'REJECT':
+              return (col, idx) => {
+			    if (!isFinite(col)) {
+			      throw new RejectedColumnValue(this.tableInfo.columnNames[idx],col);
+			    }
+				return col;
+		      }
+		    case 'NULLIFY':
+			  return (col, idx) => {
+			    if (!isFinite(col)) {
+                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
+	  		      return null;
+				}
+			    return col
+		      }   
+            default :
+              return null;
+		  }
         default :
           return null;
       }
@@ -78,28 +105,37 @@ class MariadbWriter extends YadamuWriter {
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
     	
-	this.transformations.forEach((transformation,idx) => {
-      if ((transformation !== null) && (row[idx] !== null)) {
-	    row[idx] = transformation(row[idx])
+	try {
+	  
+  	  this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+	      row[idx] = transformation(row[idx],idx)
+        }
+	  })
+
+      // Batch Mode : Create one large array. Iterative Mode : Create an Array of Arrays.    
+
+      if (this.tableInfo.insertMode === 'Iterative') {
+        this.batch.push(row);
       }
-	})
-
-    // Batch Mode : Create one large array. Iterative Mode : Create an Array of Arrays.    
-
-    if (this.tableInfo.insertMode === 'Iterative') {
-      this.batch.push(row);
-    }
-    else {
-      this.batch.push(...row);
+      else {
+        this.batch.push(...row);
+  
+	  }
     
-	}
-    
-    this.metrics.cached++
-	return this.skipTable;
+      this.metrics.cached++
+	  return this.skipTable;
+	} catch (e) {
+  	  if (e instanceof RejectedColumnValue) {
+        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],e.message);
+        this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableInfo.tableName,row);
+		this.metrics.skipped++
+        return
+	  }
+	  throw e
+	}			  
   }
-
-
-  async processWarnings(batch,results) {
+  async processWarnings(results,row) {
 
     // ### Output Records that generate warnings
 
@@ -113,7 +149,9 @@ class MariadbWriter extends YadamuWriter {
           let nextBadRow = warning.Message.split('row')
           nextBadRow = parseInt(nextBadRow[nextBadRow.length-1])
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
-          if (badRow !== nextBadRow) {
+   		  // Only write rows to Rejection File in Iterative Mode. 
+         
+          if ((this.tableInfo.insertMode === 'Iterative') && (badRow !== nextBadRow)) {
             const columnOffset = (nextBadRow-1) * this.tableInfo.columnNames.length
             const row = this.tableInfo.insertMode === 'Batch'  ? batch.slice(columnOffset,columnOffset +  this.tableInfo.columnNames.length) : batch[nextBadRow-1]
 	  	    await this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,row);
@@ -142,7 +180,7 @@ class MariadbWriter extends YadamuWriter {
           await this.dbi.createSavePoint();
           const sqlStatement = `${this.tableInfo.dml} ${args}`
           const results = await this.dbi.executeSQL(sqlStatement,batch);
-          await this.processWarnings(batch,results);
+          await this.processWarnings(results,null);
           this.endTime = performance.now();
           await this.dbi.releaseSavePoint();
 		  this.metrics.written += rowCount;
@@ -161,7 +199,7 @@ class MariadbWriter extends YadamuWriter {
           const nextRow = repackBatch ?  batch.splice(0,this.tableInfo.columnCount) : batch[row]
           try {
             const results = await this.dbi.executeSQL(this.tableInfo.dml,nextRow);
-            await this.processWarnings(batch,results);
+            await this.processWarnings(results,nextRow);
 		    this.metrics.written++;
           } catch (cause) {
             this.handleIterativeError(`INSERT ONE`,cause,row,nextRow)

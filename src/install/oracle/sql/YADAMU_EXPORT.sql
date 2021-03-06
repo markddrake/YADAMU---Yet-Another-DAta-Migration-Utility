@@ -122,16 +122,19 @@ $IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
 --
   select JSON_OBJECT(
            $IF YADAMU_FEATURE_DETECTION.TREAT_AS_JSON_SUPPORTED $THEN
-           'jsonFeatures'     value TREAT(JSON_FEATURES() as JSON),
+           'jsonFeatures'                value TREAT(JSON_FEATURES() as JSON),
            $ELSE
-           'jsonFeatures'     value JSON_QUERY(JSON_FEATURES(),'$' returning VARCHAR2(4000)),
+           'jsonFeatures'                value JSON_QUERY(JSON_FEATURES(),'$' returning VARCHAR2(4000)),
            $END
-           'databaseVersion'  value DATABASE_RELEASE(),
-           'sessionUser'      value SYS_CONTEXT('USERENV','SESSION_USER'),
-           'dbName'           value SYS_CONTEXT('USERENV','DB_NAME'),
-           'hostname'         value SYS_CONTEXT('USERENV','SERVER_HOST'),
-           'sessionTimeZone'  value SESSIONTIMEZONE,
-           'nlsParameters'    value JSON_OBJECTAGG(parameter, value)
+           'databaseVersion'             value DATABASE_RELEASE(),
+           'sessionUser'                 value SYS_CONTEXT('USERENV','SESSION_USER'),
+           'dbName'                      value SYS_CONTEXT('USERENV','DB_NAME'),
+           'hostname'                    value SYS_CONTEXT('USERENV','SERVER_HOST'),
+           'sessionTimeZone'             value SESSIONTIMEZONE,
+           'nlsParameters'               value JSON_OBJECTAGG(parameter, value),
+		   'yadamuInstanceID'            value YADAMU_FEATURE_DETECTION.YADAMU_INSTANCE_ID,
+		   'yadamuInstallationTimestamp' value YADAMU_FEATURE_DETECTION.YADAMU_INSTALLATION_TIMESTAMP
+		   
          )
     into V_RESULTS
     from NLS_DATABASE_PARAMETERS;
@@ -142,13 +145,15 @@ exception
   when YADAMU_UTILITIES.JSON_OVERFLOW1 or YADAMU_UTILITIES.JSON_OVERFLOW2 or YADAMU_UTILITIES.JSON_OVERFLOW3 or YADAMU_UTILITIES.BUFFER_OVERFLOW then
     return YADAMU_UTILITIES.JSON_OBJECT_CLOB(
              YADAMU_UTILITIES.KVP_TABLE(
-               YADAMU_UTILITIES.KVJ('jsonFeatures',    YADAMU_EXPORT.JSON_FEATURES),
-               YADAMU_UTILITIES.KVN('databaseVersion', YADAMU_EXPORT.DATABASE_RELEASE),
-               YADAMU_UTILITIES.KVS('sessionUser',     SYS_CONTEXT('USERENV','SESSION_USER')),
-               YADAMU_UTILITIES.KVS('dbName',          SYS_CONTEXT('USERENV','DB_NAME')),
-               YADAMU_UTILITIES.KVS('hostname',        SYS_CONTEXT('USERENV','SERVER_HOST')),
-               YADAMU_UTILITIES.KVS('sessionTimeZone', SESSIONTIMEZONE),
-               YADAMU_UTILITIES.KVJ('nlsParameters',   YADAMU_UTILITIES.JSON_OBJECTAGG_CLOB('select PARAMETER "KEY", 3 DATA_TYPE, NULL "NUMERIC_VALUE", VALUE "STRING_VALUE", NULL "CLOB_VALUE" from  NLS_DATABASE_PARAMETERS'))
+               YADAMU_UTILITIES.KVJ('jsonFeatures',                YADAMU_EXPORT.JSON_FEATURES),
+               YADAMU_UTILITIES.KVN('databaseVersion',             YADAMU_EXPORT.DATABASE_RELEASE),
+               YADAMU_UTILITIES.KVS('sessionUser',                 SYS_CONTEXT('USERENV','SESSION_USER')),
+               YADAMU_UTILITIES.KVS('dbName',                      SYS_CONTEXT('USERENV','DB_NAME')),
+               YADAMU_UTILITIES.KVS('hostname',                    SYS_CONTEXT('USERENV','SERVER_HOST')),
+               YADAMU_UTILITIES.KVS('sessionTimeZone',             SESSIONTIMEZONE),
+               YADAMU_UTILITIES.KVJ('nlsParameters',               YADAMU_UTILITIES.JSON_OBJECTAGG_CLOB('select PARAMETER "KEY", 3 DATA_TYPE, NULL "NUMERIC_VALUE", VALUE "STRING_VALUE", NULL "CLOB_VALUE" from  NLS_DATABASE_PARAMETERS')),
+		       YADAMU_UTILITIES.KVS('yadamuInstanceID',            YADAMU_FEATURE_DETECTION.YADAMU_INSTANCE_ID),
+		       YADAMU_UTILITIES.KVS('yadamuInstallationTimestamp', YADAMU_FEATURE_DETECTION.YADAMU_INSTALLATION_TIMESTAMP)
              )   
            );
   when others then
@@ -160,14 +165,16 @@ $ELSE
 --
   return YADAMU_UTILITIES.JSON_OBJECT_CLOB(
            YADAMU_UTILITIES.KVP_TABLE(
-             YADAMU_UTILITIES.KVJ('jsonFeatures',    YADAMU_EXPORT.JSON_FEATURES),
-             YADAMU_UTILITIES.KVN('databaseVersion', YADAMU_EXPORT.DATABASE_RELEASE),
-             YADAMU_UTILITIES.KVS('sessionUser',     SYS_CONTEXT('USERENV','SESSION_USER')),
-             YADAMU_UTILITIES.KVS('dbName',          SYS_CONTEXT('USERENV','DB_NAME')),
-             YADAMU_UTILITIES.KVS('hostname',        SYS_CONTEXT('USERENV','SERVER_HOST')),
-             YADAMU_UTILITIES.KVS('sessionTimeZone', SESSIONTIMEZONE),
-             YADAMU_UTILITIES.KVJ('nlsParameters',   YADAMU_UTILITIES.JSON_OBJECTAGG_CLOB('select PARAMETER "KEY", 3 DATA_TYPE, NULL "NUMERIC_VALUE", VALUE "STRING_VALUE", NULL "CLOB_VALUE" from  NLS_DATABASE_PARAMETERS'))
-           )   
+             YADAMU_UTILITIES.KVJ('jsonFeatures',                YADAMU_EXPORT.JSON_FEATURES),
+             YADAMU_UTILITIES.KVN('databaseVersion',             YADAMU_EXPORT.DATABASE_RELEASE),
+             YADAMU_UTILITIES.KVS('sessionUser',                 SYS_CONTEXT('USERENV','SESSION_USER')),
+             YADAMU_UTILITIES.KVS('dbName',                      SYS_CONTEXT('USERENV','DB_NAME')),
+             YADAMU_UTILITIES.KVS('hostname',                    SYS_CONTEXT('USERENV','SERVER_HOST')),
+             YADAMU_UTILITIES.KVS('sessionTimeZone',             SESSIONTIMEZONE),
+             YADAMU_UTILITIES.KVJ('nlsParameters',               YADAMU_UTILITIES.JSON_OBJECTAGG_CLOB('select PARAMETER "KEY", 3 DATA_TYPE, NULL "NUMERIC_VALUE", VALUE "STRING_VALUE", NULL "CLOB_VALUE" from  NLS_DATABASE_PARAMETERS')),
+             YADAMU_UTILITIES.KVS('yadamuInstanceID',            YADAMU_FEATURE_DETECTION.YADAMU_INSTANCE_ID),
+		     YADAMU_UTILITIES.KVS('yadamuInstallationTimestamp', YADAMU_FEATURE_DETECTION.YADAMU_INSTALLATION_TIMESTAMP)
+           )			 
          );
 $END
 --
@@ -213,7 +220,7 @@ as
                  when (jc.FORMAT is not NULL) then
                    -- Does not attempt to preserve json storage details
                    -- If storage model fidelity is required then set specify MODE=DDL_AND_DATA on the export command line to include DDL statements to the file.
-                   -- If DDL is not included in the file import operations will default to YADAMU_IMPORT.C_JSON_STORAGE_MODEL storage
+                   -- If DDL is not included in the file import operations will default to YADAMU_IMPORT.C_JSON_DATA_TYPE storage
                    '"JSON"'
                  $END                   
                  when (atc.DATA_TYPE = 'RAW' and atc.DATA_LENGTH = 1 and P_TREAT_RAW1_AS_BOOLEAN = 'TRUE') then
@@ -252,7 +259,7 @@ as
                      when DATA_PRECISION is NOT NULL then
                        '"' || DATA_PRECISION || '"'
                      else 
-					   '"38"'
+					   '""'
                    end 
                  when atc.DATA_TYPE = 'FLOAT' then
                    '"' || DATA_PRECISION || '"'
@@ -274,15 +281,9 @@ as
                  when atc.DATA_TYPE like 'TIMESTAMP%WITH LOCAL TIME ZONE' then
                    'TO_CHAR(SYS_EXTRACT_UTC("' || atc.COLUMN_NAME || '"),''YYYY-MM-DD"T"HH24:MI:SS' || case when atc.DATA_SCALE > 0 then '.FF' || atc.DATA_SCALE else '' end || '"Z"'')'
                  when atc.DATA_TYPE like 'INTERVAL DAY% TO SECOND%' then
-                   '''P''
-                   || extract(DAY FROM "' || atc.COLUMN_NAME || '") || ''D''
-                   || ''T'' || case when extract(HOUR FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(HOUR FROM  "' || atc.COLUMN_NAME || '") ||  ''H'' end
-                   || case when extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") || ''M'' end
-                   || case when extract(SECOND FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(SECOND FROM  "' || atc.COLUMN_NAME || '") ||  ''S'' end'
+                   'OBJECT_SERIALIZATION.SERIALIZE_DSINTERVAL_ISO8601("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE  like 'INTERVAL YEAR% TO MONTH%' then
-                   '''P''
-                   || extract(YEAR FROM "' || atc.COLUMN_NAME || '") || ''Y''
-                   || case when extract(MONTH FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MONTH FROM  "' || atc.COLUMN_NAME || '") || ''M'' end'
+                   'OBJECT_SERIALIZATION.SERIALIZE_YMINTERVAL_ISO8601("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE in ('NCHAR','NVARCHAR2') then
                    'TO_CHAR("' || atc.COLUMN_NAME || '")'
                  when atc.DATA_TYPE = 'NCLOB' then
@@ -409,15 +410,9 @@ as
 				 $END
                  */
                  when atc.DATA_TYPE like 'INTERVAL DAY% TO SECOND%' then
-                   '''P''
-                   || extract(DAY FROM "' || atc.COLUMN_NAME || '") || ''D''
-                   || ''T'' || case when extract(HOUR FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(HOUR FROM  "' || atc.COLUMN_NAME || '") ||  ''H'' end
-                   || case when extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MINUTE FROM  "' || atc.COLUMN_NAME || '") || ''M'' end
-                   || case when extract(SECOND FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(SECOND FROM  "' || atc.COLUMN_NAME || '") ||  ''S'' end "' || atc.COLUMN_NAME || '"'
+                   'OBJECT_SERIALIZATION.SERIALIZE_DSINTERVAL_ISO8601("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE  like 'INTERVAL YEAR% TO MONTH%' then
-                   '''P''
-                   || extract(YEAR FROM "' || atc.COLUMN_NAME || '") || ''Y''
-                   || case when extract(MONTH FROM  "' || atc.COLUMN_NAME || '") <> 0 then extract(MONTH FROM  "' || atc.COLUMN_NAME || '") || ''M'' end "' || atc.COLUMN_NAME || '"'
+                   'OBJECT_SERIALIZATION.SERIALIZE_YMINTERVAL_ISO8601("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
                  when ((atc.DATA_TYPE = 'TIMESTAMP') or (atc.DATA_TYPE like 'TIMESTAMP(%)')) then
                    'TO_CHAR("' || atc.COLUMN_NAME || '",''YYYY-MM-DD"T"HH24:MI:SS' || case when atc.DATA_SCALE > 0 then '.FF' || atc.DATA_SCALE else '' end || '"Z"'')'
                  when atc.DATA_TYPE like 'TIMESTAMP%TIME ZONE' then

@@ -128,7 +128,17 @@ class SnowflakeQA extends SnowflakeDBI {
     
     async compareSchemas(source,target,rules) {
      
+	 
       const useDatabase = `USE DATABASE "${source.database}";`;
+
+      const compareRules = {
+	    emptyStringisNull   : rules.EMPTY_STRING_IS_NULL 
+	  ,	spatialPrecision    : rules.SPATIAL_PRECISION || 18
+	  ,	timestampPrecision  : rules.TIMESTAMP_PRECISION || 9
+	  , xmlRule             : rules.XML_COMPARISSON_RULE
+	  , infinityIsNull      : rules.INFINITY_IS_NULL 
+      }
+	 	 
       let results =  await this.executeSQL(useDatabase,[]);      
          
       const report = {
@@ -136,7 +146,7 @@ class SnowflakeQA extends SnowflakeDBI {
        ,failed     : []
       }
 
-      results = await this.executeSQL(SnowflakeQA.SQL_COMPARE_SCHEMAS,[source.database,source.schema,target.schema,rules.EMPTY_STRING_IS_NULL === true,rules.TIMESTAMP_PRECISION || 9]);
+      results = await this.executeSQL(SnowflakeQA.SQL_COMPARE_SCHEMAS,[source.database,source.schema,target.schema,JSON.stringify(compareRules)]);
 	 
       let compare = JSON.parse(results[0].COMPARE_SCHEMAS)
       compare.forEach((result) => {
@@ -165,6 +175,6 @@ class SnowflakeQA extends SnowflakeDBI {
 
 module.exports = SnowflakeQA
 
-const _SQL_COMPARE_SCHEMAS = `call YADAMU_SYSTEM.PUBLIC.COMPARE_SCHEMAS(:1,:2,:3,:4,:5);`
+const _SQL_COMPARE_SCHEMAS = `call YADAMU_SYSTEM.PUBLIC.COMPARE_SCHEMAS(:1,:2,:3,:4);`
 const _SQL_SCHEMA_TABLE_ROWS = `select TABLE_NAME, ROW_COUNT from INFORMATION_SCHEMA.TABLES where TABLE_TYPE = 'BASE TABLE' and TABLE_SCHEMA = ?`;
 

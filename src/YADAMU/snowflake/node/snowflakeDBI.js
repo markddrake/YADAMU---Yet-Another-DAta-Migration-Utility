@@ -329,27 +329,23 @@ class SnowflakeDBI extends YadamuDBI {
   
     
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[]);
+    const yadamuInstanceId = await this.executeSQL(`call YADAMU_SYSTEM.PUBLIC.YADAMU_INSTANCE_ID()`,[]);
+    const yadamuInstallationTimestamp = await this.executeSQL(`call YADAMU_SYSTEM.PUBLIC.YADAMU_INSTALLATION_TIMESTAMP()`,[]);
     
     const sysInfo = results[0];
 
-    return {
-      date               : new Date().toISOString()
-     ,timeZoneOffset     : new Date().getTimezoneOffset()                      
-     //,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
-     ,vendor             : this.DATABASE_VENDOR
-     ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : this.parameters.OWNER
-     ,exportVersion      : YadamuConstants.YADAMU_VERSION
-	 //,sessionUser      : sysInfo.SESSION_USER
-	 //,currentUser      : sysInfo.CURRENT_USER
-     ,warehouse          : sysInfo.WAREHOUSE
-     ,dbName             : sysInfo.DATABASE_NAME
-     ,databaseVersion    : sysInfo.DATABASE_VERSION
-     ,client             : sysInfo.CLIENT
-     ,softwareVendor     : this.SOFTWARE_VENDOR
-     ,account            : sysInfo.ACCOUNT
-     //,nodeClient         : {}} 
-    }  
+    return Object.assign(
+	  super.getSystemInformation()
+	, {
+        account                     : sysInfo.ACCOUNT
+      , warehouse                   : sysInfo.WAREHOUSE
+      , dbName                      : sysInfo.DATABASE_NAME
+      , databaseVersion             : sysInfo.DATABASE_VERSION
+      , client                      : sysInfo.CLIENT
+	  , yadamuInstanceID            : yadamuInstanceId[0].YADAMU_INSTANCE_ID
+	  , yadamuInstallationTimestamp : yadamuInstallationTimestamp[0].YADAMU_INSTALLATION_TIMESTAMP
+      }  
+	)
   }
 
   /*

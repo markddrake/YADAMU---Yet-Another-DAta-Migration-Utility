@@ -12,7 +12,7 @@ begin
    SELECT count(*)::int
         , 'DROP FUNCTION ' || string_agg(oid::regprocedure::text, '; DROP FUNCTION ')
    FROM   pg_proc
-   WHERE  UPPER(proname) in ('EXPORT_JSON','MAP_FOREIGN_DATA_TYPE','GENERATE_STATEMENTS','IMPORT_JSON','IMPORT_JSONB','GENERATE_SQL')
+   WHERE  UPPER(proname) in ('YADAMU_EXPORT','MAP_FOREIGN_DATA_TYPE','GENERATE_STATEMENTS','YADAMU_IMPORT_JSON','YADAMU_IMPORT_JSONB','GENERATE_SQL','EXPORT_JSON','IMPORT_JSON','IMPORT_JSONB')
    INTO   _count, _sql;  -- only returned if trailing DROPs succeed
 
    if _count > 0 then
@@ -21,13 +21,242 @@ begin
 end
 $$ 
 language plpgsql;
+--
 /*
 **
-** Postgress EXPORT_JSON Function.
+** Yadamu Instance ID and Installation Timestamp
+**
+*/
+do $$ 
+declare
+   COMMAND              character varying (256);
+   V_YADAMU_INSTANCE_ID character varying(36);
+begin
+
+  begin
+    SELECT YADAMU_INSTANCE_ID() into V_YADAMU_INSTANCE_ID;
+  exception
+    when undefined_function then
+      V_YADAMU_INSTANCE_ID := upper(gen_random_uuid()::CHAR(36));
+    when others then
+      RAISE;
+   end;
+   
+   COMMAND  := concat('CREATE OR REPLACE FUNCTION YADAMU_INSTANCE_ID() RETURNS CHARACTER VARYING STABLE AS $X$ select ''',V_YADAMU_INSTANCE_ID,''' $X$ LANGUAGE SQL');
+   EXECUTE COMMAND;
+end $$;
+--
+do $$ 
+declare
+   COMMAND                   character varying(256);
+   V_INSTALLATION_TIMESTAMP  character varying(27);
+begin
+  V_INSTALLATION_TIMESTAMP := to_char(current_timestamp,'YYYY-MM-DD"T"HH24:MI:SSTZH:TZM');
+  COMMAND  := concat('CREATE OR REPLACE FUNCTION YADAMU_INSTALLATION_TIMESTAMP() RETURNS CHARACTER VARYING STABLE AS $X$ select ''',V_INSTALLATION_TIMESTAMP,''' $X$ LANGUAGE SQL');
+  EXECUTE COMMAND;
+end $$;
+--
+CREATE OR REPLACE FUNCTION YADAMU_AsPointArray(polygon)
+returns point[]
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+--
+-- Array of Points from Polygon
+--
+select array_agg(POINT(V))
+  from unnest(string_to_array(ltrim(rtrim($1::VARCHAR,'))'),'(('),'),(')) V
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU_AsPointArray(path)
+returns point[]
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+--
+-- Array of Points from Path
+--
+select array_agg(POINT(V))
+  from unnest(string_to_array(ltrim(rtrim($1::VARCHAR,')])'),'[('),'),(')) V
+$$
+LANGUAGE SQL;
+--
+/*
+**
+** JSON Based Export/Import of TSVECTOR
 **
 */
 --
-create or replace function EXPORT_JSON(P_SCHEMA VARCHAR, P_SPATIAL_FORMAT VARCHAR) 
+CREATE OR REPLACE FUNCTION YADAMU_AsJSON(tsvector) 
+returns jsonb
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select array_to_json(tsvector_to_array($1))
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU_AsTSVector(jsonb) 
+returns tsvector
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select array_to_tsvector(array_agg(value)) from jsonb_array_elements_text($1)
+$$
+LANGUAGE SQL;
+--
+/*
+**
+** JSON Based Export/Import of RANGE types
+**
+*/
+CREATE OR REPLACE FUNCTION YADAMU_AsJSON(anyRange) 
+returns jsonb
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select json_build_object(
+  'hasLowerBound',
+  not lower_inf($1),
+  'lowerBound',
+  lower($1),
+  'includeLowerBound',
+  lower_inc($1),
+  'hasUpperBound',
+  not upper_inf($1),
+  'upperBound',  
+  upper($1),
+  'includeUpperBound',
+  upper_inc($1)
+)
+$$
+LANGUAGE SQL;
+--
+create or replace function YADAMU_AsRange(jsonb)
+returns character varying
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select case when ($1 ->> 'includeLowerBound')::boolean then '[' else '(' end
+	|| case when ($1 ->> 'hasLowerBound')::boolean  then '"' || ($1 ->> 'lowerBound') || '"' else '' end
+	|| ','
+	|| case when ($1 ->> 'hasUpperBound')::boolean then '"' || ($1 ->> 'upperBound') || '"' else '' end
+    || case when ($1 ->> 'includeUpperBound')::boolean then ']' else ')' end;
+$$
+LANGUAGE SQL;
+--
+/*
+**
+** GeoJSON Based Export/Import of LINE 
+**
+*/
+--
+CREATE OR REPLACE FUNCTION YADAMU_AsGEOJSON(line) 
+returns jsonb
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select json_build_object(
+         'type',
+         'Feature',
+         'geometry',
+         json_build_object(
+           'type',
+           'Point',
+           'coordinates',
+           json_build_array(
+             ($1)[0],
+             ($1)[1]
+           )
+         ),
+        'shape',
+        'LinearEquation',
+        'properties',
+        json_build_object(
+          'constant',
+           $1[2]
+        )
+      )
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU_AsLine(jsonb) 
+returns line
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select ('{' || ($1 #>> '{geometry,coordinates,0}') || ',' || ($1 #>> '{geometry,coordinates,1}') || ',' || ($1 #>> '{properties,constant}') || '}')::line
+$$
+LANGUAGE SQL;
+--
+/*
+**
+** GeoJSON Based Export/Import of CIRCLE 
+**
+*/
+--
+CREATE OR REPLACE FUNCTION YADAMU_AsGEOJSON(circle) 
+returns jsonb
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select json_build_object(
+         'type',
+         'Feature',
+         'geometry',
+         json_build_object(
+           'type',
+           'Point',
+           'coordinates',
+           json_build_array(
+             (center($1))[0],
+             (center($1))[1]
+           )
+         ),
+         'shape',
+         'Circle',
+         'properties',
+         json_build_object(
+         'radius',
+            radius($1)
+         )
+       )
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU_AsCircle(jsonb) 
+returns circle
+STABLE RETURNS NULL ON NULL INPUT
+as
+$$
+select ('<(' || ($1 #>> '{geometry,coordinates,0}') || ',' || ($1 #>> '{geometry,coordinates,1}') || '),' || ($1 #>> '{properties,radius}') || '>')::circle
+$$
+LANGUAGE SQL;
+--
+CREATE OR REPLACE FUNCTION YADAMU_AsLSeg(path) 
+returns LSeg
+STABLE RETURNS NULL ON NULL INPUT
+as
+--
+-- PATH to LSEG
+--
+$$
+with POINTS as (
+  select YADAMU_asPointArray($1) P
+)   
+select lseg(point(p[1]),point(p[2]))
+  from POINTS;
+$$
+LANGUAGE SQL;
+--
+/*
+**
+** Postgress YADAMU_EXPORT Function.
+**
+*/
+--
+create or replace function YADAMU_EXPORT(P_SCHEMA VARCHAR, P_SPATIAL_FORMAT VARCHAR, P_OPTIONS JSONB DEFAULT '{"circleAsPolygon": false}'::JSONB) 
 returns TABLE ( TABLE_SCHEMA VARCHAR, TABLE_NAME VARCHAR, COLUMN_NAME_ARRAY JSONB, DATA_TYPE_ARRAY JSONB, SIZE_CONSTRAINT_ARRAY JSONB, CLIENT_SELECT_LIST TEXT, ERRORS JSONB)
 as $$
 declare
@@ -42,153 +271,150 @@ begin
                  ,t.table_name "TABLE_NAME"
 	             ,jsonb_agg(column_name order by ordinal_position) "COLUMN_NAME_ARRAY"
 	             ,jsonb_agg(case 
-                              when data_type = 'USER-DEFINED' then
-                                udt_name 
-                              when data_type = 'interval' then
-                                data_type || ' ' || lower(interval_type) 
+                              when c.data_type = 'USER-DEFINED' then
+                                c.udt_name 
+                              when c.data_type = 'ARRAY' then
+                                e.data_type || ' ARRAY'
+                              when ((c.data_type = 'interval') and (c.interval_type is not null)) then
+							    c.data_type || ' ' || c.interval_type
                               else 
-                                data_type 
+                                c.data_type 
                             end 
                             order by ordinal_position
                            ) "DATA_TYPE_ARRAY"
                  ,jsonb_agg(case
-                              when (numeric_precision is not null) and (numeric_scale is not null) then
-                                cast(numeric_precision as varchar) || ',' || cast(numeric_scale as varchar)
-                              when (numeric_precision is not null) then 
-                                cast(numeric_precision as varchar)
-                              when (character_maximum_length is not null) then 
-                                cast(character_maximum_length as varchar)
-                              when (datetime_precision is not null) then 
-                                cast(datetime_precision as varchar)
+                              when (c.numeric_precision is not null) and (c.numeric_scale is not null) then
+                                cast(c.numeric_precision as varchar) || ',' || cast(c.numeric_scale as varchar)
+                              when (c.numeric_precision is not null) then 
+                                cast(c.numeric_precision as varchar)
+                              when (c.character_maximum_length is not null) then 
+                                cast(c.character_maximum_length as varchar)
+                              when (c.datetime_precision is not null) then 
+                                cast(c.datetime_precision as varchar)
                             end
                             order by ordinal_position
                           ) "SIZE_CONSTRAINT_ARRAY"
 	             ,string_agg(case 
-                               when data_type = 'xml' then
+                               when c.data_type = 'xml' then
                                   '"' || column_name || '"' || '::text'
-                               when ((data_type = 'USER-DEFINED') and (udt_name in ('geometry','geography')))  then
-                                  case 
-                                    when P_SPATIAL_FORMAT = 'WKB' then
-                                      'ST_AsBinary("' || column_name || '") "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'WKT' then
-                                      'ST_AsText("' || column_name || '",18) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'EWKB' then
-                                      'ST_AsEWKB("' || column_name || '") "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'EWKT' then
-                                      'ST_AsEWKT("' || column_name || '") "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
-                                      'ST_AsGeoJSON("' || column_name || '") "' || COLUMN_NAME || '"'
-                                    else
-                                      'ST_AsEWKB("' || column_name || '") "' || COLUMN_NAME || '"'
-                                  end
-                               when (data_type in ('point','path','polygon')) then
-                                  case 
-                                    when P_SPATIAL_FORMAT = 'WKB' then
-                                      'ST_AsBinary("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'WKT' then
-                                      'ST_AsText("' || column_name || '"::geometry,18) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'EWKB' then
-                                      'ST_AsEWKB("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'EWKT' then
-                                      'ST_AsEWKT("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
-                                      'ST_AsGeoJSON("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'Native' then
-                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
-                                    else
-                                      'ST_AsEWKB("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
-                                  end
-                               when (data_type = 'line') then
-                                  case 
-                                    when P_SPATIAL_FORMAT = 'WKB' then
-                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'WKT' then
-                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'EWKB' then
-                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'EWKT' then
-                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
-                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'Native' then
-                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
-                                    else
-                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
-                                  end
-  							    when (data_type = 'lseg') then
-                                  case 
-                                    when P_SPATIAL_FORMAT = 'WKB' then
-                                      'case when "' || column_name || '" is NULL then NULL else ST_AsBinary(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'WKT' then
-                                      'case when "' || column_name || '" is NULL then NULL else ST_AsText((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry,18) end "' || COLUMN_NAME || '"' 
-                                    when P_SPATIAL_FORMAT = 'EWKB' then
-                                      'case when "' || column_name || '" is NULL then NULL else ST_AsEWKB((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'EWKT' then
-                                      'case when "' || column_name || '" is NULL then NULL else ST_AsEWKT((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
-                                      'case when "' || column_name || '" is NULL then NULL else ST_AsGeoJSON((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'Native' then
-                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
-                                    else
-                                      'case when "' || column_name || '" is NULL then NULL else ST_AsEWKB((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
-                                  end
-                               when (data_type = 'box') then
-                                  case 
-                                    when P_SPATIAL_FORMAT = 'WKB' then
-                                      'ST_AsBinary(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'WKT' then
-                                      'ST_AsText(polygon("' || column_name || '")::geometry,18) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'EWKB' then
-                                      'ST_AsEWKB(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'EWKT' then
-                                      'ST_AsEWKT(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
-                                      'ST_AsGeoJSON(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'Native' then
-                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
-                                    else
-                                      'ST_AsEWKB(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                  end
-                               when (data_type = 'circle') then
-                                  case 
-                                    when P_SPATIAL_FORMAT = 'WKB' then
-                                      'ST_AsBinary(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'WKT' then
-                                      'ST_AsText(polygon(32,"' || column_name || '")::geometry,18) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'EWKB' then
-                                      'ST_AsEWKB(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'EWKT' then
-                                      'ST_AsEWKT(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
-                                      'ST_AsGeoJSON(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                    when P_SPATIAL_FORMAT = 'Native' then
-                                      '"' || column_name || '"::TEXT "' || COLUMN_NAME || '"'
-                                    else
-                                      'ST_AsEWKB(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
-                                  end
-							   when data_type like 'interval%' then
-                                  '"' || COLUMN_NAME ||'"::varchar "' || COLUMN_NAME || '"'
-                               when data_type in ('date','timestamp without time zone') then
-                                  'to_char ("' || COLUMN_NAME ||'" at time zone ''UTC'', ''YYYY-MM-DD"T"HH24:MI:SS.US"Z"'') "' || COLUMN_NAME || '"'
-                               when data_type in ('money') then
+                               when c.data_type in ('money') then
                                  /* Suppress printing Currency Symbols */
                                  /* then '("' || column_name || '"/1::money) */
                                  '("' || column_name || '"::numeric) "' || COLUMN_NAME || '"'
-                               when data_type in ('time', 'time with time zone','time without time zone') then 
-                                 /*  '''1971-01-01T'' || to_char("' || COLUMN_NAME || '",''HH24:MI:SS.US"Z"'')  "' || COLUMN_NAME || '"' */
-                                 '''1971-01-01T'' || CAST("' || COLUMN_NAME || '" as CHARACTER VARYING(16))  "' || COLUMN_NAME || '"'
-                                when data_type like 'timestamp%' then 
-                                  'to_char ("' || COLUMN_NAME ||'" at time zone ''UTC'', ''YYYY-MM-DD"T"HH24:MI:SS.US"Z"'') "' || COLUMN_NAME || '"'
+                               when c.data_type in ('date','timestamp without time zone') then
+                                 'to_char ("' || COLUMN_NAME ||'" at time zone ''UTC'', ''YYYY-MM-DD"T"HH24:MI:SS.US"Z"'') "' || COLUMN_NAME || '"'
+                               when c.data_type in ('timestamp with time zone') then
+                                 'to_char ("' || COLUMN_NAME ||'", ''YYYY-MM-DD"T"HH24:MI:SS.US"Z"'') "' || COLUMN_NAME || '"'
+                               when c.data_type in ('time without time zone') then
+                                 'to_char ((''epoch''::date + "' || COLUMN_NAME || '")::timestamp at time zone ''UTC'', ''YYYY-MM-DD"T"HH24:MI:SS.US'') "' || COLUMN_NAME || '"'
+                               when c.data_type in ('time with time zone') then
+							     'to_char ((''epoch''::date + "' || COLUMN_NAME || '")::timestamptz, ''YYYY-MM-DD"T"HH24:MI:SS.US'') "' || COLUMN_NAME || '"'
+							   when c.data_type like 'interval%' then
+                                 '"' || COLUMN_NAME ||'"::varchar "' || COLUMN_NAME || '"'
+                               when ((c.data_type = 'USER-DEFINED') and (c.udt_name in ('geometry','geography')))  then
+                                 case 
+                                   when P_SPATIAL_FORMAT = 'WKB' then
+                                     'ST_AsBinary("' || column_name || '") "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'WKT' then
+                                     'ST_AsText("' || column_name || '",18) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'EWKB' then
+                                     'ST_AsEWKB("' || column_name || '") "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'EWKT' then
+                                     'ST_AsEWKT("' || column_name || '") "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                     'ST_AsGeoJSON("' || column_name || '") "' || COLUMN_NAME || '"'
+                                   else
+								     '"' || column_name || '"::VARCHAR "' || COLUMN_NAME || '"'
+                                 end
+                               when (c.data_type in ('point','path','polygon')) then
+                                 case 
+                                   when P_SPATIAL_FORMAT = 'WKB' then
+                                     'ST_AsBinary("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'WKT' then
+                                     'ST_AsText("' || column_name || '"::geometry,18) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'EWKB' then
+                                     'ST_AsEWKB("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'EWKT' then
+                                     'ST_AsEWKT("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                     'ST_AsGeoJSON("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'YadamuJSON' then
+								     'YADAMU_AsGeoJSON("' || column_name || '" ) "' || COLUMN_NAME || '"'
+                                   else
+								     '"' || column_name || '"::VARCHAR "' || COLUMN_NAME || '"'
+                                 end
+                               when (c.data_type = 'line') then
+                                 'YADAMU_AsGeoJSON("' || column_name || '") "' || COLUMN_NAME || '"'
+ 							   when (c.data_type = 'lseg') then
+                                 case 
+                                   when P_SPATIAL_FORMAT = 'WKB' then
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsBinary(path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'WKT' then
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsText((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry,18) end "' || COLUMN_NAME || '"' 
+                                   when P_SPATIAL_FORMAT = 'EWKB' then
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKB((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'EWKT' then
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKT((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                      'case when "' || column_name || '" is NULL then NULL else ST_AsGeoJSON((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'YadamuJSON' then
+								     'YADAMU_AsGeoJSON("' || column_name || '" ) "' || COLUMN_NAME || '"'
+                                   else
+								     '"' || column_name || '"::VARCHAR "' || COLUMN_NAME || '"'
+                                 end
+                               when (c.data_type = 'box') then
+                                 case 
+								   when P_SPATIAL_FORMAT = 'WKB' then
+                                     'ST_AsBinary(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'WKT' then
+                                     'ST_AsText(polygon("' || column_name || '")::geometry,18) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'EWKB' then
+                                      'ST_AsEWKB(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'EWKT' then
+                                     'ST_AsEWKT(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                     'ST_AsGeoJSON(polygon("' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'YadamuJSON' then
+								     'YADAMU_AsGeoJSON("' || column_name || '" ) "' || COLUMN_NAME || '"'
+                                   else
+								     '"' || column_name || '" ::VARCHAR "' || COLUMN_NAME || '"'
+                                 end
+                               when (c.data_type = 'circle') then
+                                 case 
+								   when ((P_OPTIONS ->> 'circleAsPolygon')::boolean = true) then
+								     case 
+                                       when P_SPATIAL_FORMAT = 'WKB' then
+                                         'ST_AsBinary(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                       when P_SPATIAL_FORMAT = 'WKT' then
+                                         'ST_AsText(polygon(32,"' || column_name || '")::geometry,18) "' || COLUMN_NAME || '"'
+                                       when P_SPATIAL_FORMAT = 'EWKB' then
+                                         'ST_AsEWKB(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                       when P_SPATIAL_FORMAT = 'EWKT' then
+                                         'ST_AsEWKT(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                       when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                         'ST_AsGeoJSON(polygon(32,"' || column_name || '")::geometry) "' || COLUMN_NAME || '"'
+                                       when P_SPATIAL_FORMAT = 'YadamuJSON' then
+								        'YADAMU_AsGeoJSON(polygon(32,"' || column_name || '")) "' || COLUMN_NAME || '"'
+                                       else
+								        '"' || column_name || '"::VARCHAR "' || COLUMN_NAME || '"'
+								     end
+								   else 
+                                     'YADAMU_AsGeoJSON("' || column_name || '") "' || COLUMN_NAME || '"'
+							     end  
+                               when (c.data_type in ('int4range','int8range','numrange','tsrange','tstzrange','daterange','tsvector')) then
+                                 'YADAMU_AsJSON("' || column_name || '") "' || COLUMN_NAME || '"'
                                else
                                  '"' || column_name || '"'
                              end,
 			                 ',' order by ordinal_position
                                ) "CLIENT_SELECT_LIST"
-            from information_schema.columns c, information_schema.tables t
-           where t.table_name = c.table_name 
-	         and t.table_schema = c.table_schema
-	         and t.table_type = 'BASE TABLE'
-             and t.table_schema = P_SCHEMA
+            from information_schema.columns c
+  			left join information_schema.tables t 
+			  on ((t.table_schema, t.table_name) = (c.table_schema, c.table_name))
+	        left join information_schema.element_types e
+              on ((c.table_catalog, c.table_schema, c.table_name, 'TABLE', c.dtd_identifier) = (e.object_catalog, e.object_schema, e.object_name, e.object_type, e.collection_type_identifier))
+           where t.table_type = 'BASE TABLE'
+             and t.table_schema =  P_SCHEMA
         group by t.table_schema, t.table_name
     
   loop
@@ -198,7 +424,6 @@ begin
     ** Calculate the max length of bytea fields, since Postgres does not maintain a maximum length in the dictionary.
     **
     */
-  
     select 'select jsonb_build_array(' 
         || string_agg(
              case
@@ -233,7 +458,7 @@ exception
   when others then
     GET STACKED DIAGNOSTICS PLPGSQL_CTX = PG_EXCEPTION_CONTEXT;
     ERRORS := '[]';
-    ERRORS := jsonb_insert(ERRORS, CAST('{' || jsonb_array_length(ERRORS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call EXPORT_JSON(P_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
+    ERRORS := jsonb_insert(ERRORS, CAST('{' || jsonb_array_length(ERRORS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call YADAMU_EXPORT(P_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
     return NEXT;
     return;
 end;  
@@ -241,7 +466,7 @@ $$ LANGUAGE plpgsql;
 --
 /*
 **
-** Postgress IMPORT_JSON Function.
+** Postgress YADAMU_IMPORT_JSON Function.
 **
 */
 --
@@ -250,367 +475,209 @@ $$ LANGUAGE plpgsql;
 ** TODO: Add support for specifying whether to map JSON to JSON or JSONB
 **
 */
-create or replace function MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH BIGINT, P_DATA_TYPE_SCALE INT, P_GEOMETRY_TYPE VARCHAR) 
+create or replace function MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH BIGINT, P_DATA_TYPE_SCALE INT, P_POSTGIS_INSTALLED BOOLEAN) 
 returns VARCHAR
 as $$
 declare
-  V_DATA_TYPE                    VARCHAR(128);
-  C_JSON_TYPE                    VARCHAR(5)  = 'jsonb';
-  C_CHARACTER_VARYING_MAX_LENGTH INT         = 10 * 1024 * 1024;
-  C_CHARACTER_VARYING_MAX        VARCHAR(32) = 'character varying(' || C_CHARACTER_VARYING_MAX_LENGTH || ')';
+  V_DATA_TYPE                         VARCHAR(128);
+  C_JSON_TYPE                         VARCHAR(5)  = 'jsonb';
+  C_GEOMETRY_TYPE                     VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geometry' ELSE 'JSON' END;
+  C_GEOGRAPHY_TYPE                    VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geography' ELSE 'JSON' END;
+  C_MAX_CHARACTER_VARYING_TYPE_LENGTH INT         = 10 * 1024 * 1024;
+  C_MAX_CHARACTER_VARYING_TYPE        VARCHAR(32) = 'character varying(' || C_MAX_CHARACTER_VARYING_TYPE_LENGTH || ')';
+  C_BFILE_TYPE                        VARCHAR(32) = 'character varying(2048)';
+  C_ROWID_TYPE                        VARCHAR(32) = 'character varying(18)';
+  C_MYSQL_TINY_TEXT_TYPE              VARCHAR(32) = 'character varying(256)';
+  C_MYSQL_TEXT_TYPE                   VARCHAR(32) = 'character varying(65536)';
+  C_ENUM_TYPE                         VARCHAR(32) = 'character varying(255)';
+  C_MSSQL_MONEY_TYPE                  VARCHAR(32) = 'numeric(19,4)';
+  C_MSSQL_SMALL_MONEY_TYPE            VARCHAR(32) = 'numeric(10,4)';
+  C_HIERARCHY_TYPE                    VARCHAR(32) = 'character varying(4000)';
+  C_INET_ADDR_TYPE                    VARCHAR(32) = 'character varying(39)';
+  C_MAC_ADDR_TYPE                     VARCHAR(32) = 'character varying(23)';
+  C_UNSIGNED_INT_TYPE                 VARCHAR(32) = 'decimal(10,0)';
+  C_PGSQL_IDENTIFIER                  VARCHAR(32) = 'binary(4)';
+  C_MONGO_OBJECT_ID                   VARCHAR(32) = 'binary(12)';
+  C_MONGO_UNKNOWN_TYPE                VARCHAR(32) = 'character varying(2048)';
+  C_MONGO_REGEX_TYPE                  VARCHAR(32) = 'character varying(2048)';
+     
 begin
   V_DATA_TYPE := P_DATA_TYPE;
 
   case P_SOURCE_VENDOR 
     when 'Postgres' then
       case V_DATA_TYPE 
-        when 'timestamp with time zone' then
-          return 'timestamp(' || P_DATA_TYPE_LENGTH || ') with time zone';
-        when 'timestamp without time zone' then
-          return 'timestamp(' || P_DATA_TYPE_LENGTH || ') without time zone';
-        when 'time with time zone' then
-          return 'time(' || P_DATA_TYPE_LENGTH || ') with time zone';
-        when 'time without time zone' then
-          return 'time(' || P_DATA_TYPE_LENGTH || ') without time zone';
-        else
-          return lower(V_DATA_TYPE);
+	    when 'character'                                                                         then return case when P_DATA_TYPE_LENGTH is NULL then 'bpchar' else V_DATA_TYPE end;                                                
+        when 'timestamp with time zone'                                                          then return 'timestamp(' || P_DATA_TYPE_LENGTH || ') with time zone';
+        when 'timestamp without time zone'                                                       then return 'timestamp(' || P_DATA_TYPE_LENGTH || ') without time zone';
+        when 'time with time zone'                                                               then return 'time(' || P_DATA_TYPE_LENGTH || ') with time zone';
+        when 'time without time zone'                                                            then return 'time(' || P_DATA_TYPE_LENGTH || ') without time zone';
+                                                                                                 else return lower(V_DATA_TYPE);																					
       end case;
     when 'Oracle' then
       case V_DATA_TYPE
-        when 'VARCHAR2' then
-          return 'character varying';
-        when 'NUMBER' then
-           return 'numeric';
-        when 'BINARY_FLOAT' then
-           return 'float4';
-        when 'BINARY_DOUBLE' then
-           return 'float8';
-        when 'NVARCHAR2' then
-           return 'character varying';
-        when 'RAW' then
-           return 'bytea';
-        when 'BLOB' then
-           return 'bytea';
-        when 'CLOB' then
-           return C_CHARACTER_VARYING_MAX;
-        when 'NCLOB' then
-           return C_CHARACTER_VARYING_MAX;
-        when 'TIMESTAMP' then
-          case
-            when P_DATA_TYPE_LENGTH > 6 then 
-			  return 'timestamp(6)';
-            else 
-              return 'timestamp';
-          end case;
-        when 'BFILE' then
-           return 'character varying';
-        when 'ROWID' then
-           return 'character varying';
-        when 'ANYDATA' then
-           return C_CHARACTER_VARYING_MAX;
-        when 'XMLTYPE'then
-           return 'xml';
-        when '"MDSYS"."SDO_GEOMETRY"' then
-           return P_GEOMETRY_TYPE;
+        when 'VARCHAR2'                                                                          then return 'character varying';
+        when 'NUMBER'                                                                            then return 'numeric';
+        when 'BINARY_FLOAT'                                                                      then return 'float4';
+        when 'BINARY_DOUBLE'                                                                     then return 'float8';
+        when 'NVARCHAR2'                                                                         then return 'character varying';
+        when 'RAW'                                                                               then return 'bytea';
+        when 'BLOB'                                                                              then return 'bytea';
+        when 'CLOB'                                                                              then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'NCLOB'                                                                             then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'TIMESTAMP'                                                                         then return case when P_DATA_TYPE_LENGTH > 6  then 'timestamp(6)' else 'timestamp' end;
+        when 'BFILE'                                                                             then return C_BFILE_TYPE;
+        when 'ROWID'                                                                             then return C_ROWID_TYPE;
+        when 'ANYDATA'                                                                           then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'XMLTYPE'                                                                           then return 'xml';
+        when '"MDSYS"."SDO_GEOMETRY"'                                                            then return C_GEOMETRY_TYPE;
         else
-          -- Oracle complex mappings
-          if (strpos(V_DATA_TYPE,'LOCAL TIME ZONE') > 0) then
-            return lower(replace(V_DATA_TYPE,'LOCAL TIME ZONE','TIME ZONE'));  
-          end if;
-          if ((strpos(V_DATA_TYPE,'INTERVAL') = 1) and (strpos(V_DATA_TYPE,'YEAR') > 0) and (strpos(V_DATA_TYPE,'TO MONTH') > 0)) then
-            return 'interval year to month';
-          end if;
-          if ((strpos(V_DATA_TYPE,'INTERVAL') = 1) and (strpos(V_DATA_TYPE,'DAY') > 0) and (strpos(V_DATA_TYPE,'TO SECOND') > 0)) then
-            return 'interval day to second';
-          end if;
-          if (strpos(V_DATA_TYPE,'"."XMLTYPE"') > 0) then 
-            return 'xml';
-          end if;
-          if (V_DATA_TYPE like '"%"."%"') then
-             -- Map all object types to text - Store the Oracle serialized format. 
-             -- When Oracle Objects are mapped to JSON change the mapping to JSON.
-             return C_CHARACTER_VARYING_MAX;
-          end if;
-          return lower(V_DATA_TYPE);
+		  case 
+		    when (strpos(V_DATA_TYPE,'LOCAL TIME ZONE') > 0)                                     then return lower(replace(V_DATA_TYPE,'LOCAL TIME ZONE','TIME ZONE'));  
+            when (strpos(V_DATA_TYPE,'INTERVAL') = 1) 
+			 and (strpos(V_DATA_TYPE,'YEAR') > 0) 
+			 and (strpos(V_DATA_TYPE,'TO MONTH') > 0)                                            then return 'interval year to month';
+          when (strpos(V_DATA_TYPE,'INTERVAL') = 1) 
+		   and (strpos(V_DATA_TYPE,'DAY') > 0) 
+		   and (strpos(V_DATA_TYPE,'TO SECOND') > 0)                                             then return 'interval day to second';
+		  when (strpos(V_DATA_TYPE,'"."XMLTYPE"') > 0)                                           then return 'xml';
+          -- Map all object types to text - Store the Oracle serialized format. 
+          -- When Oracle Objects are mapped to JSON change the mapping to JSON.
+          when(V_DATA_TYPE like '"%"."%"')                                                       then return C_MAX_CHARACTER_VARYING_TYPE;
+                                                                                                 else return lower(V_DATA_TYPE);
+		 end case;
       end case;
     when  'MySQL' then
       case V_DATA_TYPE
         -- MySQL Direct Mappings
-        when 'binary' then
-           return 'bytea';
-        when 'bit' then
-           return 'boolean';
-        when 'datetime' then
-           return 'timestamp';
-        when 'double' then
-           return 'double precision';
-        when  'enum' then
-           return 'varchar(255)';   
-        when 'float' then
-           return 'real';
-        when 'point' then
-           return 'point';
-        when 'linestring' then
-           return 'path';
-        when 'polygon' then
-           return 'polygon';
-        when 'geometry' then
-           return P_GEOMETRY_TYPE;
-        when 'mulitpoint' then
-           return P_GEOMETRY_TYPE;
-        when 'multilinestring' then
-           return P_GEOMETRY_TYPE;
-        when 'multipolygon' then
-           return P_GEOMETRY_TYPE;
-        when 'geometrycollection' then
-           return P_GEOMETRY_TYPE;
-        when 'tinyint' then
-           return 'smallint';
-        when 'mediumint' then
-           return 'integer';
-        when 'tinyblob' then
-           return 'bytea';
-        when 'blob' then
-           return 'bytea';
-        when 'mediumblob' then
-           return 'bytea';
-        when 'longblob' then
-           return 'bytea';
-        when 'set' then
-           return 'jsonb';   
-        when 'tinyint' then
-           return 'smallint';
-        when 'tinytext' then
-           return 'character varying(256)';
-        when 'text' then
-           return 'character varying (65536)';
-         when 'mediumtext' then
-           return C_CHARACTER_VARYING_MAX;
-        when 'longtext' then
-           return C_CHARACTER_VARYING_MAX;
-        when 'varbinary' then
-           return 'bytea';
-        when 'year' then
-           return 'smallint';
-        else
-          return lower(V_DATA_TYPE);
+        when 'binary'                                                                            then return 'bytea';
+        when 'bit'                                                                               then return 'boolean';
+        when 'datetime'                                                                          then return 'timestamp';
+        when 'double'                                                                            then return 'double precision';
+        when 'enum'                                                                              then return C_ENUM_TYPE;   
+        when 'float'                                                                             then return 'real';
+        when 'point'                                                                             then return 'point';
+        when 'linestring'                                                                        then return 'path';
+        when 'polygon'                                                                           then return 'polygon';
+        when 'geometry'                                                                          then return C_GEOMETRY_TYPE;
+        when 'multipoint'                                                                        then return C_GEOMETRY_TYPE;
+        when 'multilinestring'                                                                   then return C_GEOMETRY_TYPE;
+        when 'multipolygon'                                                                      then return C_GEOMETRY_TYPE;
+        when 'geometrycollection'                                                                then return C_GEOMETRY_TYPE;
+        when 'geomcollection'                                                                    then return C_GEOMETRY_TYPE;
+        when 'tinyint'                                                                           then return 'smallint';
+        when 'mediumint'                                                                         then return 'integer';
+        when 'int unsigned'                                                                      then return 'oid';
+        when 'tinyblob'                                                                          then return 'bytea';
+        when 'blob'                                                                              then return 'bytea';
+        when 'mediumblob'                                                                        then return 'bytea';
+        when 'longblob'                                                                          then return 'bytea';
+        when 'set'                                                                               then return 'jsonb';   
+        when 'tinyint'                                                                           then return 'smallint';
+        when 'tinytext'                                                                          then return C_MYSQL_TINY_TEXT_TYPE;
+        when 'text'                                                                              then return C_MYSQL_TEXT_TYPE;
+        when 'mediumtext'                                                                        then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'longtext'                                                                          then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'varbinary'                                                                         then return 'bytea';
+        when 'year'                                                                              then return 'smallint';
+                                                                                                 else return lower(V_DATA_TYPE);
       end case;
     when  'MariaDB' then
       case V_DATA_TYPE
         -- MySQL Direct Mappings
-        when 'binary' then
-           return 'bytea';
-        when 'bit' then
-           return 'boolean';
-        when 'datetime' then
-           return 'timestamp';
-        when 'double' then
-           return 'double precision';
-        when  'enum' then
-           return 'varchar(255)';   
-        when 'float' then
-           return 'real';
-        when 'geometry' then
-           return P_GEOMETRY_TYPE;
-        when 'geography' then
-           return P_GEOMETRY_TYPE;
-        when 'point' then
-           return  'point';
-        when 'linestring' then
-           return 'path';
-        when 'polygon' then
-           return 'polygon';
-        when 'tinyint' then
-           return 'smallint';
-        when 'mediumint' then
-           return 'integer';
-        when 'tinyblob' then
-           return 'bytea';
-        when 'blob' then
-           return 'bytea';
-        when 'mediumblob' then
-           return 'bytea';
-        when 'longblob' then
-           return 'bytea';
-        when 'set' then
-           return 'jsonb';   
-        when 'tinyint' then
-           return 'smallint';
-        when 'tinytext' then
-           return 'character varying (256)';
-        when 'text' then
-           return 'character varying (65536)';
-         when 'mediumtext' then
-           return C_CHARACTER_VARYING_MAX;
-        when 'longtext' then
-           return C_CHARACTER_VARYING_MAX;
-        when 'varbinary' then
-           return 'bytea';
-        when 'year' then
-           return 'smallint';
-        else
-          return lower(V_DATA_TYPE);
+        when 'binary'                                                                            then return 'bytea';
+        when 'bit'                                                                               then return 'boolean';
+        when 'datetime'                                                                          then return 'timestamp';
+        when 'double'                                                                            then return 'double precision';
+        when  'enum'                                                                             then return 'varchar(255)';   
+        when 'float'                                                                             then return 'real';
+        when 'point'                                                                             then return 'point';
+        when 'linestring'                                                                        then return 'path';
+        when 'polygon'                                                                           then return 'polygon';
+        when 'geometry'                                                                          then return C_GEOMETRY_TYPE;
+        when 'multipoint'                                                                        then return C_GEOMETRY_TYPE;
+        when 'multilinestring'                                                                   then return C_GEOMETRY_TYPE;
+        when 'multipolygon'                                                                      then return C_GEOMETRY_TYPE;
+        when 'geometrycollection'                                                                then return C_GEOMETRY_TYPE;
+        when 'geomcollection'                                                                    then return C_GEOMETRY_TYPE;
+        when 'tinyint'                                                                           then return 'smallint';
+        when 'mediumint'                                                                         then return 'integer';
+        when 'tinyblob'                                                                          then return 'bytea';
+        when 'blob'                                                                              then return 'bytea';
+        when 'mediumblob'                                                                        then return 'bytea';
+        when 'longblob'                                                                          then return 'bytea';
+        when 'set'                                                                               then return 'jsonb';   
+        when 'tinyint'                                                                           then return 'smallint';
+        when 'tinytext'                                                                          then return C_MYSQL_TINY_TEXT_TYPE;
+        when 'text'                                                                              then return C_MYSQL_TEXT_TYPE;
+         when 'mediumtext'                                                                       then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'longtext'                                                                          then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'varbinary'                                                                         then return 'bytea';
+        when 'year'                                                                              then return 'smallint';
+                                                                                                 else return lower(V_DATA_TYPE);
       end case;
     when 'MSSQLSERVER'  then 
       case V_DATA_TYPE         
         -- MSSQL Direct Mappings
-        when 'bit' then
-           return 'boolean';
-        when 'datetime' then
-          case
-            when P_DATA_TYPE_LENGTH > 6 then 
-			  return 'timestamp(6)';
-            else 
-              return 'timestamp';
-          end case;
-        when 'datetime2' then
-          case
-            when P_DATA_TYPE_LENGTH > 6 
-              then return 'timestamp(6)';
-            else 
-              return 'timestamp';
-          end case;
-        when 'datetimeoffset' then 
-          case
-            when P_DATA_TYPE_LENGTH > 6 then 
-			  return 'timestamp(6) with time zone';
-            else 
-              return 'timestamp with time zone';
-          end case;
-        when 'image'then 
-          return 'bytea';
-        when 'nchar'then
-          return 'char';
-        when 'ntext' then 
-          return C_CHARACTER_VARYING_MAX;
-        when 'nvarchar' then 
-          case 
-		    when P_DATA_TYPE_LENGTH = -1 then
-			  return C_CHARACTER_VARYING_MAX;
-            else
-              return 'character varying'; 
-          end case;
-        when 'varchar' then
-          case 
-		    when P_DATA_TYPE_LENGTH = -1 then
-			  return C_CHARACTER_VARYING_MAX;
-            else
-              return 'character varying'; 
-          end case;
-        when 'rowversion' then
-          return 'bytea';
-        when 'smalldatetime' then
-          return'timestamp(0)';
-        -- Do not use Postgres Money Type due to precision issues. E.G. with Locale USD Postgres only provides 2 digit precison.
-        when 'money' then
-          return 'numeric(19,4)';
-        when 'smallmoney' then
-          return 'numeric(10,4)';
-        when 'tinyint' then
-          return 'smallint';
-        when 'hierarchyid' then
-           return 'varchar(4000)';
-        when 'uniqueidentifier' then
-          return 'varchar(36)';
-        when 'varbinary' then
-          return 'bytea';
-        when 'geometry' then
-           return P_GEOMETRY_TYPE;
-           -- return 'jsonb';
-        when 'geography' then
-           return P_GEOMETRY_TYPE;
-           -- return 'jsonb';
-        else
-          return lower(V_DATA_TYPE);
+        when 'varchar'                                                                           then return case when P_DATA_TYPE_LENGTH = -1 then C_MAX_CHARACTER_VARYING_TYPE else 'character varying' end;
+        when 'nvarchar'                                                                          then return case when P_DATA_TYPE_LENGTH = -1 then C_MAX_CHARACTER_VARYING_TYPE else 'character varying' end;
+        when 'nchar'                                                                             then return 'char';
+        when 'ntext'                                                                             then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'bit'                                                                               then return 'boolean';
+        -- Do not use Postgres Money Type due to precision issues. 
+		-- E.G. with Locale USD Postgres only provides 2 digit precison.
+        when 'money'                                                                             then return C_MSSQL_MONEY_TYPE;
+        when 'smallmoney'                                                                        then return C_MSSQL_SMALL_MONEY_TYPE;
+        when 'tinyint'                                                                           then return 'smallint';
+        when 'datetime'                                                                          then return case when P_DATA_TYPE_LENGTH > 6 then 'timestamp(6)' else 'timestamp' end;
+        when 'datetime2'                                                                         then return case when P_DATA_TYPE_LENGTH > 6 then 'timestamp(6)' else 'timestamp' end;
+        when 'datetimeoffset'                                                                    then return case when P_DATA_TYPE_LENGTH > 6 then 'timestamp(6) with time zone' else 'timestamp  with time zone' end;
+        when 'smalldatetime'                                                                     then return 'timestamp(0)';
+        when 'binary'                                                                            then return 'bytea';
+        when 'varbinary'                                                                         then return 'bytea';
+        when 'image'                                                                             then return 'bytea';
+        when 'geometry'                                                                          then return C_GEOMETRY_TYPE;
+        when 'geography'                                                                         then return C_GEOGRAPHY_TYPE;
+        when 'rowversion'                                                                        then return 'bytea';
+        when 'hierarchyid'                                                                       then return C_HIERARCHY_TYPE;
+        when 'uniqueidentifier'                                                                  then return 'uuid';
+                                                                                                 else return lower(V_DATA_TYPE);
       end case;
 	when 'MongoDB' then
-      -- MongoDB typing based on BSON type model and the aggregation $type operator
-      -- ### No support for depricated Data types undefined, dbPointer, symbol
+      -- MongoDB typing based on BSON type model 
       case V_DATA_TYPE
-        when 'double' then
-           return 'double precision';
-        when 'string' then
-          case
-		    when P_DATA_TYPE_LENGTH >  C_CHARACTER_VARYING_MAX_LENGTH then
-			  return C_CHARACTER_VARYING_MAX;
-			else
-  			  return 'character varying';            
-          end case;
-        when 'object' then
-		  return C_JSON_TYPE;
-        when 'array' then
-		  return C_JSON_TYPE;
-        when 'binData' then
-		  return 'bytea';
-		when 'objectId' then
-	      return 'bytea';
-        when 'boolean' then
-           return 'bool';
-        when 'null' then
-           return 'character varying(2048)';
-        when 'regex' then
-           return 'character varying(4000)';
-        when 'javascript' then
-           return C_CHARACTER_VARYING_MAX;
-        when 'javascriptWithScope' then
-           return C_CHARACTER_VARYING_MAX;
-        when 'int' then
-           return 'int';
-        when 'long' then
-           return 'bigint';
-        when 'decimal' then
-           return 'numeric';
-        when 'date' then
-           return 'timestamp';
-        when 'timestamp' then
-           return 'timestamp';
-        when 'minkey' then
-		  return C_JSON_TYPE;
-        when 'maxkey' then
-		  return C_JSON_TYPE;
-        else 
-           return lower(P_DATA_TYPE);
+        when 'double'                                                                            then return 'double precision';
+        when 'string'                                                                            then return case when P_DATA_TYPE_LENGTH >  C_MAX_CHARACTER_VARYING_TYPE_LENGTH then C_MAX_CHARACTER_VARYING_TYPE else 'character varying' end;
+        when 'object'                                                                            then return C_JSON_TYPE;
+        when 'array'                                                                             then return C_JSON_TYPE;
+        when 'binData'                                                                           then return 'bytea';
+		when 'objectId'                                                                          then return 'bytea';
+        when 'boolean'                                                                           then return 'bool';
+        when 'null'                                                                              then return C_MONGO_UNKNOWN_TYPE;
+        when 'regex'                                                                             then return C_MONGO_REGEX_TYPE;
+        when 'javascript'                                                                        then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'javascriptWithScope'                                                               then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'int'                                                                               then return 'int';
+        when 'long'                                                                              then return 'bigint';
+        when 'decimal'                                                                           then return 'numeric';
+        when 'date'                                                                              then return 'timestamp';
+        when 'timestamp'                                                                         then return 'timestamp';
+        when 'minkey'                                                                            then return C_JSON_TYPE;
+        when 'maxkey'                                                                            then return C_JSON_TYPE;
+                                                                                                 else return lower(P_DATA_TYPE);
       end case;    
     when 'SNOWFLAKE' then
       case V_DATA_TYPE
-        when 'TEXT' then
-		  case
-		    when P_DATA_TYPE_LENGTH >  C_CHARACTER_VARYING_MAX_LENGTH then
-			  return C_CHARACTER_VARYING_MAX;
-			else
-  			  return 'character varying';            
-		  end case;
-        when 'NUMBER' then
-           return 'numeric';
-        when 'BINARY' then
-           return 'bytea';
-        when 'XML' then
-           return 'xml';
-        when 'TIME' then
-          case
-            when P_DATA_TYPE_LENGTH > 6 then 
-              return 'time(6)';
-            else 
-              return 'time';
-          end case;
-        when 'TIMESTAMP_LTZ' then
-          case
-            when P_DATA_TYPE_LENGTH > 6 then 
-              return 'timestamp(6) with time zone';
-            else 
-              return 'timestamp(' || P_DATA_TYPE_LENGTH || ') without time zone';
-          end case;
-        when 'TIMESTAMP_NTZ' then
-          case
-            when P_DATA_TYPE_LENGTH > 6 then 
-              return 'timestamp(6) with time zone';
-            else 
-              return 'timestamp(' || P_DATA_TYPE_LENGTH || ') without time zone';
-          end case;
-        when 'VARIANT'  then
-           return 'bytea';
-        else 
-           return lower(P_DATA_TYPE);
+        when 'TEXT'                                                                              then return case when P_DATA_TYPE_LENGTH >  C_MAX_CHARACTER_VARYING_TYPE_LENGTH then C_MAX_CHARACTER_VARYING_TYPE else 'character varying' end;
+        when 'NUMBER'                                                                            then return 'numeric';
+        when 'FLOAT'                                                                             then return 'double precision';
+        when 'BINARY'                                                                            then return 'bytea';
+        when 'XML'                                                                               then return 'xml';
+        when 'TIME'                                                                              then return case when P_DATA_TYPE_LENGTH > 6 then 'time(6)' else 'time' end;
+        when 'TIMESTAMP_LTZ'                                                                     then return case when P_DATA_TYPE_LENGTH > 6 then 'timestamp(6) with time zone' else 'timestamp(' || P_DATA_TYPE_LENGTH || ')  with time zone' end;
+        when 'TIMESTAMP_NTZ'                                                                     then return case when P_DATA_TYPE_LENGTH > 6 then 'timestamp(6) without time zone' else 'timestamp(' || P_DATA_TYPE_LENGTH || ')  without time zone' end;
+        when 'VARIANT'                                                                           then return 'bytea';
+                                                                                                 else return lower(P_DATA_TYPE);
       end case;	
     else 
       return lower(V_DATA_TYPE);
@@ -626,16 +693,16 @@ declare
   V_COLUMNS_CLAUSE     TEXT;
   V_INSERT_SELECT_LIST TEXT;
   V_TARGET_DATA_TYPES  JSONB;
-  V_GEOMETRY_TYPE      VARCHAR(32);
   V_POSTGIS_VERSION    VARCHAR(512);
+  V_POSTGIS_ENABLED    BOOLEAN = FALSE;
 begin
 
   begin
     SELECT PostGIS_full_version() into V_POSTGIS_VERSION;
-    V_GEOMETRY_TYPE := 'geography';
+    V_POSTGIS_ENABLED = TRUE;
   exception
     when undefined_function then
-      V_GEOMETRY_TYPE := 'text';
+      V_POSTGIS_ENABLED = FALSE;
     when others then
       RAISE;
   end;
@@ -668,7 +735,7 @@ begin
   TARGET_TABLE_DEFINITIONS
   as (
     select st.*,
-           MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR,DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT, V_GEOMETRY_TYPE) TARGET_DATA_TYPE
+           MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR,DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT, V_POSTGIS_ENABLED) TARGET_DATA_TYPE
       from SOURCE_TABLE_DEFINITIONS st
   ) 
   select STRING_AGG('"' || COLUMN_NAME || '"',',') COLUMN_NAME_LIST,
@@ -736,7 +803,7 @@ begin
 end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function IMPORT_JSONB(P_JSON jsonb, P_SCHEMA VARCHAR) 
+create or replace function YADAMU_IMPORT_JSONB(P_JSON jsonb, P_SCHEMA VARCHAR) 
 returns JSONB
 as $$
 declare
@@ -750,7 +817,7 @@ declare
   PLPGSQL_CTX        TEXT;
 begin
   for r in select "tableName"
-                 ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor', P_SCHEMA,"tableName", P_JSON #> '{systemInformation}' ->> 'spatialFormat', "columnNames", "dataTypes", "sizeConstraints", TRUE) "TABLE_INFO"
+                 ,GENERATE_STATEMENTS(P_JSON #>> '{systemInformation,vendor}', P_SCHEMA,"tableName", P_JSON #>> '{systemInformatio,typeMappings,spatialFormat}', "columnNames", "dataTypes", "sizeConstraints", TRUE) "TABLE_INFO"
              from JSONB_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
                                                                 "tableSchema"      VARCHAR, 
@@ -788,12 +855,12 @@ begin
 exception
   when others then
     GET STACKED DIAGNOSTICS PLPGSQL_CTX = PG_EXCEPTION_CONTEXT;
-    V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call IMPORT_JSONB(P_JSON jsonb,P_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
+    V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call YADAMU_IMPORT_JSONB(P_JSON jsonb,P_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
     return V_RESULTS;
 end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function IMPORT_JSON(P_JSON json,P_SCHEMA VARCHAR) 
+create or replace function YADAMU_IMPORT_JSON(P_JSON json,P_SCHEMA VARCHAR) 
 returns JSONB
 as $$
 declare
@@ -808,7 +875,7 @@ declare
 begin
 
   for r in select "tableName"
-                 ,GENERATE_STATEMENTS(P_JSON #> '{systemInformation}' ->> 'vendor',P_SCHEMA,"tableName", P_JSON #> '{systemInformation}' ->> 'spatialFormat',"columnNames","dataTypes","sizeConstraints",FALSE) "TABLE_INFO"
+                 ,GENERATE_STATEMENTS(P_JSON #>> '{systemInformation,vendor}',P_SCHEMA,"tableName", P_JSON #>> '{systemInformation,typeMappings,spatialFormat}',"columnNames","dataTypes","sizeConstraints",FALSE) "TABLE_INFO"
              from JSON_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSON_TO_RECORD(value) as METADATA(
                                                                "tableSchema"      VARCHAR, 
@@ -846,7 +913,7 @@ begin
 exception
   when others then
     GET STACKED DIAGNOSTICS PLPGSQL_CTX = PG_EXCEPTION_CONTEXT;
-    V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call IMPORT_JSON(P_JSON json,P_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
+    V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call YADAMU_IMPORT_JSON(P_JSON json,P_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
     return V_RESULTS;
 end;  
 $$ LANGUAGE plpgsql;
@@ -872,4 +939,6 @@ begin
                                                      );
 end;
 $$ LANGUAGE plpgsql;
+--
+select YADAMU_INSTANCE_ID() "YADAMU_INSTANCE_ID", YADAMU_INSTALLATION_TIMESTAMP() "YADAMU_INSTALLATION_TIMESTAMP";
 --

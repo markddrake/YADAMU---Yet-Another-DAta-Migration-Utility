@@ -1,6 +1,45 @@
 use master
 go
 --
+DECLARE @YADAMU_INSTANCE_ID VARCHAR(36);
+BEGIN
+  BEGIN TRY
+    EXECUTE @YADAMU_INSTANCE_ID = sp_YADAMU_INSTANCE_ID;
+  END TRY
+  BEGIN CATCH
+    SET @YADAMU_INSTANCE_ID = NEWID();
+    EXECUTE ('CREATE FUNCTION sp_YADAMU_INSTANCE_ID() RETURNS VARCHAR(36) AS BEGIN RETURN ''' + @YADAMU_INSTANCE_ID + ''' END');
+  END CATCH
+END;
+go
+--
+EXECUTE sp_ms_marksystemobject 'sp_YADAMU_INSTANCE_ID'
+go
+IF OBJECT_ID('sp_YADAMU_INSTALLATION_TIMESTAMP') IS NOT NULL
+   set noexec on
+go
+--
+CREATE FUNCTION sp_YADAMU_INSTALLATION_TIMESTAMP()
+RETURNS VARCHAR(27)
+as
+begin
+  return NULL
+end
+GO
+--
+set noexec off
+go
+--
+DECLARE @YADAMU_INSTALLATION_TIMESTAMP VARCHAR(36);
+BEGIN
+  SET @YADAMU_INSTALLATION_TIMESTAMP = FORMAT(GetUtcDate(),'yyyy-MM-dd"T"HH:mm:sszzz')
+  EXECUTE ('ALTER FUNCTION sp_YADAMU_INSTALLATION_TIMESTAMP() RETURNS VARCHAR(27) AS BEGIN RETURN ''' + @YADAMU_INSTALLATION_TIMESTAMP + ''' END');
+END;
+go
+--
+EXECUTE sp_ms_marksystemobject 'sp_YADAMU_INSTALLATION_TIMESTAMP'
+go
+--
 IF OBJECT_ID('sp_JSON_ESCAPE') IS NOT NULL
    set noexec on
 go
@@ -37,6 +76,8 @@ begin
 end
 go
 --
+-- " Fix Quote Mismatch in Notepad++ 
+--
 EXECUTE sp_ms_marksystemobject 'sp_JSON_ESCAPE'
 go
 --
@@ -44,7 +85,7 @@ IF OBJECT_ID('sp_MAP_FOREIGN_DATATYPE') IS NOT NULL
    set noexec on
 go
 --
-CREATE FUNCTION sp_MAP_FOREIGN_DATATYPE(@VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT, @DB_COLLATION NVARCHAR(32)) 
+CREATE FUNCTION sp_MAP_FOREIGN_DATATYPE(@VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT, @CIRCLE_FORMAT NVARCHAR(7), @DB_COLLATION NVARCHAR(32)) 
 returns VARCHAR(128) 
 as
 begin
@@ -55,232 +96,327 @@ GO
 set noexec off
 go
 --
-ALTER FUNCTION sp_MAP_FOREIGN_DATATYPE(@VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT, @DB_COLLATION NVARCHAR(32)) 
+ALTER FUNCTION sp_MAP_FOREIGN_DATATYPE(@VENDOR NVARCHAR(128), @DATA_TYPE NVARCHAR(128), @DATA_TYPE_LENGTH BIGINT, @DATA_TYPE_SCALE INT, @CIRCLE_FORMAT NVARCHAR(7), @DB_COLLATION NVARCHAR(32)) 
 returns VARCHAR(128) 
 as
 begin
+  declare @LARGEST_CHAR_SIZE      NUMERIC(6) = 2000;
+  declare @LARGEST_NCHAR_SIZE     NUMERIC(6) = 2000;
+  declare @LARGEST_VARCHAR_SIZE   NUMERIC(6) = 8000;
+  declare @LARGEST_NVARCHAR_SIZE  NUMERIC(6) = 4000;
+  declare @LARGEST_VARBINARY_SIZE NUMERIC(6) = 8000;
+  declare @LARGEST_CHAR_TYPE      VARCHAR(32) = concat('char(',@LARGEST_CHAR_SIZE,')');
+  declare @LARGEST_NCHAR_TYPE     VARCHAR(32) = concat('nchar(',@LARGEST_NCHAR_SIZE,')');
+  declare @LARGEST_VARCHAR_TYPE   VARCHAR(32) = concat('varchar(',@LARGEST_VARCHAR_SIZE,')');
+  declare @LARGEST_NVARCHAR_TYPE  VARCHAR(32) = concat('nvarchar(',@LARGEST_NVARCHAR_SIZE,')');
+  declare @LARGEST_VARBINARY_TYPE VARCHAR(32) = concat('varbinary(',@LARGEST_VARBINARY_SIZE,')');
+
+  declare @MAX_VARCHAR_TYPE       VARCHAR(32) = 'varchar(max)';
+  declare @MAX_NVARCHAR_TYPE      VARCHAR(32) = 'nvarchar(max)';
+  declare @MAX_VARBINARY_TYPE     VARCHAR(32) = 'varbinary(max)';
+
+																 
+  declare @DOUBLE_PRECISION_TYPE  VARCHAR(32) = 'float(53)';
+  declare @INTERVAL_TYPE          VARCHAR(32) = 'varchar(16)';
+  declare @BFILE_TYPE             VARCHAR(32) = 'nvarchar(2048)';
+  declare @ROWID_TYPE             VARCHAR(32) = 'varchar(18)';
+  declare @ENUM_TYPE              VARCHAR(32) = 'nvarchar(255)';
+  declare @PGSQL_MONEY_TYPE       VARCHAR(32) = 'numeric(21,2)';
+  declare @PGSQL_NUMERIC_TYPE     VARCHAR(32) = 'numeric(38,19)';
+  declare @PGSQL_NAME_TYPE        VARCHAR(32) = 'nvarchar(64)';
+  declare @PGSQL_SINGLE_CHAR_TYPE VARCHAR(32) = 'nchar(1)';
+  declare @INET_ADDR_TYPE         VARCHAR(32) = 'varchar(39)';
+  declare @MAC_ADDR_TYPE          VARCHAR(32) = 'varchar(23)';
+  declare @UNSIGNED_INT_TYPE      VARCHAR(32) = 'numeric(10,0)';
+  declare @PGSQL_IDENTIFIER       VARCHAR(32) = 'binary(4)';
+  declare @ORACLE_NUMERIC_TYPE    VARCHAR(32) = 'numeric(38,19)';
+  declare @MONGO_OBJECT_ID        VARCHAR(32) = 'binary(12)';
+  declare @MONGO_UNKNOWN_TYPE     VARCHAR(32) = 'nvarchar(2048)';
+  declare @MONGO_REGEX_TYPE       VARCHAR(32) = 'nvarchar(2048)';
+  
   return 
   case
+    when ((@VENDOR = 'MSSQLSERVER') and (@DB_COLLATION like '%UTF8')) then
+      case 
+        when @DATA_TYPE = 'text'                                                                         then 'varchar(max)'
+        when @DATA_TYPE = 'ntext'                                                                        then @MAX_NVARCHAR_TYPE 
+                                                                                                         else lower(@DATA_TYPE)
+      end      
     when @VENDOR = 'Oracle' then
       case 
-        when @DATA_TYPE = 'VARCHAR2' then 
-          'varchar'
-        when @DATA_TYPE = 'NVARCHAR2' then
-          'nvarchar'
-        when @DATA_TYPE = 'CLOB' then
-          'varchar(max)'
-        when @DATA_TYPE = 'NCLOB' then
-          'nvarchar(max)'
-        when @DATA_TYPE = 'NUMBER' then
-          'decimal'
-        when @DATA_TYPE = 'BINARY_DOUBLE' then
-          'float(53)'
-        when @DATA_TYPE = 'BINARY_FLOAT' then
-          'real'
-        when @DATA_TYPE = 'BOOLEAN' then 
-          'bit'
-        when @DATA_TYPE = 'RAW' and @DATA_TYPE_LENGTH = 1 then 
-          'bit'
+        when @DATA_TYPE = 'VARCHAR2' 
+         and @DATA_TYPE_LENGTH > @LARGEST_NVARCHAR_SIZE                                                  then @MAX_NVARCHAR_TYPE
+        when @DATA_TYPE = 'VARCHAR2'                                                                     then 'nvarchar'
+        when @DATA_TYPE = 'NVARCHAR2'                                                                    then 'nvarchar'
+        when @DATA_TYPE = 'CLOB'                                                                         then @MAX_NVARCHAR_TYPE 
+        when @DATA_TYPE = 'NCLOB'                                                                        then @MAX_NVARCHAR_TYPE
+        when @DATA_TYPE = 'NUMBER' 
+         and @DATA_TYPE_LENGTH is NULL                                                                   then @ORACLE_NUMERIC_TYPE
+        when @DATA_TYPE = 'NUMBER'                                                                       then 'decimal'
+        when @DATA_TYPE = 'BINARY_DOUBLE'                                                                then @DOUBLE_PRECISION_TYPE
+        when @DATA_TYPE = 'BINARY_FLOAT'                                                                 then 'real'
+        when @DATA_TYPE = 'BOOLEAN'                                                                      then 'bit'
         when @DATA_TYPE = 'RAW' then
-          'varbinary'
-        when @DATA_TYPE = 'BLOB' then
-          'varbinary(max)'
-        when @DATA_TYPE = 'BFILE' then
-          'varchar(2048)'  
-        when @DATA_TYPE in ('ROWID','UROWID') then
-          'varchar(18)'                  
-        when @DATA_TYPE in ('ANYDATA') then
-          'nvarchar(max)'                
-        when (CHARINDEX('INTERVAL',@DATA_TYPE) = 1) then
-          'varchar(16)'                  
-        when (CHARINDEX('TIMESTAMP',@DATA_TYPE) = 1) then
+         case 
+           when @DATA_TYPE_LENGTH = 1                                                                    then 'bit'
+           when @DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE                                              then @MAX_VARBINARY_TYPE 
+                                                                                                         else 'varbinary'
+         end
+        when @DATA_TYPE = 'BLOB'                                                                         then @MAX_VARBINARY_TYPE
+        when @DATA_TYPE = 'BFILE'                                                                        then @BFILE_TYPE  
+        when @DATA_TYPE in ('ROWID','UROWID')                                                            then @ROWID_TYPE                 
+        when @DATA_TYPE in ('ANYDATA')                                                                   then @MAX_NVARCHAR_TYPE                 
+        when (CHARINDEX('INTERVAL',@DATA_TYPE) = 1)                                                      then @INTERVAL_TYPE                  
+        when (CHARINDEX('TIMESTAMP',@DATA_TYPE) = 1) then 
           case
-                 when (CHARINDEX('TIME ZONE',@DATA_TYPE) > 0) 
-                   then 'datetimeoffset'
-                 else 
-                  'datetime2' 
+            when (CHARINDEX('TIME ZONE',@DATA_TYPE) > 0)                                                 then 'datetimeoffset'
+                                                                                                         else'datetime2' 
           end
-        when @DATA_TYPE = 'XMLTYPE' then
-          'xml'
-        when @DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"' then
-          'geometry'                
-        when @DATA_TYPE like '"%"."%"' then
-          'nvarchar(max)'
-        when @DATA_TYPE = 'JSON' then
-          'json'
-        else
-          lower(@DATA_TYPE)
+        when @DATA_TYPE = 'XMLTYPE'                                                                      then 'xml'
+        when @DATA_TYPE = '"MDSYS"."SDO_GEOMETRY"'                                                       then 'geometry'                
+        when @DATA_TYPE like '"%"."%"'                                                                   then @MAX_NVARCHAR_TYPE 
+        when @DATA_TYPE = 'JSON'                                                                         then 'json'
+                                                                                                         else lower(@DATA_TYPE)
       end
     when @VENDOR in ('MySQL','MariaDB') then
       case 
-        when @DATA_TYPE = 'tinyint' and @DATA_TYPE_LENGTH = 1 then
-          'bit'
-        when @DATA_TYPE = 'boolean' then
-          'bit'
-        when @DATA_TYPE = 'mediumint' then
-          'int'
-        when @DATA_TYPE = 'datetime' then
-          'datetime2'
-        when @DATA_TYPE = 'timestamp' then
-          'datetime2'
-        when @DATA_TYPE = 'float' then
-          'real'
-        when @DATA_TYPE = 'double' then
-          'float(53)'
-        when @DATA_TYPE = 'enum' then
-          'varchar(255)'
-        when @DATA_TYPE = 'set' then
-          'json'
-        when @DATA_TYPE = 'year' then
-          'smallint'
-        when @DATA_TYPE = 'json' then
-          'json'
-        when @DATA_TYPE = 'blob' and @DATA_TYPE_LENGTH > 8000  then
-          'varbinary(max)'
+        when @DATA_TYPE = 'tinyint' 
+         and @DATA_TYPE_LENGTH = 1                                                                       then 'bit'
+        when @DATA_TYPE = 'boolean'                                                                      then 'bit'
+        when @DATA_TYPE = 'mediumint'                                                                    then 'int'
+        when @DATA_TYPE in (
+          'numeric',
+          'decimal'
+        ) then
+        case 
+          when  @DATA_TYPE_LENGTH > 38
+           and (@DATA_TYPE_SCALE = 0)                                                                    then 'numeric(38,0)'
+          when (@DATA_TYPE_LENGTH > 38) 
+           and (@DATA_TYPE_SCALE > 0)                                                                    then concat('numeric(38,',cast(round(@DATA_TYPE_SCALE*(38.0/@DATA_TYPE_LENGTH),0) as numeric(2)),')')
+                                                                                                         else 'numeric'
+        end
+        when @DATA_TYPE = 'datetime'                                                                     then 'datetime2'
+        when @DATA_TYPE = 'timestamp'                                                                    then 'datetime2'
+        when @DATA_TYPE = 'float'                                                                        then 'real'
+        when @DATA_TYPE = 'double'                                                                       then @DOUBLE_PRECISION_TYPE
+        when @DATA_TYPE = 'enum'                                                                         then @ENUM_TYPE
+        when @DATA_TYPE = 'set'                                                                          then 'json'
+        when @DATA_TYPE = 'year'                                                                         then 'smallint'
+        when @DATA_TYPE = 'json'                                                                         then 'json'
         when @DATA_TYPE = 'blob' then
-          'varbinary'
-        -- For MySQL may need to add column character set to the table metadata object in order to accutately determine varchar Vs nvarchar ? 
-        -- Alternatively the character set could be used when generating metadata from the MySQL dictionaly that distinguishes varchar from nvarchar even thought the dictionaly does not.
-        when @DATA_TYPE = 'varchar' and (@DATA_TYPE_LENGTH is null or @DATA_TYPE_LENGTH > 4000) then
-          'nvarchar(max)'
+          case 
+            when @DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE                                                                then @MAX_VARBINARY_TYPE
+                                                                                                         else 'varbinary'
+        end
+        -- For MySQL may need to add column character set to the table metadata object 
+        -- in order to accutately determine varchar Vs nvarchar ? 
+        -- Alternatively the character set could be used when generating metadata from 
+        -- the MySQL dictionaly that distinguishes varchar from nvarchar even thought 
+        -- the dictionaly does not.
         when @DATA_TYPE = 'varchar' then
-          'nvarchar'
-        when @DATA_TYPE = 'text' then
-          'nvarchar(max)'
-        when @DATA_TYPE = 'mediumtext' then
-          'nvarchar(max)'
-        when @DATA_TYPE = 'longtext' then
-          'nvarchar(max)'
-        when @DATA_TYPE = 'longblob' then
-          'varbinary(max)'
-        when @DATA_TYPE = 'mediumblob' then
-          'varbinary(max)'
-        else
-          lower(@DATA_TYPE)
+         case
+           when @DATA_TYPE_LENGTH is null                                                                then @MAX_NVARCHAR_TYPE 
+           when @DATA_TYPE_LENGTH > @LARGEST_NVARCHAR_SIZE                                               then @MAX_NVARCHAR_TYPE 
+                                                                                                         else 'nvarchar'
+        end
+        when @DATA_TYPE = 'text'                                                                         then @MAX_NVARCHAR_TYPE 
+        when @DATA_TYPE = 'mediumtext'                                                                   then @MAX_NVARCHAR_TYPE 
+        when @DATA_TYPE = 'longtext'                                                                     then @MAX_NVARCHAR_TYPE 
+        when @DATA_TYPE = 'longblob'                                                                     then @MAX_VARBINARY_TYPE
+        when @DATA_TYPE = 'mediumblob'                                                                   then @MAX_VARBINARY_TYPE
+        when @DATA_TYPE in (
+          'point',
+          'linestring',
+          'polygon',
+          'geometry',
+          'multipoint',
+          'multilinestring',
+          'multipolygon',
+          'geometrycollection',
+          'geomcollection')                                                                              then 'geometry'
+                                                                                                         else lower(@DATA_TYPE)
       end
     when @VENDOR = 'Postgres' then
       case 
-        when @DATA_TYPE = 'character varying' and (@DATA_TYPE_LENGTH is null or @DATA_TYPE_LENGTH > 4000) then
-          'nvarchar(max)'
         when @DATA_TYPE = 'character varying' then
-          'nvarchar'
-        when @DATA_TYPE = 'character' then
-          'nchar'
-        when @DATA_TYPE = 'text' then
-          'nvarchar(max)'
-        when @DATA_TYPE = 'bytea' and (@DATA_TYPE_LENGTH is null or @DATA_TYPE_LENGTH > 8000)  then 
-          'varbinary(max)'
+         case  
+           when @DATA_TYPE_LENGTH is null                                                                then @MAX_NVARCHAR_TYPE 
+           when @DATA_TYPE_LENGTH > @LARGEST_NVARCHAR_SIZE                                               then @MAX_NVARCHAR_TYPE 
+                                                                                                         else 'nvarchar'
+        end                                                                                                              
+        when @DATA_TYPE = 'character' then                                                                
+         case  
+           when @DATA_TYPE_LENGTH is null                                                                then @MAX_NVARCHAR_TYPE 
+           when @DATA_TYPE_LENGTH > @LARGEST_NVARCHAR_SIZE                                               then @MAX_NVARCHAR_TYPE 
+           when @DATA_TYPE_LENGTH > @LARGEST_NCHAR_SIZE                                                  then 'nvarchar'
+                                                                                                         else 'nchar'
+        end                                                                                                              
+        when @DATA_TYPE = 'bpchar' then                                                                
+         case  
+           when @DATA_TYPE_LENGTH is null                                                                then @MAX_NVARCHAR_TYPE 
+           when @DATA_TYPE_LENGTH > @LARGEST_NVARCHAR_SIZE                                               then @MAX_NVARCHAR_TYPE 
+                                                                                                         else 'nchar'
+        end                                                                                                              
+        when @DATA_TYPE = 'text'                                                                         then @MAX_NVARCHAR_TYPE
+	    when @DATA_TYPE = 'char'                                                                         then @PGSQL_SINGLE_CHAR_TYPE
+        when @DATA_TYPE = 'name'                                                                         then @PGSQL_NAME_TYPE
+																													 
         when @DATA_TYPE = 'bytea' then
-          'varbinary'
-        when @DATA_TYPE = 'boolean' then
-          'bit'
-        when @DATA_TYPE = 'timestamp' then
-          'datetime'
-        when @DATA_TYPE = 'timestamp with time zone' then
-          'datetimeoffset'
-        when @DATA_TYPE = 'timestamp without time zone' then
-          'datetime2'
-        when @DATA_TYPE = 'time without time zone' then
-          'time'
-        when (CHARINDEX('interval',@DATA_TYPE) = 1) then
-          'varchar(64)'
-        when @DATA_TYPE = 'double precision' then
-          'float(53)'
-        when @DATA_TYPE = 'real' then
-          'real'
-        when @DATA_TYPE = 'geometry' then
-          'geometry'
-        when @DATA_TYPE = 'geography'then
-          'geography'
-        when @DATA_TYPE = 'jsonb'then
-          'json'
-        when @DATA_TYPE = 'integer' then
-          'int'
-        else
-          lower(@DATA_TYPE)
-      end          
-    when ((@VENDOR = 'MSSQLSERVER') and (@DB_COLLATION like '%UTF8')) then
-      case 
-        when @DATA_TYPE = 'text' then
-          'varchar(max)'
-        when @DATA_TYPE = 'ntext' then
-          'nvarchar(max)'
-        else
-          lower(@DATA_TYPE)
-      end      
-    when @VENDOR = 'MongoDB' then
-      -- MongoDB typing based on BSON type model and the aggregation $type operator
-      -- ### No support for depricated Data types undefined, dbPointer, symbol
-      case
-        when @DATA_TYPE in ('undefined','object','function','symbol') then 
-          'json'
-        when @DATA_TYPE = 'double' then
-          'float(53)'
-        when @DATA_TYPE = 'string' and (@DATA_TYPE_LENGTH is null or @DATA_TYPE_LENGTH > 4000) then
-          'nvarchar(max)'
-        when @DATA_TYPE = 'string' then
-          'nvarchar'
-        when @DATA_TYPE = 'object' then 
-          'json'          
-        when @DATA_TYPE = 'array' then 
-          'json'
-        when @DATA_TYPE = 'binData' then 
-          'varbinary(max)'
-        when @DATA_TYPE = 'objectId' then
-          'binary(12)'
-        when @DATA_TYPE = 'bool' then
-          'bit'
-        when @DATA_TYPE = 'null' then
-              'nvarchar(2048)'
-        when @DATA_TYPE = 'regex' then
-              'nvarchar(2048)'
-        when @DATA_TYPE = 'javascript' then
-              'nvarchar(max)'
-        when @DATA_TYPE = 'javascriptWithScope' then
-              'nvarchar(max)'         
-        when @DATA_TYPE = 'int' then
-          'int'
-        when @DATA_TYPE = 'long' then
-          'bigint'
-        when @DATA_TYPE = 'decimal' then
+         case  
+           when @DATA_TYPE_LENGTH is null                                                                then @MAX_VARBINARY_TYPE 
+           when @DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE                                              then @MAX_VARBINARY_TYPE 
+                                                                                                         else 'varbinary'
+        end                                                                                                              
+        when @DATA_TYPE = 'integer'                                                                      then 'int'
+        when @DATA_TYPE in (
+          'numeric',
           'decimal'
-        when @DATA_TYPE = 'timestamp' then
-          'datatime2'
-        when @DATA_TYPE = 'date' then
-          'datatime2'
-        when @DATA_TYPE = 'minkey' then 
-          'json'          
-        when @DATA_TYPE = 'maxkey' then 
-          'json'          
-        else 
-           lower(@DATA_TYPE)
+        ) then
+         case  
+           when @DATA_TYPE_LENGTH is null                                                                then @PGSQL_NUMERIC_TYPE 
+                                                                                                         else 'numeric'
+        end                                                                                                              
+        when @DATA_TYPE = 'money'                                                                        then @PGSQL_MONEY_TYPE
+        when @DATA_TYPE = 'double precision'                                                             then @DOUBLE_PRECISION_TYPE
+        when @DATA_TYPE = 'real'                                                                         then 'real'
+        when @DATA_TYPE = 'boolean'                                                                      then 'bit'
+        when @DATA_TYPE = 'timestamp'                                                                    then 'datetime'
+        when @DATA_TYPE = 'timestamp with time zone'                                                     then 'datetimeoffset'
+        when @DATA_TYPE = 'timestamp without time zone'                                                  then 'datetime2'
+        when @DATA_TYPE = 'time without time zone'                                                       then 'time'
+        when @DATA_TYPE = 'time with time zone'                                                          then 'datetimeoffset'
+        when (CHARINDEX('interval',@DATA_TYPE) = 1)                                                      then @INTERVAL_TYPE
+        when @DATA_TYPE = 'jsonb'                                                                        then 'json'
+        when @DATA_TYPE = 'geometry'                                                                     then 'geometry'
+        when @DATA_TYPE = 'geography'                                                                    then 'geography'
+        when @DATA_TYPE = 'circle' 
+         and @CIRCLE_FORMAT = 'CIRCLE'                                                                   then 'json'
+        when @DATA_TYPE in (
+          'point',
+          'lseg',
+          'box',
+          'path',
+          'polygon',
+          'circle'
+        )                                                                                                then 'geometry'
+        when @DATA_TYPE = 'line'                                                                         then 'json'
+        when @DATA_TYPE = 'uuid'                                                                         then 'uniqueidentifier'
+        when @DATA_TYPE in (
+          'bit',
+          'bit varying'
+        ) then 
+        case  
+          when (@DATA_TYPE_LENGTH is null)                                                               then @LARGEST_VARCHAR_TYPE 
+          when (@DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE)                                             then @MAX_VARCHAR_TYPE 
+                                                                                                         else 'varchar'
+        end
+        when @DATA_TYPE in (
+          -- IPv4 or IPv6 internet address
+          'cidr',
+          'inet'
+        )                                                                                                then @INET_ADDR_TYPE
+        when @DATA_TYPE in (
+          -- Mac Address
+          'macaddr',
+          'macaddr8'
+         )                                                                                               then @MAC_ADDR_TYPE
+        when @DATA_TYPE in (
+          -- Range Types: Map to JSON
+          'int4range',
+          'int8range',
+          'numrange',
+          'tsrange',
+          'tstzrange',
+          'daterange'
+        )                                                                                                then 'json'
+        when @DATA_TYPE in (
+          -- Representation of a Text Search
+          -- Sorted list of distinct lexemes used by Text Search.
+          -- GiST Index
+          'tsvector',
+          'gtsvector'
+        )                                                                                                then 'json'
+        when @DATA_TYPE in ('tsquery')                                                                   then @MAX_NVARCHAR_TYPE
+        when @DATA_TYPE in (
+          -- Postgres Object Identifier. Per documentation unsigned 4 Byte Integer 
+          'oid',
+          'regcollation',
+          'regclass',
+          'regconfig',
+          'regdictionary',
+          'regnamespace',
+          'regoper',
+          'regoperator',
+          'regproc',
+          'regprocedure',
+          'regrole',
+          'regtype'
+        )                                                                                                then @UNSIGNED_INT_TYPE
+        when @DATA_TYPE in (
+          -- Tranasaction Identifiers 32 bits.
+          'tid',
+          'xid',
+          'cid',
+          'txid_snapshot'
+        )                                                                                                then @PGSQL_IDENTIFIER
+        when @DATA_TYPE in (
+          -- Postgres ACLItem & REF Cursor. Map to JSON 
+          'aclitem',
+          'refcursor'
+        )                                                                                                then 'json'
+                                                                                                         else lower(@DATA_TYPE)
+      end          
+    when @VENDOR = 'MongoDB' then
+      -- MongoDB typing based on BSON type model 
+      case
+        when @DATA_TYPE = 'string' 
+         and (@DATA_TYPE_LENGTH is null or @DATA_TYPE_LENGTH > @LARGEST_NVARCHAR_SIZE)                   then @MAX_NVARCHAR_TYPE 
+        when @DATA_TYPE = 'string'                                                                       then 'nvarchar'
+        when @DATA_TYPE = 'int'                                                                          then 'int'
+        when @DATA_TYPE = 'long'                                                                         then 'bigint'
+        when @DATA_TYPE = 'double'                                                                       then @DOUBLE_PRECISION_TYPE
+        when @DATA_TYPE = 'decimal'                                                                      then 'numeric(38,19)'
+        when @DATA_TYPE = 'binData'                                                                      then @MAX_VARBINARY_TYPE
+        when @DATA_TYPE = 'bool'                                                                         then 'bit'
+        when @DATA_TYPE = 'date'                                                                         then 'datatime2'
+        when @DATA_TYPE = 'timestamp'                                                                    then 'datatime2'
+        when @DATA_TYPE = 'objectId'                                                                     then @MONGO_OBJECT_ID
+        when @DATA_TYPE = 'object'                                                                       then 'json'          
+        when @DATA_TYPE = 'array'                                                                        then 'json'
+        when @DATA_TYPE = 'null'                                                                         then @MONGO_UNKNOWN_TYPE
+        when @DATA_TYPE = 'regex'                                                                        then @MONGO_REGEX_TYPE
+        when @DATA_TYPE = 'javascript'                                                                   then @MAX_NVARCHAR_TYPE 
+        when @DATA_TYPE = 'javascriptWithScope'                                                          then @MAX_NVARCHAR_TYPE          
+        when @DATA_TYPE = 'minkey'                                                                       then 'json'          
+        when @DATA_TYPE = 'maxkey'                                                                       then 'json'          
+        when @DATA_TYPE in (
+          'undefined',
+          'dbPointer',
+          'function',
+          'symbol'
+        )                                                                                                then 'json'
+                                                                                                         else lower(@DATA_TYPE)
       end
     when @VENDOR = 'SNOWFLAKE' then
       case
-        when @DATA_TYPE = 'TEXT' and (@DATA_TYPE_LENGTH is null or @DATA_TYPE_LENGTH > 4000) then
-          'nvarchar(max)'
-        when @DATA_TYPE = 'TEXT' then
-          'nvarchar'
-        when @DATA_TYPE = 'BINARY' and (@DATA_TYPE_LENGTH is null or @DATA_TYPE_LENGTH > 8000)  then 
-          'varbinary(max)'
-        when @DATA_TYPE = 'BOOLEAN' then
-          'bit'
-        when @DATA_TYPE = 'BINARY' then
-          'varbinary'
-        when @DATA_TYPE = 'VARIANT' then
-          'varbinary(max)'
-        when @DATA_TYPE = 'TIMESTAMP_NTZ' and (@DATA_TYPE_LENGTH > 7) then
-          'datetimeoffset(7)'
-        when @DATA_TYPE = 'TIMESTAMP_NTZ' then
-          'datetimeoffset'
-        when @DATA_TYPE = 'TIMESTAMP_LTZ' and (@DATA_TYPE_LENGTH > 7) then
-          'datetime2(7)'
-        when @DATA_TYPE = 'TIMESTAMP_LTZ' then
-          'datetime2'
-        when @DATA_TYPE = 'NUMBER' then
-          'decimal'
-        else 
-          lower(@DATA_TYPE)
+        when @DATA_TYPE = 'TEXT' 
+         and (@DATA_TYPE_LENGTH is null or @DATA_TYPE_LENGTH > @LARGEST_NVARCHAR_SIZE)                   then @MAX_NVARCHAR_TYPE 
+        when @DATA_TYPE = 'TEXT'                                                                         then 'nvarchar'
+        when @DATA_TYPE = 'BINARY' 
+         and (@DATA_TYPE_LENGTH is null or @DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE)                  then @MAX_VARBINARY_TYPE
+																														 
+        when @DATA_TYPE = 'FLOAT'                                                                        then @DOUBLE_PRECISION_TYPE
+        when @DATA_TYPE = 'BINARY'                                                                       then 'varbinary'
+        when @DATA_TYPE = 'BOOLEAN'                                                                      then 'bit'
+        when @DATA_TYPE = 'VARIANT'                                                                      then @MAX_VARBINARY_TYPE
+        when @DATA_TYPE = 'TIMESTAMP_NTZ' 
+         and (@DATA_TYPE_LENGTH > 7)                                                                     then 'datetimeoffset(7)'
+        when @DATA_TYPE = 'TIMESTAMP_NTZ'                                                                then 'datetimeoffset'
+        when @DATA_TYPE = 'TIMESTAMP_LTZ' 
+         and (@DATA_TYPE_LENGTH > 7)                                                                     then 'datetime2(7)'
+        when @DATA_TYPE = 'TIMESTAMP_LTZ'                                                                then 'datetime2'
+        when @DATA_TYPE = 'NUMBER'                                                                       then 'decimal'
+                                                                                                         else lower(@DATA_TYPE)
       end
     else 
       lower(@DATA_TYPE)
@@ -296,7 +432,7 @@ IF OBJECT_ID('sp_GENERATE_STATEMENTS') IS NOT NULL
    set noexec on
 go
 --
-CREATE FUNCTION sp_GENERATE_STATEMENTS(@VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @COLUMN_NAMES_ARRAY NVARCHAR(MAX),@DATA_TYPES_ARARY NVARCHAR(MAX),@SIZE_CONSTRAINTS_ARRAY NVARCHAR(MAX),@DB_COLLATION NVARCHAR(32)) 
+CREATE FUNCTION sp_GENERATE_STATEMENTS(@VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @COLUMN_NAMES_ARRAY XML, @DATA_TYPES_ARARY XML, @SIZE_CONSTRAINTS_ARRAY XML, @SPATIAL_FORMAT NVARCHAR(128), @CIRCLE_FORMAT NVARCHAR(7), @DB_COLLATION NVARCHAR(32)) 
 returns NVARCHAR(MAX)
 as
 begin
@@ -307,14 +443,12 @@ GO
 set noexec off
 go
 --
-ALTER FUNCTION sp_GENERATE_STATEMENTS(@VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @SPATIAL_FORMAT NVARCHAR(128), @COLUMN_NAMES_ARRAY XML,@DATA_TYPES_ARARY XML,@SIZE_CONSTRAINTS_ARRAY XML,@DB_COLLATION NVARCHAR(32)) 
+ALTER FUNCTION sp_GENERATE_STATEMENTS(@VENDOR NVARCHAR(128), @SCHEMA NVARCHAR(128), @TABLE_NAME NVARCHAR(128), @COLUMN_NAMES_ARRAY XML, @DATA_TYPES_ARARY XML, @SIZE_CONSTRAINTS_ARRAY XML, @SPATIAL_FORMAT NVARCHAR(128), @CIRCLE_FORMAT NVARCHAR(7), @DB_COLLATION NVARCHAR(32)) 
 returns NVARCHAR(MAX)
 as
 begin
   DECLARE @COLUMN_LIST        NVARCHAR(MAX);  
   DECLARE @COLUMNS_CLAUSE     NVARCHAR(MAX);
-  DECLARE @INSERT_SELECT_LIST NVARCHAR(MAX);
-  DECLARE @WITH_CLAUSE        NVARCHAR(MAX);
   DECLARE @TARGET_DATA_TYPES  NVARCHAR(MAX)
   
   DECLARE @DDL_STATEMENT      NVARCHAR(MAX);
@@ -356,8 +490,8 @@ begin
            WHERE c."KEY" = t."KEY" and c."KEY" = s."KEY"
   ),
   "TARGET_TABLE_DEFINITION" as (
-    select st.*, master.dbo.sp_MAP_FOREIGN_DATATYPE(@VENDOR, "DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE",@DB_COLLATION) TARGET_DATA_TYPE
-      from "SOURCE_TABLE_DEFINITION" st
+    select st.*, master.dbo.sp_MAP_FOREIGN_DATATYPE(@VENDOR, "DATA_TYPE", "DATA_TYPE_LENGTH", "DATA_TYPE_SCALE", @CIRCLE_FORMAT, @DB_COLLATION) TARGET_DATA_TYPE
+     from "SOURCE_TABLE_DEFINITION" st
   )
   SELECT @COLUMN_LIST = CONCAT(@COLUMN_LIST,CONCAT('"',"COLUMN_NAME",'"'),',')
         ,@COLUMNS_CLAUSE =
@@ -413,96 +547,14 @@ begin
                                  )
                            ,','                 
                           )
-        ,@INSERT_SELECT_LIST = 
-         CONCAT(@INSERT_SELECT_LIST,case
-                      when "TARGET_DATA_TYPE" = 'image' then
-                        CONCAT('CONVERT(image,CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2))')
-                      when "TARGET_DATA_TYPE" = 'varbinary(max)' then
-                        CONCAT('CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2)')
-                      when "TARGET_DATA_TYPE" in ('binary','varbinary') then
-                        case
-                          when ((DATA_TYPE_LENGTH = -1) OR (DATA_TYPE = 'BLOB') or ((CHARINDEX('"."',DATA_TYPE) > 0))) then
-                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(max),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
-                          else 
-                            CONCAT('CONVERT(',"TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",'),data."',"COLUMN_NAME",'",2) "',"COLUMN_NAME",'"')
-                        end
-                      when "TARGET_DATA_TYPE" = 'geometry'  then
-                        case
-                          when @SPATIAL_FORMAT in ('WKT','EWKT') then
-                            CONCAT('geometry::STGeomFromText(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
-                          when @SPATIAL_FORMAT in ('WKB','EWKB') then
-                            CONCAT('geometry::STGeomFromWKB(CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2),4326) "',"COLUMN_NAME",'"')
-                          else                            
-                            CONCAT('geometry::STGeomFromWKB(CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2),4326) "',"COLUMN_NAME",'"')
-                        end
-                      when "TARGET_DATA_TYPE" = 'geography' then
-                        case
-                          when @SPATIAL_FORMAT in ('WKT','EWKT') then
-                            CONCAT('geography::STGeomFromText(data."',"COLUMN_NAME",'",4326) "',"COLUMN_NAME",'"')
-                          when @SPATIAL_FORMAT in ('WKB','EWKB') then
-                            CONCAT('geography::STGeomFromWKB(CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2),4326) "',"COLUMN_NAME",'"')
-                          else                            
-                            CONCAT('geography::STGeomFromWKB(CONVERT(varbinary(max),data."',"COLUMN_NAME",'",2),4326) "',"COLUMN_NAME",'"')
-                        end
-                      else
-                        CONCAT('data."',"COLUMN_NAME",'"')
-                    end 
-                   ,','                 
-                   )
-       ,@WITH_CLAUSE =
-        CONCAT(@WITH_CLAUSE,CONCAT('"',COLUMN_NAME,'" ',
-                          case            
-                            when "TARGET_DATA_TYPE" = 'json' then
-                              'nvarchar(max)'                
-                            when "TARGET_DATA_TYPE" = 'varbinary(max)' then
-                              'varchar(max)'                
-                            when (CHARINDEX('(',"TARGET_DATA_TYPE") > 0) then
-                              "TARGET_DATA_TYPE"
-                            when "TARGET_DATA_TYPE" in('xml','real','double precision','tinyint','smallint','int','bigint','bit','date','datetime','money','smallmoney') then
-                              "TARGET_DATA_TYPE"         
-                            when "TARGET_DATA_TYPE" = 'image' then
-                              'varchar(max)'                
-                            when "TARGET_DATA_TYPE" = 'text' then
-                              'varchar(max)'                 
-                            when "TARGET_DATA_TYPE" = 'ntext' then
-                              'nvarchar(max)'                
-                            when "TARGET_DATA_TYPE" = 'geography' then
-                              'nvarchar(4000)'                
-                            when "TARGET_DATA_TYPE" = 'geometry' then
-                              'nvarchar(4000)'                
-                            when "TARGET_DATA_TYPE" = 'hierarchyid' then
-                              'nvarchar(4000)'                
-                            when "TARGET_DATA_TYPE" in ('binary','varbinary') then
-                              case
-                                when "DATA_TYPE_LENGTH" < 0  then
-                                  'varchar(max)'
-                                else 
-                                  CONCAT('varchar(',cast(("DATA_TYPE_LENGTH" * 2) as VARCHAR),')')
-                              end
-                            when "DATA_TYPE_SCALE" IS NOT NULL then
-                              CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",',', "DATA_TYPE_SCALE",')')
-                            when "DATA_TYPE_LENGTH" IS NOT NULL  then
-                              case 
-                                when "DATA_TYPE_LENGTH" < 0  then
-                                  CONCAT("TARGET_DATA_TYPE",'(max)')
-                                else 
-                                  CONCAT("TARGET_DATA_TYPE",'(',"DATA_TYPE_LENGTH",')')
-                              end
-                            else 
-                              "TARGET_DATA_TYPE"
-                          end,
-                          ' ''$[',"INDEX",']'''
-                        )
-                        ,','                    
-                   )
       FROM "TARGET_TABLE_DEFINITION" tt;
    SET @COLUMNS_CLAUSE = LEFT(@COLUMNS_CLAUSE,LEN(@COLUMNS_CLAUSE)-1)
    SET @COLUMN_LIST = LEFT(@COLUMN_LIST,LEN(@COLUMN_LIST)-1)
-   SET @INSERT_SELECT_LIST = LEFT(@INSERT_SELECT_LIST,LEN(@INSERT_SELECT_LIST)-1)
    SET @TARGET_DATA_TYPES = LEFT(@TARGET_DATA_TYPES,LEN(@TARGET_DATA_TYPES)-1)
    
    SET @DDL_STATEMENT = CONCAT('if object_id(''"',@SCHEMA,'"."',@TABLE_NAME,'"'',''U'') is NULL create table "',@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMNS_CLAUSE,')');   
-   SET @DML_STATEMENT = CONCAT('insert into "' ,@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMN_LIST,') select ',@INSERT_SELECT_LIST,'  from "#YADAMU_STAGING" s cross apply OPENJSON("DATA",''$.data."',@TABLE_NAME,'"'') with ( ',@WITH_CLAUSE,') data');
+   -- Server Side processing of JSON not supported in SqlServer 2014
+   SET @DML_STATEMENT = CONCAT('insert into "' ,@SCHEMA,'"."',@TABLE_NAME,'" (',@COLUMN_LIST,') select ');
    
    RETURN CONCAT('{"ddl": "',master.dbo.sp_JSON_ESCAPE(@DDL_STATEMENT),'", "dml": "',master.dbo.sp_JSON_ESCAPE(@DML_STATEMENT),'", "targetDataTypes": [',@TARGET_DATA_TYPES,']}')
 end;
@@ -534,7 +586,7 @@ begin
   DECLARE @OWNER            VARCHAR(128);
   DECLARE @TABLE_NAME       VARCHAR(128);
   DECLARE @STATEMENTS       NVARCHAR(MAX);
-
+  DECLARE @CIRCLE_FORMAT    NVARCHAR(7) = 'CIRCLE';
   DECLARE @RESULTS          NVARCHAR(MAX) = '{}';
  
   DECLARE @XMLDOC XML = CAST(@METADATA AS XML)
@@ -551,7 +603,7 @@ begin
 	 from @XMLDOC.nodes('/metadata/table') AS T("TABLE_XML")
   )
   select TABLE_NAME, 
-         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, @SPATIAL_FORMAT, v.COLUMN_NAMES_ARRAY, v.DATA_TYPES_ARARY, v.SIZE_CONSTRAINTS_ARRAY,@DB_COLLATION) as STATEMENTS   
+         master.dbo.sp_GENERATE_STATEMENTS(VENDOR, @TARGET_DATABASE, v.TABLE_NAME, v.COLUMN_NAMES_ARRAY, v.DATA_TYPES_ARARY, v.SIZE_CONSTRAINTS_ARRAY, @SPATIAL_FORMAT, @CIRCLE_FORMAT, @DB_COLLATION) as STATEMENTS
     from TABLE_METADATA v;
 		
   SET QUOTED_IDENTIFIER ON; 

@@ -86,7 +86,14 @@ class PostgresQA extends PostgresDBI {
        ,failed     : []
       }
 
-      await this.executeSQL(PostgresQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,rules.EMPTY_STRING_IS_NULL === true,rules.SPATIAL_PRECISION || 18,rules.XML_COMPARISSON_RULES])      
+      const compareRules = {
+	    emptyStringisNull   : rules.EMPTY_STRING_IS_NULL 
+	  ,	spatialPrecision    : rules.SPATIAL_PRECISION || 18
+	  , xmlRule             : rules.XML_COMPARISSON_RULE
+	  , infinityIsNull      : rules.INFINITY_IS_NULL 
+      }
+	 	 
+      await this.executeSQL(PostgresQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,compareRules])      
       
       const successful = await this.executeSQL(PostgresQA.SQL_SUCCESS)            
       report.successful = successful.rows
@@ -136,4 +143,4 @@ const _SQL_FAILED =
 
 const _SQL_SCHEMA_TABLE_ROWS = `select schemaname, relname, n_live_tup from pg_stat_user_tables where schemaname = $1`;
 
-const _SQL_COMPARE_SCHEMAS = `call COMPARE_SCHEMA($1,$2,$3,$4,$5)`
+const _SQL_COMPARE_SCHEMAS = `call COMPARE_SCHEMA($1,$2,$3)`

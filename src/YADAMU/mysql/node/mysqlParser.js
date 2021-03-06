@@ -28,6 +28,7 @@ class MySQLParser extends YadamuParser {
         }
       }) 
     }
+
   }
 
   async _transform (data,encoding,callback) {

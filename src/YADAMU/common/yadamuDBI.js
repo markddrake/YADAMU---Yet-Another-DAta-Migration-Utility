@@ -37,12 +37,13 @@ class YadamuDBI {
   get PASSWORD_KEY_NAME()          { return 'password' };
   get STATEMENT_TERMINATOR()       { return '' }
 
-  get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT   || DBIConstants.SPATIAL_FORMAT };
-  get TABLE_MAX_ERRORS()           { return this.parameters.TABLE_MAX_ERRORS || DBIConstants.TABLE_MAX_ERRORS };
-  get TOTAL_MAX_ERRORS()           { return this.parameters.TOTAL_MAX_ERRORS || DBIConstants.TOTAL_MAX_ERRORS };
-  get COMMIT_RATIO()               { return this.parameters.COMMIT_RATIO     || DBIConstants.COMMIT_RATIO };
-  get MODE()                       { return this.parameters.MODE             || DBIConstants.MODE }
-  get ON_ERROR()                   { return this.parameters.ON_ERROR         || DBIConstants.ON_ERROR }
+  get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT      || DBIConstants.SPATIAL_FORMAT };
+  get TABLE_MAX_ERRORS()           { return this.parameters.TABLE_MAX_ERRORS    || DBIConstants.TABLE_MAX_ERRORS };
+  get TOTAL_MAX_ERRORS()           { return this.parameters.TOTAL_MAX_ERRORS    || DBIConstants.TOTAL_MAX_ERRORS };
+  get COMMIT_RATIO()               { return this.parameters.COMMIT_RATIO        || DBIConstants.COMMIT_RATIO };
+  get MODE()                       { return this.parameters.MODE                || DBIConstants.MODE }
+  get ON_ERROR()                   { return this.parameters.ON_ERROR            || DBIConstants.ON_ERROR }
+  get INFINITY_MANAGEMENT()        { return this.parameters.INFINITY_MANAGEMENT || DBIConstants.INFINITY_MANAGEMENT };
 
   get BATCH_SIZE() {
     this._BATCH_SIZE = this._BATCH_SIZE || (() => {
@@ -76,8 +77,6 @@ class YadamuDBI {
   get WARNING_FOLDER()                { return this.parameters.FILE     || this.yadamu.WARNING_FOLDER }
   get WARNING_FILE_PREFIX()           { return this.parameters.FILE     || this.yadamu.WARNING_FILE_PREFIX }
 
-  get TABLE_FILTER()                  { return this.parameters.TABLES || [] }
-  
   get INPUT_METRICS()                 { return this._INPUT_METRICS }
   set INPUT_METRICS(v) {
 	this._INPUT_METRICS =  Object.assign({},v);
@@ -96,11 +95,27 @@ class YadamuDBI {
 
   // Not available until configureConnection() has been called 
 
-  get DB_VERSION()             { return this._DB_VERSION }
+  get DB_VERSION()                    { return this._DB_VERSION }
 
-  get SPATIAL_SERIALIZER()                    { return this._SPATIAL_SERIALIZER }
-  set SPATIAL_SERIALIZER(v)                   { this._SPATIAL_SERIALIZER = v }
+  get SPATIAL_SERIALIZER()            { return this._SPATIAL_SERIALIZER }
+  set SPATIAL_SERIALIZER(v)           { this._SPATIAL_SERIALIZER = v }
    
+  get INBOUND_SPATIAL_FORMAT()        { return this.systemInformation?.typeMappings?.spatialFormat || this.SPATIAL_FORMAT};
+  get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation?.typeMappings?.circleFormat || null};
+
+  get TABLE_FILTER()                  { 
+    this._TABLE_FILTER || this._TABLE_FILTER || (() => {
+	  const tableFilter =  typeof this.parameters.TABLES === 'string' ? this.loadTableList(this.parameters.TABLES) : (this.parameters.TABLES || [])
+	  // Filter for Unqiueness just to be safe.
+	  this._TABLE_FILTER =  tableFilter.filter((value,index) => {
+	    return tableFilter.indexOf(value) === index
+	  }) 
+    })();
+    return this._TABLE_FILTER
+  }
+		
+  get TABLE_MATCHING()                { return this.parameters.TABLE_MATCHING }
+
   constructor(yadamu,parameters) {
     
     this.options = {
@@ -149,6 +164,18 @@ class YadamuDBI {
     this.killConfiguration = {}
   }
 
+  loadTableList(tableListPath) {
+	try {
+      const tableList = YadamuLibrary.loadJSON(tableListPath,this.yadamuLogger) 
+      if (Array.isArray(tableList)) {
+		return tableList
+	  }
+	  throw new CommandLineError(`Expected a JSON array containig a case sensitive list of table names e.g. ["Table1","Table2"]. Received ${tableList}.`)
+	} catch (e) {
+	  throw new CommandLineError(`Expected a JSON array containig a case sensitive list of table names e.g. ["Table1","Table2"]. Encountered errror "${e.message}" while loading "${tableListPath}.`)
+	}
+  }
+
   setOption(name,value) {
     this.options[name] = value;
   }
@@ -167,10 +194,6 @@ class YadamuDBI {
   setParameters(parameters) {
 	Object.assign(this.parameters, parameters || {})
 	this._COMMIT_COUNT = undefined
-  }
-  
-  applyTableFilter(tableName) { 
-    return ((this.TABLE_FILTER.length === 0) || this.TABLE_FILTER.includes(tableName))
   }
   
   traceSQL(msg) {
@@ -274,7 +297,7 @@ class YadamuDBI {
 	}
   }
           
-  processLog(log, operation, status,yadamuLogger) {
+  processLog(log, operation, status, yadamuLogger) {
 
     const logDML         = (status.loglevel && (status.loglevel > 0));
     const logDDL         = (status.loglevel && (status.loglevel > 1));
@@ -327,6 +350,7 @@ class YadamuDBI {
     }) 
 	
     if (summary.exceptions.length > 0) {
+	  this.yadamuLogger.error([this.DATABASE_VENDOR, status.operation, operation],`Server side operation resulted in ${summary.exceptions.length} errors.`)
   	  const err = new Error(`${this.DATABASE_VENDOR} ${operation} failed.`);
 	  err.causes = summary.exceptions
       throw err
@@ -515,9 +539,29 @@ class YadamuDBI {
   }
   
   transformTableName(tableName,mappings) {
-	return (mappings && mappings.hasOwnProperty(tableName)) ? mappings[tableName].tableName : tableName
+	  
+	// Transform table according to mappings file. If no Mappings file specified 
+	// Check for Uppercase or Lowercase transform
+	       	  
+			  
+	if (mappings && mappings.hasOwnProperty(tableName)) {	
+ 	  return mappings[tableName].tableName 
+	}
+	else {
+	  switch ( this.TABLE_MATCHING ) {
+        case 'UPPERCASE' :
+          return tableName.toUpperCase();
+          break;
+        case 'LOWERCASE' :
+          return tableName.toLowerCase();
+          break;
+        case 'INSENSITIVE' :
+        default:
+	      return tableName
+	  }
+	}
   }
-  
+
   transformMetadata(metadata,mappings) {
     if (mappings) {
       const mappedMetadata = this.applyTableMappings(metadata,mappings)
@@ -535,7 +579,7 @@ class YadamuDBI {
 	try {
       results = await Promise.all(ddl.map((ddlStatement) => {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
-		this.status.sqlTrace.write(this.traceSQL(ddlStatement));
+		// this.status.sqlTrace.write(this.traceSQL(ddlStatement));
         return this.executeSQL(ddlStatement,{});
       }))
     } catch (e) {
@@ -929,8 +973,29 @@ class YadamuDBI {
   **
   */
   
-  async getSystemInformation() {     
-    throw new Error('Unimplemented Method')
+  getTypeMappings() {
+	return {
+      spatialFormat: this.SPATIAL_FORMAT
+	}
+  }
+  
+  getSystemInformation() {     
+  
+    return {
+      date               : new Date().toISOString()
+    , timeZoneOffset     : new Date().getTimezoneOffset()
+    , typeMappings       : this.getTypeMappings()
+	, tableFilter        : this.getTABLE_FILTER
+    , schema             : this.parameters.FROM_USER ? this.parameters.FROM_USER : this.parameters.TO_USER
+    , exportVersion      : YadamuConstants.YADAMU_VERSION
+    , vendor             : this.DATABASE_VENDOR
+	, softwareVendor     : this.SOFTWARE_VENDOR
+    , nodeClient         : {
+        version          : process.version
+       ,architecture     : process.arch
+       ,platform         : process.platform
+      }
+    }
   }
 
   /*
@@ -955,33 +1020,63 @@ class YadamuDBI {
 	  , CLIENT_SELECT_LIST    : table[5]
 	  }
     })
+
 	return this.schemaInfo;
   }
   
-  generateMetadata(schemaInformation) {   
-
-    if (this.TABLE_FILTER.length > 0)  {
+  applyTableFilter(schemaInformation) {
+	    
+		
+    // Restrict operations to the list of tables specified.
+	// Order operations according to the order in which the tables were specified
+		
+    if (this.TABLE_FILTER.length > 0) {
+	  
+	  // Check table names are valid.
+	  // For each name in the Table Filter check there is a corresponding entry in the schemaInfoormation collection
+	  
+	  const tableNames = schemaInformation.map((tableInformation) => {
+		return tableInformation.TABLE_NAME
+	  })
+	  
+	  const invalidTableNames = this.TABLE_FILTER.filter((tableName) => {
+		 // Return true if the table does not have an entry in the schemaInformstion collection
+		 return !tableNames.includes(tableName)
+	  })
+	  
+	  if (invalidTableNames.length > 0) {
+        throw new CommandLineError(`Could not resolve the following table names : "${invalidTableNames}".`)
+      }
+	
       this.yadamuLogger.info([this.DATABASE_VENDOR],`Operations restricted to the following tables: ${JSON.stringify(this.TABLE_FILTER)}.`)
+	  	 
+	  schemaInformation = this.TABLE_FILTER.map((tableName) => {
+        return schemaInformation.filter((tableInformation) => {
+		   return (tableInformation.TABLE_NAME === tableName)
+		 })[0]
+	  })
     }
+    return schemaInformation
+  }
+  
+  generateMetadata(schemaInformation) {   
    
     const metadata = {}
+  	
     schemaInformation.forEach((table,idx) => {
       table.COLUMN_NAME_ARRAY     = typeof table.COLUMN_NAME_ARRAY     === 'string' ? JSON.parse(table.COLUMN_NAME_ARRAY)     : table.COLUMN_NAME_ARRAY
       table.DATA_TYPE_ARRAY       = typeof table.DATA_TYPE_ARRAY       === 'string' ? JSON.parse(table.DATA_TYPE_ARRAY)       : table.DATA_TYPE_ARRAY
       table.STORAGE_TYPE_ARRAY    = typeof table.STORAGE_TYPE_ARRAY    === 'string' ? JSON.parse(table.STORAGE_TYPE_ARRAY)    : table.STORAGE_TYPE_ARRAY || table.DATA_TYPE_ARRAY
       table.SIZE_CONSTRAINT_ARRAY = typeof table.SIZE_CONSTRAINT_ARRAY === 'string' ? JSON.parse(table.SIZE_CONSTRAINT_ARRAY) : table.SIZE_CONSTRAINT_ARRAY
-      table.INCLUDE_TABLE = this.applyTableFilter(table.TABLE_NAME)
-      if (table.INCLUDE_TABLE) {
-        const tableMetadata =  {
-          tableSchema              : table.TABLE_SCHEMA
-         ,tableName                : table.TABLE_NAME
-         ,columnNames              : table.COLUMN_NAME_ARRAY
-         ,dataTypes                : table.DATA_TYPE_ARRAY
-         ,storageTypes             : table.STORAGE_TYPE_ARRAY
-         ,sizeConstraints          : table.SIZE_CONSTRAINT_ARRAY
-        }
-        metadata[table.TABLE_NAME] = tableMetadata
+      const tableMetadata =  {
+        tableSchema              : table.TABLE_SCHEMA
+       ,tableName                : table.TABLE_NAME
+       ,columnNames              : table.COLUMN_NAME_ARRAY
+       ,dataTypes                : table.DATA_TYPE_ARRAY
+       ,storageTypes             : table.STORAGE_TYPE_ARRAY
+       ,sizeConstraints          : table.SIZE_CONSTRAINT_ARRAY
       }
+      metadata[table.TABLE_NAME] = tableMetadata
     }) 
 	return metadata
   }  
@@ -1039,7 +1134,7 @@ class YadamuDBI {
   }
     
   async generateStatementCache(StatementGenerator,schema) {
-	const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.systemInformation.spatialFormat,this.yadamuLogger);
+	const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.yadamuLogger);
     this.statementCache = await statementGenerator.generateStatementCache()
 	return this.statementCache
   }

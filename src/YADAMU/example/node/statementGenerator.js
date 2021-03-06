@@ -2,12 +2,11 @@
 
 class StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, spatialFormat) {
-    
+  constructor(dbi, targetSchema, metadata, yadamuLogger) { 
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
-    this.spatialFormat = spatialFormat
+    this.yadamuLogger = yadamuLogger;
   }
   
 
@@ -22,7 +21,7 @@ class StatementGenerator {
 	*/
     
     const sqlStatement = `CALL STORED PROEDCURE`
-    let statementCache = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, this.targetSchema, this.spatialFormat])
+    let statementCache = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, this.targetSchema, this.dbi.INBOUND_SPATIAL_FORMAT])
     if (statementCache === null) {
       statementCache = {}
     }

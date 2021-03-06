@@ -442,6 +442,19 @@ go
 execute sp_ms_marksystemobject 'sp_jsonCompact'
 go
 --
+create or alter function sp_jsonOrder(@JSON nvarchar(max))
+returns nvarchar(max)
+as
+begin
+  return (
+     select '{' + (STRING_AGG('"' + "key" + ':' + case when ISJSON(value) = 1 then dbo.sp_jsonOrder(value) else '"' + value + '"' end,',') WITHIN GROUP (ORDER BY "key")) + '}' from OPENJSON(@JSON)
+  )
+end
+go
+--
+execute sp_ms_marksystemobject 'sp_jsonOrder'
+go
+--
 create or alter procedure sp_COMPARE_SCHEMA(@FORMAT_RESULTS bit,@SOURCE_DATABASE nvarchar(128), @SOURCE_SCHEMA nvarchar(128), @TARGET_DATABASE nvarchar(128), @TARGET_SCHEMA nvarchar(128), @COMMENT nvarchar(2048), @EMPTY_STRING_IS_NULL bit, @SPATIAL_PRECISION int, @DATE_TIME_PRECISION int) 
 as
 begin
@@ -465,7 +478,7 @@ begin
         ,st.is_memory_optimized
         ,string_agg(case 
 	                  when cc."CONSTRAINT_NAME" is not NULL then 
-					     concat('master.dbo.sp_jsonCompact("',c.COLUMN_NAME,'") "',c.COLUMN_NAME,'"')
+					     concat('master.dbo.sp_jsonOrder("',c.COLUMN_NAME,'") "',c.COLUMN_NAME,'"')
                       when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @DATE_TIME_PRECISION)) then
                        -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@DATE_TIME_PRECISION,')) "',c.COLUMN_NAME,'"')
                         concat('convert(datetime2(',@DATE_TIME_PRECISION,'),convert(varchar(',@DATE_TIME_PRECISION+20,'),"',c.COLUMN_NAME,'"),126) "',c.COLUMN_NAME,'"')

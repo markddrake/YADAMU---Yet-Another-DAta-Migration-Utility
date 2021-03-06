@@ -68,22 +68,41 @@ class OracleParser extends YadamuParser {
     
     this.transformations = metadata.map((column,idx) => {
 	  switch (column.fetchType) {
-		 case oracledb.CLOB:
-		   return (row,idx)  => {
-             row[idx] = this.clobToString(row[idx])
-		   }           
-	     case oracledb.BLOB:	
-           if (this.tableInfo.jsonColumns.includes(idx)) {
-             // Convert JSON store as BLOB to string
-		     this.jsonTransformations[idx] = (row,idx)  => {
-               row[idx] = row[idx].toString('utf8')
-		     }
-           }
-           return (row,idx)  => {
-             row[idx] = this.blobToBuffer(row[idx])
-		   }
-         default:
-  		   return null;
+		case oracledb.CLOB:
+		  return (row,idx)  => {
+            row[idx] = this.clobToString(row[idx])
+		  }           
+	    case oracledb.BLOB:	
+          if (this.tableInfo.jsonColumns.includes(idx)) {
+            // Convert JSON store as BLOB to string
+		    this.jsonTransformations[idx] = (row,idx)  => {
+              row[idx] = row[idx].toString('utf8')
+		    }
+          }
+          return (row,idx)  => {
+            row[idx] = this.blobToBuffer(row[idx])
+		  }
+        default:
+ 		  switch (column.dbType) {
+		    case oracledb.DB_TYPE_BINARY_FLOAT:
+			case oracledb.DB_TYPE_BINARY_DOUBLE:
+		      this.jsonTransformations[idx] = (row,idx)  => {
+			    switch (row[idx]) {
+  			      case 'Inf':
+				    row[idx] = 'Infinity'
+				    break;
+				  case '-Inf':
+				    row[idx] = '-Infinity'
+				    break;
+				  case 'Nan':
+				    row[idx] = 'Nan'
+				    break;
+				  default:
+                }				  
+		      }
+			default:
+		  }
+  		  return null;
       }
     })
 	

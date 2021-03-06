@@ -254,7 +254,8 @@ class Yadamu {
     }
     else {
       console.log(`${new Date().toISOString()} [ERROR][YADAMU][${status.operation}]: Operation Failed:`);
-      console.dir(e,{depth:null});
+      // console.dir(e,{depth:null});
+	  YadamuLibrary.reportError(e)
     }
   }
 
@@ -462,7 +463,7 @@ class Yadamu {
           case '--PERFORMANCE_TRACE':
             parameters.PERFORMANCE_TRACE = parameterValue;
             break;
-                    case '--SQL_TRACE':
+          case '--SQL_TRACE':
             parameters.SQL_TRACE = parameterValue;
             break;
           case 'PARAMETER_TRACE':
@@ -519,13 +520,25 @@ class Yadamu {
             break;
           case 'TABLES':
           case '--TABLES':
-            if (typeof parameterValue === "string") {
-              parameters.TABLES = parameterValue.split(',')
-            }
-            else {
-              throw new CommandLineError(`Parameter TABLES: Expected a comma seperated list of table names. Received "TABLES=${parameterValue}".`)
-            }
+		    if ((parameterValue.indexOf('[') === 0) && (parameterValue.indexOf(']') === (parameterValue.length -1))) {
+			  // Assume we have a comma seperated list of tables - Convert to JSON Array
+			  try {
+				parameters.TABLES = JSON.parse(parameterValue) 
+			  } catch (e) {
+			    // Assume the " were not back quoted and were swallowed by OS command intepreter
+				try {
+				  parameters.TABLES = parameterValue.substring(1,parameterValue.length-1).split(',')
+				}
+				catch (e) {
+				  throw new CommandLineError(`Parameter TABLES: Expected a comma seperated, case sensitive list of table names enclosed in Square Brackets  eg TABLE=[Table1,Table2] or a path to a file. Received "TABLES=${parameterValue}".`)
+				}
+			  }
+		    }    
+			else {
+              parameters.TABLES = parameterValue
+			}
             break;
+          case 'TABLE_LIST':
           case 'OUTPUT_FORMAT':
           case '--OUTPUT_FORMAT':
             parameters.OUTPUT_FORMAT = this.isSupportedValue('OUTPUT_FORMAT',parameterValue,YadamuConstants.OUTPUT_FORMATS);

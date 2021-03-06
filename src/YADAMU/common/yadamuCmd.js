@@ -30,11 +30,11 @@ async function main() {
           break;
       } 
 	} catch (e) {
-      YadamuCmd.reportError(e)
+      this.reportError(e)
 	}
     await yadamuCmd.close();
   } catch (e) {
-    YadamuCmd.reportError(e)
+    this.reportError(e)
   }
   
 }

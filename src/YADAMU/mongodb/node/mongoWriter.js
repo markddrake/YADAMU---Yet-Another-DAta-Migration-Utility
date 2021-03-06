@@ -5,6 +5,8 @@ const { performance } = require('perf_hooks');
 const WKX = require('wkx');
 
 const ObjectID = require('mongodb').ObjectID
+const Decimal128 = require('mongodb').Decimal128
+const Long = require('mongodb').Long
 
 const Yadamu = require('../../common/yadamu.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
@@ -43,25 +45,40 @@ class MongoWriter extends YadamuWriter {
   setTableInfo(tableName) {
 	super.setTableInfo(tableName)
     
-    this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
+	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
 	   switch(targetDataType.toLowerCase()){
         case 'objectid':
 	      return (row,idx) => {
 			row[idx] = ObjectID(row[idx])
 	      }
           break;
+		case 'numeric':
+		case 'decimal':
+		  return (row,idx) => {
+			 row[idx] = Decimal128.fromString(row[idx])
+	      }
+          break;
+		case 'long':
+		  return (row,idx) => {
+			 row[idx] = Long.fromString(row[idx])
+	      }
+          break;
         case 'geometry':
         case 'geography':
 		case 'point':
-        case 'line':
-		case 'lseg':
-        case 'linestring':
+        case 'lseg':
 		case 'box':
 		case 'path':
 		case 'polygon':
 		case 'circle':
+        case 'linestring':
+		case 'multipoint':
+        case 'multilinestring':
+		case 'multipolygon':
+        case 'geometrycollection':
+        case 'geomcollection':
         case '"MDSYS"."SDO_GEOMETRY"':
-          switch (this.dbi.systemInformation.spatialFormat) {
+          switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
             case "WKB":
             case "EWKB":
               return (row,idx) => {
@@ -84,7 +101,6 @@ class MongoWriter extends YadamuWriter {
           return (row,idx) => {
             row[idx] = typeof row[idx] === 'string' && (row[idx].length > 0) ? JSON.parse(row[idx]) : row[idx]
 	      }
-
 		case 'bindata':
 		  if ((this.tableInfo.columnNames[idx] === '_id') && (this.tableInfo.sizeConstraints[idx] === '12')) {
   	        return (row,idx) => {
@@ -100,7 +116,7 @@ class MongoWriter extends YadamuWriter {
           }			
 		  return null
 		default:
-		  if (YadamuLibrary.isNumericDataType(targetDataType)) {
+		  if (YadamuLibrary.isNumericType(targetDataType)) {
 			return (row,idx) => {
 			  if (typeof row[idx] === 'string') {
 			    row[idx] = Number(row[idx])
@@ -203,7 +219,7 @@ class MongoWriter extends YadamuWriter {
   cacheRow(row) {
       
     // Apply the row transformation and add row to the current batch.
-    
+	
     this.rowTransformation(row)
 	this.batchRow(row)
     this.metrics.cached++
@@ -224,13 +240,36 @@ class MongoWriter extends YadamuWriter {
   async _writeBatch(batch,rowCount) {
     
     // ### Todo: ERROR HANDLING and Iterative Mode.
-	
-    this.metrics.batchCount++
-	const results = await this.dbi.insertMany(this.tableInfo.tableName,batch);
+
+    try {
+      this.metrics.batchCount++
+	  const results = await this.dbi.insertMany(this.tableInfo.tableName,batch);
+      this.endTime = performance.now();
+      this.metrics.written += rowCount;
+      this.releaseBatch(batch)
+	  return this.skipTable
+    } catch (cause) {
+	  this.reportBatchError(batch,`INSERT MANY`,cause)
+      this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
+    } 
+    
+         
+	for (const row in batch) {
+      try {
+        const results = await this.dbi.insertOne(this.tableInfo.tableName,batch[row]);
+        this.metrics.written++;
+      } catch(cause) {
+        this.handleIterativeError(`INSERT ONE`,cause,row,batch[row]);
+        if (this.skipTable) {
+          break;
+        }
+      }
+    }
+
     this.endTime = performance.now();
-    this.metrics.written += rowCount;
     this.releaseBatch(batch)
-	return this.skipTable
+    return this.skipTable  
+
   }
 }
 

@@ -198,7 +198,7 @@ class YadamuWriter extends Transform {
 	if (this.rowsLost()) {
 	  throw cause
 	}
-
+	
     this.metrics.skipped++;
     
     try {
@@ -493,7 +493,7 @@ class YadamuWriter extends Transform {
       callback();
     } catch (e) {
       // this.yadamuLogger.trace([`WRITER`,this.dbi.DATABASE_VENDOR,this.tableName,this.dbi.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);    
-	  this.yadamuLogger.handleException([`PIPELINE`,`WRITER0`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,messageType,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);    
+	  this.yadamuLogger.handleException([`PIPELINE`,`WRITER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,messageType,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);    
 	  try {
         switch (messageType) {
           case 'data':

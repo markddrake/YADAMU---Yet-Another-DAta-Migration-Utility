@@ -72,7 +72,7 @@ class OracleDBI extends YadamuDBI {
   // Enable configuration via command line parameters
  
   get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT         || OracleConstants.SPATIAL_FORMAT }
-  get OBJECTS_AS_JSON()        { return this.parameters.OBJECTS_AS_JSON        || OracleConstants.OBJECTS_AS_JSON }
+  get OBJECT_FORMAT()          { return this.parameters.OBJECT_FORMAT        || OracleConstants.OBJECT_FORMAT }
   get JSON_STORAGE_FORMAT()    { return this.parameters.JSON_STORAGE_FORMAT    || OracleConstants.JSON_STORAGE_FORMAT}
   get MIGRATE_JSON_STORAGE()   { return this.parameters.MIGRATE_JSON_STORAGE   || OracleConstants.MIGRATE_JSON_STORAGE}
   get XML_STORAGE_FORMAT()     { return this.parameters.XML_STORAGE_FORMAT     || OracleConstants.XML_STORAGE_FORMAT}
@@ -84,6 +84,8 @@ class OracleDBI extends YadamuDBI {
     this._LOB_MIN_SIZE = this._LOB_MIN_SIZE ||(() => { let lobMinSize = this.parameters.LOB_MIN_SIZE || OracleConstants.LOB_MIN_SIZE; lobMinSize = ((this.DB_VERSION < 12) && (lobMinSize > 4000)) ? 4000 : lobMinSize; return lobMinSize})()
     return this._LOB_MIN_SIZE 
   }
+
+   get OBJECTS_AS_JSON()        { return this.OBJECT_FORMAT === 'JSON' }
   
   /*
   **
@@ -1011,8 +1013,16 @@ class OracleDBI extends YadamuDBI {
          }
 	     break;
     }	 
-	const sqlStatement = `begin\n  ${settings}\n  :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema, :JSON_STORAGE_MODEL, :XML_STORAGE_MODEL);\nend;`;
-	const results = await this.executeSQL(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH}, json:hndl, schema:this.parameters.TO_USER, JSON_STORAGE_MODEL: this.JSON_STORAGE_MODEL, XML_STORAGE_MODEL: this.XML_STORAGE_CLAUSE})
+	
+	
+	const typeMappings = {
+	  raw1AsBoolean    : new Boolean(this.TREAT_RAW1_AS_BOOLEAN).toString().toLowerCase()
+	, jsonDataType     : this.JSON_DATA_TYPE
+	, xmlStorageModel  : this.XML_STORAGE_CLAUSE
+	}
+	
+	const sqlStatement = `begin\n  ${settings}\n  :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema, :typeMappings);\nend;`;
+	const results = await this.executeSQL(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH}, json:hndl, schema:this.parameters.TO_USER, typeMappings: JSON.stringify(typeMappings)})
     return this.processLog(results,'JSON_TABLE');  
   }
   
@@ -1027,31 +1037,30 @@ class OracleDBI extends YadamuDBI {
   **  Generate the SystemInformation object for an Export operation
   **
   */
+  
+  getTypeMappings() {
+   
+    const typeMappings = super.getTypeMappings();
+	typeMappings.objectFormat = this.OBJECT_FORMAT 
+    return typeMappings; 
+  }
 
   async getSystemInformation() {     
 
 	const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,{sysInfo:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH}})
 
-    return Object.assign({
-      date               : new Date().toISOString()
-     ,timeZoneOffset     : new Date().getTimezoneOffset()
-     ,vendor             : this.DATABASE_VENDOR
-     ,spatialFormat      : this.SPATIAL_FORMAT 
-	 ,objectFormat       : this.OBJECTS_AS_JSON === true ? 'JSON' : 'NATIVE'
-     ,schema             : this.parameters.FROM_USER ? this.parameters.FROM_USER : this.parameters.TO_USER
-     ,softwareVendor     : this.SOFTWARE_VENDOR
-     ,exportVersion      : YadamuConstants.YADAMU_VERSION
-     ,nodeClient         : {
-        version          : process.version
-       ,architecture     : process.arch
-       ,platform         : process.platform
+    return Object.assign(
+	  super.getSystemInformation()
+	, JSON.parse(results.outBinds.sysInfo)
+    , {
+		oracleDriver       : {
+          oracledbVersion  : oracledb.versionString
+        , clientVersion    : oracledb.oracleClientVersionString
+        , serverVersion    : this.connection.oracleServerVersionString
+        }
       }
-     ,oracleDriver       : {
-        oracledbVersion  : oracledb.versionString
-       ,clientVersion    : oracledb.oracleClientVersionString
-       ,serverVersion    : this.connection.oracleServerVersionString
-      }
-    },JSON.parse(results.outBinds.sysInfo));
+	);
+	  
   }
 
   /*
@@ -1118,6 +1127,7 @@ class OracleDBI extends YadamuDBI {
 	                                        }
                                           }
     )
+	
 	
     const schemaInformation = results.rows
     return schemaInformation;
@@ -1263,7 +1273,7 @@ class OracleDBI extends YadamuDBI {
   */
   
   async generateStatementCache(schema) {
-    const statementGenerator = new this.StatementGenerator(this,schema,this.metadata,this.systemInformation.spatialFormat)
+    const statementGenerator = new this.StatementGenerator(this,schema,this.metadata,this.yadamuLogger)
     this.statementCache = await statementGenerator.generateStatementCache(this.systemInformation.vendor)
 	return this.statementCache
 

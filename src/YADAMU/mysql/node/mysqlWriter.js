@@ -6,7 +6,7 @@ const util = require('util');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
-const {DatabaseError} = require('../../common/yadamuException.js');
+const {DatabaseError,RejectedColumnValue} = require('../../common/yadamuException.js');
 
 class MySQLWriter extends YadamuWriter {
 
@@ -32,7 +32,11 @@ class MySQLWriter extends YadamuWriter {
   	    case 'point':
 		case 'linestring':
 		case 'polygon':
-		  if (this.SPATIAL_FORMAT === 'GeoJSON') {
+		case 'multipoint':
+		case 'multilinestring':
+		case 'multipolygon':
+		case 'geometrycollection':
+	      if (this.SPATIAL_FORMAT === 'GeoJSON') {
             return (col,idx) => {
               return typeof col === 'object' ? JSON.stringify(col) : col
             }
@@ -60,7 +64,32 @@ class MySQLWriter extends YadamuWriter {
             return col.substring(0,26);
  		  }
  		  break;
-        default :
+ 		case "real":
+        case "float":
+		case "double":
+		case "double precision":
+		case "binary_float":
+		case "binary_double":
+		  switch (this.dbi.INFINITY_MANAGEMENT) {
+		    case 'REJECT':
+              return (col, idx) => {
+			    if (!isFinite(col)) {
+			      throw new RejectedColumnValue(this.tableInfo.columnNames[idx],col);
+			    }
+				return col;
+		      }
+		    case 'NULLIFY':
+			  return (col, idx) => {
+			    if (!isFinite(col)) {
+                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
+	  		      return null;
+				}
+			    return col
+		      }   
+			default:
+			  return null;
+	      }
+       default :
           return null
       }
     })
@@ -81,26 +110,39 @@ class MySQLWriter extends YadamuWriter {
 
     // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.metrics.cached],'cacheRow()')    
 	  
-	this.transformations.forEach((transformation,idx) => {
-      if ((transformation !== null) && (row[idx] !== null)) {
-	    row[idx] = transformation(row[idx],idx)
+	try {
+	  
+	  this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+	      row[idx] = transformation(row[idx],idx)
+        }
+	  })
+
+      // Rows mode requires an array of column values, rather than an array of rows.
+
+      if (this.tableInfo.insertMode === 'Rows')  {
+  	    this.batch.push(...row)
       }
-	})
+      else {
+       
+	   this.batch.push(row)
+      }
 
-    // Rows mode requires an array of column values, rather than an array of rows.
-
-    if (this.tableInfo.insertMode === 'Rows')  {
-  	  this.batch.push(...row)
-    }
-    else {
-      this.batch.push(row)
-    }
-
-    this.metrics.cached++
-	return this.skipTable;
+      this.metrics.cached++
+	  return this.skipTable;
+	} catch (e) {
+  	  if (e instanceof RejectedColumnValue) {
+        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],e.message);
+        this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableInfo.tableName,row);
+		this.metrics.skipped++
+        return
+	  }
+	  throw e
+	}
+	
   }  
 
-  async processWarnings(batch, results) {
+  async processWarnings(results,row) {
 
     // ### Output Records that generate warnings
 
@@ -108,16 +150,18 @@ class MySQLWriter extends YadamuWriter {
 
     if (results.warningCount >  0) {
       const warnings = await this.dbi.executeSQL('show warnings');
-      // warnings.forEach(async (warning,idx) => {
+      // warnings.forEach(async (w1arning,idx) => {
       for (const warning of warnings) {
         if (warning.Level === 'Warning') {
           let nextBadRow = warning.Message.split('row')
           nextBadRow = parseInt(nextBadRow[nextBadRow.length-1])
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
-          if (badRow !== nextBadRow) {
+		  
+		  // Only write rows to Rejection File in Iterative Mode. 
+		  
+          if ((this.tableInfo.insertMode === 'Iterative') && (badRow !== nextBadRow)) {
             const columnOffset = (nextBadRow-1) * this.tableInfo.columnNames.length
-            const row = this.tableInfo.insertMode === 'Rows'  ? batch.slice(columnOffset,columnOffset +  this.tableInfo.columnNames.length) : batch[nextBadRow-1]
-	  	    await this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,row);
+            this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,row);
             badRow = nextBadRow;
           }
         }
@@ -163,7 +207,7 @@ class MySQLWriter extends YadamuWriter {
           await this.dbi.createSavePoint();
 		  const bulkInsertStatement =  `${this.tableInfo.dml} ?`
           const results = await this.dbi.executeSQL(bulkInsertStatement,[batch]);
-          await this.processWarnings(batch,results);
+          await this.processWarnings(results,null);
           this.endTime = performance.now();
           await this.dbi.releaseSavePoint();
    		  this.metrics.written += rowCount;
@@ -172,7 +216,8 @@ class MySQLWriter extends YadamuWriter {
         } catch (cause) {
    		  this.reportBatchError(batch,'INSERT MANY',cause)
           await this.dbi.restoreSavePoint(cause);
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Multi-row insert mode.`);     
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.tableInfo.insertMode],`Switching to Multi-row insert mode.`);     
+		  this.tableInfo.insertMode = "Rows"
           batch = batch.flat()
         }
       case 'Rows':
@@ -186,11 +231,9 @@ class MySQLWriter extends YadamuWriter {
             await this.dbi.createSavePoint();    
             const multiRowInsert = `${this.tableInfo.dml} ${new Array(rowCount).fill(this.tableInfo.rowConstructor).join(',')}`
             const results = await this.dbi.executeSQL(multiRowInsert,batch);
-            await this.processWarnings(batch,results);
+            await this.processWarnings(results,null);
             this.endTime = performance.now();
             await this.dbi.releaseSavePoint();
-
-
 	   	    this.metrics.written += rowCount;
             this.releaseBatch(batch)
             return this.skipTable
@@ -204,7 +247,8 @@ class MySQLWriter extends YadamuWriter {
 			  continue;
 		    }
 	   	    this.reportBatchError(batch,'INSERT ROWS',cause)
-            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);    
+            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);    
+  		    this.tableInfo.insertMode = "Iterative"
             break;			
 		  }
         }
@@ -220,7 +264,7 @@ class MySQLWriter extends YadamuWriter {
       const nextRow  = batch.length > rowCount ? batch.slice(offset,offset + this.tableInfo.columnCount) : batch[row]
       try {
 		const results = await this.dbi.executeSQL(singleRowInsert,nextRow)
-        await this.processWarnings(batch,results);
+        await this.processWarnings(results,nextRow);
   	    this.metrics.written++;
       } catch (cause) { 
 	    if (cause.spatialErrorGeoJSON()) {

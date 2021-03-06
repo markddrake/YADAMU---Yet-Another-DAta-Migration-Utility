@@ -140,9 +140,33 @@ class MongoQA extends MongoDBI {
 		    source : 1,
 		    target : "$target.v"
 		  }
-        }]
+        },{
+  		  "$match" : { 
+		    "$expr": { 
+		      "$not": {
+		        "$and": [ 
+		          { "$eq": ["$sType","decimal"]}, 
+		          { "$eq": ["$tType","decimal"]},
+				  { "$eq": [{$toString: "$source"},{$toString: "$target"}]}
+				]
+			  }
+	        }
+		  }
+		},{
+  		  "$match" : { 
+		    "$expr": { 
+		      "$not": {
+		        "$and": [ 
+		          { "$eq": ["$sType","long"]}, 
+		          { "$eq": ["$tType","long"]},
+				  { "$eq": [{$toString: "$source"},{$toString: "$target"}]}
+				]
+			  }
+	        }
+		  }
+		}]
      
-        if ( rules.EMPTY_STRING_IS_NULL === true) {
+	    if ( rules.EMPTY_STRING_IS_NULL === true) {
 		  comparePipeline.push({
 			"$match" : { 
 		      "$expr": { 
@@ -157,6 +181,51 @@ class MongoQA extends MongoDBI {
 		  })
 		}
 		
+        if ( rules.INFINITY_IS_NULL === true) {
+		  comparePipeline.push({
+			"$match" : { 
+		      "$expr": { 
+		        "$not": {
+		          "$and": [ 
+			        { "$eq": ["$source",Infinity]}, 
+			        { "$eq": ["$target",null]}
+			      ]
+			    }
+	          }
+		    }
+		  })
+		}
+
+        if ( rules.INFINITY_IS_NULL === true) {
+		  comparePipeline.push({
+			"$match" : { 
+		      "$expr": { 
+		        "$not": {
+		          "$and": [ 
+			        { "$eq": ["$source",-Infinity]}, 
+			        { "$eq": ["$target",null]}
+			      ]
+			    }
+	          }
+		    }
+		  })
+		}
+		
+		if ( rules.INFINITY_IS_NULL === true) {
+		  comparePipeline.push({
+			"$match" : { 
+		      "$expr": { 
+		        "$not": {
+		          "$and": [ 
+			        { "$eq": ["$source",NaN]}, 
+			        { "$eq": ["$target",null]}
+			      ]
+			    }
+	          }
+		    }
+		  })
+		}
+
 		if ( rules.DOUBLE_PRECISION !== null) {		
 		  comparePipeline.push({
 		    "$match": { 
@@ -262,9 +331,11 @@ class MongoQA extends MongoDBI {
                                      })
                                    }
 	                               else {
-	                                 Object.keys(obj).forEach((key) => {
-	                                   obj[key] = geomRound(obj[key],precision)
-                                     })
+									 if (obj !== null) {
+	                                   Object.keys(obj).forEach((key) => {
+	                                     obj[key] = geomRound(obj[key],precision)
+                                       })
+									 }
 	                               }
 	                               return obj
 	                             default:
@@ -289,10 +360,12 @@ class MongoQA extends MongoDBI {
                                      })
                                    }
 	                               else {
-	                                 Object.keys(obj).forEach((key) => {
-	                                   obj[key] = geomRound(obj[key],precision)
-                                     })
-	                               }
+									 if (obj !== null) {
+	                                   Object.keys(obj).forEach((key) => {
+	                                     obj[key] = geomRound(obj[key],precision)
+                                       })
+									 }
+								   }
    								   return obj
 	                             default:
 	                               return obj
@@ -332,7 +405,7 @@ class MongoQA extends MongoDBI {
 		await this.use(this.QA_COMPARE_DBNAME)
 		const compare = await this.collection("source")
 		results = await compare.aggregate(comparePipeline).toArray()
-
+		
 		// await this.dropDatabase()
 
 		return results
@@ -340,12 +413,31 @@ class MongoQA extends MongoDBI {
 	
 	
     async compareSchemas(source,target,rules) {
-
+	  
       await this.use(source.schema);
 	  const sourceHash = await this.dbHash()
+      const sourceHashValues = sourceHash.collections;
+	  if (this.TABLE_FILTER.length > 0) {
+		Object.keys(sourceHashValues).forEach((collectionName) => {
+		  if (!this.TABLE_FILTER.includes(collectionName)) {
+			delete sourceHashValues[collectionName]
+		  }
+		})
+	  }
 	  const sourceCounts = await this.getRowCounts(source)
+	  
+	  
 	  await this.use(target.schema);
 	  const targetHash = await this.dbHash()
+      const targetHashValues = targetHash.collections;
+	  if (this.TABLE_FILTER.length > 0) {
+		Object.keys(targetHashValues).forEach((collectionName) => {
+		  if (!this.TABLE_FILTER.includes(collectionName)) {
+			delete targetHashValues[collectionName]
+		  }
+		})
+	  }
+
       const targetCounts =  await this.getRowCounts(target)
 	  
 	  const mismatchedHashList = []
@@ -355,21 +447,21 @@ class MongoQA extends MongoDBI {
        ,failed     : []
       }
 	  
-	  Object.keys(sourceHash.collections).forEach(async (collectionName,idx) => {
-		 if (targetHash.collections[collectionName] && (targetHash.collections[collectionName] === sourceHash.collections[collectionName])) {
+	  Object.keys(sourceHashValues).forEach(async (collectionName,idx) => {
+		 if (targetHashValues[collectionName] && (targetHashValues[collectionName] === sourceHashValues[collectionName])) {
            report.successful.push([source.schema,target.schema,collectionName,targetCounts.find(element => element[1] === collectionName)[2]])
 		 }
 		 else {
-           if (targetHash.collections.hasOwnProperty(collectionName)) {
+           if (targetHashValues.hasOwnProperty(collectionName)) {
 			 mismatchedHashList.push(collectionName)
            }
            else {
-		     report.failed.push([source.schema,target.schema,collectionName, sourceCounts.find(element => element[1] === collectionName)[2],-1,sourceHash.collections[collectionName],'','Collection Not Found',null])
+		     report.failed.push([source.schema,target.schema,collectionName, sourceCounts.find(element => element[1] === collectionName)[2],-1,sourceHashValues[collectionName],'','Collection Not Found',null])
            }
 		 }
 	  })
 	  
-	  if ((rules.EMPTY_STRING_IS_NULL === true) || (rules.DOUBLE_PRECISION !== null) || (rules.ORDERED_JSON === true)) {		
+	if ((rules.EMPTY_STRING_IS_NULL === true) || (rules.DOUBLE_PRECISION !== null) || (rules.ORDERED_JSON === true) || (rules.INFINITY_IS_NULL === true)){		
         for (const collectionName of mismatchedHashList) {
 		  const results = await this.compareCollections(source.schema,target.schema,collectionName,rules)
 		  if (results.length === 0) {

@@ -95,7 +95,7 @@ class DBReader extends Readable {
   async getMetadata() {
       
      const startTime = performance.now();
-     this.schemaInfo = await this.dbi.getSchemaInfo('FROM_USER')
+     this.schemaInfo = this.dbi.applyTableFilter(await this.dbi.getSchemaInfo('FROM_USER'))
      this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`Generated metadata for ${this.schemaInfo.length} tables. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
      return this.dbi.generateMetadata(this.schemaInfo)
   }
@@ -205,7 +205,7 @@ class DBReader extends Readable {
   async pipelineTables(taskList,readerDBI,writerDBI) {
 	 
 	this.activeWorkers = new Set();
-    this.yadamuLogger.info(['PIPELINE','SEQUENTIAL',this.dbi.DATABASE_VENDOR,this.dbWriter.dbi.DATABASE_VENDOR],`Processing ${this.taskList.length} Tables`);
+    this.yadamuLogger.info(['PIPELINE','SEQUENTIAL',this.dbi.DATABASE_VENDOR,this.dbWriter.dbi.DATABASE_VENDOR],`Processing ${taskList.length} Tables`);
 	  
 	while (taskList.length > 0) {
 	  const task = taskList.shift()
@@ -280,7 +280,7 @@ class DBReader extends Readable {
   async pipelineTablesToFile(taskList,readerDBI,writerDBI) {
 	
   	  await this.dbWriter.ddlComplete
-      this.yadamuLogger.info(['PIPELINE','SERIAL',this.dbi.DATABASE_VENDOR,this.dbWriter.dbi.DATABASE_VENDOR],`Processing ${this.taskList.length} Tables`);
+      this.yadamuLogger.info(['PIPELINE','SERIAL',this.dbi.DATABASE_VENDOR,this.dbWriter.dbi.DATABASE_VENDOR],`Processing ${taskList.length} Tables`);
      
 	  while (taskList.length > 0) {
 	    const task = taskList.shift()
@@ -358,15 +358,14 @@ class DBReader extends Readable {
            this.push({metadata: this.dbi.transformMetadata(this.metadata,this.dbi.inverseTableMappings)});
 		   this.dbi.yadamu.REJECTION_MANAGER.setMetadata(this.metadata)
 		   this.dbi.yadamu.WARNING_MANAGER.setMetadata(this.metadata)
- 	   	   this.taskList = this.schemaInfo.filter((task) => { return task.INCLUDE_TABLE })
-		   this.nextPhase = ((this.dbi.MODE === 'DDL_ONLY') || (this.taskList.length === 0)) ? 'exportComplete' : 'copyData';
+		   this.nextPhase = ((this.dbi.MODE === 'DDL_ONLY') || (this.schemaInfo.length === 0)) ? 'exportComplete' : 'copyData';
 		   break;
 		 case 'copyData':	   
            if (this.dbWriter.dbi.isDatabase()) {
-		     await this.pipelineTables(this.taskList,this.dbi,this.dbWriter.dbi);
+		     await this.pipelineTables(this.schemaInfo,this.dbi,this.dbWriter.dbi);
 	       }
 	       else {
-	         await this.pipelineTablesToFile(this.taskList,this.dbi,this.dbWriter.dbi);
+		     await this.pipelineTablesToFile(this.schemaInfo,this.dbi,this.dbWriter.dbi);
            }
 		   // No 'break' - fall through to 'exportComplete'.
 		 case 'exportComplete':

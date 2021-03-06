@@ -59,6 +59,8 @@ class PostgresDBI extends YadamuDBI {
   // Enable configuration via command line parameters
   
   get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT || PostgresConstants.SPATIAL_FORMAT }
+  get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT || PostgresConstants.CIRCLE_FORMAT }
+  get BYTEA_SIZING_MODEL()     { return this.parameters.BYTEA_SIZING_MODEL || PostgresConstants.BYTEA_SIZING_MODEL }
   
   get POSTGIS_VERSION()        { return this._POSTGIS_VERSION || "Not Installed" }
   set POSTGIS_VERSION(v)       { this._POSTGIS_VERSION = v }
@@ -68,6 +70,7 @@ class PostgresDBI extends YadamuDBI {
   // Standard Spatial formatting only available when PostGIS is installed.
 
   get SPATIAL_FORMAT()         { return this.POSTGIS_INSTALLED === true ? this.parameters.SPATIAL_FORMAT || DBIConstants.SPATIAL_FORMAT :  "Native" };
+  get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
 
   constructor(yadamu) {
     super(yadamu);
@@ -472,7 +475,7 @@ class PostgresDBI extends YadamuDBI {
   }
 
   async processStagingTable(schema) {  	
-  	const sqlStatement = `select ${this.useBinaryJSON ? 'import_jsonb' : 'import_json'}(data,$1) from "YADAMU_STAGING"`;
+  	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1) from "YADAMU_STAGING"`;
   	var results = await this.executeSQL(sqlStatement,[schema]);
     if (results.rows.length > 0) {
       if (this.useBinaryJSON  === true) {
@@ -483,7 +486,7 @@ class PostgresDBI extends YadamuDBI {
       }
     }
     else {
-      this.yadamuLogger.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL IMPORT_JSONB()' : 'CALL_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`);
+      this.yadamuLogger.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL YADAMU_IMPORT_JSONB()' : 'CALL_YADAMU_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`);
       // Return value will be parsed....
       return [];
     }
@@ -505,32 +508,33 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
+  getTypeMappings() {
+   
+    const typeMappings = super.getTypeMappings();
+	typeMappings.circleFormat = this.CIRCLE_FORMAT 
+    return typeMappings; 
+  }
+  
   async getSystemInformation() {     
   
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
     const sysInfo = results.rows[0];
 	
-    return {
-      date               : new Date().toISOString()
-     ,timeZoneOffset     : new Date().getTimezoneOffset()                      
-     ,sessionTimeZone    : sysInfo[4]
-     ,vendor             : this.DATABASE_VENDOR
-     ,postgisInfo        : this.POSTGIS_VERSION
-     ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : YadamuConstants.YADAMU_VERSION
-	 ,currentUser        : sysInfo[1]
-     ,sessionUser        : sysInfo[2]
-	 ,dbName             : sysInfo[0]
-     ,databaseVersion    : sysInfo[3]
-     ,softwareVendor     : this.SOFTWARE_VENDOR
-     ,nodeClient         : {
-        version          : process.version
-       ,architecture     : process.arch
-       ,platform         : process.platform
-      }      
-    }
+    return Object.assign(
+	  super.getSystemInformation()
+	, {
+	    currentUser                 : sysInfo[1]
+      , sessionUser                 : sysInfo[2]
+	  , dbName                      : sysInfo[0]
+      , databaseVersion             : sysInfo[3]
+	  , timezone                    : sysInfo[4]
+      , postgisInfo                 : this.POSTGIS_VERSION
+	  , yadamuInstanceID            : sysInfo[5]
+	  , yadamuInstallationTimestamp : sysInfo[6]
+      }
+	)
   }
+
 
   /*
   **
@@ -544,10 +548,11 @@ class PostgresDBI extends YadamuDBI {
   
   async getSchemaInfo(keyName) {
     
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.parameters[keyName],this.SPATIAL_FORMAT]);
+    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.parameters[keyName],this.SPATIAL_FORMAT,{"circleAsPolygon": this.INBOUND_CIRCLE_FORMAT === 'POLYGON'}]);
 	if ((results.rowCount === 1) && Array.isArray(results.rows[0][6])) { // EXPORT_JSON returned Errors
        this.processLog(results.rows[0][6],`EXPORT_JSON('${this.parameters[keyName]}','${this.SPATIAL_FORMAT}')`)
 	}
+	// console.dir(results,{depth:null})
     return this.generateSchemaInfo(results.rows)
   }
 
@@ -636,7 +641,7 @@ class PostgresDBI extends YadamuDBI {
 	try {
       results = await Promise.all(ddl.map((ddlStatement) => {
         ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
-		this.status.sqlTrace.write(this.traceSQL(ddlStatement));
+		// this.status.sqlTrace.write(this.traceSQL(ddlStatement));
         return this.executeSQL(ddlStatement);
       }))
     } catch (e) {

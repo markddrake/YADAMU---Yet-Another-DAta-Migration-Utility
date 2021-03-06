@@ -4,7 +4,7 @@
 , "verifyOperation"                   : true
 , "recreateSchema"                    : true
 , "exportPath"                        : "%connection%/%mode%"
-, "createFolders"                     : true
+, "createDirectory"                   : true
 , "parameters": {
   }
 , "tasks"                             : "tasks.json"

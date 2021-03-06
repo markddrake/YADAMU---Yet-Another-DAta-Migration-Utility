@@ -61,6 +61,8 @@ class YadamuRejectManager {
   }
 
   async rejectRow(tableName,data) {
+	  
+	// console.log(data);
 	 
 	if (this.currentTable === undefined) {
 	  this.currentTable = tableName

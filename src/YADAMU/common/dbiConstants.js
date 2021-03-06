@@ -13,6 +13,7 @@ class DBIConstants {
     , "TOTAL_MAX_ERRORS"          : 100
     , "BATCH_SIZE"                : 10000
     , "COMMIT_RATIO"              : 1    
+	, "INFINITY_MANAGEMENT"       : undefined
     })
     return this._STATIC_PARAMETERS;
   }
@@ -47,6 +48,7 @@ class DBIConstants {
   static get COMMIT_RATIO()        { return this.YADAMU_DBI_PARAMETERS.COMMIT_RATIO };
   static get MODE()                { return this.YADAMU_DBI_PARAMETERS.MODE }
   static get ON_ERROR()            { return this.YADAMU_DBI_PARAMETERS.ON_ERROR }
+  static get INFINITY_MANAGEMENT() { return this.YADAMU_DBI_PARAMETERS.INFINITY_MANAGEMENT };
   
 }
 

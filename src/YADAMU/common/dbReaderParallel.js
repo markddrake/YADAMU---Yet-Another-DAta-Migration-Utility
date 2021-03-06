@@ -73,7 +73,7 @@ class DBReaderParallel extends DBReader {
       })
     })
   
-    this.yadamuLogger.info(['PIPELINE','PARALLEL',workerCount,readerManagerDBI.DATABASE_VENDOR,writerManagerDBI.DATABASE_VENDOR],`Processing ${this.taskList.length} Tables`);
+    this.yadamuLogger.info(['PIPELINE','PARALLEL',workerCount,readerManagerDBI.DATABASE_VENDOR,writerManagerDBI.DATABASE_VENDOR],`Processing ${taskList.length} Tables`);
     const results = await Promise.allSettled(copyOperations)
 	if (operationAborted) throw fatalError
     // this.yadamuLogger.trace(['PIPELINE','PARALLEL',workerCount,readerManagerDBI.DATABASE_VENDOR,writerManagerDBI.DATABASE_VENDOR,taskList.length],`Processing Complete`);

@@ -490,7 +490,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   async processFile(hndl) {
-    const sqlStatement = `SET @RESULTS = ''; CALL IMPORT_JSON(?,@RESULTS); SELECT @RESULTS "logRecords";`;                     
+    const sqlStatement = `SET @RESULTS = ''; CALL YADAMU_IMPORT(?,@RESULTS); SELECT @RESULTS "logRecords";`;                     
     let results = await  this.executeSQL(sqlStatement,this.parameters.TO_USER);
     results = results.pop();
     return this.processLog(results,'JSON_TABLE');
@@ -512,29 +512,21 @@ class MySQLDBI extends YadamuDBI {
   
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION); 
     const sysInfo = results[0];
-    return {
-      date               : new Date().toISOString()
-     ,timeZoneOffset     : new Date().getTimezoneOffset()                      
-     ,sessionTimeZone    : sysInfo.SESSION_TIME_ZONE
-     ,vendor             : this.DATABASE_VENDOR
-     ,spatialFormat      : this.SPATIAL_FORMAT
-     ,schema             : this.parameters.FROM_USER
-     ,exportVersion      : YadamuConstants.YADAMU_VERSION
-     ,sessionUser        : sysInfo.SESSION_USER
-     ,dbName             : sysInfo.DATABASE_NAME
-     ,serverHostName     : sysInfo.SERVER_HOST
-     ,databaseVersion    : sysInfo.DATABASE_VERSION
-     ,serverVendor       : sysInfo.SERVER_VENDOR_ID
-     ,nls_parameters     : {
-        serverCharacterSet   : sysInfo.SERVER_CHARACTER_SET,
-        databaseCharacterSet : sysInfo.DATABASE_CHARACTER_SET
+
+    return Object.assign(
+	  super.getSystemInformation()
+	, {
+        sessionUser        : sysInfo.SESSION_USER
+      , dbName             : sysInfo.DATABASE_NAME
+      , serverHostName     : sysInfo.SERVER_HOST
+      , databaseVersion    : sysInfo.DATABASE_VERSION
+      , serverVendor       : sysInfo.SERVER_VENDOR_ID
+      , nls_parameters     : {
+          serverCharacterSet   : sysInfo.SERVER_CHARACTER_SET
+        , databaseCharacterSet : sysInfo.DATABASE_CHARACTER_SET
+        }
       }
-     ,nodeClient         : {
-        version          : process.version
-       ,architecture     : process.arch
-       ,platform         : process.platform
-      }                                                                    
-    }
+	)
   }
 
   /*
@@ -558,8 +550,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   async getInputStream(tableInfo) {
-
-
+	  
     // if the previous pipleline operation failed, it appears that the postgres driver will hang when creating a new QueryStream...
     
     if (this.failedPrematureClose) {
@@ -588,7 +579,7 @@ class MySQLDBI extends YadamuDBI {
 
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
     this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
-  while (true) {
+    while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();

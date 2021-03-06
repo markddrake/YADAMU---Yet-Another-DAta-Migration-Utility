@@ -39,17 +39,54 @@ declare
 
   V_PACKAGE_DEFINITION VARCHAR2(32767);
   
-  V_DUMMY NUMBER;
+  V_DUMMY                  NUMBER;
   V_ORACLE_MANAGED_SERVICE VARCHAR2(5);
-  V_CLOB_SUPPORTED BOOLEAN := TRUE;
-  V_RDBMS_VERSION VARCHAR2(24);
-  V_XML_STORAGE_MODEL VARCHAR2(17);
-  
+  V_CLOB_SUPPORTED         BOOLEAN := TRUE;
+  V_RDBMS_VERSION          VARCHAR2(24);
+  V_XML_STORAGE_MODEL      VARCHAR2(17);
+  V_INSTALL_TIME           VARCHAR2(28) := TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD"T"HH24:MI:SS-TZH:TZM');
+  V_YADAMU_GUID            VARCHAR2(36) := regexp_replace(rawtohex(sys_guid()), '([A-F0-9]{8})([A-F0-9]{4})([A-F0-9]{4})([A-F0-9]{4})([A-F0-9]{12})', '\1-\2-\3-\4-\5');
 begin
-  V_PACKAGE_DEFINITION := 'CREATE OR REPLACE PACKAGE YADAMU_FEATURE_DETECTION AS' || C_NEWLINE;
 
+  begin
+    execute immediate 'begin :1 := YADAMU_FEATURE_DETECTION.YADMAU_INSTANCE_ID; end;' using V_YADAMU_GUID;
+  exception 
+    when OTHERS then
+	 NULL;
+  end;
+
+  V_PACKAGE_DEFINITION := 'CREATE OR REPLACE PACKAGE YADAMU_FEATURE_DETECTION AS' || C_NEWLINE
+                       || '   YADAMU_INSTANCE_ID                      CONSTANT VARCHAR2(36)  := ''' || V_YADAMU_GUID || ''';' ||  C_NEWLINE
+                       || '   YADAMU_INSTALLATION_TIMESTAMP           CONSTANT VARCHAR2(28) := ''' || V_INSTALL_TIME || ''';' || C_NEWLINE;
+  
+  begin
+    select 1
+	  into V_DUMMY
+	  from ALL_OBJECTS
+	 where OWNER = 'MDSYS'
+	   and OBJECT_NAME = 'SDO_GEOMETRY' 
+	   and OBJECT_TYPE = 'TYPE';
+	   
+    select 1
+	  into V_DUMMY
+      from ALL_OBJECTS
+     where OWNER = 'MDSYS'
+	   and OBJECT_NAME = 'SDO_UTIL' 
+	   and OBJECT_TYPE = 'PACKAGE';
+	   
+    V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+                         || '  SPATIAL_INSTALLED             CONSTANT BOOLEAN      := TRUE;' || C_NEWLINE;
+  exception
+    when NO_DATA_FOUND then
+      V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+                           || '  SPATIAL_INSTALLED             CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE;
+    when OTHERS then
+	  RAISE;
+  end;
+--
   $IF DBMS_DB_VERSION.VER_LE_11_2 $then
 --
+
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
                          || '  JSON_PARSING_SUPPORTED         CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
 	                     || '  JSON_GENERATION_SUPPORTED      CONSTANT BOOLEAN      := FALSE;' || C_NEWLINE
@@ -232,13 +269,24 @@ $END
 --
 --  Default XML Storage Mode
 --
-  execute immediate 'create table YADAMU_XML_STORAGE_TEST(X XMLTYPE)';
+  begin
+    execute immediate 'drop table YADAMU_XML_STORAGE_TEST';
+  exception 
+    when OTHERS then 
+	  NULL;
+  end;
+ 
+  execute immediate 'create global temporary table YADAMU_XML_STORAGE_TEST(X XMLTYPE)';
+  
   select STORAGE_TYPE 
     into V_XML_STORAGE_MODEL
 	from USER_XML_TAB_COLS
    where TABLE_NAME = 'YADAMU_XML_STORAGE_TEST' 
-     and COLUMN_NAME = 'X';
+  
+  and COLUMN_NAME = 'X';
+  
   execute immediate 'drop table YADAMU_XML_STORAGE_TEST';
+  
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                   || '  XML_STORAGE_MODEL CONSTANT VARCHAR2(17) := ''' || V_XML_STORAGE_MODEL || ''';'|| C_NEWLINE;
 

@@ -5,6 +5,7 @@ const { performance } = require('perf_hooks');
 
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const DBIConstants = require('../../common/dbiConstants.js');
+const {CommandLineError} =  require('../../common/yadamuException.js');
 
 class EventStream extends Transform {
   
@@ -13,7 +14,7 @@ class EventStream extends Transform {
 	this._INPUT_METRICS =  Object.assign({},v);
   }
   
-  get TABLE_FILTER()                  { return this.dbWriter.dbi.parameters.TABLES || [] }
+  get TABLE_FILTER()                  { return this.dbWriter.dbi.TABLE_FILTER }
   
   constructor(yadamu) {
 
@@ -57,7 +58,7 @@ class EventStream extends Transform {
 
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
 
-	  if (YadamuLibrary.isBinaryDataType(dataType.type)) {
+	  if (YadamuLibrary.isBinaryType(dataType.type)) {
         return (row,idx) =>  {
   		  row[idx] = Buffer.from(row[idx],'hex')
 		}
@@ -67,13 +68,16 @@ class EventStream extends Transform {
         case "GEOMETRY":
         case "GEOGRAPHY":
 		case "POINT":
-        case "LINE":
         case "LSEG":
         case "BOX":
         case "PATH":
         case "POLYGON":
-        case "CIRCLE":
+        case "LINESTRING":
+		case "MULTIPOINT":
+        case "MULTILINESTRING":
         case "MULTIPOLYGON":
+        case "GEOMETRYCOLLECTION":
+        case "GEOMCOLLECTION":
         case '"MDSYS"."SDO_GEOMETRY"':
           if (this.spatialFormat.endsWith('WKB')) {
             return (row,idx)  => {
@@ -81,7 +85,39 @@ class EventStream extends Transform {
 			}
           }
 		  return null;
-		 default:
+        case "CIRCLE":
+		  if (this.circleFormat === 'CIRCLE') { 
+            return null;
+		  }
+          if (this.spatialFormat.endsWith('WKB')) {
+            return (row,idx)  => {
+  		      row[idx] = Buffer.from(row[idx],'hex')
+			}
+          }
+		  return null;
+		case "REAL":
+        case "FLOAT":
+		case "DOUBLE":
+		case "DOUBLE PRECISION":
+		case "BINARY_FLOAT":
+		case "BINARY_DOUBLE":
+		   return (row, idx) => {
+//			 if (!isFinite(row[idx])) {
+			   switch (row[idx]) {
+		         case "NaN":
+		   	       row[idx] = 0/0
+				   break;
+			     case "Infinity":
+				   row[idx] = 1/0
+				   break;
+				 case "-Infinity":
+				   row[idx] = -1/0
+				   break;
+				 default:
+			   }   
+//		     }
+		   }			 
+   		 default:
 		   return null
       }
     }) 
@@ -99,13 +135,31 @@ class EventStream extends Transform {
   }
   
   filterTables(data) {
-    if ((this.TABLE_FILTER.length > 0)) {
+	
+	// Restrict operations to the list of tables specified.
+	// Order operations according to the order in which the tables were specified
+		
+    if (this.TABLE_FILTER.length > 0) {
+	  
+	  // Check table names are valid.
+	  // For each name in the Table Filter check there is a corresponding entry in the schemaInfoormation collection
+	  
+	  const tableNames = Object.keys(data.metadata)
+
+	  const invalidTableNames = this.TABLE_FILTER.filter((tableName) => {
+		 // Return true if the table does not have an entry in the schemaInformstion collection
+		 return !tableNames.includes(tableName)
+	  })
+	  
+	  if (invalidTableNames.length > 0) {
+        throw new CommandLineError(`Could not resolve the following table names : "${invalidTableNames}".`)
+      }
+	
       this.yadamuLogger.info(['FILE'],`Operations restricted to the following tables: ${JSON.stringify(this.TABLE_FILTER)}.`)
+	  	 
       const metadata = {}
 	  this.TABLE_FILTER.forEach((table) => {
-	    if (data.metadata.hasOwnProperty(table)) {
-		  metadata[table] = data.metadata[table]
-		}
+         metadata[table] = data.metadata[table]
 	  })
 	  return {metadata: metadata}
 	}
@@ -134,7 +188,8 @@ class EventStream extends Transform {
  	      break;
         case 'systemInformation' :
           this.push(data)
-	  	  this.spatialFormat = data.systemInformation.spatialFormat
+	  	  this.spatialFormat = data.systemInformation.typeMappings.spatialFormat
+		  this.circleFormat = data.systemInformation.typeMappings.circleFormat
 	  	  this.yadamu.REJECTION_MANAGER.setSystemInformation(data.systemInformation)
 	  	  this.yadamu.WARNING_MANAGER.setSystemInformation(data.systemInformation)
  	      break;

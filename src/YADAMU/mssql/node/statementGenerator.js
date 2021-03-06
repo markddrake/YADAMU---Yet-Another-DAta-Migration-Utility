@@ -7,40 +7,38 @@ const YadamuLibrary = require('../../common/yadamuLibrary.js');
 
 class StatementGenerator {
   
-  constructor(dbi, targetSchema, metadata,  spatialFormat, yadamuLogger) {
+  constructor(dbi, targetSchema, metadata, yadamuLogger) {
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
-    this.spatialFormat = spatialFormat
     this.yadamuLogger = yadamuLogger;
   }
   
   bulkSupported(dataTypes) {
     
-    let supported = true;
-    dataTypes.forEach((dataType,idx) => {
+	for (const dataType of dataTypes) {
       switch (dataType.type.toLowerCase()) {
         case 'geography':
-         // TypeError: parameter.type.validate is not a function
-         supported = false;
-         break;
-	   case 'geometry':
-         // TypeError: parameter.type.validate is not a function
-         supported = false;
-         break;
-	   case 'xml':
-         // Unsupported Data Type for Bulk Load
-         supported = false;
-         break;
-        // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
-		/*
+          // TypeError: parameter.type.validate is not a function
+          return false;
+	    case 'geometry':
+          // TypeError: parameter.type.validate is not a function
+          return false;
+	    case 'xml':
+          // Unsupported Data Type for Bulk Load
+          return false;		
+        /*
+ 	    ** Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
+	    **
+		
         case 'image':
-          supported = false;
-          break;
+           return false;
+		  
+	    **
         */
       }
-     })
-    return supported;
+    }
+    return true
    
   }
   
@@ -48,7 +46,7 @@ class StatementGenerator {
 
     const table = new sql.Table(database + '.' + this.dbi.parameters.TO_USER + '.' + tableName);
     table.create = false
-    
+    let precision
     dataTypes.forEach((dataType,idx) => {
       const length = dataType.length > 0 && dataType.length < 65535 ? dataType.length : sql.MAX
       switch (dataType.type.toLowerCase()) {
@@ -56,7 +54,9 @@ class StatementGenerator {
           table.columns.add(columnList[idx],sql.Bit);
           break;
         case 'bigint':
-          table.columns.add(columnList[idx],sql.BigInt, {nullable: true});
+		  // Bind as VarChar to avoid rounding issues
+          // table.columns.add(columnList[idx],sql.BigInt, {nullable: true});
+		  table.columns.add(columnList[idx],sql.VarChar(21), {nullable: true});  
           break;
         case 'float':
           table.columns.add(columnList[idx],sql.Float, {nullable: true});
@@ -65,26 +65,40 @@ class StatementGenerator {
           table.columns.add(columnList[idx],sql.Int, {nullable: true});
           break;
         case 'money':
-          table.columns.add(columnList[idx],sql.Decimal(19,4), {nullable: true});
           // table.columns.add(columnList[idx],sql.Money, {nullable: true});
+          table.columns.add(columnList[idx],sql.Decimal(19,4), {nullable: true});
           break
         case 'decimal':
-          // sql.Decimal ([precision], [scale])
-          table.columns.add(columnList[idx],sql.Decimal(length,dataType.scale), {nullable: true});
+		  precision = dataType.length || 18
+		  if (precision > 15) {
+			// Bind as VarChar to avoid rounding issues
+			table.columns.add(columnList[idx],sql.VarChar(precision+2), {nullable: true});  
+		  }
+		  else {
+            // sql.Decimal ([precision], [scale])
+            table.columns.add(columnList[idx],sql.Decimal(dataType.length || 18,dataType.scale || 0), {nullable: true});
+		  }
+          break;
+        case 'numeric':
+		  precision = dataType.length || 18
+		  if (precision > 15) {
+			// Bind as VarChar to avoid rounding issues
+			table.columns.add(columnList[idx],sql.VarChar(precision+2), {nullable: true});  
+		  }
+		  else {
+            // sql.Numeric ([precision], [scale])
+            table.columns.add(columnList[idx],sql.Numeric(dataType.length || 18,dataType.scale || 0), {nullable: true});
+		  }
           break;
         case 'smallint':
           table.columns.add(columnList[idx],sql.SmallInt, {nullable: true});
           break;
         case 'smallmoney':
-          table.columns.add(columnList[idx],sql.Decimal(10,4), {nullable: true});
           // table.columns.add(columnList[idx],sql.SmallMoney, {nullable: true});
+          table.columns.add(columnList[idx],sql.Decimal(10,4), {nullable: true});
           break;
         case 'real':
           table.columns.add(columnList[idx],sql.Real, {nullable: true}, {nullable: true});
-          break;
-        case 'numeric':
-          // sql.Numeric ([precision], [scale])
-          table.columns.add(columnList[idx],sql.Numeric(length,dataType.scale), {nullable: true});
           break;
         case 'tinyint':
           table.columns.add(columnList[idx],sql.TinyInt, {nullable: true});
@@ -182,7 +196,7 @@ class StatementGenerator {
           // TypeError: parameter.type.validate is not a function
           // table.columns.add(columnList[idx],sql.Geography, {nullable: true});
   	      // Upload geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables bulk upload.
-		  switch (this.spatialFormat) {
+		  switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
 			case "WKB":
             case "EWKB":
               table.columns.add(columnList[idx],sql.VarBinary(sql.MAX), {nullable: true});
@@ -196,7 +210,7 @@ class StatementGenerator {
           // TypeError: parameter.type.validate is not a function
           // table.columns.add(columnList[idx],sql.Geometry, {nullable: true});
   	      // Upload geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables bulk upload.
-		  switch (this.spatialFormat) {
+		  switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
 			case "WKB":
             case "EWKB":
               table.columns.add(columnList[idx],sql.VarBinary(sql.MAX), {nullable: true});
@@ -212,27 +226,28 @@ class StatementGenerator {
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,`BULK OPERATION`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
       }
     })
+	// console.log(table)
     return table
   }
 
   getMetadata() {
-    return JSON.stringify({metadata : this.metadata})
+	return JSON.stringify({metadata : this.metadata})
   }
 
   async generateStatementCache (database) {
-
+ 
     const args = { 
 	        inputs: [{
-			  name: 'TARGET_DATABASE', type: sql.VARCHAR,   value: this.targetSchema
+			  name: 'TARGET_DATABASE', type: sql.VARCHAR,  value: this.targetSchema
 			},{
-              name: 'SPATIAL_FORMAT',  type: sql.NVARCHAR,  value: this.spatialFormat
+              name: 'SPATIAL_FORMAT',  type: sql.NVARCHAR, value: this.dbi.INBOUND_SPATIAL_FORMAT
 	        },{
-              name: 'METADATA',         type: sql.NVARCHAR, value: this.getMetadata()
+              name: 'METADATA',        type: sql.NVARCHAR, value: this.getMetadata()
 			},{ 
-			  name: 'DB_COLLATION',     type: sql.NVARCHAR, value: this.dbi.DB_COLLATION
+			  name: 'DB_COLLATION',    type: sql.NVARCHAR, value: this.dbi.DB_COLLATION
 			}]
 	      }
-      				
+  
     let results = await this.dbi.execute('master.dbo.sp_GENERATE_SQL',args,'SQL_STATEMENTS')
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
@@ -249,12 +264,12 @@ class StatementGenerator {
       
       tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
       tableInfo._COMMIT_COUNT   = this.dbi.COMMIT_COUNT
-      tableInfo._SPATIAL_FORMAT = this.spatialFormat
+      tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
        
       // Create table before attempting to Prepare Statement..
       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + "\nVALUES (";
-      this.metadata[table].columnNames.forEach((column,idx) => {
-        switch(tableInfo.targetDataTypes[idx]) {
+      dataTypes.forEach((dataType,idx) => {
+        switch(dataType.type) {
           case 'image':
 		    // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
             tableInfo.dml = tableInfo.dml + 'convert(image,@C' + idx + ')' + ','
@@ -263,7 +278,7 @@ class StatementGenerator {
             tableInfo.dml = tableInfo.dml + 'convert(XML,@C' + idx + ',1)' + ','
             break;
           case "geography":
-            switch (this.spatialFormat) {
+            switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
                case "WKT":
                case "EWKT":
                  tableInfo.dml = tableInfo.dml + 'geography::STGeomFromText(@C' + idx + ',4326)' + ','
@@ -280,7 +295,7 @@ class StatementGenerator {
             }    
             break;          
           case "geometry":
-            switch (this.spatialFormat) {
+            switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
                case "WKT":
                case "EWKT":
                  tableInfo.dml = tableInfo.dml + 'geometry::STGeomFromText(@C' + idx + ',4326)' + ','
@@ -296,13 +311,24 @@ class StatementGenerator {
                  tableInfo.dml = tableInfo.dml + 'geometry::STGeomFromWKB(@C' + idx + ',4326)' + ','
             }      
             break;            
+    	  case "numeric":
+		  case "decimal":
+		    if ((dataType.length || 18) > 15) {
+              tableInfo.dml = tableInfo.dml + 'cast(@C' + idx+ ` as ${tableInfo.targetDataTypes[idx]}),`
+			  break;
+		    }
+            tableInfo.dml = tableInfo.dml + '@C' + idx+ ','
+			break;
+		  case 'bigint':
+		    tableInfo.dml = tableInfo.dml + 'cast(@C' + idx+ ` as ${tableInfo.targetDataTypes[idx]}),`
+			break;
           default: 
              tableInfo.dml = tableInfo.dml + '@C' + idx+ ','
         }
       })
       tableInfo.dml = tableInfo.dml.slice(0,-1) + ")";
       tableInfo.bulkSupported = this.bulkSupported(dataTypes);
-      try {
+	  try {
         if (tableInfo.bulkSupported) {
 		  tableInfo.bulkOperations = [
 		    this.createBulkOperation(database, tableName, tableMetadata.columnNames, dataTypes)

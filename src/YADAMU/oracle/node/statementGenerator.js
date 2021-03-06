@@ -42,15 +42,15 @@ class StatementGenerator {
 
 
   // This is the spatial format of the incoming data, not the format used by this driver
-  get SPATIAL_FORMAT()   { return this.dbi.SPATIAL_FORMAT } 
+  get SPATIAL_FORMAT()   { return this.dbi.INBOUND_SPATIAL_FORMAT } 
   get OBJECTS_AS_JSON()  { return this.dbi.systemInformation.objectFormat === 'JSON'}
   get GEOJSON_FUNCTION() { return 'DESERIALIZE_GEOJSON' }
   
-  constructor(dbi, targetSchema, metadata, spatialFormat) {
+  constructor(dbi, targetSchema, metadata, yadamuLogger) {
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
-    this.spatialFormat = spatialFormat
+    this.yadamuLogger = yadamuLogger;
   }
    
   generateBinds(dataTypes, tableInfo, metadata) {
@@ -63,9 +63,10 @@ class StatementGenerator {
        }
        switch (dataType.type) {
          case 'NUMBER':
-		   return { type: oracledb.NUMBER }
+		   return { type: oracledb.DB_TYPE_NUMBER }
          case 'FLOAT':
          case 'BINARY_FLOAT':
+           return { type: oracledb.DB_TYPE_BINARY_FLOAT }
          case 'BINARY_DOUBLE':
            /*
            // Peek numeric binds to check for strings when writing
@@ -73,7 +74,7 @@ class StatementGenerator {
              return { type: oracledb.STRING, maxSize : dataType.length + 3}
            }
            */
-           return { type: oracledb.NUMBER }
+           return { type: oracledb.DB_TYPE_BINARY_DOUBLE }
          case 'RAW':
            return { type: oracledb.BUFFER, maxSize : dataType.length}
          case 'CHAR':
@@ -129,7 +130,7 @@ class StatementGenerator {
          case "\"MDSYS\".\"SDO_GEOMETRY\"":
            tableInfo.lobColumns = true;
            // return {type : oracledb.CLOB}
-           switch (this.spatialFormat) { 
+           switch (this.dbi.INBOUND_SPATIAL_FORMAT) { 
              case "WKB":
              case "EWKB":
                return {type : oracledb.BLOB, maxSize : this.BIND_LENGTH.GEOMETRY}
@@ -242,6 +243,20 @@ class StatementGenerator {
 	// Only Required with release 11.2.
   }
 
+
+  getTypeMappings() {
+
+    const typeMappings = {
+	  spatialFormat    : this.dbi.INBOUND_SPATIAL_FORMAT
+	, raw1AsBoolean    : new Boolean(this.dbi.TREAT_RAW1_AS_BOOLEAN).toString().toUpperCase()
+	, jsonDataType     : this.dbi.JSON_DATA_TYPE
+	, xmlStorageModel  : this.dbi.XML_STORAGE_CLAUSE
+	, circleFormat     : this.dbi.INBOUND_CIRCLE_FORMAT
+	}
+	
+	return JSON.stringify(typeMappings); 
+  }
+
   async generateStatementCache(vendor) {
 	  
      /*
@@ -249,7 +264,7 @@ class StatementGenerator {
      ** Turn the generated DDL Statements into an array and execute them as single batch via YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS()
      **
      */
-     
+	 
     const sourceDateFormatMask = this.dbi.getDateFormatMask(vendor);
     const sourceTimeStampFormatMask = this.dbi.getTimeStampFormatMask(vendor);
     const oracleDateFormatMask = this.dbi.getDateFormatMask('Oracle');
@@ -271,14 +286,19 @@ class StatementGenerator {
       setSourceTimeStampMask = `;\n  execute immediate 'ALTER SESSION SET NLS_TIMESTAMP_FORMAT = ''${sourceTimeStampFormatMask}'''`; 
     }
 
-    const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :schema, :spatialFormat, :JSON_DATA_TYPE, :XML_STORAGE_CLAUSE);\nend;`;
+    const typeMappings = this.getTypeMappings();
+	const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :schema, :typeMappings);\nend;`;
+
+    // console.log(JSON.stringify(this.metadata," ",2));
 
     const metadataLob = await this.getMetadataLob()
 	const startTime = performance.now()
-    const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:this.targetSchema, spatialFormat:this.spatialFormat, JSON_DATA_TYPE: this.dbi.JSON_DATA_TYPE, XML_STORAGE_CLAUSE: this.dbi.XML_STORAGE_CLAUSE});
+    const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:this.targetSchema, typeMappings:typeMappings});
 	// this.dbi.yadamuLogger.trace([this.constructor.name],`${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
     await metadataLob.close();
     const statementCache = JSON.parse(results.outBinds.sql);
+	
+    // console.log(JSON.stringify(statementCache," ",2));
     
     const tables = Object.keys(this.metadata); 
     tables.forEach((table,idx) => {
@@ -290,7 +310,7 @@ class StatementGenerator {
       
       tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
       tableInfo._COMMIT_COUNT   = this.dbi.COMMIT_COUNT
-      tableInfo._SPATIAL_FORMAT = this.spatialFormat
+      tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
       tableInfo.insertMode      = 'Batch';      
         
 	  if (tableMetadata.WITH_CLAUSE) {
@@ -331,7 +351,7 @@ class StatementGenerator {
 	
 	  tableInfo.numericBindPositions = []
 	  tableInfo.binds.forEach((bind,idx) => {
-		 if (bind.type === oracledb.NUMBER) {
+		 if ((bind.type === oracledb.NUMBER) || (bind.type === oracledb.DB_TYPE_NUMBER) || (bind.type === oracledb.DB_TYPE_BINARY_FLOAT) || (bind.type === oracledb.DB_TYPE_BINARY_DOUBLE)) {
 		   tableInfo.numericBindPositions.push(idx)
 		 }
 	  })
@@ -343,14 +363,14 @@ class StatementGenerator {
       const variables = []
       const values = []
 	  
-      const declarations = tableInfo.columnNames.map((column,idx) => {
+	  const declarations = tableInfo.columnNames.map((column,idx) => {
         variables.push(`"V_${column}"`);
         let targetDataType = tableInfo.targetDataTypes[idx];
         switch (targetDataType) {
           case "GEOMETRY":
           case "GEOGRAPHY":
           case "\"MDSYS\".\"SDO_GEOMETRY\"":
-             switch (this.spatialFormat) {
+             switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
                case "WKB":
                case "EWKB":
                  values.push(`OBJECT_SERIALIZATION.DESERIALIZE_WKBGEOMETRY(:${(idx+1)})`);
@@ -380,13 +400,16 @@ class StatementGenerator {
             values.push(`ANYDATA.convertVARCHAR2(:${(idx+1)})`);
             break;
           default:
-            if (targetDataType.indexOf('.') > -1) {
+		    if ((targetDataType.indexOf('INTERVAL') === 0) && (targetDataType.indexOf('DAY') > 0) && (targetDataType.indexOf('SECOND') > 0)) {
+              values.push(`OBJECT_SERIALIZATION.DESERIALIZE_ISO8601_DSINTERVAL(:${(idx+1)})`);
+			  break;
+			}
+		    if (targetDataType.indexOf('.') > -1) {
               plsqlRequired = true;
               values.push(`"#${targetDataType.slice(targetDataType.indexOf(".")+2,-1)}"(:${(idx+1)})`);
+			  break;
 			}
-            else {
-              values.push(`:${(idx+1)}`);
-            }
+            values.push(`:${(idx+1)}`);
         } 
         // Append length to bounded datatypes if necessary
         targetDataType = (StatementGenerator.BOUNDED_TYPES.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]})` : targetDataType;

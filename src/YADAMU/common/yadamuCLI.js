@@ -9,7 +9,7 @@ const Yadamu = require('./yadamu.js');
 const YadamuConstants = require('./yadamuConstants.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
 const YadamuLogger = require('./yadamuLogger.js');
-const {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuException.js');
+const {CommandLineError, ConfigurationFileError}  = require('./yadamuException.js');
 
 const {FileNotFound} = require('../file/node/fileException.js');
 
@@ -126,18 +126,6 @@ class YadamuCLI {
     return YadamuCLI._ILLEGAL_ARGUMENTS
   }
 
-  static reportError(e) {
-	if ((e instanceof UserError) || (e instanceof FileNotFound)) {
-      console.log(e.message);
-	  if (process.env.YADAMU_SHOW_CAUSE === 'TRUE') {	  
-	    console.log(e); 
-      }
-  	}
-	else {
-      console.log(e);
-  	}
-  }
-  
   constructor() {  
 
     const className = this.constructor.name.toUpperCase()
@@ -171,6 +159,10 @@ class YadamuCLI {
 	  }
       throw e
 	}
+  }
+
+  reportError(e) {
+	YadamuLibrary.reportError(e)
   }
 
   checkFileExists(targetFile,argumentName) {
@@ -435,9 +427,8 @@ class YadamuCLI {
       const targetDatabase =  Object.keys(targetConnection)[0];
       const targetDescription = this.getDescription(targetDatabase,job.target.connection,targetSchema)
           
-	  const sourceParameters = {
-		FROM_USER: this.getUser(sourceDatabase,sourceSchema)
-	  }
+	  const sourceParameters = Object.assign({},jobParameters || {})
+      sourceParameters.FROM_USER = this.getUser(sourceDatabase,sourceSchema)
 	  
       switch (sourceDatabase) {
          case 'mssql':
@@ -447,17 +438,17 @@ class YadamuCLI {
          default:
       }
 	  
-	  const targetParameters = {
-		TO_USER: this.getUser(targetDatabase,targetSchema)
-	  }
-      switch (targetDatabase) {
+	  const targetParameters = Object.assign({},jobParameters || {})
+      targetParameters.TO_USER = this.getUser(targetDatabase,targetSchema)
+	  
+	  switch (targetDatabase) {
          case 'mssql':
 		 case 'snowflake':
            targetParameters.YADAMU_DATABASE = targetSchema.database
            break;
          default:
       }
-
+	  
       this.yadamu.reloadParameters(jobParameters);
       const sourceDBI = this.getDatabaseInterface(this.yadamu,sourceDatabase,sourceConnection[sourceDatabase],sourceParameters)
       const targetDBI = this.getDatabaseInterface(this.yadamu,targetDatabase,targetConnection[targetDatabase],targetParameters)    

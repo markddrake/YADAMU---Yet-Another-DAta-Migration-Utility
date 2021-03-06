@@ -34,28 +34,41 @@ as
 --  
   $IF YADAMU_FEATURE_DETECTION.JSON_DATA_TYPE_SUPPORTED $THEN
 --
-  C_JSON_STORAGE_MODEL constant VARCHAR2(32) := 'JSON';
+  C_JSON_DATA_TYPE constant VARCHAR2(44) := 'JSON';
 --
   $ELSIF DBMS_DB_VERSION.VER_LE_11_2 $THEN
 --
-  C_JSON_STORAGE_MODEL constant VARCHAR2(32) := 'CLOB';
+  C_JSON_DATA_TYPE constant VARCHAR2(4) := 'CLOB';
 --
   -- $ELSIF DBMS_DB_VERSION.VER_LE_12 $THEN
   $ELSIF DBMS_DB_VERSION.VER_LE_12_1 $THEN
 --
-  C_JSON_STORAGE_MODEL constant VARCHAR2(32) := 'CLOB';
+  C_JSON_DATA_TYPE constant VARCHAR2(4) := 'CLOB';
 --
   $ELSE
 --
-  C_JSON_STORAGE_MODEL constant VARCHAR2(32) := 'BLOB';
+  C_JSON_DATA_TYPE constant VARCHAR2(4) := 'BLOB';
 --
   $END
 --
 
-  C_XML_STORAGE_MODEL      constant VARCHAR2(17) := 'BINARY XML';
-  C_TREAT_RAW1_AS_BOOLEAN  constant VARCHAR2(5)  := 'TRUE';
   C_SPATIAL_FORMAT         constant VARCHAR2(7)  := 'WKB';
+  C_TREAT_RAW1_AS_BOOLEAN  constant VARCHAR2(5)  := 'TRUE';
+  C_XML_STORAGE_MODEL      constant VARCHAR2(17) := 'BINARY XML';
+  C_CIRCLE_FORMAT          constant VARCHAR2(7)  := 'POLYGON';
+  
+  /*
+  C_DEFAULT_TYPE_MAPPINGS constant VARCHAR2(4000) := JSON_OBJECT(
+                                             'spatialFormat'    value C_SPATIAL_FORMAT
+                                           , 'raw1AsBoolean'    value C_TREAT_RAW1_AS_BOOLEAN
+		                                   , 'jsonDataType'     value C_JSON_DATA_TYPE
+		                                   , 'xmlStorageModel'  value C_XML_STORAGE_MODEL
+                                             returning VARCHAR2(4000)
+										   );
+  */										     
 
+  C_DEFAULT_TYPE_MAPPINGS constant VARCHAR2(4000) := '{}';
+											 
   C_SUCCESS          constant VARCHAR2(32) := 'SUCCESS';
   C_FATAL_ERROR      constant VARCHAR2(32) := 'FATAL';
   C_WARNING          constant VARCHAR2(32) := 'WARNING';
@@ -63,7 +76,7 @@ as
   C_XLARGE_CONTENT   constant VARCHAR2(32) := 'CONTENT_TOO_LARGE';
   C_XLARGE_SQL       constant VARCHAR2(32) := 'STATEMENT_TOO_LARGE';
   
-  RESULTS_CACHE        T_CLOB_TABLE := T_CLOB_TABLE();
+  RESULTS_CACHE      T_CLOB_TABLE := T_CLOB_TABLE();
   
   TYPE TABLE_INFO_RECORD is RECORD (
     DDL                CLOB
@@ -90,18 +103,14 @@ $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
   procedure IMPORT_JSON(
     P_JSON_DUMP_FILE  IN OUT NOCOPY BLOB
-  , P_TARGET_SCHEMA                 VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
-  , P_JSON_DATA_TYPE                VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
-  , P_XML_STORAGE_CLAUSE            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
-  , P_TREAT_RAW1_AS_BOOLEAN         VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  , P_TARGET_SCHEMA                VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
+  , P_TYPE_MAPPINGS                CLOB DEFAULT C_DEFAULT_TYPE_MAPPINGS
   );
 
   function IMPORT_JSON(
     P_JSON_DUMP_FILE IN OUT NOCOPY BLOB
   , P_TARGET_SCHEMA                VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
-  , P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
-  , P_XML_STORAGE_CLAUSE           VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
-  , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  , P_TYPE_MAPPINGS                CLOB DEFAULT C_DEFAULT_TYPE_MAPPINGS
   ) return CLOB;
 
   function GENERATE_SQL(
@@ -109,13 +118,14 @@ $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
   , P_TARGET_SCHEMA                VARCHAR2 
   , P_TABLE_OWNER                  VARCHAR2 
   , P_TABLE_NAME                   VARCHAR2 
-  , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
   , P_COLUMN_NAME_ARRAY            CLOB
   , P_DATA_TYPE_ARRAY              CLOB
   , P_SIZE_CONSTRAINT_ARRAY        CLOB
-  , P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
-  , P_XML_STORAGE_CLAUSE           VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+  , P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_DATA_TYPE
+  , P_XML_STORAGE_MODEL            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+  , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
   , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  , P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
   ) return TABLE_INFO_RECORD;
 --
 $ELSE
@@ -125,13 +135,14 @@ $ELSE
   , P_TARGET_SCHEMA                VARCHAR2 
   , P_TABLE_OWNER                  VARCHAR2 
   , P_TABLE_NAME                   VARCHAR2 
-  , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
   , P_COLUMN_NAME_XML              XMLTYPE
   , P_DATA_TYPE_XML                XMLTYPE
   , P_SIZE_CONSTRAINT_XML          XMLTYPE
-  , P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
-  , P_XML_STORAGE_CLAUSE           VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+  , P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_DATA_TYPE
+  , P_XML_STORAGE_MODEL            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+  , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
   , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  , P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
   ) return TABLE_INFO_RECORD;
 --
 $END  
@@ -139,10 +150,7 @@ $END
   function GENERATE_STATEMENTS(
     P_METADATA       IN OUT NOCOPY BLOB
   , P_TARGET_SCHEMA                VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
-  , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
-  , P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
-  , P_XML_STORAGE_CLAUSE           VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
-  , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  , P_TYPE_MAPPINGS                CLOB DEFAULT C_DEFAULT_TYPE_MAPPINGS
   ) return CLOB;
 
   function SET_CURRENT_SCHEMA(P_TARGET_SCHEMA VARCHAR2) return CLOB;
@@ -157,6 +165,7 @@ $END
   , P_DATA_TYPE_LENGTH             NUMBER
   , P_DATA_TYPE_SCALE              NUMBER
   , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  , P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
   ) return VARCHAR2;
 
   function GET_MILLISECONDS(P_START_TIME TIMESTAMP, P_END_TIME TIMESTAMP) return NUMBER;
@@ -176,9 +185,63 @@ set define off
 create or replace package body YADAMU_IMPORT
 as
 --
+  C_EPOCH                  CONSTANT TIMESTAMP WITH TIME ZONE := to_timestamp_tz('1970-01-01T00:00:00Z','YYYY-MM-DD"T"HH24:MI:SSTZH:TZM');
+
+$IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN
+  C_MAX_RAW_SIZE           CONSTANT PLS_INTEGER := 32767;
+  C_MAX_VARCHAR_SIZE       CONSTANT PLS_INTEGER := 32767;
+  C_MAX_NVARCHAR_SIZE      CONSTANT PLS_INTEGER := 16383;
+$ELSE
+  C_MAX_RAW_SIZE           CONSTANT PLS_INTEGER := 2000;
+  C_MAX_VARCHAR_SIZE       CONSTANT PLS_INTEGER := 4000;
+  C_MAX_NVARCHAR_SIZE      CONSTANT PLS_INTEGER := 2000;
+$END
+
+  C_MAX_CHAR_SIZE          CONSTANT PLS_INTEGER := 2000;
+  C_MAX_NCHAR_SIZE         CONSTANT PLS_INTEGER := 1000;
+
+  C_MAX_RAW_TYPE           CONSTANT VARCHAR(32) := 'RAW(' || C_MAX_RAW_SIZE || ')';
+  C_MAX_CHAR_TYPE          CONSTANT VARCHAR(32) := 'RAW(' || C_MAX_CHAR_SIZE || ')';
+  C_MAX_NCHAR_TYPE         CONSTANT VARCHAR(32) := 'RAW(' || C_MAX_NCHAR_SIZE || ')';
+  C_MAX_VARCHAR_TYPE       CONSTANT VARCHAR(32) := 'VARCHAR2(' || C_MAX_VARCHAR_SIZE || ')';
+  C_MAX_NVARCHAR_TYPE      CONSTANT VARCHAR(32) := 'VARCHAR2(' || C_MAX_NVARCHAR_SIZE || ')';
+
+$IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+   C_MAX_STRING_TYPE       CONSTANT VARCHAR(32) := 'CLOB';
+$ELSE
+   C_MAX_STRING_TYPE       CONSTANT VARCHAR(32) := C_MAX_VARCHAR_TYPE;
+$END 
+
+
+  C_TINYINT_TYPE           CONSTANT VARCHAR2(32):= 'NUMBER(3,0)';
+  C_SMALLINT_TYPE          CONSTANT VARCHAR2(32):= 'NUMBER(5,0)';
+  C_MEDIUMINT_TYPE         CONSTANT VARCHAR2(32):= 'NUMBER(7,0)';
+  C_INT_TYPE               CONSTANT VARCHAR2(32):= 'NUMBER(10,0)';
+  C_BIGINT_TYPE            CONSTANT VARCHAR2(32):= 'NUMBER(19,0)';
+  C_UUID_TYPE              CONSTANT VARCHAR2(32):= 'VARCHAR2(36)';
+  C_ENUM_TYPE              CONSTANT VARCHAR2(32):= 'VARCHAR2(255)';
+  C_BOOLEAN_TYPE           CONSTANT VARCHAR2(32):= 'RAW(1)';
+  C_HIERARCHY_TYPE         CONSTANT VARCHAR2(32):= 'VARCHAR2(4000)';
+  C_MSSQL_MONEY_TYPE       CONSTANT VARCHAR2(32):= 'NUMBER(19,4)';
+  C_MSSQL_SMALL_MONEY_TYPE CONSTANT VARCHAR2(32):= 'NUMBER(10,4)';
+  C_MSSQL_ROWVERSION_TYPE  CONSTANT VARCHAR2(32):= 'RAW(8)';
+  C_PGSQL_MONEY_TYPE       CONSTANT VARCHAR2(32):= 'NUMBER(21,2)';
+  C_PGSQL_NAME_TYPE        CONSTANT VARCHAR2(32):= 'VARCHAR2(64)';  
+  C_PGSQL_INTERVAL_TYPE    CONSTANT VARCHAR2(32):= 'VARCHAR2(16)';
+  C_PGSQL_SINGLE_CHAR_TYPE CONSTANT VARCHAR2(32):= 'CHAR(1)';  
+  C_INET_ADDR_TYPE         CONSTANT VARCHAR2(32):= 'VARCHAR2(39)';
+  C_MAC_ADDR_TYPE          CONSTANT VARCHAR2(32):= 'VARCHAR2(23)';
+  C_UNSIGNED_INT_TYPE      CONSTANT VARCHAR2(32):= 'NUMBER(10,0)';
+  C_PGSQL_IDENTIFIER       CONSTANT VARCHAR2(32):= 'RAW(4)';
+  C_MYSQL_YEAR_TYPE        CONSTANT VARCHAR2(32):= 'NUMBER(4,0)';
+  C_MONGO_OBJECT_ID        CONSTANT VARCHAR2(32):= 'RAW(12)';
+  C_MONGO_UNKNOWN_TYPE     CONSTANT VARCHAR2(32):= 'VARCHAR2(2048)';
+  C_MONGO_REGEX_TYPE       CONSTANT VARCHAR2(32):= 'VARCHAR2(2048)';
+  
+
   G_INCLUDE_DATA    BOOLEAN := TRUE;
   G_INCLUDE_DDL     BOOLEAN := FALSE;
-
+  
 function GET_MILLISECONDS(P_START_TIME TIMESTAMP, P_END_TIME TIMESTAMP)
 return NUMBER
 as
@@ -659,329 +722,238 @@ $END
 end;
 --
 function MAP_FOREIGN_DATATYPE(
- P_SOURCE_VENDOR         VARCHAR2
+ P_SOURCE_VENDOR          VARCHAR2
 , P_DATA_TYPE             VARCHAR2
 , P_DATA_TYPE_LENGTH      NUMBER
 , P_DATA_TYPE_SCALE       NUMBER
 , P_TREAT_RAW1_AS_BOOLEAN VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+, P_CIRCLE_FORMAT         VARCHAR2 DEFAULT C_CIRCLE_FORMAT
 )
 return VARCHAR2
 as
 begin
-  case 
+  case
     when P_SOURCE_VENDOR = 'Oracle' then
       case 
         -- MAP RAW(1) to VIRTUAL BOLEAN DATA TYPE
-        when P_DATA_TYPE = 'RAW' and P_DATA_TYPE_LENGTH = 1 and P_TREAT_RAW1_AS_BOOLEAN = 'TRUE' then
-           return 'BOOLEAN';
-        else 
-         return UPPER(P_DATA_TYPE);
-      end case;
-    when P_SOURCE_VENDOR = 'MSSQLSERVER' then
-      case 
-        -- exact numbers
-        when P_DATA_TYPE = 'tinyint' then
-           return 'NUMBER(3,0)';
-        when P_DATA_TYPE = 'smallint' then
-           return 'NUMBER(5,0)';
-        when P_DATA_TYPE = 'mediumint' then
-           return 'NUMBER(7,0)';
-        when P_DATA_TYPE = 'int' then
-           return 'NUMBER(10,0)';
-        when P_DATA_TYPE = 'bigint' then
-           return 'NUMBER(19,0)';
-        when P_DATA_TYPE = 'money' then
-           return 'NUMBER(19,4)';
-        when P_DATA_TYPE = 'decimal' then
-           return 'NUMBER';
-        when P_DATA_TYPE = 'numeric' then
-           return 'NUMBER';
-        when P_DATA_TYPE = 'smallmoney' then
-           return 'NUMBER(10,4)';
-        -- binary numbers
-        when P_DATA_TYPE = 'real' then
-           return 'BINARY_FLOAT';       
-        when P_DATA_TYPE = 'float' then
-           return 'BINARY_DOUBLE';
-        -- date /time data types
-        when P_DATA_TYPE = 'date' then
-           return 'DATE';
-        when P_DATA_TYPE = 'time' then
-           case 
-             when P_DATA_TYPE_LENGTH = 0 then
-               return 'DATETIME';
-             else  
-               return 'TIMESTAMP';
-            end case;
-        when P_DATA_TYPE = 'datetime' then
-           return 'TIMESTAMP(3)';
-        when P_DATA_TYPE = 'datetime2' then
-           return 'TIMESTAMP';
-        when P_DATA_TYPE = 'datetimeoffset' then
-           return 'TIMESTAMP(' || P_DATA_TYPE_LENGTH || ') WITH TIME ZONE';
-        -- text data Types
-        when P_DATA_TYPE = 'ntext' then
-           return 'NCLOB';
-        when P_DATA_TYPE = 'nvarchar'and (P_DATA_TYPE_LENGTH = -1) then
-           return 'NCLOB';
-        when P_DATA_TYPE = 'nvarchar'and (P_DATA_TYPE_LENGTH > 2000) then
-          -- Cannot create NVARCHAR2(2001) at least with AL32UTF8 Database Character Set
-           return 'NCLOB';
-        when P_DATA_TYPE = 'nvarchar' then
-           return 'NVARCHAR2';
-        when P_DATA_TYPE = 'text' then
-           return 'CLOB';
-        when P_DATA_TYPE = 'varchar'  and (P_DATA_TYPE_LENGTH = -1) then
-           return 'CLOB';
-        when P_DATA_TYPE = 'varchar' then
-           return 'VARCHAR2';
-        -- binary data types 
-        when P_DATA_TYPE = 'binary' and (P_DATA_TYPE_LENGTH = -1) then
-           return 'BLOB';
-        when P_DATA_TYPE = 'bit' then
-         -- Map to Virtual Data Type BOOLEAN so we can process content correclty later
-           return 'BOOLEAN';
-        when P_DATA_TYPE = 'binary' then
-           return 'RAW';
-        when P_DATA_TYPE = 'image' then
-           return 'BLOB';
-        when P_DATA_TYPE = 'varbinary' and (P_DATA_TYPE_LENGTH = -1) then
-           return 'BLOB';
-        when P_DATA_TYPE = 'varbinary' then
-           return 'RAW';
-        -- specialist data types
-        when P_DATA_TYPE = 'xml' then
-          return 'XMLTYPE';
-        when P_DATA_TYPE = 'hierarchyid' then
-           return 'VARCHAR2(4000)';
-        when P_DATA_TYPE = 'uniqueidentifier' then
-           return 'VARCHAR2(36)';
-        when P_DATA_TYPE in ('geography','geometry') then
-           return 'GEOMETRY';
-        else
-          return UPPER(P_DATA_TYPE);
-      end case;
-    when P_SOURCE_VENDOR = 'Postgres' then
-      case
-        when P_DATA_TYPE = 'character' then
-           return 'VARCHAR2';
-        when P_DATA_TYPE = 'character varying' then
-          case 
-            when P_DATA_TYPE_LENGTH is NULL then
-              return 'CLOB';
-            when P_DATA_TYPE_LENGTH < 2001 then
-              return 'VARCHAR2';
-            else
-              return 'CLOB';
-          end case;
-        when P_DATA_TYPE = 'smallint' then
-          return 'NUMBER(5,0)';
-        when P_DATA_TYPE = 'integer' then
-          return 'NUMBER(10,0)';
-        when P_DATA_TYPE = 'bigint' then
-          return 'NUMBER(19,0)';
-        when P_DATA_TYPE = 'real' then
-           return 'BINARY_FLOAT';
-        when P_DATA_TYPE = 'double precision' then
-           return 'BINARY_DOUBLE';
-        when P_DATA_TYPE = 'timestamp without time zone' then
-           return 'TIMESTAMP(6)';
-        when P_DATA_TYPE = 'time without time zone' then
-           return 'TIMESTAMP(6)';
-        when P_DATA_TYPE like 'interval%day%' then
-           return 'INTERVAL DAY TO SECOND';
-        when P_DATA_TYPE like 'interval%YEAR%' then
-           return 'INTERVAL YEAR TO MONTH';
-        when P_DATA_TYPE = 'text' then
-           return 'CLOB';
-        when P_DATA_TYPE = 'bytea' then
-          case 
-            when P_DATA_TYPE_LENGTH < 2001 then
-              return 'RAW';
-            else
-              return 'BLOB';
-          end case;
-        when P_DATA_TYPE = 'xml' then
-           return 'XMLTYPE';
-        when P_DATA_TYPE = 'jsonb' then
-           return 'JSON';
-        when P_DATA_TYPE in ('geography','geometry','point','line','lseg','box','path','polygon','circle') then
-           return 'GEOMETRY';
-        when P_DATA_TYPE = 'numeric' then
-           return 'NUMBER';
-        else
-          return UPPER(P_DATA_TYPE);  
+        when P_DATA_TYPE = 'RAW'                                                       then return case when P_DATA_TYPE_LENGTH = 1 and P_TREAT_RAW1_AS_BOOLEAN = 'TRUE' then 'BOOLEAN' else 'RAW' end;
+		-- Extended String Supported to Extended String Not Supported.																			                 
+        when P_DATA_TYPE in ('VARCHAR2')                                               then return case when P_DATA_TYPE_LENGTH > C_MAX_VARCHAR_SIZE then 'CLOB' else 'VARCHAR2' end;
+        when P_DATA_TYPE in ('NVARCHAR2')                                              then return case when P_DATA_TYPE_LENGTH > C_MAX_NVARCHAR_SIZE then 'CLOB' else 'NVARCHAR2' end;
+        when P_DATA_TYPE in ('RAW')                                                    then return case when P_DATA_TYPE_LENGTH > C_MAX_RAW_SIZE then 'BLOB' else 'RAW' end;
+                                                                                       else return UPPER(P_DATA_TYPE);
+      end case;                                                                        
+    when P_SOURCE_VENDOR = 'MSSQLSERVER' then                                          
+      case                                                                             
+        -- exact numbers                                                               
+        when P_DATA_TYPE = 'tinyint'                                                   then return C_TINYINT_TYPE;
+        when P_DATA_TYPE = 'smallint'                                                  then return C_SMALLINT_TYPE;
+        when P_DATA_TYPE = 'mediumint'                                                 then return C_MEDIUMINT_TYPE;
+        when P_DATA_TYPE = 'int'                                                       then return C_INT_TYPE;
+        when P_DATA_TYPE = 'bigint'                                                    then return C_BIGINT_TYPE;
+        when P_DATA_TYPE = 'money'                                                     then return C_MSSQL_MONEY_TYPE;
+        when P_DATA_TYPE = 'decimal'                                                   then return 'NUMBER';
+        when P_DATA_TYPE = 'numeric'                                                   then return 'NUMBER';
+        when P_DATA_TYPE = 'smallmoney'                                                then return 'NUMBER(10,4)';
+        -- binary numbers                                                              
+        when P_DATA_TYPE = 'real'                                                      then return 'BINARY_FLOAT';       
+        when P_DATA_TYPE = 'float'                                                     then return 'BINARY_DOUBLE';
+        -- date /time data types                                                       
+        when P_DATA_TYPE = 'date'                                                      then return 'DATE';
+        when P_DATA_TYPE = 'time'                                                      then return case when P_DATA_TYPE_LENGTH = 0 then 'DATETIME' else 'TIMESTAMP' end;
+        when P_DATA_TYPE = 'datetime'                                                  then return 'TIMESTAMP(3)';
+        when P_DATA_TYPE = 'datetime2'                                                 then return 'TIMESTAMP';
+        when P_DATA_TYPE = 'datetimeoffset'                                            then return 'TIMESTAMP(' || P_DATA_TYPE_LENGTH || ') WITH TIME ZONE';
+        -- text data Types                                                             
+        when P_DATA_TYPE in ('char','nchar')                                           then return case when P_DATA_TYPE_LENGTH = -1 then 'CLOB' when P_DATA_TYPE_LENGTH > C_MAX_CHAR_SIZE then 'CLOB' else 'CHAR' end;
+        when P_DATA_TYPE in ('varchar','nvarchar')                                     then return case when P_DATA_TYPE_LENGTH = -1 then 'CLOB' when P_DATA_TYPE_LENGTH > C_MAX_VARCHAR_SIZE then 'CLOB' else 'VARCHAR2' end;
+        when P_DATA_TYPE in ('text','ntext')                                           then return 'CLOB';
+        -- binary data types                                                           
+        when P_DATA_TYPE = 'bit'                                                       then return 'BOOLEAN';
+        when P_DATA_TYPE in ('binary','varbinary')                                     then return case when P_DATA_TYPE_LENGTH = -1 then 'BLOB' when P_DATA_TYPE_LENGTH > C_MAX_RAW_SIZE then 'BLOB' else 'RAW' end;
+        when P_DATA_TYPE = 'image'                                                     then return 'BLOB';
+        -- specialist data types                                                       
+        when P_DATA_TYPE = 'xml'                                                       then return 'XMLTYPE';
+        when P_DATA_TYPE = 'hierarchyid'                                               then return C_HIERARCHY_TYPE;
+        when P_DATA_TYPE = 'uniqueidentifier'                                          then return C_UUID_TYPE;
+        when P_DATA_TYPE in ('geography','geometry')                                   then return 'GEOMETRY';
+                                                                                       else return UPPER(P_DATA_TYPE);
+      end case;                                                                        
+    when P_SOURCE_VENDOR = 'Postgres' then                                             
+      case                                                                             
+        when P_DATA_TYPE in ('character','bpchar')                                     then return case when P_DATA_TYPE_LENGTH is NULL then 'CLOB' when P_DATA_TYPE_LENGTH > C_MAX_NCHAR_SIZE then 'CLOB' else 'CHAR' end;
+		when P_DATA_TYPE = 'character varying'                                         then return case when P_DATA_TYPE_LENGTH is NULL then 'CLOB' when P_DATA_TYPE_LENGTH > C_MAX_VARCHAR_SIZE then 'CLOB' else 'VARCHAR2' end;
+        when P_DATA_TYPE = 'text'                                                      then return 'CLOB';
+        when P_DATA_TYPE = '"char"'                                                    then return C_PGSQL_SINGLE_CHAR_TYPE;
+        when P_DATA_TYPE = 'name'                                                      then return C_PGSQL_NAME_TYPE;
+        when P_DATA_TYPE = 'bool'                                                      then return 'BOOLEAN';
+        when P_DATA_TYPE = 'bytea'                                                     then return case when P_DATA_TYPE_LENGTH is NULL then 'BLOB' when P_DATA_TYPE_LENGTH > C_MAX_RAW_SIZE then 'BLOB' else 'RAW' end;
+        when P_DATA_TYPE = 'smallint'                                                  then return C_SMALLINT_TYPE;
+        when P_DATA_TYPE = 'integer'                                                   then return C_INT_TYPE;
+        when P_DATA_TYPE = 'bigint'                                                    then return C_BIGINT_TYPE;
+        when P_DATA_TYPE = 'money'                                                     then return C_PGSQL_MONEY_TYPE;
+        when P_DATA_TYPE = 'real'                                                      then return 'BINARY_FLOAT';
+        when P_DATA_TYPE = 'double precision'                                          then return 'BINARY_DOUBLE';
+        -- TODO: Map Length > 39 or NULL to NUMBER or VARCHAR
+		when P_DATA_TYPE = 'numeric'                                                   then return 'NUMBER';
+        when P_DATA_TYPE = 'timestamp without time zone'                               then return 'TIMESTAMP(6)';
+        when P_DATA_TYPE = 'time without time zone'                                    then return 'TIMESTAMP(6)';
+        when P_DATA_TYPE = 'time with time zone'                                       then return 'TIMESTAMP(6) WITH TIME ZONE';
+        when P_DATA_TYPE like 'interval%day%'                                          then return 'INTERVAL DAY(9) TO SECOND(9)';
+        when P_DATA_TYPE like 'interval%year%'                                         then return 'INTERVAL YEAR(4) TO MONTH';
+        when P_DATA_TYPE = 'interval'                                                  then return C_PGSQL_INTERVAL_TYPE;
+        when P_DATA_TYPE = 'xml'                                                       then return 'XMLTYPE';
+        when P_DATA_TYPE = 'jsonb'                                                     then return 'JSON';
+		when P_DATA_TYPE = 'circle'                                                    then return case when P_CIRCLE_FORMAT = 'CIRCLE' then 'JSON' else 'GEOMETRY' end;
+        when P_DATA_TYPE in (
+        -- PostGIS Geometry & Geography. Postgre geometric types
+          'geography',
+		  'geometry',
+		  'point',
+		  'lseg',
+		  'box',
+		  'path',
+		  'polygon'
+		)                                                                              then return 'GEOMETRY';
+        -- Posgres Gemetric type reprsenting an linear equation (Ax + By = C)
+        when P_DATA_TYPE = 'line'                                                      then return 'JSON';
+        when P_DATA_TYPE = 'uuid'                                                      then return C_UUID_TYPE;
+        when P_DATA_TYPE in ('bit','bit varying')                                      then return C_MAX_VARCHAR_TYPE;
+        -- IPv4 or IPv6 internet address
+        when P_DATA_TYPE in ('cidr','inet')                                            then return C_INET_ADDR_TYPE;
+        -- Mac Address
+		when P_DATA_TYPE in ('macaddr','macaddr8')                                     then return C_MAC_ADDR_TYPE;
+        -- Range Types: Map to JSON
+		when P_DATA_TYPE in (
+		  'int4range',
+		  'int8range',
+		  'numrange',
+		  'tsrange',
+		  'tstzrange',
+		  'daterange'
+		)                                                                              then return 'JSON';
+	    -- Sorted list of distinct lexemes used by Text Search.
+	    -- GiST Index
+		when P_DATA_TYPE in ('tsvector','gtsvector')                                   then return 'JSON';
+		-- Representation of a Text Search
+		when P_DATA_TYPE in ('tsquery')                                                then return C_MAX_VARCHAR_TYPE;
+  	    -- Postgres Object Identifier. Per documentation unsigned 4 Byte Interger 
+		when P_DATA_TYPE in (
+		  'oid',
+		  'regcollation',
+		  'regclass',
+		  'regconfig',
+		  'regdictionary',
+		  'regnamespace',
+		  'regoper',
+		  'regoperator',
+		  'regproc',
+		  'regprocedure',
+		  'regrole',
+		  'regtype')                                                                   then return C_UNSIGNED_INT_TYPE;
+ 	    -- Tranasaction Identifiers 32 bits.
+		when P_DATA_TYPE in (
+		  'tid',
+		  'xid',
+		  'cid',
+		  'txid_snapshot'
+		)                                                                              then return C_PGSQL_IDENTIFIER;
+  	    -- Postgres ACLItem & REF Cursor. Map to JSON 
+		when P_DATA_TYPE in ('aclitem','refcursor')                                    then return 'JSON';
+                                                                                       else return UPPER(P_DATA_TYPE);  
       end case;
     when ((P_SOURCE_VENDOR = 'MySQL') or (P_SOURCE_VENDOR = 'MariaDB')) then
-      case
-        -- ExactNumbers
-        when P_DATA_TYPE = 'tinyint' then
-          return 'NUMBER(3,0)';
-        when P_DATA_TYPE = 'smallint' then
-          return 'NUMBER(5,0)';
-        when P_DATA_TYPE = 'mediumint' then
-          return 'NUMBER(7,0)';
-        when P_DATA_TYPE = 'int' then
-          return 'NUMBER(10,0)';
-        when P_DATA_TYPE = 'bigint' then
-          return 'NUMBER(19,0)';
-        when P_DATA_TYPE = 'decimal'  then
-          return 'NUMBER';
-        when P_DATA_TYPE = 'numeric' then
-          return 'NUMBER';
-        -- Binary Numbers
-        when P_DATA_TYPE = 'float' then
-          return 'BINARY_FLOAT';
-        when P_DATA_TYPE = 'double' then
-          return 'BINARY_DOUBLE';
-        -- Text Data Types           
-        when P_DATA_TYPE = 'varchar' then
-          return 'VARCHAR2';
-        when P_DATA_TYPE = 'tinytext' then
-          return 'VARCHAR2';
-         when P_DATA_TYPE = 'mediumtext' then
-          return 'CLOB';
-        when P_DATA_TYPE = 'text' then
-          return 'CLOB';
-        when P_DATA_TYPE = 'longtext' then
-          return 'CLOB';
-        -- Binary Data types
-        when P_DATA_TYPE = 'bit' then
-          return 'BOOLEAN';
-        when P_DATA_TYPE = 'binary' then
-          -- return 'RAW(' || CEIL(P_DATA_TYPE_LENGTH/8) || ')';
-          return 'RAW';
-        when P_DATA_TYPE = 'varbinary' then
-          return 'RAW';
-        when P_DATA_TYPE = 'tinyblob' then
-           return 'RAW';
-        when P_DATA_TYPE = 'mediumblob' then
-           return 'BLOB';
-        when P_DATA_TYPE = 'longblob' then
-           return 'BLOB';
-        -- Date/TIme Data Types
-        when P_DATA_TYPE = 'date' then
-           return 'DATE';
-        when P_DATA_TYPE = 'time' then
-           return 'DATE';
-        when P_DATA_TYPE = 'datetime' then
-           return 'TIMESTAMP';
-        -- Special Data Types   
-        when P_DATA_TYPE = 'enum' then
-           return 'VARCHAR2(512)';
-        when P_DATA_TYPE in ('geometry','point','polygon','linestring','multipoint','multilinestring','multipolyon','geometrycollection')  then
-           return 'GEOMETRY';
-        when P_DATA_TYPE = 'set' then
-           return 'JSON';
-        when P_DATA_TYPE = 'year' then
-           return 'NUMBER(4)';
-        else
-          return UPPER(P_DATA_TYPE);
-      end case;
-    when P_SOURCE_VENDOR = 'MariaDB' then
       -- MariaDB and MySQL currentyl share the same mappings
-      return UPPER(P_DATA_TYPE);
-    when P_SOURCE_VENDOR = 'MongoDB' then
-      -- MongoDB typing based on BSON type model and the aggregation $type operator
-	  -- ### No support for depricated Data types undefined, dbPointer, symbol
       case
-        when P_DATA_TYPE = 'double' then
-           return 'BINARY_DOUBLE';
-        when P_DATA_TYPE = 'string' then
-          case
-            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH is NULL then
-              return 'VARCHAR2(32767)';
-            when P_DATA_TYPE_LENGTH is NULL then
-              return 'VARCHAR2(4000)';
-            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH < 32768 then
-              return 'VARCHAR2';
-            when P_DATA_TYPE_LENGTH < 4001 then
-              return 'VARCHAR2';
-            else
-              return 'CLOB';
-          end case;
-        when P_DATA_TYPE = 'object' then 
-          return 'JSON';
-        when P_DATA_TYPE = 'array' then
-          return 'JSON';
-        when P_DATA_TYPE = 'binData' then
-          return 'BLOB';
-        when P_DATA_TYPE = 'objectId' then
-           return 'RAW(12)';
-        when P_DATA_TYPE = 'bool' then
-           return 'BOOLEAN';
-        when P_DATA_TYPE = 'null' then
-           return 'VARCHAR2(2048)';
-        when P_DATA_TYPE = 'regex' then
-           return 'VARCHAR2(4000)';
-        when P_DATA_TYPE = 'javascript' then
-           return 'CLOB';
-        when P_DATA_TYPE = 'javascriptWithScope' then
-           return 'CLOB';
-        when P_DATA_TYPE = 'int' then
-           return 'NUMBER(10,0)';
-        when P_DATA_TYPE = 'long' then
-           return 'NUMBER(19,0)';
-        when P_DATA_TYPE = 'decimal' then
-           return 'NUMBER';
-        when P_DATA_TYPE = 'timestamp' then
-           return 'TIMESTAMP(9) WITH TIME ZONE';
-        when P_DATA_TYPE = 'date' then
-           return 'TIMESTAMP(3) WITH TIME ZONE';
-        when P_DATA_TYPE = 'minkey' then
-           return 'JSON';
-        when P_DATA_TYPE = 'maxKey' then
-           return 'JSON';
-        else
-          return UPPER(P_DATA_TYPE);  
+	    -- Strings
+        when P_DATA_TYPE in ('varchar')                                                then return case when P_DATA_TYPE_LENGTH > C_MAX_VARCHAR_SIZE then 'CLOB' else 'VARCHAR2' end;
+        when P_DATA_TYPE = 'tinytext'                                                  then return 'VARCHAR2';
+        when P_DATA_TYPE = 'mediumtext'                                                then return 'CLOB';
+        when P_DATA_TYPE = 'text'                                                      then return 'CLOB';
+        when P_DATA_TYPE = 'longtext'                                                  then return 'CLOB';
+        -- ExactNumbers
+        when P_DATA_TYPE = 'tinyint'                                                   then return 'NUMBER(3,0)';
+        when P_DATA_TYPE = 'smallint'                                                  then return C_SMALLINT_TYPE;
+        when P_DATA_TYPE = 'mediumint'                                                 then return C_MEDIUMINT_TYPE;
+        when P_DATA_TYPE = 'int'                                                       then return C_INT_TYPE;
+        when P_DATA_TYPE = 'bigint'                                                    then return C_BIGINT_TYPE;
+        when P_DATA_TYPE = 'decimal'                                                   then return 'NUMBER';
+        when P_DATA_TYPE = 'numeric'                                                   then return 'NUMBER';
+        -- Binary Numbers
+        when P_DATA_TYPE = 'float'                                                     then return 'BINARY_FLOAT';
+        when P_DATA_TYPE = 'double'                                                    then return 'BINARY_DOUBLE';
+        -- Text Data Types           
+        when P_DATA_TYPE = 'varchar'                                                   then return 'VARCHAR2';
+        -- Binary Data types
+        when P_DATA_TYPE = 'bit'                                                       then return 'BOOLEAN';
+        -- TODO Size RAW column return 'RAW(' || CEIL(P_DATA_TYPE_LENGTH/8) || ')';
+        when P_DATA_TYPE = 'binary'                                                    then return 'RAW';
+        when P_DATA_TYPE = 'varbinary'                                                 then return 'RAW';
+        when P_DATA_TYPE = 'tinyblob'                                                  then return 'RAW';
+        when P_DATA_TYPE = 'mediumblob'                                                then return 'BLOB';
+        when P_DATA_TYPE = 'longblob'                                                  then return 'BLOB';
+        -- Date/TIme Data Types
+        when P_DATA_TYPE = 'date'                                                      then return 'DATE';
+        when P_DATA_TYPE = 'time'                                                      then return 'DATE';
+        when P_DATA_TYPE = 'datetime'                                                  then return 'TIMESTAMP';
+        -- Special Data Types   
+        when P_DATA_TYPE = 'enum'                                                      then return C_ENUM_TYPE;
+        when (P_DATA_TYPE in (
+		   'point',
+		   'linestring',
+		   'polygon',
+		   'geometry',
+		   'multipoint',
+		   'multilinestring',
+		   'multipolygon',
+		   'geometrycollection',
+		   'geomcollection'
+		))                                                                             then return 'GEOMETRY';
+        when P_DATA_TYPE = 'set'                                                       then return 'JSON';
+        when P_DATA_TYPE = 'year'                                                      then return C_MYSQL_YEAR_TYPE;
+                                                                                       else return UPPER(P_DATA_TYPE);
+      end case;
+    when P_SOURCE_VENDOR = 'MongoDB' then
+      -- MongoDB typing based on BSON type model 
+      case
+        when P_DATA_TYPE = 'string'                                                    then return case when  P_DATA_TYPE_LENGTH is NULL then C_MAX_VARCHAR_TYPE  when P_DATA_TYPE_LENGTH > C_MAX_VARCHAR_SIZE then 'CLOB' else 'VARCHAR2'end;
+        when P_DATA_TYPE = 'int'                                                       then return C_INT_TYPE;
+        when P_DATA_TYPE = 'long'                                                      then return C_BIGINT_TYPE;
+        when P_DATA_TYPE = 'double'                                                    then return 'BINARY_DOUBLE';
+        when P_DATA_TYPE = 'decimal'                                                   then return 'NUMBER';
+        when P_DATA_TYPE = 'binData'                                                   then return 'BLOB';
+        when P_DATA_TYPE = 'bool'                                                      then return 'BOOLEAN';
+        when P_DATA_TYPE = 'date'                                                      then return 'TIMESTAMP(3) WITH TIME ZONE';
+        when P_DATA_TYPE = 'timestamp'                                                 then return 'TIMESTAMP(9) WITH TIME ZONE';
+        when P_DATA_TYPE = 'objectId'                                                  then return C_MONGO_OBJECT_ID;
+        when P_DATA_TYPE = 'object'                                                    then return 'JSON';
+        when P_DATA_TYPE = 'array'                                                     then return 'JSON';
+        when P_DATA_TYPE = 'null'                                                      then return C_MONGO_UNKNOWN_TYPE;
+        when P_DATA_TYPE = 'regex'                                                     then return C_MONGO_REGEX_TYPE;
+        when P_DATA_TYPE = 'javascript'                                                then return 'CLOB';
+        when P_DATA_TYPE = 'javascriptWithScope'                                       then return 'CLOB';
+        when P_DATA_TYPE = 'minkey'                                                    then return 'JSON';
+        when P_DATA_TYPE = 'maxKey'                                                    then return 'JSON';
+        when P_DATA_TYPE in (
+		  'undefined',
+		  'dbPointer',
+		  'function',
+		  'symbol'
+		)                                                                              then return 'JSON';
+                                                                                       else return UPPER(P_DATA_TYPE);  
       end case;
     when P_SOURCE_VENDOR = 'SNOWFLAKE' then
-          case
-        when P_DATA_TYPE = 'TEXT' then
-          case
-            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH is NULL then
-              return 'VARCHAR2(32767)';
-            when P_DATA_TYPE_LENGTH is NULL then
-              return 'VARCHAR2(4000)';
-            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH < 32768 then
-              return 'VARCHAR2';
-            when P_DATA_TYPE_LENGTH < 4001 then
-              return 'VARCHAR2';
-            else
-              return 'CLOB';
-          end case;         
-        when P_DATA_TYPE = 'BINARY' then
-          case
-            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH is NULL then
-              return 'RAW(32767)';
-            when P_DATA_TYPE_LENGTH is NULL then
-              return 'RAW(4000)';
-            when YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED and P_DATA_TYPE_LENGTH < 32768 then
-              return 'RAW';
-            when P_DATA_TYPE_LENGTH < 4001 then
-              return 'RAW';
-            else
-              return 'BLOB';
-          end case;         
-        when P_DATA_TYPE = 'XML' then
-           return 'XMLTYPE';
-        when P_DATA_TYPE = 'TIME' then
-           case 
-             when P_DATA_TYPE_LENGTH = 0 then
-               return 'DATETIME';
-             else  
-               return 'TIMESTAMP';
-            end case;
-        when P_DATA_TYPE = 'TIMESTAMP_LTZ' then
-           return 'TIMESTAMP(' || P_DATA_TYPE_LENGTH || ') WITH LOCAL TIME ZONE';
-        when P_DATA_TYPE = 'TIMESTAMP_NTZ' then
-           return 'TIMESTAMP';
-        when P_DATA_TYPE = 'GEOGRAPHY'  then
-           return 'GEOMETRY';
-        when P_DATA_TYPE = 'VARIANT'  then
-           return 'CLOB';
-        else 
-           return UPPER(P_DATA_TYPE);
+      case
+        when P_DATA_TYPE = 'TEXT'                                                      then return case when P_DATA_TYPE_LENGTH is NULL then C_MAX_VARCHAR_TYPE when P_DATA_TYPE_LENGTH > C_MAX_VARCHAR_SIZE then 'CLOB' else  'VARCHAR2' end;
+	    when P_DATA_TYPE = 'BINARY'                                                    then return case when P_DATA_TYPE_LENGTH is NULL then C_MAX_RAW_TYPE when P_DATA_TYPE_LENGTH > C_MAX_RAW_SIZE then 'BLOB' else  'RAW' end;
+        when P_DATA_TYPE = 'TIME'                                                      then return case when P_DATA_TYPE_LENGTH = 0 then 'DATETIME' else 'TIMESTAMP' end;
+        when P_DATA_TYPE = 'TIMESTAMP_LTZ'                                             then return 'TIMESTAMP(' || P_DATA_TYPE_LENGTH || ') WITH LOCAL TIME ZONE';
+        when P_DATA_TYPE = 'TIMESTAMP_NTZ'                                             then return 'TIMESTAMP';
+        when P_DATA_TYPE = 'XML'                                                       then return 'XMLTYPE';
+        when P_DATA_TYPE = 'FLOAT'                                                     then return 'BINARY_DOUBLE';
+        when P_DATA_TYPE = 'GEOGRAPHY'                                                 then return 'GEOMETRY';
+        when P_DATA_TYPE = 'VARIANT'                                                   then return 'CLOB';
+                                                                                       else return UPPER(P_DATA_TYPE);
       end case;
     else
       return UPPER(P_DATA_TYPE);
@@ -1007,13 +979,14 @@ function GENERATE_SQL(
 , P_TARGET_SCHEMA                VARCHAR2 
 , P_TABLE_OWNER                  VARCHAR2 
 , P_TABLE_NAME                   VARCHAR2 
-, P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
 , P_COLUMN_NAME_ARRAY            CLOB
 , P_DATA_TYPE_ARRAY              CLOB
 , P_SIZE_CONSTRAINT_ARRAY        CLOB
-, P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
-, P_XML_STORAGE_CLAUSE           VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+, P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_DATA_TYPE
+, P_XML_STORAGE_MODEL            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+, P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
 , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+, P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
 )
 --
 $ELSE
@@ -1023,13 +996,14 @@ function GENERATE_SQL(
 , P_TARGET_SCHEMA                VARCHAR2 
 , P_TABLE_OWNER                  VARCHAR2 
 , P_TABLE_NAME                   VARCHAR2 
-, P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
 , P_COLUMN_NAME_XML              XMLTYPE
 , P_DATA_TYPE_XML                XMLTYPE
 , P_SIZE_CONSTRAINT_XML          XMLTYPE
-, P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
-, P_XML_STORAGE_CLAUSE           VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+, P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_DATA_TYPE
+, P_XML_STORAGE_MODEL            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+, P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
 , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+, P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
 )
 $END       
 --
@@ -1039,9 +1013,9 @@ as
   V_COLUMNS_CLAUSE            CLOB;
   V_INSERT_SELECT_LIST        CLOB;
   V_COLUMN_PATTERNS           CLOB;
-  V_XML_STORAGE_CLAUSE        CLOB;
+  V_XML_STORAGE_CLAUSES       CLOB;
   
-  V_XML_STORAGE_MODEL         VARCHAR2(17) := P_XML_STORAGE_CLAUSE;  
+  V_XML_STORAGE_MODEL         VARCHAR2(17) := P_XML_STORAGE_MODEL;  
   
   V_DESERIALIZATIONS          T_VC4000_TABLE;
 
@@ -1142,7 +1116,7 @@ $END
   "TARGET_TABLE_DEFINITIONS" 
   as (
     select st.*
-          ,MAP_FOREIGN_DATATYPE(P_SOURCE_VENROR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE",P_TREAT_RAW1_AS_BOOLEAN) TARGET_DATA_TYPE
+          ,MAP_FOREIGN_DATATYPE(P_SOURCE_VENROR,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE",P_TREAT_RAW1_AS_BOOLEAN, P_CIRCLE_FORMAT) TARGET_DATA_TYPE
           ,case
              -- Probe rather than Join since most rows are not objects.
              when (TYPE_NAME is not null) then
@@ -1180,7 +1154,7 @@ $END
 			   else
                  $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
                  --
-                 P_JSON_DATA_TYPE || case when P_JSON_DATA_TYPE = 'VARCHAR2' then '(' || YADAMU_FEATURE_DETECTION.C_MAX_STRING_SIZE || ')' else '' end || ' CHECK ("' || COLUMN_NAME || '" IS JSON)'
+                 P_JSON_DATA_TYPE || case when P_JSON_DATA_TYPE = 'VARCHAR2' then '(' || C_MAX_VARCHAR_SIZE || ')' else '' end || ' CHECK ("' || COLUMN_NAME || '" IS JSON)'
                  --
                  $ELSE
                  --
@@ -1193,10 +1167,12 @@ $END
              'RAW(1)'
            when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID','BINARY_FLOAT','BINARY_DOUBLE') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE like '% TIME ZONE') or (TARGET_DATA_TYPE LIKE '%(%)') then
              TARGET_DATA_TYPE
+		   when (TARGET_DATA_TYPE = 'NUMBER') and (DATA_TYPE_LENGTH > 38) then
+             TARGET_DATA_TYPE		   
            when DATA_TYPE_SCALE is not NULL then
              TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH || ',' || DATA_TYPE_SCALE || ')'
            when DATA_TYPE_LENGTH  is not NULL then
-             TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH|| ')'
+             TARGET_DATA_TYPE  || '(' || DATA_TYPE_LENGTH || CASE WHEN TARGET_DATA_TYPE = 'VARCHAR2' THEN ' CHAR' ELSE '' END || ')'
            else
              TARGET_DATA_TYPE
          end
@@ -1288,14 +1264,14 @@ $END
         ,'"' || COLUMN_NAME || '" ' ||
          case
            when TYPE_EXISTS = 1 then
-             YADAMU_FEATURE_DETECTION.C_RETURN_TYPE
+             C_MAX_STRING_TYPE
            when TARGET_DATA_TYPE  = 'GEOMETRY' then
-             YADAMU_FEATURE_DETECTION.C_RETURN_TYPE
+             C_MAX_STRING_TYPE
            when TARGET_DATA_TYPE  = 'BOOLEAN' then
              -- Maybe TRUE / FALSE or 01/00
              'NUMBER(1)'
            when TARGET_DATA_TYPE = 'JSON' then
-             YADAMU_FEATURE_DETECTION.C_RETURN_TYPE || ' FORMAT JSON'
+             C_MAX_STRING_TYPE || ' FORMAT JSON'
            when TARGET_DATA_TYPE  = 'FLOAT' then
              'NUMBER'
            when TARGET_DATA_TYPE = 'BINARY_FLOAT' then
@@ -1315,17 +1291,19 @@ $END
            when TARGET_DATA_TYPE in ('CHAR','NCHAR','NVARCHAR2','RAW','BFILE','ROWID','UROWID') or (TARGET_DATA_TYPE like 'INTERVAL%') then
              'VARCHAR2'
            when TARGET_DATA_TYPE in ('XMLTYPE','ANYDATA','CLOB','NCLOB','BLOB','LONG','LONG RAW') or (TYPE_NAME is not NULL) then
-             YADAMU_FEATURE_DETECTION.C_RETURN_TYPE
+             C_MAX_STRING_TYPE
            when "TARGET_DATA_TYPE" in ('DATE','DATETIME') then
              "TARGET_DATA_TYPE"
            when "TARGET_DATA_TYPE" like 'TIMESTAMP%TIME ZONE' then
              "TARGET_DATA_TYPE"
            when "TARGET_DATA_TYPE"  LIKE '%(%)' then
              "TARGET_DATA_TYPE"
+		   when (TARGET_DATA_TYPE = 'NUMBER') and (DATA_TYPE_LENGTH > 38) then
+             TARGET_DATA_TYPE		   
            when "DATA_TYPE_SCALE" is not NULL then
              "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ',' || "DATA_TYPE_SCALE" || ')'
            when "DATA_TYPE_LENGTH"  is not NULL then
-             "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || ')'
+             "TARGET_DATA_TYPE"  || '(' || "DATA_TYPE_LENGTH" || CASE WHEN TARGET_DATA_TYPE = 'VARCHAR2' THEN ' CHAR' ELSE '' END || ')'
            else
              "TARGET_DATA_TYPE"
          end
@@ -1400,7 +1378,7 @@ $END
   -- OBJECT RELATIONAL IS ONLY SUPPORTED IN CONJUNCTION VIA DDL_AND_DATA OPERATIONS 
   -- WE DO NOT NEED TO CONSIDER OBJECT RELATIONAL STORAGE OPTION WHEN GENERATING DDL STATEMENTS FROM YADAMU METADATA
   --
-  if (P_XML_STORAGE_CLAUSE = 'XML') then
+  if (P_XML_STORAGE_MODEL = 'XML') then
     V_XML_STORAGE_MODEL := C_XML_STORAGE_MODEL;
   end if;
   --
@@ -1423,7 +1401,7 @@ $END
     V_INSERT_SELECT_LIST     := o.INSERT_SELECT_LIST;
     V_TARGET_DATA_TYPES      := o.TARGET_DATA_TYPES;
     V_COLUMN_PATTERNS        := o.COLUMN_PATTERNS;
-    V_XML_STORAGE_CLAUSE     := o.XMLTYPE_STORAGE_CLAUSES;
+    V_XML_STORAGE_CLAUSES    := o.XMLTYPE_STORAGE_CLAUSES;
     
     select distinct COLUMN_VALUE 
       bulk collect into V_DESERIALIZATIONS
@@ -1438,18 +1416,18 @@ $END
   fetch generateStatementComponents
         bulk collect into V_COLUMN_LIST_TABLE, V_COLUMNS_CLAUSE_TABLE, V_INSERT_SELECT_TABLE, V_TARGET_DATA_TYPES_TABLE, V_XML_STORAGE_TEMP, V_COLUMN_PATTERNS_TABLE, V_DESERIALIZATION_FUNCTIONS;
 
-  V_COLUMN_LIST    := SERIALIZE_TABLE(V_COLUMN_LIST_TABLE);
-  V_COLUMNS_CLAUSE := SERIALIZE_TABLE(V_COLUMNS_CLAUSE_TABLE);
+  V_COLUMN_LIST        := SERIALIZE_TABLE(V_COLUMN_LIST_TABLE);
+  V_COLUMNS_CLAUSE     := SERIALIZE_TABLE(V_COLUMNS_CLAUSE_TABLE);
   V_INSERT_SELECT_LIST := SERIALIZE_TABLE(V_INSERT_SELECT_TABLE);
-  V_TARGET_DATA_TYPES := SERIALIZE_TABLE(V_TARGET_DATA_TYPES_TABLE);
-  V_COLUMN_PATTERNS := SERIALIZE_TABLE(V_COLUMN_PATTERNS_TABLE);
+  V_TARGET_DATA_TYPES  := SERIALIZE_TABLE(V_TARGET_DATA_TYPES_TABLE);
+  V_COLUMN_PATTERNS    := SERIALIZE_TABLE(V_COLUMN_PATTERNS_TABLE);
   
   select COLUMN_VALUE
     bulk collect into V_XML_STORAGE_TABLE
     from table (V_XML_STORAGE_TEMP)
    where COLUMN_VALUE is not NULL;
 
-  V_XML_STORAGE_CLAUSE := SERIALIZE_TABLE(V_XML_STORAGE_TABLE,YADAMU_UTILITIES.C_NEWLINE);
+  V_XML_STORAGE_CLAUSES := SERIALIZE_TABLE(V_XML_STORAGE_TABLE,YADAMU_UTILITIES.C_NEWLINE);
   
   select distinct COLUMN_VALUE
     bulk collect into V_DESERIALIZATIONS
@@ -1489,7 +1467,7 @@ $END
     --
     if (V_XML_STORAGE_MODEL <> C_XML_STORAGE_MODEL) then
       DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(YADAMU_UTILITIES.C_NEWLINE),YADAMU_UTILITIES.C_NEWLINE);
-      DBMS_LOB.APPEND(V_DDL_STATEMENT,V_XML_STORAGE_CLAUSE);
+      DBMS_LOB.APPEND(V_DDL_STATEMENT,V_XML_STORAGE_CLAUSES);
     end if;
     --
     $END
@@ -1708,9 +1686,7 @@ $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 procedure IMPORT_JSON(
   P_JSON_DUMP_FILE  IN OUT NOCOPY BLOB
 , P_TARGET_SCHEMA                 VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
-, P_JSON_DATA_TYPE            VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
-, P_XML_STORAGE_CLAUSE             VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
-, P_TREAT_RAW1_AS_BOOLEAN         VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+, P_TYPE_MAPPINGS                 CLOB DEFAULT C_DEFAULT_TYPE_MAPPINGS
 )
 as
   MUTATING_TABLE      EXCEPTION ; PRAGMA EXCEPTION_INIT( MUTATING_TABLE , -04091 );
@@ -1735,13 +1711,14 @@ as
 
   CURSOR operationsList
   is
-  select ROWNUM, TABLE_NAME, SOURCE_VENDOR, SPATIAL_FORMAT, OWNER, COLUMN_NAME_ARRAY, DATA_TYPE_ARRAY, SIZE_CONSTRAINT_ARRAY
+  select ROWNUM, TABLE_NAME, SOURCE_VENDOR, SPATIAL_FORMAT, CIRCLE_FORMAT, OWNER, COLUMN_NAME_ARRAY, DATA_TYPE_ARRAY, SIZE_CONSTRAINT_ARRAY
       from JSON_TABLE(
            P_JSON_DUMP_FILE,
            '$'           
            COLUMNS(
              SOURCE_VENDOR           VARCHAR2(128)                      PATH '$.systemInformation.vendor',
-             SPATIAL_FORMAT          VARCHAR2(128)                      PATH '$.systemInformation.spatialFormat',   
+             SPATIAL_FORMAT          VARCHAR2(128)                      PATH '$.systemInformation.typeMappings.spatialFormat',   
+             CIRCLE_FORMAT           VARCHAR2(128)                      PATH '$.systemInformation.typeMappings.circleFormat',   
              NESTED                                                     PATH '$.metadata.*'
                COLUMNS (
                  OWNER                        VARCHAR2(128)             PATH '$.tableSchema'
@@ -1764,8 +1741,13 @@ as
          )
    where TABLE_NAME is not NULL;
    
-   V_NOTHING_DONE BOOLEAN := TRUE;
-   V_ABORT_DATALOAD  BOOLEAN := FALSE;
+  V_NOTHING_DONE BOOLEAN := TRUE;
+  V_ABORT_DATALOAD  BOOLEAN := FALSE;
+   
+  V_XML_STORAGE_MODEL         VARCHAR2(17) := case when JSON_EXISTS(P_TYPE_MAPPINGS, '$.xmlStorageModel') then JSON_VALUE(P_TYPE_MAPPINGS, '$.xmlStorageModel') else C_XML_STORAGE_MODEL end;
+  V_JSON_DATA_TYPE            VARCHAR(5)   := case when JSON_EXISTS(P_TYPE_MAPPINGS, '$.jsonDataType') then JSON_VALUE(P_TYPE_MAPPINGS, '$.jsonDataType') else C_JSON_DATA_TYPE end; 
+  V_TREAT_RAW1_AS_BOOLEAN     VARCHAR(5)   := case when JSON_EXISTS(P_TYPE_MAPPINGS, '$.raw1AsBoolean') then JSON_VALUE(P_TYPE_MAPPINGS, '$.raw1AsBoolean') else C_TREAT_RAW1_AS_BOOLEAN end; 
+   
 begin
   -- LOG_INFO(JSON_OBJECT('startTime' value SYSTIMESTAMP, 'includeData' value G_INCLUDE_DATA, 'includeDDL' value G_INCLUDE_DDL));
   
@@ -1792,7 +1774,7 @@ begin
      
     for o in operationsList loop
       V_NOTHING_DONE := FALSE;
-      V_TABLE_INFO := GENERATE_SQL(o.SOURCE_VENDOR,P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.SPATIAL_FORMAT, o.COLUMN_NAME_ARRAY, o.DATA_TYPE_ARRAY, o.SIZE_CONSTRAINT_ARRAY, P_JSON_DATA_TYPE, P_XML_STORAGE_CLAUSE, P_TREAT_RAW1_AS_BOOLEAN); 
+      V_TABLE_INFO := GENERATE_SQL(o.SOURCE_VENDOR, P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.COLUMN_NAME_ARRAY, o.DATA_TYPE_ARRAY, o.SIZE_CONSTRAINT_ARRAY, V_JSON_DATA_TYPE, V_XML_STORAGE_MODEL, o.SPATIAL_FORMAT,  V_TREAT_RAW1_AS_BOOLEAN, o.CIRCLE_FORMAT); 
       V_STATEMENT := V_TABLE_INFO.DDL;
       if (V_STATEMENT is not NULL) then
         begin
@@ -1863,10 +1845,7 @@ $END
 function GENERATE_STATEMENTS(
   P_METADATA       IN OUT NOCOPY BLOB
 , P_TARGET_SCHEMA                VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
-, P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
-, P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
-, P_XML_STORAGE_CLAUSE           VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
-, P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+, P_TYPE_MAPPINGS                CLOB DEFAULT C_DEFAULT_TYPE_MAPPINGS
 ) 
 return CLOB
 as
@@ -1877,6 +1856,26 @@ as
 
   V_FRAGMENT VARCHAR2(4000);
   
+$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
+--
+  V_XML_STORAGE_MODEL         VARCHAR2(17) := case when JSON_EXISTS(P_TYPE_MAPPINGS, '$.xmlStorageModel') then JSON_VALUE(P_TYPE_MAPPINGS, '$.xmlStorageModel') else C_XML_STORAGE_MODEL end;
+  V_JSON_DATA_TYPE            VARCHAR(5)   := case when JSON_EXISTS(P_TYPE_MAPPINGS, '$.jsonDataType')    then JSON_VALUE(P_TYPE_MAPPINGS, '$.jsonDataType')    else C_JSON_DATA_TYPE end; 
+  V_SPATIAL_FORMAT            VARCHAR2(7)  := case when JSON_EXISTS(P_TYPE_MAPPINGS, '$.spatialFormat')   then JSON_VALUE(P_TYPE_MAPPINGS, '$.spatialFormat')   else C_SPATIAL_FORMAT end; 
+  V_TREAT_RAW1_AS_BOOLEAN     VARCHAR(5)   := case when JSON_EXISTS(P_TYPE_MAPPINGS, '$.raw1AsBoolean')   then JSON_VALUE(P_TYPE_MAPPINGS, '$.raw1AsBoolean')   else C_TREAT_RAW1_AS_BOOLEAN end; 
+  V_CIRCLE_FORMAT             VARCHAR(7)   := case when JSON_EXISTS(P_TYPE_MAPPINGS, '$.circleFormat')    then JSON_VALUE(P_TYPE_MAPPINGS, '$.circleFormat')    else C_CIRCLE_FORMAT end; 
+--
+$ELSE
+--
+  V_TYPE_MAPPINGS             XMLTYPE := XMLTYPE(P_TYPE_MAPPINGS);
+  V_XML_STORAGE_MODEL         VARCHAR2(17) := case when V_TYPE_MAPPINGS.EXISTSNODE('/typeMappings/xmlStorageModel') = 1 then V_TYPE_MAPPINGS.extract('/typeMappings/xmlStorageModel/text()').getStringVal() else C_XML_STORAGE_MODEL end;
+  V_JSON_DATA_TYPE            VARCHAR(5)   := case when V_TYPE_MAPPINGS.EXISTSNODE('/typeMappings/jsonDataType')    = 1 then V_TYPE_MAPPINGS.extract('/typeMappings/jsonDataType/text()').getStringVal()    else C_JSON_DATA_TYPE end; 
+  V_SPATIAL_FORMAT            VARCHAR2(7)  := case when V_TYPE_MAPPINGS.EXISTSNODE('/typeMappings/spatialFormat')   = 1 then V_TYPE_MAPPINGS.extract('/typeMappings/spatialFormat/text()').getStringVal()   else C_SPATIAL_FORMAT end; 
+  V_TREAT_RAW1_AS_BOOLEAN     VARCHAR(5)   := case when V_TYPE_MAPPINGS.EXISTSNODE('/typeMappings/raw1AsBoolean')   = 1 then V_TYPE_MAPPINGS.extract('/typeMappings/raw1AsBoolean/text()').getStringVal()  else C_TREAT_RAW1_AS_BOOLEAN end; 
+  V_CIRCLE_FORMAT             VARCHAR(7)   := case when V_TYPE_MAPPINGS.EXISTSNODE('/typeMappings/circleFormat')    = 1 then V_TYPE_MAPPINGS.extract('/typeMappings/circleFormat/text()').getStringVal()    else C_CIRCLE_FORMAT end; 
+--
+$END 
+--
+
   cursor getStatements
   is
   /*
@@ -1933,16 +1932,18 @@ $ELSE
 $END
 --
    where TABLE_NAME is not NULL;
-
+   
 begin
+  
   DBMS_LOB.CREATETEMPORARY(V_RESULTS,TRUE,DBMS_LOB.SESSION);
   DBMS_LOB.WRITEAPPEND(V_RESULTS,1,'{');
+
   for x in getStatements() loop
     if (x.ROWNUM > 1) then
       DBMS_LOB.WRITEAPPEND(V_RESULTS,1,',');
     end if;
     
-    V_TABLE_INFO := GENERATE_SQL(x.VENDOR,P_TARGET_SCHEMA, x.OWNER, x.TABLE_NAME, P_SPATIAL_FORMAT, x.COLUMN_NAME_ARRAY, x.DATA_TYPE_ARRAY, x.SIZE_CONSTRAINT_ARRAY, P_JSON_DATA_TYPE, P_XML_STORAGE_CLAUSE, P_TREAT_RAW1_AS_BOOLEAN);
+    V_TABLE_INFO := GENERATE_SQL(x.VENDOR,P_TARGET_SCHEMA, x.OWNER, x.TABLE_NAME, x.COLUMN_NAME_ARRAY, x.DATA_TYPE_ARRAY, x.SIZE_CONSTRAINT_ARRAY, V_JSON_DATA_TYPE, V_XML_STORAGE_MODEL, V_SPATIAL_FORMAT, V_TREAT_RAW1_AS_BOOLEAN, V_CIRCLE_FORMAT);
     V_FRAGMENT := '"' || x.TABLE_NAME || '" : ';
     DBMS_LOB.WRITEAPPEND(V_RESULTS,LENGTH(V_FRAGMENT),V_FRAGMENT);
     $IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN
@@ -2051,14 +2052,12 @@ $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 function IMPORT_JSON(
   P_JSON_DUMP_FILE IN OUT NOCOPY BLOB
 , P_TARGET_SCHEMA                VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
-, P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_STORAGE_MODEL
-, P_XML_STORAGE_CLAUSE           VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
-, P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+, P_TYPE_MAPPINGS                CLOB DEFAULT C_DEFAULT_TYPE_MAPPINGS
 ) 
 return CLOB
 as
 begin
-  IMPORT_JSON(P_JSON_DUMP_FILE, P_TARGET_SCHEMA,P_JSON_DATA_TYPE,P_XML_STORAGE_CLAUSE,P_TREAT_RAW1_AS_BOOLEAN);
+  IMPORT_JSON(P_JSON_DUMP_FILE, P_TARGET_SCHEMA,P_TYPE_MAPPINGS);
   return GENERATE_IMPORT_LOG();
 exception
   when others then
