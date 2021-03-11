@@ -235,6 +235,7 @@ class JSONParser extends Transform {
   }     
 
   _transform(data,enc,callback) {
+	// console.log("\n###CHUNK###:",data.toString())
     this.parser.write(data);
     callback();
   };

@@ -78,17 +78,29 @@ class CloudDBI extends LoaderDBI {
     return this.cloudService.putObject(filename,metadata)
   }
   
+  setFolderPaths(rootFolder,schema) {
+      
+	this.controlFilePath = `${path.join(rootFolder,schema)}.json`.split(path.sep).join(path.posix.sep) 
+    this.metadataFolderPath = path.join(rootFolder,'metadata').split(path.sep).join(path.posix.sep) 
+    this.dataFolderPath = path.join(rootFolder,'data').split(path.sep).join(path.posix.sep) 
+  }      
+  
   async initializeImport() {
 	 
     // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
       	
 	await this.cloudService.verifyBucketContainer()	
 
-	this.controlFilePath = `${path.join(this.IMPORT_FOLDER,this.parameters.TO_USER)}.json`.split(path.sep).join(path.posix.sep) 
-    this.metadataFolderPath = path.join(this.IMPORT_FOLDER,'metadata').split(path.sep).join(path.posix.sep) 
-    this.dataFolderPath = path.join(this.IMPORT_FOLDER,'data').split(path.sep).join(path.posix.sep) 
-    this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Using control file "${this.STORAGE_ID}/${this.controlFilePath}"`);
+    // Calculate the base directory for the unload operation. The Base Directory is dervied from the target schema name specified by the TO_USER parameter
 
+
+    this.setFolderPaths(this.IMPORT_FOLDER,this.parameters.TO_USER)
+	this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Created target directory  "${this.IMPORT_FOLDER}"`);
+    
+    const dataFileList = {}
+    const metadataFileList = {}
+    this.createControlFile(metadataFileList,dataFileList)
+    
   }
   
   getFileOutputStream(tableName) {
@@ -106,9 +118,12 @@ class CloudDBI extends LoaderDBI {
   */
 
   async initializeExport() {
+      
 	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
-	this.controlFilePath = `${path.join(this.EXPORT_FOLDER,this.parameters.FROM_USER)}.json`.split(path.sep).join(path.posix.sep) 
-    this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using control file "${this.STORAGE_ID}/${this.controlFilePath}"`);
+    
+    this.setFolderPaths(this.EXPORT_FOLDER,this.parameters.FROM_USER)
+
+	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using control file "${this.STORAGE_ID}/${this.controlFilePath}"`);
     const fileContents = await this.cloudService.getObject(this.controlFilePath)
 	this.controlFile = this.parseContents(fileContents)
   }

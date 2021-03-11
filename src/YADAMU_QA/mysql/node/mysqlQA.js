@@ -28,53 +28,24 @@ class MySQLQA extends MySQLDBI {
        super(yadamu)
     }
 	
+    setMetadata(metadata) {
+      super.setMetadata(metadata)
+    }
+
     doTimeout(milliseconds) {
-    
-       return new Promise((resolve,reject) => {
-        setTimeout(() => {
-		   resolve();
+		
+	  // Overdide YadamuDBI. No Messages
+      
+	  return new Promise((resolve,reject) => {
+        setTimeout(
+          () => {
+           resolve();
           },
           milliseconds
-       )
-     })  
+        )
+      })  
     }
-  
-    async recreateSchema() {
-        
-      try {
-        const dropSchema = `drop schema if exists "${this.parameters.TO_USER}"`;
-        await this.executeSQL(dropSchema,{});      
-      } catch (e) {
-        if (e.errorNum && (e.errorNum === 1918)) {
-        }
-        else {
-          throw e;
-        }
-      }
-      const createSchema = `create schema "${this.parameters.TO_USER}"`;
-      await this.executeSQL(createSchema,{});      
-    }    
-	
-	async scheduleTermination(pid,workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
-	  const timer = setTimeout(
-        async (pid) => {
-   	      if (this.pool !== undefined && this.pool.end) {
-    	    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
-     	    const conn = await this.getConnectionFromPool();
-		    const res = await conn.query(`kill ${pid}`);
-		    await conn.release()
-		  }
-		  else {
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
-		  }
-        },
-		this.killConfiguration.delay,
-        pid
-      )
-	  timer.unref()
-	}	
-
+   
 	async initialize() {
 	  await super.initialize();
 	  if (this.options.recreateSchema === true) {
@@ -92,7 +63,33 @@ class MySQLQA extends MySQLDBI {
       await super.finalize()
 	  await this.doTimeout(100);
 	}
+
+    async recreateSchema() {
+        
+      try {
+        const dropSchema = `drop schema if exists "${this.parameters.TO_USER}"`;
+        await this.executeSQL(dropSchema,{});      
+      } catch (e) {
+        if (e.errorNum && (e.errorNum === 1918)) {
+        }
+        else {
+          throw e;
+        }
+      }
+      const createSchema = `create schema "${this.parameters.TO_USER}"`;
+      await this.executeSQL(createSchema,{});      
+    }    
 	
+    async getRowCounts(target) {
+
+      const results = await this.executeSQL(MySQLQA.SQL_SCHEMA_TABLE_ROWS,[target.schema]);
+      
+      return results.map((row,idx) => {          
+        return [target.schema,row.TABLE_NAME,row.TABLE_ROWS]
+      })
+
+    }
+    
     async compareSchemas(source,target,rules) {     
 
       const report = {
@@ -117,16 +114,6 @@ class MySQLQA extends MySQLDBI {
       return report
     }
    
-    async getRowCounts(target) {
-
-      const results = await this.executeSQL(MySQLQA.SQL_SCHEMA_TABLE_ROWS,[target.schema]);
-      
-      return results.map((row,idx) => {          
-        return [target.schema,row.TABLE_NAME,row.TABLE_ROWS]
-      })
-
-    }
-    
     async workerDBI(idx)  {
 	  const workerDBI = await super.workerDBI(idx);
       // Manager needs to schedule termination of worker.
@@ -137,6 +124,26 @@ class MySQLQA extends MySQLDBI {
 	  return workerDBI
     }
 
+	async scheduleTermination(pid,workerId) {
+      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
+	  const timer = setTimeout(
+        async (pid) => {
+   	      if (this.pool !== undefined && this.pool.end) {
+    	    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
+     	    const conn = await this.getConnectionFromPool();
+		    const res = await conn.query(`kill ${pid}`);
+		    await conn.release()
+		  }
+		  else {
+		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+		  }
+        },
+		this.killConfiguration.delay,
+        pid
+      )
+	  timer.unref()
+	}	
+	
 }
 
 module.exports = MySQLQA

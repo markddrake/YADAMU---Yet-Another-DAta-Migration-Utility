@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const readline = require('readline');
 const { performance } = require('perf_hooks');
 const assert = require('assert');
@@ -42,22 +43,48 @@ class Yadamu {
 
   get YADAMU_DBI_PARAMETERS()         { return Yadamu.YADAMU_DBI_PARAMETERS }
   
-  get FILE()                          { return this.parameters.FILE     || YadamuConstants.FILE }
-  get CONFIG()                        { return this.parameters.CONFIG   || YadamuConstants.CONFIG }
-  get MODE()                          { return this.parameters.MODE     || YadamuConstants.MODE }
-  get ON_ERROR()                      { return this.parameters.ON_ERROR || YadamuConstants.ON_ERROR }
-  get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || YadamuConstants.PARALLEL) }
-  get PARALLEL_PROCESSING()           { return this.PARALLEL > 0 } // Parellel 1 is Parallel processing logic with a single worker.
-  get RDBMS()                         { return this.parameters.RDBMS    || YadamuConstants.RDBMS }  
+  get FILE()                          { return this.parameters.FILE                      || YadamuConstants.FILE }
+  get CONFIG()                        { return this.parameters.CONFIG                    || YadamuConstants.CONFIG }
+  get MODE()                          { return this.parameters.MODE                      || YadamuConstants.MODE }
+  get ON_ERROR()                      { return this.parameters.ON_ERROR                  || YadamuConstants.ON_ERROR }
+  get RDBMS()                         { return this.parameters.RDBMS                     || YadamuConstants.RDBMS }  
+                                                                                        
+  get EXCEPTION_FOLDER()              { return this.parameters.EXCEPTION_FOLDER          || YadamuConstants.EXCEPTION_FOLDER }
+  get EXCEPTION_FILE_PREFIX()         { return this.parameters.EXCEPTION_FILE_PREFIX     || YadamuConstants.EXCEPTION_FILE_PREFIX }
+  get REJECTION_FOLDER()              { return this.parameters.REJECTION_FOLDER          || YadamuConstants.REJECTION_FOLDER }
+  get REJECTION_FILE_PREFIX()         { return this.parameters.REJECTION_FILE_PREFIX     || YadamuConstants.REJECTION_FILE_PREFIX }
+  get WARNING_FOLDER()                { return this.parameters.WARNING_FOLDER            || YadamuConstants.WARNING_FOLDER }
+  get WARNING_FILE_PREFIX()           { return this.parameters.WARNING_FILE_PREFIX       || YadamuConstants.WARNING_FILE_PREFIX }
+
+  get IDENTIFIER_TRANSFORMATION()     { return this.parameters.IDENTIFIER_TRANSFORMATION || YadamuConstants.IDENTIFIER_TRANSFORMATION }
+  get IDENTIFIER_MAPPING_FILE()       { return this.parameters.IDENTIFIER_MAPPING_FILE }
+  get IDENTIFIER_MAPPINGS()           { 
+    this._IDENTIFIER_MAPPINGS = this._IDENTIFIER_MAPPINGS || (() => {
+      let identifierMappings = {}
+      if (this.IDENTIFIER_MAPPING_FILE) {
+        const mappingFile = path.resolve(this.IDENTIFIER_MAPPING_FILE)
+        this.LOGGER.info(['IDENTIFIER MAPPING'],`Using identifier mappings file "${mappingFile}".`)
+        identifierMappings = YadamuLibrary.loadJSON(mappingFile,this.LOGGER)
+      }
+      else {
+        identifierMappings = {}
+      }
+      return identifierMappings
+    })();
+    return this._IDENTIFIER_MAPPINGS
+  }
+  
+  get CIPHER()                        { return this.parameters.CIPHER                    || YadamuConstants.CIPHER }
+  get CIPHER_KEY_SIZE()               { return 24 }
+  get SALT()                          { return this.parameters.SALT                      || YadamuConstants.SALT }
+  get ENCRYPTION()                    { return this.parameters.ENCRYPTION                || this.parameters.ENCRYPTION === undefined ? YadamuConstants.ENCRYPTION : this.parameters.ENCRYPTION }
+  get ENCRYPTION_KEY()                { return this._ENCRYPTION_KEY }
+  set ENCRYPTION_KEY(v)               { this._ENCRYPTION_KEY = v}
+  
   get COMPRESSION()                   { return this.parameters.COMPRESSION || 'NONE' }
   get INTERACTIVE()                   { return this.STATUS.operation === 'YADAMUGUI' }
-
-  get EXCEPTION_FOLDER()              { return this.parameters.EXCEPTION_FOLDER       || YadamuConstants.EXCEPTION_FOLDER }
-  get EXCEPTION_FILE_PREFIX()         { return this.parameters.EXCEPTION_FILE_PREFIX  || YadamuConstants.EXCEPTION_FILE_PREFIX }
-  get REJECTION_FOLDER()              { return this.parameters.REJECTION_FOLDER       || YadamuConstants.REJECTION_FOLDER }
-  get REJECTION_FILE_PREFIX()         { return this.parameters.REJECTION_FILE_PREFIX  || YadamuConstants.REJECTION_FILE_PREFIX }
-  get WARNING_FOLDER()                { return this.parameters.WARNING_FOLDER         || YadamuConstants.WARNING_FOLDER }
-  get WARNING_FILE_PREFIX()           { return this.parameters.WARNING_FILE_PREFIX    || YadamuConstants.WARNING_FILE_PREFIX }
+  get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || YadamuConstants.PARALLEL) }
+  get PARALLEL_PROCESSING()           { return this.PARALLEL > 0 } // Parellel 1 is Parallel processing logic with a single worker.
 
   get MACROS()                        { return YadamuConstants.MACROS }
 
@@ -183,7 +210,7 @@ class Yadamu {
 
     // Merge parameters provided via command line arguments
     Object.assign(this.parameters,this.COMMAND_LINE_PARAMETERS)
-    
+   
   }
   
   processParameters() {
@@ -214,7 +241,42 @@ class Yadamu {
 		paramteres[parameterName] = parameters[defaultName]
 	 }
   } 
+
+  async requestPassPhrase() {
+	  
+	 if (process.env.YADAMU_PASSPHRASE) {
+	   console.log('Loaded encryption pass phrase from environment variable "YADAMU_PASSPHRASE".')
+	   return process.env.YADAMU_PASSPHRASE
+	 }
+	   
+     const prompt = `Enter pass phrase to be used when encrypting and decypting data files: `
+     const pwQuery = this.createQuestion(prompt);
+     return await pwQuery;
   
+  }
+  
+  async generateCryptoKey() {
+   
+    let passphrase = this.parameters.PASSPHRASE || await this.requestPassPhrase()
+  
+    return await new Promise((resolve,reject) => {
+	  crypto.scrypt(passphrase, this.SALT, this.CIPHER_KEY_SIZE, (err,key) => {
+		if (err) reject(err);
+		// console.log('Key',passphrase,this.SALT,this.CIPHER_KEY_SIZE,key)
+	    passphrase = undefined
+		this.ENCRYPTION_KEY = key
+		resolve()
+      })
+	  this.parameters.PASSPHRASE = undefined
+	})  
+  }
+  
+  async initialize() {
+	 if (this.ENCRYPTION) {
+	   await this.generateCryptoKey()
+     }
+  }
+	
   recordMetrics(metrics) {
 	Object.assign(this.metrics,metrics)
   }
@@ -263,6 +325,44 @@ class Yadamu {
 	 const testValue = parameterValue.toUpperCase()
 	 assert(validValues.includes(testValue),`Invalid value "${testValue}" specified for parameter "${parameterName}". Valid values are ${JSON.stringify(validValues)}.`)
 	 return testValue;
+  }
+
+  isExistingFile(parameterName,parameterValue) {
+  
+    const resolvedPath = path.resolve(parameterValue);
+	try {
+	  if (!fs.statSync(resolvedPath).isFile()) {
+	    const err = new CommandLineError(`Found Directory ["${resolvedPath}"]. The path specified for the ${parameterName} argument must not resolve to a directory.`)
+	    throw err;
+	  }
+	}
+    catch (e) {
+	  if (e.code && e.code === 'ENOENT') {
+        const err = new CommandLineError(`File not found ["${resolvedPath}"]. The path specified for the ${parameterName} argument must resolve to an existing file.`)
+	    throw err
+	  }
+      throw e;
+    } 
+    return parameterValue
+  }
+
+  isExistingFolder(parameterName,parameterValue) {
+  
+    const resolvedPath = path.resolve(parameterValue);
+	try {
+	  if (fs.statSync(resolvedPath).isFile()) {
+	    const err = new CommandLineError(`Found File ["${resolvedPath}"]. The path specified for the ${parameterValue} argument must resolve to a folder.`)
+	    throw err;
+	  }
+	}
+    catch (e) {
+	  if (e.code && e.code === 'ENOENT') {
+        const err = new CommandLineError(`Folder not found ["${resolvedPath}"]. The path specified for the ${parameterValue} argument must resolve to an existing folder.`)
+	    throw err
+	  }
+      throw e;
+    } 
+    return parameterValue
   }
 
   processValue(parameterValue) {
@@ -353,7 +453,7 @@ class Yadamu {
 	      case '--COPY':
 	      case 'TEST':		  
 	      case '--TEST':
-			parameters.CONFIG = parameterValue;
+			parameters.CONFIG = this.isExistingFile(parameterName,parameterValue);
 			break;
           case 'IMPORT':
           case '--IMPORT':
@@ -361,7 +461,7 @@ class Yadamu {
 	      case '--UPLOAD':
   	      case 'EXPORT':
           case '--EXPORT':
-			parameters.FILE = parameterValue;
+			parameters.FILE =  this.isExistingFile(parameterName,parameterValue);
             break;
           case 'RDBMS':
           case '--RDBMS':
@@ -369,14 +469,14 @@ class Yadamu {
             break;
 	      case 'OVERWRITE':		  
 	      case '--OVERWRITE':
-  	        parameters.OVERWRITE = this.isTrue(parameterValue.toUpperCase());
+  	        parameters.OVERWRITE = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? isTrue(parameterValue.toUpperCase()) : false
 		    break;
           case 'CONFIG':
           case '--CONFIG':
           case 'CONFIGURATION':
           case '--CONFIGURATION':
             parameters.CONFIG = parameterValue;
-			parameters.FILE = parameterValue;
+			parameters.FILE =  this.isExistingFile(parameterName,parameterValue);;
             break;
 	      case 'USERID':
   	        parameters.USERID = parameterValue;
@@ -484,7 +584,7 @@ class Yadamu {
             break;
           case 'EXCEPTION_FOLDER':
           case '--EXCEPTION_FOLDER':
-            parameters.EXCEPTION_FOLDER = parameterValue;
+            parameters.EXCEPTION_FOLDER = this.isExistingFolder(parameterName,parameterValue);
             break;
           case 'EXCEPTION_FILE_PREFIX':
           case '--EXCEPTION_FILE_PREFIX':
@@ -492,7 +592,7 @@ class Yadamu {
             break;
           case 'REJECT_FOLDER':
           case '--REJECT_FOLDER':
-            parameters.REJECT_FOLDER = parameterValue;
+            parameters.REJECT_FOLDER = this.isExistingFolder(parameterName,parameterValue);
             break;
           case 'REJECT_FILE_PREFIX':
           case '--REJECT_FILE_PREFIX':
@@ -538,19 +638,46 @@ class Yadamu {
               parameters.TABLES = parameterValue
 			}
             break;
-          case 'TABLE_LIST':
+          case 'IDENTIFIER_MAPPING_FILE':
+          case '--IDENTIFIER_MAPPING_FILE':
+			parameters.IDENTIFIER_MAPPING_FILE = isExistingFile(parameterName,parameterValue);
+            break;
+          case 'IDENTIFIER_TRANSFORMATION':
+          case '--IDENTIFIER_TRANSFORMATION':
+            parameters.IDENTIFIER_TRANSFORMATION = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.SUPPORTED_IDENTIFIER_TRANSFORMATION);
+            break;
           case 'OUTPUT_FORMAT':
           case '--OUTPUT_FORMAT':
-            parameters.OUTPUT_FORMAT = this.isSupportedValue('OUTPUT_FORMAT',parameterValue,YadamuConstants.OUTPUT_FORMATS);
+            parameters.OUTPUT_FORMAT = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.OUTPUT_FORMATS);
             break;
           case 'COMPRESSION':
           case '--COMPRESSION':
-            parameters.COMPRESSION = this.isSupportedValue('COMPRESSION',parameterValue,YadamuConstants.SUPPORTED_COMPRESSION)
+            parameters.COMPRESSION = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.SUPPORTED_COMPRESSION)
             break
-          case 'ENCRYPT':
-          case '--ENCRYPT':
-            parameters.ENCRYPT = null;
+          case 'ENCRYPTION':
+          case '--ENCRYPTION':
+		    const encryption = YadamuConstants.TRUE_OR_FALSE.includes(parameterValue.toUpperCase()) ? parameterValue.toUpperCase() === 'TRUE' : this.isSupportedValue(parameterName,parameterValue,YadamuConstants.SUPPORTED_CIPHER) 
+			if (typeof encryption === 'string') {
+			   parameters.ENCRYPTION = true 
+			   parameters.CIPHER = encryption
+			}
+			else {
+			  parameters.ENCRYPTION = encryption
+	    	}
+			break
+          case 'CIPHER':
+          case '--CIPHER':
+            parameters.CIPHER = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.SUPPORTED_CIPHER)
             break
+          case 'PASSPHRASE':
+          case '--PASSPHRASE':
+		    console.log(`${new Date().toISOString()} [WARNING][${this.constructor.name}]: Suppling a password on the command line interface can be insecure`);
+            parameters.PASSPHRASE = parameterValue;
+            break;
+          case 'SALT':
+          case '--SALT':
+            parameters.SALT = parameterValue;
+            break;
           default:
 		    if (allowAnyParameter) {
               try {
@@ -569,11 +696,13 @@ class Yadamu {
         }
       }
     })
+
 	return parameters;
   }
   
+
   closeFile(outputStream) {
-        
+	          
     return new Promise((resolve,reject) => {
       outputStream.on('finish',() => { resolve() });
       outputStream.close();
@@ -637,6 +766,7 @@ class Yadamu {
         this.reportStatus(this.STATUS,this.LOGGER)
 	    results = this.metrics
       } catch (e) {
+		console.log(e)
    	    await Promise.allSettled(streamsCompleted)
 	    // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
 	    if (e.code === 'ERR_STREAM_PREMATURE_CLOSE') {
@@ -679,6 +809,36 @@ class Yadamu {
     return await this.doPumpOperation(source,target)    
   }
   
+  async convertFile(fileDBI,encrypt) {
+	const options = {
+	  encryptedInput   : !encrypt
+	, compressedInput  : false
+	, encryptedOutput  : encrypt
+	, compressedOutput : false
+	, filename         : `${this.FILE}.${encrypt ? 'secure' : 'plain'}`
+    }
+	
+	let streamsCompleted
+    try {
+	  const pipelineComponents = await fileDBI.createCloneStream(options)
+	  streamsCompleted = pipelineComponents.map((s) => { 
+	    return new Promise((resolve,reject) => {
+		  finished(s,(err) => {
+		    if (err) {reject(err)} else {resolve()}
+		  })
+        })
+      })
+	
+	  await pipeline(pipelineComponents)
+      await Promise.allSettled(streamsCompleted)
+    } catch (e) {
+	  console.log(e)
+ 	  await Promise.allSettled(streamsCompleted)
+	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
+      throw e;
+    }
+  }
+  
   async doImport(dbi) {
     const fileReader = new FileDBI(this)
     const metrics = await this.pumpData(fileReader,dbi);
@@ -693,6 +853,20 @@ class Yadamu {
     return metrics
   }  
   
+  async doEncrypt() {
+    const fileDBI = new FileDBI(this)
+    await this.convertFile(fileDBI,true);
+    await this.close();
+    return
+  }  
+
+  async doDecrypt() {
+    const fileDBI = new FileDBI(this)
+    await this.convertFile(fileDBI,false);
+    await this.close();
+    return
+  }  
+
   async doCopy(source,target) {
     const metrics = await this.pumpData(source,target);
     await this.close();

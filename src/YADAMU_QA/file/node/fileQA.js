@@ -83,6 +83,10 @@ class FileQA extends FileDBI {
      this.sort = false;
   }
   
+  setMetadata(metadata) {
+    super.setMetadata(metadata)
+  }
+	 
   makeLowerCase(object) {
         
     Object.keys(object).forEach((key) => {
@@ -178,13 +182,14 @@ class FileQA extends FileDBI {
     const tables = Object.keys(gMetadata).sort();     
 
     const failedOperations = []
-
+ 
     tables.forEach((table,idx) => {
 	  const tableName = table;
+ 	  const mappedTableName = this.getMappedTableName(tableName,this.identifierMappings)
       const tableTimings = metrics[0][tableName].elapsedTime.padStart(10) 
-                         + (metrics[1][tableName] ? metrics[1][tableName].elapsedTime : "-1").padStart(10)
-                         + (metrics[2][tableName] ? metrics[2][tableName].elapsedTime : "-1").padStart(10) 
-                         + (metrics[3][tableName] ? metrics[3][tableName].elapsedTime : "-1").padStart(10);
+                         + (metrics[1][mappedTableName] ? metrics[1][mappedTableName].elapsedTime : "-1").padStart(10)
+                         + (metrics[2][mappedTableName] ? metrics[2][mappedTableName].elapsedTime : "-1").padStart(10) 
+                         + (metrics[3][mappedTableName] ? metrics[3][mappedTableName].elapsedTime : "-1").padStart(10);
  
       if (idx === 0) {                            
         this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
@@ -203,29 +208,30 @@ class FileQA extends FileDBI {
                                     + '\n');
         this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
       }
+
       	
 	  if (this.applyTableFilter(table)) {
         this.yadamuLogger.writeDirect(`| ${table.padStart(colSizes[0])} |`
                                     + ` ${gMetadata[table].rowCount.toString().padStart(colSizes[1])} |`
-                                    + ` ${pMetadata[table].rowCount.toString().padStart(colSizes[2])} |`
-                                    + ` ${(gMetadata[table].rowCount - pMetadata[table].rowCount).toString().padStart(colSizes[3])} |`
-                                    + ` ${cMetadata[table].rowCount.toString().padStart(colSizes[4])} |`
-                                    + ` ${(pMetadata[table].rowCount - cMetadata[table].rowCount).toString().padStart(colSizes[5])} |`
+                                    + ` ${pMetadata[mappedTableName].rowCount.toString().padStart(colSizes[2])} |`
+                                    + ` ${(gMetadata[table].rowCount - pMetadata[mappedTableName].rowCount).toString().padStart(colSizes[3])} |`
+                                    + ` ${cMetadata[mappedTableName].rowCount.toString().padStart(colSizes[4])} |`
+                                    + ` ${(pMetadata[mappedTableName].rowCount - cMetadata[mappedTableName].rowCount).toString().padStart(colSizes[5])} |`
                                     + ` ${gMetadata[table].byteCount.toString().padStart(colSizes[6])} |`
-                                    + ` ${pMetadata[table].byteCount.toString().padStart(colSizes[7])} |`
-                                    + ` ${(pMetadata[table].byteCount - gMetadata[table].byteCount).toString().padStart(colSizes[8])} |`
-                                    + ` ${cMetadata[table].byteCount.toString().padStart(colSizes[9])} |`
-                                    + ` ${(cMetadata[table].byteCount - pMetadata[table].byteCount).toString().padStart(colSizes[10])} |`
+                                    + ` ${pMetadata[mappedTableName].byteCount.toString().padStart(colSizes[7])} |`
+                                    + ` ${(pMetadata[mappedTableName].byteCount - gMetadata[table].byteCount).toString().padStart(colSizes[8])} |`
+                                    + ` ${cMetadata[mappedTableName].byteCount.toString().padStart(colSizes[9])} |`
+                                    + ` ${(cMetadata[mappedTableName].byteCount - pMetadata[mappedTableName].byteCount).toString().padStart(colSizes[10])} |`
                                     + ` ${tableTimings.padStart(colSizes[11])} |`
                                     + '\n');
 	  }
 	  
-	  if (gMetadata[table].rowCount !== pMetadata[table].rowCount) {
-		failedOperations.push(['','',table,gMetadata[table].rowCount,pMetadata[table].rowCount,gMetadata[table].rowCount > pMetadata[table].rowCount ? gMetadata[table].rowCount - pMetadata[table].rowCount : '' ,gMetadata[table].rowCount < pMetadata[table].rowCount ? pMetadata[table].rowCount - gMetadata[table].rowCount : '','Import #1'])
+	  if (gMetadata[table].rowCount !== pMetadata[mappedTableName].rowCount) {
+		failedOperations.push(['','',table,gMetadata[table].rowCount,pMetadata[mappedTableName].rowCount,gMetadata[table].rowCount > pMetadata[mappedTableName].rowCount ? gMetadata[table].rowCount - pMetadata[mappedTableName].rowCount : '' ,gMetadata[table].rowCount < pMetadata[mappedTableName].rowCount ? pMetadata[mappedTableName].rowCount - gMetadata[table].rowCount : '','Import #1'])
 	  }
 	  
-	  if (pMetadata[table].rowCount !== cMetadata[table].rowCount) {
-   	    failedOperations.push(['','',table,pMetadata[table].rowCount,cMetadata[table].rowCount,pMetadata[table].rowCount > cMetadata[table].rowCount ? pMetadata[table].rowCount - cMetadata[table].rowCount : '' ,pMetadata[table].rowCount < cMetadata[table].rowCount ? cMetadata[table].rowCount - pMetadata[table].rowCount : '','Import #2'])
+	  if (pMetadata[mappedTableName].rowCount !== cMetadata[mappedTableName].rowCount) {
+   	    failedOperations.push(['','',table,pMetadata[mappedTableName].rowCount,cMetadata[mappedTableName].rowCount,pMetadata[mappedTableName].rowCount > cMetadata[mappedTableName].rowCount ? pMetadata[mappedTableName].rowCount - cMetadata[mappedTableName].rowCount : '' ,pMetadata[mappedTableName].rowCount < cMetadata[mappedTableName].rowCount ? cMetadata[mappedTableName].rowCount - pMetadata[mappedTableName].rowCount : '','Import #2'])
       }
 	  
       if (idx+1 === tables.length) {

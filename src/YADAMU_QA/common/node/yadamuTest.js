@@ -30,21 +30,25 @@ class YadamuTest extends Yadamu {
     return this.#_YADAMU_DBI_PARAMETERS
   }
 
-  get YADAMU_PARAMETERS()             { return YadamuTest.YADAMU_PARAMETERS }
-  get YADAMU_DBI_PARAMETERS()         { return YadamuTest.YADAMU_DBI_PARAMETERS }
+  get YADAMU_PARAMETERS()     { return YadamuTest.YADAMU_PARAMETERS }
+  get YADAMU_DBI_PARAMETERS() { return YadamuTest.YADAMU_DBI_PARAMETERS }
 
-  get YADAMU_QA()          { return true }
+  get YADAMU_QA()             { return true }
   
-  get MACROS()             { this._MACROS = this._MACROS || { timestamp: new Date().toISOString().replace(/:/g,'.')}; return this._MACROS }
-  set MACROS(v)            { this._MACROS = v }
-  
-  get MODE()               { return this.parameters.MODE  || this.YADAMU_DBI_PARAMETERS.MODE }
+  get MACROS()                { this._MACROS = this._MACROS || { timestamp: new Date().toISOString().replace(/:/g,'.')}; return this._MACROS }
+  set MACROS(v)               { this._MACROS = v }
+   
+  get MODE()                  { return this.parameters.MODE  || this.YADAMU_DBI_PARAMETERS.MODE }
 
-  constructor(mode) {
+  get IDENTIFIER_MAPPINGS()   { return super.IDENTIFIER_MAPPINGS }
+  set IDENTIFIER_MAPPINGS(v)  { this._IDENTIFIER_MAPPINGS = v || this.IDENTIFIER_MAPPINGS }
+
+  constructor(configParameters,encryptionKey) {
 	  
 	
-    super(mode)
-    this.testMetrics = new YadamuMetrics();
+    super('TEST',configParameters)
+	this.ENCRYPTION_KEY = encryptionKey
+	this.testMetrics = new YadamuMetrics();
     
 	// console.log('YadamuTest.YADAMU_PARAMETERS:',YadamuTest.YADAMU_PARAMETERS)
 	// console.log('YadamuTest this.YADAMU_PARAMETERS:',this.YADAMU_PARAMETERS)
@@ -62,9 +66,11 @@ class YadamuTest extends Yadamu {
   }
   
   reset(testParameters) {
-	  
+	
+    this._IDENTIFIER_MAPPINGS = undefined
     this._REJECTION_MANAGER = undefined;
     this._WARNING_MANAGER = undefined;
+	
     this.STATUS.startTime     = performance.now()
     this.STATUS.warningRaised = false;
     this.STATUS.errorRaised   = false;

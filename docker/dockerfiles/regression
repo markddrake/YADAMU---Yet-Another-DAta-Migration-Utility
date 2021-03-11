@@ -25,4 +25,5 @@ RUN mkdir -p mnt/log \
  && ln -sfn mnt/local \
  && ln -sfn mnt/yadamu 
 ENV TNS_ADMIN=/usr/src/YADAMU
+ENV YADAMU_PASSPHRASE=yabasc
 ENTRYPOINT ["/bin/bash", "/usr/src/YADAMU/bin/chooseTest.sh", "$YADAMU_TEST_NAME"]

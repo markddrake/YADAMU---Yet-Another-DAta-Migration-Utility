@@ -33,6 +33,10 @@ class AWSS3QA extends AWSS3DBI {
     super(yadamu)
   }
 
+  setMetadata(metadata) {
+    super.setMetadata(metadata)
+  }
+	
   async initialize() {
 	await super.initialize();
 	if (this.options.recreateSchema === true) {

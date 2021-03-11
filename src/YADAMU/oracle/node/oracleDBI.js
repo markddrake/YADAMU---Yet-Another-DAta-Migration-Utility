@@ -1133,55 +1133,6 @@ class OracleDBI extends YadamuDBI {
     return schemaInformation;
   }
 
-  mapLongIdentifers(metadata) {
-        
-    // ### Todo Add better algorthim than simple tuncation. Check for Duplicates and use counter when duplicates are detected.
-
-    const tableMappings = {}
-    let mappingRequired = false;
-    const tables = Object.keys(metadata)    
-    tables.forEach((table,idx) => {
-      const tableName = metadata[table].tableName
-      if (tableName.length > 30) {
-        mappingRequired = true;
-        const newTableName = tableName.substring(0,29);
-        tableMappings[table] = {tableName : newTableName}
-	    this.yadamuLogger.warning([this.DATABASE_VENDOR,tableName],`Mapped to "${newTableName}".`)
-        metadata[table].tableName = newTableName;
-      }
-      const columnNames = metadata[table].columnNames
-      let mapColumns = false;
-      let columnMappings = {}
-      columnNames.forEach((columnName,idx) => {
-        if (columnName.length > 30) {
-          mappingRequired = true;
-          mapColumns = true;
-          const newColumnName = columnName.substring(0,29);
-          columnMappings[columnName] = newColumnName
-          this.yadamuLogger.warning([this.DATABASE_VENDOR,metadata[table].tableName,columnName],`Mapped to "${newColumnName}".`)
-          columnNames[idx] = newColumnName
-        }
-      });
-      if (mapColumns) {
-        metadata[table].sqlColumnList = '"' + columnNames.join('","')  + '"'
-		metadata[table].columnNames = columnNames
-        if (tableMappings[table]) {
-          tableMappings[table].columnNames = columnMappings;
-        }
-        else {
-          tableMappings[table] = {tableName : tableName, columnNames : columnMappings}
-        }
-      }
-    })        
-	
-	return mappingRequired ? tableMappings : undefined
-
-  }    
-
-  validateIdentifiers(metadata) {     
-     return this.DB_VERSION < 12 ? this.mapLongIdentifers(metadata) : undefined
-  }
-  
   generateQueryInformation(tableMetadata) {
     
     // Generate a conventional relational select statement for this table
@@ -1297,6 +1248,30 @@ class OracleDBI extends YadamuDBI {
 	const results = await this.executeSQL(`SELECT SID, SERIAL# FROM V$SESSION WHERE AUDSID = Sys_Context('USERENV', 'SESSIONID')`)
 	return {sid : results.rows[0][0], serial: results.rows[0][1]}
   }
+  
+  generateDatabaseMappings(metadata) {
+    
+    const dbMappings = {}
+
+    if (this.DB_VERSION < 12) { 
+    
+      Object.keys(metadata).forEach((table) => {
+        const mappedTableName = metadata[table].tableName.length > 30 ? metadata[table].tableName.substring(0,30) : undefined
+        if (mappedTableName) {
+          dbMappings[table] = {
+			tableName : mappedTableName
+		  }
+        }
+        const columnMappings = {}
+        metadata[table].columnNames.forEach((columnName) => { if (columnName.length > 30) { columnMappings[columnName] = columnName.substring(0,30)}})
+        if (!YadamuLibrary.isEmpty(columnMappings)) {
+          dbMappings[table] = dbMappings[table] || {}
+          dbMappings[table].columnMappings = columnMappings
+        }
+      })
+    }
+    return dbMappings;    
+  }  
 }
 
 class DDLCache extends Transform {

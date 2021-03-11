@@ -16,6 +16,7 @@ const {YadamuError, DatabaseError, IterativeInsertError, InputStreamError} = req
 
 const YadamuConstants = require('./yadamuConstants.js')
 
+/*
 class TableSwitcher extends PassThrough {
 
   constructor(tableName) {
@@ -30,6 +31,7 @@ class TableSwitcher extends PassThrough {
   }
   
 }
+*/
 
 class DBReader extends Readable {  
 
@@ -125,7 +127,6 @@ class DBReader extends Readable {
   async pipelineTable(task,readerDBI,writerDBI) {
 	 
     let tableInfo
-	let mappedTableName
 	let tableOutputStream
 
 	const yadamuPipeline = []
@@ -137,8 +138,7 @@ class DBReader extends Readable {
   
 	  const inputStreams = await readerDBI.getInputStreams(tableInfo)
       yadamuPipeline.push(...inputStreams)
-      mappedTableName = writerDBI.transformTableName(task.TABLE_NAME,readerDBI.getInverseTableMappings())
-	  const outputStreams = await writerDBI.getOutputStreams(mappedTableName,this.dbWriter.ddlComplete)
+	  const outputStreams = await writerDBI.getOutputStreams(tableInfo.MAPPED_TABLE_NAME,this.dbWriter.ddlComplete)
 	  yadamuPipeline.push(...outputStreams)
 
       tableOutputStream = outputStreams[0]
@@ -161,16 +161,16 @@ class DBReader extends Readable {
 	
 	try {
 	  this.activeWorkers.add(yadamuPipeline[0])
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return proc.constructor.name }).join(' => ')}`)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return proc.constructor.name }).join(' => ')}`)
       readerDBI.INPUT_METRICS.pipeStartTime = performance.now();
 	  await pipeline(yadamuPipeline)
 	  readerDBI.INPUT_METRICS.pipeEndTime = performance.now();
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
       this.activeWorkers.delete(yadamuPipeline[0])  
 	  await Promise.allSettled(streamsCompleted)
 	  // console.log(task.TABLE_NAME,streamsCompleted)
 	} catch (err) {
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.yadamu.ON_ERROR,'FAILED'],`${err.constructor.name},${err.message}`)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.yadamu.ON_ERROR,'FAILED'],`${err.constructor.name},${err.message}`)
 	 
 	  // Wait for DDL operations to complete. Catch, Report and Throw DDL errors. If DDL is successful this becomes a no-op.
 	  try {
@@ -184,7 +184,7 @@ class DBReader extends Readable {
       await Promise.allSettled(streamsCompleted)
 	  this.activeWorkers.delete(yadamuPipeline[0])  
 
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',mappedTableName,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
 	    
 	  const cause = readerDBI.INPUT_METRICS.readerError || readerDBI.INPUT_METRICS.parserError || yadamuPipeline.find((s) => {return s.underlyingError instanceof Error}).underlyingError || err
 	  
@@ -229,37 +229,26 @@ class DBReader extends Readable {
   }
   
   async pipelineTableToFile(readerDBI,writerDBI,task) {
-	  
+      
      // this.yadamuLogger.trace(['PIPELINE','SERIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],`Processing Table`);
 	 
 	 const tableInfo = readerDBI.generateQueryInformation(task)
 	 
 	 // Get the Table Readers 
-	 const sourcePipeline = await readerDBI.getInputStreams(tableInfo)
-	 const mappedTableName = writerDBI.transformTableName(task.TABLE_NAME,readerDBI.getInverseTableMappings())
-	 
-	 // Create a JSON Writer
-	 const jsonWriter = await writerDBI.getOutputStream(mappedTableName,undefined)
-     jsonWriter.setReaderMetrics(readerDBI.INPUT_METRICS)
-	 sourcePipeline.push(jsonWriter)
-	 
-	 // The TableSwitcher is used to prevent 'end' events propegating to the output stream
-	 const tableSwitcher = new TableSwitcher(mappedTableName) 
-	 sourcePipeline.push(tableSwitcher)
-    
-     const targetPipeline = [...writerDBI.getOutputStreams(mappedTableName)]
+	 const sourcePipeline = await readerDBI.getInputStreams(tableInfo) 
+     const targetPipeline = writerDBI.getOutputStreams(tableInfo.MAPPED_TABLE_NAME)
+	 targetPipeline[0].setReaderMetrics(readerDBI.INPUT_METRICS)
+	 const tableSwitcher = targetPipeline[1]
 	 const yadamuPipeline = new Array(...sourcePipeline,...targetPipeline)
-   	 
+   	 // console.log(yadamuPipeline.map((s) => { return s.constructor.name }).join(' ==> '))
+	
 	 const tableComplete = new Promise((resolve,reject) => {
 	   finished(tableSwitcher,() => {
 	     // Manually clean up the previous pipeline since it never completely ended. Prevents excessive memory usage..
 	     // Remove unpipe listeners on targets
 	     targetPipeline.forEach((s) => { s.removeAllListeners('unpipe') })
-	     // Unpipe the tableSwitcher`
-	   
-	     tableSwitcher.unpipe(writerDBI.PIPELINE_ENTRY_POINT)
-	   
-	     // Unpipe all target streams
+	     
+		 // Unpipe all target streams
 	     targetPipeline.forEach((s,i) => { if (i < targetPipeline.length - 1) {s.unpipe(targetPipeline[i+1])} })
 	   
 	     // Destroy the source streams
@@ -286,7 +275,6 @@ class DBReader extends Readable {
 	    const task = taskList.shift()
 		await this.pipelineTableToFile(readerDBI,writerDBI,task)
 	  }
-	  await pipeline(writerDBI.END_EXPORT_FILE,writerDBI.PIPELINE_ENTRY_POINT)
 	  
   }
 

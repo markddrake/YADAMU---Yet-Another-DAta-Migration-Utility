@@ -32,6 +32,10 @@ class LoaderQA extends LoaderDBI {
 	super(yadamu)
   }
 
+  setMetadata(metadata) {
+    super.setMetadata(metadata)
+  }
+
   async initialize() {
 	await super.initialize();
 	if (this.options.recreateSchema === true) {

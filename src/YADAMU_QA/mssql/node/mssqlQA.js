@@ -26,10 +26,22 @@ class MsSQLQA extends MsSQLDBI {
        super(yadamu)
     }
 
-	async useDatabase(databaseName) {     
-      const statement = `use ${databaseName}`
-      const results = await this.executeSQL(statement);
-    } 
+    setMetadata(metadata) {
+      super.setMetadata(metadata)
+    }
+	 
+	async initialize() {
+				
+	  if (this.options.recreateSchema === true) {
+		await this.recreateDatabase();
+	  }
+
+	  await super.initialize();
+	  if (this.terminateConnection()) {
+        const pid = await this.getConnectionID();
+	    this.scheduleTermination(pid,this.getWorkerNumber());
+	  }
+    }	   
 	
     /*
     **
@@ -73,58 +85,31 @@ class MsSQLQA extends MsSQLDBI {
 	  
     }
 	
-	async scheduleTermination(pid,workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
-      const timer = setTimeout(
-        async (pid) => {
-		  if (this.pool !== undefined) {
-		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
-			 // Do not use getRequest() as it will fail with "There is a request in progress during write opeations. Get a non pooled request
-		     // const request = new this.sql.Request(this.pool);
-			 const request = await this.sql.connect(this.connectionProperties);
-			 let stack
-			 const sqlStatement = `kill ${pid}`
-			 try {
-			   stack = new Error().stack
-  		       const res = await request.query(sqlStatement);
-			 } catch (e) {
-			   if (e.number && (e.number === 6104)) {
-				 // Msg 6104, Level 16, State 1, Line 1 Cannot use KILL to kill your own process
-			     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Worker finished prior to termination.`)
- 			   }
-			   else if (e.number && (e.number === 6106)) {
-				 // Msg 6106, Level 16, State 2, Line 1 Process ID 54 is not an active process ID.
-			     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Worker finished prior to termination.`)
- 			   }
-			   else {
-				 const cause = new MsSQLError(e,stack,sqlStatement)
-			     this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],cause)
-			   }
-			 } 
-		   }
-		   else {
-		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
-		   }
-		},
-		this.killConfiguration.delay,
-	    pid
-      )
-	  timer.unref()
-	}
+	async useDatabase(databaseName) {     
+      const statement = `use ${databaseName}`
+      const results = await this.executeSQL(statement);
+    } 
 
-	async initialize() {
-				
-	  if (this.options.recreateSchema === true) {
-		await this.recreateDatabase();
-	  }
-
-	  await super.initialize();
-	  if (this.terminateConnection()) {
-        const pid = await this.getConnectionID();
-	    this.scheduleTermination(pid,this.getWorkerNumber());
-	  }
+    async getRowCounts(connectInfo) {
+        
+      await this.useDatabase(connectInfo.database);
+      const results = await this.pool.request().input('SCHEMA',this.sql.VarChar,connectInfo.owner).query(MsSQLQA.SQL_SCHEMA_TABLE_ROWS);
+      
+      return results.recordset.map((row,idx) => {          
+        return [connectInfo.owner === 'dbo' ? connectInfo.database : connectInfo.owner,row.TableName,row.RowCount]
+      })
     }
-	   
+	
+    async workerDBI(idx)  {
+	  const workerDBI = await super.workerDBI(idx);
+      // Manager needs to schedule termination of worker.
+	  if (this.terminateConnection(idx)) {
+        const pid = await workerDBI.getConnectionID();
+	    this.scheduleTermination(pid,idx);
+	  }
+	  return workerDBI
+    }
+
    async compareSchemas(source,target,rules) {
 	   
       const report = {
@@ -177,25 +162,45 @@ class MsSQLQA extends MsSQLDBI {
       return report
     }
    
-    async getRowCounts(connectInfo) {
-        
-      await this.useDatabase(connectInfo.database);
-      const results = await this.pool.request().input('SCHEMA',this.sql.VarChar,connectInfo.owner).query(MsSQLQA.SQL_SCHEMA_TABLE_ROWS);
-      
-      return results.recordset.map((row,idx) => {          
-        return [connectInfo.owner === 'dbo' ? connectInfo.database : connectInfo.owner,row.TableName,row.RowCount]
-      })
-    }
-	
-    async workerDBI(idx)  {
-	  const workerDBI = await super.workerDBI(idx);
-      // Manager needs to schedule termination of worker.
-	  if (this.terminateConnection(idx)) {
-        const pid = await workerDBI.getConnectionID();
-	    this.scheduleTermination(pid,idx);
-	  }
-	  return workerDBI
-    }
+	async scheduleTermination(pid,workerId) {
+      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
+      const timer = setTimeout(
+        async (pid) => {
+		  if (this.pool !== undefined) {
+		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
+			 // Do not use getRequest() as it will fail with "There is a request in progress during write opeations. Get a non pooled request
+		     // const request = new this.sql.Request(this.pool);
+			 const request = await this.sql.connect(this.connectionProperties);
+			 let stack
+			 const sqlStatement = `kill ${pid}`
+			 try {
+			   stack = new Error().stack
+  		       const res = await request.query(sqlStatement);
+			 } catch (e) {
+			   if (e.number && (e.number === 6104)) {
+				 // Msg 6104, Level 16, State 1, Line 1 Cannot use KILL to kill your own process
+			     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Worker finished prior to termination.`)
+ 			   }
+			   else if (e.number && (e.number === 6106)) {
+				 // Msg 6106, Level 16, State 2, Line 1 Process ID 54 is not an active process ID.
+			     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Worker finished prior to termination.`)
+ 			   }
+			   else {
+				 const cause = new MsSQLError(e,stack,sqlStatement)
+			     this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],cause)
+			   }
+			 } 
+		   }
+		   else {
+		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+		   }
+		},
+		this.killConfiguration.delay,
+	    pid
+      )
+	  timer.unref()
+	}
+
 }
 module.exports = MsSQLQA
 

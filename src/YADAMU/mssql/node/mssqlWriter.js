@@ -81,7 +81,7 @@ class MsSQLWriter extends YadamuWriter {
 		    case 'NULLIFY':
 			  return (col, idx) => {
 			    if (!isFinite(col)) {
-                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
+                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
 	  		      return null;
 				}
 			    return col
@@ -135,8 +135,8 @@ class MsSQLWriter extends YadamuWriter {
 	  return this.skipTable;
 	} catch (e) {
   	  if (e instanceof RejectedColumnValue) {
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],e.message);
-        this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableInfo.tableName,row);
+        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
+        this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableName,row);
 		this.metrics.skipped++
         return
 	  }
@@ -176,10 +176,10 @@ class MsSQLWriter extends YadamuWriter {
 	    this.reportBatchError(batch,`INSERT MANY`,cause)
         await this.dbi.restoreSavePoint(cause);
 		if (this.dbi.TRANSACTION_IN_PROGRESS && this.dbi.tediousTransactionError) {
-		  // this.yadamuLogger.trace([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Unexpected ROLLBACK during BCP Operation. Starting new Transaction`);          
+		  // this.yadamuLogger.trace([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],`Unexpected ROLLBACK during BCP Operation. Starting new Transaction`);          
 		  await this.dbi.recoverTransactionState(true)
 		}	
-	  	this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableInfo.tableName}"`],`Switching to Iterative mode.`);          
+	  	this.yadamuLogger.warning([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],`Switching to Iterative mode.`);          
         this.tableInfo.bulkSupported = false;
       }
     }
@@ -192,7 +192,7 @@ class MsSQLWriter extends YadamuWriter {
       if (this.rowsLost()) {
 		throw cause
       }
-      this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`INSERT ONE`,`"${this.tableInfo.tableName}"`],cause);
+      this.yadamuLogger.handleException([`${this.dbi.DATABASE_VENDOR}`,`INSERT ONE`,`"${this.tableName}"`],cause);
       this.endTime = performance.now();
       this.releaseBatch(batch)
       return this.skipTable          

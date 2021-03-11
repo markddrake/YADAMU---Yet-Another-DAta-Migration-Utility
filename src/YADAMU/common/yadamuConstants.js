@@ -1,5 +1,7 @@
 "use strict"
 
+const crypto = require('crypto');
+
 const YadamuDefaults = require('./yadamuDefaults.json');
 
 class YadamuConstants {
@@ -19,7 +21,10 @@ class YadamuConstants {
      , "REJECTION_FILE_PREFIX"     : "rejection"
      , "WARNING_FOLDER"            : "warnings"
      , "WARNING_FILE_PREFIX"       : "warning"
-	 , "CRYPTO_ALGORITHM"          : 'aes-192-cbc'
+	 , "IDENTIFIER_TRANSFORMATION" : 'NONE'
+	 , "CIPHER"                    : 'aes-192-cbc'
+     , "ENCRYPTION"                : false
+	 , "SALT"                      : "YABASCYADAMUUMADAYCSABAY"
     })
     return this._STATIC_PARAMETERS;
   }
@@ -44,33 +49,41 @@ class YadamuConstants {
 	return this._CONTINUE_PROCESSING
   }
   
-  static get PRODUCT_SHORT_NAME()     { return 'YADAMU' }
-  static get PRODUCT_NAME()           { return 'Yet Another DAta Migration Utility' }
-  static get COMPANY_SHORT_NAME()     { return 'YABASC' }
-  static get COMPANY_NAME()           { return 'Yet Another Bay Area Software Company' }
-  static YADAMU()                     { return 'CSABAYUMADAYYADA' }
-  static YADAMU2()                    { return Buffer.from(this.YADAMU).toString('hex') }
+  static get PRODUCT_SHORT_NAME()              { return 'YADAMU' }
+  static get PRODUCT_NAME()                    { return 'Yet Another DAta Migration Utility' }
+  static get COMPANY_SHORT_NAME()              { return 'YABASC' }
+  static get COMPANY_NAME()                    { return 'Yet Another Bay Area Software Company' }
+                                              
+  static get YADAMU_VERSION()                  { return this.YADAMU_PARAMETERS.YADAMU_VERSION }
+  static get FILE()                            { return this.YADAMU_PARAMETERS.FILE }
+  static get CONFIG()                          { return this.YADAMU_PARAMETERS.CONFIG }
+  static get PARALLEL()                        { return this.YADAMU_PARAMETERS.PARALLEL }
+  static get RDBMS()                           { return this.YADAMU_PARAMETERS.RDBMS }
+  static get EXCEPTION_FOLDER()                { return this.YADAMU_PARAMETERS.EXCEPTION_FOLDER }
+  static get EXCEPTION_FILE_PREFIX()           { return this.YADAMU_PARAMETERS.EXCEPTION_FILE_PREFIX }
+  static get REJECTION_FOLDER()                { return this.YADAMU_PARAMETERS.REJECTION_FOLDER }
+  static get REJECTION_FILE_PREFIX()           { return this.YADAMU_PARAMETERS.REJECTION_FILE_PREFIX }
+  static get WARNING_FOLDER()                  { return this.YADAMU_PARAMETERS.WARNING_FOLDER }
+  static get WARNING_FILE_PREFIX()             { return this.YADAMU_PARAMETERS.WARNING_FILE_PREFIX }
+  static get IDENTIFIER_TRANSFORMATION()       { return this.YADAMU_PARAMETERS.IDENTIFIER_TRANSFORMATION }
+
+
+  static get ENCRYPTION_ALGORITM()             { return this.YADAMU_PARAMETERS.ENCRYPTION_ALGORITM }
+  static get ENCRYPTION()                      { return this.YADAMU_PARAMETERS.ENCRYPTION }
+  static get SALT()                            { return this.YADAMU_PARAMETERS.SALT }
   
-  static get YADAMU_VERSION()         { return this.YADAMU_PARAMETERS.YADAMU_VERSION }
-  static get FILE()                   { return this.YADAMU_PARAMETERS.FILE }
-  static get CONFIG()                 { return this.YADAMU_PARAMETERS.CONFIG }
-  static get PARALLEL()               { return this.YADAMU_PARAMETERS.PARALLEL }
-  static get RDBMS()                  { return this.YADAMU_PARAMETERS.RDBMS }
-  static get EXCEPTION_FOLDER()       { return this.YADAMU_PARAMETERS.EXCEPTION_FOLDER }
-  static get EXCEPTION_FILE_PREFIX()  { return this.YADAMU_PARAMETERS.EXCEPTION_FILE_PREFIX }
-  static get REJECTION_FOLDER()       { return this.YADAMU_PARAMETERS.REJECTION_FOLDER }
-  static get REJECTION_FILE_PREFIX()  { return this.YADAMU_PARAMETERS.REJECTION_FILE_PREFIX }
-  static get WARNING_FOLDER()         { return this.YADAMU_PARAMETERS.WARNING_FOLDER }
-  static get WARNING_FILE_PREFIX()    { return this.YADAMU_PARAMETERS.WARNING_FILE_PREFIX }
-  static get CRYPTO_ALGORITHM()       { return this.YADAMU_PARAMETERS.CRYPTO_ALGORITHM }
+  static get YADAMU_DRIVERS()                  { return this.YADAMU_CONFIGURATION.drivers }
   
-  static get YADAMU_DRIVERS()         { return this.YADAMU_CONFIGURATION.drivers }
-  
-  static get SAVE_POINT_NAME()        { return 'YADAMU_INSERT' }
+  static get SAVE_POINT_NAME()                 { return 'YADAMU_INSERT' }
 
   static get TEXTUAL_MIME_TYPES() { 
     this._TEXTUAL_MIME_TYPES = this._TEXTUAL_MIME_TYPES || Object.freeze(["application/json","application/csv"])
     return this._TEXTUAL_MIME_TYPES
+  }
+
+  static get SUPPORTED_IDENTIFIER_TRANSFORMATION() {
+    this._SUPPORTED_IDENTIFIER_TRANSFORMATION = this._SUPPORTED_COMPRESSION || Object.freeze(["NONE","UPPERACSE","LOWERCASE"])
+	return this._SUPPORTED_IDENTIFIER_TRANSFORMATION
   }
     
   static get SUPPORTED_COMPRESSION() {
@@ -78,6 +91,21 @@ class YadamuConstants {
 	return this._SUPPORTED_COMPRESSION
   }
   
+  static get TRUE_OR_FALSE() {
+    this._TRUE_OR_FALSE = this._TRUE_OR_FALSE || Object.freeze(["TRUE","FALSE"])
+	return this._TRUE_OR_FALSE
+  }
+  
+  static get SUPPORTED_CIPHER() {
+    this._SUPPORTED_CIPHER = this._SUPPORTED_CIPHER || Object.freeze(crypto.getCiphers())
+	return this._SUPPORTED_CIPHER
+  }
+
+  static get SUPPORTED_ENCRYPTION() {
+    this._SUPPORTED_CIPHER = this._SUPPORTED_ENCRYPTION || Object.freeze("TRUE","FALSE",...this.SUPPORTED_CIPHER)
+	return this._SUPPORTED_ENCRYPTION
+  }
+
   static get OUTPUT_FORMATS() {
     this._OUTPUT_FORMATS = this._OUTPUT_FORMATS || Object.freeze(["JSON","CSV","ARRAY"])
 	return this._OUTPUT_FORMATS

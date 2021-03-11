@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const util = require('util');
 
-const {Readable, pipeline} = require('stream')
+const {Readable, pipeline, finished} = require('stream')
 
 const DBWriter = require('./dbWriter.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
@@ -13,8 +13,6 @@ const NullWriter = require('./nullWriter.js');
 const {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuException.js');
 const OracleError  = require('../oracle/node/oracleException.js');
 
-const PassThrough = require('./yadamuPassThrough.js');
-const SimpleArrayReadable = require('./simpleArrayReadable.js');
 const ErrorDBI = require('../file/node/errorDBI.js');
 
 class YadamuLogger {
@@ -308,47 +306,62 @@ class YadamuLogger {
 	}
   }	  
 	  
-
   async writeDataFile(dataFilePath,tableName,currentSettings,data) {
 	let errorPipeline
     try {
       const dbi = new ErrorDBI(currentSettings.yadamu,dataFilePath)
       await dbi.initialize()
-      
+      await dbi.initializeImport();
+	  
       // const logger = this
       const logger = YadamuLogger.NULL_LOGGER;
       
-      const fileWriter = new DBWriter(dbi,logger);  
       dbi.setSystemInformation(currentSettings.systemInformation)
       dbi.setMetadata(currentSettings.metadata)
       
-	  await fileWriter.initialize()
 	  await dbi.initializeData()
       const dataObjects = data.map((d) => { return {data: d}})
-      dataObjects.unshift({table: tableName})
-      // const dataStream = Readable.from(dataObjects);
-      const dataStream = new SimpleArrayReadable(dataObjects,{objectMode: true },true);
-      const errorWriter = dbi.getOutputStream()
-      const passThrough = new PassThrough({objectMode: false},false);
-      passThrough.on('end',async () => {
-        // console.log('JSON Writer: finish',dbi.PIPELINE_ENTRY_POINT.writableEnded)
-        passThrough.unpipe();
-        dataStream.destroy();
-        errorWriter.destroy();
-        passThrough.destroy();
-        pipeline([dbi.END_EXPORT_FILE,dbi.PIPELINE_ENTRY_POINT],(err) => {
-          if (err) {throw(err)}
-        })
+	  dataObjects.unshift({table: tableName})
+	  const dataStream = Readable.from(dataObjects);
+      
+      const targetPipeline = dbi.getOutputStreams(tableName)
+	  const tableSwitcher = targetPipeline[1]
+	  const errorPipeline = new Array(dataStream,...targetPipeline)
+   	  // console.log(errorPipeline.map((s) => { return s.constructor.name }).join(' ==> '))
+	
+	
+	  const tableComplete = new Promise((resolve,reject) => {
+	    finished(tableSwitcher,() => {
+	      // Manually clean up the previous pipeline since it never completely ended. Prevents excessive memory usage..
+	      // Remove unpipe listeners on targets
+	      targetPipeline.forEach((s) => { s.removeAllListeners('unpipe') })
+	     
+		  // Unpipe all target streams
+	      targetPipeline.forEach((s,i) => { if (i < targetPipeline.length - 1) {s.unpipe(targetPipeline[i+1])} })
+	   
+	      // Destroy the source streams
+	      dataStream.destroy()
+          resolve()
+  	    })
       })
 
-      errorPipeline = [dataStream,errorWriter,passThrough,dbi.PIPELINE_ENTRY_POINT]
-      pipeline(errorPipeline,(err) => {
-		if (err) {
-          throw(err)
-		}
-      }); 
-      await dbi.pipelineComplete;
-      await dbi.finalize()
+      // this.traceSteamEvents(errorPipeline,task.TABLE_NAME)
+	  
+      // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${errorPipeline.map((proc) => { return proc.constructor.name }).join(' => ')}`)
+	  pipeline(errorPipeline,(err) => {
+		if (err && (err.code === 'ERR_STREAM_PREMATURE_CLOSE')) {
+		  errorPipeline.forEach((stream) => {
+			if (stream.underlyingError instanceof Error) {
+		      console.log(stream.constructor.name,stream.underlyingError)
+			}
+	      })
+	    }
+	  })
+	  
+	  await tableComplete
+      await dbi.finalizeData();
+	  await dbi.finalizeImport();
+	  await dbi.finalize();
       await logger.close();
     } catch (err) {    
 	  const loggerError = new Error(`Error creating data file "${dataFilePath}".`)

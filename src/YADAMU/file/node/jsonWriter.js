@@ -180,7 +180,7 @@ class JSONWriter extends YadamuWriter {
 	this.rowSeperator = ','
     this.metrics.committed++;
     if ((this.FEEDBACK_INTERVAL > 0) && ((this.metrics.committed % this.FEEDBACK_INTERVAL) === 0)) {
-      this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.dbi.OUTPUT_FORMAT],`Rows Written: ${this.metrics.committed}.`);
+      this.yadamuLogger.info([`${this.tableName}`,this.dbi.OUTPUT_FORMAT],`Rows Written: ${this.metrics.committed}.`);
     }
   }
 

@@ -28,6 +28,21 @@ class MariadbQA extends MariadbDBI {
        super(yadamu)
     }
 	
+    setMetadata(metadata) {
+      super.setMetadata(metadata)
+    }
+	 
+	async initialize() {
+	  await super.initialize();
+	  if (this.options.recreateSchema === true) {
+		await this.recreateSchema();
+	  }
+	  if (this.terminateConnection()) {
+        const pid = await this.getConnectionID();
+	    this.scheduleTermination(pid,this.getWorkerNumber());
+	  }
+	}
+ 
     async recreateSchema() {
         
       try {
@@ -44,38 +59,6 @@ class MariadbQA extends MariadbDBI {
       await this.executeSQL(createUser,{});      
     }   
 	
-	async scheduleTermination(pid,workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
-	  const timer = setTimeout(
-        async (pid) => {
-          if (this.pool !== undefined && this.pool.end) {
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
-	        const conn = await this.getConnectionFromPool();
-			const sqlStatement = `kill hard ${pid}`
-			const res = await conn.query(sqlStatement);
-			await conn.release()
-		  }
-		  else {
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
-		  }
-		},
-		this.killConfiguration.delay,
-	    pid
-      )
-	  timer.unref()
-	}	
-
-	async initialize() {
-	  await super.initialize();
-	  if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
-	  if (this.terminateConnection()) {
-        const pid = await this.getConnectionID();
-	    this.scheduleTermination(pid,this.getWorkerNumber());
-	  }
-	}
- 
     async compareSchemas(source,target,rules) {
 
       const report = {
@@ -111,6 +94,27 @@ class MariadbQA extends MariadbDBI {
 	  return workerDBI
     }
       
+	async scheduleTermination(pid,workerId) {
+      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
+	  const timer = setTimeout(
+        async (pid) => {
+          if (this.pool !== undefined && this.pool.end) {
+		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
+	        const conn = await this.getConnectionFromPool();
+			const sqlStatement = `kill hard ${pid}`
+			const res = await conn.query(sqlStatement);
+			await conn.release()
+		  }
+		  else {
+		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+		  }
+		},
+		this.killConfiguration.delay,
+	    pid
+      )
+	  timer.unref()
+	}	
+
 }
 
 module.exports = MariadbQA

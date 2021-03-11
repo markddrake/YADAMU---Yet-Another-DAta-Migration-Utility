@@ -107,6 +107,7 @@ class YadamuCLI {
     , "COPY"           : Object.freeze(['CONFIG'])
     , "TEST"           : Object.freeze(['CONFIG'])
     , "CONNECTIONTEST" : Object.freeze(['CONFIG','RDBMS'])
+    , "DECRYPT"        : Object.freeze([])
     })
     return YadamuCLI._REQUIRED_ARGUMENTS
   }
@@ -118,8 +119,8 @@ class YadamuCLI {
     , "IMPORT"    : Object.freeze(['CONFIG','CONFIGURATION',"FROM_USER","OVERWRITE"])
     , "LOAD"      : Object.freeze(['CONFIG','CONFIGURATION',"FROM_USER","OVERWRITE"])
     , "UPLOAD"    : Object.freeze(['CONFIG','CONFIGURATION',"FROM_USER","OVERWRITE"])
-    , "EXPORT"    : Object.freeze(['CONGIG','CONFIGURATION',"TO_USER"])
-    , "UNLOAD"    : Object.freeze(['CONGIG','CONFIGURATION',"TO_USER"])
+    , "EXPORT"    : Object.freeze(['CONFIG','CONFIGURATION',"TO_USER","IDENTIFIER_TRANSFORMATION"])
+    , "UNLOAD"    : Object.freeze(['CONFIG','CONFIGURATION',"TO_USER","IDENTIFIER_TRANSFORMATION"])
     , "COPY"      : Object.freeze(['FILE',"FROM_USER","TO_USER"])
     , "TEST"      : Object.freeze(['FILE',"FROM_USER","TO_USER"])
     })
@@ -397,10 +398,74 @@ class YadamuCLI {
     return `"${connectionName}"://"${db === 'mssql' ? `${schemaInfo.database}"."${schemaInfo.owner}` : schemaInfo.schema}"`
   }
   
- 
+  async doImport() {
+	await this.yadamu.initialize()
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const startTime = performance.now();
+    await this.yadamu.doImport(dbi);
+    const elapsedTime = performance.now() - startTime;
+    this.yadamuLogger.info([`YADAMU`,`IMPORT`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+  }
+  
+  async doLoad() {
+	await this.yadamu.initialize()
+    const fs = this.getDatabaseInterface(this.yadamu,'loader',{},{})
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const startTime = performance.now();
+    await this.yadamu.doCopy(fs,dbi);      
+    const elapsedTime = performance.now() - startTime;
+    this.yadamuLogger.info([`YADAMU`,`LOAD`],`Operation complete: Control File:"${fs.controlFilePath}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+  }
+  
+  async doUpload() {
+	await this.yadamu.initialize()
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const startTime = performance.now();
+    await this.yadamu.doUpload(dbi);
+    const elapsedTime = performance.now() - startTime;
+    this.yadamuLogger.info([`YADAMU`,`UPLOAD`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+  }
+  
+  async doExport() {
+	await this.yadamu.initialize()
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const startTime = performance.now();
+    await this.yadamu.doExport(dbi);
+    const elapsedTime = performance.now() - startTime;
+    this.yadamuLogger.info([`YADAMU`,`EXPORT`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+  }
+  
+  async doUnload() {
+	await this.yadamu.initialize()
+    const fs = this.getDatabaseInterface(this.yadamu,'loader',{},{})
+	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const startTime = performance.now();
+    await this.yadamu.doCopy(dbi,fs);      
+    const elapsedTime = performance.now() - startTime;
+    this.yadamuLogger.info([`YADAMU`,`UNLOAD`],`Operation complete: Control File:"${fs.controlFilePath}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+  }
+
+  async doEncrypt() {
+	await this.yadamu.initialize()
+	const startTime = performance.now();
+    await this.yadamu.doEncrypt();
+    const elapsedTime = performance.now() - startTime;
+    this.yadamuLogger.info([`YADAMU`,`ENCRYPT`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);  
+  }
+  
+  async doDecrypt() {
+	await this.yadamu.initialize()
+	const startTime = performance.now();
+    await this.yadamu.doDecrypt();
+    const elapsedTime = performance.now() - startTime;
+    this.yadamuLogger.info([`YADAMU`,`DECRYPT`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);  
+  }
+
   async doCopy() {
   
     const configuration = this.loadConfigurationFile()
+    this.yadamu.reloadParameters(configuration.parameters || {} );
+	await this.yadamu.initialize()
     const startTime = performance.now();
     for (const job of configuration.jobs) {
 
@@ -459,54 +524,14 @@ class YadamuCLI {
     const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete: Configuration:"${this.yadamu.CONFIG}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
-  
-  async doImport() {
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
-    const startTime = performance.now();
-    await this.yadamu.doImport(dbi);
-    const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`IMPORT`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
-  }
-  
-  async doLoad() {
-    const fs = this.getDatabaseInterface(this.yadamu,'loader',{},{})
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
-    const startTime = performance.now();
-    await this.yadamu.doCopy(fs,dbi);      
-    const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`LOAD`],`Operation complete: Control File:"${fs.controlFilePath}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
-  }
-  
-  async doUpload() {
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
-    const startTime = performance.now();
-    await this.yadamu.doUpload(dbi);
-    const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`UPLOAD`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
-  }
-  
-  async doExport() {
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
-    const startTime = performance.now();
-    await this.yadamu.doExport(dbi);
-    const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`EXPORT`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
-  }
-  
-  async doUnload() {
-    const fs = this.getDatabaseInterface(this.yadamu,'loader',{},{})
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
-    const startTime = performance.now();
-    await this.yadamu.doCopy(dbi,fs);      
-    const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`UNLOAD`],`Operation complete: Control File:"${fs.controlFilePath}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
-  }
-  
+    
   async doTests() {
     
 	const configuration = this.loadConfigurationFile()
+    this.yadamu.reloadParameters(configuration.parameters || {} );
+	await this.yadamu.initialize()
     const YadamuQA = require('../../YADAMU_QA/common/node/yadamuQA.js');
-	const yadamuQA = new YadamuQA(configuration);
+	const yadamuQA = new YadamuQA(configuration,this.yadamu.ENCRYPTION_KEY);
 	const startTime = performance.now();
 	const results = await yadamuQA.doTests(configuration);
 	const elapsedTime = performance.now() - startTime;

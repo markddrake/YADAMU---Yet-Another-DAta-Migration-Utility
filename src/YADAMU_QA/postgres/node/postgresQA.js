@@ -29,7 +29,22 @@ class PostgresQA extends PostgresDBI {
        super(yadamu);
     }
     
-    async recreateSchema() {
+    setMetadata(metadata) {
+      super.setMetadata(metadata)
+    }
+	 
+	async initialize() {
+	  await super.initialize();
+	  if (this.options.recreateSchema === true) {
+		await this.recreateSchema();
+	  }
+	  if (this.terminateConnection()) {
+        const pid = await this.getConnectionID();
+	    this.scheduleTermination(pid,this.getWorkerNumber());
+	  }
+	}
+	
+	async recreateSchema() {
       try {
         const dropSchema = `drop schema if exists "${this.parameters.TO_USER}" cascade`;
         this.status.sqlTrace.write(`${dropSchema};\n--\n`)
@@ -43,6 +58,47 @@ class PostgresQA extends PostgresDBI {
       }
       await this.createSchema(this.parameters.TO_USER);    
     }      
+
+	async getRowCounts(target) {
+        
+      const results = await this.executeSQL(PostgresQA.SQL_SCHEMA_TABLE_ROWS,[target.schema]);
+      return results.rows
+    }    
+
+    async compareSchemas(source,target,rules) {
+
+      const report = {
+        successful : []
+       ,failed     : []
+      }
+
+      const compareRules = {
+	    emptyStringisNull   : rules.EMPTY_STRING_IS_NULL 
+	  ,	spatialPrecision    : rules.SPATIAL_PRECISION || 18
+	  , xmlRule             : rules.XML_COMPARISSON_RULE
+	  , infinityIsNull      : rules.INFINITY_IS_NULL 
+      }
+	 	 
+      await this.executeSQL(PostgresQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,compareRules])      
+      
+      const successful = await this.executeSQL(PostgresQA.SQL_SUCCESS)            
+      report.successful = successful.rows
+      
+      const failed = await this.executeSQL(PostgresQA.SQL_FAILED)
+      report.failed = failed.rows
+
+      return report
+    }
+		
+    async workerDBI(idx)  {
+	  const workerDBI = await super.workerDBI(idx);
+      // Manager needs to schedule termination of worker.
+	  if (this.terminateConnection(idx)) {
+        const pid = await workerDBI.getConnectionID();
+	    this.scheduleTermination(pid,idx);
+	  }
+	  return workerDBI
+    }
 
 	async scheduleTermination(pid,workerId) {
       this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
@@ -68,57 +124,6 @@ class PostgresQA extends PostgresDBI {
 	  timer.unref()
 	}
 	
-	async initialize() {
-	  await super.initialize();
-	  if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
-	  if (this.terminateConnection()) {
-        const pid = await this.getConnectionID();
-	    this.scheduleTermination(pid,this.getWorkerNumber());
-	  }
-	}
-	
-    async compareSchemas(source,target,rules) {
-
-      const report = {
-        successful : []
-       ,failed     : []
-      }
-
-      const compareRules = {
-	    emptyStringisNull   : rules.EMPTY_STRING_IS_NULL 
-	  ,	spatialPrecision    : rules.SPATIAL_PRECISION || 18
-	  , xmlRule             : rules.XML_COMPARISSON_RULE
-	  , infinityIsNull      : rules.INFINITY_IS_NULL 
-      }
-	 	 
-      await this.executeSQL(PostgresQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,compareRules])      
-      
-      const successful = await this.executeSQL(PostgresQA.SQL_SUCCESS)            
-      report.successful = successful.rows
-      
-      const failed = await this.executeSQL(PostgresQA.SQL_FAILED)
-      report.failed = failed.rows
-
-      return report
-    }
-	
-	async getRowCounts(target) {
-        
-      const results = await this.executeSQL(PostgresQA.SQL_SCHEMA_TABLE_ROWS,[target.schema]);
-      return results.rows
-    }    
-	
-    async workerDBI(idx)  {
-	  const workerDBI = await super.workerDBI(idx);
-      // Manager needs to schedule termination of worker.
-	  if (this.terminateConnection(idx)) {
-        const pid = await workerDBI.getConnectionID();
-	    this.scheduleTermination(pid,idx);
-	  }
-	  return workerDBI
-    }
 }
 
 module.exports = PostgresQA

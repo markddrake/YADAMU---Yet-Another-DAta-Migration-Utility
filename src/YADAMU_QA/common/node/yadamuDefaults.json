@@ -1,6 +1,7 @@
 {
 	"yadamu": {
 		"PARALLEL": 4
+	,   "ENCRYPTION" : false
 	},
 	"yadamuDBI": {
 		"ON_ERROR": "FLUSH",

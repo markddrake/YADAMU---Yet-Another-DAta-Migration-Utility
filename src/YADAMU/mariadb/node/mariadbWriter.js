@@ -79,7 +79,7 @@ class MariadbWriter extends YadamuWriter {
 		    case 'NULLIFY':
 			  return (col, idx) => {
 			    if (!isFinite(col)) {
-                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
+                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
 	  		      return null;
 				}
 			    return col
@@ -127,8 +127,8 @@ class MariadbWriter extends YadamuWriter {
 	  return this.skipTable;
 	} catch (e) {
   	  if (e instanceof RejectedColumnValue) {
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],e.message);
-        this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableInfo.tableName,row);
+        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
+        this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableName,row);
 		this.metrics.skipped++
         return
 	  }
@@ -148,13 +148,13 @@ class MariadbWriter extends YadamuWriter {
         if (warning.Level === 'Warning') {
           let nextBadRow = warning.Message.split('row')
           nextBadRow = parseInt(nextBadRow[nextBadRow.length-1])
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
    		  // Only write rows to Rejection File in Iterative Mode. 
          
           if ((this.tableInfo.insertMode === 'Iterative') && (badRow !== nextBadRow)) {
             const columnOffset = (nextBadRow-1) * this.tableInfo.columnNames.length
             const row = this.tableInfo.insertMode === 'Batch'  ? batch.slice(columnOffset,columnOffset +  this.tableInfo.columnNames.length) : batch[nextBadRow-1]
-	  	    await this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,row);
+	  	    await this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableName,row);
             badRow = nextBadRow;
           }
         }
@@ -189,7 +189,7 @@ class MariadbWriter extends YadamuWriter {
         } catch (cause) {
   		  this.reportBatchError(batch,`INSERT MANY`,cause)
           await this.dbi.restoreSavePoint(cause);
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
           this.tableInfo.insertMode = 'Iterative'
           repackBatch = true;
         }

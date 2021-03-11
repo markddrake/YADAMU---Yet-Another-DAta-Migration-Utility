@@ -31,46 +31,19 @@ class OracleQA extends OracleDBI {
        super(yadamu)
     }
 
-    async scheduleTermination(pid,workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Termination Scheduled.`);
-      this.assassin = setTimeout(
-        async (pid) => {
-	      if ((this.pool instanceof this.oracledb.Pool) && (this.pool.status === this.oracledb.POOL_STATUS_OPEN)) {
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Killing connection.`);
-			const conn = await this.getConnection();
-			const sqlStatement = `ALTER SYSTEM KILL SESSION '${pid.sid}, ${pid.serial}'`
-			let stack
-			try {
-			  stack = new Error().stack
-	          const res = await conn.execute(sqlStatement);
- 		      await conn.close()
-			} catch (e) {
-			  if ((e.errorNum && ((e.errorNum === 27) || (e.errorNum === 31))) || (e.message.startsWith('DPI-1010'))) {
-				// The Worker has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourself (Error 27)
-			    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Worker finished prior to termination.`)
- 			  }
-			  else {
-				const cause = new OracleError(e,stack,sqlStatement)
-			    this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],cause)
-			  }
-              if (!e.message.startsWith('DPI-1010')) {
-                try {
-     		      await conn.close()
-	            } catch (closeError) {
-                  closeError.cause = e;
- 			      this.yadamuLogger.handleException(['KILL','CLOSE',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],cause)
-                }
-		      }    
-			}
-		  }
-		  else {
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Unable to Kill Connection: Connection Pool no longer available.`);
-		  }
-		},
-		this.killConfiguration.delay,
-	    pid
-      )
-	  this.assassin.unref()
+    setMetadata(metadata) {
+      super.setMetadata(metadata)
+    }
+	 
+	async initialize() {
+	  await super.initialize();
+      if (this.options.recreateSchema === true) {
+		await this.recreateSchema();
+	  }
+	  if (this.terminateConnection()) {
+        const pid = await this.getConnectionID();
+	    this.scheduleTermination(pid,this.getWorkerNumber());
+	  }
 	}
 	
  	async recreateSchema() {
@@ -89,18 +62,20 @@ class OracleQA extends OracleDBI {
       await this.executeSQL(createUser,{});      
     }  
 
+    async getRowCounts(target) {
+        
+      let args = {target:`"${target.schema}"`}
+      await this.executeSQL(OracleQA.SQL_GATHER_SCHEMA_STATS,args)
+      
+      args = {target:target.schema}
+      const results = await this.executeSQL(OracleQA.SQL_SCHEMA_TABLE_ROWS,args)
+      
+      return results.rows.map((row,idx) => {          
+        return [target.schema,row[0],row[1]]
+      })
+      
+    }
 
-	async initialize() {
-	  await super.initialize();
-      if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
-	  if (this.terminateConnection()) {
-        const pid = await this.getConnectionID();
-	    this.scheduleTermination(pid,this.getWorkerNumber());
-	  }
-	}
-	
 	async compareSchemas(source,target,rules) {
 
 	  let compareParams		
@@ -161,20 +136,6 @@ class OracleQA extends OracleDBI {
       return report
     }
       
-    async getRowCounts(target) {
-        
-      let args = {target:`"${target.schema}"`}
-      await this.executeSQL(OracleQA.SQL_GATHER_SCHEMA_STATS,args)
-      
-      args = {target:target.schema}
-      const results = await this.executeSQL(OracleQA.SQL_SCHEMA_TABLE_ROWS,args)
-      
-      return results.rows.map((row,idx) => {          
-        return [target.schema,row[0],row[1]]
-      })
-      
-    }
-
     async workerDBI(idx)  {
 	  const workerDBI = await super.workerDBI(idx);
       // Manager needs to schedule termination of worker.
@@ -188,7 +149,48 @@ class OracleQA extends OracleDBI {
     classFactory(yadamu) {
       return new OracleQA(yadamu)
     }
-
+	
+    async scheduleTermination(pid,workerId) {
+      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Termination Scheduled.`);
+      this.assassin = setTimeout(
+        async (pid) => {
+	      if ((this.pool instanceof this.oracledb.Pool) && (this.pool.status === this.oracledb.POOL_STATUS_OPEN)) {
+		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Killing connection.`);
+			const conn = await this.getConnection();
+			const sqlStatement = `ALTER SYSTEM KILL SESSION '${pid.sid}, ${pid.serial}'`
+			let stack
+			try {
+			  stack = new Error().stack
+	          const res = await conn.execute(sqlStatement);
+ 		      await conn.close()
+			} catch (e) {
+			  if ((e.errorNum && ((e.errorNum === 27) || (e.errorNum === 31))) || (e.message.startsWith('DPI-1010'))) {
+				// The Worker has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourself (Error 27)
+			    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Worker finished prior to termination.`)
+ 			  }
+			  else {
+				const cause = new OracleError(e,stack,sqlStatement)
+			    this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],cause)
+			  }
+              if (!e.message.startsWith('DPI-1010')) {
+                try {
+     		      await conn.close()
+	            } catch (closeError) {
+                  closeError.cause = e;
+ 			      this.yadamuLogger.handleException(['KILL','CLOSE',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],cause)
+                }
+		      }    
+			}
+		  }
+		  else {
+		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Unable to Kill Connection: Connection Pool no longer available.`);
+		  }
+		},
+		this.killConfiguration.delay,
+	    pid
+      )
+	  this.assassin.unref()
+    }
 }
 	
 

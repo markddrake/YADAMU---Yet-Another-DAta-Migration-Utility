@@ -30,7 +30,7 @@
     "source"      : "file-JSON"
   , "targets"     : ["oracle11g"]
   , "parameters"  : {
-      "MAPPINGS"  : "qa/mappings/Oracle11gAdventureWorks.json"
+      "IDENTIFIER_MAPPING_FILE"  : "qa/mappings/oracle11gAdventureWorks.json"
 	}
   , "tasks": [
       "mssql"

@@ -81,7 +81,7 @@ class MySQLWriter extends YadamuWriter {
 		    case 'NULLIFY':
 			  return (col, idx) => {
 			    if (!isFinite(col)) {
-                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
+                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
 	  		      return null;
 				}
 			    return col
@@ -132,8 +132,8 @@ class MySQLWriter extends YadamuWriter {
 	  return this.skipTable;
 	} catch (e) {
   	  if (e instanceof RejectedColumnValue) {
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],e.message);
-        this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableInfo.tableName,row);
+        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],e.message);
+        this.dbi.yadamu.REJECTION_MANAGER.rejectRow(this.tableName,row);
 		this.metrics.skipped++
         return
 	  }
@@ -155,13 +155,13 @@ class MySQLWriter extends YadamuWriter {
         if (warning.Level === 'Warning') {
           let nextBadRow = warning.Message.split('row')
           nextBadRow = parseInt(nextBadRow[nextBadRow.length-1])
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
 		  
 		  // Only write rows to Rejection File in Iterative Mode. 
 		  
           if ((this.tableInfo.insertMode === 'Iterative') && (badRow !== nextBadRow)) {
             const columnOffset = (nextBadRow-1) * this.tableInfo.columnNames.length
-            this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableInfo.tableName,row);
+            this.dbi.yadamu.WARNING_MANAGER.rejectRow(this.tableName,row);
             badRow = nextBadRow;
           }
         }
@@ -170,7 +170,7 @@ class MySQLWriter extends YadamuWriter {
   }
   
   recodeSpatialColumns(batch,msg) {
-    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,`INSERT ROWS`,this.metrics.cached,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
+    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,`INSERT ROWS`,this.metrics.cached,this.SPATIAL_FORMAT],`${msg} Converting batch to "WKT".`);
     YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch,false)
   }  
   
@@ -216,7 +216,7 @@ class MySQLWriter extends YadamuWriter {
         } catch (cause) {
    		  this.reportBatchError(batch,'INSERT MANY',cause)
           await this.dbi.restoreSavePoint(cause);
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.tableInfo.insertMode],`Switching to Multi-row insert mode.`);     
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Multi-row insert mode.`);     
 		  this.tableInfo.insertMode = "Rows"
           batch = batch.flat()
         }
@@ -247,7 +247,7 @@ class MySQLWriter extends YadamuWriter {
 			  continue;
 		    }
 	   	    this.reportBatchError(batch,'INSERT ROWS',cause)
-            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);    
+            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);    
   		    this.tableInfo.insertMode = "Iterative"
             break;			
 		  }

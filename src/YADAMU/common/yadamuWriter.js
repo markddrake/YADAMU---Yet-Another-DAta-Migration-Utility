@@ -319,7 +319,7 @@ class YadamuWriter extends Transform {
       } catch (cause) {
         await this.dbi.restoreSavePoint(cause);
         this.reportBatchError(batch,`INSERT MANY`,cause)
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
+        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
         
       }
@@ -357,13 +357,13 @@ class YadamuWriter extends Transform {
           await this.rollbackTransaction();
         }	  
         if (this.REPORT_BATCHES && !this.commitWork(rowsReceived)) {
-          this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows written:  ${this.metrics.written}.`);
+          this.yadamuLogger.info([`${this.tableName}`,this.insertMode],`Rows written:  ${this.metrics.written}.`);
         }                   
 	    // Commit is only done after a writing a batch
         if (this.commitWork(rowsReceived)) {
           await this.commitTransaction()
           if (this.REPORT_COMMITS) {
-            this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows commited: ${this.metrics.committed}.`);
+            this.yadamuLogger.info([`${this.tableName}`,this.insertMode],`Rows commited: ${this.metrics.committed}.`);
           }          
           await this.beginTransaction();            
         }
@@ -433,7 +433,7 @@ class YadamuWriter extends Transform {
     this.cacheRow(data)
     this.metrics.received++;
     if ((this.metrics.received % this.FEEDBACK_INTERVAL === 0) & !this.flushBatch()) {
-      this.yadamuLogger.info([`${this.tableInfo.tableName}`,this.insertMode],`Rows Cached: ${this.metrics.cached}.`);
+      this.yadamuLogger.info([`${this.tableName}`,this.insertMode],`Rows Cached: ${this.metrics.cached}.`);
     }
 	if (this.flushBatch()) {
       this.cork()

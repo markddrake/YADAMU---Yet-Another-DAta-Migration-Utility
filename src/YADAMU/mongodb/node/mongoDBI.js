@@ -407,28 +407,6 @@ class MongoDBI extends YadamuDBI {
       throw this.trackExceptions(new MongoError(e,stack,operation))
     }
   }
-
-
-  validateIdentifiers(metadata) {
-        
-    // ### Todo Add better algorthim than simply stripping the invalid characters from the name
-    // E.g. Check for Duplicates and use counter when duplicates are detected.
-    
-    const tableMappings = {}
-    let mapTables = false;
-    const tables = Object.keys(metadata)    
-    tables.forEach((table,idx) => {
-      const tableName = metadata[table].tableName
-      if (tableName.indexOf('$') > -1) {
-        mapTables = true;
-        const newTableName = tableName.replace(/\$/g,'')
-        this.yadamuLogger.warning([this.DATABASE_VENDOR,tableName],`Mapped to "${newTableName}".`)
-        tableMappings[table] = {tableName : newTableName}
-        metadata[table].tableName = newTableName;
-      }
-    })        
-    return mapTables ? tableMappings : undefined
-  }
     
   async testConnection(connectionProperties) {   
     super.setConnectionProperties(connectionProperties);
@@ -815,6 +793,7 @@ class MongoDBI extends YadamuDBI {
           tableInfo.SIZE_CONSTRAINT_ARRAY.splice(idx,1);
         }
       }
+	  tableInfo.JSON_KEY_NAME_ARRAY = [...tableInfo.COLUMN_NAME_ARRAY]
       return tableInfo
     }))
     // this.yadamuLogger.trace([`${this.constructor.name}.getSchemaInfo()`,],`Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - loopStartTime)}s.`)
@@ -886,6 +865,20 @@ class MongoDBI extends YadamuDBI {
 	return new MongoDBI(yadamu)
   }
   
+  generateDatabaseMappings(metadata) {
+    
+    const dbMappings = {}
+
+    Object.keys(metadata).forEach((table) => {
+      const mappedTableName = metadata[table].tableName.indexOf('$') > -1 ? metadata[table].tableName.replace(/\$/g,'') : undefined
+      if (mappedTableName) {
+        dbMappings[table] = {
+  	      tableName : mappedTableName
+		}
+      }
+    })
+    return dbMappings;    
+  }    
 }
 
 module.exports = MongoDBI

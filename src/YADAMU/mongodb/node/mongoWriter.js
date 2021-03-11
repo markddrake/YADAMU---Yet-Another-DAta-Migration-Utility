@@ -250,7 +250,7 @@ class MongoWriter extends YadamuWriter {
 	  return this.skipTable
     } catch (cause) {
 	  this.reportBatchError(batch,`INSERT MANY`,cause)
-      this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
+      this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
     } 
     
          

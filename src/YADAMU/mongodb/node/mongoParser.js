@@ -55,12 +55,13 @@ class MongoParser extends YadamuParser {
     switch (this.tableInfo.READ_TRANSFORMATION) {
 	  case 'DOCUMENT_TO_ARRAY' :
 	    // Need to assemble array in correct order.
-	    data = this.tableInfo.COLUMN_NAME_ARRAY.map((c) => { return data[c] })
+	    data = this.tableInfo.JSON_KEY_NAME_ARRAY.map((c) => { return data[c] })
       	this.rowTransformation(data)
 		break;
       default:
     }
 	// if (this.rowCount === 1) console.log(data)
+		
     this.push({data:data})
     callback();
   }

@@ -522,11 +522,11 @@ end;`
   **       await lob.close();
   **       lobCount++;
   **     } catch(e) {
-  **       this.yadamuLogger.logException([`${this.constructor.name}.freeLobList()`,`${this.tableInfo.tableName}`,`${idx}`],e);
+  **       this.yadamuLogger.logException([`${this.constructor.name}.freeLobList()`,`${this.tableName}`,`${idx}`],e);
   **     }   
   **   })
   **   if (lobCount > 0) {
-  **     this.yadamuLogger.info([`${this.constructor.name}.freeLobList()`,`${this.tableInfo.tableName}`],`Closed ${lobCount} lobs.`); 
+  **     this.yadamuLogger.info([`${this.constructor.name}.freeLobList()`,`${this.tableName}`],`Closed ${lobCount} lobs.`); 
   **   }
   ** }
   **
@@ -579,7 +579,7 @@ end;`
         await this.dbi.restoreSavePoint(cause);
 		if (cause.errorNum && (cause.errorNum === 4091)) {
           // Mutating Table - Convert to Cursor based PL/SQL Block
-          this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to PL/SQL Block.`);          
+          this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to PL/SQL Block.`);          
           this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
           try {
             rows = batch.rows
@@ -600,12 +600,12 @@ end;`
           } catch (cause) {
   		    await this.reportBatchError(batch,`INSERT MANY [PL/SQL]`,cause,rows) 
             await this.dbi.restoreSavePoint(cause);
-            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
+            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
             this.insertMode = 'Iterative';
           }
         } 
         else {  
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableInfo.tableName,this.insertMode],`Switching to Iterative mode.`);          
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
           this.insertMode = 'Iterative';
         }
       }

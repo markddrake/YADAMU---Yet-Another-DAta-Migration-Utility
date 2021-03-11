@@ -1,6 +1,8 @@
 "use strict" 
+
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { performance } = require('perf_hooks');
 
 const {pipeline, Readable, PassThrough} = require('stream')
@@ -33,26 +35,45 @@ const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib
 **
 */
 
-class PipeOnce extends Readable {
+class TableSwitcher extends PassThrough {
 
-  constructor(metadata,endOption) {
-	 super();
-	 this.metadata = metadata
-	 this.endOption = endOption
-  	 // this.pause();
+  constructor() {
+	super()
   }
   
   pipe(os,options) {
-	options = options || {}
-	options.end = this.endOption;
-	return super.pipe(os,options);
-  }  
-  
-  _read() {
-	 this.push(this.metadata)
-	 this.metadata = null
+    options = options || {}
+	options.end = false;
+	return super.pipe(os,options)
   }
   
+  _transform(data,enc,callback) {
+    this.push(data)
+    callback()
+  }
+ 
+}
+
+class FirstTableSwitcher extends TableSwitcher {
+
+  constructor(exportFileHeader) {
+	super()
+    this.push(exportFileHeader) 
+  }
+ 
+}
+
+class EndExportOperation extends Readable {
+
+  constructor(exportFileFooter) {
+	super()
+    this.push(exportFileFooter) 
+  }
+
+  _read() {
+   this.push(null)
+  }
+ 
 }
 
 class FileDBI extends YadamuDBI {
@@ -77,19 +98,21 @@ class FileDBI extends YadamuDBI {
     return FileDBI.YADAMU_DBI_PARAMETERS
   }
 
-  get DATABASE_KEY()          { return FileDBI.DATABASE_KEY };
-  get DATABASE_VENDOR()       { return FileDBI.DATABASE_VENDOR };
+  get DATABASE_KEY()           { return FileDBI.DATABASE_KEY };
+  get DATABASE_VENDOR()        { return FileDBI.DATABASE_VENDOR };
   
-  get COMPRESSED_OUTPUT()     { return this.yadamu.COMPRESSION !== 'NONE' }
+  get COMPRESSED_FILE()        { return this.yadamu.COMPRESSION !== 'NONE' }
+  get ENCRYPTED_FILE()         { return this.yadamu.ENCRYPTION }
   
-  set PIPELINE_ENTRY_POINT(v) { this._PIPELINE_ENTRY_POINT = v }
-  get PIPELINE_ENTRY_POINT()  { return this._PIPELINE_ENTRY_POINT }
+  set PIPELINE_ENTRY_POINT(v)  { this._PIPELINE_ENTRY_POINT = v }
+  get PIPELINE_ENTRY_POINT()   { return this._PIPELINE_ENTRY_POINT }
   
-  set START_EXPORT_FILE(v)    { this._START_EXPORT_FILE = new PipeOnce(v,false) }
-  get START_EXPORT_FILE()     { return this._START_EXPORT_FILE }
+  set EXPORT_FILE_HEADER(v)    { this._EXPORT_FILE_HEADER = v }
+  get EXPORT_FILE_HEADER()     { return this._EXPORT_FILE_HEADER }
   
-  set END_EXPORT_FILE(v)      { this._END_EXPORT_FILE =  new PipeOnce(v,true) }
-  get END_EXPORT_FILE()       { return this._END_EXPORT_FILE }
+  set INITIALIZATION_VECTOR(v) { this._INITIALIZATION_VECTOR =  v }
+  get INITIALIZATION_VECTOR()  { return new Uint8Array(16).fill(1); /* this._INITIALIZATION_VECTOR */}
+  
   
   constructor(yadamu,exportFilePath) {
     super(yadamu)
@@ -167,21 +190,26 @@ class FileDBI extends YadamuDBI {
   }
  
   async initialize() {
+    
     super.initialize(false);
     this.spatialFormat = this.parameters.SPATIAL_FORMAT || super.SPATIAL_FORMAT
 	this.exportFilePath = this.exportFilePath || this.parameters.FILE
-	this.exportFilePath = this.COMPRESSED_OUTPUT ? `${this.exportFilePath}.gz` : this.exportFilePath
+	this.exportFilePath = this.COMPRESSED_FILE ? `${this.exportFilePath}.gz` : this.exportFilePath
 	this.exportFilePath =  path.resolve(this.exportFilePath)
   }
 
-  async initializeExport() {
-	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
-	super.initializeExport();
-    await new Promise((resolve,reject) => {
+  createInputStream() {
+    return new Promise((resolve,reject) => {
       this.inputStream = fs.createReadStream(this.exportFilePath);
 	  const stack = new Error().stack
       this.inputStream.on('open',() => {resolve()}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,this.exportFilePath) : new FileError(err,stack,this.exportFilePath) )})
     })
+  }
+	 
+  async initializeExport() {
+	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
+	super.initializeExport();
+	await this.createInputStream()
   }
 
   async finalizeExport() {
@@ -189,16 +217,58 @@ class FileDBI extends YadamuDBI {
 	this.closeInputStream()
   }
   
-  async initializeImport() {
-	// For FileDBI Import is Writing data to the file system.
-    // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
-	super.initializeImport()
-    await new Promise((resolve,reject) => {
+  async createInitializationVector() {
+
+	return await new Promise((resolve,reject) => {
+      crypto.randomFill(new Uint8Array(16), (err, iv) => {
+		if (err) reject(err)
+	    resolve(iv);
+      })
+	})	    
+  } 
+  
+  createOutputStream() {
+    return new Promise((resolve,reject) => {
       this.outputStream = fs.createWriteStream(this.exportFilePath,{flags :"w"})
 	  const stack = new Error().stack
       this.outputStream.on('open',() => {resolve()}).on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(err,stack,this.exportFilePath) : new FileError(err,stack,this.exportFilePath) )})
 	})
-    this.yadamuLogger.info([this.DATABASE_VENDOR],`Data written to "${this.exportFilePath}".`)
+  }
+
+  getFileOutputStream(tableName) {
+    return this.outputStream
+  }
+
+  createOutputStreams() {
+
+    this.outputStreams = []
+	
+    if (this.COMPRESSED_FILE) {
+      this.outputStreams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
+    }
+	
+    if (this.ENCRYPTED_FILE) {
+  	  console.log('Cipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR);
+	  const cipherStream = crypto.createCipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+	  this.outputStreams.push(cipherStream)
+	}
+	
+	this.outputStreams.push(this.getFileOutputStream())
+  }
+  
+  async initializeImport() {
+	// For FileDBI Import is Writing data to the file system.
+	
+    // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
+	
+	super.initializeImport()
+	await this.createOutputStream()
+	if (this.ENCRYPTED_FILE) {
+      this.INITIALIZATION_VECTOR = await this.createInitializationVector();
+    }
+	this.createOutputStreams()
+	this.PIPELINE_ENTRY_POINT = this.outputStreams[0]
+    this.yadamuLogger.info([this.DATABASE_VENDOR],`Writing data to "${this.exportFilePath}".`)
   }
   
   async initializeData() {
@@ -210,51 +280,53 @@ class FileDBI extends YadamuDBI {
 
     const sourceInfo = {}
     Object.keys(this.metadata).forEach((key) => {if (this.metadata[key].source) sourceInfo[key] = this.metadata[key].source; delete this.metadata[key].source})
-    let startJSON = `{"systemInformation":${JSON.stringify(this.systemInformation)}${this.ddl ? `,"ddl":${JSON.stringify(this.ddl)}` : ''},"metadata":${JSON.stringify(this.metadata)}`
+    let exportFileHeader = `{"systemInformation":${JSON.stringify(this.systemInformation)}${this.ddl ? `,"ddl":${JSON.stringify(this.ddl)}` : ''},"metadata":${JSON.stringify(this.metadata)}`
 	Object.keys(sourceInfo).forEach((key) => {this.metadata[key].source = sourceInfo[key]})
 
-	let endJSON = undefined
     if ((this.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata))) {
-	  endJSON = '}'
+	  const exportFileContents = `${exportFileHeader}}`
+      const finalize = new EndExportOperation(exportFileContents)
+	  this.outputStreams.unshift(finalize)
+	  await new Promise((resolve,reject) => {
+        pipeline(this.outputStreams,(err) => {
+		  if (err) reject(err)
+	      resolve()
+        })
+	 
+	 })
 	}
     else {
-	  startJSON = `${startJSON},"data":{` 
-	  endJSON = '}}'
+	  exportFileHeader = `${exportFileHeader},"data":{` 
 	} 
 	 
-	this.START_EXPORT_FILE = startJSON
-	this.END_EXPORT_FILE  = endJSON
-	 
-	const outputStreams = this.getOutputStreams()
-	// this.yadamuLogger.trace([this.constructor.name,'EXPORT',this.DATABASE_VENDOR,this.parameters.TO_USER],`${outputStreams.map((proc) => { return proc.constructor.name }).join(' => ')}`)
-	this.PIPELINE_ENTRY_POINT = outputStreams[0]
+	this.EXPORT_FILE_HEADER = exportFileHeader
 	
-	outputStreams.unshift(this.START_EXPORT_FILE)
-	// this.yadamuLogger.trace([this.constructor.name,'EXPORT',this.DATABASE_VENDOR,this.parameters.TO_USER],`${outputStreams.map((proc) => { return proc.constructor.name }).join(' => ')}`)
-	 
-	this.pipelineComplete = new Promise((resolve,reject) => {
-	  pipeline(outputStreams,(err) => {
-	    if (err) reject(err);
-	    resolve()
-      })
-	})
-	 
-	if ((this.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata)))  {
-	  pipeline([this.END_EXPORT_FILE,this.PIPELINE_ENTRY_POINT],(err) => {
-	    if (err) throw(err);
-	  })
-    }
-	 
   }
     
+  async finalizeData() {
+    
+	// this.yadamuLogger.trace([this.constructor.name],`finalizeData(${YadamuLibrary.isEmpty(this.metadata)})`)
+	
+	if (!YadamuLibrary.isEmpty(this.metadata)) {
+      const finalize = new EndExportOperation('}}')
+	  this.outputStreams.unshift(finalize)
+	  await new Promise((resolve,reject) => {
+        pipeline(this.outputStreams,(err) => {
+		  if (err) reject(err)
+	      resolve()
+        })
+	  })
+    }
+  }
+	
   async finalizeImport() {}
+
     
   async finalize() {
     if (this.inputStream !== undefined) {
       await this.closeInputStream()
     }
   }
-
 
   /*
   **
@@ -286,7 +358,6 @@ class FileDBI extends YadamuDBI {
   **  Generate a set of DDL operations from the metadata generated by an Export operation
   **
   */
-  
       
   async generateStatementCache(schema,executeDDL) {
     this.statementCache = []
@@ -351,7 +422,13 @@ class FileDBI extends YadamuDBI {
     })
 	streams.push(is)
 	
-	if (this.COMPRESSED_OUTPUT) {
+	if (this.ENCRYPTED_FILE) {
+  	  console.log('Decipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR);
+	  const decipherStream = crypto.createDecipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+	  streams.push(decipherStream);
+	}
+
+	if (this.COMPRESSED_FILE) {
       streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
@@ -368,34 +445,75 @@ class FileDBI extends YadamuDBI {
 	const eventStream = new EventStream(this.yadamu)
 	eventStream.on('error',(err) => { 
       this.INPUT_METRICS.parserEndTime = performance.now()
-	  this.INPUT_METRICS.parserError = err
+	  this.INPUT_METRICS.parserError =
+	  err
 	  this.INPUT_METRICS.failed = true
     }).on('end',() => {
       this.INPUT_METRICS.parserEndTime = performance.now()
     })
 	streams.push(eventStream)
+
+    // console.log(streams.map((s) => { return s.constructor.name }).join(' ==> '))
 	return streams;
   }
-    
+
   getOutputStream(tableName,ddlComplete) {
     // Override parent method to allow output stream to be passed to worker
     // this.yadamuLogger.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
 	const os =  new JSONWriter(this,tableName,ddlComplete,this.firstTable,this.status,this.yadamuLogger)
-	this.firstTable = false;
-    return os
+	return os
   }
   
-  getFileOutputStream(tableName) {
-    return this.outputStream
-  }
-
   getOutputStreams(tableName) {
-    const streams = []
-	if (this.COMPRESSED_OUTPUT) {
-      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
-    }
-	streams.push(this.getFileOutputStream(tableName))
+
+    const outputStreams = [...this.outputStreams]
 	
+    // The TableSwitcher is used to prevent 'end' events propegating to the output stream
+    const tableSwitcher = this.firstTable ? new FirstTableSwitcher(this.EXPORT_FILE_HEADER) : new TableSwitcher() 
+    outputStreams.unshift(tableSwitcher)
+    
+    // Create a JSON Writer
+    const jsonWriter = this.getOutputStream(tableName,undefined)
+    outputStreams.unshift(jsonWriter)
+	this.firstTable = false;
+	 
+    // console.log(outputStreams.map((s) => { return s.constructor.name }).join(' ==> '))
+    return outputStreams	
+  }
+  
+  async createCloneStream(options) {
+	await this.initialize()
+	const streams = []
+	await this.createInputStream();
+	streams.push(this.inputStream)
+	
+	if (options.encryptedInput) {
+  	  console.log('Decipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR);
+	  const decipherStream = crypto.createDecipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+	  streams.push(decipherStream);
+	}
+	
+	if (options.compressedInput) {
+      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGunzip() : createInflate())
+	}
+      
+	if (options.compressedOutput) {
+      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
+	}
+	
+	if (options.encryptedOutput) {
+  	  console.log('Cipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR);
+	  const cipherStream = crypto.createCipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
+	  streams.push(cipherStream)
+	}
+
+    const outputFilePath = path.resolve(options.filename);
+	const inputFilePath = this.exportFilePath;
+    this.exportFilePath = outputFilePath
+	await this.createOutputStream();
+	streams.push(this.outputStream)
+	
+    // console.log(`"${inputFilePath}" ==> ${streams.map((s) => { return s.constructor.name }).join(' ==> ')} ==> "${outputFilePath}".`)
 	return streams;
   }
     

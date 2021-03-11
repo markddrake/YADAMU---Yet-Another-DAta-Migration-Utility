@@ -68,8 +68,9 @@ class StatementGenerator {
 
     let insertMode = 'DOCUMENT';
 
-    let vendor = tableMetadata.vendor
 
+    let vendor = tableMetadata.vendor
+  
     let columnNames = tableMetadata.columnNames
     let dataTypes = tableMetadata.dataTypes
     let sizeConstraints = tableMetadata.sizeConstraints

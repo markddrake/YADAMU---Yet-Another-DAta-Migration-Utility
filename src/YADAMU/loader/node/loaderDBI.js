@@ -140,26 +140,8 @@ class LoaderDBI extends YadamuDBI {
     return true;
   }
   
-  async setMetadata(metadata) {
-    Object.values(metadata).forEach((table) => {delete table.source})
-	super.setMetadata(metadata)
-  }
-
   async getSystemInformation() {
-    // this.yadamuLogger.trace([this.constructor.name,this.exportFilePath],`getSystemInformation()`)     
-	
-	/*
-	**
-	** The Loader always returns the data that was generated when the directory structure was created..
-	
-	return Object.assign(
-	  super.getSystemInformation()
-	, {}
-    )
-	
-	**
-	*/
-	
+    // this.yadamuLogger.trace([this.constructor.name,this.exportFilePath],`getSystemInformation()`)     	
 	return this.controlFile.systemInformation
   }
 
@@ -181,38 +163,6 @@ class LoaderDBI extends YadamuDBI {
     // this.yadamuLogger.trace([this.constructor.name,this.EXPORT_PATH],`getSchemaInfo()`)
 	
 	this.metadata = await this.loadMetadataFiles()
-
-    /*
-    **
-	
-    if (this.TABLE_FILTER.length > 0) {
-
-      const sourceMetadata = metadata;
-	  
-	  // Check table names are valid.
-	  // For each name in the Table Filter check there is a corresponding entry in the schemaInfoormation collection
-	  
-	  const tableNames = Object.keys(sourceMetadata)
-
-	  const invalidTableNames = this.TABLE_FILTER.filter((tableName) => {
-		 // Return true if the table does not have an entry in the schemaInformstion collection
-		 return !tableNames.includes(tableName)
-	  })
-	  
-	  if (invalidTableNames.length > 0) {
-        throw new CommandLineError(`Could not resolve the following table names : "${invalidTableNames}".`)
-      }
-	
-      this.yadamuLogger.info(['FILE'],`Operations restricted to the following tables: ${JSON.stringify(this.TABLE_FILTER)}.`)
-	  
-	  metadata = {}
-	  this.TABLE_FILTER.forEach((table) => {
-         metadata[table] = sourceMetadata[table]
-	  })
-	}
-	
-	**
-	*/
 	
     return Object.keys(this.metadata).map((tableName) => {
       return {
@@ -234,12 +184,11 @@ class LoaderDBI extends YadamuDBI {
   */
 
   async createControlFile(metadataFileList,dataFileList) {
-
   	const yadamuOptions = {
 	  contentType : this.OUTPUT_FORMAT
     , compression : this.yadamu.COMPRESSION
     }
-	this.controlFile = { yadamuOptions : yadamuOptions, systemInformation : this.systemInformation, metadata : metadataFileList, data: dataFileList}  
+	this.controlFile = { yadamuOptions : yadamuOptions, systemInformation : {}, metadata : metadataFileList, data: dataFileList}  
   }
 
   getMetadataPath(tableName) {
@@ -255,52 +204,64 @@ class LoaderDBI extends YadamuDBI {
   }
   
   async writeMetadata(metadata) {
-    // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
+    
+    // this.yadamuLogger.trace([this.constructor.name],`writeMetadata()`)
+    
     Object.values(metadata).forEach((table) => {delete table.source})
-	super.setMetadata(metadata)
-    const metadataFileList = {}
-    const metadatObject = await Promise.all(Object.values(this.metadata).map((tableMetadata) => {
+    this.controlFile.systemInformation = this.systemInformation
+	const compressedOuput = (this.yadamu.COMPRESSION !== 'NONE')
+    Object.values(this.metadata).forEach((tableMetadata) => {
 	   const file = this.getMetadataPath(tableMetadata.tableName) 
-       metadataFileList[tableMetadata.tableName] = {file: file}
-       return this.writeFile(metadataFileList[tableMetadata.tableName].file,tableMetadata)   
-    }))
-    const dataFileList = {}
-    const compressedOuput = (this.yadamu.COMPRESSION !== 'NONE')
+       this.controlFile.metadata[tableMetadata.tableName] = {file: file}
+    })
     Object.values(this.metadata).forEach((tableMetadata) =>  {
 	  let filename = `${path.join(this.dataFolderPath,tableMetadata.tableName)}.${this.FILE_EXTENSION}`
 	  filename = compressedOuput ? `${filename}.gz` : filename
-      dataFileList[tableMetadata.tableName] = {file: this.getDatafilePath(filename)}
+      this.controlFile.data[tableMetadata.tableName] = {file: this.getDatafilePath(filename)}
     })
-	this.createControlFile(metadataFileList,dataFileList)
 	await this.writeFile(this.controlFilePath,this.controlFile)
+
+    const results = await Promise.all(Object.values(this.metadata).map((tableMetadata,idx) => {
+	   const file = this.controlFile.metadata[tableMetadata.tableName].file
+       return this.writeFile(file,tableMetadata)   
+    }))
   }
 
   async setMetadata(metadata) {
-    // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
+
+    // this.yadamuLogger.trace([this.constructor.name,this.getWorkerNumber()],`setMetadata()`)
+
     Object.values(metadata).forEach((table) => {delete table.source})
 	super.setMetadata(metadata)
-	if (this.controlFile === undefined) {
-      await this.writeMetadata(metadata)
-	}
+    await this.writeMetadata(metadata)
   }
+  
+  setFolderPaths(rootFolder,schema) {
+      
+	this.controlFilePath = `${path.join(rootFolder,schema)}.json`
+    this.metadataFolderPath = path.join(rootFolder,'metadata')
+    this.dataFolderPath = path.join(rootFolder,'data')
+  }      
   
   async initializeImport() {
 	 
-	// this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
+	// this.yadamuLogger.trace([this.constructor.name,this.getWorkerNumber()],`initializeImport()`)
     
     // Calculate the base directory for the unload operation. The Base Directory is dervied from the target schema name specified by the TO_USER parameter
 
-	this.controlFilePath = `${path.join(this.IMPORT_FOLDER,this.parameters.TO_USER)}.json`
-    this.metadataFolderPath = path.join(this.IMPORT_FOLDER,'metadata')
-    this.dataFolderPath = path.join(this.IMPORT_FOLDER,'data')
-    
+    this.setFolderPaths(this.IMPORT_FOLDER,this.parameters.TO_USER)
+
     // Create the Upload, Metadata and Data folders
 	await fsp.mkdir(this.IMPORT_FOLDER, { recursive: true });
     await fsp.mkdir(this.metadataFolderPath, { recursive: true });
     await fsp.mkdir(this.dataFolderPath, { recursive: true });
     
-	this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Created control file "${this.controlFilePath}"`);
+	this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Created target directory  "${this.IMPORT_FOLDER}"`);
 
+    const dataFileList = {}
+    const metadataFileList = {}
+    this.createControlFile(metadataFileList,dataFileList)
+    
   }
 
   getOutputStream(tableName,ddlComplete) {
@@ -337,7 +298,9 @@ class LoaderDBI extends YadamuDBI {
 
   async initializeExport() {
 	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
-    this.controlFilePath = `${path.join(this.EXPORT_FOLDER,this.parameters.FROM_USER)}.json`
+    
+    this.setFolderPaths(this.EXPORT_FOLDER,this.parameters.FROM_USER)
+
 	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using control file "${this.controlFilePath}"`);
 	let stack
 	try {
@@ -379,6 +342,7 @@ class LoaderDBI extends YadamuDBI {
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating input stream on ${this.controlFile.data[tableInfo.TABLE_NAME].file}`)
 	const filename = this.controlFile.data[tableInfo.TABLE_NAME].file
     const stream = fs.createReadStream(filename);
+    const stack = new Error().stack;
     await new Promise((resolve,reject) => {
 	  stream.on('open',() => {resolve(stream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,filename) : new FileError(err,stack,filename))})
 	})
@@ -447,6 +411,11 @@ class LoaderDBI extends YadamuDBI {
   async cloneCurrentSettings(manager) {
     super.cloneCurrentSettings(manager)
 	this.controlFile = manager.controlFile
+    /*
+	this.controlFilePath = manager.controlFilePath
+    this.metadataFolderPath = manager.metadataFolderPath
+    this.dataFolderPath = manager.dataFolderPath
+    */
   }
   
   reloadStatementCache() {

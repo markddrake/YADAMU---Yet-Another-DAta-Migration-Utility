@@ -4,14 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const util = require('util');
 
-const {pipeline} = require('stream')
+const {pipeline, finished} = require('stream')
 
 const DBWriter = require('./dbWriter.js');
 const YadamuLogger = require('./yadamuLogger.js');
 
 const Pushable = require('./pushable.js');
 const ErrorDBI = require('../file/node/errorDBI.js');
-const PassThrough = require('./yadamuPassThrough.js');
 
 class YadamuRejectManager {
   
@@ -22,38 +21,26 @@ class YadamuRejectManager {
     this.filename = filename;
 	this.dbi = new ErrorDBI(yadamu,filename)
 	this.dbi.initialize()
-	
+
 	// Use a NULL Logger in production.
     // this.logger =  YadamuLogger.consoleLogger();
 	this.logger = YadamuLogger.NULL_LOGGER;
-    this.fileWriter = new DBWriter(this.dbi,this.logger);
 	
 	this.initialzied = false;
 	this.recordCount = 0
-  	this.dataStream = new Pushable({objectMode: true},true);
+  	
+	this.dataStream = new Pushable({objectMode: true},true);
 	
-    const errorWriter = this.dbi.getOutputStream()
-	const passThrough = new PassThrough({objectMode: false},false);
-    passThrough.on('end',async () => {
-   	  // console.log('JSON Writer: finish',dbi.PIPELINE_ENTRY_POINT.writableEnded)
-      passThrough.unpipe();
-	  this.dataStream.destroy();
-	  errorWriter.destroy();
-	  passThrough.destroy();
-      pipeline([this.dbi.END_EXPORT_FILE,this.dbi.PIPELINE_ENTRY_POINT],(err) => {
-   	    // console.log('EOF Pipeline: Finish',this.dbi.PIPELINE_ENTRY_POINT.writableEnded,err)
-        if (err) {throw(err)}
-      })
-	})
-    this.errorPipeline = [this.dataStream,errorWriter,passThrough]
- 	  
     this.currentTable = undefined
+	this.currentPipeline = []
+	
     const errorFolderPath = path.dirname(this.filename);
     fs.mkdirSync(errorFolderPath, { recursive: true });
   }	
   
   setSystemInformation(systemInformation) {
     this.dbi.setSystemInformation(systemInformation)
+  
   }
   
   setMetadata(metadata) {
@@ -64,13 +51,24 @@ class YadamuRejectManager {
 	  
 	// console.log(data);
 	 
-	if (this.currentTable === undefined) {
+	if (this.currentTable !== tableName) {
 	  this.currentTable = tableName
+	  if (this.currentPipeline.length === 0) {
+        await this.dbi.initializeImport();
+	    await this.dbi.initializeData()
+	  }
+	  else {
+        // Manually clean up the previous pipeline since it never completely ended. Prevents excessive memory usage..
+	    this.currentPipeline.forEach((s) => { s.removeAllListeners('unpipe') })
+        // Unpipe all target streams
+	    this.currentPipeline.forEach((s,i) => { if (i < targetPipeline.length - 1) {s.unpipe(targetPipeline[i+1])} })
+	  }
+	 
+      this.currentPipeline = new Array(this.dataStream,...this.dbi.getOutputStreams(tableName))
+   	  // console.log(this.currentPipeline .map((s) => { return s.constructor.name }).join(' ==> '))	  
+
       this.dataStream.pump({table:tableName})
-      await this.fileWriter.initialize()  
-   	  await this.dbi.initializeData()
-      this.errorPipeline.push(this.dbi.PIPELINE_ENTRY_POINT)
-      pipeline(this.errorPipeline,(err) => {
+      pipeline(this.currentPipeline,(err) => {
 		if (err && (err.code === 'ERR_STREAM_PREMATURE_CLOSE')) {
 		  errorPipeline.forEach((stream) => {
 			if (stream.underlyingError instanceof Error) {
@@ -81,21 +79,26 @@ class YadamuRejectManager {
       })  
     }
 	
-	if (this.currentTable !== tableName) {
-      this.dataStream.pump({table:tableName})
-	  this.currentTable = tableName
-	}
-
     this.recordCount++;
     this.dataStream.pump({data:data})
 
   }
   
   async close() {
+
 	if (this.recordCount > 0) {
-      this.dataStream.pump(null)
-  	  await this.dbi.pipelineComplete;
-	  await this.dbi.finalize()    
+ 	  const tableSwitcher = this.currentPipeline[2]
+	  const tableComplete = new Promise((resolve,reject) => {
+	    finished(tableSwitcher,() => {
+          resolve()
+         })
+      })
+	  
+      this.dataStream.pump(null)	  
+  	  await tableComplete;
+	  await this.dbi.finalizeData();
+	  await this.dbi.finalizeImport();
+	  await this.dbi.finalize();
       await this.logger.close()
       this.yadamu.LOGGER.info([this.usage],`${this.recordCount} records written to "${this.filename}"`)
 	}

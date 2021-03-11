@@ -119,6 +119,46 @@
   },{
     "operation"       : "import"
   , "source"          : "scratch-export"
+  , "target"          : "loader#1"
+  , "importPath"      : "oracle19c/DATA_ONLY"
+  , "parameters"      : {
+      "ROOT_FOLDER"   : "yadamu/RTS"
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
+    "source"          : "oracle19c"
+  , "target"          : "loader#1"
+  , "parameters"      : {
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
+    "source"          : "loader#1"
+  , "targets": [
+	  "oracle19c"	  
+    ]
+  , "parameters"      : {
+      "ROOT_FOLDER"   : "yadamu/RTS"
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
+    "source"          : "oracle19c"
+  , "target"          : "loader#1"
+  , "parameters" : {
+      "ROOT_FOLDER"   : "yadamu/RTS/gzip/%sourceConnection%/%mode%"
+	, "COMPRESSION"   : "GZIP"
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
+    "operation"       : "import"
+  , "source"          : "scratch-export"
   , "target"          : "minio#1"
   , "importPath"      : "oracle19c/DATA_ONLY"
   , "parameters"      : {
@@ -163,6 +203,14 @@
   , "importPath"      : "oracle19c/DATA_ONLY"
   , "parameters"      : {
       "ROOT_FOLDER"   : "yadamu/RTS"
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
+    "source"          : "oracle19c"
+  , "target"          : "azurite#1"
+  , "parameters"      : {
 	}
   , "tasks": [ 
       "HR"
