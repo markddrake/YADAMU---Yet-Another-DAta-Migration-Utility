@@ -18,6 +18,8 @@ Supported Databases :
 * MongoDB 4.0 and later
 * Snowflake Data Warehouse
 
+Yadamu can also export data sets to Amazon AWS S3 Storage and Microsoft Azure BLOB storage. Data can be exported as CSV, JSON Arrays, or JSON.
+
 Support for other databases as well as older versions of Oracle, Postgres, MySQL/MariaDB and SQL Server is under consideration.
 
 Click [here](doc/README.md) for a a set of Crib sheets that provide more information on installing and using YADAMU.
