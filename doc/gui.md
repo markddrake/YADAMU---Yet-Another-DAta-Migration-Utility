@@ -8,7 +8,7 @@ Note the "Perform Task" and "Save Configuration" buttons only become active once
 
 The following screenshot shows the GUI ready to perform a copy of the HR schema from Oracle to Postgres. 
 
-<img src="https://github.com/markddrake/YADAMU---Yet-Another-DAta-Migration-Utility/blob/master/md/assets/screenshots/YADAMU_GUI%231.JPG">
+<img src="assets/screenshots/YADAMU_GUI#.JPG">
 
 To start the GUI simply type bin\yadamu from the YADAMU directory.
 
