@@ -6,3 +6,4 @@
 
 [Installing and running the Docker Image](createDockerContainer.md)
 
+[Installing YADAMU Database support packages](databaseInstall.md)
