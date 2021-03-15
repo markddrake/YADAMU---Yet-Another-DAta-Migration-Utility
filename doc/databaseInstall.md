@@ -12,10 +12,10 @@ Installion Instructions for each supported database are given below:
 
 [Postgres](postgresInstallation.md)
 
-[MySQL](postgresInstallation.md)
+[MySQL](mysqlInstallation.md)
 
-[MaraiDB](postgresInstallation.md)
+[MariaDB](mariadbInstallation.md)
 
-[MongoDB](mondodbInstallation.md)
+[MongoDB](mongodbInstallation.md)
 
 [Snowflake](snowflakeInstallation.md)
