@@ -48,19 +48,19 @@ class MongoWriter extends YadamuWriter {
 	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
 	   switch(targetDataType.toLowerCase()){
         case 'objectid':
-	      return (row,idx) => {
-			row[idx] = ObjectID(row[idx])
+	      return (col,idx) => {
+			return ObjectID(col)
 	      }
           break;
 		case 'numeric':
 		case 'decimal':
-		  return (row,idx) => {
-			 row[idx] = Decimal128.fromString(row[idx])
+		  return (col,idx) => {
+			 return Decimal128.fromString(col)
 	      }
           break;
 		case 'long':
-		  return (row,idx) => {
-			 row[idx] = Long.fromString(row[idx])
+		  return (col,idx) => {
+			 return Long.fromString(col)
 	      }
           break;
         case 'geometry':
@@ -81,51 +81,52 @@ class MongoWriter extends YadamuWriter {
           switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
             case "WKB":
             case "EWKB":
-              return (row,idx) => {
-			    row[idx] = WKX.Geometry.parse(row[idx]).toGeoJSON()
+              return (col,idx) => {
+			    return WKX.Geometry.parse(col).toGeoJSON()
 			  }
  			  return null
             case "WKT":
             case "EWKT":
-              return (row,idx) => {
-        	    row[idx] = WKX.Geometry.parse(row[idx]).toGeoJSON()
+              return (col,idx) => {
+        	    return WKX.Geometry.parse(col).toGeoJSON()
               }
             default:
           }
 		  return null
         case 'boolean':
-          return (row,idx) => {
-            row[idx] = YadamuLibrary.toBoolean(row[idx])
+          return (col,idx) => {
+            return YadamuLibrary.toBoolean(col)
 	      }
         case 'object':
-          return (row,idx) => {
-            row[idx] = typeof row[idx] === 'string' && (row[idx].length > 0) ? JSON.parse(row[idx]) : row[idx]
+          return (col,idx) => {
+            return typeof col === 'string' && (col.length > 0) ? JSON.parse(col) : col
 	      }
 		case 'bindata':
 		  if ((this.tableInfo.columnNames[idx] === '_id') && (this.tableInfo.sizeConstraints[idx] === '12')) {
-  	        return (row,idx) => {
-              row[idx] = ObjectID(row[idx])
+  	        return (col,idx) => {
+              return ObjectID(col)
 	        }
 		  }
 		  return null
 		case 'date':
 		  if (this.dbi.MONGO_NATIVEJS_DATE) {
-	        return (row,idx) => {
-              row[idx] =  new Date(row[idx])
+	        return (col,idx) => {
+              return  new Date(col)
 	        }		
           }			
 		  return null
 		default:
 		  if (YadamuLibrary.isNumericType(targetDataType)) {
-			return (row,idx) => {
-			  if (typeof row[idx] === 'string') {
-			    row[idx] = Number(row[idx])
-			    this.transformations[idx] = (row,idx) => {
-				  row[idx] = Number(row[idx])
+			return (col,idx) => {
+			  if (typeof col === 'string') {
+			    this.transformations[idx] = (col,idx) => {
+				  return Number(col)
 				}
+			    return Number(col)
 			  }
 			  else {
                 this.transformations[idx] = null
+				return col
 			  }
 			}
           }			
@@ -133,18 +134,19 @@ class MongoWriter extends YadamuWriter {
 		  return null
           // First time through test if data is string and first character is '[' or ']'
 		  // TODO ### Trim and test last character is matching ']' or '}'
-		  return (row,idx) => {
-			if (typeof row[idx] === 'string' && ((row[idx].indexOf('[') === 0) || (row[idx].indexOf('{') === 0))) {
+		  return (col,idx) => {
+			if (typeof col === 'string' && ((col.indexOf('[') === 0) || (col.indexOf('{') === 0))) {
 			  try {
-			    row[idx] = JSON.parse(row[idx])
+			    const res = JSON.parse(col)
 				// If the parse succeeds remove the test for the remaining records.
-				this.transformations[idx] = (row,idx) => {
+				this.transformations[idx] = (col,idx) => {
 				  try {
-			        row[idx] = JSON.parse(row[idx])
+			        return JSON.parse(col)
 				  } catch (e) {
 		            this.transformations[idx] = null
 			      }
-				}	  
+				}	
+                return res				
 			  } catch (e) {
 				// If the parse fails remove the parse 
 		        this.transformations[idx] = null
@@ -159,7 +161,7 @@ class MongoWriter extends YadamuWriter {
     this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
       this.transformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
-          transformation(row,idx)
+          row[idx] = transformation(row[idx],idx)
         }
       }) 
     }
@@ -238,9 +240,9 @@ class MongoWriter extends YadamuWriter {
   }
   
   async _writeBatch(batch,rowCount) {
-    
+	      
     // ### Todo: ERROR HANDLING and Iterative Mode.
-
+	
     try {
       this.metrics.batchCount++
 	  const results = await this.dbi.insertMany(this.tableInfo.tableName,batch);

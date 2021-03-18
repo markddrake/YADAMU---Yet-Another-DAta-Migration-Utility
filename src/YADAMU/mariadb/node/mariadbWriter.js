@@ -92,6 +92,16 @@ class MariadbWriter extends YadamuWriter {
       }
     })
 	
+    // Use a dummy rowTransformation function if there are no transformations required.
+
+	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          row[idx] = transformation(row[idx],idx)
+        }
+      }) 
+    }
+	
   }
 
   getMetrics() {
@@ -107,11 +117,7 @@ class MariadbWriter extends YadamuWriter {
     	
 	try {
 	  
-  	  this.transformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-	      row[idx] = transformation(row[idx],idx)
-        }
-	  })
+      this.rowTransformation(row)
 
       // Batch Mode : Create one large array. Iterative Mode : Create an Array of Arrays.    
 

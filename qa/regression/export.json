@@ -177,5 +177,97 @@
   , "tasks": [
       "mysql"
     ]
+  },{
+    "source": "oracle19c"
+  , "target": "file-JSON"
+  , "exportPath" : "/plain/%connection%/%mode%"
+  , "parameters": {
+      "MODE": "DDL_ONLY"
+    }
+  , "tasks": [
+      "HR","BI"
+    ]
+  },{
+    "source": "oracle19c"
+  , "target": "file-JSON"
+  , "exportPath" : "/plain/%connection%/%mode%"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    }
+  , "tasks": [
+      "HR","BI"
+    ]
+  },{
+    "source": "oracle19c"
+  , "target": "file-JSON"
+  , "exportPath" : "gzip/%connection%/%mode%"
+  , "parameters": {
+      "MODE": "DDL_ONLY"
+    , "COMPRESSION" : "GZIP"
+	}
+  , "tasks": [
+      "HR","BI"
+    ]
+  },{
+    "source": "oracle19c"
+  , "target": "file-JSON"
+  , "exportPath" : "gzip/%connection%/%mode%"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+	, "COMPRESSION" : "GZIP"
+	}
+  , "tasks": [
+      "HR","BI"
+    ]
+  },{
+    "source": "oracle19c"
+  , "target": "file-JSON"
+  , "exportPath" : "X/%connection%/%mode%"
+  , "parameters": {
+      "MODE": "DDL_ONLY"
+	, "ENCRYPTION"  : true
+	, "PHASEPHRASE" : "yadamu"
+	}
+  , "tasks": [
+      "HR","BI"
+    ]
+  },{
+    "source": "oracle19c"
+  , "target": "file-JSON"
+  , "exportPath" : "X/%connection%/%mode%"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+    , "ENCRYPTION"  : true
+	, "PHASEPHRASE" : "yadamu"
+	}
+  , "tasks": [
+      "HR","BI"
+    ]
+  },{
+    "source": "oracle19c"
+  , "target": "file-JSON"
+  , "exportPath" : "X-gzip/%connection%/%mode%"
+  , "parameters": {
+      "MODE": "DDL_ONLY"
+	, "COMPRESSION" : "GZIP"
+	, "ENCRYPTION"  : true
+	, "PHASEPHRASE" : "yadamu"
+	}
+  , "tasks": [
+      "HR","BI"
+    ]
+  },{
+    "source": "oracle19c"
+  , "target": "file-JSON"
+  , "exportPath" : "X-gzip/%connection%/%mode%"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+	, "COMPRESSION" : "GZIP"
+	, "ENCRYPTION"  : true
+	, "PHASEPHRASE" : "yadamu"
+	}
+  , "tasks": [
+      "HR","BI"
+    ]
   }]
 }

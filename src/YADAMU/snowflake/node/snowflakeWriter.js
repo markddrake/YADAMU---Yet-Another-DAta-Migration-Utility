@@ -81,7 +81,7 @@ class SnowflakeWriter extends YadamuWriter {
 		case "DOUBLE PRECISION":
 		case "BINARY_FLOAT":
 		case "BINARY_DOUBLE":
-		  return (col, idx) => {
+		  return (col,idx) => {
 	        if (!isFinite(col)) {
 			  switch(col) {
 			    case Infinity:
@@ -99,6 +99,15 @@ class SnowflakeWriter extends YadamuWriter {
       }
     })
 	
+    // Use a dummy rowTransformation function if there are no transformations required.
+
+	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          row[idx] = transformation(row[idx],idx)
+        }
+      }) 
+    }
   }
         
   cacheRow(row) {
@@ -106,12 +115,8 @@ class SnowflakeWriter extends YadamuWriter {
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 
-    this.transformations.forEach((transformation,idx) => {
-      if ((transformation !== null) && (row[idx] !== null)) {			
-        row[idx] = transformation(row[idx],idx)
-      }
-	})
-	 
+    this.rowTransformation(row)
+
     if (this.tableInfo.parserRequired) {
       this.batch.push(...row);
     }
@@ -132,13 +137,7 @@ class SnowflakeWriter extends YadamuWriter {
    	  super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
 	}
   }
-  
-  recodeSpatialColumns(batch,msg) {
-	const targetFormat = 'WKT'
-    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,`INSERT MANY`,this.tableInfo.parserRequired,this.metrics.cached,this.SPATIAL_FORMAT],`${msg} Converting to "${targetFormat}".`);
-    YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,targetFormat,this.tableInfo.targetDataTypes,batch,!this.tableInfo.parserRequired)
-  }  
-
+ 
   async _writeBatch(batch,rowCount) {
  
     // Snowflake's handling of WKB appears a little 'flaky' :)

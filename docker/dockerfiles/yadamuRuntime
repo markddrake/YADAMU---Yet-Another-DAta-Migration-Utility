@@ -21,4 +21,8 @@ RUN cd bin \
  &&	ln -s $YADAMU_BIN/unload.sh yadamuUnload \
  && chmod +x $YADAMU_BIN/yadamu.sh \
  &&	ln -s $YADAMU_BIN/yadamu.sh yadamu 
+ && chmod +x $YADAMU_BIN/decrypt.sh \
+ &&	ln -s $YADAMU_BIN/decrypt.sh yadamuDecrypt 
+ && chmod +x $YADAMU_BIN/encrypt.sh \
+ &&	ln -s $YADAMU_BIN/encrypt.sh yadamuEncrypt 
 ENTRYPOINT ["sleep","365d"]

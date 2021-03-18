@@ -21,7 +21,6 @@ class YadamuError extends Error {
 	return ((e instanceof DatabaseError) && e.missingTable())
   }
   
-
 }
 
 class InternalError extends Error {

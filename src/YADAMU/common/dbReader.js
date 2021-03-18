@@ -11,27 +11,9 @@ const finished = stream.finished
 const Yadamu = require('./yadamu.js')
 const YadamuLibrary = require('./yadamuLibrary.js')
 const YadamuWriter = require('./yadamuWriter.js')
-const Pushable = require('./pushable.js')
 const {YadamuError, DatabaseError, IterativeInsertError, InputStreamError} = require('./yadamuException.js')
 
 const YadamuConstants = require('./yadamuConstants.js')
-
-/*
-class TableSwitcher extends PassThrough {
-
-  constructor(tableName) {
-	super()
-	this.tableName = tableName
-  }
-  
-  pipe(os,options) {
-    options = options || {}
-	options.end = false;
-	return super.pipe(os,options)
-  }
-  
-}
-*/
 
 class DBReader extends Readable {  
 
@@ -118,7 +100,6 @@ class DBReader extends Readable {
 	  }).once('close', (err) => {
         console.log(s.constructor.name,tableName,'close')
 	  }).once('error', (err) => {
-	    // console.log(s.constructor.name,'error',err)
 	    console.log(s.constructor.name,tableName,'error',err.message)
 	  })
 	})
@@ -235,7 +216,7 @@ class DBReader extends Readable {
 	 const tableInfo = readerDBI.generateQueryInformation(task)
 	 
 	 // Get the Table Readers 
-	 const sourcePipeline = await readerDBI.getInputStreams(tableInfo) 
+	 const sourcePipeline = await readerDBI.getInputStreams(tableInfo)
      const targetPipeline = writerDBI.getOutputStreams(tableInfo.MAPPED_TABLE_NAME)
 	 targetPipeline[0].setReaderMetrics(readerDBI.INPUT_METRICS)
 	 const tableSwitcher = targetPipeline[1]
@@ -249,7 +230,7 @@ class DBReader extends Readable {
 	     targetPipeline.forEach((s) => { s.removeAllListeners('unpipe') })
 	     
 		 // Unpipe all target streams
-	     targetPipeline.forEach((s,i) => { if (i < targetPipeline.length - 1) {s.unpipe(targetPipeline[i+1])} })
+	     targetPipeline.forEach((s,i) => { if (i < targetPipeline.length) {s.unpipe(targetPipeline[i+1])} })
 	   
 	     // Destroy the source streams
 	     sourcePipeline.forEach((s) => { s.destroy() })
@@ -270,12 +251,12 @@ class DBReader extends Readable {
 	
   	  await this.dbWriter.ddlComplete
       this.yadamuLogger.info(['PIPELINE','SERIAL',this.dbi.DATABASE_VENDOR,this.dbWriter.dbi.DATABASE_VENDOR],`Processing ${taskList.length} Tables`);
-     
+	  
 	  while (taskList.length > 0) {
 	    const task = taskList.shift()
 		await this.pipelineTableToFile(readerDBI,writerDBI,task)
 	  }
-	  
+	 
   }
 
   async generateStatementCache(metadata) {

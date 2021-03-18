@@ -65,7 +65,7 @@ class YadamuTest extends Yadamu {
 	 return this.teradateWorker
   }
   
-  reset(testParameters) {
+  async reset(testParameters) {
 	
     this._IDENTIFIER_MAPPINGS = undefined
     this._REJECTION_MANAGER = undefined;
@@ -80,6 +80,9 @@ class YadamuTest extends Yadamu {
 	this.initializeParameters(testParameters)
 	this.processParameters();
 	
+    if (testParameters.PASSPHRASE || testParameters.ENCRYPTION === true) {		
+	  await this.generateCryptoKey()
+	}
   }
   
   async doExport(dbi,file) {

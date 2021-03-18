@@ -93,7 +93,17 @@ class MsSQLWriter extends YadamuWriter {
 		  return null
       }
     })
+	
+    // Use a dummy rowTransformation function if there are no transformations required.
 
+	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          row[idx] = transformation(row[idx],idx)
+        }
+      }) 
+    }
+	
   }
       
   newBatch() {
@@ -110,7 +120,6 @@ class MsSQLWriter extends YadamuWriter {
 	}
   }
   
-
   getMetrics()  {
 	const results = super.getMetrics()
 	results.insertMode = this.tableInfo ? (this.tableInfo.bulkSupported === true ? 'Bulk' : 'Iterative' ) : 'Bulk'
@@ -123,12 +132,7 @@ class MsSQLWriter extends YadamuWriter {
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 	
 	try {
-	  this.transformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-	      row[idx] = transformation(row[idx],idx)
-        }
-	  })
-	
+      this.rowTransformation(row)	
       this.batch.rows.add(...row);
  
   	  this.metrics.cached++;

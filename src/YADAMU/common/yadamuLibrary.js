@@ -57,6 +57,11 @@ class YadamuLibrary {
      return this._CLOB_TYPES;
   }
 
+  static get BLOB_TYPES() {
+     this._BLOB_TYPES = this._BLOB_TYPES || Object.freeze(["BLOB","LONGBINARY","MEDIUMBINARY","IMAGE"])
+     return this._BLOB_TYPES;
+  }
+
   static get SPATIAL_TYPES() {
      this._SPATIAL_TYPES = this._SPATIAL_TYPES || Object.freeze(["\"MDSYS\".\"SDO_GEOMETRY\"","GEOGRAPHY","GEOMETRY","POINT","LSEG","BOX","PATH","POLYGON","CIRCLE","LINESTRING","GEOMCOLLECTION","GEOMETRYCOLLECTION","MULTIPOINT","MULTILINESTRING","MULTIPOLYGON"])
      return this._SPATIAL_TYPES;
@@ -163,6 +168,14 @@ class YadamuLibrary {
   
   static isCLOB(dataType) {
     return this.CLOB_TYPES.includes(dataType.toUpperCase());
+  }
+
+  static isBLOB(dataType) {
+    return this.BLOB_TYPES.includes(dataType.toUpperCase());
+  }
+
+  static isLOB(dataType) {
+    return this.BLOB_TYPES.includes(dataType.toUpperCase()) || this.CLOB_TYPES.includes(dataType.toUpperCase());
   }
 
   static isSpatialType(dataType) {
@@ -363,6 +376,65 @@ class YadamuLibrary {
   	}
   }
   
+  static parse8601Interval(interval) {
+	
+	let results = {}
+	// Strip the leading 'P'
+	let remainingString = interval.substring(1);
+	
+	results.type = ((remainingString.indexOf('Y') > -1) || (remainingString.indexOf('M') > remainingString.indexOf('T'))) ? 'YM' : 'DMS'
+	
+	let components
+	switch (true) {
+      case (remainingString.indexOf('Y') > -1):
+	    // Has a Years component
+	    components = remainingString.split('Y')
+        results.years = components[0].length > 0 ? Number(components[0]) : 0
+		if (components.length === 1) break;
+        remainingString = components[1];
+      case ((remainingString.indexOf('M') < remainingString.indexOf('T'))):
+	    // Has a Months component - becareful: May also have minitues
+	    components = remainingString.split('M')
+        results.months = components[0].length > 0 ? Number(components[0]) : 0
+		if (components.length === 1) break;
+		components.shift()
+        remainingString = components.join('M')
+      case (remainingString.indexOf('W') > -1):
+	    // Has a Weeks component
+	    components = remainingString.split('W')
+        results.weeks = components[0].length > 0 ? Number(components[0]) : 0
+		if (components.length === 1) break;
+        remainingString = components[1];	
+      case (remainingString.indexOf('D') > -1):
+	    // Has a Weeks component
+		console.log(interval,remainingString,results)
+	    components = remainingString.split('D')
+        results.days = components[0].length > 0 ? Number(components[0]) : 0
+		if (components.length === 1) break;
+        remainingString = components[1];
+      case (remainingString.indexOf('T') > -1):
+	    components = remainingString.split('T')
+		if (components.length === 1) break;
+        remainingString = components[1];
+      case (remainingString.indexOf('H') > -1):
+	    // Has a Hours component
+	    components = remainingString.split('H')
+        results.hours = components[0].length > 0 ? Number(components[0]) : 0
+		if (components.length === 1) break;
+        remainingString = components[1];
+      case (remainingString.indexOf('M') > -1):
+	    // Has a Weeks component
+	    components = remainingString.split('M')
+        results.minutes = components[0].length > 0 ? Number(components[0]) : 0
+        remainingString = components[1];
+      case (remainingString.indexOf('S') > -1):
+	    // Has a Weeks component
+	    components = remainingString.split('S')
+        results.seconds = components[0].length > 0 ? Number(components[0]) : 0
+      default:	  
+	}
+	return results
+  }
 }
 
 module.exports = YadamuLibrary

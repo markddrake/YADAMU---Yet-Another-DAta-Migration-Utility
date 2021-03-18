@@ -1051,7 +1051,7 @@ class YadamuDBI {
     if (this.TABLE_FILTER.length > 0) {
 	  
 	  // Check table names are valid.
-	  // For each name in the Table Filter check there is a corresponding entry in the schemaInfoormation collection
+	  // For each name in the Table Filter check there is a corresponding entry in the schemaInformation collection
 	  
 	  const tableNames = schemaInformation.map((tableInformation) => {
 		return tableInformation.TABLE_NAME
@@ -1080,7 +1080,7 @@ class YadamuDBI {
   generateMetadata(schemaInformation) {   
    
     const metadata = {}
-  	
+	
     schemaInformation.forEach((table,idx) => {
       table.COLUMN_NAME_ARRAY     = typeof table.COLUMN_NAME_ARRAY     === 'string' ? JSON.parse(table.COLUMN_NAME_ARRAY)     : table.COLUMN_NAME_ARRAY
       table.DATA_TYPE_ARRAY       = typeof table.DATA_TYPE_ARRAY       === 'string' ? JSON.parse(table.DATA_TYPE_ARRAY)       : table.DATA_TYPE_ARRAY
@@ -1098,6 +1098,35 @@ class YadamuDBI {
     }) 
 	return metadata
   }  
+  
+  buildSchemaInfo(schemaColumnInfo) {
+	const schemaInfo = []
+	let tableInfo = undefined
+    let tableName = undefined
+    schemaColumnInfo.forEach((columnInfo) => {
+	  if (tableName !== columnInfo[1] ) {
+	    if (tableName) {
+	      tableInfo.CLIENT_SELECT_LIST = tableInfo.CLIENT_SELECT_LIST.substring(1)
+ 		  schemaInfo.push(tableInfo)
+	    }
+		tableName = columnInfo[1]
+        tableInfo = {
+		  TABLE_SCHEMA          : columnInfo[0]
+	    , TABLE_NAME            : columnInfo[1]
+	    , COLUMN_NAME_ARRAY     : []
+	    , DATA_TYPE_ARRAY       : []
+	    , SIZE_CONSTRAINT_ARRAY : []
+		, CLIENT_SELECT_LIST    : ""
+	    }
+	  }
+	  const dataType = YadamuLibrary.decomposeDataType(columnInfo[3])
+      tableInfo.COLUMN_NAME_ARRAY.push(columnInfo[2])
+	  tableInfo.DATA_TYPE_ARRAY.push(dataType.type)
+	  tableInfo.SIZE_CONSTRAINT_ARRAY.push(dataType.length ? dataType.scale ? `${dataType.length},${dataType.scale}` : `${dataType.length}` : '')
+	  tableInfo.CLIENT_SELECT_LIST = `${tableInfo.CLIENT_SELECT_LIST},"${columnInfo[2]}"`
+    })
+	return schemaInfo
+  }
   
   async getSchemaInfo(keyName) {
     

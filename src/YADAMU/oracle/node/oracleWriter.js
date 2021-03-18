@@ -142,6 +142,16 @@ class OracleWriter extends YadamuWriter {
       }
     })
  
+     // Use a dummy rowTransformation function if there are no transformations required.
+
+	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          row[idx] = transformation(row[idx],idx)
+        }
+      }) 
+    }
+
     this.lobTransformations = new Array(this.tableInfo.binds.length).fill(null);
 	
 	/*
@@ -324,11 +334,7 @@ class OracleWriter extends YadamuWriter {
 	  } 
 	  else {
 		// Bind Ordering and Row Ordering are the same. Apply transformations directly to ROW where required
-	    this.transformations.forEach((transformation,idx) => {
-          if ((transformation !== null) && (row[idx] !== null)) {			
-	        row[idx] = transformation(row[idx],idx)
-          }
-	    })
+        this.rowTransformation(row)
       }
 	  // Row is now in bindOrdering. Convert CLOB and BLOB to temporaryLOBs where necessary
       if (this.bindRowAsLOB) {

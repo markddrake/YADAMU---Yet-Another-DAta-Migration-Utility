@@ -26,16 +26,14 @@ class YadamuRejectManager {
     // this.logger =  YadamuLogger.consoleLogger();
 	this.logger = YadamuLogger.NULL_LOGGER;
 	
-	this.initialzied = false;
-	this.recordCount = 0
-  	
-	this.dataStream = new Pushable({objectMode: true},true);
-	
-    this.currentTable = undefined
-	this.currentPipeline = []
-	
     const errorFolderPath = path.dirname(this.filename);
     fs.mkdirSync(errorFolderPath, { recursive: true });
+
+	this.recordCount = 0
+    this.currentPipeline = []
+	this.currentTable = undefined
+
+
   }	
   
   setSystemInformation(systemInformation) {
@@ -47,41 +45,48 @@ class YadamuRejectManager {
     this.dbi.setMetadata(metadata)
   }
 
-  async rejectRow(tableName,data) {
-	  
-	// console.log(data);
-	 
+  async initializePipeline(tableName) {
+    await this.dbi.initializeImport();
+	await this.dbi.initializeData()
+	this.dataStream = new Pushable({objectMode: true},true);
+	this.currentPipeline = new Array(this.dataStream,...this.dbi.getOutputStreams(tableName))
+    // console.log(this.currentPipeline.map((s) => { return s.constructor.name }).join(' ==> '))
+    pipeline(this.currentPipeline,(err) => {
+	  if (err && (err.code === 'ERR_STREAM_PREMATURE_CLOSE')) {
+	    this.currentPipeline.forEach((stream) => {
+	      if (stream.underlyingError instanceof Error) {
+	        console.log(stream.constructor.name,stream.underlyingError)
+	      }
+	    })
+	  }
+	})
+  }
+  
+  async checkTableName(tableName) {
 	if (this.currentTable !== tableName) {
 	  this.currentTable = tableName
-	  if (this.currentPipeline.length === 0) {
-        await this.dbi.initializeImport();
-	    await this.dbi.initializeData()
-	  }
-	  else {
-        // Manually clean up the previous pipeline since it never completely ended. Prevents excessive memory usage..
-	    this.currentPipeline.forEach((s) => { s.removeAllListeners('unpipe') })
-        // Unpipe all target streams
-	    this.currentPipeline.forEach((s,i) => { if (i < targetPipeline.length - 1) {s.unpipe(targetPipeline[i+1])} })
-	  }
-	 
-      this.currentPipeline = new Array(this.dataStream,...this.dbi.getOutputStreams(tableName))
-   	  // console.log(this.currentPipeline .map((s) => { return s.constructor.name }).join(' ==> '))	  
-
+	  if (this.recordCount === 0) {
+        await this.initializePipeline(tableName)
+      }
       this.dataStream.pump({table:tableName})
-      pipeline(this.currentPipeline,(err) => {
-		if (err && (err.code === 'ERR_STREAM_PREMATURE_CLOSE')) {
-		  errorPipeline.forEach((stream) => {
-			if (stream.underlyingError instanceof Error) {
-		      console.log(stream.constructor.name,stream.underlyingError)
-			}
-	      })
-	    }
-      })  
     }
+  }
+  
+  async rejectRow(tableName,data) {
 	
+	await this.checkTableName(tableName)
     this.recordCount++;
     this.dataStream.pump({data:data})
+  
+  }
+  
+  async rejectRows(tableName,data) {
 
+	await this.checkTableName(tableName)
+	data.forEach((row) => {
+      this.recordCount++;
+      this.dataStream.pump({data:row})
+	})
   }
   
   async close() {

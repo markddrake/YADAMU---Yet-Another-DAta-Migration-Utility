@@ -4,6 +4,8 @@ const fs = require('fs');
 const fsp = require('fs').promises;
 const path = require('path');
 const { performance } = require('perf_hooks');
+const crypto = require('crypto');
+const { PassThrough } = require('stream')
 
 const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
 
@@ -25,6 +27,42 @@ const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fi
 ** YADAMU Database Inteface class skeleton
 **
 */
+
+class IVWriter extends PassThrough {
+
+  constructor(iv) {
+	super()
+	this.push(iv)
+  }
+    
+}
+
+class IVReader extends PassThrough {
+
+  constructor(ivLength) {
+	super()
+	this.ivLength = ivLength
+  }
+   
+  passthrough = (data,enc,callback) => {
+    this.push(data)
+    callback()
+  }
+  
+  extractIV = (data,enc,callback) => {
+	this.iv = Buffer.from(data,0,this.ivLength)
+	this.push(data.slice(this.ivLength))
+	this._transform = this.passthrough
+    callback()
+  }
+  
+  getInitializationVector() {
+    return this.iv
+  }
+  
+  _transform = this.extractIV
+    
+}
 
 class LoaderDBI extends YadamuDBI {
  
@@ -119,8 +157,15 @@ class LoaderDBI extends YadamuDBI {
 	return this._FILE_EXTENSION
   }
 
-  get COMPRESSION_FORMAT()  { return this.controlFile.yadamuOptions.compression }
-  get COMPRESSED_CONTENT()  { return (this.COMPRESSION_FORMAT !== 'NONE') }
+  get COMPRESSION_FORMAT()     { return this.controlFile.yadamuOptions.compression }
+  get COMPRESSED_CONTENT()     { return (this.COMPRESSION_FORMAT !== 'NONE') }
+  get ENCRYPTED_CONTENT()      { return this.yadamu.ENCRYPTION }
+  get ENCRYPTED_INPUT()        { return this.controlFile.yadamuOptions.encryption !== "NONE" }
+  get COMPRESSED_INPUT()       { return this.controlFile.yadamuOptions.compression !== "NONE" }
+  
+  set INITIALIZATION_VECTOR(v) { this._INITIALIZATION_VECTOR =  v }
+  get INITIALIZATION_VECTOR()  { return this._INITIALIZATION_VECTOR }
+  get IV_LENGTH()              { return 16 }  
   
   
   constructor(yadamu,exportFilePath) {
@@ -187,6 +232,7 @@ class LoaderDBI extends YadamuDBI {
   	const yadamuOptions = {
 	  contentType : this.OUTPUT_FORMAT
     , compression : this.yadamu.COMPRESSION
+	, encryption  : this.ENCRYPTED_CONTENT ? this.yadamu.CIPHER : 'NONE'
     }
 	this.controlFile = { yadamuOptions : yadamuOptions, systemInformation : {}, metadata : metadataFileList, data: dataFileList}  
   }
@@ -209,7 +255,7 @@ class LoaderDBI extends YadamuDBI {
     
     Object.values(metadata).forEach((table) => {delete table.source})
     this.controlFile.systemInformation = this.systemInformation
-	const compressedOuput = (this.yadamu.COMPRESSION !== 'NONE')
+	const compressedOuput = (this.COMPRESSED_CONTENT)
     Object.values(this.metadata).forEach((tableMetadata) => {
 	   const file = this.getMetadataPath(tableMetadata.tableName) 
        this.controlFile.metadata[tableMetadata.tableName] = {file: file}
@@ -275,6 +321,16 @@ class LoaderDBI extends YadamuDBI {
   	return fs.createWriteStream(this.controlFile.data[tableName].file)
   }
 
+  async createInitializationVector() {
+
+	return await new Promise((resolve,reject) => {
+      crypto.randomFill(new Uint8Array(this.IV_LENGTH), (err, iv) => {
+		if (err) reject(err)
+	    resolve(iv);
+      })
+	})	    
+  } 
+ 
   async getOutputStreams(tableName,ddlComplete) {
 	await ddlComplete;
 	this.reloadStatementCache()
@@ -286,8 +342,18 @@ class LoaderDBI extends YadamuDBI {
 	if (this.COMPRESSED_CONTENT) {
       streams.push(this.COMPRESSION_FORMAT === 'GZIP' ? createGzip() : createDeflate())
     }
+
+    if (this.ENCRYPTED_CONTENT) {
+	  const iv = await this.createInitializationVector()
+	  // console.log('Cipher',this.controlFile.data[tableName].file,this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv);
+	  const cipherStream = crypto.createCipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv)
+	  streams.push(cipherStream)
+	  streams.push(new IVWriter(iv))
+	}
+	  
 	streams.push(this.getFileOutputStream(tableName))
-	
+
+    // console.log(streams.map((s) => { return s.constructor.name }).join(' ==> '))
 	return streams;
   }
   /*
@@ -349,6 +415,16 @@ class LoaderDBI extends YadamuDBI {
     return stream
   }
 
+  async loadInitializationVector(tableInfo) {
+
+	const filename = this.controlFile.data[tableInfo.TABLE_NAME].file
+	const fd = await fsp.open(filename)
+	const iv = new Uint8Array(this.IV_LENGTH)
+	const results = await fd.read(iv,0,this.IV_LENGTH,0)
+	await fd.close();
+	return iv;
+  }	
+  
   async getInputStreams(tableInfo) {
     
 	const streams = []
@@ -367,8 +443,16 @@ class LoaderDBI extends YadamuDBI {
     })
 	streams.push(is)
 	
-	if (this.COMPRESSED_CONTENT) {
-      streams.push(this.COMPRESSION_FORMAT === 'GZIP' ? createGunzip() : createInflate())
+	if (this.ENCRYPTED_INPUT) {
+	  const iv = await this.loadInitializationVector(tableInfo)
+	  streams.push(new IVReader(this.IV_LENGTH))
+  	  // console.log('Decipher',this.controlFile.data[tableInfo.TABLE_NAME].file,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
+	  const decipherStream = crypto.createDecipheriv(this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv)
+	  streams.push(decipherStream);
+	}
+
+	if (this.COMPRESSED_INPUT) {
+      streams.push(this.controlFile.yadamuOptions.compression === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
 	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.controlFile.data[tableInfo.TABLE_NAME].file)
@@ -396,6 +480,8 @@ class LoaderDBI extends YadamuDBI {
 	  this.INPUT_METRICS.failed = true;
 	})
 	streams.push(eventStream)
+	
+    // console.log(streams.map((s) => { return s.constructor.name }).join(' ==> '))
 	return streams;
   }
  

@@ -15,6 +15,7 @@
 		"azure": "../../loader/azure/azureQA.js",
 		"oracle": "../../oracle/node/oracleQA.js",
 		"postgres": "../../postgres/node/postgresQA.js",
+		"vertica": "../../vertica/node/verticaQA.js",
 		"mssql": "../../mssql/node/mssqlQA.js",
 		"mysql": "../../mysql/node/mysqlQA.js",
 		"mariadb": "../../mariadb/node/mariadbQA.js",

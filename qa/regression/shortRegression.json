@@ -157,6 +157,18 @@
       "HR"
 	]
   },{
+    "source"          : "oracle19c"
+  , "target"          : "loader#1"
+  , "parameters" : {
+      "ROOT_FOLDER"   : "yadamu/RTS/X-gzip/%sourceConnection%/%mode%"
+	, "COMPRESSION"   : "GZIP"
+	, "ENCRYPTION"    : true
+	, "PASSPHRASE"    : "yadamu"
+	}
+  , "tasks": [ 
+      "HR"
+	]
+  },{
     "operation"       : "import"
   , "source"          : "scratch-export"
   , "target"          : "minio#1"
@@ -237,5 +249,18 @@
   , "tasks": [ 
       "HR"
 	]
+  },{
+    "operation"        : "export"
+  , "source": "oracle19c"
+  , "target": "file-JSON"
+  , "parameters": {
+      "MODE": "DATA_ONLY"
+	, "COMPRESSION" : "GZIP"
+	, "ENCRYPTION"  : true
+	, "PASSPHRASE" : "yadamu"
+	}
+  , "tasks": [
+      "HR","BI"
+    ]
   }]
 }

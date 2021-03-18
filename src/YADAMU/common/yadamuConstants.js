@@ -22,8 +22,8 @@ class YadamuConstants {
      , "WARNING_FOLDER"            : "warnings"
      , "WARNING_FILE_PREFIX"       : "warning"
 	 , "IDENTIFIER_TRANSFORMATION" : 'NONE'
-	 , "CIPHER"                    : 'aes-192-cbc'
-     , "ENCRYPTION"                : false
+	 , "CIPHER"                    : 'aes-256-cbc'
+     , "ENCRYPTION"                : true
 	 , "SALT"                      : "YABASCYADAMUUMADAYCSABAY"
     })
     return this._STATIC_PARAMETERS;

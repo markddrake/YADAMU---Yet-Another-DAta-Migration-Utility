@@ -44,6 +44,16 @@ class ExampleWriter extends YadamuWriter {
       }
     })
 
+    // Use a dummy rowTransformation function if there are no transformations required.
+
+	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          row[idx] = transformation(row[idx],idx)
+        }
+      }) 
+    }
+	
   }
   
   cacheRow(row) {
@@ -62,13 +72,8 @@ class ExampleWriter extends YadamuWriter {
 	**   
 	**  handleBatchException(): creates an exception containing a summary of the records being inserted if an error occurs during a batch insert.
     **	
-
-	this.transformations.forEach((transformation,idx) => {
-      if ((transformation !== null) && (row[idx] !== null)) {
-	    row[idx] = transformation(row[idx])
-      }
-	})
-	
+    
+	this.rowTransformation(row)
     this.batch.push(row);
 	
 	this.metrics.cached++

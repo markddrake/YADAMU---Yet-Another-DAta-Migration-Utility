@@ -55,7 +55,7 @@ class MySQLWriter extends YadamuWriter {
             // If the the input is a string, assume 8601 Format with "T" seperating Date and Time and Timezone specified as 'Z' or +00:00
             // Neeed to convert it into a format that avoiods use of convert_tz and str_to_date, since using these operators prevents the use of Bulk Insert.
             // Session is already in UTC so we safely strip UTC markers from timestamps
-            if (typeof col !== 'string') {
+            if (col instanceof Date) {
               col = col.toISOString();
             }             
             col = col.substring(0,10) + ' '  + (col.endsWith('Z') ? col.substring(11).slice(0,-1) : (col.endsWith('+00:00') ? col.substring(11).slice(0,-6) : col.substring(11)))
@@ -93,6 +93,17 @@ class MySQLWriter extends YadamuWriter {
           return null
       }
     })
+	
+    // Use a dummy rowTransformation function if there are no transformations required.
+
+	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          row[idx] = transformation(row[idx],idx)
+        }
+      }) 
+    }
+
   }
   
   getMetrics()  {
@@ -112,11 +123,7 @@ class MySQLWriter extends YadamuWriter {
 	  
 	try {
 	  
-	  this.transformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-	      row[idx] = transformation(row[idx],idx)
-        }
-	  })
+      this.rowTransformation(row)
 
       // Rows mode requires an array of column values, rather than an array of rows.
 

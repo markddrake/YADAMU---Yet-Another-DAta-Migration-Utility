@@ -1,9 +1,8 @@
 # Installing Yadamu Database support for Postgres
 
-
 Procedures are installed using the script file src/install/postgres/sql/YADAMU_IMPORT.sql.
 Procedures should be installed by the database owner. 
-Procedures need to installed in the database where Yadamu is required
+Procedures need to installed in each database where Yadamu will be used.
 
 ```bat
 psql -Upostgres -hyadamu-db1 -dyadamu <src/install/postgres/sql/YADAMU_IMPORT.sql

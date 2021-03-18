@@ -58,7 +58,6 @@ class PostgresDBI extends YadamuDBI {
    
   // Enable configuration via command line parameters
   
-  get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT || PostgresConstants.SPATIAL_FORMAT }
   get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT || PostgresConstants.CIRCLE_FORMAT }
   get BYTEA_SIZING_MODEL()     { return this.parameters.BYTEA_SIZING_MODEL || PostgresConstants.BYTEA_SIZING_MODEL }
   
@@ -564,10 +563,6 @@ class PostgresDBI extends YadamuDBI {
     return this.trackExceptions(new PostgresError(e,this.streamingStackTrace,sqlStatement))
   }
 
-  terminateInputStream(is) {
-	is.destroy()
-  }
-  
   async getInputStream(tableInfo) {        
   
     // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,tableInfo.TABLE_NAME],'')

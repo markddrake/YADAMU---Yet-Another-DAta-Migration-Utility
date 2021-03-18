@@ -19,6 +19,7 @@
 		"azure": "../loader/s3/azureDBI.js",
 		"oracle": "../oracle/node/oracleDBI.js",
 		"postgres": "../postgres/node/postgresDBI.js",
+		"vertica": "../vertica/node/verticaDBI.js",
 		"mssql": "../mssql/node/mssqlDBI.js",
 		"mysql": "../mysql/node/mysqlDBI.js",
 		"mariadb": "../mariadb/node/mariadbDBI.js",

@@ -1254,16 +1254,25 @@ class OracleDBI extends YadamuDBI {
     const dbMappings = {}
 
     if (this.DB_VERSION < 12) { 
-    
+	
+      // ### TODO: Impliment better algorithm that truncation. Check for clashes. Add Unique ID
+	  
       Object.keys(metadata).forEach((table) => {
         const mappedTableName = metadata[table].tableName.length > 30 ? metadata[table].tableName.substring(0,30) : undefined
         if (mappedTableName) {
+		  this.yadamuLogger.warning([this.DATABASE_VENDOR,this.DB_VERSION,'IDENTIFIER LENGTH',metadata[table].tableName],`Identifier Too Long (${metadata[table].tableName.length}). Identifier re-mapped as "${mappedTableName}".`)
           dbMappings[table] = {
 			tableName : mappedTableName
 		  }
         }
         const columnMappings = {}
-        metadata[table].columnNames.forEach((columnName) => { if (columnName.length > 30) { columnMappings[columnName] = columnName.substring(0,30)}})
+        metadata[table].columnNames.forEach((columnName) => { 
+		  if (columnName.length > 30) {
+			const mappedColumnName =  columnName.substring(0,30)
+  		    this.yadamuLogger.warning([this.DATABASE_VENDOR,this.DB_VERSION,'IDENTIFIER LENGTH',metadata[table].tableName,columnName],`Identifier Too Long (${columnName.length}). Identifier re-mapped as "${mappedColumnName}".`)
+   		    columnMappings[columnName] = mappedColumnName
+		  }
+		})
         if (!YadamuLibrary.isEmpty(columnMappings)) {
           dbMappings[table] = dbMappings[table] || {}
           dbMappings[table].columnMappings = columnMappings

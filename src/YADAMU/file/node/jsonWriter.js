@@ -24,8 +24,8 @@ class JSONWriter extends YadamuWriter {
     this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
 	  if (YadamuLibrary.isBinaryType(dataType.type)) {
-		return (row,idx) =>  {
-          row[idx] = row[idx].toString('hex')
+		return (col,idx) =>  {
+          return col.toString('hex')
 		}
       }
       
@@ -46,19 +46,21 @@ class JSONWriter extends YadamuWriter {
 		case "GEOMETRYCOLLECTION":
         case '"MDSYS"."SDO_GEOMETRY"':
           if (this.SPATIAL_FORMAT.endsWith('WKB')) {
-            return (row,idx)  => {
-			  if (Buffer.isBuffer(row[idx])) {
-			    row[idx] = row[idx].toString('hex')
+            return (col,idx)  => {
+			  if (Buffer.isBuffer(col)) {
+			    return col.toString('hex')
 			  }
+			  return col
 			}
           }
           if (this.SPATIAL_FORMAT.endsWith('GeoJSON')) {
-            return (row,idx)  => {
-			  if (typeof row[idx] === 'string') {
+            return (col,idx)  => {
+			  if (typeof col === 'string') {
 				try {
-			      row[idx] = JSON.parse(row[idx])
+			      return JSON.parse(col)
 				} catch(e) {}
 			  }
+			  return col
 			}
           }
 		  return null;
@@ -68,68 +70,73 @@ class JSONWriter extends YadamuWriter {
 		case "DOUBLE PRECISION":
 		case "BINARY_FLOAT":
 		case "BINARY_DOUBLE":
-		   return (row, idx) => {
-			 if (!isFinite(row[idx])) {
+		   return (col,idx) => {
+			 if (!isFinite(col)) {
 			   switch (true) {
-		         case isNaN(row[idx]): 
-		   	       row[idx] = "NaN"
+		         case isNaN(col): 
+		   	       return "NaN"
 				   break;
-			     case (row[idx] === Infinity):
-				   row[idx] = "Infinity"
+			     case (col === Infinity):
+				   return "Infinity"
 				   break;
-				 case (row[idx] === -Infinity):
-				   row[idx] = "-Infinity"
+				 case (col === -Infinity):
+				   return "-Infinity"
 				   break;
 				 default:
 			   }   
 		     }
+  		     return col
 		   }			 
         case "JSON":
-          return (row,idx) =>  {
-            if (typeof row[idx] === 'string') {
-              row[idx] = JSON.parse(row[idx])
+          return (col,idx) =>  {
+            if (typeof col === 'string') {
+              return JSON.parse(col)
             } 
-			if (Buffer.isBuffer(row[idx])) {
-			  row[idx] = JSON.parse(row[idx].toString('utf8'))
+			if (Buffer.isBuffer(col)) {
+			  return JSON.parse(col.toString('utf8'))
 			}
+   		    return col
           }
         case "BOOLEAN":
-          return (row,idx) =>  {
-		    const bool = (typeof row[idx] === 'string') ? row[idx].toUpperCase() : (Buffer.isBuffer(row[idx])) ? row[idx].toString('hex') : row[idx]
+          return (col,idx) =>  {
+		    const bool = (typeof col === 'string') ? col.toUpperCase() : (Buffer.isBuffer(col)) ? col.toString('hex') : col
 			switch(bool) {
               case true:
               case "TRUE":
               case "01":
               case "1":
 			  case 1:
-                row[idx] = true;
+                return true;
 				break;
               case false:
               case "FALSE":
               case "00":
               case "0":
 			  case 0:
-                row[idx] = false;
+                return false;
 				break;
               default: 
             }
+            return col
           }
         case "DATE":
-          return (row,idx) =>  { 
-            if (row[idx] instanceof Date) {
-              row[idx] = row[idx].toISOString()
+          return (col,idx) =>  { 
+            if (col instanceof Date) {
+              return col.toISOString()
             }
+		    return col
           }
         case "TIMESTAMP":
-          return (row,idx) =>  { 
-            // A Ti7mestamp not explicitly marked as UTC is coerced to UTC.
+          return (col,idx) =>  { 
+            // A Timestamp not explicitly marked as UTC is coerced to UTC.
 			switch (true) {
-              case (typeof row[idx] === 'string'):
-                row[idx] = (row[idx].endsWith('Z') || row[idx].endsWith('+00:00')) ? row[idx] : row[idx] + 'Z';
+              case (typeof col === 'string'):
+                return (col.endsWith('Z') || col.endsWith('+00:00')) ? col : col + 'Z';
 				break;
-              case (row[idx] instanceof Date):
-                row[idx] = row[idx].toISOString()
+              case (col instanceof Date):
+                return col.toISOString()
             }
+  		    return col
           }
 		 default:
 		   return null
@@ -141,7 +148,7 @@ class JSONWriter extends YadamuWriter {
 	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
       this.transformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
-          transformation(row,idx)
+          row[idx] = transformation(row[idx],idx)
         }
       }) 
     }
@@ -171,11 +178,17 @@ class JSONWriter extends YadamuWriter {
   async processRow(row) {
     // Be very careful about adding unecessary code here. This is executed once for each row processed by YADAMU. Keep it as lean as possible.
 	this.checkColumnCount(row)
+
+	this.rowTransformation(row)
+
+	/*
 	this.transformations.forEach((transformation,idx) => {
       if ((transformation !== null) && (row[idx] !== null)) {
         transformation(row,idx)
       }
     })
+	*/
+	
     const x = this.push(this.formatRow(row));
 	this.rowSeperator = ','
     this.metrics.committed++;

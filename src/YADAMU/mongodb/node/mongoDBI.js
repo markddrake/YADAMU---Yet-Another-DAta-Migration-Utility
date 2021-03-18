@@ -611,7 +611,7 @@ class MongoDBI extends YadamuDBI {
     let result = s === 0 ? MongoConstants.DEFAULT_STRING_LENGTH :  Math.pow(2, Math.ceil(Math.log(s)/Math.log(2)));
     result = ((result === 4096) && (s < 4001)) ? 4000 : result
     result = ((result === 32768) && (s < 32768)) ? 32767 : result
-    return result
+    return result.toString()
   }
 
   async getSchemaInfo(keyName) {
@@ -872,6 +872,7 @@ class MongoDBI extends YadamuDBI {
     Object.keys(metadata).forEach((table) => {
       const mappedTableName = metadata[table].tableName.indexOf('$') > -1 ? metadata[table].tableName.replace(/\$/g,'') : undefined
       if (mappedTableName) {
+		this.yadamuLogger.warning([this.DATABASE_VENDOR,this.DB_VERSION,'IDENTIFIER INVALID',metadata[table].tableName],`Identifier contains invalid character "$". Identifier re-mapped as "${mappedTableName}".`)
         dbMappings[table] = {
   	      tableName : mappedTableName
 		}

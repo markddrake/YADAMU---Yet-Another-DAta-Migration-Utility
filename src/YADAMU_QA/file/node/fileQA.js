@@ -26,7 +26,21 @@ class FileQA extends FileDBI {
   get YADAMU_DBI_PARAMETERS() {
     return FileQA.YADAMU_DBI_PARAMETERS
   }	
-		
+	
+  /*
+  **
+  ** Uncomment to pass Initialization Vector around via yadamu object
+  	
+  set INITIALIZATION_VECTOR(v) { 
+    this._INITIALIZATION_VECTOR =  v 
+	this.yadamu.INITIALIZATION_VECTOR = this._INITIALIZATION_VECTOR 
+  }
+  
+  get INITIALIZATION_VECTOR()  { return this._INITIALIZATION_VECTOR || this.yadamu.INITIALIZATION_VECTOR }		
+
+  **
+  */
+  
   sortRows(array) {
      
     array.sort((a,b) => {

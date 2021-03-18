@@ -76,6 +76,16 @@ class PostgresWriter extends YadamuWriter {
       }
     })
 
+    // Use a dummy rowTransformation function if there are no transformations required.
+
+	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+      this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          row[idx] = transformation(row[idx],idx)
+        }
+      }) 
+    }
+
   }
   
   cacheRow(row) {
@@ -85,14 +95,8 @@ class PostgresWriter extends YadamuWriter {
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
   	
-	this.transformations.forEach((transformation,idx) => {
-      if ((transformation !== null) && (row[idx] !== null)) {
-	    row[idx] = transformation(row[idx])
-      }
-	})
-	
+    this.rowTransformation(row)
     this.batch.push(...row);
-	
     this.metrics.cached++
 	return this.skipTable
   }

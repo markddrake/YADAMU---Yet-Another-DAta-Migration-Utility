@@ -75,7 +75,7 @@ class Yadamu {
   }
   
   get CIPHER()                        { return this.parameters.CIPHER                    || YadamuConstants.CIPHER }
-  get CIPHER_KEY_SIZE()               { return 24 }
+  get CIPHER_KEY_SIZE()               { return 32 }
   get SALT()                          { return this.parameters.SALT                      || YadamuConstants.SALT }
   get ENCRYPTION()                    { return this.parameters.ENCRYPTION                || this.parameters.ENCRYPTION === undefined ? YadamuConstants.ENCRYPTION : this.parameters.ENCRYPTION }
   get ENCRYPTION_KEY()                { return this._ENCRYPTION_KEY }
@@ -256,7 +256,7 @@ class Yadamu {
   }
   
   async generateCryptoKey() {
-   
+
     let passphrase = this.parameters.PASSPHRASE || await this.requestPassPhrase()
   
     return await new Promise((resolve,reject) => {
@@ -271,7 +271,10 @@ class Yadamu {
 	})  
   }
   
-  async initialize() {
+  async initialize(parameters) {
+	 if (!YadamuLibrary.isEmpty(parameters)) {
+	   this.reloadParameters(parameters)
+	 }
 	 if (this.ENCRYPTION) {
 	   await this.generateCryptoKey()
      }
@@ -469,7 +472,7 @@ class Yadamu {
             break;
 	      case 'OVERWRITE':		  
 	      case '--OVERWRITE':
-  	        parameters.OVERWRITE = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? isTrue(parameterValue.toUpperCase()) : false
+  	        parameters.OVERWRITE = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? this.isTrue(parameterValue.toUpperCase()) : false
 		    break;
           case 'CONFIG':
           case '--CONFIG':

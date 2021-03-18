@@ -1,13 +1,12 @@
 "use strict"
 
+const fs = require('fs')
 const assert = require('assert').strict;
-const Writable = require('stream').Writable
-const Transform = require('stream').Transform
+const {Readable, Writable, Transform, pipeline } = require('stream')
 const { performance } = require('perf_hooks');
 
 const YadamuConstants = require('./yadamuConstants.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
-// const YadamuLogger = require('./yadamuLogger.js');
 const {YadamuError, BatchInsertError, IterativeInsertError, DatabaseError} = require('./yadamuException.js')
 
 class YadamuWriter extends Transform {
@@ -260,24 +259,17 @@ class YadamuWriter extends Transform {
   }
               
   cacheRow(row) {
-
+	  
     // Apply transformations and cache transformed row.
-    
+    4
     // Use forEach not Map as transformations are not required for most columns. 
     // Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 
     // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.metrics.cached],'cacheRow()')    
       
-    this.transformations.forEach((transformation,idx) => {
-      if ((transformation !== null) && (row[idx] !== null)) {
-        row[idx] = transformation(row[idx])
-      }
-    })
-    
+    this.rowTransformation(row)
     this.batch.push(row);
-    
     this.metrics.cached++
-
     return this.skipTable;
   }  
 
@@ -305,7 +297,23 @@ class YadamuWriter extends Transform {
       this.metrics.written = 0;
       await this.dbi.rollbackTransaction(cause)
   }
-
+  
+  async stageBatchAsCSV(filename,batch) {
+    const dataStream = Readable.from(batch.map((row) => {return this.rowToCSV(row)}));
+	const fileWriter = await new Promise((resolve,reject) => {
+      const outputStream = fs.createWriteStream(filename,{flags :"w"})
+	  const stack = new Error().stack
+      outputStream.on('open',() => {resolve(outputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(err,stack,filename) : new FileError(err,stack,filename) )})
+	})
+	const csvPipline = new Array(dataStream,fileWriter)
+    await new Promise((resolve,reject) => {
+	  pipeline(csvPipline,(err) => {
+	    if (err) reject(err)
+		resolve()
+	  })
+    })
+  }
+  
   async _writeBatch(batch,rowCount) {
     /*        
     if (this.tableInfo.insertMode === 'Batch') {

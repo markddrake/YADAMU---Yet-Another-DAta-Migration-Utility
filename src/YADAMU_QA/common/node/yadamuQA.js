@@ -34,10 +34,10 @@ class YadamuQA {
   get KILL_WORKER()                               { return this.KILL_CONNECTION.worker }
   get KILL_DELAY()                                { return this.KILL_CONNECTION.delay }
 
-  constructor(configuration,encryptionKey) {
+  constructor(configuration) {
       
     this.configuration = configuration
-    this.yadamu = new YadamuTest(configuration.parameter1s || {}, encryptionKey)
+    this.yadamu = new YadamuTest(configuration.parameters)
     this.metrics = this.yadamu.testMetrics;
     
     this.expandedTaskList = []
@@ -46,12 +46,16 @@ class YadamuQA {
     
   }
   
-  getDatabaseInterface(driver,testConnection,testParameters,recreateSchema,identifierMappings) {
+  async initialize() {
+	await this.yadamu.initialize()
+  }
+  
+  async getDatabaseInterface(driver,testConnection,testParameters,recreateSchema,identifierMappings) {
     
 	let dbi = undefined
 	// Start with specified by the test - values specified for the test will override the QA defaults
 	const parameters = Object.assign({}, testParameters || {})
-    this.yadamu.reset(parameters);
+    await this.yadamu.reset(parameters);
     
     if (YadamuTest.QA_DRIVER_MAPPINGS.hasOwnProperty(driver)) { 
       const DBI = require(YadamuTest.QA_DRIVER_MAPPINGS[driver]);
@@ -324,8 +328,8 @@ class YadamuQA {
   getCompareRules(sourceVendor,sourceVersion,targetVendor,targetVersion,targetParameters) {
 	  
 	const compareRules = {
-	  MODE   : this.yadamu.MODE
-	, TABLES : targetParameters.TABLES || []
+	  MODE             : this.yadamu.MODE
+	, TABLES           : targetParameters.TABLES || []
     }
 
 	Object.assign(compareRules,YadamuTest.COMPARE_RULES[targetVendor] || {})
@@ -338,8 +342,10 @@ class YadamuQA {
     Object.assign(compareRules, this.getDefaultValue('ORDERED_JSON',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
 	Object.assign(compareRules, this.getDefaultValue('SERIALIZED_JSON',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
 	Object.assign(compareRules, this.getDefaultValue('EMPTY_STRING_IS_NULL',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
-	Object.assign(compareRules, this.getDefaultValue('INFINITY_IS_NULL',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
 	Object.assign(compareRules, this.getDefaultValue('OBJECTS_COMPARISSON_RULE',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
+    Object.assign(compareRules, this.getDefaultValue('INFINITY_IS_NULL',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
+    
+	compareRules.INFINITY_IS_NULL = compareRules.INFINITY_IS_NULL && (targetParameters.INFINITY_MANAGEMENT === 'NULLIFY')
 	
 	if (YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[sourceVendor] > YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[targetVendor]) {
 	  compareRules.TIMESTAMP_PRECISION = YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[targetVendor]
@@ -466,7 +472,7 @@ class YadamuQA {
 
   async compareSchemas(sourceVendor,targetVendor,sourceSchema,targetSchema,connectionProperties,testParameters,rules,metrics,reportRowCounts,identifierMappings) {
       
-    const compareDBI = this.getDatabaseInterface(sourceVendor,connectionProperties,{},false,identifierMappings)
+    const compareDBI = await this.getDatabaseInterface(sourceVendor,connectionProperties,{},false,identifierMappings)
     
     try {
       compareDBI.setParameters(testParameters);
@@ -795,8 +801,8 @@ class YadamuQA {
     , targetconnection     : targetConnectionName
     })
     
-    let sourceDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
-    let compareDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,this.RECREATE_SCHEMA) 
+    let sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
+    let compareDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,this.RECREATE_SCHEMA) 
     const taskStartTime = performance.now();
     let stepStartTime = taskStartTime
     metrics.push(await this.yadamu.pumpData(sourceDBI,compareDBI));
@@ -837,8 +843,8 @@ class YadamuQA {
       compareParameters.MODE = "DATA_ONLY"
       const targetDescription = this.getDescription(targetDatabase,targetConnectionName,targetParameters,'TO_USER')  
  
-      sourceDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
-      let targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA) 
+      sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
+      let targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA) 
       this.propogateTableMatching(sourceDBI,targetDBI);
       let stepStartTime = performance.now();
       metrics.push(await this.yadamu.pumpData(sourceDBI,targetDBI));
@@ -869,8 +875,8 @@ class YadamuQA {
       
       // Apply the table mappings used by target of the the first copy operation to the source of the second copy operation.
       
-      targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,false,{})
-      compareDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,false,this.reverseIdentifierMappings(identifierMappings))
+      targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,false,{})
+      compareDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,false,this.reverseIdentifierMappings(identifierMappings))
       
       stepStartTime = performance.now();
       metrics.push(await this.yadamu.pumpData(targetDBI,compareDBI));
@@ -990,13 +996,13 @@ class YadamuQA {
     
     let sourceParameters  = Object.assign({},parameters)
     sourceParameters.FILE = importFile
-    let fileReader = this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null)
+    let fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null)
     let sourceDescription = this.getDescription(sourceDatabase,'file',sourceParameters,'FILE')
     
     let targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema1)
     let targetDescription = this.getDescription(targetDatabase,targetConnectionName,targetParameters,'TO_USER')
-    let targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA)
+    let targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA)
     const targetDBVersion = targetDBI.DB_VERSION;
     
     let sourceAndTargetMatch
@@ -1032,11 +1038,11 @@ class YadamuQA {
     sourceParameters  = Object.assign({},parameters)
     this.setUser(sourceParameters,'FROM_USER',targetDatabase, targetSchema1)
     
-    let sourceDBI = this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,null,{})
+    let sourceDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,null,{})
 
     targetParameters  = Object.assign({},parameters)
     targetParameters.FILE = file1;
-    let fileWriter = this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,null,{})
+    let fileWriter = await this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,null,{})
     targetDescription = this.getDescription(sourceDatabase,'file',targetParameters,'FILE')  
 
     stepStartTime = performance.now();
@@ -1056,11 +1062,11 @@ class YadamuQA {
 
     sourceParameters  = Object.assign({},parameters)
     sourceParameters.FILE = file1;
-    fileReader = this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null,{})
+    fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null,{})
     
     targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema2)
-    targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA,{})
+    targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA,{})
     targetDescription = this.getDescription(targetDatabase,targetConnectionName,targetParameters,'TO_USER')
     
     stepStartTime = performance.now();
@@ -1087,11 +1093,11 @@ class YadamuQA {
     
     sourceParameters  = Object.assign({},parameters)
     this.setUser(sourceParameters,'FROM_USER',targetDatabase, targetSchema2)
-    sourceDBI = this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,false,{})
+    sourceDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,false,{})
 
     targetParameters  = Object.assign({},parameters)
     targetParameters.FILE = file2;
-    fileWriter = this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,null,{})
+    fileWriter = await this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,null,{})
     targetDescription = this.getDescription(sourceDatabase,'file',targetParameters,'FILE')
 
     stepStartTime = performance.now();
@@ -1119,7 +1125,7 @@ class YadamuQA {
     **
     */
     
-    let compareDBI = this.getDatabaseInterface(targetDatabase,targetConnection,{},false)
+    let compareDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,{},false)
     await compareDBI.initialize();
     
     stepStartTime = performance.now();
@@ -1159,7 +1165,7 @@ class YadamuQA {
     
     stepStartTime = performance.now();
     const filecompareRules = this.getCompareRules(targetDatabase,targetVersion,'file',0,testParameters)
-    const fileCompare = this.getDatabaseInterface('file',{},filecompareRules,null,identifierMappings)
+    const fileCompare = await this.getDatabaseInterface('file',{},filecompareRules,null,identifierMappings)
     const fileCompareResults = await fileCompare.compareFiles(this.yadamuLoggger, importFile, file1, file2, metrics)
 
     if (fileCompareResults.length > 0) {
@@ -1222,14 +1228,14 @@ class YadamuQA {
       sourceDescription = this.getDescription(sourceDatabase,sourceDatabase, sourceParameters,'FROM_USER')
     }
 
-    const fileReader = this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null)
+    const fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null)
 
     const targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase,targetSchema)
     
     const targetDescription = this.getDescription(targetDatabase,targetConnectionName, targetParameters,'TO_USER')
     
-    const targetDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA)
+    const targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA)
     const taskStartTime = performance.now();
     let stepStartTime = taskStartTime
     
@@ -1246,7 +1252,7 @@ class YadamuQA {
     this.metrics.recordTaskTimings([task.taskName,this.OPERATION_NAME,targetDBI.MODE,sourceDatabase,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     
     if ((this.VERIFY_OPERATION === true) && (this.yadamu.MODE !== 'DDL_ONLY')) {
-      const compareDBI = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,false)
+      const compareDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,false)
       await compareDBI.initialize();
       stepStartTime = performance.now()
       this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),metrics,parameters,targetDBI.inverseIdentifierMappings) 
@@ -1282,7 +1288,7 @@ class YadamuQA {
  
     const sourceParameters  = Object.assign({},parameters)
     this.setUser(sourceParameters,'FROM_USER', sourceDatabase, this.getSourceMapping(sourceDatabase,task))
-    const sourceDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
+    const sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
     
     const targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER', targetDatabase, this.getSourceMapping(targetDatabase, task))
@@ -1315,7 +1321,7 @@ class YadamuQA {
       targetDescription = this.getDescription(targetDatabase,targetDatabase,targetParameters,'FROM_USER')
     }
     
-    const fileWriter = this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,null)
+    const fileWriter = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,null)
 
     const taskStartTime = performance.now();
     let stepStartTime = taskStartTime;
@@ -1341,13 +1347,13 @@ class YadamuQA {
        this.setUser(sourceParameters,'FROM_USER',sourceDatabase, task.source)
       }
       
-      const fileReader = this.getDatabaseInterface(targetDatabase,sourceConnection,sourceParameters,null)
+      const fileReader = await this.getDatabaseInterface(targetDatabase,sourceConnection,sourceParameters,null)
       
       const targetParameters  = Object.assign({},parameters)
       const sourceSchema = this.getSourceMapping(sourceDatabase,task)
       const targetSchema = this.getTargetMapping(sourceDatabase,task,'1')
       this.setUser(targetParameters,'TO_USER', sourceDatabase, targetSchema, task.vendor)
-      const targetDBI = this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,this.RECREATE_SCHEMA)
+      const targetDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,this.RECREATE_SCHEMA)
 
       stepStartTime = performance.now();
       metrics.push(await this.yadamu.pumpData(fileReader,targetDBI));

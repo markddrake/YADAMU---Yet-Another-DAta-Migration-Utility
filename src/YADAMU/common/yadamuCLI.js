@@ -107,6 +107,7 @@ class YadamuCLI {
     , "COPY"           : Object.freeze(['CONFIG'])
     , "TEST"           : Object.freeze(['CONFIG'])
     , "CONNECTIONTEST" : Object.freeze(['CONFIG','RDBMS'])
+    , "ENCRYPT"        : Object.freeze([])
     , "DECRYPT"        : Object.freeze([])
     })
     return YadamuCLI._REQUIRED_ARGUMENTS
@@ -464,8 +465,8 @@ class YadamuCLI {
   async doCopy() {
   
     const configuration = this.loadConfigurationFile()
-    this.yadamu.reloadParameters(configuration.parameters || {} );
-	await this.yadamu.initialize()
+    this.yadamu.reloadParameters(configuration.parameters);
+	await this.yadamu.initialize(this.configuration.parameters || {})
     const startTime = performance.now();
     for (const job of configuration.jobs) {
 
@@ -528,10 +529,9 @@ class YadamuCLI {
   async doTests() {
     
 	const configuration = this.loadConfigurationFile()
-    this.yadamu.reloadParameters(configuration.parameters || {} );
-	await this.yadamu.initialize()
     const YadamuQA = require('../../YADAMU_QA/common/node/yadamuQA.js');
-	const yadamuQA = new YadamuQA(configuration,this.yadamu.ENCRYPTION_KEY);
+	const yadamuQA = new YadamuQA(configuration);
+    await yadamuQA.initialize()
 	const startTime = performance.now();
 	const results = await yadamuQA.doTests(configuration);
 	const elapsedTime = performance.now() - startTime;
