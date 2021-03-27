@@ -120,7 +120,7 @@ class MySQLWriter extends YadamuWriter {
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 
     // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.metrics.cached],'cacheRow()')    
-	  
+	
 	try {
 	  
       this.rowTransformation(row)

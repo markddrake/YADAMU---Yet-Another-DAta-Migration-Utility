@@ -361,6 +361,7 @@ class MongoQA extends MongoDBI {
           }
         })
       }
+	  
       const sourceCounts = await this.getRowCounts(source)
       
       

@@ -36,7 +36,7 @@ class SnowflakeStatementLibrary {
                                when c.data_type = 'VARIANT' then
                                  concat('TO_VARCHAR("',column_name,'") "',column_name,'"')
                                when c.data_type = 'TIME' then
-                                 concat('cast(concat(''1971-01-01T'',','"',column_name,'"',') as Timestamp)')
+                                 concat('cast(concat(''1971-01-01T'',to_varchar("',column_name,'",''HH24:MI:SS.FF9'')) as Timestamp)')
 							   when c.data_type in ('FLOAT','FLOAT4','FLOAT8','DOUBLE','DOUBLE PRECISION','REAL') then
 							     concat('TO_VARCHAR("',column_name,'",''TME'') "',column_name,'"')
                                else

@@ -316,11 +316,109 @@ $$
 --
 DELIMITER ;
 --
+drop procedure if exists ORDERED_JSON_IMPL;
+--
+DELIMITER $$
+--
+create procedure ORDERED_JSON_IMPL(IN P_VALUE LONGTEXT,OUT P_RESULT LONGTEXT)
+begin
+  declare V_RESULT LONGTEXT;
+  declare V_KEY    VARCHAR(256);
+  declare V_VALUE  LONGTEXT;
+  declare V_ID     VARCHAR(36) DEFAULT  UUID();
+  
+  declare NO_MORE_ROWS          INT DEFAULT FALSE;
+  
+  declare ORDER_CHILD_OBJECTS
+  cursor for
+  select JSON_KEY, JSON_VALUE 
+    from KV_PAIR_CACHE
+   where JSON_OBJECT_ID = V_ID 
+     and JSON_VALUE like '{%}';
+	 
+  declare CONTINUE HANDLER FOR NOT FOUND set NO_MORE_ROWS = TRUE;
+  
+  set max_sp_recursion_depth=50;
+
+  create temporary table if not exists KV_PAIR_CACHE (
+    JSON_OBJECT_ID   VARCHAR(36)
+   ,JSON_KEY         VARCHAR(256)
+   ,JSON_VALUE       LONGTEXT
+  );
+  
+  insert into KV_PAIR_CACHE   
+  with recursive KV_ARRAYS as (
+    select JSON_KEYS("P_VALUE") "KEY_ARRAY"
+          ,JSON_EXTRACT("P_VALUE",'$.*') "VALUE_ARRAY"
+  )
+  ,KV_PAIRS as (
+    select JSON_EXTRACT("KEY_ARRAY",'$[0]') "KEY"
+          ,JSON_EXTRACT("VALUE_ARRAY",'$[0]') "VALUE"
+  		  ,JSON_REMOVE("KEY_ARRAY",'$[0]') "KEY_ARRAY"
+  		  ,JSON_REMOVE("VALUE_ARRAY",'$[0]') "VALUE_ARRAY"
+      from KV_ARRAYS
+     where JSON_EXTRACT("KEY_ARRAY",'$[0]') is not NULL
+     union all
+    select JSON_EXTRACT("KEY_ARRAY",'$[0]') "KEY"
+          ,JSON_EXTRACT("VALUE_ARRAY",'$[0]') "VALUE"
+  		  ,JSON_REMOVE("KEY_ARRAY",'$[0]') "KEY_ARRAY"
+  		  ,JSON_REMOVE("VALUE_ARRAY",'$[0]') "VALUE_ARRAY"
+   	  from KV_PAIRS
+     where JSON_EXTRACT("KEY_ARRAY",'$[0]') is not NULL
+  )
+  select V_ID, "KEY","VALUE"
+    from KV_PAIRS;
+
+  set NO_MORE_ROWS = FALSE;
+  OPEN ORDER_CHILD_OBJECTS;
+  
+  CHILD_OBJECTS: loop
+     FETCH ORDER_CHILD_OBJECTS 
+	  into V_KEY, V_VALUE;
+	  
+	 if (NO_MORE_ROWS) then
+	   leave CHILD_OBJECTS;
+	 end if;
+	 
+	 call ORDERED_JSON_IMPL(V_VALUE,V_VALUE);
+	 
+	 update KV_PAIR_CACHE 
+	    set JSON_VALUE = V_VALUE
+	  where JSON_OBJECT_ID = V_ID
+	    and JSON_KEY = V_KEY;
+
+  end loop;
+  
+  close ORDER_CHILD_OBJECTS;
+ 
+  select CONCAT('{',GROUP_CONCAT(CONCAT("JSON_KEY",':',"JSON_VALUE") ORDER BY "JSON_KEY"),'}')
+    into P_RESULT
+    from KV_PAIR_CACHE
+   where JSON_OBJECT_ID = V_ID;
+  
+end$$
+--
+DELIMITER ;
+--
+drop function if exists ORDERED_JSON;
+--
+DELIMITER $$
+--
+create function ORDERED_JSON(P_VALUE LONGTEXT)
+returns LONGTEXT DETERMINISTIC
+begin
+  declare V_RESULT LONGTEXT;
+  call ORDERED_JSON_IMPL(P_VALUE,V_RESULT);
+  return V_RESULT;
+end$$
+--
+DELIMITER ;
+--
 DROP PROCEDURE IF EXISTS COMPARE_SCHEMAS;
 --
 DELIMITER $$
 --
-CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_MAP_EMPTY_STRING_TO_NULL BOOLEAN, P_SPATIAL_PRECISION INT)
+CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_COMPARE_RULES VARCHAR(32768))
 BEGIN
   declare TABLE_NOT_FOUND CONDITION for 1146; 
 
@@ -334,6 +432,9 @@ BEGIN
   declare V_STATEMENT           TEXT;
   declare V_COUNT_STATEMENT     TEXT;
   
+  declare V_MAP_EMPTY_STRING_TO_NULL BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.emptyStringisNull');
+  declare V_SPATIAL_PRECISION        INT     DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.spatialPrecision');
+  declare V_ORDERED_JSON             BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.orderedJSON');
   
   declare MISSING_ROWS INT;
   declare EXTRA_ROWS INT;
@@ -347,13 +448,18 @@ BEGIN
   select c.table_name "TABLE_NAME"
         ,group_concat(case 
 		                when ((data_type = 'longtext') and (check_clause is not null)) then
-						  concat('concat('''',json_compact("',column_name,'"))')
+					      case 
+						    when V_ORDERED_JSON then
+						      concat('concat('''',ordered_json("',column_name,'"))')
+							else
+							  concat('concat('''',json_compact("',column_name,'"))')
+						   end
                         when data_type in ('geometry') then
                           case
-                            when P_SPATIAL_PRECISION = 18 then
+                            when V_SPATIAL_PRECISION = 18 then
                               concat('"',column_name,'"') 
                             else                            
-                              concat('ROUND_GEOMETRY(',column_name,',',P_SPATIAL_PRECISION,')')
+                              concat('ROUND_GEOMETRY(',column_name,',',V_SPATIAL_PRECISION,')')
                           end
                         when data_type in ('blob', 'varbinary', 'binary') then
                           concat('hex("',column_name,'")') 
@@ -362,7 +468,7 @@ BEGIN
                           concat('json_compact(concat(''["'',replace("',column_name,'",'','',''","''),''"]''))') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
                           case
-                            when P_MAP_EMPTY_STRING_TO_NULL then
+                            when V_MAP_EMPTY_STRING_TO_NULL then
                               concat('case when "',column_name,'" = '''' then NULL else "',column_name,'" end') 
                             else 
                               concat('"',column_name,'"') 
@@ -372,13 +478,18 @@ BEGIN
 					  order by ordinal_position separator ',')  "SOURCE_COLUMNS"
         ,group_concat(case 
 		                when ((data_type = 'longtext') and (check_clause is not null)) then
-						  concat('concat('''',json_compact("',column_name,'"))')
+					      case 
+						    when V_ORDERED_JSON then
+						      concat('concat('''',ordered_json("',column_name,'"))')
+							else
+							  concat('concat('''',json_compact("',column_name,'"))')
+						   end
                         when data_type in ('geometry') then
                           case
-                            when P_SPATIAL_PRECISION = 18 then
+                            when V_SPATIAL_PRECISION = 18 then
                               concat('"',column_name,'"') 
                             else                            
-                              concat('ROUND_GEOMETRY(',column_name,',',P_SPATIAL_PRECISION,')')
+                              concat('ROUND_GEOMETRY(',column_name,',',V_SPATIAL_PRECISION,')')
                           end
                         when data_type in ('blob', 'varbinary', 'binary') then
                           concat('hex("',column_name,'")') 
@@ -387,7 +498,7 @@ BEGIN
                           concat('json_compact("',column_name,'")') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
                           case
-                            when P_MAP_EMPTY_STRING_TO_NULL then
+                            when V_MAP_EMPTY_STRING_TO_NULL then
                               concat('case when "',column_name,'" = '''' then NULL else "',column_name,'" end') 
                             else 
                               concat('"',column_name,'"') 
@@ -505,7 +616,7 @@ BEGIN
                              '       ,(select count(*) from MISSING_ROWS) ',C_NEWLINE,
                              '       ,(select count(*) from EXTRA_ROWS) ',C_NEWLINE,
                              '       ,NULL');   
-    
+							 
     set @STATEMENT = V_STATEMENT;
     PREPARE STATEMENT FROM @STATEMENT;
     EXECUTE STATEMENT;

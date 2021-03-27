@@ -222,7 +222,7 @@ class MongoWriter extends YadamuWriter {
       
     // Apply the row transformation and add row to the current batch.
 	
-    this.rowTransformation(row)
+	this.rowTransformation(row)
 	this.batchRow(row)
     this.metrics.cached++
     return this.skipTable

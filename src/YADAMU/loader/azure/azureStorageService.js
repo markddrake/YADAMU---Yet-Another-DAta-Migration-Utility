@@ -40,9 +40,9 @@ class AzureStorageService {
 	const passThrough = new PassThrough();
 	const blockBlobClient = this.containerClient.getBlockBlobClient(key);
 	const writeOperation = blockBlobClient.uploadStream(passThrough, undefined, undefined, { blobHTTPHeaders: { blobContentType: contentType}})
-	writeOperation.then(() => {this.writeOperations.delete(writeOperation)})    
 	this.writeOperations.add(writeOperation);
-    return passThrough;
+    writeOperation.then(() => {this.writeOperations.delete(writeOperation)})    
+	return passThrough;
   }
   
   async createBucketContainer() {

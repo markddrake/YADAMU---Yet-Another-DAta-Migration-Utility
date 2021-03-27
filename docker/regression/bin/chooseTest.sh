@@ -41,6 +41,7 @@ case $YADAMU_TEST_NAME  in
   ;;	
   
   snowflake)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeDataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeTestSuite
   ;;
 

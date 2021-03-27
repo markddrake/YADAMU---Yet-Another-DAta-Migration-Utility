@@ -237,6 +237,7 @@ $END
   C_MONGO_OBJECT_ID        CONSTANT VARCHAR2(32):= 'RAW(12)';
   C_MONGO_UNKNOWN_TYPE     CONSTANT VARCHAR2(32):= 'VARCHAR2(2048)';
   C_MONGO_REGEX_TYPE       CONSTANT VARCHAR2(32):= 'VARCHAR2(2048)';
+  C_VERTICA_INTERVAL_TYPE  CONSTANT VARCHAR2(32):= 'INTERVAL DAY TO SECOND(6)';
   
 
   G_INCLUDE_DATA    BOOLEAN := TRUE;
@@ -722,7 +723,7 @@ $END
 end;
 --
 function MAP_FOREIGN_DATATYPE(
- P_SOURCE_VENDOR          VARCHAR2
+  P_SOURCE_VENDOR          VARCHAR2
 , P_DATA_TYPE             VARCHAR2
 , P_DATA_TYPE_LENGTH      NUMBER
 , P_DATA_TYPE_SCALE       NUMBER
@@ -866,7 +867,7 @@ begin
       -- MariaDB and MySQL currentyl share the same mappings
       case
 	    -- Strings
-        when P_DATA_TYPE in ('varchar')                                                then return case when P_DATA_TYPE_LENGTH > C_MAX_VARCHAR_SIZE then 'CLOB' else 'VARCHAR2' end;
+        when P_DATA_TYPE = 'varchar'                                                   then return case when P_DATA_TYPE_LENGTH > C_MAX_VARCHAR_SIZE then 'CLOB' else 'VARCHAR2' end;
         when P_DATA_TYPE = 'tinytext'                                                  then return 'VARCHAR2';
         when P_DATA_TYPE = 'mediumtext'                                                then return 'CLOB';
         when P_DATA_TYPE = 'text'                                                      then return 'CLOB';
@@ -894,7 +895,7 @@ begin
         when P_DATA_TYPE = 'longblob'                                                  then return 'BLOB';
         -- Date/TIme Data Types
         when P_DATA_TYPE = 'date'                                                      then return 'DATE';
-        when P_DATA_TYPE = 'time'                                                      then return 'DATE';
+        when P_DATA_TYPE = 'time'                                                      then return 'TIMESTAMP';
         when P_DATA_TYPE = 'datetime'                                                  then return 'TIMESTAMP';
         -- Special Data Types   
         when P_DATA_TYPE = 'enum'                                                      then return C_ENUM_TYPE;
@@ -911,6 +912,37 @@ begin
 		))                                                                             then return 'GEOMETRY';
         when P_DATA_TYPE = 'set'                                                       then return 'JSON';
         when P_DATA_TYPE = 'year'                                                      then return C_MYSQL_YEAR_TYPE;
+                                                                                       else return UPPER(P_DATA_TYPE);
+      end case;
+    when (P_SOURCE_VENDOR = 'Vertica') then
+      case
+	    -- Strings
+        when P_DATA_TYPE = 'char'                                                      then return case when P_DATA_TYPE_LENGTH > C_MAX_CHAR_SIZE then 'CLOB' else 'CHAR' end;
+        when P_DATA_TYPE = 'varchar'                                                   then return case when P_DATA_TYPE_LENGTH > C_MAX_VARCHAR_SIZE then 'CLOB' else 'VARCHAR2' end;
+        when P_DATA_TYPE = 'long varchar'                                              then return 'CLOB';
+        -- ExactNumbers
+        when P_DATA_TYPE = 'integer'                                                   then return C_INT_TYPE;
+        when P_DATA_TYPE = 'decimal'                                                   then return 'NUMBER';
+        when P_DATA_TYPE = 'numeric'                                                   then return 'NUMBER';
+        -- Binary Numbers
+        when P_DATA_TYPE = 'float'                                                     then return 'BINARY_FLOAT';
+        -- Text Data Types           
+        -- Binary Data types
+        when P_DATA_TYPE = 'binary'                                                    then return case when P_DATA_TYPE_LENGTH > C_MAX_RAW_SIZE then 'BLOB' else 'RAW' end;
+        when P_DATA_TYPE = 'varbinary'                                                 then return case when P_DATA_TYPE_LENGTH > C_MAX_RAW_SIZE then 'BLOB' else 'RAW' end;
+        when P_DATA_TYPE = 'long varbinary'                                            then return 'BLOB';
+        -- Date/TIme Data Types
+        when P_DATA_TYPE = 'int'                                                       then return C_BIGINT_TYPE;
+        when P_DATA_TYPE = 'date'                                                      then return 'DATE';
+        when P_DATA_TYPE = 'time'                                                      then return 'TIMESTAMP';
+        when P_DATA_TYPE = 'timetz'                                                    then return 'TIMESTAMP WITH TIME ZONE';
+        when P_DATA_TYPE = 'timestamptz'                                               then return 'TIMESTAMP WITH TIME ZONE';
+        when P_DATA_TYPE = 'interval'                                                  then return C_VERTICA_INTERVAL_TYPE;
+        when P_DATA_TYPE = 'datetime'                                                  then return 'TIMESTAMP';
+        -- Special Data Types   
+        when P_DATA_TYPE = 'geography'                                                 then return 'GEOMETRY';
+		when P_DATA_TYPE = 'geometry'                                                  then return 'GEOMETRY';
+        when P_DATA_TYPE = 'uuid'                                                      then return C_UUID_TYPE;
                                                                                        else return UPPER(P_DATA_TYPE);
       end case;
     when P_SOURCE_VENDOR = 'MongoDB' then

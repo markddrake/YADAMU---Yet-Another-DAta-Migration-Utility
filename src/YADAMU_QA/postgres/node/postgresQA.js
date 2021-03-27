@@ -78,7 +78,7 @@ class PostgresQA extends PostgresDBI {
 	  , xmlRule             : rules.XML_COMPARISSON_RULE
 	  , infinityIsNull      : rules.INFINITY_IS_NULL 
       }
-	 	 
+	  
       await this.executeSQL(PostgresQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,compareRules])      
       
       const successful = await this.executeSQL(PostgresQA.SQL_SUCCESS)            

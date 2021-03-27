@@ -1099,6 +1099,10 @@ class YadamuDBI {
 	return metadata
   }  
   
+  generateSelectListEntry(columnInfo) {
+	return `"${columnInfo[2]}"`
+  }
+  
   buildSchemaInfo(schemaColumnInfo) {
 	const schemaInfo = []
 	let tableInfo = undefined
@@ -1121,10 +1125,14 @@ class YadamuDBI {
 	  }
 	  const dataType = YadamuLibrary.decomposeDataType(columnInfo[3])
       tableInfo.COLUMN_NAME_ARRAY.push(columnInfo[2])
-	  tableInfo.DATA_TYPE_ARRAY.push(dataType.type)
+	  tableInfo.DATA_TYPE_ARRAY.push(dataType.typeQualifier ? `${dataType.type} ${dataType.typeQualifier}` : dataType.type)
 	  tableInfo.SIZE_CONSTRAINT_ARRAY.push(dataType.length ? dataType.scale ? `${dataType.length},${dataType.scale}` : `${dataType.length}` : '')
-	  tableInfo.CLIENT_SELECT_LIST = `${tableInfo.CLIENT_SELECT_LIST},"${columnInfo[2]}"`
+	  tableInfo.CLIENT_SELECT_LIST = `${tableInfo.CLIENT_SELECT_LIST},${this.generateSelectListEntry(columnInfo)}`
     })
+	if (tableInfo) {
+      tableInfo.CLIENT_SELECT_LIST = tableInfo.CLIENT_SELECT_LIST.substring(1)
+	  schemaInfo.push(tableInfo)
+	}
 	return schemaInfo
   }
   

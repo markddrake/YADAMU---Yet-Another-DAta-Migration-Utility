@@ -21,6 +21,7 @@
     "operation"       : "import"
   , "importPath"      : "%location%"
   , "source"          : "file-JSON"
+  , "verifyOperation" : true
   , "targets"         : [
        "oracle19c", "oracle18c", "oracle12c", "oracle11g","mssql17","mssql19","mysql#1","mariadb#1","mongodb#1"
 	]

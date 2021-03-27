@@ -398,35 +398,47 @@ $END
               -- Oracle20c and Later
 	           'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || atc.COLUMN_NAME || '" returning BLOB ' || V_ORDERING_CLAUSE || '),' || V_HASH_METHOD || ') end "' || atc.COLUMN_NAME || '"'
   		     when jc.FORMAT is not NULL then
-			  -- JSON column of type VARCHAR, CLOB or BLOB
+			   -- JSON column of type VARCHAR, CLOB or BLOB
     	       $IF DBMS_DB_VERSION.VER_LE_12_2 $THEN
-      	      --
-		      -- Ordering is not supported in 12.2 x as ORDERING may cause 3113 if any document in the table exceeds 8K
-			  -- Cannot reliably order docments < 8K as JSON formatting may change the size of the source and target documents.
-			  -- Use JSON_COMPACT to remove insignifcant whitespace and compare results.
-			  --
-               'case ' || 
-               '  when t."' || atc.COLUMN_NAME || '" is NULL then ' || 
-               '    NULL ' || 
-               '  else ' || 
+      	       --
+		       -- The ORDERED Clause of JSON_QUERY is not a documented feature. In 12.2 x ORDERED may cause 3113 if any document in the table exceeds 8K 
+			   --
 			   case 
-				 when atc.DATA_TYPE = 'BLOB' then
-		         '    dbms_crypto.HASH(YADAMU_TEST.JSON_COMPACT(TO_CLOB(t."' || atc.COLUMN_NAME || '")),' || V_HASH_METHOD || ') end /* JSON 12C BLOB NO ORDERING */ "'
-			     else 
-				 '    dbms_crypto.HASH(YADAMU_TEST.JSON_COMPACT(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end /* JSON 12C CLOB/VARCHAR2 NO ORDERING */ "'
-		       end  || atc.COLUMN_NAME || '"'
+			     when (V_ORDERING_CLAUSE = 'ORDERED') then
+				 --
+			     -- Limited Support for ORDERING JSON Objects is provided by YADAMU_UTILITIES.ORDER_JSON_OBJECTS. This utility uses JSON_TABLE so is hamgstrung by the lack of CLOB support.
+			     --
+			       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(YADAMU_UTILITIES.ORDER_JSON_OBJECTS(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end /* JSON 12C ORDERING */'
+				 else 
+				  --
+				  -- Whitespace formatting in other databases may change the size of the source and target documents. 12.2 cannot use JSON_QUERY to normalize JSON as it does not support CLOB. Use YADAMU_TEST.JSON_COMPACT to remove insignifcant whitespace and compare results.				  --
+			      case
+				     when atc.DATA_TYPE = 'BLOB' then
+		               'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(YADAMU_TEST.JSON_COMPACT(TO_CLOB(t."' || atc.COLUMN_NAME || '")),' || V_HASH_METHOD || ') end /* JSON 12C BLOB NO ORDERING */'
+			         else 
+				       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(YADAMU_TEST.JSON_COMPACT(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end /* JSON 12C CLOB/VARCHAR2 NO ORDERING */'
+		           end  
+			   end || '"' || atc.COLUMN_NAME || '"'
                $ELSIF DBMS_DB_VERSION.VER_LE_18 $THEN
-              --				   
-			  -- Order and convert to BLOB using JSON_QUERY. Ordering disabled in Oracle 18c
-              -- 
-			   'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning BLOB),' || V_HASH_METHOD || ') end /* JSON 18C NO ORDERING */ "' || atc.COLUMN_NAME || '"'
-			  --
+      	       --
+		       -- The ORDERED Clause of JSON_QUERY is not a documented feature. In 12.2 x ORDERED may cause 3113 if any document in the table exceeds 8K 
+			   --
+			   case
+			     when (V_ORDERING_CLAUSE = 'ORDERED') then
+				 --
+			     -- Support for ORDERING JSON Objects is provided by YADAMU_UTILITIES.ORDER_JSON_OBJECTS. 
+			     --
+			       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(YADAMU_UTILITIES.ORDER_JSON_OBJECTS(t."' || atc.COLUMN_NAME || '"),' || V_HASH_METHOD || ') end /* JSON 18C ORDERING */'
+			     else
+			       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning BLOB),' || V_HASH_METHOD || ') end /* JSON 18C NO ORDERING */'
+			   end || '"' || atc.COLUMN_NAME || '"'
+			   --
 			   $ELSE /* 19c */
-			  -- Order and convert to BLOB using JSON_SERIALIZE
+			   -- Order and convert to BLOB using JSON_SERIALIZE
 	           'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || atc.COLUMN_NAME || '" returning BLOB  ' || V_ORDERING_CLAUSE || '),' || V_HASH_METHOD || ') end /* JSON 19C ORDERED */"' || atc.COLUMN_NAME || '"'
-			  --
+			   --
 			   $END
-			 --
+			   --
 			 $END
 			 --
 		     when atc.DATA_TYPE = 'ANYDATA' then

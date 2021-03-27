@@ -1,6 +1,6 @@
 /*
 **
-** Drop functions regardless of signatute
+** Drop functions regardless of signature
 **
 */
 do 
@@ -93,7 +93,7 @@ returns jsonb
 STABLE RETURNS NULL ON NULL INPUT
 as
 $$
-select array_to_json(tsvector_to_array($1))
+select array_to_json(tsvector_to_array($1))::jsonb
 $$
 LANGUAGE SQL;
 --
@@ -116,7 +116,7 @@ returns jsonb
 STABLE RETURNS NULL ON NULL INPUT
 as
 $$
-select json_build_object(
+select jsonb_build_object(
   'hasLowerBound',
   not lower_inf($1),
   'lowerBound',
@@ -157,15 +157,15 @@ returns jsonb
 STABLE RETURNS NULL ON NULL INPUT
 as
 $$
-select json_build_object(
+select jsonb_build_object(
          'type',
          'Feature',
          'geometry',
-         json_build_object(
+         jsonb_build_object(
            'type',
            'Point',
            'coordinates',
-           json_build_array(
+           jsonb_build_array(
              ($1)[0],
              ($1)[1]
            )
@@ -173,7 +173,7 @@ select json_build_object(
         'shape',
         'LinearEquation',
         'properties',
-        json_build_object(
+        jsonb_build_object(
           'constant',
            $1[2]
         )
@@ -201,15 +201,15 @@ returns jsonb
 STABLE RETURNS NULL ON NULL INPUT
 as
 $$
-select json_build_object(
+select jsonb_build_object(
          'type',
          'Feature',
          'geometry',
-         json_build_object(
+         jsonb_build_object(
            'type',
            'Point',
            'coordinates',
-           json_build_array(
+           jsonb_build_array(
              (center($1))[0],
              (center($1))[1]
            )
@@ -217,7 +217,7 @@ select json_build_object(
          'shape',
          'Circle',
          'properties',
-         json_build_object(
+         jsonb_build_object(
          'radius',
             radius($1)
          )
@@ -641,6 +641,17 @@ begin
         when 'rowversion'                                                                        then return 'bytea';
         when 'hierarchyid'                                                                       then return C_HIERARCHY_TYPE;
         when 'uniqueidentifier'                                                                  then return 'uuid';
+                                                                                                 else return lower(V_DATA_TYPE);
+      end case;
+    when  'Vertica' then
+      case V_DATA_TYPE
+        -- MySQL Direct Mappings
+        when 'binary'                                                                            then return 'bytea';
+        when 'varbinary'                                                                         then return 'bytea';
+		when 'long binaray'                                                                      then return 'bytea';
+		when 'varchar'                                                                           then return 'character varying';
+		when 'long varchar'                                                                      then return C_MAX_CHARACTER_VARYING_TYPE;
+		when 'int'                                                                               then return 'bigint';
                                                                                                  else return lower(V_DATA_TYPE);
       end case;
 	when 'MongoDB' then

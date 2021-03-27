@@ -22,44 +22,46 @@ class StatementGenerator {
   **
   */
 
-  static get LARGEST_NUMERIC_TYPE()    { return 'NUMBER(38)' }
-   
-  static get LARGEST_BIT_TYPE()        { return 'bit(64)'          }
-  static get BIT_TYPE()                { return 'bit'              }
-
-  static get TINYINT_TYPE()            { return 'TINYINT'}
-  static get SMALLINT_TYPE()           { return 'SMALLINT'}
-  static get MEDIUMINT_TYPE()          { return 'INT'}
-  static get INT_TYPE()                { return 'INTEGER'}
-  static get BIGINT_TYPE()             { return 'BIGINT'}
-
-									 
-  static get BFILE_TYPE()              { return 'TEXT(2048)'    }
-  static get ROWID_TYPE()              { return 'TEXT(32)'      }
-  static get XML_TYPE()                { return SnowflakeConstants.XML_TYPE         }
-  static get UUID_TYPE()               { return 'TEXT(36)'      }
-  static get ENUM_TYPE()               { return 'TEXT(255)'     }
-  static get INTERVAL_TYPE()           { return 'TEXT(16)'      }
-  static get BOOLEAN_TYPE()            { return 'tinyint(1)'       }
-  static get HIERARCHY_TYPE()          { return 'TEXT(4000)'    }
-  static get ORACLE_NUMBERIC_TYPE()    { return 'NUMBER(38,19)'    }
-  static get MSSQL_MONEY_TYPE()        { return 'NUMBER(19,4)'    }
-  static get MSSQL_SMALL_MONEY_TYPE()  { return 'NUMBER(10,4)'    }
-  static get MSSQL_ROWVERSION_TYPE()   { return 'BINARY(8)'        }
-  static get PGSQL_MONEY_TYPE()        { return 'NUMBER(21,2)'    }
-  static get PGSQL_NAME_TYPE()         { return 'TEXT(64)'      }
-  static get PGSQL_SINGLE_CHAR_TYPE()  { return 'char(1)'          }
-  static get PGSQL_NUMERIC_TYPE()      { return 'NUMBER(38,19)'    } 
-  static get PGSQL_INTERVAL_TYPE()     { return 'VARCHAR2(16)'}
-  static get ORACLE_NUMERIC_TYPE()     { return 'NUMBER'    } 
-  static get INET_ADDR_TYPE()          { return 'TEXT(39)'      }
-  static get MAC_ADDR_TYPE()           { return 'TEXT(23)'      }
-  static get UNSIGNED_INT_TYPE()       { return 'NUMBER(10)'    }
-  static get PGSQL_IDENTIFIER()        { return 'BINARY(4)'    }
-  static get MYSQL_YEAR_TYPE()         { return 'NUMBER(4,0)'}
-  static get MONGO_OBJECT_ID()         { return 'BINARY(12)'       }
-  static get MONGO_UNKNOWN_TYPE()      { return 'TEXT(2048)'    }
-  static get MONGO_REGEX_TYPE()        { return 'TEXT(2048)'    }
+  static get LARGEST_NUMERIC_TYPE()                { return 'NUMBER(38)' }
+									             
+  static get LARGEST_BIT_TYPE()                    { return 'bit(64)'          }
+  static get BIT_TYPE()                            { return 'bit'              }
+									             
+  static get TINYINT_TYPE()                        { return 'TINYINT'}
+  static get SMALLINT_TYPE()                       { return 'SMALLINT'}
+  static get MEDIUMINT_TYPE()                      { return 'INT'}
+  static get INT_TYPE()                            { return 'INTEGER'}
+  static get BIGINT_TYPE()                         { return 'BIGINT'}
+									             
+									             
+  static get BFILE_TYPE()                          { return 'TEXT(2048)'    }
+  static get ROWID_TYPE()                          { return 'TEXT(32)'      }
+  static get XML_TYPE()                            { return SnowflakeConstants.XML_TYPE         }
+  static get UUID_TYPE()                           { return 'TEXT(36)'      }
+  static get ENUM_TYPE()                           { return 'TEXT(255)'     }
+  static get INTERVAL_TYPE()                       { return 'TEXT(16)'      }
+  static get BOOLEAN_TYPE()                        { return 'tinyint(1)'       }
+  static get HIERARCHY_TYPE()                      { return 'TEXT(4000)'    }
+  static get ORACLE_UNQUALIFIED_NUMBER_TYPE()      { return 'NUMBER(38,19)'    }
+  // static get ORACLE_UNQUALIFIED_NUMBER_TYPE()      { return 'FLOAT'    }
+  static get MSSQL_MONEY_TYPE()                    { return 'NUMBER(19,4)'    }
+  static get MSSQL_SMALL_MONEY_TYPE()              { return 'NUMBER(10,4)'    }
+  static get MSSQL_ROWVERSION_TYPE()               { return 'BINARY(8)'        }
+  static get PGSQL_MONEY_TYPE()                    { return 'NUMBER(21,2)'    }
+  static get PGSQL_NAME_TYPE()                     { return 'TEXT(64)'      }
+  static get PGSQL_SINGLE_CHAR_TYPE()              { return 'char(1)'          }
+  static get PGSQL_NUMERIC_TYPE()                  { return 'NUMBER(38,19)'    } 
+  static get PGSQL_INTERVAL_TYPE()                 { return 'VARCHAR2(16)'}
+  static get ORACLE_NUMERIC_TYPE()                 { return 'NUMBER'    } 
+  static get INET_ADDR_TYPE()                      { return 'TEXT(39)'      }
+  static get MAC_ADDR_TYPE()                       { return 'TEXT(23)'      }
+  static get UNSIGNED_INT_TYPE()                   { return 'NUMBER(10)'    }
+  static get PGSQL_IDENTIFIER()                    { return 'BINARY(4)'    }
+  static get MYSQL_YEAR_TYPE()                     { return 'NUMBER(4,0)'}
+  static get MONGO_OBJECT_ID()                     { return 'BINARY(12)'       }
+  static get MONGO_OBJECT_ID()                     { return 'BINARY(12)'       }
+  static get MONGO_DECIMAL_TYPE()                  { return 'NUMBER(38,19)' }
+  static get MONGO_REGEX_TYPE()                    { return 'TEXT(2048)' }
   
   static get UNBOUNDED_TYPES() { 
     StatementGenerator._UNBOUNDED_TYPES = StatementGenerator._UNBOUNDED_TYPES || Object.freeze([SnowflakeConstants.VARIANT_DATA_TYPE,'GEOGRAPHY','DOUBLE','FLOAT','BOOLEAN'])
@@ -95,7 +97,7 @@ class StatementGenerator {
          switch (dataType) {
            case 'VARCHAR2':                                           return 'TEXT';
            case 'NVARCHAR2':                                          return 'TEXT';
-           case 'NUMBER':                                             return dataTypeLength === undefined ? StatementGenerator.ORACLE_NUMERIC_TYPE : 'NUMBER';
+           case 'NUMBER':                                             return dataTypeLength === undefined ? StatementGenerator.ORACLE_UNQUALIFIED_NUMBER_TYPE : 'NUMBER';
            case 'BINARY_FLOAT':                                       return 'FLOAT';
            case 'BINARY_DOUBLE':                                      return 'FLOAT';
            case 'CLOB':                                               return SnowflakeConstants.CLOB_TYPE;
@@ -301,7 +303,7 @@ class StatementGenerator {
 		     }  
            case 'int':                                                return StatementGenerator.INT_TYPE;
            case 'long':                                               return StatementGenerator.BIGINT_TYPE;
-           case 'decimal':                                            return 'NUMBER';
+           case 'decimal':                                            return StatementGenerator.MONGO_DECIMAL_TYPE;
            case 'bindata':                                            return 'BINARY';
 		   case 'bool':                                               return 'BOOLEAN';
 		   case 'date':                                               return 'TIMESTAMP_LTZ(3)';

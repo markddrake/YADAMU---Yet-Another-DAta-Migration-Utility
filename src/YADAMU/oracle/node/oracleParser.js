@@ -86,16 +86,16 @@ class OracleParser extends YadamuParser {
  		  switch (column.dbType) {
 		    case oracledb.DB_TYPE_BINARY_FLOAT:
 			case oracledb.DB_TYPE_BINARY_DOUBLE:
-		      this.jsonTransformations[idx] = (row,idx)  => {
+		      return (row,idx)  => {
 			    switch (row[idx]) {
   			      case 'Inf':
-				    row[idx] = 'Infinity'
+					row[idx] = 'Infinity'
 				    break;
 				  case '-Inf':
-				    row[idx] = '-Infinity'
+					row[idx] = '-Infinity'
 				    break;
 				  case 'Nan':
-				    row[idx] = 'Nan'
+					row[idx] = 'NaN'
 				    break;
 				  default:
                 }				  

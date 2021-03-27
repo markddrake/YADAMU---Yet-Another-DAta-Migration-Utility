@@ -63,7 +63,7 @@ class StatementGenerator {
   static get MONGO_REGEX_TYPE()        { return 'varchar(2048)';    }
 									   r
   static get UNBOUNDED_TYPES() { 
-    StatementGenerator._UNBOUNDED_TYPES = StatementGenerator._UNBOUNDED_TYPES || Object.freeze(['date','time','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum'])
+    StatementGenerator._UNBOUNDED_TYPES = StatementGenerator._UNBOUNDED_TYPES || Object.freeze(['date','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum'])
     return StatementGenerator._UNBOUNDED_TYPES;
   }
 
@@ -181,7 +181,7 @@ class StatementGenerator {
            case 'real':                                                                  return 'float';
            case 'bit':                                                                   return StatementGenerator.BOOLEAN_TYPE;
            case 'datetime':                                                              return 'datetime(3)';
-           case 'time':                                                                  return dataTypeLength > 6 ? 'datetime(6)' : 'datetime';
+           case 'time':                                                                  return dataTypeLength > 6 ? 'time(6)' : 'time';
            case 'datetime2':                                                             return dataTypeLength > 6 ? 'datetime(6)' : 'datetime';
            case 'datetimeoffset':                                                        return dataTypeLength > 6 ? 'datetime(6)' : 'datetime';
            case 'smalldate':                                                             return 'datetime';
@@ -242,8 +242,8 @@ class StatementGenerator {
            case 'timestamp':                                                          
            case 'timestamp with time zone':                                           
            case 'timestamp without time zone':                                        
-           case 'time with time zone':                                                
-           case 'time without time zone':                                                return dataTypeLength === undefined ? 'datetime(6)' : 'datetime';
+           case 'time without time zone':                                                return 'datetime';
+           case 'time with time zone':                                                   return 'time(6)';
            case 'xml':                                                                   return 'longtext';     
            case 'jsonb':                                                                 return 'json';     
            case 'geography':                                                          
@@ -301,7 +301,7 @@ class StatementGenerator {
 		   case 'refcursor':                                                            return 'json';
            default:                                                                     
              if (dataType.indexOf('interval') === 0) {
-               return 'varchar(16)'; 
+               return StatementGenerator.INTERVAL_TYPE;
              }
              return dataType.toLowerCase();
          }
@@ -315,6 +315,44 @@ class StatementGenerator {
            default:                                                                    return dataType.toLowerCase();
          }
          break;
+       case 'Vertica':
+         switch (dataType) {
+           case 'varchar':     
+		   case 'long varchar':                                                        return 'longtext';
+             switch (true) {
+               case (dataTypeLength > StatementGenerator.MEDIUMTEXT_SIZE):             return 'longtext';
+               case (dataTypeLength > StatementGenerator.TEXT_SIZE):                   return 'mediumtext';
+               case (dataTypeLength > StatementGenerator.LARGEST_VARCHAR_SIZE):        return 'text';
+               default:                                                                return 'varchar';
+             }
+           case 'char':
+             switch (true) {
+               case (dataTypeLength > StatementGenerator.MEDIUMTEXT_SIZE):             return 'longtext';
+               case (dataTypeLength > StatementGenerator.TEXT_SIZE):                   return 'mediumtext';
+               case (dataTypeLength > StatementGenerator.LARGEST_CHAR_SIZE):           return 'text';
+               default:                                                                return 'char';
+             }
+           case 'binary':
+           case 'varbinary':
+           case 'long varbinary':
+             switch (true) {
+               case (dataTypeLength === undefined):                                    return 'longblob';
+               case (dataTypeLength > StatementGenerator.MEDIUMBLOB_SIZE):             return 'longblob';
+               case (dataTypeLength > StatementGenerator.BLOB_SIZE):                   return 'mediumblob';
+               case (dataTypeLength > StatementGenerator.LARGEST_VARBINARY_SIZE_SIZE): return 'blob';
+               default:                                                                return 'varbinary';
+             }
+           case 'timetz':                                                              return 'datetime(6)';
+           case 'timestamptz':                                                         return 'datetime(6)';
+           case 'timestamp':                                                           return 'datetime(6)';
+           case 'uuid':                                                                return StatementGenerator.UUID_TYPE;
+           default:                                                                    
+             if (dataType.indexOf('interval') === 0) {
+               return StatementGenerator.INTERVAL_TYPE;
+             }
+             return dataType.toLowerCase();
+		 }
+		 break;
        case 'MongoDB':
          switch (dataType) {
            case "string":
@@ -358,6 +396,7 @@ class StatementGenerator {
 		   case "binary":                                                              return dataTypeLength > StatementGenerator.LARGEST_VARBINARY_SIZE ? 'mediumblob' : 'varbinary'; 
 		   case "xml":       	                                                       return StatementGenerator.XML_TYPE
 		   case "variant":                                                             return 'longblob';
+		   case "time":                                                                return dataTypeLength > 6 ? 'time(6)' : 'time'; 
 		   case "timestamp_ltz":                                                    
 		   case "timestamp_ntz":                                                       return dataTypeLength > 6 ? 'datetime(6)' : 'datetime'; 
 		   default:
@@ -470,7 +509,7 @@ class StatementGenerator {
     const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
     const insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values `;
     const rowConstructor = `(${setOperators.join(',')})`
-    
+	
     return { 
        ddl             : createStatement, 
        dml             : insertStatement, 

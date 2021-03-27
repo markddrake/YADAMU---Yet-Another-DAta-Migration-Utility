@@ -4,6 +4,8 @@ Procedures are installed using the script file src/install/postgres/sql/YADAMU_I
 Procedures should be installed by the database owner. 
 Procedures need to installed in each database where Yadamu will be used.
 
+YADAMU assumes that the postgres extension pgcypto is enabled in the database where you are installed the Postgres Database support.
+
 ```bat
 psql -Upostgres -hyadamu-db1 -dyadamu <src/install/postgres/sql/YADAMU_IMPORT.sql
 ```

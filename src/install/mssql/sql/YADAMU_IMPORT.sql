@@ -140,7 +140,7 @@ begin
         when @DATA_TYPE = 'json'                                                                         then 'json'
         when @DATA_TYPE = 'blob' then
           case 
-            when @DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE                                                                then @MAX_VARBINARY_TYPE
+            when @DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE                                             then @MAX_VARBINARY_TYPE
                                                                                                          else 'varbinary'
         end
         -- For MySQL may need to add column character set to the table metadata object 
@@ -169,6 +169,50 @@ begin
           'multipolygon',
           'geometrycollection',
           'geomcollection')                                                                              then 'geometry'
+                                                                                                         else lower(@DATA_TYPE)
+      end
+    when @VENDOR = 'Vertica' then
+      case 
+        when @DATA_TYPE = 'char' then
+         case
+           when @DATA_TYPE_LENGTH > @LARGEST_NCHAR_SIZE                                                  then @MAX_NVARCHAR_TYPE 
+                                                                                                         else 'nchar'
+        end
+        when @DATA_TYPE = 'varchar' then
+         case
+           when @DATA_TYPE_LENGTH > @LARGEST_NVARCHAR_SIZE                                               then @MAX_NVARCHAR_TYPE 
+                                                                                                         else 'nvarchar'
+        end
+        when @DATA_TYPE = 'long varchar'                                                                 then @MAX_NVARCHAR_TYPE 
+        when @DATA_TYPE = 'binary' then
+          case 
+            when @DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE                                             then @MAX_VARBINARY_TYPE
+                                                                                                         else 'varbinary'
+        end
+        when @DATA_TYPE = 'varbinary' then
+          case 
+            when @DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE                                             then @MAX_VARBINARY_TYPE
+                                                                                                         else 'varbinary'
+        end
+        when @DATA_TYPE = 'long varbinary'                                                               then @MAX_VARBINARY_TYPE 
+        when @DATA_TYPE in (
+          'numeric',
+          'decimal'
+        ) then
+        case 
+          when  @DATA_TYPE_LENGTH > 38
+           and (@DATA_TYPE_SCALE = 0)                                                                    then 'numeric(38,0)'
+          when (@DATA_TYPE_LENGTH > 38) 
+           and (@DATA_TYPE_SCALE > 0)                                                                    then concat('numeric(38,',cast(round(@DATA_TYPE_SCALE*(38.0/@DATA_TYPE_LENGTH),0) as numeric(2)),')')
+                                                                                                         else 'numeric'
+        end
+        when @DATA_TYPE = 'int'                                                                          then 'bigint'
+        when @DATA_TYPE = 'timetz'                                                                       then 'datetimeoffset'
+        when @DATA_TYPE = 'timestamp'                                                                    then 'datetimeoffset'
+        when @DATA_TYPE = 'timestamptz'                                                                  then 'datetimeoffset'
+        when @DATA_TYPE = 'boolean'                                                                      then 'bit'
+        when (CHARINDEX('INTERVAL',@DATA_TYPE) = 1)                                                      then @INTERVAL_TYPE                  
+        when @DATA_TYPE = 'uuid'                                                                         then 'uniqueidentifier'
                                                                                                          else lower(@DATA_TYPE)
       end
     when @VENDOR = 'Postgres' then
@@ -772,7 +816,6 @@ go
 EXECUTE sp_ms_marksystemobject 'sp_GENERATE_SQL1'
 go
 --
-
 select master.dbo.sp_YADAMU_INSTANCE_ID() "YADAMU_INSTANCE_ID", master.dbo.sp_YADAMU_INSTALLATION_TIMESTAMP() "YADAMU_INSTALLATION_TIMESTAMP";
 go
 --

@@ -88,7 +88,8 @@ class MongoDBI extends YadamuDBI {
   get MONGO_EXPORT_FORMAT()    { return this.parameters.MONGO_EXPORT_FORMAT   || MongoConstants.MONGO_EXPORT_FORMAT}
   get MONGO_STRIP_ID()         { return this.parameters.MONGO_STRIP_ID        || MongoConstants.MONGO_STRIP_ID}
   get DEFAULT_STRING_LENGTH()  { return this.parameters.DEFAULT_STRING_LENGTH || MongoConstants.DEFAULT_STRING_LENGTH}
-  get MAX_STRING_LENGTH()      { return this.parameters.MAX_STRING_LENGTH     || MongoConstants.MAX_STRING_LENGTH}
+  get MAX_STRING_LENGTH()      { return MongoConstants.MAX_STRING_LENGTH}
+  get MAX_DOCUMENT_SIZE()      { return MongoConstants.MAX_DOCUMENT_SIZE}
 
   get ID_TRANSFORMATION() {
     this._ID_TRANSFORMATION = this._ID_TRANSFORMATION || ((this.MONGO_STRIP_ID === true) ? 'STRIP' : 'PRESERVE')
@@ -619,7 +620,7 @@ class MongoDBI extends YadamuDBI {
     const collections = await this.collections();
     const loopStartTime = performance.now();
     const schemaInfo = await Promise.all(collections.map(async (collection,idx) => {    // const dbMetadata = await Promise.all(collections.map(async (collection) => {    
-      const tableInfo = {TABLE_SCHEMA: this.connection.databaseName, TABLE_NAME: collection.collectionName, COLUMN_NAME_ARRAY: ["JSON_DATA"], DATA_TYPE_ARRAY: ["JSON"], SIZE_CONSTRAINT_ARRAY: [""]}
+      const tableInfo = {TABLE_SCHEMA: this.connection.databaseName, TABLE_NAME: collection.collectionName, COLUMN_NAME_ARRAY: ["JSON_DATA"], DATA_TYPE_ARRAY: ["json"], SIZE_CONSTRAINT_ARRAY: [""]}
       if ((this.MONGO_STORAGE_FORMAT === 'DOCUMENT') && (this.MONGO_EXPORT_FORMAT === 'ARRAY')) {       
         let stack
         let operation
@@ -737,7 +738,8 @@ class MongoDBI extends YadamuDBI {
                 "$max": {
                    "$switch": {
                       branches: [
-                          { case: { $eq: [{"$type" : `$${col_name}`} , 'string' ] }, then: {"$strLenBytes": { $ifNull: [`$${col_name}`,""]}}}
+                          { case: { $eq: [{"$type" : `$${col_name}`} , 'string' ] }, then: {"$strLenBytes": { $ifNull: [`$${col_name}`,""]}}},
+                          { case: { $eq: [{"$type" : `$${col_name}`} , 'binData' ] }, then: {"$binarySize": { $ifNull: [`$${col_name}`,""]}}}
                       ],
                       default : 0
                    }
@@ -774,7 +776,7 @@ class MongoDBI extends YadamuDBI {
                 size = dataType ===  'null' ? MongoConstants.DEFAULT_STRING_LENGTH : size                  
 			    dataType = dataType ===  'null' ? 'string' : dataType                  
 			    tableInfo.DATA_TYPE_ARRAY.push(dataType);
-			    tableInfo.SIZE_CONSTRAINT_ARRAY.push (dataType === 'string' ? this.roundP2(size) : '')
+			    tableInfo.SIZE_CONSTRAINT_ARRAY.push (dataType === 'string' || dataType === 'binData' ? this.roundP2(size) : '')
 			  })
             }
             else {

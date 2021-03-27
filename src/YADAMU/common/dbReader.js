@@ -116,7 +116,8 @@ class DBReader extends Readable {
    
     try {
       tableInfo = readerDBI.generateQueryInformation(task)
-  
+	  tableInfo.TARGET_DATA_TYPES = writerDBI.metadata?.[tableInfo.TABLE_NAME]?.dataTypes ?? []
+	  
 	  const inputStreams = await readerDBI.getInputStreams(tableInfo)
       yadamuPipeline.push(...inputStreams)
 	  const outputStreams = await writerDBI.getOutputStreams(tableInfo.MAPPED_TABLE_NAME,this.dbWriter.ddlComplete)

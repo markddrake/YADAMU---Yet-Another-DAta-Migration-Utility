@@ -66,7 +66,13 @@ class MariadbQA extends MariadbDBI {
        ,failed     : []
       }
 
-      let results = await this.executeSQL(MariadbQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,rules.EMPTY_STRING_IS_NULL === true, rules.SPATIAL_PRECISION || 18]);
+      const compareRules = {
+	    emptyStringisNull   : rules.EMPTY_STRING_IS_NULL 
+	  ,	spatialPrecision    : rules.SPATIAL_PRECISION || 18
+	  , orderedJSON         : Boolean(rules.ORDERED_JSON).toString().toLowerCase()
+      }
+      
+      let results = await this.executeSQL(MariadbQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,JSON.stringify(compareRules)])
 
       const successful = await this.executeSQL(MariadbQA.SQL_SUCCESS,{})
       report.successful = successful
@@ -139,4 +145,4 @@ const _SQL_FAILED =
 
 const _SQL_SCHEMA_TABLE_ROWS = `select TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = ?`;
 
-const _SQL_COMPARE_SCHEMAS =  `CALL COMPARE_SCHEMAS(?,?,?, ?);`;
+const _SQL_COMPARE_SCHEMAS =  `CALL COMPARE_SCHEMAS(?,?,?);`;

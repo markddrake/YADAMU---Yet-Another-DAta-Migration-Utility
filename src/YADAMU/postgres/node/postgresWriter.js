@@ -43,6 +43,17 @@ class PostgresWriter extends YadamuWriter {
             }
 		  }
           break;
+        case "timetz" :
+		  return (col,idx) => {
+            if (typeof col === 'string') {
+              let components = col.split('T')
+              return components.length === 1 ? components[0] : components[1]
+            }
+            else {
+              return col.getUTCHours() + ':' + col.getUTCMinutes() + ':' + col.getUTCSeconds() + '.' + col.getUTCMilliseconds();
+            }
+		  }
+          break;
         case 'date':
         case 'datetime':
         case 'timestamp':

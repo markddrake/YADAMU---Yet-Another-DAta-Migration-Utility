@@ -1191,7 +1191,6 @@ class OracleDBI extends YadamuDBI {
 	}
 
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-
     this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
 
     while (true) {

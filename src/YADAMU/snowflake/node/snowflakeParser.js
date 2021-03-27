@@ -48,8 +48,17 @@ class SnowflakeParser extends YadamuParser {
 
     this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
       this.transformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-          transformation(row,idx)
+	    if (row[idx] === 'NULL') {
+		  row[idx] = null;
+	    }
+		else {
+          if (Buffer.isBuffer(row[idx])) {
+            delete row[idx].toStringSf
+            delete row[idx].getFormat
+          }
+          if ((transformation !== null) && (row[idx] !== null)) {
+            transformation(row,idx)
+		  }
         }
       }) 
     }
@@ -59,15 +68,6 @@ class SnowflakeParser extends YadamuParser {
     // Snowflake generates o4bject based output, not array based outout. Transform object to array based on columnList
     this.rowCount++;
     data = Object.values(data)
-	data.forEach((val,idx) => {
-	   if (data[idx] === 'NULL') {
-		 data[idx] = null;
-	   }
-       if (Buffer.isBuffer(data[idx])) {
-         delete data[idx].toStringSf
-         delete data[idx].getFormat
-       }
-	})
     this.rowTransformation(data)
 	this.push({data : data})
     callback();

@@ -231,8 +231,8 @@ BEGIN
           --                                                    else return C_BIT_TYPE;
                                                                 else return 'varchar';
         end case;														    
-        when P_DATA_TYPE like ('timestamp %')                   then return case when P_DATA_TYPE_LENGTH is NULL then 'datetime(6)' when P_DATA_TYPE_LENGTH > 6 then 'datetime(6)' else  'datetime' end;
-        when P_DATA_TYPE like ('time %')                        then return case when P_DATA_TYPE_LENGTH is NULL then 'datetime(6)' when P_DATA_TYPE_LENGTH > 6 then 'datetime(6)' else  'datetime' end;
+        when P_DATA_TYPE like ('timestamp %')                   then return case when P_DATA_TYPE_LENGTH is NULL then 'datetime(6)' else  'datetime' end;
+        when P_DATA_TYPE like ('time %')                        then return case when P_DATA_TYPE_LENGTH is NULL then 'time(6)' else  'time' end;
         when P_DATA_TYPE like 'interval%'                       then return C_INTERVAL_TYPE;
         when P_DATA_TYPE = 'xml'                                then return C_XML_TYPE;
         when P_DATA_TYPE = 'jsonb'                              then return 'json';
@@ -319,6 +319,38 @@ BEGIN
         when P_DATA_TYPE = 'set'                                then return 'json';
                                                                 else return lower(P_DATA_TYPE);
       end case;       
+    when P_SOURCE_VENDOR = 'Vertica' then
+      case 
+        -- Metadata does not contain sufficinet infromation 
+		-- to rebuild ENUM and SET data types.
+        when P_DATA_TYPE = 'char' then
+          case		
+          when P_DATA_TYPE_LENGTH > C_MEDIUMTEXT_SIZE           then return 'longtext';
+          when P_DATA_TYPE_LENGTH > C_TEXT_SIZE                 then return 'mediumtext';
+          when P_DATA_TYPE_LENGTH > C_LARGEST_CHAR_SIZE         then return 'text';
+                                                                else return 'char';
+	    end case;
+        when P_DATA_TYPE = 'long varchar' then
+          case		
+            when P_DATA_TYPE_LENGTH > C_MEDIUMTEXT_SIZE         then return 'longtext';
+            when P_DATA_TYPE_LENGTH > C_TEXT_SIZE               then return 'mediumtext';
+            when P_DATA_TYPE_LENGTH > C_LARGEST_VARCHAR_SIZE    then return 'text';
+                                                                else return 'varchar'; 
+	    end case;
+        when P_DATA_TYPE = 'long varbinary' then 
+        case 
+          when P_DATA_TYPE_LENGTH > C_MEDIUMBLOB_SIZE           then return 'longblob';
+          when P_DATA_TYPE_LENGTH > C_BLOB_SIZE                 then return 'mediumblob';
+          when P_DATA_TYPE_LENGTH > C_LARGEST_VARBINARY_SIZE    then return 'blob';
+                                                                else return 'varbinary';
+	    end case;
+        when P_DATA_TYPE = 'timetz'                             then return 'datetime(6)';
+        when P_DATA_TYPE = 'timestamptz'                        then return 'datetime(6)';
+        when P_DATA_TYPE = 'timestamp'                          then return 'datetime(6)';
+        when (instr(P_DATA_TYPE,'INTERVAL') = 1)                then return C_INTERVAL_TYPE;
+	    when P_DATA_TYPE = 'uuid'                               then return C_UUID_TYPE;
+                                                                else return lower(P_DATA_TYPE);
+      end case;       
     when P_SOURCE_VENDOR = 'MongoDB' then
       -- MongoDB typing based on BSON type model
       case
@@ -373,6 +405,7 @@ BEGIN
         when P_DATA_TYPE = 'number'                             then return 'decimal';
         when P_DATA_TYPE = 'float'                              then return 'double';
         when P_DATA_TYPE = 'geography'                          then return 'geometry';
+        when P_DATA_TYPE = 'time'                       		then return case when P_DATA_TYPE_LENGTH > 6 then 'time(6)' else  'time' end;
         when P_DATA_TYPE like ('timestamp_%')                   then return case when P_DATA_TYPE_LENGTH > 6 then 'datetime(6)' else  'datetime' end;
         when P_DATA_TYPE = 'xml'                                then return C_XML_TYPE;
         when P_DATA_TYPE = 'variant'                            then return 'longblob';

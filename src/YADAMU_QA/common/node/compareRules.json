@@ -14,24 +14,34 @@
 		"mssql": {
 			"oracle": 10,
 			"mongodb": 15,
-			"postgres": -18
+			"postgres": -18,
+			"snowflake": 17
 		},
 		"mysql": {
 			"oracle": 10,
-			"postgres": -18
+			"postgres": -18,
+			"snowflake": 17
+		},
+		"postgres": {
+			"snowflake": 13
 		},
 		"mariadb": {
 			"oracle": 10,
-			"postgres": -18
+			"postgres": -18,
+			"snowflake": 17
 		},
 		"mongodb": {
 			"mysql": 12
+		},
+		"snowflake": {
+			"oracle": 12
 		}
 	},
 	"DOUBLE_PRECISION": {
 		"default": null,
 		"mongodb": {
-			"oracle": 14
+			"oracle": 14,
+			"snowflake": 14
 		}
 	},
 	"SERIALIZED_JSON": {
@@ -90,6 +100,9 @@
 		"oracle": {
 			"oracle#20": true,
 			"mysql": true,
+			"snowflake": true
+		},
+		"mariadb": {
 			"snowflake": true
 		},
 		"mongodb": {

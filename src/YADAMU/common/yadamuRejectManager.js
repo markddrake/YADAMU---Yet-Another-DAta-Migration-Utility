@@ -33,7 +33,7 @@ class YadamuRejectManager {
     this.currentPipeline = []
 	this.currentTable = undefined
 
-
+	this.dataStream = new Pushable({objectMode: true},true);
   }	
   
   setSystemInformation(systemInformation) {
@@ -48,7 +48,6 @@ class YadamuRejectManager {
   async initializePipeline(tableName) {
     await this.dbi.initializeImport();
 	await this.dbi.initializeData()
-	this.dataStream = new Pushable({objectMode: true},true);
 	this.currentPipeline = new Array(this.dataStream,...this.dbi.getOutputStreams(tableName))
     // console.log(this.currentPipeline.map((s) => { return s.constructor.name }).join(' ==> '))
     pipeline(this.currentPipeline,(err) => {
@@ -64,11 +63,11 @@ class YadamuRejectManager {
   
   async checkTableName(tableName) {
 	if (this.currentTable !== tableName) {
+      this.dataStream.pump({table:tableName})
 	  this.currentTable = tableName
 	  if (this.recordCount === 0) {
         await this.initializePipeline(tableName)
       }
-      this.dataStream.pump({table:tableName})
     }
   }
   

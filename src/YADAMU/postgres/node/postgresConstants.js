@@ -36,7 +36,7 @@ class PostgresConstants {
   static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get CIRCLE_FORMAT()          { return this.DBI_PARAMETERS.CIRCLE_FORMAT };
   static get BYTEA_SIZING_MODEL()     { return this.DBI_PARAMETERS.BYTEA_SIZING_MODEL };
-  static get STATEMENT_TERMINATOR()   { return '/' }
+  static get STATEMENT_TERMINATOR()   { return ';' }
 
 }
 

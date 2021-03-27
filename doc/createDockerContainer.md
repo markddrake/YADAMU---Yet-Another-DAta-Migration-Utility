@@ -42,7 +42,9 @@ If working with a remote docker instance set the DOCKER_HOST variable {Make sure
 set DOCKER_HOST=ssh://user@docker_host
 ``` 
 
-Verify that your docker environment is configured correctly. If it's configured correctly you will see something similar to this
+Verify that your docker environment is configured correctly. If it's configured correctly you will see something similar to this. 
+
+Note if you running on linu  against against a local docker instance, and not running as privilidged user you will probably needs to prefix the docker commands shown below with "sudo".
 
 ```
 docker info
@@ -165,6 +167,7 @@ Map the shared volume to a windows drive (assuming you want to map to drive "Y" 
 net use y: \\docker-host\work
 ```
 
+The next step is to install the database support packages for the databases you intend using YADAMU with.
 
 
     

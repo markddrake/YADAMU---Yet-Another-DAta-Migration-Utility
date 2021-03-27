@@ -26,9 +26,7 @@ as
   C_SINGLE_QUOTE    CONSTANT CHAR(1) := CHR(39);
 
   function CLOBTOBLOB(P_CLOB IN CLOB, P_CHARSET VARCHAR2 DEFAULT 'AL32UTF8') return BLOB;
---
-$IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
---
+
   TYPE KVP_RECORD is RECORD (
     KEY               VARCHAR2(4000)
    ,DATA_TYPE         NUMBER
@@ -43,7 +41,12 @@ $IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
   );
   
   TYPE KVP_TABLE is TABLE of KVP_RECORD;
-  
+  TYPE JSON_ARRAY_TABLE is TABLE OF CLOB;
+  TYPE KVP_TABLE_TABLE  is TABLE OF KVP_TABLE;
+    
+--
+$IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
   function KVNUL(KEY VARCHAR2) return KVP_RECORD;
   function KVB(KEY VARCHAR2,VALUE BOOLEAN) return KVP_RECORD;
   function KVN(KEY VARCHAR2,VALUE NUMBER) return KVP_RECORD;
@@ -51,15 +54,29 @@ $IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
   function KVC(KEY VARCHAR2,VALUE CLOB) return KVP_RECORD;  
   function KVJ(KEY VARCHAR2,VALUE CLOB) return KVP_RECORD;
 
-  TYPE JSON_ARRAY_TABLE is TABLE OF CLOB;
-  TYPE KVP_TABLE_TABLE  is TABLE OF KVP_TABLE;
-  
   function JSON_ARRAY_CLOB(P_ARRAY_ENTRIES KVP_TABLE) return CLOB;
   function JSON_OBJECT_CLOB(P_KVP_LIST KVP_TABLE) return CLOB;
   function JSON_ARRAYAGG_CLOB(P_CURSOR SYS_REFCURSOR) return CLOB;
-  function JSON_ARRAYAGG_CLOB(P_JSON_ARRAYS JSON_ARRAY_TABLE) return CLOB;  function JSON_ARRAYAGG_CLOB(P_ARRAY_ARRAY_ENTRIES KVP_TABLE_TABLE) return CLOB;
+  function JSON_ARRAYAGG_CLOB(P_JSON_ARRAYS JSON_ARRAY_TABLE) return CLOB;  
+  function JSON_ARRAYAGG_CLOB(P_ARRAY_ARRAY_ENTRIES KVP_TABLE_TABLE) return CLOB;
   function JSON_OBJECTAGG_CLOB(P_STATEMENT VARCHAR2) return CLOB;
   
+--
+$END
+
+--
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+$ELSIF DBMS_DB_VERSION.VER_LE_12_2 $THEN
+  function JSON_KEYS(P_JSON CLOB) return CLOB;
+  function JSON_KEYS(P_JSON BLOB) return CLOB;
+  function ORDER_JSON_OBJECTS(P_UNORDERED_JSON CLOB) return CLOB;
+  function ORDER_JSON_OBJECTS(P_UNORDERED_JSON BLOB) return BLOB;
+$ELSIF DBMS_DB_VERSION.VER_LE_18 and YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--   
+  function JSON_KEYS(P_JSON CLOB) return CLOB;
+  function JSON_KEYS(P_JSON BLOB) return CLOB;
+  function ORDER_JSON_OBJECTS(P_UNORDERED_JSON CLOB) return CLOB;
+  function ORDER_JSON_OBJECTS(P_UNORDERED_JSON BLOB) return BLOB;
 --
 $END
 --  
@@ -90,8 +107,7 @@ begin
    RETURN V_BLOB; 
 end;
 --
-$IF YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
-$ELSE
+$IF NOT YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
 --
 function JSON_ESCAPE(V_CHUNK VARCHAR2) 
 return VARCHAR2
@@ -99,6 +115,7 @@ as
 begin
   return REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(V_CHUNK,'\','\\') ,'"','\"'),CHR(13),'\n'),CHR(10),'\r'),CHR(9),'\t');
 end;
+-- "
 --
 function KVNUL(KEY VARCHAR2) 
 return KVP_RECORD
@@ -413,6 +430,378 @@ begin
 --    from NLS_DATABASE_PARAMETERS;
   execute immediate P_STATEMENT bulk collect into V_KVP_TABLE;
   return JSON_OBJECT_CLOB(V_KVP_TABLE);
+end;
+--
+$END
+--
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+$ELSIF DBMS_DB_VERSION.VER_LE_12_2 $THEN
+--
+function JSON_KEYS(P_JSON CLOB) 
+return CLOB 
+as
+  V_OBJECT    JSON_OBJECT_T;
+  V_ARRAY     JSON_ARRAY_T;
+  V_KEYS      JSON_KEY_LIST;
+BEGIN
+  V_ARRAY  := new JSON_ARRAY_T;
+  V_OBJECT := JSON_OBJECT_T.parse(P_JSON);
+  V_KEYS   := V_OBJECT.get_keys();
+  FOR i IN 1..V_KEYS.COUNT LOOP
+    V_ARRAY.append(V_KEYS(i));
+  END LOOP;
+  return V_ARRAY.to_string();
+EXCEPTION
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE(P_JSON);
+	return '[]';
+END;
+--
+function JSON_KEYS(P_JSON BLOB) 
+return CLOB 
+as
+  V_OBJECT    JSON_OBJECT_T;
+  V_ARRAY     JSON_ARRAY_T;
+  V_KEYS      JSON_KEY_LIST;
+BEGIN
+  V_ARRAY  := new JSON_ARRAY_T;
+  V_OBJECT := JSON_OBJECT_T.parse(P_JSON);
+  V_KEYS   := V_OBJECT.get_keys();
+  FOR i IN 1..V_KEYS.COUNT LOOP
+    V_ARRAY.append(V_KEYS(i));
+  END LOOP;
+  return V_ARRAY.to_string();
+EXCEPTION
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE(JSON_QUERY(P_JSON,'$' RETURNING CLOB));
+    return '[]';
+END;
+--
+procedure ORDER_JSON_OBJECTS(P_UNORDERED_JSON CLOB,P_ORDERED_JSON IN OUT CLOB)
+as
+begin
+    
+   /*
+   **
+   ** CLOB FORMAT JSON will be NULL if the Value is not VALID JSON. Naked Strings and Numbers are not valid for FORMAT JSON
+   ** BINARY_DOUBLE will return NULL if the value is a not a valid JSON Number
+   ** SV will return null if a string value is too long 
+   ** CV will catch eveything else but NULL
+   **
+   */
+   
+   if (SUBSTR(P_UNORDERED_JSON,1,1) = '[') then
+     DBMS_OUTPUT.PUT_LINE('Array');
+     DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,1,'[');  
+     for O in (
+	   select v.I
+	         ,v.JV
+	         ,case 
+	             when v.SV in ('true','false') and v.NV in (1,0) then 
+	  			  JSON_ARRAY(v.SV format JSON returning VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END))				
+	            when v.NV is not NULL then
+	  			  JSON_ARRAY(v.NV returning VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END))
+	  		    when v.SV is not NULL then 
+ 	  		      JSON_ARRAY(v.SV returning VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END))
+	  		    else 
+	  			  JSON_ARRAY(NULL format JSON NULL ON NULL returning VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END))				
+	  	      end JSON
+         from JSON_TABLE(P_UNORDERED_JSON,'$[*]' 
+	  	        COLUMNS 
+	  		      I                                                                                                               FOR ORDINALITY
+	  		    , NV    NUMBER                                                                                                    PATH '$' 
+	  		    , SV    VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END)              PATH '$' 
+	  		    , JV    VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END)  FORMAT JSON PATH '$' 
+	          ) V
+	    order by v.I 
+	  ) loop
+	    if (o.i > 1) then
+          DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,1,',');  
+		end if;
+        if (o.JV is not NULL) then
+     	  ORDER_JSON_OBJECTS(o.JV,P_ORDERED_JSON);
+        else 
+		  DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,LENGTH(o.JSON)-2,SUBSTR(o.JSON,2,LENGTH(O.json)-1));
+		end if;
+      end loop;
+     DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,1,']');   
+   else
+     DBMS_OUTPUT.PUT_LINE('Object');
+     DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,1,'{');  
+     for O in (
+	   with ORDERED_KEYS as (
+	     select K
+		       ,NV
+			   ,SV
+			   ,JV
+           from JSON_TABLE(YADAMU_UTILITIES.JSON_KEYS(P_UNORDERED_JSON),'$[*]' COLUMNS I FOR ORDINALITY, K VARCHAR2(256) PATH '$') K,
+                JSON_TABLE(P_UNORDERED_JSON,'$.*' 
+	  	        COLUMNS 
+	  		      I                                                                                                              FOR ORDINALITY
+	  		    , NV   NUMBER                                                                                                    PATH '$' 
+  	  		    , SV   VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END)              PATH '$' 
+	  		    , JV   VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END) FORMAT JSON  PATH '$' 
+	            ) V
+          where k.I = v.I
+	      order by k.K 
+	   ) 
+       select case when (ROWNUM = 1) then '"' else ',"' end || K || '":' K
+	         ,JV
+	         ,case 
+	            when SV in ('true','false') and NV in (1,0) then 
+	  			  JSON_ARRAY(SV format JSON returning VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END))				
+	            when NV is not NULL then
+	  			  JSON_ARRAY(NV returning VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END))
+	  		    when SV is not NULL then 
+ 	  		      JSON_ARRAY(SV returning VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END))
+	  		    else 
+	  			  JSON_ARRAY(NULL format JSON NULL ON NULL returning VARCHAR2($IF YADAMU_FEATURE_DETECTION.EXTENDED_STRING_SUPPORTED $THEN 32767 $ELSE 4000 $END))				
+	  	      end JSON
+		 from ORDERED_KEYS
+      ) loop
+	    DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,length(o.K),o.K);  
+		DBMS_OUTPUT.PUT_LINE('KEY' || o.K);
+        if (o.JV is not NULL) then
+     	  ORDER_JSON_OBJECTS(o.JV,P_ORDERED_JSON);
+        else 
+		  DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,LENGTH(o.JSON)-2,SUBSTR(o.JSON,2,LENGTH(O.json)-1));
+		end if;
+     end loop;
+     DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,1,'}');       
+   end if;
+end;
+--
+function ORDER_JSON_OBJECTS(P_UNORDERED_JSON CLOB)
+return CLOB
+as
+  V_ORDERED_JSON    CLOB;
+begin
+  DBMS_LOB.CREATETEMPORARY(V_ORDERED_JSON, TRUE );
+  ORDER_JSON_OBJECTS(P_UNORDERED_JSON,V_ORDERED_JSON);
+  return V_ORDERED_JSON;
+end;
+--
+function ORDER_JSON_OBJECTS(P_UNORDERED_JSON BLOB)
+return BLOB
+as
+  V_ORDERED_JSON    CLOB;
+  V_UNORDERED_CLOB  CLOB;
+  V_ORDERED_BLOB    BLOB;
+
+  V_SRC_OFFSET      PLS_INTEGER := 1;
+  V_DEST_OFFSET     PLS_INTEGER := 1;
+
+  V_LANG_CONTEXT    PLS_INTEGER := 0;
+  V_WARNING         PLS_INTEGER;
+  
+begin
+  DBMS_LOB.CREATETEMPORARY(V_UNORDERED_CLOB, TRUE);
+  DBMS_LOB.CREATETEMPORARY(V_ORDERED_JSON, TRUE);
+  DBMS_LOB.CONVERTTOCLOB(
+    V_UNORDERED_CLOB,
+    P_UNORDERED_JSON, 
+    DBMS_LOB.GETLENGTH(P_UNORDERED_JSON),
+    V_SRC_OFFSET,
+    V_DEST_OFFSET,
+    NLS_CHARSET_ID('AL32UTF8'),
+    V_LANG_CONTEXT, 
+    V_WARNING 
+  );
+  
+  DBMS_OUTPUT.PUT_line(DBMS_LOB.GETLENGTH(P_UNORDERED_JSON) || ',' || DBMS_LOB.GETLENGTH(V_UNORDERED_CLOB));
+  
+  ORDER_JSON_OBJECTS(V_UNORDERED_CLOB,V_ORDERED_JSON);
+  
+  V_SRC_OFFSET := 1;
+  V_DEST_OFFSET := 1;
+  
+  DBMS_LOB.CREATETEMPORARY(V_ORDERED_BLOB,TRUE);
+  DBMS_LOB.CONVERTTOBLOB(
+    V_ORDERED_BLOB,
+    V_ORDERED_JSON, 
+    DBMS_LOB.GETLENGTH(V_ORDERED_JSON),
+    V_SRC_OFFSET,
+    V_DEST_OFFSET,
+    NLS_CHARSET_ID('AL32UTF8'),
+    V_LANG_CONTEXT,
+    V_WARNING 
+  );
+  DBMS_LOB.FREETEMPORARY(V_ORDERED_JSON);
+  return V_ORDERED_BLOB;
+end;
+--
+$ELSIF DBMS_DB_VERSION.VER_LE_18 and YADAMU_FEATURE_DETECTION.CLOB_SUPPORTED $THEN
+--
+function JSON_KEYS(P_JSON CLOB) 
+return CLOB 
+as
+  V_OBJECT    JSON_OBJECT_T;
+  V_ARRAY     JSON_ARRAY_T;
+  V_KEYS      JSON_KEY_LIST;
+BEGIN
+  V_ARRAY  := new JSON_ARRAY_T;
+  V_OBJECT := JSON_OBJECT_T.parse(P_JSON);
+  V_KEYS   := V_OBJECT.get_keys();
+  FOR i IN 1..V_KEYS.COUNT LOOP
+    V_ARRAY.append(V_KEYS(i));
+  END LOOP;
+  return V_ARRAY.to_string();
+EXCEPTION
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE(P_JSON);
+	return '[]';
+END;
+--
+function JSON_KEYS(P_JSON BLOB) 
+return CLOB 
+as
+  V_OBJECT    JSON_OBJECT_T;
+  V_ARRAY     JSON_ARRAY_T;
+  V_KEYS      JSON_KEY_LIST;
+BEGIN
+  V_ARRAY  := new JSON_ARRAY_T;
+  V_OBJECT := JSON_OBJECT_T.parse(P_JSON);
+  V_KEYS   := V_OBJECT.get_keys();
+  FOR i IN 1..V_KEYS.COUNT LOOP
+    V_ARRAY.append(V_KEYS(i));
+  END LOOP;
+  return V_ARRAY.to_string();
+EXCEPTION
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE(JSON_QUERY(P_JSON,'$' RETURNING CLOB));
+    return '[]';
+END;
+--
+procedure ORDER_JSON_OBJECTS(P_UNORDERED_JSON CLOB,P_ORDERED_JSON IN OUT CLOB)
+as
+  V_ESCAPED_VALUE CLOB;
+begin
+    
+   /*
+   **
+   ** CLOB FORMAT JSON will be NULL if the Value is not VALID JSON. Naked Strings and Numbers are not valid for FORMAT JSON
+   ** BINARY_DOUBLE will return NULL if the value is a not a valid JSON Number
+   ** SV will return null if a string value is too long 
+   ** CV will catch eveything else but NULL
+   **
+   */
+   
+   if (SUBSTR(P_UNORDERED_JSON,1,1) = '[') then
+     -- DBMS_OUTPUT.PUT_LINE('Array');
+     DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,1,'[');  
+     for O in (
+	   select v.I
+	         ,v.JV
+	         ,case 
+	             when v.SV in ('true','false') and v.NV in (1,0) then 
+	  			  JSON_ARRAY(v.SV format JSON returning CLOB)				
+	            when v.NV is not NULL then
+	  			  JSON_ARRAY(v.NV returning CLOB)
+	  		    when v.SV is not NULL then 
+ 	  		      JSON_ARRAY(v.SV returning CLOB)
+	  		    when v.CV is not NULL then 
+	  			  JSON_ARRAY(NULL format JSON NULL ON NULL returning CLOB)				
+	  		    else 
+	  		     to_CLOB('[null]')
+	  	      end JSON
+         from JSON_TABLE(P_UNORDERED_JSON,'$[*]' 
+	  	        COLUMNS 
+	  		      I                       FOR ORDINALITY
+	  		    , NV    NUMBER            PATH '$' 
+	  		    , SV    VARCHAR2(32767)   PATH '$' 
+	  		    , CV    CLOB              PATH '$'
+	  		    , JV    CLOB FORMAT JSON  PATH '$'
+	          ) V
+	    order by v.I 
+	  ) loop
+	    if (o.i > 1) then
+          DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,1,',');  
+		end if;
+        if (o.JV is not NULL) then
+     	  ORDER_JSON_OBJECTS(o.JV,P_ORDERED_JSON);
+        else 
+		  DBMS_LOB.CREATETEMPORARY(V_ESCAPED_VALUE, TRUE );
+		  DBMS_LOB.COPY(V_ESCAPED_VALUE,o.JSON,DBMS_LOB.GETLENGTH(o.JSON)-2,1,2);
+		  DBMS_LOB.APPEND(P_ORDERED_JSON,V_ESCAPED_VALUE);
+		  DBMS_LOB.FREETEMPORARY(V_ESCAPED_VALUE);
+		end if;
+      end loop;
+     DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,1,']');   
+   else
+     -- DBMS_OUTPUT.PUT_LINE('Object');
+     DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,1,'{');  
+     for O in (
+	   with ORDERED_KEYS as (
+	     select K
+		       ,NV
+			   ,SV
+			   ,CV
+			   ,JV
+           from JSON_TABLE(YADAMU_UTILITIES.JSON_KEYS(P_UNORDERED_JSON),'$[*]' COLUMNS I FOR ORDINALITY, K VARCHAR2(256) PATH '$') K,
+                JSON_TABLE(P_UNORDERED_JSON,'$.*' 
+	  	        COLUMNS 
+	  		      I                      FOR ORDINALITY
+	  		    , NV   NUMBER            PATH '$' 
+  	  		    , SV   VARCHAR2(32767)   PATH '$' 
+	  		    , CV   CLOB              PATH '$'
+	  		    , JV   CLOB FORMAT JSON  PATH '$'
+	            ) V
+          where k.I = v.I
+	      order by k.K 
+	   ) 
+       select case when (ROWNUM = 1) then '"' else ',"' end || K || '":' K
+	         ,JV
+	         ,case 
+	            when SV in ('true','false') and NV in (1,0) then 
+	  			  JSON_ARRAY(SV format JSON returning CLOB)				
+	            when NV is not NULL then
+	  			  JSON_ARRAY(NV returning CLOB)
+	  		    when SV is not NULL then 
+ 	  		      JSON_ARRAY(SV returning CLOB)
+	  		    when CV is not NULL then 
+ 	  		      JSON_ARRAY(CV returning CLOB)
+	  		    else 
+	  			  JSON_ARRAY(NULL format JSON NULL ON NULL returning CLOB)				
+	  	      end JSON
+		 from ORDERED_KEYS
+      ) loop
+	    DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,length(o.K),o.K);  
+		-- DBMS_OUTPUT.PUT_LINE('KEY' || o.K);
+        if (o.JV is not NULL) then
+     	  ORDER_JSON_OBJECTS(o.JV,P_ORDERED_JSON);
+        else 
+		  DBMS_LOB.CREATETEMPORARY(V_ESCAPED_VALUE, TRUE );
+		  DBMS_LOB.COPY(V_ESCAPED_VALUE,o.JSON,DBMS_LOB.GETLENGTH(o.JSON)-2,1,2);
+		  DBMS_LOB.APPEND(P_ORDERED_JSON,V_ESCAPED_VALUE);
+		  DBMS_LOB.FREETEMPORARY(V_ESCAPED_VALUE);
+		end if;
+     end loop;
+     DBMS_LOB.WRITEAPPEND(P_ORDERED_JSON,1,'}');       
+   end if;
+end;
+--
+function ORDER_JSON_OBJECTS(P_UNORDERED_JSON CLOB)
+return CLOB
+as
+  V_ORDERED_JSON    CLOB;
+begin
+  DBMS_LOB.CREATETEMPORARY(V_ORDERED_JSON, TRUE );
+  ORDER_JSON_OBJECTS(P_UNORDERED_JSON,V_ORDERED_JSON);
+  return V_ORDERED_JSON;
+end;
+--
+function ORDER_JSON_OBJECTS(P_UNORDERED_JSON BLOB)
+return BLOB
+as
+  V_ORDERED_JSON    CLOB;
+  V_UNORDERED_CLOB  CLOB;
+  V_ORDERED_BLOB    BLOB;
+begin
+  DBMS_LOB.CREATETEMPORARY(V_ORDERED_JSON, TRUE );
+  select JSON_QUERY(P_UNORDERED_JSON, '$' RETURNING CLOB) into V_UNORDERED_CLOB from DUAL;
+  ORDER_JSON_OBJECTS(V_UNORDERED_CLOB,V_ORDERED_JSON);
+  select JSON_QUERY(V_ORDERED_JSON, '$' RETURNING BLOB) into V_ORDERED_BLOB from DUAL;
+  return V_ORDERED_BLOB;
 end;
 --
 $END

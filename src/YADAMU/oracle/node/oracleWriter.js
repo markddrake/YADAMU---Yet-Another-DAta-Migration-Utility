@@ -308,7 +308,7 @@ class OracleWriter extends YadamuWriter {
     ** When executing a PL/SQL anonymous block that requires CLOB or BLOB binds the CLOB or BLOB binds come at the end of the argument list. 
 	** The TableInfo arrays were generated taking this into account
 	** tableInfo.bindOrdering contains the indexes for the columns in row in bind ordering
-    ** If tableInfo.lobColumns = true then the contents of row need to be re-ordering a based on tableIno.bindOrdering
+    ** If tableInfo.lobColumns = true then the contents of row need to be re-ordering a based on tableInfo.bindOrdering
 	** If talbeInfo.lobColuns = false then there are no lobs so there is no need to re-order the row.
     */
           
@@ -562,7 +562,7 @@ end;`
 	   // this.batch.lobRows constists of a an array of arrays of pending promises that need to be resolved.
 	  batch.lobRows = await Promise.all(batch.lobRows.map(async (row) => { return await Promise.all(row.map((col) => {return col}))})) 
 	}
-
+	
     if (this.insertMode === 'Batch') {
       try {
         rows = batch.rows

@@ -83,9 +83,11 @@ class SnowflakeWriter extends YadamuWriter {
 		case "BINARY_DOUBLE":
 		  return (col,idx) => {
 	        if (!isFinite(col)) {
-			  switch(col) {
-			    case Infinity:
+			  switch(col) {				
+				case Infinity:
+			    case 'Infinity':
 			      return 'Inf'
+			    case '-Infinity':
 		     	case -Infinity:
 				  return '-Inf'
 			    default:
@@ -114,7 +116,7 @@ class SnowflakeWriter extends YadamuWriter {
 	  
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
-
+	
     this.rowTransformation(row)
 
     if (this.tableInfo.parserRequired) {
@@ -137,15 +139,21 @@ class SnowflakeWriter extends YadamuWriter {
    	  super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
 	}
   }
+   
+  recodeSpatialColumns(batch,msg) {
+	const targetFormat = "WKT"
+    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,`INSERT MANY`,this.tableInfo.parserRequired,this.metrics.cached,this.SPATIAL_FORMAT],`${msg} Converting to "${targetFormat}".`);
+    YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,targetFormat,this.tableInfo.targetDataTypes,batch,!this.tableInfo.parserRequired)
+  }  
  
   async _writeBatch(batch,rowCount) {
  
     // Snowflake's handling of WKB appears a little 'flaky' :)
-
+	
     if (this.tableInfo.targetDataTypes.includes('GEOGRAPHY')) {
       this.recodeSpatialColumns(batch,`Detected 'WKB' encoded spatial data.`)
     }
-      
+	
 	let sqlStatement
     this.metrics.batchCount++;
     if (this.tableInfo.insertMode === 'Batch') {

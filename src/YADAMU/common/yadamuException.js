@@ -58,6 +58,26 @@ class ConnectionError extends UserError {
   }
 }
 
+class ContentTooLarge extends Error {
+  constructor(cause,vendor,operation,maxSize) {
+    super(`Source record too large for Target Database`);
+	this.cause=cause
+	this.vendor = vendor
+	this.operation = operation
+	this.maxSize = maxSize
+  }
+  
+  getTags() {
+	return [this.vendor,this.tableName,this.operation,this.maxSize]
+  }
+  
+  setTableName(tableName) {
+	this.tableName = tableName
+  }
+  
+}
+
+
 class BatchInsertError extends Error {
   constructor(cause,tableName,batchSize,firstRow,lastRow,info) {
 	super(cause.message)
@@ -99,6 +119,8 @@ class DatabaseError extends Error {
 	this.cause = cause
 	this.stack = this.cloneStack(stack)
 	this.sql = sql
+	
+	this.setTags()
 	/*
 	// Clone properties of cause to DatabaseError
 	Object.keys(cause).forEach((key) => {
@@ -107,7 +129,15 @@ class DatabaseError extends Error {
 	  }
     })
 	*/
-	
+    
+  }
+  
+  setTags() {
+	this.tags = []
+	switch (true) {
+	  case (this.contentTooLarge()):
+	     this.tags.push('CONTENT_TOO_LARGE');
+    }
   }
   
   cloneStack(stack) {
@@ -137,6 +167,14 @@ class DatabaseError extends Error {
   spatialInsertFailed() {
 	return false;
   }
+
+  contentTooLarge() {
+    return false;
+  }	  
+  
+  getTags() {
+	return this.tags
+  }
   
 }
 
@@ -158,5 +196,6 @@ module.exports = {
 , CommandLineError  
 , ConfigurationFileError
 , ConnectionError
+, ContentTooLarge
 }
 

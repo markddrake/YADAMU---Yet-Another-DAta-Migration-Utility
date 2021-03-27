@@ -245,7 +245,7 @@ class YadamuLibrary {
   
   static toBoolean(booleanValue) {
     const dataType = typeof booleanValue
-    switch (dataType) {
+	switch (dataType) {
       case 'boolean': 
         return booleanValue;
       case 'number':
@@ -259,7 +259,7 @@ class YadamuLibrary {
         }
         return undefined;
       case 'string':
-        booleanValue = booleanValue.toUpperCase;
+        booleanValue = booleanValue.toUpperCase();
         switch(booleanValue) {
           case "TRUE":
           case "T":   
@@ -407,7 +407,6 @@ class YadamuLibrary {
         remainingString = components[1];	
       case (remainingString.indexOf('D') > -1):
 	    // Has a Weeks component
-		console.log(interval,remainingString,results)
 	    components = remainingString.split('D')
         results.days = components[0].length > 0 ? Number(components[0]) : 0
 		if (components.length === 1) break;

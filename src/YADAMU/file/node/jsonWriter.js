@@ -151,7 +151,7 @@ class JSONWriter extends YadamuWriter {
           row[idx] = transformation(row[idx],idx)
         }
       }) 
-    }
+    }	
   }
   
   beginTable() {

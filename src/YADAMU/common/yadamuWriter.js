@@ -204,7 +204,7 @@ class YadamuWriter extends Transform {
       this.rejectRow(this.tableName,record);
       const iterativeError = this.createIterativeException(cause,this.metrics.cached,rowNumber,record,info)
 	  this.dbi.trackExceptions(iterativeError);
-      this.yadamuLogger.logRejected([this.dbi.DATABASE_VENDOR,this.tableName,operation,this.metrics.cached,rowNumber],iterativeError);
+      this.yadamuLogger.logRejected([...cause.getTags(),this.dbi.DATABASE_VENDOR,this.tableName,operation,this.metrics.cached,rowNumber],iterativeError);
     } catch (e) {
       this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.tableName,this.insertMode],e)
     }
@@ -242,7 +242,7 @@ class YadamuWriter extends Transform {
     }
     const batchException = this.createBatchException(cause,this.metrics.cached,firstRow,lastRow,info)
     this.dbi.trackExceptions(batchException);
-    this.yadamuLogger.handleWarning([this.dbi.DATABASE_VENDOR,this.tableName,operation,this.insertMode,this.metrics.cached],batchException)
+    this.yadamuLogger.handleWarning([...cause.getTags(),this.dbi.DATABASE_VENDOR,this.tableName,operation,this.insertMode,this.metrics.cached],batchException)
   }
   
 
@@ -589,8 +589,9 @@ class YadamuWriter extends Transform {
     
     const cause = this.readerMetrics.readerError || this.readerMetrics.parserError ||  this.underlyingError || err
 	if (cause) {
-      const source = this.readerMetrics.readerError || this.readerMetrics.parserError ? 'STREAM READER' : 'STREAM WRITER'
- 	  this.yadamuLogger.handleException(['PIPELINE',source,this.tableName,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],cause)
+	  const tags = YadamuError.isLostConnection(cause) ? ['LOST CONNECTION'] : []
+      tags.psuh(this.readerMetrics.readerError || this.readerMetrics.parserError ? 'STREAM READER' : 'STREAM WRITER')
+ 	  this.yadamuLogger.handleException(['PIPELINE',...tags,this.tableName,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],cause)
 	}
 
 	// console.log(writerMetrics.metrics)

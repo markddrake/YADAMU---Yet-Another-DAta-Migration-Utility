@@ -18,6 +18,7 @@ class MongoConstants {
     , "DEFAULT_STRING_LENGTH"     : "32"
     , "MAX_STRING_LENGTH"         : "16777216"
     , "SPATIAL_FORMAT"            : "GeoJSON"
+	, "MAX_DOCUMENT_SIZE"         : "16777216"
     })
     return this._STATIC_PARAMETERS
   }
@@ -38,6 +39,7 @@ class MongoConstants {
   static get MAX_STRING_LENGTH()      { return this.DBI_PARAMETERS.MAX_STRING_LENGTH}
   static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get STATEMENT_TERMINATOR()   { return ';' }
+  static get MAX_DOCUMENT_SIZE()      { return this.DBI_PARAMETERS.MAX_DOCUMENT_SIZE}
 
 }
 

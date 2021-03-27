@@ -84,8 +84,7 @@ class SnowflakeQA extends SnowflakeDBI {
     }
     
     async compareSchemas(source,target,rules) {
-     
-	 
+    
       const useDatabase = `USE DATABASE "${source.database}";`;
 
       const compareRules = {
@@ -96,6 +95,7 @@ class SnowflakeQA extends SnowflakeDBI {
 	  , infinityIsNull      : rules.INFINITY_IS_NULL 
       }
 	 	 
+	  
       let results =  await this.executeSQL(useDatabase,[]);      
          
       const report = {
@@ -104,7 +104,7 @@ class SnowflakeQA extends SnowflakeDBI {
       }
 
       results = await this.executeSQL(SnowflakeQA.SQL_COMPARE_SCHEMAS,[source.database,source.schema,target.schema,JSON.stringify(compareRules)]);
-	 
+
       let compare = JSON.parse(results[0].COMPARE_SCHEMAS)
       compare.forEach((result) => {
         if ((result[3] === result[4]) && (result[5] === 0) && (result[6] === 0)) {
