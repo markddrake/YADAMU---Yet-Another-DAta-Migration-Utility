@@ -7,9 +7,11 @@ const crypto = require('crypto');
 const { pipeline } = require('stream');
 
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
+const YadamuLogger = require('../../../YADAMU/common/yadamuLogger.js');
 const LoaderDBI = require('../../../YADAMU/loader/node/loaderDBI.js');
-
+const JSONParser = require('../../../YADAMU/loader/node/jsonParser.js');
 const YadamuTest = require('../../common/node/yadamuTest.js');
+const ArrayCounter = require('./arrayCounter.js');
 
 class LoaderQA extends LoaderDBI {
 
@@ -70,10 +72,6 @@ class LoaderQA extends LoaderDBI {
 	})
   }	  
   
-  getRowCount(file) {
-	return 0
-  }
-
   compareFiles(sourceFile,targetFile) {
 	const sourceFileSize = fs.statSync(sourceFile).size
 	const targetFileSize = fs.statSync(targetFile).size
@@ -118,11 +116,57 @@ class LoaderQA extends LoaderDBI {
 	  }
     })
 	return report
-  }1
-	        
-  async getRowCounts(target) {
+  }
+  
+   async getInputStreams(tableInfo) {
+    
+	const streams = []
+    const is = await this.getInputStream(tableInfo);
+	streams.push(is)
 	
-	return []  
+	if (this.ENCRYPTED_INPUT) {
+	  const iv = await this.loadInitializationVector(tableInfo)
+	  streams.push(new IVReader(this.IV_LENGTH))
+  	  // console.log('Decipher',this.controlFile.data[tableInfo.TABLE_NAME].file,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
+	  const decipherStream = crypto.createDecipheriv(this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv)
+	  streams.push(decipherStream);
+	}
+
+	if (this.COMPRESSED_INPUT) {
+      streams.push(this.controlFile.yadamuOptions.compression === 'GZIP' ? createGunzip() : createInflate())
+	}
+	
+	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.controlFile.data[tableInfo.TABLE_NAME].file)
+	streams.push(jsonParser);
+	return streams
+  }
+  
+  async getRowCount(tableInfo) {
+    
+	const streams = await this.getInputStreams(tableInfo)
+	const arrayCounter = new ArrayCounter(this)
+	streams.push(arrayCounter)
+
+	return new Promise((resolve,reject) => {
+      pipeline(streams,(err) => {
+		if (err) reject(err) 
+		resolve(arrayCounter.getRowCount());
+	  })
+	})
+  }
+
+  async getRowCounts(target) {
+
+	const controlFilePath = path.join(this.ROOT_FOLDER,target.schema,`${target.schema}.json`);
+	const fileContents = await fsp.readFile(controlFilePath,{encoding: 'utf8'})
+    this.controlFile = JSON.parse(fileContents)
+    const counts = await Promise.all(Object.keys(this.controlFile.data).map((k) => {
+	  return this.getRowCount({TABLE_NAME:k})
+	}))
+	
+    return Object.keys(this.controlFile.data).map((k,i) => {
+	  return [target.schema,k,counts[i]]
+    })	
   }       
   
 }

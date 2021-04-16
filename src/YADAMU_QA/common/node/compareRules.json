@@ -7,7 +7,8 @@
 		"mysql": 6,
 		"oracle": 9,
 		"postgres": 6,
-		"snowflake": 9
+		"snowflake": 9,
+		"vertica": 6
 	},
 	"SPATIAL_PRECISION": {
 		"default": 18,
@@ -35,6 +36,9 @@
 		},
 		"snowflake": {
 			"oracle": 12
+		},
+		"vertica": {
+			"oracle": 17
 		}
 	},
 	"DOUBLE_PRECISION": {
@@ -42,6 +46,14 @@
 		"mongodb": {
 			"oracle": 14,
 			"snowflake": 14
+		},
+		"vertica" : {
+			"oracle"   : 9,
+ 			"mssql"    : 9,
+			"postgres" : 9,
+			"mysql"    : 9,
+			"mariadb"  : 9,
+			"vertica"  : 9
 		}
 	},
 	"SERIALIZED_JSON": {
@@ -66,8 +78,10 @@
 		},
 		"postgres": {
 			"oracle": true
+		},"snowflake": {
+			"oracle": true
 		},
-		"snowflake": {
+		"vertica": {
 			"oracle": true
 		}
 	},
@@ -103,6 +117,7 @@
 			"snowflake": true
 		},
 		"mariadb": {
+			"mysql": true,
 			"snowflake": true
 		},
 		"mongodb": {
@@ -125,6 +140,9 @@
 		   "oracle#12.2": "SERIALIZE_AS_BLOB",
 		   "oracle#11.2": "SERIALIZE_AS_BLOB",
 		   "postgres": "STRIP_XML_DECLARATION"
+		},
+		"vertica": {
+           "mssql": "DECODE_AND_STRIP_DECLARATION"
 		}
 	},
 	"OBJECTS_COMPARISSON_RULE": {

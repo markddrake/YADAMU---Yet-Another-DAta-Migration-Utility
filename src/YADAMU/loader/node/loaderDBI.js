@@ -5,7 +5,7 @@ const fsp = require('fs').promises;
 const path = require('path');
 const { performance } = require('perf_hooks');
 const crypto = require('crypto');
-const { PassThrough } = require('stream')
+const { PassThrough, finished} = require('stream')
 
 const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
 
@@ -173,6 +173,7 @@ class LoaderDBI extends YadamuDBI {
     super(yadamu,exportFilePath)
 	this._EXPORT_PATH = exportFilePath
 	this.yadamuProperties = {}
+	this.writeOperations = new Set()
   }    
   
   getConnectionProperties() {
@@ -317,8 +318,17 @@ class LoaderDBI extends YadamuDBI {
   }
   
   getFileOutputStream(tableName) {
-    // this.yadamuLogger.trace([this.constructor.name],`getFileOutputStream(${this.controlFile.data[tableName].file})`)
-  	return fs.createWriteStream(this.controlFile.data[tableName].file)
+     // this.yadamuLogger.trace([this.constructor.name],`getFileOutputStream(${this.controlFile.data[tableName].file})`)
+    const os = fs.createWriteStream(this.controlFile.data[tableName].file)
+    const opComplete = new Promise((resolve,reject) => {
+	  finished(os,(err) => {
+	    this.writeOperations.delete(opComplete)	
+		if (err) {reject(err)} 
+		resolve()
+      })
+    })
+    this.writeOperations.add(opComplete)	
+	return os;
   }
 
   async createInitializationVector() {
@@ -510,6 +520,11 @@ class LoaderDBI extends YadamuDBI {
 	}	 
   }
   
+  async finalize() {
+	await Promise.all(Array.from(this.writeOperations));
+	super.finalize()
+  }
+
   async getConnectionID() { /* OVERRIDE */ }
   
   createConnectionPool() { /* OVERRIDE */ }

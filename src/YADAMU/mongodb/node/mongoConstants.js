@@ -15,6 +15,7 @@ class MongoConstants {
     , "MONGO_STORAGE_FORMAT"      : "DOCUMENT"
     , "MONGO_EXPORT_FORMAT"       : "ARRAY"
     , "MONGO_STRIP_ID"            : false
+    , "MONGO_PARSE_STRINGS"       : true
     , "DEFAULT_STRING_LENGTH"     : "32"
     , "MAX_STRING_LENGTH"         : "16777216"
     , "SPATIAL_FORMAT"            : "GeoJSON"
@@ -35,6 +36,7 @@ class MongoConstants {
   static get MONGO_STORAGE_FORMAT()   { return this.DBI_PARAMETERS.MONGO_STORAGE_FORMAT}
   static get MONGO_EXPORT_FORMAT()    { return this.DBI_PARAMETERS.MONGO_EXPORT_FORMAT}
   static get MONGO_STRIP_ID()         { return this.DBI_PARAMETERS.MONGO_STRIP_ID}
+  static get MONGO_PARSE_STRINGS()    { return this.DBI_PARAMETERS.MONGO_PARSE_STRINGS}
   static get DEFAULT_STRING_LENGTH()  { return this.DBI_PARAMETERS.DEFAULT_STRING_LENGTH}
   static get MAX_STRING_LENGTH()      { return this.DBI_PARAMETERS.MAX_STRING_LENGTH}
   static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };

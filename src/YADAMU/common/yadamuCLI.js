@@ -530,7 +530,7 @@ class YadamuCLI {
     
 	const configuration = this.loadConfigurationFile()
     const YadamuQA = require('../../YADAMU_QA/common/node/yadamuQA.js');
-	const yadamuQA = new YadamuQA(configuration);
+	const yadamuQA = new YadamuQA(configuration,this.yadamu.activeConnections);
     await yadamuQA.initialize()
 	const startTime = performance.now();
 	const results = await yadamuQA.doTests(configuration);

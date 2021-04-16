@@ -370,7 +370,7 @@ IF OBJECT_ID('sp_COMPARE_SCHEMA') IS NOT NULL
    set noexec on
 go
 --
-CREATE procedure sp_COMPARE_SCHEMA(@FORMAT_RESULTS bit,@SOURCE_DATABASE nvarchar(128), @SOURCE_SCHEMA nvarchar(128), @TARGET_DATABASE nvarchar(128), @TARGET_SCHEMA nvarchar(128), @COMMENT nvarchar(2048), @EMPTY_STRING_IS_NULL bit, @SPATIAL_PRECISION int, @DATE_TIME_PRECISION int) 
+create procedure sp_COMPARE_SCHEMA(@FORMAT_RESULTS bit,@SOURCE_DATABASE nvarchar(128), @SOURCE_SCHEMA nvarchar(128), @TARGET_DATABASE nvarchar(128), @TARGET_SCHEMA nvarchar(128), @COMMENT nvarchar(2048), @RULES NVARCHAR(MAX)) 
 as
 begin
   return NULL
@@ -380,7 +380,7 @@ GO
 set noexec off
 go
 --
-alter procedure sp_COMPARE_SCHEMA(@FORMAT_RESULTS bit,@SOURCE_DATABASE nvarchar(128), @SOURCE_SCHEMA nvarchar(128), @TARGET_DATABASE nvarchar(128), @TARGET_SCHEMA nvarchar(128), @COMMENT nvarchar(2048), @EMPTY_STRING_IS_NULL bit, @SPATIAL_PRECISION int, @DATE_TIME_PRECISION int) 
+alter procedure sp_COMPARE_SCHEMA(@FORMAT_RESULTS bit,@SOURCE_DATABASE nvarchar(128), @SOURCE_SCHEMA nvarchar(128), @TARGET_DATABASE nvarchar(128), @TARGET_SCHEMA nvarchar(128), @COMMENT nvarchar(2048), @RULES NVARCHAR(MAX)) 
 as
 begin
   declare @OWNER            varchar(128);
@@ -397,15 +397,24 @@ begin
   declare @EXTRA_ROWS   bigint;
   declare @SQLERRM      nvarchar(2000);
   
+  declare @RULES_XML XML = CAST(@RULES AS XML)
+  
+  declare @EMPTY_STRING_IS_NULL BIT           = case when @RULES_XML.query('/emptyStringIsNull').value('.','VARCHAR(5)') = 'true' then 1 else 0 end;
+  declare @TIMESTAMP_PRECISION  INT           = @RULES_XML.query('/timestampPrecision').value('.','INT'); 
+  declare @SPATIAL_PRECISION    INT           = @RULES_XML.query('/spatialPrecision').value('.','INT');
+  declare @DOUBLE_PRECISION     INT           = @RULES_XML.query('/doublePrecision').value('.','INT');
+  declare @ORDRED_JSON          BIT           = case when @RULES_XML.query('/orderedJSON').value('.','VARCHAR(5)') = 'true' then 1 else 0 end;;
+  declare @XML_RULE             NVARCHAR(128) = @RULES_XML.query('/xmlRule').value('.','NVARCHAR(128)');
+
   declare FETCH_METADATA 
   cursor for 
   select t.TABLE_NAME
         ,st.is_memory_optimized
         ,stuff((select concat (',',
 	 	          case 
-                     when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @DATE_TIME_PRECISION)) then
-                       -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@DATE_TIME_PRECISION,')) "',c.COLUMN_NAME,'"')
-                        concat('convert(datetime2(',@DATE_TIME_PRECISION,'),convert(varchar(',@DATE_TIME_PRECISION+20,'),"',c.COLUMN_NAME,'"),126) "',c.COLUMN_NAME,'"')
+                     when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @TIMESTAMP_PRECISION)) then
+                       -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@TIMESTAMP_PRECISION,')) "',c.COLUMN_NAME,'"')
+                        concat('convert(datetime2(',@TIMESTAMP_PRECISION,'),convert(varchar(',@TIMESTAMP_PRECISION+20,'),"',c.COLUMN_NAME,'"),126) "',c.COLUMN_NAME,'"')
                      when c.DATA_TYPE in ('varchar','nvarchar') then
                        case 
                          when @EMPTY_STRING_IS_NULL = 1 then

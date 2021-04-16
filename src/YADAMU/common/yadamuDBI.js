@@ -431,8 +431,8 @@ class YadamuDBI {
   **
   */
 
-  assignMappings(target,source) {
-     
+  mergeMappings(target,source) {
+	  
     const sourceKeys = Object.keys(source);
     sourceKeys.forEach((key) => {
       if (target.hasOwnProperty(key)) {
@@ -468,7 +468,7 @@ class YadamuDBI {
             tableName      : metadata[table].tableName.toUpperCase()
           , columnMappings : {}
           }
-          metadata[table].columnNames.forEach((columnName) => { identifierMappings[table].columnMappings[columnName] = columnName.toUpperCase()})
+          metadata[table].columnNames.forEach((columnName) => { identifierMappings[table].columnMappings[columnName] = { name : columnName.toUpperCase()}})
         })
         break;
       case 'LOWERCASE':
@@ -477,7 +477,7 @@ class YadamuDBI {
             tableName      : metadata[table].tableName.toLowerCase()
           , columnMappings : {}
           }
-          metadata[table].columnNames.forEach((columnName) => { identifierMappings[table].columnMappings[columnName] = columnName.toLowerCase()})
+          metadata[table].columnNames.forEach((columnName) => { identifierMappings[table].columnMappings[columnName] = { name : columnName.toLowerCase()}})
         })
         break;
       case 'CUSTOM':
@@ -512,9 +512,9 @@ class YadamuDBI {
     // Update the metadata based on the Mappings
 
     const databaseMappings = this.generateDatabaseMappings(mappedMetadata);
-    this.assignMappings(databaseMappings, this.yadamu.IDENTIFIER_MAPPINGS)
+    this.mergeMappings(databaseMappings, this.yadamu.IDENTIFIER_MAPPINGS)
     this.metadata = YadamuLibrary.isEmpty(databaseMappings) ?  mappedMetadata : this.applyIdentifierMappings(mappedMetadata,databaseMappings,true)
-    this.setIdentifierMappings( this.assignMappings(generatedMappings,databaseMappings))
+    this.setIdentifierMappings( this.mergeMappings(generatedMappings,databaseMappings))
   }
 
   setIdentifierMappings(identifierMappings) {
@@ -541,14 +541,22 @@ class YadamuDBI {
 		}
         if (tableMappings.columnMappings) {
           const columnNames = metadata[table].columnNames
+          const dataTypes = metadata[table].dataTypes
           Object.keys(tableMappings.columnMappings).forEach((columnName) => {
-            const mappedColumnName = tableMappings.columnMappings[columnName]
             const idx = columnNames.indexOf(columnName);
+            const mappedColumnName = tableMappings.columnMappings[columnName].name || columnNames[idx]
+			const mappedDataType = tableMappings.columnMappings[columnName].dataType || dataTypes[idx]
             if (idx > -1) {
               if (reportMappedIdentifiers) { 
-                this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Column name re-mapped to "${mappedColumnName}".`)
+			    if (columnNames[idx] !== mappedColumnName) {
+                  this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Column name re-mapped to "${mappedColumnName}".`)
+				}
+			    if (dataTypes[idx] !== mappedDataType) {
+                  this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Data type "${dataTypes[idx] }" re-mapped to "${mappedDataType}".`)
+				}
               }
               columnNames[idx] = mappedColumnName          
+              dataTypes[idx] = mappedDataType       
             }
           });
           // metadata[table].columnNames = columnNames

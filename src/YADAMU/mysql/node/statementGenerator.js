@@ -24,17 +24,21 @@ class StatementGenerator {
 	
     results = results.pop();
     let statementCache = JSON.parse(results[0].INSERT_INFORMATION)
-	if (statementCache === null) {
+	
+   	if (statementCache === null) {
       statementCache = {}      
     }
     else {
+	
+		
       const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map((table,idx) => {
         const tableMetadata = this.metadata[table];
-        const tableName = tableMetadata.tableName;
+		const tableName = tableMetadata.tableName;
         const tableInfo = statementCache[tableName];
         tableInfo.columnNames = tableMetadata.columnNames
-
+		
+		tableInfo.sourceDataTypes = tableMetadata.source?.dataTypes || []
         const dataTypes = YadamuLibrary.decomposeDataTypes(tableInfo.targetDataTypes)
 		
         tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE

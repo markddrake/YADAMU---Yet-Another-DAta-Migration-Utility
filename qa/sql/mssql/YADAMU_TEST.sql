@@ -455,7 +455,29 @@ go
 execute sp_ms_marksystemobject 'sp_jsonOrder'
 go
 --
-create or alter procedure sp_COMPARE_SCHEMA(@FORMAT_RESULTS bit,@SOURCE_DATABASE nvarchar(128), @SOURCE_SCHEMA nvarchar(128), @TARGET_DATABASE nvarchar(128), @TARGET_SCHEMA nvarchar(128), @COMMENT nvarchar(2048), @EMPTY_STRING_IS_NULL bit, @SPATIAL_PRECISION int, @DATE_TIME_PRECISION int) 
+create or alter function sp_xmlNormalize(@XML_RULE nvarchar(128), @XML_VALUE xml)
+returns nvarchar(max) 
+as
+begin
+  declare @XML_DECLARATION  nvarchar(21) = '<?xml version="1.0"?>';
+  declare @RESULT           nvarchar(max);
+  if (@XML_RULE = 'DECODE_AND_STRIP_DECLARATION') begin
+	set @RESULT = convert(nvarchar(max),@XML_VALUE,1);
+	if (left(@RESULT,len(@XML_DECLARATION)) = @XML_DECLARATION) begin
+	  set @RESULT = STUFF(@RESULT,1,len(@XML_DECLARATION),'');
+    end
+  end
+  else begin
+    set @RESULT = convert(nvarchar(max),@XML_VALUE,0);
+  end
+  return @RESULT;
+end
+go
+--
+execute sp_ms_marksystemobject 'sp_xmlNormalize'
+go
+--
+create or alter procedure sp_COMPARE_SCHEMA(@FORMAT_RESULTS bit,@SOURCE_DATABASE nvarchar(128), @SOURCE_SCHEMA nvarchar(128), @TARGET_DATABASE nvarchar(128), @TARGET_SCHEMA nvarchar(128), @COMMENT nvarchar(2048), @RULES NVARCHAR(MAX)) 
 as
 begin
   declare @OWNER            varchar(128);
@@ -471,7 +493,14 @@ begin
   declare @MISSING_ROWS bigint;
   declare @EXTRA_ROWS   bigint;
   declare @SQLERRM      nvarchar(2000);
-  
+
+  declare @EMPTY_STRING_IS_NULL BIT           = case when JSON_VALUE(@RULES,'$.emptyStringIsNull') = 'true' then 1 else 0 end;
+  declare @TIMESTAMP_PRECISION  INT           = JSON_VALUE(@RULES,'$.timestampPrecision'); 
+  declare @SPATIAL_PRECISION    INT           = JSON_VALUE(@RULES,'$.spatialPrecision');
+  declare @DOUBLE_PRECISION     INT           = JSON_VALUE(@RULES,'$.doublePrecision');
+  declare @ORDRED_JSON          BIT           = case when JSON_VALUE(@RULES,'$.orderedJSON') = 'true' then 1 else 0 end;;
+  declare @XML_RULE             NVARCHAR(128) = JSON_VALUE(@RULES,'$.xmlRule');
+    
   declare FETCH_METADATA 
   cursor for 
   select t.TABLE_NAME
@@ -479,9 +508,9 @@ begin
         ,string_agg(case 
 	                  when cc."CONSTRAINT_NAME" is not NULL then 
 					     concat('master.dbo.sp_jsonOrder("',c.COLUMN_NAME,'") "',c.COLUMN_NAME,'"')
-                      when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @DATE_TIME_PRECISION)) then
-                       -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@DATE_TIME_PRECISION,')) "',c.COLUMN_NAME,'"')
-                        concat('convert(datetime2(',@DATE_TIME_PRECISION,'),convert(varchar(',@DATE_TIME_PRECISION+20,'),"',c.COLUMN_NAME,'"),126) "',c.COLUMN_NAME,'"')
+                      when (c.DATA_TYPE in ('datetime2') and (c.DATETIME_PRECISION > @TIMESTAMP_PRECISION)) then
+                       -- concat('cast("',c.COLUMN_NAME,'" as datetime2(',@TIMESTAMP_PRECISION,')) "',c.COLUMN_NAME,'"')
+                        concat('convert(datetime2(',@TIMESTAMP_PRECISION,'),convert(varchar(',@TIMESTAMP_PRECISION+20,'),"',c.COLUMN_NAME,'"),126) "',c.COLUMN_NAME,'"')
                       when c.DATA_TYPE in ('varchar','nvarchar') then
                         case 
                           when @EMPTY_STRING_IS_NULL = 1 then
@@ -508,6 +537,8 @@ begin
                           else
                             concat('master.dbo.sp_geometryAsBinaryZM("',c.COLUMN_NAME,'",',@SPATIAL_PRECISION,') "',c.COLUMN_NAME,'"')
                         end
+                      when c.DATA_TYPE in ('xml') then
+                        concat('master.dbo.sp_xmlNormalize(''',@XML_RULE,''',"',c.COLUMN_NAME,'")  collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
                       when c.DATA_TYPE in ('xml','text','ntext') then
                         concat('CAST("',c.COLUMN_NAME,'" as nvarchar(max))  collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')
                       when c.DATA_TYPE in ('image') then
@@ -543,7 +574,7 @@ begin
  
   set QUOTED_IDENTIFIER ON; 
   
-  DECLARE @SCHEMA_COMPARE_RESULTS TABLE(
+  declare @SCHEMA_COMPARE_RESULTS TABLE(
     SOURCE_DATABASE  nvarchar(128)
    ,SOURCE_SCHEMA    nvarchar(128)
    ,TARGET_DATABASE  nvarchar(128)
@@ -557,7 +588,6 @@ begin
    ,SQL_STATEMENT    nvarchar(max)
   );
 
-  
   CREATE TABLE #SOURCE_HASH_BUCKET (
     HASH BINARY(32)
   )
@@ -626,7 +656,7 @@ begin
                                     ')',
                                     'select ''',@SOURCE_DATABASE,''' "SOURCE_DATABASE",''',@SOURCE_SCHEMA,''' "SOURCE_SCHEMA",''',@TARGET_DATABASE,'''"TARGET_DATABASE",''',@TARGET_SCHEMA,'''"TARGET_SCHEMA",''',@TABLE_NAME,'''"TABLE_NAME",',
                                                 @SOURCE_COUNT,' "SOURCE_ROWS", ',@TARGET_COUNT,' "TARGET_ROWS", (select count(*) from MISSING_ROWS) "MISSING_ROWS",(select count(*) from EXTRA_ROWS) "EXTRA_ROWS", NULL "SQLERRM", NULL "SQL_STATEMENT" ')   
-       -- select @SQL_STATEMENT
+        -- select @SQL_STATEMENT;
 
         insert into @SCHEMA_COMPARE_RESULTS                  
         exec (@SQL_STATEMENT)
@@ -744,7 +774,7 @@ begin
         or EXTRA_ROWS <> 0
         or SQLERRM is not NULL
      order by TABLE_NAME;
-  end
+  end  
 --
 end
 --

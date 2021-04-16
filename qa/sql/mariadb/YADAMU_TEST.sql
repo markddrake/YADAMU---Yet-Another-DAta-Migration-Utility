@@ -7,6 +7,10 @@ set SESSION SQL_MODE=ANSI_QUOTES;
 --
 set COLLATION_CONNECTION = @@COLLATION_SERVER;
 --
+DROP FUNCTION IF EXISTS ORDERED_JSON;
+--
+DROP PROCEDURE IF EXISTS ORDERED_JSON_IMPL;
+--
 DROP FUNCTION IF EXISTS FUDGE_COORDINATE;
 --
 DELIMITER $$
@@ -316,35 +320,94 @@ $$
 --
 DELIMITER ;
 --
-drop procedure if exists ORDERED_JSON_IMPL;
+DROP PROCEDURE IF EXISTS ORDER_JSON_VALUES;
 --
 DELIMITER $$
 --
-create procedure ORDERED_JSON_IMPL(IN P_VALUE LONGTEXT,OUT P_RESULT LONGTEXT)
+CREATE PROCEDURE ORDER_JSON_VALUES(V_OBJECT_ID VARCHAR(36))
 begin
-  declare V_RESULT LONGTEXT;
-  declare V_KEY    VARCHAR(256);
-  declare V_VALUE  LONGTEXT;
-  declare V_ID     VARCHAR(36) DEFAULT  UUID();
+  declare V_KEY        VARCHAR(256);
+  declare V_VALUE      LONGTEXT;
   
-  declare NO_MORE_ROWS          INT DEFAULT FALSE;
+  declare NO_MORE_ROWS INT DEFAULT FALSE;
   
   declare ORDER_CHILD_OBJECTS
   cursor for
   select JSON_KEY, JSON_VALUE 
     from KV_PAIR_CACHE
-   where JSON_OBJECT_ID = V_ID 
+   where JSON_OBJECT_ID = V_OBJECT_ID 
      and JSON_VALUE like '{%}';
+	 
+  declare ORDER_ARRAY_OBJECTS
+  cursor for
+  select JSON_KEY, JSON_VALUE 
+    from KV_PAIR_CACHE
+   where JSON_OBJECT_ID = V_OBJECT_ID 
+     and JSON_VALUE like '[%]';
 	 
   declare CONTINUE HANDLER FOR NOT FOUND set NO_MORE_ROWS = TRUE;
   
-  set max_sp_recursion_depth=50;
+  set NO_MORE_ROWS = FALSE;
+  OPEN ORDER_CHILD_OBJECTS;
+  
+  CHILD_OBJECTS: loop
+     FETCH ORDER_CHILD_OBJECTS 
+	  into V_KEY, V_VALUE;
+	  
+	 if (NO_MORE_ROWS) then
+	   leave CHILD_OBJECTS;
+	 end if;
+	 
+	 call ORDER_JSON_OBJECT(V_VALUE,V_VALUE);
+	 
+	 update KV_PAIR_CACHE 
+	    set JSON_VALUE = V_VALUE
+	  where JSON_OBJECT_ID = V_OBJECT_ID
+	    and JSON_KEY = V_KEY;
 
-  create temporary table if not exists KV_PAIR_CACHE (
-    JSON_OBJECT_ID   VARCHAR(36)
-   ,JSON_KEY         VARCHAR(256)
-   ,JSON_VALUE       LONGTEXT
-  );
+  end loop;
+  
+  close ORDER_CHILD_OBJECTS;
+ 
+  set NO_MORE_ROWS = FALSE;
+  OPEN ORDER_ARRAY_OBJECTS;
+
+  ARRAY_OBJECTS: loop
+     FETCH ORDER_ARRAY_OBJECTS 
+	  into V_KEY, V_VALUE;
+	  
+	 if (NO_MORE_ROWS) then
+	   leave ARRAY_OBJECTS;
+	 end if;
+	 
+	 
+	 call ORDER_JSON_ARRAY(V_VALUE,V_VALUE);
+	 
+	 update KV_PAIR_CACHE 
+	    set JSON_VALUE = V_VALUE
+	  where JSON_OBJECT_ID = V_OBJECT_ID
+	    and JSON_KEY = V_KEY;
+
+  end loop;
+  
+  close ORDER_ARRAY_OBJECTS;
+ 
+end$$
+--
+DELIMITER ;
+--
+DROP PROCEDURE IF EXISTS ORDER_JSON_OBJECT;
+--
+DELIMITER $$
+--
+CREATE PROCEDURE ORDER_JSON_OBJECT(IN P_VALUE LONGTEXT,OUT P_RESULT LONGTEXT)
+begin
+  declare V_RESULT LONGTEXT;
+  declare V_KEY    VARCHAR(256);
+  declare V_VALUE  LONGTEXT;
+  declare V_ID     VARCHAR(36) DEFAULT  UUID();
+    
+  set max_sp_recursion_depth=50;
   
   insert into KV_PAIR_CACHE   
   with recursive KV_ARRAYS as (
@@ -369,29 +432,55 @@ begin
   select V_ID, "KEY","VALUE"
     from KV_PAIRS;
 
-  set NO_MORE_ROWS = FALSE;
-  OPEN ORDER_CHILD_OBJECTS;
+  call ORDER_JSON_VALUES(V_ID);
+    
+  select COALESCE(CONCAT('{',GROUP_CONCAT(CONCAT("JSON_KEY",':',"JSON_VALUE") ORDER BY "JSON_KEY"),'}'),'{}')
+    into P_RESULT
+    from KV_PAIR_CACHE
+   where JSON_OBJECT_ID = V_ID;
   
-  CHILD_OBJECTS: loop
-     FETCH ORDER_CHILD_OBJECTS 
-	  into V_KEY, V_VALUE;
-	  
-	 if (NO_MORE_ROWS) then
-	   leave CHILD_OBJECTS;
-	 end if;
-	 
-	 call ORDERED_JSON_IMPL(V_VALUE,V_VALUE);
-	 
-	 update KV_PAIR_CACHE 
-	    set JSON_VALUE = V_VALUE
-	  where JSON_OBJECT_ID = V_ID
-	    and JSON_KEY = V_KEY;
+  
+end$$
+--
+DELIMITER ;
+--
+DROP PROCEDURE IF EXISTS ORDER_JSON_ARRAY;
+--
+DELIMITER $$
+--
+CREATE PROCEDURE ORDER_JSON_ARRAY(IN P_VALUE LONGTEXT,OUT P_RESULT LONGTEXT)
+begin
+  declare V_RESULT     LONGTEXT;
+  declare V_KEY        VARCHAR(256);
+  declare V_VALUE      LONGTEXT;
+  declare V_ID         VARCHAR(36) DEFAULT  UUID();
+  
+  set max_sp_recursion_depth=50;
 
-  end loop;
+  insert into KV_PAIR_CACHE   
+  with recursive KV_ARRAYS as (
+    select 1 ROW_NUMBER
+          ,JSON_EXTRACT("P_VALUE",'$[*]') "VALUE_ARRAY"
+  )
+  ,KV_PAIRS as (
+    select ROW_NUMBER,
+	       JSON_EXTRACT("VALUE_ARRAY",'$[0]') "VALUE"
+  		  ,JSON_REMOVE("VALUE_ARRAY",'$[0]') "VALUE_ARRAY"
+      from KV_ARRAYS
+     where JSON_EXTRACT("VALUE_ARRAY",'$[0]') is not NULL
+     union all
+    select ROW_NUMBER + 1,
+	       JSON_EXTRACT("VALUE_ARRAY",'$[0]') "VALUE"
+  		  ,JSON_REMOVE("VALUE_ARRAY",'$[0]') "VALUE_ARRAY"
+   	  from KV_PAIRS
+     where JSON_EXTRACT("VALUE_ARRAY",'$[0]') is not NULL
+  )
+  select V_ID, ROW_NUMBER, "VALUE"
+    from KV_PAIRS;
+
+  call ORDER_JSON_VALUES(V_ID);
   
-  close ORDER_CHILD_OBJECTS;
- 
-  select CONCAT('{',GROUP_CONCAT(CONCAT("JSON_KEY",':',"JSON_VALUE") ORDER BY "JSON_KEY"),'}')
+  select COALESCE(CONCAT('[',GROUP_CONCAT("JSON_VALUE" ORDER BY "JSON_KEY"),']'),'[]')
     into P_RESULT
     from KV_PAIR_CACHE
    where JSON_OBJECT_ID = V_ID;
@@ -400,16 +489,31 @@ end$$
 --
 DELIMITER ;
 --
-drop function if exists ORDERED_JSON;
+DROP FUNCTION IF EXISTS ORDER_JSON_DOCUMENT;
 --
 DELIMITER $$
 --
-create function ORDERED_JSON(P_VALUE LONGTEXT)
+CREATE FUNCTION ORDER_JSON_DOCUMENT(P_JSON_DOCUMENT LONGTEXT)
 returns LONGTEXT DETERMINISTIC
 begin
-  declare V_RESULT LONGTEXT;
-  call ORDERED_JSON_IMPL(P_VALUE,V_RESULT);
-  return V_RESULT;
+  declare V_ORDERED_DOCUMENT LONGTEXT;
+
+  create temporary table if not exists KV_PAIR_CACHE (
+    JSON_OBJECT_ID   VARCHAR(36)
+   ,JSON_KEY         VARCHAR(256)
+   ,JSON_VALUE       LONGTEXT
+  );
+  
+  case 
+    when P_JSON_DOCUMENT like '{%}' then 
+	  call ORDER_JSON_OBJECT(P_JSON_DOCUMENT,V_ORDERED_DOCUMENT);
+    when P_JSON_DOCUMENT like '[%]' then 
+	  call ORDER_JSON_ARRAY(P_JSON_DOCUMENT,V_ORDERED_DOCUMENT);
+	else 
+	  set V_ORDERED_DOCUMENT = P_JSON_DOCUMENT;
+  end case;
+  
+  return V_ORDERED_DOCUMENT;
 end$$
 --
 DELIMITER ;
@@ -450,9 +554,9 @@ BEGIN
 		                when ((data_type = 'longtext') and (check_clause is not null)) then
 					      case 
 						    when V_ORDERED_JSON then
-						      concat('concat('''',ordered_json("',column_name,'"))')
+						      concat('ORDER_JSON_DOCUMENT("',column_name,'")')
 							else
-							  concat('concat('''',json_compact("',column_name,'"))')
+							  concat('JSON_COMPACT("',column_name,'")')
 						   end
                         when data_type in ('geometry') then
                           case
@@ -480,9 +584,9 @@ BEGIN
 		                when ((data_type = 'longtext') and (check_clause is not null)) then
 					      case 
 						    when V_ORDERED_JSON then
-						      concat('concat('''',ordered_json("',column_name,'"))')
+						      concat('ORDER_JSON_DOCUMENT("',column_name,'")')
 							else
-							  concat('concat('''',json_compact("',column_name,'"))')
+							  concat('JSON_COMPACT("',column_name,'")')
 						   end
                         when data_type in ('geometry') then
                           case

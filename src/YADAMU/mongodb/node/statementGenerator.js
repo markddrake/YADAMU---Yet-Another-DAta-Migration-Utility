@@ -18,7 +18,6 @@ class StatementGenerator {
       sizeConstraint = sizeConstraint || ''
       
       const precision = Number(sizeConstraint.split(',')[0])
-      
       switch (true) {
         case (YadamuLibrary.isBooleanType(dataType,sizeConstraint)):                                         return 'boolean'
         case (YadamuLibrary.isFloatingPointType(dataType)):                                                  return "number";
@@ -67,8 +66,7 @@ class StatementGenerator {
   generateTableInfo(tableMetadata) {
 
     let insertMode = 'DOCUMENT';
-
-
+    
     let vendor = tableMetadata.vendor
   
     let columnNames = tableMetadata.columnNames
@@ -90,7 +88,7 @@ class StatementGenerator {
     }
     
     const targetDataTypes = columnNames.map((columnName,idx) => { return this.mapForeignDataType(vendor,columnName,dataTypes[idx],sizeConstraints[idx])})
- 
+	
     if ((columnNames.length === 1) && (dataTypes[0] === 'JSON')) {
         // If the source table consists of a single JSON Column then insert each row into MongoDB 'As Is'   
         insertMode = 'DOCUMENT'

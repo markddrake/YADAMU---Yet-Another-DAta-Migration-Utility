@@ -10,6 +10,7 @@
   , "source"          : "file-JSON"
   , "target"          : "snow#1"
   , "importPath"      : "%location%"
+  , "verifyOperation" : true
   , "parameters"      : {
       "XML_STORAGE_MODEL" : "VARIANT"
     }

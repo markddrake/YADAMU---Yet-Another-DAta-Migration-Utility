@@ -187,7 +187,7 @@ begin
         when @DATA_TYPE = 'binary' then
           case 
             when @DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE                                             then @MAX_VARBINARY_TYPE
-                                                                                                         else 'varbinary'
+                                                                                                         else 'binary'
         end
         when @DATA_TYPE = 'varbinary' then
           case 

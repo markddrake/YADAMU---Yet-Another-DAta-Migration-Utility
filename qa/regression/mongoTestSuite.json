@@ -10,7 +10,6 @@
   , "source"            : "file-JSON"
   , "target"            : "mongodb#1"
   , "importPath"        : "%location%"
-  , "reverseOperations" : true
   , "verifyOperation"   : true
   , "tasks": [
       "oracle","mysql","mssql"

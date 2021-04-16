@@ -104,7 +104,7 @@ class JSONParser extends FileJSONParser {
     });
    
     parser.on('closearray',() => {
-      // this.yadamuLogger.trace([`${this.constructor.name}.onclosearray()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}.\nCurrentObject:${JSON.stringify(this.currentObject)}`);          
+	  // this.yadamuLogger.trace([`${this.constructor.name}.onclosearray()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}.\nCurrentObject:${JSON.stringify(this.currentObject)}`);          
       this.jDepth--;
 
       let skipObject = false;

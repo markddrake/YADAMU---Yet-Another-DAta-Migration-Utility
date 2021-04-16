@@ -14,11 +14,12 @@ class SnowflakeWriter extends YadamuWriter {
   constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {  
 	super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
   }
-  
-  setTableInfo(tableName) {
-	super.setTableInfo(tableName)
 
-    this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
+  setTransformations(targetDataTypes) {
+
+    // Set up Transformation functions to be applied to the incoming rows
+ 	 	  
+    this.transformations = targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
 	
 	  if (YadamuLibrary.isBinaryType(dataType.type)) {
@@ -103,13 +104,20 @@ class SnowflakeWriter extends YadamuWriter {
 	
     // Use a dummy rowTransformation function if there are no transformations required.
 
-	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
-      this.transformations.forEach((transformation,idx) => {
+	return transformations.every((currentValue) => { currentValue === null}) 
+	? (row) => {} 
+	: (row) => {
+      transformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
           row[idx] = transformation(row[idx],idx)
         }
       }) 
     }
+  }
+  
+  setTableInfo(tableName) {
+	super.setTableInfo(tableName)
+    this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
   }
         
   cacheRow(row) {

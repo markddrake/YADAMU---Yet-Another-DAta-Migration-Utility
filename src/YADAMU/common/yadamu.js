@@ -145,31 +145,11 @@ class Yadamu {
 	// console.log('Yadamu this.YADAMU_DBI_PARAMETERS:',this.YADAMU_DBI_PARAMETERS)
 	
     this._OPERATION = operation
-    
-	if (process.listenerCount('unhandledRejection') === 0) {
-	  process.on('unhandledRejection', (err, p) => {
-		if (err.ignoreUnhandledRejection === true) {
-	       // this.LOGGER.trace(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],'IGNORED'],err);
-		   return;
-	    }
-
-	    this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
-        this.LOGGER.handleException(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
-	    this.STATUS.errorRaised = true;
-        this.reportStatus(this.STATUS,this.LOGGER)
-		if (!this.INTERACTIVE) {
-  		  this.terminator = setTimeout(
-		    () => {
-   	          this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation,'TIMEOUT'],'Process aborted.')
-			  this.terminator = undefined
-              process.exit()
-            },
-		    5000
-	      )
-		}
-	  }) 
-	}  
-
+    this.activeConnections = new Set();
+	      
+	if (process.listenerCount('unhandledRejection') === 0) { 
+	  process.on('unhandledRejection', this.yadamuAbort.bind(this))
+	}
     // Configure Paramters
     this.initializeParameters(configParameters || {})
     this.processParameters();    
@@ -193,6 +173,38 @@ class Yadamu {
     };	
 
   }
+  
+  yadamuAbort(err,p) {
+    if (err.ignoreUnhandledRejection === true) {
+	    // this.LOGGER.trace(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],'IGNORED'],err);
+	   return;
+	}
+	
+	this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
+    this.LOGGER.handleException(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
+	this.STATUS.errorRaised = true;
+    this.reportStatus(this.STATUS,this.LOGGER)
+	this.close();
+    if (!this.INTERACTIVE) {
+  	  this.terminator = setTimeout(
+	    async () => {
+		  this.LOGGER.trace(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],`Active Connections: ${this.activeConnections.size}`);
+   	      this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation,'TIMEOUT'],'Closing connections and shutting down.')
+  	      for (const conn of this.activeConnections) {
+		    try {
+		      await conn.abort()
+		      this.LOGGER.info(['UHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],'Aborted Connection')
+		    } catch(e) {
+			  this.LOGGER.handleWarning(['UHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],e)
+			}			
+		  }
+		  this.terminator = undefined
+          process.exit()
+        },
+		5000
+	  )
+    }  
+  }  
   
   reloadParameters(parameters) {
   
@@ -737,7 +749,9 @@ class Yadamu {
 	  let cause = undefined;
 
       await source.initialize();
+	  this.activeConnections.add(source);
       await target.initialize();
+	  this.activeConnections.add(source);
 		
       this.STATUS.operationSuccessful = false;
       const dbReader = await this.getDBReader(source,parallel)
@@ -765,11 +779,12 @@ class Yadamu {
         // this.LOGGER.trace([this.constructor.name,'PIPELINE'],'Success')
 
         await source.finalize();
+	    this.activeConnections.delete(source);
    	    await target.finalize();
+	    this.activeConnections.delete(target);
         this.reportStatus(this.STATUS,this.LOGGER)
 	    results = this.metrics
       } catch (e) {
-		console.log(e)
    	    await Promise.allSettled(streamsCompleted)
 	    // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
 	    if (e.code === 'ERR_STREAM_PREMATURE_CLOSE') {
@@ -785,7 +800,9 @@ class Yadamu {
       results = e;
    
       await source.abort(e);
+      this.activeConnections.delete(source);
       await target.abort(e);
+      this.activeConnections.delete(target);
     
 	  if (!((e instanceof UserError) && (e instanceof FileNotFound))) {
         this.reportError(e,this.parameters,this.STATUS,this.LOGGER);
@@ -835,7 +852,6 @@ class Yadamu {
 	  await pipeline(pipelineComponents)
       await Promise.allSettled(streamsCompleted)
     } catch (e) {
-	  console.log(e)
  	  await Promise.allSettled(streamsCompleted)
 	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
       throw e;
@@ -908,10 +924,10 @@ class Yadamu {
      log.forEach((entry) => {
        switch (Object.keys(entry)[0]) {
          case 'dml' :
-           metrics[entry.dml.tableName] = {rowCount : entry.dml.rowCount, insertMode : "SQL", elapsedTime : entry.dml.elapsedTime + "ms", throughput: Math.round((entry.dml.rowCount/Math.round(entry.dml.elapsedTime)) * 1000).toString() + "/s"}
+           metrics[entry.dml.tableName] = {rowCount : entry.dml.rowCount, rowsSkipped: 0, insertMode : "SQL", elapsedTime : entry.dml.elapsedTime + "ms", throughput: Math.round((entry.dml.rowCount/Math.round(entry.dml.elapsedTime)) * 1000).toString() + "/s"}
            break;
          case 'error' :
-           metrics[entry.error.tableName] = {rowCount : -1, insertMode : "SQL", elapsedTime : "NaN", throughput: "NaN"}
+           metrics[entry.error.tableName] = {rowCount : -1, rowsSkipped: 0, insertMode : "SQL", elapsedTime : "NaN", throughput: "NaN"}
            break;
          default:
        }
@@ -922,16 +938,16 @@ class Yadamu {
   
   async doUploadOperation(dbi) {
 
-    const metrics = {}
-
     try {
       await dbi.initialize();
+	  this.activeConnections.add(dbi)
       this.STATUS.operationSuccessful = false;
       const pathToFile = dbi.parameters.FILE;
       const hndl = await this.uploadFile(dbi,pathToFile);
       const log = await dbi.processFile(hndl)
 	  await dbi.releasePrimaryConnection()
       await dbi.finalize();
+	  this.activeConnections.delete(dbi)
 	  const metrics = this.getMetrics(log);  
 	  this.STATUS.operationSuccessful = true;
       return metrics
@@ -940,7 +956,7 @@ class Yadamu {
 	  this.STATUS.err = e;
       await dbi.abort(e)
     }
-    return metrics;
+    return {};
   }
 
   async uploadData(dbi) {

@@ -53,16 +53,11 @@ class OracleWriter extends YadamuWriter {
 	}
   }
   
-  setTableInfo(tableName) {
-    this.newBatch();
-	this.lobList = []
-    this.includeTestcase = this.dbi.parameters.EXPORT_TESTCASE === true
-    this.lobCumlativeTime = 0;
-	
-    super.setTableInfo(tableName)   
-	// Set up an Array of Transformation functions to be applied to the incoming rows
-	
-	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
+  setTransformations(targetDataTypes) {
+
+    // Set up Transformation functions to be applied to the incoming rows
+ 
+	this.transformations =targetDataTypes.map((targetDataType,idx) => {
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
       switch (dataType.type.toUpperCase()) {
         case "GEOMETRY":
@@ -144,13 +139,28 @@ class OracleWriter extends YadamuWriter {
  
      // Use a dummy rowTransformation function if there are no transformations required.
 
-	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+	return this.transformations.every((currentValue) => { currentValue === null})
+	? (row) => {}
+	: (row) => {
       this.transformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
           row[idx] = transformation(row[idx],idx)
         }
       }) 
     }
+
+  }
+
+  setTableInfo(tableName) {
+    this.newBatch();
+	this.lobList = []
+    this.includeTestcase = this.dbi.parameters.EXPORT_TESTCASE === true
+    this.lobCumlativeTime = 0;
+	
+    super.setTableInfo(tableName)   
+
+    this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
+
 
     this.lobTransformations = new Array(this.tableInfo.binds.length).fill(null);
 	
@@ -548,6 +558,8 @@ end;`
   }
   
   async _writeBatch(batch,rowCount) {
+	  
+	// console.log(batch)
       
     // Ideally we used should reuse tempLobs since this is much more efficient that setting them up, using them once and tearing them down.
     // Unfortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.

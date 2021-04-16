@@ -88,6 +88,8 @@ class MsSQLStatementLibrary extends DefaultStatmentLibrary {
                                     end 
                                   when "DATA_TYPE" in ('money') and ("NUMERIC_PRECISION" > 15) then
                                     concat('case when "',c."COLUMN_NAME",'" is NULL then NULL else replace(rtrim(replace(convert(VARCHAR,"',c."COLUMN_NAME",'",2),''0'','' '')),'' '',''0'') end"',c."COLUMN_NAME",'"')
+                                  when "DATA_TYPE" in ('float','real') then
+                                    concat('convert(VARCHAR,"',c."COLUMN_NAME",'",2) "',c."COLUMN_NAME",'"')
                                   else 
                                     concat('"',c."COLUMN_NAME",'"') 
                                 end

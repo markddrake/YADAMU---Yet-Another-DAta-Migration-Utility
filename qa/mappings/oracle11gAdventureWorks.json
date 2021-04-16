@@ -6,9 +6,9 @@
       "tableName" : "FactAdditionalIPD"
     },
     "DimEmployee" : {
-      "columnMappings" : { "ParentEmployeeNationalIDAlternateKey" : "ParentEmployeeNationalID" }
+      "columnMappings" : { "ParentEmployeeNationalIDAlternateKey" : { "name" : "ParentEmployeeNationalID" }}
     },
     "Production" : {
-      "columnMappings" : { "productmodelproductdescriptionculture" : "productmodelpdc" }
+      "columnMappings" : { "productmodelproductdescriptionculture" : { "name" : "productmodelpdc" }}
     }   
 }    

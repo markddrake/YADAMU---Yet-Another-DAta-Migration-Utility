@@ -42,10 +42,11 @@ class MongoWriter extends YadamuWriter {
     super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
   }
   
-  setTableInfo(tableName) {
-	super.setTableInfo(tableName)
-    
-	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
+  setTransformations(targetDataTypes) {
+
+    // Set up Transformation functions to be applied to the incoming rows
+ 	  
+	const transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
 	   switch(targetDataType.toLowerCase()){
         case 'objectid':
 	      return (col,idx) => {
@@ -111,7 +112,7 @@ class MongoWriter extends YadamuWriter {
 		case 'date':
 		  if (this.dbi.MONGO_NATIVEJS_DATE) {
 	        return (col,idx) => {
-              return  new Date(col)
+              return new Date(col)
 	        }		
           }			
 		  return null
@@ -119,53 +120,64 @@ class MongoWriter extends YadamuWriter {
 		  if (YadamuLibrary.isNumericType(targetDataType)) {
 			return (col,idx) => {
 			  if (typeof col === 'string') {
-			    this.transformations[idx] = (col,idx) => {
+			    transformations[idx] = (col,idx) => {
 				  return Number(col)
 				}
 			    return Number(col)
 			  }
 			  else {
-                this.transformations[idx] = null
+                transformations[idx] = null
 				return col
 			  }
 			}
           }			
-		  // ### Disable automatic conversion of serialized JSON to JSON objects. This causes problems when attempting to load data back into NON JSON columns..
-		  return null
           // First time through test if data is string and first character is '[' or ']'
 		  // TODO ### Trim and test last character is matching ']' or '}'
-		  return (col,idx) => {
-			if (typeof col === 'string' && ((col.indexOf('[') === 0) || (col.indexOf('{') === 0))) {
-			  try {
-			    const res = JSON.parse(col)
-				// If the parse succeeds remove the test for the remaining records.
-				this.transformations[idx] = (col,idx) => {
-				  try {
-			        return JSON.parse(col)
-				  } catch (e) {
-		            this.transformations[idx] = null
-			      }
-				}	
-                return res				
-			  } catch (e) {
-				// If the parse fails remove the parse 
-		        this.transformations[idx] = null
+		  if (this.dbi.MONGO_PARSE_STRINGS) {
+		    return (col,idx) => {
+			  if (typeof col === 'string' && ((col.indexOf('[') === 0) || (col.indexOf('{') === 0))) {
+			    try {
+			      const res = JSON.parse(col)
+				  // If the parse succeeds remove the test for the remaining records.
+				  transformations[idx] = (col,idx) => {
+				    try {
+  			          return JSON.parse(col)
+				    } catch (e) {
+					  // If the parse fails disable the parse on the remaining records.
+		              transformations[idx] = null
+					  return col
+			        }
+				  }	
+                  return res				
+			    } catch (e) {
+				  // If the parse fails remove the parse 
+		          transformations[idx] = null
+			    }
+			  }
+  		      return col
 			}
 		  }
-		}
+		  return null
 	  }
 	})
 
     // Use a dummy rowTransformation function if there are no transformations required.
 
-    this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
-      this.transformations.forEach((transformation,idx) => {
+    return transformations.every((currentValue) => { currentValue === null}) 
+	? (row) => {} 
+	: (row) => {
+      transformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
           row[idx] = transformation(row[idx],idx)
         }
       }) 
     }
-	
+  }
+
+  setTableInfo(tableName) {
+	super.setTableInfo(tableName)
+    this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
+	    
 	// Set up the batchRow() function used by cacheRow...
 	
 	switch (this.tableInfo.insertMode) {
@@ -207,7 +219,7 @@ class MongoWriter extends YadamuWriter {
           this.batch.push({ row : row });
 		}
     }
-	
+
   }
   
   async initialize(obj) {      

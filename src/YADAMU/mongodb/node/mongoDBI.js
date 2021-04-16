@@ -87,6 +87,7 @@ class MongoDBI extends YadamuDBI {
   get MONGO_STORAGE_FORMAT()   { return this.parameters.MONGO_STORAGE_FORMAT  || MongoConstants.MONGO_STORAGE_FORMAT}
   get MONGO_EXPORT_FORMAT()    { return this.parameters.MONGO_EXPORT_FORMAT   || MongoConstants.MONGO_EXPORT_FORMAT}
   get MONGO_STRIP_ID()         { return this.parameters.MONGO_STRIP_ID        || MongoConstants.MONGO_STRIP_ID}
+  get MONGO_PARSE_STRINGS()    { return this.parameters.MONGO_PARSE_STRINGS  === false ? false : this.parameters.MONGO_PARSE_STRINGS || MongoConstants.MONGO_PARSE_STRINGS}
   get DEFAULT_STRING_LENGTH()  { return this.parameters.DEFAULT_STRING_LENGTH || MongoConstants.DEFAULT_STRING_LENGTH}
   get MAX_STRING_LENGTH()      { return MongoConstants.MAX_STRING_LENGTH}
   get MAX_DOCUMENT_SIZE()      { return MongoConstants.MAX_DOCUMENT_SIZE}

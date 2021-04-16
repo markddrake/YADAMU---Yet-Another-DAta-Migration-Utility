@@ -13,12 +13,11 @@ class MariadbWriter extends YadamuWriter {
     super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
   }
   
-  setTableInfo(tableName) {
-	super.setTableInfo(tableName)
-	
-    this.tableInfo.columnCount = this.tableInfo.columnNames.length;
-	
-	this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {
+  setTransformations(targetDataTypes) {
+
+    // Set up Transformation functions to be applied to the incoming rows
+ 
+	const transformations = targetDataTypes.map((targetDataType,idx) => {
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
       switch (dataType.type.toLowerCase()) {
         case "json" :
@@ -94,14 +93,22 @@ class MariadbWriter extends YadamuWriter {
 	
     // Use a dummy rowTransformation function if there are no transformations required.
 
-	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
-      this.transformations.forEach((transformation,idx) => {
+	return transformations.every((currentValue) => { currentValue === null}) 
+	? (row) => {} 
+	: (row) => {
+      transformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
           row[idx] = transformation(row[idx],idx)
         }
       }) 
     }
-	
+
+  }
+
+  setTableInfo(tableName) {
+	super.setTableInfo(tableName)
+    this.tableInfo.columnCount = this.tableInfo.columnNames.length;	
+    this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
   }
 
   getMetrics() {

@@ -60,7 +60,7 @@ class MsSQLStatementLibrary {
                                         -- concat('concat('''',"',c."COLUMN_NAME",'") "',c."COLUMN_NAME",'"')
                                         -- Replace all zeros with spaces, remove trailing spaces and convert remaining spaces back to zeros.
                                         -- WorldWideImportersDW.Fact.Order: Rows 231412. Reader Elapsed Time: 00:00:05.064s. 
-                                      concat('case when "',c."COLUMN_NAME",'" is NULL then NULL else replace(rtrim(replace("',c."COLUMN_NAME",'",''0'','' '')),'' '',''0'') end"',c."COLUMN_NAME",'"')
+                                      concat('case when "',c."COLUMN_NAME",'" is NULL then NULL else replace(rtrim(replace("',c."COLUMN_NAME",'",''0'','' '')),'' '',''0'') end "',c."COLUMN_NAME",'"')
                                         -- Use SQL Format operator - Format is painfully slow
                                         -- WorldWideImportersDW.Fact.Order: Rows 231412. Reader Elapsed Time: 00:03:24.503s. 
                                         -- concat('format("',c."COLUMN_NAME",'",''g',"NUMERIC_PRECISION",''') "',c."COLUMN_NAME",'"') 
@@ -69,6 +69,8 @@ class MsSQLStatementLibrary {
                                     end 
                                   when "DATA_TYPE" in ('money') and ("NUMERIC_PRECISION" > 15) then
                                     concat('case when "',c."COLUMN_NAME",'" is NULL then NULL else replace(rtrim(replace(convert(VARCHAR,"',c."COLUMN_NAME",'",2),''0'','' '')),'' '',''0'') end"',c."COLUMN_NAME",'"')
+                                  when "DATA_TYPE" in ('float','real') then
+                                    concat('convert(VARCHAR,"',c."COLUMN_NAME",'",3) "',c."COLUMN_NAME",'"')
                                   else 
                                     concat('"',c."COLUMN_NAME",'"') 
                                 end

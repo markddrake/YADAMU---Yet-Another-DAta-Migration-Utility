@@ -584,7 +584,7 @@ class PostgresDBI extends YadamuDBI {
       try {
         const sqlStartTime = performance.now();
 		this.streamingStackTrace = new Error().stack
-        const queryStream = new QueryStream(tableInfo.SQL_STATEMENT)
+        const queryStream = new QueryStream(tableInfo.SQL_STATEMENT,[],{rowMode : "array"})
         this.traceTiming(sqlStartTime,performance.now())
         const inputStream = await this.connection.query(queryStream)   
 		

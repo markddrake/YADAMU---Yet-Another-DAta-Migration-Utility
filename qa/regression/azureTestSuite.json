@@ -11,6 +11,7 @@
   , "source"          : "file-JSON"
   , "target"          : "azurite#1"
   , "importPath"      : "%location%"
+  , "verifyOperation" : true
   , "parameters"      : {
       "ROOT_FOLDER"   : "yadamu/RTS"
 	}

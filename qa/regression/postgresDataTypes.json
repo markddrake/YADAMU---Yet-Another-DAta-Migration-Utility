@@ -12,7 +12,6 @@
   , "source"          : "postgres#1"
   , "target"          : "file-JSON"
   , "exportPath"      : "%vendor%"
-  , "createDirectory" : true
   , "verifyOperation" : true
   , "tasks": [ 
       "postgresDataTypes"

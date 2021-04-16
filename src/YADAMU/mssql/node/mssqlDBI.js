@@ -171,6 +171,7 @@ class MsSQLDBI extends YadamuDBI {
   }
   
   async recoverTransactionState(newTransaction) {
+	await this.request.cancel();
 	this.transaction = this.getTransactionManager()
     if (newTransaction) {
 	  // Error Recovery if Rows are lost
@@ -184,11 +185,11 @@ class MsSQLDBI extends YadamuDBI {
     let stack
     try {
       stack = new Error().stack;
-      const request = new sql.Request(this.requestProvider)
-      request.on('info',(infoMsg) => { 
+      this.request = new sql.Request(this.requestProvider)
+      this.request.on('info',(infoMsg) => { 
         this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`MESSAGE`],`${infoMsg.message}`);
       })
-      return request;
+      return this.request;
     } catch (e) {
       throw this.trackExceptions(new MsSQLError(e,stack,`sql.Request(${this.requestProvider.constuctor.name})`))
     }
@@ -521,7 +522,7 @@ class MsSQLDBI extends YadamuDBI {
         } catch(e) {
 		  clearTimeout(timer)
           // this.pool = undefined
-          this.yadamuLogger.trace([this.DATABASE_VENDOR],`Error Closing Pool`)
+          this.yadamuLogger.info([this.DATABASE_VENDOR],`Error Closing Pool`)
           reject(this.trackExceptions(new MsSQLError(e,stack,psudeoSQL)))
         }
 	  })
@@ -667,6 +668,8 @@ class MsSQLDBI extends YadamuDBI {
     let operation = `Bulk Operation: ${bulkOperation.path}. [${bulkOperation.rows.length}] rows.`
     this.status.sqlTrace.write(this.traceComment(operation))
    
+    
+    const previousRequest = this.request
     while (true) {
       // Exit with result or exception.  
       try {
@@ -678,6 +681,17 @@ class MsSQLDBI extends YadamuDBI {
         return results;
       } catch (e) {
         const cause = this.trackExceptions(new MsSQLError(e,stack,operation))
+		/*
+        if (e.code === 'EREQINPROG') {
+		  try {
+			 await previousRequest.cancel();
+			 continue
+		  } catch (e) {
+			cause.cancelFailed = e
+			throw cause;
+		  } 
+		}
+		*/
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -695,17 +709,30 @@ class MsSQLDBI extends YadamuDBI {
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
     this.status.sqlTrace.write(this.traceSQL(sqlStatement))
     
+    const previousRequest = this.request
     while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
         stack = new Error().stack
         const request = this.getRequestWithArgs(args)
+        this.currentRequest = request
         const results = await request.query(sqlStatement);  
         this.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
-        const cause = this.trackExceptions(new MsSQLError(e,stack,sqlStatement));
+		const cause = this.trackExceptions(new MsSQLError(e,stack,sqlStatement));
+		/*
+        if (e.code === 'EREQINPROG') {
+		  try {
+			 await previousRequest.cancel();
+			 continue
+		  } catch (e) {
+			cause.cancelFailed = e
+			throw cause;
+		  } 
+		}
+		*/
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -940,7 +967,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async rollbackTransaction(cause) {
 
-    this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),(this.preparedStatement !== undefined)],`${this.cause ? this.cause.message : undefined}`)
+    // this.yadamuLogger.trace([`${this.constructor.name}.rollbackTransaction()`,this.getWorkerNumber(),(this.preparedStatement !== undefined)],`${this.cause ? this.cause.message : undefined}`)
     
 	this.checkConnectionState(cause)
     
@@ -979,6 +1006,7 @@ class MsSQLDBI extends YadamuDBI {
   async createSavePoint() {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber(),this.metrics.written,this.metrics.cached],``)
+
     await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT);
     super.createSavePoint()
   }

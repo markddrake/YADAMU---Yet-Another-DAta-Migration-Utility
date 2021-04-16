@@ -14,14 +14,11 @@ class JSONWriter extends YadamuWriter {
 	this.rowSeperator = '';
   }
         
-  setTableInfo(tableName) {
-	super.setTableInfo(tableName)
-    this.insertMode = 'JSON';    
-    if (this.dbi.tableMappings && this.dbi.tableMappings.hasOwnProperty(tableName)) {
-	  tableName = this.dbi.tableMappings[tableName].tableName
-	}
+  setTransformations(targetDataTypes) {
 
-    this.transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
+    // Set up Transformation functions to be applied to the incoming rows
+ 	  
+    const transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
 	  if (YadamuLibrary.isBinaryType(dataType.type)) {
 		return (col,idx) =>  {
@@ -145,13 +142,25 @@ class JSONWriter extends YadamuWriter {
 	
     // Use a dummy rowTransformation function if there are no transformations required.
 
-	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
-      this.transformations.forEach((transformation,idx) => {
+	return transformations.every((currentValue) => { currentValue === null}) 
+	? (row) => {} 
+	: (row) => {
+      transformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
           row[idx] = transformation(row[idx],idx)
         }
       }) 
     }	
+
+  }
+		
+  setTableInfo(tableName) {
+	super.setTableInfo(tableName)
+    this.insertMode = 'JSON';    
+    if (this.dbi.tableMappings && this.dbi.tableMappings.hasOwnProperty(tableName)) {
+	  tableName = this.dbi.tableMappings[tableName].tableName
+	}
+    this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
   }
   
   beginTable() {

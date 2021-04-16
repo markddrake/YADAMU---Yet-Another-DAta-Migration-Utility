@@ -17,7 +17,7 @@ class YadamuLibrary {
      return this._BOOLEAN_SIZE_CONSTRAINTS;
   }
   static get BINARY_TYPES() {
-     this._BINARY_TYPES = this._BINARY_TYPES || Object.freeze(["RAW","BLOB","BINARY","VARBINARY","IMAGE","BYTEA","TINYBLOB","MEDIUMBLOB","LONGBLOB","ROWVERSION","OBJECTID","BINDATA"])
+     this._BINARY_TYPES = this._BINARY_TYPES || Object.freeze(["RAW","BLOB","BINARY","VARBINARY","LONG VARBINARY","IMAGE","BYTEA","TINYBLOB","MEDIUMBLOB","LONGBLOB","ROWVERSION","OBJECTID","BINDATA"])
      return this._BINARY_TYPES;
   }
 
@@ -36,7 +36,6 @@ class YadamuLibrary {
      return this._INTEGER_TYPES;
   }
 
-
   static get NUMERIC_TYPES() {
      this._NUMERIC_TYPES = this._NUMERIC_TYPES || Object.freeze([...this.FLOATING_POINT_TYPES,...this.INTEGER_TYPES,"NUMERIC","DECIMAL","NUMBER","MONEY","SMALLMONEY"])
      return this._NUMERIC_TYPES;
@@ -48,7 +47,7 @@ class YadamuLibrary {
   }
 
   static get JSON_TYPES() {
-     this._JSON_TYPES = this._JSON_TYPES || Object.freeze(["JSON","JSONB","SET","BFILE"])
+     this._JSON_TYPES = this._JSON_TYPES || Object.freeze(["JSON","JSONB","SET","BFILE","OBJECT","ARRAY"])
      return this._JSON_TYPES;
   }
 
@@ -377,7 +376,6 @@ class YadamuLibrary {
   }
   
   static parse8601Interval(interval) {
-	
 	let results = {}
 	// Strip the leading 'P'
 	let remainingString = interval.substring(1);
@@ -392,7 +390,7 @@ class YadamuLibrary {
         results.years = components[0].length > 0 ? Number(components[0]) : 0
 		if (components.length === 1) break;
         remainingString = components[1];
-      case ((remainingString.indexOf('M') < remainingString.indexOf('T'))):
+      case ((remainingString.indexOf('M') > -1)  && (remainingString.indexOf('M') < remainingString.indexOf('T'))):
 	    // Has a Months component - becareful: May also have minitues
 	    components = remainingString.split('M')
         results.months = components[0].length > 0 ? Number(components[0]) : 0
@@ -425,9 +423,11 @@ class YadamuLibrary {
 	    // Has a Weeks component
 	    components = remainingString.split('M')
         results.minutes = components[0].length > 0 ? Number(components[0]) : 0
+        if (components.length === 1) break;
         remainingString = components[1];
       case (remainingString.indexOf('S') > -1):
-	    // Has a Weeks component
+	    
+		// Has a Weeks component
 	    components = remainingString.split('S')
         results.seconds = components[0].length > 0 ? Number(components[0]) : 0
       default:	  

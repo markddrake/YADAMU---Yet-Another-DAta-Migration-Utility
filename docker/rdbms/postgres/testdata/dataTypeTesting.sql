@@ -50,6 +50,246 @@ values(
 --
 insert into t_postgres.numeric_types 
 values(
+  -32768,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  -2147483648,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  -9223372036854775808,
+  null,
+  null,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  12356789.123456789,
+  null,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  12356789.123456789,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  1.17549e-38,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  2.22507e-308,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  -92233720368547758.08,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  32767, 
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null, 
+  2147483647,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  9223372036854775807,
+  null,
+  null,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  12356789.123456789,
+  null,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  12356789.123456789,
+  null,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  3.4028235e+38,
+  null,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  1.79769e308,
+  null,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  92233720368547758.07,
+  DEFAULT,
+  DEFAULT,
+  DEFAULT
+);
+--
+insert into t_postgres.numeric_types 
+values(
   NULL, 
   NULL,
   NULL,
@@ -118,6 +358,45 @@ values (
  REPEAT('X',65535),
  REPEAT('X',65535),
  REPEAT('ABCD-',(10485760/5))
+);
+--
+insert into  t_postgres.character_types
+values (
+ 'Z',
+ REPEAT('ABCD-',10),
+ REPEAT('ABCD-',10),
+ REPEAT('ABCD-',10), 
+ REPEAT('ABCD',10),
+ REPEAT('ABCD',10),
+ REPEAT('X',10),
+ REPEAT('X',10),
+ REPEAT('ABCD-',10)
+);
+--
+insert into  t_postgres.character_types
+values (
+ 'E',
+ '',
+ '',
+ '', 
+ '',
+ '',
+ '',
+ '',
+ ''
+);
+--
+insert into  t_postgres.character_types
+values (
+ 'N',
+ null,
+ null,
+ null, 
+ null,
+ null,
+ null,
+ null,
+ null
 );
 --
 -- 8.5. Date/Time Types
@@ -228,8 +507,8 @@ values (
 insert into t_postgres.document_types
 values (
   '<XML></XML>',
-  '[]',
-  '[]'
+  '{"C":30,"B":{"C":30,"B":"20","A":10},"A":10,"ARRAY":["30","20",{"C":30,"B":"20","A":10},10]}',
+  '{"C":30,"B":{"C":30,"B":"20","A":10},"A":10,"ARRAY":["30","20",{"C":30,"B":"20","A":10},10]}'
 );
 --
 -- 8.12. UUID Type

@@ -75,7 +75,10 @@ class CloudDBI extends LoaderDBI {
   }
 
   writeFile(filename,metadata) {
-    return this.cloudService.putObject(filename,metadata)
+	const res = this.cloudService.putObject(filename,metadata)
+    this.cloudService.writeOperations.add(res)
+	res.then(() => { this.cloudService.writeOperations.delete(res)})
+    return res;
   }
   
   setFolderPaths(rootFolder,schema) {

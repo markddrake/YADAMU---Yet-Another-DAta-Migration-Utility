@@ -83,9 +83,9 @@ class OracleParser extends YadamuParser {
             row[idx] = this.blobToBuffer(row[idx])
 		  }
         default:
- 		  switch (column.dbType) {
-		    case oracledb.DB_TYPE_BINARY_FLOAT:
-			case oracledb.DB_TYPE_BINARY_DOUBLE:
+ 		  switch (this.tableInfo.DATA_TYPE_ARRAY[idx].toUpperCase()) {
+		    case 'BINARY_FLOAT':
+			case 'BINARY_DOUBLE':
 		      return (row,idx)  => {
 			    switch (row[idx]) {
   			      case 'Inf':

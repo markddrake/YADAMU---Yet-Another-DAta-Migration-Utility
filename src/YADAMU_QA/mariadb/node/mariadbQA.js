@@ -69,9 +69,9 @@ class MariadbQA extends MariadbDBI {
       const compareRules = {
 	    emptyStringisNull   : rules.EMPTY_STRING_IS_NULL 
 	  ,	spatialPrecision    : rules.SPATIAL_PRECISION || 18
-	  , orderedJSON         : Boolean(rules.ORDERED_JSON).toString().toLowerCase()
+	  , orderedJSON         : rules.ORDERED_JSON
       }
-      
+	 
       let results = await this.executeSQL(MariadbQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,JSON.stringify(compareRules)])
 
       const successful = await this.executeSQL(MariadbQA.SQL_SUCCESS,{})

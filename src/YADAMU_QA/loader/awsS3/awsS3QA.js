@@ -8,8 +8,11 @@ const { pipeline } = require('stream');
 const AWSS3DBI = require('../../../YADAMU//loader/awsS3/awsS3DBI.js');
 const AWSS3Error = require('../../../YADAMU/loader/awsS3/awsS3Exception.js')
 const AWSS3Constants = require('../../../YADAMU/loader/awsS3/awsS3Constants.js');
-
 const YadamuTest = require('../../common/node/yadamuTest.js');
+
+const ArrayCounter = require('../../loader/node/arrayCounter.js');
+const JSONParser = require('../../../YADAMU/loader/node/jsonParser.js');
+
 
 class AWSS3QA extends AWSS3DBI {
 
@@ -80,11 +83,7 @@ class AWSS3QA extends AWSS3DBI {
 	  })
 	})
   }	  
-  
-  getRowCount(file) {
-	return 0
-  }
-
+ 
   async compareFiles(sourceFile,targetFile) {
 	let props = await this.cloudService.getObjectProps(sourceFile)
 	const sourceFileSize = props.ContentLength
@@ -157,10 +156,57 @@ class AWSS3QA extends AWSS3DBI {
 	return report
   }
 	        
-  async getRowCounts(target) {
+			
+   async getInputStreams(tableInfo) {
+    
+	const streams = []
+    const is = await this.getInputStream(tableInfo);
+	streams.push(is)
 	
-	return []  
-  }       
+	if (this.ENCRYPTED_INPUT) {
+	  const iv = await this.loadInitializationVector(tableInfo)
+	  streams.push(new IVReader(this.IV_LENGTH))
+  	  // console.log('Decipher',this.controlFile.data[tableInfo.TABLE_NAME].file,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
+	  const decipherStream = crypto.createDecipheriv(this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv)
+	  streams.push(decipherStream);
+	}
+
+	if (this.COMPRESSED_INPUT) {
+      streams.push(this.controlFile.yadamuOptions.compression === 'GZIP' ? createGunzip() : createInflate())
+	}
+	
+	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.controlFile.data[tableInfo.TABLE_NAME].file)
+	streams.push(jsonParser);
+	return streams
+  }
   
+  async getRowCount(tableInfo) {
+    
+	const streams = await this.getInputStreams(tableInfo)
+	const arrayCounter = new ArrayCounter(this)
+	streams.push(arrayCounter)
+
+	return new Promise((resolve,reject) => {
+      pipeline(streams,(err) => {
+		if (err) reject(err) 
+		resolve(arrayCounter.getRowCount());
+	  })
+	})
+  }
+
+  async getRowCounts(target) {
+
+    const targetControlPath = `${path.join(this.ROOT_FOLDER,target.schema,target.schema)}.json`.split(path.sep).join(path.posix.sep) 
+	
+    const fileContents = await this.cloudService.getObject(targetControlPath)		
+    this.controlFile = this.parseContents(fileContents)
+    const counts = await Promise.all(Object.keys(this.controlFile.data).map((k) => {
+	  return this.getRowCount({TABLE_NAME:k})
+	}))
+
+    return Object.keys(this.controlFile.data).map((k,i) => {
+	  return [target.schema,k,counts[i]]
+    })	
+  }       
 }
 module.exports = AWSS3QA

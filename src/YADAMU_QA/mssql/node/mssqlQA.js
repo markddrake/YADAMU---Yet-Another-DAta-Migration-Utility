@@ -118,23 +118,47 @@ class MsSQLQA extends MsSQLDBI {
       }
 
       await this.useDatabase(source.database);
+	  
+	  let compareParams
+	  if (this.DB_VERSION > 12) {
+		
+	    compareParams = JSON.stringify({
+  	      emptyStringIsNull    : rules.EMPTY_STRING_IS_NULL 
+        , spatialPrecision     : rules.SPATIAL_PRECISION || 18
+	   	, doublePrecision      : rules.DOUBLE_PRECISION || 18
+	    , timestampPrecision   : rules.TIMESTAMP_PRECISION || 9
+	    , orderedJSON          : Boolean(rules.ORDERED_JSON).toString().toLowerCase()
+	    , xmlRule              : rules.XML_COMPARISSON_RULE || null
+        });
+	  }  
+	  else {
+	    compareParams = 
+`<rules>
+   <emptyStringIsNull>${Boolean(rules.EMPTY_STRING_IS_NULL).toString().toLowerCase()}</emptyStringIsNull>
+   <spatialPrecision>${rules.SPATIAL_PRECISION || 18}</spatialPrecision>
+   <doublePrecision>${rules.DOUBLE_PRECISION || 18}</doublePrecision>
+   <timestampPrecision>${rules.TIMESTAMP_PRECISION || 9}</timestampPrecision>
+   <orderedJSON>${Boolean(rules.ORDERED_JSON).toString().toLowerCase()}</orderedJSON>
+   <xmlRule>${rules.XML_COMPARISSON_RULE || ''}</xmlRule>
+</rules>`;
+	  }
+	  
 
       let args = 
 `--
--- declare @FORMAT_RESULTS         bit          = 0;
--- declare @SOURCE_DATABASE        varchar(128) = '${source.database}';
--- declare @SOURCE_SCHEMA          varchar(128) = '${source.owner}';
+-- declare @FORMAT_RESULTS         bit           = 0;
+-- declare @SOURCE_DATABASE        varchar(128)  = '${source.database}';
+-- declare @SOURCE_SCHEMA          varchar(128)  = '${source.owner}';
 -- declare @TARGET_DATABASE        varchar(128)  = '${target.database}';
--- declare @TARGET_SCHEMA          varchar(128) = '${target.owner}';
--- declare @COMMENT                varchar(128) = '';
--- declare @EMPTY_STRING_IS_NULL   bit = ${rules.EMPTY_STRING_IS_NULL === true};
--- declare @SPATIAL_PRECISION      varchar(128) = ${rules.SPATIAL_PRECISION || 18};
--- declare @DATE_TIME_PRECISION    varchar(128)  = ${rules.TIMESTAMP_PRECISION || null};
+-- declare @TARGET_SCHEMA          varchar(128)  = '${target.owner}';
+-- declare @COMMENT                varchar(128)  = '';
+-- declare @RULES                  narchar(4000) = '${compareParams}';
 --`;
             
       this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION,@DATE_TIME_PRECISION)\ngo\n`)
 
       const request = this.getRequest();
+	  
       let results = await request
                           .input('FORMAT_RESULTS',this.sql.Bit,false)
                           .input('SOURCE_DATABASE',this.sql.VarChar,source.database)
@@ -142,12 +166,12 @@ class MsSQLQA extends MsSQLDBI {
                           .input('TARGET_DATABASE',this.sql.VarChar,target.database)
                           .input('TARGET_SCHEMA',this.sql.VarChar,target.owner)
                           .input('COMMENT',this.sql.VarChar,'')
-                          .input('EMPTY_STRING_IS_NULL',this.sql.Bit,(rules.EMPTY_STRING_IS_NULL === true ? 1 : 0))
-                          .input('SPATIAL_PRECISION',this.sql.Int,rules.SPATIAL_PRECISION || 18)
-                          .input('DATE_TIME_PRECISION',this.sql.Int,rules.TIMESTAMP_PRECISION || null)
+                          .input('RULES',this.sql.VarChar,compareParams)
                           .execute(MsSQLQA.SQL_COMPARE_SCHEMAS,{},{resultSet: true});
 
       // Use length-2 and length-1 to allow Debugging info to be included in the output
+	  
+	  // console.log(results.recordsets[0])
 	  
       const successful = results.recordsets[results.recordsets.length-2]      
       report.successful = successful.map((row,idx) => {          

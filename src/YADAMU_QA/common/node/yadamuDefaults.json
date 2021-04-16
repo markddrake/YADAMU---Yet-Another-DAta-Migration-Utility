@@ -24,12 +24,15 @@
 		"teradata": "../../teradata/worker/teradataQA.js"
 	},
 	"mongodb": {
-		"MONGO_STRIP_ID": true
+		"MONGO_PARSE_STRINGS" : false
 	},
 	"oracle": {
 		"XML_STORAGE_FORMAT": "CLOB"
 	},
 	"snowflake": {
 		"XML_STORAGE_FORMAT": "TEXT"
-	}
+	},
+	"vertica": {
+	   "VERTICA_CHAR_SIZE" : 1.5
+	 }
 }

@@ -183,6 +183,10 @@ class MongoQA extends MongoDBI {
           })
         }
        
+	   function sortKeys(x) {
+}
+
+	   
         if ( rules.ORDERED_JSON === true) {     
           comparePipeline.push({
             "$match": { 
@@ -191,11 +195,46 @@ class MongoQA extends MongoDBI {
                   "$and": [ 
                     { "$eq": ["$sType","object"]}, 
                     { "$eq": ["$tType","object"]},
-                    { "$setEquals": [ {$objectToArray : "$source"}, {$objectToArray : "$target"}]}
-                  ]
+                    { "$setEquals": [{ $objectToArray : {
+						                 $function : {
+						                    body: `function(obj) {
+										             const sortKeys = (j) => {
+                                                       if (typeof j !== 'object' || !j)
+                                                         return j;
+                                                       if (Array.isArray(j))
+                                                         return j.map(sortKeys);
+                                                       return Object.keys(j).sort().reduce((o, k) => ({...o, [k]: sortKeys(j[k])}), {});
+												     }
+													 return sortKeys(obj)
+												   }`,
+											args: [ "$source" ],
+											lang: "js"
+										 }
+					                   }
+					                 },
+                                     {  $objectToArray : {
+						                 $function : {
+						                    body: `function(obj) {
+										             const sortKeys = (j) => {
+                                                       if (typeof j !== 'object' || !j)
+                                                         return j;
+                                                       if (Array.isArray(j))
+                                                         return j.map(sortKeys);
+                                                       return Object.keys(j).sort().reduce((o, k) => ({...o, [k]: sortKeys(j[k])}), {});
+												     }
+													 return sortKeys(obj)
+												   }`,
+											args: [ "$source" ],
+											lang: "js"
+										 }
+					                   }
+									 }									 
+								    ]
+                    }
+				  ]
                 }
               }
-            }
+			}
           })
         }         
         

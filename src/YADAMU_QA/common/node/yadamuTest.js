@@ -43,11 +43,12 @@ class YadamuTest extends Yadamu {
   get IDENTIFIER_MAPPINGS()   { return super.IDENTIFIER_MAPPINGS }
   set IDENTIFIER_MAPPINGS(v)  { this._IDENTIFIER_MAPPINGS = v || this.IDENTIFIER_MAPPINGS }
 
-  constructor(configParameters,encryptionKey) {
+  constructor(configParameters,activeConnections,encryptionKey) {
 	  
 	
     super('TEST',configParameters)
-	this.ENCRYPTION_KEY = encryptionKey
+	this.activeConnections = activeConnections
+	// this.ENCRYPTION_KEY = encryptionKey
 	this.testMetrics = new YadamuMetrics();
     
 	// console.log('YadamuTest.YADAMU_PARAMETERS:',YadamuTest.YADAMU_PARAMETERS)

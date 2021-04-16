@@ -1269,7 +1269,7 @@ class OracleDBI extends YadamuDBI {
 		  if (columnName.length > 30) {
 			const mappedColumnName =  columnName.substring(0,30)
   		    this.yadamuLogger.warning([this.DATABASE_VENDOR,this.DB_VERSION,'IDENTIFIER LENGTH',metadata[table].tableName,columnName],`Identifier Too Long (${columnName.length}). Identifier re-mapped as "${mappedColumnName}".`)
-   		    columnMappings[columnName] = mappedColumnName
+   		    columnMappings[columnName] = {name: mappedColumnName}
 		  }
 		})
         if (!YadamuLibrary.isEmpty(columnMappings)) {

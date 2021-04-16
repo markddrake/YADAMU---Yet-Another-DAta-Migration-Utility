@@ -942,6 +942,7 @@ begin
         -- Special Data Types   
         when P_DATA_TYPE = 'geography'                                                 then return 'GEOMETRY';
 		when P_DATA_TYPE = 'geometry'                                                  then return 'GEOMETRY';
+        when P_DATA_TYPE = 'xml'                                                       then return 'XMLTYPE';
         when P_DATA_TYPE = 'uuid'                                                      then return C_UUID_TYPE;
                                                                                        else return UPPER(P_DATA_TYPE);
       end case;

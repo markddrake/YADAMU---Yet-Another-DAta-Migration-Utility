@@ -243,7 +243,7 @@ class StatementGenerator {
            case 'timestamp with time zone':                                           
            case 'timestamp without time zone':                                        
            case 'time without time zone':                                                return 'datetime';
-           case 'time with time zone':                                                   return 'time(6)';
+           case 'time with time zone':                                                   return dataTypeLength === undefined ? 'time(6)' : 'time';
            case 'xml':                                                                   return 'longtext';     
            case 'jsonb':                                                                 return 'json';     
            case 'geography':                                                          
@@ -342,9 +342,11 @@ class StatementGenerator {
                case (dataTypeLength > StatementGenerator.LARGEST_VARBINARY_SIZE_SIZE): return 'blob';
                default:                                                                return 'varbinary';
              }
+           case 'time':                                                                return dataTypeLength === undefined ? 'time(6)' : 'time';			 
            case 'timetz':                                                              return 'datetime(6)';
            case 'timestamptz':                                                         return 'datetime(6)';
            case 'timestamp':                                                           return 'datetime(6)';
+           case 'xml':                                                                 return 'longtext';
            case 'uuid':                                                                return StatementGenerator.UUID_TYPE;
            default:                                                                    
              if (dataType.indexOf('interval') === 0) {

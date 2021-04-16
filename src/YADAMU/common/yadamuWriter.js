@@ -155,36 +155,46 @@ class YadamuWriter extends Transform {
               
   createBatchException(cause,batchSize,firstRow,lastRow,info) {
 
-    const details = {
-      currentSettings        : {
-        yadamu               : this.dbi.yadamu
-      , systemInformation    : this.dbi.systemInformation
-      , metadata             : { 
-          [this.tableName]   : this.dbi.metadata[this.tableName]
+    try {
+      const details = {
+        currentSettings        : {
+          yadamu               : this.dbi.yadamu
+        , systemInformation    : this.dbi.systemInformation
+        , metadata             : { 
+            [this.tableName]   : this.dbi.metadata[this.tableName]
+          }
         }
+      , columnNames          : this.tableInfo.columnNames
+      , targetDataTypes      : this.tableInfo.targetDataTypes 
       }
-    , columnNames          : this.tableInfo.columnNames
-    , targetDataTypes      : this.tableInfo.targetDataTypes 
+      Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
+      return new BatchInsertError(cause,this.tableName,batchSize,firstRow,lastRow,details)
+    } catch (e) {
+	  cause.batchErrorIssue = e
+      return cause
     }
-    Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
-    return new BatchInsertError(cause,this.tableName,batchSize,firstRow,lastRow,details)
   }
   
   createIterativeException(cause,batchSize,rowNumber,row,info) {
     // String to Object conversion takes place in the handleIterativeError since the JSON record is written to the Rejected Records file
-    const details = {
-      currentSettings        : {
-        yadamu               : this.dbi.yadamu
-      , systemInformation    : this.dbi.systemInformation
-      , metadata             : { 
-          [this.tableName]   : this.dbi.metadata[this.tableName]
+    try {
+      const details = {
+        currentSettings        : {
+          yadamu               : this.dbi.yadamu
+        , systemInformation    : this.dbi.systemInformation
+        , metadata             : { 
+            [this.tableName]   : this.dbi.metadata[this.tableName]
+          }
         }
+      , columnNames            : this.tableInfo.columnNames
+      , targetDataTypes        : this.tableInfo.targetDataTypes 
       }
-    , columnNames            : this.tableInfo.columnNames
-    , targetDataTypes        : this.tableInfo.targetDataTypes 
+      Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
+      return new IterativeInsertError(cause,this.tableName,batchSize,rowNumber,row,details)
+    } catch (e) {
+	  cause.IterativeErrorIssue = e
+      return cause
     }
-    Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
-    return new IterativeInsertError(cause,this.tableName,batchSize,rowNumber,row,details)
   }
     
   async rejectRow(tableName,row) {
@@ -204,7 +214,7 @@ class YadamuWriter extends Transform {
       this.rejectRow(this.tableName,record);
       const iterativeError = this.createIterativeException(cause,this.metrics.cached,rowNumber,record,info)
 	  this.dbi.trackExceptions(iterativeError);
-      this.yadamuLogger.logRejected([...cause.getTags(),this.dbi.DATABASE_VENDOR,this.tableName,operation,this.metrics.cached,rowNumber],iterativeError);
+      this.yadamuLogger.logRejected([...(typeof cause.getTags === 'function' ? cause.getTags() : []),this.dbi.DATABASE_VENDOR,this.tableName,operation,this.metrics.cached,rowNumber],iterativeError);
     } catch (e) {
       this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.tableName,this.insertMode],e)
     }
@@ -242,7 +252,7 @@ class YadamuWriter extends Transform {
     }
     const batchException = this.createBatchException(cause,this.metrics.cached,firstRow,lastRow,info)
     this.dbi.trackExceptions(batchException);
-    this.yadamuLogger.handleWarning([...cause.getTags(),this.dbi.DATABASE_VENDOR,this.tableName,operation,this.insertMode,this.metrics.cached],batchException)
+    this.yadamuLogger.handleWarning([...(cause.getTags?.() || []),this.dbi.DATABASE_VENDOR,this.tableName,operation,this.insertMode,this.metrics.cached],batchException)
   }
   
 
@@ -287,33 +297,124 @@ class YadamuWriter extends Transform {
   }
   
   async rollbackTransaction(cause) {
-	  // Rollback means that records written but not committed are lost
+	 
+	 // Rollback means that records written but not committed are lost
 	  // Accounting for in-flight records is dependant on the value of ON_ERROR.
 
       // this.yadamuLogger.trace([this.constructor.name,this.tableName,this.dbi.getWorkerNumber()],'rollbackTransaction()')
-	  
-      
+	 
 	  this.metrics.lost += this.metrics.written;
       this.metrics.written = 0;
       await this.dbi.rollbackTransaction(cause)
   }
+
+  createWriteStream(filename) {
   
-  async stageBatchAsCSV(filename,batch) {
-    const dataStream = Readable.from(batch.map((row) => {return this.rowToCSV(row)}));
-	const fileWriter = await new Promise((resolve,reject) => {
+	return new Promise((resolve,reject) => {
       const outputStream = fs.createWriteStream(filename,{flags :"w"})
 	  const stack = new Error().stack
       outputStream.on('open',() => {resolve(outputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(err,stack,filename) : new FileError(err,stack,filename) )})
 	})
-	const csvPipline = new Array(dataStream,fileWriter)
-    await new Promise((resolve,reject) => {
-	  pipeline(csvPipline,(err) => {
-	    if (err) reject(err)
-		resolve()
-	  })
-    })
   }
   
+  closeWriteStream(fs) {
+    return new Promise((resolve,reject) => {
+	  fs.end(null,null,()=>{resolve()})
+	})
+  }
+  
+  writeRowAsCSV(fs,row) {
+
+	row.forEach((col,idx) => {
+	  if (col === null) {
+		fs.write((idx < (row.length-1)) ? ',' : '\n')
+	  }
+	  else {
+        this.csvTransformations[idx](fs,col)
+	  }
+	})
+  }
+  
+  writeBatchAsCSV(fs,batch) {  
+    batch.forEach((row) => {
+	   this.writeRowAsCSV(fs,row)
+    })
+  }   
+
+  getCSVTransformation(col,isLastColumn) {
+
+    switch (typeof col) {
+	  case "number":
+        return (isLastColumn)
+ 	    ? (fs,col) => {
+   		    fs.write(col.toString());
+			fs.write('\n');
+		  } 
+		: (fs,col) => {
+   		    fs.write(col.toString());
+			fs.write(',');
+		  }
+		case "boolean":
+		  return (isLastColumn) 
+		  ? (fs,col) => {
+  		      fs.write(col ? 'true' : 'false')
+			  fs.write('\n');
+		    } 
+		  : (fs,col) => {
+  		      fs.write(col ? 'true' : 'false')
+			  fs.write(',');
+		    } 
+		case "string":
+		  return (isLastColumn)
+		  ? (fs,col) => {
+		      // sw.write(JSON.stringify(col));
+              fs.write('"')
+	  	      fs.write(col.indexOf('"') > -1 ? col.replace(/"/g,'""') : col)
+		      fs.write('"\n')
+		    } 
+		  : (fs,col) => {
+		      // sw.write(JSON.stringify(col));
+              fs.write('"')
+	  	      fs.write(col.indexOf('"') > -1 ? col.replace(/"/g,'""') : col)
+		      fs.write('",')
+		    } 
+	    case "object":
+		  return (isLastColumn)
+		  ? (fs,col) => {
+              fs.write('"')
+		      fs.write(JSON.stringify(col).replace(/"/g,'""'))
+		      fs.write('"\n')
+		    } 
+		  : (fs,col) => {
+              fs.write('"')
+		      fs.write(col === null ? '' : JSON.stringify(col).replace(/"/g,'""'))
+		      fs.write('",')
+		    } 
+		default:
+		  return (isLastColumn)
+		  ? (fs,col) => {
+  		      fs.write(col);
+			  fs.write('\n');
+		    } 
+	      : (fs,col) => {
+  		      fs.write(col);
+		  	  fs.write(',');
+		    } 
+	}
+  }	 
+  
+  setCSVTransformations(batch) {
+    // RFC4180
+
+    const rowIdx = 0
+	const lastIdx = batch[rowIdx].length -1
+	this.csvTransformations = batch[rowIdx].map((col,colIdx) => {
+       const lastColumn = colIdx === lastIdx
+	   return col !== null ? this.getCSVTransformation(col,lastColumn) : this.getCSVTransformation(batch[batch.findIndex((row) => {return row[colIdx] !== null})]?.[colIdx],lastColumn)
+	})
+		
+  }  
+
   async _writeBatch(batch,rowCount) {
     /*        
     if (this.tableInfo.insertMode === 'Batch') {
@@ -360,7 +461,12 @@ class YadamuWriter extends Transform {
 	if (!this.skipTable) {
 	  try {
 		 
-	    this.skipTable = await this._writeBatch(batch,rowsCached);
+	    this.skipTable = await this._writeBatch(batch,rowsCached).catch((e) => {
+		   if (!e.yadamuAlreadyReported === true) {
+		     this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],'Write Batch Failed');
+		     this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode,'BATCH WRITE'],e)
+		   }
+		})
         if (this.skipTable) {
           await this.rollbackTransaction();
         }	  
@@ -459,7 +565,7 @@ class YadamuWriter extends Transform {
       this.newBatch()
  	  this.uncork(true)
       this.batchWritten = this.getBatchWritten(this.metrics.batchCount)
-	  this.processBatch(nextBatch,rowsReceived,rowsCached);
+	  this.processBatch(nextBatch,rowsReceived,rowsCached).catch((e) => {console.log(e)});
     }
   }
   
@@ -493,7 +599,7 @@ class YadamuWriter extends Transform {
       case 'eod':
         // Used when processing serial data sources such as files to indicate that all records have been processed by the writer
         // this.yadamuLogger.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType,this.tableName,'EMIT'],`"allDataReceived"`)  
-		await this.endTable()
+		// await this.endTable()
         this.emit('allDataReceived')
         break;  
       default:
@@ -635,7 +741,7 @@ class YadamuWriter extends Transform {
 	  const rowsReceived = this.metrics.received
       const rowsCached = this.metrics.cached
       this.batchWritten = this.getBatchWritten(this.metrics.batchCount)
-	  this.processBatch(nextBatch,rowsReceived,rowsCached)
+	  this.processBatch(nextBatch,rowsReceived,rowsCached).catch((e) => {console.log(e)})
  	}
 	else {
 	  this.metrics.lost+= this.metrics.cached

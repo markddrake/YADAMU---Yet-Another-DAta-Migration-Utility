@@ -255,9 +255,10 @@ class EventStream extends Transform {
 			  finished(outputStream,(err) => {resolve(err)})
             })
 			
-			outputStream.destroy()	
-			await writerComplete
-		
+			// outputStream.destroy()	
+			outputStream.end()	
+		    await writerComplete
+			
 			if ((this.terminalStream instanceof PassThrough) && !this.terminalStream.ended) {
 	          // Pipelines that terminate in a PassThrough stream seem not to destroy all of the components correctly when the data has been proceseds. This causes the operation to hang. 
 	          // Explicitly end such a stream

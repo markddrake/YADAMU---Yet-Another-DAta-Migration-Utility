@@ -34,10 +34,10 @@ class YadamuQA {
   get KILL_WORKER()                               { return this.KILL_CONNECTION.worker }
   get KILL_DELAY()                                { return this.KILL_CONNECTION.delay }
 
-  constructor(configuration) {
+  constructor(configuration,activeConnections) {
       
     this.configuration = configuration
-    this.yadamu = new YadamuTest(configuration.parameters)
+    this.yadamu = new YadamuTest(configuration.parameters,activeConnections)
     this.metrics = this.yadamu.testMetrics;
     
     this.expandedTaskList = []
@@ -421,11 +421,12 @@ class YadamuQA {
 
     rowCounts.forEach((row,idx) => {          
       const unmappedTableName = this.unmapTableName(row[1],identifierMappings)
-	  const rowCount = metrics.hasOwnProperty(unmappedTableName) ?  metrics[unmappedTableName].rowCount : -1
-      row.push(rowCount)
+	  const tableMetrics = metrics[unmappedTableName]
+	  const rowCounts = tableMetrics ? [(tableMetrics.rowCount + tableMetrics.rowsSkipped), tableMetrics?.rowsSkipped, tableMetrics?.rowCount ] : [-1,-1,-1]
+      row.push(...rowCounts)
     })   
 
-    const colSizes = [32, 48, 14, 14, 14]
+    const colSizes = [32, 48, 14, 14, 14, 14, 14]
       
     let seperatorSize = (colSizes.length * 3) - 1;
     colSizes.forEach((size)  => {
@@ -440,26 +441,32 @@ class YadamuQA {
         this.yadamu.LOGGER.writeDirect(`|`
                                      + ` ${'TARGET SCHEMA'.padStart(colSizes[0])} |` 
                                      + ` ${'TABLE_NAME'.padStart(colSizes[1])} |`
-                                     + ` ${'ROWS'.padStart(colSizes[2])} |`
-                                     + ` ${'ROWS IMPORTED'.padStart(colSizes[3])} |`
-                                     + ` ${'DELTA'.padStart(colSizes[4])} |`
+                                     + ` ${'ROWS READ'.padStart(colSizes[2])} |`
+                                     + ` ${'SKIPPED'.padStart(colSizes[3])} |`
+                                     + ` ${'WRITTEN'.padStart(colSizes[4])} |`
+                                     + ` ${'COUNT'.padStart(colSizes[5])} |`
+                                     + ` ${'DELTA'.padStart(colSizes[6])} |`
                            + '\n');
         this.yadamu.LOGGER.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
         this.yadamu.LOGGER.writeDirect(`|`
                                      + ` ${row[0].padStart(colSizes[0])} |`
                                      + ` ${row[1].padStart(colSizes[1])} |`
-                                     + ` ${row[2].toString().padStart(colSizes[2])} |` 
-                                     + ` ${row[3].toString().padStart(colSizes[3])} |` 
-                                     + ` ${(row[3] - row[2]).toString().padStart(colSizes[4])} |`
+                                     + ` ${row[3].toString().padStart(colSizes[2])} |` 
+                                     + ` ${row[4].toString().padStart(colSizes[3])} |` 
+                                     + ` ${row[5].toString().padStart(colSizes[4])} |` 
+                                     + ` ${row[2].toString().padStart(colSizes[5])} |` 
+                                     + ` ${(row[5] - row[2]).toString().padStart(colSizes[6])} |`
                            + '\n');
       }
       else {
         this.yadamu.LOGGER.writeDirect(`|`
                                      + ` ${''.padStart(colSizes[0])} |`
                                      + ` ${row[1].padStart(colSizes[1])} |`
-                                     + ` ${row[2].toString().padStart(colSizes[2])} |` 
-                                     + ` ${row[3].toString().padStart(colSizes[3])} |` 
-                                     + ` ${(row[3] - row[2]).toString().padStart(colSizes[4])} |`
+                                     + ` ${row[3].toString().padStart(colSizes[2])} |` 
+                                     + ` ${row[4].toString().padStart(colSizes[3])} |` 
+                                     + ` ${row[5].toString().padStart(colSizes[4])} |` 
+                                     + ` ${row[2].toString().padStart(colSizes[5])} |` 
+                                     + ` ${(row[5] - row[2]).toString().padStart(colSizes[6])} |`
                            + '\n');         
       }
     })
@@ -473,10 +480,11 @@ class YadamuQA {
   async compareSchemas(sourceVendor,targetVendor,sourceSchema,targetSchema,connectionProperties,testParameters,rules,metrics,reportRowCounts,identifierMappings) {
       
     const compareDBI = await this.getDatabaseInterface(sourceVendor,connectionProperties,{},false,identifierMappings)
-    
+	
     try {
       compareDBI.setParameters(testParameters);
       await compareDBI.initialize();
+      this.yadamu.activeConnections.add(compareDBI)
       if (reportRowCounts) {
         this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),metrics,rules,identifierMappings) 
       } 
@@ -488,6 +496,7 @@ class YadamuQA {
 
       await compareDBI.releasePrimaryConnection()
       await compareDBI.finalize();
+      this.yadamu.activeConnections.delete(compareDBI)
 
       compareResults.successful.forEach((row,idx) => {          
         // const tableName = (rules.TABLE_MATCHING === 'INSENSITIVE') ? row[2].toLowerCase() : row[2];
@@ -513,6 +522,7 @@ class YadamuQA {
     } catch (e) {
       this.yadamu.LOGGER.logException([`COMPARE`],e)
       await compareDBI.abort();
+      this.yadamu.activeConnections.delete(compareDBI)
       throw e
     } 
   }
@@ -686,8 +696,6 @@ class YadamuQA {
     }
     return sourceDB.parameters.TABLE_MATCHING
   }
-
-
   
   dbRoundtripResults(operationsList,elapsedTime) {
     
@@ -722,6 +730,18 @@ class YadamuQA {
         
   }
   
+  setMongoStripID(sourceDatabase,targetDatabase,parameters) {
+	 
+	if (sourceDatabase === 'mongodb') {
+       parameters.MONGO_STRIP_ID = parameters.MONGO_STRIP_ID || false
+	}
+	
+	if (targetDatabase === 'mongodb') {
+      parameters.MONGO_STRIP_ID = parameters.MONGO_STRIP_ID || true
+	}
+  
+  }
+  
   async dbRoundtrip(task,configuration,test,targetConnectionName,parameters) {
   /*
   **
@@ -748,7 +768,8 @@ class YadamuQA {
 
     const sourceDatabase =  Object.keys(sourceConnectionInfo)[0];
     const targetDatabase =  Object.keys(targetConnectionInfo)[0];
-
+    this.setMongoStripID(sourceDatabase,targetDatabase,parameters);
+	
     const sourceConnection = sourceConnectionInfo[sourceDatabase]
     const targetConnection = targetConnectionInfo[targetDatabase]
 
@@ -1127,7 +1148,8 @@ class YadamuQA {
     
     let compareDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,{},false)
     await compareDBI.initialize();
-    
+    this.yadamu.activeConnections.add(compareDBI);
+	
     stepStartTime = performance.now();
     this.reportRowCounts(await compareDBI.getRowCounts(targetSchema1),metrics[0],parameters,identifierMappings) 
     stepElapsedTime = performance.now() - stepStartTime 
@@ -1140,6 +1162,8 @@ class YadamuQA {
    
     await compareDBI.releasePrimaryConnection()
     await compareDBI.finalize();
+	this.yadamu.activeConnections.delete(compareDBI);
+	
     
     // If the content of the export file originated in the target database compare the imported schema with the source schema.
 
@@ -1255,7 +1279,7 @@ class YadamuQA {
       const compareDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,false)
       await compareDBI.initialize();
       stepStartTime = performance.now()
-      this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),metrics,parameters,targetDBI.inverseIdentifierMappings) 
+      this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),metrics,parameters) 
       stepElapsedTime = performance.now() - stepStartTime 
       await compareDBI.releasePrimaryConnection()
       await compareDBI.finalize();

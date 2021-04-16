@@ -15,12 +15,6 @@ class JSONWriter extends JSONWriter_FILE {
 	this.startTable = '['
   }
   
-  async endTable() {
-	super.endTable()
-  }
-
-  
-  
 }
 
 module.exports = JSONWriter;

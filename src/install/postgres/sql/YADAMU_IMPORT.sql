@@ -485,6 +485,7 @@ declare
   C_GEOGRAPHY_TYPE                    VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geography' ELSE 'JSON' END;
   C_MAX_CHARACTER_VARYING_TYPE_LENGTH INT         = 10 * 1024 * 1024;
   C_MAX_CHARACTER_VARYING_TYPE        VARCHAR(32) = 'character varying(' || C_MAX_CHARACTER_VARYING_TYPE_LENGTH || ')';
+  C_CLOB_TYPE                         VARCHAR(32) = 'text';
   C_BFILE_TYPE                        VARCHAR(32) = 'character varying(2048)';
   C_ROWID_TYPE                        VARCHAR(32) = 'character varying(18)';
   C_MYSQL_TINY_TEXT_TYPE              VARCHAR(32) = 'character varying(256)';
@@ -523,12 +524,12 @@ begin
         when 'NVARCHAR2'                                                                         then return 'character varying';
         when 'RAW'                                                                               then return 'bytea';
         when 'BLOB'                                                                              then return 'bytea';
-        when 'CLOB'                                                                              then return C_MAX_CHARACTER_VARYING_TYPE;
-        when 'NCLOB'                                                                             then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'CLOB'                                                                              then return C_CLOB_TYPE;
+        when 'NCLOB'                                                                             then return C_CLOB_TYPE;
         when 'TIMESTAMP'                                                                         then return case when P_DATA_TYPE_LENGTH > 6  then 'timestamp(6)' else 'timestamp' end;
         when 'BFILE'                                                                             then return C_BFILE_TYPE;
         when 'ROWID'                                                                             then return C_ROWID_TYPE;
-        when 'ANYDATA'                                                                           then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'ANYDATA'                                                                           then return C_CLOB_TYPE;
         when 'XMLTYPE'                                                                           then return 'xml';
         when '"MDSYS"."SDO_GEOMETRY"'                                                            then return C_GEOMETRY_TYPE;
         else
@@ -543,7 +544,7 @@ begin
 		  when (strpos(V_DATA_TYPE,'"."XMLTYPE"') > 0)                                           then return 'xml';
           -- Map all object types to text - Store the Oracle serialized format. 
           -- When Oracle Objects are mapped to JSON change the mapping to JSON.
-          when(V_DATA_TYPE like '"%"."%"')                                                       then return C_MAX_CHARACTER_VARYING_TYPE;
+          when(V_DATA_TYPE like '"%"."%"')                                                       then return C_CLOB_TYPE;
                                                                                                  else return lower(V_DATA_TYPE);
 		 end case;
       end case;
@@ -576,8 +577,8 @@ begin
         when 'tinyint'                                                                           then return 'smallint';
         when 'tinytext'                                                                          then return C_MYSQL_TINY_TEXT_TYPE;
         when 'text'                                                                              then return C_MYSQL_TEXT_TYPE;
-        when 'mediumtext'                                                                        then return C_MAX_CHARACTER_VARYING_TYPE;
-        when 'longtext'                                                                          then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'mediumtext'                                                                        then return C_CLOB_TYPE;
+        when 'longtext'                                                                          then return C_CLOB_TYPE;
         when 'varbinary'                                                                         then return 'bytea';
         when 'year'                                                                              then return 'smallint';
                                                                                                  else return lower(V_DATA_TYPE);
@@ -610,8 +611,8 @@ begin
         when 'tinyint'                                                                           then return 'smallint';
         when 'tinytext'                                                                          then return C_MYSQL_TINY_TEXT_TYPE;
         when 'text'                                                                              then return C_MYSQL_TEXT_TYPE;
-         when 'mediumtext'                                                                       then return C_MAX_CHARACTER_VARYING_TYPE;
-        when 'longtext'                                                                          then return C_MAX_CHARACTER_VARYING_TYPE;
+         when 'mediumtext'                                                                       then return C_CLOB_TYPE;
+        when 'longtext'                                                                          then return C_CLOB_TYPE;
         when 'varbinary'                                                                         then return 'bytea';
         when 'year'                                                                              then return 'smallint';
                                                                                                  else return lower(V_DATA_TYPE);
@@ -619,10 +620,10 @@ begin
     when 'MSSQLSERVER'  then 
       case V_DATA_TYPE         
         -- MSSQL Direct Mappings
-        when 'varchar'                                                                           then return case when P_DATA_TYPE_LENGTH = -1 then C_MAX_CHARACTER_VARYING_TYPE else 'character varying' end;
-        when 'nvarchar'                                                                          then return case when P_DATA_TYPE_LENGTH = -1 then C_MAX_CHARACTER_VARYING_TYPE else 'character varying' end;
+        when 'varchar'                                                                           then return case when P_DATA_TYPE_LENGTH = -1 then C_CLOB_TYPE else 'character varying' end;
+        when 'nvarchar'                                                                          then return case when P_DATA_TYPE_LENGTH = -1 then C_CLOB_TYPE else 'character varying' end;
         when 'nchar'                                                                             then return 'char';
-        when 'ntext'                                                                             then return C_MAX_CHARACTER_VARYING_TYPE;
+        when 'ntext'                                                                             then return C_CLOB_TYPE;
         when 'bit'                                                                               then return 'boolean';
         -- Do not use Postgres Money Type due to precision issues. 
 		-- E.G. with Locale USD Postgres only provides 2 digit precison.
@@ -648,7 +649,7 @@ begin
         -- MySQL Direct Mappings
         when 'binary'                                                                            then return 'bytea';
         when 'varbinary'                                                                         then return 'bytea';
-		when 'long binaray'                                                                      then return 'bytea';
+		when 'long varbinary'                                                                    then return 'bytea';
 		when 'varchar'                                                                           then return 'character varying';
 		when 'long varchar'                                                                      then return C_MAX_CHARACTER_VARYING_TYPE;
 		when 'int'                                                                               then return 'bigint';
@@ -658,7 +659,7 @@ begin
       -- MongoDB typing based on BSON type model 
       case V_DATA_TYPE
         when 'double'                                                                            then return 'double precision';
-        when 'string'                                                                            then return case when P_DATA_TYPE_LENGTH >  C_MAX_CHARACTER_VARYING_TYPE_LENGTH then C_MAX_CHARACTER_VARYING_TYPE else 'character varying' end;
+        when 'string'                                                                            then return case when P_DATA_TYPE_LENGTH >  C_MAX_CHARACTER_VARYING_TYPE_LENGTH then C_CLOB_TYPE else 'character varying' end;
         when 'object'                                                                            then return C_JSON_TYPE;
         when 'array'                                                                             then return C_JSON_TYPE;
         when 'binData'                                                                           then return 'bytea';
@@ -679,7 +680,7 @@ begin
       end case;    
     when 'SNOWFLAKE' then
       case V_DATA_TYPE
-        when 'TEXT'                                                                              then return case when P_DATA_TYPE_LENGTH >  C_MAX_CHARACTER_VARYING_TYPE_LENGTH then C_MAX_CHARACTER_VARYING_TYPE else 'character varying' end;
+        when 'TEXT'                                                                              then return case when P_DATA_TYPE_LENGTH >  C_MAX_CHARACTER_VARYING_TYPE_LENGTH then C_CLOB_TYPE else 'character varying' end;
         when 'NUMBER'                                                                            then return 'numeric';
         when 'FLOAT'                                                                             then return 'double precision';
         when 'BINARY'                                                                            then return 'bytea';

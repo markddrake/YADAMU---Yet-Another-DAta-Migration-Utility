@@ -18,6 +18,10 @@ class StringWriter extends Writable {
     return this.chunks.join('');
   }
   
+  reset() {
+	this.chunks = []
+  }
+  
 }
 
 module.exports = StringWriter;

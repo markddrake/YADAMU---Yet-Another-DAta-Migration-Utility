@@ -392,6 +392,11 @@ as
         ,cast(collect(
                case
                  /*
+                 ** Higher Precision representation of the FLOAT and DOUBLE
+                 */
+                 when atc.DATA_TYPE in ('BINARY_DOUBLE','BINARY_FLOAT') then
+                   'TO_CHAR("' || atc.COLUMN_NAME || '")'
+                 /*
                  ** Quick Fixes for datatypes not natively supported by NODE.js Driver
                  */
                  when atc.DATA_TYPE = 'RAW' then
