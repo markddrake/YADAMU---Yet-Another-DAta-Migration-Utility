@@ -1,0 +1,126 @@
+{
+  "operation"         : "dbRoundTrip"
+, "connections"       : "connections.json"
+, "tasks"             : "tasks.json"
+, "recreateSchema"    : true
+, "createFolders"     : true
+, "parameters": {
+    "VERTICA_STAGING_FOLDER" : "/mnt/shared/vertica"
+  , "YADAMU_STAGING_FOLDER"  : "/usr/src/YADAMU/mnt/vertica"
+  , "INFINITY_MANAGEMENT" : "NULLIFY"
+  , "CIRCLE_FORMAT"  : "CIRCLE"
+  }
+, "tests"             : [{
+    "operation"       : "export"
+  , "source"          : "postgres#1"
+  , "target"          : "file-JSON"
+  , "exportPath"      : "%vendor%"
+  , "createFolders"   : true
+  , "verifyOperation" : true
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "operation"       : "import"
+  , "importPath"      : "%location%"
+  , "source"          : "file-JSON"
+  , "verifyOperation" : true
+  , "targets"         : [
+       "vertica#1","oracle19c","mongodb#1","mysql#1","mariadb#1","mssql19"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "oracle19c"
+  , "targets"         : [
+       "vertica#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "oracle18c"
+  , "targets"         : [
+       "vertica#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "oracle12c"
+  , "targets"         : [
+       "vertica#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "oracle11g"
+  , "targets"         : [
+       "vertica#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mssql17"
+  , "targets"         : [
+        "vertica#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mssql19"
+  , "targets"         : [
+        "vertica#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "postgres#1"
+  , "targets"         : [
+       "vertica#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mysql#1"
+  , "targets"         : [
+       "vertica#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mariadb#1"
+  , "targets"         : [
+       "vertica#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "mongodb#1",
+	"parameters"      : {
+	   "MONGO_STRIP_ID" : false
+	}
+  , "targets"         : [
+       "vertica#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "vertica#1"
+  , "targets"         : [
+       "vertica#1","oracle19c","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  }]
+}

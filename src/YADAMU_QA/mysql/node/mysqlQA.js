@@ -100,13 +100,11 @@ class MySQLQA extends MySQLDBI {
       let results = await this.executeSQL(MySQLQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,rules.EMPTY_STRING_IS_NULL === true,rules.SPATIAL_PRECISION|| 18]);
 
       const successful = await this.executeSQL(MySQLQA.SQL_SUCCESS,{})
-          
       report.successful = successful.map((row,idx) => {          
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT]
       })
 
       const failed = await this.executeSQL(MySQLQA.SQL_FAILED,{})
-
       report.failed = failed.map((row,idx) => {
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.NOTES !== undefined ? row.NOTES : '')]
       })

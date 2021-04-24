@@ -159,12 +159,12 @@ class PostgresWriter extends YadamuWriter {
 	  const offset = row * this.tableInfo.columnCount
       const nextRow  = repackBatch ? batch.slice(offset,offset + this.tableInfo.columnCount) : batch[row]
       try {
-        this.dbi.createSavePoint();
+        await this.dbi.createSavePoint();
         const results = await this.dbi.insertBatch(sqlStatement,nextRow);
-        this.dbi.releaseSavePoint();
+        await this.dbi.releaseSavePoint();
 		this.metrics.written++;
       } catch(cause) {
-        this.dbi.restoreSavePoint(cause);
+        await this.dbi.restoreSavePoint(cause);
         this.handleIterativeError(`INSERT ONE`,cause,row,nextRow);
         if (this.skipTable) {
           break;

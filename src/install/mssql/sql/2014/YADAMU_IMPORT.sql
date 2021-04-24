@@ -205,7 +205,7 @@ begin
         when @DATA_TYPE = 'json'                                                                         then 'json'
         when @DATA_TYPE = 'blob' then
           case 
-            when @DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE                                                                then @MAX_VARBINARY_TYPE
+            when @DATA_TYPE_LENGTH > @LARGEST_VARBINARY_SIZE                                             then @MAX_VARBINARY_TYPE
                                                                                                          else 'varbinary'
         end
         -- For MySQL may need to add column character set to the table metadata object 
@@ -272,6 +272,7 @@ begin
                                                                                                          else 'numeric'
         end
         when @DATA_TYPE = 'int'                                                                          then 'bigint'
+        when @DATA_TYPE = 'float'                                                                        then @DOUBLE_PRECISION_TYPE
         when @DATA_TYPE = 'timetz'                                                                       then 'datetimeoffset'
         when @DATA_TYPE = 'timestamp'                                                                    then 'datetimeoffset'
         when @DATA_TYPE = 'timestamptz'                                                                  then 'datetimeoffset'

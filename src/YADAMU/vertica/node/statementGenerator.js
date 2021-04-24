@@ -1,7 +1,9 @@
 "use strict";
 
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
+const crypto = require('crypto');
+const path = require('path');
 
+const YadamuLibrary = require('../../common/yadamuLibrary.js');
 
 class StatementGenerator {
 
@@ -421,85 +423,87 @@ class StatementGenerator {
 		  }
 		  sizeConstraints[idx] = targetLength
       }		
-
-
-      const targetType = YadamuLibrary.decomposeDataType(targetDataType)
-	  switch (true) {
-        case ((YadamuLibrary.isBinaryType(targetType.type)) || ((targetType.type ===  'long') && (targetType.typeQualifier === 'varbinary'))) :
-		  let columnLength = targetType.length || sizeConstraints[idx];
-		  columnLength = ( isNaN(columnLength) || ((columnLength < 1) || (columnLength > StatementGenerator.LARGEST_LOB_SIZE))) ? StatementGenerator.LARGEST_LOB_SIZE : columnLength
+	  
+      const typeInfo = targetDataType.split('(')
+	  const targetType = typeInfo[0].toUpperCase()
+	  switch (targetType) {		
+        case 'BINARY':
+		case 'VARBINARY':
+		case 'LONG VARBINARY':
+		  let columnLength = typeInfo.length > 1 ? typeInfo[1].split(')')[0] : sizeConstraints[idx];
+		  columnLength = ( isNaN(columnLength) || ((columnLength < 1) || (columnLength > StatementGenerator.LARGEST_LOB_SIZE))) ? StatementGenerator.LARGEST_LOB_SIZE : parseInt(columnLength)
 		  let hexLength = columnLength * 2
 		  hexLength = ((hexLength < 2) || (hexLength > StatementGenerator.LARGEST_LOB_SIZE)) ? StatementGenerator.LARGEST_LOB_SIZE : hexLength
 		  switch (true) {
 			 case (columnLength > StatementGenerator.LARGEST_BINARY_SIZE) :
 			   // LONG VARBINARY
+               // copyColumnList[idx] = `"${columnName}" FORMAT 'HEX'`
 			   copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER long varchar(${hexLength}), "${columnName}" as YADAMU.LONG_HEX_TO_BINARY("YADAMU_COL_${column_suffix}")`
-			   insertOperators[idx] = { 
-			     prefix  : 'YADAMU.LONG_HEX_TO_BINARY('
-			   , suffix  : ')'
-			   }
 			   break;
 			 case (hexLength > StatementGenerator.LARGEST_VARCHAR_SIZE) :
 			   // VARBINARY > 32500 < 65000 - Use LONG VARCHAR for HEX can cast result to VARBINARY
-			   copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER long varchar(${hexLength}), "${columnName}" as CAST(YADAMU.LONG_HEX_TO_BINARY("YADAMU_COL_${column_suffix}") as ${targetType.type}(${columnLength}))`
-			   insertOperators[idx] = { 
-			     prefix  : 'CAST(YADAMU.LONG_HEX_TO_BINARY('
-			   , suffix  : `) as ${targetType.type}(${columnLength}))`
-			   }
+               // copyColumnList[idx] = `"${columnName}" FORMAT 'HEX'`
+			   copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER long varchar(${hexLength}), "${columnName}" as CAST(YADAMU.LONG_HEX_TO_BINARY("YADAMU_COL_${column_suffix}") as ${targetType}(${columnLength}))`
 			   break;
 			 default:   
 			   copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER varchar(${hexLength}), "${columnName}" as HEX_TO_BINARY("YADAMU_COL_${column_suffix}")`
-			   insertOperators[idx] = { 
-			     prefix  : 'HEX_TO_BINARY('
-			  ,  suffix  : ')'
-			  }
+               // copyColumnList[idx] = `"${columnName}" FORMAT 'HEX'`
           }
+   	      insertOperators[idx] = {
+	        prefix  : 'X'
+		  , suffix  : `::${targetType.toUpperCase()}(${columnLength})`
+		  }
 		  break
-		case ((targetDataType === 'circle') && (this.dbi.INBOUND_CIRCLE_FORMAT === 'CIRCLE')):
-  	      copyColumnList.push(`"${columnName}"`)
-	    case (targetDataType === 'geometry'):
+		case 'CIRCLE':
+		  if (this.dbi.INBOUND_CIRCLE_FORMAT === 'CIRCLE') {
+  	        copyColumnList.push(`"${columnName}"`)
+		    break;
+		  }
+	    case 'GEOMETRY':
 		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(65000), "${columnName}" as ST_GeomFromText("YADAMU_COL_${column_suffix}")`
 	  	  insertOperators[idx] = { 
 			prefix  : 'ST_GeomFromText('
 		  , suffix  : ')'
 		  }
 		  break;
-	    case (targetDataType === 'geography'):
+	    case 'GEOGRAPHY':
 		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(65000), "${columnName}" as ST_GeographyFromText("YADAMU_COL_${column_suffix}")`
 	  	  insertOperators[idx] = { 
 			prefix  : 'ST_GeographyFromText('
 		  , suffix  : ')'
 		  }
 		  break;
-		case (targetDataType === 'time'):
+		case 'TIME':
 		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as cast("YADAMU_COL_${column_suffix}" as TIME)`
 	  	  insertOperators[idx] = { 
 			prefix  : 'cast('
 		  , suffix  : ' as TIME)'
 		  }
 		  break;
-		case (targetDataType === 'time with timezone'):
+		case 'TIME WITH TIMEZONE':
 		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as cast("YADAMU_COL_${column_suffix}" as TIME WITH TIME ZONE)`
 	  	  insertOperators[idx] = { 
 			prefix  : 'cast('
 		  , suffix  : ' as TIME WITH TIME ZONE)'
 		  }
 		  break;
-		case ((targetDataType.indexOf('interval') === 0 ) && (targetDataType.indexOf('second') > 0)):
+		case 'INTERVAL DAY':
+		case 'INTERVAL DAY TO SECOND':
 		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(64), "${columnName}" as CAST("YADAMU_COL_${column_suffix}" AS INTERVAL DAY TO SECOND)`
 	  	  insertOperators[idx] = { 
 			prefix  : 'cast('
 		  , suffix  : ' as INTERVAL DAY TO SECOND)'
 		  }
 		  break;
-		case ((targetDataType.indexOf('interval') === 0 )&& (targetDataType.indexOf('month') > 0)):
+		case 'INTERVAL YEAR':
+		case 'INTERVAL YEAR TO MONTH':
 		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(64), "${columnName}" as CAST("YADAMU_COL_${column_suffix}" AS INTERVAL YEAR TO MONTH)`
 	  	  insertOperators[idx] = { 
 			prefix  : 'cast('
 		  , suffix  : ' as INTERVAL YEAR TO MONTH)'
 		  }
 		  break;
-		case (targetDataType === 'uuid') :
+		case 'UUID':
 		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as CAST("YADAMU_COL_${column_suffix}" AS UUID)`
 	  	  insertOperators[idx] = null
 		  break;
@@ -692,15 +696,23 @@ class StatementGenerator {
 		}
 	  })
 	}
+
+	const stagingFile     =  `YST-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
+	const localPath       =  path.resolve(path.join(this.dbi.YADAMU_STAGING_FOLDER,stagingFile)); 
+	const remotePath      =  path.join(this.dbi.VERTICA_STAGING_FOLDER,stagingFile).split(path.sep).join(path.posix.sep); 
 	
     const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
     const insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values `;
-	const copyStatement   = `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')})`
+	const copyStatement   = `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath}' PARSER fcsvparser(type='rfc4180', header=false, trim=false) NULL ''`
+	const mergeoutStatement = `select do_tm_task('mergeout','${this.targetSchema}.${tableMetadata.tableName}')`
+
     
 	return { 
        ddl             : createStatement, 
        dml             : insertStatement, 
 	   copy            : copyStatement,
+	   mergeout        : mergeoutStatement,
+	   localPath       : localPath,
 	   columnNames     : columnNames,
        targetDataTypes : targetDataTypes, 
 	   sizeConstraints : sizeConstraints,

@@ -45,6 +45,11 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeTestSuite
   ;;
 
+  vertica)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaTestSuite
+  ;;
+
   mssql2014TestSuite)
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
   ;;
@@ -74,6 +79,6 @@ case $YADAMU_TEST_NAME  in
   ;; 
   
   *)
-    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, import, fileRoundtrip, dbRoundtrip, lostConnection, mongo, snowflake, loader, aws, azure, cmdLine, interactive or all (default)"
+    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, import, fileRoundtrip, dbRoundtrip, lostConnection, mongo, snowflake, vertica, loader, aws, azure, cmdLine, interactive or all (default)"
   ;;
 esac

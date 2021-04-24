@@ -461,32 +461,39 @@ class YadamuWriter extends Transform {
 	if (!this.skipTable) {
 	  try {
 		 
-	    this.skipTable = await this._writeBatch(batch,rowsCached).catch((e) => {
-		   if (!e.yadamuAlreadyReported === true) {
-		     this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],'Write Batch Failed');
-		     this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode,'BATCH WRITE'],e)
-		   }
-		})
+	    this.skipTable = await this._writeBatch(batch,rowsCached)
         if (this.skipTable) {
           await this.rollbackTransaction();
         }	  
         if (this.REPORT_BATCHES && !this.commitWork(rowsReceived)) {
           this.yadamuLogger.info([`${this.tableName}`,this.insertMode],`Rows written:  ${this.metrics.written}.`);
         }                   
-	    // Commit is only done after a writing a batch
+	    // Commit after a writing a batch if the Commit threshold has been reached or passed. Start a new Transaction
         if (this.commitWork(rowsReceived)) {
-          await this.commitTransaction()
-          if (this.REPORT_COMMITS) {
-            this.yadamuLogger.info([`${this.tableName}`,this.insertMode],`Rows commited: ${this.metrics.committed}.`);
-          }          
-          await this.beginTransaction();            
+		  try {
+            await this.commitTransaction()
+            if (this.REPORT_COMMITS) {
+              this.yadamuLogger.info([`${this.tableName}`,this.insertMode],`Rows commited: ${this.metrics.committed}.`);
+            }          
+		  } catch (commitFailure) {
+			// Attempt to start a new transaction even if the commit failed.
+			try {
+              await this.beginTransaction();            
+			} catch (beginFailure) {
+			  // Append the Begin Failure to the Commit Failure
+			  // ### Is This FATAL. Cannot establish a transaction context. 
+			  commitFailure.beginFailure = beginFailure
+			}
+			throw commitFailure
+		  }
+          await this.beginTransaction();            	  
         }
 	  } catch (err) { 
 
   	    /*
 	    **
 	    ** An unrecoverable error occured while writing a batch. Examples of unrecoverable errors include lost connections, missing tables, too many errors during iterative inserts
-	    ** or anything else that causes the _writeBach implementation to throw an error. 
+	    ** or anything else that causes the _writeBach implementation to throw an error. This will also catch issues with Transaction State (Errors during COMMIT and/or BEGIN transaction operations)
         **
 	    ** processBatch() is typically executed outside of 'try', 'await', 'catch' block, so that Yadamu can prepare the next batch of rows while the current batch of rows in being written.
 	    **
@@ -565,7 +572,10 @@ class YadamuWriter extends Transform {
       this.newBatch()
  	  this.uncork(true)
       this.batchWritten = this.getBatchWritten(this.metrics.batchCount)
-	  this.processBatch(nextBatch,rowsReceived,rowsCached).catch((e) => {console.log(e)});
+	  this.processBatch(nextBatch,rowsReceived,rowsCached).catch((e) => {
+        this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],'Write Batch Failed');
+	    this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode,'BATCH WRITE'],e)
+      })
     }
   }
   

@@ -37,7 +37,7 @@ class VertiaCopyOperationFailure extends VerticaError {
   }
 }
 
-class LeadingTrailingSpaces extends Error {
+class WhitespaceIssue extends Error {
 
 }
   
@@ -56,6 +56,6 @@ class ContentTooLarge extends Error {
 module.exports = {
   VerticaError
 , VertiaCopyOperationFailure
-, LeadingTrailingSpaces
+, WhitespaceIssue
 , ContentTooLarge
 }

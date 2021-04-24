@@ -15,6 +15,7 @@ RUN mkdir -p mnt/log \
  &&	mkdir -p mnt/output \	
  &&	mkdir -p mnt/loader \	
  &&	mkdir -p mnt/local \	
+ &&	mkdir -p mnt/vertica \	
  &&	mkdir -p mnt/yadamu \	
  && ln -sfn mnt/log \
  && ln -sfn mnt/JSON \
@@ -23,6 +24,7 @@ RUN mkdir -p mnt/log \
  && ln -sfn mnt/output \
  && ln -sfn mnt/loader \
  && ln -sfn mnt/local \
+ && ln -sfn mnt/vertica \
  && ln -sfn mnt/yadamu 
 ENV TNS_ADMIN=/usr/src/YADAMU
 ENV YADAMU_PASSPHRASE=yabasc

@@ -380,58 +380,70 @@ class YadamuLibrary {
 	// Strip the leading 'P'
 	let remainingString = interval.substring(1);
 	
-	results.type = ((remainingString.indexOf('Y') > -1) || (remainingString.indexOf('M') > remainingString.indexOf('T'))) ? 'YM' : 'DMS'
-	
+	results.type = ((remainingString.indexOf('Y') > -1) || ((remainingString.indexOf('M') > -1) && ((remainingString.indexOf('T') === -1) || (remainingString.indexOf('M') < remainingString.indexOf('T'))))) ? 'YM' : 'DMS'
+
 	let components
-	switch (true) {
-      case (remainingString.indexOf('Y') > -1):
-	    // Has a Years component
-	    components = remainingString.split('Y')
-        results.years = components[0].length > 0 ? Number(components[0]) : 0
-		if (components.length === 1) break;
-        remainingString = components[1];
-      case ((remainingString.indexOf('M') > -1)  && (remainingString.indexOf('M') < remainingString.indexOf('T'))):
-	    // Has a Months component - becareful: May also have minitues
-	    components = remainingString.split('M')
-        results.months = components[0].length > 0 ? Number(components[0]) : 0
-		if (components.length === 1) break;
-		components.shift()
-        remainingString = components.join('M')
-      case (remainingString.indexOf('W') > -1):
-	    // Has a Weeks component
-	    components = remainingString.split('W')
-        results.weeks = components[0].length > 0 ? Number(components[0]) : 0
-		if (components.length === 1) break;
-        remainingString = components[1];	
-      case (remainingString.indexOf('D') > -1):
-	    // Has a Weeks component
-	    components = remainingString.split('D')
-        results.days = components[0].length > 0 ? Number(components[0]) : 0
-		if (components.length === 1) break;
-        remainingString = components[1];
-      case (remainingString.indexOf('T') > -1):
-	    components = remainingString.split('T')
-		if (components.length === 1) break;
-        remainingString = components[1];
-      case (remainingString.indexOf('H') > -1):
-	    // Has a Hours component
-	    components = remainingString.split('H')
-        results.hours = components[0].length > 0 ? Number(components[0]) : 0
-		if (components.length === 1) break;
-        remainingString = components[1];
-      case (remainingString.indexOf('M') > -1):
-	    // Has a Weeks component
-	    components = remainingString.split('M')
-        results.minutes = components[0].length > 0 ? Number(components[0]) : 0
-        if (components.length === 1) break;
-        remainingString = components[1];
-      case (remainingString.indexOf('S') > -1):
-	    
-		// Has a Weeks component
-	    components = remainingString.split('S')
-        results.seconds = components[0].length > 0 ? Number(components[0]) : 0
-      default:	  
+	if (remainingString.indexOf('Y') > -1) {
+	  // Has a Years component - be careful: May also have minitues
+	  components = remainingString.split('Y')
+      results.years = Number(components[0]) 
+	  if (components.length === 1) return results
+      remainingString = components[1]
 	}
+	
+	if ((remainingString.indexOf('M') > -1) && ((remainingString.indexOf('T') === -1) || (remainingString.indexOf('M') < remainingString.indexOf('T')))) {
+      // Has a Months component - be careful: May also have minitues
+	  components = remainingString.split('M')
+      results.months = Number(components[0]) 
+      if (components.length === 1) return results
+	  components.shift()
+      remainingString = components.join('M')
+    }	   
+      
+    if (remainingString.indexOf('W') > -1) {
+	  // Has a Weeks component
+	  components = remainingString.split('W')
+      results.weeks = Number(components[0]) 
+      if (components.length === 1) return results
+      remainingString = components[1];	
+    }
+    
+    if (remainingString.indexOf('D') > -1) {
+	  // Has a Days component
+	  components = remainingString.split('D')
+      results.days = Number(components[0]) 
+      if (components.length === 1) return results
+      remainingString = components[1];
+    }
+	
+	if (remainingString.indexOf('T') > -1) {
+	  components = remainingString.split('T')
+	  if (components.length === 1) return results
+      remainingString = components[1];
+    }
+    
+	if (remainingString.indexOf('H') > -1) {
+	  // Has a Hours component
+	  components = remainingString.split('H')
+      results.hours = Number(components[0]) 
+      if (components.length === 1) return results
+	  remainingString = components[1]
+	}
+	
+    if (remainingString.indexOf('M') > -1) {
+	  // Has a Minutes component
+	  components = remainingString.split('M')
+      results.minutes = Number(components[0]) 
+      if (components.length === 1) return results
+      remainingString = components[1];
+	}
+	
+	if (remainingString.indexOf('S') > -1) {
+ 	  // Has a Weeks component
+	  components = remainingString.split('S')
+      results.seconds = Number(components[0]) 
+	}
+	
 	return results
   }
 }

@@ -925,7 +925,7 @@ begin
         when P_DATA_TYPE = 'decimal'                                                   then return 'NUMBER';
         when P_DATA_TYPE = 'numeric'                                                   then return 'NUMBER';
         -- Binary Numbers
-        when P_DATA_TYPE = 'float'                                                     then return 'BINARY_FLOAT';
+        when P_DATA_TYPE = 'float'                                                     then return 'BINARY_DOUBLE';
         -- Text Data Types           
         -- Binary Data types
         when P_DATA_TYPE = 'binary'                                                    then return case when P_DATA_TYPE_LENGTH > C_MAX_RAW_SIZE then 'BLOB' else 'RAW' end;

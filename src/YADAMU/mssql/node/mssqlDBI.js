@@ -998,6 +998,11 @@ class MsSQLDBI extends YadamuDBI {
     } catch (e) {
       this.yadamuRollback = false;
       let newIssue = this.trackExceptions(new MsSQLError(e,stack,'sql.Transaction.rollback()'))
+      if (attemptReconnect && cause.lostConnection()) {
+        attemptReconnect = false;
+        // reconnect() throws cause if it cannot reconnect...
+        await this.reconnect(cause,'ROLLBACK TRANSACTION')
+      }
       this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
     }   
     

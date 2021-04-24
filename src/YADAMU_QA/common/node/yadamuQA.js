@@ -281,17 +281,23 @@ class YadamuQA {
   }
   
   reverseIdentifierMappings(tableMappings) {
-
-    if (tableMappings) {
+	  
+	if (tableMappings) {
       const reverseMappings = {}
       Object.keys(tableMappings).forEach((table) => {
-        const newKey = tableMappings[table].tableName
-        reverseMappings[newKey] = { "tableName" : table};
+        const newKey = tableMappings[table].tableName || table
+		reverseMappings[newKey] = {}
+		if (newKey !== table) {
+          reverseMappings[newKey].tableName = table
+		}
         if (tableMappings[table].columnMappings) {
           const columnMappings = {};
           Object.keys(tableMappings[table].columnMappings).forEach((column) => {
-            const newKey = tableMappings[table].columnMappings[column]
-            columnMappings[newKey] = column;
+			const newKey = tableMappings[table].columnMappings[column].name || column
+			columnMappings[newKey] = {}
+			if (newKey !== column) {
+              columnMappings[newKey].name = column
+			}
           });
           reverseMappings[newKey].columnMappings = columnMappings
         }
@@ -809,6 +815,7 @@ class YadamuQA {
     sourceParameters.MODE = mode;
     compareParameters.MODE = mode;
 
+
     // Clone the Source Schema to the CompareSchema
     
     this.yadamu.MACROS = Object.assign(this.yadamu.MACROS, {
@@ -821,6 +828,10 @@ class YadamuQA {
     , sourceConnection     : sourceConnectionName 
     , targetconnection     : targetConnectionName
     })
+
+    // Do not apply IDENTIFIER MAPPINGS during a 'CLONE' operation
+	
+    delete compareParameters.IDENTIFIER_MAPPING_FILE
     
     let sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
     let compareDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,this.RECREATE_SCHEMA) 
@@ -862,6 +873,8 @@ class YadamuQA {
       sourceParameters.MODE = "DATA_ONLY"
       targetParameters.MODE = "DATA_ONLY"
       compareParameters.MODE = "DATA_ONLY"
+      compareParameters.IDENTIFIER_MAPPING_FILE = parameters.IDENTIFIER_MAPPING_FILE
+
       const targetDescription = this.getDescription(targetDatabase,targetConnectionName,targetParameters,'TO_USER')  
  
       sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)

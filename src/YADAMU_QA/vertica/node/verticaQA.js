@@ -102,7 +102,7 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
     buildColumnLists(schemaColumnInfo,rules) {
 
       // console.log(rules)
-
+	  
       const columnLists = {}
       let tableInfo = undefined
       let tableName = undefined
@@ -117,10 +117,13 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
         }
         
 	    switch (true) {
+		   case columnInfo[3].startsWith('xml') :
+			 columns.push(rules.XML_COMPARISSON_RULE === 'STRIP_XML_DECLARATION' ? `YADAMU.STRIP_XML_DECLARATION("${columnInfo[2]}")` : `"${columnInfo[2]}"`)
+			 break;
            case columnInfo[3].startsWith('char') :
            case columnInfo[3].startsWith('varchar') :
            case columnInfo[3].startsWith('long varchar') :
-	         columns.push(rules.EMPTY_STRING_IS_NULL  ?  `case when "${columnInfo[2]}" = '' then NULL else "${columnInfo[2]}" end` : `"${columnInfo[2]}"`)
+		     columns.push(rules.EMPTY_STRING_IS_NULL ? `case when "${columnInfo[2]}" = '' then NULL else "${columnInfo[2]}" end` : `"${columnInfo[2]}"`)
              break;
 		  case columnInfo[3].startsWith('float') :
 		     columns.push(rules.DOUBLE_PRECISION !== null ? `round("${columnInfo[2]}",${rules.DOUBLE_PRECISION})` : `"${columnInfo[2]}"`)
@@ -172,6 +175,8 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
   (select count(*) from (select ${compareOperations[TABLE_NAME]} from "${target.schema}"."${TABLE_NAME}" except select ${compareOperations[TABLE_NAME]} from "${source.schema}"."${TABLE_NAME}") T2) MISSING_ROWS`;
         return this.executeSQL(sqlStatement);
      }))
+	 
+	 
      
      compareResults.forEach((results,idx) => {
         const compareResult =  results.rows[0]

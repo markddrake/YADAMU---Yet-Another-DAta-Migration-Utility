@@ -68,6 +68,8 @@ class VerticaDBI extends YadamuDBI {
   get YADAMU_STAGING_FOLDER()  { return this.parameters.YADAMU_STAGING_FOLDER || VerticaConstants.YADAMU_STAGING_FOLDER }
   get VERTICA_STAGING_FOLDER() { return this.parameters.VERTICA_STAGING_FOLDER || VerticaConstants.VERTICA_STAGING_FOLDER }
   get STAGING_FILE_RETENTION() { return this.parameters.STAGING_FILE_RETENTION || VerticaConstants.STAGING_FILE_RETENTION }
+  get PRESERVE_WHITESPACE()    { return this.parameters.PRESERVE_WHITESPACE || VerticaConstants.PRESERVE_WHITESPACE }
+  get MERGEOUT_INSERT_COUNT()  { return this.parameters.MERGEOUT_INSERT_COUNT || VerticaConstants.MERGEOUT_INSERT_COUNT }
   get VERTICA_CHAR_SIZE()      { return this.parameters.VERTICA_CHAR_SIZE || VerticaConstants.VERTICA_CHAR_SIZE }
 
   constructor(yadamu) {
@@ -332,7 +334,7 @@ class VerticaDBI extends YadamuDBI {
   
   async commitTransaction() {
 	  
-    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
+    // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],new Error().stack)
 
 	super.commitTransaction()
     await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION);
@@ -540,8 +542,10 @@ class VerticaDBI extends YadamuDBI {
 	switch (dataType.type) {
 	  case 'interval':
 	    return `CAST("${columnInfo[2]}" AS VARCHAR) "${columnInfo[2]}"` 
+	  /*
 	  case 'numeric':
 	    return `CAST("${columnInfo[2]}" AS VARCHAR) "${columnInfo[2]}"` 
+	  */
 	  case 'date':
 		return `TO_CHAR("${columnInfo[2]}",'YYYY-MM-DD"T"HH24:MI:SS"Z"') "${columnInfo[2]}"`
 	  case 'time':

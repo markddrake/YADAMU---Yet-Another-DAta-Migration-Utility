@@ -342,12 +342,15 @@ class StatementGenerator {
                case (dataTypeLength > StatementGenerator.LARGEST_VARBINARY_SIZE_SIZE): return 'blob';
                default:                                                                return 'varbinary';
              }
+           case 'float':                                                               return 'double';
            case 'time':                                                                return dataTypeLength === undefined ? 'time(6)' : 'time';			 
            case 'timetz':                                                              return 'datetime(6)';
            case 'timestamptz':                                                         return 'datetime(6)';
            case 'timestamp':                                                           return 'datetime(6)';
            case 'xml':                                                                 return 'longtext';
            case 'uuid':                                                                return StatementGenerator.UUID_TYPE;
+           case 'geography':                                                          
+           case 'geography':                                                           return 'geometry';     
            default:                                                                    
              if (dataType.indexOf('interval') === 0) {
                return StatementGenerator.INTERVAL_TYPE;

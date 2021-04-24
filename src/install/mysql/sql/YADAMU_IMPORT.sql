@@ -344,6 +344,7 @@ BEGIN
           when P_DATA_TYPE_LENGTH > C_LARGEST_VARBINARY_SIZE    then return 'blob';
                                                                 else return 'varbinary';
 	    end case;
+        when P_DATA_TYPE = 'float'                              then return 'double';
         when P_DATA_TYPE = 'time'                               then return case when P_DATA_TYPE_LENGTH is NULL then 'time(6)' else  'time' end;
         when P_DATA_TYPE = 'timetz'                             then return 'datetime(6)';
         when P_DATA_TYPE = 'timestamptz'                        then return 'datetime(6)';
@@ -351,6 +352,10 @@ BEGIN
         when (instr(P_DATA_TYPE,'INTERVAL') = 1)                then return C_INTERVAL_TYPE;
         when P_DATA_TYPE = 'xml'                                then return C_XML_TYPE;
 	    when P_DATA_TYPE = 'uuid'                               then return C_UUID_TYPE;
+        when P_DATA_TYPE in (
+		 'geography',
+		 'geometry'
+		)                                                       then return 'geometry';
                                                                 else return lower(P_DATA_TYPE);
       end case;       
     when P_SOURCE_VENDOR = 'MongoDB' then

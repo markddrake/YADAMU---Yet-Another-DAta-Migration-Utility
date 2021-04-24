@@ -48,12 +48,12 @@
 			"snowflake": 14
 		},
 		"vertica" : {
-			"oracle"   : 9,
- 			"mssql"    : 9,
-			"postgres" : 9,
-			"mysql"    : 9,
-			"mariadb"  : 9,
-			"vertica"  : 9
+			"oracle"   : 14,
+			"mssql"    : 14,
+			"postgres" : 14,
+			"mysql"    : 14,
+			"mariadb"  : 14,
+			"vertica"  : 14
 		}
 	},
 	"SERIALIZED_JSON": {
@@ -139,7 +139,8 @@
            "oracle": "STRIP_XML_DECLARATION",
 		   "oracle#12.2": "SERIALIZE_AS_BLOB",
 		   "oracle#11.2": "SERIALIZE_AS_BLOB",
-		   "postgres": "STRIP_XML_DECLARATION"
+		   "postgres": "STRIP_XML_DECLARATION",
+		   "vertica": "STRIP_XML_DECLARATION"
 		},
 		"vertica": {
            "mssql": "DECODE_AND_STRIP_DECLARATION"

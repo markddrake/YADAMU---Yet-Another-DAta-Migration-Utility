@@ -14,19 +14,7 @@ class VerticaParser extends YadamuParser {
 	    case 'geography':
 	      return (row,idx) => {
 			row[idx] = Buffer.from(row[idx],'hex')
-		  }
-	    /*
-	    case 'binary':
-        case 'varbinary':
-	    case 'long varbinary':
-	      return (row,idx) => {
-			row[idx] = Buffer.from(row[idx],'hex')
-		  }
-		*/
-	    case 'boolean':
-	      return (row,idx) => {
-			row[idx] = YadamuLibrary.toBoolean(row[idx])
-		  }		
+		  }	
 		case 'interval year to month':
 		  return (row,idx) => {
 			const components = row[idx].split('-');

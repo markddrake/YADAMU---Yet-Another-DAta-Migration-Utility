@@ -27,6 +27,19 @@
       , "connectString"                 : "ORA1120"
       }
     },
+    "mssql14"                           : {
+      "mssql"                           : {  
+        "user"                          : "sa"
+      , "server"                        : "MSSQL14-01"
+      , "database"                      : "master"
+      , "password"                      : "oracle#1"
+      , "requestTimeout"                : 360000000
+      , "options"                       : {
+          "encrypt"                     : false 
+        , "abortTransactionOnError"     : false
+        }
+      }
+    },									   
     "mssql17"                           : {
       "mssql"                           : {  
         "user"                          : "sa"
@@ -100,7 +113,7 @@
         }
       }
     },
-    "snow#1" : {
+    "snow#1"                            : {
       "snowflake"                       : {
   	    "account"                       : "snowflake_account"
       , "username"                      : "snowflake_username"
@@ -110,17 +123,27 @@
 	  , "schema"                        : "PUBLIC"	
       }
     },
+    "vertica#1"                         : {
+      "vertica"                         : {
+	    "user"                          : "dbadmin"
+	  ,	"host"                          : "VERTICA-01"
+	  ,	"database"                      : "docker"
+	  ,	"password"                      : "oracle"
+	  ,	"port"                          : 5433
+      }
+    },
 	"minio#1": {
-		"awsS3": {
-			"accessKeyId": "AKIAIOSFODNN7EXAMPLE",
-			"secretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-			"endpoint": "http://MINIO-01:9000",
-			"s3ForcePathStyle": true,
-			"signatureVersion": "v4",
-			"yadamuProperties" : {
-			  "bucketName" : "Bucket1"
-			, "rootFolder" : "Yadamu"
-			}		}
+	  "awsS3": {
+		"accessKeyId"                   : "AKIAIOSFODNN7EXAMPLE"
+	  ,	"secretAccessKey"               : "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+	  ,	"endpoint"                      : "http://MINIO-01:9000"
+	  ,	"s3ForcePathStyle"              : true
+	  ,	"signatureVersion"              : "v4"
+	  ,	"yadamuProperties"              : {
+		  "bucketName"                  : "Bucket1"
+		, "rootFolder"                  : "Yadamu"
+		}		
+	  }
 	},
 	"azurite#1": {
 		"azure": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://AZURE-01:10000/devstoreaccount1"

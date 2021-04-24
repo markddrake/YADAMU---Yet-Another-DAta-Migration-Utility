@@ -430,7 +430,7 @@ end;`
     return plsqlBlock;
   }
  
-  batchComplete() {
+  flushBatch() {
     return ((this.metrics.cached === this.BATCH_SIZE) || (this.batch.tempLobCount >= this.dbi.BATCH_LOB_COUNT) || (this.batch.cachedLobCount > this.dbi.LOB_CACHE_COUNT))
   }
 
