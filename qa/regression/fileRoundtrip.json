@@ -2,11 +2,10 @@
   "operation"         : "fileRoundtrip"
 , "connections"       : "connections.json"
 , "tasks"             : "tasks.json"
-, "importPath"        : "JSON/%location%"
-, "exportPath"        : "output/%operation%/%connection%/%mode%/%location%"
 , "recreateSchema"    : true
 , "createDirectory"   : true
 , "parameters": {
+	"SOURCE_DIRECTORY" : "stagingArea/export/json/%location%"
   }
 , "tests" : [{
     "source": "file-YADAMU_HOME"
@@ -22,6 +21,9 @@
     , "mariadb#1"
     ]
   , "parser" : "CLARINET"
+  , "parameters": {
+      "TARGET_DIRECTORY" : "longRegress/%operation%/client/%connection%/%location%"
+    }
   , "tasks": [
        "oracle", "mysql", "mssql"
     ]
@@ -37,9 +39,11 @@
     , "mysql#1"
     ]
   , "parser" : "SQL"
-  , "exportPath"                      : "output/%operation%/SQL/%connection%/%mode%/%location%"
+  , "parameters": {
+      "TARGET_DIRECTORY" : "longRegress/%operation%/rdbms/%connection%/%location%"
+    }
   , "tasks": [
-       "oracle", "mysql", "mssql-fileRoundtrip"
+       "oracle", "mysql", "mssql-rdbms"
     ]
   }]
 }

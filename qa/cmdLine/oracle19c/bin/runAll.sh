@@ -1,1 +1,0 @@
-source $(dirname "$(dirname "$(dirname "${BASH_SOURCE[0]}")")")/runCmdTests.sh ${BASH_SOURCE[0]}

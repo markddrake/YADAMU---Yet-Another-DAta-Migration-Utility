@@ -7,10 +7,12 @@
   }
 , "tests"               : [{
     "operation"         : "import"
-  , "source"            : "file-JSON"
+  , "source"            : "file-staging"
   , "target"            : "mongodb#1"
-  , "importPath"        : "%location%"
   , "verifyOperation"   : true
+  , "parameters"        : {
+      "DIRECTORY"       : "export/json/%location%"
+    }                    
   , "tasks": [
       "oracle","mysql","mssql"
     ]

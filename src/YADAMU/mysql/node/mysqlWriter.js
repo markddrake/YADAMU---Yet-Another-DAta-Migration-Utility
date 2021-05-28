@@ -186,7 +186,7 @@ class MySQLWriter extends YadamuWriter {
         if (warning.Level === 'Warning') {
           let nextBadRow = warning.Message.split('row')
           nextBadRow = parseInt(nextBadRow[nextBadRow.length-1])
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode,nextBadRow],`${warning.Code} Details: ${warning.Message}.`)
 		  
 		  // Only write rows to Rejection File in Iterative Mode. 
 		  

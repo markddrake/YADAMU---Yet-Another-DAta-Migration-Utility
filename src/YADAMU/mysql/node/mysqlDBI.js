@@ -58,8 +58,8 @@ class MySQLDBI extends YadamuDBI {
 
   get CASE_SENSITIVE_NAMING()             { return this._CASE_SENSITIVE_NAMING }
   
-  constructor(yadamu) {
-    super(yadamu)
+  constructor(yadamu,settings,parameters) {
+    super(yadamu,settings,parameters)
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
     this.keepAliveHdl = undefined
 	
@@ -135,7 +135,7 @@ class MySQLDBI extends YadamuDBI {
       stack = new Error().stack;
       operation = 'mysql.createPool()'  
       const sqlStartTime = performance.now();
-      this.pool = new mysql.createPool(this.connectionProperties);
+      this.pool = new mysql.createPool(this.vendorProperties);
       this.traceTiming(sqlStartTime,performance.now())
       await this.checkMaxAllowedPacketSize()
     } catch (e) {
@@ -284,19 +284,26 @@ class MySQLDBI extends YadamuDBI {
     })) 
     return ddlResults;
   }
+  
+  setVendorProperties(connectionProperties) {
+	super.setVendorProperties(connectionProperties)
+    this.vendorProperties = Object.assign(
+	  {},
+	  MySQLConstants.CONNECTION_PROPERTY_DEFAULTS,
+	  this.vendorProperties
+    )
+  }	 
 
-  setConnectionProperties(connectionProperties) {
-     super.setConnectionProperties(Object.assign( Object.keys(connectionProperties).length > 0 ? connectionProperties : this.connectionProperties, MySQLConstants.CONNECTION_PROPERTY_DEFAULTS));
-  }
+  updateVendorProperties(vendorProperties) {
 
-  getConnectionProperties() {
-    return Object.assign({
-      host              : this.parameters.HOSTNAME
-    , user              : this.parameters.USERNAME
-    , password          : this.parameters.PASSWORD
-    , database          : this.parameters.DATABASE
-    , port              : this.parameters.PORT
-    },MySQLConstants.CONNECTION_PROPERTY_DEFAULTS);
+    vendorProperties.host              = this.parameters.HOSTNAME || vendorProperties.host
+    vendorProperties.user              = this.parameters.USERNAME || vendorProperties.user 
+    vendorProperties. password         = this.parameters.PASSWORD || vendorProperties. password
+    vendorProperties.database          = this.parameters.DATABASE || vendorProperties.database
+    vendorProperties.port              = this.parameters.PORT     || vendorProperties.port
+    
+	Object.assign(vendorProperties,MySQLConstants.CONNECTION_PROPERTY_DEFAULTS);
+	
   }
   
   /*  
@@ -467,6 +474,8 @@ class MySQLDBI extends YadamuDBI {
   */
  
   async uploadFile(importFilePath) {
+
+	this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
     let results = await this.createStagingTable();
     results = await this.loadStagingTable(importFilePath);
     return results;
@@ -516,14 +525,16 @@ class MySQLDBI extends YadamuDBI {
     return Object.assign(
 	  super.getSystemInformation()
 	, {
-        sessionUser        : sysInfo.SESSION_USER
-      , dbName             : sysInfo.DATABASE_NAME
-      , serverHostName     : sysInfo.SERVER_HOST
-      , databaseVersion    : sysInfo.DATABASE_VERSION
-      , serverVendor       : sysInfo.SERVER_VENDOR_ID
-      , nls_parameters     : {
-          serverCharacterSet   : sysInfo.SERVER_CHARACTER_SET
-        , databaseCharacterSet : sysInfo.DATABASE_CHARACTER_SET
+        sessionUser                 : sysInfo.SESSION_USER
+      , dbName                      : sysInfo.DATABASE_NAME
+      , serverHostName              : sysInfo.SERVER_HOST
+      , databaseVersion             : sysInfo.DATABASE_VERSION
+      , serverVendor                : sysInfo.SERVER_VENDOR_ID
+	  , yadamuInstanceID            : sysInfo.YADAMU_INSTANCE_ID
+	  , yadamuInstallationTimestamp : sysInfo.YADAMU_INSTALLATION_TIMESTAMP
+      , nls_parameters              : {
+          serverCharacterSet        : sysInfo.SERVER_CHARACTER_SET
+        , databaseCharacterSet      : sysInfo.DATABASE_CHARACTER_SET
         }
       }
 	)

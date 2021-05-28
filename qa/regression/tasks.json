@@ -6,7 +6,7 @@
 , "WorldWideImporters"   : [ "WWI_Application", "WWI_Purchasing", "WWI_Sales"]
 , "WorldWideImportersDW" : [ "WWI_Warehouse", "WWI_Dimension", "WWI_Fact", "WWI_Integration"]
 , "mssql"                : [ "Northwind", "AdventureWorks", "AdventureWorksDW", "WorldWideImporters", "WorldWideImportersDW"]
-, "mssql-fileRoundtrip"  : [ "Northwind", "AdventureWorks", "AdventureWorksDW", "AdventureWorksAll"]
+, "mssql-rdbms"          : [ "Northwind", "AdventureWorks", "AdventureWorksDW", "AdventureWorksAll"]
 , "HR"                   : { "vendor": "oracle",   "file" : "HR.json",                "source" : {"schema" : "HR"    }}
 , "SH"                   : { "vendor": "oracle",   "file" : "SH.json",                "source" : {"schema" : "SH"    }}
 , "OE"                   : { "vendor": "oracle",   "file" : "OE.json",                "source" : {"schema" : "OE"    }}
@@ -40,8 +40,8 @@
 , "AdventureWorksDW_AWA" : { "vendor": "mssql",    "file" : "AdventureWorksDW.json",  "source" : {"database": "AdventureWorksAll",    "owner": "dbo"}}
 , "postgresDataTypes"    : { "vendor": "postgres", "file" : "postgresTypes.json",     "source" : {"schema" : "t_postgres" }}
 , "datasetLocation" : {
-    "oracle"    : "oracle19c/DATA_ONLY"
-  , "mssql"     : "mssql19"
+    "oracle"    : "oracle"
+  , "mssql"     : "mssql"
   , "mysql"     : "mysql"
   , "postgres"  : "postgres"
   } 

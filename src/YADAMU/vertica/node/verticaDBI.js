@@ -3,6 +3,7 @@ const fs = require('fs');
 const fsp = require('fs').promises
 const Readable = require('stream').Readable;
 const { performance } = require('perf_hooks');
+const crypto = require('crypto');
 
 const util = require('util')
 const stream = require('stream')
@@ -65,15 +66,12 @@ class VerticaDBI extends YadamuDBI {
   get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT || VerticaConstants.CIRCLE_FORMAT }
   
   get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
-  get YADAMU_STAGING_FOLDER()  { return this.parameters.YADAMU_STAGING_FOLDER || VerticaConstants.YADAMU_STAGING_FOLDER }
-  get VERTICA_STAGING_FOLDER() { return this.parameters.VERTICA_STAGING_FOLDER || VerticaConstants.VERTICA_STAGING_FOLDER }
-  get STAGING_FILE_RETENTION() { return this.parameters.STAGING_FILE_RETENTION || VerticaConstants.STAGING_FILE_RETENTION }
-  get PRESERVE_WHITESPACE()    { return this.parameters.PRESERVE_WHITESPACE || VerticaConstants.PRESERVE_WHITESPACE }
+  get COPY_TRIM_WHITEPSPACE()  { return this.parameters.COPY_TRIM_WHITEPSPACE || VerticaConstants.COPY_TRIM_WHITEPSPACE }
   get MERGEOUT_INSERT_COUNT()  { return this.parameters.MERGEOUT_INSERT_COUNT || VerticaConstants.MERGEOUT_INSERT_COUNT }
   get VERTICA_CHAR_SIZE()      { return this.parameters.VERTICA_CHAR_SIZE || VerticaConstants.VERTICA_CHAR_SIZE }
 
-  constructor(yadamu) {
-    super(yadamu);
+  constructor(yadamu,settings,parameters) {
+    super(yadamu,settings,parameters);
        
     this.pgClient = undefined;
     
@@ -89,6 +87,14 @@ class VerticaDBI extends YadamuDBI {
    
   }
 
+  async copyOperationAvailble(vendor,controlFile) {
+ 
+    if (!VerticaConstants.COPY_OPERATION_SOURCES.includes(vendor)) {
+      throw new YadamuError(`COPY operations not supported between "${vendor}" and "${this.DATABASE_VENDOR}".`)
+	}
+	
+  }
+
   /*
   **
   ** Local methods 
@@ -98,7 +104,7 @@ class VerticaDBI extends YadamuDBI {
   async testConnection(connectionProperties) {   
     super.setConnectionProperties(connectionProperties);
 	try {
-      const pgClient = new Client(this.connectionProperties);
+      const pgClient = new Client(this.vendorProperties);
       await pgClient.connect();
       await pgClient.end();     
 								  
@@ -112,7 +118,7 @@ class VerticaDBI extends YadamuDBI {
 	
     this.logConnectionProperties();
 	let sqlStartTime = performance.now();
-	this.pool = new Pool(this.connectionProperties);
+	this.pool = new Pool(this.vendorProperties);
     this.traceTiming(sqlStartTime,performance.now())
 	
 	this.pool.on('error',(err, p) => {
@@ -153,7 +159,7 @@ class VerticaDBI extends YadamuDBI {
 	try {
 	  operation = 'pg.Client()'
 	  stack = new Error().stack;
-      const pgClient = new Client(this.connectionProperties);
+      const pgClient = new Client(this.vendorProperties);
 					
 	  operation = 'Client.connect()'
 	  stack = new Error().stack;
@@ -234,14 +240,14 @@ class VerticaDBI extends YadamuDBI {
     const results = await this.executeSQL('select now()')
   }
   
-  getConnectionProperties() {
-    return {
-      user      : this.parameters.USERNAME
-     ,host      : this.parameters.HOSTNAME
-     ,database  : this.parameters.DATABASE
-     ,password  : this.parameters.PASSWORD
-     ,port      : this.parameters.PORT
-    }
+  updateVendorProperties(vendorProperties) {
+
+    vendorProperties.user      = this.parameters.USERNAME  || vendorProperties.user
+    vendorProperties.host      = this.parameters.HOSTNAME  || vendorProperties.host
+    vendorProperties.database  = this.parameters.DATABASE  || vendorProperties.database 
+    vendorProperties.password  = this.parameters.PASSWORD  || vendorProperties.password
+    vendorProperties.port      = this.parameters.PORT      || vendorProperties.port   
+
   }
 
   /*  
@@ -293,20 +299,30 @@ class VerticaDBI extends YadamuDBI {
     const stack = new Error().stack
     let result = await this.executeSQL(sqlStatement)
 	
-	const copyResults = `select get_num_accepted_rows(),get_num_rejected_rows ()`
+	const copyResults = `select get_num_accepted_rows(),get_num_rejected_rows()`
     result = await this.executeSQL(copyResults);
-	result = result.rows[0]
-	const failed = result[1];
-	if (failed > 0) {
-        const results = await this.executeSQL(`select row_number, substring(rejected_reason,1, 256), rejected_data_orig_length from "${rejectedRecordsTableName}" where transaction_id = current_trans_id()`);
-	    return results.rows	 
-	}
+	const inserted = parseInt(result.rows[0][0])
+	const rejected = parseInt(result.rows[0][1])
+	let errors = []
+	if (rejected > 0) {
+      const results = await this.executeSQL(`select row_number, substring(rejected_reason,1, 256), rejected_data_orig_length from "${rejectedRecordsTableName}" where transaction_id = current_trans_id()`)
+      errors = results.rows
+    }
 	// await this.executeSQL(`drop table if exists "${rejectedRecordsTableName}"`)
-    return []
+    return {
+	  inserted : inserted
+	, rejected : rejected
+	, errors   : errors
+	}
   }
   
   async initialize() {
     await super.initialize(true);
+  }
+  
+  async initializeImport() {
+	 super.initializeImport()
+	 await fsp.mkdir(this.LOCAL_STAGING_AREA,{recursive: true});
   }
   
   /*
@@ -556,6 +572,7 @@ class VerticaDBI extends YadamuDBI {
 	    return `TO_CHAR("${columnInfo[2]}",'YYYY-MM-DD"T"HH24:MI:SS.FF6TZH:TZM') "${columnInfo[2]}"`
 	  case 'geometry':
 	  case 'geography':
+	    // TODO : Support Text / GeoJSON
 	    return `TO_HEX(ST_AsBinary("${columnInfo[2]}")) "${columnInfo[2]}"` 
 	  default:
 	    return `"${columnInfo[2]}"`
@@ -566,21 +583,6 @@ class VerticaDBI extends YadamuDBI {
   
     // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,tableInfo.TABLE_NAME],'')
     
-    
-	/*
-	**
-	**
-	**
-	
-  
-    process.exit();
-	
-    /*
-    **
-    **	If the previous pipleline operation failed, it appears that the vertica driver will hang when creating a new QueryStream...
-	**
-	*/
-	
 	if (this.failedPrematureClose) {
 	  await this.reconnect(new Error('Previous Pipeline Aborted. Switching database connection'),'INPUT STREAM')
 	}
@@ -663,7 +665,68 @@ class VerticaDBI extends YadamuDBI {
 	const pid = results.rows[0][0];
     return pid
   }
-
+  
+  async reportCopyErrors(tableName,results,stack,statement) {
+	  
+	 const causes = []
+	 let sizeIssue = 0;
+	 results.forEach((r) => {
+	   const err = new Error()
+	   err.stack =  `${stack.slice(0,5)}: ${r[1]}${stack.slice(5)}`
+	   err.recordNumber = r[0]
+	   const columnNameOffset = r[1].indexOf('column: [') + 9
+	   /*
+	   err.columnName = r[1].substring(columnNameOffset,r[1].indexOf(']',columnNameOffset+1))
+	   err.columnIdx = this.metadata.columnNames.indexOf(err.columnName)
+	   err.columnLength = this.maxLengths[err.columnIdx]
+	   err.dataLength = parseInt(r[2])
+	   */
+	   err.tags = []
+	   if (err.dataLength > err.columnLength) {
+		 err.tags.push("CONTENT_TOO_LARGE")
+		 sizeIssue++
+	   }
+  	   causes.push(err)
+	 })
+     const err = new Error(`Vertica COPY Failure: ${results.length} records rejected.`);
+	 err.tags = []
+	 if (causes.length === sizeIssue) {
+	    err.tags.push("CONTENT_TOO_LARGE")
+	 } 
+     err.cause = causes;	 
+	 err.sql = statement;
+	 this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
+  }
+  
+  async copyOperation(tableName,statement) {
+	let startTime 
+    try {
+      const stack = new Error().stack
+  	  const rejectedRecordsTableName = `YRT-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
+      const sqlStatement = `${statement} REJECTED DATA AS TABLE "${rejectedRecordsTableName}"  NO COMMIT`; 	
+	  let startTime = performance.now()
+      const results = await this.insertBatch(sqlStatement,rejectedRecordsTableName);
+	  const elapsedTime = performance.now() - startTime;
+	  if (results.rejected > 0) {
+	    await this.reportCopyErrors(tableName,results.errors,stack,sqlStatement)
+      }
+      await this.commitTransaction();
+	  const writerThroughput = isNaN(elapsedTime) ? 'N/A' : Math.round((results.inserted/elapsedTime) * 1000)
+      const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round(writerThroughput)} rows/s.`
+  	  const rowSummary = results.rejected === 0 ? `Rows ${results.inserted}.` : `Rows ${results.inserted}. Skipped ${results.rejected}.`
+      if (results.rejected > 0) {
+		this.yadamuLogger.error([tableName,'copy'],`${rowSummary} ${writerTimings}`)  
+	  }
+	  else {
+		this.yadamuLogger.info([tableName,'copy'],`${rowSummary} ${writerTimings}`)  
+	  }	  
+	} catch (cause) { 
+	  const elapsedTime = performance.now() - startTime;
+  	  await this.rollbackTransaction(cause);
+	  // await this.reportCopyErrors(batch.copy,`COPY`,cause)
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],cause)
+    } 
+  }
 }
 
 module.exports = VerticaDBI

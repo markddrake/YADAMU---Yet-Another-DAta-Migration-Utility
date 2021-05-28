@@ -48,12 +48,7 @@
 			"snowflake": 14
 		},
 		"vertica" : {
-			"oracle"   : 14,
-			"mssql"    : 14,
-			"postgres" : 14,
-			"mysql"    : 14,
-			"mariadb"  : 14,
-			"vertica"  : 14
+			"default" : 14
 		}
 	},
 	"SERIALIZED_JSON": {

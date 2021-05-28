@@ -52,14 +52,23 @@ class SnowflakeDBI extends YadamuDBI {
   // Enable configuration via command line parameters
 
   get SPATIAL_FORMAT()        { return this.parameters.SPATIAL_FORMAT || SnowflakeConstants.SPATIAL_FORMAT };
-  get XML_TYPE()              { return this.parameters.XML_STORAGE_FORMAT || SnowflakeConstants.XML_TYPE }
+  
+  // SNOWFLAKE XML TYPE can be set to TEXT to avoid multiple XML Fidelity issues with persisting XML data as VARIANT
+  
+  get SNOWFLAKE_XML_TYPE()    { return this.parameters.SNOWFLAKE_XML_TYPE || SnowflakeConstants.SNOWFLAKE_XML_TYPE }
+  get SNOWFLAKE_JSON_TYPE()   { return this.parameters.SNOWFLAKE_JSON_TYPE || SnowflakeConstants.SNOWFLAKE_JSON_TYPE }
 
-  constructor(yadamu) {	  
-    super(yadamu);
+
+  constructor(yadamu,settings,parameters) {	  
+    super(yadamu,settings,parameters);
 	this.StatementLibrary = SnowflakeStatementLibrary
 	this.statementLibrary = undefined
   }
 
+  getSchemaIdentifer(key) {
+	return `${this.parameters.YADAMU_DATABASE}"."${this.parameters[key]}`
+  }  
+  
   /*
   **
   ** Local methods 
@@ -83,7 +92,7 @@ class SnowflakeDBI extends YadamuDBI {
     super.setConnectionProperties(connectionProperties);
 	this.setDatabase();
 	try {
-      let connection = snowflake.createConnection(this.connectionProperties);
+      let connection = snowflake.createConnection(this.vendorProperties);
       connection = await this.establishConnection(connection);
       connection.destroy()
 	  super.setParameters(parameters)
@@ -105,7 +114,7 @@ class SnowflakeDBI extends YadamuDBI {
   	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
     this.setDatabase();
     this.logConnectionProperties();
-    let connection = snowflake.createConnection(this.connectionProperties);
+    let connection = snowflake.createConnection(this.vendorProperties);
     connection = await this.establishConnection(connection);
     const sqlStartTime = performance.now();
     this.traceTiming(sqlStartTime,performance.now())
@@ -124,10 +133,13 @@ class SnowflakeDBI extends YadamuDBI {
     results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[]);    
     this._DB_VERSION = results[0].DATABASE_VERSION
 
-    if ((this.isManager()) && (this.XML_TYPE !== SnowflakeConstants.XML_TYPE )) {
-       this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`${this.DB_VERSION}`,`Configuration`],`XMLType storage model is ${this.XML_TYPE}.`)
+    if ((this.isManager()) && (this.SNOWFLAKE_XML_TYPE !== SnowflakeConstants.SNOWFLAKE_XML_TYPE )) {
+       this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`${this.DB_VERSION}`,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_XML_TYPE}.`)
     }	
 
+    if ((this.isManager()) && (this.SNOWFLAKE_JSON_TYPE !== SnowflakeConstants.SNOWFLAKE_JSON_TYPE )) {
+       this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`${this.DB_VERSION}`,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_JSON_TYPE}.`)
+    }	
 
   }
 
@@ -145,18 +157,17 @@ class SnowflakeDBI extends YadamuDBI {
   	// Snowflake-SDK does not support connection pooling
   }
     
-  getConnectionProperties() {
+  updateVendorProperties(vendorProperties) {
+
 	// Convert supplied parameters to format expected by connection mechansim
 	
-   this.parameters.YADAMU_DATABASE = this.parameters.YADAMU_DATABASE || this.parameters.DATABASE
+    this.parameters.YADAMU_DATABASE = this.parameters.YADAMU_DATABASE || this.parameters.DATABASE
 	
-    return {
-      account           : this.parameters.ACCOUNT
-    , username          : this.parameters.USERNAME
-    , password          : this.parameters.PASSWORD
-	, warehouse         : this.parameters.WAREHOUSE
-    , database          : this.parameters.DATABASE
-    }
+    vendorProperties.account           = this.parameters.ACCOUNT    || vendorProperties.account 
+    vendorProperties.username          = this.parameters.USERNAME   || vendorProperties.username 
+    vendorProperties.password          = this.parameters.PASSWORD   || vendorProperties.password  
+    vendorProperties.warehouse         = this.parameters.WAREHOUSE  || vendorProperties.warehouse
+    vendorProperties.database          = this.parameters.DATABASE   || vendorProperties.database   
      
   }
 
@@ -217,8 +228,8 @@ class SnowflakeDBI extends YadamuDBI {
   }
 
   setDatabase() {  
-    if ((this.parameters.YADAMU_DATABASE) && (this.parameters.YADAMU_DATABASE !== this.connectionProperties.database)) {
-      this.connectionProperties.database = this.parameters.YADAMU_DATABASE
+    if ((this.parameters.YADAMU_DATABASE) && (this.parameters.YADAMU_DATABASE !== this.vendorProperties.database)) {
+      this.vendorProperties.database = this.parameters.YADAMU_DATABASE
     }
   }  
   

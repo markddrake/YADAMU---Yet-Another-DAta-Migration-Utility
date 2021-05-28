@@ -10,6 +10,7 @@ class AzureConstants {
   static get DATABASE_KEY()               { return 'azure' };
   static get DATABASE_VENDOR()            { return 'AzureBlobStorage' };
   static get SOFTWARE_VENDOR()            { return 'Microsoft Corporation' };
+  static get PROTOCOL()                   { return 'azure://' };
 
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
@@ -26,8 +27,6 @@ class AzureConstants {
     return this.#_DBI_PARAMETERS
   }
   
-  static get AZURITE_CONNECT_STRNG()      { `DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://192.168.1.250:10000/devstoreaccount1;` }
-
   static get CONTAINER()                  { return this.DBI_PARAMETERS.CONTAINER }
   static get CHUNK_SIZE()                 { return this.DBI_PARAMETERS.CHUNK_SIZE }
 

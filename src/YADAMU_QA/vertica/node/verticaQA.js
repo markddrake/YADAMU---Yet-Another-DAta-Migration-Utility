@@ -57,8 +57,8 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
 `
     }
     
-    constructor(yadamu) {
-       super(yadamu);
+    constructor(yadamu,settings,parameters) {
+       super(yadamu,settings,parameters);
     }
     
     setMetadata(metadata) {
@@ -143,7 +143,7 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
     }
 
     async compareSchemas(source,target,rules) {
-
+		
       const report = {
         successful : []
        ,failed     : []
@@ -177,7 +177,6 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
      }))
 	 
 	 
-     
      compareResults.forEach((results,idx) => {
         const compareResult =  results.rows[0]
         if ((parseInt(compareResult[1]) === parseInt(compareResult[2])) && (parseInt(compareResult[3]) === 0) && (parseInt(compareResult[4])  === 0)) {

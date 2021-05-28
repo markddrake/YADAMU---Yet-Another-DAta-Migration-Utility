@@ -496,6 +496,7 @@ begin
 
   declare @EMPTY_STRING_IS_NULL BIT           = case when JSON_VALUE(@RULES,'$.emptyStringIsNull') = 'true' then 1 else 0 end;
   declare @TIMESTAMP_PRECISION  INT           = JSON_VALUE(@RULES,'$.timestampPrecision'); 
+                                                                   
   declare @SPATIAL_PRECISION    INT           = JSON_VALUE(@RULES,'$.spatialPrecision');
   declare @DOUBLE_PRECISION     INT           = JSON_VALUE(@RULES,'$.doublePrecision');
   declare @ORDRED_JSON          BIT           = case when JSON_VALUE(@RULES,'$.orderedJSON') = 'true' then 1 else 0 end;;

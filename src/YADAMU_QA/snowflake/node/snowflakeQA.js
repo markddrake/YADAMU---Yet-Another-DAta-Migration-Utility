@@ -22,8 +22,8 @@ class SnowflakeQA extends SnowflakeDBI {
       return SnowflakeQA.YADAMU_DBI_PARAMETERS
     }	
 		
-    constructor(yadamu) {
-       super(yadamu)
+    constructor(yadamu,settings,parameters) {
+       super(yadamu,settings,parameters)
     }
     
 	setMetadata(metadata) {
@@ -43,11 +43,11 @@ class SnowflakeQA extends SnowflakeDBI {
 
     async recreateSchema() {
         
-      const database = this.connectionProperties.database;
+      const database = this.vendorProperties.database;
       const YADAMU_DATABASE = this.parameters.YADAMU_DATABASE;
       delete this.parameters.YADAMU_DATABASE;
       
-      this.connectionProperties.database = '';
+      this.vendorProperties.database = '';
       await this.createConnectionPool(); 
       this.connection = await this.getConnectionFromPool();
         
@@ -72,7 +72,7 @@ class SnowflakeQA extends SnowflakeDBI {
       
       await this.finalize()
       this.parameters.YADAMU_DATABASE = YADAMU_DATABASE
-      this.connectionProperties.database = database;
+      this.vendorProperties.database = database;
     }   
 
     async getRowCounts(target) {

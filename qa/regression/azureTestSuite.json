@@ -1,79 +1,80 @@
 {
-  "operation"         : "dbRoundTrip"
-, "connections"       : "connections.json"
-, "tasks"             : "tasks.json"
-, "recreateSchema"    : true
-, "parameters": {
-    "ROOT_FOLDER"     : "yadamu/RTS/%sourceConnection%/%mode%"
-  }
-, "tests"             : [{
-    "operation"       : "import"
-  , "source"          : "file-JSON"
-  , "target"          : "azurite#1"
-  , "importPath"      : "%location%"
-  , "parameters"      : {
-      "ROOT_FOLDER"   : "yadamu/RTS"
-	}
+  "operation"            : "dbRoundTrip"
+, "connections"          : "connections.json"
+, "tasks"                : "tasks.json"
+, "recreateSchema"       : true
+, "parameters"           : {
+     "DIRECTORY"         : "longRegress/%operation%/json/%sourceConnection%"
+   }                    
+, "tests"                : [{
+    "operation"          : "import"
+  , "source"             : "file-staging"
+  , "target"             : "azurite#1"
+  , "verifyOperation"    : true
+  , "parameters"         : {
+      "SOURCE_DIRECTORY" : "export/json/%location%"
+    , "TARGET_DIRECTORY" : "stagingArea/json"
+    }                    
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "oracle19c"
-  , "target"          : "azurite#1"
+    "source"             : "oracle19c"
+  , "target"             : "azurite#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "oracle18c"
-  , "target"          : "azurite#1"
+    "source"             : "oracle18c"
+  , "target"             : "azurite#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "oracle12c"
-  , "target"          : "azurite#1"
+    "source"             : "oracle12c"
+  , "target"             : "azurite#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "oracle11g"
-  , "target"          : "azurite#1"
+    "source"             : "oracle11g"
+  , "target"             : "azurite#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "mssql17"
-  , "target"          : "azurite#1"
+    "source"             : "mssql17"
+  , "target"             : "azurite#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "mssql19"
-  , "target"          : "azurite#1"
+    "source"             : "mssql19"
+  , "target"             : "azurite#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "postgres#1"
-  , "target"          : "azurite#1"
+    "source"             : "postgres#1"
+  , "target"             : "azurite#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "mysql#1"
-  , "target"          : "azurite#1"
+    "source"             : "mysql#1"
+  , "target"             : "azurite#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "mariadb#1"
-  , "target"          : "azurite#1"
+    "source"             : "mariadb#1"
+  , "target"             : "azurite#1"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "mongodb#1"
-  , "target"          : "azurite#1"
+    "source"             : "mongodb#1"
+  , "target"             : "azurite#1"
   , "parameters" : {
       "MONGO_STRIP_ID": false
 	}
@@ -81,50 +82,73 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "azurite#1"
+    "source"             : "azurite#1"
   , "targets": [
 	  "oracle19c","oracle18c","oracle12c","oracle11g"
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "yadamu/RTS"
+      "SOURCE_DIRECTORY" : "stagingArea/json"
+    , "TARGET_DIRECTORY" : "longRegress/%operation%/copy-json/%targetConnection%"
 	}
   , "tasks": [ 
       "oracle"
 	]
   },{
-    "source"          : "azurite#1"
+    "source"             : "azurite#1"
   , "targets": [
 	   "mssql17","mssql19"
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "yadamu/RTS"
+      "SOURCE_DIRECTORY" : "stagingArea/json"
+    , "TARGET_DIRECTORY" : "longRegress/%operation%/copy-json/%targetConnection%"
 	}
   , "tasks": [ 
       "mssql"
 	]
   },{
-    "source"          : "azurite#1"
+    "source"             : "azurite#1"
   , "targets": [
 	  "mysql#1","mariadb#1"
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "yadamu/RTS"
+      "SOURCE_DIRECTORY" : "stagingArea/json"
+    , "TARGET_DIRECTORY" : "longRegress/%operation%/copy-json/%targetConnection%"
 	}
   , "tasks": [ 
       "mysql"
 	]
   },{
-    "source"          : "mssql19"
-  , "target"          : "azurite#1"
-  , "parameters" : {
-      "ROOT_FOLDER"   : "yadamu/RTS/zip/%sourceConnection%/%mode%"
-	, "COMPRESSION"   : "GZIP"
-	}
+    "source"             : "oracle19c"
+  , "target"             : "azurite#1"
+  , "parameters"         : {
+      "DIRECTORY"        : "longRegress/%operation%/gzip-json/%sourceConnection%"
+	, "COMPRESSION"      : "GZIP"
+	}                  
   , "tasks": [ 
-      "HR","sakila","Northwind","WWI_Warehouse"
+      "HR","BI"
+	]
+  },{
+    "source"             : "mssql19"
+  , "target"             : "azurite#1"
+  , "parameters"         : {
+      "DIRECTORY"        : "longRegress/%operation%/gzip-json/%sourceConnection%"
+	, "COMPRESSION"      : "GZIP"
+	}                  
+  , "tasks": [ 
+      "Northwind","WWI_Warehouse"
+	]
+  },{
+    "source"             : "mysql#1"
+  , "target"             : "azurite#1"
+  , "parameters"         : {
+      "DIRECTORY"        : "longRegress/%operation%/gzip-json/%sourceConnection%"
+	, "COMPRESSION"      : "GZIP"
+	}                  
+  , "tasks": [ 
+      "sakila"
 	]
   }]
 }

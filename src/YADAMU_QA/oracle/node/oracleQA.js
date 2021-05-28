@@ -27,8 +27,8 @@ class OracleQA extends OracleDBI {
       return OracleQA.YADAMU_DBI_PARAMETERS
     }	
 	
-    constructor(yadamu) {
-       super(yadamu)
+    constructor(yadamu,settings,parameters) {
+       super(yadamu,settings,parameters)
     }
 
     setMetadata(metadata) {
@@ -58,7 +58,7 @@ class OracleQA extends OracleDBI {
           throw e;
         }
       }
-      const createUser = `grant connect, resource, unlimited tablespace to "${this.parameters.TO_USER}" identified by ${this.connectionProperties.password}`;
+      const createUser = `grant connect, resource, unlimited tablespace to "${this.parameters.TO_USER}" identified by ${this.vendorProperties.password}`;
       await this.executeSQL(createUser,{});      
     }  
 

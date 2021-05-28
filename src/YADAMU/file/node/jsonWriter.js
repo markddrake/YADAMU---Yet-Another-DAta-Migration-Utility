@@ -156,7 +156,7 @@ class JSONWriter extends YadamuWriter {
 		
   setTableInfo(tableName) {
 	super.setTableInfo(tableName)
-    this.insertMode = 'JSON';    
+    this.tableInfo.insertMode = 'JSON';    
     if (this.dbi.tableMappings && this.dbi.tableMappings.hasOwnProperty(tableName)) {
 	  tableName = this.dbi.tableMappings[tableName].tableName
 	}

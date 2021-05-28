@@ -76,8 +76,8 @@ class MsSQLDBI extends YadamuDBI {
   get TRANSACTION_IN_PROGRESS()       { return super.TRANSACTION_IN_PROGRESS ||this.tediousTransactionError  }
   set TRANSACTION_IN_PROGRESS(v)      { super.TRANSACTION_IN_PROGRESS = v }
 
-  constructor(yadamu) {
-    super(yadamu);
+  constructor(yadamu,settings,parameters) {
+    super(yadamu,settings,parameters);
     this.requestProvider = undefined;
     this.transaction = undefined;
     this.pool = undefined;
@@ -97,6 +97,10 @@ class MsSQLDBI extends YadamuDBI {
 	        
   }
   
+  getSchemaIdentifer(key) {
+	return `${this.parameters.YADAMU_DATABASE}"."${this.parameters[key]}`
+  }  
+  
   /*
   **
   ** Local methods 
@@ -107,7 +111,7 @@ class MsSQLDBI extends YadamuDBI {
     try {
       this.setConnectionProperties(connectionProperties);
       this.setTargetDatabase();
-      const connection = await sql.connect(this.connectionProperties);
+      const connection = await sql.connect(this.vendorProperties);
       await sql.close();
       super.setParameters(parameters)
     } catch (e) {
@@ -143,8 +147,8 @@ class MsSQLDBI extends YadamuDBI {
   }
   
   setTargetDatabase() {  
-    if ((this.parameters.YADAMU_DATABASE) && (this.parameters.YADAMU_DATABASE !== this.connectionProperties.database)) {
-      this.connectionProperties.database = this.parameters.YADAMU_DATABASE
+    if ((this.parameters.YADAMU_DATABASE) && (this.parameters.YADAMU_DATABASE !== this.vendorProperties.database)) {
+      this.vendorProperties.database = this.parameters.YADAMU_DATABASE
     }
   }
   
@@ -404,7 +408,7 @@ class MsSQLDBI extends YadamuDBI {
       const sqlStartTime = performance.now();
       stack = new Error().stack;
       operation = 'sql.connectionPool()'
-      this.pool = new sql.ConnectionPool(this.connectionProperties)
+      this.pool = new sql.ConnectionPool(this.vendorProperties)
       this.pool.on('error',(err, p) => {
         const cause = err instanceof MsSQLError ? err : this.trackExceptions(new MsSQLError(err,stack,`${operation}.onError()`))
         if (!cause.suppressedError())  {
@@ -434,7 +438,7 @@ class MsSQLDBI extends YadamuDBI {
       // this.yadamuLogger.trace(this.DATABASE_VENDOR,this.getWorkerNumber()],`_getDatabaseConnection()`)
       await this.createConnectionPool();
     } catch (e) {
-      const err = new ConnectionError(e,this.connectionProperties);
+      const err = new ConnectionError(e,this.vendorProperties);
       throw err
     }
   } 
@@ -536,19 +540,17 @@ class MsSQLDBI extends YadamuDBI {
     this.transaction = this.getTransactionManager()
   }
   
-  
-  
-  setConnectionProperties(connectionProperties) {
-    if (Object.getOwnPropertyNames(connectionProperties).length > 0) {    
-      if (!connectionProperties.options) {
-        connectionProperties.options = {}
+  setVendorProperties(connectionSettings) {
+    super.setVendorProperties(connectionSettings) 
+    if (this.vendorProperties) {
+	  if (!this.vendorProperties.hasOwnProperty("options")) {    
+        this.vendorProperties.options = {}
       }
-      connectionProperties.options.abortTransactionOnError = false
-      connectionProperties.options.enableArithAbort = true;
+      this.vendorProperties.options.abortTransactionOnError = false
+      this.vendorProperties.options.enableArithAbort = true;
     }
-    super.setConnectionProperties(connectionProperties)
   }
-  
+   
   async executeBatch(sqlStatment) {
 
     let stack
@@ -831,20 +833,25 @@ class MsSQLDBI extends YadamuDBI {
 	this.statementLibrary = new this.StatementLibrary(this)
   }    
 
-  getConnectionProperties() {
-    return {
-      server          : this.parameters.HOSTNAME
-    , user            : this.parameters.USERNAME
-    , database        : this.parameters.DATABASE
-    , password        : this.parameters.PASSWORD
-    , port            : parseInt(this.parameters.PORT)
-    , requestTimeout  : 2 * 60 * 60 * 10000
-    , options         : {
-        encrypt: false // Use this if you're on Windows Azure
-      , abortTransactionOnError : false
-      , enableArithAbort : true
-      }
+  updateVendorProperties(vendorProperties) {
+
+    vendorProperties.server          = this.parameters.HOSTNAME        || vendorProperties.server 
+    vendorProperties.user            = this.parameters.USERNAME        || vendorProperties.user
+    vendorProperties.database        = this.parameters.DATABASE        || vendorProperties.database    
+    vendorProperties.password        = this.parameters.PASSWORD        || vendorProperties.password    
+    vendorProperties.port            = parseInt(this.parameters.PORT)  || vendorProperties.port
+    vendorProperties.requestTimeout  = 2 * 60 * 60 * 10000
+    vendorProperties.options         = {
+      encrypt                        : false // Use this if you're on Windows Azure
+    , abortTransactionOnError        : false
+    , enableArithAbort               : true
     }
+	
+	// MsSQL does not fallback to the default port if port is undefined
+	
+	if (vendorProperties.port === undefined) {
+	  delete vendorProperties.port
+	}
   }
       
   /*
@@ -1051,7 +1058,9 @@ class MsSQLDBI extends YadamuDBI {
   */
   
   async uploadFile(importFilePath) {
-    
+
+	this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
+         
     const stagingTable = new StagingTable(this,MsSQLConstants.STAGING_TABLE,importFilePath,this.status); 
     let results = await stagingTable.uploadFile()
     // results = await this.verifyDataLoad(this.generateRequest(),MsSQLConstants.STAGING_TABLE);
@@ -1175,7 +1184,7 @@ class MsSQLDBI extends YadamuDBI {
   async generateStatementCache(schema) {
     /* ### OVERRIDE ### Pass additional parameter Database Name */
     const statementGenerator = new this.StatementGenerator(this, schema, this.metadata ,this.yadamuLogger);
-    this.statementCache = await statementGenerator.generateStatementCache(this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.connectionProperties.database)
+    this.statementCache = await statementGenerator.generateStatementCache(this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.vendorProperties.database)
 	return this.statementCache
   }
 

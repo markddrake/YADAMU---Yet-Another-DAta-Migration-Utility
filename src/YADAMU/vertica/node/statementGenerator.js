@@ -50,7 +50,7 @@ class StatementGenerator {
   static get C_UNTYPED_INTERVAL_TYPE() { return 'varchar(16)';    }
 
   static get UNBOUNDED_TYPES() { 
-  StatementGenerator._UNBOUNDED_TYPES = StatementGenerator._UNBOUNDED_TYPES || Object.freeze(['date','time','datetime','timestamp','time with timezone','timestamp with timezone','float','int','tinyint','smallint','bigint','geometry','geography'])
+  StatementGenerator._UNBOUNDED_TYPES = StatementGenerator._UNBOUNDED_TYPES || Object.freeze(['date','time','datetime','timestamp','time with timezone','timestamp with timezone','float','int','tinyint','smallint','bigint','geometry','geography','interval day to second','interval year to month'])
     return StatementGenerator._UNBOUNDED_TYPES;
   }
 
@@ -103,11 +103,11 @@ class StatementGenerator {
            case 'BOOLEAN':                                                               return 'boolean'
            default :
 		     switch (true) {
-               case (dataType.indexOf('interval') > -1):
+               case (dataType.indexOf('INTERVAL') > -1):
    		         switch (true) {
-                   case (dataType.indexOf('year') > -1):                                return 'interval day to second';
-                   case (dataType.indexOf('day') > -1):                                 return 'interval year to month';
-				   default:                                                             return 'interval day to second';
+                   case (dataType.indexOf('YEAR') > -1):                                 return 'interval year to month';
+                   case (dataType.indexOf('DAY') > -1):                                  return 'interval day to second';
+				   default:                                                              return 'interval year to month';
 				 }                                                           
 			   case (dataType.indexOf('TIME ZONE') > -1):                                return 'datetime'; 
                case (dataType.indexOf('XMLTYPE') > -1):                                  return StatementGenerator.XML_TYPE;
@@ -327,7 +327,7 @@ class StatementGenerator {
 		   case "decimal":              		                                       return StatementGenerator.MONGO_DECIMAL_TYPE;
 		   case "binData":             		                                           return StatementGenerator.BLOB_TYPE;
 		   case "bool":                                                                return 'boolean';
-		   case "date":                                                                return 'datatime';
+		   case "date":                                                                return 'datetime';
 		   case "timestamp":		                                                   return 'datetime';
 		   case "objectId":            		                                           return StatementGenerator.MONGO_OBJECT_ID
 		   case "json":                                                            
@@ -399,10 +399,11 @@ class StatementGenerator {
     const copyColumnList = [];
 	const insertOperators =[]
 
-	const columnClauses = columnNames.map((columnName,idx) => {
+    const columnClauses = columnNames.map((columnName,idx) => {
 	  const column_suffix = String(idx+1).padStart(3,"0");
 	 
 	  const dataType = YadamuLibrary.composeDataType(dataTypes[idx],sizeConstraints[idx])       
+	  
 	  let targetDataType = this.mapForeignDataType(tableMetadata.vendor,dataType.type,dataType.length,dataType.scale)
 	  targetDataTypes.push(targetDataType)
 	  
@@ -413,7 +414,6 @@ class StatementGenerator {
         // case 'char':
 		case 'varchar':
 		case 'long varchar':
-		  
 		  targetLength = tableMetadata.vendor === 'Vertica' ? targetLength : Math.ceil(targetLength * this.dbi.VERTICA_CHAR_SIZE);
 		  if (targetLength > StatementGenerator.LARGEST_VARCHAR_SIZE) {
 			targetDataType = 'long varchar';
@@ -423,7 +423,6 @@ class StatementGenerator {
 		  }
 		  sizeConstraints[idx] = targetLength
       }		
-	  
       const typeInfo = targetDataType.split('(')
 	  const targetType = typeInfo[0].toUpperCase()
 	  switch (targetType) {		
@@ -460,17 +459,63 @@ class StatementGenerator {
 		    break;
 		  }
 	    case 'GEOMETRY':
-		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(65000), "${columnName}" as ST_GeomFromText("YADAMU_COL_${column_suffix}")`
-	  	  insertOperators[idx] = { 
-			prefix  : 'ST_GeomFromText('
-		  , suffix  : ')'
+		  switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+			case 'WKT':
+			case 'EWKT':
+            case 'GeoJSON':
+    		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(65000), "${columnName}" as ST_GeomFromText("YADAMU_COL_${column_suffix}")`
+	  	      insertOperators[idx] = { 
+    			prefix  : '('
+	    	  , suffix  : ')'
+		      }
+		      break;
+			case 'WKB':
+			case 'EWKB':
+		      copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(65000), "${columnName}" as ST_GeomFromWKB(HEX_TO_BINARY("YADAMU_COL_${column_suffix}"))`
+	  	      insertOperators[idx] = { 
+   			    prefix  : 'ST_GeomFromWKB(HEX_TO_BINARY('
+		      , suffix  : '))'
+		      }
+		      break;
+			/*
+            case 'GeoJSON':
+		      copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(65000), "${columnName}" as ST_GeomFromGeoJSON("YADAMU_COL_${column_suffix}")`
+	  	      insertOperators[idx] = { 
+   			    prefix  : 'ST_GeomFromGeoJSON('
+		      , suffix  : ')'
+		      }
+		      break;
+			*/
 		  }
 		  break;
 	    case 'GEOGRAPHY':
-		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(65000), "${columnName}" as ST_GeographyFromText("YADAMU_COL_${column_suffix}")`
-	  	  insertOperators[idx] = { 
-			prefix  : 'ST_GeographyFromText('
-		  , suffix  : ')'
+		  switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+			case 'WKT':
+			case 'EWKT':
+            case 'GeoJSON':
+		      copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(65000), "${columnName}" as ST_GeographyFromText("YADAMU_COL_${column_suffix}")`
+	  	      insertOperators[idx] = { 
+   			    prefix  : 'ST_GeographyFromText('
+		      , suffix  : ')'
+		      }
+		      break;
+			case 'WKB':
+			case 'EWKB':
+		      copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(65000), "${columnName}" as ST_GeographyFromWKB(HEX_TO_BINARY("YADAMU_COL_${column_suffix}"))`
+	  	      insertOperators[idx] = { 
+   			    prefix  : 'ST_GeographyFromWKB(HEX_TO_BINARY('
+		      , suffix  : '))'
+		      }
+		      break;
+			/*
+            case 'GeoJSON':
+		      copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(65000), "${columnName}" as ST_GeographyFromGeoJSON("YADAMU_COL_${column_suffix}")`
+	  	      insertOperators[idx] = { 
+   			    prefix  : 'ST_GeographyFromGeoJSON('
+		      , suffix  : ')'
+		      }
+		      break;
+			*/
 		  }
 		  break;
 		case 'TIME':
@@ -685,8 +730,12 @@ class StatementGenerator {
    	      sizeConstraints[idx] = `${this.TABLE_LOB_SIZE}`
 	    }
         if (columnClauses[idx].indexOf(`" ${StatementGenerator.BLOB_TYPE}`) > 0) {
+   	      const column_suffix = String(idx+1).padStart(3,"0");
+		  // Vertica 10.x Raises out of Memory if copy buffer is > 32M
+		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER long varchar(${this.TABLE_LOB_SIZE}), "${columnNames[idx]}" as YADAMU.LONG_HEX_TO_BINARY("YADAMU_COL_${column_suffix}")`	
+		  // copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER long varchar(${this.TABLE_LOB_SIZE > 16000000 ? StatementGenerator.LARGEST_LOB_SIZE : (this.TABLE_LOB_SIZE * 2)}), "${columnNames[idx]}" as YADAMU.LONG_HEX_TO_BINARY("YADAMU_COL_${column_suffix}")`	
   		  columnClauses[idx] = `"${columnNames[idx]}" ${this.BLOB_TYPE}`;
-   	      sizeConstraints[idx] = `${this.TABLE_LOB_SIZE}`
+   	      sizeConstraints[idx] = `${this.TABLE_LOB_SIZE}` 
 	    }		
 		if (YadamuLibrary.isJSON(tableMetadata.dataTypes[idx])) {
 		  columnClauses[idx] = `${tableMetadata.columnNames[idx]} ${this.CLOB_TYPE} check(YADAMU.IS_JSON("${tableMetadata.columnNames[idx]}"))`
@@ -698,16 +747,15 @@ class StatementGenerator {
 	}
 
 	const stagingFile     =  `YST-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
-	const localPath       =  path.resolve(path.join(this.dbi.YADAMU_STAGING_FOLDER,stagingFile)); 
-	const remotePath      =  path.join(this.dbi.VERTICA_STAGING_FOLDER,stagingFile).split(path.sep).join(path.posix.sep); 
+	const localPath       =  path.resolve(path.join(this.dbi.LOCAL_STAGING_AREA,stagingFile)); 
+	const remotePath      =  tableMetadata.dataFile || path.join(this.dbi.REMOTE_STAGING_AREA,stagingFile).split(path.sep).join(path.posix.sep); 
 	
     const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
     const insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values `;
-	const copyStatement   = `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath}' PARSER fcsvparser(type='rfc4180', header=false, trim=false) NULL ''`
+	const copyStatement   = `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath}' PARSER fcsvparser(type='rfc4180', header=false, trim=${this.dbi.COPY_TRIM_WHITEPSPACE===true}) NULL ''`
 	const mergeoutStatement = `select do_tm_task('mergeout','${this.targetSchema}.${tableMetadata.tableName}')`
 
-    
-	return { 
+    return { 
        ddl             : createStatement, 
        dml             : insertStatement, 
 	   copy            : copyStatement,
@@ -720,7 +768,9 @@ class StatementGenerator {
        insertMode      : insertMode,
        _BATCH_SIZE     : this.dbi.BATCH_SIZE,
        _COMMIT_COUNT   : this.dbi.COMMIT_COUNT,
-       _SPATIAL_FORMAT : this.dbi.INBOUND_SPATIAL_FORMAT
+       _SPATIAL_FORMAT : this.dbi.INBOUND_SPATIAL_FORMAT,
+	   _SCHEMA_NAME    : this.targetSchema,
+	   _TABLE_NAME     : tableMetadata.tableName
     }
   }
   

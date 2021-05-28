@@ -38,13 +38,16 @@ class YadamuDBI {
   get PASSWORD_KEY_NAME()          { return 'password' };
   get STATEMENT_TERMINATOR()       { return '' }
 
-  get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT      || DBIConstants.SPATIAL_FORMAT };
-  get TABLE_MAX_ERRORS()           { return this.parameters.TABLE_MAX_ERRORS    || DBIConstants.TABLE_MAX_ERRORS };
-  get TOTAL_MAX_ERRORS()           { return this.parameters.TOTAL_MAX_ERRORS    || DBIConstants.TOTAL_MAX_ERRORS };
-  get COMMIT_RATIO()               { return this.parameters.COMMIT_RATIO        || DBIConstants.COMMIT_RATIO };
-  get MODE()                       { return this.parameters.MODE                || DBIConstants.MODE }
-  get ON_ERROR()                   { return this.parameters.ON_ERROR            || DBIConstants.ON_ERROR }
-  get INFINITY_MANAGEMENT()        { return this.parameters.INFINITY_MANAGEMENT || DBIConstants.INFINITY_MANAGEMENT };
+  get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT         || DBIConstants.SPATIAL_FORMAT };
+  get TABLE_MAX_ERRORS()           { return this.parameters.TABLE_MAX_ERRORS       || DBIConstants.TABLE_MAX_ERRORS };
+  get TOTAL_MAX_ERRORS()           { return this.parameters.TOTAL_MAX_ERRORS       || DBIConstants.TOTAL_MAX_ERRORS };
+  get COMMIT_RATIO()               { return this.parameters.COMMIT_RATIO           || DBIConstants.COMMIT_RATIO };
+  get MODE()                       { return this.parameters.MODE                   || DBIConstants.MODE }
+  get ON_ERROR()                   { return this.parameters.ON_ERROR               || DBIConstants.ON_ERROR }
+  get INFINITY_MANAGEMENT()        { return this.parameters.INFINITY_MANAGEMENT    || DBIConstants.INFINITY_MANAGEMENT };
+  get LOCAL_STAGING_AREA()         { return this.parameters.LOCAL_STAGING_AREA     || DBIConstants.LOCAL_STAGING_AREA }
+  get REMOTE_STAGING_AREA()        { return this.parameters.REMOTE_STAGING_AREA    || DBIConstants.REMOTE_STAGING_AREA }
+  get STAGING_FILE_RETENTION()     { return this.parameters.STAGING_FILE_RETENTION || DBIConstants.STAGING_FILE_RETENTION }
   get RETRY_COUNT()                { return 3 }
 
   get BATCH_SIZE() {
@@ -95,6 +98,9 @@ class YadamuDBI {
 
   get ATTEMPT_RECONNECTION()          { return !this.RECONNECT_IN_PROGRESS }
 
+  get SOURCE_DIRECTORY()              { return this.parameters.SOURCE_DIRECTORY || this.parameters.DIRECTORY }
+  get TARGET_DIRECTORY()              { return this.parameters.TARGET_DIRECTORY || this.parameters.DIRECTORY }
+
   // Not available until configureConnection() has been called 
 
   get DB_VERSION()                    { return this._DB_VERSION }
@@ -115,13 +121,45 @@ class YadamuDBI {
     })();
     return this._TABLE_FILTER
   }
-		
-  get TABLE_MATCHING()                { return this.parameters.TABLE_MATCHING }
+  
+  get UPLOAD_FILE()                     {
 
-  constructor(yadamu,parameters) {
+    /*
+	**
+	** Rules for File Location are as follows
+	**
+	
+	Parameter FILE is absolute: FILE
+    OTHERWISE: 
+	
+	  Parameter DIRECTORY is not supplied: conn:directory/FILE
+	  OTHERWISE
+    
+        Paramter DIRECTORY is absolute: DIRECTORY/FILE
+	    OTHERWISE: conn:directory/DIRECTORY/FILE
+	
+	**
+	*/
+	
+    return this._UPLOAD_FILE || (() => {
+	  let file =  this.parameters.FILE || 'yadamu.json'
+	  if (!path.isAbsolute(file)) {
+   	    file = path.join(this.SOURCE_DIRECTORY,file)
+	  }
+	  file = YadamuLibrary.macroSubstitions(file,this.yadamu.MACROS)
+	  this._UPLOAD_FILE = path.resolve(file)
+	  return this._UPLOAD_FILE
+    })()
+  }		
+  get TABLE_MATCHING()                { return this.parameters.TABLE_MATCHING }
+  
+  get DESCRIPTION()                   { return this._DESCRIPTION }
+  set DESCRIPTION(v)                  { this._DESCRIPTION = v }
+
+  constructor(yadamu,settings,parameters) {
     
     this.options = {
-      recreateTargetSchema : false
+      recreateSchema : false
     }
     
     this._DB_VERSION = 'N/A'    
@@ -130,10 +168,11 @@ class YadamuDBI {
     this.sqlTraceTag = '';
     this.status = yadamu.STATUS
     this.yadamuLogger = yadamu.LOGGER;
-    this.initializeParameters(parameters);
-    this.systemInformation = undefined;
+	this.setConnectionProperties(settings || {})
+	this.initializeParameters(parameters || {});
+    this.vendorProperties = this.getVendorProperties()   
+	this.systemInformation = undefined;
     this.metadata = undefined;
-    this.connectionProperties = this.getConnectionProperties()   
     this.connection = undefined;
 	
     this.statementCache = undefined;
@@ -180,16 +219,14 @@ class YadamuDBI {
       
   initializeParameters(parameters){
 
-    this.parameters = Object.assign({}, this.YADAMU_DBI_PARAMETERS);
+	// Merge default parameters for this driver with parameters from configuration files and command line parameters.
 
-	// Merge parameters from configuration files
-    Object.assign(this.parameters, parameters);
-    // Merge parameters provided via command line arguments
-    Object.assign(this.parameters,this.yadamu.COMMAND_LINE_PARAMETERS)
-
+    this.parameters = Object.assign({}, this.YADAMU_DBI_PARAMETERS, this.vendorParameters, parameters,this.yadamu.COMMAND_LINE_PARAMETERS);
+    // console.log(this.YADAMU_DBI_PARAMETERS, this.vendorParameters, parameters,this.yadamu.COMMAND_LINE_PARAMETERS,this.parameters)									  									 
   }
 
   setParameters(parameters) {
+	
 	Object.assign(this.parameters, parameters || {})
 	this._COMMIT_COUNT = undefined
   }
@@ -357,27 +394,43 @@ class YadamuDBI {
   }    
 
   logDisconnect() {
-    const pwRedacted = Object.assign({},this.connectionProperties)
+    const pwRedacted = Object.assign({},this.vendorProperties)
     delete pwRedacted.password
     this.status.sqlTrace.write(this.traceComment(`DISCONNECT : Properies: ${JSON.stringify(pwRedacted)}`))
   }
   
   logConnectionProperties() {    
-    const pwRedacted = Object.assign({},this.connectionProperties)
+    const pwRedacted = Object.assign({},this.vendorProperties)
     delete pwRedacted.password
     this.status.sqlTrace.write(this.traceComment(`CONNECT : Properies: ${JSON.stringify(pwRedacted)}`))
   }
-     
-  setConnectionProperties(connectionProperties) {
-	if (!YadamuLibrary.isEmpty(connectionProperties)) {
-      this.connectionProperties = connectionProperties 
+  
+  updateVendorProperties(vendorProperties) {
+  }
+
+  getVendorProperties() {
+
+    const vendorProperties = this.vendorProperties || {}
+    this.updateVendorProperties(vendorProperties)
+	return vendorProperties
+
+  }
+  
+  setVendorProperties(connectionSettings) {
+	if (!YadamuLibrary.isEmpty(connectionSettings[this.DATABASE_KEY])) {
+      this.vendorProperties = connectionSettings[this.DATABASE_KEY] 
+      delete connectionSettings[this.DATABASE_KEY] 
     }
+	else {
+	  this.vendorProperties = {}
+    }	 
   }
-  
-  getConnectionProperties() {
-    this.connectionProperties = {}
+     
+  setConnectionProperties(connectionSettings) {
+	this.setVendorProperties(connectionSettings)
+    this.vendorParameters = connectionSettings.parameters || {}
   }
-  
+   
   isValidDDL() {
     return (this.systemInformation.vendor === this.DATABASE_VENDOR)
   }
@@ -386,6 +439,14 @@ class YadamuDBI {
     return true;
   }
   
+  isDirectLoadSource() {
+    return false;
+  }
+  
+  copyOperationAvailble(source,controlFile) {
+    return false
+  }
+ 
   trackExceptions(err) {
     // Reset by passing undefined 
     this.firstError = this.firstError === undefined ? err : this.firstError
@@ -622,7 +683,7 @@ class YadamuDBI {
       this.connection = await this.getConnectionFromPool();
       await this.configureConnection();
     } catch (e) {
-      const err = new ConnectionError(e,this.connectionProperties);
+      const err = new ConnectionError(e,this.vendorProperties);
       throw err
     }
 
@@ -746,7 +807,7 @@ class YadamuDBI {
   }
   
   async getDatabaseConnection(requirePassword) {
-    let interactiveCredentials = (requirePassword && ((this.connectionProperties[this.PASSWORD_KEY_NAME] === undefined) || (this.connectionProperties[this.PASSWORD_KEY_NAME].length === 0))) 
+    let interactiveCredentials = (requirePassword && ((this.vendorProperties[this.PASSWORD_KEY_NAME] === undefined) || (this.vendorProperties[this.PASSWORD_KEY_NAME].length === 0))) 
     let retryCount = interactiveCredentials ? this.RETRY_COUNT : 1
     
 	
@@ -759,12 +820,12 @@ class YadamuDBI {
       if (interactiveCredentials)  {
 		if (retryCount === this.RETRY_COUNT) {
 		  console.log('Loaded database password from environment variable "YADAMU_PASSWORD".')
-	      this.connectionProperties[this.PASSWORD_KEY_NAME] = process.env.YADAMU_PASSWORD
+	      this.vendorProperties[this.PASSWORD_KEY_NAME] = process.env.YADAMU_PASSWORD
 		}
 	    else {
           const pwQuery = this.yadamu.createQuestion(prompt);
           const password = await pwQuery;
-          this.connectionProperties[this.PASSWORD_KEY_NAME] = password;
+          this.vendorProperties[this.PASSWORD_KEY_NAME] = password;
 		}
       }
       try {
@@ -1168,11 +1229,17 @@ class YadamuDBI {
      
   /*
   **
-  ** The following methods are used by the YADAMU DBwriter class
+  **
+  The following methods are used by the YADAMU DBwriter class
   **
   */
   
+  getSchemaIdentifer(key) {
+	return this.parameters[key]
+  }
+
   async initializeExport() {
+	this.DESCRIPTION = this.getSchemaIdentifer('FROM_USER')
   }
   
   async finalizeExport() {
@@ -1185,6 +1252,7 @@ class YadamuDBI {
   */
   
   async initializeImport() {
+	this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
   }
   
   async initializeData() {
@@ -1381,6 +1449,128 @@ class YadamuDBI {
     return (!YadamuLibrary.isEmpty(this.killConfiguration) && ((this.isManager() && this.killConfiguration.worker === undefined) || (this.killConfiguration.worker === idx)))
   }
  
+  /*
+  **
+  ** Copy-based Import Operations - Experimental
+  **
+  */
+    
+  async prepareCopyImport(metadata) {
+    const startTime = performance.now()
+    await this.setMetadata(metadata)     
+    const statementCache = await this.generateStatementCache(this.parameters.TO_USER)
+	let ddlStatementCount = 0
+	let dmlStatementCount = 0
+	let ddlStatements = []
+	Object.values(statementCache).forEach((tableInfo) => {
+	  if (tableInfo.ddl !== null) {
+		ddlStatements.push(tableInfo.ddl)
+	  }
+	  if (tableInfo.dml !== null) {
+		dmlStatementCount++;
+      }
+    })	 
+	this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Generated ${ddlStatements.length === 0 ? 'no' : ddlStatements.length} "Create Table" statements and ${dmlStatementCount === 0 ? 'no' : dmlStatementCount} DML statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+    ddlStatements = this.prepareDDLStatements(ddlStatements)	
+	try {
+      const results = await this.executeDDL(ddlStatements) 
+    } catch (e) {
+	  console.log(e)
+  	  throw e
+	}
+	return statementCache
+  }     
+  
+  async validateControlFile(controlFile) {
+   return true
+  } 
+
+  async copyOperation(tableName,statement) {
+	let startTime 
+	try {
+	  startTime = performance.now();
+	  let results = await this.executeSQL(statement);
+	  const elapsedTime = performance.now() - startTime;
+      const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.} rows/s.`
+      this.yadamuLogger.info([tableName,'Copy'],`${writerTimings}`)  
+	} catch(e) {
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+	}
+  }
+  		  
+  async copyOperations(taskList,sourceVendor) {
+	 
+    this.activeWorkers = new Set()
+    const taskCount = taskList.length
+	
+    const maxWorkerCount = parseInt(this.yadamu.PARALLEL)
+    const workerCount = taskList.length < maxWorkerCount ? taskList.length : maxWorkerCount
+  
+    const workers = workerCount === 0 ? [this] : await Promise.all(new Array(workerCount).fill(0).map((x,idx) => { return this.workerDBI(idx) }))
+	const concurrency = workerCount > 0 ? 'PARALLEL' : 'SERIAL'
+	
+	let operationAborted = false;
+	let fatalError = undefined
+    
+    const copyOperations = workers.map((worker,idx) => { 
+	  return new Promise(async (resolve,reject) => {
+        // ### Await inside a Promise is an anti-pattern ???
+        let result = undefined
+        try {
+     	  while (taskList.length > 0) {
+	        const task = taskList.shift();
+		    await worker.copyOperation(task.TABLE_NAME,task.copyStatement)
+          }
+		} catch (cause) {
+		  result = cause
+		  // this.yadamuLogger.trace(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,this.getWorkerNumber()],cause)
+		  this.yadamuLogger.handleException(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,this.getWorkerNumber()],cause)
+		  if ((this.ON_ERROR === 'ABORT') && !operationAborted) {
+			fatalError = result
+    	    operationAborted = true
+			if (taskList.length > 0) {
+		      this.yadamuLogger.error(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,worker.ON_ERROR],`Operation failed: Skipping ${taskList.length} Tables`);
+			}
+			else {
+		      this.yadamuLogger.warning(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,worker.ON_ERROR],`Operation failed.`);
+			}		
+            taskList.length = 0;
+          }
+		}
+        if (!worker.isManager()) {
+		  await worker.releaseWorkerConnection()
+	    }
+		resolve(result) 
+      })
+    })
+	  
+    this.yadamuLogger.info(['PIPELINE','COPY',concurrency,workerCount,sourceVendor,this.DATABASE_VENDOR],`Processing ${taskCount} Tables`);
+    const results = await Promise.allSettled(copyOperations)
+	if (operationAborted) throw fatalError
+    // this.yadamuLogger.trace(['PIPELINE','COPY',concurrency,workerCount,sourceVendor,this.DATABASE_VENDOR,taskList.length],`Processing Complete`);
+	return results
+  }  
+  
+  verifyCopyImport(vendor,controlFile) { 
+    // Throw errors if copy based import not available for the source.
+  }
+  
+  async doCopyBasedImport(vendor,controlFile,metadata) {
+	
+    this.verifyCopyImport(vendor,controlFile)	
+	this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
+
+	const statementCache = await this.prepareCopyImport(metadata);
+	const taskList = Object.keys(statementCache).map((table) => {
+	  return { 
+	    TABLE_NAME    : table
+	  ,	copyStatement : statementCache[table].copy
+      }
+	})
+    const results = await this.copyOperations(taskList,vendor)
+	return results
+  }
+  
 }
 
 module.exports = YadamuDBI

@@ -14,7 +14,10 @@ set heading off
 select to_char(SYS_EXTRACT_UTC(SYSTIMESTAMP),'YYYY-MM-DD"T"HH24:MI:SS"Z"') || ': "&SCHEMA&ID1", "&SCHEMA&ID2", "&METHOD", "&MODE"' || CHR(13) "Timestamp"
   from DUAL
 /
-call YADAMU_TEST.COMPARE_SCHEMAS('&SCHEMA&ID1','&SCHEMA&ID2');
+begin
+  YADAMU_TEST.COMPARE_SCHEMAS('&SCHEMA&ID1','&SCHEMA&ID2',$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED  $THEN '{objectsRule:"SKIP"}' $ELSE '<rules><objectsRule>SKIP</objectsRule></rules>' $END );
+end;
+/
 --
 set heading on
 set feedback on

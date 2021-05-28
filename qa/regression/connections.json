@@ -74,7 +74,6 @@
       , "password"                      : "oracle"
       , "port"                          : 5432
       }
-    , "pathPrefix"                      : "JSON/postgres"
     },
     "mysql#1"                           : {
       "mysql"                           : {          
@@ -123,10 +122,19 @@
 	  , "schema"                        : "PUBLIC"	
       }
     },
-    "vertica#1"                         : {
+    "vertica09"                         : {
       "vertica"                         : {
 	    "user"                          : "dbadmin"
 	  ,	"host"                          : "VERTICA-01"
+	  ,	"database"                      : "docker"
+	  ,	"password"                      : "oracle"
+	  ,	"port"                          : 5433
+      }
+    },
+   "vertica10"                         : {
+      "vertica"                         : {
+	    "user"                          : "dbadmin"
+	  ,	"host"                          : "VERTICA-02"
 	  ,	"database"                      : "docker"
 	  ,	"password"                      : "oracle"
 	  ,	"port"                          : 5433
@@ -139,43 +147,65 @@
 	  ,	"endpoint"                      : "http://MINIO-01:9000"
 	  ,	"s3ForcePathStyle"              : true
 	  ,	"signatureVersion"              : "v4"
-	  ,	"yadamuProperties"              : {
-		  "bucketName"                  : "Bucket1"
-		, "rootFolder"                  : "Yadamu"
-		}		
+	  },
+      "settings" : {
+		"directory" : "aws"
 	  }
 	},
 	"azurite#1": {
-		"azure": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://AZURE-01:10000/devstoreaccount1"
+	  "azure": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://AZURE-01:10000/devstoreaccount1",
+      "settings" : {
+		"directory" : "azure"
+	  }
 	},
     "file-YADAMU_HOME"                  : {
       "file"                            : {
 		"directory"                     : "" 
       }
     },
-    "file-JSON"                         : {
+    "file-ROOT"                         : {
       "file"                            : {
-		"directory"                     : "JSON" 
+		"directory"                     : "/" 
       }
+    },
+	"file-staging"                      : {
+      "file"                            : {
+		"directory"                     : "stagingArea"
+	  }
 	},
-    "scratch"                           : {
+    "file-lRegress"                     : {
       "file"                            : {
-		"directory"                     : "scratch" 
+		"directory"                     : "longRegress" 
       }
     },
-    "scratch-export"                    : {
+    "file-sRegress"                     : {
       "file"                            : {
-		"directory"                     : "scratch/export" 
+		"directory"                     : "shortRegress" 
       }
     },
-    "loader#1"                : {
+    "loader-YADAMU_HOME"                  : {
+      "loader"                            : {
+		"directory"                     : "" 
+      }
+    },
+    "loader-ROOT"                         : {
+      "loader"                            : {
+		"directory"                     : "/" 
+      }
+    },
+    "loader-staging"                    : {
       "loader"                          : {
-		"rootFolder" : "loader" 
+		"directory"                     : "stagingArea" 
       }
     },
-	"loader-scratch": {
-      "loader": {
-		"rootFolder": "scratch/loader"
+	"loader-lRegress"                   : {
+      "loader"                          : {
+		"directory"                     : "longRegress/loader"
+	  }
+	},
+	"loader-sRegress"                   : {
+      "loader"                          : {
+		"directory"                     : "shortRegress/loader"
 	  }
 	}
 }

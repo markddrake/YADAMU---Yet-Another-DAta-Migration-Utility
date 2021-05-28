@@ -5,6 +5,7 @@ const mime = require('mime-types');
 
 const LoaderDBI = require('../node/loaderDBI.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
+const {YadamuError} = require('../../../YADAMU/common/yadamuException.js');
 
 /*
 **
@@ -25,23 +26,65 @@ class CloudDBI extends LoaderDBI {
   
   get STORAGE_ID()          { return 'ABSTACT_STORAGE_ID' }
   
-  get ROOT_FOLDER()              { 
-    return this._ROOT_FOLDER || (() => { 
-      const rootFolder = this.parameters.ROOT_FOLDER || this.connectionProperties.rootFolder || '' 
-	  this._ROOT_FOLDER = YadamuLibrary.macroSubstitions(rootFolder, this.yadamu.MACROS).split(path.sep).join(path.posix.sep)
-	  return this._ROOT_FOLDER
-    })() 
+  get BASE_DIRECTORY() {
+
+    /*
+	**
+	** Rules for Root Folder Location are as follows
+	**
+	
+	Parameter BASE_DIRECTORY is absolute: DIRECTORY
+    OTHERWISE: 
+	
+	  Parameter DIRECTORY is not supplied: conn:directory
+      OTHERWISE: conn:directory/DIRECTORY/FILE
+	
+	**
+	*/
+	
+    return this._BASE_DIRECTORY || (() => {
+	  let baseDirectory =  this.vendorSettings.directory || ""
+	  if (this.DIRECTORY) {
+        if (path.isAbsolute(this.DIRECTORY)) {
+	      baseDirectory = this.DIRECTORY
+        }
+        else {
+          baseDirectory = path.join(this.vendorSettings.directory,this.DIRECTORY)
+		}
+	  }
+	  this._BASE_DIRECTORY  = YadamuLibrary.macroSubstitions(baseDirectory,this.yadamu.MACROS)
+	  return this._BASE_DIRECTORY
+    })()
   }
   
-  constructor(yadamu) {
+  constructor(yadamu,settings,parameters) {
     // Export File Path is a Directory for in Load/Unload Mode
-    super(yadamu)
-	this.cloudProperties = {}
+    super(yadamu,settings,parameters)
   }    
+  
+  async createInitializationVector() {
+    throw new YadamuError(`Encyption option not currently supported for "${this.DATABASE_VENDOR}"`);
+  }	
+
+  async loadInitializationVector(filename) {
+    throw new YadamuError(`Encyption option not currently supported for "${this.DATABASE_VENDOR}"`);
+  }	
+   
+
+
+  resolve(target) {
+    return target.split(path.sep).join(path.posix.sep)
+  }
+  
+  setConnectionProperties(connectionSettings) {
+	this.vendorSettings = connectionSettings.settings
+	delete connectionSettings.settings;
+	super.setConnectionProperties(connectionSettings)
+  }
   
   async createConnectionPool() {
 	// this.yadamuLogger.trace([this.constructor.name],`new AWS.S3()`)
-	this.s3 = await new AWS.S3(this.connectionProperties)
+	this.s3 = await new AWS.S3(this.vendorProperties)
 	this.cloudService = new S3IO(this.s3,{},this.yadamuLogger)
   }
   
@@ -55,6 +98,7 @@ class CloudDBI extends LoaderDBI {
 	  metdataRecords.forEach((content) =>  {
         const json = this.parseContents(content)
         metadata[json.tableName] = json;
+        json.dataFile = this.controlFile.data[json.tableName].file
       })
     }
     return metadata;      
@@ -67,11 +111,11 @@ class CloudDBI extends LoaderDBI {
   */
 
   getMetadataPath(tableName) {
-     return `${path.join(this.metadataFolderPath,tableName)}.json`.split(path.sep).join(path.posix.sep)
+     return this.resolve(`${path.join(this.metadataFolderPath,tableName)}.json`)
   }
   
   getDatafilePath(filename) {
-	  return filename.split(path.sep).join(path.posix.sep)
+	  return this.resolve(filename)
   }
 
   writeFile(filename,metadata) {
@@ -83,22 +127,28 @@ class CloudDBI extends LoaderDBI {
   
   setFolderPaths(rootFolder,schema) {
       
-	this.controlFilePath = `${path.join(rootFolder,schema)}.json`.split(path.sep).join(path.posix.sep) 
-    this.metadataFolderPath = path.join(rootFolder,'metadata').split(path.sep).join(path.posix.sep) 
-    this.dataFolderPath = path.join(rootFolder,'data').split(path.sep).join(path.posix.sep) 
+	this.controlFilePath = this.resolve(`${path.join(rootFolder,schema)}.json`)
+    this.metadataFolderPath = this.resolve(path.join(rootFolder,'metadata'))
+    this.dataFolderPath = this.resolve(path.join(rootFolder,'data'))
   }      
+  
+  getURI(target) {
+    return `${this.PROTOCOL}${this.STORAGE_ID}${path.posix.sep}${this.resolve(target)}`
+  }
   
   async initializeImport() {
 	 
     // this.yadamuLogger.trace([this.constructor.name],`initializeImport()`)
       	
-	await this.cloudService.verifyBucketContainer()	
-
+	this.DIRECTORY = this.TARGET_DIRECTORY
+    await this.cloudService.verifyBucketContainer()	
+       
     // Calculate the base directory for the unload operation. The Base Directory is dervied from the target schema name specified by the TO_USER parameter
 
 
     this.setFolderPaths(this.IMPORT_FOLDER,this.parameters.TO_USER)
-	this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Created target directory  "${this.IMPORT_FOLDER}"`);
+	this.DESCRIPTION = this.IMPORT_FOLDER
+    this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created directory: "${this.getURI(this.IMPORT_FOLDER)}"`);
     
     const dataFileList = {}
     const metadataFileList = {}
@@ -121,19 +171,22 @@ class CloudDBI extends LoaderDBI {
   */
 
   async initializeExport() {
-      
-	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
-    
-    this.setFolderPaths(this.EXPORT_FOLDER,this.parameters.FROM_USER)
 
-	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using control file "${this.STORAGE_ID}/${this.controlFilePath}"`);
+	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
+
+    this.DIRECTORY = this.SOURCE_DIRECTORY
+    this.setFolderPaths(this.EXPORT_FOLDER,this.parameters.FROM_USER)
+	this.DESCRIPTION = this.EXPORT_FOLDER
+
+	this.yadamuLogger.info(['EXPORT',this.DATABASE_VENDOR],`Using control file "${this.getURI(this.controlFilePath)}"`);
     const fileContents = await this.cloudService.getObject(this.controlFilePath)
 	this.controlFile = this.parseContents(fileContents)
   }
 
-  async getInputStream(tableInfo) {
+  async getInputStream(filename) {
+
     // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating readable stream on ${this.controlFile.data[tableInfo.TABLE_NAME].file}`)
-    const stream = await this.cloudService.createReadStream(this.controlFile.data[tableInfo.TABLE_NAME].file)
+    const stream = await this.cloudService.createReadStream(filename)
 	return stream
   }
   

@@ -15,7 +15,13 @@ class StatementGenerator {
   async generateStatementCache () {    
     
     const sqlStatement = `select GENERATE_SQL($1,$2,$3)`
-    const results = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, this.targetSchema, this.dbi.INBOUND_SPATIAL_FORMAT])
+	
+	const options = {
+	  spatialFormat    : this.dbi.INBOUND_SPATIAL_FORMAT
+	, jsonDataType     : this.dbi.JSON_DATA_TYPE
+	}
+	
+    const results = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, this.targetSchema, options])
     let statementCache = results.rows[0][0]
 	if (statementCache === null) {
       statementCache = {}

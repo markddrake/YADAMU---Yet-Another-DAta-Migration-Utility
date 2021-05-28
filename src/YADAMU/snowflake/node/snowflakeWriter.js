@@ -19,7 +19,7 @@ class SnowflakeWriter extends YadamuWriter {
 
     // Set up Transformation functions to be applied to the incoming rows
  	 	  
-    this.transformations = targetDataTypes.map((targetDataType,idx) => {      
+    const transformations  = targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
 	
 	  if (YadamuLibrary.isBinaryType(dataType.type)) {
@@ -64,7 +64,7 @@ class SnowflakeWriter extends YadamuWriter {
 			  return col
             }
             else {
-              return col.getUTCHours() + ':' + col.getUTCMinutes() + ':' + col.getUTCSeconds() + '.' + col.getUTCMilliseconds();  
+              return `${col.getUTCHours()}:${col.getUTCMinutes()}:${col.getUTCSeconds()}.${col.getUTCMilliseconds()}`;  
             }
 		  }
           break;
@@ -177,7 +177,7 @@ class SnowflakeWriter extends YadamuWriter {
         return this.skipTable
       } catch (cause) {
 		this.reportBatchError(batch,`INSERT MANY`,cause)
-		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
+		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
 		this.tableInfo.insertMode = 'BinarySplit'   
       }
     }

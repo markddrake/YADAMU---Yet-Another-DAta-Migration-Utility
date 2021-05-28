@@ -111,6 +111,11 @@ class YadamuConstants {
 	return this._OUTPUT_FORMATS
   }
   
+  static get MODES() {
+    this._OUTPUT_FORMATS = this._OUTPUT_FORMATS || Object.freeze(["DDL_ONLY","DATA_ONLY","DDL_AND_DATA"])
+	return this._OUTPUT_FORMATS
+  }
+  
   static get MACROS() {
 	this._MACROS = this._MACROS || Object.freeze({ timestamp: new Date().toISOString().replace(/:/g,'.')})
 	return this._MACROS

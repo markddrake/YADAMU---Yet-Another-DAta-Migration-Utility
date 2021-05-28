@@ -5,9 +5,6 @@
 , "recreateSchema"                    : true
 , "createDirectory"                   : true
 , "verifyOperation"                   : true
-, "parameters": {
-    "ROOT_FOLDER"     : "yadamu/RTS/%sourceConnection%/%mode%"
-  }
 , "tests" : [{
     "source": "oracle19c"
   , "target": "oracle19c"
@@ -71,196 +68,214 @@
   , "tasks": [
        "HR","BI"
     ]
+  },{                    
+    "operation"          : "export"
+  , "source"             : "oracle19c"
+  , "target"             : "file-sRegress"
+  , "parameters"         : {
+	  "DIRECTORY"        : "%operation%/json/%vendor%/%mode%"
+    }                    
+  , "tasks": [           
+       "HR","BI"         
+    ]                    
   },{
-    "operation"        : "export"
-  , "source"           : "oracle19c"
-  , "target"           : "scratch"
-  , "exportPath"       : "%operation%/%connection%/%mode%"
-  , "parameters" : {
-     "MODE"      : "DDL_ONLY"
+    "operation"          : "export"
+  , "source"             : "oracle19c"
+  , "target"             : "file-sRegress"
+  , "parameters"         : {
+      "MODE"             : "DDL_ONLY"
+	, "DIRECTORY"        : "%operation%/json/%vendor%/%mode%"
+    }                    
+  , "tasks": [           
+       "HR","BI"         
+    ]                    
+  },{                    
+    "operation"          : "export"
+  , "source"             : "oracle19c"
+  , "target"             : "file-sRegress"
+  , "parameters"         : {
+      "MODE"             : "DDL_AND_DATA"
+	, "DIRECTORY"        : "%operation%/json/%vendor%/%mode%"
     }
   , "tasks": [
        "HR","BI"
     ]
-  },{
-    "operation"        : "export"
-  , "source"           : "oracle19c"
-  , "target"           : "scratch"
-  , "exportPath"       : "%operation%/%connection%/%mode%"
-  , "parameters" : {
-     "MODE"      : "DATA_ONLY"
-    }
-  , "tasks": [
-       "HR","BI"
-    ]
-  },{
-    "operation"        : "export"
-  , "source"           : "oracle19c"
-  , "target"           : "scratch"
-  , "exportPath"       : "%operation%/%connection%/%mode%"
-  , "parameters" : {
-     "MODE"      : "DDL_AND_DATA"
-    }
-  , "tasks": [
-       "HR","BI"
-    ]
-  },{
-    "operation"       : "fileRoundtrip"
-  , "source"          : "scratch-export"
-  , "target"          : "oracle19c"
-  , "importPath"      : "oracle19c/DATA_ONLY"
-  , "exportPath"      : "output/%operation%/%connection%/%mode%/%importPath%"
-  , "parameters" : {
-     "MODE"      : "DDL_AND_DATA"
-    }
-  , "tasks": [
-       "HR","BI"
-  ]
-  },{
-    "operation"       : "import"
-  , "source"          : "scratch-export"
-  , "target"          : "loader#1"
-  , "importPath"      : "oracle19c/DATA_ONLY"
-  , "parameters"      : {
-      "ROOT_FOLDER"   : "yadamu/RTS"
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "source"          : "oracle19c"
-  , "target"          : "loader#1"
-  , "parameters"      : {
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "source"          : "loader#1"
-  , "targets": [
-	  "oracle19c"	  
-    ]
-  , "parameters"      : {
-      "ROOT_FOLDER"   : "yadamu/RTS"
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "source"          : "oracle19c"
-  , "target"          : "loader#1"
-  , "parameters" : {
-      "ROOT_FOLDER"   : "yadamu/RTS/gzip/%sourceConnection%/%mode%"
-	, "COMPRESSION"   : "GZIP"
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "source"          : "oracle19c"
-  , "target"          : "loader#1"
-  , "parameters" : {
-      "ROOT_FOLDER"   : "yadamu/RTS/X-gzip/%sourceConnection%/%mode%"
-	, "COMPRESSION"   : "GZIP"
-	, "ENCRYPTION"    : true
-	, "PASSPHRASE"    : "yadamu"
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "operation"       : "import"
-  , "source"          : "scratch-export"
-  , "target"          : "minio#1"
-  , "importPath"      : "oracle19c/DATA_ONLY"
-  , "parameters"      : {
-      "ROOT_FOLDER"   : "yadamu/RTS"
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "source"          : "oracle19c"
-  , "target"          : "minio#1"
-  , "parameters"      : {
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "source"          : "minio#1"
-  , "targets": [
-	  "oracle19c"	  
-    ]
-  , "parameters"      : {
-      "ROOT_FOLDER"   : "yadamu/RTS"
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "source"          : "oracle19c"
-  , "target"          : "minio#1"
-  , "parameters" : {
-      "ROOT_FOLDER"   : "yadamu/RTS/gzip/%sourceConnection%/%mode%"
-	, "COMPRESSION"   : "GZIP"
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "operation"       : "import"
-  , "source"          : "scratch-export"
-  , "target"          : "azurite#1"
-  , "importPath"      : "oracle19c/DATA_ONLY"
-  , "parameters"      : {
-      "ROOT_FOLDER"   : "yadamu/RTS"
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "source"          : "oracle19c"
-  , "target"          : "azurite#1"
-  , "parameters"      : {
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "source"          : "azurite#1"
-  , "targets": [
-	  "oracle19c"
-	  
-    ]
-  , "parameters": {
-      "ROOT_FOLDER"  : "yadamu/RTS"
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "source"          : "oracle19c"
-  , "target"          : "azurite#1"
-  , "parameters" : {
-      "ROOT_FOLDER"   : "yadamu/RTS/gzip/%sourceConnection%/%mode%"
-	, "COMPRESSION"   : "GZIP"
-	}
-  , "tasks": [ 
-      "HR"
-	]
-  },{
-    "operation"        : "export"
-  , "source": "oracle19c"
-  , "target": "file-JSON"
-  , "parameters": {
-      "MODE": "DATA_ONLY"
-	, "COMPRESSION" : "GZIP"
-	, "ENCRYPTION"  : true
-	, "PASSPHRASE" : "yadamu"
+  },{                  
+    "operation"           : "export"
+  , "source"              : "oracle19c"
+  , "target"              : "file-sRegress"
+  , "parameters"          : {
+	  "DIRECTORY"        : "%operation%/gzip/%vendor%/%mode%"
+	, "COMPRESSION"       : "GZIP"
 	}
   , "tasks": [
       "HR","BI"
     ]
+  },{                  
+    "operation"           : "export"
+  , "source"              : "oracle19c"
+  , "target"              : "file-sRegress"
+  , "parameters"          : {
+	  "DIRECTORY"        : "%operation%/x-gzip/%vendor%/%mode%"
+    , "COMPRESSION"       : "GZIP"
+	, "ENCRYPTION"        : true
+	, "PASSPHRASE"        : "yadamu"
+	}
+  , "tasks": [
+      "HR","BI"
+    ]
+  },{                  
+    "operation"           : "export"
+  , "source"              : "oracle19c"
+  , "target"              : "file-sRegress"
+  , "parameters"          : {
+	  "DIRECTORY"        : "%operation%/x-json/%vendor%/%mode%"
+	, "ENCRYPTION"        : true
+	, "PASSPHRASE"        : "yadamu"
+	}
+  , "tasks": [
+      "HR","BI"
+    ]
+  },{
+    "operation"          : "fileRoundtrip"
+  , "source"             : "file-sRegress"
+  , "target"             : "oracle19c"
+  , "parameters"         : {
+      "MODE"             : "DDL_AND_DATA"
+    , "SOURCE_DIRECTORY" : "export/json/%location%/%mode%"
+    , "TARGET_DIRECTORY" : "%operation%/json/%connection%/%mode%"
+    }
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+    "operation"          : "import"
+  , "source"             : "file-sRegress"
+  , "target"             : "loader-sRegress"
+  , "parameters"         : {
+      "SOURCE_DIRECTORY" : "export/json/%location%/%mode%"
+    , "TARGET_DIRECTORY" : "json"
+    }
+  , "tasks": [         
+      "HR","BI"        
+	]                  
+  },{                  
+    "source"             : "oracle19c"
+  , "target"             : "loader-sRegress"
+  , "parameters" : {   
+      "DIRECTORY"        : "%sourceConnection%/json"
+    }
+  , "tasks": [         
+      "HR","BI"        
+	]                  
+  },{                  
+    "source"             : "loader-sRegress"
+  , "target"             : "oracle19c"	  
+  , "parameters" : {   
+      "DIRECTORY"        : "json"
+    }
+  , "tasks": [         
+     "HR","BI"         
+	]                  
+  },{                  
+    "source"             : "oracle19c"
+  , "target"             : "loader-sRegress"
+  , "parameters"         : {
+      "DIRECTORY"        : "gzip"
+	, "COMPRESSION"      : "GZIP"
+	}                  
+  , "tasks": [         
+      "HR","BI"        
+	]                  
+  },{                  
+    "source"             : "oracle19c"
+  , "target"             : "loader-sRegress"
+  , "parameters" : {   
+      "DIRECTORY"        : "x-gzip"
+	, "COMPRESSION"      : "GZIP"
+	, "ENCRYPTION"       : true
+	, "PASSPHRASE"       : "yadamu"
+	}                  
+  , "tasks": [         
+      "HR","BI"        
+	]                  
+  },{                  
+    "operation"          : "import"
+  , "source"             : "file-sRegress"
+  , "target"             : "minio#1"
+  , "parameters"         : {
+      "SOURCE_DIRECTORY" : "export/json/%location%/%mode%"
+    , "TARGET_DIRECTORY" : "json"
+    }                    
+  , "tasks": [         
+      "HR","BI"        
+	]                  
+  },{                  
+    "source"             : "oracle19c"
+  , "target"             : "minio#1"
+  , "parameters"         : {
+      "DIRECTORY"        : "%sourceConnection%/json"
+  }                    
+  , "tasks": [         
+      "HR","BI"        
+	]                  
+  },{                  
+    "source"             : "minio#1"
+  , "target"             : "oracle19c"
+  , "parameters"         : {
+	  "DIRECTORY"        : "json"
+  }                    
+  , "tasks": [         
+      "HR","BI"        
+	]                  
+  },{                  
+    "source"             : "oracle19c"
+  , "target"             : "minio#1"
+  , "parameters"         : {
+      "DIRECTORY"        : "gzip"
+	, "COMPRESSION"      : "GZIP"
+	}                  
+  , "tasks": [         
+      "HR","BI"        
+	]                  
+  },{                  
+    "operation"          : "import"
+  , "source"             : "file-sRegress"
+  , "target"             : "azurite#1"
+  , "parameters"         : {
+      "SOURCE_DIRECTORY" : "export/json/%location%/%mode%"
+    , "TARGET_DIRECTORY" : "json"
+  }                    
+  , "tasks": [         
+      "HR","BI"        
+	]                  
+  },{                  
+    "source"             : "oracle19c"
+  , "target"             : "azurite#1"
+  , "parameters"         : {
+      "DIRECTORY"        : "%sourceConnection%/json"
+  }                    
+  , "tasks": [         
+      "HR","BI"        
+	]                  
+  },{                  
+    "source"             : "azurite#1"
+  , "target"             : "oracle19c"	  
+  , "parameters"         : {
+	  "DIRECTORY"        : "json"
+  }                    
+  , "tasks": [         
+      "HR","BI"        
+	]                  
+  },{                  
+    "source"             : "oracle19c"
+  , "target"             : "azurite#1"
+  , "parameters"         : {
+      "DIRECTORY"        : "gzip"
+	, "COMPRESSION"      : "GZIP"
+	}                  
+  , "tasks": [         
+      "HR","BI"        
+	]                  
   }]
 }

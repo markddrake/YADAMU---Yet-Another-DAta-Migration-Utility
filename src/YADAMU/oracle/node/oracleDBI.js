@@ -72,10 +72,10 @@ class OracleDBI extends YadamuDBI {
   // Enable configuration via command line parameters
  
   get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT         || OracleConstants.SPATIAL_FORMAT }
-  get OBJECT_FORMAT()          { return this.parameters.OBJECT_FORMAT        || OracleConstants.OBJECT_FORMAT }
-  get JSON_STORAGE_FORMAT()    { return this.parameters.JSON_STORAGE_FORMAT    || OracleConstants.JSON_STORAGE_FORMAT}
+  get OBJECT_FORMAT()          { return this.parameters.OBJECT_FORMAT          || OracleConstants.OBJECT_FORMAT }
+  get ORACLE_XML_TYPE()        { return this.parameters.ORACLE_XML_TYPE        || OracleConstants.ORACLE_XML_TYPE}
+  get ORACLE_JSON_TYPE()       { return this.parameters.ORACLE_JSON_TYPE       || OracleConstants.ORACLE_JSON_TYPE}
   get MIGRATE_JSON_STORAGE()   { return this.parameters.MIGRATE_JSON_STORAGE   || OracleConstants.MIGRATE_JSON_STORAGE}
-  get XML_STORAGE_FORMAT()     { return this.parameters.XML_STORAGE_FORMAT     || OracleConstants.XML_STORAGE_FORMAT}
   get TREAT_RAW1_AS_BOOLEAN()  { return this.parameters.TREAT_RAW1_AS_BOOLEAN  || OracleConstants.TREAT_RAW1_AS_BOOLEAN }  
   get LOB_MAX_SIZE()           { return this.parameters.LOB_MAX_SIZE           || OracleConstants.LOB_MAX_SIZE}
 
@@ -89,9 +89,11 @@ class OracleDBI extends YadamuDBI {
   
   /*
   **
-  **  User can specify the data type to be used to store JSON Data using the parameter JSON_STORAGE_FORMAT.
+  ** Use parameter ORACLE_JSON_TYPE to determine how JSON content is stored in the database.
   **
-  **  If set to JSON the actual Data Type used is determined by the database version and is exposed as JSON_STORAGE_MODEL
+  ** Set to BLOB or CLOB to force BLOB or CLOB storage regardless of Database Version. 
+  **
+  ** Set to JSON to allow driver to pick storage model based on Database Version. Choices are shown below:
   **
   **  20c : Native JSON data type
   **  19c : BLOB with IS JSON constraint
@@ -99,9 +101,9 @@ class OracleDBI extends YadamuDBI {
   **  12c : CLOB with IS JSON constraint
   **  11g : CLOB - No JSON support in 11g
   **
-  **  JSON_STORAGE_FORMAT : Defined via Configuration Files and Command Line Parameters. The data type to be used to store JSON_DATA_TYPE
-  **  JSON_STORAGE_MODEL  : The preferred data type for this database.
-  **  JSON_DATA_TYPE      : The data type that will be by the current session.
+  **  ORACLE_JSON_TYPE    : Value is derived from Constants, Configuration Files and Command Line Parameters. Default is JSON
+  **  JSON_STORAGE_MODEL  : The recommended Storage Model for this version of the database.
+  **  JSON_DATA_TYPE      : The data type that will be used by the driver. 
   **
   **  ### What about the actual data type when dealing with an existing table ???
   **
@@ -112,9 +114,9 @@ class OracleDBI extends YadamuDBI {
       switch (true) {
         case this.NATIVE_DATA_TYPE :
           // What ever the user specified, the default is JSON, IS JSON will be specified for CLOB, BLOB or VARCHAR2
-          return this.JSON_STORAGE_FORMAT;
+          return this.ORACLE_JSON_TYPE;
         case this.JSON_PARSING_SUPPORTED:
-          return this.JSON_STORAGE_FORMAT === 'JSON' ? this.JSON_STORAGE_MODEL : this.JSON_STORAGE_FORMAT
+          return this.ORACLE_JSON_TYPE === 'JSON' ? this.JSON_STORAGE_MODEL : this.ORACLE_JSON_TYPE
         default:
           return this.JSON_STORAGE_MODEL
       }
@@ -122,16 +124,48 @@ class OracleDBI extends YadamuDBI {
     return this._JSON_DATA_TYPE
   }
   
+  /*
+  **
+  ** Use parameter ORACLE_XML_TYPE to determine how XML content is stored in the database.
+  **
+  ** Set to CLOB to force XMLTYPE STORE AS CLOB, which provides best chance of preserving XML Fidelity.
+  ** Set to BINARY to force XMLTYPE STORE AS BINARY XML, which provides best performance but not guarantee XML Fidelity in all use cases.
+  ** Set to XML to allow the driver to pck the storage model based on the Database Version.  
+  **
+  **
+  ** OBJECT RELATAIONAL XML is only supported when migrating between Oracle Databases in DDL_AND_DATA mode
+  **
+  **  ORACLE_XML_TYPE    : Value is derived from Constants, Configuration Files and Command Line Parameters. Default is JSON
+  **  XML_STORAGE_MODEL  : The recommended Storage Model for this version of the database.
+  **  JSON_DATA_TYPE     : The data type that will be used by the driver. 
+  **
+  **  ### What about the actual data type when dealing with an existing table ???
+  **
+  */
+  
   get XML_STORAGE_CLAUSE() {
     this._XML_STORAGE_CLAUSE = this._XML_STORAGE_CLAUSE || (() => {
-       return this.XML_STORAGE_FORMAT === 'XML' ? this.XML_STORAGE_MODEL : this.XML_STORAGE_FORMAT
+	   switch (this.ORACLE_XML_TYPE) {
+		 case 'XML' : 
+		   switch (this.XML_STORAGE_MODEL) {
+			  case 'CLOB':
+			    return 'CLOB';
+		      case 'BINARY':
+			  default:
+			    return 'BINARY XML';
+           }			  
+		 case 'CLOB':
+		   return 'CLOB'
+		 case 'BINARY':
+		 default:
+		   return 'BINARY XML';
+       }
     })()
     return this._XML_STORAGE_CLAUSE
   }
   
-  constructor(yadamu) {
-	  
-    super(yadamu);
+  constructor(yadamu,settings,parameters) {
+    super(yadamu,settings,parameters);
 	
 	// make oracledb constants available to decendants of OracleDBI	
 	this.oracledb = oracledb
@@ -151,42 +185,41 @@ class OracleDBI extends YadamuDBI {
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Constructor Complete');
 
   }
-
-  getConnectionProperties() {
-    
-    if (this.parameters.USERID) {
-      return this.parseConnectionString(this.parameters.USERID)
-    }
-    else {
-     return {
-       user             : this.parameters.USER
-     , password         : this.parameters.PASSWORD
-     , connectionString : this.parameters.CONNECT_STRING
-     }
-    }
-  }
   
-  parseConnectionString(connectionString) {
+  parseConnectionString(vendorProperties, connectionString) {
     
     const user = YadamuLibrary.convertQuotedIdentifer(connectionString.substring(0,connectionString.indexOf('/')));
-    let password = connectionString.substring(connectionString.indexOf('/')+1);
+    
+	let password = connectionString.substring(connectionString.indexOf('/')+1)
+	
     let connectString = '';
     if (password.indexOf('@') > -1) {
 	  connectString = password.substring(password.indexOf('@')+1);
 	  password = password.substring(password,password.indexOf('@'));
       console.log(`${new Date().toISOString()}[WARNING][${this.constructor.name}]: Suppling a password on the command line interface can be insecure`);
     }
-    return {
-      user          : user,
-      password      : password,
-      connectString : connectString
-    }
+	
+    vendorProperties.user             = user          || vendorProperties.user
+    vendorProperties.password         = password      || vendorProperties.password
+    vendorProperties.connectString    = connectString || vendorProperties.connectString 
   }     
 
-  async testConnection(connectionProperties,parameters) {   
+  updateVendorProperties(vendorProperties) {
+
+    if (this.parameters.USERID) {
+      this.parseConnectionString(vendorProperties,this.parameters.USERID)
+    }
+    else {
+     vendorProperties.user             = this.parameters.USER            || vendorProperties.user 
+     vendorProperties.password         = this.parameters.PASSWORD        || vendorProperties.password  
+     vendorProperties.connectString    = this.parameters.CONNECT_STRING  || vendorProperties.connectString 
+    }
+  }
+  
+  async testConnection(connectionProperties,parameters) {  
     super.setConnectionProperties(connectionProperties);
 	try {
-      const conn = await oracledb.getConnection(connectionProperties)
+      const conn = await oracledb.getConnection(this.vendorProperties)
       await conn.close();
 	  super.setParameters(parameters)
 	} catch (e) {
@@ -199,11 +232,11 @@ class OracleDBI extends YadamuDBI {
 	let stack;
     this.logConnectionProperties();
 	const sqlStartTime = performance.now();
-	this.connectionProperties.poolMax = this.yadamu.PARALLEL ? parseInt(this.yadamu.PARALLEL) + 1 : 3
+	this.vendorProperties.poolMax = this.yadamu.PARALLEL ? parseInt(this.yadamu.PARALLEL) + 1 : 3
 	try {
       stack = new Error().stack
       // this.yadamuLogger.trace([this.DATABASE_VENDOR],'Creating Pool');
-	  this.pool = await oracledb.createPool(this.connectionProperties);
+	  this.pool = await oracledb.createPool(this.vendorProperties);
       // this.yadamuLogger.trace([this.DATABASE_VENDOR],'Pool Created');
       this.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
@@ -236,7 +269,7 @@ class OracleDBI extends YadamuDBI {
   async getConnection() {
     this.logConnectionProperties();
 	const sqlStartTime = performance.now();
-	const connection = await oracledb.getConnection(this.connectionProperties);
+	const connection = await oracledb.getConnection(this.vendorProperties);
 	this.traceTiming(sqlStartTime,performance.now())
     return connection
   }
@@ -561,6 +594,16 @@ class OracleDBI extends YadamuDBI {
   async executeMany(sqlStatement,rows,binds) {
 	   
     let attemptReconnect = (this.ATTEMPT_RECONNECTION)
+	
+	/*
+	**
+	** Test for LOB argumnets. Reconnection is not useful with LOB binds since
+	** LOBs are invalid after the reconnection 
+	**
+    ** PLS-00306: wrong number or types of arguments in call to ...
+    ** ORA-06550: line 1, column 7:
+	**
+	*/
 
     if (rows.length > 0) {
       this.status.sqlTrace.write(this.traceComment(`Bulk Operation: ${rows.length} records.`))
@@ -595,6 +638,16 @@ class OracleDBI extends YadamuDBI {
   async executeSQL(sqlStatement,args,outputFormat) {
      
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
+	
+	/*
+	**
+	** Test for LOB argumnets. Reconnection is not useful with LOB arguments since
+	** LOBs are invalid after the reconnection 
+	**
+    ** PLS-00306: wrong number or types of arguments in call to ...
+    ** ORA-06550: line 1, column 7:
+	**
+	*/
 
 	args = args === undefined ? {} : args
 	outputFormat = outputFormat === undefined ? {} : outputFormat
@@ -792,15 +845,17 @@ class OracleDBI extends YadamuDBI {
   */
 
   async initializeExport() {
+    super.initializeExport()
     await this.setCurrentSchema(this.parameters.FROM_USER)
   }
 
   async finalizeExport() {
 	this.checkConnectionState(this.latestError) 
-    await this.setCurrentSchema(this.connectionProperties.user);
+    await this.setCurrentSchema(this.vendorProperties.user);
   }
 
   async initializeImport() {
+	super.initializeImport()
     await this.setCurrentSchema(this.parameters.TO_USER)
   }
 
@@ -817,7 +872,7 @@ class OracleDBI extends YadamuDBI {
 
   async finalizeImport() {
     this.checkConnectionState(this.latestError) 
-	await this.setCurrentSchema(this.connectionProperties.user);
+	await this.setCurrentSchema(this.vendorProperties.user);
   }
 
   /*
@@ -938,7 +993,9 @@ class OracleDBI extends YadamuDBI {
   */
 
   async uploadFile(importFilePath) {
-      
+     
+	 this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
+
      if (this.MAX_STRING_SIZE > 32767) {
        const json = await this.fileToBlob(importFilePath);
        return json;

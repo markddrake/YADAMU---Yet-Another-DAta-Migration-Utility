@@ -119,8 +119,8 @@ class MongoDBI extends YadamuDBI {
     return this._WRITE_TRANSFORMATION 
   }
     
-  constructor(yadamu) {	  
-    super(yadamu)
+  constructor(yadamu,settings,parameters) {	  
+    super(yadamu,settings,parameters)
   }
                                                              ;
   async _executeDDL(collectionList) {
@@ -147,7 +147,7 @@ class MongoDBI extends YadamuDBI {
 
   getMongoURL() {
     
-    return `mongodb://${this.connectionProperties.host}:${this.connectionProperties.port}/${this.connectionProperties.database !== undefined ? this.connectionProperties.database : ''}`;
+    return `mongodb://${this.vendorProperties.host}:${this.vendorProperties.port}/${this.vendorProperties.database !== undefined ? this.vendorProperties.database : ''}`;
     
   }
 
@@ -428,11 +428,11 @@ class MongoDBI extends YadamuDBI {
       
     this.logConnectionProperties();
     const poolSize = this.yadamu.PARALLEL ? parseInt(this.yadamu.PARALLEL) + 1 : 5
-    this.connectionProperties.options = typeof this.connectionProperties.options === 'object' ? this.connectionProperties.options : {}
+    this.vendorProperties.options = typeof this.vendorProperties.options === 'object' ? this.vendorProperties.options : {}
     if (poolSize > 5) {
-      this.connectionProperties.options.poolSize = poolSize
+      this.vendorProperties.options.poolSize = poolSize
     }
-    await this.connect(this.connectionProperties.options)
+    await this.connect(this.vendorProperties.options)
   }
   
   async getConnectionFromPool() {
@@ -471,12 +471,11 @@ class MongoDBI extends YadamuDBI {
 
   }
   
-  getConnectionProperties() {
-  
-    return{
-      host             : this.parameters.HOSTNAME
-     ,port             : this.parameters.PORT
-    }
+  updateVendorProperties(vendorProperties) {
+
+    vendorProperties.host             = this.parameters.HOSTNAME || vendorProperties.host 
+    vendorProperties.port             = this.parameters.PORT     || vendorProperties.port
+
   }
   
   /*  
@@ -522,24 +521,6 @@ class MongoDBI extends YadamuDBI {
   async restoreSavePoint(cause)  { /* OVERRIDE */ }
 
   async releaseSavePoint(cause)  { /* OVERRIDE */ }
-
-  /*
-  **
-  **  Upload a JSON File to the server. Optionally return a handle that can be used to process the file
-  **
-  */
-  
-  async uploadFile(importFilePath) {
-  }
-  
-  /*
-  **
-  **  Process a JSON File that has been uploaded to the server. 
-  **
-  */
-
-  async processFile(hndl) {
-  }
   
   /*
   **

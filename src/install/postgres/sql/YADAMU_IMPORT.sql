@@ -475,12 +475,10 @@ $$ LANGUAGE plpgsql;
 ** TODO: Add support for specifying whether to map JSON to JSON or JSONB
 **
 */
-create or replace function MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH BIGINT, P_DATA_TYPE_SCALE INT, P_POSTGIS_INSTALLED BOOLEAN) 
+create or replace function MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH BIGINT, P_DATA_TYPE_SCALE INT, P_JSON_DATA_TYPE VARCHAR, P_POSTGIS_INSTALLED BOOLEAN) 
 returns VARCHAR
 as $$
 declare
-  V_DATA_TYPE                         VARCHAR(128);
-  C_JSON_TYPE                         VARCHAR(5)  = 'jsonb';
   C_GEOMETRY_TYPE                     VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geometry' ELSE 'JSON' END;
   C_GEOGRAPHY_TYPE                    VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geography' ELSE 'JSON' END;
   C_MAX_CHARACTER_VARYING_TYPE_LENGTH INT         = 10 * 1024 * 1024;
@@ -501,6 +499,8 @@ declare
   C_MONGO_OBJECT_ID                   VARCHAR(32) = 'binary(12)';
   C_MONGO_UNKNOWN_TYPE                VARCHAR(32) = 'character varying(2048)';
   C_MONGO_REGEX_TYPE                  VARCHAR(32) = 'character varying(2048)';
+
+  V_DATA_TYPE                         VARCHAR(128);
      
 begin
   V_DATA_TYPE := P_DATA_TYPE;
@@ -660,8 +660,8 @@ begin
       case V_DATA_TYPE
         when 'double'                                                                            then return 'double precision';
         when 'string'                                                                            then return case when P_DATA_TYPE_LENGTH >  C_MAX_CHARACTER_VARYING_TYPE_LENGTH then C_CLOB_TYPE else 'character varying' end;
-        when 'object'                                                                            then return C_JSON_TYPE;
-        when 'array'                                                                             then return C_JSON_TYPE;
+        when 'object'                                                                            then return P_JSON_DATA_TYPE;
+        when 'array'                                                                             then return P_JSON_DATA_TYPE;
         when 'binData'                                                                           then return 'bytea';
 		when 'objectId'                                                                          then return 'bytea';
         when 'boolean'                                                                           then return 'bool';
@@ -674,8 +674,8 @@ begin
         when 'decimal'                                                                           then return 'numeric';
         when 'date'                                                                              then return 'timestamp';
         when 'timestamp'                                                                         then return 'timestamp';
-        when 'minkey'                                                                            then return C_JSON_TYPE;
-        when 'maxkey'                                                                            then return C_JSON_TYPE;
+        when 'minkey'                                                                            then return P_JSON_DATA_TYPE;
+        when 'maxkey'                                                                            then return P_JSON_DATA_TYPE;
                                                                                                  else return lower(P_DATA_TYPE);
       end case;    
     when 'SNOWFLAKE' then
@@ -697,7 +697,7 @@ begin
 end;
 $$ LANGUAGE plpgsql;
 --
-create or replace function GENERATE_STATEMENTS(P_SOURCE_VENDOR VARCHAR, P_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_SPATIAL_FORMAT VARCHAR, P_COLUMN_NAME_ARRAY JSONB, P_DATA_TYPE_ARRAY JSONB, P_SIZE_CONSTRAINT_ARRAY JSONB, P_BINARY_JSON BOOLEAN)
+create or replace function GENERATE_STATEMENTS(P_SOURCE_VENDOR VARCHAR, P_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_COLUMN_NAME_ARRAY JSONB, P_DATA_TYPE_ARRAY JSONB, P_SIZE_CONSTRAINT_ARRAY JSONB, P_SPATIAL_FORMAT VARCHAR, P_JSON_DATA_TYPE VARCHAR, P_BINARY_JSON BOOLEAN)
 returns JSONB
 as $$
 declare
@@ -747,7 +747,7 @@ begin
   TARGET_TABLE_DEFINITIONS
   as (
     select st.*,
-           MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR,DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT, V_POSTGIS_ENABLED) TARGET_DATA_TYPE
+           MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR,DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT, P_JSON_DATA_TYPE, V_POSTGIS_ENABLED) TARGET_DATA_TYPE
       from SOURCE_TABLE_DEFINITIONS st
   ) 
   select STRING_AGG('"' || COLUMN_NAME || '"',',') COLUMN_NAME_LIST,
@@ -829,7 +829,7 @@ declare
   PLPGSQL_CTX        TEXT;
 begin
   for r in select "tableName"
-                 ,GENERATE_STATEMENTS(P_JSON #>> '{systemInformation,vendor}', P_SCHEMA,"tableName", P_JSON #>> '{systemInformatio,typeMappings,spatialFormat}', "columnNames", "dataTypes", "sizeConstraints", TRUE) "TABLE_INFO"
+                 ,GENERATE_STATEMENTS(P_JSON #>> '{systemInformation,vendor}', P_SCHEMA,"tableName", "columnNames", "dataTypes", "sizeConstraints", P_JSON #>> '{systemInformatio,typeMappings,spatialFormat}', 'jsonb', TRUE) "TABLE_INFO"
              from JSONB_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
                                                                 "tableSchema"      VARCHAR, 
@@ -842,7 +842,7 @@ begin
                                                               
     begin
       EXECUTE r."TABLE_INFO" ->> 'ddl';
-      V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('ddl', jsonb_build_object('tableName',r."tableName",'sqlStatement',r."TABLE_INFO"->>'ddl')), true);
+      V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('ddl', jsonb_build_object('tableName',r."tableName",'sqlStatement',r."TABLE_INFO"->>'ddl')), TRUE);
     exception 
       when others then
         GET STACKED DIAGNOSTICS PLPGSQL_CTX = PG_EXCEPTION_CONTEXT;
@@ -887,7 +887,7 @@ declare
 begin
 
   for r in select "tableName"
-                 ,GENERATE_STATEMENTS(P_JSON #>> '{systemInformation,vendor}',P_SCHEMA,"tableName", P_JSON #>> '{systemInformation,typeMappings,spatialFormat}',"columnNames","dataTypes","sizeConstraints",FALSE) "TABLE_INFO"
+                 ,GENERATE_STATEMENTS(P_JSON #>> '{systemInformation,vendor}',P_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_JSON #>> '{systemInformation,typeMappings,spatialFormat}', 'jsonb', FALSE) "TABLE_INFO"
              from JSON_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSON_TO_RECORD(value) as METADATA(
                                                                "tableSchema"      VARCHAR, 
@@ -930,7 +930,7 @@ exception
 end;  
 $$ LANGUAGE plpgsql;
 ---
-create or replace function GENERATE_SQL(P_JSON jsonb, P_SCHEMA VARCHAR, P_SPATIAL_FORMAT VARCHAR)
+create or replace function GENERATE_SQL(P_JSON jsonb, P_SCHEMA VARCHAR, P_OPTIONS jsonb)
 returns SETOF jsonb
 as $$
 declare
@@ -938,7 +938,7 @@ begin
   RETURN QUERY
     select jsonb_object_agg(
            "tableName",
-           GENERATE_STATEMENTS("vendor",P_SCHEMA,"tableName",P_SPATIAL_FORMAT,"columnNames","dataTypes","sizeConstraints",FALSE)
+           GENERATE_STATEMENTS("vendor",P_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_OPTIONS ->> 'spatialFormat', P_OPTIONS ->> 'jsonDataType', FALSE)
          )
     from JSONB_EACH(P_JSON -> 'metadata')  
          CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(

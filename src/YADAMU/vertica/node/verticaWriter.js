@@ -12,13 +12,14 @@ const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 const StringWriter = require('../../common/stringWriter.js');
 const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
-const {WhitespaceIssue, ContentTooLarge} = require('./verticaException.js')
+const {WhitespaceIssue, EmptyStringDetected, ContentTooLarge} = require('./verticaException.js')
 
 class VerticaWriter extends YadamuWriter {
 
+  get STAGING_FILE()       { return this.tableInfo.localPath }
+
   constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
     super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
-    this.insertMode = 'Copy'
   }
 
   newBatch() {
@@ -28,7 +29,7 @@ class VerticaWriter extends YadamuWriter {
 	, insert        : []
     }
   }  
-  
+    
   releaseBatch(batch) {
 	if (Array.isArray(batch.copy)) {
 	  batch.copy.length = 0;
@@ -44,7 +45,7 @@ class VerticaWriter extends YadamuWriter {
 	
     const transformations = targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-
+7
 	  if ((YadamuLibrary.isBinaryType(dataType.type)) || ((dataType.type ===  'long') && (dataType.typeQualifier === 'varbinary'))) {
 		return (col,idx) =>  {
 		 return col.toString('hex')
@@ -68,18 +69,25 @@ class VerticaWriter extends YadamuWriter {
 		case "GEOMETRYCOLLECTION":
         case '"MDSYS"."SDO_GEOMETRY"':
           if (this.SPATIAL_FORMAT.endsWith('WKB')) {
-            return (col,idx)  => {
-			  if (Buffer.isBuffer(col)) {
-			    return YadamuSpatialLibrary.bufferToWkT(col)
-			  }
-        	  return YadamuSpatialLibrary.hexBinaryToWkT(col)
-			}
+		    return (col,idx) =>  {
+		     return col.toString('hex')
+		    }
           }
           if (this.SPATIAL_FORMAT.endsWith('GeoJSON')) {
             return (col,idx)  => {
 			  return YadamuSpatialLibrary.geoJSONtoWKT(col)
 			}
           }
+          /*
+          if (this.SPATIAL_FORMAT.endsWith('WKB')) {
+            return (col,idx)  => {
+			  if (Buffer.isBuffer(col)) {
+			    return Buffer.
+			  }
+        	  return YadamuSpatialLibrary.hexBinaryToWkT(col)
+			}
+          }
+		  */
 		  return null;
         case "JSON":
           return (col,idx) =>  {
@@ -186,14 +194,14 @@ class VerticaWriter extends YadamuWriter {
 		  }
 		case 'CHAR':
 		case 'VARCHAR':
-	      if (this.dbi.PRESERVE_WHITESPACE) {
+	      if (!this.dbi.COPY_TRIM_WHITEPSPACE) {
 		    // Track Indexes of columns Needed Whitespace preservation
 		    stringColumns.push(idx);
 	      }
           return null		  
           break;     	
 		case 'LONG':
-	      if ((dataType.typeQualifier.toUpperCase() === 'VARCHAR') && this.dbi.PRESERVE_WHITESPACE) {
+	      if ((dataType.typeQualifier.toUpperCase() === 'VARCHAR') && !this.dbi.COPY_TRIM_WHITEPSPACE) {
 		    // Track Indexes of columns Needed Whitespace preservation
 		    stringColumns.push(idx);
 	      }
@@ -205,7 +213,7 @@ class VerticaWriter extends YadamuWriter {
     }) 
 
 	// Use a dummy rowTransformation function if there are no transformations required.
-
+	
     return (transformations.every((currentValue) => { currentValue === null}) && stringColumns.length === 0)
 	? (row) => {} 
 	: (row) => {
@@ -214,16 +222,19 @@ class VerticaWriter extends YadamuWriter {
           row[idx] = transformation(row[idx],idx)
         }
       })
-  	  // The COPY operator seems to strip leading and trailing whitespace characters from Strings. If these characters needs to presserved then the row must be processed using an INSERT statement, not as part of a COPY operation.
-      // Whitespace preseravation must not be peformed until all other transformations have completed successfully since it uses the exception mechansim to signal that the row requires specical handling in order to preserve whitespace.
+	  const emptyStringList = []
 	  stringColumns.forEach((idx) => {
 		if ((row[idx] !== null) && (typeof row[idx] === 'string')) {
 	      // COPY seems to cause EMPTY Strings to become NULL
 	      if (row[idx].length === 0) {
-		    throw new WhitespaceIssue()
+			emptyStringList.push(idx)
+		    // throw new WhitespaceIssue(this.tableInfo.columnNames[idx])
 	      }
         }
 	  })
+      if (emptyStringList.length > 0) {
+		throw new EmptyStringDetected(emptyStringList)
+	  }
 	}  
 	
   }
@@ -231,6 +242,7 @@ class VerticaWriter extends YadamuWriter {
   setTableInfo(tableName) {
     this.newBatch();
 	super.setTableInfo(tableName)	
+    this.tableInfo.insertMode = 'Copy'
 	this.mergeoutInsertCount = this.dbi.MERGEOUT_INSERT_COUNT;
 
     this.maxLengths = this.tableInfo.sizeConstraints.map((sizeConstraint) => {
@@ -259,6 +271,13 @@ class VerticaWriter extends YadamuWriter {
 	  if (cause instanceof WhitespaceIssue) {
 	    this.batch.insert.push(row);
         this.metrics.cached++
+	    return this.skipTable
+	  }
+	  if (cause instanceof EmptyStringDetected) {
+		const emptyStringKey= cause.emptyStringList.join('-')
+		this.batch[emptyStringKey] = this.batch[emptyStringKey] || []
+		this.batch[emptyStringKey].push(row)
+	    this.metrics.cached++
 	    return this.skipTable
 	  }
 	  throw cause;
@@ -316,7 +335,7 @@ class VerticaWriter extends YadamuWriter {
 	 this.yadamuLogger.handleException([...err.tags,this.dbi.DATABASE_VENDOR,this.tableInfo.tableName],err)
   }
   
-  stagingFileCleanup(stagingFile,loadSuccessful) {
+  cleanupStagingFile(stagingFile,loadSuccessful) {
 	switch(true) {
 	  case(this.dbi.STAGING_FILE_RETENTION === 'NONE'):
 	  case((this.dbi.STAGING_FILE_RETENTION === 'ERROR') && loadSuccessful):
@@ -333,13 +352,28 @@ class VerticaWriter extends YadamuWriter {
 		  return `'${arg.replace(/'/g,"''")}'`
 		case 'object':
 		  return arg === null ? 'null' : `'${JSON.stringify(arg).replace(/'/g,"''")}'`
+		case 'number':
+		  switch (arg) {
+			case Infinity:
+			  return "'inf'";
+			case -Infinity:
+			  return "'-inf'"
+			case NaN:
+			  return "'nan'"
+			default:
+			  return arg
+		  }	
 		default:
 		  return arg
 	 }
   }
   
   addOperator(arg,operator) {
-	 return arg === null ? 'null'  : `${operator.prefix}${this.addArgument(arg)}${operator.suffix}`
+
+	 if ((arg.length > 65000) && (operator.prefix.indexOf('(HEX_TO_BINARY(') > -1)) {
+	   operator.prefix = operator.prefix.replace('(HEX_TO_BINARY(','(LONG_HEX_TO_BINARY(')
+	 }
+	 return `${operator.prefix}${this.addArgument(arg)}${operator.suffix}`
   }
   
   async _writeBatch(batch,rowCount) {
@@ -348,50 +382,103 @@ class VerticaWriter extends YadamuWriter {
 	
 	// console.log('Write Batch',this.metrics.batchCount,rowCount,'Copy',batch.copy.length,'Insert',batch.insert.length)
 	
-    if ((this.tableInfo.insertMode === 'Copy') && (batch.copy.length > 0))  {
-      try {
-        await this.dbi.createSavePoint();
-	    await this.writeBatchAsCSV(this.tableInfo.localPath,batch.copy)
-		const stack = new Error().stack
-        const rejectedRecordsTableName = `YRT-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
-        const sqlStatement = `${this.tableInfo.copy} REJECTED DATA AS TABLE "${rejectedRecordsTableName}"  NO COMMIT`; 	
-        const results = await this.dbi.insertBatch(sqlStatement,rejectedRecordsTableName);
-		if (results.length > 0) {
-	      await this.reportCopyErrors(results,batch.copy,stack,sqlStatement)
-		}
-		this.endTime = performance.now();
-        await this.dbi.releaseSavePoint();
-		this.stagingFileCleanup(this.YADAMU_STAGING_FILE,true);
-		const written = batch.copy.length - results.length;
-		this.metrics.written += written
-		this.metrics.skipped += results.length
-      } catch (cause) {
-        this.endTime = performance.now();1
-		await this.reportBatchError(batch.copy,`COPY`,cause)
-        await this.dbi.restoreSavePoint(cause);
-		this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);    
-        batch.insert.push(...batch.copy)		
-        this.tableInfo.insertMode = 'Iterative' 
-      }
-	  
-      this.stagingFileCleanup(this.YADAMU_STAGING_FILE,true);
+	const emptyStringDataSets = Object.keys(batch).filter((key) => {return ((key !== 'copy') && (key !== 'insert'))})
+	delete emptyStringDataSets.copy
+	delete emptyStringDataSets.insert
 
-    } 
+	let rejectedRecordsTableName = `YRT-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
+	const dataSets = batch.copy.length === 0 ? {} : {
+       copy : {
+		 sql:   `${this.tableInfo.copy} REJECTED DATA AS TABLE "${rejectedRecordsTableName}"  NO COMMIT`	
+	   , errors: rejectedRecordsTableName
+	   }
+    }		
+	
+    /*
+	**
+	** Modify Copy Statement to workaround Empty String is NULL issue
+	**
+	** https://forum.vertica.com/discussion/242246/preseve-empty-string-when-using-fcsv-parser#latest
+    **
+	** c2_filler FILLER VARCHAR, c2 AS NVL(c2_filler, ''), 
+	**
+	*/
+
+	emptyStringDataSets.forEach((id) => {  
+	  rejectedRecordsTableName = `YRT-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
+	  const columns = id.split('-')
+	  let sqlStatement = this.tableInfo.copy
+	  columns.forEach((idx) => {
+		const columnName = `"${this.tableInfo.columnNames[idx]}"`
+		const fillerName = `"YADAMU_COL_${String(parseInt(idx)+1).padStart(3,"0")}"`
+		const fillerSize = this.tableInfo.sizeConstraints[idx]
+	    const columnReplacement = `${fillerName} FILLER${fillerSize > 65000 ? ' LONG ': ' '}VARCHAR(${fillerSize}), ${columnName} AS NVL(${fillerName}, '')`
+		sqlStatement = sqlStatement.replace(columnName,columnReplacement)
+	  }) 
+	  dataSets[id] = { 
+	    sql: `${sqlStatement} REJECTED DATA AS TABLE "${rejectedRecordsTableName}"  NO COMMIT`	
+	  ,	errors : rejectedRecordsTableName
+      }
+    })
+  
+    
+  
+    try {
+      await this.dbi.createSavePoint();
+	  for (const key of Object.keys(dataSets)) {
+		await this.writeBatchAsCSV(this.STAGING_FILE,batch[key])
+		const stack = new Error().stack
+        const results = await this.dbi.insertBatch(dataSets[key].sql,dataSets[key].errors);
+		if (results.rejected > 0) {
+	      await this.reportCopyErrors(results.errors,batch.copy,stack,dataSets[key].sql)
+		}
+		this.metrics.written+= results.inserted
+		this.metrics.skipped+= results.rejected
+		await this.cleanupStagingFile(this.STAGING_FILE,true);
+	  }
+      this.endTime = performance.now();
+      await this.dbi.releaseSavePoint();
+    } catch (cause) {
+      this.endTime = performance.now();1
+      this.cleanupStagingFile(this.STAGING_FILE,true);
+	  await this.reportBatchError(batch.copy,`COPY`,cause)
+      await this.dbi.restoreSavePoint(cause);
+	  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);  
+      for (const key of Object.keys(dataSets)) {	  
+        batch.insert.push(...batch[key])		
+	  }
+      this.tableInfo.insertMode = 'Iterative' 
+    }
+	 
 	
 	if (batch.insert.length > 0) {
 	  for (const row in batch.insert) {
         try {
 	      await this.dbi.createSavePoint();
-		  const sqlStatement = `${this.tableInfo.dml} (${batch.insert[row].map((col,idx) => {return this.tableInfo.insertOperators[idx] === null ? this.addArgument(col): this.addOperator(col,this.tableInfo.insertOperators[idx])}).join(",")})`
+		  const sqlStatement = `${this.tableInfo.dml} (${batch.insert[row].map((col,idx) => {return ((col === null) || (this.tableInfo.insertOperators[idx] === null)) ? this.addArgument(col) : this.addOperator(col,this.tableInfo.insertOperators[idx])}).join(",")})`
 		  let results = await this.dbi.executeSQL(sqlStatement);
-          // await this.dbi.releaseSavePoint();
+          await this.dbi.releaseSavePoint();
 	   	  this.metrics.written++;
 		  this.mergeoutInsertCount--;
 		  if (this.mergeoutInsertCount === 0) {
-		    results = await this.dbi.executeSQL(this.tableInfo.mergeout);
+			results = await this.dbi.executeSQL(this.tableInfo.mergeout);
+			/*
+			**
+			** Monitor MergeOut
+			**
+			
+			const sql = `SELECT OPERATION_START_TIMESTAMP, node_name, operation_status, table_schema, table_name, projection_name, plan_type FROM TUPLE_MOVER_OPERATIONS where table_schema = '${this.tableInfo._SCHEMA_NAME}' and table_name = '${this.tableName}' order by OPERATION_START_TIMESTAMP desc;`
+			// console.log(sql)
+		    results = await this.dbi.executeSQL(sql);
+			console.log(results.rows);
+						
+			**
+			*/
+
 			this.mergeoutInsertCount = this.dbi.MERGEOUT_INSERT_COUNT
 		  }
         } catch(cause) {
+		  console.log(cause);
 	  	  this.dbi.restoreSavePoint(cause);
           this.handleIterativeError(`INSERT ONE`,cause,row,batch.insert[row]);
           if (this.skipTable) {
@@ -407,7 +494,6 @@ class VerticaWriter extends YadamuWriter {
 
   toSQLInterval(interval) {
     const jsInterval = YadamuLibrary.parse8601Interval(interval)
-	console.log(interval,jsInterval)
 	switch (jsInterval.type) {
 	  case 'YM':
   	    return `${jsInterval.years || 0}-${jsInterval.months || 0}`

@@ -24,8 +24,8 @@ class MySQLQA extends MySQLDBI {
       return MySQLQA.YADAMU_DBI_PARAMETERS
     }	
 			
-    constructor(yadamu) {
-       super(yadamu)
+    constructor(yadamu,settings,parameters) {
+       super(yadamu,settings,parameters)
     }
 	
     setMetadata(metadata) {
@@ -59,11 +59,11 @@ class MySQLQA extends MySQLDBI {
 	
     // ### Hack to avoid missng rows when using a new connection to read previously written rows using new connection immediately after closing current connection.....'
 
-    async finalize() {
-      await super.finalize()
+	async finalizeImport() {
 	  await this.doTimeout(100);
-	}
-
+	  super.finalizeImport()
+    }
+	
     async recreateSchema() {
         
       try {

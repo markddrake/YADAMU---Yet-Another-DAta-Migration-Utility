@@ -11,11 +11,8 @@ class VerticaConstants {
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "SPATIAL_FORMAT"            : "WKB"
-	, "YADAMU_STAGING_FOLDER"     : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
-	, "VERTICA_STAGING_FOLDER"    : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
-	, "STAGING_FILE_RETENTION"    : "FAILED"
-	, "PRESERVE_WHITESPACE"       : true
-	, "MERGEOUT_INSERT_COUNT"     : 1024
+	, "COPY_TRIM_WHITEPSPACE"     : false
+	, "MERGEOUT_INSERT_COUNT"     : 128
 	, "VERTICA_CHAR_SIZE"         : 4
     })
     return this._STATIC_PARAMETERS;
@@ -28,14 +25,12 @@ class VerticaConstants {
     return this.#_DBI_PARAMETERS
   }
   static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
-  static get YADAMU_STAGING_FOLDER()  { return this.DBI_PARAMETERS.YADMAU_STAGING_FOLDER };
-  static get VERTICA_STAGING_FOLDER() { return this.DBI_PARAMETERS.VERTICA_STAGING_FOLDER };
-  static get STAGING_FILE_RETENTION() { return this.DBI_PARAMETERS.STAGING_FILE_RETENTION };
-  static get PRESERVE_WHITESPACE()    { return this.DBI_PARAMETERS.PRESERVE_WHITESPACE === true };
+  static get COPY_TRIM_WHITEPSPACE()  { return this.DBI_PARAMETERS.COPY_TRIM_WHITEPSPACE === true };
   static get VERTICA_CHAR_SIZE()      { return this.DBI_PARAMETERS.VERTICA_CHAR_SIZE };
   static get MERGEOUT_INSERT_COUNT()  { return this.DBI_PARAMETERS.MERGEOUT_INSERT_COUNT };
   static get STATEMENT_TERMINATOR()   { return ';' }
 
+  static get COPY_OPERATION_SOURCES()    { return Object.freeze(['loader']) }
 
 }
 

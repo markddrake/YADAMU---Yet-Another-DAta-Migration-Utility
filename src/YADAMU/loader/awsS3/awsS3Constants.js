@@ -6,9 +6,10 @@ const YadamuConstants = require('../../common/yadamuConstants.js');
 
 class AWSS3Constants {
 
-  static get DATABASE_KEY()               { return 's3' };
+  static get DATABASE_KEY()               { return 'awsS3' };
   static get DATABASE_VENDOR()            { return 'AWSS3' };
   static get SOFTWARE_VENDOR()            { return 'Amazon Web Services LLC' };
+  static get PROTOCOL()                   { return 's3://' };
 
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({

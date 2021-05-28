@@ -21,6 +21,9 @@ class CSVWriter extends JSONWriter {
 
   _setCSVTransformations(row) {
 
+    // Construct CSV Transformation Rules Incrementatlly (Row by Row). Transformations are defined basded on the first non-null column.
+    // Once all columns have been processed this function beomes a No-op.
+
     this.missingTransformations = this.missingTransformations.flatMap((idx) => {
 	  if (row[idx] !== null) {
         this.csvTransformations[idx] = this.getCSVTransformation(row[idx],(idx === row.length-1)) 

@@ -2,32 +2,32 @@
   "operation"         : "import"
 , "connections"       : "connections.json"
 , "tasks"             : "tasks.json"
-, "importPath"        : "%location%"
 , "recreateSchema"    : true
 , "reverseOperations" : true
 , "verifyOperation"   : true
 , "parameters": {
+	"DIRECTORY"       :  "export/json/%location%"
   }
 , "tests" : [{
-    "source"      : "file-JSON"
+    "source"      : "file-staging"
   , "targets"     : ["mssql17","mssql19","postgres#1","mysql#1","mariadb#1"]
   , "tasks": [
       "oracle"
     ]
   },{
-    "source"      : "file-JSON"
+    "source"      : "file-staging"
   , "targets"     : ["oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1"]
   , "tasks": [
       "mysql"
     ]
   },{
-    "source"      : "file-JSON"
+    "source"      : "file-staging"
   , "targets"     : ["oracle19c","oracle18c","oracle12c","postgres#1","mysql#1","mariadb#1"]
   , "tasks": [
       "mssql"
     ]
   },{
-    "source"      : "file-JSON"
+    "source"      : "file-staging"
   , "targets"     : ["oracle11g"]
   , "parameters"  : {
       "IDENTIFIER_MAPPING_FILE"  : "qa/mappings/oracle11gAdventureWorks.json"

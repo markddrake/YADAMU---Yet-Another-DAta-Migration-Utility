@@ -5,8 +5,8 @@ const ErrorWriter = require('./errorWriter.js');
 
 class ErrorDBI extends FileDBI {
   
-  constructor(yadamu,exportFilePath) {
-    super(yadamu,exportFilePath)
+  constructor(yadamu,filename) {
+    super(yadamu,{},{FILE : filename})
   }
  
   getOutputStream() {

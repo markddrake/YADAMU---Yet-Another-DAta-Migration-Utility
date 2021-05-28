@@ -14,10 +14,11 @@ const DBIConstants = require('../../common/dbiConstants.js');
 const YadamuConstants = require('../../common/yadamuConstants.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js')
 
+const LoaderConstants = require('./loaderConstants.js');
 const JSONParser = require('./jsonParser.js');
 const EventStream = require('./eventStream.js');
 const JSONWriter = require('./jsonWriter.js');
-const ArrayWriterWriter = require('./arrayWriter.js');
+const ArrayWriter = require('./arrayWriter.js');
 const CSVWriter = require('./csvWriter.js');
 const {YadamuError, CommandLineError} = require('../../common/yadamuException.js');
 const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
@@ -43,7 +44,7 @@ class IVReader extends PassThrough {
 	super()
 	this.ivLength = ivLength
   }
-   
+      
   passthrough = (data,enc,callback) => {
     this.push(data)
     callback()
@@ -77,8 +78,10 @@ class LoaderDBI extends YadamuDBI {
   **
   */
 
-  static get DATABASE_KEY()      { return 'loader' };
-  static get DATABASE_VENDOR()   { return 'LOADER' };
+  static get DATABASE_KEY()          { return LoaderConstants.DATABASE_KEY};
+  static get DATABASE_VENDOR()       { return LoaderConstants.DATABASE_VENDOR};
+  static get SOFTWARE_VENDOR()       { return LoaderConstants.SOFTWARE_VENDOR};
+  static get PROTOCOL()              { return LoaderConstants.PROTOCOL }
 
   static #_YADAMU_DBI_PARAMETERS
 
@@ -93,7 +96,9 @@ class LoaderDBI extends YadamuDBI {
     
   get DATABASE_KEY()             { return LoaderDBI.DATABASE_KEY };
   get DATABASE_VENDOR()          { return LoaderDBI.DATABASE_VENDOR };
-
+  get SOFTWARE_VENDOR()          { return LoaderDBI.SOFTWARE_VENDOR };
+  get PROTOCOL()                 { return LoaderDBI.PROTOCOL };
+  
   get YADAMU_DBI_PARAMETERS()    { 
 	this._YADAMU_DBI_PARAMETERS = this._YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},super.YADAMU_DBI_PARAMETERS,{}))
 	return this._YADAMU_DBI_PARAMETERS
@@ -102,22 +107,46 @@ class LoaderDBI extends YadamuDBI {
   get JSON_OUTPUT()              { return this.OUTPUT_FORMAT === 'JSON' }
   get ARRAY_OUTPUT()             { return this.OUTPUT_FORMAT === 'ARRAY' }
   get CSV_OUTPUT()               { return this.OUTPUT_FORMAT === 'CSV'  }
-    
+  get PROTOCOL()                 { return 'file://' }
   
-  get ROOT_FOLDER()              { 
-    return this._ROOT_FOLDER || (() => { 
-      const rootFolder = this.parameters.ROOT_FOLDER || this.connectionProperties.rootFolder || '' 
-	  this._ROOT_FOLDER = YadamuLibrary.macroSubstitions(rootFolder, this.yadamu.MACROS)
-	  return this._ROOT_FOLDER
-    })() 
+  get BASE_DIRECTORY() {
+
+    /*
+	**
+	** Rules for Root Folder Location are as follows
+	**
+	
+	Parameter BASE_DIRECTORY is absolute: DIRECTORY
+    OTHERWISE: 
+	
+	  Parameter DIRECTORY is not supplied: conn:directory
+      OTHERWISE: conn:directory/DIRECTORY/FILE
+	
+	**
+	*/
+	
+    return this._BASE_DIRECTORY || (() => {
+	  let baseDirectory =  this.vendorProperties.directory
+	  if (this.DIRECTORY) {
+        if (path.isAbsolute(this.DIRECTORY)) {
+	      baseDirectory = this.DIRECTORY
+        }
+        else {
+          baseDirectory = path.join(this.vendorProperties.directory,this.DIRECTORY)
+		}
+	  }
+	  baseDirectory = YadamuLibrary.macroSubstitions(baseDirectory,this.yadamu.MACROS)
+	  this._BASE_DIRECTORY = path.resolve(baseDirectory)
+	  return this._BASE_DIRECTORY
+    })()
   }
   
-  get IMPORT_FOLDER()            { return this._IMPORT_FOLDER || (() => {this._IMPORT_FOLDER = path.join(this.ROOT_FOLDER,this.parameters.TO_USER); return this._IMPORT_FOLDER})() }
-  get EXPORT_FOLDER()            { return this._EXPORT_FOLDER || (() => {this._EXPORT_FOLDER = path.join(this.ROOT_FOLDER,this.parameters.FROM_USER); return this._EXPORT_FOLDER})() }
+  get IMPORT_FOLDER()            { return this._IMPORT_FOLDER || (() => {this._IMPORT_FOLDER = path.join(this.BASE_DIRECTORY,this.parameters.TO_USER); return this._IMPORT_FOLDER})() }
+  get EXPORT_FOLDER()            { return this._EXPORT_FOLDER || (() => {this._EXPORT_FOLDER = path.join(this.BASE_DIRECTORY,this.parameters.FROM_USER); return this._EXPORT_FOLDER})() }
   
   get OUTPUT_FORMAT() { 
     this._OUTPUT_FORMAT = this._OUTPUT_FORMAT || (() => {
-	  switch (this.parameters.OUTPUT_FORMAT ? this.parameters.OUTPUT_FORMAT.toUpperCase() : 'JSON') {
+	  switch (this.controlFile?.yadamuOptions.contentType || this.parameters.OUTPUT_FORMAT?.toUpperCase() || 'JSON') {
         case 'ARRAY':
           this._FILE_EXTENSION = 'data'
           this._OUTPUT_FORMAT = 'ARRAY'
@@ -141,7 +170,7 @@ class LoaderDBI extends YadamuDBI {
 
   get WRITER() {
     this._WRITER = this._WRITER || (() => { 
-	  // Referencing OUTPUT_FORAMT sets _WRITER
+	  // Referencing _OUTPUT_FORMAT sets _WRITER
 	  const outputformat = this.OUTPUT_FORMAT; 
 	  return this._WRITER
 	})();
@@ -150,59 +179,80 @@ class LoaderDBI extends YadamuDBI {
   
   get FILE_EXTENSION() {
     this._FILE_EXTENSION = this._FILE_EXTENSION || (() => { 
-	  // Referencing OUTPUT_FORAMT sets _FILE_EXTENSION
+	  // Referencing _OUTPUT_FORMAT sets _FILE_EXTENSION
 	  const outputformat = this.OUTPUT_FORMAT; 
 	  return this._FILE_EXTENSION
 	})();
 	return this._FILE_EXTENSION
   }
 
-  get COMPRESSION_FORMAT()     { return this.controlFile.yadamuOptions.compression }
   get COMPRESSED_CONTENT()     { return (this.COMPRESSION_FORMAT !== 'NONE') }
-  get ENCRYPTED_CONTENT()      { return this.yadamu.ENCRYPTION }
-  get ENCRYPTED_INPUT()        { return this.controlFile.yadamuOptions.encryption !== "NONE" }
+  get ENCRYPTED_CONTENT()      { return this.yadamu.ENCRYPTION && this.yadamu.ENCRYPTION !== 'NONE' }
+
   get COMPRESSED_INPUT()       { return this.controlFile.yadamuOptions.compression !== "NONE" }
+  get COMPRESSION_FORMAT()     { return this.controlFile.yadamuOptions.compression }
+  get ENCRYPTED_INPUT()        { return this.controlFile.yadamuOptions.encryption !== "NONE" }
   
   set INITIALIZATION_VECTOR(v) { this._INITIALIZATION_VECTOR =  v }
   get INITIALIZATION_VECTOR()  { return this._INITIALIZATION_VECTOR }
   get IV_LENGTH()              { return 16 }  
   
   
-  constructor(yadamu,exportFilePath) {
-    // Export File Path is a Directory for in Load/Unload Mode
-    super(yadamu,exportFilePath)
-	this._EXPORT_PATH = exportFilePath
+  constructor(yadamu,settings,parameters) {
+    super(yadamu,settings,parameters)
 	this.yadamuProperties = {}
 	this.writeOperations = new Set()
-  }    
-  
-  getConnectionProperties() {
-    return {
-      rootFolder       : this.parameters.ROOT_FOLDER
-    }
+	this.baseDirectory = path.resolve(this.vendorProperties.directory || "")
+  }    	
+
+  resolve(target) {
+	return path.resolve(target)
   }
 
+  setDescription(description) {
+    this.DESCRIPTION = description.indexOf(this.baseDirectory) === 0 ? description.substring(this.baseDirectory.length+1) : description
+  }
+  
+  getURI(target) {
+    return `${this.PROTOCOL}${this.resolve(target)}`
+  }
+  
+  updateVendorProperties(vendorProperties) {
+
+  // vendorProperties.directory   = this.parameters.DIRECTORY || vendorProperties.directory 
+	
+  }
+  
   isDatabase() {
     return true;
   }
   
+  isCopyOperationSource() {
+    return true;
+  }
+
   async getSystemInformation() {
     // this.yadamuLogger.trace([this.constructor.name,this.exportFilePath],`getSystemInformation()`)     	
 	return this.controlFile.systemInformation
   }
 
   async loadMetadataFiles() {
-  	const metadata = {}
+  	this.metadata = {}
     if (this.controlFile) {
       const metdataRecords = await Promise.all(Object.keys(this.controlFile.metadata).map((tableName) => {
         return fsp.readFile(this.controlFile.metadata[tableName].file,{encoding: 'utf8'})
       }))
       metdataRecords.forEach((content) =>  {
         const json = JSON.parse(content)
-		metadata[json.tableName] = json;
+		this.metadata[json.tableName] = json;
+        json.dataFile = this.controlFile.data[json.tableName].file
       })
     }
-    return metadata;      
+    return this.metadata;      
+  }
+
+  generateMetadata() {
+	return this.metadata
   }
 
   async getSchemaInfo() {
@@ -213,12 +263,17 @@ class LoaderDBI extends YadamuDBI {
     return Object.keys(this.metadata).map((tableName) => {
       return {
 		TABLE_SCHEMA          : this.metadata[tableName].tableSchema
+	  , TABLE_NAME : tableName
+      , DATA_TYPE_ARRAY       : this.metadata[tableName].dataTypes
+	  , SPATIAL_FORMAT        : this.systemInformation.typeMappings.spatialFormat 
+	  } 
+	  /*
+      return {
       , TABLE_NAME            : tableName
       , COLUMN_NAME_ARRAY     : this.metadata[tableName].columnNames
-	  , DATA_TYPE_ARRAY       : this.metadata[tableName].dataTypes
 	  , SIZE_CONSTRAINT_ARRAY : this.metadata[tableName].sizeConstraints
-	  , SPATIAL_FORMAT        : this.systemInformation.typeMappings.spatialFormat 
       } 
+	  */
     })
 
   }
@@ -272,6 +327,7 @@ class LoaderDBI extends YadamuDBI {
 	   const file = this.controlFile.metadata[tableMetadata.tableName].file
        return this.writeFile(file,tableMetadata)   
     }))
+	this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created Control File: "${this.getURI(this.controlFilePath)}"`);
   }
 
   async setMetadata(metadata) {
@@ -280,7 +336,6 @@ class LoaderDBI extends YadamuDBI {
 
     Object.values(metadata).forEach((table) => {delete table.source})
 	super.setMetadata(metadata)
-    await this.writeMetadata(metadata)
   }
   
   setFolderPaths(rootFolder,schema) {
@@ -296,19 +351,19 @@ class LoaderDBI extends YadamuDBI {
     
     // Calculate the base directory for the unload operation. The Base Directory is dervied from the target schema name specified by the TO_USER parameter
 
-    this.setFolderPaths(this.IMPORT_FOLDER,this.parameters.TO_USER)
-
+    this.DIRECTORY = this.TARGET_DIRECTORY
+	this.setFolderPaths(this.IMPORT_FOLDER,this.parameters.TO_USER)
+    this.setDescription(this.IMPORT_FOLDER)
+	
     // Create the Upload, Metadata and Data folders
 	await fsp.mkdir(this.IMPORT_FOLDER, { recursive: true });
     await fsp.mkdir(this.metadataFolderPath, { recursive: true });
     await fsp.mkdir(this.dataFolderPath, { recursive: true });
     
-	this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Created target directory  "${this.IMPORT_FOLDER}"`);
-
+	this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Created directory: "${this.PROTOCOL}${this.resolve(this.IMPORT_FOLDER)}"`);
     const dataFileList = {}
     const metadataFileList = {}
     this.createControlFile(metadataFileList,dataFileList)
-    
   }
 
   getOutputStream(tableName,ddlComplete) {
@@ -352,8 +407,8 @@ class LoaderDBI extends YadamuDBI {
 	if (this.COMPRESSED_CONTENT) {
       streams.push(this.COMPRESSION_FORMAT === 'GZIP' ? createGzip() : createDeflate())
     }
-
-    if (this.ENCRYPTED_CONTENT) {
+	
+	if (this.ENCRYPTED_CONTENT) {
 	  const iv = await this.createInitializationVector()
 	  // console.log('Cipher',this.controlFile.data[tableName].file,this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv);
 	  const cipherStream = crypto.createCipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv)
@@ -372,18 +427,20 @@ class LoaderDBI extends YadamuDBI {
   **
   */
 
-  async initializeExport() {
+  async initializeExport(csvLoadingEnabled) {
 	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
     
+    this.DIRECTORY = this.SOURCE_DIRECTORY
     this.setFolderPaths(this.EXPORT_FOLDER,this.parameters.FROM_USER)
+    this.setDescription(this.EXPORT_FOLDER)
 
-	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using control file "${this.controlFilePath}"`);
+	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using Control File: "${this.PROTOCOL}${this.resolve(this.controlFilePath)}"`);
 	let stack
 	try {
 	  stack = new Error().stack;
       const fileContents = await fsp.readFile(this.controlFilePath,{encoding: 'utf8'})
       this.controlFile = JSON.parse(fileContents)
-	  if (this.controlFile.yadamuOptions.contentType === 'CSV') {
+	  if (this.controlFile.yadamuOptions.contentType === 'CSV' && !csvLoadingEnabled) {
   	    throw new YadamuError('Loading of CSV formatted data sets is not supported')
       }
 	} catch (err) {
@@ -414,9 +471,8 @@ class LoaderDBI extends YadamuDBI {
     }
   }
 
-  async getInputStream(tableInfo) {
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating input stream on ${this.controlFile.data[tableInfo.TABLE_NAME].file}`)
-	const filename = this.controlFile.data[tableInfo.TABLE_NAME].file
+  async getInputStream(filename) {
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating input stream on ${filename}`)
     const stream = fs.createReadStream(filename);
     const stack = new Error().stack;
     await new Promise((resolve,reject) => {
@@ -425,9 +481,7 @@ class LoaderDBI extends YadamuDBI {
     return stream
   }
 
-  async loadInitializationVector(tableInfo) {
-
-	const filename = this.controlFile.data[tableInfo.TABLE_NAME].file
+  async loadInitializationVector(filename) {
 	const fd = await fsp.open(filename)
 	const iv = new Uint8Array(this.IV_LENGTH)
 	const results = await fd.read(iv,0,this.IV_LENGTH,0)
@@ -436,12 +490,13 @@ class LoaderDBI extends YadamuDBI {
   }	
   
   async getInputStreams(tableInfo) {
-    
 	const streams = []
+	const filename = this.controlFile.data[tableInfo.TABLE_NAME].file  
+
     this.INPUT_METRICS = DBIConstants.NEW_TIMINGS
 	this.INPUT_METRICS.DATABASE_VENDOR = this.DATABASE_VENDOR
 
-	const is = await this.getInputStream(tableInfo);
+	const is = await this.getInputStream(filename);
 	is.once('readable',() => {
 	  this.INPUT_METRICS.readerStartTime = performance.now()
 	}).on('error',(err) => { 
@@ -454,9 +509,9 @@ class LoaderDBI extends YadamuDBI {
 	streams.push(is)
 	
 	if (this.ENCRYPTED_INPUT) {
-	  const iv = await this.loadInitializationVector(tableInfo)
+	  const iv = await this.loadInitializationVector(filename)
 	  streams.push(new IVReader(this.IV_LENGTH))
-  	  // console.log('Decipher',this.controlFile.data[tableInfo.TABLE_NAME].file,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
+  	  // console.log('Decipher',filename,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
 	  const decipherStream = crypto.createDecipheriv(this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv)
 	  streams.push(decipherStream);
 	}
@@ -465,7 +520,7 @@ class LoaderDBI extends YadamuDBI {
       streams.push(this.controlFile.yadamuOptions.compression === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
-	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.controlFile.data[tableInfo.TABLE_NAME].file)
+	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, filename)
 	jsonParser.once('readable',() => {
 	  this.INPUT_METRICS.parserStartTime = performance.now()
 	}).on('error',(err) => { 
@@ -499,7 +554,15 @@ class LoaderDBI extends YadamuDBI {
 	this.statementCache = {}
 	return this.statementCache
   }
+
+  async executeDDL(ddl) {
+	if (this.MODE !== 'DDL_ONLY') {
+	  await this.writeMetadata(this.metadata)
+	}
+	return []
     
+  }
+  
   classFactory(yadamu) {
 	return new LoaderDBI(yadamu)
   }
@@ -507,11 +570,6 @@ class LoaderDBI extends YadamuDBI {
   async cloneCurrentSettings(manager) {
     super.cloneCurrentSettings(manager)
 	this.controlFile = manager.controlFile
-    /*
-	this.controlFilePath = manager.controlFilePath
-    this.metadataFolderPath = manager.metadataFolderPath
-    this.dataFolderPath = manager.dataFolderPath
-    */
   }
   
   reloadStatementCache() {
@@ -523,6 +581,10 @@ class LoaderDBI extends YadamuDBI {
   async finalize() {
 	await Promise.all(Array.from(this.writeOperations));
 	super.finalize()
+  }
+  
+  getControlFile() {
+	 return this.controlFile
   }
 
   async getConnectionID() { /* OVERRIDE */ }

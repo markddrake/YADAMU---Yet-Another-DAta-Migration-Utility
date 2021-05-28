@@ -25,8 +25,8 @@ class PostgresQA extends PostgresDBI {
       return PostgresQA.YADAMU_DBI_PARAMETERS
     }	
 		
-    constructor(yadamu) {
-       super(yadamu);
+    constructor(yadamu,settings,parameters) {
+       super(yadamu,settings,parameters);
     }
     
     setMetadata(metadata) {

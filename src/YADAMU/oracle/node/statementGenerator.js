@@ -287,7 +287,7 @@ class StatementGenerator {
     }
 
     const typeMappings = this.getTypeMappings();
-	const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :schema, :typeMappings);\nend;`;
+	const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :schema, :typeMappings);end;`;
 
     // console.log(JSON.stringify(this.metadata," ",2));
 

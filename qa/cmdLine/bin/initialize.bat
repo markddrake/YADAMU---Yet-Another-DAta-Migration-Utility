@@ -15,7 +15,7 @@ set YADAMU_SCRIPT_PATH=%YADAMU_SCRIPT_PATH:~0,-1%
 set YADAMU_BIN=%YADAMU_HOME%\bin
 set YADAMU_LOG_ROOT=%YADAMU_HOME%\log
 call qa\bin\initializeLogging.bat %YADAMU_TESTNAME%
-set YADAMU_QA_JSPATH=%YADAMU_HOME%\src\YADAMU_QA\utilities\node
+set YADAMU_QA_JSPATH=%YADAMU_HOME%\utilities\node
 set YADAMU_ENV_PATH=%YADAMU_HOME%\src\install\%YADAMU_DATABASE%
 call %YADAMU_ENV_PATH%\env\dbConnection.bat
 set YADAMU_SQL_PATH=%YADAMU_HOME%\qa\sql\%YADAMU_VENDOR%

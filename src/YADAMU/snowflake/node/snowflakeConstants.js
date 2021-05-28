@@ -7,7 +7,7 @@ class SnowflakeConstants {
   static get DATABASE_KEY()           { return 'snowflake' };
   static get DATABASE_VENDOR()        { return 'SNOWFLAKE' };
   static get SOFTWARE_VENDOR()        { return 'Snowflake Software Inc' };
-
+  static get VARIANT_DATA_TYPE()      { return `VARIANT` }
 
   static get STATIC_PARAMETERS()      { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
@@ -17,6 +17,8 @@ class SnowflakeConstants {
     , "TRANSIENT_TABLES"          : true
     , "DATA_RETENTION_TIME"       : 0
     , "SPATIAL_FORMAT"            : "WKB"
+	, "SNOWFLAKE_XML_TYPE"        : this.VARIANT_DATA_TYPE
+	, "SNOWFLAKE_JSON_TYPE"       : this.VARIANT_DATA_TYPE
     })
     return this._STATIC_PARAMETERS;
   }
@@ -34,11 +36,10 @@ class SnowflakeConstants {
   static get TRANSIENT_TABLES()       { return this.DBI_PARAMETERS.TRANSIENT_TABLES}
   static get DATA_RETENTION_TIME()    { return this.DBI_PARAMETERS.DATA_RETENTION_TIME}
   static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
+  static get SNOWFLAKE_XML_TYPE()     { return this.DBI_PARAMETERS.SNOWFLAKE_XML_TYPE };
+  static get SNOWFLAKE_JSON_TYPE()    { return this.DBI_PARAMETERS.SNOWFLAKE_JSON_TYPE };
   static get STATEMENT_TERMINATOR()   { return ';' }
 
-  static get VARIANT_DATA_TYPE()      { return `VARIANT` }
-  static get XML_TYPE()               { return this.VARIANT_DATA_TYPE }  
-  static get JSON_TYPE()              { return this.VARIANT_DATA_TYPE }
   static get CLOB_TYPE()              { return `VARCHAR(${this.MAX_CHARACTER_SIZE})`}
   static get BLOB_TYPE()              { return `BINARY(${this.MAX_BINARY_SIZE})`}
   

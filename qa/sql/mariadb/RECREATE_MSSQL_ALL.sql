@@ -102,6 +102,13 @@ PREPARE STATEMENT FROM @STATEMENT;
 EXECUTE STATEMENT;
 DEALLOCATE PREPARE STATEMENT;
 --
+/*
+**
+** Dissable Command Line Testing for WorldWideImporters and WorldWideImportersDW
+**
+*/
+quit
+--
 set @SCHEMA = 'WWI_Application';
 --
 SET @STATEMENT = CONCAT('DROP SCHEMA IF EXISTS ','"',@SCHEMA,@ID,'"');

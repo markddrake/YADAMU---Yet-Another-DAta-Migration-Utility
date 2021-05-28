@@ -8,22 +8,26 @@
   , "CIRCLE_FORMAT"  : "CIRCLE"
   }
 , "tests"             : [{
-    "operation"       : "export"
-  , "source"          : "postgres#1"
-  , "target"          : "file-JSON"
-  , "exportPath"      : "%vendor%"
-  , "verifyOperation" : true
-  , "tasks": [ 
+    "operation"              : "export"
+  , "source"                 : "postgres#1"
+  , "target"                 : "file-staging"
+  , "verifyOperation"        : true
+  , "parameters"             : {
+	  "DIRECTORY"            : "%operation%/json/%vendor%"
+    }
+  , "tasks"                  : [
       "postgresDataTypes"
 	]
   },{
     "operation"       : "import"
-  , "importPath"      : "%location%"
-  , "source"          : "file-JSON"
-  , "verifyOperation" : true
+  , "source"          : "file-staging"
   , "targets"         : [
        "snow#1","oracle19c","mongodb#1","mysql#1","mariadb#1","mssql19"
 	]
+  , "verifyOperation" : true
+  , "parameters"      : {
+      "DIRECTORY"     : "export/json/%location%"
+    }                    
   , "tasks": [ 
       "postgresDataTypes"
 	]

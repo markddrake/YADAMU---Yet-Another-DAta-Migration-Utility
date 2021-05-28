@@ -1,273 +1,196 @@
 {
   "operation"                         : "export"
 , "connections"                       : "connections.json"
-, "verifyOperation"                   : true
 , "recreateSchema"                    : true
-, "exportPath"                        : "%connection%/%mode%"
 , "createDirectory"                   : true
-, "parameters": {
+, "verifyOperation"                   : true
+, "parameters"                        : {
+	"DIRECTORY"                       : "%operation%/%mode%/%connection%"
   }
 , "tasks"                             : "tasks.json"
 , "tests" : [{
     "source": "oracle19c"
-  , "target": "file-JSON"
-  , "parameters": {
-      "MODE": "DDL_ONLY"
-    }
+  , "target": "file-staging"
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "%operation%/json/%vendor%"
+     }
   , "tasks": [
       "oracle"
     ]
   },{
-    "source": "oracle19c"
-  , "target": "file-JSON"
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle19c"
-  , "target": "file-JSON"
-  , "parameters": {
-      "MODE": "DDL_AND_DATA"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle18c"
-  , "target": "file-JSON"
-  , "parameters": {
-      "MODE": "DDL_ONLY"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle18c"
-  , "target": "file-JSON"
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle18c"
-  , "target": "file-JSON"
-  , "parameters": {
-      "MODE": "DDL_AND_DATA"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle12c"
-  , "target": "file-JSON"
-  , "parameters": {
-      "MODE": "DDL_ONLY"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle12c"
-  , "target": "file-JSON"
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle12c"
-  , "target": "file-JSON"
-  , "parameters": {
-      "MODE": "DDL_AND_DATA"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle11g"
-  , "target": "file-JSON"
-  , "parameters": {
-      "MODE": "DDL_ONLY"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle11g"
-  , "target": "file-JSON"
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source": "oracle11g"
-  , "target": "file-JSON"
-  , "parameters": {
-      "MODE": "DDL_AND_DATA"
-    }
-  , "tasks": [
-      "oracle"
-    ]
-  },{
-    "source"          : "mssql17"
-  , "target"          : "file-JSON"
-  , "exportPath"      : "%connection%"
-  , "tasks": [
-      "mssql"
-    ]
-  },{
-    "operation"       : "import"
-  , "source"          : "file-JSON"
-  , "target"          : "mssql17"
-  , "importPath"      : "%connection%"
-  , "verifyOperation" : false
-  , "tasks": [
-      "Northwind_AWA"
-    ]  
-  },{
-    "operation"       : "import"
-  , "source"          : "file-JSON"
-  , "target"          : "mssql17"
-  , "importPath"      : "%connection%"
-  , "recreateSchema"  : false
-  , "verifyOperation" : false
-  , "tasks": [
-      "AdventureWorks_AWA"
-    ]  
-  },{
-    "source"          : "mssql17"
-  , "target"          : "file-JSON"
-  , "exportPath"      : "%connection%"
-  , "tasks": [
-      "AdventureWorksAll"
-    ]
-  },{
-    "source"          : "mssql19"
-  , "target"          : "file-JSON"
-  , "exportPath"      : "%connection%"
-  , "tasks": [
-      "mssql"
-    ]
-  },{
-    "operation"       : "import"
-  , "source"          : "file-JSON"
-  , "target"          : "mssql19"
-  , "importPath"      : "%connection%"
-  , "verifyOperation" : false
-  , "tasks": [
-      "Northwind_AWA"
-    ]  
-  },{
-    "operation"       : "import"
-  , "source"          : "file-JSON"
-  , "target"          : "mssql19"
-  , "importPath"      : "%connection%"
-  , "recreateSchema"  : false
-  , "verifyOperation" : false
-  , "tasks": [
-      "AdventureWorks_AWA"
-    ]  
-  },{
-    "source"          : "mssql19"
-  , "target"          : "file-JSON"
-  , "exportPath"      : "%connection%"
-  , "tasks": [
-      "AdventureWorksAll"
-    ]
-  },{
-    "source"          : "mysql#1"
-  , "target"          : "file-JSON"
-  , "exportPath"      : "%vendor%"
+    "source"                          : "mysql#1"
+  , "target"                          : "file-staging"
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "%operation%/json/%vendor%"
+     }
   , "tasks": [
       "mysql"
     ]
   },{
+    "source"                          : "mssql19"
+  , "target"                          : "file-staging"
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "%operation%/json/%vendor%"
+     }
+  , "tasks": [
+      "mssql"
+    ]
+  },{
+    "operation"                       : "import"
+  , "source"                          : "file-staging"
+  , "target"                          : "mssql19"
+  , "verifyOperation"                 : false
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "export/json/%vendor%"
+    }
+  , "tasks": [                        
+      "Northwind_AWA"                 
+    ]                                 
+  },{                                 
+    "operation"                       : "import"
+  , "source"                          : "file-staging"
+  , "target"                          : "mssql19"
+  , "recreateSchema"                  : false
+  , "verifyOperation"                 : false
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "export/json/%vendor%"
+     }
+  , "tasks": [
+      "AdventureWorks_AWA"
+    ]  
+  },{
+    "source"                          : "mssql19"
+  , "target"                          : "file-staging"
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "%operation%/json/%vendor%"
+     }
+  , "tasks": [
+      "AdventureWorksAll"
+    ]
+  },{
     "source": "oracle19c"
-  , "target": "file-JSON"
-  , "exportPath" : "/plain/%connection%/%mode%"
+  , "target": "file-lRegress"
+  , "parameters": {
+      "MODE": "DDL_ONLY"
+     }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle19c"
+  , "target": "file-lRegress"
+  , "parameters": {
+      "MODE": "DDL_AND_DATA"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle18c"
+  , "target": "file-lRegress"
   , "parameters": {
       "MODE": "DDL_ONLY"
     }
   , "tasks": [
-      "HR","BI"
+      "oracle"
     ]
   },{
-    "source": "oracle19c"
-  , "target": "file-JSON"
-  , "exportPath" : "/plain/%connection%/%mode%"
+    "source": "oracle18c"
+  , "target": "file-lRegress"
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle18c"
+  , "target": "file-lRegress"
   , "parameters": {
-      "MODE": "DATA_ONLY"
+      "MODE": "DDL_AND_DATA"
     }
   , "tasks": [
-      "HR","BI"
+      "oracle"
     ]
   },{
-    "source": "oracle19c"
-  , "target": "file-JSON"
-  , "exportPath" : "gzip/%connection%/%mode%"
+    "source": "oracle12c"
+  , "target": "file-lRegress"
   , "parameters": {
       "MODE": "DDL_ONLY"
-    , "COMPRESSION" : "GZIP"
-	}
+    }
   , "tasks": [
-      "HR","BI"
+      "oracle"
     ]
   },{
-    "source": "oracle19c"
-  , "target": "file-JSON"
-  , "exportPath" : "gzip/%connection%/%mode%"
+    "source": "oracle12c"
+  , "target": "file-lRegress"
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source": "oracle12c"
+  , "target": "file-lRegress"
   , "parameters": {
-      "MODE": "DATA_ONLY"
-	, "COMPRESSION" : "GZIP"
-	}
+      "MODE": "DDL_AND_DATA"
+    }
   , "tasks": [
-      "HR","BI"
+      "oracle"
     ]
   },{
-    "source": "oracle19c"
-  , "target": "file-JSON"
-  , "exportPath" : "X/%connection%/%mode%"
-  , "parameters": {
-      "MODE": "DDL_ONLY"
-	, "ENCRYPTION"  : true
-	, "PHASEPHRASE" : "yadamu"
-	}
-  , "tasks": [
-      "HR","BI"
-    ]
-  },{
-    "source": "oracle19c"
-  , "target": "file-JSON"
-  , "exportPath" : "X/%connection%/%mode%"
-  , "parameters": {
-      "MODE": "DATA_ONLY"
-    , "ENCRYPTION"  : true
-	, "PHASEPHRASE" : "yadamu"
-	}
-  , "tasks": [
-      "HR","BI"
-    ]
-  },{
-    "source": "oracle19c"
-  , "target": "file-JSON"
-  , "exportPath" : "X-gzip/%connection%/%mode%"
+    "source": "oracle11g"
+  , "target": "file-lRegress"
   , "parameters": {
       "MODE": "DDL_ONLY"
-	, "COMPRESSION" : "GZIP"
-	, "ENCRYPTION"  : true
-	, "PHASEPHRASE" : "yadamu"
-	}
+    }
   , "tasks": [
-      "HR","BI"
+      "oracle"
     ]
   },{
-    "source": "oracle19c"
-  , "target": "file-JSON"
-  , "exportPath" : "X-gzip/%connection%/%mode%"
-  , "parameters": {
-      "MODE": "DATA_ONLY"
-	, "COMPRESSION" : "GZIP"
-	, "ENCRYPTION"  : true
-	, "PHASEPHRASE" : "yadamu"
-	}
+    "source": "oracle11g"
+  , "target": "file-lRegress"
   , "tasks": [
-      "HR","BI"
+      "oracle"
+    ]
+  },{
+    "source": "oracle11g"
+  , "target": "file-lRegress"
+  , "parameters": {
+      "MODE": "DDL_AND_DATA"
+    }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source"          : "mssql17"
+  , "target"          : "file-lRegress"
+  , "tasks": [
+      "mssql"
+    ]
+  },{
+    "operation"       : "import"
+  , "source"          : "file-lRegress"
+  , "target"          : "mssql17"
+  , "verifyOperation" : false
+  , "parameters"      : {
+	  "DIRECTORY"     : "export/%mode%/%connection%"
+    }
+  , "tasks": [
+      "Northwind_AWA"
+    ]  
+  },{
+    "operation"       : "import"
+  , "source"          : "file-lRegress"
+  , "target"          : "mssql17"
+  , "recreateSchema"  : false
+  , "verifyOperation" : false
+  , "parameters"      : {
+	  "DIRECTORY"     : "export/%mode%/%connection%"
+    }
+  , "tasks": [
+      "AdventureWorks_AWA"
+    ]  
+  },{
+    "source"          : "mssql17"
+  , "target"          : "file-lRegress"
+  , "tasks": [
+      "AdventureWorksAll"
     ]
   }]
 }

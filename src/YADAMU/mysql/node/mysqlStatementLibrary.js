@@ -99,7 +99,7 @@ const _SQL_GET_CONNECTION_INFORMATION = `select version() "DATABASE_VERSION"`
 
 const _SQL_SHOW_SYSTEM_VARIABLES      = `show variables where Variable_name='lower_case_table_names'`;
 
-const _SQL_SYSTEM_INFORMATION         = `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET"`;                     
+const _SQL_SYSTEM_INFORMATION         = `select database() "DATABASE_NAME", current_user() "CURRENT_USER", session_user() "SESSION_USER", version() "DATABASE_VERSION", @@version_comment "SERVER_VENDOR_ID", @@session.time_zone "SESSION_TIME_ZONE", @@character_set_server "SERVER_CHARACTER_SET", @@character_set_database "DATABASE_CHARACTER_SET", YADAMU_INSTANCE_ID() "YADAMU_INSTANCE_ID", YADAMU_INSTALLATION_TIMESTAMP() "YADAMU_INSTALLATION_TIMESTAMP"`;                     
 
 const _SQL_INFORMATION_SCHEMA_FROM_CLAUSE =
 `   from information_schema.columns c, information_schema.tables t

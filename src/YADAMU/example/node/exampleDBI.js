@@ -62,8 +62,8 @@ class ExampleDBI extends YadamuDBI {
 
   get SPATIAL_FORMAT()        { return this.parameters.SPATIAL_FORMAT || ExampleConstants.SPATIAL_FORMAT };
 
-  constructor(yadamu) {
-    super(yadamu);
+  constructor(yadamu,settings,parameters) {
+    super(yadamu,settings,parameters);
 	this.StatementLibary = StatementLibary
   }
 
@@ -108,11 +108,7 @@ class ExampleDBI extends YadamuDBI {
 	throw new Error('Unimplemented Method')
   }
 
-  getConnectionProperties() {
-	// Convert supplied parameters to format expected by connection mechansim
-    return {		
-	}
-     
+  updateVendorProperties(vendorProperties) {
   }
 
   async executeSQL(sqlStatement,args) {
@@ -324,7 +320,10 @@ class ExampleDBI extends YadamuDBI {
 	// Upload a JSON file to the server so it can be parsed and processed using the database's native JSON capabilities. In most use cases 
 	// using client side implementaions are faster, more efficient and can handle much larger files. 
 	// The default implementation throws an unsupport feature exception
-	super.uploadFile()
+
+	 this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
+
+     super.uploadFile()
   }
   
   /*

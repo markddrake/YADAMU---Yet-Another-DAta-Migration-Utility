@@ -1,80 +1,81 @@
 {
-  "operation"         : "dbRoundTrip"
-, "connections"       : "connections.json"
-, "tasks"             : "tasks.json"
-, "recreateSchema"    : true
-, "parameters": {
-    "ROOT_FOLDER"     : "yadamu/RTS/%sourceConnection%/%mode%"
-  }
-, "tests"             : [{
-    "operation"       : "import"
-  , "source"          : "file-JSON"
-  , "target"          : "loader#1"
-  , "importPath"      : "%location%"
-  , "verifyOperation" : true
-  , "parameters"      : {
-      "ROOT_FOLDER"   : "yadamu/RTS"
-	}
+  "operation"            : "dbRoundTrip"
+, "connections"          : "connections.json"
+, "tasks"                : "tasks.json"
+, "recreateSchema"       : true
+, "parameters"           : {
+     "SOURCE_DIRECTORY"  : "%operation%/json/%sourceConnection%"
+   , "TARGET_DIRECTORY"  : "%operation%/json/%sourceConnection%"
+   }                    
+, "tests"                : [{
+    "operation"          : "import"
+  , "source"             : "file-staging"
+  , "target"             : "loader-staging"
+  , "verifyOperation"    : true
+  , "parameters"         : {
+      "SOURCE_DIRECTORY" : "export/json/%location%"
+    , "TARGET_DIRECTORY" : "loader/json"
+    }                    
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "oracle19c"
-  , "target"          : "loader#1"
+    "source"             : "oracle19c"
+  , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "oracle18c"
-  , "target"          : "loader#1"
+    "source"             : "oracle18c"
+  , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "oracle12c"
-  , "target"          : "loader#1"
+    "source"             : "oracle12c"
+  , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "oracle11g"
-  , "target"          : "loader#1"
+    "source"             : "oracle11g"
+  , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "mssql17"
-  , "target"          : "loader#1"
+    "source"             : "mssql17"
+  , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "mssql19"
-  , "target"          : "loader#1"
+    "source"             : "mssql19"
+  , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "postgres#1"
-  , "target"          : "loader#1"
+    "source"             : "postgres#1"
+  , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "mysql#1"
-  , "target"          : "loader#1"
+    "source"             : "mysql#1"
+  , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "mariadb#1"
-  , "target"          : "loader#1"
+    "source"             : "mariadb#1"
+  , "target"             : "loader-lRegress"
   , "tasks": [ 
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "mongodb#1"
-  , "target"          : "loader#1"
+    "source"             : "mongodb#1"
+  , "target"             : "loader-lRegress"
   , "parameters" : {
       "MONGO_STRIP_ID": false
 	}
@@ -82,50 +83,142 @@
       "oracle","mysql","mssql"
 	]
   },{
-    "source"          : "loader#1"
+    "source"             : "loader-YADAMU_HOME"
   , "targets": [
 	  "oracle19c","oracle18c","oracle12c","oracle11g"
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "yadamu/RTS"
+      "SOURCE_DIRECTORY" : "stagingArea/loader/json"
+    , "TARGET_DIRECTORY" : "longRegress/loader/%operation%/copy-json/%targetConnection%"
 	}
   , "tasks": [ 
       "oracle"
 	]
   },{
-    "source"          : "loader#1"
+    "source"             : "loader-YADAMU_HOME"
   , "targets": [
 	   "mssql17","mssql19"
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "yadamu/RTS"
+      "SOURCE_DIRECTORY" : "stagingArea/loader/json/"
+    , "TARGET_DIRECTORY" : "longRegress/loader/%operation%/copy-json/%targetConnection%"
 	}
   , "tasks": [ 
       "mssql"
 	]
   },{
-    "source"          : "loader#1"
+    "source"             : "loader-YADAMU_HOME"
   , "targets": [
 	  "mysql#1","mariadb#1"
 	  
     ]
   , "parameters": {
-      "ROOT_FOLDER"  : "yadamu/RTS"
+      "SOURCE_DIRECTORY" : "stagingArea/loader/json/"
+    , "TARGET_DIRECTORY" : "longRegress/loader/%operation%/copy-json/%targetConnection%"
 	}
   , "tasks": [ 
       "mysql"
 	]
   },{
-    "source"          : "mssql19"
-  , "target"          : "loader#1"
-  , "parameters" : {
-      "ROOT_FOLDER"   : "yadamu/RTS/zip/%sourceConnection%/%mode%"
-	, "COMPRESSION"   : "GZIP"
-	}
+    "source"             : "oracle19c"
+  , "target"             : "loader-lRegress"
+  , "parameters"         : {
+      "DIRECTORY"        : "%operation%/gzip-json/%sourceConnection%"
+	, "COMPRESSION"      : "GZIP"
+	}                  
   , "tasks": [ 
-      "HR","sakila","Northwind","WWI_Warehouse"
+      "HR","BI"
+	]
+  },{
+    "source"             : "oracle19c"
+  , "target"             : "loader-lRegress"
+  , "parameters"         : {
+      "DIRECTORY"        : "%operation%/x-gzip-json/%sourceConnection%"
+	, "COMPRESSION"      : "GZIP"
+	, "ENCRYPTION"       : true
+	, "PASSPHRASE"       : "yadamu"
+	}                  
+  , "tasks": [ 
+      "HR","BI"
+	]
+  },{
+    "source"             : "oracle19c"
+  , "target"             : "loader-lRegress"
+  , "parameters"         : {
+      "DIRECTORY"        : "%operation%/x-json/%sourceConnection%"
+	, "ENCRYPTION"       : true
+	, "PASSPHRASE"       : "yadamu"
+	}                  
+  , "tasks": [ 
+      "HR","BI"
+	]
+  },{
+    "source"             : "mssql19"
+  , "target"             : "loader-lRegress"
+  , "parameters"         : {
+      "DIRECTORY"        : "%operation%/gzip-json/%sourceConnection%"
+	, "COMPRESSION"      : "GZIP"
+	}                  
+  , "tasks": [ 
+      "Northwind","WWI_Warehouse"
+	]
+  },{
+    "source"             : "mssql19"
+  , "target"             : "loader-lRegress"
+  , "parameters"         : {
+      "DIRECTORY"        : "%operation%/x-gzip-json/%sourceConnection%"
+	, "COMPRESSION"      : "GZIP"
+	, "ENCRYPTION"       : true
+	, "PASSPHRASE"       : "yadamu"
+	}                  
+  , "tasks": [ 
+      "Northwind","WWI_Warehouse"
+	]
+  },{
+    "source"             : "mssql19"
+  , "target"             : "loader-lRegress"
+  , "parameters"         : {
+      "DIRECTORY"        : "%operation%/x-json/%sourceConnection%"
+	, "ENCRYPTION"       : true
+	, "PASSPHRASE"       : "yadamu"
+	}                  
+  , "tasks": [ 
+      "Northwind","WWI_Warehouse"
+	]
+  },{
+    "source"             : "mysql#1"
+  , "target"             : "loader-lRegress"
+  , "parameters"         : {
+      "DIRECTORY"        : "%operation%/gzip-json/%sourceConnection%"
+	, "COMPRESSION"      : "GZIP"
+	}                  
+  , "tasks": [ 
+      "sakila"
+	]
+  },{
+    "source"             : "mysql#1"
+  , "target"             : "loader-lRegress"
+  , "parameters"         : {
+      "DIRECTORY"        : "%operation%/x-gzip-json/%sourceConnection%"
+	, "COMPRESSION"      : "GZIP"
+	, "ENCRYPTION"       : true
+	, "PASSPHRASE"       : "yadamu"
+	}                  
+  , "tasks": [ 
+      "sakila"
+	]
+  },{
+    "source"             : "mysql#1"
+  , "target"             : "loader-lRegress"
+  , "parameters"         : {
+      "DIRECTORY"        : "%operation%/x-json/%sourceConnection%"
+	, "ENCRYPTION"       : true
+	, "PASSPHRASE"       : "yadamu"
+	}                  
+  , "tasks": [ 
+      "sakila"
 	]
   }]
 }

@@ -21,8 +21,8 @@ class MongoQA extends MongoDBI {
       return MongoQA.YADAMU_DBI_PARAMETERS
     }   
         
-    constructor(yadamu) {
-       super(yadamu)
+    constructor(yadamu,settings,parameters) {
+       super(yadamu,settings,parameters)
     }
 
     setMetadata(metadata) {

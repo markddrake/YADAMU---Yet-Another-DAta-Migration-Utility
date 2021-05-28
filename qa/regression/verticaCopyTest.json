@@ -1,0 +1,37 @@
+{
+	"operation": "dbRoundTrip",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
+	"stagingSource": "loader-staging",
+	"recreateSchema": true,
+	"parameters": {
+		"IDENTIFIER_MAPPING_FILE" : "qa/mappings/verticaMappings.json",
+		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/csv",
+		"DIRECTORY"               : "loader/csv"
+	},
+	"tests": [
+		{
+			"source": "oracle19c",
+			"target": "vertica10",
+			"tasks": [
+				"oracle"
+			]
+		},
+		{
+			"source": "mssql19",
+			"target": "vertica10",
+			"emptyStringIsNull" : true,
+			"tasks": [
+				"mssql"
+			]
+		},
+		{
+			"source": "mysql#1",
+			"target": "vertica10",
+			"emptyStringIsNull" : true,
+			"tasks": [
+				"mysql"
+			]
+		}
+	]
+}

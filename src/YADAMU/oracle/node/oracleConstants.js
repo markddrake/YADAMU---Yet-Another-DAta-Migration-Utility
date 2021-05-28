@@ -17,8 +17,8 @@ class OracleConstants {
     , "LOB_MIN_SIZE"              : 32768
     , "LOB_MAX_SIZE"              : 16777216
     , "LOB_CACHE_COUNT"           : 50000
-    , "XML_STORAGE_FORMAT"        : "XML"
-    , "JSON_STORAGE_FORMAT"       : "JSON"
+    , "ORACLE_XML_TYPE"           : "XML"
+    , "ORACLE_JSON_TYPE"          : "JSON"
     , "MIGRATE_JSON_STORAGE"      : false
     , "OBJECT_FORMAT"             : "NATIVE"
     , "TREAT_RAW1_AS_BOOLEAN"     : true
@@ -38,8 +38,8 @@ class OracleConstants {
   static get LOB_MIN_SIZE()           { return this.DBI_PARAMETERS.LOB_MIN_SIZE}
   static get LOB_MAX_SIZE()           { return this.DBI_PARAMETERS.LOB_MAX_SIZE}
   static get LOB_CACHE_COUNT()        { return this.DBI_PARAMETERS.LOB_CACHE_COUNT}
-  static get XML_STORAGE_FORMAT()     { return this.DBI_PARAMETERS.XML_STORAGE_FORMAT}
-  static get JSON_STORAGE_FORMAT()    { return this.DBI_PARAMETERS.JSON_STORAGE_FORMAT}
+  static get ORACLE_XML_TYPE()     { return this.DBI_PARAMETERS.ORACLE_XML_TYPE}
+  static get ORACLE_JSON_TYPE()    { return this.DBI_PARAMETERS.ORACLE_JSON_TYPE}
   static get MIGRATE_JSON_STORAGE()   { return this.DBI_PARAMETERS.MIGRATE_JSON_STORAGE}
   static get OBJECT_FORMAT()          { return this.DBI_PARAMETERS.OBJECT_FORMAT}
   static get TREAT_RAW1_AS_BOOLEAN()  { return this.DBI_PARAMETERS.TREAT_RAW1_AS_BOOLEAN}

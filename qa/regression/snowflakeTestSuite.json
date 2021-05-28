@@ -7,12 +7,12 @@
   }
 , "tests"             : [{
     "operation"       : "import"
-  , "source"          : "file-JSON"
+  , "source"          : "file-staging"
   , "target"          : "snow#1"
-  , "importPath"      : "%location%"
   , "verifyOperation" : true
   , "parameters"      : {
-      "XML_STORAGE_MODEL" : "VARIANT"
+      "SOURCE_DIRECTORY" : "export/json/%location%"
+    , "XML_STORAGE_MODEL" : "VARIANT"
     }
   , "tasks": [
       "oracle","mysql","mssql"

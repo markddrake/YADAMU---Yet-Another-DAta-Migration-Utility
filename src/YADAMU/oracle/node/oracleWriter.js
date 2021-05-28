@@ -575,7 +575,7 @@ end;`
 	  batch.lobRows = await Promise.all(batch.lobRows.map(async (row) => { return await Promise.all(row.map((col) => {return col}))})) 
 	}
 	
-    if (this.insertMode === 'Batch') {
+    if (this.tableInfo.insertMode === 'Batch') {
       try {
         rows = batch.rows
         binds = this.tableInfo.binds
@@ -597,7 +597,7 @@ end;`
         await this.dbi.restoreSavePoint(cause);
 		if (cause.errorNum && (cause.errorNum === 4091)) {
           // Mutating Table - Convert to Cursor based PL/SQL Block
-          this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to PL/SQL Block.`);          
+          this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to PL/SQL Block.`);          
           this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
           try {
             rows = batch.rows
@@ -618,13 +618,13 @@ end;`
           } catch (cause) {
   		    await this.reportBatchError(batch,`INSERT MANY [PL/SQL]`,cause,rows) 
             await this.dbi.restoreSavePoint(cause);
-            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
-            this.insertMode = 'Iterative';
+            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+            this.tableInfo.insertMode = 'Iterative';
           }
         } 
         else {  
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
-          this.insertMode = 'Iterative';
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+          this.tableInfo.insertMode = 'Iterative';
         }
       }
     }

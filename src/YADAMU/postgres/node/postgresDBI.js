@@ -71,8 +71,11 @@ class PostgresDBI extends YadamuDBI {
   get SPATIAL_FORMAT()         { return this.POSTGIS_INSTALLED === true ? this.parameters.SPATIAL_FORMAT || DBIConstants.SPATIAL_FORMAT :  "Native" };
   get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
 
-  constructor(yadamu) {
-    super(yadamu);
+  get JSON_DATA_TYPE()         { return this.parameters.POSTGRES_JSON_TYPE || PostgresConstants.POSTGRES_JSON_TYPE }
+  
+
+  constructor(yadamu,settings,parameters) {
+    super(yadamu,settings,parameters);
        
     this.pgClient = undefined;
     this.useBinaryJSON = false
@@ -98,7 +101,7 @@ class PostgresDBI extends YadamuDBI {
   async testConnection(connectionProperties) {   
     super.setConnectionProperties(connectionProperties);
 	try {
-      const pgClient = new Client(this.connectionProperties);
+      const pgClient = new Client(this.vendorProperties);
       await pgClient.connect();
       await pgClient.end();     
 								  
@@ -112,7 +115,7 @@ class PostgresDBI extends YadamuDBI {
 	
     this.logConnectionProperties();
 	let sqlStartTime = performance.now();
-	this.pool = new Pool(this.connectionProperties);
+	this.pool = new Pool(this.vendorProperties);
     this.traceTiming(sqlStartTime,performance.now())
 	
 	this.pool.on('error',(err, p) => {
@@ -153,7 +156,7 @@ class PostgresDBI extends YadamuDBI {
 	try {
 	  operation = 'pg.Client()'
 	  stack = new Error().stack;
-      const pgClient = new Client(this.connectionProperties);
+      const pgClient = new Client(this.vendorProperties);
 					
 	  operation = 'Client.connect()'
 	  stack = new Error().stack;
@@ -255,14 +258,14 @@ class PostgresDBI extends YadamuDBI {
     const results = await this.executeSQL('select now()')
   }
   
-  getConnectionProperties() {
-    return {
-      user      : this.parameters.USERNAME
-     ,host      : this.parameters.HOSTNAME
-     ,database  : this.parameters.DATABASE
-     ,password  : this.parameters.PASSWORD
-     ,port      : this.parameters.PORT
-    }
+  updateVendorProperties(vendorProperties) {
+
+    vendorProperties.user      = this.parameters.USERNAME  || vendorProperties.user
+    vendorProperties.host      = this.parameters.HOSTNAME  || vendorProperties.host
+    vendorProperties.database  = this.parameters.DATABASE  || vendorProperties.database 
+    vendorProperties.password  = this.parameters.PASSWORD  || vendorProperties.password
+    vendorProperties.port      = this.parameters.PORT      || vendorProperties.port 
+	
   }
 
   /*  
@@ -444,6 +447,9 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async uploadFile(importFilePath) {
+
+    this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
+
     let elapsedTime;
     try {
       await this.createStagingTable();    
@@ -547,7 +553,7 @@ class PostgresDBI extends YadamuDBI {
   
   async getSchemaInfo(keyName) {
     
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.parameters[keyName],this.SPATIAL_FORMAT,{"circleAsPolygon": this.INBOUND_CIRCLE_FORMAT === 'POLYGON'}]);
+    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.parameters[keyName],this.SPATIAL_FORMAT,{"circleAsPolygon": this.INBOUND_CIRCLE_FORMAT === 'POLYGON',"calculateByteaSize":true}]);
 	if ((results.rowCount === 1) && Array.isArray(results.rows[0][6])) { // EXPORT_JSON returned Errors
        this.processLog(results.rows[0][6],`EXPORT_JSON('${this.parameters[keyName]}','${this.SPATIAL_FORMAT}')`)
 	}

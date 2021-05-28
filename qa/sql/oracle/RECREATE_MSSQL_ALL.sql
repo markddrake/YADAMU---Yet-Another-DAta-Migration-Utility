@@ -42,6 +42,12 @@ grant connect, resource, unlimited tablespace to "AdventureWorksDW&ID" identifie
 /
 drop user "WWI_Application&ID" cascade
 /
+quit
+/*
+**
+** Command Line Testing for WorldWideImporters disabled
+**
+*/
 grant connect, resource, unlimited tablespace to "WWI_Application&ID" identified by oracle
 /
 drop user "WWI_Purchasing&ID" cascade

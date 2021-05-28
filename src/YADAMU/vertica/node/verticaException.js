@@ -38,7 +38,16 @@ class VertiaCopyOperationFailure extends VerticaError {
 }
 
 class WhitespaceIssue extends Error {
-
+  constructor(columnName) {
+    super(`Empty String Detected: "${columnName}"`)
+  }
+}
+  
+class EmptyStringDetected extends Error {
+  constructor(emptyStringList) {
+    super(`Empty Strings Detected`)
+	this.emptyStringList = emptyStringList
+  }
 }
   
 class ContentTooLarge extends Error {
@@ -57,5 +66,6 @@ module.exports = {
   VerticaError
 , VertiaCopyOperationFailure
 , WhitespaceIssue
+, EmptyStringDetected
 , ContentTooLarge
 }

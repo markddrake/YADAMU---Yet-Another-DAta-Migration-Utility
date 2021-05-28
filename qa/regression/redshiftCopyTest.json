@@ -1,0 +1,35 @@
+{
+	"operation": "dbRoundTrip",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
+	"stagingSource": "awsS3-staging",
+	"recreateSchema": true,
+	"parameters": {
+	  "REMOTE_STAGING_AREA": "aws/loader/csv",
+	  "DIRECTORY": "loader/csv",
+      "IDENTIFIER_MAPPING_FILE"  : "qa/mappings/redshiftMappings.json"
+	},
+	"tests": [
+		{
+			"source": "oracle19c",
+			"target": "redshift#1",
+			"tasks": [
+				"oracle"
+			]
+		},
+		{
+			"source": "mssql19",
+			"target": "redshift#1",
+			"tasks": [
+				"mssql"
+			]
+		},
+		{
+			"source": "mysql#1",
+			"target": "redshift#1",
+			"tasks": [
+				"mysql"
+			]
+		}
+	]
+}

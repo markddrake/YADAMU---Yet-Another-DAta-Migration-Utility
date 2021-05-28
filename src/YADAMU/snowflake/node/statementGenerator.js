@@ -36,7 +36,7 @@ class StatementGenerator {
 									             
   static get BFILE_TYPE()                          { return 'TEXT(2048)'    }
   static get ROWID_TYPE()                          { return 'TEXT(32)'      }
-  static get XML_TYPE()                            { return SnowflakeConstants.XML_TYPE         }
+  static get XML_TYPE()                            { return SnowflakeConstants.SNOWFLAKE_XML_TYPE         }
   static get UUID_TYPE()                           { return 'TEXT(36)'      }
   static get ENUM_TYPE()                           { return 'TEXT(255)'     }
   static get INTERVAL_TYPE()                       { return 'TEXT(16)'      }
@@ -103,8 +103,8 @@ class StatementGenerator {
            case 'CLOB':                                               return SnowflakeConstants.CLOB_TYPE;
            case 'BLOB':                                               return SnowflakeConstants.BLOB_TYPE;
            case 'NCLOB':                                              return SnowflakeConstants.CLOB_TYPE;
-           case 'XMLTYPE':                                            return this.dbi.XML_TYPE;
-           case 'JSON':                                               return SnowflakeConstants.JSON_TYPE;
+           case 'XMLTYPE':                                            return this.dbi.SNOWFLAKE_XML_TYPE;
+           case 'JSON':                                               return this.dbi.SNOWFLAKE_JSON_TYPE;
            case 'TIMESTAMP':                                          return 'DATETIME';
            case 'BFILE':                                              return StatementGenerator.BFILE_TYPE;
            case 'ROWID':                                              return StatementGenerator.ROWID_TYPE;
@@ -116,7 +116,7 @@ class StatementGenerator {
                case (dataType.indexOf('LOCAL TIME ZONE') > -1):       return 'TIMESTAMP_LTZ'; 
                case (dataType.indexOf('TIME ZONE') > -1):             return 'TIMESTAMP_NTZ'; 
                case (dataType.indexOf('INTERVAL') === 0):             return StatementGenerator.INTERVAL_TYPE; 
-               case (dataType.indexOf('XMLTYPE') > -1):               return SnowflakeConstants.XML_TYPE;
+               case (dataType.indexOf('XMLTYPE') > -1):               return this.dbi.SNOWFLAKE_XML_TYPE;
                case (dataType.indexOf('.') > -1):                     return SnowflakeConstants.CLOB_TYPE;
 			   default:                                               return dataType.toUpperCase();
          	 }	 
@@ -131,8 +131,8 @@ class StatementGenerator {
            case 'bit':                                                return 'BOOLEAN';
            case 'ntext':                                              return SnowflakeConstants.CLOB_TYPE;
            case 'image':                                              return SnowflakeConstants.BLOB_TYPE;
-           case 'xml':                                                return this.dbi.XML_TYPE;
-           case 'json':                                               return SnowflakeConstants.JSON_TYPE;
+           case 'xml':                                                return this.dbi.SNOWFLAKE_XML_TYPE;
+           case 'json':                                               return this.dbi.SNOWFLAKE_JSON_TYPE;
            case 'datetime':                                         
            case 'datetime2':                                          return 'TIMESTAMP_NTZ';
            case 'datetimeoffset':                                     return 'TIMESTAMP_NTZ';
@@ -178,18 +178,18 @@ class StatementGenerator {
 		   case 'decimal':
            case 'numeric':                                            return dataTypeLength === undefined ? StatementGenerator.PGSQL_NUMERIC_TYPE : 'NUMBER';
 		   case 'money':                                              return StatementGenerator.PGSQL_MONEY_TYPE
+           case 'time without time zone':                             return 'TIME'
+           case 'timestamp':                                         
+           case 'timestamp without time zone':                        return 'TIMESTAMP_NTZ';
            case 'time with time zone':
            case 'timestamp with time zone':                           return 'TIMESTAMP_LTZ';
-           case 'timestamp':                                         
-           case 'time without time zone':                            
-           case 'timestamp without time zone':                        return 'TIMESTAMP_NTZ';
            case 'numeric':                                            return 'DECIMAL';
            case 'double precision':                                   return 'DOUBLE';
            case 'real':                                               return 'FLOAT';
            case 'integer':                                            return 'INT';
            case 'jsonb':                                             
-           case 'json':                                               return SnowflakeConstants.JSON_TYPE;
-           case 'xml':                                                return this.dbi.XML_TYPE;;     
+           case 'json':                                               return this.dbi.SNOWFLAKE_JSON_TYPE;
+           case 'xml':                                                return this.dbi.SNOWFLAKE_XML_TYPE;;     
            case 'text':                                               return SnowflakeConstants.CLOB_TYPE;
            case 'geometry':                                          
            case 'geography':                                             
@@ -198,8 +198,8 @@ class StatementGenerator {
            case 'path':                                                  
            case 'box':                                                
            case 'polygon':                                            return 'GEOGRAPHY';  
-           case 'circle':                                             return this.dbi.INBOUND_CIRCLE_FORMAT === 'CIRCLE' ? SnowflakeConstants.JSON_TYPE : 'GEOGRAPHY';
-           case 'line':                                               return SnowflakeConstants.JSON_TYPE;    
+           case 'circle':                                             return this.dbi.INBOUND_CIRCLE_FORMAT === 'CIRCLE' ? this.dbi.SNOWFLAKE_JSON_TYPE : 'GEOGRAPHY';
+           case 'line':                                               return this.dbi.SNOWFLAKE_JSON_TYPE;    
            case 'uuid':                                               return StatementGenerator.UUID_TYPE
 		   case 'bit':
 		   case 'bit varying':    
@@ -219,9 +219,9 @@ class StatementGenerator {
 		   case 'numrange':                                          
 		   case 'tsrange':                                           
 		   case 'tstzrange':                                         
-		   case 'daterange':                                          return SnowflakeConstants.JSON_TYPE;
+		   case 'daterange':                                          return this.dbi.SNOWFLAKE_JSON_TYPE;
 		   case 'tsvector':                                          
-		   case 'gtsvector':                                          return SnowflakeConstants.JSON_TYPE;
+		   case 'gtsvector':                                          return this.dbi.SNOWFLAKE_JSON_TYPE;
 		   case 'tsquery':                                            return StatementGenerator.LARGEST_VARCHAR_TYPE;
            case 'oid':                                               
 		   case 'regcollation':                                      
@@ -240,7 +240,7 @@ class StatementGenerator {
 		   case 'cid':                                               
 		   case 'txid_snapshot':                                      return StatementGenerator.PGSQL_IDENTIFIER;
 		   case 'aclitem':                                           
-		   case 'refcursor':                                          return SnowflakeConstants.JSON_TYPE;
+		   case 'refcursor':                                          return this.dbi.SNOWFLAKE_JSON_TYPE;
            default:
 		     switch (true) {
                case (dataType.indexOf('interval') === 0):             return StatementGenerator.INTERVAL_TYPE; 
@@ -269,10 +269,10 @@ class StatementGenerator {
            case 'tinytext':                                           return 'TEXT(256)'
 		   case 'varchar':                                            return 'TEXT'
            case 'geometry':                                           return 'GEOGRAPHY';
-           case 'set':                                                return SnowflakeConstants.JSON_TYPE;
+           case 'set':                                                return this.dbi.SNOWFLAKE_JSON_TYPE;
            case 'enum':                                               return 'TEXT(512)';
-           case 'json':                                               return SnowflakeConstants.JSON_TYPE;
-           case 'xml':                                                return this.dbi.XML_TYPE;
+           case 'json':                                               return this.dbi.SNOWFLAKE_JSON_TYPE;
+           case 'xml':                                                return this.dbi.SNOWFLAKE_XML_TYPE;
 		   case 'point':
 		   case 'linestring':
 		   case 'polygon':
@@ -287,10 +287,10 @@ class StatementGenerator {
          break;                                                      
        case 'SNOWFLAKE':                                             
          switch (dataType.toUpperCase()) {                           
-           case 'JSON':                                               return SnowflakeConstants.JSON_TYPE;
-           case 'SET':                                                return SnowflakeConstants.JSON_TYPE;
-           case 'XML':                                                return SnowflakeConstants.XML_TYPE;
-           case 'XMLTYPE':                                            return SnowflakeConstants.XML_TYPE;
+           case 'JSON':                                               return this.dbi.SNOWFLAKE_JSON_TYPE;
+           case 'SET':                                                return this.dbi.SNOWFLAKE_JSON_TYPE;
+           case 'XML':                                                return this.dbi.SNOWFLAKE_XML_TYPE;
+           case 'XMLTYPE':                                            return this.dbi.SNOWFLAKE_XML_TYPE;
            default:                                                   return dataType.toUpperCase();
          }
        case 'MongoDB':
@@ -310,19 +310,19 @@ class StatementGenerator {
 		   case 'timestamp':                                          return 'TIMESTAMP_LTZ(9)';
            case 'objectid':                                           return StatementGenerator.MONGO_OBJECT_ID;
 		   case 'array':                                            
-           case 'object':                                             return SnowflakeConstants.JSON_TYPE;
+           case 'object':                                             return this.dbi.SNOWFLAKE_JSON_TYPE;
            case 'null':                                               return StatementGenerator.MONGO_UNKNOWN_TYPE;
            case 'regex':                                              return StatementGenerator.MONGO_REGEX_TYPE;
            case 'javascript':                                         return SnowflakeConstants.CLOB_TYPE;
            case 'javascriptWithScope':                                return SnowflakeConstants.CLOB_TYPE;
-           case 'minkey':                                             return SnowflakeConstants.JSON_TYPE;
-           case 'maxKey':                                             return SnowflakeConstants.JSON_TYPE;
+           case 'minkey':                                             return this.dbi.SNOWFLAKE_JSON_TYPE;
+           case 'maxKey':                                             return this.dbi.SNOWFLAKE_JSON_TYPE;
            case 'undefined':
 		   case 'dbPointer':
 		   case 'function':
-		   case 'symbol':                                             return SnowflakeConstants.JSON_TYPE;
+		   case 'symbol':                                             return this.dbi.SNOWFLAKE_JSON_TYPE;
            // No data in the Mongo Collection
-           case 'json':                                               return SnowflakeConstants.JSON_TYPE;
+           case 'json':                                               return this.dbi.SNOWFLAKE_JSON_TYPE;
 		   default:                                                   return dataType.toUpperCase();
          }                                                          
        default: 
@@ -408,8 +408,8 @@ class StatementGenerator {
 		   case 'XML':
 		   case 'XMLTYPE':
 		     switch (true) {
-			   case (this.dbi.XML_TYPE === SnowflakeConstants.XML_TYPE): 
-			   case (tableMetadata.storageTypes[idx] === SnowflakeConstants.XML_TYPE):
+			   case (this.dbi.SNOWFLAKE_XML_TYPE === SnowflakeConstants.SNOWFLAKE_XML_TYPE): 
+			   case (tableMetadata.storageTypes[idx] === SnowflakeConstants.SNOWFLAKE_XML_TYPE):
 			     selectList[idx] = `PARSE_XML("${selectList[idx]}")`
 				 columnClause[idx] = ''
 				 break

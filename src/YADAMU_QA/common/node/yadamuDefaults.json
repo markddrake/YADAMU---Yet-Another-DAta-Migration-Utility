@@ -16,6 +16,7 @@
 		"oracle": "../../oracle/node/oracleQA.js",
 		"postgres": "../../postgres/node/postgresQA.js",
 		"vertica": "../../vertica/node/verticaQA.js",
+		"redshift": "../../redshift/node/redshiftQA.js",
 		"mssql": "../../mssql/node/mssqlQA.js",
 		"mysql": "../../mysql/node/mysqlQA.js",
 		"mariadb": "../../mariadb/node/mariadbQA.js",
@@ -27,10 +28,10 @@
 		"MONGO_PARSE_STRINGS" : false
 	},
 	"oracle": {
-		"XML_STORAGE_FORMAT": "CLOB"
+		"ORACLE_XML_TYPE": "CLOB"
 	},
 	"snowflake": {
-		"XML_STORAGE_FORMAT": "TEXT"
+		"SNOWFLAKE_XML_TYPE": "TEXT"
 	},
 	"vertica": {
 	   "VERTICA_CHAR_SIZE" : 1.5

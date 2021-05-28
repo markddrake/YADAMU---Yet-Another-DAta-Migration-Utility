@@ -55,6 +55,13 @@ drop schema if exists :"SCHEMA" cascade;
 --
 create schema :"SCHEMA";
 --
+/*
+**
+** Dissable Command Line Testing for WorldWideImporters and WorldWideImportersDW
+**
+*/
+\quit
+--
 select 'WWI_Application' || :'ID' "SCHEMA" \gset
 --
 \echo :SCHEMA

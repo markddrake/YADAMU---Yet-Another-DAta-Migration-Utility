@@ -28,12 +28,13 @@ class AWSS3QA extends AWSS3DBI {
   }	
 	 
   async recreateSchema() {
+	this.DIRECTORY = this.TARGET_DIRECTORY
 	await this.cloudService.createBucketContainer()
 	await this.cloudService.deleteFolder(this.IMPORT_FOLDER)
   }
 	
-  constructor(yadamu) {
-    super(yadamu)
+  constructor(yadamu,settings,parameters) {
+    super(yadamu,settings,parameters)
   }
 
   setMetadata(metadata) {
@@ -41,7 +42,7 @@ class AWSS3QA extends AWSS3DBI {
   }
 	
   async initialize() {
-	await super.initialize();
+    await super.initialize();
 	if (this.options.recreateSchema === true) {
 		await this.recreateSchema();
 	}
@@ -112,8 +113,13 @@ class AWSS3QA extends AWSS3DBI {
     let sourceControlFile
 	let targetControlFile
 
-  	const sourceControlPath = `${path.join(this.ROOT_FOLDER,source.schema,source.schema)}.json`.split(path.sep).join(path.posix.sep) 
-    const targetControlPath = `${path.join(this.ROOT_FOLDER,target.schema,target.schema)}.json`.split(path.sep).join(path.posix.sep) 
+    this._BASE_DIRECTORY = undefined
+    this.DIRECTORY = this.SOURCE_DIRECTORY
+  	const sourceControlPath = this.resolve(path.join(this.BASE_DIRECTORY,source.schema,`${source.schema}.json`))
+
+    this._BASE_DIRECTORY = undefined
+    this.DIRECTORY = this.TARGET_DIRECTORY	
+    const targetControlPath = this.resolve(path.join(this.BASE_DIRECTORY,target.schema,`${target.schema}.json`))
 	
     try {
 	  assert.notEqual(sourceControlPath,targetControlPath,`Source & Target control files are identical: "${sourceControlPath}"`);
@@ -157,16 +163,16 @@ class AWSS3QA extends AWSS3DBI {
   }
 	        
 			
-   async getInputStreams(tableInfo) {
+   async getInputStreams(filename) {
     
 	const streams = []
-    const is = await this.getInputStream(tableInfo);
+    const is = await this.getInputStream(filename);
 	streams.push(is)
 	
 	if (this.ENCRYPTED_INPUT) {
-	  const iv = await this.loadInitializationVector(tableInfo)
+	  const iv = await this.loadInitializationVector(filename)
 	  streams.push(new IVReader(this.IV_LENGTH))
-  	  // console.log('Decipher',this.controlFile.data[tableInfo.TABLE_NAME].file,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
+  	  // console.log('Decipher',filename,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
 	  const decipherStream = crypto.createDecipheriv(this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv)
 	  streams.push(decipherStream);
 	}
@@ -175,38 +181,51 @@ class AWSS3QA extends AWSS3DBI {
       streams.push(this.controlFile.yadamuOptions.compression === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
-	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.controlFile.data[tableInfo.TABLE_NAME].file)
+	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, filename)
 	streams.push(jsonParser);
 	return streams
   }
   
-  async getRowCount(tableInfo) {
+  async getRowCount(filename) {
     
-	const streams = await this.getInputStreams(tableInfo)
+	const streams = await this.getInputStreams(filename)
 	const arrayCounter = new ArrayCounter(this)
 	streams.push(arrayCounter)
 
 	return new Promise((resolve,reject) => {
       pipeline(streams,(err) => {
-		if (err) reject(err) 
+		if (err) reject(err)
 		resolve(arrayCounter.getRowCount());
 	  })
 	})
   }
 
   async getRowCounts(target) {
-
-    const targetControlPath = `${path.join(this.ROOT_FOLDER,target.schema,target.schema)}.json`.split(path.sep).join(path.posix.sep) 
 	
-    const fileContents = await this.cloudService.getObject(targetControlPath)		
+    this.DIRECTORY = this.TARGET_DIRECTORY
+    const controlFilePath = this.resolve(`${path.join(this.BASE_DIRECTORY,target.schema,target.schema)}.json`)
+	
+    const fileContents = await this.cloudService.getObject(controlFilePath)		
     this.controlFile = this.parseContents(fileContents)
-    const counts = await Promise.all(Object.keys(this.controlFile.data).map((k) => {
-	  return this.getRowCount({TABLE_NAME:k})
+    const counts = await Promise.all(Object.values(this.controlFile.data).map((dataFile) => {
+	  return this.getRowCount(dataFile.file)
 	}))
 
     return Object.keys(this.controlFile.data).map((k,i) => {
 	  return [target.schema,k,counts[i]]
     })	
-  }       
+	
+  }      
+  
+  getYadamuOptions() {
+    return this.controlFile.yadamuOptions
+  }
+  
+  setYadamuOptions(options) {
+	this.parameters.OUTPUT_FORMAT = options.contentType
+	this.yadamu.parameters.COMPRESSION = options.compression
+	this.yadamu.parameters.ENCRYPTION = options.encryption
+  }
 }
+ 
 module.exports = AWSS3QA

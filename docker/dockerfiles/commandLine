@@ -15,5 +15,6 @@ RUN apt install apt-transport-https \
  && apt install -y mariadb-client \
  && alien -i ./oracle-instantclient19.6-sqlplus-19.6.0.0.0-1.x86_64.rpm \
  && cd /usr/local/bin \
- && ln -s /opt/mssql-tools/bin/sqlcmd
- 
+ && ln -s /opt/mssql-tools/bin/sqlcmd \
+ &&  mkdir -p mnt/cmdLine \	
+ &&  ln -sfn mnt/cmdLine 

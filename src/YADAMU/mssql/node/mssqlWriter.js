@@ -106,10 +106,11 @@ class MsSQLWriter extends YadamuWriter {
   
   setTableInfo(tableName) {
 	super.setTableInfo(tableName)
+	this.tableInfo.insertMode = 'Bulk';
+
 	this.useNext = 0;
 	this.newBatch()
     	
-	this.insertMode = 'Bulk';
     this.dataTypes  = YadamuLibrary.decomposeDataTypes(this.tableInfo.targetDataTypes)
     this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
 		

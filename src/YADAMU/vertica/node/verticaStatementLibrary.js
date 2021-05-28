@@ -67,7 +67,7 @@ const _SQL_SCHEMA_INFORMATION   =
                order by t.TABLE_NAME,
 			            c.ORDINAL_POSITION`;
  
-const _SQL_SYSTEM_INFORMATION   = `select current_database() database_name, current_user, session_user, version(), session_id from sessions`;
+const _SQL_SYSTEM_INFORMATION   = `select current_database() database_name, current_user, session_user, version(), session_id, YADAMU.YADAMU_INSTANCE_ID(), YADAMU.YADAMU_INSTALLATION_TIMESTAMP() from sessions`;
 
 const _SQL_BEGIN_TRANSACTION    = `begin transaction`
 

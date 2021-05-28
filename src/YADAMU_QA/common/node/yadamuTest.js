@@ -44,7 +44,6 @@ class YadamuTest extends Yadamu {
   set IDENTIFIER_MAPPINGS(v)  { this._IDENTIFIER_MAPPINGS = v || this.IDENTIFIER_MAPPINGS }
 
   constructor(configParameters,activeConnections,encryptionKey) {
-	  
 	
     super('TEST',configParameters)
 	this.activeConnections = activeConnections

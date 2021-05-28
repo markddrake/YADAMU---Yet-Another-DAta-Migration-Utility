@@ -1,0 +1,8 @@
+{
+    "PRODUCT_DESCRIPTIONS" : {
+      "columnMappings" : { 
+	    "TRANSLATED_NAME" : { "dataType" : "varchar(150)" }
+      , "TRANSLATED_DESCRIPTION" : { "dataType" : "varchar(6000)" }
+	  }
+    }   
+}    

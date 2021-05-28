@@ -1,5 +1,6 @@
 "use strict" 
 const fs = require('fs');
+const fsp = require('fs').promises
 const path = require('path');
 
 const util = require('util')
@@ -91,8 +92,8 @@ class FileQA extends FileDBI {
     super.configureTest(recreateSchema);
   }
     
-  constructor(yadamu) {
-     super(yadamu)
+  constructor(yadamu,settings,parameters) {
+     super(yadamu,settings,parameters)
      this.deepCompare = false;
      this.sort = false;
   }
@@ -121,11 +122,8 @@ class FileQA extends FileDBI {
     })
   }
 
-  async recreateSchema(target,password) {
-  }        
-  
   async compareFiles(yadamuLogger,grandparent,parent,child,metrics) {
-    let colSizes = [48, 18, 12, 12, 12, 12]
+    let colSizes = [128, 18, 12, 12, 12, 12]
  
     let seperatorSize = (colSizes.length * 3) - 1;
     colSizes.forEach((size)  => {
@@ -254,6 +252,14 @@ class FileQA extends FileDBI {
     })
 	
 	return failedOperations;
+  }
+
+  async createOutputStream() {
+	
+	if (this.options.recreateSchema === true) {
+  	  await fsp.mkdir(path.dirname(this.FILE),{recursive: true})
+	}
+  	await super.createOutputStream()
   }
   
 }

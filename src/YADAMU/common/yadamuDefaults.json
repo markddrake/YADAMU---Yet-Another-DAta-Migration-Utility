@@ -15,11 +15,12 @@
 	"drivers": {
 		"file": "../file/node/fileDBI.js",
 		"loader": "../loader/node/loaderDBI.js",
-		"awsS3": "../loader/s3/awss3DBI.js",
-		"azure": "../loader/s3/azureDBI.js",
+		"awsS3": "../loader/awsS3/awsS3DBI.js",
+		"azure": "../loader/azure/azureDBI.js",
 		"oracle": "../oracle/node/oracleDBI.js",
 		"postgres": "../postgres/node/postgresDBI.js",
 		"vertica": "../vertica/node/verticaDBI.js",
+		"redshift": "../redshift/node/redshiftDBI.js",
 		"mssql": "../mssql/node/mssqlDBI.js",
 		"mysql": "../mysql/node/mysqlDBI.js",
 		"mariadb": "../mariadb/node/mariadbDBI.js",
@@ -58,8 +59,8 @@
 		"LOB_MIN_SIZE": 32768,
 		"LOB_MAX_SIZE": 16777216,
 		"LOB_CACHE_COUNT": 50000,
-		"XML_STORAGE_FORMAT": "XML",
-		"JSON_STORAGE_FORMAT": "JSON",
+		"ORACLE_XML_TYPE": "XML",
+		"ORACLE_JSON_TYPE": "JSON",
 		"OBJECT_FORMAT": "NATIVE",
 		"MIGRATE_JSON_STORAGE": false,
 		"TREAT_RAW1_AS_BOOLEAN": true,
@@ -75,6 +76,6 @@
 		"TRANSIENT_TABLES": true,
 		"DATA_RETENTION_TIME": 0,
 		"SPATIAL_FORMAT": "WKB",
-		"XML_STORAGE_FORMAT": "VARIANT"
+		"ORACLE_XML_TYPE": "VARIANT"
 	}
 }

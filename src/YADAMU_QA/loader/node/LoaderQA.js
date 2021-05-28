@@ -4,6 +4,7 @@ const fs = require('fs')
 const fsp = require('fs').promises
 const path = require('path')
 const crypto = require('crypto');
+const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
 const { pipeline } = require('stream');
 
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
@@ -12,6 +13,7 @@ const LoaderDBI = require('../../../YADAMU/loader/node/loaderDBI.js');
 const JSONParser = require('../../../YADAMU/loader/node/jsonParser.js');
 const YadamuTest = require('../../common/node/yadamuTest.js');
 const ArrayCounter = require('./arrayCounter.js');
+const ArrayReader = require('./arrayReader.js');
 
 class LoaderQA extends LoaderDBI {
 
@@ -27,11 +29,12 @@ class LoaderQA extends LoaderDBI {
   }	
 			
   async recreateSchema() {
-	 await fsp.rmdir(this.IMPORT_FOLDER,{recursive: true})
+    this.DIRECTORY = this.TARGET_DIRECTORY
+    await fsp.rmdir(this.IMPORT_FOLDER,{recursive: true})
   }
 
-  constructor(yadamu) {
-	super(yadamu)
+  constructor(yadamu,settings,parameters) {
+	super(yadamu,settings,parameters)
   }
 
   setMetadata(metadata) {
@@ -44,10 +47,23 @@ class LoaderQA extends LoaderDBI {
 		await this.recreateSchema();
 	}
   }
-  
-  calculateSortedHash(file) {
-  
-    const array =  YadamuLibrary.loadJSON(file,this.yadamuLogger) 
+
+  async getArray(filename) {
+	const streams = await this.getInputStreams(filename)
+	const arrayReader = new ArrayReader(this)
+	streams.push(arrayReader)
+
+	return new Promise((resolve,reject) => {
+      pipeline(streams,(err) => {
+		if (err) reject(err) 
+		resolve(arrayReader.getArray());
+	  })
+	})
+  }
+    
+  async calculateSortedHash(filename) {
+    try {
+    const array = await this.getArray(filename)
 	array.sort((r1,r2) => {
 	  for (const i in r1) {
         if (r1[i] < r2[i]) return -1
@@ -56,6 +72,7 @@ class LoaderQA extends LoaderDBI {
 	  return 0
     })
     return crypto.createHash('sha256').update(JSON.stringify(array)).digest('hex');
+  } catch (e) { console.log(e) }
   } 
   
   calculateHash(file) {
@@ -72,7 +89,7 @@ class LoaderQA extends LoaderDBI {
 	})
   }	  
   
-  compareFiles(sourceFile,targetFile) {
+  async compareFiles(sourceFile,targetFile) {
 	const sourceFileSize = fs.statSync(sourceFile).size
 	const targetFileSize = fs.statSync(targetFile).size
 	let sourceHash = ''
@@ -81,8 +98,8 @@ class LoaderQA extends LoaderDBI {
       sourceHash = this.calculateHash(sourceFile)
 	  targetHash = this.calculateHash(targetFile)
 	  if (sourceHash !== targetHash) {
-		sourceHash = this.calculateSortedHash(sourceFile);
-		targetHash = this.calculateSortedHash(targetFile)
+		sourceHash = await this.calculateSortedHash(sourceFile);
+		targetHash = await this.calculateSortedHash(targetFile)
 	  }
 	}
     return [sourceFileSize,targetFileSize,sourceHash,targetHash]
@@ -94,17 +111,25 @@ class LoaderQA extends LoaderDBI {
       successful : []
     , failed     : []
     }
+
+	this._BASE_DIRECTORY = undefined
+    this.DIRECTORY = this.SOURCE_DIRECTORY
+	let controlFilePath = path.join(this.BASE_DIRECTORY,source.schema,`${source.schema}.json`);
 	
-	let controlFilePath = path.join(this.ROOT_FOLDER,source.schema,`${source.schema}.json`);
 	let fileContents = await fsp.readFile(controlFilePath,{encoding: 'utf8'})
     const sourceControlFile = JSON.parse(fileContents)
-
-	controlFilePath = path.join(this.ROOT_FOLDER,target.schema,`${target.schema}.json`);
+	
+	// Assume the source control file contains the correct options for both source and target
+    this.controlFile = sourceControlFile
+	
+    this._BASE_DIRECTORY = undefined
+    this.DIRECTORY = this.TARGET_DIRECTORY
+	controlFilePath = path.join(this.BASE_DIRECTORY,target.schema,`${target.schema}.json`);
+	
 	fileContents = await fsp.readFile(controlFilePath,{encoding: 'utf8'})
     const targetControlFile = JSON.parse(fileContents)
 
-    let results = Object.keys(sourceControlFile.data).map((tableName) => {return this.compareFiles( sourceControlFile.data[tableName].file, targetControlFile.data[tableName].file)})
-    results = await Promise.all(results.map(async(result) => { return await Promise.all(result)}))
+    let results = await Promise.all(Object.keys(sourceControlFile.data).map((tableName) => {return this.compareFiles( sourceControlFile.data[tableName].file, targetControlFile.data[tableName].file)}))
 	
     Object.keys(sourceControlFile.data).map((tableName,idx) => {
 	  const result = results[idx]
@@ -118,16 +143,16 @@ class LoaderQA extends LoaderDBI {
 	return report
   }
   
-   async getInputStreams(tableInfo) {
+   async getInputStreams(filename) {
     
 	const streams = []
-    const is = await this.getInputStream(tableInfo);
+    const is = await this.getInputStream(filename);
 	streams.push(is)
 	
 	if (this.ENCRYPTED_INPUT) {
-	  const iv = await this.loadInitializationVector(tableInfo)
+	  const iv = await this.loadInitializationVector(filename)
 	  streams.push(new IVReader(this.IV_LENGTH))
-  	  // console.log('Decipher',this.controlFile.data[tableInfo.TABLE_NAME].file,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
+  	  // console.log('Decipher',filename,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
 	  const decipherStream = crypto.createDecipheriv(this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv)
 	  streams.push(decipherStream);
 	}
@@ -136,14 +161,15 @@ class LoaderQA extends LoaderDBI {
       streams.push(this.controlFile.yadamuOptions.compression === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
-	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.controlFile.data[tableInfo.TABLE_NAME].file)
+	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, filename)
 	streams.push(jsonParser);
 	return streams
   }
   
   async getRowCount(tableInfo) {
     
-	const streams = await this.getInputStreams(tableInfo)
+	const filename = this.controlFile.data[tableInfo.TABLE_NAME].file
+	const streams = await this.getInputStreams(filename)
 	const arrayCounter = new ArrayCounter(this)
 	streams.push(arrayCounter)
 
@@ -157,7 +183,9 @@ class LoaderQA extends LoaderDBI {
 
   async getRowCounts(target) {
 
-	const controlFilePath = path.join(this.ROOT_FOLDER,target.schema,`${target.schema}.json`);
+	this.DIRECTORY = this.TARGET_DIRECTORY
+    const controlFilePath = path.resolve(`${path.join(this.BASE_DIRECTORY,target.schema,target.schema)}.json`)
+	
 	const fileContents = await fsp.readFile(controlFilePath,{encoding: 'utf8'})
     this.controlFile = JSON.parse(fileContents)
     const counts = await Promise.all(Object.keys(this.controlFile.data).map((k) => {
@@ -167,7 +195,17 @@ class LoaderQA extends LoaderDBI {
     return Object.keys(this.controlFile.data).map((k,i) => {
 	  return [target.schema,k,counts[i]]
     })	
-  }       
+  }    
+
+  getYadamuOptions() {
+    return this.controlFile.yadamuOptions
+  }
+  
+  setYadamuOptions(options) {
+	this.parameters.OUTPUT_FORMAT = options.contentType
+	this.yadamu.parameters.COMPRESSION = options.compression
+	this.yadamu.parameters.ENCRYPTION = options.encryption
+  }
   
 }
 module.exports = LoaderQA

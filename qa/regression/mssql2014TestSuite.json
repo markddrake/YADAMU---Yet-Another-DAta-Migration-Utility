@@ -7,11 +7,12 @@
   }
 , "tests"               : [{
     "operation"         : "import"
-  , "source"            : "file-JSON"
+  , "source"            : "file-staging"
   , "target"            : "mssql14"
-  , "importPath"        : "%location%"
-  , "reverseOperations" : true
   , "verifyOperation"   : true
+  , "parameters"        : {
+      "DIRECTORY"       : "export/json/%location%"
+    }                    
   , "tasks": [
       "oracle","mysql","mssql"
     ]

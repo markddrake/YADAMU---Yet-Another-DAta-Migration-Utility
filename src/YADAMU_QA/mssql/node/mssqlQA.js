@@ -22,8 +22,8 @@ class MsSQLQA extends MsSQLDBI {
       return MsSQLQA.YADAMU_DBI_PARAMETERS
     }	
 		
-    constructor(yadamu) {
-       super(yadamu)
+    constructor(yadamu,settings,parameters) {
+       super(yadamu,settings,parameters)
     }
 
     setMetadata(metadata) {
@@ -57,18 +57,18 @@ class MsSQLQA extends MsSQLDBI {
 	
       try {
 
-        // Cache the current value of YADAMU_DATABASE and remove it from this.parameters. This prevents the call to setTargetDatabase() from overriding the value of this.connectionProperties.database in createConnectionPool()
+        // Cache the current value of YADAMU_DATABASE and remove it from this.parameters. This prevents the call to setTargetDatabase() from overriding the value of this.vendorProperties.database in createConnectionPool()
 		
   	    const YADAMU_DATABASE = this.parameters.YADAMU_DATABASE;
-		const database = this.connectionProperties.database
+		const database = this.vendorProperties.database
         delete this.parameters.YADAMU_DATABASE;
       
 	    // Create a connection pool using a well known database that must exist	  
-	    this.connectionProperties.database = 'master';
+	    this.vendorProperties.database = 'master';
         await super.initialize();
 
 	    this.parameters.YADAMU_DATABASE = YADAMU_DATABASE
-	    this.connectionProperties.database = database;
+	    this.vendorProperties.database = database;
 
         let results;       
         const dropDatabase = this.statementLibrary.DROP_DATABASE
@@ -194,7 +194,7 @@ class MsSQLQA extends MsSQLDBI {
 		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
 			 // Do not use getRequest() as it will fail with "There is a request in progress during write opeations. Get a non pooled request
 		     // const request = new this.sql.Request(this.pool);
-			 const request = await this.sql.connect(this.connectionProperties);
+			 const request = await this.sql.connect(this.vendorProperties);
 			 let stack
 			 const sqlStatement = `kill ${pid}`
 			 try {

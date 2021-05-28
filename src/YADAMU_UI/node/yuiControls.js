@@ -224,9 +224,9 @@ function validateOracleSource(button) {
   button.disabled = true;
   const status = document.getElementById('source-oracle-status')
   const connectionProperties = {
-    user           : document.getElementById('source-oracle-user').value
-  , connectString  : document.getElementById('source-oracle-connectString').value
-  , password       : document.getElementById('source-oracle-password').value
+    user              : document.getElementById('source-oracle-user').value
+  , connectString     : document.getElementById('source-oracle-connectString').value
+  , password          : document.getElementById('source-oracle-password').value
   };
   
   const parameters = {
@@ -239,7 +239,7 @@ function validateOracleSource(button) {
     parameters.FROM_USER = parameters.FROM_USER.toUpperCase();
   }	
  
-  window.validSource = testConnection(button,status,'source-oracle',connectionProperties,parameters)  
+  window.validSource = testConnection(button,status,'source-oracle',{ oracle: connectionProperties},parameters)  
   setCopyState()
   
 }
@@ -249,9 +249,9 @@ function validateOracleTarget(button) {
   button.disabled = true;
   const status = document.getElementById('target-oracle-status')
   const connectionProperties = {
-    user           : document.getElementById('target-oracle-user').value
-  , connectString  : document.getElementById('target-oracle-connectString').value
-  , password  : document.getElementById('target-oracle-password').value
+    user              : document.getElementById('target-oracle-user').value
+  , connectString     : document.getElementById('target-oracle-connectString').value
+  , password          : document.getElementById('target-oracle-password').value
   };
   
   const parameters = {
@@ -263,7 +263,7 @@ function validateOracleTarget(button) {
     parameters.TO_USER = parameters.TO_USER.toUpperCase();
   }	
  
-  window.validTarget = testConnection(button,status,'target-oracle',connectionProperties,parameters)  
+  window.validTarget = testConnection(button,status,'target-oracle',{ oracle: connectionProperties},parameters)  
   setCopyState()
   
 }
@@ -284,7 +284,7 @@ function validatePostgresSource(button) {
 	FROM_USER : document.getElementById('source-postgres-schema').value
   }
  
-  window.validSource = testConnection(button,status,'source-postgres',connectionProperties,parameters)  
+  window.validSource = testConnection(button,status,'source-postgres',{ postgres: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -305,7 +305,7 @@ function validatePostgresTarget(button) {
 	TO_USER : document.getElementById('target-postgres-schema').value
   }
  
-  window.validTarget = testConnection(button,status,'target-postgres',connectionProperties,parameters)  
+  window.validTarget = testConnection(button,status,'target-postgres',{ postgres: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -330,7 +330,7 @@ function validateMsSQLSource(button) {
 	FROM_USER : document.getElementById('source-mssql-schema').value
   }
  
-  window.validSource = testConnection(button,status,'source-mssql',connectionProperties,parameters)  
+  window.validSource = testConnection(button,status,'source-mssql',{ mssql: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -355,7 +355,7 @@ function validateMsSQLTarget(button) {
 	TO_USER : document.getElementById('target-mssql-schema').value
   }
  
-  window.validTarget = testConnection(button,status,'target-mssql',connectionProperties,parameters)  
+  window.validTarget = testConnection(button,status,'target-mssql',{ mssql: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -381,7 +381,7 @@ function validateMySQLSource(button) {
 	FROM_USER : document.getElementById('source-mysql-schema').value
   }
  
-  window.validSource = testConnection(button,status,'source-mysql',connectionProperties,parameters)  
+  window.validSource = testConnection(button,status,'source-mysql',{ mysql: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -407,7 +407,7 @@ function validateMySQLTarget(button) {
 	TO_USER : document.getElementById('target-mysql-schema').value
   }
  
-  window.validTarget = testConnection(button,status,'target-mysql',connectionProperties,parameters)  
+  window.validTarget = testConnection(button,status,'target-mysql',{ mysql: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -433,7 +433,7 @@ function validateMariaDBSource(button) {
 	FROM_USER : document.getElementById('source-mariadb-schema').value
   }
  
-  window.validSource = testConnection(button,status,'source-mariadb',connectionProperties,parameters)  
+  window.validSource = testConnection(button,status,'source-mariadb',{ mariadb: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -459,7 +459,7 @@ function validateMariaDBTarget(button) {
 	TO_USER : document.getElementById('target-mariadb-schema').value
   }
  
-  window.validTarget = testConnection(button,status,'target-mariadb',connectionProperties,parameters)  
+  window.validTarget = testConnection(button,status,'target-mariadb',{ mariadb: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -481,7 +481,7 @@ function validatesnowflakeSource(button) {
   , FROM_USER : document.getElementById('source-snowflake-schema').value
   }
  
-  window.validSource = testConnection(button,status,'source-snowflake',connectionProperties,parameters)  
+  window.validSource = testConnection(button,status,'source-snowflake',{ snowflake: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -503,7 +503,7 @@ function validatesnowflakeTarget(button) {
   , TO_USER : document.getElementById('target-snowflake-schema').value
   }
  
-  window.validTarget = testConnection(button,status,'target-snowflake',connectionProperties,parameters)  
+  window.validTarget = testConnection(button,status,'target-snowflake',{ snowflake: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -521,7 +521,7 @@ function validateMongoDBSource(button) {
   const parameters = {
   }
   
-  window.validSource = testConnection(button,status,'source-mongodb',connectionProperties,parameters)  
+  window.validSource = testConnection(button,status,'source-mongodb',{ mongodb: connectionProperties},parameters)  
   setCopyState()
 
 }
@@ -539,7 +539,7 @@ function validateMongoDBTarget(button) {
   const parameters = {
   }
 
-  window.validTarget = testConnection(button,status,'target-mongodb',connectionProperties,parameters)  
+  window.validTarget = testConnection(button,status,'target-mongodb',{ mongodb: connectionProperties},parameters)  
   setCopyState()
 
 }

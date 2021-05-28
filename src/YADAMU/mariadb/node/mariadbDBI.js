@@ -66,9 +66,9 @@ class MariadbDBI extends YadamuDBI {
   get TABLE_MATCHING()             { return this.parameters.TABLE_MATCHING            || MariadbDBI.TABLE_MATCHING}
   get TREAT_TINYINT1_AS_BOOLEAN()  { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MariadbConstants.TREAT_TINYINT1_AS_BOOLEAN }
   
-  constructor(yadamu) {
+  constructor(yadamu,settings,parameters) {
 
-    super(yadamu);
+    super(yadamu,settings,parameters);
     this.pool = undefined;
 	
     this.StatementLibrary = MariadbStatementLibrary
@@ -78,7 +78,7 @@ class MariadbDBI extends YadamuDBI {
   async testConnection(connectionProperties,parameters) {   
     try {
 	  this.setConnectionProperties(connectionProperties);
-      this.connection = await mariadb.createConnection(this.connectionProperties);
+      this.connection = await mariadb.createConnection(this.vendorProperties);
 	  await this.connection.end();
 	  super.setParameters(parameters)
 	} catch (e) {
@@ -117,7 +117,7 @@ class MariadbDBI extends YadamuDBI {
   async createConnectionPool() {
     this.logConnectionProperties();
 	let sqlStartTime = performance.now();
-	this.pool = mariadb.createPool(this.connectionProperties);
+	this.pool = mariadb.createPool(this.vendorProperties);
 	this.traceTiming(sqlStartTime,performance.now())
     await this.checkMaxAllowedPacketSize();
   }
@@ -222,18 +222,24 @@ class MariadbDBI extends YadamuDBI {
 	return ddlResults;
   }
 
-  setConnectionProperties(connectionProperties) {
-  	 super.setConnectionProperties(Object.assign( Object.keys(connectionProperties).length > 0 ? connectionProperties : this.connectionProperties, MariadbConstants.CONNECTION_PROPERTY_DEFAULTS));
-  }
+  setVendorProperties(connectionProperties) {
+	super.setVendorProperties(connectionProperties)
+    this.vendorProperties = Object.assign(
+	  {},
+	  MariadbConstants.CONNECTION_PROPERTY_DEFAULTS,
+	  this.vendorProperties
+    )
+  }	 
 
-  getConnectionProperties() {
-    return Object.assign({
-      host              : this.parameters.HOSTNAME
-    , user              : this.parameters.USERNAME
-    , password          : this.parameters.PASSWORD
-    , database          : this.parameters.DATABASE
-    , port              : this.parameters.PORT
-    },MariadbConstants.CONNECTION_PROPERTY_DEFAULTS);
+  updateVendorProperties(vendorProperties) {
+
+    vendorProperties.host              = this.parameters.HOSTNAME || vendorProperties.host
+    vendorProperties.user              = this.parameters.USERNAME || vendorProperties.user 
+    vendorProperties. password         = this.parameters.PASSWORD || vendorProperties. password
+    vendorProperties.database          = this.parameters.DATABASE || vendorProperties.database
+    vendorProperties.port              = this.parameters.PORT     || vendorProperties.port
+    
+	Object.assign(vendorProperties,MariadbConstants.CONNECTION_PROPERTY_DEFAULTS)
   }
   
   /*  
@@ -443,14 +449,16 @@ class MariadbDBI extends YadamuDBI {
 	return Object.assign(
 	  super.getSystemInformation()
 	, {
-        currentUser        : sysInfo[1]
-      , sessionUser        : sysInfo[2]
-      , dbName             : sysInfo[0]
-      , databaseVersion    : sysInfo[3]
-      , serverVendor       : sysInfo[4]
-      , nls_parameters     : {
-          serverCharacterSet   : sysInfo[6]
-        , databaseCharacterSet : sysInfo[7]
+        currentUser                 : sysInfo[1]
+      , sessionUser                 : sysInfo[2]
+      , dbName                      : sysInfo[0]
+      , databaseVersion             : sysInfo[3]
+      , serverVendor                : sysInfo[4]
+	  , yadamuInstanceID            : sysInfo[8]
+	  , yadamuInstallationTimestamp : sysInfo[9]
+      , nls_parameters              : {
+          serverCharacterSet        : sysInfo[6]
+        , databaseCharacterSet      : sysInfo[7]
         }
       } 
 	)

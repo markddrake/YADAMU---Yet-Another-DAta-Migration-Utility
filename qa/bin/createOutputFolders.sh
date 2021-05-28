@@ -1,24 +1,42 @@
 export YADMAU_OUTPUT_FOLDER=$1
 if [ ! -e $YADMAU_OUTPUT_FOLDER ]; then mkdir $YADMAU_OUTPUT_FOLDER; fi
-if [ -e $YADMAU_OUTPUT_FOLDER/JSON ]; then rm -rf $YADMAU_OUTPUT_FOLDER/JSON; fi
-mkdir $YADMAU_OUTPUT_FOLDER/JSON
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle19c
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle19c/DDL_ONLY
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle19c/DATA_ONLY
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle19c/DDL_AND_DATA
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle18c
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle18c/DDL_ONLY
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle18c/DATA_ONLY
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle18c/DDL_AND_DATA
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle12c
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle12c/DDL_ONLY
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle12c/DATA_ONLY
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle12c/DDL_AND_DATA
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle11g
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle11g/DDL_ONLY
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle11g/DATA_ONLY
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/oracle11g/DDL_AND_DATA
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/mssql17
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/mssql19
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/mysql
-mkdir $YADMAU_OUTPUT_FOLDER/JSON/postgres
+mkdir -p $BASE_FOLDER/mysql
+mkdir -p $BASE_FOLDER/mssql
+mkdir -p $BASE_FOLDER/oracle
+mkdir -p $BASE_FOLDER/postgres
+# mkdir -p $BASE_FOLDER/DDL_ONLY
+# mkdir -p $BASE_FOLDER/DDL_ONLY/mssql
+# mkdir -p $BASE_FOLDER/DDL_ONLY/mysql
+# mkdir -p $BASE_FOLDER/DDL_ONLY/postgres
+# mkdir -p $BASE_FOLDER/DDL_ONLY/oracle19c
+# mkdir -p $BASE_FOLDER/DDL_ONLY/oracle18c
+# mkdir -p $BASE_FOLDER/DDL_ONLY/oracle12c
+# mkdir -p $BASE_FOLDER/DDL_ONLY/oracle11g
+# mkdir -p $BASE_FOLDER/DDL_ONLY/oracle19c
+# mkdir -p $BASE_FOLDER/DDL_ONLY/oracle18c
+# mkdir -p $BASE_FOLDER/DDL_ONLY/oracle12c
+# mkdir -p $BASE_FOLDER/DDL_ONLY/oracle11g
+# mkdir -p $BASE_FOLDER/DATA_ONLY
+# mkdir -p $BASE_FOLDER/DATA_ONLY/mssql
+# mkdir -p $BASE_FOLDER/DATA_ONLY/mysql
+# mkdir -p $BASE_FOLDER/DATA_ONLY/postgres
+# mkdir -p $BASE_FOLDER/DATA_ONLY/oracle19c
+# mkdir -p $BASE_FOLDER/DATA_ONLY/oracle18c
+# mkdir -p $BASE_FOLDER/DATA_ONLY/oracle12c
+# mkdir -p $BASE_FOLDER/DATA_ONLY/oracle11g
+# mkdir -p $BASE_FOLDER/DATA_ONLY/oracle19c
+# mkdir -p $BASE_FOLDER/DATA_ONLY/oracle18c
+# mkdir -p $BASE_FOLDER/DATA_ONLY/oracle12c
+# mkdir -p $BASE_FOLDER/DATA_ONLY/oracle11g
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA/mssql
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA/mysql
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA/postgres
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA/oracle19c
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA/oracle18c
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA/oracle12c
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA/oracle11g
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA/oracle19c
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA/oracle18c
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA/oracle12c
+# mkdir -p $BASE_FOLDER/DDL_AND_DATA/oracle11g

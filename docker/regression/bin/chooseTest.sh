@@ -2,9 +2,11 @@ export YADAMU_HOME="${YADAMU_HOME:=`pwd`}"
 export YADAMU_QA_HOME=$YADAMU_HOME/qa
 export YADAMU_SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 export YADAMU_TEST_NAME=${YADAMU_TEST_NAME:-all}
+source qa/bin/createSharedFolders.sh mnt
 case $YADAMU_TEST_NAME  in
   shortRegression)
-    source qa/bin/createOutputFolders.sh mnt
+    source qa/bin/resetFolders.sh mnt/stagingArea/export/json/postgres
+    source qa/bin/resetFolders.sh mnt/stagingArea/export/json/postgres
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
   ;;
 
@@ -13,7 +15,9 @@ case $YADAMU_TEST_NAME  in
 	;;
   
   export)
-    source qa/bin/createOutputFolders.sh mnt
+    source qa/bin/resetFolders.sh mnt/stagingArea/export/json/mysql
+    source qa/bin/resetFolders.sh mnt/stagingArea/export/json/mssql
+    source qa/bin/resetFolders.sh mnt/stagingArea/export/json/oracle
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
   ;;
   
@@ -47,7 +51,9 @@ case $YADAMU_TEST_NAME  in
 
   vertica)
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica900DataTypes
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica900TestSuite
   ;;
 
   mssql2014TestSuite)
@@ -74,10 +80,14 @@ case $YADAMU_TEST_NAME  in
     sleep 365d
   ;; 
   
-  local)
-    source $YADAMU_SCRIPT_DIR/runLocalTest.sh $TESTNAME
+  custom)
+    source $YADAMU_SCRIPT_DIR/runCustomTest.sh $TESTNAME
   ;; 
   
+  regression)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh $TESTNAME
+  ;; 
+
   *)
     echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, import, fileRoundtrip, dbRoundtrip, lostConnection, mongo, snowflake, vertica, loader, aws, azure, cmdLine, interactive or all (default)"
   ;;

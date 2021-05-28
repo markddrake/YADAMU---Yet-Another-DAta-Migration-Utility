@@ -6,6 +6,7 @@ const { performance } = require('perf_hooks');
 
 const Yadamu = require('../../YADAMU/common/yadamu.js');
 const YadamuLogger = require('../../YADAMU/common/yadamuLogger.js');
+const YadamuLibraray = require('../../YADAMU/common/yadamuLibrary.js');
 const HttpDBI = require('./httpDBI.js');
 const FileDBI = require('../../YADAMU/file/node/fileDBI.js')
 
@@ -118,12 +119,12 @@ class YadamuServer {
    
 	  const sourceConnection = this.configuration.connections[request.params.connection]
       const sourceSchema = this.configuration.schemas[request.params.schema]
-      const sourceDatabase =  Object.keys(sourceConnection)[0];
+      const sourceDatabase =   YadamuLibrary.getVendorName(sourceConnection)
       const yadamu = new Yadamu('HTTP',{});
 	  const sourceParameters = {
 		FROM_USER: this.getUser(sourceDatabase,sourceSchema)
 	  }
-      const sourceDBI = this.getDatabaseInterface(yadamu,sourceDatabase,sourceConnection[sourceDatabase],sourceParameters);
+      const sourceDBI = this.getDatabaseInterface(yadamu,sourceDatabase,sourceConnection,sourceParameters);
 	  const targetDBI = new HttpDBI(yadamu,response)
 	  response.type('json')
 	  await yadamu.doCopy(sourceDBI,targetDBI);  
@@ -134,12 +135,12 @@ class YadamuServer {
 	  
       const targetConnection = this.configuration.connections[request.params.connection]
       const targetSchema = this.configuration.schemas[request.params.schema]
-      const targetDatabase =  Object.keys(targetConnection)[0];
+      const targetDatabase = YadamuLibrary.getVendorName(targetConnection);
       const yadamu = new Yadamu('HTTP',{});
 	  const targetParameters = {
 		TO_USER: this.getUser(targetDatabase,targetSchema)
 	  }
-      const targetDBI = this.getDatabaseInterface(yadamu,targetDatabase,targetConnection[targetDatabase],targetParameters);
+      const targetDBI = this.getDatabaseInterface(yadamu,targetDatabase,targetConnection,targetParameters);
 	  const sourceDBI = new HttpDBI(yadamu,request)
 	  
 	  response.type('text')
@@ -153,12 +154,12 @@ class YadamuServer {
 	  
 	  const sourceConnection = this.configuration.connections[request.params.connection]
       const sourceSchema = this.configuration.schemas[request.params.schema]
-      const sourceDatabase =  Object.keys(sourceConnection)[0];
+      const sourceDatabase =   YadamuLibrary.getVendorName(sourceConnection)
       const yadamu = new Yadamu('HTTP',{});
 	  const sourceParameters = {
 		FROM_USER: this.getUser(sourceDatabase,sourceSchema)
 	  }
-      const sourceDBI = this.getDatabaseInterface(yadamu,sourceDatabase,sourceConnection[sourceDatabase],sourceParameters);
+      const sourceDBI = this.getDatabaseInterface(yadamu,sourceDatabase,sourceConnection,sourceParameters);
 
       const targetConnection = this.configuration.connections[request.params.directory]
 	  const targetParameters = {
@@ -183,12 +184,12 @@ class YadamuServer {
 	  
 	  const targetConnection = this.configuration.connections[request.params.connection]
       const targetSchema = this.configuration.schemas[request.params.schema]
-      const targetDatabase =  Object.keys(targetConnection)[0];
+      const targetDatabase =  YadamuLibrary.getVendorName(targetConnection);
       const yadamu = new Yadamu('HTTP',{});
 	  const targetParameters = {
 		TO_USER: this.getUser(targetDatabase,targetSchema)
 	  }
-      const targetDBI = this.getDatabaseInterface(yadamu,targetDatabase,targetConnection[targetDatabase],targetParameters);
+      const targetDBI = this.getDatabaseInterface(yadamu,targetDatabase,targetConnection,targetParameters);
 
 	  response.type('text')
 	  yadamu.getYadamuLogger().switchOutputStream(response);
@@ -204,19 +205,19 @@ class YadamuServer {
 
 	  const sourceConnection = this.configuration.connections[request.params.connection]
       const sourceSchema = this.configuration.schemas[request.params.schema]
-      const sourceDatabase =  Object.keys(sourceConnection)[0];
+      const sourceDatabase =   YadamuLibrary.getVendorName(sourceConnection)
 	  const sourceParameters = {
 		FROM_USER: this.getUser(sourceDatabase,sourceSchema)
 	  }
-      const sourceDBI = this.getDatabaseInterface(yadamu,sourceDatabase,sourceConnection[sourceDatabase],sourceParameters);
+      const sourceDBI = this.getDatabaseInterface(yadamu,sourceDatabase,sourceConnection,sourceParameters);
 
 	  const targetConnection = this.configuration.connections[request.params.connection]
       const targetSchema = this.configuration.schemas[request.params.schema]
-      const targetDatabase =  Object.keys(targetConnection)[0];
+      const targetDatabase =  YadamuLibrary.getVendorName(targetConnection);
 	  const targetParameters = {
 		TO_USER: this.getUser(targetDatabase,targetSchema)
 	  }
-      const targetDBI = this.getDatabaseInterface(yadamu,targetDatabase,targetConnection[targetDatabase],targetParameters);
+      const targetDBI = this.getDatabaseInterface(yadamu,targetDatabase,targetConnection,targetParameters);
 
 	  response.type('text')
 	  yadamu.getYadamuLogger().switchOutputStream(response);

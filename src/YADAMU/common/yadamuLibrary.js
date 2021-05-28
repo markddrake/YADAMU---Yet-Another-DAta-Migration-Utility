@@ -375,6 +375,17 @@ class YadamuLibrary {
   	}
   }
   
+  static intervalYearMonthTo8601(interval) {
+	let components = interval.split('-')
+	return components.length > 1 ? `P${components[0]}Y${components[1]}M` : `P${components[0]}Y`
+  }
+  
+  static intervalDaySecondTo8601(interval) {
+    let components = interval.split('-')
+	return `P${components[0]}YT${components[1]}H${components[2] || 0}M${components[3] || 0}S`
+	
+  }
+  
   static parse8601Interval(interval) {
 	let results = {}
 	// Strip the leading 'P'
@@ -446,6 +457,31 @@ class YadamuLibrary {
 	
 	return results
   }
+
+  static getVendorName(connectionProperties) {
+    const keys = Object.keys(connectionProperties)
+	
+    switch (keys.length) {
+      case 0:
+	    throw new new ConfigurationFileError('Empty Connection Object')
+	  case 1: 
+        return keys[0]
+  	  default:
+	    if (connectionProperties.hasOwnProperty("vendor") && connectionProperties.hasOwnProperty(connectionProperties.vendor)) {
+	      return connectionProperties.vendor
+	    }
+		const vendor = keys.filter((key) => {return !["parameters","vendor","settings"].includes(key)})
+		if (vendor.length !== 1) {
+	      throw new ConfigurationFileError('Unable to determine vendor')
+		}
+		return vendor[0]
+    } 
+  }
+
+  static getVendorSettings(connectionProperties) {
+    return connectionProperties(this.getVendorName(connectionProperties))
+  }
+  
 }
 
 module.exports = YadamuLibrary

@@ -74,10 +74,10 @@ class Yadamu {
     return this._IDENTIFIER_MAPPINGS
   }
   
-  get CIPHER()                        { return this.parameters.CIPHER                    || YadamuConstants.CIPHER }
   get CIPHER_KEY_SIZE()               { return 32 }
-  get SALT()                          { return this.parameters.SALT                      || YadamuConstants.SALT }
-  get ENCRYPTION()                    { return this.parameters.ENCRYPTION                || this.parameters.ENCRYPTION === undefined ? YadamuConstants.ENCRYPTION : this.parameters.ENCRYPTION }
+  get CIPHER()                        { return this.parameters.CIPHER || YadamuConstants.CIPHER }
+  get SALT()                          { return this.parameters.SALT || YadamuConstants.SALT }
+  get ENCRYPTION()                    { return this.parameters.ENCRYPTION === undefined ? YadamuConstants.ENCRYPTION : this.parameters.ENCRYPTION }
   get ENCRYPTION_KEY()                { return this._ENCRYPTION_KEY }
   set ENCRYPTION_KEY(v)               { this._ENCRYPTION_KEY = v}
   
@@ -85,6 +85,9 @@ class Yadamu {
   get INTERACTIVE()                   { return this.STATUS.operation === 'YADAMUGUI' }
   get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || YadamuConstants.PARALLEL) }
   get PARALLEL_PROCESSING()           { return this.PARALLEL > 0 } // Parellel 1 is Parallel processing logic with a single worker.
+
+  get SOURCE_DIRECTORY()              { return this.parameters.SOURCE_DIRECTORY || this.parameters.DIRECTORY }
+  get TARGET_DIRECTORY()              { return this.parameters.TARGET_DIRECTORY || this.parameters.DIRECTORY }
 
   get MACROS()                        { return YadamuConstants.MACROS }
 
@@ -94,6 +97,7 @@ class Yadamu {
   get YADAMU_QA()                     { return false }
   
   get LOG_FILE()                      { return this.parameters.LOG_FILE }
+  get IDENTIFIER_MAPPING_FILE()       { return this.parameters.IDENTIFIER_MAPPING_FILE }
 
   get CONFIGURATION_FILE_PATH()       { return this.COMMAND_LINE_PARAMETERS.CONFIG }
   
@@ -212,6 +216,10 @@ class Yadamu {
     this.processParameters();    
   }
   
+  appendSynonym(argument,value) {
+	this._COMMAND_LINE_PARAMETERS[argument] = value
+  }
+  
   initializeParameters(configParameters) {
 
     // Start with Yadamu Defaults
@@ -257,11 +265,11 @@ class Yadamu {
   async requestPassPhrase() {
 	  
 	 if (process.env.YADAMU_PASSPHRASE) {
-	   console.log('Loaded encryption pass phrase from environment variable "YADAMU_PASSPHRASE".')
+	   this.LOGGER.info(['YADAMU'],'Passphrase used for Encryption and Decryption operations supplied using environemnt variable YADAMU_PASSPHRASE.')
 	   return process.env.YADAMU_PASSPHRASE
 	 }
 	   
-     const prompt = `Enter pass phrase to be used when encrypting and decypting data files: `
+     const prompt = `Enter passphrase to be used when encrypting and decypting data files: `
      const pwQuery = this.createQuestion(prompt);
      return await pwQuery;
   
@@ -459,183 +467,147 @@ class Yadamu {
     process.argv.forEach((arg) => {
      
       if (arg.indexOf('=') > -1) {
-        const parameterName = arg.substring(0,arg.indexOf('=')).toUpperCase();
+        let parameterName = arg.substring(0,arg.indexOf('=')).toUpperCase();
+        parameterName = parameterName.startsWith('--') ? parameterName.substring(2) : parameterName.startsWith('-') ? parameterName.substring(1) : parameterName
         const parameterValue = arg.substring(arg.indexOf('=')+1);
         switch (parameterName) {
 	      case 'INIT':		  
-	      case '--INIT':
 	      case 'COPY':		  
-	      case '--COPY':
 	      case 'TEST':		  
-	      case '--TEST':
-			parameters.CONFIG = this.isExistingFile(parameterName,parameterValue);
+   	        parameters.CONFIG = this.isExistingFile(parameterName,parameterValue);
 			break;
           case 'IMPORT':
-          case '--IMPORT':
           case 'UPLOAD':		  
-	      case '--UPLOAD':
-  	      case 'EXPORT':
-          case '--EXPORT':
-			parameters.FILE =  this.isExistingFile(parameterName,parameterValue);
+	      case 'EXPORT':
+            parameters.FILE =  this.isExistingFile(parameterName,parameterValue);
             break;
           case 'RDBMS':
-          case '--RDBMS':
             parameters.RDBMS = parameterValue;
             break;
 	      case 'OVERWRITE':		  
-	      case '--OVERWRITE':
-  	        parameters.OVERWRITE = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? this.isTrue(parameterValue.toUpperCase()) : false
+	        parameters.OVERWRITE = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? this.isTrue(parameterValue.toUpperCase()) : false
 		    break;
           case 'CONFIG':
-          case '--CONFIG':
           case 'CONFIGURATION':
-          case '--CONFIGURATION':
-            parameters.CONFIG = parameterValue;
-			parameters.FILE =  this.isExistingFile(parameterName,parameterValue);;
+            parameters.CONFIG =  this.isExistingFile(parameterName,parameterValue);
+			// parameters.FILE = parameters.CONFIG
             break;
 	      case 'USERID':
   	        parameters.USERID = parameterValue;
 			break;
           case 'USERNAME':
-          case '--USERNAME':
             parameters.USERNAME = parameterValue;
             break;
           case 'PASSWORD':
-          case '--PASSWORD':
-		    console.log(`${new Date().toISOString()} [WARNING][${this.constructor.name}]: Suppling a password on the command line interface can be insecure`);
+            console.log(`${new Date().toISOString()} [WARNING][${this.constructor.name}]: Suppling a password on the command line interface can be insecure`);
             parameters.PASSWORD = parameterValue;
             break;
           case 'DATABASE':
-          case '--DATABASE':
             parameters.DATABASE = parameterValue;
             break;
           case 'HOSTNAME':
-          case '--HOSTNAME':
             parameters.HOSTNAME = parameterValue;
             break;
           case 'ACCOUNT':
-          case '--ACCOUNT':
             parameters.ACCOUNT = parameterValue;
             break;
           case 'WAREHOUSE':
-          case '--WAREHOUSE':
             parameters.WAREHOUSE = parameterValue;
             break;
           case 'HOSTNAME':
-          case '--HOSTNAME':
             parameters.HOSTNAME = parameterValue;
             break;
           case 'PORT':
-          case '--PORT':
             parameters.PORT = parameterValue;
             break;
           case 'FILE':
-          case '--FILE':
-		    if (parameters.IMPORT || parameters.EXPORT) {
+            if (parameters.IMPORT || parameters.EXPORT) {
 			  throw new error(`Cannot combine legacy parameter FILE with IMPORT or EXPORT`);
 			}
             parameters.FILE = parameterValue;
             break;
-          case 'ROOT_FOLDER':
-          case '--ROOT_FOLDER':
-            parameters.FILE = parameterValue;
+          case 'DIRECTORY':
+            parameters.DIRECTORY = parameterValue;
+            break;
+		  case 'SOURCE':
+          case 'SOURCE_DIR':
+          case 'SOURCE_DIRECTORY':
+            parameters.SOURCE_DIRECTORY = parameterValue;
+            break;
+		  case 'TARGET':
+          case 'TARGET_DIR':
+          case 'TARGET_DIRECTORY':
+            parameters.TARGET_DIRECTORY = parameterValue;
             break;
           case 'BUCKET':
-          case '--BUCKET':
             parameters.BUCKET = parameterValue;
             break;
           case 'CONTAINER':
-          case '--CONTAINER':
             parameters.CONTAINER = parameterValue;
             break;
           case 'OWNER':
-          case '--OWNER':
+            parameters.OWNER = this.processValue(parameterValue);
+            break;
           case 'FROM_USER':
-          case '--FROM_USER':
             parameters.FROM_USER = this.processValue(parameterValue);
             break;
-          case 'TOUSER':
-          case '--TOUSER':
           case 'TO_USER':
-          case '--TO_USER':
             parameters.TO_USER = this.processValue(parameterValue);
             break;
           case 'PARALLEL':
-          case '--PARALLEL':
             parameters.PARALLEL = parameterValue;
             break;
           case 'LOG_FILE':
-          case '--LOG_FILE':
             parameters.LOG_FILE = parameterValue;
             break;
           case 'SQL_TRACE':
-          case '--SQL_TRACE':
             parameters.SQL_TRACE = parameterValue;
             break;
           case 'PERF_TRACE':
-          case '--PERF_TRACE':
-		  case 'PERFORMANCE_TRACE':
-          case '--PERFORMANCE_TRACE':
+          case 'PERFORMANCE_TRACE':
             parameters.PERFORMANCE_TRACE = parameterValue;
             break;
-          case '--SQL_TRACE':
-            parameters.SQL_TRACE = parameterValue;
-            break;
           case 'PARAMETER_TRACE':
-          case '--PARAMETER_TRACE':
             parameters.PARAMETER_TRACE = (parameterValue.toLowerCase() === 'true');
             break;
           case 'SPATIAL_FORMAT':
-          case '--SPATIAL_FORMAT':
             parameters.SPATIAL_FORMAT = parameterValue.toUpperCase()
             break;
           case 'LOG_LEVEL':
-          case '--LOG_LEVEL':
             parameters.LOG_LEVEL = parameterValue;
             break;
           case 'DUMP_FILE':
-          case '--DUMP_FILE':
             parameters.DUMP_FILE = parameterValue;
             break;
           case 'EXCEPTION_FOLDER':
-          case '--EXCEPTION_FOLDER':
             parameters.EXCEPTION_FOLDER = this.isExistingFolder(parameterName,parameterValue);
             break;
           case 'EXCEPTION_FILE_PREFIX':
-          case '--EXCEPTION_FILE_PREFIX':
             parameters.EXCEPTION_FILE_PREFIX = parameterValue;
             break;
           case 'REJECT_FOLDER':
-          case '--REJECT_FOLDER':
             parameters.REJECT_FOLDER = this.isExistingFolder(parameterName,parameterValue);
             break;
           case 'REJECT_FILE_PREFIX':
-          case '--REJECT_FILE_PREFIX':
             parameters.REJECT_FILE_PREFIX = parameterValue;
             break;
           case 'FEEDBACK':
-          case '--FEEDBACK':
             parameters.FEEDBACK = parameterValue.toUpperCase();
             break;
           case 'MODE':
-          case '--MODE':
-            parameters.MODE = parameterValue.toUpperCase();
+            parameters.MODE = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.MODES)
             break
           case 'BATCH_SIZE':
-          case '--BATCH_SIZE':
             this.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           case 'COMMIT_RATIO':
-          case '--COMMIT_RATIO':
             this.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           case 'BATCH_LOB_COUNT':
-          case '--BATCH_LOB_COUNT':
             this.ensureNumeric(parameters,parameterName.toUpperCase(),parameterValue)
             break;
           case 'TABLES':
-          case '--TABLES':
-		    if ((parameterValue.indexOf('[') === 0) && (parameterValue.indexOf(']') === (parameterValue.length -1))) {
+            if ((parameterValue.indexOf('[') === 0) && (parameterValue.indexOf(']') === (parameterValue.length -1))) {
 			  // Assume we have a comma seperated list of tables - Convert to JSON Array
 			  try {
 				parameters.TABLES = JSON.parse(parameterValue) 
@@ -654,24 +626,19 @@ class Yadamu {
 			}
             break;
           case 'IDENTIFIER_MAPPING_FILE':
-          case '--IDENTIFIER_MAPPING_FILE':
-			parameters.IDENTIFIER_MAPPING_FILE = isExistingFile(parameterName,parameterValue);
+            parameters.IDENTIFIER_MAPPING_FILE = isExistingFile(parameterName,parameterValue);
             break;
           case 'IDENTIFIER_TRANSFORMATION':
-          case '--IDENTIFIER_TRANSFORMATION':
             parameters.IDENTIFIER_TRANSFORMATION = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.SUPPORTED_IDENTIFIER_TRANSFORMATION);
             break;
           case 'OUTPUT_FORMAT':
-          case '--OUTPUT_FORMAT':
             parameters.OUTPUT_FORMAT = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.OUTPUT_FORMATS);
             break;
           case 'COMPRESSION':
-          case '--COMPRESSION':
             parameters.COMPRESSION = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.SUPPORTED_COMPRESSION)
             break
           case 'ENCRYPTION':
-          case '--ENCRYPTION':
-		    const encryption = YadamuConstants.TRUE_OR_FALSE.includes(parameterValue.toUpperCase()) ? parameterValue.toUpperCase() === 'TRUE' : this.isSupportedValue(parameterName,parameterValue,YadamuConstants.SUPPORTED_CIPHER) 
+            const encryption = YadamuConstants.TRUE_OR_FALSE.includes(parameterValue.toUpperCase()) ? parameterValue.toUpperCase() === 'TRUE' : this.isSupportedValue(parameterName,parameterValue,YadamuConstants.SUPPORTED_CIPHER) 
 			if (typeof encryption === 'string') {
 			   parameters.ENCRYPTION = true 
 			   parameters.CIPHER = encryption
@@ -681,16 +648,13 @@ class Yadamu {
 	    	}
 			break
           case 'CIPHER':
-          case '--CIPHER':
             parameters.CIPHER = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.SUPPORTED_CIPHER)
             break
           case 'PASSPHRASE':
-          case '--PASSPHRASE':
-		    console.log(`${new Date().toISOString()} [WARNING][${this.constructor.name}]: Suppling a password on the command line interface can be insecure`);
+            console.log(`${new Date().toISOString()} [WARNING][${this.constructor.name}]: Suppling a password on the command line interface can be insecure`);
             parameters.PASSPHRASE = parameterValue;
             break;
           case 'SALT':
-          case '--SALT':
             parameters.SALT = parameterValue;
             break;
           default:
@@ -852,8 +816,8 @@ class Yadamu {
 	  await pipeline(pipelineComponents)
       await Promise.allSettled(streamsCompleted)
     } catch (e) {
- 	  await Promise.allSettled(streamsCompleted)
 	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
+ 	  await Promise.allSettled(streamsCompleted)
       throw e;
     }
   }
@@ -934,7 +898,6 @@ class Yadamu {
      })
      return metrics
   }
-
   
   async doUploadOperation(dbi) {
 
@@ -942,8 +905,7 @@ class Yadamu {
       await dbi.initialize();
 	  this.activeConnections.add(dbi)
       this.STATUS.operationSuccessful = false;
-      const pathToFile = dbi.parameters.FILE;
-      const hndl = await this.uploadFile(dbi,pathToFile);
+      const hndl = await this.uploadFile(dbi,dbi.UPLOAD_FILE);
       const log = await dbi.processFile(hndl)
 	  await dbi.releasePrimaryConnection()
       await dbi.finalize();
@@ -990,6 +952,45 @@ class Yadamu {
     await this.close();
     return metrics
   }  
+  
+  async loadStagedData(source,target) {
+	  
+	if (!source.isCopyOperationSource()) {
+       throw new YadamuError(`SQL COPY operations are not supported with "${source.DATABASE_KEY}"`)
+	}
+	
+	await source.initialize()
+	await source.initializeExport(true)
+	const controlFile = source.controlFile
+	const controlFilePath = source.controlFilePath
+	
+	if (target.REMOTE_STAGING_AREA) {
+	  Object.keys(controlFile.data).forEach((tableName,idx) => {
+		if ((source.TABLE_FILTER.length === 0) || source.TABLE_FILTER.includes(tableName)) {
+    	  const localPath = controlFile.data[tableName].file
+	  	  source.DIRECTORY = source.TARGET_DIRECTORY
+		  const remotePath = path.join(target.REMOTE_STAGING_AREA,localPath.substring(source.BASE_DIRECTORY.length)).split(/[/\\]/g).join(path.posix.sep)
+	      controlFile.data[tableName].file = remotePath
+	    }
+		else {
+		  delete controlFile.metadata[tableName]
+		  delete controlFile.data[tableName]
+		}
+	  })
+	}
+		
+	const metadata = await source.loadMetadataFiles()
+	await source.finalizeExport();
+	await source.finalize();
+	
+	// Remap the data file locations in the control file to a path that is accessible by the target database
+	
+	target.setSystemInformation(controlFile.systemInformation)
+	await target.initialize()
+	const results = await target.doCopyBasedImport(source.DATABASE_KEY,controlFile,metadata)
+	await target.finalize();
+	
+  }
 
 }  
      

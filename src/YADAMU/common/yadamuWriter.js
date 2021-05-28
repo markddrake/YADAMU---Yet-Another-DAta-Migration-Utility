@@ -72,7 +72,6 @@ class YadamuWriter extends Transform {
     this.dbi.setMetrics(this.metrics)
     
     this.batch = [];
-    this.insertMode = 'Batch';    
     this.skipTable = this.dbi.MODE === 'DDL_ONLY';
     this.sqlInitialTime = this.dbi.sqlCumlativeTime
     this.startTime = performance.now();
@@ -88,6 +87,7 @@ class YadamuWriter extends Transform {
   setTableInfo(tableName) {
     this.skipTable = true
     this.tableInfo = this.dbi.getTableInfo(tableName)
+    this.tableInfo.insertMode = this.tableInfo.insertMode || 'Batch';    
     this.skipTable = false;
   }
    
@@ -216,11 +216,11 @@ class YadamuWriter extends Transform {
 	  this.dbi.trackExceptions(iterativeError);
       this.yadamuLogger.logRejected([...(typeof cause.getTags === 'function' ? cause.getTags() : []),this.dbi.DATABASE_VENDOR,this.tableName,operation,this.metrics.cached,rowNumber],iterativeError);
     } catch (e) {
-      this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.tableName,this.insertMode],e)
+      this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.tableName,this.tableInfo.insertMode],e)
     }
     
     if (this.metrics.skipped === this.dbi.TABLE_MAX_ERRORS) {
-      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
+      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
       this.abortTable()
     }
   }
@@ -235,12 +235,12 @@ class YadamuWriter extends Transform {
 	  this.dbi.trackExceptions(iterativeError);
       this.yadamuLogger.logRejectedAsWarning([this.dbi.DATABASE_VENDOR,this.tableName,operation,this.metrics.cached,rowNumber],iterativeError);
     } catch (e) {
-      this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.tableName,this.insertMode],e)
+      this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.tableName,this.tableInfo.insertMode],e)
     }
 
     
     if (this.metrics.skipped === this.dbi.TABLE_MAX_ERRORS) {
-      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
+      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
       this.abortTable()
     }
   }
@@ -252,7 +252,7 @@ class YadamuWriter extends Transform {
     }
     const batchException = this.createBatchException(cause,this.metrics.cached,firstRow,lastRow,info)
     this.dbi.trackExceptions(batchException);
-    this.yadamuLogger.handleWarning([...(cause.getTags?.() || []),this.dbi.DATABASE_VENDOR,this.tableName,operation,this.insertMode,this.metrics.cached],batchException)
+    this.yadamuLogger.handleWarning([...(cause.getTags?.() || []),this.dbi.DATABASE_VENDOR,this.tableName,operation,this.tableInfo.insertMode,this.metrics.cached],batchException)
   }
   
 
@@ -379,17 +379,32 @@ class YadamuWriter extends Transform {
 		      fs.write('",')
 		    } 
 	    case "object":
-		  return (isLastColumn)
-		  ? (fs,col) => {
-              fs.write('"')
-		      fs.write(JSON.stringify(col).replace(/"/g,'""'))
-		      fs.write('"\n')
-		    } 
-		  : (fs,col) => {
-              fs.write('"')
-		      fs.write(col === null ? '' : JSON.stringify(col).replace(/"/g,'""'))
-		      fs.write('",')
-		    } 
+		  switch (true) {
+		    case (col instanceof Date):
+		      return (isLastColumn)
+		      ? (fs,col) => {
+                  fs.write('"')
+                  fs.write(col === null ? '' : col.toISOString())
+		          fs.write('"\n')
+		        } 
+		      : (fs,col) => {
+                fs.write('"')
+		        fs.write(col === null ? '' : col.toISOString())
+		        fs.write('",')
+		      } 
+			default:
+		      return (isLastColumn)
+		      ? (fs,col) => {
+                  fs.write('"')
+		          fs.write(col === null ? '' : JSON.stringify(col).replace(/"/g,'""'))
+		          fs.write('"\n')
+		        } 
+		      : (fs,col) => {
+                  fs.write('"')
+		          fs.write(col === null ? '' : JSON.stringify(col).replace(/"/g,'""'))
+		          fs.write('",')
+		        } 
+		  }
 		default:
 		  return (isLastColumn)
 		  ? (fs,col) => {
@@ -404,11 +419,13 @@ class YadamuWriter extends Transform {
   }	 
   
   setCSVTransformations(batch) {
+
     // RFC4180
 
-    const rowIdx = 0
-	const lastIdx = batch[rowIdx].length -1
-	this.csvTransformations = batch[rowIdx].map((col,colIdx) => {
+    // Set the CSV Transformation functions based on the first non-null value for each column.
+
+	const lastIdx = batch[0].length - 1
+	this.csvTransformations = batch[0].map((col,colIdx) => {
        const lastColumn = colIdx === lastIdx
 	   return col !== null ? this.getCSVTransformation(col,lastColumn) : this.getCSVTransformation(batch[batch.findIndex((row) => {return row[colIdx] !== null})]?.[colIdx],lastColumn)
 	})
@@ -428,7 +445,7 @@ class YadamuWriter extends Transform {
       } catch (cause) {
         await this.dbi.restoreSavePoint(cause);
         this.reportBatchError(batch,`INSERT MANY`,cause)
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],`Switching to Iterative mode.`);          
+        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative' 
         
       }
@@ -466,14 +483,14 @@ class YadamuWriter extends Transform {
           await this.rollbackTransaction();
         }	  
         if (this.REPORT_BATCHES && !this.commitWork(rowsReceived)) {
-          this.yadamuLogger.info([`${this.tableName}`,this.insertMode],`Rows written:  ${this.metrics.written}.`);
+          this.yadamuLogger.info([`${this.tableName}`,this.tableInfo.insertMode],`Rows written:  ${this.metrics.written}.`);
         }                   
 	    // Commit after a writing a batch if the Commit threshold has been reached or passed. Start a new Transaction
         if (this.commitWork(rowsReceived)) {
 		  try {
             await this.commitTransaction()
             if (this.REPORT_COMMITS) {
-              this.yadamuLogger.info([`${this.tableName}`,this.insertMode],`Rows commited: ${this.metrics.committed}.`);
+              this.yadamuLogger.info([`${this.tableName}`,this.tableInfo.insertMode],`Rows commited: ${this.metrics.committed}.`);
             }          
 		  } catch (commitFailure) {
 			// Attempt to start a new transaction even if the commit failed.
@@ -554,7 +571,7 @@ class YadamuWriter extends Transform {
     this.cacheRow(data)
     this.metrics.received++;
     if ((this.metrics.received % this.FEEDBACK_INTERVAL === 0) & !this.flushBatch()) {
-      this.yadamuLogger.info([`${this.tableName}`,this.insertMode],`Rows Cached: ${this.metrics.cached}.`);
+      this.yadamuLogger.info([`${this.tableName}`,this.tableInfo.insertMode],`Rows Cached: ${this.metrics.cached}.`);
     }
 	if (this.flushBatch()) {
       this.cork()
@@ -573,8 +590,8 @@ class YadamuWriter extends Transform {
  	  this.uncork(true)
       this.batchWritten = this.getBatchWritten(this.metrics.batchCount)
 	  this.processBatch(nextBatch,rowsReceived,rowsCached).catch((e) => {
-        this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode],'Write Batch Failed');
-	    this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,this.tableName,this.insertMode,'BATCH WRITE'],e)
+        this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],'Write Batch Failed');
+	    this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode,'BATCH WRITE'],e)
       })
     }
   }
@@ -584,7 +601,7 @@ class YadamuWriter extends Transform {
       startTime     : this.startTime
     , endTime       : this.endTime
     , sqlTime       : this.dbi.sqlCumlativeTime - this.sqlInitialTime
-    , insertMode    : this.insertMode
+    , insertMode    : this.tableInfo.insertMode
     , skipTable     : this.skipTable
     , metrics       : this.metrics
     }    
@@ -705,8 +722,8 @@ class YadamuWriter extends Transform {
     
     const cause = this.readerMetrics.readerError || this.readerMetrics.parserError ||  this.underlyingError || err
 	if (cause) {
-	  const tags = YadamuError.isLostConnection(cause) ? ['LOST CONNECTION'] : []
-      tags.psuh(this.readerMetrics.readerError || this.readerMetrics.parserError ? 'STREAM READER' : 'STREAM WRITER')
+	  const tags = YadamuError.lostConnection(cause) ? ['LOST CONNECTION'] : []
+      tags.push(this.readerMetrics.readerError || this.readerMetrics.parserError ? 'STREAM READER' : 'STREAM WRITER')
  	  this.yadamuLogger.handleException(['PIPELINE',...tags,this.tableName,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],cause)
 	}
 

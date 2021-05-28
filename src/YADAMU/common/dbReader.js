@@ -169,7 +169,6 @@ class DBReader extends Readable {
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
 	    
 	  const cause = readerDBI.INPUT_METRICS.readerError || readerDBI.INPUT_METRICS.parserError || yadamuPipeline.find((s) => {return s.underlyingError instanceof Error}).underlyingError || err
-	  
       if (readerDBI.ON_ERROR === 'ABORT') {
   	    // Throw the underlying cause if ON_ERROR handling is ABORT
         throw cause;
@@ -179,7 +178,13 @@ class DBReader extends Readable {
         // If the reader or parser failed with a lost connection error re-establish the input stream connection 
   	    await readerDBI.reconnect(cause,'READER')
       }
-
+	  /*
+	  else {
+        this.yadamuLogger.handleException(['PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
+		tableOutputStream.destroy(cause);
+	  }
+	  */
+	  
       this.dbi.resetExceptionTracking()
     }
   }
@@ -219,6 +224,9 @@ class DBReader extends Readable {
 	 // Get the Table Readers 
 	 const sourcePipeline = await readerDBI.getInputStreams(tableInfo)
      const targetPipeline = writerDBI.getOutputStreams(tableInfo.MAPPED_TABLE_NAME)
+
+     // targetPipeline.forEach((s) => { console.log( task.TABLE_NAME,s.constructor.name, s.eventNames().map((e) => {return `"${e}(${s.listenerCount(e)})"`}).join(','))})
+
 	 targetPipeline[0].setReaderMetrics(readerDBI.INPUT_METRICS)
 	 const tableSwitcher = targetPipeline[1]
 	 const yadamuPipeline = new Array(...sourcePipeline,...targetPipeline)
@@ -238,7 +246,8 @@ class DBReader extends Readable {
          resolve()
   	   })
      })
-
+   
+     // targetPipeline.forEach((s) => { console.log(task.TABLE_NAME,s.constructor.name, s.eventNames().map((e) => {return `"${e}(${s.listenerCount(e)})"`}).join(','))})
      // this.traceSteamEvents(yadamuPipeline,task.TABLE_NAME)
 	  
      // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return proc.constructor.name }).join(' => ')}`)

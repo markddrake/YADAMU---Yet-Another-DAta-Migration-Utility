@@ -47,6 +47,13 @@ go
 CREATE SCHEMA $(SCHEMA)
 go
 --
+/*
+**
+** Dissable Command Line Testing for WorldWideImporters and WorldWideImportersDW
+**
+*/
+quit
+--
 :setvar DATABASE WorldWideImporters  
 --
 DROP DATABASE $(DATABASE)$(ID)

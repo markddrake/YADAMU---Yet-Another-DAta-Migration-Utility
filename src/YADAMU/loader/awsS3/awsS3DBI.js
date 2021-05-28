@@ -45,42 +45,58 @@ class AWSS3DBI extends CloudDBI {
   get DATABASE_KEY()          { return AWSS3Constants.DATABASE_KEY};
   get DATABASE_VENDOR()       { return AWSS3Constants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()       { return AWSS3Constants.SOFTWARE_VENDOR};
+  get PROTOCOL()              { return AWSS3Constants.PROTOCOL }
   
-  get STORAGE_ID() {
+  get BUCKET() {
     this._BUCKET = this._BUCKET || (() => { 
-	  const bucket = this.parameters.BUCKET || this.s3Options.bucket || AWSS3Constants.BUCKET
+	  const bucket = this.parameters.BUCKET || AWSS3Constants.BUCKET
 	  this._BUCKET = YadamuLibrary.macroSubstitions(bucket, this.yadamu.MACROS)
 	  return this._BUCKET
 	})();
 	return this._BUCKET
   }
   
-  constructor(yadamu) {
-    super(yadamu)
-	this.s3Options = {}
-  }    
+  get STORAGE_ID()            { return this.BUCKET }
   
+  constructor(yadamu,settings,parameters) {
+    super(yadamu,settings,parameters)
+  }    
+ 
   async finalize() {
 	await Promise.all(Array.from(this.cloudService.writeOperations))
 	super.finalize()
   }
   
-  getConnectionProperties() {
-	  
-    return {
-	  accessKey        : this.parameters.USERNAME
-    , secretAccessKey  : this.parameters.PASSWORD
-	, endpoint         : `${this.parameters.HOSTNAME}:${this.parameters.PORT}`
-    , s3ForcePathStyle : true
-    , signatureVersion : "v4"
-    }
+  updateVendorProperties(vendorProperties) {
 	
+	let url = vendorProperties.endpoint
+	url = url && url.indexOf('://') < 0 ? `http://${url}` : url
+	try {
+	  url = new URL(url ? url : 'http://0.0.0.0')
+	} catch (e) {
+      this.yadamuLogger.error([this.DATABASE_VENDOR,'CONNECTION'],`Invalid endpoint specified: "${vendorProperties.endpoint}"`)
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'CONNECTION'],e)
+	  url = new URL('http://0.0.0.0')
+	}
+
+    url.protocol                      = this.parameters.PROTOCOL  || url.protocol 
+	url.hostname                      = this.parameters.HOSTNAME  || url.hostname
+	url.port                          = this.parameters.PORT      || url.port
+	url                               = url.toString()
+	
+    vendorProperties.accessKey        = this.parameters.USERNAME  || vendorProperties.accessKey 
+    vendorProperties.secretAccessKey  = this.parameters.PASSWORD  || vendorProperties.secretAccessKey	
+	vendorProperties.region           = this.parameters.REGION    || vendorProperties.region
+	vendorProperties.endpoint         = url
+    vendorProperties.s3ForcePathStyle = true
+    vendorProperties.signatureVersion = "v4"
+    
   }
   
   async createConnectionPool() {
 	// this.yadamuLogger.trace([this.constructor.name],`new AWS.S3()`)
-	this.cloudConnection = await new AWS.S3(this.connectionProperties)
-	this.cloudService = new AWSS3StorageService(this.cloudConnection,this.STORAGE_ID,{},this.yadamuLogger)
+	this.cloudConnection = await new AWS.S3(this.vendorProperties)
+	this.cloudService = new AWSS3StorageService(this.cloudConnection,this.BUCKET,{},this.yadamuLogger)
   }
 
 
