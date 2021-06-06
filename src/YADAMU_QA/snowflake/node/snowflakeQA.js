@@ -76,8 +76,11 @@ class SnowflakeQA extends SnowflakeDBI {
     }   
 
     async getRowCounts(target) {
-      
-      const results = await this.executeSQL(SnowflakeQA.SQL_SCHEMA_TABLE_ROWS,[target.schema]); 
+
+      const useDatabase = `USE DATABASE "${target.database}";`;	  
+      let results =  await this.executeSQL(useDatabase,[]);      
+         
+      results = await this.executeSQL(SnowflakeQA.SQL_SCHEMA_TABLE_ROWS,[target.schema]); 
       return results.map((row,idx) => {          
         return [target.schema,row.TABLE_NAME,row.ROW_COUNT]
       })
@@ -85,17 +88,9 @@ class SnowflakeQA extends SnowflakeDBI {
     
     async compareSchemas(source,target,rules) {
     
+      const compareRules = JSON.stringify(this.yadamu.getCompareRules(rules))  
+ 	
       const useDatabase = `USE DATABASE "${source.database}";`;
-
-      const compareRules = {
-	    emptyStringisNull   : rules.EMPTY_STRING_IS_NULL 
-	  ,	spatialPrecision    : rules.SPATIAL_PRECISION || 18
-	  ,	timestampPrecision  : rules.TIMESTAMP_PRECISION || 9
-	  , xmlRule             : rules.XML_COMPARISSON_RULE
-	  , infinityIsNull      : rules.INFINITY_IS_NULL 
-      }
-	 	 
-	  
       let results =  await this.executeSQL(useDatabase,[]);      
          
       const report = {
@@ -103,7 +98,7 @@ class SnowflakeQA extends SnowflakeDBI {
        ,failed     : []
       }
 
-      results = await this.executeSQL(SnowflakeQA.SQL_COMPARE_SCHEMAS,[source.database,source.schema,target.schema,JSON.stringify(compareRules)]);
+      results = await this.executeSQL(SnowflakeQA.SQL_COMPARE_SCHEMAS,[source.database,source.schema,target.schema,compareRules]);
 
       let compare = JSON.parse(results[0].COMPARE_SCHEMAS)
       compare.forEach((result) => {

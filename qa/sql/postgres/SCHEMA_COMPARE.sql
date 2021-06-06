@@ -1,7 +1,7 @@
 --
 select to_char (now()::timestamptz  at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') || ': "' || :'SCHEMA' || :'ID1' || '", "' || :'SCHEMA' || :'ID2' || '", "' || :'METHOD' || '"' "Timestamp";
 --
-call COMPARE_SCHEMA(:'SCHEMA' || :'ID1',:'SCHEMA' || :'ID2',jsonb_build_object('emptyStringisNull', FALSE,'xmlRule', 'STRIP_XML_DECLARATION','spatialPrecision', 18));
+call COMPARE_SCHEMA(:'SCHEMA' || :'ID1',:'SCHEMA' || :'ID2',jsonb_build_object('emptyStringIsNull', FALSE,'xmlRule', 'STRIP_XML_DECLARATION','spatialPrecision', 18));
 --
 select 'SUCCESSFUL' "RESULTS", SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT
   from SCHEMA_COMPARE_RESULTS 

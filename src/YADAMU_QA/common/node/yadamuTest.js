@@ -105,6 +105,23 @@ class YadamuTest extends Yadamu {
     delete this.parameters.FILE
     return metrics;
   }
+		
+  getCompareRules(rules) {
+    return {
+      emptyStringIsNull    : rules.EMPTY_STRING_IS_NULL 
+    , doublePrecision      : rules.DOUBLE_PRECISION || 18
+	, spatialPrecision     : rules.SPATIAL_PRECISION || 18
+	, timestampPrecision   : rules.TIMESTAMP_PRECISION || 9
+	, orderedJSON          : rules.hasOwnProperty("ORDERED_JSON") ? rules.ORDERED_JSON : false	, xmlRule              : rules.XML_COMPARISSON_RULE || null
+    , objectsRule          : rules.OBJECTS_COMPARISSON_RULE || 'SKIP'
+    , excludeMViews        : rules.hasOwnProperty("MODE") ? rules.MODE === 'DATA_ONLY' : false 
+    , infinityIsNull       : rules.hasOwnProperty("INFINITY_IS_NULL") ? rules.INFINITY_IS_NULL : false 
+    }
+  }
+
+  makeXML(rules) {
+    return `<rules>${Object.keys(rules).map((tag) => { return `<${tag}>${rules[tag] === null ? '' : rules[tag]}</${tag}>` }).join()}</rules>`
+  }
 
 }  
      

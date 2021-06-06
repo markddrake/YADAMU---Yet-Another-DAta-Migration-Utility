@@ -14,6 +14,7 @@ class MySQLConstants {
     , "READ_KEEP_ALIVE"           : 0
     , "TREAT_TINYINT1_AS_BOOLEAN" : true    
     , "SPATIAL_FORMAT"            : "WKB"
+	, "TIMESTAMP_PRECISION"       : 6
     })
     return this._STATIC_PARAMETERS;
   }

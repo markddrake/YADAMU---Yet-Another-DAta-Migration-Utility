@@ -48,6 +48,8 @@ class YadamuDBI {
   get LOCAL_STAGING_AREA()         { return this.parameters.LOCAL_STAGING_AREA     || DBIConstants.LOCAL_STAGING_AREA }
   get REMOTE_STAGING_AREA()        { return this.parameters.REMOTE_STAGING_AREA    || DBIConstants.REMOTE_STAGING_AREA }
   get STAGING_FILE_RETENTION()     { return this.parameters.STAGING_FILE_RETENTION || DBIConstants.STAGING_FILE_RETENTION }
+  get TIMESTAMP_PRECISION()        { return this.parameters.TIMESTAMP_PRECISION    || DBIConstants.TIMESTAMP_PRECISION }
+  get BYTE_TO_CHAR_RATIO()         { return this.parameters.BYTE_TO_CHAR_RATIO     || DBIConstants.BYTE_TO_CHAR_RATIO }
   get RETRY_COUNT()                { return 3 }
 
   get BATCH_SIZE() {

@@ -10,10 +10,8 @@ class RedshiftConstants {
 
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
-      "SPATIAL_FORMAT"            : "WKB",
-	  "CIRCLE_FORMAT"             : "POLYGON",  /* Portable as spatial type by leads to loss of fidelity  */
-	  "REDSHIFT_JSON_TYPE"        : "JSONB",
-	  "BYTEA_SIZING_MODEL"        : "100%"
+      "SPATIAL_FORMAT"            : "WKB"
+    , "BYTE_TO_CHAR_RATIO"        : 4
     })
     return this._STATIC_PARAMETERS;
   }
@@ -25,9 +23,7 @@ class RedshiftConstants {
     return this.#_DBI_PARAMETERS
   }
 
-  static get PGOID_DATE()          { return _PGOID_DATE }
-  static get PGOID_TIMESTAMP()     { return _PGOID_TIMESTAMP }
-  static get PGOID_TIMESTAMP_TZ()  { return _PGOID_TIMESTAMP_TZ }
+  static get COPY_OPERATION_SOURCES()    { return Object.freeze(['loader']) }
 
   static get FETCH_AS_STRING() { 
     this._FETCH_AS_STRING = this._FETCH_AS_STRING || Object.freeze([this.PGOID_DATE,this.PGOID_TIMESTAMP,this.PGOID_TIMESTAMP_TZ])
@@ -35,9 +31,7 @@ class RedshiftConstants {
   }
 
   static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
-  static get CIRCLE_FORMAT()          { return this.DBI_PARAMETERS.CIRCLE_FORMAT };
-  static get BYTEA_SIZING_MODEL()     { return this.DBI_PARAMETERS.BYTEA_SIZING_MODEL };
-  static get REDSHIFT_JSON_TYPE()     { return this.DBI_PARAMETERS.REDSHIFT_JSON_TYPE };
+  static get BYTE_TO_CHAR_RATIO()     { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
   static get STATEMENT_TERMINATOR()   { return ';' }
 
 }

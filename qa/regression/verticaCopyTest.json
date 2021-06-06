@@ -4,6 +4,7 @@
 	"tasks": "tasks.json",
 	"stagingSource": "loader-staging",
 	"recreateSchema": true,
+	"emptyStringIsNull" : true,
 	"parameters": {
 		"IDENTIFIER_MAPPING_FILE" : "qa/mappings/verticaMappings.json",
 		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/csv",
@@ -20,7 +21,6 @@
 		{
 			"source": "mssql19",
 			"target": "vertica10",
-			"emptyStringIsNull" : true,
 			"tasks": [
 				"mssql"
 			]
@@ -28,7 +28,6 @@
 		{
 			"source": "mysql#1",
 			"target": "vertica10",
-			"emptyStringIsNull" : true,
 			"tasks": [
 				"mysql"
 			]

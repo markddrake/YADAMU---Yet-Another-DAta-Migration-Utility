@@ -196,10 +196,14 @@ DROP PROCEDURE IF EXISTS COMPARE_SCHEMAS;
 --
 DELIMITER $$
 --
-CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_MAP_EMPTY_STRING_TO_NULL BOOLEAN, P_SPATIAL_PRECISION INT)
+CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_COMPARE_RULES JSON)
 BEGIN
-  declare TABLE_NOT_FOUND CONDITION for 1146; 
+  declare V_MAP_EMPTY_STRING_TO_NULL BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.emptyStringIsNull' returning DECIMAL) = 1;
+  declare V_SPATIAL_PRECISION        INT     DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.spatialPrecision');
+  declare V_DOUBLE_PRECISION         INT     DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.doublePrecision');
+  declare V_ORDERED_JSON             BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.orderedJSON' returning DECIMAL) = 1;
 
+  declare TABLE_NOT_FOUND CONDITION for 1146; 
   declare C_NEWLINE             VARCHAR(1) DEFAULT CHAR(32);
   
   declare NO_MORE_ROWS          INT DEFAULT FALSE;
@@ -222,12 +226,14 @@ BEGIN
   CURSOR FOR 
   select c.table_name "TABLE_NAME"
         ,group_concat(case 
+                        when data_type in ('double') and (V_DOUBLE_PRECISION < 18) then
+                          concat('round("',column_name,'",',V_DOUBLE_PRECISION,')') 
                         when data_type in ('geometry') then
                           case
-                            when P_SPATIAL_PRECISION = 18 then
+                            when V_SPATIAL_PRECISION = 18 then
                               concat('"',column_name,'"') 
                             else                            
-                              concat('ROUND_GEOMETRY(',column_name,',',P_SPATIAL_PRECISION,')')
+                              concat('ROUND_GEOMETRY(',column_name,',',V_SPATIAL_PRECISION,')')
                           end
                         when data_type in ('blob', 'varbinary', 'binary') then
                           concat('hex("',column_name,'")') 
@@ -236,7 +242,7 @@ BEGIN
                           concat('cast(concat(''["'',replace("',column_name,'",'','',''","''),''"]'') as json)') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
                           case
-                            when P_MAP_EMPTY_STRING_TO_NULL then
+                            when V_MAP_EMPTY_STRING_TO_NULL then
                               concat('case when "',column_name,'" = '''' then NULL else "',column_name,'" end') 
                             else 
                               concat('"',column_name,'"') 
@@ -245,18 +251,20 @@ BEGIN
                       end
 					  order by ordinal_position separator ',')  "SOURCE_COLUMNS"
         ,group_concat(case 
+                        when data_type in ('double') and (V_DOUBLE_PRECISION < 18) then
+                          concat('round("',column_name,'",',V_DOUBLE_PRECISION,')') 
                         when data_type in ('geometry') then
                           case
-                            when P_SPATIAL_PRECISION = 18 then
+                            when V_SPATIAL_PRECISION = 18 then
                               concat('"',column_name,'"') 
                             else                            
-                              concat('ROUND_GEOMETRY(',column_name,',',P_SPATIAL_PRECISION,')')
+                              concat('ROUND_GEOMETRY(',column_name,',',V_SPATIAL_PRECISION,')')
                           end
                         when data_type in ('blob', 'varbinary', 'binary') then
                           concat('hex("',column_name,'")') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
                           case
-                            when P_MAP_EMPTY_STRING_TO_NULL then
+                            when V_MAP_EMPTY_STRING_TO_NULL then
                               concat('case when "',column_name,'" = '''' then NULL else "',column_name,'" end') 
                             else 
                               concat('"',column_name,'"') 
@@ -302,6 +310,7 @@ BEGIN
   set SESSION SQL_MODE=ANSI_QUOTES;
   set SESSION group_concat_max_len = 131072;
   set max_heap_table_size = 1 * 1024 *1024 *1024;
+  
   create temporary table if not exists SCHEMA_COMPARE_RESULTS (
     SOURCE_SCHEMA    VARCHAR(128)
    ,TARGET_SCHEMA    VARCHAR(128)

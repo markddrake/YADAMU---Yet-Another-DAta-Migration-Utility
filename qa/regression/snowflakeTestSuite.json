@@ -6,14 +6,14 @@
 , "parameters": {
   }
 , "tests"             : [{
-    "operation"       : "import"
-  , "source"          : "file-staging"
+    "operation"         : "import"
+  , "source"            : "file-staging"
   , "target"          : "snow#1"
-  , "verifyOperation" : true
-  , "parameters"      : {
-      "SOURCE_DIRECTORY" : "export/json/%location%"
+  , "verifyOperation"   : true
+  , "parameters"        : {
+      "DIRECTORY"       : "export/json/%location%"
     , "XML_STORAGE_MODEL" : "VARIANT"
-    }
+    }                    
   , "tasks": [
       "oracle","mysql","mssql"
     ]

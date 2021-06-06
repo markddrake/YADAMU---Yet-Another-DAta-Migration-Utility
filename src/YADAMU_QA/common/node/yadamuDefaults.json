@@ -34,6 +34,9 @@
 		"SNOWFLAKE_XML_TYPE": "TEXT"
 	},
 	"vertica": {
-	   "VERTICA_CHAR_SIZE" : 1.5
-	 }
+	   "BYTE_TO_CHAR_RATIO" : 1.5
+	},
+   	"redshift": {
+	   "BYTE_TO_CHAR_RATIO" : 1.5
+	}
 }

@@ -66,13 +66,8 @@ class MariadbQA extends MariadbDBI {
        ,failed     : []
       }
 
-      const compareRules = {
-	    emptyStringisNull   : rules.EMPTY_STRING_IS_NULL 
-	  ,	spatialPrecision    : rules.SPATIAL_PRECISION || 18
-	  , orderedJSON         : rules.ORDERED_JSON
-      }
-	 
-      let results = await this.executeSQL(MariadbQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,JSON.stringify(compareRules)])
+      const compareRules =  this.yadamu.getCompareRules(rules)  
+      let results = await this.executeSQL(MariadbQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,compareRules])
 
       const successful = await this.executeSQL(MariadbQA.SQL_SUCCESS,{})
       report.successful = successful

@@ -7,7 +7,6 @@ class VerticaParser extends YadamuParser {
   
   constructor(tableInfo,yadamuLogger) {
     super(tableInfo,yadamuLogger);     
-	
 	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
       switch (dataType.toLowerCase()) {
 	    case 'geometry':
@@ -15,10 +14,20 @@ class VerticaParser extends YadamuParser {
 	      return (row,idx) => {
 			row[idx] = Buffer.from(row[idx],'hex')
 		  }	
-		case 'interval':
 		case 'interval year to month':
+		  return (row,idx) => {
+			row[idx] = YadamuLibrary.intervalYearMonthTo8601(row[idx])
+		  }
 		case 'interval day to second':
+ 		  return (row,idx) => {
+		    row[idx] = YadamuLibrary.intervaDaySecondTo8601(row[idx])
+		  }
+		case 'interval':
           switch (true) {
+            case (tableInfo.TARGET_DATA_TYPE.length === 0):
+		      return (row,idx) => {
+			    row[idx] = YadamuLibrary.intervalYearMonthTo8601(row[idx])
+		      }
             case (tableInfo.TARGET_DATA_TYPES[idx].toLowerCase().startsWith('interval year')):
 		      return (row,idx) => {
 			    row[idx] = YadamuLibrary.intervalYearMonthTo8601(row[idx])

@@ -78,37 +78,13 @@ class OracleQA extends OracleDBI {
 
 	async compareSchemas(source,target,rules) {
 
-	  let compareParams		
-		
-      if (this.JSON_PARSING_SUPPORTED) {
-		
-	    compareParams = JSON.stringify({
-	   	  doublePrecision      : rules.DOUBLE_PRECISION || 18
-	    , timestampPrecision   : rules.TIMESTAMP_PRECISION || 9
-	    , orderedJSON          : Boolean(rules.ORDERED_JSON).toString().toUpperCase()
-	    , xmlRule              : rules.XML_COMPARISSON_RULE || null
-	    , objectsRule          : rules.OBJECTS_COMPARISSON_RULE || 'SKIP'
-	    , excludeMViews        : Boolean(rules.MODE === 'DATA_ONLY').toString().toUpperCase()
-	    , infinityIsNull       : Boolean(rules.INFINITY_IS_NULL).toString().toUpperCase()
-        });
-	  }  
-	  else {
-	    compareParams = 
-`<rules>
-   <doublePrecision>${rules.DOUBLE_PRECISION || 18}</doublePrecision>
-   <timestampPrecision>${rules.TIMESTAMP_PRECISION || 9}</timestampPrecision>
-   <orderedJSON>${Boolean(rules.ORDERED_JSON).toString().toUpperCase()}</orderedJSON>
-   <xmlRule>${rules.XML_COMPARISSON_RULE || ''}</xmlRule>
-   <objectsRule>${rules.OBJECTS_COMPARISSON_RULE || 'SKIP'}</objectsRule>
-   <excludeMViews>${Boolean(rules.MODE === 'DATA_ONLY').toString().toUpperCase()}</excludeMViews>
-   <infinityIsNull>${Boolean(rules.INFINITY_IS_NULL).toString().toUpperCase()}</infinityIsNull>
-</rules>`;
-	  }
+	  let compareRules = this.yadamu.getCompareRules(rules)	  
+	  compareRules = this.JSON_PARSING_SUPPORTED ? JSON.stringify(compareRules) : this.yadamu.makeXML(compareRules)
 
 	  const args = {
 		P_SOURCE_SCHEMA        : source.schema,
 		P_TARGET_SCHEMA        : target.schema,
-		P_RULES                : compareParams
+		P_RULES                : compareRules
 	  }
 	        
       const report = {

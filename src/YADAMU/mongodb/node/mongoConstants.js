@@ -20,6 +20,7 @@ class MongoConstants {
     , "MAX_STRING_LENGTH"         : "16777216"
     , "SPATIAL_FORMAT"            : "GeoJSON"
 	, "MAX_DOCUMENT_SIZE"         : "16777216"
+	, "TIMESTAMP_PRECISION"       : 6
     })
     return this._STATIC_PARAMETERS
   }

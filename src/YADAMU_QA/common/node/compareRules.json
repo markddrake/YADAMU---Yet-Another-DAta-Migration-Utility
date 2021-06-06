@@ -7,6 +7,7 @@
 		"mysql": 6,
 		"oracle": 9,
 		"postgres": 6,
+		"redshift": 6,
 		"snowflake": 9,
 		"vertica": 6
 	},

@@ -68,8 +68,8 @@ class VerticaDBI extends YadamuDBI {
   get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
   get COPY_TRIM_WHITEPSPACE()  { return this.parameters.COPY_TRIM_WHITEPSPACE || VerticaConstants.COPY_TRIM_WHITEPSPACE }
   get MERGEOUT_INSERT_COUNT()  { return this.parameters.MERGEOUT_INSERT_COUNT || VerticaConstants.MERGEOUT_INSERT_COUNT }
-  get VERTICA_CHAR_SIZE()      { return this.parameters.VERTICA_CHAR_SIZE || VerticaConstants.VERTICA_CHAR_SIZE }
-
+  get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM || VerticaConstants.STAGING_PLATFORM } 
+  
   constructor(yadamu,settings,parameters) {
     super(yadamu,settings,parameters);
        
@@ -85,14 +85,6 @@ class VerticaDBI extends YadamuDBI {
     this.statementLibrary = undefined
     this.pipelineAborted = false;
    
-  }
-
-  async copyOperationAvailble(vendor,controlFile) {
- 
-    if (!VerticaConstants.COPY_OPERATION_SOURCES.includes(vendor)) {
-      throw new YadamuError(`COPY operations not supported between "${vendor}" and "${this.DATABASE_VENDOR}".`)
-	}
-	
   }
 
   /*
@@ -688,7 +680,7 @@ class VerticaDBI extends YadamuDBI {
 	   }
   	   causes.push(err)
 	 })
-     const err = new Error(`Vertica COPY Failure: ${results.length} records rejected.`);
+	 const err = new Error(`Errors detected durng COPY operation: ${results.length} records rejected.`);
 	 err.tags = []
 	 if (causes.length === sizeIssue) {
 	    err.tags.push("CONTENT_TOO_LARGE")
@@ -696,6 +688,13 @@ class VerticaDBI extends YadamuDBI {
      err.cause = causes;	 
 	 err.sql = statement;
 	 this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
+  }
+
+  copyOperationSupported(vendor,controlFile) {
+ 
+    if (!VerticaConstants.COPY_OPERATION_SOURCES.includes(vendor)) {
+      throw new YadamuError(`COPY operations not supported between "${vendor}" and "${this.DATABASE_VENDOR}".`)
+	}
   }
   
   async copyOperation(tableName,statement) {

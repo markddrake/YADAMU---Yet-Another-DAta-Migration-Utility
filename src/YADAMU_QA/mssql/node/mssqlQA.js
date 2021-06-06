@@ -119,31 +119,10 @@ class MsSQLQA extends MsSQLDBI {
 
       await this.useDatabase(source.database);
 	  
-	  let compareParams
-	  if (this.DB_VERSION > 12) {
-		
-	    compareParams = JSON.stringify({
-  	      emptyStringIsNull    : rules.EMPTY_STRING_IS_NULL 
-        , spatialPrecision     : rules.SPATIAL_PRECISION || 18
-	   	, doublePrecision      : rules.DOUBLE_PRECISION || 18
-	    , timestampPrecision   : rules.TIMESTAMP_PRECISION || 9
-	    , orderedJSON          : Boolean(rules.ORDERED_JSON).toString().toLowerCase()
-	    , xmlRule              : rules.XML_COMPARISSON_RULE || null
-        });
-	  }  
-	  else {
-	    compareParams = 
-`<rules>
-   <emptyStringIsNull>${Boolean(rules.EMPTY_STRING_IS_NULL).toString().toLowerCase()}</emptyStringIsNull>
-   <spatialPrecision>${rules.SPATIAL_PRECISION || 18}</spatialPrecision>
-   <doublePrecision>${rules.DOUBLE_PRECISION || 18}</doublePrecision>
-   <timestampPrecision>${rules.TIMESTAMP_PRECISION || 9}</timestampPrecision>
-   <orderedJSON>${Boolean(rules.ORDERED_JSON).toString().toLowerCase()}</orderedJSON>
-   <xmlRule>${rules.XML_COMPARISSON_RULE || ''}</xmlRule>
-</rules>`;
-	  }
-	  
+	  let compareRules = this.yadamu.getCompareRules(rules)	  
+	  compareRules = this.DB_VERSION  > 12 ? JSON.stringify(compareRules) : this.yadamu.makeXML(compareRules)
 
+	  
       let args = 
 `--
 -- declare @FORMAT_RESULTS         bit           = 0;
@@ -152,7 +131,7 @@ class MsSQLQA extends MsSQLDBI {
 -- declare @TARGET_DATABASE        varchar(128)  = '${target.database}';
 -- declare @TARGET_SCHEMA          varchar(128)  = '${target.owner}';
 -- declare @COMMENT                varchar(128)  = '';
--- declare @RULES                  narchar(4000) = '${compareParams}';
+-- declare @RULES                  narchar(4000) = '${compareRules}';
 --`;
             
       this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION,@DATE_TIME_PRECISION)\ngo\n`)
@@ -166,7 +145,7 @@ class MsSQLQA extends MsSQLDBI {
                           .input('TARGET_DATABASE',this.sql.VarChar,target.database)
                           .input('TARGET_SCHEMA',this.sql.VarChar,target.owner)
                           .input('COMMENT',this.sql.VarChar,'')
-                          .input('RULES',this.sql.VarChar,compareParams)
+                          .input('RULES',this.sql.VarChar,compareRules)
                           .execute(MsSQLQA.SQL_COMPARE_SCHEMAS,{},{resultSet: true});
 
       // Use length-2 and length-1 to allow Debugging info to be included in the output

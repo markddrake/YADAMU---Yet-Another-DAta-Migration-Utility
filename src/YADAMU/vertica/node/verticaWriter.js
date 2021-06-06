@@ -130,30 +130,23 @@ class VerticaWriter extends YadamuWriter {
           }
         case "DATETIME":
         case "TIMESTAMP":
+		  // Timestamps are truncated to a maximum of 6 digits
+          // Timestamps not explicitly marked as UTC are coerced to UTC.
+		  // Timestamps using a '+00:00' are converted are converted to 
 		  return (col,idx) =>  { 
-            // A Timestamp not explicitly marked as UTC is coerced to UTC.
+		    let ts
 			switch (true) {
-              case (typeof col === 'string'):
-                if (col.endsWith('Z') && col.length === 28) {
-                  return col.slice(0,-2) + 'Z'
-                }
-                else {
-                  if (col.endsWith('+00:00')) {
-			        if (col.length > 32) {
-					  return col.slice(0,26) + 'Z'
-				    }
-				  }
-				  else {
-                    if (col.length === 27) {                                
-                      return col.slice(0,-1) + "Z"
-                    }
-                  }
-                }               
-                return col
               case (col instanceof Date):
                 return col.toISOString()
+              case col.endsWith('+00:00'):
+			    ts = col.slice(0,-6) 
+				return `${ts.slice(0,26)}Z`
+              case col.endsWith('Z'):
+			    ts = col.slice(0,-1) 
+		    	return `${ts.slice(0,26)}Z`
+			  default:
+			    return `${col.slice(0,26)}Z`
             }
-			return col
           }
         case "INTERVAL":
 	      switch (dataType.typeQualifier.toUpperCase()) {
@@ -268,16 +261,16 @@ class VerticaWriter extends YadamuWriter {
       this.metrics.cached++
 	  return this.skipTable
 	} catch (cause) {
-	  if (cause instanceof WhitespaceIssue) {
-	    this.batch.insert.push(row);
-        this.metrics.cached++
-	    return this.skipTable
-	  }
 	  if (cause instanceof EmptyStringDetected) {
 		const emptyStringKey= cause.emptyStringList.join('-')
 		this.batch[emptyStringKey] = this.batch[emptyStringKey] || []
 		this.batch[emptyStringKey].push(row)
 	    this.metrics.cached++
+	    return this.skipTable
+	  }
+	  if (cause instanceof WhitespaceIssue) {
+	    this.batch.insert.push(row);
+        this.metrics.cached++
 	    return this.skipTable
 	  }
 	  throw cause;
@@ -379,6 +372,7 @@ class VerticaWriter extends YadamuWriter {
   async _writeBatch(batch,rowCount) {
 	  
     this.metrics.batchCount++;
+
 	
 	// console.log('Write Batch',this.metrics.batchCount,rowCount,'Copy',batch.copy.length,'Insert',batch.insert.length)
 	
@@ -420,8 +414,6 @@ class VerticaWriter extends YadamuWriter {
 	  ,	errors : rejectedRecordsTableName
       }
     })
-  
-    
   
     try {
       await this.dbi.createSavePoint();

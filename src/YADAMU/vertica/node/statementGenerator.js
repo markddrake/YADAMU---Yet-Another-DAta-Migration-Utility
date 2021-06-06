@@ -408,21 +408,23 @@ class StatementGenerator {
 	  targetDataTypes.push(targetDataType)
 	  
 	  let targetLength = dataType.length
-
-      switch (targetDataType) {
+      
+	  switch (targetDataType) {
 		// Disable char to byte calculation for char as this leads to issues with blank padding.
         // case 'char':
 		case 'varchar':
 		case 'long varchar':
-		  targetLength = tableMetadata.vendor === 'Vertica' ? targetLength : Math.ceil(targetLength * this.dbi.VERTICA_CHAR_SIZE);
+		  targetLength = tableMetadata.vendor === 'Vertica' ? targetLength : Math.ceil(targetLength * this.dbi.BYTE_TO_CHAR_RATIO);
 		  if (targetLength > StatementGenerator.LARGEST_VARCHAR_SIZE) {
 			targetDataType = 'long varchar';
 		  }
 		  if (targetLength > StatementGenerator.LARGEST_LOB_SIZE) {
-			targetLength= undefined;
+			targetLength = undefined;
 		  }
-		  sizeConstraints[idx] = targetLength
       }		
+	  
+      sizeConstraints[idx] = targetLength?.toString() || sizeConstraints[idx] ||  ''
+	  
       const typeInfo = targetDataType.split('(')
 	  const targetType = typeInfo[0].toUpperCase()
 	  switch (targetType) {		

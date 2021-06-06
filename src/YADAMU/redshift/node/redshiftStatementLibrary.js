@@ -15,9 +15,10 @@ class RedshiftStatementLibrary {
   static get SQL_RESTORE_SAVE_POINT()         { return _SQL_RESTORE_SAVE_POINT }
   static get SQL_RELEASE_SAVE_POINT()         { return _SQL_RELEASE_SAVE_POINT }
   
-  static get SQL_GET_TABLE_OID()              { return _SQL_GET_TABLE_OID }
-  static get SQL_GET_COPY_ERRORS()           { return _SQL_GET_COPY_ERRORS }
-  
+  static get SQL_COPY_STATUS()                { return _SQL_COPY_STATUS }
+  static get SQL_COPY_ERRORS()                { return _SQL_COPY_ERRORS }
+  static get SQL_COPY_ERROR_SUMMARY()         { return _SQL_COPY_ERROR_SUMMARY }
+  static get SQL_SUPER_ERROR_SUMMARY()        { return _SQL_SUPER_ERROR_SUMMARY }
 }
 
 module.exports = RedshiftStatementLibrary
@@ -61,15 +62,10 @@ const _SQL_RESTORE_SAVE_POINT   = `rollback to savepoint "${YadamuConstants.SAVE
 
 const _SQL_RELEASE_SAVE_POINT   = `release savepoint "${YadamuConstants.SAVE_POINT_NAME}"`;
 
-// const _SQL_GET_TABLE_OID        = `select c.oid "oid", pg_backend_pid() "session" from pg_class c left join pg_namespace n on n.oid = c.relnamespace where nspname = $1 and relname = $2`
+const _SQL_COPY_STATUS          = `select lines_scanned from stl_load_commits where query = pg_last_copy_id()`
 
-// const _SQL_GET_COPY_ERRORS      = `select line_number, colname, err_reason, err_code, col_length, query, filename, type, position, raw_field_value FROM stl_load_errors e where tbl-4 = $1 and session = $2` 
+const _SQL_COPY_ERRORS          = `select count(*) from stl_load_errors where query = pg_last_copy_id()`
 
-const _SQL_GET_TABLE_OID        = `select pg_backend_pid(),pg_backend_pid()`
+const _SQL_COPY_ERROR_SUMMARY   = `select line_number, colname, err_reason, err_code, col_length, query, filename, type, position, raw_field_value FROM stl_load_errors e where query = pg_last_copy_id()` 
 
-const _SQL_GET_COPY_ERRORS      = `select line_number, colname, err_reason, err_code, col_length, query, filename, type, position, raw_field_value FROM stl_load_errors e where starttime = (select max(starttime) from stl_load_errors where session = $1) and session = $2` 
-
-const _PGOID_DATE         = 1082; 
-const _PGOID_TIMESTAMP    = 1114;
-const _PGOID_TIMESTAMP_TZ = 1118;
-
+const _SQL_SUPER_ERROR_SUMMARY  = `select line_number, colname, err_reason, err_code, col_length, query, filename, type, position, raw_field_value FROM stl_load_errors e where starttime = (select max(starttime) from stl_load_errors where session = pg_backend_pid()) and session = pg_backend_pid()` 

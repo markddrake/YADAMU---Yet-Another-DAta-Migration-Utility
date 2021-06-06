@@ -72,13 +72,8 @@ class PostgresQA extends PostgresDBI {
        ,failed     : []
       }
 
-      const compareRules = {
-	    emptyStringisNull   : rules.EMPTY_STRING_IS_NULL 
-	  ,	spatialPrecision    : rules.SPATIAL_PRECISION || 18
-	  , xmlRule             : rules.XML_COMPARISSON_RULE
-	  , infinityIsNull      : rules.INFINITY_IS_NULL 
-      }
-	  
+      const compareRules = this.yadamu.getCompareRules(rules)	  
+
       await this.executeSQL(PostgresQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,compareRules])      
       
       const successful = await this.executeSQL(PostgresQA.SQL_SUCCESS)            

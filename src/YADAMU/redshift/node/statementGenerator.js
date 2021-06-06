@@ -399,7 +399,18 @@ class StatementGenerator {
 	  const dataType = YadamuLibrary.composeDataType(dataTypes[idx],sizeConstraints[idx])       
 	  let targetDataType = this.mapForeignDataType(tableMetadata.vendor,dataType.type,dataType.length,dataType.scale)
 	  targetDataTypes.push(targetDataType)
-	  return `"${columnName}" ${this.getColumnDataType(targetDataType,dataType.length,dataType.scale)}`
+	  
+      let targetLength = dataType.length
+	  switch (targetDataType) {
+		case 'varchar':
+          targetLength = tableMetadata.vendor === 'Redshift' ? targetLength : Math.ceil(targetLength * this.dbi.BYTE_TO_CHAR_RATIO);
+		  if (targetLength > StatementGenerator.LARGEST_VARCHAR_SIZE) {
+			targetLength = StatementGenerator.LARGEST_VARCHAR_SIZE
+		  }
+		  sizeConstraints[idx] = targetLength
+      }		
+      
+	  return `"${columnName}" ${this.getColumnDataType(targetDataType,targetLength,dataType.scale)}`
     })
 	
     const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
@@ -427,7 +438,7 @@ class StatementGenerator {
 	
 	if (tableMetadata.dataFile) {
 	  this.dbi.IAM_ROLE = 'arn:aws:iam::437125103918:role/RedshiftFastLoad'
-	  tableInfo.copy  = `copy "${this.targetSchema}"."${tableMetadata.tableName}" from 's3://${this.dbi.BUCKET}/${tableMetadata.dataFile}' iam_role '${this.dbi.IAM_ROLE}' EMPTYASNULL DATEFORMAT 'auto' TIMEFORMAT 'auto' FORMAT AS CSV`		
+	  tableInfo.copy  = `copy "${this.targetSchema}"."${tableMetadata.tableName}" from 's3://${this.dbi.BUCKET}/${tableMetadata.dataFile}' iam_role '${this.dbi.IAM_ROLE}' EMPTYASNULL DATEFORMAT 'auto' TIMEFORMAT 'auto' MAXERROR ${this.dbi.TABLE_MAX_ERRORS} FORMAT AS CSV`		
 	}
 	
 	return tableInfo

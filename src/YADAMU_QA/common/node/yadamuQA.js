@@ -340,7 +340,7 @@ class YadamuQA {
     Object.assign(compareRules, this.getDefaultValue('INFINITY_IS_NULL',YadamuTest.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
     
 	compareRules.INFINITY_IS_NULL = compareRules.INFINITY_IS_NULL && (targetParameters.INFINITY_MANAGEMENT === 'NULLIFY')
-	compareRules.EMPTY_STRING_IS_NULL = (this.EMPTY_STRING_IS_NULL === true) || (this.EMPTY_STRING_IS_NULL === false ) || compareRules.INFINITY_IS_NULL 
+	compareRules.EMPTY_STRING_IS_NULL = this.EMPTY_STRING_IS_NULL !== undefined ? this.EMPTY_STRING_IS_NULL : compareRules.EMPTY_STRING_IS_NULL 
 	
 	if (YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[sourceVendor] > YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[targetVendor]) {
 	  compareRules.TIMESTAMP_PRECISION = YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[targetVendor]
@@ -1275,7 +1275,7 @@ class YadamuQA {
     let importFile
 
     const filename = task.hasOwnProperty('schemaPrefix') ? `${task.schemaPrefix}_${task.file}` : task.file
-    const directory = this.test.parameters?.SOURCE_DIRECTORY || this.configuration.parameters?.SOURCE_DIRECTORY || this.test.parameters?.DIRECTORY || this.configuration.parameters?.DIRECTORY
+    const directory = this.test.parameters?.SOURCE_DIRECTORY || this.configuration.parameters?.SOURCE_DIRECTORY || this.test.parameters?.DIRECTORY || this.configuration.parameters?.DIRECTORY ||''
     const importDirectory = YadamuLibrary.macroSubstitions(path.join(directory,this.IMPORT_PATH),this.yadamu.MACROS)
 	
     sourceParameters.SOURCE_DIRECTORY = importDirectory
@@ -1370,7 +1370,7 @@ class YadamuQA {
     const sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
 
     const filename = task.hasOwnProperty('schemaPrefix') ? `${task.schemaPrefix}_${task.file}` : task.file
-    const directory = this.test.parameters?.TARGET_DIRECTORY || this.configuration.parameters?.TARGET_DIRECTORY || this.test.parameters?.DIRECTORY || this.configuration.parameters?.DIRECTORY
+    const directory = this.test.parameters?.TARGET_DIRECTORY || this.configuration.parameters?.TARGET_DIRECTORY || this.test.parameters?.DIRECTORY || this.configuration.parameters?.DIRECTORY || ''
     const exportDirectory = YadamuLibrary.macroSubstitions(path.join(directory,this.EXPORT_PATH),this.yadamu.MACROS)	
 
     if (targetDatabase === "file") {

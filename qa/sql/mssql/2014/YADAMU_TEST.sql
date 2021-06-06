@@ -399,12 +399,12 @@ begin
   
   declare @RULES_XML XML = CAST(@RULES AS XML)
   
-  declare @EMPTY_STRING_IS_NULL BIT           = case when @RULES_XML.query('/emptyStringIsNull').value('.','VARCHAR(5)') = 'true' then 1 else 0 end;
-  declare @TIMESTAMP_PRECISION  INT           = @RULES_XML.query('/timestampPrecision').value('.','INT'); 
-  declare @SPATIAL_PRECISION    INT           = @RULES_XML.query('/spatialPrecision').value('.','INT');
-  declare @DOUBLE_PRECISION     INT           = @RULES_XML.query('/doublePrecision').value('.','INT');
-  declare @ORDRED_JSON          BIT           = case when @RULES_XML.query('/orderedJSON').value('.','VARCHAR(5)') = 'true' then 1 else 0 end;;
-  declare @XML_RULE             NVARCHAR(128) = @RULES_XML.query('/xmlRule').value('.','NVARCHAR(128)');
+  declare @EMPTY_STRING_IS_NULL BIT           = case when @RULES_XML.query('/rules/emptyStringIsNull').value('.','VARCHAR(5)') = 'true' then 1 else 0 end;
+  declare @TIMESTAMP_PRECISION  INT           = @RULES_XML.query('/rules/timestampPrecision').value('.','INT'); 
+  declare @SPATIAL_PRECISION    INT           = @RULES_XML.query('/rules/spatialPrecision').value('.','INT');
+  declare @DOUBLE_PRECISION     INT           = @RULES_XML.query('/rules/doublePrecision').value('.','INT');
+  declare @ORDRED_JSON          BIT           = case when @RULES_XML.query('/rules/orderedJSON').value('.','VARCHAR(5)') = 'true' then 1 else 0 end;;
+  declare @XML_RULE             NVARCHAR(128) = @RULES_XML.query('/rules/xmlRule').value('.','NVARCHAR(128)');
 
   declare FETCH_METADATA 
   cursor for 
@@ -424,6 +424,8 @@ begin
                        end
                      when c.DATA_TYPE in ('char','nchar') then
                        concat('"',c.COLUMN_NAME,'" collate DATABASE_DEFAULT "',c.COLUMN_NAME,'"')					  
+   			         when c.DATA_TYPE in ('float','real') and (@DOUBLE_PRECISION < 18) then
+					   concat('round("',c.COLUMN_NAME,'",',@DOUBLE_PRECISION,') "',c.COLUMN_NAME,'"')
                      when c.DATA_TYPE in ('geography') then
                        case 
                          when @SPATIAL_PRECISION = 18 then

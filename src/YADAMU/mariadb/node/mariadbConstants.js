@@ -13,6 +13,7 @@ class MariadbConstants {
       "TABLE_MATCHING"            : "INSENSITIVE"
     , "TREAT_TINYINT1_AS_BOOLEAN" : true    
     , "SPATIAL_FORMAT"            : "WKB"
+	, "TIMESTAMP_PRECISION"       : 6
     })
     return this._STATIC_PARAMETERS;
   }

@@ -522,7 +522,7 @@ DROP PROCEDURE IF EXISTS COMPARE_SCHEMAS;
 --
 DELIMITER $$
 --
-CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_COMPARE_RULES VARCHAR(32768))
+CREATE PROCEDURE COMPARE_SCHEMAS(P_SOURCE_SCHEMA VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_COMPARE_RULES JSON)
 BEGIN
   declare TABLE_NOT_FOUND CONDITION for 1146; 
 
@@ -536,9 +536,10 @@ BEGIN
   declare V_STATEMENT           TEXT;
   declare V_COUNT_STATEMENT     TEXT;
   
-  declare V_MAP_EMPTY_STRING_TO_NULL BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.emptyStringisNull');
+  declare V_MAP_EMPTY_STRING_TO_NULL BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.emptyStringIsNull');
   declare V_SPATIAL_PRECISION        INT     DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.spatialPrecision');
-  declare V_ORDERED_JSON             BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.');
+  declare V_DOUBLE_PRECISION         INT     DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.doublePrecision');
+  declare V_ORDERED_JSON             BOOLEAN DEFAULT JSON_VALUE(P_COMPARE_RULES,'$.orderedJSON');
   
   declare MISSING_ROWS INT;
   declare EXTRA_ROWS INT;
@@ -551,6 +552,8 @@ BEGIN
   CURSOR FOR 
   select c.table_name "TABLE_NAME"
         ,group_concat(case 
+                        when data_type in ('double') and (V_DOUBLE_PRECISION < 18) then
+                          concat('round("',column_name,'",',V_DOUBLE_PRECISION,')') 
 		                when ((data_type = 'longtext') and (check_clause is not null)) then
 					      case 
 						    when V_ORDERED_JSON then
@@ -581,6 +584,8 @@ BEGIN
                       end
 					  order by ordinal_position separator ',')  "SOURCE_COLUMNS"
         ,group_concat(case 
+                        when data_type in ('double') and (V_DOUBLE_PRECISION < 18) then
+                          concat('round("',column_name,'",',V_DOUBLE_PRECISION,')') 
 		                when ((data_type = 'longtext') and (check_clause is not null)) then
 					      case 
 						    when V_ORDERED_JSON then
@@ -654,6 +659,7 @@ BEGIN
   set SESSION SQL_MODE=ANSI_QUOTES;
   set SESSION group_concat_max_len = 131072;
   set max_heap_table_size = 1 * 1024 *1024 *1024;
+
   create temporary table if not exists SCHEMA_COMPARE_RESULTS (
     SOURCE_SCHEMA    VARCHAR(128)
    ,TARGET_SCHEMA    VARCHAR(128)

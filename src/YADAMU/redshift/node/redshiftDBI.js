@@ -617,38 +617,57 @@ class RedshiftDBI extends YadamuDBI {
     return results.rows[0]
   }
 	 
-  async reportCopyErrors(tableName,results,stack,statement) {
+  async reportCopyErrors(tableName,stack,copyStatement) {
 	  
 	 const causes = []
 	 let sizeIssue = 0;
-	 results.forEach((r) => {
+	 
+     let results = await this.executeSQL(this.StatementLibrary.SQL_COPY_ERROR_SUMMARY)
+	 if (results.rows.length === 0) {
+       // Special error handling for tables with one or more columns of type 'SUPER'
+       results = await this.executeSQL(this.StatementLibrary.SQL_SUPER_ERROR_SUMMARY)
+     }
+	 
+	 results.rows.forEach((r) => {
 	   const err = new Error()
 	   err.code = r[3]
 	   err.stack =  `${stack.slice(0,5)}: ${r[2]}${stack.slice(5)}`
 	   err.columnName = r[1]
 	   err.recordNumber = r[0]
 	   err.dataLength = parseInt(r[4])
-	   /*
-	   err.columnIdx = this.metadata.columnNames.indexOf(err.columnName)
-	   err.columnLength = this.maxLengths[err.columnIdx]
 	   err.tags = []
-	   if (err.dataLength > err.columnLength) {
-		 err.tags.push("CONTENT_TOO_LARGE")
+	   if (r[2].trim().endsWith(' exceeds DDL length')) {
+	     err.tags.push("CONTENT_TOO_LARGE")
 		 sizeIssue++
 	   }
-	   */
   	   causes.push(err)
 	 })
-     const err = new Error(`Vertica COPY Failure: ${results.length} records rejected.`);
+     const err = new Error(`Errors detected durng COPY operation: ${results.rows.length} records rejected.`);
 	 err.tags = []
 	 if (causes.length === sizeIssue) {
 	    err.tags.push("CONTENT_TOO_LARGE")
 	 } 
      err.cause = causes;	 
-	 err.sql = statement;
+	 err.sql = copyStatement;
 	 this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
   }
   
+  async reportCopyResults(tableName,rowsRead,failed,elapsedTime,sqlStatement,stack) {
+    
+    const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rowsRead/elapsedTime) * 1000)} rows/s.`
+   
+    let rowCountSummary
+    switch (failed) {
+	  case 0:
+	    rowCountSummary = `Rows ${rowsRead}.`
+        this.yadamuLogger.info([`${tableName}`,`COPY`],`${rowCountSummary} ${writerTimings}`)  
+        break
+      default:
+	    rowCountSummary = `Read ${rowsRead}. Written ${rowsRead - failed}.`
+        this.yadamuLogger.error([`${tableName}`,`COPY`],`${rowCountSummary} ${writerTimings}`)  
+        await this.reportCopyErrors(tableName,stack,sqlStatement)
+	}
+  }
   
   async copyOperation(tableName,sqlStatement) {
 	let stack
@@ -659,29 +678,23 @@ class RedshiftDBI extends YadamuDBI {
  	  await this.commitTransaction()
 	  let results = await this.executeSQL(sqlStatement);
 	  const elapsedTime = performance.now() - startTime;
-	  // const query_id = await this.executeSQL('select pg_last_query_id()')
-	  results = await this.executeSQL(`select lines_scanned from stl_load_commits where query = pg_last_copy_id()`);
-	  const rows = results.rows[0][0]
-      const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. SQL Exection Time: Throughput: ${Math.round((rows/elapsedTime) * 1000)} rows/s.`
-      const rowCountSummary = `Rows ${rows}.`
-      this.yadamuLogger.log([this.DATABASE_VENDOR,'COPY',tableName],`${rowCountSummary} ${writerTimings}`)  
 	  await this.commitTransaction()
-	} catch(e) {
-      if ((e instanceof RedshiftError) && e.detailedErrorAvailable()) {
-        try {
- 	      await this.commitTransaction()
-          const idInfo = await this.getTableAndSession(this.parameters['TO_USER'],tableName)
-  	      const results = await this.executeSQL(this.StatementLibrary.SQL_GET_COPY_ERRORS,idInfo);
-	      await this.reportCopyErrors(tableName,results.rows,stack,sqlStatement)
+	  results = await this.executeSQL(this.StatementLibrary.SQL_COPY_STATUS);
+	  const rowsRead = results.rows[0][0]
+	  results = await this.executeSQL(this.StatementLibrary.SQL_COPY_ERRORS);
+	  const failed = parseInt(results.rows[0][0])
+	  await this.reportCopyResults(tableName,rowsRead,failed,elapsedTime,sqlStatement,stack)
+	} catch(cause) {
+      await this.rollbackTransaction(cause)
+      if ((cause instanceof RedshiftError) && cause.detailedErrorAvailable()) {
+		try {
+	      await this.reportCopyErrors(tableName,stack,sqlStatement)
+	  	  return
 	    } catch (e) {
-  		  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY','ERROR REPORT',tableName],e)
+		  cause.cause = e
 	    }
-		return
-	  }
-	  else {
-        await this.rollbackTransaction()
       }
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],cause)
 	} 
   }
 }

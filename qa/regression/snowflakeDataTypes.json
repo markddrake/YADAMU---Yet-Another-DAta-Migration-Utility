@@ -8,42 +8,13 @@
   , "CIRCLE_FORMAT"  : "CIRCLE"
   }
 , "tests"             : [{
-    "operation"              : "export"
-  , "source"                 : "postgres#1"
-  , "target"                 : "file-staging"
-  , "verifyOperation"        : true
-  , "parameters"             : {
-	  "DIRECTORY"            : "%operation%/json/%vendor%"
-    }
-  , "tasks"                  : [
-      "postgresDataTypes"
-	]
-  },{
     "operation"       : "import"
   , "source"          : "file-staging"
-  , "targets"         : [
-       "snow#1","oracle19c","mongodb#1","mysql#1","mariadb#1","mssql19"
-	]
+  , "target"          : "snow#1"
   , "verifyOperation" : true
   , "parameters"      : {
       "DIRECTORY"     : "export/json/%location%"
     }                    
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "snow#1"
-  , "targets"         : [
-       "snow#1","oracle19c","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
-	]
-  , "tasks": [ 
-      "postgresDataTypes"
-	]
-  },{
-    "source"          : "postgres#1"
-  , "targets"         : [
-       "snow#1"
-	]
   , "tasks": [ 
       "postgresDataTypes"
 	]
@@ -59,6 +30,14 @@
     "source"          : "mssql19"
   , "targets"         : [
         "snow#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "postgres#1"
+  , "targets"         : [
+       "snow#1"
 	]
   , "tasks": [ 
       "postgresDataTypes"
@@ -86,6 +65,14 @@
 	}
   , "targets"         : [
        "snow#1"
+	]
+  , "tasks": [ 
+      "postgresDataTypes"
+	]
+  },{
+    "source"          : "snow#1"
+  , "targets"         : [
+       "snow#1","oracle19c","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
 	]
   , "tasks": [ 
       "postgresDataTypes"

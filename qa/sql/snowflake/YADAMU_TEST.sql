@@ -26,7 +26,7 @@ select table_name, listagg(
                          ${rules.spatialPrecision < 18 ? `'case when "'  || column_name || '" is NULL then NULL else YADAMU_SYSTEM.PUBLIC.ROUND_GEOJSON(ST_ASGEOJSON("'  || column_name || '")::VARCHAR,${rules.spatialPrecision}) end'` : `'ST_ASWKT("'  || column_name || '")'`} || ' "' || column_name || '"'
                        when data_type in ('TIMESTAMP_NTZ') then
                          'substr(to_char("' || column_name || '",''YYYY-MM-DD"T"HH24:MI:SS.FF9''),1,${timeStampLength}) "' || column_name || '"'
-                       ${rules.emptyStringisNull ? `when data_type in ('TEXT','VARCHAR') then 'case when "' || column_name || '" = '''' then NULL else "' || column_name || '" end "' || column_name || '"'` : ''} 
+                       ${rules.emptyStringIsNull ? `when data_type in ('TEXT','VARCHAR') then 'case when "' || column_name || '" = '''' then NULL else "' || column_name || '" end "' || column_name || '"'` : ''} 
                        ${rules.infinityIsNull ? `when data_type in ('FLOAT') then 'case when "' || column_name || '" in (''INF'',''-INF'',''NAN'') then NULL else "' || column_name || '"  end "' || column_name || '"'` : ''}
                        else 
                          '"' || column_name || '"'

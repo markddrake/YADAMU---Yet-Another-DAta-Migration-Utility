@@ -501,7 +501,7 @@ begin
   declare @DOUBLE_PRECISION     INT           = JSON_VALUE(@RULES,'$.doublePrecision');
   declare @ORDRED_JSON          BIT           = case when JSON_VALUE(@RULES,'$.orderedJSON') = 'true' then 1 else 0 end;;
   declare @XML_RULE             NVARCHAR(128) = JSON_VALUE(@RULES,'$.xmlRule');
-    
+   
   declare FETCH_METADATA 
   cursor for 
   select t.TABLE_NAME
@@ -529,6 +529,8 @@ begin
                           else
                             concat('master.dbo.sp_geographyAsBinaryZM("',c.COLUMN_NAME,'",',@SPATIAL_PRECISION,') "',c.COLUMN_NAME,'"')
                         end
+				      when c.DATA_TYPE in ('float','real') and (@DOUBLE_PRECISION < 18) then
+					     concat('round("',c.COLUMN_NAME,'",',@DOUBLE_PRECISION,') "',c.COLUMN_NAME,'"')
                       when c.DATA_TYPE in ('geometry') then
                        -- concat('CONVERT(varchar(max), "',c.COLUMN_NAME,'".AsBinaryZM(),2) "',c.COLUMN_NAME,'"')
                         case 

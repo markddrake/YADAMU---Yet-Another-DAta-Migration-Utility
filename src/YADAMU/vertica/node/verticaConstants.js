@@ -13,7 +13,8 @@ class VerticaConstants {
       "SPATIAL_FORMAT"            : "WKB"
 	, "COPY_TRIM_WHITEPSPACE"     : false
 	, "MERGEOUT_INSERT_COUNT"     : 128
-	, "VERTICA_CHAR_SIZE"         : 4
+	, "BYTE_TO_CHAR_RATIO"        : 4
+	, "STAGING_PLATFORM"          : "loader"
     })
     return this._STATIC_PARAMETERS;
   }
@@ -26,8 +27,9 @@ class VerticaConstants {
   }
   static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get COPY_TRIM_WHITEPSPACE()  { return this.DBI_PARAMETERS.COPY_TRIM_WHITEPSPACE === true };
-  static get VERTICA_CHAR_SIZE()      { return this.DBI_PARAMETERS.VERTICA_CHAR_SIZE };
+  static get BYTE_TO_CHAR_RATIO()     { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
   static get MERGEOUT_INSERT_COUNT()  { return this.DBI_PARAMETERS.MERGEOUT_INSERT_COUNT };
+  static get STAGING_PLATFORM()       { return this.DBI_PARAMETERS.STAGING_PLATFORM };
   static get STATEMENT_TERMINATOR()   { return ';' }
 
   static get COPY_OPERATION_SOURCES()    { return Object.freeze(['loader']) }

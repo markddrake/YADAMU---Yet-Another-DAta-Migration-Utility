@@ -17,7 +17,6 @@ class JSONWriter extends YadamuWriter {
   setTransformations(targetDataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
- 	  
     const transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
 	  if (YadamuLibrary.isBinaryType(dataType.type)) {
@@ -123,20 +122,31 @@ class JSONWriter extends YadamuWriter {
             }
 		    return col
           }
+        case "DATETIME":
+        case "DATETIME2":
         case "TIMESTAMP":
-          return (col,idx) =>  { 
-            // A Timestamp not explicitly marked as UTC is coerced to UTC.
+		  // YYYY-MM-DDTHH24:MI:SS.nnnnnnnnn
+		  // Timestamps are truncated to a maximum of 6 digits
+          // Timestamps not explicitly marked as UTC are coerced to UTC.
+		  // Timestamps using a '+00:00' are converted are converted to 
+		  const tsMaxLength = 20 + this.dbi.TIMESTAMP_PRECISION
+		  return (col,idx) =>  { 
+		    let ts
 			switch (true) {
-              case (typeof col === 'string'):
-                return (col.endsWith('Z') || col.endsWith('+00:00')) ? col : col + 'Z';
-				break;
               case (col instanceof Date):
                 return col.toISOString()
+              case col.endsWith('+00:00'):
+			    ts = col.slice(0,-6) 
+				return `${ts.slice(0,tsMaxLength)}Z`
+              case col.endsWith('Z'):
+			    ts = col.slice(0,-1) 
+			    return `${ts.slice(0,tsMaxLength)}Z`
+			  default:
+			    return `${col.slice(0,tsMaxLength)}Z`
             }
-  		    return col
           }
-		 default:
-		   return null
+		default:
+		  return null
       }
     }) 
 	

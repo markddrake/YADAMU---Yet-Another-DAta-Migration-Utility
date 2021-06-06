@@ -9,6 +9,7 @@
 , "parameters"                        : {
     "OUTPUT_FORMAT"                   : "CSV"
   , "DIRECTORY"                       : "loader/csv"
+  , "TIMESTAMP_PRECISION"             : 6
   }
 , "tests"                             : [{
     "source"                          : "oracle19c"

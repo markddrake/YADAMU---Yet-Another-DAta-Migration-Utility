@@ -4,10 +4,12 @@
 	"tasks": "tasks.json",
 	"stagingSource": "awsS3-staging",
 	"recreateSchema": true,
+	"emptyStringIsNull" : true,
 	"parameters": {
 	  "REMOTE_STAGING_AREA": "aws/loader/csv",
 	  "DIRECTORY": "loader/csv",
-      "IDENTIFIER_MAPPING_FILE"  : "qa/mappings/redshiftMappings.json"
+      "IDENTIFIER_MAPPING_FILE"  : "qa/mappings/redshiftMappings.json",
+	  "TABLE_MAX_ERRORS"         : 100000
 	},
 	"tests": [
 		{
