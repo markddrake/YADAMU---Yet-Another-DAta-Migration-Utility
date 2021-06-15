@@ -73,7 +73,6 @@ class DBWriter extends Writable {
   async executeDDL(ddlStatements) {
 	// this.yadamuLogger.trace([this.constructor.name,`executeDDL()`,this.dbi.DATABASE_VENDOR],`Executing DLL statements)`) 
     const startTime = performance.now()
-	ddlStatements = this.dbi.prepareDDLStatements(ddlStatements)	
 	try {
       const results = await this.dbi.executeDDL(ddlStatements) 
   	  this.emit('ddlComplete',results,startTime);	 
@@ -84,30 +83,16 @@ class DBWriter extends Writable {
   
   async generateStatementCache(metadata) {
     const startTime = performance.now()
-    // console.log(metadata)
     await this.dbi.setMetadata(metadata)     
-    // console.log(metadata)
     const statementCache = await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER)
-	// console.log(statementCache)
-	let ddlStatementCount = 0
-	let dmlStatementCount = 0
-	const ddlStatements = []
-	Object.values(statementCache).forEach((tableInfo) => {
-	  if (tableInfo.ddl !== null) {
-		ddlStatements.push(tableInfo.ddl)
-	  }
-	  if (tableInfo.dml !== null) {
-		dmlStatementCount++;
-      }
-    })	 
-	this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`Generated ${ddlStatements.length === 0 ? 'no' : ddlStatements.length} "Create Table" statements and ${dmlStatementCount === 0 ? 'no' : dmlStatementCount} DML statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
-	// console.log(this.ddlCompleted)
-	// Execute DDL Statements Asynchronously - Emit dllComplete when ddl execution is finished. 
+	const ddlStatements = this.dbi.analyzeStatementCache(statementCache,startTime)
+
 	if (this.ddlCompleted) {
       // this.yadamuLogger.trace([this.constructor.name,`generateStatementCache()`,this.dbi.DATABASE_VENDOR,],`DDL already completed. Emit ddlComplete(SUCCESS))`)  
 	  this.emit('ddlComplete',[],performance.now());
 	}
 	else {
+  	  // Execute DDL Statements Asynchronously - Emit dllComplete when ddl execution is finished. 
       this.executeDDL(ddlStatements)
     }
   }   

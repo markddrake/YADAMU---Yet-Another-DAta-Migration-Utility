@@ -31,10 +31,13 @@ class YadamuDBI {
 
   // Instance level getters.. invoke as this.METHOD
 
-  get DATABASE_KEY()          { return 'yadamu' };
-  get DATABASE_VENDOR()       { return 'YADAMU' };
-  get SOFTWARE_VENDOR()       { return 'YABASC - Yet Another Bay Area Software Company'};
-    
+  get DATABASE_KEY()               { return 'yadamu' };
+  get DATABASE_VENDOR()            { return 'YADAMU' };
+  get SOFTWARE_VENDOR()            { return 'YABASC - Yet Another Bay Area Software Company'};
+ 
+  get DATA_STAGING_SUPPORTED()     { return false } 
+  get SQL_COPY_SUPPORTED()         { return false }
+  
   get PASSWORD_KEY_NAME()          { return 'password' };
   get STATEMENT_TERMINATOR()       { return '' }
 
@@ -45,8 +48,8 @@ class YadamuDBI {
   get MODE()                       { return this.parameters.MODE                   || DBIConstants.MODE }
   get ON_ERROR()                   { return this.parameters.ON_ERROR               || DBIConstants.ON_ERROR }
   get INFINITY_MANAGEMENT()        { return this.parameters.INFINITY_MANAGEMENT    || DBIConstants.INFINITY_MANAGEMENT };
-  get LOCAL_STAGING_AREA()         { return this.parameters.LOCAL_STAGING_AREA     || DBIConstants.LOCAL_STAGING_AREA }
-  get REMOTE_STAGING_AREA()        { return this.parameters.REMOTE_STAGING_AREA    || DBIConstants.REMOTE_STAGING_AREA }
+  get LOCAL_STAGING_AREA()         { return YadamuLibrary.macroSubstitions((this.parameters.LOCAL_STAGING_AREA     || DBIConstants.LOCAL_STAGING_AREA || ''), this.yadamu.MACROS || '') }
+  get REMOTE_STAGING_AREA()        { return YadamuLibrary.macroSubstitions((this.parameters.REMOTE_STAGING_AREA    || DBIConstants.REMOTE_STAGING_AREA || ''), this.yadamu.MACROS || '') }
   get STAGING_FILE_RETENTION()     { return this.parameters.STAGING_FILE_RETENTION || DBIConstants.STAGING_FILE_RETENTION }
   get TIMESTAMP_PRECISION()        { return this.parameters.TIMESTAMP_PRECISION    || DBIConstants.TIMESTAMP_PRECISION }
   get BYTE_TO_CHAR_RATIO()         { return this.parameters.BYTE_TO_CHAR_RATIO     || DBIConstants.BYTE_TO_CHAR_RATIO }
@@ -153,6 +156,7 @@ class YadamuDBI {
 	  return this._UPLOAD_FILE
     })()
   }		
+    
   get TABLE_MATCHING()                { return this.parameters.TABLE_MATCHING }
   
   get DESCRIPTION()                   { return this._DESCRIPTION }
@@ -431,6 +435,7 @@ class YadamuDBI {
   setConnectionProperties(connectionSettings) {
 	this.setVendorProperties(connectionSettings)
     this.vendorParameters = connectionSettings.parameters || {}
+	this.vendorSettings = connectionSettings.settings || {}
   }
    
   isValidDDL() {
@@ -441,14 +446,6 @@ class YadamuDBI {
     return true;
   }
   
-  isDirectLoadSource() {
-    return false;
-  }
-  
-  copyOperationAvailble(source,controlFile) {
-    return false
-  }
- 
   trackExceptions(err) {
     // Reset by passing undefined 
     this.firstError = this.firstError === undefined ? err : this.firstError
@@ -904,7 +901,7 @@ class YadamuDBI {
 	options = options === undefined ? {abort: false} : Object.assign(options,{abort:false})
     await this.closeConnection(options)
     await this.closePool(options);
-	this.logDisconnect();
+    this.logDisconnect();
   }
 
   /*
@@ -1084,6 +1081,14 @@ class YadamuDBI {
        ,architecture     : process.arch
        ,platform         : process.platform
       }
+    }
+  }
+  
+  async getYadamuInstanceInfo() {
+	const systemInfo = await this.getSystemInformation();
+	return {
+	  yadamuInstanceID: systemInfo.yadamuInstanceID
+	, yadamuInstallationTimestamp: systemInfo.yadamuInstallationTimestamp
     }
   }
 
@@ -1456,12 +1461,34 @@ class YadamuDBI {
   ** Copy-based Import Operations - Experimental
   **
   */
-    
-  async prepareCopyImport(metadata) {
-    const startTime = performance.now()
-    await this.setMetadata(metadata)     
-    const statementCache = await this.generateStatementCache(this.parameters.TO_USER)
-	let ddlStatementCount = 0
+  
+  getCredentials(key) {
+    return ''
+  }
+	
+  validStagedDataSet(source,controlFilePath,controlFile) {   
+
+    /*
+	**
+    ** Does the Target support copy operations from this source / control file ?
+    **
+	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
+	** Return false if the data set cannot be consumed using a Copy operation
+	** Do not throw errors if the data set cannot be used for a COPY operatio
+	** Generate Info messages to explain why COPY cannot be used.
+	**
+  
+    return true
+	
+	**
+	*/
+	
+    throw new YadamuError(`Unsupported Feature for Driver "${this.DATABASE_KEY}".`)
+	
+  }
+  
+  analyzeStatementCache(statementCache,startTime) {
+  
 	let dmlStatementCount = 0
 	let ddlStatements = []
 	Object.values(statementCache).forEach((tableInfo) => {
@@ -1474,32 +1501,64 @@ class YadamuDBI {
     })	 
 	this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Generated ${ddlStatements.length === 0 ? 'no' : ddlStatements.length} "Create Table" statements and ${dmlStatementCount === 0 ? 'no' : dmlStatementCount} DML statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
     ddlStatements = this.prepareDDLStatements(ddlStatements)	
-	try {
-      const results = await this.executeDDL(ddlStatements) 
-    } catch (e) {
-	  console.log(e)
-  	  throw e
-	}
+	return ddlStatements	
+  }  
+  
+  async generateCopyStatements(metadata) {
+    const startTime = performance.now()
+    await this.setMetadata(metadata)     
+    const statementCache = await this.generateStatementCache(this.parameters.TO_USER)
 	return statementCache
   }     
   
-  async validateControlFile(controlFile) {
-   return true
-  } 
-
+  async reportCopyErrors(tableName,stack,sqlStatement) {
+  }
+  
+  async reportCopyResults(tableName,rowsRead,failed,elapsedTime,sqlStatement,stack) {
+    const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rowsRead/elapsedTime) * 1000)} rows/s.`
+   
+    let rowCountSummary
+    switch (failed) {
+	  case 0:
+	    rowCountSummary = `Rows ${rowsRead}.`
+        this.yadamuLogger.info([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
+        break
+      default:
+	    rowCountSummary = `Read ${rowsRead}. Written ${rowsRead - failed}.`
+        this.yadamuLogger.error([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
+        await this.reportCopyErrors(tableName,stack,sqlStatement)
+	}
+  }
+  
+  async initializeCopy() {
+  }
+  
   async copyOperation(tableName,statement) {
+	
+    /*
+    **
+    ** Generic Basic Imementation - Override as required for error reporting etc
+    **
+    */
+	
 	let startTime 
 	try {
 	  startTime = performance.now();
-	  let results = await this.executeSQL(statement);
+	  let results = await this.beginTransaction()
+	  results = await this.executeSQL(statement);
 	  const elapsedTime = performance.now() - startTime;
-      const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.} rows/s.`
+	  results = await this.commitTransaction()
+      const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  rows/s.`
       this.yadamuLogger.info([tableName,'Copy'],`${writerTimings}`)  
 	} catch(e) {
 	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+	  let results = await this.rollbackTransaction()
 	}
   }
   		  
+  async finalizeCopy() {
+  }
+
   async copyOperations(taskList,sourceVendor) {
 	 
     this.activeWorkers = new Set()
@@ -1513,7 +1572,6 @@ class YadamuDBI {
 	
 	let operationAborted = false;
 	let fatalError = undefined
-    
     const copyOperations = workers.map((worker,idx) => { 
 	  return new Promise(async (resolve,reject) => {
         // ### Await inside a Promise is an anti-pattern ???
@@ -1553,24 +1611,42 @@ class YadamuDBI {
 	return results
   }  
   
-  verifyCopyImport(vendor,controlFile) { 
-    // Throw errors if copy based import not available for the source.
+  verifyStagingSource(validSources,source) {   
+    if (!validSources.includes(source)) {
+      throw new YadamuError(`COPY operations not supported between "${source}" and "${this.DATABASE_VENDOR}".`)
+	}
   }
-  
-  async doCopyBasedImport(vendor,controlFile,metadata) {
-	
-    this.verifyCopyImport(vendor,controlFile)	
-	this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
+   
+  async copyStagedData(vendor,controlFile,metadata,credentials) {
 
-	const statementCache = await this.prepareCopyImport(metadata);
-	const taskList = Object.keys(statementCache).map((table) => {
-	  return { 
-	    TABLE_NAME    : table
-	  ,	copyStatement : statementCache[table].copy
-      }
-	})
-    const results = await this.copyOperations(taskList,vendor)
-	return results
+	this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
+	this.setSystemInformation(controlFile.systemInformation)
+
+    const startTime = performance.now()	
+	const statementCache = await this.generateCopyStatements(metadata);
+	const ddlStatements = this.analyzeStatementCache(statementCache,startTime)
+	let results = await this.executeDDL(ddlStatements)
+    if (results instanceof Error) {
+	  this.yadamuLogger.ddl([this.DATABASE_VENDOR],`DDL Failure. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+	  return results
+    }
+	else {
+  	  this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Executed ${Array.isArray(results) ? results.length : undefined} DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+	}
+
+	if (this.MODE != 'DDL_ONLY') {
+	  const taskList = Object.keys(statementCache).map((table) => {
+	    return { 
+  	      TABLE_NAME    : table
+	    , copyStatement : statementCache[table].copy
+        }
+	  })
+	  await this.initializeCopy(credentials)
+      results = await this.copyOperations(taskList,vendor)
+	  await this.finalizeCopy()
+	  
+	}
+    return results
   }
   
 }

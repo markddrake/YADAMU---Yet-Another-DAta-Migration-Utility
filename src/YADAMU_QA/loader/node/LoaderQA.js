@@ -129,9 +129,9 @@ class LoaderQA extends LoaderDBI {
 	fileContents = await fsp.readFile(controlFilePath,{encoding: 'utf8'})
     const targetControlFile = JSON.parse(fileContents)
 
-    let results = await Promise.all(Object.keys(sourceControlFile.data).map((tableName) => {return this.compareFiles( sourceControlFile.data[tableName].file, targetControlFile.data[tableName].file)}))
+    let results = await Promise.all(Object.keys(targetControlFile.data).map((tableName) => {return this.compareFiles( sourceControlFile.data[tableName].file, targetControlFile.data[tableName].file)}))
 	
-    Object.keys(sourceControlFile.data).map((tableName,idx) => {
+    Object.keys(targetControlFile.data).map((tableName,idx) => {
 	  const result = results[idx]
 	  if ((result[0] === result[1]) && (result[2] === result[3])) {
 		report.successful.push([source.schema,target.schema,tableName,result[0]])
@@ -152,13 +152,13 @@ class LoaderQA extends LoaderDBI {
 	if (this.ENCRYPTED_INPUT) {
 	  const iv = await this.loadInitializationVector(filename)
 	  streams.push(new IVReader(this.IV_LENGTH))
-  	  // console.log('Decipher',filename,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
-	  const decipherStream = crypto.createDecipheriv(this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv)
+  	  // console.log('Decipher',filename,this.controlFile.settings.encryption,this.yadamu.ENCRYPTION_KEY,iv);
+	  const decipherStream = crypto.createDecipheriv(this.controlFile.settings.encryption,this.yadamu.ENCRYPTION_KEY,iv)
 	  streams.push(decipherStream);
 	}
 
 	if (this.COMPRESSED_INPUT) {
-      streams.push(this.controlFile.yadamuOptions.compression === 'GZIP' ? createGunzip() : createInflate())
+      streams.push(this.controlFile.settings.compression === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
 	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, filename)
@@ -197,11 +197,11 @@ class LoaderQA extends LoaderDBI {
     })	
   }    
 
-  getYadamuOptions() {
-    return this.controlFile.yadamuOptions
+  getControlFileSettings() {
+    return this.controlFile.settings
   }
   
-  setYadamuOptions(options) {
+  setControlFileSettings(options) {
 	this.parameters.OUTPUT_FORMAT = options.contentType
 	this.yadamu.parameters.COMPRESSION = options.compression
 	this.yadamu.parameters.ENCRYPTION = options.encryption

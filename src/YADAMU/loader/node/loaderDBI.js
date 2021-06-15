@@ -97,6 +97,7 @@ class LoaderDBI extends YadamuDBI {
   get DATABASE_KEY()             { return LoaderDBI.DATABASE_KEY };
   get DATABASE_VENDOR()          { return LoaderDBI.DATABASE_VENDOR };
   get SOFTWARE_VENDOR()          { return LoaderDBI.SOFTWARE_VENDOR };
+  get DATA_STAGING_SUPPORTED()   { return true } 
   get PROTOCOL()                 { return LoaderDBI.PROTOCOL };
   
   get YADAMU_DBI_PARAMETERS()    { 
@@ -126,13 +127,13 @@ class LoaderDBI extends YadamuDBI {
 	*/
 	
     return this._BASE_DIRECTORY || (() => {
-	  let baseDirectory =  this.vendorProperties.directory
+	  let baseDirectory =  this.vendorProperties.directory || ""
 	  if (this.DIRECTORY) {
         if (path.isAbsolute(this.DIRECTORY)) {
 	      baseDirectory = this.DIRECTORY
         }
         else {
-          baseDirectory = path.join(this.vendorProperties.directory,this.DIRECTORY)
+          baseDirectory = path.join(baseDirectory,this.DIRECTORY)
 		}
 	  }
 	  baseDirectory = YadamuLibrary.macroSubstitions(baseDirectory,this.yadamu.MACROS)
@@ -146,7 +147,7 @@ class LoaderDBI extends YadamuDBI {
   
   get OUTPUT_FORMAT() { 
     this._OUTPUT_FORMAT = this._OUTPUT_FORMAT || (() => {
-	  switch (this.controlFile?.yadamuOptions.contentType || this.parameters.OUTPUT_FORMAT?.toUpperCase() || 'JSON') {
+	  switch (this.controlFile?.settings.contentType || this.parameters.OUTPUT_FORMAT?.toUpperCase() || 'JSON') {
         case 'ARRAY':
           this._FILE_EXTENSION = 'data'
           this._OUTPUT_FORMAT = 'ARRAY'
@@ -189,9 +190,9 @@ class LoaderDBI extends YadamuDBI {
   get COMPRESSED_CONTENT()     { return (this.COMPRESSION_FORMAT !== 'NONE') }
   get ENCRYPTED_CONTENT()      { return this.yadamu.ENCRYPTION && this.yadamu.ENCRYPTION !== 'NONE' }
 
-  get COMPRESSED_INPUT()       { return this.controlFile.yadamuOptions.compression !== "NONE" }
-  get COMPRESSION_FORMAT()     { return this.controlFile.yadamuOptions.compression }
-  get ENCRYPTED_INPUT()        { return this.controlFile.yadamuOptions.encryption !== "NONE" }
+  get COMPRESSED_INPUT()       { return this.controlFile.settings.compression !== "NONE" }
+  get COMPRESSION_FORMAT()     { return this.controlFile.settings.compression }
+  get ENCRYPTED_INPUT()        { return this.controlFile.settings.encryption !== "NONE" }
   
   set INITIALIZATION_VECTOR(v) { this._INITIALIZATION_VECTOR =  v }
   get INITIALIZATION_VECTOR()  { return this._INITIALIZATION_VECTOR }
@@ -227,16 +228,12 @@ class LoaderDBI extends YadamuDBI {
     return true;
   }
   
-  isCopyOperationSource() {
-    return true;
-  }
-
   async getSystemInformation() {
     // this.yadamuLogger.trace([this.constructor.name,this.exportFilePath],`getSystemInformation()`)     	
 	return this.controlFile.systemInformation
   }
 
-  async loadMetadataFiles() {
+  async loadMetadataFiles(copyStagedData) {
   	this.metadata = {}
     if (this.controlFile) {
       const metdataRecords = await Promise.all(Object.keys(this.controlFile.metadata).map((tableName) => {
@@ -245,7 +242,9 @@ class LoaderDBI extends YadamuDBI {
       metdataRecords.forEach((content) =>  {
         const json = JSON.parse(content)
 		this.metadata[json.tableName] = json;
-        json.dataFile = this.controlFile.data[json.tableName].file
+        if (copyStagedData) {
+		  json.dataFile = this.controlFile.data[json.tableName].file
+		}
       })
     }
     return this.metadata;      
@@ -258,7 +257,7 @@ class LoaderDBI extends YadamuDBI {
   async getSchemaInfo() {
     // this.yadamuLogger.trace([this.constructor.name,this.EXPORT_PATH],`getSchemaInfo()`)
 	
-	this.metadata = await this.loadMetadataFiles()
+	this.metadata = await this.loadMetadataFiles(false)
 	
     return Object.keys(this.metadata).map((tableName) => {
       return {
@@ -285,12 +284,13 @@ class LoaderDBI extends YadamuDBI {
   */
 
   async createControlFile(metadataFileList,dataFileList) {
-  	const yadamuOptions = {
+  	const settings = {
 	  contentType : this.OUTPUT_FORMAT
     , compression : this.yadamu.COMPRESSION
 	, encryption  : this.ENCRYPTED_CONTENT ? this.yadamu.CIPHER : 'NONE'
+	, baseFolder  : this.IMPORT_FOLDER
     }
-	this.controlFile = { yadamuOptions : yadamuOptions, systemInformation : {}, metadata : metadataFileList, data: dataFileList}  
+	this.controlFile = { settings : settings, systemInformation : {}, metadata : metadataFileList, data: dataFileList}  
   }
 
   getMetadataPath(tableName) {
@@ -426,26 +426,34 @@ class LoaderDBI extends YadamuDBI {
   ** !!! Remember: Export is Reading data from the local file system - Load
   **
   */
+  
+  async loadControlFile() {
 
-  async initializeExport(csvLoadingEnabled) {
-	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
-    
     this.DIRECTORY = this.SOURCE_DIRECTORY
+	
     this.setFolderPaths(this.EXPORT_FOLDER,this.parameters.FROM_USER)
     this.setDescription(this.EXPORT_FOLDER)
 
-	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using Control File: "${this.PROTOCOL}${this.resolve(this.controlFilePath)}"`);
 	let stack
+
 	try {
 	  stack = new Error().stack;
       const fileContents = await fsp.readFile(this.controlFilePath,{encoding: 'utf8'})
       this.controlFile = JSON.parse(fileContents)
-	  if (this.controlFile.yadamuOptions.contentType === 'CSV' && !csvLoadingEnabled) {
-  	    throw new YadamuError('Loading of CSV formatted data sets is not supported')
-      }
 	} catch (err) {
       throw err.code === 'ENOENT' ? new FileNotFound(err,stack,this.controlFilePath) : new FileError(err,stack,this.controlFilePath)
 	}
+  }
+  
+  async initializeExport() {
+
+	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
+	
+	await this.loadControlFile()
+    if ((this.MODE != 'DDL_ONLY') && (this.controlFile.settings.contentType === 'CSV')) {
+      throw new YadamuError('Loading of "CSV" data sets not supported')
+    }
+	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using Control File: "${this.PROTOCOL}${this.resolve(this.controlFilePath)}"`);
 
   }
 
@@ -511,13 +519,13 @@ class LoaderDBI extends YadamuDBI {
 	if (this.ENCRYPTED_INPUT) {
 	  const iv = await this.loadInitializationVector(filename)
 	  streams.push(new IVReader(this.IV_LENGTH))
-  	  // console.log('Decipher',filename,this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv);
-	  const decipherStream = crypto.createDecipheriv(this.controlFile.yadamuOptions.encryption,this.yadamu.ENCRYPTION_KEY,iv)
+  	  // console.log('Decipher',filename,this.controlFile.settings.encryption,this.yadamu.ENCRYPTION_KEY,iv);
+	  const decipherStream = crypto.createDecipheriv(this.controlFile.settings.encryption,this.yadamu.ENCRYPTION_KEY,iv)
 	  streams.push(decipherStream);
 	}
 
 	if (this.COMPRESSED_INPUT) {
-      streams.push(this.controlFile.yadamuOptions.compression === 'GZIP' ? createGunzip() : createInflate())
+      streams.push(this.controlFile.settings.compression === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
 	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, filename)

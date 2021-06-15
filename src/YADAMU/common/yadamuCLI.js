@@ -105,7 +105,7 @@ class YadamuCLI {
     , "YADAMUGUI"      : Object.freeze([])
     , "YADAMUCLI"      : Object.freeze([])
     , "IMPORT"         : Object.freeze(['TO_USER'])
-    , "DIRECTLOAD"     : Object.freeze(['FROM_USER','TO_USER','DIRECTORY'])
+    , "DIRECTLOAD"     : Object.freeze(['FROM_USER','TO_USER','REMOTE_STAGING_AREA'])
     , "LOAD"           : Object.freeze(['FROM_USER','TO_USER','DIRECTORY'])
     , "UPLOAD"         : Object.freeze(['TO_USER'])
     , "EXPORT"         : Object.freeze(['FROM_USER'])
@@ -223,7 +223,7 @@ class YadamuCLI {
 
   validateParameters(command) {
 	  
-	for (const synonym of Object.keys(YadamuCLI.ARGUMENT_SYNONYMS[command])) {
+	for (const synonym of Object.keys(YadamuCLI.ARGUMENT_SYNONYMS[command] || {})) {
       if (this.yadamu.COMMAND_LINE_PARAMETERS[synonym] !== undefined) {
 	    const argument = YadamuCLI.ARGUMENT_SYNONYMS[command][synonym] 
 		this.yadamu.appendSynonym(argument,this.yadamu.parameters[synonym])
@@ -439,13 +439,12 @@ class YadamuCLI {
     this.yadamuLogger.info([`YADAMU`,`IMPORT`],`Operation complete: File:"${this.yadamu.FILE}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
 
-  async doCopyBasedImport() {
+  async doCopyStagedData() {
 	await this.yadamu.initialize()
-	this.yadamu.STAGING_AREA = 'loader'
-    const stage = this.getDatabaseInterface(this.yadamu,this.yadamu.STAGING_AREA,{},{})
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
-    const startTime = performance.now();
-    await this.yadamu.doCopyBasedImport(stage,dbi);      
+    const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const stage = this.getDatabaseInterface(this.yadamu,dbi.STAGING_PLATFORM,{},{})
+	const startTime = performance.now();
+    await this.yadamu.doCopy(stage,dbi);      
     const elapsedTime = performance.now() - startTime;
     this.yadamuLogger.info([`YADAMU`,`LOAD`],`Operation complete: Control File:"${stage.controlFilePath}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
@@ -565,12 +564,7 @@ class YadamuCLI {
 	  else {
 	    const sourceDBI = this.getDatabaseInterface(this.yadamu,sourceDatabase,sourceConnection,sourceParameters)
         const targetDBI = this.getDatabaseInterface(this.yadamu,targetDatabase,targetConnection,targetParameters)    
-        if (this.yadamu.MODE === 'COPY') {
-  		  await this.yadamu.doCopyBasedImport(sourceDBI,targetDBI) 
-	    }
-	    else {
-          await this.yadamu.doCopy(sourceDBI,targetDBI);      
-	    }
+        await this.yadamu.doCopy(sourceDBI,targetDBI);      
       }
       this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`);
     }

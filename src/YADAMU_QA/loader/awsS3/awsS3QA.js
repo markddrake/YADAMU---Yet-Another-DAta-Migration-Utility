@@ -217,15 +217,16 @@ class AWSS3QA extends AWSS3DBI {
 	
   }      
   
-  getYadamuOptions() {
-    return this.controlFile.yadamuOptions
+  getControlFileSettings() {
+    return this.controlFile.settings
   }
   
-  setYadamuOptions(options) {
+  setControlFileSettings(options) {
 	this.parameters.OUTPUT_FORMAT = options.contentType
 	this.yadamu.parameters.COMPRESSION = options.compression
 	this.yadamu.parameters.ENCRYPTION = options.encryption
   }
+  
 }
  
 module.exports = AWSS3QA

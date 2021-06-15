@@ -168,7 +168,10 @@ class SnowflakeQA extends SnowflakeDBI {
       )
       timer.unref()
     }
-    
+
+    verifyStagingSource(source) {  
+      super.verifyStagingSource(SnowflakeConstants.STAGED_DATA_SOURCES,source)
+    }       
 }
 
 module.exports = SnowflakeQA

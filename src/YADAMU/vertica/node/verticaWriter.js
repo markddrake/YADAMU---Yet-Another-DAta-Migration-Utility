@@ -12,7 +12,7 @@ const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
 const YadamuWriter = require('../../common/yadamuWriter.js');
 const StringWriter = require('../../common/stringWriter.js');
 const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
-const {WhitespaceIssue, EmptyStringDetected, ContentTooLarge} = require('./verticaException.js')
+const {WhitespaceIssue, EmptyStringDetected, ContentTooLarge, StagingAreaMisMatch} = require('./verticaException.js')
 
 class VerticaWriter extends YadamuWriter {
 
@@ -432,6 +432,9 @@ class VerticaWriter extends YadamuWriter {
       await this.dbi.releaseSavePoint();
     } catch (cause) {
       this.endTime = performance.now();1
+	  if (cause.missingFile()) {
+		cause = new StagingAreaMisMatch(this.dbi.LOCAL_STAGING_AREA, this.dbi.REMOTE_STAGING_AREA,cause)
+	  } 
       this.cleanupStagingFile(this.STAGING_FILE,true);
 	  await this.reportBatchError(batch.copy,`COPY`,cause)
       await this.dbi.restoreSavePoint(cause);
@@ -470,7 +473,6 @@ class VerticaWriter extends YadamuWriter {
 			this.mergeoutInsertCount = this.dbi.MERGEOUT_INSERT_COUNT
 		  }
         } catch(cause) {
-		  console.log(cause);
 	  	  this.dbi.restoreSavePoint(cause);
           this.handleIterativeError(`INSERT ONE`,cause,row,batch.insert[row]);
           if (this.skipTable) {

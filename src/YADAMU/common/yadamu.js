@@ -55,6 +55,7 @@ class Yadamu {
   get REJECTION_FILE_PREFIX()         { return this.parameters.REJECTION_FILE_PREFIX     || YadamuConstants.REJECTION_FILE_PREFIX }
   get WARNING_FOLDER()                { return this.parameters.WARNING_FOLDER            || YadamuConstants.WARNING_FOLDER }
   get WARNING_FILE_PREFIX()           { return this.parameters.WARNING_FILE_PREFIX       || YadamuConstants.WARNING_FILE_PREFIX }
+ 
 
   get IDENTIFIER_TRANSFORMATION()     { return this.parameters.IDENTIFIER_TRANSFORMATION || YadamuConstants.IDENTIFIER_TRANSFORMATION }
   get IDENTIFIER_MAPPING_FILE()       { return this.parameters.IDENTIFIER_MAPPING_FILE }
@@ -82,7 +83,10 @@ class Yadamu {
   set ENCRYPTION_KEY(v)               { this._ENCRYPTION_KEY = v}
   
   get COMPRESSION()                   { return this.parameters.COMPRESSION || 'NONE' }
+  get DATA_STAGING_ENABLED()          { return this.parameters.hasOwnProperty('DATA_STAGING_ENABLED') ? this.parameters.DATA_STAGING_ENABLED : true }
+  
   get INTERACTIVE()                   { return this.STATUS.operation === 'YADAMUGUI' }
+  
   get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || YadamuConstants.PARALLEL) }
   get PARALLEL_PROCESSING()           { return this.PARALLEL > 0 } // Parellel 1 is Parallel processing logic with a single worker.
 
@@ -143,11 +147,6 @@ class Yadamu {
 
   constructor(operation,configParameters) {
 	 
-	// console.log('Yadamu.YADAMU_PARAMETERS:',Yadamu.YADAMU_PARAMETERS)
-	// console.log('Yadamu this.YADAMU_PARAMETERS:',this.YADAMU_PARAMETERS)
-	// console.log('Yadamu.YADAMU_DBI_PARAMETERS:',Yadamu.YADAMU_DBI_PARAMETERS)
-	// console.log('Yadamu this.YADAMU_DBI_PARAMETERS:',this.YADAMU_DBI_PARAMETERS)
-	
     this._OPERATION = operation
     this.activeConnections = new Set();
 	      
@@ -462,7 +461,7 @@ class Yadamu {
    
     const parameters = {}
 
-    const allowAnyParameter = process.argv.some((currentValue) => {return ((typeof  currentValue === 'string') && (currentValue.toUpperCase() === 'ALLOW_ANY_PARAMETER=TRUE'))})
+    let allowAnyParameter = false
 
     process.argv.forEach((arg) => {
      
@@ -471,6 +470,9 @@ class Yadamu {
         parameterName = parameterName.startsWith('--') ? parameterName.substring(2) : parameterName.startsWith('-') ? parameterName.substring(1) : parameterName
         const parameterValue = arg.substring(arg.indexOf('=')+1);
         switch (parameterName) {
+		  case 'ALLOW_ANY_PARAMETER':
+   	        allowAnyParameter = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? this.isTrue(parameterValue.toUpperCase()) : false
+		    break;
 	      case 'INIT':		  
 	      case 'COPY':		  
 	      case 'TEST':		  
@@ -487,10 +489,11 @@ class Yadamu {
 	      case 'OVERWRITE':		  
 	        parameters.OVERWRITE = this.isSupportedValue(parameterName,parameterValue,YadamuConstants.TRUE_OR_FALSE) ? this.isTrue(parameterValue.toUpperCase()) : false
 		    break;
+          case 'CREDENTIALS':
+            parameters.CREDENTIALS =  this.isExistingFile(parameterName,parameterValue);
           case 'CONFIG':
           case 'CONFIGURATION':
             parameters.CONFIG =  this.isExistingFile(parameterName,parameterValue);
-			// parameters.FILE = parameters.CONFIG
             break;
 	      case 'USERID':
   	        parameters.USERID = parameterValue;
@@ -520,6 +523,9 @@ class Yadamu {
           case 'PORT':
             parameters.PORT = parameterValue;
             break;
+		  case 'STAGING_PLATFORM':
+            parameters.STAGING_PLATFORM = parameterValue;
+            break;		    
           case 'FILE':
             if (parameters.IMPORT || parameters.EXPORT) {
 			  throw new error(`Cannot combine legacy parameter FILE with IMPORT or EXPORT`);
@@ -538,6 +544,12 @@ class Yadamu {
           case 'TARGET_DIR':
           case 'TARGET_DIRECTORY':
             parameters.TARGET_DIRECTORY = parameterValue;
+            break;
+          case 'LOCAL_STAGING_AREA':
+            parameters.LOCAL_STAGING_AREA = parameterValue;
+            break;
+          case 'REMOTE_STAGING_AREA':
+            parameters.REMOTE_STAGING_AREA = parameterValue;
             break;
           case 'BUCKET':
             parameters.BUCKET = parameterValue;
@@ -700,14 +712,105 @@ class Yadamu {
     await dbWriter.initialize();
     return dbWriter;
   }
+    
+  async doCopyOperation(source,target) {
+	
+    /*
+	**
+	** Load data the has been previously staged to a file system that is directly accessable by the target database.
+	**
+	*/
+	
+   	// Remap the data file locations in the control file to a path that is accessible by the target database
+	
+    const controlFile = source.controlFile
+    const controlFilePath = source.controlFilePath
+    this.LOGGER.info(['COPY',source.DATABASE_VENDOR,target.DATABASE_VENDOR],`Using Control File "${source.controlFilePath}".`)
+	      
+	if (target.REMOTE_STAGING_AREA) {
+	  Object.keys(controlFile.data).forEach((tableName,idx) => {
+		if ((source.TABLE_FILTER.length === 0) || source.TABLE_FILTER.includes(tableName)) {
+    	  source.DIRECTORY = source.TARGET_DIRECTORY
+		  const remotePath = path.join(target.REMOTE_STAGING_AREA,path.relative(path.dirname(controlFile.settings.baseFolder),controlFile.data[tableName].file)).split(/[/\\]/g).join(path.posix.sep)
+	      controlFile.data[tableName].file = remotePath
+	    }
+		else {
+		  delete controlFile.metadata[tableName]
+		  delete controlFile.data[tableName]
+		}
+	  })
+	}
+
+	const metadata = await source.loadMetadataFiles(true)
+	
+	await source.finalizeExport();
+	await source.finalize();
+    this.activeConnections.delete(source);
+
+	const results = await target.copyStagedData(source.DATABASE_KEY,controlFile,metadata,source.getCredentials(target.DATABASE_KEY))
+    await target.finalize();
+    this.activeConnections.delete(target);
+
+	return results;
+  }
+
+  async doPipelineOperation(source,target) {
+
+    /*
+	**
+	** Load data the has using a Node Pipeline.
+	**
+	*/
+
+	let streamsCompleted
+	const parallel = (this.PARALLEL_PROCESSING && source.isDatabase() && target.isDatabase());
+
+	this.STATUS.operationSuccessful = false;
+    const dbReader = await this.getDBReader(source,parallel)
+    const dbWriter = await this.getDBWriter(target,parallel) 
+
+	// this.LOGGER.trace([this.constructor.name,'PIPELINE'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
+    try {
+      const yadamuPipeline = []
+      // dbReader.getInputStream() returns itself (this) for databases...	  
+	  yadamuPipeline.push(...dbReader.getInputStreams())
+	  yadamuPipeline.push(dbWriter)
+
+	  streamsCompleted = yadamuPipeline.map((s) => { 
+	    return new Promise((resolve,reject) => {
+	      finished(s,(err) => {
+		    if (err) {reject(err)} else {resolve()}
+		  })
+        })
+      })
+	
+	  await pipeline(yadamuPipeline)
+      this.STATUS.operationSuccessful = true;
+   	  await Promise.allSettled(streamsCompleted)
+
+      // this.LOGGER.trace([this.constructor.name,'PIPELINE'],'Success')
+
+      await source.finalize();
+	  this.activeConnections.delete(source);
+   	  await target.finalize();
+	  this.activeConnections.delete(target);
+      this.reportStatus(this.STATUS,this.LOGGER)
+    } catch (e) {
+   	  await Promise.allSettled(streamsCompleted)
+	  // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
+	  if (e.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+	    e = dbReader.underlyingError instanceof Error ? dbReader.underlyingError : (dbWriter.underlyingError instanceof Error ? dbWriter.underlyingError : e)
+	  }
+  	  // this.LOGGER.trace([this.constructor.name,'PIPELINE','FAILED'],e)
+	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
+	  throw e;
+	}
+  }
   
   async doPumpOperation(source,target) {
 	     
 	let results;
-    let streamsCompleted
-	
-	const parallel = (this.PARALLEL_PROCESSING && source.isDatabase() && target.isDatabase());
-    
+      
 	try {
 	  let failed = false;
 	  let cause = undefined;
@@ -717,47 +820,21 @@ class Yadamu {
       await target.initialize();
 	  this.activeConnections.add(source);
 		
-      this.STATUS.operationSuccessful = false;
-      const dbReader = await this.getDBReader(source,parallel)
-      const dbWriter = await this.getDBWriter(target,parallel) 
-
-	  // this.LOGGER.trace([this.constructor.name,'PIPELINE'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
-      try {
-        const yadamuPipeline = []
-        // dbReader.getInputStream() returns itself (this) for databases...	  
-	    yadamuPipeline.push(...dbReader.getInputStreams())
-	    yadamuPipeline.push(dbWriter)
-
-	    streamsCompleted = yadamuPipeline.map((s) => { 
-	      return new Promise((resolve,reject) => {
-		    finished(s,(err) => {
-		      if (err) {reject(err)} else {resolve()}
-		    })
-          })
-        })
-	
-	    await pipeline(yadamuPipeline)
-        this.STATUS.operationSuccessful = true;
-   	    await Promise.allSettled(streamsCompleted)
-
-        // this.LOGGER.trace([this.constructor.name,'PIPELINE'],'Success')
-
-        await source.finalize();
-	    this.activeConnections.delete(source);
-   	    await target.finalize();
-	    this.activeConnections.delete(target);
-        this.reportStatus(this.STATUS,this.LOGGER)
-	    results = this.metrics
-      } catch (e) {
-   	    await Promise.allSettled(streamsCompleted)
-	    // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
-	    if (e.code === 'ERR_STREAM_PREMATURE_CLOSE') {
-		  e = dbReader.underlyingError instanceof Error ? dbReader.underlyingError : (dbWriter.underlyingError instanceof Error ? dbWriter.underlyingError : e)
+      if (this.DATA_STAGING_ENABLED && source.DATA_STAGING_SUPPORTED && target.SQL_COPY_SUPPORTED) {
+		await source.loadControlFile()
+		if (target.validStagedDataSet(source.DATABASE_KEY,source.controlFilePath,source.controlFile)) {
+          await this.doCopyOperation(source,target)
 	    }
-  	    // this.LOGGER.trace([this.constructor.name,'PIPELINE','FAILED'],e)
-	    this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
-		throw e;
-	  }
+		else {
+		  await this.doPipelineOperation(source,target)
+	    }
+	  }	
+	  else {
+	    await this.doPipelineOperation(source,target)
+      }		  
+	 
+	  results = this.metrics
+	  
 	} catch (e) {		
 	  this.STATUS.operationSuccessful = false;
 	  this.STATUS.err = e;
@@ -953,45 +1030,6 @@ class Yadamu {
     return metrics
   }  
   
-  async loadStagedData(source,target) {
-	  
-	if (!source.isCopyOperationSource()) {
-       throw new YadamuError(`SQL COPY operations are not supported with "${source.DATABASE_KEY}"`)
-	}
-	
-	await source.initialize()
-	await source.initializeExport(true)
-	const controlFile = source.controlFile
-	const controlFilePath = source.controlFilePath
-	
-	if (target.REMOTE_STAGING_AREA) {
-	  Object.keys(controlFile.data).forEach((tableName,idx) => {
-		if ((source.TABLE_FILTER.length === 0) || source.TABLE_FILTER.includes(tableName)) {
-    	  const localPath = controlFile.data[tableName].file
-	  	  source.DIRECTORY = source.TARGET_DIRECTORY
-		  const remotePath = path.join(target.REMOTE_STAGING_AREA,localPath.substring(source.BASE_DIRECTORY.length)).split(/[/\\]/g).join(path.posix.sep)
-	      controlFile.data[tableName].file = remotePath
-	    }
-		else {
-		  delete controlFile.metadata[tableName]
-		  delete controlFile.data[tableName]
-		}
-	  })
-	}
-		
-	const metadata = await source.loadMetadataFiles()
-	await source.finalizeExport();
-	await source.finalize();
-	
-	// Remap the data file locations in the control file to a path that is accessible by the target database
-	
-	target.setSystemInformation(controlFile.systemInformation)
-	await target.initialize()
-	const results = await target.doCopyBasedImport(source.DATABASE_KEY,controlFile,metadata)
-	await target.finalize();
-	
-  }
-
 }  
      
 module.exports = Yadamu;

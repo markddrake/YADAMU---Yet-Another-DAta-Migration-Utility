@@ -1,5 +1,7 @@
 "use strict";
 
+const path = require('path')
+
 const Yadamu = require('../../common/yadamu.js');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 const SnowflakeConstants = require('./snowflakeConstants.js');
@@ -466,9 +468,15 @@ class StatementGenerator {
       insertStatement = `insert into "${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values ${valuesBlock}`;
     }
 
+    let copyStatement 
+    if (tableMetadata.dataFile) {
+      copyStatement = `copy into "${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."${tableMetadata.tableName}" from '@"${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,tableMetadata.dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
+	}
+
     return { 
        ddl             : createStatement, 
        dml             : insertStatement,
+	   copy            : copyStatement,
        valuesBlock     : valuesBlock,
        columnNames     : columnNames,     
        targetDataTypes : targetDataTypes, 
@@ -485,11 +493,10 @@ class StatementGenerator {
     const statementCache = {}
     const tables = Object.keys(this.metadata); 
 
-    const ddlStatements = tables.map((table,idx) => {
+    tables.forEach((table,idx) => {
       const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);
       statementCache[this.metadata[table].tableName] = tableInfo;
-      return tableInfo.ddl;
     })
     return statementCache;
   }

@@ -47,17 +47,42 @@ class SnowflakeDBI extends YadamuDBI {
   get DATABASE_KEY()           { return SnowflakeConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return SnowflakeConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return SnowflakeConstants.SOFTWARE_VENDOR};
+  get SQL_COPY_SUPPORTED()     { return true }
   get STATEMENT_TERMINATOR()   { return SnowflakeConstants.STATEMENT_TERMINATOR };
 
   // Enable configuration via command line parameters
 
-  get SPATIAL_FORMAT()        { return this.parameters.SPATIAL_FORMAT || SnowflakeConstants.SPATIAL_FORMAT };
+  get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT || SnowflakeConstants.SPATIAL_FORMAT };
   
   // SNOWFLAKE XML TYPE can be set to TEXT to avoid multiple XML Fidelity issues with persisting XML data as VARIANT
   
-  get SNOWFLAKE_XML_TYPE()    { return this.parameters.SNOWFLAKE_XML_TYPE || SnowflakeConstants.SNOWFLAKE_XML_TYPE }
-  get SNOWFLAKE_JSON_TYPE()   { return this.parameters.SNOWFLAKE_JSON_TYPE || SnowflakeConstants.SNOWFLAKE_JSON_TYPE }
+  get SNOWFLAKE_XML_TYPE()     { return this.parameters.SNOWFLAKE_XML_TYPE || SnowflakeConstants.SNOWFLAKE_XML_TYPE }
+  get SNOWFLAKE_JSON_TYPE()    { return this.parameters.SNOWFLAKE_JSON_TYPE || SnowflakeConstants.SNOWFLAKE_JSON_TYPE }
 
+  get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM || VerticaConstants.STAGING_PLATFORM } 
+
+  get SPATIAL_SERIALIZER()     { return this._SPATIAL_SERIALIZER || "ST_AsWKB"; }
+
+  set SPATIAL_SERIALIZER(spatialFormat) {      
+    switch (spatialFormat) {
+      case "WKB":
+        this._SPATIAL_SERIALIZER = "ST_AsWKB";
+        break;
+        this._SPATIAL_SERIALIZER = "ST_AsEWKB";
+        break;
+      case "WKT":
+        this._SPATIAL_SERIALIZER = "ST_AsWKT";
+        break;
+      case "EWKT":
+        this._SPATIAL_SERIALIZER = "ST_AsEWKT";
+        break;
+       case "GeoJSON":
+         this._SPATIAL_SERIALIZER = "ST_AsGeoJSON"
+         break;
+     default:
+        this._SPATIAL_SERIALIZER = "ST_AsWKB";
+    }  
+  }    
 
   constructor(yadamu,settings,parameters) {	  
     super(yadamu,settings,parameters);
@@ -236,6 +261,7 @@ class SnowflakeDBI extends YadamuDBI {
   async initialize() {
     await super.initialize(true);   
 	this.statementLibrary = new this.StatementLibrary(this)
+	this.SPATIAL_SERIALIZER = this.SPATIAL_FORMAT
   }
     
   /*
@@ -461,6 +487,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   async getInputStream(tableInfo) {
     // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
+    this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT));
     return new SnowflakeReader(this.connection,tableInfo.SQL_STATEMENT);
 	
   }  
@@ -496,6 +523,95 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     return pid
   }
  
+  validStagedDataSet(vendor,controlFilePath,controlFile) {
+
+    /*
+	**
+	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
+	** Return false if the data set cannot be consumed using a Copy operation
+	** Do not throw errors if the data set cannot be used for a COPY operatio
+	** Generate Info messages to explain why COPY cannot be used.
+	**
+	*/
+
+    if (!SnowflakeConstants.STAGED_DATA_SOURCES.includes(vendor)) {
+       return false;
+	}
+	
+	if (controlFile.settings.contentType != 'CSV') {
+	  this.yadamuLogger.info([this.DATABASE_VENDOR,'COPY','INVALID DATA SET'],`Copy option unavailable. Control File "${controlFilePath}" describes a "${controlFile.settings.contentType}" data set. Copy operations only supported for "CSV" data sets.`)
+	  return false;
+	}
+    return true
+  }
+  
+  async reportCopyErrors(tableName,failed,stack,copyStatement) {
+	  
+    const err = new Error(`Errors detected durng COPY operation: ${failed} records rejected.`);
+    err.sql = copyStatement;
+	err.tags = []
+
+	try {
+	  const results = await this.executeSQL(`select * from table(validate("${this.parameters.YADAMU_DATABASE}"."${this.parameters.TO_USER}"."${tableName}", job_id => '_last'))`);
+      err.cause = results.map((err) => {
+	    loadError = new Error(err.error)
+		Object.assign(loadError,err);
+		return loadError
+	  })
+	} catch (e) {
+      err.cause = e
+	}
+	this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)	   	
+  }
+  
+    
+  async reportCopyResults(tableName,rowsRead,failed,elapsedTime,sqlStatement,stack) {
+    const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rowsRead/elapsedTime) * 1000)} rows/s.`
+   
+    let rowCountSummary
+    switch (failed) {
+	  case 0:
+	    rowCountSummary = `Rows ${rowsRead}.`
+        this.yadamuLogger.info([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
+        break
+      default:
+	    rowCountSummary = `Read ${rowsRead}. Written ${rowsRead - failed}.`
+        this.yadamuLogger.error([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
+        await this.reportCopyErrors(tableName,failed,stack,sqlStatement)
+	}
+  }
+  
+  async initializeCopy(credentials) {
+	this.statementLibrary.STAGE_CREDENTIALS = credentials
+	const sqlStatement = this.statementLibrary.SQL_CREATE_STAGE
+    const  results = await this.executeSQL(sqlStatement);
+  }
+  
+  async copyOperation(tableName,sqlStatement) {
+
+    await this.beginTransaction()
+    const startTime = performance.now();
+	let results = await this.executeSQL(sqlStatement);
+	const stack = new Error().stack
+	const elapsedTime = performance.now() - startTime;
+    const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  rows/s.`
+	let rowsParsed = 0
+	let rowsLoaded = 0
+	let errors = 0
+	results.forEach((file) => {
+	  rowsParsed += parseInt(file.rows_parsed)
+	  rowsLoaded += parseInt(file.rows_loaded)
+	  errors += parseInt(file.errors_seen)
+	  })
+  	await this.reportCopyResults(tableName,rowsParsed,rowsParsed - rowsLoaded,elapsedTime,sqlStatement,stack)
+	await this.commitTransaction()
+  }
+  
+  async fianlizeeCopy() {
+	const sqlStatement = this.statementLibrary.SQL_DROP_STAGE
+    const  results = await this.executeSQL(sqlStatement);
+  }
+    
 }
 
 module.exports = SnowflakeDBI

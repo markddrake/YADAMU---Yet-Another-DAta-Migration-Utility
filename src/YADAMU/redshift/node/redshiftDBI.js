@@ -55,12 +55,14 @@ class RedshiftDBI extends YadamuDBI {
   get DATABASE_KEY()             { return RedshiftConstants.DATABASE_KEY};
   get DATABASE_VENDOR()          { return RedshiftConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()          { return RedshiftConstants.SOFTWARE_VENDOR};
+  get SQL_COPY_SUPPORTED()       { return true }
   get STATEMENT_TERMINATOR()     { return RedshiftConstants.STATEMENT_TERMINATOR };
    
   // Enable configuration via command line parameters
   
-  get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT || RedshiftConstants.CIRCLE_FORMAT }
+  get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT      || RedshiftConstants.CIRCLE_FORMAT }
   get BYTEA_SIZING_MODEL()     { return this.parameters.BYTEA_SIZING_MODEL || RedshiftConstants.BYTEA_SIZING_MODEL }
+  get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM   || RedshiftConstants.STAGING_PLATFORM } 
   
   get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT || DBIConstants.SPATIAL_FORMAT };
   get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
@@ -75,7 +77,9 @@ class RedshiftDBI extends YadamuDBI {
 	})();
 	return this._BUCKET
   }
-  
+
+  get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM || VerticaConstants.STAGING_PLATFORM } 
+
   constructor(yadamu,settings,parameters) {
     super(yadamu,settings,parameters);
        
@@ -610,13 +614,29 @@ class RedshiftDBI extends YadamuDBI {
   classFactory(yadamu) {
 	return new RedshiftDBI(yadamu)
   }
-  
-  async getTableAndSession(schemaName,tableName) {
-	// const results = await this.executeSQL(this.StatementLibrary.SQL_GET_TABLE_OID,[schemaName,tableName])
-    const results = await this.executeSQL(this.StatementLibrary.SQL_GET_TABLE_OID)
-    return results.rows[0]
+
+  validStagedDataSet(vendor,controlFilePath,controlFile) {
+
+    /*
+	**
+	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
+	** Return false if the data set cannot be consumed using a Copy operation
+	** Do not throw errors if the data set cannot be used for a COPY operatio
+	** Generate Info messages to explain why COPY cannot be used.
+	**
+	*/
+
+    if (!RedshiftConstants.STAGED_DATA_SOURCES.includes(vendor)) {
+       return false;
+	}
+	
+	if (controlFile.settings.contentType != 'CSV') {
+	  this.yadamuLogger.info([this.DATABASE_VENDOR,'Copy','INVALID DATA SET'],`Copy option unavailable. Control File "${controlFilePath}" describes a "${controlFile.settings.contentType}" data set. Copy operations only supported for "CSV" data sets.`)
+	  return false;
+	}
+    return true
   }
-	 
+  
   async reportCopyErrors(tableName,stack,copyStatement) {
 	  
 	 const causes = []
@@ -652,29 +672,11 @@ class RedshiftDBI extends YadamuDBI {
 	 this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
   }
   
-  async reportCopyResults(tableName,rowsRead,failed,elapsedTime,sqlStatement,stack) {
-    
-    const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rowsRead/elapsedTime) * 1000)} rows/s.`
-   
-    let rowCountSummary
-    switch (failed) {
-	  case 0:
-	    rowCountSummary = `Rows ${rowsRead}.`
-        this.yadamuLogger.info([`${tableName}`,`COPY`],`${rowCountSummary} ${writerTimings}`)  
-        break
-      default:
-	    rowCountSummary = `Read ${rowsRead}. Written ${rowsRead - failed}.`
-        this.yadamuLogger.error([`${tableName}`,`COPY`],`${rowCountSummary} ${writerTimings}`)  
-        await this.reportCopyErrors(tableName,stack,sqlStatement)
-	}
-  }
-  
   async copyOperation(tableName,sqlStatement) {
 	let stack
-	let startTime 
 	try {
 	  stack = new Error().stack;
-	  startTime = performance.now();
+	  const startTime = performance.now();
  	  await this.commitTransaction()
 	  let results = await this.executeSQL(sqlStatement);
 	  const elapsedTime = performance.now() - startTime;
@@ -694,7 +696,7 @@ class RedshiftDBI extends YadamuDBI {
 		  cause.cause = e
 	    }
       }
-      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],cause)
+      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'Copy',tableName],cause)
 	} 
   }
 }

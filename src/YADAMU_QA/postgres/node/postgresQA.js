@@ -118,7 +118,6 @@ class PostgresQA extends PostgresDBI {
       )
 	  timer.unref()
 	}
-	
 }
 
 module.exports = PostgresQA

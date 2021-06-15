@@ -17,6 +17,8 @@ const JSONParser = require('../../../YADAMU/file/node/jsonParser.js');
 const {ConfigurationFileError} = require('../../../YADAMU/common/yadamuException.js');
 const YadamuDefaults = require('./yadamuDefaults.json')
 
+// const wtf = require('wtfnode');
+
 class YadamuQA {
 
   get VERIFY_OPERATION()                          { return this.test.hasOwnProperty('verifyOperation') ? this.test.verifyOperation : this.configuration.hasOwnProperty('verifyOperation') ? this.configuration.verifyOperation : false }
@@ -24,7 +26,8 @@ class YadamuQA {
   get TARGET_SCHEMA_SUFFIX()                      { return this.test.hasOwnProperty('targetSchemaSuffix') ? this.test.targetSchemaSuffix : this.configuration.hasOwnProperty('targetSchemaSuffix') ? this.configuration.targetSchemaSuffix : "1" }
   get COMPARE_SCHEMA_SUFFIX()                     { return this.test.hasOwnProperty('comapreSchemaSuffix') ? this.test.compareSchemaSuffix : this.configuration.hasOwnProperty('compareSchemaSuffix') ? this.configuration.compareSchemaSuffix : "1" }
   get KILL_CONNECTION()                           { return this.test.hasOwnProperty('kill') ? this.test.kill : this.configuration.hasOwnProperty('kill') ? this.configuration.kill : false }
-  get STAGING_SOURCE()                            { return this.test.hasOwnProperty('stagingSource') ? this.test.stagingSource : this.configuration.hasOwnProperty('stagingSource') ? this.configuration.stagingSource : undefined }
+  get STAGING_AREA()                              { return this.test.hasOwnProperty('stagingArea') ? this.test.stagingArea : this.configuration.hasOwnProperty('stagingArea') ? this.configuration.stagingArea : undefined }
+  get RELOAD_STAGING_AREA()                       { return this.test.hasOwnProperty('reloadStagingArea') ? this.test.reloadStagingArea : this.configuration.hasOwnProperty('reloadStagingArea') ? this.configuration.reloadStagingArea : false }
   get EMPTY_STRING_IS_NULL()                      { return this.test.hasOwnProperty('emptyStringIsNull') ? this.test.emptyStringIsNull : this.configuration.hasOwnProperty('emptyStringIsNull') ? this.configuration.emptyStringIsNull : undefined }
   
   get EXPORT_PATH()                               { return this.test.exportPath || this.configuration.exportPath || '' }
@@ -217,7 +220,7 @@ class YadamuQA {
         }
         break;
       case 'snowflake':
-        parameters.YADAMU_DATABASE = schemaInfo.database ? schemaInfo.database : database.toUpperCase()
+        parameters.YADAMU_DATABASE = schemaInfo.database || database.toUpperCase()
         parameters[key] = schemaInfo.schema ? schemaInfo.schema : schemaInfo.owner
         // ### Force Database name to uppercase otherwise queries against INFORMATION_SCHEMA fail
         // parameters.YADAMU_DATABASE = parameters.YADAMU_DATABASE.toUpperCase();
@@ -737,17 +740,73 @@ class YadamuQA {
   
   }
   
+  /*
+  **
+  ** Compare the Conttrol File with the System Information section from the SourceDBI to check that the data set is usable
+  **
+  */
+  
+  async validateStagedData(sourceDBI,stagingDBI) {
+	 try {
+  	   const source = sourceDBI.classFactory(this.yadamu)  
+	   source.parameters = Object.assign({},sourceDBI.parameters);
+	   source.vendorProperties = Object.assign({},sourceDBI.vendorProperties);
+	   source.vendorSettings = Object.assign({},sourceDBI.vendorSettings);
+	   await source.initialize()
+	   const sourceInstance = await source.getYadamuInstanceInfo() 
+  	   await source.finalize()
+     
+	   const staging = stagingDBI.classFactory(this.yadamu)  
+	   staging.parameters = Object.assign({},stagingDBI.parameters);
+	   staging.vendorProperties = Object.assign({},stagingDBI.vendorProperties);
+	   staging.vendorSettings = Object.assign({},stagingDBI.vendorSettings);
+	   staging.parameters.FROM_USER = staging.parameters.TO_USER
+	   delete staging.parameters.TO_USER
+	   await staging.initialize()
+	   await staging.loadControlFile()
+	   const targetInstance = await staging.getYadamuInstanceInfo();
+	   await source.finalize()
+	 
+	   if (staging.controlFile.settings.contentType === 'CSV') {
+	     if ((sourceInstance.yadamuInstanceID === targetInstance.yadamuInstanceID) && (sourceInstance.yadamuInstallationTimestamp === targetInstance.yadamuInstallationTimestamp)) {
+           this.yadamu.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY',stagingDBI.DATABASE_KEY],`Using existing Data Set "${staging.controlFilePath}" with ID "${targetInstance.yadamuInstanceID}".`);
+	       return true;
+	     } 
+	     else {
+	       this.yadamu.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY',stagingDBI.DATABASE_KEY],`Cannot use existing Data Set "${staging.controlFilePath}". Exepected ID "${sourceInstance.yadamuInstanceID}", found ID "${targetInstance.yadamuInstanceID}".`);
+	     }
+	   }
+	   else {
+         this.yadamu.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY',stagingDBI.DATABASE_KEY],`Cannot use existing Data Set "${staging.controlFilePath}". Exepected format "CSV", found format "${staging.controlFile.settings.contentType}".`);
+	   }
+	 } catch (e) {
+	 }
+     return false
+	 
+  }
+  
   async dbRoundtrip(task,configuration,test,targetConnectionName,parameters) {
   /*
   **
   ** QA Test 
   **
-  ** 1. Recreate targetSchema in sourceDB
-  ** 2. Clone sourceSchema in sourceDB to targetSchema in sourceDB using DDL_ONLY mode copy
-  ** 3. Recreate targetSchema in targetDB.
-  ** 4. Copy sourceSchema in sourceDB to targetSchema in targetDB using DATA_ONLY copy
-  ** 5. Copy targetSchema in targetDB to targetSchema in sourceDB using DATA_ONLY copy
-  ** 6. Compare sourceSchema in sourceDB with targetSchema in sourceDB
+  ** 1. Clone source schema in the source database.
+  **
+  ** Source and target database are the same: 
+  ** 2. Copy contents of the source schema to the cloned schema
+  ** 
+  ** Source and target schema are not the saame and no Staging Area is specified:
+  ** 3. Create the target schema in the target database
+  ** 4. Copy the contents of the source schema in the source database to the target schema in the target database
+  ** 5. Copy the contents of the target schema in the target database to the cloned schema in the source database 
+  **
+  ** Source and target schema are not the saame and a Staging Area is specified
+  ** 3. Copy the contents of the source schema in the source database to the staging area.
+  ** 4. Create a schema in the target database from the contents of the staging area.
+  ** 5. Copy the contents of the staging Area to the schema in the target database
+  ** 6. Copy the contents of the schema in the target database to the cloned schema in the source database 
+  **
+  ** 7. Compare the contentes of source schema in the source database with the contents of the cloned schema in the source database
   **
   */
               
@@ -756,7 +815,7 @@ class YadamuQA {
     let identifierMappings = {}
 	let outboundParameters
     
-    const sourceConnectionName = test.source
+    let sourceConnectionName = test.source
 
     const sourceConnection = this.getConnection(configuration.connections,sourceConnectionName)
     const targetConnection = this.getConnection(configuration.connections,targetConnectionName)
@@ -788,7 +847,7 @@ class YadamuQA {
     **
     ** Source Connection and Target Connection are identical: 
     **
-    ** Performa a single operation to copies the schema and optionally, data between the source schema and the compare schema in the source database. A DATA_ONLY mode operation is mapped to a DATA_AND_DDL operation.
+    ** Perform a single operation to copies the schema and optionally, data between the source schema and the compare schema in the source database. A DATA_ONLY mode operation is mapped to a DATA_AND_DDL operation.
     ** 
     ** Source Connection and Target Connection are different: 
     ** Fist use a DDL_ONLY mode copy operation to replicate the data structures from the source schema to the compare schemas. Then perform a DATA_ONLY mode copy operation to copy the data from source schema to the 
@@ -796,7 +855,7 @@ class YadamuQA {
     **
     */
     
-    const mode = ((sourceConnection === targetConnection) && !this.STAGING_SOURCE) ? (taskMode === 'DATA_ONLY' ? 'DDL_AND_DATA' : taskMode ) : 'DDL_ONLY'
+    const mode = (sourceConnection === targetConnection) ? (taskMode === 'DATA_ONLY' ? 'DDL_AND_DATA' : taskMode ) : 'DDL_ONLY'
 
     sourceParameters.MODE = mode;
     compareParameters.MODE = mode;
@@ -846,14 +905,16 @@ class YadamuQA {
     
     this.printResults(this.OPERATION_NAME,sourceDescription,compareDescription,stepElapsedTime) 
     
-    // Test the current value of MODE. 
-    // If MODE is set to DDL_ONLY the first copy operation cloned the structure of the source schema into the compare schema.
+	// Test the current value of MODE. 
+    // If MODE = DDL_ONLY the first copy operation cloned the structure of the source schema into the compare schema.
     // If MODE = DDL_AND_DATA the first copy completed the operation. 
-    
-    if ((sourceConnection !== targetConnection) || (this.STAGING_SOURCE)) {
+	// If MODE = DATA_ONLY we need to round trip the data.
+        
+    if (sourceConnection !== targetConnection) {
       
       // Run two more COPY operations. 
-      // The first copies the DATA from source to the target. 
+      
+	  // The first copies the DATA from source to the target. 
       
       operationsList.length = 0
       const targetParameters  = Object.assign({},parameters)
@@ -864,24 +925,55 @@ class YadamuQA {
       compareParameters.IDENTIFIER_MAPPING_FILE = parameters.IDENTIFIER_MAPPING_FILE
 
 	  // console.log(targetDBI.parameters)
+      sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
       let targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA) 
       
-	  if (this.STAGING_SOURCE) {
-	  	const stagingConnection = this.getConnection(configuration.connections,this.STAGING_SOURCE)
-	    const stagingFileSystem =  YadamuLibrary.getVendorName(stagingConnection);
-		this.setUser(sourceParameters,'FROM_USER',stagingFileSystem, sourceSchema)
-		sourceParameters.FROM_USER =  this.getPrefixedSchema(task.schemaPrefix,sourceParameters.FROM_USER)
-		sourceDBI = await this.getDatabaseInterface(stagingFileSystem,stagingConnection,sourceParameters,false)
-  	    this.propogateTableMatching(sourceDBI,targetDBI);
-        let stepStartTime = performance.now();
-        metrics.push(await this.yadamu.loadStagedData(sourceDBI,targetDBI));
-	  }
-	  else {
-        sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
-  	    this.propogateTableMatching(sourceDBI,targetDBI);
-        let stepStartTime = performance.now();
-        metrics.push(await this.yadamu.pumpData(sourceDBI,targetDBI));
-	  }
+	  /*
+	  **
+	  ** If a staging area is specified for the test and reuseStagedData
+	  ** 
+	  **
+	  */
+	  
+	  
+	  if (this.STAGING_AREA) {
+		const stagingConnectionName = this.STAGING_AREA
+	    const stagingConnection =  this.getConnection(configuration.connections,stagingConnectionName)
+		const stagingPlatform =  YadamuLibrary.getVendorName(stagingConnection);
+		const stagingSchema = this.getTargetMapping(stagingPlatform,task,'1')
+		const stagingParameters = Object.assign({},targetParameters)
+		stagingParameters.OUTPUT_FORMAT = 'CSV'
+		this.setUser(stagingParameters,'TO_USER',stagingPlatform,stagingSchema)
+	  	const stagingDBI = await this.getDatabaseInterface(stagingPlatform,stagingConnection,stagingParameters,this.RELOAD_STAGING_AREA)
+
+        const dataStagingRequired = this.RELOAD_STAGING_AREA || !await this.validateStagedData(sourceDBI,stagingDBI)
+		if (dataStagingRequired) {
+		  this.setUser(sourceParameters,'FROM_USER',targetDBI, sourceSchema)
+		  sourceParameters.FROM_USER =  this.getPrefixedSchema(task.schemaPrefix,sourceParameters.FROM_USER)
+		  targetDBI.verifyStagingSource(stagingDBI.DATABASE_KEY)
+          const stepStartTime = performance.now();
+          metrics.push(await this.yadamu.pumpData(sourceDBI,stagingDBI));
+	      stepElapsedTime = performance.now() - stepStartTime
+          this.metrics.recordTaskTimings([task.taskName,'STAGE',targetDBI.MODE,sourceConnectionName,stagingConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
+          if (metrics[metrics.length-1] instanceof Error) {
+            const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
+            const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, 
+		    compareSchema, sourceConnection, parameters, compareRules, this.yadamu.metrics, false, undefined)
+            this.printCompareResults(sourceConnectionName,targetConnectionName,task.taskName,compareResults)
+            this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
+            this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
+            return;
+	      }
+		}
+	    stagingParameters.FROM_USER = stagingParameters.TO_USER
+		delete stagingParameters.TO_USER
+		sourceDBI = await this.getDatabaseInterface(stagingPlatform,stagingConnection,stagingParameters,false)
+		sourceConnectionName = stagingConnectionName
+      }
+      
+	  this.propogateTableMatching(sourceDBI,targetDBI);
+      stepStartTime = performance.now();
+      metrics.push(await this.yadamu.pumpData(sourceDBI,targetDBI));
 	  stepElapsedTime = performance.now() - stepStartTime
       const targetDescription = this.getDescription(targetConnectionName,targetDBI)  
       this.metrics.recordTaskTimings([task.taskName,'COPY',targetDBI.MODE,sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
@@ -917,18 +1009,18 @@ class YadamuQA {
 	 
 	  if ((sourceDBI instanceof LoaderDBI) && (compareDBI instanceof LoaderDBI)) {
 	    // Configure the the OUTPUT_FORMAT, COMPRESSION AND ENCRYPTION settings to the target Parameters
-		compareDBI.setYadamuOptions(sourceDBI.getYadamuOptions())
+		compareDBI.setControlFileSettings(sourceDBI.getControlFileSettings())
 	  }
 	 	 
       stepStartTime = performance.now();
       metrics.push(await this.yadamu.pumpData(targetDBI,compareDBI));
       stepElapsedTime = performance.now() - stepStartTime
-      this.metrics.recordTaskTimings([task.taskName,'COPY',compareDBI.MODE,targetConnectionName,sourceConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
+      this.metrics.recordTaskTimings([task.taskName,'COPY',compareDBI.MODE,targetConnectionName,test.source,YadamuLibrary.stringifyDuration(stepElapsedTime)])
       if (metrics[metrics.length-1] instanceof Error) {
         const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
         const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules,  this.yadamu.metrics, false, {})
-        this.printCompareResults(sourceConnectionName,targetConnectionName,task.taskName,compareResults)
-        this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
+        this.printCompareResults(test.source,targetConnectionName,task.taskName,compareResults)
+        this.metrics.recordTaskTimings([task.taskName,'COMPARE','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
         this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
         return;
       }
@@ -937,7 +1029,7 @@ class YadamuQA {
       this.printResults(this.OPERATION_NAME,targetDescription,compareDescription,stepElapsedTime)
      
       const taskElapsedTime =  performance.now() - taskStartTime
-      this.metrics.recordTaskTimings([task.taskName,'TASK','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(taskElapsedTime)])
+      this.metrics.recordTaskTimings([task.taskName,'TASK','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(taskElapsedTime)])
 
     }    
     
@@ -945,11 +1037,11 @@ class YadamuQA {
     if (this.yadamu.MODE !== 'DDL_ONLY') {
       const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
       const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules, metrics[metrics.length-1], false, identifierMappings)
-      this.printCompareResults(sourceConnectionName,targetConnectionName,task.taskName,compareResults)
+      this.printCompareResults(test.source,targetConnectionName,task.taskName,compareResults)
       this.metrics.recordFailed(compareResults.failed.length)
-      this.metrics.recordTaskTimings([task.taskName,'COMPARE','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
+      this.metrics.recordTaskTimings([task.taskName,'COMPARE','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
       const elapsedTime =  performance.now() - taskStartTime
-      this.metrics.recordTaskTimings([task.taskName,'TOTAL','',sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])
+      this.metrics.recordTaskTimings([task.taskName,'TOTAL','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])
       this.dbRoundtripResults(operationsList,elapsedTime)
     }
     const elapsedTime =  performance.now() - taskStartTime
@@ -1481,10 +1573,6 @@ class YadamuQA {
     }
   }
   
-  formatArray(v) {
-    
-  }
-  
   calculateColumnSizes(tabularResults) {
     const colSizes = new Array(tabularResults[0].length).fill(0)
     tabularResults.forEach((row) => {
@@ -1792,6 +1880,7 @@ class YadamuQA {
     this.printFailedSummary()
     this.printSourceSummary(summary)
     this.printTargetSummary(summary)
+	// wtf.dump();
     return this.metrics.formatMetrics(this.metrics.suite)
   } 
 

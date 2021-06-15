@@ -11,6 +11,9 @@ class SnowflakeStatementLibrary {
   static get SQL_COMMIT_TRANSACTION()                         { return _SQL_COMMIT_TRANSACTION }
   static get SQL_ROLLBACK_TRANSACTION()                       { return _SQL_ROLLBACK_TRANSACTION }
 
+  set STAGE_CREDENTIALS(v) { this._CREDENTIALS = v }
+  get STAGE_CREDENTIALS()  { return this._CREDENTIALS }
+
   get SQL_SCHEMA_INFORMATION() {
      this._SQL_SCHEMA_INFORMATION = this._SQL_SCHEMA_INFORMATION || (() => { 
        return `select t.table_schema   "TABLE_SCHEMA"
@@ -37,6 +40,8 @@ class SnowflakeStatementLibrary {
                                  concat('TO_VARCHAR("',column_name,'") "',column_name,'"')
                                when c.data_type = 'TIME' then
                                  concat('cast(concat(''1971-01-01T'',to_varchar("',column_name,'",''HH24:MI:SS.FF9'')) as Timestamp)')
+                               when c.data_type in ('GEOMETRY','GEOGRAPHY') then
+							     concat('${this.dbi.SPATIAL_SERIALIZER}("',column_name,'")')
 							   when c.data_type in ('FLOAT','FLOAT4','FLOAT8','DOUBLE','DOUBLE PRECISION','REAL') then
 							     concat('TO_VARCHAR("',column_name,'",''TME'') "',column_name,'"')
                                else
@@ -53,6 +58,20 @@ class SnowflakeStatementLibrary {
                 group by t.table_schema, t.table_name`;
     })();
     return this._SQL_SCHEMA_INFORMATION
+  }     
+
+  get SQL_CREATE_STAGE() {
+	this._SQL_CREATE_STAGE = this._SQL_CREATE_STAGE || (() => { 
+	  return `create or replace stage  "${this.dbi.parameters.YADAMU_DATABASE}"."${this.dbi.parameters.TO_USER}"."YADAMU_STAGE" url = 's3://${this.dbi.REMOTE_STAGING_AREA}/' credentials = (${this.STAGE_CREDENTIALS}) file_format = (TYPE=CSV TRIM_SPACE=FALSE FIELD_OPTIONALLY_ENCLOSED_BY = '"')`;
+    })();
+    return this._SQL_CREATE_STAGE
+  }     
+
+  get SQL_DROP_STAGE() {
+	this._SQL_DROP_STAGE = this._SQL_DROP_STAGE || (() => { 
+	  return `drop stage  "${this.dbi.parameters.YADAMU_DATABASE}"."${this.dbi.parameters.TO_USER}"."YADAMU_STAGE" `;
+    })();
+    return this._SQL_DROP_STAGE
   }     
 
   constructor(dbi) {

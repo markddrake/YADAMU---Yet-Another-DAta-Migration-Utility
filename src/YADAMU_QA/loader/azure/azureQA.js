@@ -223,14 +223,15 @@ class AzureQA extends AzureDBI {
     })	
   }       
   
-    getYadamuOptions() {
-    return this.controlFile.yadamuOptions
+  getControlFileSettings() {
+    return this.controlFile.settings
   }
   
-  setYadamuOptions(options) {
+  setControlFileSettings(options) {
 	this.parameters.OUTPUT_FORMAT = options.contentType
 	this.yadamu.parameters.COMPRESSION = options.compression
 	this.yadamu.parameters.ENCRYPTION = options.encryption
   }
+  
 }
 module.exports = AzureQA

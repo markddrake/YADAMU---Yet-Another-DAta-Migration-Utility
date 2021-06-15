@@ -14,7 +14,6 @@ class VerticaConstants {
 	, "COPY_TRIM_WHITEPSPACE"     : false
 	, "MERGEOUT_INSERT_COUNT"     : 128
 	, "BYTE_TO_CHAR_RATIO"        : 4
-	, "STAGING_PLATFORM"          : "loader"
     })
     return this._STATIC_PARAMETERS;
   }
@@ -29,10 +28,9 @@ class VerticaConstants {
   static get COPY_TRIM_WHITEPSPACE()  { return this.DBI_PARAMETERS.COPY_TRIM_WHITEPSPACE === true };
   static get BYTE_TO_CHAR_RATIO()     { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
   static get MERGEOUT_INSERT_COUNT()  { return this.DBI_PARAMETERS.MERGEOUT_INSERT_COUNT };
-  static get STAGING_PLATFORM()       { return this.DBI_PARAMETERS.STAGING_PLATFORM };
   static get STATEMENT_TERMINATOR()   { return ';' }
 
-  static get COPY_OPERATION_SOURCES()    { return Object.freeze(['loader']) }
+  static get STAGED_DATA_SOURCES()    { return Object.freeze(['loader']) }
 
 }
 

@@ -20,6 +20,8 @@ class StatementGenerator {
   static get LARGEST_CHAR_TYPE()       { return StatementGenerator.LARGEST_VARCHAR_TYPE }
   static get LARGEST_BINARY_TYPE()     { return StatementGenerator.LARGEST_VARCHAR_TYPE }
   static get LARGEST_VARBINARY_TYPE()  { return StatementGenerator.LARGEST_VARCHAR_TYPE }
+
+  static get LARGEST_NUMERIC_TYPE()    { return 'decimal(38)' }
   
   /*
   static get CLOB_TYPE()               { return 'super' }
@@ -45,7 +47,7 @@ class StatementGenerator {
   static get HIERARCHY_TYPE()          { return 'varchar(4000)';    }
   static get MSSQL_MONEY_TYPE()        { return 'decimal(19,4)';    }
   static get MSSQL_SMALL_MONEY_TYPE()  { return 'decimal(10,4)';    }
-  static get MSSQL_ROWVERSION_TYPE()   { return 'binary(8)';        }
+  static get MSSQL_ROWVERSION_TYPE()   { return `varchar(${8*2})`;        }
   static get PGSQL_MONEY_TYPE()        { return 'decimal(21,2)';    }
   static get PGSQL_NAME_TYPE()         { return 'varchar(64)';      }
   static get PGSQL_SINGLE_CHAR_TYPE()  { return 'char(1)';          }
@@ -56,13 +58,13 @@ class StatementGenerator {
   static get MAC_ADDR_TYPE()           { return 'varchar(23)';      }
   static get PGSQL_IDENTIFIER()        { return 'bigint';        }
   static get MYSQL_YEAR_TYPE()         { return 'smallint';         }
-  static get MONGO_OBJECT_ID()         { return 'binary(12)';       }
+  static get MONGO_OBJECT_ID()         { return `varchar(${12*2})`}
   static get MONGO_UNKNOWN_TYPE()      { return 'varchar(2048)';    }
   static get MONGO_REGEX_TYPE()        { return 'varchar(2048)';    }
   static get C_UNTYPED_INTERVAL_TYPE() { return 'varchar(16)';    }
 
   static get UNBOUNDED_TYPES() { 
-  StatementGenerator._UNBOUNDED_TYPES = StatementGenerator._UNBOUNDED_TYPES || Object.freeze(['smallint','int','bigint','float','timestamp without time zone','super'])
+  StatementGenerator._UNBOUNDED_TYPES = StatementGenerator._UNBOUNDED_TYPES || Object.freeze(['smallint','int','bigint','float','timestamp','timestamp with time zone','timestamp without time zone','super'])
     return StatementGenerator._UNBOUNDED_TYPES;
   }
 
@@ -93,10 +95,10 @@ class StatementGenerator {
            case 'BLOB':                                                                  return StatementGenerator.BLOB_TYPE;
            case 'NCLOB':                                                                 return StatementGenerator.CLOB_TYPE;
            case 'XMLTYPE':                                                               return StatementGenerator.XML_TYPE;
-           case 'TIMESTAMP':                                                             return dataTypeLength > 6 ? 'timestamp without time zone' : 'timestamp without time zone';
+           case 'TIMESTAMP':                                                             return 'timestamp without time zone';
            case 'BFILE':                                                                 return StatementGenerator.BFILE_TYPE;
            case 'ROWID':                                                                 return StatementGenerator.ROWID_TYPE;
-           case 'RAW':                                                                   return `varchar(${2*dataTypeLength})`;
+           case 'RAW':                                                                   return `varchar(${2 * dataTypeLength})`;
            case 'ANYDATA':                                                               return StatementGenerator.CLOB_TYPE;
            case 'JSON':                                                                  return StatementGenerator.JSON_TYPE;
            case '"MDSYS"."SDO_GEOMETRY"':                                                return 'geometry';
@@ -144,13 +146,13 @@ class StatementGenerator {
              switch (true) {
                case (dataTypeLength === -1):                                             return StatementGenerator.BLOB_TYPE;
                case (dataTypeLength > StatementGenerator.LARGEST_BINARY_SIZE_SIZE):      return StatementGenerator.BLOB_TYPE;
-               default:                                                                  return 'binary';
+               default:                                                                  return `varchar(${2 * dataTypeLength})`;
              }
            case 'varbinary':
              switch (true) {
                case (dataTypeLength === -1):                                             return StatementGenerator.BLOB_TYPE;
                case (dataTypeLength > StatementGenerator.LARGEST_VARBINARY_SIZE_SIZE):   return StatementGenerator.BLOB_TYPE;
-               default:                                                                  return 'varbinary';
+               default:                                                                  return `varchar(${2 * dataTypeLength})`;
              }
            case 'image':                                                                 return StatementGenerator.BLOB_TYPE;
            case 'boolean':                                                               return 'boolean'
@@ -168,7 +170,7 @@ class StatementGenerator {
            case 'geography':                                                             return 'geometry';
            case 'geometry':                                                              return 'geometry';
            case 'hierarchyid':                                                           return StatementGenerator.HIERARCHY_TYPE
-           case 'rowversion':                                                            return 'binary(8)';
+           case 'rowversion':                                                            return `varchar(${2*8})`;
            case 'uniqueidentifier':                                                      return StatementGenerator.UUID_TYPE
            case 'json':                                                                  return StatementGenerator.JSON_TYPE;
            case 'xml':                                                                   return StatementGenerator.XML_TYPE;
@@ -202,7 +204,7 @@ class StatementGenerator {
              switch (true) {
                case (dataTypeLength === undefined):                                       return StatementGenerator.BLOB_TYPE;
                case (dataTypeLength > StatementGenerator.LARGEST_VARBINARY_SIZE_SIZE):    return StatementGenerator.BLOB_TYPE;
-               default:                                                                   return 'varbinary';
+               default:                                                                   return `varchar(${dataTypeLength > 32767 ? 65535 : 2 * dataTypeLength})`;
              }
 		   case 'decimal':
            case 'numeric':                                                               return dataTypeLength === undefined ? StatementGenerator.PGSQL_NUMERIC_TYPE : 'decimal';
@@ -212,9 +214,9 @@ class StatementGenerator {
            case 'double precision':                                                      return 'float';
            case 'boolean':                                                               return 'boolean'
            case 'timestamp':                                                             return 'timestamp'
-           case 'timestamp with time zone':                                              return 'timestamp with timezone'                                 
+           case 'timestamp with time zone':                                              return 'timestamp with time zone'                                 
            case 'timestamp without time zone':                                           return 'timestamp'
-           case 'time with time zone':                                                   return 'time with timezone'
+           case 'time with time zone':                                                   return 'time with time zone'
            case 'time without time zone':                                                return 'time';
 		   case 'json':
            case 'jsonb':                                                                 return StatementGenerator.JSON_TYPE;
@@ -228,7 +230,7 @@ class StatementGenerator {
            case 'polygon':                                                               return 'polygon';     
            case 'circle':                                                                return this.dbi.INBOUND_CIRCLE_FORMAT === 'CIRCLE' ? StatementGenerator.JSON_TYPE : 'geometry';
            case 'line':                                                                  return StatementGenerator.JSON_TYPE;     
-           case 'uuid':                                                                  return 'uuid'
+           case 'uuid':                                                                  return StatementGenerator.UUID_TYPE
 		   case 'bit':
 		   case 'bit varying':    
  		     switch (true) {
@@ -284,11 +286,20 @@ class StatementGenerator {
          switch (dataType.toLowerCase()) {
            case 'boolean':                                                             return 'boolean'
            case 'double':                                                              return 'float';
+           case 'decimal':                                           
+             switch (true) {
+               case (dataTypeLength > 38 && dataTypeScale === 0):                      return StatementGenerator.LARGEST_NUMERIC_TYPE
+               case (dataTypeLength > 38 && dataTypeScale !==0 ):                      return `${StatementGenerator.LARGEST_NUMERIC_TYPE.substr(0,StatementGenerator.LARGEST_NUMERIC_TYPE.length-1)},${Math.round(dataTypeScale*(38/dataTypeLength))})`;
+               default:                                                                return 'decimal'                                                      
+             }
            case 'tinyint':                                                             return 'smallint';
            case 'mediumint':                                                           return 'int'
            case 'longtext':                 
            case 'mediumtext':               
            case 'text':                                                                return StatementGenerator.CLOB_TYPE;
+           case 'binary':
+		   case 'varbinary':                                                           return `varchar(${dataTypeLength > 32767 ? 65535 : 2 * dataTypeLength})`;
+           case 'datetime':                                                            return 'timestamp without time zone';
            case 'year':                                                                return StatementGenerator.MYSQL_YEAR_TYPE;
            case 'longblob':                 
            case 'mediumblob':                 
@@ -348,7 +359,7 @@ class StatementGenerator {
 		   case "float":		                                                       return 'float';
 		   case "geography":   	                                                       return 'geometry';
 		   case "text":                                                                return dataTypeLength > StatementGenerator.LARGEST_VARCHAR_SIZE ? StatementGenerator.CLOB_TYPE: 'varchar'; 
-		   case "binary":                                                              return dataTypeLength > StatementGenerator.LARGEST_VARBINARY_SIZE ? StatementGenerator.BLOB_TYPE : 'varbinary'; 
+		   case "binary":                                                              return dataTypeLength > StatementGenerator.LARGEST_VARBINARY_SIZE ? StatementGenerator.BLOB_TYPE : `varchar(dataTypeLength > 32767 ? 65535 : 2 * dataTypeLength)`;
            case 'json':                                                                return StatementGenerator.JSON_TYPE;
 		   case "xml":       	                                                       return StatementGenerator.XML_TYPE
 		   case "variant":                                                             return StatementGenerator.BLOB_TYPE;

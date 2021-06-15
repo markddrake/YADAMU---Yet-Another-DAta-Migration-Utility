@@ -43,7 +43,8 @@ class StatementGenerator {
         tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
         tableInfo.insertMode      = 'Batch';
         
-        tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('select ')-1) + '\nvalues ';        
+        tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('select ')-1) + '\nvalues ';    
+
         tableInfo.insertOperators = dataTypes.map((dataType,idx) => {
 		  switch (dataType.type) {
             case "geography":

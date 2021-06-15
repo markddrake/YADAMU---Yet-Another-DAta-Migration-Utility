@@ -84,13 +84,22 @@ class AWSS3DBI extends CloudDBI {
 	url.port                          = this.parameters.PORT      || url.port
 	url                               = url.toString()
 	
-    vendorProperties.accessKey        = this.parameters.USERNAME  || vendorProperties.accessKey 
+    vendorProperties.accessKeyId       = this.parameters.USERNAME  || vendorProperties.accessKeyId 
     vendorProperties.secretAccessKey  = this.parameters.PASSWORD  || vendorProperties.secretAccessKey	
 	vendorProperties.region           = this.parameters.REGION    || vendorProperties.region
 	vendorProperties.endpoint         = url
     vendorProperties.s3ForcePathStyle = true
     vendorProperties.signatureVersion = "v4"
     
+  }
+
+  getCredentials(vendorKey) {
+	 
+	switch (vendorKey) {
+	  case 'snowflake':
+	    return `AWS_KEY_ID = '${this.vendorProperties.accessKeyId}'  AWS_SECRET_KEY = '${this.vendorProperties.secretAccessKey}'`;
+	}
+	return ''
   }
   
   async createConnectionPool() {
@@ -113,7 +122,16 @@ class AWSS3DBI extends CloudDBI {
   classFactory(yadamu) {
 	return new AWSS3DBI(yadamu)
   }
-    
+   
+  getCredentials(vendorKey) {
+	 
+	switch (vendorKey) {
+	  case 'snowflake':
+	     return `AWS_KEY_ID = '${this.vendorProperties.accessKeyId}'  AWS_SECRET_KEY = '${this.vendorProperties.secretAccessKey}'`;
+	}
+	return ''
+  }
+	  
 }
 
 module.exports = AWSS3DBI

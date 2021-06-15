@@ -224,7 +224,10 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
       )
       timer.unref()
     }
-    
+	
+    verifyStagingSource(source) {  
+      super.verifyStagingSource(RedshiftConstants.STAGED_DATA_SOURCES,source)
+    }    
 }
 
 module.exports = RedshiftQA

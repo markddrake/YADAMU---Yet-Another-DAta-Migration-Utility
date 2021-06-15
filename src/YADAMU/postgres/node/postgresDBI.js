@@ -669,7 +669,7 @@ class PostgresDBI extends YadamuDBI {
 	const pid = results.rows[0][0];
     return pid
   }
-	  
+
 }
 
 module.exports = PostgresDBI

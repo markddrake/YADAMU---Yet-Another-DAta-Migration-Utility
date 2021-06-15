@@ -49,7 +49,7 @@ class CloudDBI extends LoaderDBI {
 	      baseDirectory = this.DIRECTORY
         }
         else {
-          baseDirectory = path.join(this.vendorSettings.directory,this.DIRECTORY)
+          baseDirectory = path.join(baseDirectory,this.DIRECTORY)
 		}
 	  }
 	  this._BASE_DIRECTORY  = YadamuLibrary.macroSubstitions(baseDirectory,this.yadamu.MACROS)
@@ -70,22 +70,14 @@ class CloudDBI extends LoaderDBI {
     throw new YadamuError(`Encyption option not currently supported for "${this.DATABASE_VENDOR}"`);
   }	
    
-
-
   resolve(target) {
     return target.split(path.sep).join(path.posix.sep)
   }
   
   setConnectionProperties(connectionSettings) {
 	this.vendorSettings = connectionSettings.settings
-	delete connectionSettings.settings;
+	// delete connectionSettings.settings;
 	super.setConnectionProperties(connectionSettings)
-  }
-  
-  async createConnectionPool() {
-	// this.yadamuLogger.trace([this.constructor.name],`new AWS.S3()`)
-	this.s3 = await new AWS.S3(this.vendorProperties)
-	this.cloudService = new S3IO(this.s3,{},this.yadamuLogger)
   }
   
   async loadMetadataFiles() {
@@ -170,7 +162,7 @@ class CloudDBI extends LoaderDBI {
   **
   */
 
-  async initializeExport() {
+  async loadControlFile() {
 
 	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
 
@@ -178,8 +170,7 @@ class CloudDBI extends LoaderDBI {
     this.setFolderPaths(this.EXPORT_FOLDER,this.parameters.FROM_USER)
 	this.DESCRIPTION = this.EXPORT_FOLDER
 
-	this.yadamuLogger.info(['EXPORT',this.DATABASE_VENDOR],`Using control file "${this.getURI(this.controlFilePath)}"`);
-    const fileContents = await this.cloudService.getObject(this.controlFilePath)
+	const fileContents = await this.cloudService.getObject(this.controlFilePath)
 	this.controlFile = this.parseContents(fileContents)
   }
 

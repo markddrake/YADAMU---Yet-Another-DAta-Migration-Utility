@@ -58,6 +58,7 @@ class VerticaDBI extends YadamuDBI {
   get DATABASE_KEY()           { return VerticaConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return VerticaConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return VerticaConstants.SOFTWARE_VENDOR};
+  get SQL_COPY_SUPPORTED()     { return true }
   get STATEMENT_TERMINATOR()   { return VerticaConstants.STATEMENT_TERMINATOR };
    
   // Enable configuration via command line parameters
@@ -68,7 +69,6 @@ class VerticaDBI extends YadamuDBI {
   get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
   get COPY_TRIM_WHITEPSPACE()  { return this.parameters.COPY_TRIM_WHITEPSPACE || VerticaConstants.COPY_TRIM_WHITEPSPACE }
   get MERGEOUT_INSERT_COUNT()  { return this.parameters.MERGEOUT_INSERT_COUNT || VerticaConstants.MERGEOUT_INSERT_COUNT }
-  get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM || VerticaConstants.STAGING_PLATFORM } 
   
   constructor(yadamu,settings,parameters) {
     super(yadamu,settings,parameters);
@@ -124,9 +124,8 @@ class VerticaDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
-
-	
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
+	  
 	let stack
     this.status.sqlTrace.write(this.traceComment(`Getting Connection From Pool.`));
 
@@ -657,6 +656,28 @@ class VerticaDBI extends YadamuDBI {
 	const pid = results.rows[0][0];
     return pid
   }
+    
+  validStagedDataSet(vendor,controlFilePath,controlFile) {
+
+    /*
+	**
+	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
+	** Return false if the data set cannot be consumed using a Copy operation
+	** Do not throw errors if the data set cannot be used for a COPY operatio
+	** Generate Info messages to explain why COPY cannot be used.
+	**
+	*/
+
+    if (!VerticaConstants.STAGED_DATA_SOURCES.includes(vendor)) {
+       return false;
+	}
+	
+	if (controlFile.settings.contentType != 'CSV') {
+	  this.yadamuLogger.info([this.DATABASE_VENDOR,'COPY','INVALID DATA SET'],`Copy option unavailable. Control File "${controlFilePath}" describes a "${controlFile.settings.contentType}" data set. Copy operations only supported for "CSV" data sets.`)
+	  return false;
+	}
+    return true
+  }
   
   async reportCopyErrors(tableName,results,stack,statement) {
 	  
@@ -690,13 +711,6 @@ class VerticaDBI extends YadamuDBI {
 	 this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
   }
 
-  copyOperationSupported(vendor,controlFile) {
- 
-    if (!VerticaConstants.COPY_OPERATION_SOURCES.includes(vendor)) {
-      throw new YadamuError(`COPY operations not supported between "${vendor}" and "${this.DATABASE_VENDOR}".`)
-	}
-  }
-  
   async copyOperation(tableName,statement) {
 	let startTime 
     try {
@@ -714,16 +728,16 @@ class VerticaDBI extends YadamuDBI {
       const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round(writerThroughput)} rows/s.`
   	  const rowSummary = results.rejected === 0 ? `Rows ${results.inserted}.` : `Rows ${results.inserted}. Skipped ${results.rejected}.`
       if (results.rejected > 0) {
-		this.yadamuLogger.error([tableName,'copy'],`${rowSummary} ${writerTimings}`)  
+		this.yadamuLogger.error([tableName,'Copy'],`${rowSummary} ${writerTimings}`)  
 	  }
 	  else {
-		this.yadamuLogger.info([tableName,'copy'],`${rowSummary} ${writerTimings}`)  
+		this.yadamuLogger.info([tableName,'Copy'],`${rowSummary} ${writerTimings}`)  
 	  }	  
 	} catch (cause) { 
 	  const elapsedTime = performance.now() - startTime;
   	  await this.rollbackTransaction(cause);
-	  // await this.reportCopyErrors(batch.copy,`COPY`,cause)
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],cause)
+	  // await this.reportCopyErrors(batch.copy,'Copy',cause)
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'Copy',tableName],cause)
     } 
   }
 }

@@ -1,0 +1,45 @@
+{
+	"operation": "dbRoundTrip",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
+	"stagingArea": "awsS3-staging",
+	"recreateSchema": true,
+	"reloadStagingArea" : false,
+	"emptyStringIsNull" : true,
+	"parameters": {
+        "REMOTE_STAGING_AREA"     : "yadamu/aws/loader/%sourceConnection%/sflake/csv",
+		"DIRECTORY"               : "loader/%sourceConnection%/sflake/csv",
+		"SPATIAL_FORMAT"          : "WKT"
+	},
+	"tests": [{
+			"source": "oracle19c",
+			"target": "snow#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mssql19",
+			"target": "snow#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "postgres#1",
+			"target": "snow#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mysql#1",
+			"target": "snow#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		},{
+			"source": "mongodb#1",
+			"target": "snow#1",
+			"tasks": [
+				"oracle","mssql","mysql"
+			]
+		}]
+}

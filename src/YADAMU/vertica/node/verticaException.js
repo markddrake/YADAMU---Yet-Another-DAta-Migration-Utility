@@ -1,4 +1,4 @@
-"use strict"
+"use  strict"
 
 const {DatabaseError} = require('../../common/yadamuException.js')
 
@@ -27,9 +27,22 @@ class VerticaError extends DatabaseError {
   missingTable() {
 	return ((this.cause.severity && (this.cause.severity === 'ERROR')) && (this.cause.code && (this.cause.code === '42P01')))
   }
+
+  missingFile() {
+	return ((this.cause.severity && (this.cause.severity === 'ERROR')) && (this.cause.code && (this.cause.code === '58V01')))
+  }
  
 }
 
+class StagingAreaMisMatch extends VerticaError {
+  constructor(local,remote,cause) {
+	super( new Error(`Vertica Copy Operation Failed. File Not Found. Please ensure folder "${local}" is mapped to folder "${remote}" on the server hosting your Vertica databases.`))
+    this.cause = cause
+    this.local_staging_area = local
+    this.remote_staging_area = remote
+  }
+}
+  
 class VertiaCopyOperationFailure extends VerticaError {
 
   constructor(accepted, rejected, stack, sql) {
@@ -68,4 +81,5 @@ module.exports = {
 , WhitespaceIssue
 , EmptyStringDetected
 , ContentTooLarge
+, StagingAreaMisMatch
 }
