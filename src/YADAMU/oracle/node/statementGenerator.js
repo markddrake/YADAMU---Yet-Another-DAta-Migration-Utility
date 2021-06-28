@@ -1,5 +1,7 @@
 "use strict";
 
+const path = require('path');
+const crypto = require('crypto');
 const { performance } = require('perf_hooks');
 
 const oracledb = require('oracledb');
@@ -45,7 +47,12 @@ class StatementGenerator {
   get SPATIAL_FORMAT()   { return this.dbi.INBOUND_SPATIAL_FORMAT } 
   get OBJECTS_AS_JSON()  { return this.dbi.systemInformation.objectFormat === 'JSON'}
   get GEOJSON_FUNCTION() { return 'DESERIALIZE_GEOJSON' }
-  
+
+  get SQL_DIRECTORY_NAME()     { return this._SQL_DIRECTORY_NAME }
+  set SQL_DIRECTORY_NAME(v)    { this._SQL_DIRECTORY_NAME = v }
+  get LOADER_CLOB_SIZE()       { return 67108864 }
+  get LOADER_CLOB_TYPE()       { return `CHAR(${this.LOADER_CLOB_SIZE})`}
+    
   constructor(dbi, targetSchema, metadata, yadamuLogger) {
     this.dbi = dbi;
     this.targetSchema = targetSchema
@@ -163,7 +170,8 @@ class StatementGenerator {
  
   getPLSQL(dml) {
     
-    return dml.substring(dml.indexOf('\nWITH\n')+5,dml.indexOf('\nselect'));
+	const withOffset = dml.indexOf('\nWITH\n')
+    return withOffset > -1 ? dml.substring(withOffset+5,dml.indexOf('\nselect')) : null
   }
  
   generatePLSQL(targetSchema,tableName,dml,columns,declarations,assignments,variables) {
@@ -264,7 +272,8 @@ class StatementGenerator {
      ** Turn the generated DDL Statements into an array and execute them as single batch via YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS()
      **
      */
-	 
+	this.SQL_DIRECTORY_NAME = `"YDIR-${crypto.randomBytes(16).toString("hex").toUpperCase()}"`
+ 
     const sourceDateFormatMask = this.dbi.getDateFormatMask(vendor);
     const sourceTimeStampFormatMask = this.dbi.getTimeStampFormatMask(vendor);
     const oracleDateFormatMask = this.dbi.getDateFormatMask('Oracle');
@@ -290,7 +299,6 @@ class StatementGenerator {
 	const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :schema, :typeMappings);end;`;
 
     // console.log(JSON.stringify(this.metadata," ",2));
-
     const metadataLob = await this.getMetadataLob()
 	const startTime = performance.now()
     const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:this.targetSchema, typeMappings:typeMappings});
@@ -306,12 +314,15 @@ class StatementGenerator {
       const tableName = tableMetadata.tableName;
       const tableInfo = statementCache[tableName];
       tableInfo.columnNames = tableMetadata.columnNames
+	  tableInfo.sizeConstraints = tableMetadata.sizeConstraints
       const dataTypes = YadamuLibrary.decomposeDataTypes(tableInfo.targetDataTypes)
       
       tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
       tableInfo._COMMIT_COUNT   = this.dbi.COMMIT_COUNT
       tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
       tableInfo.insertMode      = 'Batch';      
+	  tableInfo.dataFile        = tableMetadata.dataFile
+		
         
 	  if (tableMetadata.WITH_CLAUSE) {
 		generateWrapperName(tableMetadata);
@@ -355,67 +366,201 @@ class StatementGenerator {
 		   tableInfo.numericBindPositions.push(idx)
 		 }
 	  })
+	  
 	
       let plsqlRequired = false;        
       
+	  // const nullSettings =  ' NULLIF ${copyColumnDefinition}=BLANKS'
+	  const nullSettings = ''
+	  
       const assignments = [];
       const operators = [];
       const variables = []
       const values = []
-	  
+	  const externalSelectList = []
+	  const copyColumnDefinitions = []
+      const externalColumnDefinitions = []
 	  const declarations = tableInfo.columnNames.map((column,idx) => {
         variables.push(`"V_${column}"`);
         let targetDataType = tableInfo.targetDataTypes[idx];
+        let externalDataType = undefined
+		let copyColumnDefinition = `"${column}"`
+		let value = `:${(idx+1)}`
+	    let externalSelect = copyColumnDefinition
         switch (targetDataType) {
           case "GEOMETRY":
           case "GEOGRAPHY":
           case "\"MDSYS\".\"SDO_GEOMETRY\"":
-             switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+		     externalDataType = "CLOB"
+			 copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
+		     switch (this.dbi.INBOUND_SPATIAL_FORMAT) {       
                case "WKB":
                case "EWKB":
-                 values.push(`OBJECT_SERIALIZATION.DESERIALIZE_WKBGEOMETRY(:${(idx+1)})`);
+                 value = `OBJECT_SERIALIZATION.DESERIALIZE_WKBGEOMETRY(:${(idx+1)})`;
+		         externalSelect = `case when LENGTH("${column}") > 0 then  OBJECT_SERIALIZATION.DESERIALIZE_WKBGEOMETRY(OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("${column}")) else NULL end`
                  break;
                case "WKT":
                case "EWKT":
-                 values.push(`OBJECT_SERIALIZATION.DESERIALIZE_WKTGEOMETRY(:${(idx+1)})`);
+                 value = `OBJECT_SERIALIZATION.DESERIALIZE_WKTGEOMETRY(:${(idx+1)})`;
+		         externalSelect = `OBJECT_SERIALIZATION.DESERIALIZE_WKTGEOMETRY("${column}")`
                  break;
                case "GeoJSON":
-                 values.push(`OBJECT_SERIALIZATION.${this.GEOJSON_FUNCTION}(:${(idx+1)})`);
+                 value = `OBJECT_SERIALIZATION.${this.GEOJSON_FUNCTION}(:${(idx+1)})`;
+		         externalSelect = `OBJECT_SERIALIZATION.${this.GEOJSON_FUNCTION}("${column}")`
                  break;
                default:
             }
             break
+          case "RAW":
+		    const length = tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]*2
+			switch (true) {
+			  case (length > 32767):
+		        externalDataType =  'CLOB'
+		        copyColumnDefinition = `${copyColumnDefinition}  ${this.LOADER_CLOB_TYPE}`
+	            externalSelect = `OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("${column}")`
+				break;
+			  default:
+		        externalDataType = `VARCHAR2(${length})`			    
+		        copyColumnDefinition = `${copyColumnDefinition}  CHAR(${length})`
+	            externalSelect = `HEXTORAW(TRIM("${column}"))`
+		}
+			break;
           case "XMLTYPE":
-             values.push(`OBJECT_SERIALIZATION.DESERIALIZE_XML(:${(idx+1)})`);
-             break
-           case "BFILE":
-		     if (this.OBJECTS_AS_JSON) {
-               values.push(`OBJECT_TO_JSON.DESERIALIZE_BFILE(:${(idx+1)})`);
-			 }
-			 else {
-			   values.push(`OBJECT_SERIALIZATION.DESERIALIZE_BFILE(:${(idx+1)})`);
-             }
-             break;
-          case "ANYDATA":
-            values.push(`ANYDATA.convertVARCHAR2(:${(idx+1)})`);
+		    externalDataType = "CLOB"
+            copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
+		    value = `OBJECT_SERIALIZATION.DESERIALIZE_XML(:${(idx+1)})`;
+	        externalSelect = `case when LENGTH("${column}") > 0 then OBJECT_SERIALIZATION.DESERIALIZE_XML("${column}") else NULL end`
+            break
+          case "BFILE":
+		    if (this.OBJECTS_AS_JSON) {
+              value = `OBJECT_TO_JSON.DESERIALIZE_BFILE(:${(idx+1)})`;
+			}
+			else {
+			  value = `OBJECT_SERIALIZATION.DESERIALIZE_BFILE(:${(idx+1)})`;
+            }
+  	        externalDataType = 'VARCHAR2(2048)'
+  		    copyColumnDefinition = `"${column}" CHAR(2048)`
+            externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
             break;
+          case "JSON":
+  	        externalDataType = 'BLOB'
+            copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
+            externalSelect = `case when LENGTH("${column}") > 0 then "${column}" else NULL end`
+			break
+          case "ANYDATA":
+  	        externalDataType = 'CLOB'
+  		    copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}`
+            value = `ANYDATA.convertVARCHAR2(:${(idx+1)})`;
+  		    externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
+            break;
+		  case 'NCHAR':
+          case 'NVARCHAR2':
+		  case 'CHAR':
+		  case 'VARCHAR2':
+		    copyColumnDefinition = `${copyColumnDefinition} CHAR(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]*this.dbi.BYTE_TO_CHAR_RATIO})${nullSettings}`
+		    break; 
+		  case 'BLOB':
+  	        externalDataType = 'CLOB'
+  		    copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}`
+            externalSelect = `case when LENGTH("${column}") > 0 then OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("${column}") else NULL end`
+		    break; 		  
+		  case 'NCLOB':
+		  case 'CLOB':
+            copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}`
+            externalSelect = `case when LENGTH("${column}") > 0 then "${column}" else NULL end`
+            break;
+          case "DATE":
+  	        externalDataType = 'CHAR(32)'
+  		    copyColumnDefinition = `"${column}" ${externalDataType}`
+            externalSelect = `to_date(substr("${column}",1,19),'YYYY-MM-DD"T"HH24:MI:SS')` 
+            // copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT DATE 'YYYY-MM_DD"T"HH24:MI:SS#########"Z"'`
+		    break;
+          case "BOOLEAN":
+  	        externalDataType = 'CHAR(5)'
+  		    copyColumnDefinition = `"${column}" ${externalDataType}`
+            externalSelect = `case when "${column}" is NULL then NULL when LENGTH("${column}") = 0 then NULL when "${column}" = 'true' then HEXTORAW('01') else HEXTORAW('00') end` 
+		    break;
           default:
+		    if ((targetDataType.indexOf('TIMESTAMP') === 0) ) {
+		      externalDataType = 'CHAR(36)'
+			  copyColumnDefinition = `"${column}" ${externalDataType}`
+		      externalSelect = targetDataType.indexOf('ZONE') > 0 ? `to_timestamp_tz("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM')` : `to_timestamp("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')` 
+			  /*
+			  switch (true) {
+				case (targetDataType.indexOf('LOCAL') > 0):
+				   copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP WITH LOCAL TIME ZONE 'YYYY-MM_DD"T"HH24:MI:SS.FF9"Z"'`
+    		       break;
+				case (targetDataType.indexOf('ZONE') > 0):
+				   copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP WITH TIME ZONE 'YYYY-MM_DD"T"HH24:MI:SS.FF9"Z"'`
+    		       break;
+				default:
+				   copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP 'YYYY-MM_DD"T"HH24:MI:SS.FF9'`
+    		       break;
+			  }
+			  */
+		    }
 		    if ((targetDataType.indexOf('INTERVAL') === 0) && (targetDataType.indexOf('DAY') > 0) && (targetDataType.indexOf('SECOND') > 0)) {
-              values.push(`OBJECT_SERIALIZATION.DESERIALIZE_ISO8601_DSINTERVAL(:${(idx+1)})`);
-			  break;
-			}
+              value = `OBJECT_SERIALIZATION.DESERIALIZE_ISO8601_DSINTERVAL(:${(idx+1)})`;
+		      break;
+		    }
 		    if (targetDataType.indexOf('.') > -1) {
-              plsqlRequired = true;
-              values.push(`"#${targetDataType.slice(targetDataType.indexOf(".")+2,-1)}"(:${(idx+1)})`);
+ 		      externalDataType = "CLOB"
+			  copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}`
+		      plsqlRequired = true;
+              value = `"#${targetDataType.slice(targetDataType.indexOf(".")+2,-1)}"(:${(idx+1)})`;
+			  externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
 			  break;
-			}
-            values.push(`:${(idx+1)}`);
+		    }
         } 
         // Append length to bounded datatypes if necessary
         targetDataType = (StatementGenerator.BOUNDED_TYPES.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]})` : targetDataType;
+		values.push(value)
+		copyColumnDefinitions[tableInfo.bindOrdering[idx]]     = copyColumnDefinition
+		externalColumnDefinitions[tableInfo.bindOrdering[idx]] = `"${column}" ${externalDataType || targetDataType}`
+		externalSelectList[tableInfo.bindOrdering[idx]]        = externalSelect
         return `${variables[idx]} ${targetDataType}`;
       })
-      
+	  
+	  if (tableMetadata.dataFile) {
+	   	this.dbi.SQL_DIRECTORY_NAME = this.SQL_DIRECTORY_NAME
+        const externalTableName = `"${this.targetSchema}"."YXT-${crypto.randomBytes(16).toString("hex").toUpperCase()}"`;
+		/*
+	    let columnList = tableInfo.ddl.substr(tableInfo.ddl.indexOf('V_STATEMENT'))
+	    columnList = columnList.substring(columnList.indexOf('('),columnList.indexOf(';')-1)
+	    columnList = columnList.indexOf(')\nXMLTYPE ') === -1 ? columnList : columnList.substring(0,columnList.indexOf(')\nXMLTYPE')+1)
+		*/
+		const plsql = this.getPLSQL(tableInfo.dml)
+        const copyDDL = `
+CREATE TABLE ${externalTableName} (
+  ${externalColumnDefinitions.join(',')}
+) 
+ORGANIZATION EXTERNAL ( 
+  default directory ${this.SQL_DIRECTORY_NAME} 
+  ACCESS PARAMETERS (
+    RECORDS DELIMITED BY NEWLINE 
+	READSIZE 67108864 
+	CHARACTERSET AL32UTF8 
+	${this.dbi.COPY_BADFILE_DIRNAME ? `BADFILE ${this.dbi.COPY_BADFILE_DIRNAME}:` : 'NOBADFILE'}
+	${this.dbi.COPY_LOGFILE_DIRNAME ? `LOGFILE ${this.dbi.COPY_LOGFILE_DIRNAME}:` : 'NOLOGFILE'}
+	FIELDS CSV 
+	       WITH EMBEDDED 
+		   MISSING FIELD VALUES ARE NULL 
+		   (
+		     ${copyColumnDefinitions.join(",")}
+		   )
+  ) 
+  LOCATION (
+	'${path.basename(tableMetadata.dataFile).split(path.sep).join(path.posix.sep)}'
+  )
+)`
+
+	    tableInfo.copy = {
+		  ddl          : copyDDL
+        , dml          : `insert ${plsql ? `/*+ WITH_PLSQL */` : '/*+ APPEND */'} into "${this.targetSchema}"."${tableName}"\n${plsql ? `WITH\n${plsql}\n` : ''}select ${externalSelectList.join(",")} from ${externalTableName}`
+	    , drop         : `drop table ${externalTableName}`
+	    }
+      } 
+	  
       if (plsqlRequired === true) {
         const assignments = values.map((value,idx) => {
           if (value[1] === '#') {
@@ -428,7 +573,7 @@ class StatementGenerator {
         tableInfo.dml = this.generatePLSQL(this.targetSchema,tableMetadata.tableName,tableInfo.dml,tableInfo.columnNames,declarations,assignments,variables);
       }
       else  {
-        tableInfo.dml = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" (${tableInfo.columnNames.map((col) => {return `"${col}"`}).join(',')}) values (${values.join(',')})`;
+        tableInfo.dml = `insert /*+ APPEND */ into "${this.targetSchema}"."${tableMetadata.tableName}" (${tableInfo.columnNames.map((col) => {return `"${col}"`}).join(',')}) values (${values.join(',')})`;
       }	  
     });
 	return statementCache

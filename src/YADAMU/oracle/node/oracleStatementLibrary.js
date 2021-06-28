@@ -22,6 +22,12 @@ class OracleStatementLibrary {
     this.dbi = dbi
   }
 
+  get SQL_CREATE_EXTERNAL_TABLE() {
+     this._SQL_CREATE_EXTERNAL_TABLE = this._SQL_CREATE_EXTERNAL_TABLE || (() => { 
+       return 
+    })();
+    return this._SQL_CREATE_EXTERNAL_TABLE
+  }   
 }
  
 module.exports = OracleStatementLibrary

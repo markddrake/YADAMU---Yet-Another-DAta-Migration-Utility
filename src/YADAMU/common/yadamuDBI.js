@@ -237,9 +237,9 @@ class YadamuDBI {
 	this._COMMIT_COUNT = undefined
   }
   
-  traceSQL(msg) {
+  traceSQL(msg,rows,lobCount) {
      // this.yadamuLogger.trace([this.DATABASE_VENDOR,'SQL'],msg)
-     return(`${msg.trim()} ${this.sqlTraceTag} ${this.sqlTerminator}`);
+     return(`${msg.trim()} ${rows ? `/* Rows: ${rows}. */ ` : ''} ${lobCount ? `/* LOBS: ${lobCount}. */ ` : ''}${this.sqlTraceTag} ${this.sqlTerminator}`);
   }
   
   traceTiming(startTime,endTime) {      
@@ -1466,6 +1466,12 @@ class YadamuDBI {
     return ''
   }
 	
+  reportCopyOperationMode(copyEnabled,controlFilePath,contentType) {
+    this.yadamuLogger.info([this.DATABASE_VENDOR,'COPY',`${contentType}`],`Processing ${controlFilePath}" using ${copyEnabled ? 'COPY' : 'PIPELINE' } mode.`)
+	return copyEnabled
+  } 
+	
+	
   validStagedDataSet(source,controlFilePath,controlFile) {   
 
     /*
@@ -1506,7 +1512,7 @@ class YadamuDBI {
   
   async generateCopyStatements(metadata) {
     const startTime = performance.now()
-    await this.setMetadata(metadata)     
+    await this.setMetadata(metadata)   
     const statementCache = await this.generateStatementCache(this.parameters.TO_USER)
 	return statementCache
   }     
@@ -1641,7 +1647,7 @@ class YadamuDBI {
 	    , copyStatement : statementCache[table].copy
         }
 	  })
-	  await this.initializeCopy(credentials)
+	  await this.initializeCopy(credentials,statementCache)
       results = await this.copyOperations(taskList,vendor)
 	  await this.finalizeCopy()
 	  

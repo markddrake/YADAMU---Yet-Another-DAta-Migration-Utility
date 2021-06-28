@@ -1,5 +1,6 @@
 "use strict" 
 const fs = require('fs');
+const path = require('path');
 const Readable = require('stream').Readable;
 const Writable = require('stream').Writable;
 const Transform = require('stream').Transform;
@@ -65,6 +66,7 @@ class OracleDBI extends YadamuDBI {
   get DATABASE_KEY()           { return OracleConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return OracleConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return OracleConstants.SOFTWARE_VENDOR};
+  get SQL_COPY_SUPPORTED()     { return true }
   get STATEMENT_TERMINATOR()   { return OracleConstants.STATEMENT_TERMINATOR };
   get DBI_PARAMETERS()         { return OracleConstants.DBI_PARAMETERS }
 
@@ -77,12 +79,26 @@ class OracleDBI extends YadamuDBI {
   get ORACLE_JSON_TYPE()       { return this.parameters.ORACLE_JSON_TYPE       || OracleConstants.ORACLE_JSON_TYPE}
   get MIGRATE_JSON_STORAGE()   { return this.parameters.MIGRATE_JSON_STORAGE   || OracleConstants.MIGRATE_JSON_STORAGE}
   get TREAT_RAW1_AS_BOOLEAN()  { return this.parameters.TREAT_RAW1_AS_BOOLEAN  || OracleConstants.TREAT_RAW1_AS_BOOLEAN }  
+  get BYTE_TO_CHAR_RATIO()     { return this.parameters.BYTE_TO_CHAR_RATIO     || OracleConstants.BYTE_TO_CHAR_RATIO };
+  get COPY_LOGFILE_DIRNAME()   { return this.parameters.COPY_LOGFILE_DIRNAME   || OracleConstants.COPY_LOGFILE_DIRNAME };
+  get COPY_BADFILE_DIRNAME()   { return this.parameters.COPY_BADFILE_DIRNAME   || OracleConstants.COPY_BADFILE_DIRNAME };
+  get BATCH_TEMPLOB_LIMIT()    { return this.parameters.BATCH_TEMPLOB_LIMIT    || OracleConstants.BATCH_TEMPLOB_LIMIT}
+  get BATCH_CACHELOB_LIMIT()   { return this.parameters.BATCH_CACHELOB_LIMIT   || OracleConstants.BATCH_CACHELOB_LIMIT}
   get LOB_MAX_SIZE()           { return this.parameters.LOB_MAX_SIZE           || OracleConstants.LOB_MAX_SIZE}
-
   get LOB_MIN_SIZE() { 
     // Set with anonymous function to enforce 4K limit in Oracle11g
     this._LOB_MIN_SIZE = this._LOB_MIN_SIZE ||(() => { let lobMinSize = this.parameters.LOB_MIN_SIZE || OracleConstants.LOB_MIN_SIZE; lobMinSize = ((this.DB_VERSION < 12) && (lobMinSize > 4000)) ? 4000 : lobMinSize; return lobMinSize})()
     return this._LOB_MIN_SIZE 
+  }
+
+  get COMMIT_TEMPLOB_LIMIT() {
+    this._COMMIT_TEMPLOB_LIMIT = this._COMMIT_TEMPLOB_LIMIT || (() => { return this.BATCH_TEMPLOB_LIMIT * (isNaN(this.COMMIT_RATIO) ? DBIConstants.COMMIT_RATIO : this.COMMIT_RATIO)})()
+    return this._COMMIT_TEMPLOB_LIMIT 
+  }
+
+  get COMMIT_CACHELOB_LIMIT() { 
+    this._COMMIT_CACHELOB_LIMIT = this._COMMIT_CACHELOB_LIMIT ||(() => { return this.BATCH_CACHELOB_LIMIT * (isNaN(this.COMMIT_RATIO) ? DBIConstants.COMMIT_RATIO : this.COMMIT_RATIO)})()
+    return this._COMMIT_CACHELOB_LIMIT 
   }
 
    get OBJECTS_AS_JSON()        { return this.OBJECT_FORMAT === 'JSON' }
@@ -325,7 +341,7 @@ class OracleDBI extends YadamuDBI {
       const sqlStartTime = performance.now();
 	  stack = new Error().stack
       const lob =  await this.connection.createLob(lobType);
-      this.traceTiming(sqlStartTime,performance.now())
+      // this.traceTiming(sqlStartTime,performance.now())
 	  return lob;
    	} catch (e) {
 	  throw this.trackExceptions(new OracleError(e,stack,`Oracledb.Connection.createLob()`))
@@ -591,7 +607,7 @@ class OracleDBI extends YadamuDBI {
 	
   } 
   
-  async executeMany(sqlStatement,rows,binds) {
+  async executeMany(sqlStatement,rows,binds,lobCount) {
 	   
     let attemptReconnect = (this.ATTEMPT_RECONNECTION)
 	
@@ -606,9 +622,9 @@ class OracleDBI extends YadamuDBI {
 	*/
 
     if (rows.length > 0) {
-      this.status.sqlTrace.write(this.traceComment(`Bulk Operation: ${rows.length} records.`))
-      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
-      
+      // this.status.sqlTrace.write())
+      this.status.sqlTrace.write(this.traceSQL(sqlStatement,rows.length,lobCount))
+	  
   	  let stack
 	  let results;
       while (true) {
@@ -1337,6 +1353,58 @@ class OracleDBI extends YadamuDBI {
     }
     return dbMappings;    
   }  
+
+  validStagedDataSet(vendor,controlFilePath,controlFile) {
+
+    /*
+	**
+	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
+	** Return false if the data set cannot be consumed using a Copy operation
+	** Do not throw errors if the data set cannot be used for a COPY operatio
+	** Generate Info messages to explain why COPY cannot be used.
+	**
+	*/
+
+    if (!OracleConstants.STAGED_DATA_SOURCES.includes(vendor)) {
+       return false;
+	}
+	
+	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
+  }
+  
+  async initializeCopy() {
+	 await this.executeSQL(`create or replace directory ${this.SQL_DIRECTORY_NAME} as '${path.join(this.REMOTE_STAGING_AREA,this.parameters.TO_USER,'data').split(path.sep).join(path.posix.sep)}/'`);
+  }
+  
+  async copyOperation(tableName,copy) {
+	
+    /*
+    **
+    ** Generic Basic Imementation - Override as required for error reporting etc
+    **
+    */
+	
+	try {
+	  const startTime = performance.now();
+	  const stack = new Error().stack
+	  let results = await this.beginTransaction();
+	  results = await this.executeSQL(copy.ddl);
+	  results = await this.executeSQL(copy.dml);
+	  const rowsRead = results.rowsAffected
+	  results = await this.executeSQL(copy.drop);
+	  const elapsedTime = performance.now() - startTime;
+	  results = await this.commitTransaction()
+  	  await this.reportCopyResults(tableName,rowsRead,0,elapsedTime,copy.dml,stack)
+	} catch(e) {
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+	  let results = await this.rollbackTransaction()
+	}
+  }
+
+  async finalizeCopy() {
+	 await this.executeSQL(`drop directory ${this.SQL_DIRECTORY_NAME}`);
+  }
+  
 }
 
 class DDLCache extends Transform {
@@ -1380,6 +1448,7 @@ class DDLCache extends Transform {
   getSystemInformation() {
     return this.systemInformation
   }
+    
 }
  
 module.exports = OracleDBI

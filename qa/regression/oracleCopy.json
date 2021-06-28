@@ -7,37 +7,36 @@
 	"reloadStagingArea" : false,
 	"emptyStringIsNull" : true,
 	"parameters": {
-		"IDENTIFIER_MAPPING_FILE" : "qa/mappings/verticaMappings.json",
-		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
+		"REMOTE_STAGING_AREA"     : "/mnt/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
 		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv"
 	},
 	"tests": [{
 			"source": "oracle19c",
-			"target": "vertica10",
+			"target": "oracle19c",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mssql19",
-			"target": "vertica10",
+			"target": "oracle19c",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "postgres#1",
-			"target": "vertica10",
+			"target": "oracle19c",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mysql#1",
-			"target": "vertica10",
+			"target": "oracle19c",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mongodb#1",
-			"target": "vertica10",
+			"target": "oracle19c",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]

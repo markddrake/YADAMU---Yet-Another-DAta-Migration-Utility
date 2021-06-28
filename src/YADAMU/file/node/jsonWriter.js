@@ -133,6 +133,8 @@ class JSONWriter extends YadamuWriter {
 		  return (col,idx) =>  { 
 		    let ts
 			switch (true) {
+			  case (col === null):
+			    return null
               case (col instanceof Date):
                 return col.toISOString()
               case col.endsWith('+00:00'):

@@ -1,8 +1,13 @@
 "use strict";
 
+const path = require('path');
+const crypto = require('crypto');
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 
 class StatementGenerator {
+
+  get SQL_DIRECTORY_NAME()     { return this._SQL_DIRECTORY_NAME }
+  set SQL_DIRECTORY_NAME(v)    { this._SQL_DIRECTORY_NAME = v }
   
   constructor(dbi, targetSchema, metadata, yadamuLogger) {  
     this.dbi = dbi;
@@ -166,8 +171,38 @@ class StatementGenerator {
               return '$%';
           }            
         })
-        return tableInfo.ddl
+		
+
+        if (tableMetadata.dataFile) {
+		  const columnDefinitions = []
+          const copyOperators = dataTypes.map((dataType,idx) => {
+		    switch (dataType.type) {
+    	      case 'bytea':
+		        columnDefinitions.push(`"${tableInfo.columnNames[idx]}" text`)
+		        return `decode("${tableInfo.columnNames[idx]}",'hex')`   			  
+		      case 'character':
+		      case 'character varying':
+		      case 'char':
+		      case 'nchar':
+		      case 'bpchar':
+		        columnDefinitions.push(`"${tableInfo.columnNames[idx]}" text`)
+		        return `"${tableInfo.columnNames[idx]}"`
+		    }		  
+		    columnDefinitions.push(`"${tableInfo.columnNames[idx]}" ${tableInfo.targetDataTypes[idx]}`)
+		    return `"${tableInfo.columnNames[idx]}"`
+		  })
+
+	   	  this.dbi.SQL_DIRECTORY_NAME = this.SQL_DIRECTORY_NAME
+          const externalTableName = `"${this.targetSchema}"."YXT-${crypto.randomBytes(16).toString("hex").toUpperCase()}"`;
+		  tableInfo.copy = {
+		    ddl          : `create foreign table ${externalTableName} (${columnDefinitions.join(",")}) SERVER "${this.dbi.COPY_SERVER_NAME}" options (format 'csv', filename '${tableMetadata.dataFile.split(path.sep).join(path.posix.sep)}')`
+          , dml          : `insert into "${this.targetSchema}"."${tableName}" select ${copyOperators.join(",")} from ${externalTableName}`
+	      , drop         : `drop foreign table ${externalTableName}`
+	      }
+        } 
+	    return tableInfo.ddl
       });
+	  
     }
     return statementCache;
   }

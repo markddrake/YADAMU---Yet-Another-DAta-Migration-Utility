@@ -630,11 +630,7 @@ class RedshiftDBI extends YadamuDBI {
        return false;
 	}
 	
-	if (controlFile.settings.contentType != 'CSV') {
-	  this.yadamuLogger.info([this.DATABASE_VENDOR,'Copy','INVALID DATA SET'],`Copy option unavailable. Control File "${controlFilePath}" describes a "${controlFile.settings.contentType}" data set. Copy operations only supported for "CSV" data sets.`)
-	  return false;
-	}
-    return true
+	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
   }
   
   async reportCopyErrors(tableName,stack,copyStatement) {

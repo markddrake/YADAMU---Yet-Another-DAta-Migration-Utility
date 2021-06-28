@@ -11,22 +11,22 @@ REM MongoDB 4.0
 docker run --name MONGO40-01 --memory="16g" --shm-size=4g -p 27017:27017 -v MONGO40-01-DATA:/data/db -d mongo:latest 
 REM
 REM Oracle 19.3.0.0.0
-docker run --name ORA1903-01 --memory="16g" --shm-size=4g -p 1521:1521 -e ORACLE_SID=CDB19300 -e ORACLE_PDB=PDB19300 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1903-01-DATA:/opt/oracle/oradata -vORA1903-01-DIAG:/opt/oracle/diag -vORA1903-01-DIAG:/opt/oracle/admin --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:19.3.0-ee
+docker run --name ORA1903-01 --memory="16g" --shm-size=4g -p 1521:1521 -e ORACLE_SID=CDB19300 -e ORACLE_PDB=PDB19300 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1903-01-DATA:/opt/oracle/oradata -vORA1903-01-DIAG:/opt/oracle/diag -vORA1903-01-DIAG:/opt/oracle/admin  -vYADAMU_01_MNT:/mnt --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:19.3.0-ee
 REM
 REM Oracle 18.3.0.0.0                                                                                                                                                        
-docker run --name ORA1803-01 --memory="16g" --shm-size=4g -p 1522:1521 -e ORACLE_SID=CDB18300 -e ORACLE_PDB=PDB18300 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1803-01-DATA:/opt/oracle/oradata -vORA1803-01-DIAG:/opt/oracle/diag -vORA1803-01-DIAG:/opt/oracle/admin --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:18.3.0-ee
+docker run --name ORA1803-01 --memory="16g" --shm-size=4g -p 1522:1521 -e ORACLE_SID=CDB18300 -e ORACLE_PDB=PDB18300 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1803-01-DATA:/opt/oracle/oradata -vORA1803-01-DIAG:/opt/oracle/diag -vORA1803-01-DIAG:/opt/oracle/admin  -vYADAMU_01_MNT:/mnt --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:18.3.0-ee
 REM
 REM Oracle 12.2.0.1.0                                                                                                                                                        
-docker run --name ORA1220-01 --memory="16g" --shm-size=4g -p 1523:1521 -e ORACLE_SID=CDB12200 -e ORACLE_PDB=PDB12200 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1220-01-DATA:/opt/oracle/oradata -vORA1220-01-DIAG:/opt/oracle/diag -vORA1220-01-DIAG:/opt/oracle/admin --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:12.2.0.1-ee 
+docker run --name ORA1220-01 --memory="16g" --shm-size=4g -p 1523:1521 -e ORACLE_SID=CDB12200 -e ORACLE_PDB=PDB12200 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1220-01-DATA:/opt/oracle/oradata -vORA1220-01-DIAG:/opt/oracle/diag -vORA1220-01-DIAG:/opt/oracle/admin  -vYADAMU_01_MNT:/mnt --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:12.2.0.1-ee 
 REM
 REM Oracle 12.1.0.2.0                                                                                                                                                        
-REM docker run --name ORA1210-01 --memory="16g" --shm-size=4g -p 1524:1521 -e ORACLE_SID=CDB12100 -e ORACLE_PDB=PDB12100 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1210-01-DATA:/opt/oracle/oradata -vORA1210-01-DIAG:/opt/oracle/diag -vORA1210-01-DIAG:/opt/oracle/admin --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:12.1.0.2-ee 
+REM docker run --name ORA1210-01 --memory="16g" --shm-size=4g -p 1524:1521 -e ORACLE_SID=CDB12100 -e ORACLE_PDB=PDB12100 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1210-01-DATA:/opt/oracle/oradata -vORA1210-01-DIAG:/opt/oracle/diag -vORA1210-01-DIAG:/opt/oracle/admin  -vYADAMU_01_MNT:/mnt --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:12.1.0.2-ee 
 REM
 REM Oracle 11.2.0.1.0                                                                                                                                                        
 REM Fix for Oracle 11.2..0.1.0 persmissions
 set /P DOCKER_USER=docker 
 ssh %DOCKER_USER%@%DOCKER_IP_ADDR% "sudo chown 54321:54322 /var/lib/docker/volumes/ORA1120-01-DIAG/_data"
-docker run --name ORA1120-01 --memory="16g" --shm-size=4g -p 1525:1521 -e ORACLE_SID=ORA11200 -e ORACLE_PDB=ORA11200 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1120-01-DATA:/opt/oracle/oradata -vORA1120-01-DIAG:/opt/oracle/diag -vORA1120-01-DIAG:/opt/oracle/admin  --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:11.2.0.1-ee
+docker run --name ORA1120-01 --memory="16g" --shm-size=4g -p 1525:1521 -e ORACLE_SID=ORA11200 -e ORACLE_PDB=ORA11200 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1120-01-DATA:/opt/oracle/oradata -vORA1120-01-DIAG:/opt/oracle/diag -vORA1120-01-DIAG:/opt/oracle/admin   -vYADAMU_01_MNT:/mnt --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:11.2.0.1-ee
 REM
 REM Oracle MySQL 8.0
 docker run --name MYSQL80-01 --memory="16g" --shm-size=4g -p 3306:3306 -v MYSQL80-01-DATA:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=oracle --cap-add=sys_nice -d mysql:latest 

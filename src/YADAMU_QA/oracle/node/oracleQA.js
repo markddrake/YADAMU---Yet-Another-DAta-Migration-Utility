@@ -105,7 +105,7 @@ class OracleQA extends OracleDBI {
       // const failed = await this.executeSQL(OracleQA.SQL_FAILED,{},options)      
       const failed = await this.executeSQL(OracleQA.SQL_FAILED,{})      
       report.failed = await Promise.all(failed.rows.map(async (row,idx) => {
-		const result = [row[0],row[1],row[2],row[4],row[5],row[6],row[7],row[8] === null ? row[8] : this.clobToString(row[8])]
+		const result = [row[0],row[1],row[2],row[4],row[5],row[6],row[7],((row[8] === null) || (typeof row[8] === 'string')) ? row[8] : this.clobToString(row[8])]
 		return await Promise.all(result)
       }))
 	  
@@ -167,6 +167,10 @@ class OracleQA extends OracleDBI {
       )
 	  this.assassin.unref()
     }
+	
+    verifyStagingSource(source) {  
+      super.verifyStagingSource(OracleConstants.STAGED_DATA_SOURCES,source)
+    } 
 }
 	
 

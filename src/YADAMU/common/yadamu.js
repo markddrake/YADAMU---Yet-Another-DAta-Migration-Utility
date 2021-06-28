@@ -823,7 +823,8 @@ class Yadamu {
       if (this.DATA_STAGING_ENABLED && source.DATA_STAGING_SUPPORTED && target.SQL_COPY_SUPPORTED) {
 		await source.loadControlFile()
 		if (target.validStagedDataSet(source.DATABASE_KEY,source.controlFilePath,source.controlFile)) {
-          await this.doCopyOperation(source,target)
+		  // TODO: If all copy operations fail due to issues accessing file fallback to Pipeline.
+		  await this.doCopyOperation(source,target)
 	    }
 		else {
 		  await this.doPipelineOperation(source,target)

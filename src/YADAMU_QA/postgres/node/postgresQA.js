@@ -118,6 +118,11 @@ class PostgresQA extends PostgresDBI {
       )
 	  timer.unref()
 	}
+
+    verifyStagingSource(source) {  
+      super.verifyStagingSource(PostgresConstants.STAGED_DATA_SOURCES,source)
+    } 
+
 }
 
 module.exports = PostgresQA

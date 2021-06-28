@@ -538,11 +538,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
        return false;
 	}
 	
-	if (controlFile.settings.contentType != 'CSV') {
-	  this.yadamuLogger.info([this.DATABASE_VENDOR,'COPY','INVALID DATA SET'],`Copy option unavailable. Control File "${controlFilePath}" describes a "${controlFile.settings.contentType}" data set. Copy operations only supported for "CSV" data sets.`)
-	  return false;
-	}
-    return true
+	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
   }
   
   async reportCopyErrors(tableName,failed,stack,copyStatement) {

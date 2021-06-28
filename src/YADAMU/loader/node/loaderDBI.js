@@ -285,10 +285,11 @@ class LoaderDBI extends YadamuDBI {
 
   async createControlFile(metadataFileList,dataFileList) {
   	const settings = {
-	  contentType : this.OUTPUT_FORMAT
-    , compression : this.yadamu.COMPRESSION
-	, encryption  : this.ENCRYPTED_CONTENT ? this.yadamu.CIPHER : 'NONE'
-	, baseFolder  : this.IMPORT_FOLDER
+	  contentType        : this.OUTPUT_FORMAT
+    , compression        : this.yadamu.COMPRESSION
+	, encryption         : this.ENCRYPTED_CONTENT ? this.yadamu.CIPHER : 'NONE'
+	, baseFolder         : this.IMPORT_FOLDER
+	, timestampPrecision : this.TIMESTAMP_PRECISION
     }
 	this.controlFile = { settings : settings, systemInformation : {}, metadata : metadataFileList, data: dataFileList}  
   }

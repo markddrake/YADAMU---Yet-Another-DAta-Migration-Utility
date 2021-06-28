@@ -855,7 +855,7 @@ class YadamuQA {
     **
     */
     
-    const mode = (sourceConnection === targetConnection) ? (taskMode === 'DATA_ONLY' ? 'DDL_AND_DATA' : taskMode ) : 'DDL_ONLY'
+    const mode = ((sourceConnection === targetConnection)) ? (taskMode === 'DATA_ONLY' ? (this.STAGING_AREA ? 'DDL_ONLY' : 'DDL_AND_DATA') : taskMode ) : 'DDL_ONLY'
 
     sourceParameters.MODE = mode;
     compareParameters.MODE = mode;
@@ -910,7 +910,7 @@ class YadamuQA {
     // If MODE = DDL_AND_DATA the first copy completed the operation. 
 	// If MODE = DATA_ONLY we need to round trip the data.
         
-    if (sourceConnection !== targetConnection) {
+    if ((sourceConnection !== targetConnection) || this.STAGING_AREA) {
       
       // Run two more COPY operations. 
       
@@ -970,7 +970,7 @@ class YadamuQA {
 		sourceDBI = await this.getDatabaseInterface(stagingPlatform,stagingConnection,stagingParameters,false)
 		sourceConnectionName = stagingConnectionName
       }
-      
+	
 	  this.propogateTableMatching(sourceDBI,targetDBI);
       stepStartTime = performance.now();
       metrics.push(await this.yadamu.pumpData(sourceDBI,targetDBI));
@@ -1011,26 +1011,27 @@ class YadamuQA {
 	    // Configure the the OUTPUT_FORMAT, COMPRESSION AND ENCRYPTION settings to the target Parameters
 		compareDBI.setControlFileSettings(sourceDBI.getControlFileSettings())
 	  }
-	 	 
-      stepStartTime = performance.now();
-      metrics.push(await this.yadamu.pumpData(targetDBI,compareDBI));
-      stepElapsedTime = performance.now() - stepStartTime
-      this.metrics.recordTaskTimings([task.taskName,'COPY',compareDBI.MODE,targetConnectionName,test.source,YadamuLibrary.stringifyDuration(stepElapsedTime)])
-      if (metrics[metrics.length-1] instanceof Error) {
-        const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
-        const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules,  this.yadamu.metrics, false, {})
-        this.printCompareResults(test.source,targetConnectionName,task.taskName,compareResults)
-        this.metrics.recordTaskTimings([task.taskName,'COMPARE','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
-        this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
-        return;
-      }
-      
-      operationsList.push(compareDescription)
-      this.printResults(this.OPERATION_NAME,targetDescription,compareDescription,stepElapsedTime)
-     
-      const taskElapsedTime =  performance.now() - taskStartTime
-      this.metrics.recordTaskTimings([task.taskName,'TASK','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(taskElapsedTime)])
 
+      if (sourceConnection !== targetConnection) {
+        stepStartTime = performance.now();
+        metrics.push(await this.yadamu.pumpData(targetDBI,compareDBI));
+        stepElapsedTime = performance.now() - stepStartTime
+        this.metrics.recordTaskTimings([task.taskName,'COPY',compareDBI.MODE,targetConnectionName,test.source,YadamuLibrary.stringifyDuration(stepElapsedTime)])
+        if (metrics[metrics.length-1] instanceof Error) {
+          const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
+          const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules,  this.yadamu.metrics, false, {})
+          this.printCompareResults(test.source,targetConnectionName,task.taskName,compareResults)
+          this.metrics.recordTaskTimings([task.taskName,'COMPARE','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
+          this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
+          return;
+        }
+      
+        operationsList.push(compareDescription)
+        this.printResults(this.OPERATION_NAME,targetDescription,compareDescription,stepElapsedTime)
+     
+        const taskElapsedTime =  performance.now() - taskStartTime
+        this.metrics.recordTaskTimings([task.taskName,'TASK','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(taskElapsedTime)])
+	  }
     }    
     
     this.fixupMetrics(metrics);   

@@ -24,16 +24,18 @@ class OracleWriter extends YadamuWriter {
   ** Binding LOBS requires less client side memory than binding Strings and Buffers
   **
   ** The Yadamu Oracle interface allows you to optimize LOB usage via the following parameters
-  **    LOB_BATCH_COUNT  : A Batch will be regarded as complete when it uses more LOBS than LOB_BATCH_COUNT
-  **    LOB_MIN_SIZE     : If a String or Buffer is mapped to a CLOB or a BLOB then it will be inserted using a LOB if it exceeeds this value.
-  **    LOB_CACHE_COUNT  : A Batch will be regarded as complete when the number of CACHED (String & Buffer) LOBs exceeds this value.
+  **    BATCH_TEMPLOB_LIMIT  : A Batch will be regarded as complete when it uses more LOBS than BATCH_TEMPLOB_LIMIT
+  **    LOB_MIN_SIZE         : If a String or Buffer is mapped to a CLOB or a BLOB then it will be inserted using a LOB if it exceeeds this value.
+  **    BATCH_CACHELOB_LIMIT : A Batch will be regarded as complete when the number of CACHED (String & Buffer) LOBs exceeds this value.
   **
-  ** The amount of client side memory required to manage the LOB Cache is approx LOB_MIN_SIZE * LOB_CACHE_COUNT
+  ** The amount of client side memory required to manage the LOB Cache is approx LOB_MIN_SIZE * BATCH_CACHELOB_LIMIT
   **
   */
 
   constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
     super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
+	this.tempLobCount = 0;
+	this.cachedLobCount = 0;
   }
   
   newBatch() {
@@ -431,9 +433,14 @@ end;`
   }
  
   flushBatch() {
-    return ((this.metrics.cached === this.BATCH_SIZE) || (this.batch.tempLobCount >= this.dbi.BATCH_LOB_COUNT) || (this.batch.cachedLobCount > this.dbi.LOB_CACHE_COUNT))
+	return ((this.metrics.cached === this.BATCH_SIZE) || (this.batch.tempLobCount >= this.dbi.BATCH_TEMPLOB_LIMIT) || (this.batch.cachedLobCount > this.dbi.BATCH_CACHELOB_LIMIT))
   }
 
+  commitWork() {
+    // While COMMIT is defined as a multiple of BATCH_SIZE some drivers may write smaller batches.
+    return ((this.metrics.written === this.COMMIT_COUNT) || (this.tempLobCount >= this.dbi.COMMIT_TEMPLOB_LIMIT) || (this.cachedLobCount > this.dbi.COMMIT_CACHELOB_LIMIT))
+  }
+  
   async serializeLob(lob) {
 	switch (lob.type) {
       case oracledb.CLOB:
@@ -548,6 +555,12 @@ end;`
   **
   */
   
+  async beginTransaction() {
+    this.tempLobCount = 0
+	this.cacheLobCount = 0
+	await super.beginTransaction()
+  }
+  
   freeLobList() {
   }
      
@@ -567,6 +580,7 @@ end;`
 
     this.metrics.batchCount++;
     let rows = undefined;
+	
     let binds = undefined;
     
     const lobInsert = (batch.lobRows.length > 0)
@@ -574,6 +588,9 @@ end;`
 	   // this.batch.lobRows constists of a an array of arrays of pending promises that need to be resolved.
 	  batch.lobRows = await Promise.all(batch.lobRows.map(async (row) => { return await Promise.all(row.map((col) => {return col}))})) 
 	}
+	
+	this.tempLobCount+=batch.tempLobCount;
+	this.cacheLobCount+=batch.cacheLobCount;
 	
     if (this.tableInfo.insertMode === 'Batch') {
       try {
@@ -584,8 +601,8 @@ end;`
 		if (lobInsert) {
           rows = batch.lobRows
           binds = this.tableInfo.lobBinds
-          const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds});
-          // await Promise.all(this.freeLobList());
+          const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds},batch.tempLobCount);
+		  // await Promise.all(this.freeLobList());
           this.freeLobList();
         }         
         this.endTime = performance.now();

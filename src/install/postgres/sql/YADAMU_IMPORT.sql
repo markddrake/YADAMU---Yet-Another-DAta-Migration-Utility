@@ -517,15 +517,17 @@ begin
       end case;
     when 'Oracle' then
       case V_DATA_TYPE
+        when 'CHAR'                                                                              then return 'character';
+        when 'NCHAR'                                                                             then return 'character';
         when 'VARCHAR2'                                                                          then return 'character varying';
-        when 'NUMBER'                                                                            then return 'numeric';
-        when 'BINARY_FLOAT'                                                                      then return 'float4';
-        when 'BINARY_DOUBLE'                                                                     then return 'float8';
-        when 'NVARCHAR2'                                                                         then return 'character varying';
-        when 'RAW'                                                                               then return 'bytea';
-        when 'BLOB'                                                                              then return 'bytea';
+		when 'NVARCHAR2'                                                                         then return 'character varying';
         when 'CLOB'                                                                              then return C_CLOB_TYPE;
         when 'NCLOB'                                                                             then return C_CLOB_TYPE;
+		when 'NUMBER'                                                                            then return 'numeric';
+        when 'BINARY_FLOAT'                                                                      then return 'float4';
+        when 'BINARY_DOUBLE'                                                                     then return 'float8';
+        when 'RAW'                                                                               then return 'bytea';
+        when 'BLOB'                                                                              then return 'bytea';
         when 'TIMESTAMP'                                                                         then return case when P_DATA_TYPE_LENGTH > 6  then 'timestamp(6)' else 'timestamp' end;
         when 'BFILE'                                                                             then return C_BFILE_TYPE;
         when 'ROWID'                                                                             then return C_ROWID_TYPE;

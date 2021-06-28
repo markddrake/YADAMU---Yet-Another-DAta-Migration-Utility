@@ -54,13 +54,15 @@ class PostgresDBI extends YadamuDBI {
   get DATABASE_KEY()           { return PostgresConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return PostgresConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return PostgresConstants.SOFTWARE_VENDOR};
+  get SQL_COPY_SUPPORTED()     { return true }
   get STATEMENT_TERMINATOR()   { return PostgresConstants.STATEMENT_TERMINATOR };
    
   // Enable configuration via command line parameters
   
   get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT || PostgresConstants.CIRCLE_FORMAT }
   get BYTEA_SIZING_MODEL()     { return this.parameters.BYTEA_SIZING_MODEL || PostgresConstants.BYTEA_SIZING_MODEL }
-  
+  get COPY_SERVER_NAME()       { return this.parameters.COPY_SERVER_NAME || PostgresConstants.COPY_SERVER_NAME }
+   
   get POSTGIS_VERSION()        { return this._POSTGIS_VERSION || "Not Installed" }
   set POSTGIS_VERSION(v)       { this._POSTGIS_VERSION = v }
   
@@ -668,6 +670,57 @@ class PostgresDBI extends YadamuDBI {
 	const results = await this.executeSQL(`select pg_backend_pid()`)
 	const pid = results.rows[0][0];
     return pid
+  }
+
+  validStagedDataSet(vendor,controlFilePath,controlFile) {
+
+    /*
+	**
+	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
+	** Return false if the data set cannot be consumed using a Copy operation
+	** Do not throw errors if the data set cannot be used for a COPY operatio
+	** Generate Info messages to explain why COPY cannot be used.
+	**
+	*/
+
+    if (!PostgresConstants.STAGED_DATA_SOURCES.includes(vendor)) {
+       return false;
+	}
+	
+	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
+  }
+  
+  async initializeCopy() {
+	 await this.executeSQL(`create server "${this.COPY_SERVER_NAME}" FOREIGN DATA WRAPPER file_fdw`)
+  }
+  
+  async copyOperation(tableName,copy) {
+	
+    /*
+    **
+    ** Generic Basic Imementation - Override as required for error reporting etc
+    **
+    */
+	
+	try {
+	  const startTime = performance.now();
+	  const stack = new Error().stack
+	  let results = await this.beginTransaction();
+	  results = await this.executeSQL(copy.ddl);
+	  results = await this.executeSQL(copy.dml);
+	  const rowsRead = results.rowCount
+	  results = await this.executeSQL(copy.drop);
+	  const elapsedTime = performance.now() - startTime;
+	  results = await this.commitTransaction()
+  	  await this.reportCopyResults(tableName,rowsRead,0,elapsedTime,copy.dml,stack)
+	} catch(e) {
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+	  let results = await this.rollbackTransaction()
+	}
+  }
+
+  async finalizeCopy() {
+	 await this.executeSQL(`drop server "${this.COPY_SERVER_NAME}" `);
   }
 
 }
