@@ -76,6 +76,16 @@ case $YADAMU_TEST_NAME  in
     source  $YADAMU_SCRIPT_DIR/runCmdLineTests.sh
   ;;
 
+  copy) 
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh oracleCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mysqlCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh redshiftCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
+  ;;
+
   interactive)
     sleep 365d
   ;; 
@@ -89,6 +99,6 @@ case $YADAMU_TEST_NAME  in
   ;; 
 
   *)
-    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, import, fileRoundtrip, dbRoundtrip, lostConnection, mongo, snowflake, vertica, loader, aws, azure, cmdLine, interactive or all (default)"
+    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, import, fileRoundtrip, dbRoundtrip, lostConnection, mongo, snowflake, vertica, loader, aws, azure, cmdLine, copy, interactive or all (default)"
   ;;
 esac

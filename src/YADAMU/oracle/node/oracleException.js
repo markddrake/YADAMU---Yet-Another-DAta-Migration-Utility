@@ -78,6 +78,10 @@ class OracleError extends DatabaseError {
     return (this.cause.errorNum && OracleConstants.SPATIAL_ERROR.includes(this.cause.errorNum))
   }
 
+  copyFileNotFoundError() {
+    return (this.cause.errorNum && OracleConstants.COPY_FILE_NOT_FOUND_ERROR.includes(this.cause.errorNum))
+  }
+
   spatialErrorWKB() {
     return (this.spatialError() && (this.cause.message.indexOf(' WKB ') > -1))
   }

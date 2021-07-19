@@ -8,7 +8,8 @@
 	"emptyStringIsNull" : true,
 	"parameters": {
 		"REMOTE_STAGING_AREA"     : "/mnt/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
-		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv"
+		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
+		"COMMIT_RATIO"            : 0
 	},
 	"tests": [{
 			"source": "oracle19c",

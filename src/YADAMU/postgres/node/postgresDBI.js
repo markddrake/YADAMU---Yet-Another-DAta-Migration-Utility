@@ -691,7 +691,7 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async initializeCopy() {
-	 await this.executeSQL(`create server "${this.COPY_SERVER_NAME}" FOREIGN DATA WRAPPER file_fdw`)
+	 await this.executeSQL(`create server if not exists "${this.COPY_SERVER_NAME}" FOREIGN DATA WRAPPER file_fdw`)
   }
   
   async copyOperation(tableName,copy) {

@@ -40,16 +40,9 @@ class MongoQA extends MongoDBI {
     }
 
     async recreateDatabase() {
-
-      const operation = this.traceMongo(`dropDatabase()`)
-      try {
         await this.use(this.parameters.TO_USER)
-        this.status.sqlTrace.write(operation)      
         await this.dropDatabase()
         await this.use(this.parameters.TO_USER)
-      } catch (e) {
-        throw new MongodbError(e,operation)
-      }
     }
 
     async getRowCounts(target) {

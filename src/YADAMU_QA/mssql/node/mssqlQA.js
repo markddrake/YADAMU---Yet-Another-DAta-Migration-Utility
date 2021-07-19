@@ -204,6 +204,10 @@ class MsSQLQA extends MsSQLDBI {
 	  timer.unref()
 	}
 
+    verifyStagingSource(source) {  
+      super.verifyStagingSource(MsSQLConstants.STAGED_DATA_SOURCES,source)
+    } 
+	
 }
 module.exports = MsSQLQA
 

@@ -7,8 +7,8 @@
 	"reloadStagingArea" : false,
 	"emptyStringIsNull" : true,
 	"parameters": {
-        "REMOTE_STAGING_AREA"     : "yadamu/aws/loader/%sourceConnection%/sflake/csv",
-		"DIRECTORY"               : "loader/%sourceConnection%/sflake/csv",
+        "REMOTE_STAGING_AREA"     : "yadamu/aws/loader/%targetConnection%/%sourceConnection%/csv",
+		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
 		"SPATIAL_FORMAT"          : "WKT"
 	},
 	"tests": [{

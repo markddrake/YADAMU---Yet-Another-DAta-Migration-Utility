@@ -20,18 +20,14 @@ class JSONParser extends FileJSONParser {
   	  this.unpipe() 
 	  // Swallow any further errors raised by the Parser
 	  this.parser.on('error',(err) => {});
-    })
-    
-    parser.on('key',(key) => {
+    }).on('key',(key) => {
       // Push the current object onto the stack and the current object to the key
 
       // this.yadamuLogger.trace([`${this.constructor.name}.onKey()`,`${this.jDepth}`,`"${key}"`],``);
       
       this.objectStack.push(this.currentObject);
       this.currentObject = key;
-    });
-
-    parser.on('openobject',(key) => {
+    }).on('openobject',(key) => {
       // If the object has a key put the object on the stack and set the current object to the key. 
 
       // this.yadamuLogger.trace([`${this.constructor.name}.onOpenObject()`,`${this.jDepth}`,`"${key}"`],`ObjectStack:${this.objectStack}\n`);      
@@ -46,23 +42,16 @@ class JSONParser extends FileJSONParser {
         this.objectStack.push(this.currentObject);
         this.currentObject = key;
       }
-    });
-
-    parser.on('openarray',() => {
+    }).on('openarray',() => {
       // this.yadamuLogger.trace([`${this.constructor.name}.onOpenArray()`,`${this.jDepth}`],`ObjectStack: ${this.objectStack}`);
       if (this.jDepth > 0) {
         this.objectStack.push(this.currentObject);
       }
       this.currentObject = [];
       this.jDepth++;
-    });
-
-
-    parser.on('valuechunk',(v) => {
+    }).on('valuechunk',(v) => {
       this.chunks.push(v);  
-    });
-       
-    parser.on('value',(v) => {
+    }).on('value',(v) => {
       // this.yadamuLogger.trace([`${this.constructor.name}.onvalue()`,`${this.jDepth}`],`ObjectStack: ${this.objectStack}\n`);        
       if (this.chunks.length > 0) {
         this.chunks.push(v);
@@ -80,9 +69,7 @@ class JSONParser extends FileJSONParser {
           parentObject[this.currentObject] = v;
           this.currentObject = parentObject;
       }
-    });
-      
-    parser.on('closeobject',() => {
+    }).on('closeobject',() => {
       // this.yadamuLogger.trace([`${this.constructor.name}.onCloseObject()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}\nCurrentObject: ${JSON.stringify(this.currentObject)}`);           
       this.jDepth--;
 
@@ -101,9 +88,7 @@ class JSONParser extends FileJSONParser {
         }   
         this.currentObject = parentObject;
       }
-    });
-   
-    parser.on('closearray',() => {
+    }).on('closearray',() => {
 	  // this.yadamuLogger.trace([`${this.constructor.name}.onclosearray()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}.\nCurrentObject:${JSON.stringify(this.currentObject)}`);          
       this.jDepth--;
 

@@ -5,7 +5,7 @@ for /f "usebackq tokens=1 delims=," %%a in ("%DCONFIG%\bin\volumes.csv") do (
 docker volume ls
 docker network create YADAMU-NET
 REM Postgres 13
-docker run --name PGSQL13-01 --memory="16g" --shm-size=4g -p 5432:5432 -e POSTGRES_PASSWORD=oracle -v PGSQL13-01-DATA:/var/lib/postgresql/data -d postgres:latest 
+docker run --name PGSQL13-01 --memory="16g" --shm-size=4g -p 5432:5432 -e POSTGRES_PASSWORD=oracle -v PGSQL13-01-DATA:/var/lib/postgresql/data -vYADAMU_01_MNT:/mnt -d postgres:latest 
 REM
 REM MongoDB 4.0
 docker run --name MONGO40-01 --memory="16g" --shm-size=4g -p 27017:27017 -v MONGO40-01-DATA:/data/db -d mongo:latest 
@@ -29,16 +29,16 @@ ssh %DOCKER_USER%@%DOCKER_IP_ADDR% "sudo chown 54321:54322 /var/lib/docker/volum
 docker run --name ORA1120-01 --memory="16g" --shm-size=4g -p 1525:1521 -e ORACLE_SID=ORA11200 -e ORACLE_PDB=ORA11200 -e ORACLE_PWD=oracle -e ORACLE_CHARACTERSET=AL32UTF8 -vORA1120-01-DATA:/opt/oracle/oradata -vORA1120-01-DIAG:/opt/oracle/diag -vORA1120-01-DIAG:/opt/oracle/admin   -vYADAMU_01_MNT:/mnt --tmpfs /dev/shm/:rw,nosuid,nodev,exec,size=4g -d oracle/database:11.2.0.1-ee
 REM
 REM Oracle MySQL 8.0
-docker run --name MYSQL80-01 --memory="16g" --shm-size=4g -p 3306:3306 -v MYSQL80-01-DATA:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=oracle --cap-add=sys_nice -d mysql:latest 
+docker run --name MYSQL80-01 --memory="16g" --shm-size=4g -p 3306:3306 -v MYSQL80-01-DATA:/var/lib/mysql -vYADAMU_01_MNT:/mnt -e MYSQL_ROOT_PASSWORD=oracle --cap-add=sys_nice -d mysql:latest --secure-file-priv=/mnt 
 REM
 REM MaraDB 10.0
-docker run --name MARIA10-01 --memory="16g" --shm-size=4g -p 3307:3306 -v MARIA10-01-DATA:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=oracle -d mariadb:latest  
+docker run --name MARIA10-01 --memory="16g" --shm-size=4g -p 3307:3306 -v MARIA10-01-DATA:/var/lib/mysql -vYADAMU_01_MNT:/mnt -e MYSQL_ROOT_PASSWORD=oracle -d mariadb:latest  
 REM
 REM MsSQL 2019
-docker run --name MSSQL19-01 --memory="48g" --shm-size=4g -p 1434:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -e "MSSQL_MEMORY_LIMIT_MB=16384" -v MSSQL19-01-DATA:/var/opt/mssql -d mcr.microsoft.com/mssql/server:2019-latest
+docker run --name MSSQL19-01 --memory="48g" --shm-size=4g -p 1434:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -e "MSSQL_MEMORY_LIMIT_MB=16384" -v MSSQL19-01-DATA:/var/opt/mssql -vYADAMU_01_MNT:/mnt  -d mcr.microsoft.com/mssql/server:2019-latest
 REM
 REM MsSQL 2017
-docker run --name MSSQL17-01 --memory="48g" --shm-size=4g -p 1433:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -e "MSSQL_MEMORY_LIMIT_MB=16384" -v MSSQL17-01-DATA:/var/opt/mssql -d mcr.microsoft.com/mssql/server:2017-latest
+docker run --name MSSQL17-01 --memory="48g" --shm-size=4g -p 1433:1433 -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=oracle#1" -e "MSSQL_MEMORY_LIMIT_MB=16384" -v MSSQL17-01-DATA:/var/opt/mssql -vYADAMU_01_MNT:/mnt -d mcr.microsoft.com/mssql/server:2017-latest
 REM
 REM Postgres 12
 REM docker run --name PGSQL12-01 --memory="16g" --shm-size=4g -p 5432:5432 -e POSTGRES_PASSWORD=oracle -v PGSQL12-01-DATA:/var/lib/postgresql/data -d postgres:12 

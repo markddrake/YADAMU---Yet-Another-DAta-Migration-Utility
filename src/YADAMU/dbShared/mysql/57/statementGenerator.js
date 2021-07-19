@@ -1,5 +1,7 @@
 "use strict";
 
+const path = require('path');
+
 const YadamuLibrary = require('../../../common/yadamuLibrary.js');
 
 // Code Shared by MySQL 5.7 and MariaDB. 
@@ -61,7 +63,7 @@ class StatementGenerator {
   static get MONGO_OBJECT_ID()         { return 'binary(12)';       }
   static get MONGO_UNKNOWN_TYPE()      { return 'varchar(2048)';    }
   static get MONGO_REGEX_TYPE()        { return 'varchar(2048)';    }
-									   r
+                                       r
   static get UNBOUNDED_TYPES() { 
     StatementGenerator._UNBOUNDED_TYPES = StatementGenerator._UNBOUNDED_TYPES || Object.freeze(['date','tinytext','mediumtext','text','longtext','tinyblob','mediumblob','blob','longblob','json','set','enum'])
     return StatementGenerator._UNBOUNDED_TYPES;
@@ -110,13 +112,13 @@ class StatementGenerator {
            case '"MDSYS"."SDO_GEOMETRY"':                                                return 'geometry';
            case 'BOOLEAN':                                                               return this.dbi.TREAT_TINYINT1_AS_BOOLEAN ? 'boolean' : 'tinyint(1)'
            default :
-		     switch (true) {
+             switch (true) {
                case (dataType.indexOf('TIME ZONE') > -1):                                return 'datetime'; 
                case (dataType.indexOf('INTERVAL') === 0):                                return StatementGenerator.INTERVAL_TYPE;
                case (dataType.indexOf('XMLTYPE') > -1):                                  return XML_TYPE;
                case (dataType.indexOf('.') > -1):                                        return 'longtext';
                default:                                                                  return dataType.toLowerCase();
-			 }
+             }
          }
          break;
        case 'MSSQLSERVER':
@@ -153,7 +155,7 @@ class StatementGenerator {
                case (dataTypeLength > StatementGenerator.LARGEST_CHAR_SIZE):             return 'text';
                default:                                                                  return 'char';
              }
-			 
+             
            case 'text':                            return 'longtext';                   
            case 'ntext':                                                                 return 'longtext';
            case 'binary':
@@ -212,10 +214,10 @@ class StatementGenerator {
                case (dataTypeLength > StatementGenerator.LARGEST_CHAR_SIZE):              return 'text';
                default:                                                                   return 'char';
              }
-		   case 'text':                                                                   return 'longtext';
-		   case 'char':                                                                   return StatementGenerator.PGSQL_SINGLE_CHAR_TYPE;
-		   case 'name':                                                                   return StatementGenerator.PGSQL_NAME_TYPE
-		   case 'bpchar':                     
+           case 'text':                                                                   return 'longtext';
+           case 'char':                                                                   return StatementGenerator.PGSQL_SINGLE_CHAR_TYPE;
+           case 'name':                                                                   return StatementGenerator.PGSQL_NAME_TYPE
+           case 'bpchar':                     
              switch (true) {
                case (dataTypeLength === undefined):                                       return 'longtext';
                case (dataTypeLength > StatementGenerator.MEDIUMTEXT_SIZE):                return 'longtext';
@@ -231,9 +233,9 @@ class StatementGenerator {
                case (dataTypeLength > StatementGenerator.LARGEST_VARBINARY_SIZE_SIZE):    return 'blob';
                default:                                                                   return 'varbinary';
              }
-		   case 'decimal':
+           case 'decimal':
            case 'numeric':                                                               return dataTypeLength === undefined ? StatementGenerator.PGSQL_NUMERIC_TYPE : 'decimal';
-		   case 'money':                                                                 return StatementGenerator.PGSQL_MONEY_TYPE
+           case 'money':                                                                 return StatementGenerator.PGSQL_MONEY_TYPE
            case 'integer unsigned':                                                      return 'oid';
            case 'integer':                                                               return 'int';
            case 'real':                                                                  return 'float';
@@ -256,49 +258,49 @@ class StatementGenerator {
            case 'circle':                                                                return this.dbi.INBOUND_CIRCLE_FORMAT === 'CIRCLE' ? 'json' : 'polygon';
            case 'line':                                                                  return 'json';     
            case 'uuid':                                                                  return StatementGenerator.UUID_TYPE
-		   case 'bit':
-		   case 'bit varying':    
- 		     switch (true) {
+           case 'bit':
+           case 'bit varying':    
+             switch (true) {
            //  case (dataTypeLength === undefined):                                      return StatementGenerator.LARGEST_BIT_TYPE;
                case (dataTypeLength === undefined):                                      return StatementGenerator.LARGEST_VARCHAR_TYPE;
                case (dataTypeLength > StatementGenerator.MEDIUMTEXT_SIZE):               return 'longtext';
                case (dataTypeLength > StatementGenerator.TEXT_SIZE):                     return 'mediumtext';
                case (dataTypeLength > StatementGenerator.LARGEST_VARCHAR_SIZE):          return 'text';
-			   case (dataTypeLength > 64):                                               return 'varchar';
+               case (dataTypeLength > 64):                                               return 'varchar';
            //  default:                                                                  return StatementGenerator.BIT_TYPE;
                default:                                                                  return 'varchar'
-			 }
-		   case 'cidr':
-		   case 'inet':                                                                  return StatementGenerator.INET_ADDR_TYPE
-		   case 'macaddr':                                                              
-		   case 'macaddr8':                                                              return StatementGenerator.MAC_ADDR_TYPE
-		   case 'int4range':                                                            
-		   case 'int8range':                                                            
-		   case 'numrange':                                                             
-		   case 'tsrange':                                                              
-		   case 'tstzrange':                                                            
-		   case 'daterange':                                                             return 'json';
-		   case 'tsvector':                                                             
-		   case 'gtsvector':                                                             return 'json';
-		   case 'tsquery':                                                               return StatementGenerator.LARGEST_VARCHAR_TYPE;
+             }
+           case 'cidr':
+           case 'inet':                                                                  return StatementGenerator.INET_ADDR_TYPE
+           case 'macaddr':                                                              
+           case 'macaddr8':                                                              return StatementGenerator.MAC_ADDR_TYPE
+           case 'int4range':                                                            
+           case 'int8range':                                                            
+           case 'numrange':                                                             
+           case 'tsrange':                                                              
+           case 'tstzrange':                                                            
+           case 'daterange':                                                             return 'json';
+           case 'tsvector':                                                             
+           case 'gtsvector':                                                             return 'json';
+           case 'tsquery':                                                               return StatementGenerator.LARGEST_VARCHAR_TYPE;
            case 'oid':                                                                  
-		   case 'regcollation':                                                         
-		   case 'regclass':                                                             
-		   case 'regconfig':                                                            
-		   case 'regdictionary':                                                        
-		   case 'regnamespace':                                                         
-		   case 'regoper':                                                              
-		   case 'regoperator':                                                          
-		   case 'regproc':                                                              
-		   case 'regprocedure':                                                         
-		   case 'regrole':                                                              
-		   case 'regtype':                                                              return 'int unsigned';
-		   case 'tid':                                                                  
-		   case 'xid':                                                                  
-		   case 'cid':                                                                  
-		   case 'txid_snapshot':                                                        return StatementGenerator.PGSQL_IDENTIFIER;
-		   case 'aclitem':                                                              
-		   case 'refcursor':                                                            return 'json';
+           case 'regcollation':                                                         
+           case 'regclass':                                                             
+           case 'regconfig':                                                            
+           case 'regdictionary':                                                        
+           case 'regnamespace':                                                         
+           case 'regoper':                                                              
+           case 'regoperator':                                                          
+           case 'regproc':                                                              
+           case 'regprocedure':                                                         
+           case 'regrole':                                                              
+           case 'regtype':                                                              return 'int unsigned';
+           case 'tid':                                                                  
+           case 'xid':                                                                  
+           case 'cid':                                                                  
+           case 'txid_snapshot':                                                        return StatementGenerator.PGSQL_IDENTIFIER;
+           case 'aclitem':                                                              
+           case 'refcursor':                                                            return 'json';
            default:                                                                     
              if (dataType.indexOf('interval') === 0) {
                return StatementGenerator.INTERVAL_TYPE;
@@ -318,7 +320,7 @@ class StatementGenerator {
        case 'Vertica':
          switch (dataType) {
            case 'varchar':     
-		   case 'long varchar':                                                        return 'longtext';
+           case 'long varchar':                                                        return 'longtext';
              switch (true) {
                case (dataTypeLength > StatementGenerator.MEDIUMTEXT_SIZE):             return 'longtext';
                case (dataTypeLength > StatementGenerator.TEXT_SIZE):                   return 'mediumtext';
@@ -343,7 +345,7 @@ class StatementGenerator {
                default:                                                                return 'varbinary';
              }
            case 'float':                                                               return 'double';
-           case 'time':                                                                return dataTypeLength === undefined ? 'time(6)' : 'time';			 
+           case 'time':                                                                return dataTypeLength === undefined ? 'time(6)' : 'time';             
            case 'timetz':                                                              return 'datetime(6)';
            case 'timestamptz':                                                         return 'datetime(6)';
            case 'timestamp':                                                           return 'datetime(6)';
@@ -356,64 +358,64 @@ class StatementGenerator {
                return StatementGenerator.INTERVAL_TYPE;
              }
              return dataType.toLowerCase();
-		 }
-		 break;
+         }
+         break;
        case 'MongoDB':
          switch (dataType) {
            case "string":
-		     switch (true) {
+             switch (true) {
                case (dataTypeLength === undefined):                                    return 'longtext';
                case (dataTypeLength > StatementGenerator.MEDIUMTEXT_SIZE):             return 'longtext';
                case (dataTypeLength > StatementGenerator.TEXT_SIZE):                   return 'mediumtext';
                case (dataTypeLength > StatementGenerator.LARGEST_VARCHAR_SIZE):        return 'text';
                default:                                                                return 'varchar';
              }
-		   case "int":                                                                 return 'int';
-		   case "long":                                                                return 'bigint';
-		   case "double":                 	                                           return 'double';
-		   case "decimal":              		                                       return 'decimal(65,30)';
-		   case "binData":             		                                           return 'longblob';
-		   case "bool":                                                                return 'tinyint(1)';
-		   case "date":                                                                return 'datatime(6)';
-		   case "timestamp":		                                                   return 'datetime(6)';
-		   case "objectId":            		                                           return StatementGenerator.MONGO_OBJECT_ID
-		   case "object":                                                            
-		   case "array":                                                               return 'json';
+           case "int":                                                                 return 'int';
+           case "long":                                                                return 'bigint';
+           case "double":                                                              return 'double';
+           case "decimal":                                                             return 'decimal(65,30)';
+           case "binData":                                                             return 'longblob';
+           case "bool":                                                                return 'tinyint(1)';
+           case "date":                                                                return 'datatime(6)';
+           case "timestamp":                                                           return 'datetime(6)';
+           case "objectId":                                                            return StatementGenerator.MONGO_OBJECT_ID
+           case "object":                                                            
+           case "array":                                                               return 'json';
            case "null":                                                                return StatementGenerator.MONGO_UNKNOWN_TYPE
-           case "regex":                		                                       return StatementGenerator.MONGO_REGEX_TYPE
-           case "javascript":		                                                   return 'longtext';
-		   case "javascriptWithScope":    	                                           return 'longtext';
-		   case "minkey":                                                            
-		   case "maxkey":                                                              return "json";
-		   case "undefined":                                                         
-		   case 'dbPointer':                                                         
-		   case 'function':                                                          
-		   case 'symbol':                                                              return "json";
+           case "regex":                                                               return StatementGenerator.MONGO_REGEX_TYPE
+           case "javascript":                                                          return 'longtext';
+           case "javascriptWithScope":                                                 return 'longtext';
+           case "minkey":                                                            
+           case "maxkey":                                                              return "json";
+           case "undefined":                                                         
+           case 'dbPointer':                                                         
+           case 'function':                                                          
+           case 'symbol':                                                              return "json";
            default:                                                                    return dataType.toLowerCase();
-		 }
-		 break;
+         }
+         break;
        case 'SNOWFLAKE':
          switch (dataType.toLowerCase()) {
-		   case "number":		                                                       return 'decimal';
-		   case "float":		                                                       return 'double';
-		   case "geography":   	                                                       return 'geometry';
-		   case "text":                                                                return dataTypeLength > StatementGenerator.LARGEST_VARCHAR_SIZE ? 'mediumtext' : 'varchar'; 
-		   case "binary":                                                              return dataTypeLength > StatementGenerator.LARGEST_VARBINARY_SIZE ? 'mediumblob' : 'varbinary'; 
-		   case "xml":       	                                                       return StatementGenerator.XML_TYPE
-		   case "variant":                                                             return 'longblob';
-		   case "time":                                                                return dataTypeLength > 6 ? 'time(6)' : 'time'; 
-		   case "timestamp_ltz":                                                    
-		   case "timestamp_ntz":                                                       return dataTypeLength > 6 ? 'datetime(6)' : 'datetime'; 
-		   default:
+           case "number":                                                              return 'decimal';
+           case "float":                                                               return 'double';
+           case "geography":                                                           return 'geometry';
+           case "text":                                                                return dataTypeLength > StatementGenerator.LARGEST_VARCHAR_SIZE ? 'mediumtext' : 'varchar'; 
+           case "binary":                                                              return dataTypeLength > StatementGenerator.LARGEST_VARBINARY_SIZE ? 'mediumblob' : 'varbinary'; 
+           case "xml":                                                                 return StatementGenerator.XML_TYPE
+           case "variant":                                                             return 'longblob';
+           case "time":                                                                return dataTypeLength > 6 ? 'time(6)' : 'time'; 
+           case "timestamp_ltz":                                                    
+           case "timestamp_ntz":                                                       return dataTypeLength > 6 ? 'datetime(6)' : 'datetime'; 
+           default:
              return dataType.toLowerCase();
-	     }
-	   default :
+         }
+       default :
          return dataType.toLowerCase();
     }  
   }
   
   getColumnDataType(targetDataType, length, scale) {
-	 
+     
      if (RegExp(/\(.*\)/).test(targetDataType)) {
        return targetDataType
      }
@@ -431,14 +433,14 @@ class StatementGenerator {
      }
   
      if (StatementGenerator.SPATIAL_TYPES.includes(targetDataType)) {
-	   targetDataType = targetDataType === 'geomcollection'  ?  'geometrycollection' : targetDataType
+       targetDataType = targetDataType === 'geomcollection'  ?  'geometrycollection' : targetDataType
        return targetDataType
      }
   
      if (StatementGenerator.NATIONAL_TYPES.includes(targetDataType)) {
        return targetDataType + '(' + length + ')'
      }
-      	  
+          
      if (scale) {
        if (StatementGenerator.INTEGER_TYPES.includes(targetDataType)) {
          return targetDataType + '(' + length + ')';
@@ -446,7 +448,7 @@ class StatementGenerator {
        return targetDataType + '(' + length + ',' + scale + ')';
      }                                                   
   
-     if (length) {	 
+     if (length) {   
        if (targetDataType === 'double')  {
          return targetDataType
        }
@@ -459,31 +461,31 @@ class StatementGenerator {
   generateTableInfo(tableMetadata) {
       
     let insertMode = 'Batch';
-	
+    
     const columnNames = tableMetadata.columnNames
     const dataTypes = tableMetadata.dataTypes
     const sizeConstraints = tableMetadata.sizeConstraints
     const targetDataTypes = [];
     const setOperators = []
     const columnClauses = columnNames.map((columnName,idx) => {
-	  const dataType = YadamuLibrary.composeDataType(dataTypes[idx],sizeConstraints[idx])       
-	  let targetDataType = this.mapForeignDataType(tableMetadata.vendor,dataType.type,dataType.length,dataType.scale);
-	  targetDataTypes.push(targetDataType);
+      const dataType = YadamuLibrary.composeDataType(dataTypes[idx],sizeConstraints[idx])       
+      let targetDataType = this.mapForeignDataType(tableMetadata.vendor,dataType.type,dataType.length,dataType.scale);
+      targetDataTypes.push(targetDataType);
 
       let ensureNullable = false;
       switch (targetDataType) {
         case 'geometry':
-   	    case 'point':
-		case 'lseg':
-		case 'linestring':
-		case 'box':
-		case 'path':
-		case 'polygon':
-		case 'multipoint':
-		case 'multilinestring':
-		case 'multipolygon':
-		case 'geomcollection':
-		case 'geometrycollection':
+        case 'point':
+        case 'lseg':
+        case 'linestring':
+        case 'box':
+        case 'path':
+        case 'polygon':
+        case 'multipoint':
+        case 'multilinestring':
+        case 'multipolygon':
+        case 'geomcollection':
+        case 'geometrycollection':
           switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
              case "WKB":
              case "EWKB":
@@ -500,9 +502,9 @@ class StatementGenerator {
                setOperators.push('ST_GeomFromWKB(?)');
            }              
            break;                                                 
-		 case 'bit':
+         case 'bit':
            setOperators.push('conv(?,2,10)+0');
-		   break;
+           break;
         case 'timestamp':
            ensureNullable = true;
         default:
@@ -514,11 +516,11 @@ class StatementGenerator {
     const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
     const insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values `;
     const rowConstructor = `(${setOperators.join(',')})`
-	
-    return { 
+
+    const tableInfo =  { 
        ddl             : createStatement, 
        dml             : insertStatement, 
-	   columnNames     : columnNames,
+       columnNames     : columnNames,
        rowConstructor  : rowConstructor,
        targetDataTypes : targetDataTypes, 
        insertMode      : insertMode,
@@ -526,13 +528,108 @@ class StatementGenerator {
        _COMMIT_COUNT   : this.dbi.COMMIT_COUNT,
        _SPATIAL_FORMAT : this.dbi.INBOUND_SPATIAL_FORMAT
     }
-  }
-  
+    
+    if (tableMetadata.dataFile) {
+      const loadColumnNames = []
+      const setOperations = []
+      const copyOperators = targetDataTypes.map((targetDataType,idx) => {
+		const dataType = YadamuLibrary.decomposeDataType(targetDataType)
+        const psuedoColumnName = `@YADAMU_${String(idx+1).padStart(3,"0")}`
+        loadColumnNames.push(psuedoColumnName);
+        setOperations.push(`"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${psuedoColumnName})`)
+	    switch (dataType.type.toLowerCase()) {
+          case 'point':
+          case 'linestring':
+          case 'polygon':
+          case 'geometry':
+          case 'multipoint':
+          case 'multilinestring':
+          case 'multipolygon':
+          case 'geometry':                             
+          case 'geometrycollection':
+          case 'geomcollection':
+            let spatialFunction
+            switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+              case "WKB":
+              case "EWKB":
+                spatialFunction = `ST_GeomFromWKB(UNHEX(${psuedoColumnName}))`;
+                break;
+              case "WKT":
+                case "EWRT":
+                spatialFunction = `ST_GeomFromText(${psuedoColumnName})`;
+                break;
+              case "GeoJSON":
+                spatialFunction = `ST_GeomFromGeoJSON(${psuedoColumnName})`;
+                break;
+              default:
+                return `ST_GeomFromWKB(UNHEX(${psuedoColumnName}))`;
+            }
+            setOperations[idx] = `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${spatialFunction})`
+            break
+          case 'binary':                              
+          case 'varbinary':                              
+          case 'blob':                                 
+          case 'tinyblob':                             
+          case 'mediumblob':                           
+          case 'longblob':                             
+            setOperations[idx] = `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, UNHEX(${psuedoColumnName}))`
+            break;
+          case 'time':
+            setOperations[idx] = `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
+            break;
+          case 'datetime':
+          case 'timestamp':
+            setOperations[idx] = `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
+            break;
+		  case 'boolean':
+            setOperations[idx] = `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
+            break;
+          case 'tinyint':    
+            switch (true) {
+              case ((dataType.length === 1) && this.dbi.TREAT_TINYINT1_AS_BOOLEAN):
+                setOperations[idx] = `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
+                break;
+            }
+            break;                 
+          /*
+          case 'smallint':
+          case 'mediumint':
+          case 'integer':
+          case 'bigint':
+          case 'decimal':                                           
+          case 'float':                                           
+          case 'double':                                           
+          case 'bit':
+          case 'date':
+          case 'year':                            
+          case 'char':                              
+          case 'varchar':                              
+          case 'text':                                 
+          cae 'tinytext':
+          case 'mediumtext':                           
+          case 'longtext':                             
+          case 'set':                                  
+          case 'enum':                                 
+          case 'json':                                 
+          case 'xml':                                  
+          */
+          default:
+        }
+      })
+   
+      tableInfo.copy = {
+        dml         : `load data infile '${tableMetadata.dataFile.split(path.sep).join(path.posix.sep)}' into table "${this.targetSchema}"."${tableMetadata.tableName}" character set UTF8 fields terminated by ',' optionally enclosed by '"' ESCAPED BY '"' lines terminated by '\n' (${loadColumnNames.join(",")}) SET ${setOperations.join(",")}`
+      }
+	  
+	}
+    return tableInfo
+  }      
+   
   async generateStatementCache() {
       
     const statementCache = {}
     const tables = Object.keys(this.metadata); 
-	
+    
     const ddlStatements = tables.map((table,idx) => {
       const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);

@@ -18,11 +18,12 @@ class NullWritable extends Writable {
   _write(chunk, encoding, callback) {
 	callback() 
   }
+  
   _writev(chunks, callback) {
 	callback()
   }
 	
-  _final(err, callback) {
+  _final(callback) {
 	 callback()
   }
 

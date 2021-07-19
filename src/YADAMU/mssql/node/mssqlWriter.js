@@ -170,7 +170,7 @@ class MsSQLWriter extends YadamuWriter {
   async _writeBatch(batch,rowCount) {
 	  	  
     this.metrics.batchCount++;
-  
+    
     // console.log(this.tableInfo.bulkSupported,)
     // console.dir(batch,{depth:null})
     

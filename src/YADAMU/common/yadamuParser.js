@@ -9,6 +9,7 @@ class YadamuParser extends Transform {
     super({objectMode: true });  
     this.tableInfo = tableInfo;
     this.yadamuLogger = yadamuLogger
+	this.startTime = performance.now()
     this.rowCount = 0
 	
 	// Push the table name into the stream before sending the data.

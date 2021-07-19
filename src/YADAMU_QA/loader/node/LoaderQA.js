@@ -4,16 +4,22 @@ const fs = require('fs')
 const fsp = require('fs').promises
 const path = require('path')
 const crypto = require('crypto');
+const csv = require('csv-parser');
+const assert = require('assert');
 const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
-const { pipeline } = require('stream');
+const { pipeline, finished } = require('stream');
 
+const Parser = require('../../../YADAMU/clarinet/clarinet.js');
+const NullWriter = require('../../../YADAMU/common/nullWritable.js');
 const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
 const YadamuLogger = require('../../../YADAMU/common/yadamuLogger.js');
 const LoaderDBI = require('../../../YADAMU/loader/node/loaderDBI.js');
 const JSONParser = require('../../../YADAMU/loader/node/jsonParser.js');
 const YadamuTest = require('../../common/node/yadamuTest.js');
-const ArrayCounter = require('./arrayCounter.js');
+// const ArrayCounter = require('./arrayCounter.js');
 const ArrayReader = require('./arrayReader.js');
+
+const {FileError, FileNotFound, DirectoryNotFound} = require('../../../YADAMU/file/node/fileException.js');
 
 class LoaderQA extends LoaderDBI {
 
@@ -30,15 +36,26 @@ class LoaderQA extends LoaderDBI {
 			
   async recreateSchema() {
     this.DIRECTORY = this.TARGET_DIRECTORY
-    await fsp.rmdir(this.IMPORT_FOLDER,{recursive: true})
+    
+	let stack
+	try {
+	  stack = new Error().stack;
+      await fsp.rmdir(this.IMPORT_FOLDER,{recursive: true})
+	} catch(err) {
+	  if (err.code !== 'ENOENT') {
+	    throw new FileError(err,stack,this.IMPORT_FOLDER);
+	  }
+	}
+	try {
+	  stack = new Error().stack;
+      await fsp.mkdir(this.IMPORT_FOLDER,{recursive: true})
+	} catch(err) {
+      throw err.code === 'ENOENT' ? new DirectoryNotFound(err,stack,this.IMPORT_FOLDER) : new FileError(err,stack,this.IMPORT_FOLDER)
+	}
   }
 
   constructor(yadamu,settings,parameters) {
 	super(yadamu,settings,parameters)
-  }
-
-  setMetadata(metadata) {
-    super.setMetadata(metadata)
   }
 
   async initialize() {
@@ -49,7 +66,11 @@ class LoaderQA extends LoaderDBI {
   }
 
   async getArray(filename) {
-	const streams = await this.getInputStreams(filename)
+	const streams = await this.qaInputStreams(filename)
+		
+	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, filename)
+	streams.push(jsonParser);
+	
 	const arrayReader = new ArrayReader(this)
 	streams.push(arrayReader)
 
@@ -90,6 +111,7 @@ class LoaderQA extends LoaderDBI {
   }	  
   
   async compareFiles(sourceFile,targetFile) {
+
 	const sourceFileSize = fs.statSync(sourceFile).size
 	const targetFileSize = fs.statSync(targetFile).size
 	let sourceHash = ''
@@ -106,30 +128,56 @@ class LoaderQA extends LoaderDBI {
   }
   
   async compareSchemas(source,target) {
-	 
+
     const report = {
       successful : []
     , failed     : []
     }
-
+	 
 	this._BASE_DIRECTORY = undefined
     this.DIRECTORY = this.SOURCE_DIRECTORY
-	let controlFilePath = path.join(this.BASE_DIRECTORY,source.schema,`${source.schema}.json`);
+	this.setFolderPaths(path.join(this.BASE_DIRECTORY,source.schema),source.schema)
+    const sourceFilePath = this.CONTROL_FILE_PATH;
+    
+	this._BASE_DIRECTORY = undefined
+    this.DIRECTORY = this.TARGET_DIRECTORY
+	this.setFolderPaths(path.join(this.BASE_DIRECTORY,target.schema),target.schema)
+    const targetFilePath = this.CONTROL_FILE_PATH;
 	
-	let fileContents = await fsp.readFile(controlFilePath,{encoding: 'utf8'})
+	try {
+	  assert.notEqual(sourceFilePath,targetFilePath,`Source & Target control files are identical: "${sourceFilePath}"`);
+	} catch(err) {
+	  report.failed.push([source.schema,target.schema,'',0,0,0,0,err.message])
+      return report	 
+	}
+	
+    let fileContents	
+	
+	try {
+  	  fileContents = await fsp.readFile(sourceFilePath,{encoding: 'utf8'})
+	} catch(err) {
+	  report.failed.push([source.schema,target.schema,'*',0,0,0,0,err.message])
+      return report	 
+	}
+
     const sourceControlFile = JSON.parse(fileContents)
 	
+	try {
+	  fileContents = await fsp.readFile(sourceFilePath,{encoding: 'utf8'})
+	} catch(err) {
+	  report.failed.push([source.schema,target.schema,'*',0,0,0,0,err.message])
+      return report	 
+	}
+	
+    const targetControlFile = JSON.parse(fileContents)
+
 	// Assume the source control file contains the correct options for both source and target
     this.controlFile = sourceControlFile
 	
-    this._BASE_DIRECTORY = undefined
-    this.DIRECTORY = this.TARGET_DIRECTORY
-	controlFilePath = path.join(this.BASE_DIRECTORY,target.schema,`${target.schema}.json`);
-	
-	fileContents = await fsp.readFile(controlFilePath,{encoding: 'utf8'})
-    const targetControlFile = JSON.parse(fileContents)
-
-    let results = await Promise.all(Object.keys(targetControlFile.data).map((tableName) => {return this.compareFiles( sourceControlFile.data[tableName].file, targetControlFile.data[tableName].file)}))
+    const sourceFolder = path.dirname(sourceFilePath)
+	const targetFolder = path.dirname(targetFilePath)
+   
+    let results = await Promise.all(Object.keys(targetControlFile.data).map((tableName) => {return this.compareFiles( path.resolve(sourceFolder,sourceControlFile.data[tableName].file), path.resolve(targetFolder,targetControlFile.data[tableName].file))}))
 	
     Object.keys(targetControlFile.data).map((tableName,idx) => {
 	  const result = results[idx]
@@ -143,10 +191,9 @@ class LoaderQA extends LoaderDBI {
 	return report
   }
   
-   async getInputStreams(filename) {
-    
-	const streams = []
-    const is = await this.getInputStream(filename);
+  async qaInputStreams(filename) {
+    const streams = []
+	const is = await this.getInputStream(filename);
 	streams.push(is)
 	
 	if (this.ENCRYPTED_INPUT) {
@@ -161,40 +208,84 @@ class LoaderQA extends LoaderDBI {
       streams.push(this.controlFile.settings.compression === 'GZIP' ? createGunzip() : createInflate())
 	}
 	
-	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, filename)
-	streams.push(jsonParser);
-	return streams
+    return streams
   }
-  
+
   async getRowCount(tableInfo) {
     
-	const filename = this.controlFile.data[tableInfo.TABLE_NAME].file
-	const streams = await this.getInputStreams(filename)
-	const arrayCounter = new ArrayCounter(this)
-	streams.push(arrayCounter)
-
-	return new Promise((resolve,reject) => {
-      pipeline(streams,(err) => {
-		if (err) reject(err) 
-		resolve(arrayCounter.getRowCount());
-	  })
-	})
+    let arrayLength = 0
+    const parser = Parser.createStream()
+	const nullStream = new NullWriter();
+	
+    parser.once('error',(err) => {
+      this.yadamuLogger.handleException([`JSON_PARSER`,`Invalid JSON Document`,`"${this.exportFilePath}"`],err)
+	  parser.destroy(err);
+  	  parser.unpipe() 
+	  // Swallow any further errors raised by the Parser
+	  parser.on('error',(err) => {});
+    }).on('openobject',(key) => {
+      this.jDepth++;
+    }).on('openarray',() => {
+      this.jDepth++;
+    }).on('closeobject',() => {
+      // this.yadamuLogger.trace([`${this.constructor.name}.onCloseObject()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}\nCurrentObject: ${JSON.stringify(this.currentObject)}`);           
+      this.jDepth--;
+    }).on('closearray',() => {
+	  // this.yadamuLogger.trace([`${this.constructor.name}.onclosearray()`,`${this.jDepth}`],`\nObjectStack: ${this.objectStack}.\nCurrentObject:${JSON.stringify(this.currentObject)}`);          
+      this.jDepth--;
+      switch (this.jDepth){
+        case 1:
+		  arrayLength++
+      }
+    });  
+	
+	const streams = await this.qaInputStreams(this.makeAbsolute(this.controlFile.data[tableInfo.TABLE_NAME].file))
+	streams.push(parser)
+	streams.push(nullStream)
+	const rowCount = new Promise((resolve,reject) => {
+      finished(nullStream,(err) => {
+		if (err) {reject(err)} else {resolve(arrayLength)}
+      })
+    })
+    pipeline(streams,(err) => {})
+	return rowCount
   }
-
+  
   async getRowCounts(target) {
 
 	this.DIRECTORY = this.TARGET_DIRECTORY
-    const controlFilePath = path.resolve(`${path.join(this.BASE_DIRECTORY,target.schema,target.schema)}.json`)
+	this.setFolderPaths(this.IMPORT_FOLDER,target.schema)
 	
-	const fileContents = await fsp.readFile(controlFilePath,{encoding: 'utf8'})
-    this.controlFile = JSON.parse(fileContents)
-    const counts = await Promise.all(Object.keys(this.controlFile.data).map((k) => {
-	  return this.getRowCount({TABLE_NAME:k})
-	}))
-	
-    return Object.keys(this.controlFile.data).map((k,i) => {
-	  return [target.schema,k,counts[i]]
-    })	
+	let stack
+	try {
+	  const fileContents = await fsp.readFile(this.CONTROL_FILE_PATH,{encoding: 'utf8'})
+      this.controlFile = JSON.parse(fileContents)
+      let counts 
+	  switch (this.controlFile.settings.contentType) {
+		case 'JSON':
+          counts = await Promise.all(Object.keys(this.controlFile.data).map((k) => {
+  	        return this.getRowCount({TABLE_NAME:k})
+	      }))
+		 	
+          return Object.keys(this.controlFile.data).map((k,i) => {
+	        return [target.schema,k,counts[i]]
+          })	
+  	    case 'CSV':
+   		  stack = new Error().stack
+		  counts = await Promise.all(Object.values(this.controlFile.data).map((t) => {
+		    return new Promise((resolve,reject) => {
+  			  let count = 0;
+			  fs.createReadStream(this.makeRelative(t.file)).pipe(this.getCSVParser()).on('data', (data) => {count++}).on('end', () => {resolve(count)});
+			})
+    	 }))
+		 
+		 return Object.keys(this.controlFile.data).map((k,i) => {
+	       return [target.schema,k,counts[i]]
+         })	
+      }
+	} catch(err) {
+      throw err.code === 'ENOENT' ? new FileNotFound(err,stack,this.CONTROL_FILE_PATH) : new FileError(err,stack,this.CONTROL_FILE_PATH)
+	}
   }    
 
   getControlFileSettings() {
@@ -206,6 +297,25 @@ class LoaderQA extends LoaderDBI {
 	this.yadamu.parameters.COMPRESSION = options.compression
 	this.yadamu.parameters.ENCRYPTION = options.encryption
   }
+
+  async initializeExport() {
+
+	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
+	
+	await this.loadControlFile()
+	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using Control File: "${this.PROTOCOL}${this.resolve(this.CONTROL_FILE_PATH)}"`);
+
+  }
+  
+  classFactory(yadamu) {
+    return new LoaderQA(yadamu)
+  }
+  
+  getCSVParser() {
+	 return csv({headers: false})
+  }
   
 }
+
+
 module.exports = LoaderQA

@@ -18,6 +18,7 @@
     "aws-sdk": "^2.731.0",
     "bootstrap": "^4.4.1",
     "cookie-parser": "^1.4.5",
+    "csv-parser": "^3.0.0",
     "express": "^4.17.1",
     "express-session": "^1.17.1",
     "ffi-napi": "^3.0.1",

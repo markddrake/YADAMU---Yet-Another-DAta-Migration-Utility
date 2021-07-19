@@ -21,6 +21,7 @@ class MongoConstants {
     , "SPATIAL_FORMAT"            : "GeoJSON"
 	, "MAX_DOCUMENT_SIZE"         : "16777216"
 	, "TIMESTAMP_PRECISION"       : 6
+	, "DEFAULT_DATABASE"          : "admin"
     })
     return this._STATIC_PARAMETERS
   }
@@ -43,6 +44,7 @@ class MongoConstants {
   static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get STATEMENT_TERMINATOR()   { return ';' }
   static get MAX_DOCUMENT_SIZE()      { return this.DBI_PARAMETERS.MAX_DOCUMENT_SIZE}
+  static get DEFAULT_DATABASE()       { return this.DBI_PARAMETERS.DEFAULT_DATABASE };
 
 }
 

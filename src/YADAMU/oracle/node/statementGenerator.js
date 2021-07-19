@@ -50,6 +50,8 @@ class StatementGenerator {
 
   get SQL_DIRECTORY_NAME()     { return this._SQL_DIRECTORY_NAME }
   set SQL_DIRECTORY_NAME(v)    { this._SQL_DIRECTORY_NAME = v }
+  get SQL_DIRECTORY_PATH()     { return this._SQL_DIRECTORY_PATH }
+  set SQL_DIRECTORY_PATH(v)    { this._SQL_DIRECTORY_PATH = v }
   get LOADER_CLOB_SIZE()       { return 67108864 }
   get LOADER_CLOB_TYPE()       { return `CHAR(${this.LOADER_CLOB_SIZE})`}
     

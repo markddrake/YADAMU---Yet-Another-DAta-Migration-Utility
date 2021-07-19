@@ -438,7 +438,7 @@ end;`
 
   commitWork() {
     // While COMMIT is defined as a multiple of BATCH_SIZE some drivers may write smaller batches.
-    return ((this.metrics.written === this.COMMIT_COUNT) || (this.tempLobCount >= this.dbi.COMMIT_TEMPLOB_LIMIT) || (this.cachedLobCount > this.dbi.COMMIT_CACHELOB_LIMIT))
+    return (super.commitWork() || (this.tempLobCount >= this.dbi.COMMIT_TEMPLOB_LIMIT) || (this.cachedLobCount > this.dbi.COMMIT_CACHELOB_LIMIT))
   }
   
   async serializeLob(lob) {

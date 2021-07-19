@@ -66,6 +66,7 @@ class MsSQLDBI extends YadamuDBI {
   get DATABASE_KEY()           { return MsSQLConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return MsSQLConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return MsSQLConstants.SOFTWARE_VENDOR};
+  // get SQL_COPY_SUPPORTED()     { return true }
   get STATEMENT_TERMINATOR()   { return MsSQLConstants.STATEMENT_TERMINATOR };
 
   // Enable configuration via command line parameters
@@ -1209,8 +1210,49 @@ class MsSQLDBI extends YadamuDBI {
     const results = await this.executeSQL(`select @@SPID "SPID"`)
     const pid = results.recordset[0].SPID
     return pid
-}  
+  }  
   
+    validStagedDataSet(vendor,controlFilePath,controlFile) {
+
+    /*
+	**
+	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
+	** Return false if the data set cannot be consumed using a Copy operation
+	** Do not throw errors if the data set cannot be used for a COPY operatio
+	** Generate Info messages to explain why COPY cannot be used.
+	**
+	*/
+
+    if (!MsSQLConstants.STAGED_DATA_SOURCES.includes(vendor)) {
+       return false;
+	}
+	
+	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
+  }
+   
+  async copyOperation(tableName,copy) {
+	
+    /*
+    **
+    ** Generic Basic Imementation - Override as required for error reporting etc
+    **
+    */
+	
+	try {
+	  const startTime = performance.now();
+	  const stack = new Error().stack
+	  let results = await this.beginTransaction();
+	  results = await this.executeSQL(copy.dml);
+	  const rowsRead = results.rowsAffected
+	  const elapsedTime = performance.now() - startTime;
+	  results = await this.commitTransaction()
+  	  await this.reportCopyResults(tableName,rowsRead,0,elapsedTime,copy.dml,stack)
+	} catch(e) {
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+	  let results = await this.rollbackTransaction()
+	}
+  }
+
 }
 
 module.exports = MsSQLDBI

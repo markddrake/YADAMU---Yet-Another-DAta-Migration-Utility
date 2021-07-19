@@ -68,6 +68,7 @@ class OracleDBI extends YadamuDBI {
   get SOFTWARE_VENDOR()        { return OracleConstants.SOFTWARE_VENDOR};
   get SQL_COPY_SUPPORTED()     { return true }
   get STATEMENT_TERMINATOR()   { return OracleConstants.STATEMENT_TERMINATOR };
+  get STATEMENT_SEPERATOR()    { return OracleConstants.STATEMENT_SEPERATOR };
   get DBI_PARAMETERS()         { return OracleConstants.DBI_PARAMETERS }
 
  
@@ -92,12 +93,12 @@ class OracleDBI extends YadamuDBI {
   }
 
   get COMMIT_TEMPLOB_LIMIT() {
-    this._COMMIT_TEMPLOB_LIMIT = this._COMMIT_TEMPLOB_LIMIT || (() => { return this.BATCH_TEMPLOB_LIMIT * (isNaN(this.COMMIT_RATIO) ? DBIConstants.COMMIT_RATIO : this.COMMIT_RATIO)})()
+    this._COMMIT_TEMPLOB_LIMIT = this._COMMIT_TEMPLOB_LIMIT || (() => { return this.BATCH_TEMPLOB_LIMIT * (this.COMMIT_RATIO || 1)})()
     return this._COMMIT_TEMPLOB_LIMIT 
   }
 
   get COMMIT_CACHELOB_LIMIT() { 
-    this._COMMIT_CACHELOB_LIMIT = this._COMMIT_CACHELOB_LIMIT ||(() => { return this.BATCH_CACHELOB_LIMIT * (isNaN(this.COMMIT_RATIO) ? DBIConstants.COMMIT_RATIO : this.COMMIT_RATIO)})()
+    this._COMMIT_CACHELOB_LIMIT = this._COMMIT_CACHELOB_LIMIT || (() => { return this.BATCH_CACHELOB_LIMIT * (this.COMMIT_RATIO || 1)})()
     return this._COMMIT_CACHELOB_LIMIT 
   }
 
@@ -1314,6 +1315,7 @@ class OracleDBI extends YadamuDBI {
     super.cloneCurrentSettings(manager)
 	await this.setCurrentSchema(manager.currentSchema);
     await this.setDateFormatMask(this.systemInformation.vendor);
+	this.SQL_DIRECTORY_PATH = this.manager.SQL_DIRECTORY_PATH
   }
   
   async getConnectionID() {
@@ -1368,12 +1370,12 @@ class OracleDBI extends YadamuDBI {
     if (!OracleConstants.STAGED_DATA_SOURCES.includes(vendor)) {
        return false;
 	}
-	
+    	
 	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
   }
   
   async initializeCopy() {
-	 await this.executeSQL(`create or replace directory ${this.SQL_DIRECTORY_NAME} as '${path.join(this.REMOTE_STAGING_AREA,this.parameters.TO_USER,'data').split(path.sep).join(path.posix.sep)}/'`);
+	 await this.executeSQL(`create or replace directory ${this.SQL_DIRECTORY_NAME} as '${this.SQL_DIRECTORY_PATH}/'`);
   }
   
   async copyOperation(tableName,copy) {
@@ -1396,6 +1398,9 @@ class OracleDBI extends YadamuDBI {
 	  results = await this.commitTransaction()
   	  await this.reportCopyResults(tableName,rowsRead,0,elapsedTime,copy.dml,stack)
 	} catch(e) {
+	  if (e.copyFileNotFoundError()) {
+		e.directoryPath = this.SQL_DIRECTORY_PATH
+	  }
 	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
 	  let results = await this.rollbackTransaction()
 	}
@@ -1403,6 +1408,11 @@ class OracleDBI extends YadamuDBI {
 
   async finalizeCopy() {
 	 await this.executeSQL(`drop directory ${this.SQL_DIRECTORY_NAME}`);
+  }
+  
+  async copyStagedData(vendor,controlFile,metadata,credentials) {
+	this.SQL_DIRECTORY_PATH = path.join(this.REMOTE_STAGING_AREA,path.basename(controlFile.settings.baseFolder),'data').split(path.sep).join(path.posix.sep)
+	return super.copyStagedData(vendor,controlFile,metadata,credentials) 
   }
   
 }

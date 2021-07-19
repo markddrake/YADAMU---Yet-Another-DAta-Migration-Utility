@@ -446,7 +446,7 @@ class YadamuCLI {
 	const startTime = performance.now();
     await this.yadamu.doCopy(stage,dbi);      
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`LOAD`],`Operation complete: Control File:"${stage.controlFilePath}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`YADAMU`,`LOAD`],`Operation complete: Control File:"${stage.CONTROL_FILE_PATH}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
 
   async doLoad() {
@@ -456,7 +456,7 @@ class YadamuCLI {
     const startTime = performance.now();
     await this.yadamu.doCopy(fs,dbi);      
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`LOAD`],`Operation complete: Control File:"${fs.controlFilePath}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`YADAMU`,`LOAD`],`Operation complete: Control File:"${fs.CONTROL_FILE_PATH}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
   
   async doUpload() {
@@ -484,7 +484,7 @@ class YadamuCLI {
     const startTime = performance.now();
     await this.yadamu.doCopy(dbi,fs);      
     const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.info([`YADAMU`,`UNLOAD`],`Operation complete: Control File:"${fs.controlFilePath}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.info([`YADAMU`,`UNLOAD`],`Operation complete: Control File:"${fs.CONTROL_FILE_PATH}". Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
   }
 
   async doEncrypt() {

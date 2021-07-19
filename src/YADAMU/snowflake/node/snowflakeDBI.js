@@ -523,6 +523,11 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     return pid
   }
  
+  async generateCopyStatements(metadata,credentials) {
+	 this.statementLibrary.STAGE_CREDENTIALS = credentials
+	 return super.generateCopyStatements(metadata) 
+  }
+ 
   validStagedDataSet(vendor,controlFilePath,controlFile) {
 
     /*
@@ -558,8 +563,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
       err.cause = e
 	}
 	this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)	   	
-  }
-  
+  }  
     
   async reportCopyResults(tableName,rowsRead,failed,elapsedTime,sqlStatement,stack) {
     const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rowsRead/elapsedTime) * 1000)} rows/s.`
@@ -576,11 +580,9 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
         await this.reportCopyErrors(tableName,failed,stack,sqlStatement)
 	}
   }
-  
+
   async initializeCopy(credentials) {
-	this.statementLibrary.STAGE_CREDENTIALS = credentials
-	const sqlStatement = this.statementLibrary.SQL_CREATE_STAGE
-    const  results = await this.executeSQL(sqlStatement);
+    const results = await this.executeSQL(this.statementLibrary.SQL_CREATE_STAGE);
   }
   
   async copyOperation(tableName,sqlStatement) {

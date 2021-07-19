@@ -482,6 +482,16 @@ class YadamuLibrary {
     return connectionProperties(this.getVendorName(connectionProperties))
   }
   
+  static applyMixins(targetClass) {
+	if (Array.isArray(targetClass.MIXINS)) {
+	  for (const mixinPath of targetClass.MIXINS) {
+	    const mixin =  require(mixinPath);
+        for (const key of Object.getOwnPropertyNames(mixin.prototype)) {
+          targetClass.prototype[key] = mixin.prototype[key]
+        }
+      }
+    }
+  }
 }
 
 module.exports = YadamuLibrary

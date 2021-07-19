@@ -39,12 +39,13 @@ class YadamuDBI {
   get SQL_COPY_SUPPORTED()         { return false }
   
   get PASSWORD_KEY_NAME()          { return 'password' };
-  get STATEMENT_TERMINATOR()       { return '' }
+  get STATEMENT_TERMINATOR()       { return ';' }
+  get STATEMENT_SEPERATOR()        { return '\n--\n' }
 
   get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT         || DBIConstants.SPATIAL_FORMAT };
   get TABLE_MAX_ERRORS()           { return this.parameters.TABLE_MAX_ERRORS       || DBIConstants.TABLE_MAX_ERRORS };
   get TOTAL_MAX_ERRORS()           { return this.parameters.TOTAL_MAX_ERRORS       || DBIConstants.TOTAL_MAX_ERRORS };
-  get COMMIT_RATIO()               { return this.parameters.COMMIT_RATIO           || DBIConstants.COMMIT_RATIO };
+  get COMMIT_RATIO()               { return this.parameters.hasOwnProperty('COMMIT_RATIO') ?  this.parameters.COMMIT_RATIO : DBIConstants.COMMIT_RATIO };
   get MODE()                       { return this.parameters.MODE                   || DBIConstants.MODE }
   get ON_ERROR()                   { return this.parameters.ON_ERROR               || DBIConstants.ON_ERROR }
   get INFINITY_MANAGEMENT()        { return this.parameters.INFINITY_MANAGEMENT    || DBIConstants.INFINITY_MANAGEMENT };
@@ -66,7 +67,7 @@ class YadamuDBI {
   }
 
   get COMMIT_COUNT() {    
-    this._COMMIT_COUNT = this._COMMIT_COUNT || (() => {
+    this._COMMIT_COUNT = this._COMMIT_COUNT !== undefined ? this._COMMIT_COUNT : (() => {
       let commitCount = isNaN(this.COMMIT_RATIO) ? DBIConstants.COMMIT_RATIO : this.COMMIT_RATIO
       commitCount = Math.abs(Math.ceil(commitCount))
       commitCount = commitCount * this.BATCH_SIZE
@@ -197,7 +198,6 @@ class YadamuDBI {
 
     this.sqlTraceTag = `/* Manager */`;	
     this.sqlCumlativeTime = 0
-    this.sqlTerminator = `\n${this.STATEMENT_TERMINATOR}\n`
 	this.firstError = undefined
 	this.latestError = undefined    
     
@@ -239,7 +239,7 @@ class YadamuDBI {
   
   traceSQL(msg,rows,lobCount) {
      // this.yadamuLogger.trace([this.DATABASE_VENDOR,'SQL'],msg)
-     return(`${msg.trim()} ${rows ? `/* Rows: ${rows}. */ ` : ''} ${lobCount ? `/* LOBS: ${lobCount}. */ ` : ''}${this.sqlTraceTag} ${this.sqlTerminator}`);
+     return(`${msg.trim()}${this.STATEMENT_TERMINATOR} ${rows ? `/* Rows: ${rows}. */ ` : ''} ${lobCount ? `/* LOBS: ${lobCount}. */ ` : ''}${this.sqlTraceTag}${this.STATEMENT_SEPERATOR}`);
   }
   
   traceTiming(startTime,endTime) {      
@@ -1521,7 +1521,8 @@ class YadamuDBI {
   }
   
   async reportCopyResults(tableName,rowsRead,failed,elapsedTime,sqlStatement,stack) {
-    const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rowsRead/elapsedTime) * 1000)} rows/s.`
+	const throughput = Math.round((rowsRead/elapsedTime) * 1000)
+    const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${throughput} rows/s.`
    
     let rowCountSummary
     switch (failed) {
@@ -1534,6 +1535,17 @@ class YadamuDBI {
         this.yadamuLogger.error([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
         await this.reportCopyErrors(tableName,stack,sqlStatement)
 	}
+	
+	const metrics = {
+	  [tableName] : {
+		rowCount    : rowsRead
+	  , insertMode  : 'copy'
+	  , elapsedTime : elapsedTime
+	  , throughput  : `${throughput}/s`
+	  }
+    }
+    
+	this.yadamu.recordMetrics(metrics);  
   }
   
   async initializeCopy() {
@@ -1629,7 +1641,7 @@ class YadamuDBI {
 	this.setSystemInformation(controlFile.systemInformation)
 
     const startTime = performance.now()	
-	const statementCache = await this.generateCopyStatements(metadata);
+	const statementCache = await this.generateCopyStatements(metadata,credentials);
 	const ddlStatements = this.analyzeStatementCache(statementCache,startTime)
 	let results = await this.executeDDL(ddlStatements)
     if (results instanceof Error) {
@@ -1647,7 +1659,7 @@ class YadamuDBI {
 	    , copyStatement : statementCache[table].copy
         }
 	  })
-	  await this.initializeCopy(credentials,statementCache)
+	  await this.initializeCopy()
       results = await this.copyOperations(taskList,vendor)
 	  await this.finalizeCopy()
 	  

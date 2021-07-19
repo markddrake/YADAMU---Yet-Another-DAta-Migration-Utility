@@ -60,7 +60,7 @@ class MySQLQA extends MySQLDBI {
     // ### Hack to avoid missng rows when using a new connection to read previously written rows using new connection immediately after closing current connection.....'
 
 	async finalizeImport() {
-	  await this.doTimeout(100);
+	  await this.doTimeout(1000);
 	  super.finalizeImport()
     }
 	
@@ -82,11 +82,15 @@ class MySQLQA extends MySQLDBI {
 	
     async getRowCounts(target) {
 
-      const results = await this.executeSQL(MySQLQA.SQL_SCHEMA_TABLE_ROWS,[target.schema]);
+      let results = await this.executeSQL(MySQLQA.SQL_SCHEMA_TABLE_ROWS,[target.schema]);
       
+	  // const ACURATE_ROW_COUNT = results.map((row) => {return `select '${target.schema}', '${row.TABLE_NAME}', count(*) from "${target.schema}"."{row.TABLE}"`}).join('\nunion all\n');
+      // results = await this.executeSQL(MySQLQA.ACURATE_ROW_COUNT);
+	  
       return results.map((row,idx) => {          
-        return [target.schema,row.TABLE_NAME,row.TABLE_ROWS]
+        return [target.schema,row.TABLE_NAME,parseInt(row.TABLE_ROWS)]
       })
+	  
 
     }
     
@@ -102,12 +106,12 @@ class MySQLQA extends MySQLDBI {
 
       const successful = await this.executeSQL(MySQLQA.SQL_SUCCESS,{})
       report.successful = successful.map((row,idx) => {          
-        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT]
+        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,parseInt(row.TARGET_ROW_COUNT)]
       })
 
       const failed = await this.executeSQL(MySQLQA.SQL_FAILED,{})
       report.failed = failed.map((row,idx) => {
-        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.SOURCE_ROW_COUNT,row.TARGET_ROW_COUNT,row.MISSING_ROWS,row.EXTRA_ROWS,(row.NOTES !== undefined ? row.NOTES : '')]
+        return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,parseInt(row.SOURCE_ROW_COUNT),parseInt(row.TARGET_ROW_COUNT),parseInt(row.MISSING_ROWS),parseInt(row.EXTRA_ROWS),(row.NOTES !== undefined ? row.NOTES : '')]
       })
       
       return report
@@ -142,6 +146,10 @@ class MySQLQA extends MySQLDBI {
       )
 	  timer.unref()
 	}	
+
+    verifyStagingSource(source) {  
+      super.verifyStagingSource(MySQLConstants.STAGED_DATA_SOURCES,source)
+    } 
 	
 }
 

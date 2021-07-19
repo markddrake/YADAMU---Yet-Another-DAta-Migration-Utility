@@ -74,6 +74,7 @@ class MySQLConstants {
     return this._JSON_PARSING_ERROR
   }
 
+  static get STAGED_DATA_SOURCES()    { return Object.freeze(['loader']) }
 }
 
 module.exports = MySQLConstants

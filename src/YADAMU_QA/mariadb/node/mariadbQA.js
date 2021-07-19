@@ -116,6 +116,9 @@ class MariadbQA extends MariadbDBI {
 	  timer.unref()
 	}	
 
+    verifyStagingSource(source) {  
+      super.verifyStagingSource(MariadbConstants.STAGED_DATA_SOURCES,source)
+    } 
 }
 
 module.exports = MariadbQA

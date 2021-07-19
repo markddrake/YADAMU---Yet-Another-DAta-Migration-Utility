@@ -1,0 +1,177 @@
+{
+	"operation": "copy",
+	"connections": "connections.json",
+	"tasks": "tasks.json",
+	"stagingArea": "loader-staging",
+	"recreateSchema": true,
+	"reloadStagingArea" : false,
+	"emptyStringIsNull" : true,
+	"parameters": {
+		"REMOTE_STAGING_AREA"     : "/mnt/stagingArea/loader/csv",
+		"DIRECTORY"               : "loader/csv",
+		"COMMIT_RATIO"            : 0
+	},
+	"tests": [{
+			"source": "loader-staging",
+			"target": "oracle19c",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : true
+			},
+			"tasks": [
+				"oracle"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "oracle19c",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : false
+			},
+			"tasks": [
+				"oracle"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "oracle19c",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : true
+			},
+			"tasks": [
+				"mssql"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "oracle19c",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : false
+			},
+			"tasks": [
+				"mssql"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "oracle19c",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : true
+			},
+			"tasks": [
+				"mysql"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "oracle19c",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : false
+			},
+			"tasks": [
+				"mysql"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "postgres#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : true
+			},
+			"tasks": [
+				"oracle"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "postgres#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : false
+			},
+			"tasks": [
+				"oracle"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "postgres#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : true
+			},
+			"tasks": [
+				"mssql"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "postgres#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : false
+			},
+			"tasks": [
+				"mssql"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "postgres#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : true
+			},
+			"tasks": [
+				"mysql"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "postgres#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : false
+			},
+			"tasks": [
+				"mysql"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "mysql#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : true
+			},
+			"tasks": [
+				"oracle"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "mysql#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : false
+			},
+			"tasks": [
+				"oracle"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "mysql#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : true
+			},
+			"tasks": [
+				"mssql"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "mysql#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : false
+			},
+			"tasks": [
+				"mssql"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "mysql#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : true
+			},
+			"tasks": [
+				"mysql"
+			]
+		},{
+			"source": "loader-staging",
+			"target": "mysql#1",
+	        "parameters": {
+			   "DATA_STAGING_ENABLED" : false
+			},
+			"tasks": [
+				"mysql"
+			]
+		}]
+}

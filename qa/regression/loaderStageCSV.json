@@ -1,0 +1,19 @@
+{
+  "operation"            : "import"
+, "connections"          : "connections.json"
+, "tasks"                : "tasks.json"
+, "recreateSchema"       : true
+, "parameters"           : {
+      "SOURCE_DIRECTORY" : "export/json/%location%"
+    , "TARGET_DIRECTORY" : "loader/csv"
+	, "OUTPUT_FORMAT"    : "CSV"
+   }                    
+, "tests"                : [{
+    "operation"          : "import"
+  , "source"             : "file-staging"
+  , "target"             : "loader-staging"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  }]
+}

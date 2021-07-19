@@ -70,8 +70,8 @@ class CloudDBI extends LoaderDBI {
     throw new YadamuError(`Encyption option not currently supported for "${this.DATABASE_VENDOR}"`);
   }	
    
-  resolve(target) {
-    return target.split(path.sep).join(path.posix.sep)
+  makeCloudPath(target) {
+	return target.split(path.sep).join(path.posix.sep)
   }
   
   setConnectionProperties(connectionSettings) {
@@ -85,7 +85,7 @@ class CloudDBI extends LoaderDBI {
   	const metadata = {}
     if (this.controlFile) {
       const metdataRecords = await Promise.all(Object.keys(this.controlFile.metadata).map((tableName) => {
-		return this.cloudService.getObject(this.controlFile.metadata[tableName].file)
+		return this.cloudService.getObject(this.makeAbsolute(this.controlFile.metadata[tableName].file))
       }))
 	  metdataRecords.forEach((content) =>  {
         const json = this.parseContents(content)
@@ -102,30 +102,27 @@ class CloudDBI extends LoaderDBI {
   **
   */
 
-  getMetadataPath(tableName) {
-     return this.resolve(`${path.join(this.metadataFolderPath,tableName)}.json`)
+  metadataRelativePath(tableName) {
+     return this.makeCloudPath(super.metadataRelativePath(tableName))
   }
   
-  getDatafilePath(filename) {
-	  return this.resolve(filename)
+  dataRelativePath(filename) {
+    return this.makeCloudPath(super.dataRelativePath(filename))
   }
-
-  writeFile(filename,metadata) {
-	const res = this.cloudService.putObject(filename,metadata)
+  
+  makeAbsolute(relativePath) {
+	return this.makeCloudPath(path.join(this.CONTROL_FILE_FOLDER,relativePath))
+  }
+  
+  writeFile(filename,content) {
+	const res = this.cloudService.putObject(filename,content)
     this.cloudService.writeOperations.add(res)
 	res.then(() => { this.cloudService.writeOperations.delete(res)})
     return res;
   }
   
-  setFolderPaths(rootFolder,schema) {
-      
-	this.controlFilePath = this.resolve(`${path.join(rootFolder,schema)}.json`)
-    this.metadataFolderPath = this.resolve(path.join(rootFolder,'metadata'))
-    this.dataFolderPath = this.resolve(path.join(rootFolder,'data'))
-  }      
-  
   getURI(target) {
-    return `${this.PROTOCOL}${this.STORAGE_ID}${path.posix.sep}${this.resolve(target)}`
+    return `${this.PROTOCOL}${this.STORAGE_ID}${path.posix.sep}${this.makeCloudPath(target)}`
   }
   
   async initializeImport() {
@@ -136,7 +133,6 @@ class CloudDBI extends LoaderDBI {
     await this.cloudService.verifyBucketContainer()	
        
     // Calculate the base directory for the unload operation. The Base Directory is dervied from the target schema name specified by the TO_USER parameter
-
 
     this.setFolderPaths(this.IMPORT_FOLDER,this.parameters.TO_USER)
 	this.DESCRIPTION = this.IMPORT_FOLDER
@@ -150,7 +146,7 @@ class CloudDBI extends LoaderDBI {
   
   getFileOutputStream(tableName) {
     // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,tableName],`Creating readable stream on getFileOutputStream(${this.controlFile.data[tableName].file})`)
-	const file = this.controlFile.data[tableName].file
+	const file = this.makeAbsolute(this.controlFile.data[tableName].file)
 	const extension = path.extname(file);
 	const contentType = mime.lookup(extension) || 'application/octet-stream'
 	return this.cloudService.createWriteStream(file,contentType)
@@ -168,9 +164,8 @@ class CloudDBI extends LoaderDBI {
 
     this.DIRECTORY = this.SOURCE_DIRECTORY
     this.setFolderPaths(this.EXPORT_FOLDER,this.parameters.FROM_USER)
-	this.DESCRIPTION = this.EXPORT_FOLDER
 
-	const fileContents = await this.cloudService.getObject(this.controlFilePath)
+	const fileContents = await this.cloudService.getObject(this.CONTROL_FILE_PATH)
 	this.controlFile = this.parseContents(fileContents)
   }
 

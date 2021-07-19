@@ -724,14 +724,13 @@ class Yadamu {
    	// Remap the data file locations in the control file to a path that is accessible by the target database
 	
     const controlFile = source.controlFile
-    const controlFilePath = source.controlFilePath
-    this.LOGGER.info(['COPY',source.DATABASE_VENDOR,target.DATABASE_VENDOR],`Using Control File "${source.controlFilePath}".`)
+    this.LOGGER.info(['COPY',source.DATABASE_VENDOR,target.DATABASE_VENDOR],`Using Control File "${source.CONTROL_FILE_PATH}".`)
 	      
 	if (target.REMOTE_STAGING_AREA) {
 	  Object.keys(controlFile.data).forEach((tableName,idx) => {
 		if ((source.TABLE_FILTER.length === 0) || source.TABLE_FILTER.includes(tableName)) {
     	  source.DIRECTORY = source.TARGET_DIRECTORY
-		  const remotePath = path.join(target.REMOTE_STAGING_AREA,path.relative(path.dirname(controlFile.settings.baseFolder),controlFile.data[tableName].file)).split(/[/\\]/g).join(path.posix.sep)
+		  const remotePath = path.join(target.REMOTE_STAGING_AREA,path.basename(source.CONTROL_FILE_FOLDER),controlFile.data[tableName].file)
 	      controlFile.data[tableName].file = remotePath
 	    }
 		else {
@@ -822,7 +821,7 @@ class Yadamu {
 		
       if (this.DATA_STAGING_ENABLED && source.DATA_STAGING_SUPPORTED && target.SQL_COPY_SUPPORTED) {
 		await source.loadControlFile()
-		if (target.validStagedDataSet(source.DATABASE_KEY,source.controlFilePath,source.controlFile)) {
+		if (target.validStagedDataSet(source.DATABASE_KEY,source.CONTROL_FILE_PATH,source.controlFile)) {
 		  // TODO: If all copy operations fail due to issues accessing file fallback to Pipeline.
 		  await this.doCopyOperation(source,target)
 	    }

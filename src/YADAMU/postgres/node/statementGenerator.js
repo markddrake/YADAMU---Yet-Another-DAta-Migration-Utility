@@ -6,9 +6,6 @@ const YadamuLibrary = require('../../common/yadamuLibrary.js');
 
 class StatementGenerator {
 
-  get SQL_DIRECTORY_NAME()     { return this._SQL_DIRECTORY_NAME }
-  set SQL_DIRECTORY_NAME(v)    { this._SQL_DIRECTORY_NAME = v }
-  
   constructor(dbi, targetSchema, metadata, yadamuLogger) {  
     this.dbi = dbi;
     this.targetSchema = targetSchema
@@ -187,12 +184,15 @@ class StatementGenerator {
 		      case 'bpchar':
 		        columnDefinitions.push(`"${tableInfo.columnNames[idx]}" text`)
 		        return `"${tableInfo.columnNames[idx]}"`
+			  case 'time':
+		        columnDefinitions.push(`"${tableInfo.columnNames[idx]}" text`)
+		        return `case when position('1970-01-01T' in "${tableInfo.columnNames[idx]}") = 1 then substring("${tableInfo.columnNames[idx]}",12)::time else "${tableInfo.columnNames[idx]}"::time end`
+				
 		    }		  
 		    columnDefinitions.push(`"${tableInfo.columnNames[idx]}" ${tableInfo.targetDataTypes[idx]}`)
 		    return `"${tableInfo.columnNames[idx]}"`
 		  })
 
-	   	  this.dbi.SQL_DIRECTORY_NAME = this.SQL_DIRECTORY_NAME
           const externalTableName = `"${this.targetSchema}"."YXT-${crypto.randomBytes(16).toString("hex").toUpperCase()}"`;
 		  tableInfo.copy = {
 		    ddl          : `create foreign table ${externalTableName} (${columnDefinitions.join(",")}) SERVER "${this.dbi.COPY_SERVER_NAME}" options (format 'csv', filename '${tableMetadata.dataFile.split(path.sep).join(path.posix.sep)}')`

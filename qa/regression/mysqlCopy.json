@@ -2,43 +2,42 @@
 	"operation": "dbRoundTrip",
 	"connections": "connections.json",
 	"tasks": "tasks.json",
-	"stagingArea": "awsS3-staging",
+	"stagingArea": "loader-staging",
 	"recreateSchema": true,
 	"reloadStagingArea" : false,
 	"emptyStringIsNull" : true,
 	"parameters": {
-		"IDENTIFIER_MAPPING_FILE" : "qa/mappings/redshiftMappings.json",
-        "REMOTE_STAGING_AREA"     : "aws/loader/%targetConnection%/%sourceConnection%/csv",
+		"REMOTE_STAGING_AREA"     : "/mnt/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
 		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
-		"TIMESTAMP_PRECISION"     : 6
+		"COMMIT_RATIO"            : 0
 	},
 	"tests": [{
 			"source": "oracle19c",
-			"target": "redshift#1",
+			"target": "mysql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mssql19",
-			"target": "redshift#1",
+			"target": "mysql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "postgres#1",
-			"target": "redshift#1",
+			"target": "mysql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mysql#1",
-			"target": "redshift#1",
+			"target": "mysql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mongodb#1",
-			"target": "redshift#1",
+			"target": "mysql#1",
 			"tasks": [
 				"oracle","mssql","mysql"
 			]

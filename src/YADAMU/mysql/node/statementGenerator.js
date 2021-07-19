@@ -1,5 +1,7 @@
 "use strict";
 
+const path = require('path');
+
 const YadamuLibrary = require('../../common/yadamuLibrary.js');
 
 class StatementGenerator {
@@ -141,6 +143,96 @@ class StatementGenerator {
             tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('(')) + ` set ` + setOperators.join(',');
             break;
         }
+       
+        if (tableMetadata.dataFile) {
+		  const loadColumnNames = []
+		  const setOperations = []
+          const copyOperators = dataTypes.map((dataType,idx) => {
+			const psuedoColumnName = `@YADAMU_${String(idx+1).padStart(3,"0")}`
+   	        loadColumnNames.push(psuedoColumnName);
+		    setOperations.push(`"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${psuedoColumnName})`)
+			switch (dataType.type.toLowerCase()) {
+			  case 'point':
+              case 'linestring':
+              case 'polygon':
+              case 'geometry':
+              case 'multipoint':
+              case 'multilinestring':
+              case 'multipolygon':
+              case 'geometry':                             
+              case 'geometrycollection':
+              case 'geomcollection':
+			    let spatialFunction
+                switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
+                  case "WKB":
+                  case "EWKB":
+                    spatialFunction = `ST_GeomFromWKB(UNHEX(${psuedoColumnName}))`;
+                    break;
+                  case "WKT":
+                  case "EWRT":
+                    spatialFunction = `ST_GeomFromText(${psuedoColumnName})`;
+                    break;
+                  case "GeoJSON":
+                    spatialFunction = `ST_GeomFromGeoJSON(${psuedoColumnName})`;
+                    break;
+                  default:
+                    return `ST_GeomFromWKB(UNHEX(${psuedoColumnName}))`;
+				}
+                setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${spatialFunction})`
+			    break
+              case 'binary':                              
+              case 'varbinary':                              
+              case 'blob':                                 
+              case 'tinyblob':                             
+              case 'mediumblob':                           
+              case 'longblob':                             
+                setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, UNHEX(${psuedoColumnName}))`
+			    break;
+			  case 'time':
+                setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
+			    break;
+			  case 'datetime':
+			  case 'timestamp':
+                setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
+			    break;
+  			  case 'tinyint':    
+                switch (true) {
+                  case ((dataType.length === 1) && this.dbi.TREAT_TINYINT1_AS_BOOLEAN):
+                     setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
+				     break;
+				}
+                break;				 
+            /*
+              case 'smallint':
+              case 'mediumint':
+              case 'integer':
+              case 'bigint':
+              case 'decimal':                                           
+              case 'float':                                           
+              case 'double':                                           
+              case 'bit':
+			  case 'date':
+              case 'year':                            
+              case 'char':                              
+              case 'varchar':                              
+              case 'text':                                 
+              case 'tinytext':
+			  case 'mediumtext':                           
+              case 'longtext':                             
+              case 'set':                                  
+              case 'enum':                                 
+              case 'json':                                 
+              case 'xml':                                  
+              
+			*/
+	          default:
+			}
+		  })
+
+		  tableInfo.copy = {
+	        dml         : `load data infile '${tableMetadata.dataFile.split(path.sep).join(path.posix.sep)}' into table "${this.targetSchema}"."${tableName}" character set UTF8 fields terminated by ',' optionally enclosed by '"' ESCAPED BY '"' lines terminated by '\n' (${loadColumnNames.join(",")}) SET ${setOperations.join(",")}`
+	      }
+        }       
         return tableInfo.ddl;
       });
     }

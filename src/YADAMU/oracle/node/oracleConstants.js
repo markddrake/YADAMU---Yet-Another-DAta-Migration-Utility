@@ -9,7 +9,8 @@ class OracleConstants {
   static get DATABASE_KEY()           { return 'oracle' };
   static get DATABASE_VENDOR()        { return 'Oracle' };
   static get SOFTWARE_VENDOR()        { return 'Oracle Corporation' };
-  static get STATEMENT_TERMINATOR()   { return '/' }
+  static get STATEMENT_TERMINATOR()   { return '' }
+  static get STATEMENT_SEPERATOR()    { return '\n/\n' }
 
   static get STATIC_DEFAULTS() { 
     this._STATIC_DEFAULTS = this._STATIC_DEFAULTS || Object.freeze({
@@ -147,6 +148,11 @@ class OracleConstants {
   static get JSON_PARSING_ERROR() {
     this._JSON_PARSING_ERROR = this._JSON_PARSING_ERROR || Object.freeze([40441])
     return this._JSON_PARSING_ERROR
+  }
+
+  static get COPY_FILE_NOT_FOUND_ERROR() {
+    this._COPY_FILE_NOT_FOUND_ERROR = this._COPY_FILE_NOT_FOUND_ERROR || Object.freeze([29913])
+    return this._COPY_FILE_NOT_FOUND_ERROR
   }
 
   static get STAGED_DATA_SOURCES()    { return Object.freeze(['loader']) }

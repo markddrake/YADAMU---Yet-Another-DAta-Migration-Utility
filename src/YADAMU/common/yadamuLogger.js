@@ -11,7 +11,8 @@ const YadamuLibrary = require('./yadamuLibrary.js');
 const StringWriter = require('./stringWriter.js')
 const NullWriter = require('./nullWriter.js');
 const {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuException.js');
-const OracleError  = require('../oracle/node/oracleException.js');
+const OracleError = require('../oracle/node/oracleException.js');
+const {FileError} = require('../file/node/fileException.js');
 
 const ErrorDBI = require('../file/node/errorDBI.js');
 
@@ -242,7 +243,7 @@ class YadamuLogger {
   logDatabaseError(e) {
     this.os.write(`${e.message}\n`);
     this.os.write(`${e.stack}\n`)
-    this.os.write(`SQL: ${e.sql}\n`);
+    this.os.write(e instanceof FileError ?  `PATH: "${e.path}"\n` : `SQL: ${e.sql}\n`);
     if (e instanceof OracleError) {
       this.logOracleError(e)
     }

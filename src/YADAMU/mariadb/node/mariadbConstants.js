@@ -44,6 +44,8 @@ class MariadbConstants {
    return this._CONNECTION_PROPERTY_DEFAULTS;
   }
 
+  static get STAGED_DATA_SOURCES()    { return Object.freeze(['loader']) }
+
 }
 
 module.exports = MariadbConstants

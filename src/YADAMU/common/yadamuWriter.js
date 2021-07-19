@@ -146,7 +146,7 @@ class YadamuWriter extends Transform {
   
   commitWork() {
     // While COMMIT is defined as a multiple of BATCH_SIZE some drivers may write smaller batches.
-    return ((this.metrics.written >= this.COMMIT_COUNT) && !this.skipTable)
+    return (((this.COMMIT_COUNT > 0) && (this.metrics.written >= this.COMMIT_COUNT)) && !this.skipTable)
   }
 
   hasPendingRows() {

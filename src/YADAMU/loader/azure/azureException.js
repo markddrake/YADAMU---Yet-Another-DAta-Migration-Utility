@@ -4,8 +4,10 @@ const {DatabaseError} = require('../../common/yadamuException.js')
 
 class AzureError extends DatabaseError {
   
-  constructor(cause,stack,sql) {
-    super(cause,stack,sql);
+  constructor(cause,stack,url) {
+    super(cause,stack,url);
+	this.path = this.sql
+	delete this.sql
   }
 
   possibleConsistencyError() {
