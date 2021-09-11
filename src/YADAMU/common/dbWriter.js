@@ -126,16 +126,17 @@ class DBWriter extends Writable {
 	   
       Object.keys(sourceMetadata).forEach((table) => {
         const tableMetadata = sourceMetadata[table]
+		tableMetadata.source = Object.assign({},sourceMetadata[table])
         if (!tableMetadata.hasOwnProperty('vendor')) {
            tableMetadata.vendor = this.dbi.systemInformation.vendor;   
         }
-        tableMetadata.source = {
+	    /*
           vendor          : tableMetadata.vendor
          ,columnNames     : tableMetadata.columnNames
          ,dataTypes       : tableMetadata.dataTypes
 		 ,storageTypes    : tableMetadata.storageTypes
          ,sizeConstraints : tableMetadata.sizeConstraints
-        }
+		 */
       })
     
       if (this.targetSchemaInfo.length > 0) {

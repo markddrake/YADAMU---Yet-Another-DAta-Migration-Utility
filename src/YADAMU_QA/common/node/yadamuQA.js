@@ -478,7 +478,6 @@ class YadamuQA {
   }
 
   async compareSchemas(sourceVendor,targetVendor,sourceSchema,targetSchema,connectionProperties,testParameters,rules,metrics,reportRowCounts,identifierMappings) {
-      
     const compareDBI = await this.getDatabaseInterface(sourceVendor,connectionProperties,{},false,identifierMappings)
 	
     try {
@@ -811,7 +810,8 @@ class YadamuQA {
     const targetParameters = Object.assign({},parameters)
     
     this.setUser(sourceParameters,'FROM_USER',sourceDatabase, sourceSchema)
-    this.setUser(targetParameters,'TO_USER', sourceDatabase, targetSchema)
+    // this.setUser(targetParameters,'TO_USER', sourceDatabase, targetSchema)
+    this.setUser(targetParameters,'TO_USER', targetDatabase, targetSchema)
 
     this.yadamu.MACROS = Object.assign(this.yadamu.MACROS, {
       connection           : targetConnectionName
@@ -875,13 +875,15 @@ class YadamuQA {
 	}
 	
     targetRowCounts.forEach((targetTable) => {
-	  const sourceTable = sourceRowCounts.find((sourceTable) => { return targetTable[1] === sourceTable[1]})
-	  const targetMetrics = keyMetrics[targetTable[1]]
-	  if (sourceTable[2] === targetTable[2]) {
-	    compareResults.successful.push([sourceTable[0],targetTable[0],sourceTable[1],sourceTable[2],targetMetrics.elapsedTime,targetMetrics.throughput])
-	  }
-	  else {
-		compareResults.failed.push([sourceTable[0],targetTable[0],sourceTable[1],sourceTable[2],targetTable[2],-1,-1,'','','',''])
+	  if (keyMetrics.hasOwnProperty(targetTable[1])) {
+	    const sourceTable = sourceRowCounts.find((sourceTable) => { return targetTable[1] === sourceTable[1]})
+	    const targetMetrics = keyMetrics[targetTable[1]]
+	    if (sourceTable[2] === targetTable[2]) {
+	      compareResults.successful.push([sourceTable[0],targetTable[0],sourceTable[1],sourceTable[2],targetMetrics.elapsedTime,targetMetrics.throughput])
+	    }
+	    else {
+		  compareResults.failed.push([sourceTable[0],targetTable[0],sourceTable[1],sourceTable[2],targetTable[2],-1,-1,'','','',''])
+	    }
 	  }
 	})
 	
@@ -1033,7 +1035,6 @@ class YadamuQA {
       compareParameters.MODE = "DATA_ONLY"
       compareParameters.IDENTIFIER_MAPPING_FILE = parameters.IDENTIFIER_MAPPING_FILE
 
-	  // console.log(targetDBI.parameters)
       sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
       let targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA) 
       
@@ -1113,6 +1114,10 @@ class YadamuQA {
       
       // Apply the table mappings used by target of the the first copy operation to the source of the second copy operation.
       
+	  if (sourceParameters.TABLES && !YadamuLibrary.isEmpty(identifierMappings)) {
+		sourceParameters.TABLES = sourceParameters.TABLES.map((tableName) => { return identifierMappings[tableName].tableName || tableName})
+	  }		
+	  
       targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,sourceParameters,false,{})
       compareDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,false,this.reverseIdentifierMappings(identifierMappings))
 	 

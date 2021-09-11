@@ -16,7 +16,8 @@ const {WhitespaceIssue, EmptyStringDetected, ContentTooLarge, StagingAreaMisMatc
 
 class VerticaWriter extends YadamuWriter {
 
-  get STAGING_FILE()       { return this.tableInfo.localPath }
+  get STAGING_FILE()       { return this._STAGING_FILE }
+  set STAGING_FILE(v)      { this._STAGING_FILE = v }
 
   constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
     super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
@@ -236,6 +237,8 @@ class VerticaWriter extends YadamuWriter {
     this.newBatch();
 	super.setTableInfo(tableName)	
     this.tableInfo.insertMode = 'Copy'
+	this.copyStatement = this.tableInfo.copy
+	this.STAGING_FILE = this.tableInfo.localPath
 	this.mergeoutInsertCount = this.dbi.MERGEOUT_INSERT_COUNT;
 
     this.maxLengths = this.tableInfo.sizeConstraints.map((sizeConstraint) => {
@@ -245,6 +248,13 @@ class VerticaWriter extends YadamuWriter {
 	 	
 	this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
 
+  }
+  
+   async initializePartition(partitionInfo) {
+	await super.initializePartition(partitionInfo)
+	const partitionId = this.partitionInfo.partitionNumber.toString().padStart(5,'0')
+	this.copyStatement = this.copyStatement.replace(this.tableInfo.stagingFileName,`${this.tableInfo.stagingFileName}-${partitionId}`)
+    this.STAGING_FILE = `${this.STAGING_FILE}-${partitionId}`
   }
   
   cacheRow(row) {
@@ -383,7 +393,7 @@ class VerticaWriter extends YadamuWriter {
 	let rejectedRecordsTableName = `YRT-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
 	const dataSets = batch.copy.length === 0 ? {} : {
        copy : {
-		 sql:   `${this.tableInfo.copy} REJECTED DATA AS TABLE "${rejectedRecordsTableName}"  NO COMMIT`	
+		 sql:   `${this.copyStatement} REJECTED DATA AS TABLE "${rejectedRecordsTableName}"  NO COMMIT`	
 	   , errors: rejectedRecordsTableName
 	   }
     }		
@@ -401,7 +411,7 @@ class VerticaWriter extends YadamuWriter {
 	emptyStringDataSets.forEach((id) => {  
 	  rejectedRecordsTableName = `YRT-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
 	  const columns = id.split('-')
-	  let sqlStatement = this.tableInfo.copy
+	  let sqlStatement = this.copyStatement
 	  columns.forEach((idx) => {
 		const columnName = `"${this.tableInfo.columnNames[idx]}"`
 		const fillerName = `"YADAMU_COL_${String(parseInt(idx)+1).padStart(3,"0")}"`

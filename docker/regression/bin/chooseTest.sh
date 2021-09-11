@@ -50,10 +50,15 @@ case $YADAMU_TEST_NAME  in
   ;;
 
   vertica)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaDataTypes
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica900DataTypes
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaTestSuite
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica900TestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11TestSuite
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10TestSuite
+  ;;
+    
+  vertica09)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica09DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica09TestSuite
   ;;
 
   mssql2014TestSuite)

@@ -13,8 +13,24 @@ class YadamuParser extends Transform {
     this.rowCount = 0
 	
 	// Push the table name into the stream before sending the data.
-	// console.log(tableInfo,new Error().stack)
-    this.push({table: tableInfo.MAPPED_TABLE_NAME})
+	
+	// Push a Partition Object or a Table Object
+	
+    if (tableInfo.PARTITION_COUNT) {
+	  // console.log('YadamuParser()','PUSH','PARTITION',tableInfo.MAPPED_TABLE_NAME,tableInfo.partitionInfo.PARTITION_NUMBER,tableInfo.partitionPARTITION_NAME)
+	  this.push({
+		partition: {
+	      tableName          : tableInfo.MAPPED_TABLE_NAME
+	    , partitionCount     : tableInfo.PARTITION_COUNT
+		, partitionNumber    : tableInfo.partitionInfo.PARTITION_NUMBER
+		, partitionName      : tableInfo.partitionInfo.PARTITION_NAME
+  	    }
+	  })				
+	}
+	else {
+	  // console.log('YadamuParser()','PUSH','TABLE',tableInfo.MAPPED_TABLE_NAME)
+      this.push({table: tableInfo.MAPPED_TABLE_NAME})
+	}
   }
     
   getRowCount() {

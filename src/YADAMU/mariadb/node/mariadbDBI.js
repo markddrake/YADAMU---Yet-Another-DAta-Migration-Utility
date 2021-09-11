@@ -58,7 +58,7 @@ class MariadbDBI extends YadamuDBI {
   get DATABASE_KEY()           { return MariadbConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return MariadbConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return MariadbConstants.SOFTWARE_VENDOR};
-  get SQL_COPY_SUPPORTED()     { return true }
+  get SQL_COPY_OPERATIONS()    { return true }
   get STATEMENT_TERMINATOR()   { return MariadbConstants.STATEMENT_TERMINATOR };
 
   // Enable configuration via command line parameters
@@ -565,28 +565,14 @@ class MariadbDBI extends YadamuDBI {
     */
 	
 	try {
-	  const startTime = performance.now();
 	  const stack = new Error().stack
 	  let results = await this.beginTransaction();
-	  /*
-	  results = await this.executeSQL(copy.ddl);
-	  results = await this.executeSQL(copy.load);
-	  .
-	  results = await this.executeSQL(copy.copy);
-	  const rowsRead = results.affectedRows
-	  results = await this.executeSQL(copy.drop);
-	  */
+	  const startTime = performance.now();
 	  results = await this.executeSQL(copy.dml);
 	  const rowsRead = results.affectedRows
-	  /*
-	  if (results.warningCount >  0) {
-        const warnings = await this.executeSQL('show warnings');
-        console.log(warnings)
-      }
-      */
-	  const elapsedTime = performance.now() - startTime;
+	  const endTime = performance.now();
 	  results = await this.commitTransaction()
-  	  await this.reportCopyResults(tableName,rowsRead,0,elapsedTime,copy.dml,stack)
+	  await this.reportCopyResults(tableName,rowsRead,0,startTime,endTime,copy,stack)
 	} catch(e) {
 	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
 	  let results = await this.rollbackTransaction()

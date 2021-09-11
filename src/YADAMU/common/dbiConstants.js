@@ -6,19 +6,19 @@ class DBIConstants {
 
   static get STATIC_PARAMETERS() {
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
-      "MODE"                      : "DATA_ONLY"
-    , "ON_ERROR"                  : "ABORT"
-    , "SPATIAL_FORMAT"            : "WKB"
-    , "TABLE_MAX_ERRORS"          : 10
-    , "TOTAL_MAX_ERRORS"          : 100
-    , "BATCH_SIZE"                : 10000
-    , "COMMIT_RATIO"              : 1    
-	, "INFINITY_MANAGEMENT"       : undefined
-	, "LOCAL_STAGING_AREA"        : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
-	, "REMOTE_STAGING_AREA"       : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
-	, "STAGING_FILE_RETENTION"    : "FAILED"
-	, "TIMESTAMP_PRECISION"       : 9
-	, "BYTE_TO_CHAR_RATIO"        : 1
+      "MODE"                       : "DATA_ONLY"
+    , "ON_ERROR"                   : "ABORT"
+    , "SPATIAL_FORMAT"             : "WKB"
+    , "TABLE_MAX_ERRORS"           : 10
+    , "TOTAL_MAX_ERRORS"           : 100
+    , "BATCH_SIZE"                 : 10000
+    , "COMMIT_RATIO"               : 1    
+	, "INFINITY_MANAGEMENT"        : undefined
+	, "LOCAL_STAGING_AREA"         : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
+	, "REMOTE_STAGING_AREA"        : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
+	, "STAGING_FILE_RETENTION"     : "FAILED"
+	, "TIMESTAMP_PRECISION"        : 9
+	, "BYTE_TO_CHAR_RATIO"         : 1
     })
     return this._STATIC_PARAMETERS;
   }
@@ -44,19 +44,19 @@ class DBIConstants {
 	return this.#_YADAMU_DBI_PARAMETERS
   }
   
-  static get SPATIAL_FORMAT()         { return this.YADAMU_DBI_PARAMETERS.SPATIAL_FORMAT };
-  static get TABLE_MAX_ERRORS()       { return this.YADAMU_DBI_PARAMETERS.TABLE_MAX_ERRORS };
-  static get TOTAL_MAX_ERRORS()       { return this.YADAMU_DBI_PARAMETERS.TOTAL_MAX_ERRORS };
-  static get BATCH_SIZE()             { return this.YADAMU_DBI_PARAMETERS.BATCH_SIZE };
-  static get COMMIT_RATIO()           { return this.YADAMU_DBI_PARAMETERS.COMMIT_RATIO };
-  static get MODE()                   { return this.YADAMU_DBI_PARAMETERS.MODE }
-  static get ON_ERROR()               { return this.YADAMU_DBI_PARAMETERS.ON_ERROR }
-  static get INFINITY_MANAGEMENT()    { return this.YADAMU_DBI_PARAMETERS.INFINITY_MANAGEMENT };
-  static get LOCAL_STAGING_AREA()     { return this.YADAMU_DBI_PARAMETERS.LOCAL_STAGING_AREA };
-  static get REMOTE_STAGING_AREA()    { return this.YADAMU_DBI_PARAMETERS.REMOTE_STAGING_AREA };
-  static get STAGING_FILE_RETENTION() { return this.YADAMU_DBI_PARAMETERS.STAGING_FILE_RETENTION };
-  static get TIMESTAMP_PRECISION()    { return this.YADAMU_DBI_PARAMETERS.TIMESTAMP_PRECISION };
-  static get BYTE_TO_CHAR_RATIO()     { return this.YADAMU_DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
+  static get MODE()                       { return this.YADAMU_DBI_PARAMETERS.MODE }
+  static get ON_ERROR()                   { return this.YADAMU_DBI_PARAMETERS.ON_ERROR }
+  static get SPATIAL_FORMAT()             { return this.YADAMU_DBI_PARAMETERS.SPATIAL_FORMAT };
+  static get TABLE_MAX_ERRORS()           { return this.YADAMU_DBI_PARAMETERS.TABLE_MAX_ERRORS };
+  static get TOTAL_MAX_ERRORS()           { return this.YADAMU_DBI_PARAMETERS.TOTAL_MAX_ERRORS };
+  static get BATCH_SIZE()                 { return this.YADAMU_DBI_PARAMETERS.BATCH_SIZE };
+  static get COMMIT_RATIO()               { return this.YADAMU_DBI_PARAMETERS.COMMIT_RATIO };
+  static get INFINITY_MANAGEMENT()        { return this.YADAMU_DBI_PARAMETERS.INFINITY_MANAGEMENT };
+  static get LOCAL_STAGING_AREA()         { return this.YADAMU_DBI_PARAMETERS.LOCAL_STAGING_AREA };
+  static get REMOTE_STAGING_AREA()        { return this.YADAMU_DBI_PARAMETERS.REMOTE_STAGING_AREA };
+  static get STAGING_FILE_RETENTION()     { return this.YADAMU_DBI_PARAMETERS.STAGING_FILE_RETENTION };
+  static get TIMESTAMP_PRECISION()        { return this.YADAMU_DBI_PARAMETERS.TIMESTAMP_PRECISION };
+  static get BYTE_TO_CHAR_RATIO()         { return this.YADAMU_DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
   
 }
 

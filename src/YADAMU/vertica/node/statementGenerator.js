@@ -748,9 +748,10 @@ class StatementGenerator {
 	  })
 	}
 
-	const stagingFile     =  `YST-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
-	const localPath       =  path.resolve(path.join(this.dbi.LOCAL_STAGING_AREA,stagingFile)); 
-	const remotePath      =  tableMetadata.dataFile || path.join(this.dbi.REMOTE_STAGING_AREA,stagingFile).split(path.sep).join(path.posix.sep); 
+	const stagingFileName =  `YST-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
+	const stagingFilePath =  path.join(this.dbi.LOCAL_STAGING_AREA,stagingFileName)
+	const localPath       =  path.resolve(stagingFilePath); 
+	const remotePath      =  tableMetadata.dataFile || path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName).split(path.sep).join(path.posix.sep); 
 	
     const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
     const insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values `;
@@ -762,6 +763,7 @@ class StatementGenerator {
        dml             : insertStatement, 
 	   copy            : copyStatement,
 	   mergeout        : mergeoutStatement,
+	   stagingFileName : stagingFileName,
 	   localPath       : localPath,
 	   columnNames     : columnNames,
        targetDataTypes : targetDataTypes, 

@@ -1,4 +1,11 @@
 {
+    "oracle21c"                         : {
+      "oracle"                          : {
+        "user"                          : "SYSTEM"
+      , "password"                      : "oracle"
+      , "connectString"                 : "ORA2103"
+      }
+    },
     "oracle19c"                         : {
       "oracle"                          : {
         "user"                          : "SYSTEM"
@@ -125,7 +132,7 @@
     "vertica09"                         : {
       "vertica"                         : {
 	    "user"                          : "dbadmin"
-	  ,	"host"                          : "VERTICA-01"
+	  ,	"host"                          : "VRTCA09-01"
 	  ,	"database"                      : "docker"
 	  ,	"password"                      : "oracle"
 	  ,	"port"                          : 5433
@@ -134,8 +141,17 @@
    "vertica10"                         : {
       "vertica"                         : {
 	    "user"                          : "dbadmin"
-	  ,	"host"                          : "VERTICA-02"
-	  ,	"database"                      : "docker"
+	  ,	"host"                          : "VRTCA10-01"
+	  ,	"database"                      : "VMart"
+	  ,	"password"                      : "oracle"
+	  ,	"port"                          : 5433
+      }
+    },
+   "vertica11"                         : {
+      "vertica"                         : {
+	    "user"                          : "dbadmin"
+	  ,	"host"                          : "VRTCA11-01"
+	  ,	"database"                      : "VMart"
 	  ,	"password"                      : "oracle"
 	  ,	"port"                          : 5433
       }

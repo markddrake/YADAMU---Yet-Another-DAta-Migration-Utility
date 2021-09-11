@@ -55,37 +55,38 @@ class OracleDBI extends YadamuDBI {
 
   // Not available until configureConnection() has been called 
   
-  get MAX_STRING_SIZE()        { return this._MAX_STRING_SIZE }
-  get JSON_STORAGE_MODEL()     { return this._JSON_STORAGE_MODEL }
-  get XML_STORAGE_MODEL()      { return this._XML_STORAGE_MODEL }
-  get NATIVE_DATA_TYPE()       { return this._NATIVE_DATA_TYPE }
-  get JSON_PARSING_SUPPORTED() { return this._JSON_PARSER }
-    	
-  // Override YadamuDBI
-
-  get DATABASE_KEY()           { return OracleConstants.DATABASE_KEY};
-  get DATABASE_VENDOR()        { return OracleConstants.DATABASE_VENDOR};
-  get SOFTWARE_VENDOR()        { return OracleConstants.SOFTWARE_VENDOR};
-  get SQL_COPY_SUPPORTED()     { return true }
-  get STATEMENT_TERMINATOR()   { return OracleConstants.STATEMENT_TERMINATOR };
-  get STATEMENT_SEPERATOR()    { return OracleConstants.STATEMENT_SEPERATOR };
-  get DBI_PARAMETERS()         { return OracleConstants.DBI_PARAMETERS }
+  get MAX_STRING_SIZE()            { return this._MAX_STRING_SIZE }
+  get JSON_STORAGE_MODEL()         { return this._JSON_STORAGE_MODEL }
+  get XML_STORAGE_MODEL()          { return this._XML_STORAGE_MODEL }
+  get NATIVE_DATA_TYPE()           { return this._NATIVE_DATA_TYPE }
+  get JSON_PARSING_SUPPORTED()     { return this._JSON_PARSER }
+							      
+  // Override YadamuDBI           
+							      
+  get DATABASE_KEY()               { return OracleConstants.DATABASE_KEY};
+  get DATABASE_VENDOR()            { return OracleConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()            { return OracleConstants.SOFTWARE_VENDOR};
+  get SQL_COPY_OPERATIONS()        { return true }
+  get PARTITION_LEVEL_OPERATIONS() { return true }
+  get STATEMENT_TERMINATOR()       { return OracleConstants.STATEMENT_TERMINATOR };
+  get STATEMENT_SEPERATOR()        { return OracleConstants.STATEMENT_SEPERATOR };
+  get DBI_PARAMETERS()             { return OracleConstants.DBI_PARAMETERS }
 
  
   // Enable configuration via command line parameters
  
-  get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT         || OracleConstants.SPATIAL_FORMAT }
-  get OBJECT_FORMAT()          { return this.parameters.OBJECT_FORMAT          || OracleConstants.OBJECT_FORMAT }
-  get ORACLE_XML_TYPE()        { return this.parameters.ORACLE_XML_TYPE        || OracleConstants.ORACLE_XML_TYPE}
-  get ORACLE_JSON_TYPE()       { return this.parameters.ORACLE_JSON_TYPE       || OracleConstants.ORACLE_JSON_TYPE}
-  get MIGRATE_JSON_STORAGE()   { return this.parameters.MIGRATE_JSON_STORAGE   || OracleConstants.MIGRATE_JSON_STORAGE}
-  get TREAT_RAW1_AS_BOOLEAN()  { return this.parameters.TREAT_RAW1_AS_BOOLEAN  || OracleConstants.TREAT_RAW1_AS_BOOLEAN }  
-  get BYTE_TO_CHAR_RATIO()     { return this.parameters.BYTE_TO_CHAR_RATIO     || OracleConstants.BYTE_TO_CHAR_RATIO };
-  get COPY_LOGFILE_DIRNAME()   { return this.parameters.COPY_LOGFILE_DIRNAME   || OracleConstants.COPY_LOGFILE_DIRNAME };
-  get COPY_BADFILE_DIRNAME()   { return this.parameters.COPY_BADFILE_DIRNAME   || OracleConstants.COPY_BADFILE_DIRNAME };
-  get BATCH_TEMPLOB_LIMIT()    { return this.parameters.BATCH_TEMPLOB_LIMIT    || OracleConstants.BATCH_TEMPLOB_LIMIT}
-  get BATCH_CACHELOB_LIMIT()   { return this.parameters.BATCH_CACHELOB_LIMIT   || OracleConstants.BATCH_CACHELOB_LIMIT}
-  get LOB_MAX_SIZE()           { return this.parameters.LOB_MAX_SIZE           || OracleConstants.LOB_MAX_SIZE}
+  get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT              || OracleConstants.SPATIAL_FORMAT }
+  get OBJECT_FORMAT()              { return this.parameters.OBJECT_FORMAT               || OracleConstants.OBJECT_FORMAT }
+  get ORACLE_XML_TYPE()            { return this.parameters.ORACLE_XML_TYPE             || OracleConstants.ORACLE_XML_TYPE}
+  get ORACLE_JSON_TYPE()           { return this.parameters.ORACLE_JSON_TYPE            || OracleConstants.ORACLE_JSON_TYPE}
+  get MIGRATE_JSON_STORAGE()       { return this.parameters.MIGRATE_JSON_STORAGE        || OracleConstants.MIGRATE_JSON_STORAGE}
+  get TREAT_RAW1_AS_BOOLEAN()      { return this.parameters.TREAT_RAW1_AS_BOOLEAN       || OracleConstants.TREAT_RAW1_AS_BOOLEAN }  
+  get BYTE_TO_CHAR_RATIO()         { return this.parameters.BYTE_TO_CHAR_RATIO          || OracleConstants.BYTE_TO_CHAR_RATIO };
+  get COPY_LOGFILE_DIRNAME()       { return this.parameters.COPY_LOGFILE_DIRNAME        || OracleConstants.COPY_LOGFILE_DIRNAME };
+  get COPY_BADFILE_DIRNAME()       { return this.parameters.COPY_BADFILE_DIRNAME        || OracleConstants.COPY_BADFILE_DIRNAME };
+  get BATCH_TEMPLOB_LIMIT()        { return this.parameters.BATCH_TEMPLOB_LIMIT         || OracleConstants.BATCH_TEMPLOB_LIMIT}
+  get BATCH_CACHELOB_LIMIT()       { return this.parameters.BATCH_CACHELOB_LIMIT        || OracleConstants.BATCH_CACHELOB_LIMIT}
+  get LOB_MAX_SIZE()               { return this.parameters.LOB_MAX_SIZE                || OracleConstants.LOB_MAX_SIZE}
   get LOB_MIN_SIZE() { 
     // Set with anonymous function to enforce 4K limit in Oracle11g
     this._LOB_MIN_SIZE = this._LOB_MIN_SIZE ||(() => { let lobMinSize = this.parameters.LOB_MIN_SIZE || OracleConstants.LOB_MIN_SIZE; lobMinSize = ((this.DB_VERSION < 12) && (lobMinSize > 4000)) ? 4000 : lobMinSize; return lobMinSize})()
@@ -198,7 +199,6 @@ class OracleDBI extends YadamuDBI {
 	// Oracle always has a transaction in progress, so beginTransaction is a no-op
 	
 	this.TRANSACTION_IN_PROGRESS = true;
-	
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR],'Constructor Complete');
 
   }
@@ -1202,9 +1202,20 @@ class OracleDBI extends YadamuDBI {
                                           }
     )
 	
+	this.partitionLists = {}
 	
-    const schemaInformation = results.rows
-    return schemaInformation;
+    const schemaInformation = results.rows.flatMap((tableInfo) => {
+	  const partitionList = JSON.parse(tableInfo.PARTITION_LIST)
+	  delete tableInfo.PARTITION_LIST
+  	  if (this.yadamu.PARALLEL_ENABLED && this.PARTITION_LEVEL_OPERATIONS && (partitionList.length > 0)) {
+		// Clone the table Info for each Partition and Add Parition Info
+		this.partitionLists[tableInfo.TABLE_NAME] = partitionList
+	    const partitionInfo = partitionList.map((partitionName,idx) => { return Object.assign({}, tableInfo, { PARTITION_COUNT: partitionList.length, partitionInfo : {PARTITION_NAME : partitionName, PARTITION_NUMBER: idx+1 }})})
+		return partitionInfo;
+	  }
+      return tableInfo;
+	})
+	return schemaInformation;
   }
 
   generateQueryInformation(tableMetadata) {
@@ -1248,8 +1259,30 @@ class OracleDBI extends YadamuDBI {
 	return this.trackExceptions(cause instanceof OracleError ? cause : new OracleError(cause,this.streamingStackTrace,sqlStatement))
   }
   
+  async disableTriggers(schema,tableName) {
+    const sqlStatement = `ALTER TABLE "${schema}"."${tableName}" DISABLE ALL TRIGGERS`;
+    return await this.executeSQL(sqlStatement,[]);    
+  }
+  
+  async enableTriggers(schema,tableName) {
+   
+	try {
+  	  this.checkConnectionState(this.latestError) 
+      const sqlStatement = `ALTER TABLE "${schema}"."${tableName}" ENABLE ALL TRIGGERS`;
+      return await this.executeSQL(sqlStatement,[]);
+	} catch (e) {
+	  this.yadamuLogger.error(['DBA',this.DATABASE_VENDOR,'TRIGGERS',tableName],`Unable to re-enable triggers.`);          
+      this.yadamuLogger.handleException(['TRIGGERS',this.DATABASE_VENDOR,],e);          
+    } 
+  }
+  
   async getInputStream(tableInfo) {
-     
+
+    if (tableInfo.partitionInfo?.PARTITION_NAME) {
+	  tableInfo.SQL_STATEMENT = `${tableInfo.SQL_STATEMENT.slice(0,-1)} PARTITION("${tableInfo.partitionInfo.PARTITION_NAME}") t`
+	}
+	
+
     if (tableInfo.WITH_CLAUSE !== null) {
       if (this.DB_VERSION < 12) {
 		// The "WITH_CLAUSE" is a create procedure statement that creates a stored procedure that wraps the required conversions
@@ -1316,6 +1349,7 @@ class OracleDBI extends YadamuDBI {
 	await this.setCurrentSchema(manager.currentSchema);
     await this.setDateFormatMask(this.systemInformation.vendor);
 	this.SQL_DIRECTORY_PATH = this.manager.SQL_DIRECTORY_PATH
+	this.partitionLists = this.manager.partitionLists
   }
   
   async getConnectionID() {
@@ -1394,10 +1428,11 @@ class OracleDBI extends YadamuDBI {
 	  results = await this.executeSQL(copy.dml);
 	  const rowsRead = results.rowsAffected
 	  results = await this.executeSQL(copy.drop);
-	  const elapsedTime = performance.now() - startTime;
+	  const endTime = performance.now();
 	  results = await this.commitTransaction()
-  	  await this.reportCopyResults(tableName,rowsRead,0,elapsedTime,copy.dml,stack)
+  	  await this.reportCopyResults(tableName,rowsRead,0,startTime,endTime,copy.dml,stack)
 	} catch(e) {
+      console.log(e)
 	  if (e.copyFileNotFoundError()) {
 		e.directoryPath = this.SQL_DIRECTORY_PATH
 	  }

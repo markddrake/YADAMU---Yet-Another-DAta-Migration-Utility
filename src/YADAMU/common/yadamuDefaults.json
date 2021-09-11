@@ -1,7 +1,6 @@
 {
 	"yadamu": {
-		"FILE": "yadamu.json",
-		"PARALLEL": 0
+		"FILE": "yadamu.json"
 	},
 	"yadamuDBI": {
 		"MODE": "DATA_ONLY",

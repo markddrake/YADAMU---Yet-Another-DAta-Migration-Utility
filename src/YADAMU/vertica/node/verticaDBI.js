@@ -58,7 +58,7 @@ class VerticaDBI extends YadamuDBI {
   get DATABASE_KEY()           { return VerticaConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return VerticaConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return VerticaConstants.SOFTWARE_VENDOR};
-  get SQL_COPY_SUPPORTED()     { return true }
+  get SQL_COPY_OPERATIONS()    { return true }
   get STATEMENT_TERMINATOR()   { return VerticaConstants.STATEMENT_TERMINATOR };
    
   // Enable configuration via command line parameters
@@ -250,7 +250,6 @@ class VerticaDBI extends YadamuDBI {
   async executeSQL(sqlStatement,args) {
 	
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-
 	if (this.status.sqlTrace  &&(typeof sqlStatement === 'string')){
 	  let sql = sqlStatement
 	  if (sql.indexOf('),($') > 0) {

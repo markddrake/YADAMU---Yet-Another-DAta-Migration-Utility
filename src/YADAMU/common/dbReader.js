@@ -46,8 +46,7 @@ class DBReader extends Readable {
     this.schemaInfo = [];
   
     this.nextPhase = 'systemInformation'
-    this.dbWriter = undefined;
-		
+    this.dbWriter = undefined;		
   }
 
   isDatabase() {
@@ -56,11 +55,16 @@ class DBReader extends Readable {
     
   pipe(outputStream,options) {
 	this.dbWriter = outputStream
+	// If the target does not support Parallel operation overide the setting of PARALLEL
+	if (!this.dbWriter.dbi.PARALLEL_WRITE_OPERATIONS) {
+	  this.dbi.yadamu.parameters.PARALLEL = 0
+	}
 	return super.pipe(outputStream,options);
   } 
   
   async initialize() {
 	await this.dbi.initializeExport() 
+	
   }
   
   async getSystemInformation(version) {
@@ -84,7 +88,7 @@ class DBReader extends Readable {
      return this.dbi.generateMetadata(this.schemaInfo)
   }
   
-  traceSteamEvents(streams,tableName) {
+  traceStreamEvents(streams,tableName) {
 
     // Add event tracing to the streams
 	  
@@ -118,6 +122,8 @@ class DBReader extends Readable {
       tableInfo = readerDBI.generateQueryInformation(task)
 	  tableInfo.TARGET_DATA_TYPES = writerDBI.metadata?.[tableInfo.TABLE_NAME]?.dataTypes ?? []
 	  
+	  // ### TODO: Pass partitioning information to getOutputStreams() ???
+	  
 	  const inputStreams = await readerDBI.getInputStreams(tableInfo)
       yadamuPipeline.push(...inputStreams)
 	  const outputStreams = await writerDBI.getOutputStreams(tableInfo.MAPPED_TABLE_NAME,this.dbWriter.ddlComplete)
@@ -131,7 +137,7 @@ class DBReader extends Readable {
       throw (e)
     }
 
-    // this.traceSteamEvents(yadamuPipeline,task.TABLE_NAME)
+    // this.traceStreamEvents(yadamuPipeline,task.TABLE_NAME)
 	
 	const streamsCompleted = yadamuPipeline.map((s) => { 
 	  return new Promise((resolve,reject) => {
@@ -230,16 +236,23 @@ class DBReader extends Readable {
 	 targetPipeline[0].setReaderMetrics(readerDBI.INPUT_METRICS)
 	 const tableSwitcher = targetPipeline[1]
 	 const yadamuPipeline = new Array(...sourcePipeline,...targetPipeline)
+
+     // this.traceStreamEvents(yadamuPipeline,task.TABLE_NAME)
+
    	 // console.log(yadamuPipeline.map((s) => { return s.constructor.name }).join(' ==> '))
 	
 	 const tableComplete = new Promise((resolve,reject) => {
 	   finished(tableSwitcher,() => {
-	     // Manually clean up the previous pipeline since it never completely ended. Prevents excessive memory usage..
-	     // Remove unpipe listeners on targets
-	     targetPipeline.forEach((s) => { s.removeAllListeners('unpipe') })
+	     // Manually clean up the previous pipeline since it never completely ended. Prevents excessive memory usage and dangling listeners
 	     
-		 // Unpipe all target streams
-	     targetPipeline.forEach((s,i) => { if (i < targetPipeline.length) {s.unpipe(targetPipeline[i+1])} })
+		 // Remove unpipe listeners on targets, unpipe all target streams
+	     targetPipeline.forEach((s,i) => { 
+           s.removeAllListeners('unpipe')
+		   if (i < targetPipeline.length-1) {
+		     s.unpipe(targetPipeline[i+1])
+		   }
+		   s.removeAllListeners(); 
+		 })
 	   
 	     // Destroy the source streams
 	     sourcePipeline.forEach((s) => { s.destroy() })
@@ -248,13 +261,13 @@ class DBReader extends Readable {
      })
    
      // targetPipeline.forEach((s) => { console.log(task.TABLE_NAME,s.constructor.name, s.eventNames().map((e) => {return `"${e}(${s.listenerCount(e)})"`}).join(','))})
-     // this.traceSteamEvents(yadamuPipeline,task.TABLE_NAME)
+     // this.traceStreamEvents(yadamuPipeline,task.TABLE_NAME)
 	  
      // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return proc.constructor.name }).join(' => ')}`)
 	 pipeline(yadamuPipeline)
 	 
 	 await tableComplete
-	 
+	 	 
   }
 
   async pipelineTablesToFile(taskList,readerDBI,writerDBI) {
@@ -266,7 +279,6 @@ class DBReader extends Readable {
 	    const task = taskList.shift()
 		await this.pipelineTableToFile(readerDBI,writerDBI,task)
 	  }
-	 
   }
 
   async generateStatementCache(metadata) {
@@ -353,7 +365,7 @@ class DBReader extends Readable {
            // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'DDL COMPLETE: PROCESSING')
 		   this.dbWriter.callDeferredCallback()
 		   this.push(null);
-		   break;
+       	   break;
 	    default:
       }
     } catch (cause) {

@@ -28,7 +28,7 @@ class MsSQLConstants {
   static get YADAMU_USER()            { return this.DBI_PARAMETERS.YADAMU_USER}
   static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get SPATIAL_MAKE_VALID()     { return this.DBI_PARAMETERS.SPATIAL_MAKE_VALID };
-  static get STATEMENT_TERMINATOR()   { return 'go' }
+  static get STATEMENT_TERMINATOR()   { return ';' }
  
   static get STAGING_TABLE () { 
     this._STAGING_TABLE = this._STAGING_TABLE || Object.freeze({

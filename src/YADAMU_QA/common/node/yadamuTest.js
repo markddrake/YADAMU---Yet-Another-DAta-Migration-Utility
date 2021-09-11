@@ -21,7 +21,7 @@ class YadamuTest extends Yadamu {
   
   static get YADAMU_PARAMETERS() { 
     this.#_YADAMU_PARAMETERS = this.#_YADAMU_PARAMETERS || Object.freeze(Object.assign({},{MODE: DBIConstants.MODE},Yadamu.YADAMU_PARAMETERS,this.QA_CONFIGURATION.yadamu))
-    return this.#_YADAMU_PARAMETERS
+	return this.#_YADAMU_PARAMETERS
   }
   
   // YADAMU_PARAMETERS merged with the yadamuDBI section of the Master Configuration File and the yadamuDBI section of the QA Master Configuration File

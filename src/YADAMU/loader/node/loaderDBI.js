@@ -95,11 +95,12 @@ class LoaderDBI extends YadamuDBI {
 	return LoaderDBI.YADAMU_DBI_PARAMETERS
   }
     
-  get DATABASE_KEY()             { return LoaderDBI.DATABASE_KEY };
-  get DATABASE_VENDOR()          { return LoaderDBI.DATABASE_VENDOR };
-  get SOFTWARE_VENDOR()          { return LoaderDBI.SOFTWARE_VENDOR };
-  get DATA_STAGING_SUPPORTED()   { return true } 
-  get PROTOCOL()                 { return LoaderDBI.PROTOCOL };
+  get DATABASE_KEY()               { return LoaderDBI.DATABASE_KEY };
+  get DATABASE_VENDOR()            { return LoaderDBI.DATABASE_VENDOR };
+  get SOFTWARE_VENDOR()            { return LoaderDBI.SOFTWARE_VENDOR };
+  get DATA_STAGING_SUPPORTED()     { return true } 
+  get PARTITION_LEVEL_OPERATIONS() { return true }
+  get PROTOCOL()                   { return LoaderDBI.PROTOCOL };
   
   get YADAMU_DBI_PARAMETERS()    { 
 	this._YADAMU_DBI_PARAMETERS = this._YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},super.YADAMU_DBI_PARAMETERS,{}))
@@ -245,6 +246,12 @@ class LoaderDBI extends YadamuDBI {
   makeRelative(target) {
 	return path.join(this.EXPORT_FOLDER,path.relative(this.controlFile.settings.baseFolder,target))
   }
+  
+  getDataFileName(tableName,partitionNumber) {
+	 
+	 return Array.isArray(this.controlFile.data[tableName].files) ?  this.controlFile.data[tableName].files.shift() : this.controlFile.data[tableName].file 
+	 
+  }
 
   async loadMetadataFiles(copyStagedData) {
   	this.metadata = {}
@@ -261,7 +268,7 @@ class LoaderDBI extends YadamuDBI {
           const json = JSON.parse(content)
 	 	  this.metadata[json.tableName] = json;
           if (copyStagedData) {
-  		    json.dataFile = this.controlFile.data[json.tableName].file
+            json.dataFile = this.controlFile.data[json.tableName].files || this.controlFile.data[json.tableName].file 
 		  }
         })
       } catch (err) {
@@ -276,28 +283,27 @@ class LoaderDBI extends YadamuDBI {
   }
 
   async getSchemaInfo() {
+
     // this.yadamuLogger.trace([this.constructor.name,this.EXPORT_PATH],`getSchemaInfo()`)
 	
 	this.metadata = await this.loadMetadataFiles(false)
 	
-    return Object.keys(this.metadata).map((tableName) => {
-      return {
+	const schemaInformation = Object.keys(this.metadata).flatMap((tableName) => {
+	  const tableInfo =  {
 		TABLE_SCHEMA          : this.metadata[tableName].tableSchema
-	  , TABLE_NAME : tableName
+	  , TABLE_NAME            : tableName
       , DATA_TYPE_ARRAY       : this.metadata[tableName].dataTypes
 	  , SPATIAL_FORMAT        : this.systemInformation.typeMappings.spatialFormat 
 	  } 
-	  /*
-      return {
-      , TABLE_NAME            : tableName
-      , COLUMN_NAME_ARRAY     : this.metadata[tableName].columnNames
-	  , SIZE_CONSTRAINT_ARRAY : this.metadata[tableName].sizeConstraints
-      } 
-	  */
-    })
-
+      if (this.yadamu.PARALLEL_ENABLED && this.PARTITION_LEVEL_OPERATIONS && Array.isArray(this.controlFile.data[tableName].files)) {
+	    const partitionInfo = this.controlFile.data[tableName].files.map((fileName,idx) => { return Object.assign({}, tableInfo, { PARTITION_COUNT: this.controlFile.data[tableName].files.length, partitionInfo : {PARTITION_NUMBER: idx+1 }})})
+		return partitionInfo
+	  }
+      return tableInfo
+	})
+	return schemaInformation;
   }
-   
+	   
   /*
   **
   ** Remember: Import is Writing data to the local file system - unload.
@@ -345,9 +351,15 @@ class LoaderDBI extends YadamuDBI {
 	   const file = this.metadataRelativePath(tableMetadata.tableName) 
        this.controlFile.metadata[tableMetadata.tableName] = {file: file}
     })
-    Object.values(this.metadata).forEach((tableMetadata) =>  {
-	  const file = this.dataRelativePath(tableMetadata.tableName) 
-      this.controlFile.data[tableMetadata.tableName] = {file: file}
+	Object.values(this.metadata).forEach((tableMetadata) =>  {
+	  if (tableMetadata.partitionCount) {
+		const padSize = tableMetadata.partitionCount.toString().length
+		this.controlFile.data[tableMetadata.tableName] = {files : new Array(tableMetadata.partitionCount).fill(0).map((v,i) => { return this.dataRelativePath(`${tableMetadata.tableName}.${(i+1).toString().padStart(padSize,"0")}`)})}
+	  }
+	  else {
+	    const file =  this.dataRelativePath(tableMetadata.tableName) 
+        this.controlFile.data[tableMetadata.tableName] = {file : file }
+      }
     })
 	
     let stack
@@ -358,7 +370,7 @@ class LoaderDBI extends YadamuDBI {
       throw err.code === 'ENOENT' ? new DirectoryNotFound(err,stack,this.CONTROL_FILE_PATH) : new FileError(err,stack,this.CONTROL_FILE_PATH)
 	}
 	
-	let file
+    let file
 	try {
       const results = await Promise.all(Object.values(this.metadata).map((tableMetadata,idx) => {
 	    stack = new Error().stack;
@@ -413,7 +425,7 @@ class LoaderDBI extends YadamuDBI {
   
   getFileOutputStream(tableName) {
      // this.yadamuLogger.trace([this.constructor.name],`getFileOutputStream(${this.controlFile.data[tableName].file})`)
-    const os = fs.createWriteStream(this.makeAbsolute(this.controlFile.data[tableName].file))
+    const os = fs.createWriteStream(this.makeAbsolute(this.getDataFileName(tableName)))
     const opComplete = new Promise((resolve,reject) => {
 	  finished(os,(err) => {
 	    this.writeOperations.delete(opComplete)	
@@ -449,7 +461,7 @@ class LoaderDBI extends YadamuDBI {
 	
 	if (this.ENCRYPTED_CONTENT) {
 	  const iv = await this.createInitializationVector()
-	  // console.log('Cipher',this.controlFile.data[tableName].file,this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv);
+	  // console.log('Cipher',this.getDataFileName(tableName),this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv);
 	  const cipherStream = crypto.createCipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv)
 	  streams.push(cipherStream)
 	  streams.push(new IVWriter(iv))
@@ -496,28 +508,6 @@ class LoaderDBI extends YadamuDBI {
 
   }
 
-  getTableInfo(tableName) {
-	
-    if (this.metadata === undefined) {
-      this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`Metadata undefined. Cannot obtain required information.`)
-	}
-
-	if (this.metadata[tableName] === undefined) {
-      this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`No metadata entry for "${tableName}". Current entries: ${JSON.stringify(Object.keys(this.metadata))}`)
-	}
-
-	// ### Need to simplify and standardize DataTypes - Data type mapping for Files.. 
-	
-	// Include a dummy dataTypes array of the correct length to ensure the column count assertion does not throw
-	return { 
-	  tableName         : tableName
-	, _SPATIAL_FORMAT   : this.systemInformation.typeMappings.spatialFormat 
-	, _BATCH_SIZE       : this.BATCH_SIZE
-    , columnNames       : [... this.metadata[tableName].columnNames]
-    , targetDataTypes   : [... this.metadata[tableName].dataTypes]
-    }
-  }
-
   async getInputStream(filename) {
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating input stream on ${filename}`)
     const stream = fs.createReadStream(filename);
@@ -542,7 +532,7 @@ class LoaderDBI extends YadamuDBI {
   
   async getInputStreams(tableInfo) {
 	const streams = []
-	const filename = this.makeAbsolute(this.controlFile.data[tableInfo.TABLE_NAME].file)
+	const filename = this.makeAbsolute(this.getDataFileName(tableInfo.TABLE_NAME))
 
     this.INPUT_METRICS = DBIConstants.NEW_TIMINGS
 	this.INPUT_METRICS.DATABASE_VENDOR = this.DATABASE_VENDOR
@@ -620,8 +610,19 @@ class LoaderDBI extends YadamuDBI {
   }
  
   generateStatementCache() {
+
 	this.statementCache = {}
-	return this.statementCache
+	
+    Object.keys(this.metadata).forEach((table,idx) => {
+      const tableMetadata = this.metadata[table];
+	  this.statementCache[tableMetadata.tableName] = {	tableName         : table
+	  , _SPATIAL_FORMAT   : this.systemInformation.typeMappings.spatialFormat 
+	  , _BATCH_SIZE       : this.BATCH_SIZE
+      , columnNames       : [... tableMetadata.columnNames]
+      , targetDataTypes   : [... tableMetadata.dataTypes]
+      }
+    })
+    return this.statementCache
   }
 
   async executeDDL(ddl) {
@@ -640,6 +641,7 @@ class LoaderDBI extends YadamuDBI {
     super.cloneCurrentSettings(manager)
     this.CONTROL_FILE_PATH = this.manager.CONTROL_FILE_PATH
 	this.controlFile = manager.controlFile
+	this.statementCache = manager.statementCache
   }
   
   reloadStatementCache() {

@@ -1,0 +1,1 @@
+docker cp YADAMU-01:/usr/src/YADAMU/mnt/log .

@@ -522,7 +522,7 @@ as
                    '"' || atc.COLUMN_NAME || '"'
                end
         order by INTERNAL_COLUMN_ID) as T_VC4000_TABLE) CLIENT_SELECT_LIST,
-		(select cast(collect(partition_name) as T_VC4000_TABLE) from ALL_TAB_PARTITIONS atp where ATP.TABLE_NAME = aat.TABLE_NAME) PARTITION_LIST
+		(select cast(collect('"' || partition_name || '"') as T_VC4000_TABLE) from ALL_TAB_PARTITIONS atp where ATP.TABLE_NAME = aat.TABLE_NAME and atp.TABLE_OWNER = aat.OWNER) PARTITION_LIST
     from ALL_ALL_TABLES aat
          inner join ALL_TAB_COLS atc
                  on atc.OWNER = aat.OWNER
@@ -644,7 +644,7 @@ begin
 	  V_ROW.CLIENT_SELECT_LIST    := TABLE_TO_LIST(t.CLIENT_SELECT_LIST);
 	  V_ROW.EXPORT_SELECT_LIST    := TABLE_TO_LIST(t.EXPORT_SELECT_LIST);
 	  V_ROW.WITH_CLAUSE           := V_OBJECT_SERIALIZATION;
-	  V_ROW.PARTITiON_LIST        := TABLE_TO_LIST(t.PARTITION_LIST);
+	  V_ROW.PARTITiON_LIST        := '[' || TABLE_TO_LIST(t.PARTITION_LIST) || ']';
 
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN               
 --

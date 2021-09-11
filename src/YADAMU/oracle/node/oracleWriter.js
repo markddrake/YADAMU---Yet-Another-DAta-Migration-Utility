@@ -36,6 +36,7 @@ class OracleWriter extends YadamuWriter {
     super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
 	this.tempLobCount = 0;
 	this.cachedLobCount = 0;
+	this.partitionInfo = undefined;
   }
   
   newBatch() {
@@ -226,31 +227,37 @@ class OracleWriter extends YadamuWriter {
       })
     }
   }
-
+  
   async initialize(tableName) {
     await super.initialize(tableName)
-    await this.disableTriggers()
- }
-
-  async disableTriggers() {
+	if (!this.PARTITIONED_TABLE) {
+      await this.dbi.disableTriggers(this.schema,this.tableInfo.tableName)     
+ 	}
+  }
   
-    const sqlStatement = `ALTER TABLE "${this.schema}"."${this.tableInfo.tableName}" DISABLE ALL TRIGGERS`;
-    return await this.dbi.executeSQL(sqlStatement,[]);
-    
+  async initializePartition(partitionInfo) {
+	await super.initializePartition(partitionInfo)
+	if (this.dbi.PARTITION_LEVEL_OPERATIONS && this.PARTITIONED_TABLE) {
+	  if (this.dbi.partitionLists.hasOwnProperty(this.tableInfo.tableName) && this.dbi.partitionLists[this.tableInfo.tableName].includes(partitionInfo.partitionName)) {
+        this.dml = this.dml.replace(`."${this.tableInfo.tableName}" (`,`."${this.tableInfo.tableName}" PARTITION("${this.partitionInfo.partitionName}") (`)
+      }
+	  if (this.partitionInfo.partitionNumber === 1) {
+		this.tableInfo.partitionCount = partitionInfo.partitionCount
+	    this.tableInfo.readyToLoad = new Promise(async (resolve,reject) => {
+		   try {
+		     await this.dbi.disableTriggers(this.schema,this.tableInfo.tableName)     
+		     resolve()
+		   } catch (e) {
+			 reject(e)
+		   }
+	    })
+	  }
+	  else {
+        await this.tableInfo.readyToLoad
+	  }
+	}
   }
-
-  async enableTriggers() {
-   
-	try {
-  	  this.dbi.checkConnectionState(this.dbi.latestError) 
-      const sqlStatement = `ALTER TABLE "${this.schema}"."${this.tableInfo.tableName}" ENABLE ALL TRIGGERS`;
-      return await this.dbi.executeSQL(sqlStatement,[]);
-	} catch (e) {
-	  this.yadamuLogger.error(['DBA',this.dbi.DATABASE_VENDOR,'TRIGGERS',this.tableInfo.tableName],`Unable to re-enable triggers.`);          
-      this.yadamuLogger.handleException(['TRIGGERS',this.dbi.DATABASE_VENDOR,],e);          
-    } 
-  }
-
+  
   trackStringToClob(s) {
     const clob = this.dbi.stringToClob(s).catch((err) => { 
       // Suppress Unhandled Rejections that can arise if the pipeline aborts while a LOB operation is in progress.
@@ -481,7 +488,7 @@ end;`
 	  // ### Need to serialize and LOBS and parse JSON objects when generating a testcase.
 	  info.testcase = {
         DDL:   this.tableInfo.ddl
-      , DML:   this.tableInfo.dml
+      , DML:   this.dml
       , binds: binds
 	  , data:  rows.slice(0,9)
 	  }
@@ -545,11 +552,11 @@ end;`
   **       await lob.close();
   **       lobCount++;
   **     } catch(e) {
-  **       this.yadamuLogger.logException([`${this.constructor.name}.freeLobList()`,`${this.tableName}`,`${idx}`],e);
+  **       this.yadamuLogger.logException([`${this.constructor.name}.freeLobList()`,`${this.displayName}`,`${idx}`],e);
   **     }   
   **   })
   **   if (lobCount > 0) {
-  **     this.yadamuLogger.info([`${this.constructor.name}.freeLobList()`,`${this.tableName}`],`Closed ${lobCount} lobs.`); 
+  **     this.yadamuLogger.info([`${this.constructor.name}.freeLobList()`,`${this.displayName}`],`Closed ${lobCount} lobs.`); 
   **   }
   ** }
   **
@@ -597,11 +604,11 @@ end;`
         rows = batch.rows
         binds = this.tableInfo.binds
         await this.dbi.createSavePoint()
-        const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds});
+        const results = await this.dbi.executeMany(this.dml,rows,{bindDefs : binds});
 		if (lobInsert) {
           rows = batch.lobRows
           binds = this.tableInfo.lobBinds
-          const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds},batch.tempLobCount);
+          const results = await this.dbi.executeMany(this.dml,rows,{bindDefs : binds},batch.tempLobCount);
 		  // await Promise.all(this.freeLobList());
           this.freeLobList();
         }         
@@ -614,17 +621,17 @@ end;`
         await this.dbi.restoreSavePoint(cause);
 		if (cause.errorNum && (cause.errorNum === 4091)) {
           // Mutating Table - Convert to Cursor based PL/SQL Block
-          this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to PL/SQL Block.`);          
-          this.tableInfo.dml = this.avoidMutatingTable(this.tableInfo.dml);
+          this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to PL/SQL Block.`);          
+          this.dml = this.avoidMutatingTable(this.dml);
           try {
             rows = batch.rows
             binds = this.tableInfo.binds
             await this.dbi.createSavePoint()
-            const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds});
+            const results = await this.dbi.executeMany(this.dml,rows,{bindDefs : binds});
             if (lobInsert) {
               rows = batch.lobRows
               binds = this.tableInfo.lobBinds
-              const results = await this.dbi.executeMany(this.tableInfo.dml,rows,{bindDefs : binds});
+              const results = await this.dbi.executeMany(this.dml,rows,{bindDefs : binds});
               // await Promise.all(this.freeLobList());
               this.freeLobList();
             }         
@@ -635,12 +642,12 @@ end;`
           } catch (cause) {
   		    await this.reportBatchError(batch,`INSERT MANY [PL/SQL]`,cause,rows) 
             await this.dbi.restoreSavePoint(cause);
-            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+            this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
             this.tableInfo.insertMode = 'Iterative';
           }
         } 
         else {  
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
           this.tableInfo.insertMode = 'Iterative';
         }
       }
@@ -656,11 +663,11 @@ end;`
 		  // Create a bound row by cloning the current set of binds and adding the column value.
 		  // boundRow = await Promise.all([... new Array(rows[row].length).keys()].map(async (i) => {const bind = Object.assign({},binds[i]); bind.val=await rows[row][i]; return bind}))
 		  const boundRow = rows[row].map((col,idx) => {return Object.assign({},binds[idx],{val: col})})
-          const results = await this.dbi.executeSQL(this.tableInfo.dml,boundRow)
+          const results = await this.dbi.executeSQL(this.dml,boundRow)
 		  this.metrics.written++
         } catch (cause) {
 		  if ((cause instanceof DatabaseError) && cause.jsonParsingFailed() && cause.includesSpatialOperation()) {
-			await this.retryGeoJSONAsWKT(this.tableInfo.dml,binds,row,rows[row])
+			await this.retryGeoJSONAsWKT(this.dml,binds,row,rows[row])
 		  }
 		  else {
             this.handleIterativeError('INSERT ONE',cause,row,await this.serializeLobColumns(rows[row]));
@@ -686,7 +693,9 @@ end;`
 	// Re-enable triggers on the current table
 	// Skip enablling enableTriggers if tableInfo is not available. If tableInfo is not available an exception must have prevented initialize() from completing successfully. 
 	if (this.tableInfo) {
-      await this.enableTriggers();
+	  if (!this.PARTITIONED_TABLE  || (this.tableInfo.partitionsRemaining === 0)) {
+		await this.dbi.enableTriggers(this.schema,this.tableInfo.tableName);
+	  }
 	}
   }
 }

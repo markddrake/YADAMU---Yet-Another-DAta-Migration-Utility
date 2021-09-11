@@ -47,7 +47,7 @@ class SnowflakeDBI extends YadamuDBI {
   get DATABASE_KEY()           { return SnowflakeConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return SnowflakeConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return SnowflakeConstants.SOFTWARE_VENDOR};
-  get SQL_COPY_SUPPORTED()     { return true }
+  get SQL_COPY_OPERATIONS()    { return true }
   get STATEMENT_TERMINATOR()   { return SnowflakeConstants.STATEMENT_TERMINATOR };
 
   // Enable configuration via command line parameters

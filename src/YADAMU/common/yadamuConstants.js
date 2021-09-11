@@ -13,7 +13,6 @@ class YadamuConstants {
        "YADAMU_VERSION"            : '2.0'
      , "FILE"                      : "yadamu.json"
 	 , "CONFIG"                    : "config.json"
-     , "PARALLEL"                  : 0
      , "RDBMS"                     : "file"
      , "EXCEPTION_FOLDER"          : "exceptions"
      , "EXCEPTION_FILE_PREFIX"     : "exception"
@@ -57,7 +56,6 @@ class YadamuConstants {
   static get YADAMU_VERSION()                  { return this.YADAMU_PARAMETERS.YADAMU_VERSION }
   static get FILE()                            { return this.YADAMU_PARAMETERS.FILE }
   static get CONFIG()                          { return this.YADAMU_PARAMETERS.CONFIG }
-  static get PARALLEL()                        { return this.YADAMU_PARAMETERS.PARALLEL }
   static get RDBMS()                           { return this.YADAMU_PARAMETERS.RDBMS }
   static get EXCEPTION_FOLDER()                { return this.YADAMU_PARAMETERS.EXCEPTION_FOLDER }
   static get EXCEPTION_FILE_PREFIX()           { return this.YADAMU_PARAMETERS.EXCEPTION_FILE_PREFIX }

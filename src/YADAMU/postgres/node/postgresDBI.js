@@ -54,7 +54,7 @@ class PostgresDBI extends YadamuDBI {
   get DATABASE_KEY()           { return PostgresConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return PostgresConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return PostgresConstants.SOFTWARE_VENDOR};
-  get SQL_COPY_SUPPORTED()     { return true }
+  get SQL_COPY_OPERATIONS()    { return true }
   get STATEMENT_TERMINATOR()   { return PostgresConstants.STATEMENT_TERMINATOR };
    
   // Enable configuration via command line parameters
@@ -710,9 +710,9 @@ class PostgresDBI extends YadamuDBI {
 	  results = await this.executeSQL(copy.dml);
 	  const rowsRead = results.rowCount
 	  results = await this.executeSQL(copy.drop);
-	  const elapsedTime = performance.now() - startTime;
+	  const endTime = performance.now()
 	  results = await this.commitTransaction()
-  	  await this.reportCopyResults(tableName,rowsRead,0,elapsedTime,copy.dml,stack)
+  	  await this.reportCopyResults(tableName,rowsRead,0,startTime,endTime,copy,stack)
 	} catch(e) {
 	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
 	  let results = await this.rollbackTransaction()

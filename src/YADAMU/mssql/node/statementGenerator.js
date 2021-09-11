@@ -227,7 +227,6 @@ class StatementGenerator {
           this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,`BULK OPERATION`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
       }
     })
-	// console.log(table)
     return table
   }
 
@@ -329,7 +328,11 @@ class StatementGenerator {
       })
       tableInfo.dml = tableInfo.dml.slice(0,-1) + ")";
       tableInfo.bulkSupported = this.bulkSupported(dataTypes);
+ 	  tableInfo.dataTypes = dataTypes
+
 	  try {
+		
+		/*
         if (tableInfo.bulkSupported) {
 		  tableInfo.bulkOperations = [
 		    this.createBulkOperation(database, tableName, tableMetadata.columnNames, dataTypes)
@@ -343,6 +346,7 @@ class StatementGenerator {
           , new sql.Table()                                            
 		  ]
         }
+		*/
 		
 		if (tableMetadata.dataFile) {
 		  const loadColumnNames = []

@@ -13,31 +13,41 @@
 	},
 	"tests": [{
 			"source": "oracle19c",
-			"target": "vertica10",
+			"targets": [
+			   "vertica10","vertica11"
+		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mssql19",
-			"target": "vertica10",
+			"targets": [
+			   "vertica10","vertica11"
+		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "postgres#1",
-			"target": "vertica10",
+			"targets": [
+			   "vertica10","vertica11"
+		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mysql#1",
-			"target": "vertica10",
+			"targets": [
+			   "vertica10","vertica11"
+		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
 			]
 		},{
 			"source": "mongodb#1",
-			"target": "vertica10",
+			"targets": [
+			   "vertica10","vertica11"
+		    ],
 			"tasks": [
 				"oracle","mssql","mysql"
 			]

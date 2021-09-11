@@ -55,7 +55,7 @@ class RedshiftDBI extends YadamuDBI {
   get DATABASE_KEY()             { return RedshiftConstants.DATABASE_KEY};
   get DATABASE_VENDOR()          { return RedshiftConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()          { return RedshiftConstants.SOFTWARE_VENDOR};
-  get SQL_COPY_SUPPORTED()       { return true }
+  get SQL_COPY_OPERATIONS()      { return true }
   get STATEMENT_TERMINATOR()     { return RedshiftConstants.STATEMENT_TERMINATOR };
    
   // Enable configuration via command line parameters

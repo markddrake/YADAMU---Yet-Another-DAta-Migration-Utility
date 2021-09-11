@@ -1,0 +1,32 @@
+{
+  "operation"          : "copy"
+, "connections"        : "connections.json"
+, "tasks"              : "tasks.json"
+, "recreateSchema"     : true
+, "targetSchemaSuffix" : ""
+, "parameters": {
+	   "SQL_TRACE" : "trace.sql"
+  }
+, "tests"                  : [{
+    "source": "oracle18c"
+  , "targets": [
+	  "oracle19c"
+    ]
+  , "recreateSchema"    : false
+  , "parameters" : {
+	    "MODE"   : "DATA_ONLY"
+	,	"TABLES" : [ "ONLINE_MEDIA" ]
+	}
+  , "tasks": [ 
+      "PM"
+	]
+  },{
+    "source": "oracle19c"
+  , "targets": [
+	  "mssql17","mssql19","postgres#1","mysql#1","mariadb#1","mongodb#1"
+    ]
+  , "tasks": [ 
+      "HR","BI"
+	]
+  }]
+}

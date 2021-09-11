@@ -66,8 +66,9 @@ class MsSQLDBI extends YadamuDBI {
   get DATABASE_KEY()           { return MsSQLConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return MsSQLConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return MsSQLConstants.SOFTWARE_VENDOR};
-  // get SQL_COPY_SUPPORTED()     { return true }
+  // get SQL_COPY_OPERATIONS()    { return true }
   get STATEMENT_TERMINATOR()   { return MsSQLConstants.STATEMENT_TERMINATOR };
+  get STATEMENT_SEPERATOR()        { return '\ngo\n--\n' }
 
   // Enable configuration via command line parameters
 
@@ -76,6 +77,8 @@ class MsSQLDBI extends YadamuDBI {
 
   get TRANSACTION_IN_PROGRESS()       { return super.TRANSACTION_IN_PROGRESS ||this.tediousTransactionError  }
   set TRANSACTION_IN_PROGRESS(v)      { super.TRANSACTION_IN_PROGRESS = v }
+
+  get DATABASE_NAME()          { return this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.vendorProperties.database }
 
   constructor(yadamu,settings,parameters) {
     super(yadamu,settings,parameters);
@@ -915,7 +918,10 @@ class MsSQLDBI extends YadamuDBI {
 	        this.beginTransactionError = true
 	        await this.transaction.rollback()
 	      } catch (e) {
-  		    console.log(e)
+			if (e.code && (e.code !== 'EINVALIDSTATE')) {
+              stack = new Error().stack
+  		      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'TRANSACTION MANAGER','BEGIN','ERROR_CLEAN_UP]'],new MsSQLError(e,stack,'sql.Transaction.rollback()'))
+			}
 	      }
 
           attemptReconnect = false;
@@ -1185,7 +1191,7 @@ class MsSQLDBI extends YadamuDBI {
   async generateStatementCache(schema) {
     /* ### OVERRIDE ### Pass additional parameter Database Name */
     const statementGenerator = new this.StatementGenerator(this, schema, this.metadata ,this.yadamuLogger);
-    this.statementCache = await statementGenerator.generateStatementCache(this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.vendorProperties.database)
+    this.statementCache = await statementGenerator.generateStatementCache(this.DATABASE_NAME)
 	return this.statementCache
   }
 

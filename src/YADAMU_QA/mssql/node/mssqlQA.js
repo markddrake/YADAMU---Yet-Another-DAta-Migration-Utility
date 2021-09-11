@@ -79,7 +79,7 @@ class MsSQLQA extends MsSQLDBI {
 
         await this.finalize()
 	  } catch (e) {
-		this.yadamuLogger.qa([this.DATABASE_VENDOR,'recreateDatabase()'],e.message);
+		this.yadamuLogger.handleException([this.DATABASE_VENDOR,'recreateDatabase()'],e);
 		throw e
 	  }
 	  
@@ -96,7 +96,7 @@ class MsSQLQA extends MsSQLDBI {
       const results = await this.pool.request().input('SCHEMA',this.sql.VarChar,connectInfo.owner).query(MsSQLQA.SQL_SCHEMA_TABLE_ROWS);
       
       return results.recordset.map((row,idx) => {          
-        return [connectInfo.owner === 'dbo' ? connectInfo.database : connectInfo.owner,row.TableName,row.RowCount]
+        return [connectInfo.owner === 'dbo' ? connectInfo.database : connectInfo.owner,row.TableName,parseInt(row.RowCount)]
       })
     }
 	

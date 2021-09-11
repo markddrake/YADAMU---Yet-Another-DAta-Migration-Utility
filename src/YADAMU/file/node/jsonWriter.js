@@ -196,7 +196,7 @@ class JSONWriter extends YadamuWriter {
     return `${this.rowSeperator}${JSON.stringify(row)}`
   }
 
-  async processRow(row) {
+  processRow(row) {
     // Be very careful about adding unecessary code here. This is executed once for each row processed by YADAMU. Keep it as lean as possible.
 	this.checkColumnCount(row)
 
@@ -218,18 +218,18 @@ class JSONWriter extends YadamuWriter {
     }
   }
 
-  async endTable() {
+  endTable() {
     // Called from YadamuWriter when 'eod' is recieved during import or from _final during direct copy
 	this.push(']')
   }
 
-  async _final(callback) {
+  _final(callback) {
 	 /* OVERRIDE */ 
-	await this.endTable()
+	this.endTable()
     callback()
   }	  
   
-  async _destroy(err,callback) {
+  _destroy(err,callback) {
 	 /* OVERRIDE */ 
 	this.endTime = performance.now()
     this.reportPerformance(err)
@@ -237,11 +237,11 @@ class JSONWriter extends YadamuWriter {
 	callback()
   }	  
   
-  async _writeBatch /* OVERRIDE */ () {}
+  _writeBatch /* OVERRIDE */ () {}
 
-  async commitTransaction() { /* OVERRIDE */ }
+  commitTransaction() { /* OVERRIDE */ }
 
-  async rollbackTransaction() { /* OVERRIDE */ }
+  rollbackTransaction() { /* OVERRIDE */ }
   
 }
 

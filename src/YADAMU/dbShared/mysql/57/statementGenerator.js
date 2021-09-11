@@ -617,9 +617,22 @@ class StatementGenerator {
         }
       })
    
-      tableInfo.copy = {
-        dml         : `load data infile '${tableMetadata.dataFile.split(path.sep).join(path.posix.sep)}' into table "${this.targetSchema}"."${tableMetadata.tableName}" character set UTF8 fields terminated by ',' optionally enclosed by '"' ESCAPED BY '"' lines terminated by '\n' (${loadColumnNames.join(",")}) SET ${setOperations.join(",")}`
-      }
+	  // Partitioned Tables need one entry per partition 
+
+      if (tableMetadata.hasOwnProperty('partitionCount')) {
+  	    tableInfo.copy = tableMetadata.dataFile.map((filename,idx) => {
+		  return  {
+            dml             : `load data infile '${filename.split(path.sep).join(path.posix.sep)}' into table "${this.targetSchema}"."${tableMetadata.tableName}" character set UTF8 fields terminated by ',' optionally enclosed by '"' ESCAPED BY '"' lines terminated by '\n' (${loadColumnNames.join(",")}) SET ${setOperations.join(",")}`
+		  , partitionCount  : tableMetadata.partitionCount
+		  , partitionID     : idx+1
+          }
+		})
+	  }
+	  else {
+    	tableInfo.copy = {
+          dml         : `load data infile '${tableMetadata.dataFile.split(path.sep).join(path.posix.sep)}' into table "${this.targetSchema}"."${tableMetadata.tableName}" character set UTF8 fields terminated by ',' optionally enclosed by '"' ESCAPED BY '"' lines terminated by '\n' (${loadColumnNames.join(",")}) SET ${setOperations.join(",")}`
+        }
+	  }
 	  
 	}
     return tableInfo

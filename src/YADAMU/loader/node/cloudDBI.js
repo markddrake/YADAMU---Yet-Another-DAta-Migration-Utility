@@ -90,7 +90,7 @@ class CloudDBI extends LoaderDBI {
 	  metdataRecords.forEach((content) =>  {
         const json = this.parseContents(content)
         metadata[json.tableName] = json;
-        json.dataFile = this.controlFile.data[json.tableName].file
+        json.dataFile = this.getDataFileName(json.tableName)
       })
     }
     return metadata;      
@@ -145,8 +145,8 @@ class CloudDBI extends LoaderDBI {
   }
   
   getFileOutputStream(tableName) {
-    // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,tableName],`Creating readable stream on getFileOutputStream(${this.controlFile.data[tableName].file})`)
-	const file = this.makeAbsolute(this.controlFile.data[tableName].file)
+    // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,tableName],`Creating readable stream on getFileOutputStream(${this.getDataFileName(tableName)})`)
+	const file = this.makeAbsolute(this.getDataFileName(tableName))
 	const extension = path.extname(file);
 	const contentType = mime.lookup(extension) || 'application/octet-stream'
 	return this.cloudService.createWriteStream(file,contentType)
@@ -171,7 +171,7 @@ class CloudDBI extends LoaderDBI {
 
   async getInputStream(filename) {
 
-    // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating readable stream on ${this.controlFile.data[tableInfo.TABLE_NAME].file}`)
+    // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating readable stream on ${this.getDataFileName(tableName)}`)
     const stream = await this.cloudService.createReadStream(filename)
 	return stream
   }

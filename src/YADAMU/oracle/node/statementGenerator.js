@@ -425,7 +425,7 @@ class StatementGenerator {
 		        externalDataType = `VARCHAR2(${length})`			    
 		        copyColumnDefinition = `${copyColumnDefinition}  CHAR(${length})`
 	            externalSelect = `HEXTORAW(TRIM("${column}"))`
-		}
+		    }
 			break;
           case "XMLTYPE":
 		    externalDataType = "CLOB"
@@ -532,7 +532,7 @@ class StatementGenerator {
 	    columnList = columnList.indexOf(')\nXMLTYPE ') === -1 ? columnList : columnList.substring(0,columnList.indexOf(')\nXMLTYPE')+1)
 		*/
 		const plsql = this.getPLSQL(tableInfo.dml)
-        const copyDDL = `
+		const copyDDL = `
 CREATE TABLE ${externalTableName} (
   ${externalColumnDefinitions.join(',')}
 ) 
@@ -552,10 +552,11 @@ ORGANIZATION EXTERNAL (
 		   )
   ) 
   LOCATION (
-	'${path.basename(tableMetadata.dataFile).split(path.sep).join(path.posix.sep)}'
+	'${tableMetadata.partitionCount ? `${tableMetadata.dataFile.map((filename) => { return path.basename(filename).split(path.sep).join(path.posix.sep)}).join("','")}` : path.basename(tableMetadata.dataFile).split(path.sep).join(path.posix.sep)}'
   )
-)`
-
+) 
+${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > this.dbi.PARALLEL) ? this.dbi.PARALLEL : tableMetadata.partitionCount}` : ''}
+`
 	    tableInfo.copy = {
 		  ddl          : copyDDL
         , dml          : `insert ${plsql ? `/*+ WITH_PLSQL */` : '/*+ APPEND */'} into "${this.targetSchema}"."${tableName}"\n${plsql ? `WITH\n${plsql}\n` : ''}select ${externalSelectList.join(",")} from ${externalTableName}`
@@ -577,6 +578,7 @@ ORGANIZATION EXTERNAL (
       else  {
         tableInfo.dml = `insert /*+ APPEND */ into "${this.targetSchema}"."${tableMetadata.tableName}" (${tableInfo.columnNames.map((col) => {return `"${col}"`}).join(',')}) values (${values.join(',')})`;
       }	  
+
     });
 	return statementCache
   }  

@@ -193,12 +193,29 @@ class StatementGenerator {
 		    return `"${tableInfo.columnNames[idx]}"`
 		  })
 
-          const externalTableName = `"${this.targetSchema}"."YXT-${crypto.randomBytes(16).toString("hex").toUpperCase()}"`;
-		  tableInfo.copy = {
-		    ddl          : `create foreign table ${externalTableName} (${columnDefinitions.join(",")}) SERVER "${this.dbi.COPY_SERVER_NAME}" options (format 'csv', filename '${tableMetadata.dataFile.split(path.sep).join(path.posix.sep)}')`
-          , dml          : `insert into "${this.targetSchema}"."${tableName}" select ${copyOperators.join(",")} from ${externalTableName}`
-	      , drop         : `drop foreign table ${externalTableName}`
-	      }
+          // Partitioned Tables need one entry per partition 
+
+          if (tableMetadata.hasOwnProperty('partitionCount')) {
+	  	    tableInfo.copy = tableMetadata.dataFile.map((filename,idx) => {
+              const externalTableName = `"${this.targetSchema}"."YXT-${crypto.randomBytes(16).toString("hex").toUpperCase()}"`;
+			  return  {
+  		        ddl             : `create foreign table ${externalTableName} (${columnDefinitions.join(",")}) SERVER "${this.dbi.COPY_SERVER_NAME}" options (format 'csv', filename '${filename.split(path.sep).join(path.posix.sep)}')`
+              , dml             : `insert into "${this.targetSchema}"."${tableName}" select ${copyOperators.join(",")} from ${externalTableName}`
+	          , drop            : `drop foreign table ${externalTableName}`
+			  , partitionCount  : tableMetadata.partitionCount
+			  , partitionID     : idx+1
+	          }
+			})
+		  }
+		  else {
+			const externalTableName = `"${this.targetSchema}"."YXT-${crypto.randomBytes(16).toString("hex").toUpperCase()}"`;
+	    	tableInfo.copy = {
+		      ddl          : `create foreign table ${externalTableName} (${columnDefinitions.join(",")}) SERVER "${this.dbi.COPY_SERVER_NAME}" options (format 'csv', filename '${tableMetadata.dataFile.split(path.sep).join(path.posix.sep)}')`
+            , dml          : `insert into "${this.targetSchema}"."${tableName}" select ${copyOperators.join(",")} from ${externalTableName}`
+	        , drop         : `drop foreign table ${externalTableName}`
+	        }
+		  }
+
         } 
 	    return tableInfo.ddl
       });

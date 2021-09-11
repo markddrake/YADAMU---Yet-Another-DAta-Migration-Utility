@@ -6,8 +6,8 @@ const YadamuLibrary = require('../../common/yadamuLibrary.js')
 class EventStream extends YadamuParser {
   
   constructor(tableInfo,yadamuLogger) {
-  
-    super(tableInfo,yadamuLogger);      
+    
+	super(tableInfo,yadamuLogger);      
 
 	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 

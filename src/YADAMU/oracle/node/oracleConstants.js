@@ -14,19 +14,20 @@ class OracleConstants {
 
   static get STATIC_DEFAULTS() { 
     this._STATIC_DEFAULTS = this._STATIC_DEFAULTS || Object.freeze({
-      "BATCH_TEMPLOB_LIMIT"       : 8192
-    , "BATCH_CACHELOB_LIMIT"      : 65336
-    , "ORACLE_XML_TYPE"           : "XML"
-    , "LOB_MIN_SIZE"              : 32768
-    , "LOB_MAX_SIZE"              : 16777216
-    , "ORACLE_JSON_TYPE"          : "JSON"
-    , "MIGRATE_JSON_STORAGE"      : false
-    , "OBJECT_FORMAT"             : "NATIVE"
-    , "TREAT_RAW1_AS_BOOLEAN"     : true
-    , "SPATIAL_FORMAT"            : "WKB"
-	, "BYTE_TO_CHAR_RATIO"        : 4
-	, "COPY_LOGFILE_DIRNAME"      : null
-	, "COPY_BADFILE_DIRNAME"      : null
+      "SPATIAL_FORMAT"             : "WKB"
+    , "BATCH_TEMPLOB_LIMIT"        : 8192
+    , "BATCH_CACHELOB_LIMIT"       : 65336
+    , "LOB_MIN_SIZE"               : 32768
+    , "LOB_MAX_SIZE"               : 16777216
+    , "ORACLE_XML_TYPE"            : "XML"
+    , "ORACLE_JSON_TYPE"           : "JSON"
+    , "MIGRATE_JSON_STORAGE"       : false
+    , "OBJECT_FORMAT"              : "NATIVE"
+    , "TREAT_RAW1_AS_BOOLEAN"      : true
+	, "PARTITION_LEVEL_OPERATIONS" : true
+	, "BYTE_TO_CHAR_RATIO"         : 4
+	, "COPY_LOGFILE_DIRNAME"       : null
+	, "COPY_BADFILE_DIRNAME"       : null
     })
     return this._STATIC_DEFAULTS;
   }
@@ -38,19 +39,20 @@ class OracleConstants {
     return this.#_DBI_PARAMETERS
   }
 
-  static get BATCH_TEMPLOB_LIMIT()    { return this.DBI_PARAMETERS.BATCH_TEMPLOB_LIMIT}
-  static get BATCH_CACHELOB_LIMIT()   { return this.DBI_PARAMETERS.BATCH_CACHELOB_LIMIT}
-  static get LOB_MIN_SIZE()           { return this.DBI_PARAMETERS.LOB_MIN_SIZE}
-  static get LOB_MAX_SIZE()           { return this.DBI_PARAMETERS.LOB_MAX_SIZE}
-  static get ORACLE_XML_TYPE()        { return this.DBI_PARAMETERS.ORACLE_XML_TYPE}
-  static get ORACLE_JSON_TYPE()       { return this.DBI_PARAMETERS.ORACLE_JSON_TYPE}
-  static get MIGRATE_JSON_STORAGE()   { return this.DBI_PARAMETERS.MIGRATE_JSON_STORAGE}
-  static get OBJECT_FORMAT()          { return this.DBI_PARAMETERS.OBJECT_FORMAT}
-  static get TREAT_RAW1_AS_BOOLEAN()  { return this.DBI_PARAMETERS.TREAT_RAW1_AS_BOOLEAN}
-  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
-  static get BYTE_TO_CHAR_RATIO()     { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
-  static get COPY_LOGFILE_DIRNAME()   { return this.DBI_PARAMETERS.COPY_LOGFILE_DIRNAME };
-  static get COPY_BADFILE_DIRNAME()   { return this.DBI_PARAMETERS.COPY_BADFILE_DIRNAME };
+  static get SPATIAL_FORMAT()             { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
+  static get BATCH_TEMPLOB_LIMIT()        { return this.DBI_PARAMETERS.BATCH_TEMPLOB_LIMIT}
+  static get BATCH_CACHELOB_LIMIT()       { return this.DBI_PARAMETERS.BATCH_CACHELOB_LIMIT}
+  static get LOB_MIN_SIZE()               { return this.DBI_PARAMETERS.LOB_MIN_SIZE}
+  static get LOB_MAX_SIZE()               { return this.DBI_PARAMETERS.LOB_MAX_SIZE}
+  static get ORACLE_XML_TYPE()            { return this.DBI_PARAMETERS.ORACLE_XML_TYPE}
+  static get ORACLE_JSON_TYPE()           { return this.DBI_PARAMETERS.ORACLE_JSON_TYPE}
+  static get MIGRATE_JSON_STORAGE()       { return this.DBI_PARAMETERS.MIGRATE_JSON_STORAGE}
+  static get OBJECT_FORMAT()              { return this.DBI_PARAMETERS.OBJECT_FORMAT}
+  static get TREAT_RAW1_AS_BOOLEAN()      { return this.DBI_PARAMETERS.TREAT_RAW1_AS_BOOLEAN}
+  static get PARTITION_LEVEL_OPERATIONS() { return this.DBI_PARAMETERS.PARTITION_LEVEL_OPERATIONS };
+  static get BYTE_TO_CHAR_RATIO()         { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
+  static get COPY_LOGFILE_DIRNAME()       { return this.DBI_PARAMETERS.COPY_LOGFILE_DIRNAME };
+  static get COPY_BADFILE_DIRNAME()       { return this.DBI_PARAMETERS.COPY_BADFILE_DIRNAME };
 
   // Until we have static constants
 

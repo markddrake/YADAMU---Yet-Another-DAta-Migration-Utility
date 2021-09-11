@@ -1,0 +1,392 @@
+{
+	"connections": "connections.json",
+	"operation": "dbRoundtrip",
+	"tasks": "tasks.json",
+	"recreateSchema": true,
+	"createDirectory": true,
+	"verifyOperation": true,
+	"parameters": {
+		"PARALLEL": 8
+	},
+	"tests": [
+		{
+			"source": "oracle19c",
+			"target": "oracle19c",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "mssql19",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "postgres#1",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "mysql#1",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "mariadb#1",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "mongodb#1",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle18c",
+			"target": "oracle18c",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle12c",
+			"target": "oracle12c",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle11g",
+			"target": "oracle11g",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "mssql19",
+			"target": "mssql19",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "mssql17",
+			"target": "mssql17",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "postgres#1",
+			"target": "postgres#1",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "mysql#1",
+			"target": "mysql#1",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "mariadb#1",
+			"target": "mariadb#1",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "mongodb#1",
+			"target": "mongodb#1",
+			"parameters": {
+				"MONGO_STRIP_ID": false
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"operation": "export",
+			"source": "oracle19c",
+			"target": "file-sRegress",
+			"parameters": {
+				"DIRECTORY": "%operation%/json/%vendor%/%mode%"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"operation": "export",
+			"source": "oracle19c",
+			"target": "file-sRegress",
+			"parameters": {
+				"MODE": "DDL_ONLY",
+				"DIRECTORY": "%operation%/json/%vendor%/%mode%"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"operation": "export",
+			"source": "oracle19c",
+			"target": "file-sRegress",
+			"parameters": {
+				"MODE": "DDL_AND_DATA",
+				"DIRECTORY": "%operation%/json/%vendor%/%mode%"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"operation": "export",
+			"source": "oracle19c",
+			"target": "file-sRegress",
+			"parameters": {
+				"DIRECTORY": "%operation%/gzip/%vendor%/%mode%",
+				"COMPRESSION": "GZIP"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"operation": "export",
+			"source": "oracle19c",
+			"target": "file-sRegress",
+			"parameters": {
+				"DIRECTORY": "%operation%/x-gzip/%vendor%/%mode%",
+				"COMPRESSION": "GZIP",
+				"ENCRYPTION": true,
+				"PASSPHRASE": "yadamu"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"operation": "export",
+			"source": "oracle19c",
+			"target": "file-sRegress",
+			"parameters": {
+				"DIRECTORY": "%operation%/x-json/%vendor%/%mode%",
+				"ENCRYPTION": true,
+				"PASSPHRASE": "yadamu"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"operation": "fileRoundtrip",
+			"source": "file-sRegress",
+			"target": "oracle19c",
+			"parameters": {
+				"MODE": "DDL_AND_DATA",
+				"SOURCE_DIRECTORY": "export/json/%location%/%mode%",
+				"TARGET_DIRECTORY": "%operation%/json/%connection%/%mode%"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"operation": "import",
+			"source": "file-sRegress",
+			"target": "loader-sRegress",
+			"parameters": {
+				"SOURCE_DIRECTORY": "export/json/%location%/%mode%",
+				"TARGET_DIRECTORY": "json"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "loader-sRegress",
+			"parameters": {
+				"DIRECTORY": "%sourceConnection%/json"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "loader-sRegress",
+			"target": "oracle19c",
+			"parameters": {
+				"DIRECTORY": "json"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "loader-sRegress",
+			"parameters": {
+				"DIRECTORY": "gzip",
+				"COMPRESSION": "GZIP"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "loader-sRegress",
+			"parameters": {
+				"DIRECTORY": "x-gzip",
+				"COMPRESSION": "GZIP",
+				"ENCRYPTION": true,
+				"PASSPHRASE": "yadamu"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"operation": "import",
+			"source": "file-sRegress",
+			"target": "minio#1",
+			"parameters": {
+				"SOURCE_DIRECTORY": "export/json/%location%/%mode%",
+				"TARGET_DIRECTORY": "json"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "minio#1",
+			"parameters": {
+				"DIRECTORY": "%sourceConnection%/json"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "minio#1",
+			"target": "oracle19c",
+			"parameters": {
+				"DIRECTORY": "json"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "minio#1",
+			"parameters": {
+				"DIRECTORY": "gzip",
+				"COMPRESSION": "GZIP"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"operation": "import",
+			"source": "file-sRegress",
+			"target": "azurite#1",
+			"parameters": {
+				"SOURCE_DIRECTORY": "export/json/%location%/%mode%",
+				"TARGET_DIRECTORY": "json"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "azurite#1",
+			"parameters": {
+				"DIRECTORY": "%sourceConnection%/json"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "azurite#1",
+			"target": "oracle19c",
+			"parameters": {
+				"DIRECTORY": "json"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "azurite#1",
+			"parameters": {
+				"DIRECTORY": "gzip",
+				"COMPRESSION": "GZIP"
+			},
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "oracle19c",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "postgres#1",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "mysql#1",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "mariadb#1",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "mssql19",
+			"tasks": [
+				"SH"
+			]
+		},
+		{
+			"source": "oracle19c",
+			"target": "mongodb#1",
+			"tasks": [
+				"SH"
+			]
+		}
+	]
+}

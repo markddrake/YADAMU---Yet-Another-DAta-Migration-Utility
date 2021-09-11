@@ -83,7 +83,8 @@ class MongoWriter extends YadamuWriter {
             case "WKB":
             case "EWKB":
               return (col,idx) => {
-			    return WKX.Geometry.parse(col).toGeoJSON()
+				// Handle case where incoming format is already GeoJSON
+			    return Buffer.isBuffer(col) ? WKX.Geometry.parse(col).toGeoJSON() : col
 			  }
  			  return null
             case "WKT":

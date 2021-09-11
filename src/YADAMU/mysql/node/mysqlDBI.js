@@ -46,7 +46,7 @@ class MySQLDBI extends YadamuDBI {
   get DATABASE_KEY()           { return MySQLConstants.DATABASE_KEY};
   get DATABASE_VENDOR()        { return MySQLConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()        { return MySQLConstants.SOFTWARE_VENDOR};
-  get SQL_COPY_SUPPORTED()     { return true }
+  get SQL_COPY_OPERATIONS()    { return true }
   get STATEMENT_TERMINATOR()   { return MySQLConstants.STATEMENT_TERMINATOR };
   
   // Enable configuration via command line parameters
@@ -687,9 +687,9 @@ class MySQLDBI extends YadamuDBI {
 	  let results = await this.beginTransaction();
 	  results = await this.executeSQL(copy.dml);
 	  const rowsRead = results.affectedRows
-	  const elapsedTime = performance.now() - startTime;
+	  const endTime = performance.now();
 	  results = await this.commitTransaction()
-	  await this.reportCopyResults(tableName,rowsRead,0,elapsedTime,copy.dml,stack)
+	  await this.reportCopyResults(tableName,rowsRead,0,startTime,endTime,copy,stack)
 	} catch(e) {
 	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
 	  let results = await this.rollbackTransaction()

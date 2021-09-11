@@ -88,7 +88,8 @@ class Yadamu {
   get INTERACTIVE()                   { return this.STATUS.operation === 'YADAMUGUI' }
   
   get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || YadamuConstants.PARALLEL) }
-  get PARALLEL_PROCESSING()           { return this.PARALLEL > 0 } // Parellel 1 is Parallel processing logic with a single worker.
+  get PARALLEL_ENABLED()              { return this._PARALLEL_ENABLED || false }
+  set PARALLEL_ENABLED(v)             { this._PARALLEL_ENABLED = ((this.PARALLEL && (this.PARALLEL > 0)) && v )}
 
   get SOURCE_DIRECTORY()              { return this.parameters.SOURCE_DIRECTORY || this.parameters.DIRECTORY }
   get TARGET_DIRECTORY()              { return this.parameters.TARGET_DIRECTORY || this.parameters.DIRECTORY }
@@ -298,7 +299,32 @@ class Yadamu {
 	   await this.generateCryptoKey()
      }
   }
-	
+  
+  recordPartitionMetrics(table,partitionMetrics) {
+	if (this.metrics.hasOwnProperty(table)) {
+	  const metrics = this.metrics[table]
+      metrics.startTime = partitionMetrics.startTime < metrics.startTime ? partitionMetrics.startTime : metrics.startTime
+	  metrics.endTime = partitionMetrics.endTime > metrics.endTime ? partitionMetrics.endTime : metrics.endTime
+	  metrics.rowCount+= partitionMetrics.rowCount
+	  metrics.rowsSkipped+= partitionMetrics.rowsSkipped
+	  metrics.sqlExecutionTime+= partitionMetrics.sqlExecutionTime
+      metrics.partitionCount--
+	  if (metrics.partitionCount === 1) {
+		delete metrics.partitionCount
+        metrics.elapsedTime = metrics.endTime - metrics.startTime
+		delete metrics.startTime
+		delete metrics.endTime
+		const throughput = Math.round((metrics.rowCount/metrics.elapsedTime) * 1000)
+		metrics.throughput =  throughput  + "/s"
+	    const timings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(metrics.elapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(metrics.sqlExecutionTime))}s. Throughput: ${throughput} rows/s.`
+	    this.LOGGER.info([`${table}`],`Total Rows ${metrics.rowCount}. ${timings}`)  
+      }
+	}
+	else {
+	 this.metrics[table] = partitionMetrics
+	}
+  }
+  
   recordMetrics(metrics) {
 	Object.assign(this.metrics,metrics)
   }
@@ -701,13 +727,13 @@ class Yadamu {
 
   }
 
-  async getDBReader(dbi,parallel) {
-	const dbReader = parallel ? new DBReaderParallel(dbi, this.LOGGER) : new DBReader(dbi, this.LOGGER);
+  async getDBReader(dbi) {
+	const dbReader = this.PARALLEL_ENABLED ? new DBReaderParallel(dbi, this.LOGGER) : new DBReader(dbi, this.LOGGER);
 	await dbReader.initialize();
     return dbReader;
   }
   
-  async getDBWriter(dbi,parallel) {
+  async getDBWriter(dbi) {
 	const dbWriter = new DBWriter(dbi, this.LOGGER);
     await dbWriter.initialize();
     return dbWriter;
@@ -730,8 +756,16 @@ class Yadamu {
 	  Object.keys(controlFile.data).forEach((tableName,idx) => {
 		if ((source.TABLE_FILTER.length === 0) || source.TABLE_FILTER.includes(tableName)) {
     	  source.DIRECTORY = source.TARGET_DIRECTORY
-		  const remotePath = path.join(target.REMOTE_STAGING_AREA,path.basename(source.CONTROL_FILE_FOLDER),controlFile.data[tableName].file)
-	      controlFile.data[tableName].file = remotePath
+		  switch (Array.isArray(controlFile.data[tableName].files)) {
+			case true:			
+		       const remotePaths = controlFile.data[tableName].files.map((filename) => {return path.join(target.REMOTE_STAGING_AREA,path.basename(source.CONTROL_FILE_FOLDER),filename)})
+	           controlFile.data[tableName].files = remotePaths
+			  break
+			case false:
+		       const remotePath = path.join(target.REMOTE_STAGING_AREA,path.basename(source.CONTROL_FILE_FOLDER),controlFile.data[tableName].file)
+	           controlFile.data[tableName].file = remotePath
+			  break
+	      }
 	    }
 		else {
 		  delete controlFile.metadata[tableName]
@@ -762,11 +796,17 @@ class Yadamu {
 	*/
 
 	let streamsCompleted
-	const parallel = (this.PARALLEL_PROCESSING && source.isDatabase() && target.isDatabase());
 
-	this.STATUS.operationSuccessful = false;
-    const dbReader = await this.getDBReader(source,parallel)
-    const dbWriter = await this.getDBWriter(target,parallel) 
+    /*
+	**
+	** Enabled Parallel Processing if source 
+	**
+	*/ 
+	
+	this.PARALLEL_ENABLED = source.PARALLEL_OPERATIONS && target.PARALLEL_OPERATIONS
+	
+    const dbReader = await this.getDBReader(source)
+    const dbWriter = await this.getDBWriter(target) 
 
 	// this.LOGGER.trace([this.constructor.name,'PIPELINE'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
     try {
@@ -819,7 +859,7 @@ class Yadamu {
       await target.initialize();
 	  this.activeConnections.add(source);
 		
-      if (this.DATA_STAGING_ENABLED && source.DATA_STAGING_SUPPORTED && target.SQL_COPY_SUPPORTED) {
+      if (this.DATA_STAGING_ENABLED && source.DATA_STAGING_SUPPORTED && target.SQL_COPY_OPERATIONS) {
 		await source.loadControlFile()
 		if (target.validStagedDataSet(source.DATABASE_KEY,source.CONTROL_FILE_PATH,source.controlFile)) {
 		  // TODO: If all copy operations fail due to issues accessing file fallback to Pipeline.

@@ -6,7 +6,8 @@ const path = require('path');
 const crypto = require('crypto');
 const { performance } = require('perf_hooks');
 
-const {pipeline, finished, Readable, PassThrough} = require('stream')
+const {finished, Readable, PassThrough} = require('stream')
+const {pipeline} = require('stream/promises')
 const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
 
 /*
@@ -136,22 +137,25 @@ class FileDBI extends YadamuDBI {
     return FileDBI.YADAMU_DBI_PARAMETERS
   }
 
-  get DATABASE_KEY()           { return FileDBI.DATABASE_KEY };
-  get DATABASE_VENDOR()        { return FileDBI.DATABASE_VENDOR };
-  get SOFTWARE_VENDOR()        { return FileDBI.SOFTWARE_VENDOR };
+  get DATABASE_KEY()               { return FileDBI.DATABASE_KEY };
+  get DATABASE_VENDOR()            { return FileDBI.DATABASE_VENDOR };
+  get SOFTWARE_VENDOR()            { return FileDBI.SOFTWARE_VENDOR };
   
-  get COMPRESSED_FILE()        { return this.yadamu.COMPRESSION !== 'NONE' }
-  get ENCRYPTED_FILE()         { return this.yadamu.ENCRYPTION }
+  get PARALLEL_READ_OPERATIONS()   { return false };
+  get PARALLEL_WRITE_OPERATIONS()  { return false }  
   
-  set PIPELINE_ENTRY_POINT(v)  { this._PIPELINE_ENTRY_POINT = v }
-  get PIPELINE_ENTRY_POINT()   { return this._PIPELINE_ENTRY_POINT }
-  
-  set EXPORT_FILE_HEADER(v)    { this._EXPORT_FILE_HEADER = v }
-  get EXPORT_FILE_HEADER()     { return this._EXPORT_FILE_HEADER }
-  
-  set INITIALIZATION_VECTOR(v) { this._INITIALIZATION_VECTOR =  v }
-  get INITIALIZATION_VECTOR()  { return this._INITIALIZATION_VECTOR }
-  get IV_LENGTH()              { return 16 }  
+  get COMPRESSED_FILE()            { return this.yadamu.COMPRESSION !== 'NONE' }
+  get ENCRYPTED_FILE()             { return this.yadamu.ENCRYPTION }
+							      
+  set PIPELINE_ENTRY_POINT(v)      { this._PIPELINE_ENTRY_POINT = v }
+  get PIPELINE_ENTRY_POINT()       { return this._PIPELINE_ENTRY_POINT }
+							      
+  set EXPORT_FILE_HEADER(v)        { this._EXPORT_FILE_HEADER = v }
+  get EXPORT_FILE_HEADER()         { return this._EXPORT_FILE_HEADER }
+							      
+  set INITIALIZATION_VECTOR(v)     { this._INITIALIZATION_VECTOR =  v }
+  get INITIALIZATION_VECTOR()      { return this._INITIALIZATION_VECTOR }
+  get IV_LENGTH()                  { return 16 }  
     
   get DIRECTORY()  { return this._DIRECTORY }
   set DIRECTORY(v) { this._DIRECTORY = v };
@@ -216,7 +220,7 @@ class FileDBI extends YadamuDBI {
 	this.statementCache = {}
   }
       
-  async executeDDL(ddl) {
+  executeDDL(ddl) {
 	this.ddl = ddl
     return ddl
   }
@@ -257,30 +261,30 @@ class FileDBI extends YadamuDBI {
      return false;  
   }
 
-  async getMetadata() {
+  getMetadata() {
 	return []
   }
   
-  async getSystemInformation() {
+  getSystemInformation() {
 	return Object.assign(
 	  super.getSystemInformation()
 	, {}
     )
   }
 
-  async setSystemInformation(systemInformation) {
+  setSystemInformation(systemInformation) {
 	super.setSystemInformation(systemInformation) 
   }
     
-  async setMetadata(metadata) {
+  setMetadata(metadata) {
     // Object.values(metadata).forEach((table) => {delete table.source})
 	super.setMetadata(metadata)
   }
  
-  async releaseConnection() {
+  releaseConnection() {
   }
  
-  async initialize() {
+  initialize() {
     
     super.initialize(false);
 	
@@ -310,7 +314,7 @@ class FileDBI extends YadamuDBI {
 	await this.createInputStream()
   }
 
-  async finalizeExport() {
+  finalizeExport() {
  	// this.yadamuLogger.trace([this.constructor.name,],'finalizeExport()')
 	this.closeInputStream()
   }
@@ -354,33 +358,19 @@ class FileDBI extends YadamuDBI {
 	
 	this.outputStreams.push(this.getFileOutputStream())
 	
-	// If there is more than one stream involved in the output stream construct a pipeline linking each output stream.	
-	// Set up a finished listener for each component of the output stage.
-		
-    this.streamsCompleted = this.outputStreams.map((s) => { 
-	  return new Promise((resolve,reject) => {
-	    finished(s,(err) => {
-		  if (err) {reject(err)} else {resolve()}
-		})
-      })
-    })
+    // this.outputStreams.forEach((s) => { console.log(s.constructor.name, s.eventNames().map((e) => {return `"${e}(${s.listenerCount(e)})"`}).join(','))})
+	
+	// Cache the set of listeners for the outputStreams. This allows the listeners to be restored. 
+
+	this.defaultListeners = this.outputStreams.map((s) => { 
+	   const eventList = {} 
+	   s.eventNames().forEach((e) => { eventList[e] = s.listeners(e)})
+	   return eventList
+	 })
 	 
-	if (this.outputStreams.length > 1)  {
-  	  pipeline(this.outputStreams,(err) => {
-	    if (err) this.yadamuLogger.handleException([this.DATABASE_VENDOR,'PIPELINE','OUTPUT STAGE'],err)
-	    // this.yadamuLogger.trace([this.DATABASE_VENDOR,'PIPELINE','OUTPUT STAGE'],'Complete') 
-	  }) 
-	}
-	
-	// Preserve the set of listeners attached to entrance to the pipeline.
-	
-	const entrance = this.outputStreams[0]
-	this.eventList = {}
-	entrance.eventNames().forEach((e) => { this.eventList[e] = entrance.listeners(e)})
-	
   }
 
-  async checkDirectory() {
+  checkDirectory() {
   }
 	 
   
@@ -417,10 +407,7 @@ class FileDBI extends YadamuDBI {
     if ((this.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata))) {
 	  const exportFileContents = `${exportFileHeader}}`
       const finalize = new EndExportOperation(exportFileContents)
-      pipeline(finalize,this.outputStreams[0],(err) => {
-	    if (err) this.yadamuLogger.handleException([this.DATABASE_VENDOR,'PIPELINE','FINALIZE'],err)
-	    // this.yadamuLogger.trace([this.DATABASE_VENDOR,'PIPELINE','FINALIZE'],'Complete') 
-	  })
+      await pipeline([finalize,...this.outputStreams])
 	}
     else {
 	  exportFileHeader = `${exportFileHeader},"data":{` 
@@ -429,30 +416,51 @@ class FileDBI extends YadamuDBI {
 	this.EXPORT_FILE_HEADER = exportFileHeader
 	
   }
-    
+
+  traceStreamEvents(streams) {
+
+    // Add event tracing to the streams
+	  
+	streams[0].once('readable',() => {
+	  console.log(streams[0].constructor.name,'readable')
+	})
+	
+    streams.forEach((s,idx) => {
+	  s.once('end',() => {
+	     console.log(s.constructor.name,'end')
+	  }).once('finish', (err) => {
+	    console.log(s.constructor.name,'finish')
+	  }).once('close', (err) => {
+        console.log(s.constructor.name,'close')
+	  }).once('error', (err) => {
+        console.log(s.constructor.name,'error',err.message)
+      })
+	})
+  }
+  
   async finalizeData() {
     
 	// this.yadamuLogger.trace([this.constructor.name],`finalizeData(${YadamuLibrary.isEmpty(this.metadata)})`)
 	
 	if (!YadamuLibrary.isEmpty(this.metadata)) {
       const finalize = new EndExportOperation('}}')
-      pipeline(finalize,this.outputStreams[0],(err) => {
-	    if (err) this.yadamuLogger.handleException([this.DATABASE_VENDOR,'PIPELINE','FINALIZE'],err)
-	    // this.yadamuLogger.trace([this.DATABASE_VENDOR,'PIPELINE','FINALIZE'],'Complete') 
-	  }) 
-	  
+	  // Restore the default listeners to the outputStreams
+      // this.traceStreamEvents([finalize,...this.outputStreams])
+	  this.outputStreams.forEach((s,i) => { 
+	    if (!YadamuLibrary.isEmpty(this.defaultListeners[i])) {
+		  Object.keys(this.defaultListeners[i]).forEach((e) => {this.defaultListeners[i][e].forEach((l) => {s.on(e,l)})})
+		}
+	  })
+      await pipeline([finalize,...this.outputStreams])
     }
-	
-    await Promise.allSettled(this.streamsCompleted)
-	
   }
 	
-  async finalizeImport() {}
+  finalizeImport() {}
 
     
-  async finalize() {
+  finalize() {
     if (this.inputStream !== undefined) {
-      await this.closeInputStream()
+      this.closeInputStream()
     }
   }
 
@@ -462,11 +470,11 @@ class FileDBI extends YadamuDBI {
   **
   */
 
-  async abort(e) {
+  abort(e) {
 
     try {
       if (this.inputStream !== undefined) {
-        await this.closeInputStream()
+        this.closeInputStream()
 	  }
     } catch (err) {
       this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','InputStream'],err);
@@ -474,7 +482,7 @@ class FileDBI extends YadamuDBI {
 	 
     try {
       if (this.outputStream !== undefined) {
-        await this.closeOutputStream()
+        this.closeOutputStream()
 	  }
     } catch (err) {
       this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','OutputStream'],err);
@@ -487,16 +495,17 @@ class FileDBI extends YadamuDBI {
   **
   */
       
-  async generateStatementCache(schema,executeDDL) {
+   generateStatementCache(schema,executeDDL) {
     this.statementCache = []
 	return this.statementCache
   }
 
-  async getDDLOperations() {
+  getDDLOperations() {
     return []
   }
   
-  async getSchemaInfo(schema) {
+  
+  getSchemaInfo(schema) {
     return []
   }
   
@@ -622,28 +631,11 @@ class FileDBI extends YadamuDBI {
     const tableSwitcher = this.firstTable ? new FirstTableSwitcher(this.EXPORT_FILE_HEADER) : new TableSwitcher() 
     outputStreams.push(tableSwitcher)
 	
-	// Remove any dangling listeners attached to entrance to the pipeline.
-	const entrance = this.outputStreams[0]
-	
-	entrance.eventNames().forEach((e) => {
-	  const events = this.eventList[e]
-	  entrance.listeners(e).forEach((l) => {
-		if (!events.includes(l)) {
-		  entrance.removeListener(e,l);
-        }
-	  })
-	})
-
-    // Construct a pipleline between the Table Switcher and output stage.
-        	
-    pipeline(tableSwitcher,this.outputStreams[0],(err) => {
-	  if (err) this.yadamuLogger.handleException([this.DATABASE_VENDOR,'PIPELINE','BRIDGE'],err)
-	  // this.yadamuLogger.trace([this.DATABASE_VENDOR,'PIPELINE','BRIDGE'],'Complete') 
-	}) 
-	
+	outputStreams.push(...this.outputStreams)
 	this.firstTable = false;
     // console.log(outputStreams.map((s) => { return s.constructor.name }).join(' ==> '))
     return outputStreams	
+	
   }
   
   async createCloneStream(options) {
