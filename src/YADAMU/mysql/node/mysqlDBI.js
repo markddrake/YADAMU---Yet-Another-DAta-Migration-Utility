@@ -682,8 +682,8 @@ class MySQLDBI extends YadamuDBI {
     */
 	
 	try {
-	  const startTime = performance.now();
 	  const stack = new Error().stack
+	  const startTime = performance.now();
 	  let results = await this.beginTransaction();
 	  results = await this.executeSQL(copy.dml);
 	  const rowsRead = results.affectedRows

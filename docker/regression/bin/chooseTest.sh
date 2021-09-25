@@ -4,15 +4,12 @@ export YADAMU_SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 export YADAMU_TEST_NAME=${YADAMU_TEST_NAME:-all}
 source qa/bin/createSharedFolders.sh mnt
 case $YADAMU_TEST_NAME  in
+
   shortRegression)
     source qa/bin/resetFolders.sh mnt/stagingArea/export/json/postgres
     source qa/bin/resetFolders.sh mnt/stagingArea/export/json/postgres
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
   ;;
-
-  dataTypes)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
-	;;
   
   export)
     source qa/bin/resetFolders.sh mnt/stagingArea/export/json/mysql
@@ -21,27 +18,19 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
   ;;
   
-  import)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
-  ;;
-  fileRoundtrip)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
-	;;
-	
-  dbRoundtrip)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
-  ;;
-    
-  mongo)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoTestSuite
-  ;;
-
-  lostConnection)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
-  ;;
-
   all)
-    source $YADAMU_SCRIPT_DIR/runRegressionTests.sh 
+    source qa/bin/createOutputFolders.sh mnt
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh loaderTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh awsTestSuite
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh azureTestSuite
   ;;	
   
   snowflake)
@@ -56,27 +45,6 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10TestSuite
   ;;
     
-  vertica09)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica09DataTypes
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica09TestSuite
-  ;;
-
-  mssql2014TestSuite)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mssql2014TestSuite
-  ;;
-
-  loader)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh loaderTestSuite
-  ;;
-
-  aws)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh awsTestSuite
-  ;;
-
-  azure)
-    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh azureTestSuite
-  ;;
-
   cmdLine) 
     source  $YADAMU_SCRIPT_DIR/runCmdLineTests.sh
   ;;
@@ -86,15 +54,12 @@ case $YADAMU_TEST_NAME  in
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mysqlCopy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mariadbCopy
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh verticaCopy
-	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh redshiftCopy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica10Copy
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica11Copy
 	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh snowflakeCopy
   ;;
+	# source $YADAMU_SCRIPT_DIR/runRegressionTest.sh redshiftCopy
 
-  interactive)
-    sleep 365d
-  ;; 
-  
   custom)
     source $YADAMU_SCRIPT_DIR/runCustomTest.sh $TESTNAME
   ;; 
@@ -103,7 +68,17 @@ case $YADAMU_TEST_NAME  in
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh $TESTNAME
   ;; 
 
+  vertica09)
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica09DataTypes
+    source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica09TestSuite
+	source $YADAMU_SCRIPT_DIR/runRegressionTest.sh vertica09Copy
+  ;;
+
+  interactive)
+    sleep 365d
+  ;; 
+  
   *)
-    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, import, fileRoundtrip, dbRoundtrip, lostConnection, mongo, snowflake, vertica, loader, aws, azure, cmdLine, copy, interactive or all (default)"
+    echo "Invalid Test $YADAMU_TEST_NAME: Valid values are shortRegression, export, snowflake, vertica, vertica09, cmdLine, copy, interactive or custom"
   ;;
 esac

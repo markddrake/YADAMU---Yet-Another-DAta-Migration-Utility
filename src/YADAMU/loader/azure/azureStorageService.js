@@ -3,7 +3,8 @@
 const Stream = require('stream');
 const PassThrough = Stream.PassThrough;
 const util = require('util')
-const pipeline = util.promisify(Stream.pipeline);
+// const pipeline = util.promisify(stream.pipeline);
+const { pipeline } = require('stream/promises');
 
 
 const StringWriter = require('../../common/stringWriter.js');

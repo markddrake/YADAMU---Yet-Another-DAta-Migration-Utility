@@ -1,6 +1,6 @@
 FROM yadamu/regression:latest
 WORKDIR /usr/src/YADAMU
-ADD https://download.oracle.com/otn_software/linux/instantclient/19600/oracle-instantclient19.6-sqlplus-19.6.0.0.0-1.x86_64.rpm .
+ADD https://download.oracle.com/otn_software/linux/instantclient/213000/oracle-instantclient-sqlplus-21.3.0.0.0-1.x86_64.rpm .
 ENV LD_LIBRARY_PATH /usr/lib/oracle/19.6/client64/lib:$LD_LIBRARY_PATH
 ENV ACCEPT_EULA=Y
 RUN apt install apt-transport-https \
@@ -13,7 +13,7 @@ RUN apt install apt-transport-https \
  && apt-get  -y update \
  && apt install -y postgresql-client \
  && apt install -y mariadb-client \
- && alien -i ./oracle-instantclient19.6-sqlplus-19.6.0.0.0-1.x86_64.rpm \
+ && alien -i --scripts ./oracle-instantclient-sqlplus-21.3.0.0.0-1.x86_64.rpm \
  && cd /usr/local/bin \
  && ln -s /opt/mssql-tools/bin/sqlcmd \
  &&  mkdir -p mnt/cmdLine \	

@@ -46,7 +46,7 @@ as
   procedure COMPARE_SCHEMAS(
     P_SOURCE_SCHEMA       VARCHAR2, 
     P_TARGET_SCHEMA       VARCHAR2, 
-    P_RULES               CLOB
+    P_RULES               VARCHAR2
   );
   function JSON_COMPACT(P_JSON_INPUT CLOB) return CLOB;
   function APPLY_XML_RULE(P_XML_RULE VARCHAR2, P_XML XMLTYPE) return XMLTYPE;
@@ -280,7 +280,7 @@ end;
 procedure COMPARE_SCHEMAS(
   P_SOURCE_SCHEMA       VARCHAR2, 
   P_TARGET_SCHEMA       VARCHAR2, 
-  P_RULES               CLOB
+  P_RULES               VARCHAR2
 )
 as
   TABLE_NOT_FOUND EXCEPTION;

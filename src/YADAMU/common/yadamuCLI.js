@@ -404,7 +404,7 @@ class YadamuCLI {
 	const connection = Object.assign({}, connectionSettings);
 	
     if (YadamuConstants.YADAMU_DRIVERS.hasOwnProperty(driver)) { 
-	  const DBI = require(YadamuConstants.YADAMU_DRIVERS[driver]);
+	  const DBI = require(YadamuConstants.YADAMU_DRIVERS[driver])
 	  dbi = new DBI(this.yadamu,connection,parameters);
     }	
     else {   

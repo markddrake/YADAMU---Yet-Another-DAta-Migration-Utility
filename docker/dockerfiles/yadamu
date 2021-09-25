@@ -2,4 +2,6 @@ FROM yadamu/environment:latest
 WORKDIR /usr/src/YADAMU
 COPY src src
 COPY bin bin
+# Patch Query Stream until oracleb 5.3
+COPY patch/oracledb/lib/queryStream.js node_modules/oracledb/lib
 RUN mkdir mnt 

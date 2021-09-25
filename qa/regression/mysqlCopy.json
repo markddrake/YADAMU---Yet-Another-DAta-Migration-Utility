@@ -7,13 +7,16 @@
 	"reloadStagingArea" : false,
 	"emptyStringIsNull" : true,
 	"parameters": {
-		"REMOTE_STAGING_AREA"     : "/mnt/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
+		"REMOTE_STAGING_AREA"     : "/mnt/shared/stagingArea/loader/%targetConnection%/%sourceConnection%/csv",
 		"DIRECTORY"               : "loader/%targetConnection%/%sourceConnection%/csv",
 		"COMMIT_RATIO"            : 0
 	},
 	"tests": [{
 			"source": "oracle19c",
 			"target": "mysql#1",
+			"parameters" : {
+				"SPATIAL_FORMAT": "WKT"
+		    },
 			"tasks": [
 				"oracle","mssql","mysql"
 			]

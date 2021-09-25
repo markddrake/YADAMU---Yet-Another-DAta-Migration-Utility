@@ -743,7 +743,8 @@ class StatementGenerator {
 		  columnClauses[idx] = `${tableMetadata.columnNames[idx]} ${this.CLOB_TYPE} check(YADAMU.IS_JSON("${tableMetadata.columnNames[idx]}"))`
 		}
 		if (YadamuLibrary.isXML(tableMetadata.dataTypes[idx])) {
-		  columnClauses[idx] = `${tableMetadata.columnNames[idx]} ${this.CLOB_TYPE} check(YADAMU.IS_XML("${tableMetadata.columnNames[idx]}"))`
+		 
+		 columnClauses[idx] = `${tableMetadata.columnNames[idx]} ${this.CLOB_TYPE} check(YADAMU.IS_XML("${tableMetadata.columnNames[idx]}"))`
 		}
 	  })
 	}
@@ -751,17 +752,34 @@ class StatementGenerator {
 	const stagingFileName =  `YST-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
 	const stagingFilePath =  path.join(this.dbi.LOCAL_STAGING_AREA,stagingFileName)
 	const localPath       =  path.resolve(stagingFilePath); 
-	const remotePath      =  tableMetadata.dataFile || path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName).split(path.sep).join(path.posix.sep); 
+	let remotePath        =  tableMetadata.dataFile || path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName)
+	// remotePath            =  Array.isArray(remotePath) ? remotePath.map((p) => { return p.split(path.sep).join(path.posix.sep)}).join("','") : remotePath.split(path.sep).join(path.posix.sep); 
+	// remotePath         =   =  Array.isArray(remotePath) ? remotePath.map((p) => { return p.split(path.sep).join(path.posix.sep)}).join("','") : remotePath.split(path.sep).join(path.posix.sep); 
 	
     const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
     const insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values `;
-	const copyStatement   = `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath}' PARSER fcsvparser(type='rfc4180', header=false, trim=${this.dbi.COPY_TRIM_WHITEPSPACE===true}) NULL ''`
 	const mergeoutStatement = `select do_tm_task('mergeout','${this.targetSchema}.${tableMetadata.tableName}')`
 
+    let copy
+	if (Array.isArray(tableMetadata.dataFile)) {
+      copy = tableMetadata.dataFile.map((remotePath,idx) => {
+	    return  {
+	      dml             : `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath.split(path.sep).join(path.posix.sep)}' PARSER fcsvparser(type='rfc4180', header=false, trim=${this.dbi.COPY_TRIM_WHITEPSPACE===true}) NULL ''`
+		, partitionCount  : tableMetadata.partitionCount
+		, partitionID     : idx+1
+	    }
+	  })
+	}
+    else {
+	  copy = {
+	   dml         : `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath.split(path.sep).join(path.posix.sep)}' PARSER fcsvparser(type='rfc4180', header=false, trim=${this.dbi.COPY_TRIM_WHITEPSPACE===true}) NULL ''`
+	  }
+    }
+	
     return { 
        ddl             : createStatement, 
        dml             : insertStatement, 
-	   copy            : copyStatement,
+	   copy            : copy,
 	   mergeout        : mergeoutStatement,
 	   stagingFileName : stagingFileName,
 	   localPath       : localPath,

@@ -5,7 +5,8 @@ const { performance } = require('perf_hooks');
 
 const util = require('util')
 const stream = require('stream')
-const pipeline = util.promisify(stream.pipeline);
+// const pipeline = util.promisify(stream.pipeline);
+const { pipeline } = require('stream/promises');
 
 /* 
 **

@@ -7,6 +7,7 @@ class ErrorDBI extends FileDBI {
   
   constructor(yadamu,filename) {
     super(yadamu,{},{FILE : filename})
+	this.FILE = filename
   }
  
   getOutputStream() {

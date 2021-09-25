@@ -7,7 +7,8 @@ const crypto = require('crypto');
 
 const util = require('util')
 const stream = require('stream')
-const pipeline = util.promisify(stream.pipeline);
+// const pipeline = util.promisify(stream.pipeline);
+const { pipeline } = require('stream/promises');
 
 /* 
 **
@@ -705,35 +706,28 @@ class VerticaDBI extends YadamuDBI {
 	 err.sql = statement;
 	 this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
   }
-
-  async copyOperation(tableName,statement) {
-	let startTime 
-    try {
-      const stack = new Error().stack
+    
+  async copyOperation(tableName,copy) {
+	
+    /*
+    **
+    ** Generic Basic Imementation - Override as required for error reporting etc
+    **
+    */
+	
+	try {
   	  const rejectedRecordsTableName = `YRT-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
-      const sqlStatement = `${statement} REJECTED DATA AS TABLE "${rejectedRecordsTableName}"  NO COMMIT`; 	
-	  let startTime = performance.now()
-      const results = await this.insertBatch(sqlStatement,rejectedRecordsTableName);
-	  const elapsedTime = performance.now() - startTime;
-	  if (results.rejected > 0) {
-	    await this.reportCopyErrors(tableName,results.errors,stack,sqlStatement)
-      }
-      await this.commitTransaction();
-	  const writerThroughput = isNaN(elapsedTime) ? 'N/A' : Math.round((results.inserted/elapsedTime) * 1000)
-      const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round(writerThroughput)} rows/s.`
-  	  const rowSummary = results.rejected === 0 ? `Rows ${results.inserted}.` : `Rows ${results.inserted}. Skipped ${results.rejected}.`
-      if (results.rejected > 0) {
-		this.yadamuLogger.error([tableName,'Copy'],`${rowSummary} ${writerTimings}`)  
-	  }
-	  else {
-		this.yadamuLogger.info([tableName,'Copy'],`${rowSummary} ${writerTimings}`)  
-	  }	  
-	} catch (cause) { 
-	  const elapsedTime = performance.now() - startTime;
+      const sqlStatement = `${copy.dml} REJECTED DATA AS TABLE "${rejectedRecordsTableName}"  NO COMMIT`; 	
+	  const stack = new Error().stack
+	  const startTime = performance.now();
+	  const results = await this.insertBatch(sqlStatement,rejectedRecordsTableName);
+	  const endTime = performance.now();
+	  await this.commitTransaction();
+	  await this.reportCopyResults(tableName,results.inserted,results.rejected,startTime,endTime,copy,stack)
+	} catch(cause) {
   	  await this.rollbackTransaction(cause);
-	  // await this.reportCopyErrors(batch.copy,'Copy',cause)
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'Copy',tableName],cause)
-    } 
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],cause)
+	}
   }
 }
 

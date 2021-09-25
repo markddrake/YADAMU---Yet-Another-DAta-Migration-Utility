@@ -24,11 +24,11 @@ class OracleWriter extends YadamuWriter {
   ** Binding LOBS requires less client side memory than binding Strings and Buffers
   **
   ** The Yadamu Oracle interface allows you to optimize LOB usage via the following parameters
-  **    BATCH_TEMPLOB_LIMIT  : A Batch will be regarded as complete when it uses more LOBS than BATCH_TEMPLOB_LIMIT
-  **    LOB_MIN_SIZE         : If a String or Buffer is mapped to a CLOB or a BLOB then it will be inserted using a LOB if it exceeeds this value.
-  **    BATCH_CACHELOB_LIMIT : A Batch will be regarded as complete when the number of CACHED (String & Buffer) LOBs exceeds this value.
+  **    TEMPLOB_BATCH_LIMIT  : A Batch will be regarded as complete when it uses more LOBS than TEMPLOB_BATCH_LIMIT
+  **    CACHELOB_MAX_SIZE    : If a String or Buffer is mapped to a CLOB or a BLOB then it will be inserted using a LOB if it exceeeds this value.
+  **    CACHELOB_BATCH_LIMIT : A Batch will be regarded as complete when the number of CACHED (String & Buffer) LOBs exceeds this value.
   **
-  ** The amount of client side memory required to manage the LOB Cache is approx LOB_MIN_SIZE * BATCH_CACHELOB_LIMIT
+  ** The amount of client side memory required to manage the LOB Cache is approx CACHELOB_MAX_SIZE * CACHELOB_BATCH_LIMIT
   **
   */
 
@@ -185,7 +185,7 @@ class OracleWriter extends YadamuWriter {
                 col = JSON.stringify(col);
               }
               this.batch.cachedLobCount++
-              this.bindRowAsLOB = this.bindRowAsLOB || (Buffer.byteLength(col,'utf8') > this.dbi.LOB_MIN_SIZE) || Buffer.byteLength(col,'utf8') === 0
+              this.bindRowAsLOB = this.bindRowAsLOB || (Buffer.byteLength(col,'utf8') > this.dbi.CACHELOB_MAX_SIZE) || Buffer.byteLength(col,'utf8') === 0
 			  return col;
 		    }
 		    break;
@@ -208,7 +208,7 @@ class OracleWriter extends YadamuWriter {
 			  if ((typeof col === "object") && (!Buffer.isBuffer(col))) {
 				col = Buffer.from(JSON.stringify(col),'utf-8')
 			  }
-              if ((typeof col === "string") /* && ((col.length/2) <= this.dbi.LOB_MIN_SIZE) */) {
+              if ((typeof col === "string") /* && ((col.length/2) <= this.dbi.CACHELOB_MAX_SIZE) */) {
 				if (YadamuLibrary.decomposeDataType(this.tableInfo.targetDataTypes[idx]).type === 'JSON') {
 				  col = Buffer.from(col,'utf-8')
 				}
@@ -217,7 +217,7 @@ class OracleWriter extends YadamuWriter {
 				}
               }
 		      this.batch.cachedLobCount++
-			  this.bindRowAsLOB = this.bindRowAsLOB || (col.length > this.dbi.LOB_MIN_SIZE) 
+			  this.bindRowAsLOB = this.bindRowAsLOB || (col.length > this.dbi.CACHELOB_MAX_SIZE) 
 			  return col
 			}
             break
@@ -440,7 +440,7 @@ end;`
   }
  
   flushBatch() {
-	return ((this.metrics.cached === this.BATCH_SIZE) || (this.batch.tempLobCount >= this.dbi.BATCH_TEMPLOB_LIMIT) || (this.batch.cachedLobCount > this.dbi.BATCH_CACHELOB_LIMIT))
+	return ((this.metrics.cached === this.BATCH_SIZE) || (this.batch.tempLobCount >= this.dbi.TEMPLOB_BATCH_LIMIT) || (this.batch.cachedLobCount > this.dbi.CACHELOB_BATCH_LIMIT))
   }
 
   commitWork() {

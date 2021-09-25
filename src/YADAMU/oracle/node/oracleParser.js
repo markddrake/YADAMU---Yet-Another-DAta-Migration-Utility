@@ -1,7 +1,8 @@
 "use strict" 
 const util = require('util')
 const stream = require('stream')
-const pipeline = util.promisify(stream.pipeline);
+// const pipeline = util.promisify(stream.pipeline);
+const { pipeline } = require('stream/promises');
 
 const oracledb = require('oracledb');
 
@@ -68,11 +69,12 @@ class OracleParser extends YadamuParser {
     
     this.transformations = metadata.map((column,idx) => {
 	  switch (column.fetchType) {
-		case oracledb.CLOB:
+		case oracledb.DB_TYPE_NCLOB:
+		case oracledb.DB_TYPE_CLOB:
 		  return (row,idx)  => {
             row[idx] = this.clobToString(row[idx])
 		  }           
-	    case oracledb.BLOB:	
+	    case oracledb.DB_TYPE_BLOB:	
           if (this.tableInfo.jsonColumns.includes(idx)) {
             // Convert JSON store as BLOB to string
 		    this.jsonTransformations[idx] = (row,idx)  => {

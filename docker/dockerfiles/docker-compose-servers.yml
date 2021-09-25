@@ -248,20 +248,6 @@ services:
 #     - VRTCA09-01-DATA:/home/dbadmin/docker
 #   restart: always
 #
-# VRTCA10-01: 
-#   container_name: VRTCA10-01
-#   image:  vertica/vertica:latest 
-#   mem_limit: '16gb'
-#   shm_size: '4gb'
-#   networks:
-#    - YADAMU-NET
-#   ports: 
-#     - "5434:5433"
-#   volumes:
-#     - YADAMU_01-SHARED:/mnt/shared
-#     - VRTCA10-01-DATA:/home/dbadmin/docker
-#   restart: always    
-
   VRTCA10-01: 
     container_name: VRTCA10-01
     image: vertica/vertica-ce:10.1.1-0
@@ -280,7 +266,7 @@ services:
     #  mode: global
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - VRTCA10-01-DATA:/home/dbadmin/docker
+      - VRTCA10-01-DATA:/data
     restart: always
 
   VRTCA11-01: 
@@ -301,7 +287,7 @@ services:
     #  mode: global
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - VRTCA11-01-DATA:/home/dbadmin/docker
+      - VRTCA11-01-DATA:/data
     restart: always    
         
   MINIO-01: 
@@ -335,7 +321,7 @@ services:
     container_name: YADAMU-SMB
     image:   dperson/samba
     mem_limit: '512mb'
-    command: -p -s "work;/mount;yes;no;yes" -n
+    command: -p -s "work;/mount;yes;no;yes" -n -p
     networks:
       - YADAMU-NET
     ports: 

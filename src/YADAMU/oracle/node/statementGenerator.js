@@ -85,31 +85,36 @@ class StatementGenerator {
            */
            return { type: oracledb.DB_TYPE_BINARY_DOUBLE }
          case 'RAW':
-           return { type: oracledb.BUFFER, maxSize : dataType.length}
+           return { type: oracledb.DB_TYPE_RAW, maxSize : dataType.length}
          case 'CHAR':
+           return { type: oracledb.DB_TYPE_CHAR, maxSize : dataType.length * 2}
          case 'VARCHAR':
          case 'VARCHAR2':
-           // return { type: oracledb.STRING, maxSize : dataType.length}
-           return { type: oracledb.STRING, maxSize : dataType.length * 2}
+           return { type: oracledb.DB_TYPE_VARCHAR, maxSize : dataType.length * 2}
          case 'NCHAR':
+           return { type: oracledb.DB_TYPE_NCHAR, maxSize : dataType.length * 2}
          case 'NVARCHAR2':
-           return { type: oracledb.STRING, maxSize : dataType.length * 2}
+           return { type: oracledb.DB_TYPE_VARCHAR, maxSize : dataType.length * 2}
          case 'DATE':
          case 'TIMESTAMP':
            return { type: oracledb.STRING, maxSize : 35}
          case 'INTERVAL':
             return { type: oracledb.STRING, maxSize : 12}
          case 'CLOB':
+           tableInfo.lobColumns = true;
+           return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.CLOB }
          case 'NCLOB':
+           tableInfo.lobColumns = true;
+           // return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.NCLOB }
+           return {type : oracledb.DB_TYPE_NCLOB, maxSize : this.BIND_LENGTH.NCLOB }
          case 'ANYDATA':
            tableInfo.lobColumns = true;
-           // return {type : oracledb.CLOB}
-           return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.ANYDATA }
+           return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.ANYDATA }
          case 'XMLTYPE':
            // Cannot Bind XMLTYPE > 32K as String: ORA-01461: can bind a LONG value only for insert into a LONG column when constructing XMLTYPE
            tableInfo.lobColumns = true;
            // return {type : oracledb.CLOB}
-           return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.CLOB}
+           return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.CLOB}
          case 'JSON':
            // Defalt JSON Storeage model: JSON store as CLOB
            // JSON store as BLOB can lead to Error: ORA-40479: internal JSON serializer error during export operations.
@@ -118,20 +123,20 @@ class StatementGenerator {
 			  case 'JSON':
 			  case 'BLOB':
                 tableInfo.lobColumns = true;
-                return {type : oracledb.BLOB, maxSize : this.BIND_LENGTH.JSON}
+                return {type : oracledb.DB_TYPE_BLOB, maxSize : this.BIND_LENGTH.JSON}
 			  case 'CLOB':
                 tableInfo.lobColumns = true;
-                return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.JSON}
+                return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.JSON}
 			  default:
-			    return {type : oracledb.STRING, maxSize : 32767 }
+			    return {type : oracledb.DB_TYPE_VARCHAR, maxSize : 32767 }
 		   }
          case 'BLOB':
            // return {type : oracledb.BUFFER}
            // return {type : oracledb.BUFFER, maxSize : BIND_LENGTH.BLOB }
            tableInfo.lobColumns = true;
-           return {type : oracledb.BLOB, maxSize : this.BIND_LENGTH.BLOB}
+           return {type : oracledb.DB_TYPE_BLOB, maxSize : this.BIND_LENGTH.BLOB}
          case 'BFILE':
-           return { type :oracledb.STRING, maxSize : this.BIND_LENGTH.BFILE }
+           return { type :oracledb.DB_TYPE_VARCHAR, maxSize : this.BIND_LENGTH.BFILE }
          case 'BOOLEAN':
             return { type: oracledb.BUFFER, maxSize :  this.BIND_LENGTH.BOOLEAN }         
          case 'GEOMETRY':
@@ -142,12 +147,12 @@ class StatementGenerator {
            switch (this.dbi.INBOUND_SPATIAL_FORMAT) { 
              case "WKB":
              case "EWKB":
-               return {type : oracledb.BLOB, maxSize : this.BIND_LENGTH.GEOMETRY}
+               return {type : oracledb.DB_TYPE_BLOB, maxSize : this.BIND_LENGTH.GEOMETRY}
                break;
              case "WKT":
              case "EWKT":
              case "GeoJSON":
-               return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.JSON}
+               return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.JSON}
                break;
              default:
            }
@@ -156,9 +161,9 @@ class StatementGenerator {
            if (dataType.type.indexOf('.') > -1) {
              // return {type : oracledb.CLOB}
              tableInfo.lobColumns = true
-			 return {type : oracledb.CLOB, maxSize : this.BIND_LENGTH.OBJECT}
+			 return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.OBJECT}
            }
-           return {type : oracledb.STRING, maxSize :  dataType.length}
+           return {type : oracledb.DB_TYPE_VARCHAR, maxSize :  dataType.length}
        }
      })
   
@@ -342,10 +347,10 @@ class StatementGenerator {
 		tableInfo.binds = tableInfo.lobBinds.map((bind) => {
 		  switch (bind.type) {
 		    case oracledb.CLOB:
-		      return { type: oracledb.STRING, maxSize : this.dbi.LOB_MIN_SIZE }
+		      return { type: oracledb.STRING, maxSize : this.dbi.CACHELOB_MAX_SIZE}
 			  break;
 		    case oracledb.BLOB:
-		      return { type: oracledb.BUFFER, maxSize : this.dbi.LOB_MIN_SIZE }
+		      return { type: oracledb.BUFFER, maxSize : this.dbi.CACHELOB_MAX_SIZE}
 			  break;
 		    default:
 		      return bind;	
@@ -445,6 +450,7 @@ class StatementGenerator {
             externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
             break;
           case "JSON":
+            // value = this.dbi.DB_VERSION > 19  ? `JSON(:${(idx+1)})` : value
   	        externalDataType = 'BLOB'
             copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
             externalSelect = `case when LENGTH("${column}") > 0 then "${column}" else NULL end`

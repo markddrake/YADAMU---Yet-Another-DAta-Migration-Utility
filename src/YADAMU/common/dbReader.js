@@ -5,7 +5,8 @@ const util = require('util')
 const Readable = require('stream').Readable;
 const stream = require('stream')
 const PassThrough = stream.PassThrough
-const pipeline = util.promisify(stream.pipeline);
+//const pipeline = util.promisify(stream.pipeline);
+const { pipeline } = require('stream/promises');
 const finished = stream.finished
 
 const Yadamu = require('./yadamu.js')
@@ -96,6 +97,14 @@ class DBReader extends Readable {
 	  console.log(streams[0].constructor.name,tableName,'readable')
 	})
 	
+	/*
+	  .on('read',() => {
+	  console.log(streams[0].constructor.name,tableName,'read')
+	}).on('data',() => {
+	  console.log(streams[0].constructor.name,tableName,'data')
+	})
+	*/
+	
     streams.forEach((s,idx) => {
 	  s.once('end',() => {
 	     console.log(s.constructor.name,tableName,'end')
@@ -106,7 +115,7 @@ class DBReader extends Readable {
 	  }).once('error', (err) => {
 	    console.log(s.constructor.name,tableName,'error',err.message)
 	  })
-	})
+	}) 
   }
   
   async pipelineTable(task,readerDBI,writerDBI) {
@@ -138,7 +147,7 @@ class DBReader extends Readable {
     }
 
     // this.traceStreamEvents(yadamuPipeline,task.TABLE_NAME)
-	
+	// yadamuPipeline.forEach((s) => { console.log(task.TABLE_NAME,s.constructor.name, s.eventNames().map((e) => {return `"${e}(${s.listenerCount(e)})"`}).join(','))})
 	const streamsCompleted = yadamuPipeline.map((s) => { 
 	  return new Promise((resolve,reject) => {
 		finished(s,(err) => {
@@ -155,6 +164,7 @@ class DBReader extends Readable {
 	  readerDBI.INPUT_METRICS.pipeEndTime = performance.now();
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
       this.activeWorkers.delete(yadamuPipeline[0])  
+	  // console.log(task.TABLE_NAME,streamsCompleted)
 	  await Promise.allSettled(streamsCompleted)
 	  // console.log(task.TABLE_NAME,streamsCompleted)
 	} catch (err) {
@@ -171,7 +181,7 @@ class DBReader extends Readable {
 	  // When an the pipleline throws an exception not all componants of the pipeline have been finished processing. Wait all the streams to complete
       await Promise.allSettled(streamsCompleted)
 	  this.activeWorkers.delete(yadamuPipeline[0])  
-
+	  
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
 	    
 	  const cause = readerDBI.INPUT_METRICS.readerError || readerDBI.INPUT_METRICS.parserError || yadamuPipeline.find((s) => {return s.underlyingError instanceof Error}).underlyingError || err
@@ -277,7 +287,11 @@ class DBReader extends Readable {
 	  
 	  while (taskList.length > 0) {
 	    const task = taskList.shift()
-		await this.pipelineTableToFile(readerDBI,writerDBI,task)
+		try {
+		  await this.pipelineTableToFile(readerDBI,writerDBI,task)
+		} catch (e) {
+		  console.log('Caught',e)
+		}
 	  }
   }
 

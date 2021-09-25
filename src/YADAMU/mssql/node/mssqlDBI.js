@@ -889,20 +889,25 @@ class MsSQLDBI extends YadamuDBI {
     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
           
     let stack
-    let attemptReconnect = this.ATTEMPT_RECONNECTION;
     const psuedoSQL = 'begin transaction'
     this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
+    let attemptReconnect = this.ATTEMPT_RECONNECTION;
     
+	let logSuccess = false;
+	
     while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
         stack = new Error().stack
         await this.transaction.begin();
-        this.traceTiming(sqlStartTime,performance.now())
+		this.traceTiming(sqlStartTime,performance.now())
         this.tediousTransactionError = false;
         this.requestProvider = this.transaction
         super.beginTransaction()
+        if (logSuccess) {
+		  this.yadamuLogger.info([this.DATABASE_VENDOR,'TRANSACTION MANAGER','BEGIN','RECONNECTION'],'Success')
+        }
         break;
       } catch (e) {
         const cause = this.trackExceptions(new MsSQLError(e,stack,'sql.Transaction.begin()'))
@@ -927,6 +932,7 @@ class MsSQLDBI extends YadamuDBI {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
           await this.reconnect(cause,'BEGIN TRANSACTION')
+		  logSuccess = true;
           continue;
         }
         throw cause
@@ -948,11 +954,11 @@ class MsSQLDBI extends YadamuDBI {
 	  return;
 	}
 
-    let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
     let stack
     const psuedoSQL = 'commit transaction'
     this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
+    let attemptReconnect = this.ATTEMPT_RECONNECTION;
       
     try {
       super.commitTransaction()
@@ -996,9 +1002,11 @@ class MsSQLDBI extends YadamuDBI {
     // If rollbackTransaction was invoked due to encounterng an error and the rollback operation results in a second exception being raised, log the exception raised by the rollback operation and throw the original error.
     // Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 
+
     let stack
     const psuedoSQL = 'rollback transaction'
     this.status.sqlTrace.write(this.traceSQL(psuedoSQL));
+    let attemptReconnect = this.ATTEMPT_RECONNECTION;
       
     try {
       super.rollbackTransaction()

@@ -230,7 +230,7 @@ class StatementGenerator {
 		  })
 		  
 		  // Partitioned Tables need one entry per partition 
-
+		  
           if (tableMetadata.hasOwnProperty('partitionCount')) {
 	  	    tableInfo.copy = tableMetadata.dataFile.map((filename,idx) => {
 			  return  {

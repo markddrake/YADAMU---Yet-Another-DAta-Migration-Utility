@@ -1,0 +1,69 @@
+{
+  "operation"                         : "export"
+, "connections"                       : "connections.json"
+, "recreateSchema"                    : true
+, "createDirectory"                   : true
+, "verifyOperation"                   : false
+, "parameters"                        : {
+	"DIRECTORY"                       : "%operation%/%mode%/%connection%"
+  }
+, "tasks"                             : "tasks.json"
+, "tests" : [{
+    "source": "oracle19c"
+  , "target": "file-staging"
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "%operation%/json/%vendor%"
+     }
+  , "tasks": [
+      "oracle"
+    ]
+  },{
+    "source"                          : "mysql#1"
+  , "target"                          : "file-staging"
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "%operation%/json/%vendor%"
+     }
+  , "tasks": [
+      "mysql"
+    ]
+  },{
+    "source"                          : "mssql19"
+  , "target"                          : "file-staging"
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "%operation%/json/%vendor%"
+     }
+  , "tasks": [
+      "mssql"
+    ]
+  },{
+    "operation"                       : "import"
+  , "source"                          : "file-staging"
+  , "target"                          : "mssql19"
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "export/json/%vendor%"
+    }
+  , "tasks": [                        
+      "Northwind_AWA"                 
+    ]                                 
+  },{                                 
+    "operation"                       : "import"
+  , "source"                          : "file-staging"
+  , "target"                          : "mssql19"
+  , "recreateSchema"                  : false
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "export/json/%vendor%"
+     }
+  , "tasks": [
+      "AdventureWorks_AWA"
+    ]  
+  },{
+    "source"                          : "mssql19"
+  , "target"                          : "file-staging"
+  , "parameters"                      : {
+	  "DIRECTORY"                     : "%operation%/json/%vendor%"
+     }
+  , "tasks": [
+      "AdventureWorksAll"
+    ]
+  }]
+}

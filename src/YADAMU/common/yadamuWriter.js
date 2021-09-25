@@ -412,6 +412,18 @@ class YadamuWriter extends Transform {
 		        fs.write(col === null ? '' : col.toISOString())
 		        fs.write('",')
 		      } 
+		    case (Buffer.isBuffer(col)):
+		      return (isLastColumn)
+		      ? (fs,col) => {
+                  fs.write('"')
+                  fs.write(col === null ? '' : col.toString('hex'))
+		          fs.write('"\n')
+		        } 
+		      : (fs,col) => {
+                fs.write('"')
+		        fs.write(col === null ? '' : col.toString('hex'))
+		        fs.write('",')
+		      } 
 			default:
 		      return (isLastColumn)
 		      ? (fs,col) => {
@@ -764,7 +776,7 @@ class YadamuWriter extends Transform {
 	if (cause) {
 	  const tags = YadamuError.lostConnection(cause) ? ['LOST CONNECTION'] : []
       tags.push(this.readerMetrics.readerError || this.readerMetrics.parserError ? 'STREAM READER' : 'STREAM WRITER')
- 	  this.yadamuLogger.handleException(['PIPELINE',...tags,this.displayName,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],cause)
+	  this.yadamuLogger.handleException(['PIPELINE',...tags,this.displayName,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],cause)
 	}
 
 	// console.log(writerMetrics.metrics)

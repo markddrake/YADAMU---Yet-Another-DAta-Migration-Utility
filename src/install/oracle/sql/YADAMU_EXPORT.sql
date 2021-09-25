@@ -15,7 +15,8 @@ as
   
   TYPE EXPORT_METADATA_TABLE IS TABLE OF EXPORT_METADATA_RECORD;
   
-  function GET_SYSTEM_INFORMATION return CLOB;
+  -- function GET_SYSTEM_INFORMATION return CLOB;
+  function GET_SYSTEM_INFORMATION return VARCHAR2;
 
   function GET_DML_STATEMENTS(
     P_OWNER_LIST             VARCHAR2 
@@ -114,7 +115,8 @@ begin
 end;
 --
 function GET_SYSTEM_INFORMATION
-return CLOB
+-- return CLOB
+return VARCHAR2
 as
    V_RESULTS CLOB;
 begin

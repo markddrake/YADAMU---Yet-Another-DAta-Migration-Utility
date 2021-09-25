@@ -565,44 +565,32 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)	   	
   }  
     
-  async reportCopyResults(tableName,rowsRead,failed,elapsedTime,sqlStatement,stack) {
-    const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${Math.round((rowsRead/elapsedTime) * 1000)} rows/s.`
-   
-    let rowCountSummary
-    switch (failed) {
-	  case 0:
-	    rowCountSummary = `Rows ${rowsRead}.`
-        this.yadamuLogger.info([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
-        break
-      default:
-	    rowCountSummary = `Read ${rowsRead}. Written ${rowsRead - failed}.`
-        this.yadamuLogger.error([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
-        await this.reportCopyErrors(tableName,failed,stack,sqlStatement)
-	}
-  }
-
   async initializeCopy(credentials) {
     const results = await this.executeSQL(this.statementLibrary.SQL_CREATE_STAGE);
   }
   
-  async copyOperation(tableName,sqlStatement) {
+  async copyOperation(tableName,copy) {
 
-    await this.beginTransaction()
-    const startTime = performance.now();
-	let results = await this.executeSQL(sqlStatement);
-	const stack = new Error().stack
-	const elapsedTime = performance.now() - startTime;
-    const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  rows/s.`
-	let rowsParsed = 0
-	let rowsLoaded = 0
-	let errors = 0
-	results.forEach((file) => {
-	  rowsParsed += parseInt(file.rows_parsed)
-	  rowsLoaded += parseInt(file.rows_loaded)
-	  errors += parseInt(file.errors_seen)
+	try {
+	  const stack = new Error().stack
+      await this.beginTransaction()
+      const startTime = performance.now();
+	  let results = await this.executeSQL(copy.dml);
+	  const endTime = performance.now();
+	  await this.commitTransaction();
+	  let rowsParsed = 0
+	  let rowsLoaded = 0
+	  let errors = 0
+	  results.forEach((file) => {
+	    rowsParsed += parseInt(file.rows_parsed)
+	    rowsLoaded += parseInt(file.rows_loaded)
+	    errors += parseInt(file.errors_seen)
 	  })
-  	await this.reportCopyResults(tableName,rowsParsed,rowsParsed - rowsLoaded,elapsedTime,sqlStatement,stack)
-	await this.commitTransaction()
+	  await this.reportCopyResults(tableName,rowsLoaded,rowsParsed - rowsLoaded,startTime,endTime,copy,stack)
+	} catch(cause) {
+  	  await this.rollbackTransaction(cause);
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],cause)
+	}	
   }
   
   async fianlizeeCopy() {

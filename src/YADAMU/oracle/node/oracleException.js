@@ -11,7 +11,7 @@ class OracleError extends DatabaseError {
     if (Array.isArray(args)) {
       return args.map((arg) => {
         if (arg.type && arg.val) {
-          arg.jsType = OracleConstants.BIND_TYPES[arg.type]
+          arg.dataType = OracleConstants.BIND_TYPES[arg.type]
           switch (true) {
             case (Buffer.isBuffer(arg.val)):
               arg.val = "Buffer"
@@ -40,6 +40,9 @@ class OracleError extends DatabaseError {
           }
         })
       }
+	  if (Array.isArray(args?.bindDefs)) {
+		args.bindDefs.forEach((bindDef) => {bindDef.dataType = OracleConstants.BIND_TYPES[bindDef.type]})
+	  }
     }
 	return args
   }
@@ -55,11 +58,12 @@ class OracleError extends DatabaseError {
   }
 
   invalidPool() {
-    return this.cause.message.startsWith(OracleConstants.INVALID_POOL)
+    return this.cause.message.startsWith(OracleConstants.NJS_INVALID_POOL)
   } 
   
   lostConnection() {
-    return ((this.cause.errorNum && OracleConstants.LOST_CONNECTION_ERROR.includes(this.cause.errorNum)) || ((this.cause.errorNum === 0) && (this.cause.message.startsWith(OracleConstants.NOT_CONNECTED) || this.cause.message.startsWith(OracleConstants.INVALID_CONNECTION))))
+	const oracledbCode = this.cause.message.substring(0,this.cause.message.indexOf(':'))
+	return (OracleConstants.LOST_CONNECTION_ERROR.includes(this.cause.errorNum)) || (OracleConstants.ORACLEDB_LOST_CONNECTION.includes(oracledbCode))
   }
 
   missingTable() {
@@ -92,4 +96,18 @@ class OracleError extends DatabaseError {
  
 }
 
-module.exports = OracleError
+class StagingFileError extends OracleError {
+  constructor(local,remote,cause) {
+	super(cause,cause.stack,cause.sql,cause.args,cause.outputFormat)
+	this.message = `Oracle Copy Operation Failed. File Not Found. Please ensure folder "${local}" maps to folder "${remote}" on the server hosting your Oracle databases.`
+	this.stack = cause.stack
+    this.cause = cause
+    this.local_staging_area = local
+    this.remote_staging_area = remote
+  }
+}
+module.exports = {
+  OracleError,
+  StagingFileError
+}
+  

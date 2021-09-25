@@ -4,6 +4,9 @@
         "user"                          : "SYSTEM"
       , "password"                      : "oracle"
       , "connectString"                 : "ORA2103"
+      },
+	  "parameters"                      : {
+		  "SPATIAL_FORMAT"              : "GeoJSON"
       }
     },
     "oracle19c"                         : {

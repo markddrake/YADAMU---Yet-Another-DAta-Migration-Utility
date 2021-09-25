@@ -80,7 +80,7 @@ class CloudDBI extends LoaderDBI {
 	super.setConnectionProperties(connectionSettings)
   }
   
-  async loadMetadataFiles() {
+  async loadMetadataFiles(copyStagedData) {
     // this.yadamuLogger.trace([this.constructor.name,this.EXPORT_PATH],`loadMetadataFiles()`)
   	const metadata = {}
     if (this.controlFile) {
@@ -90,7 +90,10 @@ class CloudDBI extends LoaderDBI {
 	  metdataRecords.forEach((content) =>  {
         const json = this.parseContents(content)
         metadata[json.tableName] = json;
-        json.dataFile = this.getDataFileName(json.tableName)
+        // json.dataFile = this.getDataFileName(json.tableName)
+        if (copyStagedData) {
+          json.dataFile = this.controlFile.data[json.tableName].files || this.controlFile.data[json.tableName].file 
+        }
       })
     }
     return metadata;      

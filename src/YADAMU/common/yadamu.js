@@ -9,7 +9,8 @@ const assert = require('assert');
 
 const util = require('util')
 const stream = require('stream')
-const pipeline = util.promisify(stream.pipeline);
+// const pipeline = util.promisify(stream.pipeline);
+const { pipeline } = require('stream/promises');
 const finished = stream.finished
 
 const FileDBI = require('../file/node/fileDBI.js');

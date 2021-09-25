@@ -36,7 +36,7 @@ class VerticaError extends DatabaseError {
 
 class StagingAreaMisMatch extends VerticaError {
   constructor(local,remote,cause) {
-	super( new Error(`Vertica Copy Operation Failed. File Not Found. Please ensure folder "${local}" is mapped to folder "${remote}" on the server hosting your Vertica databases.`))
+	super( new Error(`Vertica Copy Operation Failed. File Not Found. Please ensure folder "${local}" maps to folder "${remote}" on the server hosting your Vertica databases.`))
     this.cause = cause
     this.local_staging_area = local
     this.remote_staging_area = remote

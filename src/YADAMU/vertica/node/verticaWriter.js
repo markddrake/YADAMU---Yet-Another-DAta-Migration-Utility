@@ -237,7 +237,7 @@ class VerticaWriter extends YadamuWriter {
     this.newBatch();
 	super.setTableInfo(tableName)	
     this.tableInfo.insertMode = 'Copy'
-	this.copyStatement = this.tableInfo.copy
+	this.copyStatement = this.tableInfo.copy.dml
 	this.STAGING_FILE = this.tableInfo.localPath
 	this.mergeoutInsertCount = this.dbi.MERGEOUT_INSERT_COUNT;
 
@@ -374,7 +374,7 @@ class VerticaWriter extends YadamuWriter {
   addOperator(arg,operator) {
 
 	 if ((arg.length > 65000) && (operator.prefix.indexOf('(HEX_TO_BINARY(') > -1)) {
-	   operator.prefix = operator.prefix.replace('(HEX_TO_BINARY(','(LONG_HEX_TO_BINARY(')
+	   operator.prefix = operator.prefix.replace('(HEX_TO_BINARY(','(YADAMU.LONG_HEX_TO_BINARY(')
 	 }
 	 return `${operator.prefix}${this.addArgument(arg)}${operator.suffix}`
   }

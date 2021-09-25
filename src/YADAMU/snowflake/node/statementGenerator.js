@@ -468,15 +468,35 @@ class StatementGenerator {
       insertStatement = `insert into "${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values ${valuesBlock}`;
     }
 
-    let copyStatement 
+    /*
+    let copy 
     if (tableMetadata.dataFile) {
-      copyStatement = `copy into "${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."${tableMetadata.tableName}" from '@"${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,tableMetadata.dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
+      copy = `copy into "${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."${tableMetadata.tableName}" from '@"${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,tableMetadata.dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
 	}
-
+    */
+	
+    let copy
+	if (tableMetadata.dataFile) {
+	  if (tableMetadata.hasOwnProperty('partitionCount')) {
+        copy = tableMetadata.dataFile.map((dataFile,idx) => {
+	      return  {
+	        dml             : `copy into "${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."${tableMetadata.tableName}" from '@"${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
+		  , partitionCount  : tableMetadata.partitionCount
+		  , partitionID     : idx+1
+	      }
+	    })
+	  }
+      else {
+	    copy = {
+	     dml         : `copy into "${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."${tableMetadata.tableName}" from '@"${this.dbi.parameters.YADAMU_DATABASE}"."${this.targetSchema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,tableMetadata.dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
+	    }
+	  }
+    }
+	
     return { 
        ddl             : createStatement, 
        dml             : insertStatement,
-	   copy            : copyStatement,
+	   copy            : copy,
        valuesBlock     : valuesBlock,
        columnNames     : columnNames,     
        targetDataTypes : targetDataTypes, 
