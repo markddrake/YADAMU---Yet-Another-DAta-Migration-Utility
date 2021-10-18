@@ -169,9 +169,9 @@ services:
       - MSSQL19-01-DATA:/var/opt/mssql
     restart: always
 
-  PGSQL13-01: 
-    container_name: PGSQL13-01
-    image:  yadamu/postgres:latest 
+  PGSQL14-01: 
+    container_name: PGSQL14-01
+    image:  yadamu/postgres:14 
     mem_limit: '16gb'
     shm_size: '4gb'
     networks:
@@ -182,7 +182,7 @@ services:
       POSTGRES_PASSWORD: oracle 
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - PGSQL13-01-DATA:/var/lib/postgresql/data
+      - PGSQL14-01-DATA:/var/lib/postgresql/data
     restart: always
 
   MYSQL80-01: 
@@ -234,20 +234,6 @@ services:
       - MONGO40-01-DATA:/data/db 
     restart: always
 
-# VRTCA09-01:
-#   container_name: VRTCA09-01
-#   image:  dataplatform/docker-vertica
-#   mem_limit: '16gb'
-#   shm_size: '4gb'
-#   networks:
-#     - YADAMU-NET
-#   ports: 
-#     - "5433:5433"
-#   volumes:
-#     - YADAMU_01-SHARED:/mnt/shared
-#     - VRTCA09-01-DATA:/home/dbadmin/docker
-#   restart: always
-#
   VRTCA10-01: 
     container_name: VRTCA10-01
     image: vertica/vertica-ce:10.1.1-0
@@ -354,12 +340,11 @@ volumes:
   ORA1120-01-DIAG:
   MSSQL17-01-DATA:
   MSSQL19-01-DATA:
-  PGSQL13-01-DATA:
+  PGSQL14-01-DATA:
   MYSQL80-01-DATA:
   MARIA10-01-CONF:
   MARIA10-01-DATA:
   MONGO40-01-DATA:
-# VRTCA09-01-DATA:
   VRTCA10-01-DATA:
   VRTCA11-01-DATA:
   MINIO-01-DATA:

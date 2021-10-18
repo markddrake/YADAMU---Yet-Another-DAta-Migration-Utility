@@ -1,0 +1,27 @@
+# escape=`
+FROM mcr.microsoft.com/windows/servercore:ltsc2019
+#
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+#
+# Add LogMonitor
+#
+ADD https://github.com/microsoft/windows-container-tools/releases/download/v1.1/LogMonitor.exe LogMonitor.exe 
+#
+# Visual Studio 2015 - 2022 Redistributable Package x64
+#
+ADD https://aka.ms/vs/16/release/vc_redist.x64.exe .
+RUN Start-Process c:\vc_redist.x64.exe  -Wait -ArgumentList """/q"""; `
+    Remove-Item c:\vc_redist.x64.exe
+#
+# DOTNET Framework 4.8
+#
+ADD https://download.visualstudio.microsoft.com/download/pr/2d6bb6b2-226a-4baa-bdec-798822606ff1/8494001c276a4b96804cde7829c04d7f/ndp48-x86-x64-allos-enu.exe .
+#RUN Start-Process c:\ndp48-x86-x64-allos-enu.exe -Wait -ArgumentList """/q""", """/norestart"""; `
+#    Remove-Item c:\ndp48-x86-x64-allos-enu.exe
+RUN c:\ndp48-x86-x64-allos-enu.exe /q /norestart
+RUN Remove-Item c:\ndp48-x86-x64-allos-enu.exe
+#
+# Install VIM via Chocolatey
+#
+#RUN Invoke-WebRequest https://chocolatey.org/install.ps1 -UseBasicParsing | Invoke-Expression; `
+#    choco install -y vim

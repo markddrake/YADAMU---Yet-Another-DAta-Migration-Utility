@@ -2,8 +2,11 @@
 -- Resize the UNDO and USER tablespaces
 --
 set echo on
+
+def STAGE_LOCATION=&1
+def ORADATA_LOCATION=&2
 --
-spool /opt/oracle/diag/setup/configure.log
+spool &STAGE_LOCATION/log/configure.log
 --
 select file_id, file_name from DBA_DATA_FILES
 /
@@ -43,9 +46,9 @@ select 'configure_' ||  SUBSTR('&_O_RELEASE',1,4) || '.sql' SCRIPT_NAME
 alter user system identified by oracle
 /
 --
--- Move the Recovery File Location to the 'diag' volume
+-- Move the Recovery File Location to the 'oradata' volume
 --
-alter system set  db_recovery_file_dest='/opt/oracle/oradata/flash_recovery_area' scope=spfile
+alter system set  db_recovery_file_dest='&ORADATA_LOCATION/oradata/flash_recovery_area' scope=spfile
 /
 alter system set  db_recovery_file_dest_size=4G scope=spfile
 /

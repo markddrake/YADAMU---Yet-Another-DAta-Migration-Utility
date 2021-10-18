@@ -1,10 +1,11 @@
-create database sakila;
+CREATE USER if not exists 'root'@'%' identified by  'oracle';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+SET GLOBAL max_allowed_packet=1024*1024*1024;
+create database if not exists sakila;
 use sakila;
 source testdata/sakila/sakila-schema.sql
 source testdata/sakila/sakila-data.sql
-create database jtest;
+create database  if not exists jtest;
 use jtest;
 source testdata/jtest.audit.sql
 exit
-rm -rf setup
-rm -rf testdata

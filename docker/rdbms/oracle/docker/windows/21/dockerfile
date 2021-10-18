@@ -1,0 +1,30 @@
+# escape=`
+FROM yadamu/svr-2019:vs22
+#
+# Unpack Oracle RDBMS
+#
+WORKDIR c:/
+ENV ORACLE_HOME c:\oracle\rdbms\21.3\db_home1
+COPY WINDOWS.X64_213000_db_home.zip C:/
+RUN New-Item -ItemType "directory" -Path $env:ORACLE_HOME; `
+    Expand-Archive -Path C:\WINDOWS.X64_213000_db_home.zip -DestinationPath $env:ORACLE_HOME; `
+    Remove-Item WINDOWS.X64_213000_db_home.zip
+#
+# Install Oracle Software
+#
+WORKDIR $ORACLE_HOME
+COPY dbca.rsp .
+COPY setup.rsp $ORACLE_HOME/inventory/Scripts/
+RUN .\setup.exe -silent -responseFile %ORACLE_HOME%/inventory/Scripts/setup.rsp
+#
+# Compress and remove diag folder. It will be restored in Start.ps1
+#
+RUN Compress-Archive -Path c:\oracle\diag  -DestinationPath c:\oracle\diag.zip; `
+    Remove-Item -Recurse c:\oracle\diag
+#
+# Defer execution of NETCA and DBCA to Start.ps1. This allows volumes and hostnames to be assigned using "Docker RUN" or "Docker-Compose"
+#
+WORKDIR c:/
+COPY Start.ps1 .
+ENTRYPOINT ["powershell","c:\\Start.ps1"]
+#ENTRYPOINT ["powershell","wait-event"]

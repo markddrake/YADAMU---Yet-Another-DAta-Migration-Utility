@@ -1,0 +1,68 @@
+# escape=`
+FROM mcr.microsoft.com/windows/servercore:ltsc2016
+#
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+#
+ADD https://github.com/microsoft/windows-container-tools/releases/download/v1.1/LogMonitor.exe LogMonitor.exe 
+#
+# Download and install Visual C++ Redistributable
+#
+ADD https://aka.ms/vs/16/release/vc_redist.x64.exe .
+RUN Start-Process c:\vc_redist.x64.exe  -Wait -ArgumentList "/q"
+RUN Remove-Item c:\vc_redist.x64.exe
+#
+# Download and Install .NET Framework 4.8
+#
+ADD https://download.visualstudio.microsoft.com/download/pr/2d6bb6b2-226a-4baa-bdec-798822606ff1/8494001c276a4b96804cde7829c04d7f/ndp48-x86-x64-allos-enu.exe .
+RUN c:\ndp48-x86-x64-allos-enu.exe /q  /norestart
+RUN Remove-Item c:\ndp48-x86-x64-allos-enu.exe
+#
+RUN New-Item -ItemType "directory" C:\INSTALL; `
+    New-Item -ItemType "directory" C:\INSTALL\CU;   
+#
+# Unpack SQL Server
+#
+WORKDIR c:/INSTALL
+COPY SQLServer2017-DEV-x64-ENU.exe .
+COPY SQLServer2017-DEV-x64-ENU.box .
+COPY SQLServer2017-KB5005226-x64.exe .
+COPY setup.ps1 .
+COPY fixDataFileLocations.sql .
+RUN .\SQLServer2017-DEV-x64-ENU.exe /x:SQLServer2017-DEV-x64-ENU /u;
+#
+# Install SQL Server
+#
+#
+# Inoking Setup from a script appears to bypass the issue with "username" cannot be null issue that occurs when setup is invoked directly via the RUN command 
+#
+# RUN C:\INSTALL\SQLServer2017-DEV-x64-ENU\SETUP.exe /Q /ACTION=INSTALL /FEATURES=SQLENGINE /INSTANCENAME=MSSQLSERVER /SECURITYMODE=SQL /SAPWD="oracle#1" /SQLSVCACCOUNT="NT AUTHORITY\System" /AGTSVCACCOUNT="NT AUTHORITY\System" /SQLSYSADMINACCOUNTS="BUILTIN\Administrators" /IACCEPTSQLSERVERLICENSETERMS=1 /TCPENABLED=1 /UPDATEENABLED=false ; exit 0
+#
+RUN .\setup.ps1
+
+RUN $SQLSERVER = GET-SERVICE "MSSQLSERVER"; `
+	$SQLSERVER.Start(@('/T3608','/T3609')); `
+	invoke-sqlcmd -InputFile fixDataFileLocations.sql -username "sa"; `
+	$SQLSERVER.stop(); `
+	$SQLSERVER.Start
+#
+RUN .\SQLServer2017-KB5005226-x64.exe /x:CU /u
+#
+RUN .\CU\Setup.exe /Q /IAcceptSQLServerLicenseTerms /Action=Patch /InstanceID=MSSQLSERVER
+#
+RUN Remove-Item SQLServer2017-DEV-x64-ENU.exe; `
+    Remove-Item SQLServer2017-DEV-x64-ENU.box; `
+    Remove-Item SQLServer2017-KB5005226-x64.exe; `
+    Remove-Item setup.ps1; `
+    Remove-Item fixDataFileLocations.sql
+#
+WORKDIR c:/
+COPY prepareMounts.ps1 .
+RUN Set-Service  -Name "MSSQLSERVER" -StartupType "Manual"; `
+    Stop-Service -Name "MSSQLSERVER"; `
+    c:\prepareMounts.ps1; `
+    Remove-Item c:\prepareMounts.ps1
+SHELL [ "powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+COPY Start.ps1 .
+#ENTRYPOINT [ "powershell","c:\\Start.ps1","-ACCEPT_EULA $ENV:ACCEPT_EULA","-SA_PASSWORD $ENV:SA_PASSWORD"]
+ENTRYPOINT powershell "c:\\Start.ps1 -ACCEPT_EULA $ENV:ACCEPT_EULA -SA_PASSWORD $ENV:SA_PASSWORD
+#ENTRYPOINT ["powershell","wait-event"]

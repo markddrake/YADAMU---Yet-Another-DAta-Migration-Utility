@@ -1,0 +1,52 @@
+# escape=`
+FROM yadamu/svr-2019:vs13
+#
+# The 12.2 version of setup.exe will not run in servercore. (No GUI).
+# In order to get a working 12.2 in server core is necessary to perform a software only installation in a clean Windows 10 or 11 environment. 
+# The Oracle Home should be c:\oracle\dbms\12.2\db_home1
+#
+# Once the software only setup has completed prepare the following files and place them in the folder containing this dockerfile.
+#
+# (1) winx64_12201_dbhome_1.zip:     A Zip file containing the contents of the folder db_home1. Generate this achive by right-clicking on the db_home1 folder created by setup and selecting the 'Compress to Zip File" option. 
+# (2) oracleInventory.zip:           A zip file containing the contents of the folder c:\Program Files\oracle. Generate this achive by right-clicking on the oracle folder created by setup and selecting the 'Compress to Zip File" option. 
+# (3) oracle.reg:                    An export of the HKLM:\Software\oracle. Generate this file using the RegEdit to export the oracle key.
+#
+WORKDIR C:/
+
+ENV ORACLE_SID CDB12201
+ENV ORACLE_HOME c:\oracle\rdbms\12.2\db_home1
+#
+COPY winx64_12201_dbhome_1.zip C:/
+COPY oracleInventory.zip C:/
+COPY oracle.reg C:/
+#
+# Install Oracle Software:
+#
+# Unpack Oracle RDBMS and the Oracle Inventory. 
+# Update the Registry
+# Prepend Oracle Bin folder to PATH environment variable and set ORACLE_SID.
+# Create ora_dba group
+# Add containerAdministrator to the ora_dbo group: enable "connect / as syssdba"
+#
+RUN New-Item -ItemType "directory" -Path $env:ORACLE_HOME; `
+    Expand-Archive -Path C:\winx64_12201_dbhome_1.zip -DestinationPath (split-path -path $env:ORACLE_HOME -parent); `
+    Remove-Item winx64_12201_dbhome_1.zip; `
+    Expand-Archive -Path C:\oracleInventory.zip -DestinationPath """c:\Program Files"""; `
+    Remove-Item oracleInventory.zip; `
+	reg import oracle.reg; `
+    Remove-Item oracle.reg; `
+    [Environment]::SetEnvironmentVariable("""Path""", $env:ORACLE_HOME + """\bin;""" +  $env:Path,"""Machine"""); `
+    New-LocalGroup -Name ora_dba; `
+    Add-LocalGroupMember -Group ora_dba -Member containerAdministrator
+#
+WORKDIR $ORACLE_HOME
+#
+COPY dbca.rsp .
+COPY tnsnames.ora $ORACLE_HOME/network/admin
+#
+# Defer execution of NETCA and DBCA to Start.ps1. This allows volumes and hostnames to be assigned using "Docker RUN" or "Docker-Compose"
+#
+WORKDIR c:/
+COPY Start.ps1 .
+ENTRYPOINT ["powershell","c:\\Start.ps1"]
+#ENTRYPOINT ["powershell","wait-event"]

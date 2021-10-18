@@ -5,7 +5,7 @@ COPY src/package*.json ./
 RUN apt update \
  && apt-get -y install libaio1 \
  && apt-get -y install alien \
- && alien -i ./oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm \
+ && alien -i --scripts ./oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm \
  && npm install --global electron \
  && npm install
  

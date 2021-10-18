@@ -1,4 +1,4 @@
-cd /opt/oracle/diag
+cd $STAGE
 unzip testdata/sampleSchemas.zip
-cd /opt/oracle/diag/sampleSchemas
+cd sampleSchemas
 exit | sqlplus /nolog @mksample oracle oracle oracle oracle oracle oracle oracle oracle USERS TEMP log/ $ORACLE_PDB
