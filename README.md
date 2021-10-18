@@ -1,7 +1,7 @@
 # YADAMU - Yet Another Data Migration Utility
 
 This project has morphed in scope from being a simple drop in replacement for Oracle's traditional IMP and EXP utilities.
-It now supports homegeneous IMPORT and EXPORT operations on Oracle 11g, 12c 18c and 19c, Postgres, MySQL, MariaDB, SQL Server, Vertica, Amazon Redshift as well as hetrogeneous migrations between any of the supported databases. Support for MongoDB and Snowflake is also available on an experimental basis. Hence the new name - YADAMU. 
+It now supports homegeneous IMPORT and EXPORT operations on Oracle, Postgres, MySQL, MariaDB, SQL Server, Vertica, Amazon Redshift as well as hetrogeneous migrations between any of the supported databases. Support for MongoDB and Snowflake is also available on an experimental basis. Hence the new name - YADAMU. 
 
 YADAMU migrates DDL and Content.
 
@@ -10,14 +10,20 @@ For homogeneous Oracle migrations all schema objects supported by DBMS_METADATA 
 For databases other than Oracle, or hetrogeneous migrations DDL operations are currently restriced to table layouts. Migration of indexes and other schema objects is not currently supported.
 
 Supported Databases :
-* Oracle 11.2.x and later
-* Microsoft SQL Server 2014 and later
-* Postgres 11 and later
+* Oracle 21c
+* Oracle 19c
+* Oracle 18c
+* Oracle 12cR2
+* Oracle 11gR2
+* Microsoft SQL Server 2014
+* Microsoft SQL Server 2017
+* Microsoft SQL Server 2019
+* Postgres 11 through Postgres 14
 * MySQL 8.0.12 and later
 * MariaDB 5.5 and later
 * MongoDB 4.0 and later
 * Snowflake Data Warehouse
-* Vertica
+* Vertica 9 through Vertica 11
 * Amazon Redshift (Experimental)
 
 Yadamu can also export data sets to Amazon AWS S3 Storage and Microsoft Azure BLOB storage. Data can be exported as CSV, JSON Arrays, or JSON.
