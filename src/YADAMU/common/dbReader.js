@@ -12,7 +12,7 @@ const finished = stream.finished
 const Yadamu = require('./yadamu.js')
 const YadamuLibrary = require('./yadamuLibrary.js')
 const YadamuWriter = require('./yadamuWriter.js')
-const {YadamuError, DatabaseError, IterativeInsertError, InputStreamError} = require('./yadamuException.js')
+const {YadamuError, ExportError, DatabaseError, IterativeInsertError, InputStreamError} = require('./yadamuException.js')
 
 const YadamuConstants = require('./yadamuConstants.js')
 
@@ -151,7 +151,8 @@ class DBReader extends Readable {
 	const streamsCompleted = yadamuPipeline.map((s) => { 
 	  return new Promise((resolve,reject) => {
 		finished(s,(err) => {
-		  if (err) {reject(err)} else {resolve()}
+          resolve()
+		  // if (err) {reject(err)} else {resolve()}
 		})
       })
     })
@@ -251,10 +252,10 @@ class DBReader extends Readable {
 
    	 // console.log(yadamuPipeline.map((s) => { return s.constructor.name }).join(' ==> '))
 	
+	 const stack = new Error().stack
 	 const tableComplete = new Promise((resolve,reject) => {
-	   finished(tableSwitcher,() => {
+	   finished(tableSwitcher,(cause) => {
 	     // Manually clean up the previous pipeline since it never completely ended. Prevents excessive memory usage and dangling listeners
-	     
 		 // Remove unpipe listeners on targets, unpipe all target streams
 	     targetPipeline.forEach((s,i) => { 
            s.removeAllListeners('unpipe')
@@ -266,6 +267,7 @@ class DBReader extends Readable {
 	   
 	     // Destroy the source streams
 	     sourcePipeline.forEach((s) => { s.destroy() })
+		 if (cause instanceof Error) reject(new ExportError(task.TABLE_NAME,cause,stack))
          resolve()
   	   })
      })
@@ -274,9 +276,11 @@ class DBReader extends Readable {
      // this.traceStreamEvents(yadamuPipeline,task.TABLE_NAME)
 	  
      // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return proc.constructor.name }).join(' => ')}`)
-	 pipeline(yadamuPipeline)
+     pipeline(yadamuPipeline).catch((cause) => {
+	   // console.log('EMIT','ExportFailed')
+	 })
 	 
-	 await tableComplete
+     await tableComplete
 	 	 
   }
 
@@ -288,9 +292,10 @@ class DBReader extends Readable {
 	  while (taskList.length > 0) {
 	    const task = taskList.shift()
 		try {
-		  await this.pipelineTableToFile(readerDBI,writerDBI,task)
-		} catch (e) {
-		  console.log('Caught',e)
+  	      await this.pipelineTableToFile(readerDBI,writerDBI,task)
+		} catch (cause) {
+		  this.yadamuLogger.handleException(['PIPELINE','SERIAL',task.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
+		  taskList.length = 0
 		}
 	  }
   }

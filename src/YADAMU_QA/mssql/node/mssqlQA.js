@@ -71,6 +71,9 @@ class MsSQLQA extends MsSQLDBI {
 	    this.vendorProperties.database = database;
 
         let results;       
+		
+        const setSingleUserMode = this.statementLibrary.SINGLE_USER_MODE
+        results =  await this.executeSQL(setSingleUserMode);      
         const dropDatabase = this.statementLibrary.DROP_DATABASE
         results =  await this.executeSQL(dropDatabase);      
       

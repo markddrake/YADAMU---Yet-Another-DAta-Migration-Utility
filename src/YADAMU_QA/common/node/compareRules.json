@@ -108,15 +108,17 @@
 	"ORDERED_JSON": {
 		"default": false,
 		"oracle": {
-			"oracle#20": true,
+			"oracle#21": true,
 			"mysql": true,
 			"snowflake": true
 		},
 		"mariadb": {
+			"oracle#21": true,
 			"mysql": true,
 			"snowflake": true
 		},
 		"mongodb": {
+			"oracle#21": true,
 			"postgres": true,
 			"mysql": true,
 			"snowflake": true

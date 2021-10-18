@@ -79,7 +79,7 @@
     "postgres#1"                        : {
       "postgres"                        : {
         "user"                          : "postgres"
-      , "host"                          : "PGSQL13-01"
+      , "host"                          : "PGSQL14-01"
       , "database"                      : "yadamu"
       , "password"                      : "oracle"
       , "port"                          : 5432

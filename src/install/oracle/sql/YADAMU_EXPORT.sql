@@ -35,6 +35,12 @@ $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
 --
 $END
 --
+$IF DBMS_DB_VERSION.VERSION = 21 $THEN
+-- 
+  function DISABLE_VALUE_CLOB(P_VALUE_CLOB CLOB) return CLOB;
+--
+$END
+--
 end;
 /
 --
@@ -472,7 +478,16 @@ as
 				     when P_RETURN_BINARY_JSON = 'TRUE' then
                        '"' || atc.COLUMN_NAME || '"'
 					 else
+					   /*
+					   **
+					   ** Workaronund for issue related to JSON_SERIALIZE returning VALUE CLOB raising ORA-24826: Value LOB no longer available
+					   **
+					   */
+					   $IF DBMS_DB_VERSION.VERSION = 21 $THEN
+					   'YADAMU_EXPORT.DISABLE_VALUE_CLOB(JSON_SERIALIZE("' || atc.COLUMN_NAME || '" returning CLOB)) "' || atc.COLUMN_NAME || '"'
+					   $ELSE
 				 	   'JSON_SERIALIZE("' || atc.COLUMN_NAME || '" returning CLOB) "' || atc.COLUMN_NAME || '"'
+					   $END
 				   end
 			     $END
                  when TYPECODE = 'COLLECTION' then
@@ -689,6 +704,20 @@ $END
   end;  
 --
 end;
+--
+$IF DBMS_DB_VERSION.VERSION = 21 $THEN
+-- 
+function DISABLE_VALUE_CLOB(P_VALUE_CLOB CLOB) 
+return CLOB
+as
+  NORMAL_CLOB CLOB;
+begin
+  NORMAL_CLOB := P_VALUE_CLOB;
+  return NORMAL_CLOB;
+end;
+--
+$END
+--
 
 end;
 /

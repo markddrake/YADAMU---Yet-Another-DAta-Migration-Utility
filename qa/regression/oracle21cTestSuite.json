@@ -13,7 +13,7 @@
 			"parameters": {
 				"DIRECTORY": "%operation%/%mode%/%connection%"
 			},
-			"source": "oracle11g",
+			"source": "oracle21c",
 			"target": "file-staging",
 			"parameters": {
 				"DIRECTORY": "%operation%/json/%vendor%"
@@ -25,7 +25,7 @@
 		{
 			"operation": "import",
 			"source": "file-staging",
-			"target": "oracle11g",
+			"target": "oracle21c",
 			"verifyOperation": true,
 			"parameters": {
 				"DIRECTORY": "export/json/%location%"
@@ -36,8 +36,8 @@
 			]
 		},
 		{
-			"source": "oracle11g",
-			"target": "oracle11g",
+			"source": "oracle21c",
+			"target": "oracle21c",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -46,7 +46,7 @@
 		},
 		{
 			"source": "oracle19c",
-			"target": "oracle11g",
+			"target": "oracle21c",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -55,7 +55,7 @@
 		},
 		{
 			"source": "oracle18c",
-			"target": "oracle11g",
+			"target": "oracle21c",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -64,7 +64,7 @@
 		},
 		{
 			"source": "oracle12c",
-			"target": "oracle11g",
+			"target": "oracle21c",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -72,8 +72,8 @@
 			]
 		},
 		{
-			"source": "oracle21c",
-			"target": "oracle11g",
+			"source": "oracle11g",
+			"target": "oracle21c",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -82,7 +82,7 @@
 		},
 		{
 			"source": "mssql19",
-			"target": "oracle11g",
+			"target": "oracle21c",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -91,7 +91,7 @@
 		},
 		{
 			"source": "mssql17",
-			"target": "oracle11g",
+			"target": "oracle21c",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -100,7 +100,7 @@
 		},
 		{
 			"source": "postgres#1",
-			"target": "oracle11g",
+			"target": "oracle21c",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -109,7 +109,7 @@
 		},
 		{
 			"source": "mysql#1",
-			"target": "oracle11g",
+			"target": "oracle21c",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -118,7 +118,7 @@
 		},
 		{
 			"source": "mariadb#1",
-			"target": "oracle11g",
+			"target": "oracle21c",
 			"tasks": [
 				"oracle",
 				"mysql",
@@ -127,7 +127,7 @@
 		},
 		{
 			"source": "mongodb#1",
-			"target": "oracle11g",
+			"target": "oracle21c",
 			"parameters": {
 				"MONGO_STRIP_ID": false
 			},
@@ -138,13 +138,13 @@
 			]
 		},
 		{
-			"source": "oracle11g",
+			"source": "oracle21c",
 			"targets": [
-				"oracle11g",
+				"oracle21c",
 				"oracle19c",
 				"oracle18c",
 				"oracle12c",
-				"oracle21c",
+				"oracle11g",
 				"mssql17",
 				"mssql19",
 				"postgres#1",
@@ -159,8 +159,8 @@
 			]
 		},
 		{
-			"source": "oracle11g",
-			"target": "oracle11g",
+			"source": "oracle21c",
+			"target": "oracle21c",
 			"stagingArea": "loader-staging",
 			"reloadStagingArea" : false,
 			"emptyStringIsNull" : true,

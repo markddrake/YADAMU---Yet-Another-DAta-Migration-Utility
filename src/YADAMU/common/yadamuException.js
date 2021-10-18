@@ -20,6 +20,10 @@ class YadamuError extends Error {
   static missingTable(e) {
 	return ((e instanceof DatabaseError) && e.missingTable())
   }
+    
+  cloneStack(stack) {
+	return stack && stack.indexOf('Error') === 0 ? `${stack.slice(0,5)}: ${this.cause.message}${stack.slice(5)}` : stack
+  }
   
 }
 
@@ -30,6 +34,17 @@ class InternalError extends Error {
 	this.info = info
   }
 }
+
+class ExportError extends YadamuError {
+  constructor(tableName,cause,stack) {
+    super(`Export Operation Failed while processing "${tableName}". Cannot create export file. Retry using "Unload" Operation`);
+	this.cause = cause;
+	this.tableName = tableName;
+	this.stack = this.cloneStack(stack)
+  }
+}
+
+
 
 class UserError extends Error {
   constructor(message) {
@@ -77,7 +92,6 @@ class ContentTooLarge extends Error {
   
 }
 
-
 class BatchInsertError extends Error {
   constructor(cause,tableName,batchSize,firstRow,lastRow,info) {
 	super(cause.message)
@@ -111,7 +125,7 @@ class RejectedColumnValue extends Error {
 }
   
 
-class DatabaseError extends Error {
+class DatabaseError extends YadamuError {
   constructor(cause,stack,sql) {
 	let oneLineMessage = cause.message.indexOf('\r') > 0 ? cause.message.substr(0,cause.message.indexOf('\r')) : cause.message 
 	oneLineMessage = oneLineMessage.indexOf('\n') > 0 ? oneLineMessage.substr(0,oneLineMessage.indexOf('\n')) : oneLineMessage
@@ -139,11 +153,7 @@ class DatabaseError extends Error {
 	     this.tags.push('CONTENT_TOO_LARGE');
     }
   }
-  
-  cloneStack(stack) {
-	return stack && stack.indexOf('Error') === 0 ? `${stack.slice(0,5)}: ${this.cause.message}${stack.slice(5)}` : stack
-  }
-  
+
   lostConnection() {
 	return false;
   }
@@ -197,5 +207,6 @@ module.exports = {
 , ConfigurationFileError
 , ConnectionError
 , ContentTooLarge
+, ExportError
 }
 

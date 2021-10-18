@@ -6,9 +6,12 @@ class MySQLParser extends YadamuParser {
   
   constructor(tableInfo,yadamuLogger) {
     super(tableInfo,yadamuLogger);      
-
-	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType) => {
+    this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType) => {
 	  switch (dataType.toLowerCase()) {
+		 case "decimal":
+		   return (row,idx) => {
+			  row[idx] = typeof row[idx] === 'string' ? row[idx].replace(/(\.0*|(?<=(\..*))0*)$/, '') : row[idx]
+		   }
 		 case "set":
 		   // Convert comma seperated list to string array. Assume that a value cannont contain a ',' which seems to enforced at DDL time
 		   return (row,idx) => {
@@ -34,6 +37,7 @@ class MySQLParser extends YadamuParser {
   async _transform (data,encoding,callback) {
     this.rowCount++
     data = Object.values(data)    
+    // if (this.rowCount === 1) console.log(data)
     this.rowTransformation(data)
     // if (this.rowCount === 1) console.log(data)
     this.push({data:data})

@@ -10,7 +10,7 @@ const YadamuParser = require('../../common/yadamuParser.js')
 const StringWriter = require('../../common/stringWriter.js');
 const BufferWriter = require('../../common/bufferWriter.js');
 
-const OracleError = require('./oracleException.js');
+const {OracleError} = require('./oracleException.js');
 
 class OracleParser extends YadamuParser {
   
@@ -18,50 +18,6 @@ class OracleParser extends YadamuParser {
     super(tableInfo,yadamuLogger); 
 	// console.log(tableInfo)
   }
-  
-  async closeLob(lob) {
-	let stack
-	const operation = 'oracledb.Lob.close()'
-    try {
-	  stack = new Error().stack
-      await lob.close()
-	} catch (e) {
-      this.yadamuLogger.handleException([this.constructor.name,'CLOSE_LOB'],new OracleError(e,stack,operation))
-    }
-  }	 
-
-  async blobToBuffer(blob) {
-	  
-	let stack
-	const operation = 'oracledb.Lob.pipe(Buffer)'
-    try {
-      const bufferWriter = new  BufferWriter();
-	  stack = new Error().stack
-  	  await pipeline(blob,bufferWriter)
-	  await this.closeLob(blob)
-      return bufferWriter.toBuffer()
-	} catch(e) {
-	  await this.closeLob(blob)
-	  throw new OracleError(e,stack,operation)
-	}
-  }	
-  
-  async clobToString(clob) {
-     
-    let stack
-	const operation = 'oracledb.Lob.pipe(String)'
-	try {
-      const stringWriter = new  StringWriter();
-      clob.setEncoding('utf8');  // set the encoding so we get a 'string' not a 'buffer'
-	  stack = new Error().stack
-  	  await pipeline(clob,stringWriter)
-	  await this.closeLob(clob)
-	  return stringWriter.toString()
-	} catch(e) {
-	  await this.closeLob(clob)
-	  throw new OracleError(e,stack,operation)
-	}
-  };
 
   setColumnMetadata(metadata) { 
 
@@ -72,7 +28,8 @@ class OracleParser extends YadamuParser {
 		case oracledb.DB_TYPE_NCLOB:
 		case oracledb.DB_TYPE_CLOB:
 		  return (row,idx)  => {
-            row[idx] = this.clobToString(row[idx])
+            // row[idx] = this.clobToString(row[idx])
+			row[idx] = row[idx].getData()
 		  }           
 	    case oracledb.DB_TYPE_BLOB:	
           if (this.tableInfo.jsonColumns.includes(idx)) {
@@ -82,7 +39,8 @@ class OracleParser extends YadamuParser {
 		    }
           }
           return (row,idx)  => {
-            row[idx] = this.blobToBuffer(row[idx])
+            // row[idx] = this.blobToBuffer(row[idx])
+			row[idx] = row[idx].getData()
 		  }
         default:
  		  switch (this.tableInfo.DATA_TYPE_ARRAY[idx].toUpperCase()) {
@@ -145,3 +103,49 @@ class OracleParser extends YadamuParser {
 }
 
 module.exports = OracleParser
+
+/*
+  async closeLob(lob) {
+	let stack
+	const operation = 'oracledb.Lob.close()'
+    try {
+	  stack = new Error().stack
+      await lob.close()
+	} catch (e) {
+      this.yadamuLogger.handleException([this.constructor.name,'CLOSE_LOB'],new OracleError(e,stack,operation))
+    }
+  }	 
+
+  async blobToBuffer(blob) {
+	  
+	let stack
+	const operation = 'oracledb.Lob.pipe(Buffer)'
+    try {
+      const bufferWriter = new  BufferWriter();
+	  stack = new Error().stack
+  	  await pipeline(blob,bufferWriter)
+	  await this.closeLob(blob)
+      return bufferWriter.toBuffer()
+	} catch(e) {
+	  await this.closeLob(blob)
+	  throw new OracleError(e,stack,operation)
+	}
+  }	
+  
+  async clobToString(clob) {
+     
+    let stack
+	const operation = 'oracledb.Lob.pipe(String)'
+	try {
+      const stringWriter = new  StringWriter();
+      clob.setEncoding('utf8');  // set the encoding so we get a 'string' not a 'buffer'
+	  stack = new Error().stack
+  	  await pipeline(clob,stringWriter)
+	  await this.closeLob(clob)
+	  return stringWriter.toString()
+	} catch(e) {
+	  await this.closeLob(clob)
+	  throw new OracleError(e,stack,operation)
+	}
+  };
+*/

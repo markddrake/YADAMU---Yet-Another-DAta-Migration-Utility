@@ -233,7 +233,6 @@ class JSONWriter extends YadamuWriter {
 	 /* OVERRIDE */ 
 	this.endTime = performance.now()
     this.reportPerformance(err)
- 	// this.emit('writerComplete')
 	callback()
   }	  
   

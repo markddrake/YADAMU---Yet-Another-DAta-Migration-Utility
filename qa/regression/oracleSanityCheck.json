@@ -1,0 +1,39 @@
+{
+  "connections"                       : "connections.json"
+, "operation"                         : "dbRoundtrip"
+, "tasks"                             : "tasks.json"
+, "recreateSchema"                    : true
+, "createDirectory"                   : true
+, "verifyOperation"                   : true
+, "tests" : [{
+    "source": "oracle19c"
+  , "target": "oracle19c"
+  , "tasks": [
+       "oracle"
+    ]
+  },{
+    "source": "oracle18c"
+  , "target": "oracle18c"
+  , "tasks": [
+       "oracle"
+    ]
+  },{
+    "source": "oracle12c"
+  , "target": "oracle12c"
+  , "tasks": [
+       "oracle"
+    ]
+  },{
+    "source": "oracle11g"
+  , "target": "oracle11g"
+  , "tasks": [
+       "oracle"
+    ]
+  },{
+    "source": "oracle21c"
+  , "target": "oracle21c"
+  , "tasks": [
+       "oracle"
+    ]
+  }]
+}

@@ -285,6 +285,9 @@ procedure COMPARE_SCHEMAS(
 as
   TABLE_NOT_FOUND EXCEPTION;
   PRAGMA EXCEPTION_INIT( TABLE_NOT_FOUND , -00942 );
+
+  ORACLE_21C_SPATIAL_ISSUE EXCEPTION;
+  PRAGMA EXCEPTION_INIT( ORACLE_21C_SPATIAL_ISSUE , -13199 );
       
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
@@ -433,7 +436,7 @@ $END
 			       'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_QUERY(t."' || atc.COLUMN_NAME || '", ''$'' returning BLOB),' || V_HASH_METHOD || ') end /* JSON 18C NO ORDERING */'
 			   end || '"' || atc.COLUMN_NAME || '"'
 			   --
-			   $ELSE /* 19c */
+			   $ELSE /* 19c and later */
 			   -- Order and convert to BLOB using JSON_SERIALIZE
 	           'case when t."' || atc.COLUMN_NAME || '" is NULL then NULL else dbms_crypto.HASH(JSON_SERIALIZE(t."' || atc.COLUMN_NAME || '" returning BLOB  ' || V_ORDERING_CLAUSE || '),' || V_HASH_METHOD || ') end /* JSON 19C ORDERED */"' || atc.COLUMN_NAME || '"'
 			   --
@@ -594,9 +597,17 @@ begin
                     || 'select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROWS, TARGET_ROWS, MISSING_ROWS, EXTRA_ROWS, NULL' || YADAMU_UTILITIES.C_NEWLINE                    
                     || '  from TABLE_COMPARE_RESULTS';
 
-	begin
-      EXECUTE IMMEDIATE V_SQL_STATEMENT;
-    exception 
+    begin 
+	  begin
+        EXECUTE IMMEDIATE V_SQL_STATEMENT;
+      exception 
+	    when ORACLE_21C_SPATIAL_ISSUE THEN  
+		  V_SQL_STATEMENT := REPLACE(V_SQL_STATEMENT,'get_WKB','get_GeoJSON');
+          EXECUTE IMMEDIATE V_SQL_STATEMENT;
+	    when OTHERS THEN
+          RAISE;
+      end;
+    exception	  
       when OTHERS then
         V_SQLERRM := SQLERRM || ' SQL: ' || V_SQL_STATEMENT;					  
         begin 

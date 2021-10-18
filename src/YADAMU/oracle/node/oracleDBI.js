@@ -88,8 +88,10 @@ class OracleDBI extends YadamuDBI {
   get COPY_BADFILE_DIRNAME()       { return this.parameters.COPY_BADFILE_DIRNAME        || OracleConstants.COPY_BADFILE_DIRNAME };
   get TEMPLOB_BATCH_LIMIT()        { return this.parameters.TEMPLOB_BATCH_LIMIT         || OracleConstants.TEMPLOB_BATCH_LIMIT}
   get CACHELOB_BATCH_LIMIT()       { return this.parameters.CACHELOB_BATCH_LIMIT        || OracleConstants.CACHELOB_BATCH_LIMIT}
-  get CACHELOB_MAX_SIZE ()         { return this.EXTENDED_STRING ? OracleConstants.VARCHAR_MAX_SIZE_EXTENDED : OracleConstants.VARCHAR_MAX_SIZE_STANDARD}
   get LOB_MAX_SIZE()               { return this.parameters.LOB_MAX_SIZE                || OracleConstants.LOB_MAX_SIZE}
+
+  get CACHELOB_MAX_SIZE ()         { return this.EXTENDED_STRING ? OracleConstants.VARCHAR_MAX_SIZE_EXTENDED : OracleConstants.VARCHAR_MAX_SIZE_STANDARD}
+
   get VARCHAR_MAX_SIZE() {
     // Set with anonymous function to enforce 4K limit in Oracle11g
     this._VARCHAR_MAX_SIZE = this._VARCHAR_MAX_SIZE ||(() => { 
@@ -357,63 +359,18 @@ class OracleDBI extends YadamuDBI {
     }
   }
 
-  async closeLob(lob) {
-	let stack
-	const operation = 'oracledb.LOB.close()'
-    try {
-      await lob.close()
-	} catch (e) {
-      this.yadamuLogger.handleException([this.constructor.name,'CLOSE_LOB'],new OracleError(e,stack,operation))
-    }
-  }
-
-  async blobToBuffer(blob) {
-
-	let stack
-	let operation = 'oracledb.BLOB.pipe(Buffer)'
-    try {
-      const bufferWriter = new BufferWriter();
-	  stack = new Error().stack
-  	  await pipeline(blob,bufferWriter)
-	  operation = 'oracledb.LOB.close(BLOB)'
-  	  await this.closeLob(blob)
-      return bufferWriter.toBuffer()
-	} catch(e) {
-	  await this.closeLob(blob)
-	  throw new OracleError(e,stack,operation)
-	}
-  }
-
-  async clobToString(clob) {
-
-    let stack
-	let operation = 'oracledb.CLOB.pipe(String)'
-	try {
-      const stringWriter = new  StringWriter();
-      clob.setEncoding('utf8');  // set the encoding so we get a 'string' not a 'buffer'
-	  stack = new Error().stack
-  	  await pipeline(clob,stringWriter)
-	  operation = 'oracledb.LOB.close(CLOB)'
-	  await this.closeLob(clob)
-	  return stringWriter.toString()
-	} catch(e) {
-	  await this.closeLob(clob)
-	  throw new OracleError(e,stack,operation)
-	}
-  };
-
   async clientClobToString(clob) {
      // ### Ugly workaround due to the fact it does not appear possible to directly re-read a local CLOB
      const sql = `select :tempClob "newClob" from dual`;
      const results = await this.executeSQL(sql,{tempClob:clob});
-     return await this.clobToString(results.rows[0][0])
+     return await results.rows[0][0].getData()
   }
 
   async clientBlobToBuffer(blob) {
      // ### Ugly workaround due to the fact it does not appear possible to directly re-read a local BLOB
      const sql = `select :tempBlob "newBlob" from dual`;
      const results = await this.executeSQL(sql,{tempBlob:blob});
-     return await this.blobToBuffer(results.rows[0][0])
+     return await results.rows[0][0].getData()
   }
 
   async streamToBlob(readable) {
@@ -1366,6 +1323,11 @@ class OracleDBI extends YadamuDBI {
 	  this.yadamuLogger.error(['DBA',this.DATABASE_VENDOR,'TRIGGERS',tableName],`Unable to re-enable triggers.`);
       this.yadamuLogger.handleException(['TRIGGERS',this.DATABASE_VENDOR,],e);
     }
+  }
+  
+  async getDataRecoveryInputStream(tableInfo) {
+	 tableInfo.SQL_STATEMENT = `select ROWID from "${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}" t`
+	 return this.getInputStream(tableInfo);
   }
 
   async getInputStream(tableInfo) {

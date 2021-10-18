@@ -231,7 +231,7 @@ class YadamuDBI {
   initializeParameters(parameters){
 
 	// Merge default parameters for this driver with parameters from configuration files and command line parameters.
-    this.parameters = Object.assign({}, this.YADAMU_DBI_PARAMETERS, this.vendorParameters, parameters,this.yadamu.COMMAND_LINE_PARAMETERS);
+    this.parameters = Object.assign({}, this.YADAMU_DBI_PARAMETERS, this.vendorParameters, parameters, this.yadamu.COMMAND_LINE_PARAMETERS);
   }
 
   setParameters(parameters) {
@@ -297,10 +297,10 @@ class YadamuDBI {
 	  
     switch (logEntry.severity) {
       case 'CONTENT_TOO_LARGE' :
-        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database does not support VARCHAR2 values longer than ${this.MAX_STRING_SIZE} bytes.`)
+        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`Exceeded maximum string size [${this.MAX_STRING_SIZE} bytes].`)
         return;
       case 'SQL_TOO_LARGE':
-        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`This database is not configured for DLL statements longer than ${this.MAX_STRING_SIZE} bytes.`)
+        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`Exceeded maximum DDL statement length [${this.MAX_STRING_SIZE} bytes].`)
         return;
       case 'FATAL':
         summary.errors++

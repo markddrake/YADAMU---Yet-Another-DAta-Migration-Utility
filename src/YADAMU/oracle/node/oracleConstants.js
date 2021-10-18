@@ -149,6 +149,8 @@ class OracleConstants {
   static get NJS_INVALID_CONNECTION()          { return 'NJS-003' }
 
   static get NJS_INVALID_POOL()                { return 'NJS-002' }
+  
+  static get KUP_FILE_NOT_FOUND()              { return 'KUP-0404' }
 
   static get MISSING_TABLE_ERROR() {
     this._MISSING_TABLE_ERROR = this._MISSING_TABLE_ERROR || Object.freeze([942])
@@ -181,9 +183,9 @@ class OracleConstants {
     return this._JSON_PARSING_ERROR
   }
 
-  static get COPY_FILE_NOT_FOUND_ERROR() {
-    this._COPY_FILE_NOT_FOUND_ERROR = this._COPY_FILE_NOT_FOUND_ERROR || Object.freeze([29913])
-    return this._COPY_FILE_NOT_FOUND_ERROR
+  static get OCI_CALLOUT_ERROR() {
+    this._OCI_CALLOUT_ERROR = this._OCI_CALLOUT_ERROR || Object.freeze([29913])
+    return this._OCI_CALLOUT_ERROR
   }
 
   static get STAGED_DATA_SOURCES()    { return Object.freeze(['loader']) }

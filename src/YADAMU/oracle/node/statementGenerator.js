@@ -46,14 +46,17 @@ class StatementGenerator {
   // This is the spatial format of the incoming data, not the format used by this driver
   get SPATIAL_FORMAT()   { return this.dbi.INBOUND_SPATIAL_FORMAT } 
   get OBJECTS_AS_JSON()  { return this.dbi.systemInformation.objectFormat === 'JSON'}
-  get GEOJSON_FUNCTION() { return 'DESERIALIZE_GEOJSON' }
 
-  get SQL_DIRECTORY_NAME()     { return this._SQL_DIRECTORY_NAME }
-  set SQL_DIRECTORY_NAME(v)    { this._SQL_DIRECTORY_NAME = v }
-  get SQL_DIRECTORY_PATH()     { return this._SQL_DIRECTORY_PATH }
-  set SQL_DIRECTORY_PATH(v)    { this._SQL_DIRECTORY_PATH = v }
-  get LOADER_CLOB_SIZE()       { return 67108864 }
-  get LOADER_CLOB_TYPE()       { return `CHAR(${this.LOADER_CLOB_SIZE})`}
+  get GEOJSON_FUNCTION()         { return 'DESERIALIZE_GEOJSON' }
+  get RANDOM_OBJECT_LENGTH()     { return 16 }
+  get ORACLE_CSV_SPECIFICATION() { return 'CSV WITH EMBEDDED' }
+  
+  get SQL_DIRECTORY_NAME()       { return this._SQL_DIRECTORY_NAME }
+  set SQL_DIRECTORY_NAME(v)      { this._SQL_DIRECTORY_NAME = v }
+  get SQL_DIRECTORY_PATH()       { return this._SQL_DIRECTORY_PATH }
+  set SQL_DIRECTORY_PATH(v)      { this._SQL_DIRECTORY_PATH = v }
+  get LOADER_CLOB_SIZE()         { return 67108864 }
+  get LOADER_CLOB_TYPE()         { return `CHAR(${this.LOADER_CLOB_SIZE})`}
     
   constructor(dbi, targetSchema, metadata, yadamuLogger) {
     this.dbi = dbi;
@@ -175,8 +178,7 @@ class StatementGenerator {
       
   }
  
-  getPLSQL(dml) {
-    
+  getPLSQL(dml) {    
 	const withOffset = dml.indexOf('\nWITH\n')
     return withOffset > -1 ? dml.substring(withOffset+5,dml.indexOf('\nselect')) : null
   }
@@ -279,8 +281,8 @@ class StatementGenerator {
      ** Turn the generated DDL Statements into an array and execute them as single batch via YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS()
      **
      */
-	this.SQL_DIRECTORY_NAME = `"YDIR-${crypto.randomBytes(16).toString("hex").toUpperCase()}"`
- 
+	this.SQL_DIRECTORY_NAME = `"YDIR-${crypto.randomBytes(this.RANDOM_OBJECT_LENGTH).toString("hex").toUpperCase()}"`
+	
     const sourceDateFormatMask = this.dbi.getDateFormatMask(vendor);
     const sourceTimeStampFormatMask = this.dbi.getTimeStampFormatMask(vendor);
     const oracleDateFormatMask = this.dbi.getDateFormatMask('Oracle');
@@ -531,7 +533,7 @@ class StatementGenerator {
 	  
 	  if (tableMetadata.dataFile) {
 	   	this.dbi.SQL_DIRECTORY_NAME = this.SQL_DIRECTORY_NAME
-        const externalTableName = `"${this.targetSchema}"."YXT-${crypto.randomBytes(16).toString("hex").toUpperCase()}"`;
+        const externalTableName = `"${this.targetSchema}"."YXT-${crypto.randomBytes(this.RANDOM_OBJECT_LENGTH).toString("hex").toUpperCase()}"`;
 		/*
 	    let columnList = tableInfo.ddl.substr(tableInfo.ddl.indexOf('V_STATEMENT'))
 	    columnList = columnList.substring(columnList.indexOf('('),columnList.indexOf(';')-1)
@@ -550,8 +552,7 @@ ORGANIZATION EXTERNAL (
 	CHARACTERSET AL32UTF8 
 	${this.dbi.COPY_BADFILE_DIRNAME ? `BADFILE ${this.dbi.COPY_BADFILE_DIRNAME}:` : 'NOBADFILE'}
 	${this.dbi.COPY_LOGFILE_DIRNAME ? `LOGFILE ${this.dbi.COPY_LOGFILE_DIRNAME}:` : 'NOLOGFILE'}
-	FIELDS CSV 
-	       WITH EMBEDDED 
+	FIELDS ${this.ORACLE_CSV_SPECIFICATION}
 		   MISSING FIELD VALUES ARE NULL 
 		   (
 		     ${copyColumnDefinitions.join(",")}
@@ -563,7 +564,7 @@ ORGANIZATION EXTERNAL (
 ) 
 ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > this.dbi.PARALLEL) ? this.dbi.PARALLEL : tableMetadata.partitionCount}` : ''}
 `
-	    tableInfo.copy = {
+        tableInfo.copy = {
 		  ddl          : copyDDL
         , dml          : `insert ${plsql ? `/*+ WITH_PLSQL */` : '/*+ APPEND */'} into "${this.targetSchema}"."${tableName}"\n${plsql ? `WITH\n${plsql}\n` : ''}select ${externalSelectList.join(",")} from ${externalTableName}`
 	    , drop         : `drop table ${externalTableName}`

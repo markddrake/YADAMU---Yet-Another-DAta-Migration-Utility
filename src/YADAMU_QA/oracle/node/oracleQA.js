@@ -105,7 +105,7 @@ class OracleQA extends OracleDBI {
       // const failed = await this.executeSQL(OracleQA.SQL_FAILED,{},options)      
       const failed = await this.executeSQL(OracleQA.SQL_FAILED,{})      
       report.failed = await Promise.all(failed.rows.map(async (row,idx) => {
-		const result = [row[0],row[1],row[2],parseInt(row[4]),parseInt(row[5]),parseInt(row[6]),parseInt(row[7]),((row[8] === null) || (typeof row[8] === 'string')) ? row[8] : this.clobToString(row[8])]
+		const result = [row[0],row[1],row[2],parseInt(row[4]),parseInt(row[5]),parseInt(row[6]),parseInt(row[7]),((row[8] === null) || (typeof row[8] === 'string')) ? row[8] : row[8].getData()]
 		return await Promise.all(result)
       }))
 	  

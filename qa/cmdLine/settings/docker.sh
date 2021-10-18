@@ -49,7 +49,7 @@ unset ORACLE11G_PWD
 # Postgres Connection Information
 unset POSTGRES_USER
 unset POSTGRES_PWD
-export POSTGRES_HOST=PGSQL13-01
+export POSTGRES_HOST=PGSQL14-01
 unset POSTGRES_PORT
 unset POSTGRES_DBNAME
 # Relative location of export files to be used for testing

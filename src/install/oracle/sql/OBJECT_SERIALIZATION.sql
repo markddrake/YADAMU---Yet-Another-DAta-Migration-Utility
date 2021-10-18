@@ -253,7 +253,7 @@ function DESERIALIZE_GEOJSON(P_SERIALIZATION CLOB)
 return MDSYS.SDO_GEOMETRY
 as
 begin
-  if (P_SERIALIZATION is not NULL) then
+  if ((P_SERIALIZATION is not NULL) and (LENGTH(P_SERIALIZATION) > 0)) then
     --
     $IF (DBMS_DB_VERSION.VER_LE_11_2) $THEN
     --

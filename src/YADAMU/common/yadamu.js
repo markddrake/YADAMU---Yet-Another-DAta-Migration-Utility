@@ -184,7 +184,7 @@ class Yadamu {
 	    // this.LOGGER.trace(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],'IGNORED'],err);
 	   return;
 	}
-	
+
 	this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
     this.LOGGER.handleException(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
 	this.STATUS.errorRaised = true;
@@ -331,11 +331,11 @@ class Yadamu {
   }
   
   reportStatus(status,yadamuLogger) {
-
+     
     const endTime = performance.now();
       
 	const metrics = yadamuLogger.getMetrics();
-    status.statusMsg = status.warningRaised === true ? `with ${metrics.warnings} warnings` : status.statusMsg;
+	status.statusMsg = status.warningRaised === true ? `with ${metrics.warnings} warnings` : status.statusMsg;
     status.statusMsg = status.errorRaised === true ? `with ${metrics.errors} errors and ${metrics.warnings} warnings`  : status.statusMsg;  
   
     const terminationArgs = [`YADAMU`,`${status.operation}`]
@@ -784,6 +784,7 @@ class Yadamu {
 	const results = await target.copyStagedData(source.DATABASE_KEY,controlFile,metadata,source.getCredentials(target.DATABASE_KEY))
     await target.finalize();
     this.activeConnections.delete(target);
+    this.reportStatus(this.STATUS,this.LOGGER)
 
 	return results;
   }

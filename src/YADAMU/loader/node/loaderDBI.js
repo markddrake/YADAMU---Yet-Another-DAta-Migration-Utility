@@ -429,8 +429,7 @@ class LoaderDBI extends YadamuDBI {
     const opComplete = new Promise((resolve,reject) => {
 	  finished(os,(err) => {
 	    this.writeOperations.delete(opComplete)	
-		if (err) {reject(err)} 
-		resolve()
+		resolve(err)
       })
     })
     this.writeOperations.add(opComplete)	

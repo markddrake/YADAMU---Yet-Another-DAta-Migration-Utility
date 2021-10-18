@@ -101,6 +101,7 @@ class MsSQLStatementLibrary {
     return this._SQL_SCHEMA_INFORMATION
   }     
   
+  get SINGLE_USER_MODE() { return `alter database [${this.dbi.parameters.YADAMU_DATABASE}] set single_user with rollback immediate` }
   get DROP_DATABASE() { return `drop database if exists "${this.dbi.parameters.YADAMU_DATABASE}"` }
   
   constructor(dbi) {

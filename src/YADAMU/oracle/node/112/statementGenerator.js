@@ -20,7 +20,11 @@ const DefaultStatementGenerator = require('../statementGenerator.js');
 class StatementGenerator extends DefaultStatementGenerator {
     
   // 11.x does not support GeoJSON. We need to use WKX to convert GeoJSON to WKT
-  get GEOJSON_FUNCTION() { return 'DESERIALIZE_WKTGEOMETRY' }
+
+  get GEOJSON_FUNCTION()         { return 'DESERIALIZE_WKTGEOMETRY' }
+  get RANDOM_OBJECT_LENGTH()     { return 12 }
+  get ORACLE_CSV_SPECIFICATION() { return `TERMINATED  BY ',' OPTIONALLY ENCLOSED BY '"'` }
+
   
   constructor(dbi, targetSchema, metadata, yadamuLogger) {
     super(dbi, targetSchema, metadata, yadamuLogger)
@@ -29,7 +33,8 @@ class StatementGenerator extends DefaultStatementGenerator {
   // In 11g the seperator character appears to be \r rather than \n
 
   getPLSQL(dml) {
-    return dml.substring(dml.indexOf('\rWITH\r')+5,dml.indexOf('\rselect'));
+	const withOffset = dml.indexOf('\rWITH\r')
+    return withOffset > -1 ? dml.substring(dml.indexOf('\rWITH\r')+5,dml.indexOf('\rselect')) : null
   }
     
   metadataToXML() {
