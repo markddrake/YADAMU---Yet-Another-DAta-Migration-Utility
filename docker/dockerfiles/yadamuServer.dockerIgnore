@@ -1,12 +1,4 @@
-app
-bin
-dist
-JSON
-log
-md
-qa
-results
-scratch
-tests
-utilities
-work
+*
+!docker/regression/tnsnames.ora
+!docker/regression/server
+!src/YADAMU_SVR

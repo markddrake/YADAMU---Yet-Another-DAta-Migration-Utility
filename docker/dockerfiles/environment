@@ -8,4 +8,6 @@ RUN apt update \
  && alien -i --scripts ./oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm \
  && npm install --global electron \
  && npm install
+# Patch Query Stream until oracleb 5.3
+COPY patch/oracledb/lib/queryStream.js node_modules/oracledb/lib
  

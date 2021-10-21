@@ -1,0 +1,8 @@
+# escape=`
+FROM yadamu/environment:latest
+WORKDIR C:/YADAMU
+COPY bin bin
+COPY src src
+RUN mkdir mnt; `
+    [Environment]::SetEnvironmentVariable("""Path""", """C:\YADAMU\bin;""" +  $env:Path,"""Machine""")
+

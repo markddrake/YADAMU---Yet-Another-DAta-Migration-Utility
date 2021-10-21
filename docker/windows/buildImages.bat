@@ -5,7 +5,7 @@ docker build -t yadamu/svr-2016:vs22             --file=c:\Docker\Build\YADAMU\W
 docker build -t yadamu/mssql:2019                --file=c:\Docker\Build\YADAMU\MsSQL\Windows\2019\dockerfile        c:\Docker\Build\YADAMU\MsSQL\Windows\2019
 docker build -t yadamu/mssql:2019-CU13           --file=c:\Docker\Build\YADAMU\MsSQL\Windows\2019\dockerfile.CU13   c:\Docker\Build\YADAMU\MsSQL\Windows\2019
 docker build -t yadamu/mssql:2017                --file=c:\Docker\Build\YADAMU\MsSQL\Windows\2017\dockerfile        c:\Docker\Build\YADAMU\MsSQL\Windows\2017
-docker build -t yadamu/svr-2016/mssql:2017       --file=c:\Docker\Build\YADAMU\MsSQL\Windows\2017\dockerfile.2017   c:\Docker\Build\YADAMU\MsSQL\Windows\2017
+docker build -t yadamu/svr-2016/mssql:2017       --file=c:\Docker\Build\YADAMU\MsSQL\Windows\2017\dockerfile.2016   c:\Docker\Build\YADAMU\MsSQL\Windows\2017
 docker build -t yadamu/svr-2016/mssql:2017-CU26  --file=c:\Docker\Build\YADAMU\MsSQL\Windows\2017\dockerfile.CU26   c:\Docker\Build\YADAMU\MsSQL\Windows\2017
 docker build -t yadamu/svr-2016/mssql:2014       --file=c:\Docker\Build\YADAMU\MsSQL\Windows\2014\dockerfile        c:\Docker\Build\YADAMU\MsSQL\Windows\2014
 

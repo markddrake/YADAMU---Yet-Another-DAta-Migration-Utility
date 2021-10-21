@@ -18,3 +18,4 @@ RUN apt install apt-transport-https \
  && ln -s /opt/mssql-tools/bin/sqlcmd \
  &&  mkdir -p mnt/cmdLine \	
  &&  ln -sfn mnt/cmdLine 
+COPY qa/cmdline qa/cmdline

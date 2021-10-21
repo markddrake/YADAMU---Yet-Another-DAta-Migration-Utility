@@ -7,7 +7,6 @@ case $YADAMU_TEST_NAME  in
 
   shortRegression)
     source qa/bin/resetFolders.sh mnt/stagingArea/export/json/postgres
-    source qa/bin/resetFolders.sh mnt/stagingArea/export/json/postgres
     source $YADAMU_SCRIPT_DIR/runRegressionTest.sh shortRegression
   ;;
   

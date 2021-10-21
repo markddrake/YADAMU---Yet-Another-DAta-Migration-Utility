@@ -1,0 +1,4 @@
+*
+!bin\*.bat
+!src\install
+!src\YADAMU

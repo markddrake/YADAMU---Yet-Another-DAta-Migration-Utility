@@ -1,6 +1,2 @@
-@set TESTNAME=%1
-docker stop YADAMU-01
-docker rm YADAMU-01
-docker run --security-opt=seccomp:unconfined --name YADAMU-01 --memory="16g" -v YADAMU_01-SHARED:/usr/src/YADAMU/mnt --network YADAMU-NET -d -e YADAMU_TEST_NAME=regression -e TESTNAME=%TESTNAME% yadamu/secure:latest
-docker logs YADAMU-01
-
+@set CONFIGURATION_FILE=%1
+call %~dp0runContainer.bat YADAMU-01 yadamu/secure:latest regression %CONFIGURATION_FILE%

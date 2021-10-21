@@ -1,11 +1,4 @@
-app/node_modules
-dist
-dockerfiles
-JSON
-log
-md
-qa
-results
-scratch
-tests
-work
+*
+!bin/*.sh
+!src/install
+!src/YADAMU

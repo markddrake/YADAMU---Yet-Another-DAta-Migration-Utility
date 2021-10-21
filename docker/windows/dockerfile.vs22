@@ -20,8 +20,3 @@ ADD https://download.visualstudio.microsoft.com/download/pr/2d6bb6b2-226a-4baa-b
 #    Remove-Item c:\ndp48-x86-x64-allos-enu.exe
 RUN c:\ndp48-x86-x64-allos-enu.exe /q /norestart
 RUN Remove-Item c:\ndp48-x86-x64-allos-enu.exe
-#
-# Install VIM via Chocolatey
-#
-#RUN Invoke-WebRequest https://chocolatey.org/install.ps1 -UseBasicParsing | Invoke-Expression; `
-#    choco install -y vim

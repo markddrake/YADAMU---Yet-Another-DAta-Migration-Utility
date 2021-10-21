@@ -1,12 +1,12 @@
 FROM yadamu/base:latest
 WORKDIR /usr/src/YADAMU
+COPY docker/regression/bin bin
+COPY docker/regression/tnsnames.ora .
 COPY qa/bin qa/bin
 COPY qa/mappings qa/mappings
 COPY qa/regression qa/regression
 COPY qa/sql qa/sql
-COPY qa/cmdLine qa/cmdLine
-COPY docker/regression/bin bin
-COPY docker/regression/tnsnames.ora .
+COPY src src
 copy utilities utilities
 ENV TNS_ADMIN=/usr/src/YADAMU
 ENV YADAMU_PASSPHRASE=yabasc

@@ -1,0 +1,10 @@
+*
+!docker\regression\tnsnames.ora
+!docker\regression\bin\*.ps1
+!qa\bin\*.bat
+!qa\mappings
+!qa\regression
+!qa\sql
+!src\YADAMU_QA
+!utilities\bin\*.bat
+utilities\bin\deploy.bat
