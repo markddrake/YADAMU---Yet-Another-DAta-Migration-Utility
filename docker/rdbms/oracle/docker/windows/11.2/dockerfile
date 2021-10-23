@@ -12,7 +12,7 @@ FROM yadamu/svr-2019:vs13
 # (3) oracle.reg:                    An export of the HKLM:\Software\oracle. Generate this file using the RegEdit to export the oracle key.
 #
 WORKDIR C:/
-ENV ORACLE_SID ORA11201
+ENV ORACLE_SID ORA11200
 ENV ORACLE_HOME c:\oracle\rdbms\11.2\db_home1
 #	   
 COPY win64_11grR2_db_home1.zip C:/

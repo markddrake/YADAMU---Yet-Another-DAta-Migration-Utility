@@ -12,19 +12,21 @@ FROM yadamu/svr-2019:vs13
 # (3) oracle.reg:                    An export of the HKLM:\Software\oracle. Generate this file using the RegEdit to export the oracle key.
 #
 WORKDIR C:/
-
-ENV ORACLE_SID CDB12201
-ENV ORACLE_HOME c:\oracle\rdbms\12.2\db_home1
 #
 COPY winx64_12201_dbhome_1.zip C:/
 COPY oracleInventory.zip C:/
 COPY oracle.reg C:/
 #
+#
+# Prepend Oracle Bin folder to PATH environment variable and set ORACLE_SID.
+#
+ENV ORACLE_SID CDB12200
+ENV ORACLE_HOME c:\oracle\rdbms\12.2\db_home1
+#
 # Install Oracle Software:
 #
 # Unpack Oracle RDBMS and the Oracle Inventory. 
 # Update the Registry
-# Prepend Oracle Bin folder to PATH environment variable and set ORACLE_SID.
 # Create ora_dba group
 # Add containerAdministrator to the ora_dbo group: enable "connect / as syssdba"
 #
@@ -33,7 +35,7 @@ RUN New-Item -ItemType "directory" -Path $env:ORACLE_HOME; `
     Remove-Item winx64_12201_dbhome_1.zip; `
     Expand-Archive -Path C:\oracleInventory.zip -DestinationPath """c:\Program Files"""; `
     Remove-Item oracleInventory.zip; `
-	reg import oracle.reg; `
+    reg import oracle.reg; `
     Remove-Item oracle.reg; `
     [Environment]::SetEnvironmentVariable("""Path""", $env:ORACLE_HOME + """\bin;""" +  $env:Path,"""Machine"""); `
     New-LocalGroup -Name ora_dba; `

@@ -1,35 +1,13 @@
-# escape=`
-FROM yadamu/svr-2019:vs22
-#
-# Install Node
-#
-ADD https://nodejs.org/dist/v16.11.1/node-v16.11.1-x64.msi .
-RUN Start-Process MsiExec.exe -Wait -ArgumentList """/i""", """node-v16.11.1-x64.msi""", """/qn"""; `
-    Remove-Item node-v16.11.1-x64.msi
-#
-# Install Oracle Instant Client
-# 
-Add https://download.oracle.com/otn_software/nt/instantclient/213000/instantclient-basic-windows.x64-21.3.0.0.0.zip .
-RUN Expand-Archive -Path instantclient-basic-windows.x64-21.3.0.0.0.zip -DestinationPath """C:\Program Files\Oracle\InstantClient\21"""; `
-    Move-Item """C:\Program Files\Oracle\InstantClient\21\instantclient_21_3""" """C:\Program Files\Oracle\InstantClient\21\bin"""; `
-    Remove-Item instantclient-basic-windows.x64-21.3.0.0.0.zip; `
-    [Environment]::SetEnvironmentVariable("""Path""", """C:\Program Files\Oracle\InstantClient\21\bin;""" +  $env:Path,"""Machine"""); 
-#
-# Python 3
-#
-ADD https://www.python.org/ftp/python/3.9.7/python-3.9.7-amd64.exe .
-RUN Start-Process  .\python-3.9.7-amd64.exe  -Wait -ArgumentList """/quiet""", """InstallAllUsers=1""", """PrependPath=1"""; `
-	Remove-Item c:\python-3.9.7-amd64.exe; 
-#
-# Install Packages
-#
-RUN New-Item -ItemType Directory -Force YADAMU
-WORKDIR C:/YADAMU
-COPY src\package.json .
-RUN npm install --global electron; `
-    npm install
+FROM node:latest
+WORKDIR /usr/src/YADAMU
+ADD https://download.oracle.com/otn_software/linux/instantclient/213000/oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm .
+COPY src/package*.json ./
+RUN apt update \
+ && apt-get -y install libaio1 \
+ && apt-get -y install alien \
+ && alien -i --scripts ./oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm \
+ && npm install --global electron \
+ && npm install
 # Patch Query Stream until oracleb 5.3
 COPY patch/oracledb/lib/queryStream.js node_modules/oracledb/lib
-ENTRYPOINT ["powershell","wait-event"]
-
  

@@ -75,7 +75,7 @@ OPERATION_TYPE = "createDatabase"
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-GDBNAME = "ORA11201"
+GDBNAME = "ORA11200"
 
 #-----------------------------------------------------------------------------
 # Name          : POLICYMANAGED
@@ -146,7 +146,7 @@ GDBNAME = "ORA11201"
 # Default value : <db_name> specified in GDBNAME
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-SID = "ORA11201"
+SID = "ORA11200"
 
 #-----------------------------------------------------------------------------
 # Name          : NODELIST
@@ -489,7 +489,7 @@ NATIONALCHARACTERSET= "AL16UTF16"
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-variables=DB_UNIQUE_NAME=ORA11201,ORACLE_BASE=c:\oracle,DB_NAME=ORA11201,ORACLE_HOME=c:\oracle\rdbms\11.2\db_home1,SID=ORA11201
+variables=DB_UNIQUE_NAME=ORA11200,ORACLE_BASE=c:\oracle,DB_NAME=ORA11200,ORACLE_HOME=c:\oracle\rdbms\11.2\db_home1,SID=ORA11200
 
 #-----------------------------------------------------------------------------
 # Name          : INITPARAMS
@@ -498,7 +498,7 @@ variables=DB_UNIQUE_NAME=ORA11201,ORACLE_BASE=c:\oracle,DB_NAME=ORA11201,ORACLE_
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-initParams=compatible=11.2.0,db_name=ORA11201,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\admin\{DB_UNIQUE_NAME}\adump,diagnostic_dest={ORACLE_BASE},db_recovery_file_dest_size=16384,db_recovery_file_dest={ORACLE_BASE}\fast_recovery_area\{DB_UNIQUE_NAME}
+initParams=compatible=11.2.0,db_name=ORA11200,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\oradata\admin\{DB_UNIQUE_NAME}\adump,diagnostic_dest={ORACLE_BASE},db_recovery_file_dest_size=4096,db_recovery_file_dest={ORACLE_BASE}\oradata\fast_recovery_area\{DB_UNIQUE_NAME}
 
 #-----------------------------------------------------------------------------
 # Name          : MEMORYPERCENTAGE

@@ -255,7 +255,7 @@ variables=DB_UNIQUE_NAME=###ORACLE_SID###,ORACLE_BASE=/opt/oracle/,DB_NAME=###OR
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-initParams=compatible=12initParams=compatible=12.1.0,db_name=###ORACLE_SID###,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,sga_target=7GB,pga_aggregate_target=3GB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}/admin/{DB_UNIQUE_NAME}/adump,diagnostic_dest={ORACLE_BASE},db_recovery_file_dest_size=16GB,db_recovery_file_dest={ORACLE_BASE}/fast_recovery_area/{DB_UNIQUE_NAME}
+initParams=compatible=12initParams=compatible=12.1.0,db_name=###ORACLE_SID###,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,sga_target=7GB,pga_aggregate_target=3GB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}/oradata/admin/{DB_UNIQUE_NAME}/adump,diagnostic_dest={ORACLE_BASE},db_recovery_file_dest_size=4GB,db_recovery_file_dest={ORACLE_BASE}/oradata/fast_recovery_area/{DB_UNIQUE_NAME}
 
 #-----------------------------------------------------------------------------
 # Name          : AUTOMATICMEMORYMANAGEMENT

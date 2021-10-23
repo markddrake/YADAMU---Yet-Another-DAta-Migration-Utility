@@ -1,6 +1,5 @@
-# escape=`
 FROM yadamu/base:latest
-WORKDIR C:/YADAMU
+WORKDIR /usr/src/YADAMU
 COPY docker/regression/bin bin
 COPY docker/regression/tnsnames.ora .
 COPY qa/bin qa/bin
@@ -9,28 +8,24 @@ COPY qa/regression qa/regression
 COPY qa/sql qa/sql
 COPY src src
 copy utilities utilities
-ENV TNS_ADMIN=c:\YADAMU
+ENV TNS_ADMIN=/usr/src/YADAMU
 ENV YADAMU_PASSPHRASE=yabasc
-RUN New-Item -force -ItemType directory -Path mnt\log; `
-    New-Item -force -ItemType directory -Path mnt\longRegress; `
-    New-Item -force -ItemType directory -Path mnt\shortRegress; `	
-    New-Item -force -ItemType directory -Path mnt\stagingArea; `
-    New-Item -force -ItemType directory -Path mnt\cmdLine; `
-    New-Item -force -ItemType directory -Path mnt\output; `
-    New-Item -force -ItemType directory -Path mnt\scratch; `	
-    New-Item -force -ItemType directory -Path mnt\test; `
-    New-Item -force -ItemType directory -Path mnt\work; `
-	New-Item -ItemType SymbolicLink -Path log          -Value C:\YADAMU\mnt\log; `
-	New-Item -ItemType SymbolicLink -Path longRegress  -Value C:\YADAMU\mnt\longRegress; `
-	New-Item -ItemType SymbolicLink -Path shortRegress -Value C:\YADAMU\mnt\shortRegress; `
-	New-Item -ItemType SymbolicLink -Path stagingArea  -Value C:\YADAMU\mnt\stagingArea; `
-	New-Item -ItemType SymbolicLink -Path cmdLine      -Value C:\YADAMU\mnt\cmdLine; `
-	New-Item -ItemType SymbolicLink -Path output       -Value C:\YADAMU\mnt\output; `
-	New-Item -ItemType SymbolicLink -Path scratch      -Value C:\YADAMU\mnt\scratch; `
-	New-Item -ItemType SymbolicLink -Path test         -Value C:\YADAMU\mnt\test; `
-	New-Item -ItemType SymbolicLink -Path work         -Value C:\YADAMU\mnt\work
-	
-ENTRYPOINT ["powershell","c:\\YADAMU\\bin\\chooseTest.ps1"]
-#ENTRYPOINT ["powershell","wait-event"]
-
-
+RUN mkdir -p mnt/log \
+&&  mkdir -p mnt/longRegress \	
+&&  mkdir -p mnt/shortRegress \	
+&&  mkdir -p mnt/stagingArea \	
+&&  mkdir -p mnt/cmdLine \	
+&&  mkdir -p mnt/output \	
+&&  mkdir -p mnt/scratch \	
+&&  mkdir -p mnt/test \	
+&&  mkdir -p mnt/work \	
+&&  ln -sfn mnt/log \
+&&  ln -sfn mnt/longRegress \
+&&  ln -sfn mnt/shortRegress \
+&&  ln -sfn mnt/stagingArea \
+&&  ln -sfn mnt/cmdLine \	
+&&  ln -sfn mnt/output \	
+&&  ln -sfn mnt/scratch \	
+&&  ln -sfn mnt/test \	
+&&  ln -sfn mnt/work 
+ENTRYPOINT ["/bin/bash", "/usr/src/YADAMU/bin/chooseTest.sh", "$YADAMU_TEST_NAME"]

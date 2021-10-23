@@ -17,6 +17,6 @@ goto :eof
 
 :windowsContainer
   @set MAX_MEMORY="4g"
-  docker run --name %CONTAINER_NAME% --network YADAMU-NET --memory=%MAX_MEMORY% -v C:\SHARED:C:\SHARED -e YADAMU_TEST_NAME=%YADAMU_TEST_NAME% -e TESTNAME=%CONFIGURATION_FILE% -d %TARGET_IMAGE%
+  docker run --name %CONTAINER_NAME% --network YADAMU-NET --memory=%MAX_MEMORY% -v C:\SHARED:C:\YADAMU\mnt -e YADAMU_TEST_NAME=%YADAMU_TEST_NAME% -e TESTNAME=%CONFIGURATION_FILE% -d %TARGET_IMAGE%
   exit /b
 :end

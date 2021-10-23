@@ -29,7 +29,7 @@ responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v12.2.0
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-gdbName=CDB12201
+gdbName=CDB12200
 
 #-----------------------------------------------------------------------------
 # Name          : sid
@@ -39,7 +39,7 @@ gdbName=CDB12201
 # Default value : <db_name> specified in GDBNAME
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-sid=CDB12201
+sid=CDB12200
 
 #-----------------------------------------------------------------------------
 # Name          : databaseConfigType
@@ -179,7 +179,7 @@ numberOfPDBs=1
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-pdbName=PDB12201
+pdbName=PDB12200
 
 #-----------------------------------------------------------------------------
 # Name          : useLocalUndoForPDBs 
@@ -542,7 +542,7 @@ variablesFile=
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-variables=DB_UNIQUE_NAME=CDB12201,ORACLE_BASEc:\oracle\,PDB_NAME=PDB12201,DB_NAME=CDB12201,ORACLE_HOME=c:\oracle\rdbms\12.2\db_home1,SID=CDB12201
+variables=DB_UNIQUE_NAME=CDB12200,ORACLE_BASE=c:\oracle\,PDB_NAME=PDB12200,DB_NAME=CDB12200,ORACLE_HOME=c:\oracle\rdbms\12.2\db_home1,SID=CDB12200
 
 #-----------------------------------------------------------------------------
 # Name          : initParams
@@ -552,7 +552,7 @@ variables=DB_UNIQUE_NAME=CDB12201,ORACLE_BASEc:\oracle\,PDB_NAME=PDB12201,DB_NAM
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
-initParams=compatible=12.2.0,db_name=CDB12201,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}/admin/{DB_UNIQUE_NAME}/adump,db_recovery_file_dest_size=16GB,,db_recovery_file_dest={ORACLE_BASE}/fast_recovery_area/{DB_UNIQUE_NAME}
+initParams=compatible=12.2.0,db_name=CDB12200,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\oradata\admin\{DB_UNIQUE_NAME}\adump,db_recovery_file_dest_size=4GB,db_recovery_file_dest={ORACLE_BASE}\oradata\fast_recovery_area/{DB_UNIQUE_NAME}
 
 #-----------------------------------------------------------------------------
 # Name          : sampleSchema
