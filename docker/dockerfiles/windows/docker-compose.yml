@@ -3,8 +3,8 @@ services:
 
   ORA2103-01: 
     container_name: ORA2103-01
-    image:  oracle/database:21.3.0-ee
-    mem_limit: '16gb'
+    image:  yadamu/oracle:21
+    mem_limit: '6gb'
     shm_size: '4gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
@@ -17,16 +17,16 @@ services:
       ORACLE_PWD: oracle 
       ORACLE_CHARACTERSET: AL32UTF8
     volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - ORA2103-01-ADMIN:/opt/oracle/admin
-      - ORA2103-01-DATA:/opt/oracle/oradata
-      - ORA2103-01-DIAG:/opt/oracle/diag
+      - YADAMU_01-SHARED:c:\mount
+      - ORA2103-01-ADMIN:c:\oracle\admin
+      - ORA2103-01-DATA:c:\oracle\oradata
+      - ORA2103-01-DIAG:c:\oracle\diag
     restart: always
 
   ORA1903-01: 
     container_name: ORA1903-01
-    image:  oracle/database:19.3.0-ee
-    mem_limit: '16gb'
+    image:  yadamu/oracle:19
+    mem_limit: '6gb'
     shm_size: '4gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
@@ -39,16 +39,16 @@ services:
       ORACLE_PWD: oracle 
       ORACLE_CHARACTERSET: AL32UTF8
     volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - ORA1903-01-ADMIN:/opt/oracle/admin
-      - ORA1903-01-DATA:/opt/oracle/oradata
-      - ORA1903-01-DIAG:/opt/oracle/diag
+      - YADAMU_01-SHARED:c:\mount
+      - ORA1903-01-ADMIN:c:\oracle\admin
+      - ORA1903-01-DATA:c:\oracle\oradata
+      - ORA1903-01-DIAG:c:\oracle\diag
     restart: always
 
   ORA1803-01: 
     container_name: ORA1803-01
-    image:  oracle/database:18.3.0-ee
-    mem_limit: '16gb'
+    image:  yadamu/oracle:18
+    mem_limit: '6gb'
     shm_size: '4gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
@@ -61,16 +61,16 @@ services:
       ORACLE_PWD: oracle 
       ORACLE_CHARACTERSET: AL32UTF8
     volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - ORA1803-01-ADMIN:/opt/oracle/admin
-      - ORA1803-01-DATA:/opt/oracle/oradata
-      - ORA1803-01-DIAG:/opt/oracle/diag
+      - YADAMU_01-SHARED:c:\mount
+      - ORA1803-01-ADMIN:c:\oracle\admin
+      - ORA1803-01-DATA:c:\oracle\oradata
+      - ORA1803-01-DIAG:c:\oracle\diag
     restart: always
 
   ORA1220-01: 
     container_name: ORA1220-01
-    image:  oracle/database:12.2.0.1-ee 
-    mem_limit: '16gb'
+    image:  yadamu/oracle:12.2
+    mem_limit: '6gb'
     shm_size: '4gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
@@ -78,43 +78,21 @@ services:
     ports: 
       - "1523:1521"
     environment:
-      ORACLE_SID: CDB12200 
+      ORACLE_SID: CDB12200
       ORACLE_PDB: PDB12200 
       ORACLE_PWD: oracle 
       ORACLE_CHARACTERSET: AL32UTF8
     volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - ORA1220-01-ADMIN:/opt/oracle/admin
-      - ORA1220-01-DATA:/opt/oracle/oradata
-      - ORA1220-01-DIAG:/opt/oracle/diag
-    restart: always
-
-  ORA1210-01: 
-    container_name: ORA1210-01
-    image:  oracle/database:12.1.0.2-ee 
-    mem_limit: '16gb'
-    shm_size: '4gb'
-    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
-    networks:
-      - YADAMU-NET
-    ports: 
-      - "1524:1521"
-    environment:
-      ORACLE_SID: CDB12100
-      ORACLE_PDB: PDB12100
-      ORACLE_PWD: oracle 
-      ORACLE_CHARACTERSET: AL32UTF8
-    volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - ORA1210-01-ADMIN:/opt/oracle/admin
-      - ORA1210-01-DATA:/opt/oracle/oradata
-      - ORA1210-01-DIAG:/opt/oracle/diag
+      - YADAMU_01-SHARED:c:\mount
+      - ORA1220-01-ADMIN:c:\oracle\admin
+      - ORA1220-01-DATA:c:\oracle\oradata
+      - ORA1220-01-DIAG:c:\oracle\diag
     restart: always
 
   ORA1120-01: 
     container_name: ORA1120-01
-    image:  oracle/database:11.2.0.4-ee
-    mem_limit: '16gb'
+    image:  yadamu/oracle:11.2
+    mem_limit: '6gb'
     shm_size: '4gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
@@ -127,16 +105,16 @@ services:
       ORACLE_PWD: oracle 
       ORACLE_CHARACTERSET: AL32UTF8
     volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - ORA1120-01-ADMIN:/opt/oracle/admin
-      - ORA1120-01-DATA:/opt/oracle/oradata
-      - ORA1120-01-DIAG:/opt/oracle/diag
+      - YADAMU_01-SHARED:c:\mount
+      - ORA1120-01-ADMIN:c:\oracle\admin
+      - ORA1120-01-DATA:c:\oracle\oradata
+      - ORA1120-01-DIAG:c:\oracle\diag
     restart: always
 
   MSSQL17-01: 
     container_name: MSSQL17-01
-    image:  mcr.microsoft.com/mssql/server:2017-latest
-    mem_limit: '16gb'
+    image:  yadamu/svr-2016/mssql:2017-CU26
+    mem_limit: '6gb'
     shm_size: '4gb'
     networks:
       - YADAMU-NET
@@ -144,35 +122,53 @@ services:
       - "1433:1433"
     environment:
       ACCEPT_EULA: Y
-      MSSQL_MEMORY_LIMIT_MB: 16384
       SA_PASSWORD: oracle#1
     volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - MSSQL17-01-VOLUME:/var/opt/mssql 
+      - YADAMU_01-SHARED:c:\mount
+      - MSSQL17-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\DATA
+      - MSSQL17-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\LOG
     restart: always
 
   MSSQL19-01: 
-    container_name: MSSQL19-01
-    image:  mcr.microsoft.com/mssql/server:2019-latest
-    mem_limit: '16gb'
-    shm_size: '4gb'
-    networks:
-      - YADAMU-NET
-    ports: 
-      - "1434:1433"
-    environment:
-      ACCEPT_EULA: Y
-      MSSQL_MEMORY_LIMIT_MB: 16384
-      SA_PASSWORD: oracle#1
-    volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - MSSQL19-01-VOLUME:/var/opt/mssql
-    restart: always
-
+      container_name: MSSQL19-01
+      image:  yadamu/mssql:2019-CU13
+      mem_limit: '6gb'
+      shm_size: '4gb'
+      networks:
+        - YADAMU-NET
+      ports: 
+        - "1434:1433"
+      environment:
+        ACCEPT_EULA: Y
+        SA_PASSWORD: oracle#1
+      volumes:
+        - YADAMU_01-SHARED:c:\mount
+        - MSSQL19-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\DATA
+        - MSSQL19-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\LOG
+      restart: always
+  
+  MSSQL14-01: 
+      container_name: MSSQL14-01
+      image:  yadamu/svr-2016/mssql:2014
+      mem_limit: '6gb'
+      shm_size: '4gb'
+      networks:
+        - YADAMU-NET
+      ports: 
+        - "1435:1433"
+      environment:
+        ACCEPT_EULA: Y
+        SA_PASSWORD: oracle#1
+      volumes:
+        - YADAMU_01-SHARED:c:\mount
+        - MSSQL14-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\DATA
+        - MSSQL14-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\LOG
+      restart: always
+  
   PGSQL14-01: 
     container_name: PGSQL14-01
     image:  yadamu/postgres:14 
-    mem_limit: '16gb'
+    mem_limit: '6gb'
     shm_size: '4gb'
     networks:
       - YADAMU-NET
@@ -181,33 +177,28 @@ services:
     environment:
       POSTGRES_PASSWORD: oracle 
     volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - PGSQL14-01-VOLUME:/var/lib/postgresql/data
+      - YADAMU_01-SHARED:c:\mount
+      - PGSQL14-01-VOLUME:C:\ProgramData\PostgreSQL\14\data\
     restart: always
-
+    
   MYSQL80-01: 
     container_name: MYSQL80-01
-    image:  mysql:latest
-    command: --secure-file-priv=/mnt/shared  
-    mem_limit: '16gb'
+    image:  yadamu/mysql:8
+    mem_limit: '6gb'
     shm_size: '4gb'
-    cap_add:
-      - SYS_NICE  # CAP_SYS_NICE
     networks:
       - YADAMU-NET
     ports: 
       - "3306:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: oracle  
     volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - MYSQL80-01-VOLUME:/var/lib/mysql 
+      - YADAMU_01-SHARED:c:\shared
+      - MYSQL80-01-VOLUME:C:\ProgramData\MySQL\8.0
     restart: always
-
+  
   MARIA10-01: 
     container_name: MARIA10-01
-    image:  mariadb:latest
-    mem_limit: '16gb'
+    image:  yadamu/mariadb:10
+    mem_limit: '6gb'
     shm_size: '4gb'
     networks:
       - YADAMU-NET
@@ -216,109 +207,25 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: oracle  
     volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - MARIA10-01-CONF:/etc/mysql/conf.d
-      - MARIA10-01-DATA:/var/lib/mysql 
+      - YADAMU_01-SHARED:c:\shared
+      #- MARIA10-01-CONF:/etc/mysql/conf.d
+      - MARIA10-01-VOLUME:C:\ProgramData\MariaDB\10
     restart: always
 
-  MONGO40-01: 
-    container_name: MONGO40-01
-    image:  mongo:latest 
-    mem_limit: '16gb'
+  MONGO50-01: 
+    container_name: MONGO50-01
+    image:  yadamu/mongodb:5
+    mem_limit: '6gb'
     shm_size: '4gb'
     networks:
       - YADAMU-NET
     ports: 
       - "27017:27017"
     volumes:
-      - MONGO40-01-VOLUME:/data/db 
-    restart: always
-
-  VRTCA10-01: 
-    container_name: VRTCA10-01
-    image: vertica/vertica-ce:10.1.1-0
-    mem_limit: '16gb'
-    shm_size: '4gb'
-    networks:
-      - YADAMU-NET
-    ports: 
-      - "5434:5433"
-      - "5445:5444"
-    environment:
-      APP_DB_USER: "vertica"
-      APP_DB_PASSWORD: "oracle"
-      TZ: "Etc/UTC"
-    #deploy:
-    #  mode: global
-    volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - VRTCA10-01-VOLUME:/data
-    restart: always
-
-  VRTCA11-01: 
-    container_name: VRTCA11-01
-    image:  vertica/vertica-ce:latest 
-    mem_limit: '16gb'
-    shm_size: '4gb'
-    networks:
-     - YADAMU-NET
-    ports: 
-      - "5433:5433"
-      - "5444:5444"
-    environment:
-      APP_DB_USER: "vertica"
-      APP_DB_PASSWORD: "oracle"
-      TZ: "Etc/UTC"
-    #deploy:
-    #  mode: global
-    volumes:
-      - YADAMU_01-SHARED:/mnt/shared
-      - VRTCA11-01-VOLUME:/data
-    restart: always    
-        
-  MINIO-01: 
-    container_name: MINIO-01
-    image:  minio/minio 
-    command:  server /data
-    networks:
-      - YADAMU-NET
-    ports: 
-      - "9000:9000"
-    environment:
-      MINIO_ACCESS_KEY: AKIAIOSFODNN7EXAMPLE
-      MINIO_SECRET_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-    volumes:
-      - MINIO-01-VOLUME:/data
+      - YADAMU_01-SHARED:c:\shared
+      - MONGO50-01-VOLUME:c:\ProgramData\MongoDB\Server\5.0
     restart: always
     
-  AZURE-01: 
-    container_name: AZURE-01
-    image:   mcr.microsoft.com/azure-storage/azurite 
-    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000
-    networks:
-      - YADAMU-NET
-    ports: 
-      - "10000:10000"
-    volumes:
-      - AZURE-01-VOLUME:/data
-    restart: always
-
-  YADAMU-SMB: 
-    container_name: YADAMU-SMB
-    image:   dperson/samba
-    mem_limit: '512mb'
-    command: -p -s "work;/mount;yes;no;yes" -n -p
-    networks:
-      - YADAMU-NET
-    ports: 
-      - "139:139"
-      - "445:445"
-      - "137:137/udp"
-      - "138:138/udp"
-    volumes:
-      - YADAMU_01-SHARED:/mount
-    restart: always
-
 networks: 
   YADAMU-NET:
      name: YADAMU-NET
@@ -338,23 +245,17 @@ volumes:
   ORA1220-01-ADMIN:
   ORA1220-01-DATA:
   ORA1220-01-DIAG:
-  ORA1210-01-ADMIN:
-  ORA1210-01-DATA:
-  ORA1210-01-DIAG:
   ORA1120-01-ADMIN:
   ORA1120-01-DATA:
   ORA1120-01-DIAG:
-  MSSQL17-01-VOLUME:
-  MSSQL19-01-VOLUME:
+  MSSQL14-01-DATA:
+  MSSQL14-01-LOG:
+  MSSQL17-01-DATA:
+  MSSQL17-01-LOG:
+  MSSQL19-01-DATA:
+  MSSQL19-01-LOG:
   PGSQL14-01-VOLUME:
   MYSQL80-01-VOLUME:
-  MARIA10-01-CONF:
-  MARIA10-01-DATA:
-  MONGO40-01-VOLUME:
-  VRTCA10-01-VOLUME:
-  VRTCA11-01-VOLUME:
-  MINIO-01-VOLUME:
-  AZURE-01-VOLUME:
-    
-
-    
+  MARIA10-01-VOLUME:
+  MONGO50-01-VOLUME:
+     

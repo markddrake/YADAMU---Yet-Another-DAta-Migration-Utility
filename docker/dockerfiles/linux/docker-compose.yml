@@ -18,8 +18,8 @@ services:
       ORACLE_CHARACTERSET: AL32UTF8
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
+      - ORA2103-01-ADMIN:/opt/oracle/admin
       - ORA2103-01-DATA:/opt/oracle/oradata
-      - ORA2103-01-DIAG:/opt/oracle/admin
       - ORA2103-01-DIAG:/opt/oracle/diag
     restart: always
 
@@ -40,8 +40,8 @@ services:
       ORACLE_CHARACTERSET: AL32UTF8
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
+      - ORA1903-01-ADMIN:/opt/oracle/admin
       - ORA1903-01-DATA:/opt/oracle/oradata
-      - ORA1903-01-DIAG:/opt/oracle/admin
       - ORA1903-01-DIAG:/opt/oracle/diag
     restart: always
 
@@ -62,8 +62,8 @@ services:
       ORACLE_CHARACTERSET: AL32UTF8
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
+      - ORA1803-01-ADMIN:/opt/oracle/admin
       - ORA1803-01-DATA:/opt/oracle/oradata
-      - ORA1803-01-DIAG:/opt/oracle/admin
       - ORA1803-01-DIAG:/opt/oracle/diag
     restart: always
 
@@ -84,8 +84,8 @@ services:
       ORACLE_CHARACTERSET: AL32UTF8
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
+      - ORA1220-01-ADMIN:/opt/oracle/admin
       - ORA1220-01-DATA:/opt/oracle/oradata
-      - ORA1220-01-DIAG:/opt/oracle/admin
       - ORA1220-01-DIAG:/opt/oracle/diag
     restart: always
 
@@ -106,8 +106,8 @@ services:
       ORACLE_CHARACTERSET: AL32UTF8
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
+      - ORA1210-01-ADMIN:/opt/oracle/admin
       - ORA1210-01-DATA:/opt/oracle/oradata
-      - ORA1210-01-DIAG:/opt/oracle/admin
       - ORA1210-01-DIAG:/opt/oracle/diag
     restart: always
 
@@ -128,8 +128,8 @@ services:
       ORACLE_CHARACTERSET: AL32UTF8
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
+      - ORA1120-01-ADMIN:/opt/oracle/admin
       - ORA1120-01-DATA:/opt/oracle/oradata
-      - ORA1120-01-DIAG:/opt/oracle/admin
       - ORA1120-01-DIAG:/opt/oracle/diag
     restart: always
 
@@ -148,7 +148,7 @@ services:
       SA_PASSWORD: oracle#1
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - MSSQL17-01-DATA:/var/opt/mssql 
+      - MSSQL17-01-VOLUME:/var/opt/mssql 
     restart: always
 
   MSSQL19-01: 
@@ -166,7 +166,7 @@ services:
       SA_PASSWORD: oracle#1
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - MSSQL19-01-DATA:/var/opt/mssql
+      - MSSQL19-01-VOLUME:/var/opt/mssql
     restart: always
 
   PGSQL14-01: 
@@ -182,7 +182,7 @@ services:
       POSTGRES_PASSWORD: oracle 
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - PGSQL14-01-DATA:/var/lib/postgresql/data
+      - PGSQL14-01-VOLUME:/var/lib/postgresql/data
     restart: always
 
   MYSQL80-01: 
@@ -201,7 +201,7 @@ services:
       MYSQL_ROOT_PASSWORD: oracle  
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - MYSQL80-01-DATA:/var/lib/mysql 
+      - MYSQL80-01-VOLUME:/var/lib/mysql 
     restart: always
 
   MARIA10-01: 
@@ -221,8 +221,8 @@ services:
       - MARIA10-01-DATA:/var/lib/mysql 
     restart: always
 
-  MONGO40-01: 
-    container_name: MONGO40-01
+  MONGO50-01: 
+    container_name: MONGO50-01
     image:  mongo:latest 
     mem_limit: '16gb'
     shm_size: '4gb'
@@ -231,7 +231,7 @@ services:
     ports: 
       - "27017:27017"
     volumes:
-      - MONGO40-01-DATA:/data/db 
+      - MONGO50-01-VOLUME:/data/db 
     restart: always
 
   VRTCA10-01: 
@@ -252,7 +252,7 @@ services:
     #  mode: global
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - VRTCA10-01-DATA:/data
+      - VRTCA10-01-VOLUME:/data
     restart: always
 
   VRTCA11-01: 
@@ -273,7 +273,7 @@ services:
     #  mode: global
     volumes:
       - YADAMU_01-SHARED:/mnt/shared
-      - VRTCA11-01-DATA:/data
+      - VRTCA11-01-VOLUME:/data
     restart: always    
         
   MINIO-01: 
@@ -288,7 +288,7 @@ services:
       MINIO_ACCESS_KEY: AKIAIOSFODNN7EXAMPLE
       MINIO_SECRET_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
     volumes:
-      - MINIO-01-DATA:/data
+      - MINIO-01-VOLUME:/data
     restart: always
     
   AZURE-01: 
@@ -300,7 +300,7 @@ services:
     ports: 
       - "10000:10000"
     volumes:
-      - AZURE-01-DATA:/data
+      - AZURE-01-VOLUME:/data
     restart: always
 
   YADAMU-SMB: 
@@ -326,29 +326,35 @@ networks:
 volumes:
   YADAMU_01-SHARED:
     name: YADAMU_01-SHARED
+  ORA2103-01-ADMIN:
   ORA2103-01-DATA:
   ORA2103-01-DIAG:
+  ORA1903-01-ADMIN:
   ORA1903-01-DATA:
   ORA1903-01-DIAG:
+  ORA1803-01-ADMIN:
   ORA1803-01-DATA:
   ORA1803-01-DIAG:
+  ORA1220-01-ADMIN:
   ORA1220-01-DATA:
   ORA1220-01-DIAG:
+  ORA1210-01-ADMIN:
   ORA1210-01-DATA:
   ORA1210-01-DIAG:
+  ORA1120-01-ADMIN:
   ORA1120-01-DATA:
   ORA1120-01-DIAG:
-  MSSQL17-01-DATA:
-  MSSQL19-01-DATA:
-  PGSQL14-01-DATA:
-  MYSQL80-01-DATA:
+  MSSQL17-01-VOLUME:
+  MSSQL19-01-VOLUME:
+  PGSQL14-01-VOLUME:
+  MYSQL80-01-VOLUME:
   MARIA10-01-CONF:
   MARIA10-01-DATA:
-  MONGO40-01-DATA:
-  VRTCA10-01-DATA:
-  VRTCA11-01-DATA:
-  MINIO-01-DATA:
-  AZURE-01-DATA:
+  MONGO50-01-VOLUME:
+  VRTCA10-01-VOLUME:
+  VRTCA11-01-VOLUME:
+  MINIO-01-VOLUME:
+  AZURE-01-VOLUME:
     
 
     

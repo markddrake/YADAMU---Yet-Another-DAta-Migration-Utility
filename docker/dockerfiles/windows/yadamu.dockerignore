@@ -1,4 +1,4 @@
 *
-!bin/*.sh
-!src/install
-!src/YADAMU
+!bin\*.bat
+!src\install
+!src\YADAMU

@@ -48,10 +48,12 @@ alter user system identified by oracle
 --
 -- Move the Recovery File Location to the 'oradata' volume
 --
-alter system set  db_recovery_file_dest='&ORADATA_LOCATION/oradata/flash_recovery_area' scope=spfile
-/
-alter system set  db_recovery_file_dest_size=4G scope=spfile
-/
+-- Changes integrated into the to dbca.rsp file 
+--
+-- alter system set  db_recovery_file_dest='&ORADATA_LOCATION/oradata/flash_recovery_area' scope=spfile
+-- /
+-- alter system set  db_recovery_file_dest_size=4G scope=spfile
+-- /
 --
 -- Restart to force changes to take effect
 --

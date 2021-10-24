@@ -1,5 +1,5 @@
 @set CONTAINER_NAME=%1
-docker exec -it                                 %CONTAINER_NAME% powershell -command New-Item -Force -ItemType directory -Path c:\stage
+docker exec -it                                 %CONTAINER_NAME% powershell -command New-Item -Force -Recurse -ItemType directory -Path c:\stage\sql
 REM 
 REM Cannot copy to Windows Container when it is running. 
 REM Cannot copy to Volume mapped folder when container is not running.
