@@ -1,4 +1,4 @@
-##############################################################################
+A##############################################################################
 ##                                                                          ##
 ##                            DBCA response file                            ##
 ##                            ------------------                            ##
@@ -75,7 +75,7 @@ OPERATION_TYPE = "createDatabase"
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-GDBNAME = "###ORACLE_SID###"
+GDBNAME = "CDB12100
 
 #-----------------------------------------------------------------------------
 # Name          : DATABASECONFTYPE
@@ -95,7 +95,7 @@ GDBNAME = "###ORACLE_SID###"
 # Default value : <db_name> specified in GDBNAME
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-SID = "###ORACLE_SID###"
+SID = "CDB12100"
 
 #-----------------------------------------------------------------------------
 # Name          : CREATEASCONTAINERDATABASE 
@@ -125,7 +125,7 @@ NUMBEROFPDBS = 1
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-PDBNAME = "###ORACLE_PDB###"
+PDBNAME = "PDB12100"
 
 #-----------------------------------------------------------------------------
 # Name          : PDBADMINPASSWORD
@@ -135,7 +135,7 @@ PDBNAME = "###ORACLE_PDB###"
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-PDBADMINPASSWORD = "###ORACLE_PWD###"
+PDBADMINPASSWORD = "oracle"
 
 #-----------------------------------------------------------------------------
 # Name          : TEMPLATENAME
@@ -155,7 +155,7 @@ TEMPLATENAME = "General_Purpose.dbc"
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-SYSPASSWORD = "###ORACLE_PWD###"
+SYSPASSWORD = "oracle"
 
 #-----------------------------------------------------------------------------
 # Name          : SYSTEMPASSWORD
@@ -165,7 +165,7 @@ SYSPASSWORD = "###ORACLE_PWD###"
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-SYSTEMPASSWORD = "###ORACLE_PWD###"
+SYSTEMPASSWORD = "oracle"
 
 #-----------------------------------------------------------------------------
 # Name          : SERVICEUSERPASSWORD
@@ -207,7 +207,7 @@ EMEXPRESSPORT = "5500"
 # Mandatory     : Yes, if EMCONFIGURATION is specified or
 #                 the value of RUNCVUCHECKS is TRUE
 #-----------------------------------------------------------------------------
-DBSNMPPASSWORD = "###ORACLE_PWD###"
+DBSNMPPASSWORD = "oracle"
 
 #-----------------------------------------------------------------------------
 # Name          : STORAGETYPE
@@ -227,7 +227,7 @@ DBSNMPPASSWORD = "###ORACLE_PWD###"
 # Default value : "US7ASCII"
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-CHARACTERSET = "###ORACLE_CHARACTERSET###"
+CHARACTERSET = AL32UTF8"
 
 #-----------------------------------------------------------------------------
 # Name          : NATIONALCHARACTERSET
@@ -246,7 +246,7 @@ NATIONALCHARACTERSET= "AL16UTF16"
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-variables=DB_UNIQUE_NAME=###ORACLE_SID###,ORACLE_BASE=/opt/oracle/,DB_NAME=###ORACLE_SID###,ORACLE_HOME=/opt/oracle/product/12.1.0.2/dbhome_1,SID=###ORACLE_SID###
+variables=DB_UNIQUE_NAME=CDB12100,ORACLE_BASE=/opt/oracle/,DB_NAME=CDB12100,ORACLE_HOME=/opt/oracle/rdbms/12.1/db_home1,SID=CDB12100
 
 #-----------------------------------------------------------------------------
 # Name          : INITPARAMS
@@ -255,7 +255,7 @@ variables=DB_UNIQUE_NAME=###ORACLE_SID###,ORACLE_BASE=/opt/oracle/,DB_NAME=###OR
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-initParams=compatible=12initParams=compatible=12.1.0,db_name=###ORACLE_SID###,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,sga_target=7GB,pga_aggregate_target=3GB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}/oradata/admin/{DB_UNIQUE_NAME}/adump,diagnostic_dest={ORACLE_BASE},db_recovery_file_dest_size=4GB,db_recovery_file_dest={ORACLE_BASE}/oradata/fast_recovery_area/{DB_UNIQUE_NAME}
+initParams=compatible=12.1.0.2.0,db_name=CDB12100,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}/oradata/admin/{DB_UNIQUE_NAME}/adump,diagnostic_dest={ORACLE_BASE},db_recovery_file_dest_size=16384,db_recovery_file_dest={ORACLE_BASE}/oradata/fast_recovery_area/{DB_UNIQUE_NAME}
 
 #-----------------------------------------------------------------------------
 # Name          : AUTOMATICMEMORYMANAGEMENT

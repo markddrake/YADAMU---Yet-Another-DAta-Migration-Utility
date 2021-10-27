@@ -2,7 +2,7 @@
 ##                                                                          ##
 ##                            DBCA response file                            ##
 ##                            ------------------                            ##
-## Copyright(c) Oracle Corporation 1998,2019. All rights reserved.          ##
+## Copyright(c) Oracle Corporation 2198,2021. All rights reserved.          ##
 ##                                                                          ##
 ## Specify values for the variables listed below to customize               ##
 ## your installation.                                                       ##
@@ -18,7 +18,7 @@
 #-------------------------------------------------------------------------------
 # Do not change the following system generated value. 
 #-------------------------------------------------------------------------------
-responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v12.2.0
+responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v21.0.0
 
 #-----------------------------------------------------------------------------
 # Name          : gdbName
@@ -29,7 +29,7 @@ responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v12.2.0
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-gdbName=###ORACLE_SID###
+gdbName=CDB21300
 
 #-----------------------------------------------------------------------------
 # Name          : sid
@@ -39,7 +39,7 @@ gdbName=###ORACLE_SID###
 # Default value : <db_name> specified in GDBNAME
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-sid=###ORACLE_SID###
+sid=CDB21300
 
 #-----------------------------------------------------------------------------
 # Name          : databaseConfigType
@@ -179,7 +179,7 @@ numberOfPDBs=1
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-pdbName=###ORACLE_PDB###
+pdbName=PDB21300
 
 #-----------------------------------------------------------------------------
 # Name          : useLocalUndoForPDBs 
@@ -200,7 +200,7 @@ useLocalUndoForPDBs=true
 # Mandatory     : No
 #-----------------------------------------------------------------------------
 
-pdbAdminPassword=###ORACLE_PWD###
+pdbAdminPassword=oracle
 
 #-----------------------------------------------------------------------------
 # Name          : nodelist
@@ -230,7 +230,7 @@ templateName=General_Purpose.dbc
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-sysPassword=###ORACLE_PWD###
+sysPassword=oracle
 
 #-----------------------------------------------------------------------------
 # Name          : systemPassword
@@ -240,7 +240,7 @@ sysPassword=###ORACLE_PWD###
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-systemPassword=###ORACLE_PWD###
+systemPassword=oracle
 
 #-----------------------------------------------------------------------------
 # Name          : serviceUserPassword
@@ -292,7 +292,7 @@ runCVUChecks=FALSE
 # Mandatory     : Yes, if emConfiguration is specified or
 #                 the value of runCVUChecks is TRUE
 #-----------------------------------------------------------------------------
-dbsnmpPassword=###ORACLE_PWD###
+dbsnmpPassword=oracle
 
 #-----------------------------------------------------------------------------
 # Name          : omsHost
@@ -398,7 +398,7 @@ olsConfiguration=false
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-datafileJarLocation={ORACLE_HOME}/assistants/dbca/templates/
+datafileJarLocation={ORACLE_HOME}\assistants\dbca\templates\
 
 #-----------------------------------------------------------------------------
 # Name          : datafileDestination 
@@ -408,7 +408,7 @@ datafileJarLocation={ORACLE_HOME}/assistants/dbca/templates/
 # Default value : $ORACLE_BASE/oradata
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-datafileDestination={ORACLE_BASE}/oradata/{DB_UNIQUE_NAME}/
+datafileDestination={ORACLE_BASE}\oradata\{DB_UNIQUE_NAME}\
 
 #-----------------------------------------------------------------------------
 # Name          : recoveryAreaDestination
@@ -418,7 +418,7 @@ datafileDestination={ORACLE_BASE}/oradata/{DB_UNIQUE_NAME}/
 # Default value : $ORACLE_BASE/flash_recovery_area
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-recoveryAreaDestination={ORACLE_BASE}/fast_recovery_area/{DB_UNIQUE_NAME}
+recoveryAreaDestination={ORACLE_BASE}\fast_recovery_area\{DB_UNIQUE_NAME}
 
 #-----------------------------------------------------------------------------
 # Name          : storageType
@@ -465,8 +465,7 @@ recoveryGroupName=
 # Default value : "US7ASCII"
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-characterSet=###ORACLE_CHARACTERSET###
-
+characterSet=AL32UTF8
 #-----------------------------------------------------------------------------
 # Name          : nationalCharacterSet
 # Datatype      : String
@@ -543,7 +542,7 @@ variablesFile=
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-variables=DB_UNIQUE_NAME=###ORACLE_SID###,ORACLE_BASE=/opt/oracle/,PDB_NAME=###ORACLE_PDB###,DB_NAME=###ORACLE_SID###,ORACLE_HOME=/opt/oracle/product/18c/dbhome_1,SID=###ORACLE_SID###
+variables=DB_UNIQUE_NAME=CDB21300,ORACLE_BASE=c:\oracle\,PDB_NAME=PDB21300,DB_NAME=CDB21300,ORACLE_HOME=c:\oracle\rdbms\21.3\db_home1,SID=CDB21300
 
 #-----------------------------------------------------------------------------
 # Name          : initParams
@@ -553,8 +552,7 @@ variables=DB_UNIQUE_NAME=###ORACLE_SID###,ORACLE_BASE=/opt/oracle/,PDB_NAME=###O
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
-initParams=compatible=18.0.0,db_name=###ORACLE_SID###,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,sga_target=7GB,pga_aggregate_target=3GB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}/oradata/admin/{DB_UNIQUE_NAME}/adump,diagnostic_dest={ORACLE_BASE},db_recovery_file_dest_size=4GB,db_recovery_file_dest={ORACLE_BASE}/oradata/fast_recovery_area/{DB_UNIQUE_NAME}
-
+initParams=compatible=21.0.0,db_name=CDB21300,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\oradata\admin\{DB_UNIQUE_NAME}\adump,db_recovery_file_dest_size=16GB,db_recovery_file_dest={ORACLE_BASE}\oradata\fast_recovery_area\{DB_UNIQUE_NAME}
 
 #-----------------------------------------------------------------------------
 # Name          : sampleSchema
@@ -573,7 +571,7 @@ sampleSchema=false
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-memoryPercentage=75
+memoryPercentage=85
 
 #-----------------------------------------------------------------------------
 # Name          : databaseType

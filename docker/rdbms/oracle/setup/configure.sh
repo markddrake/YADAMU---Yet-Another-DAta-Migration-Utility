@@ -1,7 +1,7 @@
 export STAGE=/opt/oracle/oradata/stage
-mkdir -p /opt/oracle/oradata/flash_recovery_area
-mkdir -p $STAGE/log
-sqlplus sys/oracle@$ORACLE_PDB as sysdba @$STAGE/setup/configure.sql $STAGE /opt/oracle
+cd $STAGE
+mkdir log
+sqlplus sys/oracle@localhost:1521/$ORACLE_PDB  as sysdba @$STAGE/setup/configure.sql $STAGE /opt/oracle
 echo "# Do Nothing" > extendedStringSizeAction.sh
 sqlplus -s / as sysdba <<-EOF
 whenever oserror exit failure
@@ -35,7 +35,7 @@ spool off
 exit
 EOF
 source extendedStringSizeAction.sh
-sqlplus -s sys/oracle@$ORACLE_PDB as sysdba <<-EOF
+sqlplus -s sys/oracle@localhost:1521/$ORACLE_PDB as sysdba <<-EOF
 whenever oserror exit failure
 whenever sqlerror exit failure rollback
 set heading off pagesize 0 feedback off linesize 400
@@ -64,7 +64,7 @@ spool off
 exit
 EOF
 source sampleSchemas.sh
-sqlplus -s sys/oracle@$ORACLE_PDB as sysdba <<-EOF
+sqlplus -s sys/oracle@localhost:1521/$ORACLE_PDB as sysdba <<-EOF
 whenever oserror exit failure
 whenever sqlerror exit failure rollback
 set heading off pagesize 0 feedback off linesize 400
@@ -94,6 +94,6 @@ spool off
 exit
 EOF
 source installOnlineMedia.sh
-sqlplus system/oracle@$ORACLE_PDB @$STAGE/sql/COMPILE_ALL.sql $STAGE/log
-sqlplus system/oracle@$ORACLE_PDB @$STAGE/sql/YADAMU_TEST.sql $STAGE/log OFF
+sqlplus system/oracle@localhost:1521/$ORACLE_PDB @$STAGE/sql/COMPILE_ALL.sql $STAGE/log
+sqlplus system/oracle@localhost:1521/$ORACLE_PDB @$STAGE/sql/YADAMU_TEST.sql $STAGE/log OFF
  

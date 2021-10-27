@@ -13,11 +13,11 @@ docker build -t yadamu/mysql:8                   --file=c:\Docker\Build\YADAMU\m
 docker build -t yadamu/mariadb:10                --file=c:\Docker\Build\YADAMU\mariadb\windows\10\dockerfile        c:\Docker\Build\YADAMU\mariadb\windows\10
 docker build -t yadamu/mongodb:5                 --file=c:\Docker\Build\YADAMU\mongodb\windows\05\dockerfile        c:\Docker\Build\YADAMU\mongodb\windows\05
 
-docker build -t yadamu/oracle:21                 --file=c:\Docker\Build\YADAMU\oracle\Windows\21\dockerfile         c:\Docker\Build\YADAMU\oracle\Windows\21
-docker build -t yadamu/oracle:19                 --file=c:\Docker\Build\YADAMU\oracle\Windows\19\dockerfile         c:\Docker\Build\YADAMU\oracle\Windows\19
-docker build -t yadamu/oracle:18                 --file=c:\Docker\Build\YADAMU\oracle\Windows\18\dockerfile         c:\Docker\Build\YADAMU\oracle\Windows\18
-docker build -t yadamu/oracle:12.2               --file=c:\Docker\Build\YADAMU\oracle\Windows\12.2\dockerfile       c:\Docker\Build\YADAMU\oracle\Windows\12.2
-docker build -t yadamu/oracle:11.2               --file=c:\Docker\Build\YADAMU\oracle\Windows\11.2\dockerfile       c:\Docker\Build\YADAMU\oracle\Windows\11.2
+docker build -t yadamu/oracle:21.3.0             --file=c:\Docker\Build\YADAMU\oracle\Windows\21.3\dockerfile       c:\Docker\Build\YADAMU\oracle\Windows\21.3
+docker build -t yadamu/oracle:19.3.0             --file=c:\Docker\Build\YADAMU\oracle\Windows\19.3\dockerfile       c:\Docker\Build\YADAMU\oracle\Windows\19.3
+docker build -t yadamu/oracle:18.3.0             --file=c:\Docker\Build\YADAMU\oracle\Windows\18.3\dockerfile       c:\Docker\Build\YADAMU\oracle\Windows\18.3
+docker build -t yadamu/oracle:12.2.0             --file=c:\Docker\Build\YADAMU\oracle\Windows\12.2\dockerfile       c:\Docker\Build\YADAMU\oracle\Windows\12.2
+docker build -t yadamu/oracle:11.2.0.4           --file=c:\Docker\Build\YADAMU\oracle\Windows\11.2.0.4\dockerfile   c:\Docker\Build\YADAMU\oracle\Windows\11.2.0.4
 						               								           
 docker build -t yadamu/postgres:14              --file=c:\Docker\Build\YADAMU\postgres\windows\14\dockerfile       c:\Docker\Build\YADAMU\postgres\windows\14
 

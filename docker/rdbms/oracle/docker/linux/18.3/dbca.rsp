@@ -2,7 +2,7 @@
 ##                                                                          ##
 ##                            DBCA response file                            ##
 ##                            ------------------                            ##
-## Copyright(c) Oracle Corporation 2198,2021. All rights reserved.          ##
+## Copyright(c) Oracle Corporation 2018,2021. All rights reserved.          ##
 ##                                                                          ##
 ## Specify values for the variables listed below to customize               ##
 ## your installation.                                                       ##
@@ -18,7 +18,7 @@
 #-------------------------------------------------------------------------------
 # Do not change the following system generated value. 
 #-------------------------------------------------------------------------------
-responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v21.0.0
+responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v18.2.0
 
 #-----------------------------------------------------------------------------
 # Name          : gdbName
@@ -29,7 +29,7 @@ responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v21.0.0
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-gdbName=CDB21300
+gdbName=CDB18300
 
 #-----------------------------------------------------------------------------
 # Name          : sid
@@ -39,13 +39,13 @@ gdbName=CDB21300
 # Default value : <db_name> specified in GDBNAME
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-sid=CDB21300
+sid=CDB18300
 
 #-----------------------------------------------------------------------------
 # Name          : databaseConfigType
 # Datatype      : String
 # Description   : database conf type as Single Instance, Real Application Cluster or Real Application Cluster One Nodes database
-# Valid values  : SI\RAC\RACONENODE
+# Valid values  : SI/RAC/RACONENODE
 # Default value : SI
 # Mandatory     : No
 #-----------------------------------------------------------------------------
@@ -67,7 +67,7 @@ RACOneNodeServiceName=
 # Datatype      : Boolean
 # Description   : Set to true if Database is policy managed and 
 #         set to false if  Database is admin managed
-# Valid values  : TRUE\FALSE
+# Valid values  : TRUE/FALSE
 # Default value : FALSE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
@@ -81,7 +81,7 @@ policyManaged=false
 #         if this option is specified then the newly created database 
 #         will use this newly created serverpool. 
 #         Multiple serverpoolname can not be specified for database
-# Valid values  : TRUE\FALSE
+# Valid values  : TRUE/FALSE
 # Default value : FALSE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
@@ -120,7 +120,7 @@ cardinality=
 #         will be assigned server even if no free servers are available.
 #         This may affect already running database.
 #         This flag can be specified for Admin managed as well as policy managed db.
-# Valid values  : TRUE\FALSE
+# Valid values  : TRUE/FALSE
 # Default value : FALSE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
@@ -179,13 +179,13 @@ numberOfPDBs=1
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-pdbName=PDB21300
+pdbName=PDB18300
 
 #-----------------------------------------------------------------------------
 # Name          : useLocalUndoForPDBs 
 # Datatype      : boolean
 # Description   : Flag to create local undo tablespace for all PDB's.
-# Valid values  : TRUE\FALSE
+# Valid values  : TRUE/FALSE
 # Default value : TRUE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
@@ -277,7 +277,7 @@ emExpressPort=0
 # Datatype      : Boolean
 # Description   : Specify whether to run Cluster Verification Utility checks
 #                 periodically in Cluster environment
-# Valid values  : TRUE\FALSE
+# Valid values  : TRUE/FALSE
 # Default value : FALSE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
@@ -398,7 +398,7 @@ olsConfiguration=false
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-datafileJarLocation={ORACLE_HOME}\assistants\dbca\templates\
+datafileJarLocation={ORACLE_HOME}/assistants/dbca/templates/
 
 #-----------------------------------------------------------------------------
 # Name          : datafileDestination 
@@ -408,7 +408,7 @@ datafileJarLocation={ORACLE_HOME}\assistants\dbca\templates\
 # Default value : $ORACLE_BASE/oradata
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-datafileDestination={ORACLE_BASE}\oradata\{DB_UNIQUE_NAME}\
+datafileDestination={ORACLE_BASE}/oradata/{DB_UNIQUE_NAME}/
 
 #-----------------------------------------------------------------------------
 # Name          : recoveryAreaDestination
@@ -418,7 +418,7 @@ datafileDestination={ORACLE_BASE}\oradata\{DB_UNIQUE_NAME}\
 # Default value : $ORACLE_BASE/flash_recovery_area
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-recoveryAreaDestination={ORACLE_BASE}\fast_recovery_area\{DB_UNIQUE_NAME}
+recoveryAreaDestination={ORACLE_BASE}/fast_recovery_area/{DB_UNIQUE_NAME}
 
 #-----------------------------------------------------------------------------
 # Name          : storageType
@@ -480,7 +480,7 @@ nationalCharacterSet=AL16UTF16
 # Name          : registerWithDirService
 # Datatype      : Boolean
 # Description   : Specifies whether to register with Directory Service.
-# Valid values  : TRUE \ FALSE
+# Valid values  : TRUE / FALSE
 # Default value : FALSE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
@@ -542,7 +542,7 @@ variablesFile=
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-variables=DB_UNIQUE_NAME=CDB21300,ORACLE_BASE=c:\oracle\,PDB_NAME=PDB21300,DB_NAME=CDB21300,ORACLE_HOME=c:\oracle\rdbms\21.3\db_home1,SID=CDB21300
+variables=DB_UNIQUE_NAME=CDB18300,ORACLE_BASE=/opt/oracle,PDB_NAME=PDB18300,DB_NAME=CDB18300,ORACLE_HOME=/opt/oracle/rdbms/18.0/db_home1,SID=CDB18300
 
 #-----------------------------------------------------------------------------
 # Name          : initParams
@@ -552,13 +552,13 @@ variables=DB_UNIQUE_NAME=CDB21300,ORACLE_BASE=c:\oracle\,PDB_NAME=PDB21300,DB_NA
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
-initParams=compatible=21.0.0,db_name=CDB21300,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\oradata\admin\{DB_UNIQUE_NAME}\adump,db_recovery_file_dest_size=4GB,db_recovery_file_dest={ORACLE_BASE}\oradata\fast_recovery_area\{DB_UNIQUE_NAME}
+initParams=compatible=18.0.0,db_name=CDB18300,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}/oradata/admin/{DB_UNIQUE_NAME}/adump,db_recovery_file_dest_size=16GB,db_recovery_file_dest={ORACLE_BASE}/oradata/fast_recovery_area/{DB_UNIQUE_NAME}
 
 #-----------------------------------------------------------------------------
 # Name          : sampleSchema
 # Datatype      : Boolean
 # Description   : Specifies whether or not to add the Sample Schemas to your database
-# Valid values  : TRUE \ FALSE
+# Valid values  : TRUE / FALSE
 # Default value : FASLE
 # Mandatory     : No
 #-----------------------------------------------------------------------------

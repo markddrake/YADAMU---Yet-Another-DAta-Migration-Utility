@@ -1,6 +1,6 @@
 set STAGE=c:\oracle\oradata\stage
 cd %STAGE%
-powershell -command New-Item -Force -ItemType directory -Path c:\oracle\oradata\flash_recovery_area; New-Item -Force -ItemType directory -Path log
+powershell -command New-Item -Force -ItemType directory -Path log
 powershell -command (Get-Service  ("""OracleService""" + $env:ORACLE_SID)).waitForStatus("""Running""","""00:03:00""");
 sqlplus sys/oracle@localhost:1521/%ORACLE_PDB% as sysdba @%STAGE%\setup\configure.sql %STAGE% c:\oracle
 echo "REM Do Nothing" > extendedStringSizeAction.bat

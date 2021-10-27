@@ -2,7 +2,7 @@
 ##                                                                          ##
 ##                            DBCA response file                            ##
 ##                            ------------------                            ##
-## Copyright(c) Oracle Corporation 1898,2018. All rights reserved.          ##
+## Copyright(c) Oracle Corporation 1998,2019. All rights reserved.          ##
 ##                                                                          ##
 ## Specify values for the variables listed below to customize               ##
 ## your installation.                                                       ##
@@ -18,7 +18,7 @@
 #-------------------------------------------------------------------------------
 # Do not change the following system generated value. 
 #-------------------------------------------------------------------------------
-responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v18.0.0
+responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v19.0.0
 
 #-----------------------------------------------------------------------------
 # Name          : gdbName
@@ -29,7 +29,7 @@ responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v18.0.0
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-gdbName=CDB18300
+gdbName=CDB19300
 
 #-----------------------------------------------------------------------------
 # Name          : sid
@@ -39,7 +39,7 @@ gdbName=CDB18300
 # Default value : <db_name> specified in GDBNAME
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-sid=CDB18300
+sid=CDB19300
 
 #-----------------------------------------------------------------------------
 # Name          : databaseConfigType
@@ -179,7 +179,7 @@ numberOfPDBs=1
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-pdbName=PDB18300
+pdbName=PDB19300
 
 #-----------------------------------------------------------------------------
 # Name          : useLocalUndoForPDBs 
@@ -542,7 +542,7 @@ variablesFile=
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-variables=DB_UNIQUE_NAME=CDB18300,ORACLE_BASE=c:\oracle\,PDB_NAME=PDB18300,DB_NAME=CDB18300,ORACLE_HOME=c:\oracle\rdbms\18.0\db_home1,SID=CDB18300
+variables=DB_UNIQUE_NAME=CDB19300,ORACLE_BASE=c:\oracle\,PDB_NAME=PDB19300,DB_NAME=CDB19300,ORACLE_HOME=c:\oracle\rdbms\19.3\db_home1,SID=CDB19300
 
 #-----------------------------------------------------------------------------
 # Name          : initParams
@@ -552,7 +552,7 @@ variables=DB_UNIQUE_NAME=CDB18300,ORACLE_BASE=c:\oracle\,PDB_NAME=PDB18300,DB_NA
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
-initParams=compatible=18.0.0,db_name=CDB18300,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\oradata\admin\{DB_UNIQUE_NAME}\adump,db_recovery_file_dest_size=4GB,db_recovery_file_dest={ORACLE_BASE}\oradata\fast_recovery_area\{DB_UNIQUE_NAME}
+initParams=compatible=19.0.0,db_name=CDB19300,audit_trail=none,audit_sys_operations=false,remote_login_passwordfile=EXCLUSIVE,undo_tablespace=UNDOTBS1,db_block_size=8KB,processes=320,open_cursors=300,dispatchers=(PROTOCOL=TCP) (SERVICE={SID}XDB),audit_file_dest={ORACLE_BASE}\oradata\admin\{DB_UNIQUE_NAME}\adump,db_recovery_file_dest_size=16GB,db_recovery_file_dest={ORACLE_BASE}\oradata\fast_recovery_area\{DB_UNIQUE_NAME}
 
 #-----------------------------------------------------------------------------
 # Name          : sampleSchema

@@ -1,0 +1,62 @@
+FROM oraclelinux:7-slim as base
+#
+# Configure OS for Oracle Database
+#
+RUN yum -y install oracle-database-preinstall-18c openssl \
+ && yum clean all \
+ && mkdir /opt/oracle \
+ && mkdir /opt/oracle/admin \
+ && mkdir /opt/oracle/diag \
+ && mkdir /opt/oracle/oradata \
+ && chown -R oracle:oinstall /opt/oracle \
+ && echo oracle:oracle | chpasswd  
+#
+# Set Environment Variables
+#
+USER oracle
+WORKDIR /opt/oracle
+ENV ORACLE_BASE=/opt/oracle \
+    ORACLE_HOME=/opt/oracle/rdbms/18.0/db_home1 \
+    ORACLE_SID=CDB18300 \
+    ORACLE_PDB=PDB18300
+ENV PATH=$ORACLE_HOME/bin:$ORACLE_HOME/OPatch/:/usr/sbin:$PATH \
+    LD_LIBRARY_PATH=$ORACLE_HOME/lib:/usr/lib \
+    CLASSPATH=$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib
+#
+# Copy and Unpack Oracle RDBMS into ORACLE_HOME
+#
+COPY --chown=oracle:oinstall LINUX.X64_180000_db_home.zip .
+#
+RUN mkdir -p $ORACLE_HOME \
+ && unzip LINUX.X64_180000_db_home.zip -d $ORACLE_HOME \
+ && rm LINUX.X64_180000_db_home.zip 
+#
+# Install Oracle Software
+#
+WORKDIR $ORACLE_HOME
+#
+COPY --chown=oracle:oinstall setup.rsp inventory/Scripts/
+COPY --chown=oracle:oinstall dbca.rsp  .
+RUN ./runInstaller -silent -force -waitforcompletion -responseFile inventory/Scripts/setup.rsp  -ignorePrereqFailure; exit 0 
+RUN rm -rf $ORACLE_HOME/apex \
+ && rm -rf $ORACLE_HOME/ords \
+ && rm -rf $ORACLE_HOME/sqldeveloper \
+ && rm -rf $ORACLE_HOME/ucp \
+ && rm -rf $ORACLE_HOME/lib/*.zip \
+ && rm -rf $ORACLE_HOME/inventory/backup/* \
+ && rm -rf $ORACLE_HOME/network/tools/help \
+ && rm -rf $ORACLE_HOME/assistants/dbua \
+ && rm -rf $ORACLE_HOME/dmu \
+ && rm -rf $ORACLE_HOME/install/pilot \
+ && rm -rf $ORACLE_HOME/suptools \
+ && rm -rf /tmp/*
+#
+USER root
+RUN /opt/oracle/oraInventory/orainstRoot.sh \
+ && /opt/oracle/rdbms/18.0/db_home1/root.sh
+#
+USER oracle
+WORKDIR /
+COPY --chown=oracle:oinstall start.sh .
+#
+ENTRYPOINT ["/bin/bash", "/start.sh"]
