@@ -1,4 +1,4 @@
-if ((-not (Test-Path -Path "C:\Program Data\MySQL\8.0\data"  -PathType Container)) -or (@( Get-ChildItem "C:\Program Data\MySQL\8.0\data" ).Count -eq 0)){
+if ((-not (Test-Path -Path "C:\Program Data\MySQL\8.0\data"  -PathType Container)) -or (@( Get-ChildItem "C:\ProgramData\MySQL\8.0\data" ).Count -eq 0)){
   Write-Output "MySQL: Initializing MySQL service"
   mysqld --initialize-insecure --log-error="C:\ProgramData\MySQL\8.0\data\MySQL.log"
   mysqld --install MySQL

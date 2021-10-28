@@ -17,7 +17,8 @@ docker build -t yadamu/oracle:21.3.0             --file=c:\Docker\Build\YADAMU\o
 docker build -t yadamu/oracle:19.3.0             --file=c:\Docker\Build\YADAMU\oracle\Windows\19.3\dockerfile       c:\Docker\Build\YADAMU\oracle\Windows\19.3
 docker build -t yadamu/oracle:18.3.0             --file=c:\Docker\Build\YADAMU\oracle\Windows\18.3\dockerfile       c:\Docker\Build\YADAMU\oracle\Windows\18.3
 docker build -t yadamu/oracle:12.2.0             --file=c:\Docker\Build\YADAMU\oracle\Windows\12.2\dockerfile       c:\Docker\Build\YADAMU\oracle\Windows\12.2
-docker build -t yadamu/oracle:11.2.0.4           --file=c:\Docker\Build\YADAMU\oracle\Windows\11.2.0.4\dockerfile   c:\Docker\Build\YADAMU\oracle\Windows\11.2.0.4
+REM docker build -t yadamu/oracle:11.2.0.4           --file=c:\Docker\Build\YADAMU\oracle\Windows\11.2.0.4\dockerfile   c:\Docker\Build\YADAMU\oracle\Windows\11.2.0.4
+docker build -t yadamu/oracle:11.2.0.1           --file=c:\Docker\Build\YADAMU\oracle\Windows\11.2.0.1\dockerfile   c:\Docker\Build\YADAMU\oracle\Windows\11.2.0.1
 						               								           
 docker build -t yadamu/postgres:14              --file=c:\Docker\Build\YADAMU\postgres\windows\14\dockerfile       c:\Docker\Build\YADAMU\postgres\windows\14
 

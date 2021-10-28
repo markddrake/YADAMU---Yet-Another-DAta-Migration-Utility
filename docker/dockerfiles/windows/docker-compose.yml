@@ -3,7 +3,7 @@ services:
 
   ORA2103-01: 
     container_name: ORA2103-01
-    image:  yadamu/oracle:21
+    image:  yadamu/oracle:21.3.0
     mem_limit: '6gb'
     shm_size: '4gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
@@ -25,7 +25,7 @@ services:
 
   ORA1903-01: 
     container_name: ORA1903-01
-    image:  yadamu/oracle:19
+    image:  yadamu/oracle:19.3.0
     mem_limit: '6gb'
     shm_size: '4gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
@@ -47,7 +47,7 @@ services:
 
   ORA1803-01: 
     container_name: ORA1803-01
-    image:  yadamu/oracle:18
+    image:  yadamu/oracle:18.3.0
     mem_limit: '6gb'
     shm_size: '4gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
@@ -69,7 +69,7 @@ services:
 
   ORA1220-01: 
     container_name: ORA1220-01
-    image:  yadamu/oracle:12.2
+    image:  yadamu/oracle:12.2.0
     mem_limit: '6gb'
     shm_size: '4gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
@@ -91,7 +91,7 @@ services:
 
   ORA1120-01: 
     container_name: ORA1120-01
-    image:  yadamu/oracle:11.2
+    image:  yadamu/oracle:11.2.0.1
     mem_limit: '6gb'
     shm_size: '4gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
