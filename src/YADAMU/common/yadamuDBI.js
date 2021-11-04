@@ -681,12 +681,15 @@ class YadamuDBI {
   }
   
   async _getDatabaseConnection() {
+	  
+	let connected = false;
     try {
       await this.createConnectionPool();
       this.connection = await this.getConnectionFromPool();
+      connected = true
       await this.configureConnection();
     } catch (e) {
-      const err = new ConnectionError(e,this.vendorProperties);
+      const err = connected ? e : new ConnectionError(e,this.vendorProperties);
       throw err
     }
 

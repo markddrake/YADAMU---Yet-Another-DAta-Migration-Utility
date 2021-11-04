@@ -161,7 +161,7 @@ class DBReader extends Readable {
 	  this.activeWorkers.add(yadamuPipeline[0])
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return proc.constructor.name }).join(' => ')}`)
       readerDBI.INPUT_METRICS.pipeStartTime = performance.now();
-	  await pipeline(yadamuPipeline)
+	  await pipeline(...yadamuPipeline)
 	  readerDBI.INPUT_METRICS.pipeEndTime = performance.now();
 	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
       this.activeWorkers.delete(yadamuPipeline[0])  
@@ -276,7 +276,7 @@ class DBReader extends Readable {
      // this.traceStreamEvents(yadamuPipeline,task.TABLE_NAME)
 	  
      // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return proc.constructor.name }).join(' => ')}`)
-     pipeline(yadamuPipeline).catch((cause) => {
+     pipeline(...yadamuPipeline).catch((cause) => {
 	   // console.log('EMIT','ExportFailed')
 	 })
 	 

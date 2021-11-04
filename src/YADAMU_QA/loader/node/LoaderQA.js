@@ -40,7 +40,7 @@ class LoaderQA extends LoaderDBI {
 	let stack
 	try {
 	  stack = new Error().stack;
-      await fsp.rmdir(this.IMPORT_FOLDER,{recursive: true})
+      await fsp.rm(this.IMPORT_FOLDER,{recursive: true, force: true})
 	} catch(err) {
 	  if (err.code !== 'ENOENT') {
 	    throw new FileError(err,stack,this.IMPORT_FOLDER);

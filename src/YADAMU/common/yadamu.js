@@ -23,7 +23,7 @@ const DBIConstants = require('./dbiConstants.js');
 const NullWriter = require('./nullWriter.js');
 const YadamuLogger = require('./yadamuLogger.js');
 const YadamuLibrary = require('./yadamuLibrary.js');
-const {YadamuError, UserError, CommandLineError, ConfigurationFileError, DatabaseError} = require('./yadamuException.js');
+const {YadamuError, UserError, CommandLineError, ConfigurationFileError, DatabaseError, ConnectionError} = require('./yadamuException.js');
 const {FileNotFound, FileError} = require('../file/node/fileException.js');
 const YadamuRejectManager = require('./yadamuRejectManager.js');
 
@@ -359,8 +359,12 @@ class Yadamu {
   
   reportError(e,parameters,status,yadamuLogger) {
     
+	
+    if (!(e instanceof ConnectionError)) {
+	  yadamuLogger.handleException([`YADAMU`,`"${status.operation}"`],e);
+	}
+	
     if (yadamuLogger.FILE_LOGGER) {
-      yadamuLogger.handleException([`${this.constructor.name}`,`"${status.operation}"`],e);
       console.log(`${new Date().toISOString()} [ERROR][YADAMU][${status.operation}]: Operation failed: See "${parameters.LOG_FILE ? parameters.LOG_FILE  : 'above'}" for details.`);
     }
     else {
@@ -790,10 +794,12 @@ class Yadamu {
   }
 
   async doPipelineOperation(source,target) {
+	  
+    // this.LOGGER.trace([this.constructor.name,`PIPELINE`,source.DATABASE_VENDOR,target.DATABASE_VENDOR,process.arch,process.platform,process.version],'Pipeline')
 
     /*
 	**
-	** Load data the has using a Node Pipeline.
+	** Copy data using a Node Pipeline.
 	**
 	*/
 
@@ -801,7 +807,7 @@ class Yadamu {
 
     /*
 	**
-	** Enabled Parallel Processing if source 
+	** Enabled Parallel Processing if parallel operations are support by the soure and target
 	**
 	*/ 
 	
@@ -810,12 +816,13 @@ class Yadamu {
     const dbReader = await this.getDBReader(source)
     const dbWriter = await this.getDBWriter(target) 
 
-	// this.LOGGER.trace([this.constructor.name,'PIPELINE'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
     try {
       const yadamuPipeline = []
       // dbReader.getInputStream() returns itself (this) for databases...	  
 	  yadamuPipeline.push(...dbReader.getInputStreams())
 	  yadamuPipeline.push(dbWriter)
+
+      // this.LOGGER.trace([this.constructor.name,'PIPELINE'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
 
 	  streamsCompleted = yadamuPipeline.map((s) => { 
 	    return new Promise((resolve,reject) => {
@@ -824,8 +831,9 @@ class Yadamu {
 		  })
         })
       })
-	
-	  await pipeline(yadamuPipeline)
+
+ 	  // this.LOGGER.trace([this.constructor.name,`PIPELINE`,dbReader.dbi.DATABASE_VENDOR,dbWriter.dbi.DATABASE_VENDOR,process.arch,process.platform,process.version],'Starting Pipeline')
+	  await pipeline(...yadamuPipeline)
       this.STATUS.operationSuccessful = true;
    	  await Promise.allSettled(streamsCompleted)
 
@@ -837,13 +845,13 @@ class Yadamu {
 	  this.activeConnections.delete(target);
       this.reportStatus(this.STATUS,this.LOGGER)
     } catch (e) {
-   	  await Promise.allSettled(streamsCompleted)
+	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
+	  await Promise.allSettled(streamsCompleted)
 	  // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
 	  if (e.code === 'ERR_STREAM_PREMATURE_CLOSE') {
 	    e = dbReader.underlyingError instanceof Error ? dbReader.underlyingError : (dbWriter.underlyingError instanceof Error ? dbWriter.underlyingError : e)
 	  }
   	  // this.LOGGER.trace([this.constructor.name,'PIPELINE','FAILED'],e)
-	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
 	  throw e;
 	}
   }
@@ -932,7 +940,7 @@ class Yadamu {
         })
       })
 	
-	  await pipeline(pipelineComponents)
+	  await pipeline(...pipelineComponents)
       await Promise.allSettled(streamsCompleted)
     } catch (e) {
 	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)

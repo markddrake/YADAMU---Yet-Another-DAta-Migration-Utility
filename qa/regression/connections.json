@@ -122,6 +122,15 @@
         }
       }
     },
+    "mongodb#40"                        : {
+      "mongodb"                         : {
+        "host"                          : "MONGO40-01"
+      , "port"                          : 27017
+      , "options"                       : {
+           "socketTimeoutMS"            : 900000
+        }
+      }
+    },
     "snow#1"                            : {
       "snowflake"                       : {
   	    "account"                       : "snowflake_account"

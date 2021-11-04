@@ -407,7 +407,7 @@ class FileDBI extends YadamuDBI {
     if ((this.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata))) {
 	  const exportFileContents = `${exportFileHeader}}`
       const finalize = new EndExportOperation(exportFileContents)
-      await pipeline([finalize,...this.outputStreams])
+      await pipeline(finalize,...this.outputStreams)
 	}
     else {
 	  exportFileHeader = `${exportFileHeader},"data":{` 
@@ -451,7 +451,7 @@ class FileDBI extends YadamuDBI {
 		  Object.keys(this.defaultListeners[i]).forEach((e) => {this.defaultListeners[i][e].forEach((l) => {s.on(e,l)})})
 		}
 	  })
-      await pipeline([finalize,...this.outputStreams])
+      await pipeline(finalize,...this.outputStreams)
     }
   }
 	

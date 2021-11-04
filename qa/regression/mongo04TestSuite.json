@@ -1,0 +1,85 @@
+{
+  "operation"         : "dbRoundTrip"
+, "connections"       : "connections.json"
+, "tasks"             : "tasks.json"
+, "recreateSchema"    : true
+, "parameters": {
+  }
+, "tests"               : [{
+    "operation"         : "import"
+  , "source"            : "file-staging"
+  , "target"            : "mongodb#40"
+  , "verifyOperation"   : true
+  , "parameters"        : {
+      "DIRECTORY"       : "export/json/%location%"
+    }                    
+  , "tasks": [
+      "oracle","mysql","mssql"
+    ]
+  },{
+    "source"            : "oracle19c"
+  , "target"            : "mongodb#40"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "oracle18c"
+  , "target"            : "mongodb#40"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "oracle12c"
+  , "target"            : "mongodb#40"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "oracle11g"
+  , "target"            : "mongodb#40"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mssql17"
+  , "target"            : "mongodb#40"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mssql19"
+  , "target"            : "mongodb#40"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "postgres#1"
+  , "target"            : "mongodb#40"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mysql#1"
+  , "target"            : "mongodb#40"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mariadb#1"
+  , "target"            : "mongodb#40"
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  },{
+    "source"            : "mongodb#40"
+  , "targets": [
+	  "mongodb#40","oracle19c","oracle18c","oracle12c","oracle11g","mssql17","mssql19","postgres#1","mysql#1","mariadb#1"
+    ]
+  , "parameters" : {
+      "MONGO_STRIP_ID": false
+	}
+  , "tasks": [ 
+      "oracle","mysql","mssql"
+	]
+  }]
+}

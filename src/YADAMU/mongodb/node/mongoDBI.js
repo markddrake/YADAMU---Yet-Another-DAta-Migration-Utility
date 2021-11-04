@@ -143,7 +143,7 @@ class MongoDBI extends YadamuDBI {
   }    
    
    traceMongo(apiCall) {
-    return `MongoClient.db(${this.connection.databaseName}).${apiCall}\n`
+    return `MongoClient.db(${this.connection?.databaseName || this.vendorProperties.database }).${apiCall}\n`
   }
 
   getMongoURL() {
@@ -163,6 +163,7 @@ class MongoDBI extends YadamuDBI {
     // Wrapper for client.db()
     
 	let stack
+    options.useUnifiedTopology = true
     const operation = `new MongoClient.connect(${this.getMongoURL()}))\n`
     try {   
       this.status.sqlTrace.write(operation)
@@ -316,16 +317,16 @@ class MongoDBI extends YadamuDBI {
 
   async collectionCount(collection,query,options) {
 
-    // Wrapper for db.collection.count()
+    // Wrapper for db.collection.countDocuments()
     
     
 	let stack
-    const operation = `collection.count(${collection.namespace})`
+    const operation = `collection.countDocuments(${collection.namespace})`
     try {
       this.status.sqlTrace.write(this.traceMongo(operation))    
       let sqlStartTime = performance.now();
   	  stack =  new Error().stack    
-      const count = await collection.count(query,options)
+      const count = await collection.countDocuments(query,options)
       this.traceTiming(sqlStartTime,performance.now())
       return count
     } catch (e) {
