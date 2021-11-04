@@ -21,6 +21,7 @@ Write-Output "MSSQLSERVER: Start Type $STATUS"
 
 if ($STATUS -eq "Manual") {
   Write-Output "MSSQLSERVER: Restoring DATA and Log Folders"
+  New-Item -ItemType Directory -Path "C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\IN_MEMORY"
   Expand-Archive -Path "C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\DATA.zip" -DestinationPath "C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\"  
   Expand-Archive -Path "C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\Log.zip"  -DestinationPath "C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\"  
   Write-Output "MSSQLSERVER: Restored DATA and Log Folders"

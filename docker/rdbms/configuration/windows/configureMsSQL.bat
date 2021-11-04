@@ -10,5 +10,4 @@ docker cp docker/rdbms/mssql/testdata   %CONTAINER_NAME%:c:\stage
 docker cp src/install/mssql/sql         %CONTAINER_NAME%:c:\stage
 docker cp qa/sql/mssql/YADAMU_TEST.sql  %CONTAINER_NAME%:c:\stage\sql
 docker start                            %CONTAINER_NAME%
-#docker exec -it                        %CONTAINER_NAME% robocopy c:\stage c:\ProgramData\MariaDB\10\stage /MIR 
 docker exec -it                         %CONTAINER_NAME% cmd /c c:\stage\setup\configure.bat

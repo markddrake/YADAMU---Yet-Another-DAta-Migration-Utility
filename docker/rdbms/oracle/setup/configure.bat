@@ -70,7 +70,7 @@ echo.exit
 echo on
 call sampleSchemaAction.bat
 cd %stage%
-echo "REM Do Nothing" > onlineMediaAction.bat
+echo "REM Do Nothing" > installOnlineMedia.bat
 echo off
 (echo.whenever oserror exit failure
 echo.whenever sqlerror exit failure rollback
@@ -93,13 +93,43 @@ echo.  when others then
 echo.    RAISE;
 echo.end;
 echo./
-echo.spool onlineMediaAction.bat
+echo.spool installOnlineMedia.bat
 echo.select :INSTALL_ACTION from dual;
 echo.spool off
 echo.exit
 ) | sqlplus -s sys/oracle@localhost:1521/%ORACLE_PDB% as sysdba
 echo on
-call onlineMediaAction.bat
+call installOnlineMedia.bat
+echo "REM Do Nothing" > installCosts.bat
+echo off
+(echo.whenever oserror exit failure
+echo.whenever sqlerror exit failure rollback
+echo.set heading off pagesize 0 feedback off linesize 400
+echo.set trimout on trimspool on termout off echo off sqlprompt ''
+echo.VAR INSTALL_ACTION VARCHAR2(1024^^^)
+echo.--
+echo.begin
+echo.  select 'imp system/oracle@localhost:1521/%ORACLE_PDB% file=%STAGE%\testdata\sh_costs.exp fromuser=SH touser=SH DATA_ONLY=y' 
+echo.	into :INSTALL_ACTION
+echo.    from (
+echo.	  select count(*^^^) CNT
+echo.        from SH.COSTS
+echo.	^^^)
+echo.  where CNT = 0;	
+echo.exception
+echo.  when NO_DATA_FOUND then
+echo.   	:INSTALL_ACTION := 'REM PM.ONLINE_MEDIA ALREADY INSTALLED';
+echo.  when others then 
+echo.    RAISE;
+echo.end;
+echo./
+echo.spool installCosts.bat
+echo.select :INSTALL_ACTION from dual;
+echo.spool off
+echo.exit
+) | sqlplus -s sys/oracle@localhost:1521/%ORACLE_PDB% as sysdba
+echo on
+call installCosts.bat
 sqlplus system/oracle@localhost:1521/%ORACLE_PDB% @%STAGE%\sql\COMPILE_ALL.sql %STAGE%\log
 sqlplus system/oracle@localhost:1521/%ORACLE_PDB% @%STAGE%\sql\YADAMU_TEST.sql %STAGE%\log OFF
  

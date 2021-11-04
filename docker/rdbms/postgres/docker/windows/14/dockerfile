@@ -13,7 +13,8 @@ RUN .\postgis-bundle-pg14x64-setup-3.1.4-1.exe /S /D="C:\Program Files\PostgreSQ
 # Python 3
 #
 ADD https://www.python.org/ftp/python/3.9.7/python-3.9.7-amd64.exe .
-RUN .\python-3.9.7-amd64.exe /quiet InstallAllUsers=1 PrependPath=1
+RUN .\python-3.9.7-amd64.exe /quiet InstallAllUsers=1 PrependPath=1; `
+    pip3 install lxml
 #
 RUN Add-Content -path """c:\Program Files\PostgreSQL\14\data\pg_hba.conf""" -Value """host    all             all             0.0.0.0/0            trust"""; `
     Remove-Item c:\postgresql-14.0-1-windows-x64.exe; `

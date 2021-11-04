@@ -208,8 +208,8 @@ services:
       MYSQL_ROOT_PASSWORD: oracle  
     volumes:
       - YADAMU_01-SHARED:c:\shared
-      #- MARIA10-01-CONF:/etc/mysql/conf.d
-      - MARIA10-01-VOLUME:C:\ProgramData\MariaDB\10
+      - MARIA10-01-CONF:C:\ProgramData\MariaDB\10\Conf.d
+      - MARIA10-01-DATA:C:\ProgramData\MariaDB\10\Data
     restart: always
 
   MONGO50-01: 
@@ -256,6 +256,7 @@ volumes:
   MSSQL19-01-LOG:
   PGSQL14-01-VOLUME:
   MYSQL80-01-VOLUME:
-  MARIA10-01-VOLUME:
+  MARIA10-01-CONF:
+  MARIA10-01-DATA:
   MONGO50-01-VOLUME:
      

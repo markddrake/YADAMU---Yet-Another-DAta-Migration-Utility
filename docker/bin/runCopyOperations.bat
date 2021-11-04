@@ -1,1 +1,1 @@
-call %~dp0runContainer.bat YADAMU-01 yadamu/regression:latest copy
+call %~dp0runContainer.bat YADAMU-01 yadamu/secure:latest copy
