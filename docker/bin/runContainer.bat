@@ -4,10 +4,10 @@
 @set CONFIGURATION_FILE=%4
 docker stop %CONTAINER_NAME%
 docker rm %CONTAINER_NAME%
-if "%DOCKER_ENGINE%" == "Linux" ( call :linuxContainer ) else ( call :windowsContainer)
+for /f "tokens=1,2" %%i in ('docker info ^| findstr OSType') do set DOCKER_ENGINE=%%j
+if "%DOCKER_ENGINE%" == "linux" ( call :linuxContainer ) else ( call :windowsContainer)
 docker logs %CONTAINER_NAME%
 goto :eof
-
 :linuxContainer
   @set MAX_MEMORY="16g"
   @set SECURITY_OPTION=seccomp:unconfined

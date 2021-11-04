@@ -105,9 +105,11 @@ switch ($ENV:YADAMU_TEST_NAME) {
   }
   
   "all" {
-    createOutputFolders $YADAMU_MOUNT_FOLDER
     runRegressionTest "shortRegression"
     runRegressionTest "postgresDataTypes"
+    resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mysql")
+    resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\mssql")
+    resetFolder (Join-Path -Path $YADAMU_MOUNT_FOLDER -ChildPath "stagingArea\export\json\oracle")
     runRegressionTest "export"
     runRegressionTest "import"
     runRegressionTest "fileRoundtrip"

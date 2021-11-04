@@ -1,4 +1,4 @@
-if ((-not (Test-Path -Path "c:\Program Data\MariaDB\10\data"  -PathType Container)) -or (@( Get-ChildItem "c:\ProgramData\MariaDB\10\data" ).Count -eq 0)){
+if ((-not (Test-Path -Path "c:\ProgramData\MariaDB\10\data"  -PathType Container)) -or (@( Get-ChildItem "c:\ProgramData\MariaDB\10\data" ).Count -eq 0)){
   Write-Output "MariaDB: Initializing MySQL service"
   mysql_install_db.exe --datadir="c:\ProgramData\MariaDB\10\data" --service=MariaDB --password=oracle --default-user --allow-remote-root-access 
   Start-Service MariaDB

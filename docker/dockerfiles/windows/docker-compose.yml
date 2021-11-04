@@ -91,7 +91,7 @@ services:
 
   ORA1120-01: 
     container_name: ORA1120-01
-    image:  yadamu/oracle:11.2.0.1
+    image:  yadamu/oracle:11.2.0.4
     mem_limit: '6gb'
     shm_size: '4gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g

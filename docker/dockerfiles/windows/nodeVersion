@@ -3,9 +3,11 @@ FROM yadamu/svr-2019:vs22
 #
 # Install Node
 #
-ADD https://nodejs.org/dist/v17.0.0/node-v17.0.0-x64.msi .
-RUN Start-Process MsiExec.exe -Wait -ArgumentList """/i""", """node-v17.0.0-x64.msi""", """/qn"""; `
-    Remove-Item node-v17.0.0-x64.msi
+ARG NODE_VERSION
+ENV NODE_VERSION=${NODE_VERSION}
+ADD https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-x64.msi .
+RUN Start-Process MsiExec.exe -Wait -ArgumentList """/i""", """node-v$ENV:NODE_VERSION-x64.msi""", """/qn"""; `
+    Remove-Item node-v$ENV:NODE_VERSION-x64.msi
 #
 # Install Oracle Instant Client
 # 
