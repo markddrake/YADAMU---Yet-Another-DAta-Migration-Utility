@@ -3,7 +3,7 @@ FROM yadamu/base:latest
 WORKDIR C:/YADAMU
 COPY docker/regression/bin bin
 COPY docker/regression/tnsnames.ora .
-COPY docker/regression/hosts c:/windows/system32/drivers/etc/
+#COPY docker/regression/hosts c:/windows/system32/drivers/etc/
 COPY qa/bin qa/bin
 COPY qa/mappings qa/mappings
 COPY qa/regression qa/regression

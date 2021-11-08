@@ -1,21 +1,47 @@
+# escape=`
 FROM yadamu/regression:latest
-WORKDIR /usr/src/YADAMU
-ADD https://download.oracle.com/otn_software/linux/instantclient/213000/oracle-instantclient-sqlplus-21.3.0.0.0-1.x86_64.rpm .
-ENV LD_LIBRARY_PATH /usr/lib/oracle/19.6/client64/lib:$LD_LIBRARY_PATH
-ENV ACCEPT_EULA=Y
-RUN apt install apt-transport-https \
- && curl -sSL https://packages.microsoft.com/config/ubuntu/20.04/prod.list | tee /etc/apt/sources.list.d/microsoft-prod.list \
- && curl -sSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
- && apt -y update \
- && apt install -y  mssql-tools \
- && wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O - | apt-key add - \
- && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ stretch-pgdg main" >> /etc/apt/sources.list.d/pgdg.list' \
- && apt-get  -y update \
- && apt install -y postgresql-client \
- && apt install -y mariadb-client \
- && alien -i --scripts ./oracle-instantclient-sqlplus-21.3.0.0.0-1.x86_64.rpm \
- && cd /usr/local/bin \
- && ln -s /opt/mssql-tools/bin/sqlcmd \
- &&  mkdir -p mnt/cmdLine \	
- &&  ln -sfn mnt/cmdLine 
-COPY qa/cmdline qa/cmdline
+WORKDIR c:\YADAMU
+# Oracle SQL*PLUS
+ADD https://download.oracle.com/otn_software/nt/instantclient/213000/instantclient-sqlplus-windows.x64-21.3.0.0.0.zip .
+RUN Expand-Archive -Path instantclient-sqlplus-windows.x64-21.3.0.0.0.zip -DestinationPath """C:\Program Files\Oracle\InstantClient\21"""; `
+    Move-Item """C:\Program Files\Oracle\InstantClient\21\instantclient_21_3\*""" """C:\Program Files\Oracle\InstantClient\21\bin"""; `
+    Remove-Item instantclient-sqlplus-windows.x64-21.3.0.0.0.zip
+#
+# MsSQL ODBC 17 and sqlcmd
+#
+ADD https://download.microsoft.com/download/a/e/b/aeb7d4ff-ca20-45db-86b8-8a8f774ce97b/en-US/17.8.1.1/x64/msodbcsql.msi .
+ADD https://download.microsoft.com/download/0/e/6/0e63d835-3513-45a0-9cf0-0bc75fb4269e/EN/x64/MsSqlCmdLnUtils.msi .
+RUN Start-Process MsiExec.exe  -Wait -ArgumentList """/quiet""", """/passive""", """/qn""", """/i""", """msodbcsql.msi""", """IACCEPTMSODBCSQLLICENSETERMS=YES""", """ADDLOCAL=ALL"""; `
+    Start-Process MsiExec.exe  -Wait -ArgumentList """/quiet""", """/passive""", """/qn""",  """/i""", """MsSqlCmdLnUtils.msi""", """IACCEPTMSSQLCMDLNUTILSLICENSETERMS=YES""", """/qn"""; `
+    Remove-Item msodbcsql.msi, MsSqlCmdLnUtils.msi
+#
+# Postgres Command Line 
+#
+ADD https://get.enterprisedb.com/postgresql/postgresql-14.0-1-windows-x64.exe .
+RUN Start-Process .\postgresql-14.0-1-windows-x64.exe  -Wait -ArgumentList """--mode""", """unattended""", """--superpassword""", """oracle""", """--unattendedmodeui""", """none""", """--enable-components""", """commandlinetools""";`
+    [Environment]::SetEnvironmentVariable("""Path""", """c:\Program Files\PostgreSQL\14\bin;""" +  $env:Path,"""Machine"""); `
+    Remove-Item  postgresql-14.0-1-windows-x64.exe 
+#
+ADD https://cdn.mysql.com//Downloads/MySQLGUITools/mysql-workbench-community-8.0.27-winx64.msi .
+RUN Start-Process MsiExec.exe  -Wait -ArgumentList """/quiet""", """/passive""", """/qn""", """/i""", """mysql-workbench-community-8.0.27-winx64.msi""", """ ALLUSERS=1"""; `
+    Remove-Item .\mysql-workbench-community-8.0.27-winx64.msi; `
+    New-Item -ItemType directory -Path """C:\Program Files\MySQL\8.0"""; `
+    Move-Item """C:\Program Files\MySQL\MySQL Workbench 8.0 CE""" """C:\Program Files\MySQL\8.0\Workbench"""; `
+    [Environment]::SetEnvironmentVariable("""Path""", """C:\Program Files\MySQL\8.0\Workbench;""" +  $env:Path,"""Machine"""); 
+#
+# MySQLsh
+#
+ADD https://cdn.mysql.com//Downloads/MySQL-Shell/mysql-shell-8.0.26-windows-x86-64bit.zip .
+RUN Expand-Archive -Path .\mysql-shell-8.0.26-windows-x86-64bit.zip -destinationPath """C:\Program Files\MySQL"""; ` 
+    Remove-Item .\mysql-shell-8.0.26-windows-x86-64bit.zip; `
+	Move-Item """C:\Program Files\MySQL\mysql-shell-8.0.26-windows-x86-64bit""" """C:\Program Files\MySQL\8.0\Shell"""; `
+    [Environment]::SetEnvironmentVariable("""Path""", """C:\Program Files\MySQL\8.0\Shell\bin;""" +  $env:Path,"""Machine"""); 
+#
+#
+# Mongosh
+# 
+ADD https://downloads.mongodb.com/compass/mongosh-1.1.2-x64.msi .
+RUN Start-Process MsiExec.exe  -Wait -ArgumentList """/quiet""", """/passive""", """/qn""", """/i""", """mongosh-1.1.2-x64.msi"""; `
+    Remove-Item .\mongosh-1.1.2-x64.msi;
+#
+COPY qa/cmdLine qa/cmdLine
