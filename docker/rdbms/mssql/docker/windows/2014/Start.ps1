@@ -17,30 +17,31 @@ if($ACCEPT_EULA -ne "Y" -And $ACCEPT_EULA -ne "y")
 # start the service
 
 $STATUS = (Get-Service MSSQLSERVER).StartType
-Write-Output "MSSQLSERVER: Start Type $STATUS"
+$NOW = Get-Date -Format "o"
+Write-Output "$NOW Start Type $STATUS"
 
 if ($STATUS -eq "Manual") {
-  Write-Output "MSSQLSERVER: Restoring DATA and Log Folders"
+  Start-Sleep -Seconds $ENV:DELAY
+  $NOW = Get-Date -Format "o"
+  Write-Output "$NOW MSSQLSERVER: Enabling Database Service ""MSSQLSERVER""."
   Expand-Archive -Path "C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\DATA.zip" -DestinationPath "C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\"  
   Expand-Archive -Path "C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\Log.zip"  -DestinationPath "C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\"  
-  Write-Output "MSSQLSERVER: Restored DATA and Log Folders"
+  Set-Service  -Name "SQLWRITER" -StartupType "Automatic"; 
+  start-service SQLWRITER
   Set-Service -Name "MSSQLSERVER" -StartupType "Automatic"
-  Write-Output "MSSQLSERVER: Set StartType Automatic"
-  Write-Output "MSSQLSERVER: Starting."
   start-service MSSQLSERVER
+  $NOW = Get-Date -Format "o"
+  Write-Output "$NOW MSSQLSERVER: Database Service enabled."
+
+  if($sa_password -ne "_") {
+    $NOW = Get-Date -Format "o"
+    Write-Output "$NOW MSSQLSERVER: Updating sa credentials."
+      $sqlcmd = "ALTER LOGIN sa with password=" +"'" + $sa_password + "'" + ";ALTER LOGIN sa ENABLE;"
+      & sqlcmd -Q $sqlcmd
+  }
 }
-
-Write-Output "MSSQLSERVER: Started."
-
-if($sa_password -ne "_")
-{
-    Write-Output "MSSQLSERVER: Updating sa credentials."
-    $sqlcmd = "ALTER LOGIN sa with password=" +"'" + $sa_password + "'" + ";ALTER LOGIN sa ENABLE;"
-    & sqlcmd -Q $sqlcmd
-}
-
-Write-Output "MSSQLSERVER: Container Ready. Monitoring Logs."
-
+$NOW = Get-Date -Format "o"
+Write-Output "$NOW MSSQLSERVER: Container Ready. Monitoring Logs."
 $lastCheck = (Get-Date).AddSeconds(-2) 
 while ($true) 
 { 
