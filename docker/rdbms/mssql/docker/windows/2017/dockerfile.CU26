@@ -1,51 +1,41 @@
 # escape=`
-FROM yadamu/svr-2016:vs22
+FROM yadamu/svr:vs22
 #
 RUN New-Item -ItemType "directory" C:\INSTALL; `
-    New-Item -ItemType "directory" C:\INSTALL\CU   
+    New-Item -ItemType "directory" C:\INSTALL\CU
 #
 # Unpack SQL Server
 #
 WORKDIR c:/INSTALL
 COPY SQLServer2017-DEV-x64-ENU.exe .
 COPY SQLServer2017-DEV-x64-ENU.box .
+COPY SQLServer2017-Config.ini .
 RUN Start-Process .\SQLServer2017-DEV-x64-ENU.exe  -Wait -ArgumentList """/x:SQLServer2017-DEV-x64-ENU""", """/u"""; `
     Remove-Item SQLServer2017-DEV-x64-ENU.exe; `
     Remove-Item SQLServer2017-DEV-x64-ENU.box
 #
-# Install SQL Server
+# Unpload the Cummulative update #26: SQLServer2017-KB5005679-x64
 #
-# RUN C:\INSTALL\SQLServer2017-DEV-x64-ENU\SETUP.exe /Q /ACTION=Install /UPDATEENABLED=FALSE /FEATURES=SQLEngine /INSTANCENAME=MSSQLSERVER /SQLSVCACCOUNT='NT AUTHORITY\System' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS=1 /SECURITYMODE=SQL /SAPWD="""oracle#1"""
+# ADD https://download.microsoft.com/download/6/e/7/6e72dddf-dfa4-4889-bc3d-e5d3a0fd11ce/SQLServer2017-KB5005226-x64.exe CU\SQLServer2017-KB5005226-x64.exe
+COPY SQLServer2017-KB5005226-x64.exe CU
 #
-# Invoking Setup from a script appears to bypass the issue with "username" cannot be null issue that occurs when setup is invoked directly via the RUN command 
+# Install SQL Server Applying the Cummlative Update
 #
-COPY setup.ps1 .
-COPY fixDataFileLocations.sql .
-RUN .\setup.ps1
-#
-RUN $SQLSERVER = GET-SERVICE "MSSQLSERVER"; `
-	$SQLSERVER.Start(@('/T3608','/T3609')); `
-	invoke-sqlcmd -InputFile fixDataFileLocations.sql -username "sa"; `
-	$SQLSERVER.stop(); `
-	$SQLSERVER.Start
-#
-RUN Remove-Item setup.ps1; `
-    Remove-Item fixDataFileLocations.sql
-#
-# Apply Cummlative Update KB5005226
-#
-COPY SQLServer2017-KB5005226-x64.exe .
-RUN Start-Process .\SQLServer2017-KB5005226-x64.exe  -Wait -ArgumentList """/x:CU""", """/u"""; `
-    .\CU\Setup.exe /Q /IAcceptSQLServerLicenseTerms /Action=Patch /InstanceID=MSSQLSERVER; `
-    Remove-Item SQLServer2017-KB5005226-x64.exe
+RUN C:\INSTALL\SQLServer2017-DEV-x64-ENU\SETUP.exe /ConfigurationFile=C:\INSTALL\SQLServer2017-Config.ini;`
+    Remove-Item C:\INSTALL\CU\SQLServer2017-KB5005226-x64.exe; `
+	Remove-Item C:\INSTALL\SQLServer2017-Config.ini
 #
 WORKDIR c:/
-COPY prepareMounts.ps1 .
-RUN Set-Service  -Name "MSSQLSERVER" -StartupType "Manual"; `
-    Stop-Service -Name "MSSQLSERVER"; `
-    c:\prepareMounts.ps1; `
-    Remove-Item c:\prepareMounts.ps1
-SHELL [ "powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+#						
+RUN  Stop-Service -Name """SQLTELEMETRY"""; `
+     Stop-Service -Name """SQLWRITER"""; `
+	 Set-Service  -Name """SQLTELEMETRY""" -StartupType """Manual"""; `
+     Set-Service  -Name """SQLWRITER""" -StartupType """Manual"""; `
+     Compress-Archive -Path """C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\DATA""" -DestinationPath """C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\Data.zip"""; `
+     Compress-Archive -Path """C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\Log"""  -DestinationPath """C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\Log.zip"""; `
+     Remove-Item -Recurse  """C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\DATA"""; `
+     Remove-Item -Recurse  """C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\Log"""
+#    
 COPY Start.ps1 .
 #ENTRYPOINT [ "powershell","c:\\Start.ps1","-ACCEPT_EULA $ENV:ACCEPT_EULA","-SA_PASSWORD $ENV:SA_PASSWORD"]
 ENTRYPOINT powershell "c:\\Start.ps1 -ACCEPT_EULA $ENV:ACCEPT_EULA -SA_PASSWORD $ENV:SA_PASSWORD

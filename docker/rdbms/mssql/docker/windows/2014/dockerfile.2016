@@ -1,0 +1,46 @@
+# escape=`
+FROM yadamu/svr-2016:vs22
+#
+RUN New-Item -ItemType "directory" C:\INSTALL; `
+    New-Item -ItemType "directory" C:\INSTALL\CU
+#
+WORKDIR c:/INSTALL
+#
+# Install .NET 3.5SP1 using dism
+#
+copy sxs-server-2016.zip .
+RUN Expand-Archive -Path C:\INSTALL\sxs-server-2016.zip -destinationPath C:\INSTALL; `
+    dism /online /enable-feature /featurename:NetFX3 /all /Source:c:\install\sxs /LimitAccess; `
+    Remove-Item -Recurse c:\install\sxs; `
+    Remove-Item C:\INSTALL\sxs-server-2016.zip
+#
+# Unpack SQL Server
+#
+COPY SQLServer2014-SP3-DEV-x64-ENU.zip .
+COPY SQLServer2014-Config.ini .							   
+RUN Expand-Archive -Path "C:\INSTALL\SQLServer2014-SP3-DEV-x64-ENU.zip" -DestinationPath "C:\INSTALL\SQLServer2014-SP3-DEV-x64-ENU"  
+#
+# Install SQL Server
+#
+RUN C:\INSTALL\SQLServer2014-SP3-DEV-x64-ENU\SETUP.exe  /ConfigurationFile=C:\INSTALL\SQLServer2014-Config.ini; exit 0		
+#
+WORKDIR c:/
+COPY fixDataFileLocations.sql .
+#
+RUN $SQLSERVER = GET-SERVICE "MSSQLSERVER"; `
+	$SQLSERVER.Start(@('/T3608','/T3609')); `
+	invoke-sqlcmd -InputFile c:\fixDataFileLocations.sql -username "sa"; `
+	$SQLSERVER.stop(); `
+	Stop-Service -Name """SQLWRITER"""; `
+	Set-Service  -Name """SQLWRITER""" -StartupType """Manual"""; `
+    Compress-Archive -Path """C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\DATA""" -DestinationPath """C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\Data.zip"""; `
+    Compress-Archive -Path """C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\Log"""  -DestinationPath """C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\Log.zip"""; `
+    Remove-Item -Recurse  """C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\DATA"""; `
+    Remove-Item -Recurse  """C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\Log"""; 
+    # Remove-Item fixDataFileLocations.sql
+#
+WORKDIR c:/
+COPY Start.ps1 .
+#ENTRYPOINT [ "powershell","c:\\Start.ps1","-ACCEPT_EULA $ENV:ACCEPT_EULA","-SA_PASSWORD $ENV:SA_PASSWORD"]
+ENTRYPOINT powershell "c:\\Start.ps1 -ACCEPT_EULA $ENV:ACCEPT_EULA -SA_PASSWORD $ENV:SA_PASSWORD
+#ENTRYPOINT ["powershell","wait-event"]

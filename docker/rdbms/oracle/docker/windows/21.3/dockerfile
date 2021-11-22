@@ -1,5 +1,5 @@
 # escape=`
-FROM yadamu/svr-2019:vs22
+FROM yadamu/svr:vs22
 #
 # Unpack Oracle RDBMS
 #
@@ -13,9 +13,9 @@ RUN New-Item -ItemType "directory" -Path $env:ORACLE_HOME; `
 # Install Oracle Software
 #
 WORKDIR $ORACLE_HOME
-COPY dbca.rsp .
 COPY setup.rsp $ORACLE_HOME/inventory/Scripts/
 RUN .\setup.exe -silent -responseFile %ORACLE_HOME%/inventory/Scripts/setup.rsp
+COPY dbca.rsp .
 #
 # Compress and remove diag folder. It will be restored in Start.ps1
 #

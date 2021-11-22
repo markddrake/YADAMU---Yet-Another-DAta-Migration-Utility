@@ -571,7 +571,7 @@ sampleSchema=false
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-memoryPercentage=85
+memoryPercentage=25
 
 #-----------------------------------------------------------------------------
 # Name          : databaseType

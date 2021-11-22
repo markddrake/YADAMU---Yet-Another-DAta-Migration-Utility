@@ -11,5 +11,5 @@
 **
 */
 --
-@/opt/oracle/diag/setup/resizeLogGroups.sql
+@@resizeLogGroups.sql
 --

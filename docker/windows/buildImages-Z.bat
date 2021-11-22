@@ -1,6 +1,10 @@
-docker build -t yadamu/svr-2019:vs22             --file=z:\Build\YADAMU\Windows\dockerfile.vs22              z:\Build\YADAMU\Windows
-docker build -t yadamu/svr-2019:vs13             --file=z:\Build\YADAMU\Windows\dockerfile.vs13              z:\Build\YADAMU\Windows
-docker build -t yadamu/svr-2016:vs22             --file=z:\Build\YADAMU\Windows\dockerfile.svr-2016          z:\Build\YADAMU\Windows
+docker build -t yadamu/svr-2022:vs22             --file=z:\Build\YADAMU\Windows\dockerfile.2022.vs22         z:\Build\YADAMU\Windows
+docker build -t yadamu/svr-2022:vs13             --file=z:\Build\YADAMU\Windows\dockerfile.2022.vs13         z:\Build\YADAMU\Windows
+docker build -t yadamu/svr-2019:vs22             --file=z:\Build\YADAMU\Windows\dockerfile.2019.vs22         z:\Build\YADAMU\Windows
+docker build -t yadamu/svr-2019:vs13             --file=z:\Build\YADAMU\Windows\dockerfile.2019.vs13         z:\Build\YADAMU\Windows
+docker build -t yadamu/svr-2016:vs22             --file=z:\Build\YADAMU\Windows\dockerfile.2016.vs22         z:\Build\YADAMU\Windows
+docker tag yadamu/svr-2022:vs22   yadamu/svr:vs22   
+docker tag yadamu/svr-2022:vs13   yadamu/svr:vs13   
 
 docker build -t yadamu/mssql:2019                --file=z:\Build\YADAMU\MsSQL\Windows\2019\dockerfile        z:\Build\YADAMU\MsSQL\Windows\2019
 docker build -t yadamu/mssql:2019-CU13           --file=z:\Build\YADAMU\MsSQL\Windows\2019\dockerfile.CU13   z:\Build\YADAMU\MsSQL\Windows\2019

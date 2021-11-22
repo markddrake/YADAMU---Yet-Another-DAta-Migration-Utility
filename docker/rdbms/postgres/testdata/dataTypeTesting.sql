@@ -410,33 +410,33 @@ create table t_postgres.temporal_types (
  ,interval_col               interval
 );
 --
-insert into t_postgres.temporal_types values ( 'epoch'::timestamp,  'epoch'::timestamptz,  'epoch'::date,  'allballs'::time,  'epoch'::timestamptz::timetz,  '1y');
+insert into t_postgres.temporal_types values ( 'epoch'::timestamp(6),  'epoch'::timestamptz,  'epoch'::date,  'allballs'::time,  'epoch'::timestamptz::timetz,  '1y');
 --
-insert into t_postgres.temporal_types values ( 'now'::timestamp,  'now'::timestamptz,  'now'::date,  'now'::time,  'now'::timestamptz::timetz,  '365d');
+insert into t_postgres.temporal_types values ( 'now'::timestamp(6),  'now'::timestamptz,  'now'::date,  'now'::time,  'now'::timestamptz::timetz,  '365d');
 --
-insert into t_postgres.temporal_types values ( 'today'::timestamp,  'today'::timestamptz,  'today'::date,  'today'::timestamp::time,  'today'::timestamptz::timetz,  '1d');
+insert into t_postgres.temporal_types values ( 'today'::timestamp(6),  'today'::timestamptz,  'today'::date,  'today'::timestamp::time,  'today'::timestamptz::timetz,  '1d');
 --
-insert into t_postgres.temporal_types values ( 'tomorrow'::timestamp,  'tomorrow'::timestamptz,  'tomorrow'::date,  'tomorrow'::timestamp::time,  'tomorrow'::timestamptz::timetz,  '24h');
+insert into t_postgres.temporal_types values ( 'tomorrow'::timestamp(6),  'tomorrow'::timestamptz,  'tomorrow'::date,  'tomorrow'::timestamp::time,  'tomorrow'::timestamptz::timetz,  '24h');
 --
-insert into t_postgres.temporal_types values ( 'yesterday'::timestamp,  'yesterday'::timestamptz,  'yesterday'::date,  'yesterday'::timestamp::time,  'yesterday'::timestamptz::timetz,  '1h');
+insert into t_postgres.temporal_types values ( 'yesterday'::timestamp(6),  'yesterday'::timestamptz,  'yesterday'::date,  'yesterday'::timestamp::time,  'yesterday'::timestamptz::timetz,  '1h');
 --
--- insert into t_postgres.temporal_types values ( 'epoch'::timestamp,  'epoch'::timestamptz at time zone 'PST',  'epoch'::date,  'allballs'::time,  'epoch'::timestamptz::timetz at time zone 'PST',  '1m');
+-- insert into t_postgres.temporal_types values ( 'epoch'::timestamp(6),  'epoch'::timestamptz at time zone 'PST',  'epoch'::date,  'allballs'::time,  'epoch'::timestamptz::timetz at time zone 'PST',  '1m');
 --
--- insert into t_postgres.temporal_types values ( 'now'::timestamp,  'now'::timestamptz  at time zone 'PST',  'now'::date,  'now'::timestamp::time,  'now'::timestamptz::timetz at time zone 'PST',  '60s');
+-- insert into t_postgres.temporal_types values ( 'now'::timestamp(6),  'now'::timestamptz  at time zone 'PST',  'now'::date,  'now'::timestamp::time,  'now'::timestamptz::timetz at time zone 'PST',  '60s');
 --
--- insert into t_postgres.temporal_types values ( 'today'::timestamp,  'today'::timestamptz  at time zone 'PST',  'today'::date,  'today'::timestamp::time,  'today'::timestamptz::timetz  at time zone 'PST',  '1s');
+-- insert into t_postgres.temporal_types values ( 'today'::timestamp(6),  'today'::timestamptz  at time zone 'PST',  'today'::date,  'today'::timestamp::time,  'today'::timestamptz::timetz  at time zone 'PST',  '1s');
 --
--- insert into t_postgres.temporal_types values ( 'tomorrow'::timestamp,  'tomorrow'::timestamptz  at time zone 'PST',  'tomorrow'::date,  'tomorrow'::timestamp::time,  'tomorrow'::timestamptz::timetz  at time zone 'PST',  '1y');
+-- insert into t_postgres.temporal_types values ( 'tomorrow'::timestamp(6),  'tomorrow'::timestamptz  at time zone 'PST',  'tomorrow'::date,  'tomorrow'::timestamp::time,  'tomorrow'::timestamptz::timetz  at time zone 'PST',  '1y');
 --
--- insert into t_postgres.temporal_types values ( 'yesterday'::timestamp,  'yesterday'::timestamptz  at time zone 'PST',  'yesterday'::date,  'yesterday'::timestamp::time,  'yesterday'::timestamptz::timetz  at time zone 'PST',  '1y');
+-- insert into t_postgres.temporal_types values ( 'yesterday'::timestamp(6),  'yesterday'::timestamptz  at time zone 'PST',  'yesterday'::date,  'yesterday'::timestamp::time,  'yesterday'::timestamptz::timetz  at time zone 'PST',  '1y');
 --
--- insert into t_postgres.temporal_types values ( 'Infinity'::timestamp,  'Infinity'::timestamptz,  'Infinity'::date,  'allballs'::time,  'Infinity'::timestamptz::timetz,  '1y');
+-- insert into t_postgres.temporal_types values ( 'Infinity'::timestamp(6),  'Infinity'::timestamptz,  'Infinity'::date,  'allballs'::time,  'Infinity'::timestamptz::timetz,  '1y');
 --
--- insert into t_postgres.temporal_types values ( '-Infinity'::timestamp,  '-Infinity'::timestamptz,  '-Infinity'::date,  'allballs'::time,  '-Infinity'::timestamptz::timetz,  '1y');
+-- insert into t_postgres.temporal_types values ( '-Infinity'::timestamp(6),  '-Infinity'::timestamptz,  '-Infinity'::date,  'allballs'::time,  '-Infinity'::timestamptz::timetz,  '1y');
 --
--- insert into t_postgres.temporal_types values ( '4713-01-01 00:00:00 BC'::timestamp,  '4713-01-01 00:00:00 BC'::timestamptz,  '4713-01-01'::date,  '00:00:00'::time,  '00:00:00+1559'::timetz at time zone 'UTC',  '-178000000y');
+-- insert into t_postgres.temporal_types values ( '4713-01-01 00:00:00 BC'::timestamp(6),  '4713-01-01 00:00:00 BC'::timestamptz,  '4713-01-01'::date,  '00:00:00'::time,  '00:00:00+1559'::timetz at time zone 'UTC',  '-178000000y');
 --
--- insert into t_postgres.temporal_types values ( '294276-12-31 00:00:00 AD'::timestamp,  '294276-12-31 00:00:00 AD'::timestamptz,  '5874897-01-01'::date,  '24:00:00'::time,  '24:00:00-1559'::timetz at time zone 'UTC',  '178000000y');
+-- insert into t_postgres.temporal_types values ( '294276-12-31 00:00:00 AD'::timestamp(6),  '294276-12-31 00:00:00 AD'::timestamptz,  '5874897-01-01'::date,  '24:00:00'::time,  '24:00:00-1559'::timetz at time zone 'UTC',  '178000000y');
 --
 --
 -- 8.8. Geometric Types

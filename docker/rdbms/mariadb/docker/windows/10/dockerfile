@@ -1,5 +1,5 @@
 # escape=`
-FROM yadamu/svr-2019:vs22
+FROM yadamu/svr:vs22
 WORKDIR c:/
 #
 ADD http://mirrors.accretive-networks.net/mariadb//mariadb-10.6.4/winx64-packages/mariadb-10.6.4-winx64.zip .

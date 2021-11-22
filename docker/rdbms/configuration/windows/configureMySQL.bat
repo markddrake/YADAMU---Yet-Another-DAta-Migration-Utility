@@ -8,6 +8,7 @@ docker stop                             %CONTAINER_NAME%
 docker cp docker/rdbms/mysql/setup      %CONTAINER_NAME%:c:\stage
 docker cp docker/rdbms/mysql/testdata   %CONTAINER_NAME%:c:\stage
 docker cp src/install/mysql/sql         %CONTAINER_NAME%:c:\stage
+docker cp src/install/mysql/js          %CONTAINER_NAME%:c:\stage
 docker cp qa/sql/mysql/YADAMU_TEST.sql  %CONTAINER_NAME%:c:\stage\sql
 docker start                            %CONTAINER_NAME%
 docker exec -it                         %CONTAINER_NAME% robocopy c:\stage c:\ProgramData\MySQL\8.0\stage /MIR 

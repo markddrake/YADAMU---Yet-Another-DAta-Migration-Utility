@@ -1,5 +1,5 @@
 # escape=`
-FROM yadamu/svr-2019:vs13
+FROM yadamu/svr:vs13
 #
 # The 12.2 version of setup.exe will not run in servercore. (No GUI).
 # In order to get a working 12.2 in server core is necessary to perform a software only installation in a clean Windows 10 or 11 environment. 
@@ -12,21 +12,18 @@ FROM yadamu/svr-2019:vs13
 # (3) oracle.reg:                    An export of the HKLM:\Software\oracle. Generate this file using the RegEdit to export the oracle key.
 #
 WORKDIR C:/
+ENV ORACLE_SID CDB12200
+ENV ORACLE_HOME c:\oracle\rdbms\12.2\db_home1
 #
 COPY winx64_12201_dbhome_1.zip C:/
 COPY oracleInventory.zip C:/
 COPY oracle.reg C:/
 #
-#
-# Prepend Oracle Bin folder to PATH environment variable and set ORACLE_SID.
-#
-ENV ORACLE_SID CDB12200
-ENV ORACLE_HOME c:\oracle\rdbms\12.2\db_home1
-#
 # Install Oracle Software:
 #
 # Unpack Oracle RDBMS and the Oracle Inventory. 
 # Update the Registry
+# Prepend Oracle Bin folder to PATH environment variable and set ORACLE_SID.																			
 # Create ora_dba group
 # Add containerAdministrator to the ora_dbo group: enable "connect / as syssdba"
 #
@@ -46,9 +43,10 @@ WORKDIR $ORACLE_HOME
 COPY dbca.rsp .
 COPY tnsnames.ora $ORACLE_HOME/network/admin
 #
-# Defer execution of NETCA and DBCA to Start.ps1. This allows volumes and hostnames to be assigned using "Docker RUN" or "Docker-Compose"
+# Execution of NETCA and DBCA deferred to Start.ps1. This allows volumes and hostnames to be assigned using "Docker RUN" or "Docker-Compose"
 #
 WORKDIR c:/
 COPY Start.ps1 .
 ENTRYPOINT ["powershell","c:\\Start.ps1"]
 #ENTRYPOINT ["powershell","wait-event"]
+

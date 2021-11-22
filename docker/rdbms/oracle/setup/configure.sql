@@ -29,6 +29,17 @@ alter database datafile &FILE_ID resize 1G
 alter database datafile &FILE_ID autoextend on next 256M
 /
 --
+-- Set Temp Tablespace to 1G
+--
+select FILE_ID 
+  from DBA_TEMP_FILES
+ where TABLESPACE_NAME = 'TEMP'
+/
+alter database tempfile &FILE_ID resize 1G
+/
+alter database tempfile &FILE_ID autoextend on next 256M
+/
+--
 -- Grant permission required to use DBMS_CRYPTO during Schema Compare Operations
 --
 grant execute on DBMS_CRYPTO to SYSTEM
@@ -45,6 +56,9 @@ select 'configure_' ||  SUBSTR('&_O_RELEASE',1,4) || '.sql' SCRIPT_NAME
 --
 alter user system identified by oracle
 /
+
+alter system register
+/
 --
 -- Move the Recovery File Location to the 'oradata' volume
 --
@@ -57,9 +71,8 @@ alter user system identified by oracle
 --
 -- Restart to force changes to take effect
 --
-shutdown immediate;
-connect / as sysdba
-startup
-alter system register
-/
+-- shutdown immediate;
+-- connect / as sysdba
+-- startup
+--
 exit

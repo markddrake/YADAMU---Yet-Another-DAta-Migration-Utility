@@ -4,8 +4,8 @@ services:
   ORA1903-01: 
     container_name: ORA1903-01
     image:  yadamu/oracle:19.3.0
-    mem_limit: '10gb'
-    shm_size: '4gb'
+    mem_limit: '5gb'
+    shm_size: '2gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
@@ -26,8 +26,8 @@ services:
   ORA1803-01: 
     container_name: ORA1803-01
     image:  yadamu/oracle:18.3.0
-    mem_limit: '10gb'
-    shm_size: '4gb'
+    mem_limit: '5gb'
+    shm_size: '2gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
@@ -48,8 +48,8 @@ services:
   ORA1220-01: 
     container_name: ORA1220-01
     image:  yadamu/oracle:12.2.0
-    mem_limit: '10gb'
-    shm_size: '4gb'
+    mem_limit: '5gb'
+    shm_size: '2gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
@@ -70,8 +70,8 @@ services:
   ORA1120-01: 
     container_name: ORA1120-01
     image:  yadamu/oracle:11.2.0.4
-    mem_limit: '10gb'
-    shm_size: '4gb'
+    mem_limit: '5gb'
+    shm_size: '2gb'
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
@@ -93,8 +93,8 @@ services:
   MYSQL80-01: 
     container_name: MYSQL80-01
     image:  yadamu/mysql:8
-    mem_limit: '8gb'
-    shm_size: '4gb'
+    mem_limit: '3gb'
+    shm_size: '2gb'
     networks:
       - YADAMU-NET
     #ports: 
@@ -107,8 +107,8 @@ services:
   MARIA10-01: 
     container_name: MARIA10-01
     image:  yadamu/mariadb:10
-    mem_limit: '8gb'
-    shm_size: '4gb'
+    mem_limit: '3gb'
+    shm_size: '2gb'
     networks:
       - YADAMU-NET
     #ports: 

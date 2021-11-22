@@ -1,5 +1,5 @@
 # escape=`
-FROM yadamu/svr-2019:vs22
+FROM yadamu/svr:vs22
 #
 # Install Node
 #

@@ -1,8 +1,8 @@
 # escape=`
-FROM yadamu/svr-2019:vs22
+FROM yadamu/svr:vs22
 #
 ADD https://get.enterprisedb.com/postgresql/postgresql-14.0-1-windows-x64.exe .
-RUN c:\postgresql-14.0-1-windows-x64.exe --mode unattended --superpassword oracle --unattendedmodeui none; `
+RUN c:\postgresql-14.0-1-windows-x64.exe --mode unattended --superpassword oracle --unattendedmodeui none --extract-only yes; `
     [Environment]::SetEnvironmentVariable("""Path""", """c:\Program Files\PostgreSQL\14\bin;""" +  $env:Path,"""Machine"""); 
 #
 # PostGIS
@@ -16,16 +16,10 @@ ADD https://www.python.org/ftp/python/3.9.7/python-3.9.7-amd64.exe .
 RUN .\python-3.9.7-amd64.exe /quiet InstallAllUsers=1 PrependPath=1;
 RUN pip3 install lxml
 #
-RUN Add-Content -path """c:\Program Files\PostgreSQL\14\data\pg_hba.conf""" -Value """host    all             all             0.0.0.0/0            trust"""; `
-    Remove-Item c:\postgresql-14.0-1-windows-x64.exe; `
+RUN Remove-Item c:\postgresql-14.0-1-windows-x64.exe; `
 	Remove-Item c:\postgis-bundle-pg14x64-setup-3.1.4-1.exe; `
-	Remove-Item c:\python-3.9.7-amd64.exe; `
-    Stop-Service -Name "postgresql-x64-14"; `
-    Set-Service  -Name "postgresql-x64-14" -StartupType "Manual"; `
-    Compress-Archive -Path """c:\Program Files\PostgreSQL\14\data""" -DestinationPath """c:\Program Files\PostgreSQL\14\data.zip"""; `
-	Remove-Item -recurse """c:\Program Files\PostgreSQL\14\data"""
-    
-#
+	Remove-Item c:\python-3.9.7-amd64.exe; 
+#`
 COPY Start.ps1 .
 ENTRYPOINT ["powershell", "c:/Start.ps1"]
 #ENTRYPOINT ["powershell","wait-event"]
