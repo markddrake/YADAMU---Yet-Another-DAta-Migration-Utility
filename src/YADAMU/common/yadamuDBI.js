@@ -17,6 +17,7 @@ const DBIConstants = require('./dbiConstants.js');
 const YadamuConstants = require('./yadamuConstants.js');
 const YadamuLibrary = require('./yadamuLibrary.js')
 const {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError, BatchInsertError, IterativeInsertError, InputStreamError} =  require('./yadamuException.js');
+const {FileNotFound, FileError} = require('../file/node/fileException.js');
 const DefaultParser = require('./defaultParser.js');
 const DummyWritable = require('./nullWritable.js')
 
@@ -31,35 +32,36 @@ class YadamuDBI {
 
   // Instance level getters.. invoke as this.METHOD
 
-  get DATABASE_KEY()               { return 'yadamu' };
-  get DATABASE_VENDOR()            { return 'YADAMU' };
-  get SOFTWARE_VENDOR()            { return 'YABASC - Yet Another Bay Area Software Company'};
+  get DATABASE_KEY()                 { return 'yadamu' };
+  get DATABASE_VENDOR()              { return 'YADAMU' };
+  get SOFTWARE_VENDOR()              { return 'YABASC - Yet Another Bay Area Software Company'};
  
-  get DATA_STAGING_SUPPORTED()     { return false } 
-  get SQL_COPY_OPERATIONS()        { return false }
-  get PARALLEL_READ_OPERATIONS()   { return true };
-  get PARALLEL_WRITE_OPERATIONS()  { return true }
-  get PARALLEL_OPERATIONS()        { return this.PARALLEL_READ_OPERATIONS && this.PARALLEL_WRITE_OPERATIONS }
+  get DATA_STAGING_SUPPORTED()       { return false } 
+  get SQL_COPY_OPERATIONS()          { return false }
+  get PARALLEL_READ_OPERATIONS()     { return true };
+  get PARALLEL_WRITE_OPERATIONS()    { return true }
+  get PARALLEL_OPERATIONS()          { return this.PARALLEL_READ_OPERATIONS && this.PARALLEL_WRITE_OPERATIONS }
   
-  get PASSWORD_KEY_NAME()          { return 'password' };
-  get STATEMENT_TERMINATOR()       { return ';' }
-  get STATEMENT_SEPERATOR()        { return '\n--\n' }
+  get PASSWORD_KEY_NAME()            { return 'password' };
+  get STATEMENT_TERMINATOR()         { return ';' }
+  get STATEMENT_SEPERATOR()          { return '\n--\n' }
 
-  get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT              || DBIConstants.SPATIAL_FORMAT };
-  get TABLE_MAX_ERRORS()           { return this.parameters.TABLE_MAX_ERRORS            || DBIConstants.TABLE_MAX_ERRORS };
-  get TOTAL_MAX_ERRORS()           { return this.parameters.TOTAL_MAX_ERRORS            || DBIConstants.TOTAL_MAX_ERRORS };
-  get COMMIT_RATIO()               { return this.parameters.hasOwnProperty('COMMIT_RATIO') ?  this.parameters.COMMIT_RATIO : DBIConstants.COMMIT_RATIO };
-  get MODE()                       { return this.parameters.MODE                        || DBIConstants.MODE }
-  get ON_ERROR()                   { return this.parameters.ON_ERROR                    || DBIConstants.ON_ERROR }
-  get INFINITY_MANAGEMENT()        { return this.parameters.INFINITY_MANAGEMENT         || DBIConstants.INFINITY_MANAGEMENT };
-  get LOCAL_STAGING_AREA()         { return YadamuLibrary.macroSubstitions((this.parameters.LOCAL_STAGING_AREA     || DBIConstants.LOCAL_STAGING_AREA || ''), this.yadamu.MACROS || '') }
-  get REMOTE_STAGING_AREA()        { return YadamuLibrary.macroSubstitions((this.parameters.REMOTE_STAGING_AREA    || DBIConstants.REMOTE_STAGING_AREA || ''), this.yadamu.MACROS || '') }
-  get STAGING_FILE_RETENTION()     { return this.parameters.STAGING_FILE_RETENTION      || DBIConstants.STAGING_FILE_RETENTION }
-  get TIMESTAMP_PRECISION()        { return this.parameters.TIMESTAMP_PRECISION         || DBIConstants.TIMESTAMP_PRECISION }
-  get BYTE_TO_CHAR_RATIO()         { return this.parameters.BYTE_TO_CHAR_RATIO          || DBIConstants.BYTE_TO_CHAR_RATIO }
-  get RETRY_COUNT()                { return 3 }
-  get PARTITION_LEVEL_OPERATIONS() { return this.parameters.PARTITION_LEVEL_OPERATIONS  || DBIConstants.PARTITION_LEVEL_OPERATIONS }
-  
+  get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT              || DBIConstants.SPATIAL_FORMAT };
+  get TABLE_MAX_ERRORS()             { return this.parameters.TABLE_MAX_ERRORS            || DBIConstants.TABLE_MAX_ERRORS };
+  get TOTAL_MAX_ERRORS()             { return this.parameters.TOTAL_MAX_ERRORS            || DBIConstants.TOTAL_MAX_ERRORS };
+  get COMMIT_RATIO()                 { return this.parameters.hasOwnProperty('COMMIT_RATIO') ?  this.parameters.COMMIT_RATIO : DBIConstants.COMMIT_RATIO };
+  get MODE()                         { return this.parameters.MODE                        || DBIConstants.MODE }
+  get ON_ERROR()                     { return this.parameters.ON_ERROR                    || DBIConstants.ON_ERROR }
+  get INFINITY_MANAGEMENT()          { return this.parameters.INFINITY_MANAGEMENT         || DBIConstants.INFINITY_MANAGEMENT };
+  get LOCAL_STAGING_AREA()           { return YadamuLibrary.macroSubstitions((this.parameters.LOCAL_STAGING_AREA     || DBIConstants.LOCAL_STAGING_AREA || ''), this.yadamu.MACROS || '') }
+  get REMOTE_STAGING_AREA()          { return YadamuLibrary.macroSubstitions((this.parameters.REMOTE_STAGING_AREA    || DBIConstants.REMOTE_STAGING_AREA || ''), this.yadamu.MACROS || '') }
+  get STAGING_FILE_RETENTION()       { return this.parameters.STAGING_FILE_RETENTION      || DBIConstants.STAGING_FILE_RETENTION }
+  get TIMESTAMP_PRECISION()          { return this.parameters.TIMESTAMP_PRECISION         || DBIConstants.TIMESTAMP_PRECISION }
+  get BYTE_TO_CHAR_RATIO()           { return this.parameters.BYTE_TO_CHAR_RATIO          || DBIConstants.BYTE_TO_CHAR_RATIO }
+  get RETRY_COUNT()                  { return 3 }
+  get IDENTIFIER_TRANSFORMATION()    { return this.yadamu.IDENTIFIER_TRANSFORMATION }
+  get PARTITION_LEVEL_OPERATIONS()   { return this.parameters.PARTITION_LEVEL_OPERATIONS  || DBIConstants.PARTITION_LEVEL_OPERATIONS }
+
   get BATCH_SIZE() {
     this._BATCH_SIZE = this._BATCH_SIZE || (() => {
       let batchSize =  this.parameters.BATCH_SIZE || DBIConstants.BATCH_SIZE
@@ -86,8 +88,7 @@ class YadamuDBI {
   get PARALLEL()                      { return this.parameters.PARALLEL === 0 ? 0 : (this.parameters.PARALLEL || this.yadamu.PARALLEL)}
   
   get EXCEPTION_FOLDER()              { return this.parameters.FILE     || this.yadamu.EXCEPTION_FOLDER }
-  get EXCEPTION_FILE_PREFIX()         { returny
-  this.parameters.FILE     || this.yadamu.EXCEPTION_FILE_PREFIX }
+  get EXCEPTION_FILE_PREFIX()         { return this.parameters.FILE     || this.yadamu.EXCEPTION_FILE_PREFIX }
   get REJECTION_FOLDER()              { return this.parameters.FILE     || this.yadamu.REJECTION_FOLDER }
   get REJECTION_FILE_PREFIX()         { return this.parameters.FILE     || this.yadamu.REJECTION_FILE_PREFIX }
   get WARNING_FOLDER()                { return this.parameters.FILE     || this.yadamu.WARNING_FOLDER }
@@ -162,9 +163,7 @@ class YadamuDBI {
 	  return this._UPLOAD_FILE
     })()
   }		
-    
-  get TABLE_MATCHING()                { return this.parameters.TABLE_MATCHING }
-  
+     
   get DESCRIPTION()                   { return this._DESCRIPTION }
   set DESCRIPTION(v)                  { this._DESCRIPTION = v }
 
@@ -235,7 +234,7 @@ class YadamuDBI {
   }
 
   setParameters(parameters) {
-	
+	// Used when creating a worker.
 	Object.assign(this.parameters, parameters || {})
 	this._COMMIT_COUNT = undefined
   }
@@ -442,7 +441,7 @@ class YadamuDBI {
   }
    
   isValidDDL() {
-    return (this.systemInformation.vendor === this.DATABASE_VENDOR)
+    return ((this.systemInformation.vendor === this.DATABASE_VENDOR) && (this.systemInformation.dbVersion <= this.DB_VERSION))
   }
   
   isDatabase() {
@@ -522,7 +521,7 @@ class YadamuDBI {
      
   generateIdentifierMappings(metadata) {
     const identifierMappings = {}
-    switch (this.yadamu.IDENTIFIER_TRANSFORMATION) {
+    switch (this.IDENTIFIER_TRANSFORMATION) {
       case 'NONE':
         break;
       case 'UPPERCASE':
@@ -543,10 +542,18 @@ class YadamuDBI {
           metadata[table].columnNames.forEach((columnName) => { identifierMappings[table].columnMappings[columnName] = { name : columnName.toLowerCase()}})
         })
         break;
+      case 'LOWERCASE_TABLE_NAMES':
+        Object.keys(metadata).forEach((table) => {
+          identifierMappings[table] = { 
+            tableName      : metadata[table].tableName.toLowerCase()
+          , columnMappings : {}
+          }
+        })
+        break;
       case 'CUSTOM':
-        throw new YadamuError([this.DATABSE_VENDOR],`IDENTIFIER_TRANSFORMATION="${this.yadamu.IDENTIFIER_TRANSFORMATION}": Unsupported Feature in YADAMU ${YadamuConstants.YADAMU_VERSION}.`)       
+        throw new YadamuError([this.DATABSE_VENDOR],`IDENTIFIER_TRANSFORMATION="${this.IDENTIFIER_TRANSFORMATION}": Unsupported Feature in YADAMU ${YadamuConstants.YADAMU_VERSION}.`)       
       default:
-        throw new YadamuError([this.DATABSE_VENDOR],`Invalid IDENTIFIER_TRANSFORMATION specified (${this.yadamu.IDENTIFIER_TRANSFORMATION}). Valid Values are ${YadamuConstants.SUPPORTED_IDENTIFIER_TRANSFORMATION}.`)
+        throw new YadamuError([this.DATABSE_VENDOR],`Invalid IDENTIFIER_TRANSFORMATION specified (${this.IDENTIFIER_TRANSFORMATION}). Valid Values are ${YadamuConstants.SUPPORTED_IDENTIFIER_TRANSFORMATION}.`)
     } 
    
     return identifierMappings
@@ -576,7 +583,7 @@ class YadamuDBI {
 
     const databaseMappings = this.generateDatabaseMappings(mappedMetadata);
     this.mergeMappings(databaseMappings, this.yadamu.IDENTIFIER_MAPPINGS)
-    this.metadata = YadamuLibrary.isEmpty(databaseMappings) ?  mappedMetadata : this.applyIdentifierMappings(mappedMetadata,databaseMappings,true)
+	this.metadata = YadamuLibrary.isEmpty(databaseMappings) ?  mappedMetadata : this.applyIdentifierMappings(mappedMetadata,databaseMappings,true)
     this.setIdentifierMappings( this.mergeMappings(generatedMappings,databaseMappings))
   }
 
@@ -897,11 +904,6 @@ class YadamuDBI {
   async releaseWorkerConnection() {
 	await this.closeConnection()
   }
-
-  async releasePrimaryConnection() {
-	// Defer until finalize()
-	// await this.closeConnection()
-  }
   
   async finalize(options) {
 	// this.yadamuLogger.trace([this.constructor.name,`finalize(${poolOptions})`],'')
@@ -1034,6 +1036,29 @@ class YadamuDBI {
   **
   */
 
+  
+  async upload() {
+
+	let stack 
+	try {
+      stack = new Error().stack		
+      const stats = fs.statSync(this.UPLOAD_FILE)
+      const fileSizeInBytes = stats.size    
+
+      const startTime = performance.now();
+      const jsonHndl = await this.uploadFile(this.UPLOAD_FILE);
+      const elapsedTime = performance.now() - startTime;
+      this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`UPLOAD`],`File "${this.UPLOAD_FILE}". Size ${fileSizeInBytes}. Elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
+	  await this.initializeImport()
+      const log = await this.processFile(jsonHndl)
+	  await this.finalizeImport()
+	  return log
+    } catch (err) {
+      throw err.code === 'ENOENT' ? new FileNotFound(err,stack,this.UPLOAD_FILE) : new FileError(err,stack,this.UPLOAD_FILE)
+	}
+  }
+
+
   /*
   **
   **  Upload a JSON File to the server. Optionally return a handle that can be used to process the file
@@ -1075,13 +1100,14 @@ class YadamuDBI {
   getSystemInformation() {     
   
     return {
-      date               : new Date().toISOString()
+      yadamuVersion      : YadamuConstants.YADAMU_VERSION
+    , date               : new Date().toISOString()
     , timeZoneOffset     : new Date().getTimezoneOffset()
     , typeMappings       : this.getTypeMappings()
 	, tableFilter        : this.getTABLE_FILTER
     , schema             : this.parameters.FROM_USER ? this.parameters.FROM_USER : this.parameters.TO_USER
-    , exportVersion      : YadamuConstants.YADAMU_VERSION
     , vendor             : this.DATABASE_VENDOR
+	, dbVersion          : this.DB_VERSION
 	, softwareVendor     : this.SOFTWARE_VENDOR
     , nodeClient         : {
         version          : process.version
@@ -1291,7 +1317,7 @@ class YadamuDBI {
   }
   
   getTableInfo(tableName) {
-	  
+	
     if (this.statementCache === undefined) {
       this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`Statement Cache undefined. Cannot obtain required information.`)
 	}
@@ -1383,17 +1409,6 @@ class YadamuDBI {
   }
   
   keepAlive(rowCount) {
-  }
-
-  configureTest(recreateSchema) {
-    /*
-    if (this.parameters.IDENTIFIER_MAPPING_FILE) {
-      this.loadIdentifierMappings(this.parameters.IDENTIFIER_MAPPING_FILE);
-    } 
-    */    
-    if (recreateSchema === true) {
-      this.setOption('recreateSchema',true);
-    }
   }
 
   reloadStatementCache() {
@@ -1527,11 +1542,11 @@ class YadamuDBI {
 	return statementCache
   }     
   
-  async reportCopyErrors(tableName,stack,sqlStatement) {
+  async reportCopyErrors(tableName,stack,sqlStatement,failed) {
   }
   
   async reportCopyResults(tableName,rowsRead,failed,startTime,endTime,copyStatements,stack) {
-	  
+	 
 	const elapsedTime = endTime - startTime
 	const throughput = Math.round((rowsRead/elapsedTime) * 1000)
     const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${throughput} rows/s.`
@@ -1545,7 +1560,7 @@ class YadamuDBI {
       default:
 	    rowCountSummary = `Read ${rowsRead}. Written ${rowsRead - failed}.`
         this.yadamuLogger.error([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
-        await this.reportCopyErrors(tableName,stack,copyStatements.dml)
+        await this.reportCopyErrors(tableName,stack,copyStatements.dml,failed)
 	}
 	
 	if (copyStatements.hasOwnProperty('partitionCount')) {
@@ -1605,7 +1620,6 @@ class YadamuDBI {
 	 
     this.activeWorkers = new Set()
     const taskCount = taskList.length
-	
     const maxWorkerCount = parseInt(this.yadamu.PARALLEL)
     const workerCount = taskList.length < maxWorkerCount ? taskList.length : maxWorkerCount
   
@@ -1665,6 +1679,8 @@ class YadamuDBI {
 	this.setSystemInformation(controlFile.systemInformation)
 
     const startTime = performance.now()	
+	await this.initializeImport()
+
 	const statementCache = await this.generateCopyStatements(metadata,credentials);
 	const ddlStatements = this.analyzeStatementCache(statementCache,startTime)
 	let results = await this.executeDDL(ddlStatements)
@@ -1675,7 +1691,7 @@ class YadamuDBI {
 	else {
   	  this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Executed ${Array.isArray(results) ? results.length : undefined} DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
 	}
-
+    
 	if (this.MODE != 'DDL_ONLY') {
 	  const taskList = Object.keys(statementCache).flatMap((table) => {
 		if (Array.isArray(statementCache[table].copy)) {
@@ -1698,6 +1714,7 @@ class YadamuDBI {
 	  await this.finalizeCopy()
 	  
 	}
+	await this.finalizeImport()
     return results
   }
   

@@ -30,26 +30,25 @@ class PostgresQA extends PostgresDBI {
        super(yadamu,settings,parameters);
     }
     
-    setMetadata(metadata) {
-      super.setMetadata(metadata)
-    }
-	 
 	async initialize() {
 	  await super.initialize();
-	  if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
 	  if (this.terminateConnection()) {
         const pid = await this.getConnectionID();
 	    this.scheduleTermination(pid,this.getWorkerNumber());
 	  }
 	}
 	
-	async recreateSchema() {
+    async initializeImport() {
+	  if (this.options.recreateSchema === true) {
+		await this.recreateSchema();
+	  }
+	  await super.initializeImport();
+    }	
+
+ 	async recreateSchema() {
       try {
         const dropSchema = `drop schema if exists "${this.parameters.TO_USER}" cascade`;
-        this.status.sqlTrace.write(`${dropSchema};\n--\n`)
-        await this.executeSQL(dropSchema);      
+        const results = await this.executeSQL(dropSchema);      
       } catch (e) {
         if (e.errorNum && (e.errorNum === 1918)) {
         }

@@ -44,19 +44,20 @@ class StatementGenerator {
 
 
   // This is the spatial format of the incoming data, not the format used by this driver
-  get SPATIAL_FORMAT()   { return this.dbi.INBOUND_SPATIAL_FORMAT } 
-  get OBJECTS_AS_JSON()  { return this.dbi.systemInformation.objectFormat === 'JSON'}
+  get SPATIAL_FORMAT()               { return this.dbi.INBOUND_SPATIAL_FORMAT } 
+  get OBJECTS_AS_JSON()              { return this.dbi.systemInformation.objectFormat === 'JSON'}
 
-  get GEOJSON_FUNCTION()         { return 'DESERIALIZE_GEOJSON' }
-  get RANDOM_OBJECT_LENGTH()     { return 16 }
-  get ORACLE_CSV_SPECIFICATION() { return 'CSV WITH EMBEDDED' }
+  get GEOJSON_FUNCTION()             { return 'DESERIALIZE_GEOJSON' }
+  get RANDOM_OBJECT_LENGTH()         { return 16 }
+  get ORACLE_CSV_SPECIFICATION()     { return 'CSV WITH EMBEDDED' }
+  get ORACLE_NEWLINE_SPECIFICATION() { return 'RECORDS DELIMITED BY NEWLINE'}
   
-  get SQL_DIRECTORY_NAME()       { return this._SQL_DIRECTORY_NAME }
-  set SQL_DIRECTORY_NAME(v)      { this._SQL_DIRECTORY_NAME = v }
-  get SQL_DIRECTORY_PATH()       { return this._SQL_DIRECTORY_PATH }
-  set SQL_DIRECTORY_PATH(v)      { this._SQL_DIRECTORY_PATH = v }
-  get LOADER_CLOB_SIZE()         { return 67108864 }
-  get LOADER_CLOB_TYPE()         { return `CHAR(${this.LOADER_CLOB_SIZE})`}
+  get SQL_DIRECTORY_NAME()           { return this._SQL_DIRECTORY_NAME }
+  set SQL_DIRECTORY_NAME(v)          { this._SQL_DIRECTORY_NAME = v }
+  get SQL_DIRECTORY_PATH()           { return this._SQL_DIRECTORY_PATH }
+  set SQL_DIRECTORY_PATH(v)          { this._SQL_DIRECTORY_PATH = v }
+  get LOADER_CLOB_SIZE()             { return 67108864 }
+  get LOADER_CLOB_TYPE()             { return `CHAR(${this.LOADER_CLOB_SIZE})`}
     
   constructor(dbi, targetSchema, metadata, yadamuLogger) {
     this.dbi = dbi;
@@ -255,11 +256,6 @@ class StatementGenerator {
 	
     return tableInfo
   }
-  
-  generateWrapperNames(tableInfo) {
-	// Only Required with release 11.2.
-  }
-
 
   getTypeMappings() {
 
@@ -272,6 +268,49 @@ class StatementGenerator {
 	}
 	
 	return JSON.stringify(typeMappings); 
+  }
+  
+  generateExternalTableDefinition(tableMetadata,externalTableName,externalColumnDefinitions,copyColumnDefinitions) {
+	 return `
+CREATE TABLE ${externalTableName} (
+  ${externalColumnDefinitions.join(',')}
+) 
+ORGANIZATION EXTERNAL ( 
+  default directory ${this.SQL_DIRECTORY_NAME} 
+  ACCESS PARAMETERS (
+    ${this.ORACLE_NEWLINE_SPECIFICATION}
+	READSIZE 67108864 
+	CHARACTERSET AL32UTF8 
+	${this.dbi.COPY_BADFILE_DIRNAME ? `BADFILE ${this.dbi.COPY_BADFILE_DIRNAME}:` : 'NOBADFILE'}
+	${this.dbi.COPY_LOGFILE_DIRNAME ? `LOGFILE ${this.dbi.COPY_LOGFILE_DIRNAME}:` : 'NOLOGFILE'}
+	FIELDS ${this.ORACLE_CSV_SPECIFICATION}
+		   MISSING FIELD VALUES ARE NULL 
+		   (
+		     ${copyColumnDefinitions.join(",")}
+		   )
+  ) 
+  LOCATION (
+	'${tableMetadata.partitionCount ? `${tableMetadata.dataFile.map((filename) => { return path.basename(filename).split(path.sep).join(path.posix.sep)}).join("','")}` : path.basename(tableMetadata.dataFile).split(path.sep).join(path.posix.sep)}'
+  )
+) 
+${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > this.dbi.PARALLEL) ? this.dbi.PARALLEL : tableMetadata.partitionCount}` : ''}
+` 
+  }
+  
+  generateCopyStatement(targetSchema,tableName,externalTableName,externalColumnNames,externalSelectList,plsql) {
+	return `insert ${plsql ? `/*+ WITH_PLSQL */` : '/*+ APPEND */'} into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})\n${plsql ? `WITH\n${plsql}\n` : ''}select ${externalSelectList.join(",")} from ${externalTableName}`
+  }
+
+  generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions) {
+		  
+   	this.dbi.SQL_DIRECTORY_NAME = this.SQL_DIRECTORY_NAME
+    const externalTableName = `"${this.targetSchema}"."YXT-${crypto.randomBytes(this.RANDOM_OBJECT_LENGTH).toString("hex").toUpperCase()}"`;
+
+    tableInfo.copy = {
+      ddl          : this.generateExternalTableDefinition(tableMetadata,externalTableName,externalColumnDefinitions,copyColumnDefinitions)
+    , dml          : this.generateCopyStatement(this.targetSchema,tableMetadata.tableName,externalTableName,externalColumnNames,externalSelectList,this.getPLSQL(tableInfo.dml)) 
+	, drop         : `drop table ${externalTableName}`
+	}
   }
 
   async generateStatementCache(vendor) {
@@ -314,8 +353,6 @@ class StatementGenerator {
 	// this.dbi.yadamuLogger.trace([this.constructor.name],`${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
     await metadataLob.close();
     const statementCache = JSON.parse(results.outBinds.sql);
-	
-    // console.log(JSON.stringify(statementCache," ",2));
     
     const tables = Object.keys(this.metadata); 
     tables.forEach((table,idx) => {
@@ -332,12 +369,7 @@ class StatementGenerator {
       tableInfo.insertMode      = 'Batch';      
 	  tableInfo.dataFile        = tableMetadata.dataFile
 		
-        
-	  if (tableMetadata.WITH_CLAUSE) {
-		generateWrapperName(tableMetadata);
-	  }
-	     
-	  tableInfo.binds = this.generateBinds(dataTypes,tableInfo,tableMetadata);
+  	  tableInfo.binds = this.generateBinds(dataTypes,tableInfo,tableMetadata);
 
 	  if (tableInfo.lobColumns) {
 		// Do not 'copy' binds to lobBinds. binds is a collection of objects and we do not want to change properties of the objects in binds when we modify corresponding properties in lobBinds.
@@ -377,7 +409,7 @@ class StatementGenerator {
 	  })
 	  
 	
-      let plsqlRequired = false;        
+      let includesObjectTypes = false;        
       
 	  // const nullSettings =  ' NULLIF ${copyColumnDefinition}=BLANKS'
 	  const nullSettings = ''
@@ -389,6 +421,8 @@ class StatementGenerator {
 	  const externalSelectList = []
 	  const copyColumnDefinitions = []
       const externalColumnDefinitions = []
+	  const externalColumnNames = []
+	  
 	  const declarations = tableInfo.columnNames.map((column,idx) => {
         variables.push(`"V_${column}"`);
         let targetDataType = tableInfo.targetDataTypes[idx];
@@ -514,9 +548,9 @@ class StatementGenerator {
 		      break;
 		    }
 		    if (targetDataType.indexOf('.') > -1) {
+		      includesObjectTypes = true;
  		      externalDataType = "CLOB"
 			  copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}`
-		      plsqlRequired = true;
               value = `"#${targetDataType.slice(targetDataType.indexOf(".")+2,-1)}"(:${(idx+1)})`;
 			  externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
 			  break;
@@ -528,50 +562,16 @@ class StatementGenerator {
 		copyColumnDefinitions[tableInfo.bindOrdering[idx]]     = copyColumnDefinition
 		externalColumnDefinitions[tableInfo.bindOrdering[idx]] = `"${column}" ${externalDataType || targetDataType}`
 		externalSelectList[tableInfo.bindOrdering[idx]]        = externalSelect
+	    externalColumnNames[tableInfo.bindOrdering[idx]]       = `"${column}"`
         return `${variables[idx]} ${targetDataType}`;
       })
 	  
 	  if (tableMetadata.dataFile) {
-	   	this.dbi.SQL_DIRECTORY_NAME = this.SQL_DIRECTORY_NAME
-        const externalTableName = `"${this.targetSchema}"."YXT-${crypto.randomBytes(this.RANDOM_OBJECT_LENGTH).toString("hex").toUpperCase()}"`;
-		/*
-	    let columnList = tableInfo.ddl.substr(tableInfo.ddl.indexOf('V_STATEMENT'))
-	    columnList = columnList.substring(columnList.indexOf('('),columnList.indexOf(';')-1)
-	    columnList = columnList.indexOf(')\nXMLTYPE ') === -1 ? columnList : columnList.substring(0,columnList.indexOf(')\nXMLTYPE')+1)
-		*/
-		const plsql = this.getPLSQL(tableInfo.dml)
-		const copyDDL = `
-CREATE TABLE ${externalTableName} (
-  ${externalColumnDefinitions.join(',')}
-) 
-ORGANIZATION EXTERNAL ( 
-  default directory ${this.SQL_DIRECTORY_NAME} 
-  ACCESS PARAMETERS (
-    RECORDS DELIMITED BY NEWLINE 
-	READSIZE 67108864 
-	CHARACTERSET AL32UTF8 
-	${this.dbi.COPY_BADFILE_DIRNAME ? `BADFILE ${this.dbi.COPY_BADFILE_DIRNAME}:` : 'NOBADFILE'}
-	${this.dbi.COPY_LOGFILE_DIRNAME ? `LOGFILE ${this.dbi.COPY_LOGFILE_DIRNAME}:` : 'NOLOGFILE'}
-	FIELDS ${this.ORACLE_CSV_SPECIFICATION}
-		   MISSING FIELD VALUES ARE NULL 
-		   (
-		     ${copyColumnDefinitions.join(",")}
-		   )
-  ) 
-  LOCATION (
-	'${tableMetadata.partitionCount ? `${tableMetadata.dataFile.map((filename) => { return path.basename(filename).split(path.sep).join(path.posix.sep)}).join("','")}` : path.basename(tableMetadata.dataFile).split(path.sep).join(path.posix.sep)}'
-  )
-) 
-${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > this.dbi.PARALLEL) ? this.dbi.PARALLEL : tableMetadata.partitionCount}` : ''}
-`
-        tableInfo.copy = {
-		  ddl          : copyDDL
-        , dml          : `insert ${plsql ? `/*+ WITH_PLSQL */` : '/*+ APPEND */'} into "${this.targetSchema}"."${tableName}"\n${plsql ? `WITH\n${plsql}\n` : ''}select ${externalSelectList.join(",")} from ${externalTableName}`
-	    , drop         : `drop table ${externalTableName}`
-	    }
+		this.generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions) 
+
       } 
 	  
-      if (plsqlRequired === true) {
+      if (includesObjectTypes === true) {
         const assignments = values.map((value,idx) => {
           if (value[1] === '#') {
             return `${setOracleDateMask}${setOracleTimeStampMask}${variables[idx]} := ${value}${setSourceDateMask}${setSourceTimeStampMask}`;
@@ -586,7 +586,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
         tableInfo.dml = `insert /*+ APPEND */ into "${this.targetSchema}"."${tableMetadata.tableName}" (${tableInfo.columnNames.map((col) => {return `"${col}"`}).join(',')}) values (${values.join(',')})`;
       }	  
 
-    });
+	});
 	return statementCache
   }  
 }

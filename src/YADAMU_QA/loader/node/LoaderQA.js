@@ -58,11 +58,11 @@ class LoaderQA extends LoaderDBI {
 	super(yadamu,settings,parameters)
   }
 
-  async initialize() {
-	await super.initialize();
+  async initializeImport() {
 	if (this.options.recreateSchema === true) {
 		await this.recreateSchema();
 	}
+	await super.initializeImport();
   }
 
   async getArray(filename) {

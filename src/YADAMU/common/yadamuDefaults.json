@@ -31,7 +31,6 @@
 		"oracle"
 	],
 	"mariadb": {
-		"TABLE_MATCHING": "INSENSITIVE",
 		"TREAT_TINYINT1_AS_BOOLEAN": true
 	},
 	"mongodb": {
@@ -49,7 +48,6 @@
 		"SPATIAL_MAKE_VALID": false
 	},
 	"mysql": {
-		"TABLE_MATCHING": "INSENSITIVE",
 		"READ_KEEP_ALIVE": 0,
 		"TREAT_TINYINT1_AS_BOOLEAN": true
 	},

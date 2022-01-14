@@ -7,6 +7,7 @@ source $YADAMU_SCRIPT_DIR/runRegressionTest.sh postgresDataTypes
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh export
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh import
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh fileRoundtrip
+source $YADAMU_SCRIPT_DIR/runRegressionTest.sh uploadRoundtrip
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh dbRoundtrip
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh mongoTestSuite
 source $YADAMU_SCRIPT_DIR/runRegressionTest.sh lostConnection

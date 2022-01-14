@@ -1,4 +1,4 @@
-FROM node:latest
+FROM node:17.1.0
 WORKDIR /usr/src/YADAMU
 ADD https://download.oracle.com/otn_software/linux/instantclient/213000/oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm .
 COPY src/package*.json ./
@@ -8,6 +8,3 @@ RUN apt update \
  && alien -i --scripts ./oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm \
  && npm install --global electron \
  && npm install
-# Patch Query Stream until oracleb 5.3
-COPY patch/oracledb/lib/queryStream.js node_modules/oracledb/lib
- 

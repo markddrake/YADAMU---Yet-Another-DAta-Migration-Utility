@@ -108,8 +108,6 @@ class MsSQLStatementLibrary extends DefaultStatmentLibrary {
     return this._SQL_SCHEMA_INFORMATION
   }     
 
-  get DROP_DATABASE() { return `if DB_ID('${this.dbi.parameters.YADAMU_DATABASE}') is not NULL drop database "${this.dbi.parameters.YADAMU_DATABASE}"` }
-  
   constructor(dbi) {
     super(dbi)
   }

@@ -18,8 +18,6 @@ class ErrorWriter extends JSONWriter {
 	await super.initialize(tableName);
   }
   
-  //   Disable the columnCountCheck when writing an error report
-  
   cacheRow(row) {
 	try {
       super.cacheRow(row)
@@ -29,7 +27,8 @@ class ErrorWriter extends JSONWriter {
     }
   }
 
-  
+  //   Disable the columnCountCheck when writing an error report
+    
   checkColumnCount() { /* OVERRRIDE */ }
   
   reportPerformance() { /* OVERRRIDE */ }

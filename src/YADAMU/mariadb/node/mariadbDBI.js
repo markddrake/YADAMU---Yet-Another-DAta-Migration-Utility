@@ -56,17 +56,22 @@ class MariadbDBI extends YadamuDBI {
   // Override YadamuDBI
 
   get DATABASE_KEY()           { return MariadbConstants.DATABASE_KEY};
-  get DATABASE_VENDOR()        { return MariadbConstants.DATABASE_VENDOR};
-  get SOFTWARE_VENDOR()        { return MariadbConstants.SOFTWARE_VENDOR};
-  get SQL_COPY_OPERATIONS()    { return true }
-  get STATEMENT_TERMINATOR()   { return MariadbConstants.STATEMENT_TERMINATOR };
+  get DATABASE_VENDOR()              { return MariadbConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()              { return MariadbConstants.SOFTWARE_VENDOR};
+  get SQL_COPY_OPERATIONS()          { return true }
+  get STATEMENT_TERMINATOR()         { return MariadbConstants.STATEMENT_TERMINATOR };
 
   // Enable configuration via command line parameters
 
-  get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT            || MariadbConstants.SPATIAL_FORMAT }
-  get TABLE_MATCHING()             { return this.parameters.TABLE_MATCHING            || MariadbDBI.TABLE_MATCHING}
-  get TREAT_TINYINT1_AS_BOOLEAN()  { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MariadbConstants.TREAT_TINYINT1_AS_BOOLEAN }
-  
+  get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT            || MariadbConstants.SPATIAL_FORMAT }
+  get TREAT_TINYINT1_AS_BOOLEAN()    { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MariadbConstants.TREAT_TINYINT1_AS_BOOLEAN }
+
+  // Not available until configureConnection() has been called 
+
+  get LOWER_CASE_TABLE_NAMES()       { this._LOWER_CASE_TABLE_NAMES }
+  set LOWER_CASE_TABLE_NAMES(v)      { this._LOWER_CASE_TABLE_NAMES = v }
+  get IDENTIFIER_TRANSFORMATION()    { return (this._LOWER_CASE_TABLE_NAMES> 0) ? 'LOWERCASE_TABLE_NAMES' : super.IDENTIFIER_TRANSFORMATION }
+
   constructor(yadamu,settings,parameters) {
 
     super(yadamu,settings,parameters);
@@ -92,27 +97,51 @@ class MariadbDBI extends YadamuDBI {
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION);
 
     let results = await this.executeSQL(this.StatementLibrary.SQL_GET_CONNECTION_INFORMATION);
-    this._DB_VERSION = results[0][0]
+    this._DB_VERSION = results[0]
 
- 
+    results = await this.executeSQL(this.StatementLibrary.SQL_SHOW_SYSTEM_VARIABLES)
+	results.forEach((row,i) => { 
+	  switch (row[0]) {
+		case 'lower_case_table_names':
+          this.LOWER_CASE_TABLE_NAMES = parseInt(row[1])
+          if (this.isManager() && (this.LOWERCASE_TABLE_NAMES > 0)) {
+	        this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`);
+	      }
+        break;
+	  }
+	})
   }
 
   async checkMaxAllowedPacketSize() {
 	  
-	this.connection = await this.getConnectionFromPool()
-
+    const existingConnection = this.connection !== undefined
+	  
+    if (!existingConnection) {
+	  this.connection = await this.getConnectionFromPool()
+	}
+    
     const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
     const sqlQueryPacketSize = `SELECT @@max_allowed_packet`;
     const sqlSetPacketSize = `SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`
-    
+      
     let results = await this.executeSQL(sqlQueryPacketSize);
     if (parseInt(results[0][0]) <  maxAllowedPacketSize) {
-      this.yadamuLogger.info([`${this.constructor.name}.setMaxAllowedPacketSize()`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
+		
+	  // Need to change the setting.
+		
+      this.yadamuLogger.info([`${this.DATABASE_VENDOR}`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
       results = await this.executeSQL(sqlSetPacketSize);
+	  
+	  if (existingConnection) {
+		// Need to repalce the existsing connection to pick up the change. 
+		this.connection = await this.getConnectionFromPool()
+	  }	  
     }    
-	
-	await this.closeConnection();
-	
+    
+	if (!existingConnection) {    
+      await this.closeConnection();
+	}
+
   }
   
   async createConnectionPool() {
@@ -175,9 +204,11 @@ class MariadbDBI extends YadamuDBI {
   };
    
   async _reconnect() {
+	  
     this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
+	await this.checkMaxAllowedPacketSize()
+	
   }
-
   async createSchema(schema) {    	
   
 	const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;					   

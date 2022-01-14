@@ -98,10 +98,6 @@ class FileQA extends FileDBI {
      this.sort = false;
   }
   
-  setMetadata(metadata) {
-    super.setMetadata(metadata)
-  }
-	 
   makeLowerCase(object) {
         
     Object.keys(object).forEach((key) => {
@@ -176,21 +172,10 @@ class FileQA extends FileDBI {
       seperatorSize += size;
     })
     
-    const gMetadata = await this.getContentMetadata(grandparent)
+	const gMetadata = await this.getContentMetadata(grandparent)
     const pMetadata = await this.getContentMetadata(parent)
     const cMetadata = await this.getContentMetadata(child);
-		
-    if (this.parameters.TABLE_MATCHING === 'INSENSITIVE') {
-      metrics = metrics.map((t) => {
-        this.makeLowerCase(t)
-        return t
-      });
-     
-      this.makeLowerCase(gMetadata)
-      this.makeLowerCase(pMetadata);
-      this.makeLowerCase(cMetadata);
-    }
-
+	
     const tables = Object.keys(gMetadata).sort();     
 
     const failedOperations = []

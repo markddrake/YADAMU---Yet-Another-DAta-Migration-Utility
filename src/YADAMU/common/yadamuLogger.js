@@ -11,7 +11,7 @@ const YadamuLibrary = require('./yadamuLibrary.js');
 const StringWriter = require('./stringWriter.js')
 const NullWriter = require('./nullWriter.js');
 const {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuException.js');
-const OracleError = require('../oracle/node/oracleException.js');
+const {OracleError} = require('../oracle/node/oracleException.js');
 const {FileError} = require('../file/node/fileException.js');
 
 const ErrorDBI = require('../file/node/errorDBI.js');
@@ -409,7 +409,6 @@ class YadamuLogger {
 
   handleException(args,e) {
     // Handle Exception does not produce any output if the exception has already been processed by handleException or logException
-
     if (e.yadamuAlreadyReported === true) {
       if (this.YADAMU_STACK_TRACE === true) {
         this.trace(args,e)

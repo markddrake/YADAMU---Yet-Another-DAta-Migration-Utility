@@ -24,21 +24,21 @@ class MongoQA extends MongoDBI {
     constructor(yadamu,settings,parameters) {
        super(yadamu,settings,parameters)
     }
-
-    setMetadata(metadata) {
-      super.setMetadata(metadata)
-    }
-     
+	
     async initialize() {
       await super.initialize();
-      if (this.options.recreateSchema === true) {
-        await this.recreateDatabase();
-      }
       if (this.terminateConnection()) {
         this.scheduleTermination(this.getWorkerNumber());
       }
     }
 
+    async initializeImport() {
+	  if (this.options.recreateSchema === true) {
+		await this.recreateDatabase();
+	  }
+	  await super.initializeImport();
+    }	
+	
     async recreateDatabase() {
         await this.use(this.parameters.TO_USER)
         await this.dropDatabase()

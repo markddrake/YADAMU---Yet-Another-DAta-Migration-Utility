@@ -240,7 +240,8 @@ class SnowflakeWriter extends YadamuWriter {
 		      this.handleSpatialError(`BINARY`,cause,rowNumbers[0],nextBatch[0])
 			}
 			else {
-              this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch[0])
+			  // operation,cause,rowNumber,record,info
+              this.handleIterativeError(`BINARY`,cause,rowNumbers[0],nextBatch)
 			}
             if (this.skipTable) {
               break;

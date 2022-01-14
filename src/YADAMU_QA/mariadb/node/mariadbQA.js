@@ -27,22 +27,22 @@ class MariadbQA extends MariadbDBI {
 	constructor(yadamu,settings,parameters) {
        super(yadamu,settings,parameters)
     }
-	
-    setMetadata(metadata) {
-      super.setMetadata(metadata)
-    }
-	 
+
 	async initialize() {
 	  await super.initialize();
-	  if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
 	  if (this.terminateConnection()) {
         const pid = await this.getConnectionID();
 	    this.scheduleTermination(pid,this.getWorkerNumber());
 	  }
 	}
  
+    async initializeImport() {
+	  if (this.options.recreateSchema === true) {
+		await this.recreateSchema();
+	  }
+	  await super.initializeImport();
+    }	
+
     async recreateSchema() {
         
       try {
@@ -66,7 +66,7 @@ class MariadbQA extends MariadbDBI {
        ,failed     : []
       }
 
-      const compareRules =  this.yadamu.getCompareRules(rules)  
+      const compareRules =  JSON.stringify(this.yadamu.getCompareRules(rules))
       let results = await this.executeSQL(MariadbQA.SQL_COMPARE_SCHEMAS,[source.schema,target.schema,compareRules])
 
       const successful = await this.executeSQL(MariadbQA.SQL_SUCCESS,{})

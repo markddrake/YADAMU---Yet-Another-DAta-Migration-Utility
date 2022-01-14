@@ -705,6 +705,7 @@ class YadamuWriter extends Transform {
             } catch (e) {
               // Passing the exception to callback triggers the onError() event
               callback(e)   
+			  return
             } 
           case 'table':
           case 'eod':

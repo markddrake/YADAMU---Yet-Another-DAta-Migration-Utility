@@ -43,21 +43,22 @@ class MySQLDBI extends YadamuDBI {
  
   // Override YadamuDBI
 
-  get DATABASE_KEY()           { return MySQLConstants.DATABASE_KEY};
-  get DATABASE_VENDOR()        { return MySQLConstants.DATABASE_VENDOR};
-  get SOFTWARE_VENDOR()        { return MySQLConstants.SOFTWARE_VENDOR};
-  get SQL_COPY_OPERATIONS()    { return true }
-  get STATEMENT_TERMINATOR()   { return MySQLConstants.STATEMENT_TERMINATOR };
+  get DATABASE_KEY()                 { return MySQLConstants.DATABASE_KEY};
+  get DATABASE_VENDOR()              { return MySQLConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()              { return MySQLConstants.SOFTWARE_VENDOR};
+  get SQL_COPY_OPERATIONS()          { return true }
+  get STATEMENT_TERMINATOR()         { return MySQLConstants.STATEMENT_TERMINATOR };
   
   // Enable configuration via command line parameters
-  get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT            || MySQLConstants.SPATIAL_FORMAT }
-  get TABLE_MATCHING()             { return this.parameters.TABLE_MATCHING            || MySQLConstants.TABLE_MATCHING}
-  get READ_KEEP_ALIVE()            { return this.parameters.READ_KEEP_ALIVE           || MySQLConstants.READ_KEEP_ALIVE}
-  get TREAT_TINYINT1_AS_BOOLEAN()  { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MySQLConstants.TREAT_TINYINT1_AS_BOOLEAN }
-  
+  get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT            || MySQLConstants.SPATIAL_FORMAT }
+  get READ_KEEP_ALIVE()              { return this.parameters.READ_KEEP_ALIVE           || MySQLConstants.READ_KEEP_ALIVE}
+  get TREAT_TINYINT1_AS_BOOLEAN()    { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MySQLConstants.TREAT_TINYINT1_AS_BOOLEAN }
+
   // Not available until configureConnection() has been called 
 
-  get CASE_SENSITIVE_NAMING()             { return this._CASE_SENSITIVE_NAMING }
+  get LOWER_CASE_TABLE_NAMES()       { this._LOWER_CASE_TABLE_NAMES }
+  set LOWER_CASE_TABLE_NAMES(v)      { this._LOWER_CASE_TABLE_NAMES = v }
+  get IDENTIFIER_TRANSFORMATION()    { return (this._LOWER_CASE_TABLE_NAMES> 0) ? 'LOWERCASE_TABLE_NAMES' : super.IDENTIFIER_TRANSFORMATION }
   
   constructor(yadamu,settings,parameters) {
     super(yadamu,settings,parameters)
@@ -100,7 +101,10 @@ class MySQLDBI extends YadamuDBI {
     results.forEach((row) => {
       switch (row.Variable_name) {
         case 'lower_case_table_names':
-          this._CASE_SENSITIVE_NAMING = row.Value  
+          this.LOWER_CASE_TABLE_NAMES = row.Value
+          if (this.isManager() && (this.LOWERCASE_TABLE_NAMES > 0)) {
+			this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`);
+	      }
           break;
        }
     })
@@ -108,7 +112,11 @@ class MySQLDBI extends YadamuDBI {
   
   async checkMaxAllowedPacketSize() {
 
-    this.connection = await this.getConnectionFromPool()
+    const existingConnection = this.connection !== undefined
+	  
+    if (!existingConnection) {
+	  this.connection = await this.getConnectionFromPool()
+	}
     
     const maxAllowedPacketSize = 1 * 1024 * 1024 * 1024;
     const sqlQueryPacketSize = `SELECT @@max_allowed_packet`;
@@ -117,11 +125,22 @@ class MySQLDBI extends YadamuDBI {
     let results = await this.executeSQL(sqlQueryPacketSize);
     
     if (parseInt(results[0]['@@max_allowed_packet']) <  maxAllowedPacketSize) {
-      this.yadamuLogger.info([`${this.constructor.name}.setMaxAllowedPacketSize()`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
+		
+	  // Need to change the setting.
+		
+      this.yadamuLogger.info([`${this.DATABASE_VENDOR}`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
       results = await this.executeSQL(sqlSetPacketSize);
-      
+	  
+	  if (existingConnection) {
+		// Need to repalce the existsing connection to pick up the change. 
+		this.connection = await this.getConnectionFromPool()
+	  }	  
     }    
-    await this.closeConnection();
+    
+	if (!existingConnection) {    
+      await this.closeConnection();
+	}
+	
   }
   
 
@@ -211,8 +230,18 @@ class MySQLDBI extends YadamuDBI {
   };      
 
   async _reconnect() {
+	  
     this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
     await this.connection.ping()
+	
+	/*
+	**
+	** If the lost connection reesulted from a Servcer Crash, need to reset MAX_ALLOWED_PACKET. 
+	**
+	*/
+	 
+	await this.checkMaxAllowedPacketSize()
+	
   }
 
   executeSQL(sqlStatement,args) {
@@ -249,7 +278,7 @@ class MySQLDBI extends YadamuDBI {
       })
     })
   }  
-     
+  
   async createSchema(schema) {      
   
     const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;                      
@@ -264,11 +293,23 @@ class MySQLDBI extends YadamuDBI {
     return results;
   }
 
-  async loadStagingTable(importFilePath) { 
+  async loadStagingTable(importFilePath,retryUpload) { 
+  
     importFilePath = importFilePath.replace(/\\/g, "\\\\");
-    const sqlStatement = `LOAD DATA LOCAL INFILE '${importFilePath}' INTO TABLE "YADAMU_STAGING" FIELDS ESCAPED BY ''`;                    
-    const results = await this.executeSQL(sqlStatement);
-    return results;
+	
+	try {
+      const sqlStatement = `LOAD DATA LOCAL INFILE '${importFilePath}' INTO TABLE "YADAMU_STAGING" FIELDS ESCAPED BY ''`;                    
+      const results = await this.executeSQL(sqlStatement);
+      return results;
+    } catch (e) {
+	  if (retryUpload && (e instanceof MySQLError) && e.missingTable()) {
+	    // Assume the staging table was lost as a result of a lost connection.
+	    await this.createStagingTable() 
+		const results = await this.loadStagingTable(importFilePath,false)
+		return results
+  	  }
+	  throw e
+	}
   }
 
   async verifyDataLoad() {      
@@ -478,7 +519,7 @@ class MySQLDBI extends YadamuDBI {
 
 	this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
     let results = await this.createStagingTable();
-    results = await this.loadStagingTable(importFilePath);
+    results = await this.loadStagingTable(importFilePath,true);
     return results;
   }
 

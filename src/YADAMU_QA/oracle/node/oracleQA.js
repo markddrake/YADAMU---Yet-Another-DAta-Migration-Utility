@@ -31,20 +31,20 @@ class OracleQA extends OracleDBI {
        super(yadamu,settings,parameters)
     }
 
-    setMetadata(metadata) {
-      super.setMetadata(metadata)
-    }
-	 
 	async initialize() {
 	  await super.initialize();
-      if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
 	  if (this.terminateConnection()) {
         const pid = await this.getConnectionID();
 	    this.scheduleTermination(pid,this.getWorkerNumber());
 	  }
 	}
+	
+    async initializeImport() {
+      if (this.options.recreateSchema === true) {
+ 	    await this.recreateSchema();
+	  }
+      await super.initializeImport();
+    }	
 	
  	async recreateSchema() {
         
@@ -77,10 +77,14 @@ class OracleQA extends OracleDBI {
     }
 
 	async compareSchemas(source,target,rules) {
-
+		
 	  let compareRules = this.yadamu.getCompareRules(rules)	  
+	  
+	  compareRules.objectsRule   = rules.OBJECTS_COMPARISSON_RULE || 'SKIP'
+      compareRules.excludeMViews = ((rules.OPERATION  !== 'DBROUNDTRIP') && (rules.MODE === 'DATA_ONLY'))
+   	  
 	  compareRules = this.JSON_PARSING_SUPPORTED ? JSON.stringify(compareRules) : this.yadamu.makeXML(compareRules)
-
+	  
 	  const args = {
 		P_SOURCE_SCHEMA        : source.schema,
 		P_TARGET_SCHEMA        : target.schema,

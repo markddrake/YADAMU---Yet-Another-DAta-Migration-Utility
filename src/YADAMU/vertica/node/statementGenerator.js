@@ -388,7 +388,7 @@ class StatementGenerator {
   }
       
   generateTableInfo(tableMetadata) {
-      
+	  
     let insertMode = 'Copy';
 	
     const columnNames = tableMetadata.columnNames
@@ -521,7 +521,21 @@ class StatementGenerator {
 		  }
 		  break;
 		case 'TIME':
-		  copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as cast("YADAMU_COL_${column_suffix}" as TIME)`
+		  if (tableMetadata.hasOwnProperty('dataFile')) {
+            copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as cast(TO_TIMESTAMP("YADAMU_COL_${column_suffix}",'YYYY-MM-DD"T"HH24:MI:SS.US') as TIME)`
+		  }
+		  else {
+  		    switch (tableMetadata.vendor) {
+		      case "Postgres":
+			  case "MySQL":
+			  case "MariaDB":
+			  case "Vertica":
+  		        copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as cast("YADAMU_COL_${column_suffix}" as TIME)`
+			    break;
+			  default:
+		        copyColumnList[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as cast(TO_TIMESTAMP("YADAMU_COL_${column_suffix}",'YYYY-MM-DD"T"HH24:MI:SS.US') as TIME)`
+		    }
+		  }
 	  	  insertOperators[idx] = { 
 			prefix  : 'cast('
 		  , suffix  : ' as TIME)'

@@ -39,16 +39,16 @@ UNIX_GROUP_NAME=oinstall
 # This is an optional parameter if installing on
 # Windows based Operating System.
 #-------------------------------------------------------------------------------
-INVENTORY_LOCATION=c:\Program Files\oracle\oraInventory
+INVENTORY_LOCATION=C:\Program Files\oracle\oraInventory
 #-------------------------------------------------------------------------------
 # Specify the complete path of the Oracle Home. 
 #-------------------------------------------------------------------------------
-ORACLE_HOME=c:\oracle\rdbms\21.3\db_home1
+ORACLE_HOME=C:\oracle\rdbms\21.3\db_home1
 
 #-------------------------------------------------------------------------------
 # Specify the complete path of the Oracle Base. 
 #-------------------------------------------------------------------------------
-ORACLE_BASE=c:\oracle
+ORACLE_BASE=C:\oracle
 
 #-------------------------------------------------------------------------------
 # Specify the installation edition of the component.                     

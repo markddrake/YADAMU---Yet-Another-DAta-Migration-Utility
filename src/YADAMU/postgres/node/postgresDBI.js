@@ -5,6 +5,11 @@ const { performance } = require('perf_hooks');
 
 const util = require('util')
 const stream = require('stream')
+const Parser = require('../../clarinet/clarinet.js');
+const readline = require('readline');
+const { once } = require('events');
+
+
 // const pipeline = util.promisify(stream.pipeline);
 const { pipeline } = require('stream/promises');
 
@@ -83,12 +88,6 @@ class PostgresDBI extends YadamuDBI {
     this.pgClient = undefined;
     this.useBinaryJSON = false
     
-    /*
-    FETCH_AS_STRING.forEach((PGOID) => {
-      types.setTypeParser(PGOID, (v) => {return v})
-    })
-    */
-	
     this.StatementLibrary = PostgresStatementLibrary
     this.statementLibrary = undefined
     this.pipelineAborted = false;
@@ -434,19 +433,29 @@ class PostgresDBI extends YadamuDBI {
   
   async loadStagingTable(importFilePath) {
 
+	let stack 
     const copyStatement = `copy "YADAMU_STAGING" from STDIN csv quote e'\x01' delimiter e'\x02'`;
     this.status.sqlTrace.write(this.traceSQL(copyStatement))
+	try {
+	  // Create an Readable stream from an async interator based on the readline interface. This avoids issue with uploading Pretty Printed JSON 
+	  const is = fs.createReadStream(importFilePath)
+      await once(is, 'open');1
+      const rl = readline.createInterface({input: is, crlfDelay: Infinity})
+      const rli = rl[Symbol.asyncIterator]();
+      const rlis = Readable.from(rli);
 
-    const inputStream = await new Promise((resolve,reject) => {
-      const inputStream = fs.createReadStream(importFilePath);
-      inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
-    })
-    const outputStream = await this.executeSQL(CopyFrom(copyStatement));    
-    const startTime = performance.now();
-    await pipeline(inputStream,outputStream)
-    const elapsedTime = performance.now() - startTime
-    inputStream.close()
-    return elapsedTime;
+	  stack = new Error().stack		
+      const outputStream = await this.executeSQL(CopyFrom(copyStatement));    
+      const startTime = performance.now();
+	  await pipeline(rlis,outputStream)
+      const elapsedTime = performance.now() - startTime
+      is.close()
+      return elapsedTime;
+    }
+    catch (e) {
+      const cause = this.trackExceptions(new PostgresError(e,stack,copyStatement))
+	  throw cause
+	}
   }
   
   async uploadFile(importFilePath) {
@@ -459,12 +468,12 @@ class PostgresDBI extends YadamuDBI {
       elapsedTime = await this.loadStagingTable(importFilePath)
     }
     catch (e) {
-      if (e.code && (e.code === '54000')) {
-        this.yadamuLogger.info([`${this.constructor.name}.uploadFile()`],`Cannot process file using Binary JSON. Switching to textual JSON.`)
+	  if ((e instanceof PostgresError) && e.bjsonTooLarge()) {
+        this.yadamuLogger.info([this.DATABASE_VENDOR,`UPLOAD`],`Cannot process file using Binary JSON. Switching to textual JSON.`)
         this.useBinaryJSON = false;
         await this.createStagingTable();
         elapsedTime = await this.loadStagingTable(importFilePath);	
-      }      
+      }     
       else {
         throw e
       }
@@ -494,7 +503,7 @@ class PostgresDBI extends YadamuDBI {
       }
     }
     else {
-      this.yadamuLogger.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL YADAMU_IMPORT_JSONB()' : 'CALL_YADAMU_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`);
+      this.yadamuLogger.error([this.DATABASE_VENDOR,`UPLOAD`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL YADAMU_IMPORT_JSONB()' : 'CALL_YADAMU_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`);
       // Return value will be parsed....
       return [];
     }
@@ -609,9 +618,13 @@ class PostgresDBI extends YadamuDBI {
 		*/
 		
         const handleConnectionError = (err) => {inputStream.destroy(err); inputStream.emit('error',err)}
+		
 	    this.connection.on('error',handleConnectionError)
-        inputStream.on('end',() => { this.connection.removeListener('end',handleConnectionError)}).on('error',() => { this.connection.removeListener('error',handleConnectionError)})  
-  		
+        inputStream.on('end',() => { 
+		  this.connection.removeListener('error',handleConnectionError)
+		}).on('error',() => { 
+		  this.connection.removeListener('error',handleConnectionError)
+		})    		
 		return inputStream
       } catch (e) {
 		const cause = this.trackExceptions(new PostgresError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
@@ -639,8 +652,8 @@ class PostgresDBI extends YadamuDBI {
   
   async _executeDDL(ddl) {
 	
-	let results = []
-    await this.createSchema(this.parameters.TO_USER);
+   let results = []
+   //  await this.createSchema(this.parameters.TO_USER);
 	
 	try {
       results = await Promise.all(ddl.map((ddlStatement) => {

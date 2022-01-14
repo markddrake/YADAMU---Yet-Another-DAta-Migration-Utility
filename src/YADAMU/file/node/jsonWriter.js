@@ -85,12 +85,14 @@ class JSONWriter extends YadamuWriter {
 		   }			 
         case "JSON":
           return (col,idx) =>  {
-            if (typeof col === 'string') {
-              return JSON.parse(col)
-            } 
-			if (Buffer.isBuffer(col)) {
-			  return JSON.parse(col.toString('utf8'))
-			}
+			try {
+              if (typeof col === 'string') {
+                return JSON.parse(col)
+              } 
+			  if (Buffer.isBuffer(col)) {
+			    return JSON.parse(col.toString('utf8'))
+			  }
+			} catch (e) { return { "YADAMU_INVALID_JSON_VALUE" : col }}
    		    return col
           }
         case "BOOLEAN":

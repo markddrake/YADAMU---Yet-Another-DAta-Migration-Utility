@@ -137,6 +137,7 @@ class SnowflakeDBI extends YadamuDBI {
   async getConnectionFromPool() {
   	// Snowflake-SDK does not support connection pooling
   	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
+    
     this.setDatabase();
     this.logConnectionProperties();
     let connection = snowflake.createConnection(this.vendorProperties);
@@ -546,7 +547,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
   }
   
-  async reportCopyErrors(tableName,failed,stack,copyStatement) {
+  async reportCopyErrors(tableName,stack,copyStatement,failed) {
 	  
     const err = new Error(`Errors detected durng COPY operation: ${failed} records rejected.`);
     err.sql = copyStatement;
@@ -555,7 +556,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	try {
 	  const results = await this.executeSQL(`select * from table(validate("${this.parameters.YADAMU_DATABASE}"."${this.parameters.TO_USER}"."${tableName}", job_id => '_last'))`);
       err.cause = results.map((err) => {
-	    loadError = new Error(err.error)
+	    const loadError = new Error(err.error)
 		Object.assign(loadError,err);
 		return loadError
 	  })
@@ -566,7 +567,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   }  
     
   async initializeCopy(credentials) {
-    const results = await this.executeSQL(this.statementLibrary.SQL_CREATE_STAGE);
+    let results = await this.executeSQL(this.statementLibrary.SQL_CREATE_STAGE);
   }
   
   async copyOperation(tableName,copy) {
@@ -575,7 +576,8 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	  const stack = new Error().stack
       await this.beginTransaction()
       const startTime = performance.now();
-	  let results = await this.executeSQL(copy.dml);
+	  let results = await this.executeSQL(`alter session set TIME_INPUT_FORMAT='${SnowflakeConstants.TIME_INPUT_FORMAT[this.systemInformation.vendor]}'`);
+	  results = await this.executeSQL(copy.dml);
 	  const endTime = performance.now();
 	  await this.commitTransaction();
 	  let rowsParsed = 0
@@ -588,7 +590,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	  })
 	  await this.reportCopyResults(tableName,rowsLoaded,rowsParsed - rowsLoaded,startTime,endTime,copy,stack)
 	} catch(cause) {
-  	  await this.rollbackTransaction(cause);
+	  await this.rollbackTransaction(cause);
 	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],cause)
 	}	
   }

@@ -22,7 +22,20 @@ class SnowflakeConstants {
     })
     return this._STATIC_PARAMETERS;
   }
-
+  
+  static get TIME_INPUT_FORMAT() {
+    this._TIMESTAMP_FORMAT_MASKS = this._TIMESTAMP_FORMAT_MASKS || Object.freeze({
+      Oracle      : 'HH24:MI:SS.FF9'
+    , MSSQLSERVER : 'YYYY-MM-DDTHH24:MI:SS'
+    , Postgres    : 'YYYY-MM-DDTHH24:MI:SS.FF6'
+    , Vertica     : 'HH24:MI:SS.FF9'
+    , MySQL       : 'YYYY-MM-DDTHH24:MI:SS.FF6TZH:TZM'
+    , MariaDB     : 'YYYY-MM-DDTHH24:MI:SS.FF6TZH:TZM'
+    , MongoDB     : 'HH24:MI:SS.FF9'
+    , SNOWFLAKE   : 'YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM'
+    })
+    return this._TIMESTAMP_FORMAT_MASKS
+  }
   static #_DBI_PARAMETERS
   
   static get DBI_PARAMETERS() { 

@@ -2,12 +2,18 @@
 **
 ** MySQL/MariaDB COMPARE_SCHEMAS Function.
 **
-*/
+*/--
 set SESSION SQL_MODE=ANSI_QUOTES;
 --
 set COLLATION_CONNECTION = @@COLLATION_SERVER;
 --
 DROP FUNCTION IF EXISTS ORDERED_JSON;
+--
+DROP FUNCTION IF EXISTS ORDER_JSON_DOCUMENT;
+--
+DROP FUNCTION IF EXISTS ORDER_JSON_OBJECT;
+--
+DROP FUNCTION IF EXISTS ORDER_JSON_ARRAY;
 --
 DROP PROCEDURE IF EXISTS ORDERED_JSON_IMPL;
 --
@@ -358,7 +364,7 @@ begin
 	   leave CHILD_OBJECTS;
 	 end if;
 	 
-	 call ORDER_JSON_OBJECT(V_VALUE,V_VALUE);
+	 call YADAMU_JSON_OBJECT_NORMALIZE(V_VALUE,V_VALUE);
 	 
 	 update KV_PAIR_CACHE 
 	    set JSON_VALUE = V_VALUE
@@ -381,7 +387,7 @@ begin
 	 end if;
 	 
 	 
-	 call ORDER_JSON_ARRAY(V_VALUE,V_VALUE);
+	 call YADAMU_JSON_ARRAY_NORMALIZE(V_VALUE,V_VALUE);
 	 
 	 update KV_PAIR_CACHE 
 	    set JSON_VALUE = V_VALUE
@@ -396,11 +402,11 @@ end$$
 --
 DELIMITER ;
 --
-DROP PROCEDURE IF EXISTS ORDER_JSON_OBJECT;
+DROP PROCEDURE IF EXISTS YADAMU_JSON_OBJECT_NORMALIZE;
 --
 DELIMITER $$
 --
-CREATE PROCEDURE ORDER_JSON_OBJECT(IN P_VALUE LONGTEXT,OUT P_RESULT LONGTEXT)
+CREATE PROCEDURE YADAMU_JSON_OBJECT_NORMALIZE(IN P_VALUE LONGTEXT,OUT P_RESULT LONGTEXT)
 begin
   declare V_RESULT LONGTEXT;
   declare V_KEY    VARCHAR(256);
@@ -444,11 +450,11 @@ end$$
 --
 DELIMITER ;
 --
-DROP PROCEDURE IF EXISTS ORDER_JSON_ARRAY;
+DROP PROCEDURE IF EXISTS YADAMU_JSON_ARRAY_NORMALIZE;
 --
 DELIMITER $$
 --
-CREATE PROCEDURE ORDER_JSON_ARRAY(IN P_VALUE LONGTEXT,OUT P_RESULT LONGTEXT)
+CREATE PROCEDURE YADAMU_JSON_ARRAY_NORMALIZE(IN P_VALUE LONGTEXT,OUT P_RESULT LONGTEXT)
 begin
   declare V_RESULT     LONGTEXT;
   declare V_KEY        VARCHAR(256);
@@ -489,11 +495,11 @@ end$$
 --
 DELIMITER ;
 --
-DROP FUNCTION IF EXISTS ORDER_JSON_DOCUMENT;
+DROP FUNCTION IF EXISTS YADAMU_JSON_NORMALIZE;
 --
 DELIMITER $$
 --
-CREATE FUNCTION ORDER_JSON_DOCUMENT(P_JSON_DOCUMENT LONGTEXT)
+CREATE FUNCTION YADAMU_JSON_NORMALIZE(P_JSON_DOCUMENT LONGTEXT)
 returns LONGTEXT DETERMINISTIC
 begin
   declare V_ORDERED_DOCUMENT LONGTEXT;
@@ -506,9 +512,9 @@ begin
   
   case 
     when P_JSON_DOCUMENT like '{%}' then 
-	  call ORDER_JSON_OBJECT(P_JSON_DOCUMENT,V_ORDERED_DOCUMENT);
+	  call YADAMU_JSON_OBJECT_NORMALIZE(P_JSON_DOCUMENT,V_ORDERED_DOCUMENT);
     when P_JSON_DOCUMENT like '[%]' then 
-	  call ORDER_JSON_ARRAY(P_JSON_DOCUMENT,V_ORDERED_DOCUMENT);
+	  call YADAMU_JSON_ARRAY_NORMALIZE(P_JSON_DOCUMENT,V_ORDERED_DOCUMENT);
 	else 
 	  set V_ORDERED_DOCUMENT = P_JSON_DOCUMENT;
   end case;
@@ -547,6 +553,8 @@ BEGIN
   
   declare V_SQLSTATE         INT;
   declare V_SQLERRM          TEXT;
+
+  -- Cannot use JSON_COMPACT to normalize JSON spacing because JSON_ARRAY(JSON_COMPACT(X)) apprears to normaized to X. 
   
   declare TABLE_METADATA 
   CURSOR FOR 
@@ -557,9 +565,9 @@ BEGIN
 		                when ((data_type = 'longtext') and (check_clause is not null)) then
 					      case 
 						    when V_ORDERED_JSON then
-						      concat('ORDER_JSON_DOCUMENT("',column_name,'")')
+						      concat('YADAMU_JSON_NORMALIZE("',column_name,'")')
 							else
-							  concat('JSON_COMPACT("',column_name,'")')
+							  concat('JSON_EXTRACT("',column_name,'",''$'')')
 						   end
                         when data_type in ('geometry') then
                           case
@@ -571,8 +579,10 @@ BEGIN
                         when data_type in ('blob', 'varbinary', 'binary') then
                           concat('hex("',column_name,'")') 
                         when data_type in ('set') then
-						 -- Set is stored as a JSON_ARRAY in the target...
-                          concat('json_compact(concat(''["'',replace("',column_name,'",'','',''","''),''"]''))') 
+						  -- Convert a set in the source table into a JSON_ARRAY. 
+						  -- Replace commas with Double Quote, Comma, Double Quote and wrap with Brackets and Quotes
+						  -- Use JSON_Extract to normalize JSON formatting
+						  concat('JSON_EXTRACT(CONCAT(''["'',REPLACE("',column_name,'",'','',''","''),''"]''),''$'')') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
                           case
                             when V_MAP_EMPTY_STRING_TO_NULL then
@@ -589,9 +599,9 @@ BEGIN
 		                when ((data_type = 'longtext') and (check_clause is not null)) then
 					      case 
 						    when V_ORDERED_JSON then
-						      concat('ORDER_JSON_DOCUMENT("',column_name,'")')
+						      concat('YADAMU_JSON_NORMALIZE("',column_name,'")')
 							else
-							  concat('JSON_COMPACT("',column_name,'")')
+							  concat('JSON_EXTRACT("',column_name,'",''$'')')
 						   end
                         when data_type in ('geometry') then
                           case
@@ -603,8 +613,10 @@ BEGIN
                         when data_type in ('blob', 'varbinary', 'binary') then
                           concat('hex("',column_name,'")') 
                         when data_type in ('set') then
-						 -- Set is stored as a JSON_ARRAY in the target...
-                          concat('json_compact("',column_name,'")') 
+						  -- A Set in the source schema will transformed into a JSON_ARRAY in the target database and then stored as JSON in the compare schema.
+						  -- Use JSON_EXTRACT to normalize spacing of JSON.
+						  -- There is no need to order the JSON as a set is mapped to to an array of strings
+                          concat('JSON_EXTRACT("',column_name,'",''$'')') 
                         when data_type in ('varchar','text','mediumtext','longtext') then
                           case
                             when V_MAP_EMPTY_STRING_TO_NULL then
@@ -681,7 +693,7 @@ BEGIN
   
   TRUNCATE TABLE SCHEMA_COMPARE_RESULTS;
   COMMIT;
-  
+
   set NO_MORE_ROWS = FALSE;
   OPEN TABLE_METADATA;
     

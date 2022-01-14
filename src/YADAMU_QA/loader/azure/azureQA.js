@@ -26,13 +26,13 @@ class AzureQA extends AzureDBI {
      super(yadamu,settings,parameters)
   }
   
-  async initialize() {
-	await super.initialize();
-	if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
+  async initializeImport() {
+    if (this.options.recreateSchema === true) {
+ 	  await this.recreateSchema();
 	}
-  }
-  
+    await super.initializeImport();
+  }	
+
   setConnectionProperties(connectionProperties) {
 	if (connectionProperties.hasOwnProperty('yadamuOptions')) {
 	  Object.assign(this.azureOptions,connectionProperties.yadamuOptions)

@@ -28,9 +28,8 @@ class RedshiftQA extends RedshiftDBI {
     }   
     
     SQL_SCHEMA_TABLE_ROWS(schema) { return `with num_rows as (
-    select schema_name,
-    
-           anchor_tabyle_name as table_name,
+    select schema_name,   
+           anchor_table_name as table_name,
            sum(total_row_count) as rows
       from v_monitor.storage_containers sc
       join v_catalog.projections p
@@ -61,21 +60,21 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
        super(yadamu,settings,parameters);
     }
     
-    setMetadata(metadata) {
-      super.setMetadata(metadata)
-    }
-     
     async initialize() {
       await super.initialize();
-      if (this.options.recreateSchema === true) {
-        await this.recreateSchema();
-      }
       if (this.terminateConnection()) {
         const pid = await this.getConnectionID();
         this.scheduleTermination(pid,this.getWorkerNumber());
       }
     }
     
+    async initializeImport() {
+      if (this.options.recreateSchema === true) {
+ 	    await this.recreateSchema();
+	  }
+      await super.initializeImport();
+    }	
+	
     async recreateSchema() {
       try {
         const dropSchema = `drop schema if exists "${this.parameters.TO_USER}" cascade`;

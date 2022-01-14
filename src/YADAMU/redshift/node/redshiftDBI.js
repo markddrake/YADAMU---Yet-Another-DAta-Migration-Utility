@@ -669,25 +669,25 @@ class RedshiftDBI extends YadamuDBI {
 	 this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
   }
   
-  async copyOperation(tableName,sqlStatement) {
+  async copyOperation(tableName,copy) {
 	let stack
 	try {
 	  stack = new Error().stack;
 	  const startTime = performance.now();
  	  await this.commitTransaction()
-	  let results = await this.executeSQL(sqlStatement);
+	  let results = await this.executeSQL(copy.dml);
 	  const elapsedTime = performance.now() - startTime;
 	  await this.commitTransaction()
 	  results = await this.executeSQL(this.StatementLibrary.SQL_COPY_STATUS);
 	  const rowsRead = results.rows[0][0]
 	  results = await this.executeSQL(this.StatementLibrary.SQL_COPY_ERRORS);
 	  const failed = parseInt(results.rows[0][0])
-	  await this.reportCopyResults(tableName,rowsRead,failed,elapsedTime,sqlStatement,stack)
+	  await this.reportCopyResults(tableName,rowsRead,failed,elapsedTime,copy.dml,stack)
 	} catch(cause) {
       await this.rollbackTransaction(cause)
       if ((cause instanceof RedshiftError) && cause.detailedErrorAvailable()) {
 		try {
-	      await this.reportCopyErrors(tableName,stack,sqlStatement)
+	      await this.reportCopyErrors(tableName,stack,copy.dml,failed)
 	  	  return
 	    } catch (e) {
 		  cause.cause = e

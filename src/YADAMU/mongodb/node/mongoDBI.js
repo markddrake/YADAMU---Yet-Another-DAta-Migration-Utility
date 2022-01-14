@@ -259,6 +259,57 @@ class MongoDBI extends YadamuDBI {
       throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
     }
   }
+
+  async yadamuInstanceId() {
+      
+    //  Wrapper for db.admin().buildInfo()  
+      
+	let stack
+    const operation = `db().collection('system.js').mapReduce()`
+    try {
+	  const ydb = await this.client.db('yadamu')
+      this.status.sqlTrace.write(this.traceMongo(operation))    
+      const sqlStartTime = performance.now();
+   
+      const results = await ydb.collection('system.js').aggregate(
+	  [
+       { "$match"   : { _id : "yadamu_instance_id"}},
+       { "$project" : { _id : 0, instance_id : { "$function" : { body: `function(f) { return f() }`, args : ["$value"], lang: "js"}}}},
+       { "$lookup"  : {
+           from: "system.js",
+           pipeline: [
+              { "$match"   : { _id : "yadamu_installation_timestamp" } },
+              { "$project" : { _id : 0, timestamp : { "$function" : { body: `function(f) { return f() }`, args : ["$value"], lang: "js"}}}}
+           ],
+           as: "timestamp"
+       }},
+       { "$project" : { _id : 0, instance_id: "$instance_id", timestamp: { $first : "$timestamp.timestamp"}}}
+      ]).toArray()
+	  this.traceTiming(sqlStartTime,performance.now())
+      return results[0]
+    } catch (e) {
+      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+    }
+  }
+  
+
+  async serverInfo() {
+      
+    //  Wrapper for db.admin().serverInfo()    
+    
+	let stack
+    const operation = `admin().serverInfo()`
+    try {
+      this.status.sqlTrace.write(this.traceMongo(operation))    
+      const sqlStartTime = performance.now();
+      
+      const results = await this.connection.admin().serverInfo()
+      this.traceTiming(sqlStartTime,performance.now())
+      return results
+    } catch (e) {
+      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+    }
+  }
   
   async stats(options) {
       
@@ -271,8 +322,9 @@ class MongoDBI extends YadamuDBI {
       this.status.sqlTrace.write(this.traceMongo(operation)) 
       let sqlStartTime = performance.now();
 	  stack =  new Error().stack      
-      this.stats = await this.connection.stats(options);    
+      const results = await this.connection.stats(options);    
       this.traceTiming(sqlStartTime,performance.now())
+	  return results
     } catch (e) {
       throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
     }
@@ -379,12 +431,13 @@ class MongoDBI extends YadamuDBI {
     
 	let stack
     const operation = `${collectionName}.insertOne()`
+    const writeConcern = options?.writeConcern || {w:1} 
     try {
       this.status.sqlTrace.write(this.traceMongo(operation))    
-      options = options === undefined ? {w:1} : (options.w === undefined ? Object.assign (options, {w:1} ) : options)
+      options = options === undefined ? {writeConcern: writeConcern} : (options.writeConcern === undefined ? Object.assign (options, {writeConcern:writeConcern} ) : options)
       let sqlStartTime = performance.now();
 	  stack =  new Error().stack      
-      const results = await this.connection.collection(collectionName).insertOne(doc,{w:1});
+      const results = await this.connection.collection(collectionName).insertOne(doc,options);
       this.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
@@ -398,9 +451,10 @@ class MongoDBI extends YadamuDBI {
 
 	let stack
     const operation = `${collectionName}.insertMany(${array.length})`
+	const writeConcern = options?.writeConcern || {w:1} 
     try {
       this.status.sqlTrace.write(this.traceMongo(operation))    
-      options = options === undefined ? {w:1} : (options.w === undefined ? Object.assign (options, {w:1} ) : options)
+      options = options === undefined ? {writeConcern: writeConcern} : (options.writeConcern === undefined ? Object.assign (options, {writeConcern:writeConcern} ) : options)
       let sqlStartTime = performance.now();
 	  stack =  new Error().stack
       const results = await this.connection.collection(collectionName).insertMany(array,options);
@@ -444,8 +498,8 @@ class MongoDBI extends YadamuDBI {
       
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`configureConnection()`)
 
-    this.buildInformation = await this.buildInfo()
-    this._DB_VERSION = this.buildInformation.version
+    const serverInfo = await this.serverInfo()
+    this._DB_VERSION = serverInfo.version
   }
   
   async closeConnection() {
@@ -538,13 +592,23 @@ class MongoDBI extends YadamuDBI {
   
   async getSystemInformation() {     
  
-   const stats = await this.stats();
+ 
+   const results = await this.yadamuInstanceId()
 
-	return Object.assign(
+   const stats = await this.stats();
+   const serverInfo = await this.serverInfo()
+   const buildInfo = await this.builInfo
+   const clientMetadata = this.client.topology.s.options.metadata;
+   // Object.getOwnPropertySymbols(this.client).forEach((k) => {console.log(this.client[k]);clientMetadata = clientMetadata || (this.client[k]?.metadata)})
+   return Object.assign(
 	  super.getSystemInformation()
 	, {
-        buildInfo          : this.buildInformation
-      , stats              : stats
+	    yadamuInstanceID            : results.instance_id
+	  , yadamuInstallationTimestamp : results.timestamp
+      , buildInfo                   : buildInfo
+	  , serverInfo                  : serverInfo
+      , stats                       : stats
+	  , clientMetadata              : clientMetadata
       }
 	)
   }
@@ -805,9 +869,6 @@ class MongoDBI extends YadamuDBI {
   async getInputStream(collectionInfo,parser) {
             
     const collectionName = collectionInfo.TABLE_NAME
-    const readStream = new Readable({objectMode: true });
-    readStream._read = () => {};
-
     let stack
     const operation = `${collectionName}.find().stream()`
     try {
@@ -816,13 +877,7 @@ class MongoDBI extends YadamuDBI {
       stack =  new Error().stack
       const mongoStream = await this.connection.collection(collectionName).find().stream();
       this.traceTiming(sqlStartTime,performance.now())
-      mongoStream.on('data',(data) => {readStream.push(data)})
-      mongoStream.on('end',(result) => {readStream.push(null)});
-      mongoStream.on('error',(e) => {
-        this.streamingStackTrace = new Error().stack;
-        readStream.emit('error',e)
-      });
-      return readStream;      
+      return mongoStream;      
     } catch (e) {
       throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
     }

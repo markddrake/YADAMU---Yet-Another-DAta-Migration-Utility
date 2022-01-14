@@ -31,6 +31,14 @@ class PostgresError extends DatabaseError {
   postgisUnavailable() { 
 	return ((this.cause.severity && (this.cause.severity === 'ERROR')) && (this.cause.code && (this.cause.code === '42883')) || (this.cause.code && (this.cause.message === 'function postgis_full_version() does not exist')))
   }
+  
+  bjsonTooLarge() {
+	return ((this.cause.severity && (this.cause.severity === 'ERROR')) && (this.cause.code && (this.cause.code === '54000')))
+  }	  
+  
+  prettyPrintedJSON() {
+	return ((this.cause.severity && (this.cause.severity === 'ERROR')) && (this.cause.code && (this.cause.code === '22P02')))
+  }
 }
 
 module.exports = PostgresError

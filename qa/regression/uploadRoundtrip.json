@@ -13,19 +13,17 @@
       "oracle19c"
     , "oracle18c"
     , "oracle12c"
-    , "oracle11g"
     , "mssql17"
     , "mssql19"
     , "postgres#1"
     , "mysql#1"
-    , "mariadb#1"
     ]
-  , "parser" : "CLARINET"
+  , "parser" : "SQL"
   , "parameters": {
-      "TARGET_DIRECTORY" : "longRegress/%operation%/client/%connection%/%location%"
+      "TARGET_DIRECTORY" : "longRegress/%operation%/rdbms/%connection%/%location%"
     }
   , "tasks": [
-       "oracle", "mysql", "mssql"
+       "oracle", "mysql", "mssql-rdbms"
     ]
   }]
 }

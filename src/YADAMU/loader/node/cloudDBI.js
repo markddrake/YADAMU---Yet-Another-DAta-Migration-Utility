@@ -82,8 +82,8 @@ class CloudDBI extends LoaderDBI {
   
   async loadMetadataFiles(copyStagedData) {
     // this.yadamuLogger.trace([this.constructor.name,this.EXPORT_PATH],`loadMetadataFiles()`)
-  	const metadata = {}
-    if (this.controlFile) {
+ 	const metadata = {}
+    if (this.controlFile.metadata) {
       const metdataRecords = await Promise.all(Object.keys(this.controlFile.metadata).map((tableName) => {
 		return this.cloudService.getObject(this.makeAbsolute(this.controlFile.metadata[tableName].file))
       }))

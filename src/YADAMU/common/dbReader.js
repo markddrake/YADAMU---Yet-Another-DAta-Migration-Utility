@@ -119,7 +119,7 @@ class DBReader extends Readable {
   }
   
   async pipelineTable(task,readerDBI,writerDBI) {
-	 
+	  
     let tableInfo
 	let tableOutputStream
 
@@ -390,7 +390,6 @@ class DBReader extends Readable {
     } catch (cause) {
   	  this.yadamuLogger.handleException([`READER`,`READ`,this.nextPhase,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],cause);
 	  this.underlyingError = cause;
-	  await this.dbi.releasePrimaryConnection();
       this.destroy(cause)
     }
   }  
@@ -399,7 +398,6 @@ class DBReader extends Readable {
     // this.yadamuLogger.trace([this.constructor.name,this.dbi.isDatabase()],'_destroy()')
     try {
 	  await this.dbi.finalizeExport();
-	  await this.dbi.releasePrimaryConnection();
 	  callback()
 	} catch (e) {
       if (YadamuError.lostConnection(cause)) {

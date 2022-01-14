@@ -295,6 +295,7 @@ class StatementGenerator {
            case 'XMLTYPE':                                            return this.dbi.SNOWFLAKE_XML_TYPE;
            default:                                                   return dataType.toUpperCase();
          }
+		 break;
        case 'MongoDB':
          switch (dataType.toLowerCase()) {
 		   case 'string':
@@ -326,7 +327,48 @@ class StatementGenerator {
            // No data in the Mongo Collection
            case 'json':                                               return this.dbi.SNOWFLAKE_JSON_TYPE;
 		   default:                                                   return dataType.toUpperCase();
-         }                                                          
+         }   
+         break;		 
+       case 'Vertica':
+         switch (dataType) {
+           case 'char':
+           case 'varchar':     
+           case 'long varchar':
+             switch (true) {
+               case (dataTypeLength > this.dbi.MAX_CHARACTER_SIZE):   return SnowflakeConstants.CLOB_TYPE;
+               default:                                               return 'TEXT';
+             }
+           case 'binary':
+           case 'varbinary':
+           case 'long varbinary':
+             switch (true) {
+               case (dataTypeLength > this.dbi.MAX_BINARY_SIZE):      return SnowflakeConstants.BLOB_TYPE;
+               default:                                               return 'BINARY';
+             }
+           case 'numeric':                                           
+             switch (true) {
+               case (dataTypeLength > 38 && dataTypeScale === 0):     return StatementGenerator.LARGEST_NUMERIC_TYPE
+               case (dataTypeLength > 38 && dataTypeScale !==0 ):     return `${StatementGenerator.LARGEST_NUMERIC_TYPE.substr(0,StatementGenerator.LARGEST_NUMERIC_TYPE.length-1)},${Math.round(dataTypeScale*(38/dataTypeLength))})`;
+               default:                                               return 'NUMBER'                                                      
+             }
+           case 'year':                                               return StatementGenerator.MYSQL_YEAR_TYPE;
+           case 'float':                                              return 'DOUBLE';
+           case 'time':                                               return 'TIME';   
+           case 'timetz':                                             return 'TIMESTAMP_LTZ(6)';
+           case 'timestamptz':                                        return 'TIMESTAMP_LTZ(6)';
+           case 'timestamp':                                          return 'TIMESTAMP_NTZ(6)';
+           case 'xml':                                                return this.dbi.SNOWFLAKE_XML_TYPE;
+           case 'json':                                               return this.dbi.SNOWFLAKE_JSON_TYPE;
+           case 'uuid':                                               return StatementGenerator.UUID_TYPE;
+           case 'geometry':                                                          
+           case 'geography':                                          return 'GEOGRAPHY';
+           default:                                                                    
+             if (dataType.indexOf('interval') === 0) {
+               return StatementGenerator.INTERVAL_TYPE;
+             }
+             return dataType.toUpperCase();
+         }
+         break;
        default: 
          return dataType.toUpperCase();
     }  
@@ -380,7 +422,7 @@ class StatementGenerator {
     const targetDataTypes = [];
 	
 	const columnClauses = columnNames.map((columnName,idx) => {    
-        
+
        // If the 'class' of a VARIANT datatype cannot be determned by insepecting the information available from Snowflake type it based on the incoming data stream 
        
        if ((dataTypes[idx] === SnowflakeConstants.VARIANT_DATA_TYPE) && tableMetadata.source) {
@@ -403,8 +445,7 @@ class StatementGenerator {
        }
            
        let targetDataType = this.mapForeignDataType(tableMetadata.vendor,tableMetadata.vendor === 'SNOWFLAKE' ? tableMetadata.storageTypes[idx] : dataType.type,dataType.length,dataType.scale);
-	   
-        if (targetDataType === 'VARIANT') {
+       if (targetDataType === 'VARIANT') {
          parserRequired =  true;
 		 switch (dataType.type.toUpperCase()) {
 		   case 'XML':
@@ -492,7 +533,7 @@ class StatementGenerator {
 	    }
 	  }
     }
-	
+
     return { 
        ddl             : createStatement, 
        dml             : insertStatement,

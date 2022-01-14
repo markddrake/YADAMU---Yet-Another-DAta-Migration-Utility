@@ -215,7 +215,11 @@ class LoaderDBI extends YadamuDBI {
 	this.writeOperations = new Set()
 	this.baseDirectory = path.resolve(this.vendorProperties.directory || "")
   }    	
-
+ 
+  isValidDDL() {
+    return true;
+  }
+  
   resolve(target) {
 	return path.resolve(target)
   }
@@ -255,7 +259,7 @@ class LoaderDBI extends YadamuDBI {
 
   async loadMetadataFiles(copyStagedData) {
   	this.metadata = {}
-    if (this.controlFile) {
+    if (this.controlFile.metadata) {
 	  let stack
       let metadataPath
       try {
@@ -310,15 +314,17 @@ class LoaderDBI extends YadamuDBI {
   **
   */
 
-  async createControlFile(metadataFileList,dataFileList) {
-  	const settings = {
-	  contentType        : this.OUTPUT_FORMAT
-    , compression        : this.yadamu.COMPRESSION
-	, encryption         : this.ENCRYPTED_CONTENT ? this.yadamu.CIPHER : 'NONE'
-	, baseFolder         : this.IMPORT_FOLDER
-	, timestampPrecision : this.TIMESTAMP_PRECISION
-    }
-	this.controlFile = { settings : settings, systemInformation : {}, metadata : metadataFileList, data: dataFileList}  
+  async createControlFile() {
+
+	this.controlFile = { 
+  	  settings : {
+  	    contentType        : this.OUTPUT_FORMAT
+      , compression        : this.yadamu.COMPRESSION
+	  , encryption         : this.ENCRYPTED_CONTENT ? this.yadamu.CIPHER : 'NONE'
+	  , baseFolder         : this.IMPORT_FOLDER
+	  , timestampPrecision : this.TIMESTAMP_PRECISION
+      },
+	}
   }
 
 
@@ -344,9 +350,17 @@ class LoaderDBI extends YadamuDBI {
   async writeMetadata(metadata) {
     
     // this.yadamuLogger.trace([this.constructor.name],`writeMetadata()`)
-    
     Object.values(metadata).forEach((table) => {delete table.source})
+
     this.controlFile.systemInformation = this.systemInformation
+	
+	if (this.ddl  && (this.ddl.length > 0)) {
+	  this.controlFile.ddl = this.ddl
+	}
+	
+    this.controlFile.metadata = {}
+    this.controlFile.data = {}
+
     Object.values(this.metadata).forEach((tableMetadata) => {
 	   const file = this.metadataRelativePath(tableMetadata.tableName) 
        this.controlFile.metadata[tableMetadata.tableName] = {file: file}
@@ -389,6 +403,7 @@ class LoaderDBI extends YadamuDBI {
 
     Object.values(metadata).forEach((table) => {delete table.source})
 	super.setMetadata(metadata)
+
   }
   
   setFolderPaths(controlFileFolder,schema) {  
@@ -412,11 +427,16 @@ class LoaderDBI extends YadamuDBI {
     await fsp.mkdir(this.DATA_FOLDER, { recursive: true });
     
 	this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Created directory: "${this.PROTOCOL}${this.resolve(this.IMPORT_FOLDER)}"`);
-    const dataFileList = {}
-    const metadataFileList = {}
-    this.createControlFile(metadataFileList,dataFileList)
+    this.createControlFile()
   }
-
+  
+  /*
+  async initializeData() {
+    this.yadamuLogger.trace([this.constructor.name,this.getWorkerNumber()],`initializeData()`)
+    await this.writeMetadata(this.metadata)
+  }
+  */
+  
   getOutputStream(tableName,ddlComplete) {
 	// this.yadamuLogger.trace([this.constructor.name],`getOutputStream()`)
 	const os = new this.WRITER(this,tableName,ddlComplete,this.status,this.yadamuLogger)  
@@ -448,7 +468,7 @@ class LoaderDBI extends YadamuDBI {
  
   async getOutputStreams(tableName,ddlComplete) {
 	await ddlComplete;
-	this.reloadStatementCache()
+	this.reloadControlFile()
 	const streams = []
 	
 	const writer = this.getOutputStream(tableName,ddlComplete)
@@ -505,6 +525,10 @@ class LoaderDBI extends YadamuDBI {
     }
 	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using Control File: "${this.PROTOCOL}${this.resolve(this.CONTROL_FILE_PATH)}"`);
 
+  }
+  
+  getDDLOperations() {
+	return this.controlFile.ddl
   }
 
   async getInputStream(filename) {
@@ -619,17 +643,17 @@ class LoaderDBI extends YadamuDBI {
 	  , _BATCH_SIZE       : this.BATCH_SIZE
       , columnNames       : [... tableMetadata.columnNames]
       , targetDataTypes   : [... tableMetadata.dataTypes]
+	  , dml               : null
+	  , ddl               : null
       }
     })
     return this.statementCache
   }
 
   async executeDDL(ddl) {
-	if (this.MODE !== 'DDL_ONLY') {
-	  await this.writeMetadata(this.metadata)
-	}
-	return []
-    
+	this.ddl = ddl
+    const result = await this.writeMetadata(this.metadata)
+	return [result]
   }
   
   classFactory(yadamu) {
@@ -643,7 +667,7 @@ class LoaderDBI extends YadamuDBI {
 	this.statementCache = manager.statementCache
   }
   
-  reloadStatementCache() {
+  reloadControlFile() {
     if (!this.isManager()) {
       this.controlFile = this.manager.controlFile
 	}	 

@@ -25,17 +25,14 @@ class MsSQLQA extends MsSQLDBI {
     constructor(yadamu,settings,parameters) {
        super(yadamu,settings,parameters)
     }
-
-    setMetadata(metadata) {
-      super.setMetadata(metadata)
-    }
 	 
 	async initialize() {
+				
+	  // Must (re) create the database before attempting to connection. initialize() will fail if the database does not exist.
 				
 	  if (this.options.recreateSchema === true) {
 		await this.recreateDatabase();
 	  }
-
 	  await super.initialize();
 	  if (this.terminateConnection()) {
         const pid = await this.getConnectionID();
@@ -52,42 +49,18 @@ class MsSQLQA extends MsSQLDBI {
 	** After creating the database the connection must be closed and a new connection opened to the target database.
     **
     */	  
-	
+
 	async recreateDatabase() {
-	
-      try {
 
-        // Cache the current value of YADAMU_DATABASE and remove it from this.parameters. This prevents the call to setTargetDatabase() from overriding the value of this.vendorProperties.database in createConnectionPool()
-		
-  	    const YADAMU_DATABASE = this.parameters.YADAMU_DATABASE;
-		const database = this.vendorProperties.database
-        delete this.parameters.YADAMU_DATABASE;
-      
-	    // Create a connection pool using a well known database that must exist	  
-	    this.vendorProperties.database = 'master';
-        await super.initialize();
+      try {	
+	    const connectionProperties = Object.assign({},this.vendorProperties)
+	    const dbi = new MsSQLDBMgr(this.yadamuLogger,this.status, connectionProperties)
+	    await dbi.recreateDatabase(this.parameters.YADAMU_DATABASE)
+	  }	catch (e) {
+		console.log(e)
+      }
+	}
 
-	    this.parameters.YADAMU_DATABASE = YADAMU_DATABASE
-	    this.vendorProperties.database = database;
-
-        let results;       
-		
-        const setSingleUserMode = this.statementLibrary.SINGLE_USER_MODE
-        results =  await this.executeSQL(setSingleUserMode);      
-        const dropDatabase = this.statementLibrary.DROP_DATABASE
-        results =  await this.executeSQL(dropDatabase);      
-      
-        const createDatabase = `create database "${this.parameters.YADAMU_DATABASE}" COLLATE ${this.DB_COLLATION}`;
-        results =  await this.executeSQL(createDatabase);      
-
-        await this.finalize()
-	  } catch (e) {
-		this.yadamuLogger.handleException([this.DATABASE_VENDOR,'recreateDatabase()'],e);
-		throw e
-	  }
-	  
-    }
-	
 	async useDatabase(databaseName) {     
       const statement = `use ${databaseName}`
       const results = await this.executeSQL(statement);
@@ -212,6 +185,49 @@ class MsSQLQA extends MsSQLDBI {
     } 
 	
 }
+
+class MsSQLDBMgr extends MsSQLDBI {
+	
+	constructor(logger,status,vendorProperties) {
+	  super({})
+	  this.yadamuLogger = logger;
+  	  this.status = status
+	  this.vendorProperties = vendorProperties
+      this.vendorProperties.database = 'master';
+	}
+	
+    async initialize() {
+      await this._getDatabaseConnection()
+    }
+  
+    async recreateDatabase(database) {
+
+	   const SINGLE_USER_MODE = `if DB_ID('${database}') IS NOT NULL alter database [${database}] set single_user with rollback immediate` 
+       const DROP_DATABASE = `if DB_ID('${database}') IS NOT NULL drop database [${database}]`
+	
+      try {
+        await this.initialize()
+	    // Create a connection pool using a well known database that must exist	  
+	    this.vendorProperties.database = 'master';
+        // await super.initialize();
+
+        let results;       
+		
+        results =  await this.executeSQL(SINGLE_USER_MODE);      
+        results =  await this.executeSQL(DROP_DATABASE);      
+        const CREATE_DATABASE = `create database "${database}" COLLATE ${this.DB_COLLATION}`;
+        results =  await this.executeSQL(CREATE_DATABASE);      
+
+        await this.finalize()
+
+	  } catch (e) {
+		console.log([this.DATABASE_VENDOR,'recreateDatabase()'],e);
+		throw e
+	  }
+	  
+    }	
+}  
+
 module.exports = MsSQLQA
 
 const _SQL_SCHEMA_TABLE_ROWS = `SELECT sOBJ.name AS [TableName], SUM(sPTN.Rows) AS [RowCount] 

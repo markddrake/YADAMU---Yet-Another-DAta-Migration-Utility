@@ -21,10 +21,9 @@ class StatementGenerator extends DefaultStatementGenerator {
     
   // 11.x does not support GeoJSON. We need to use WKX to convert GeoJSON to WKT
 
-  get GEOJSON_FUNCTION()         { return 'DESERIALIZE_WKTGEOMETRY' }
-  get RANDOM_OBJECT_LENGTH()     { return 12 }
-  get ORACLE_CSV_SPECIFICATION() { return `TERMINATED  BY ',' OPTIONALLY ENCLOSED BY '"'` }
-
+  get GEOJSON_FUNCTION()             { return 'DESERIALIZE_WKTGEOMETRY' }
+  get RANDOM_OBJECT_LENGTH()         { return 12 }
+  get ORACLE_CSV_SPECIFICATION()     { return `TERMINATED  BY ',' OPTIONALLY ENCLOSED BY '"'` }
   
   constructor(dbi, targetSchema, metadata, yadamuLogger) {
     super(dbi, targetSchema, metadata, yadamuLogger)
@@ -50,6 +49,28 @@ class StatementGenerator extends DefaultStatementGenerator {
     }).join('');
     return `<metadata>${metadataXML}</metadata>`
     
+  }
+  
+  generateCopyStatement(targetSchema,tableName,externalTableName,externalColumnNames,externalSelectList,plsql) {
+	return `insert /*+ APPEND */ into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})\nselect ${externalSelectList.join(",")} from ${externalTableName}`
+  }
+
+  generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions) {
+    super.generateCopyOperation(tableMetadata,tableInfo,externalColumnNames,externalColumnDefinitions,externalSelectList,copyColumnDefinitions) 
+	const plsql = this.getPLSQL(tableInfo.dml)
+	if (plsql) {
+	  const functionList  = plsql.split('\rfunction')
+	  functionList.shift()
+	
+	  const dropFunctions = functionList.map((functionDefinition,idx) => {
+	    const functionName = functionDefinition.substring(2,functionDefinition.indexOf('"',2))
+	    functionList[idx] = `create or replace function "${this.targetSchema}".${functionDefinition.substring(1)}`
+	    return `drop function "${this.targetSchema}"."${functionName}"`
+	  })
+
+	  tableInfo.copy.createFunctions = functionList
+	  tableInfo.copy.dropFunctions = dropFunctions
+	}
   }
   
   getTypeMappings() {

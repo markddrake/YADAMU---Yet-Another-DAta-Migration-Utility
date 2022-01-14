@@ -9,7 +9,7 @@ const DBIConstants = require('../../../YADAMU/common/dbiConstants.js');
 const YadamuMetrics = require('./yadamuMetrics.js');
 const YadamuDefaults = require('./yadamuDefaults.json')
 const CompareRules = require('./compareRules.json')
-
+const NullWriter =  require('../../../YADAMU/common/nullWriter.js');
 class YadamuTest extends Yadamu {
 
   static #_YADAMU_PARAMETERS
@@ -84,6 +84,13 @@ class YadamuTest extends Yadamu {
 	  await this.generateCryptoKey()
 	}
   }
+
+  initializeSQLTrace() {
+	if ((this.STATUS.sqlTrace instanceof NullWriter) && this.parameters.SQL_TRACE) {
+       this.STATUS.sqlTrace = undefined
+	}
+	super.initializeSQLTrace()
+  } 
   
   async doExport(dbi,file) {
     this.parameters.FILE = file
@@ -107,14 +114,13 @@ class YadamuTest extends Yadamu {
   }
 		
   getCompareRules(rules) {
-    return {
+	return {
       emptyStringIsNull    : rules.EMPTY_STRING_IS_NULL 
     , doublePrecision      : rules.DOUBLE_PRECISION || 18
 	, spatialPrecision     : rules.SPATIAL_PRECISION || 18
 	, timestampPrecision   : rules.TIMESTAMP_PRECISION || 9
-	, orderedJSON          : rules.hasOwnProperty("ORDERED_JSON") ? rules.ORDERED_JSON : false	, xmlRule              : rules.XML_COMPARISSON_RULE || null
-    , objectsRule          : rules.OBJECTS_COMPARISSON_RULE || 'SKIP'
-    , excludeMViews        : rules.hasOwnProperty("MODE") ? rules.MODE === 'DATA_ONLY' : false 
+	, orderedJSON          : rules.hasOwnProperty("ORDERED_JSON") ? rules.ORDERED_JSON : false	
+	, xmlRule              : rules.XML_COMPARISSON_RULE || null
     , infinityIsNull       : rules.hasOwnProperty("INFINITY_IS_NULL") ? rules.INFINITY_IS_NULL : false 
     }
   }

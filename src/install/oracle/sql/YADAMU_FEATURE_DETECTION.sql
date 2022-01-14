@@ -45,14 +45,14 @@ declare
   V_RDBMS_VERSION          VARCHAR2(24);
   V_XML_STORAGE_MODEL      VARCHAR2(17);
   V_INSTALL_TIME           VARCHAR2(28) := TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD"T"HH24:MI:SS-TZH:TZM');
-  V_YADAMU_GUID            VARCHAR2(36) := regexp_replace(rawtohex(sys_guid()), '([A-F0-9]{8})([A-F0-9]{4})([A-F0-9]{4})([A-F0-9]{4})([A-F0-9]{12})', '\1-\2-\3-\4-\5');
+  V_YADAMU_GUID            VARCHAR2(36) := NULL;
 begin
 
   begin
-    execute immediate 'begin :1 := YADAMU_FEATURE_DETECTION.YADMAU_INSTANCE_ID; end;' using V_YADAMU_GUID;
+    execute immediate 'begin :1 := YADAMU_FEATURE_DETECTION.YADAMU_INSTANCE_ID; end;' using V_YADAMU_GUID;
   exception 
     when OTHERS then
-	 NULL;
+	, V_YADAMU_GUID := regexp_replace(rawtohex(sys_guid()), '([A-F0-9]{8})([A-F0-9]{4})([A-F0-9]{4})([A-F0-9]{4})([A-F0-9]{12})', '\1-\2-\3-\4-\5');
   end;
 
   V_PACKAGE_DEFINITION := 'CREATE OR REPLACE PACKAGE YADAMU_FEATURE_DETECTION AS' || C_NEWLINE

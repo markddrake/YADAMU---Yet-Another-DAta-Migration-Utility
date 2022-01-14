@@ -57,7 +57,6 @@ class Yadamu {
   get WARNING_FOLDER()                { return this.parameters.WARNING_FOLDER            || YadamuConstants.WARNING_FOLDER }
   get WARNING_FILE_PREFIX()           { return this.parameters.WARNING_FILE_PREFIX       || YadamuConstants.WARNING_FILE_PREFIX }
  
-
   get IDENTIFIER_TRANSFORMATION()     { return this.parameters.IDENTIFIER_TRANSFORMATION || YadamuConstants.IDENTIFIER_TRANSFORMATION }
   get IDENTIFIER_MAPPING_FILE()       { return this.parameters.IDENTIFIER_MAPPING_FILE }
   get IDENTIFIER_MAPPINGS()           { 
@@ -894,7 +893,6 @@ class Yadamu {
       this.activeConnections.delete(source);
       await target.abort(e);
       this.activeConnections.delete(target);
-    
 	  if (!((e instanceof UserError) && (e instanceof FileNotFound))) {
         this.reportError(e,this.parameters,this.STATUS,this.LOGGER);
 	  }
@@ -991,23 +989,6 @@ class Yadamu {
     await this.close();
     return metrics
   }
-  
-  async uploadFile(dbi,importFilePath) {
-	let stack 
-	try {
-      stack = new Error().stack		
-      const stats = fs.statSync(importFilePath)
-      const fileSizeInBytes = stats.size    
-
-      const startTime = performance.now();
-      const json = await dbi.uploadFile(importFilePath);
-      const elapsedTime = performance.now() - startTime;
-      this.LOGGER.info([`${dbi.DATABASE_VENDOR}`,`UPLOAD`],`File "${importFilePath}". Size ${fileSizeInBytes}. Elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
-      return json;
-    } catch (err) {
-      throw err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath)
-	}
-  }
    
   getMetrics(log) {
       
@@ -1032,9 +1013,7 @@ class Yadamu {
       await dbi.initialize();
 	  this.activeConnections.add(dbi)
       this.STATUS.operationSuccessful = false;
-      const hndl = await this.uploadFile(dbi,dbi.UPLOAD_FILE);
-      const log = await dbi.processFile(hndl)
-	  await dbi.releasePrimaryConnection()
+	  const log = await dbi.upload()
       await dbi.finalize();
 	  this.activeConnections.delete(dbi)
 	  const metrics = this.getMetrics(log);  

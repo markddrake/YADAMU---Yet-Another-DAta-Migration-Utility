@@ -86,7 +86,7 @@ class DBWriter extends Writable {
     await this.dbi.setMetadata(metadata)     
     const statementCache = await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER)
 	const ddlStatements = this.dbi.analyzeStatementCache(statementCache,startTime)
-
+	
 	if (this.ddlCompleted) {
       // this.yadamuLogger.trace([this.constructor.name,`generateStatementCache()`,this.dbi.DATABASE_VENDOR,],`DDL already completed. Emit ddlComplete(SUCCESS))`)  
 	  this.emit('ddlComplete',[],performance.now());
@@ -148,7 +148,7 @@ class DBWriter extends Writable {
           sourceMetadata = this.dbi.applyTableMappings(sourceMetadata,this.dbi.tableMappings)	  
 	    }
 	 
-        // Get source and target Tablenames. Apply name transformations based on TABLE_MATCHING parameter.    
+        // Get source and target Tablenames. Apply name transformations based on the DBI IDENTIFIER_TRANSFORMATION parameter.    
 
         let targetTableNames = this.targetSchemaInfo.map((tableInfo) => {
           return tableInfo.TABLE_NAME;
@@ -158,28 +158,25 @@ class DBWriter extends Writable {
         let sourceTableNames = sourceKeyNames.map((key) => {
           return sourceMetadata[key].tableName;
         })
-
-        switch ( this.dbi.TABLE_MATCHING ) {
-          case 'UPPERCASE' :
-            sourceTableNames = sourceTableNames.map((tableName) => {
-              return tableName.toUpperCase();
-            })
-            break;
-          case 'LOWERCASE' :
-            sourceTableNames = sourceTableNames.map((tableName) => {
-              return tableName.toLowerCase();
-            })
-            break;
-          case 'INSENSITIVE' :
+        
+		switch (this.dbi.IDENTIFIER_TRANSFORMATION ) {
+          case 'LOWERCASE':
             sourceTableNames = sourceTableNames.map((tableName) => {
               return tableName.toLowerCase();
             })
             targetTableNames = targetTableNames.map((tableName) => {
-              return tableName.toLowerCase();
+               return tableName.toLowerCase();
             })
-            break;
-          default:
-        }
+			break;
+          case 'UPPERRCASE':
+            sourceTableNames = sourceTableNames.map((tableName) => {
+              return tableName.toUpperCase();
+            })
+            targetTableNames = targetTableNames.map((tableName) => {
+               return tableName.toUpperCase();
+            })
+			break;
+		}	
            
         // Merge metadata for existing table with metadata from export source
 
@@ -267,7 +264,6 @@ class DBWriter extends Writable {
 		}
 	  }
       await this.dbi.finalizeImport();
-      await this.dbi.releasePrimaryConnection()
       callback();
     } catch (e) {
       this.yadamuLogger.handleException([`WRITER`,`FINAL`,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],e);

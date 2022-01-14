@@ -22,7 +22,7 @@ COPY SQLServer2019-KB5005679-x64.exe CU
 # Install SQL Server Applying the Cummlative Update
 #
 RUN C:\INSTALL\SQLServer2019-DEV-x64-ENU\SETUP.exe /ConfigurationFile=C:\INSTALL\SQLServer2019-Config.ini; `
-    Remove-Item C:\INSTALL\CU\SQLServer2019-KB5005679-x64; `
+    Remove-Item C:\INSTALL\CU\SQLServer2019-KB5005679-x64.exe; `
 	Remove-Item C:\INSTALL\SQLServer2019-Config.ini
 #
 WORKDIR c:/

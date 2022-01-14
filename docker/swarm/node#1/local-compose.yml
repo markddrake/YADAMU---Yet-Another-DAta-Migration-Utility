@@ -1,35 +1,15 @@
 version: "2.4"
 services:
 
-  ORA2103-01: 
-    container_name: ORA2103-01
-    image:  yadamu/oracle:21.3.0
-    isolation: hyperv
-    mem_limit: 8192M
-    tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
-    networks:
-      - YADAMU-NET
-    ports: 
-      - "1526:1521"
-    environment:
-      ORACLE_SID: CDB21300 
-      ORACLE_PDB: PDB21300 
-      ORACLE_PWD: oracle 
-      ORACLE_CHARACTERSET: AL32UTF8
-    volumes:
-      - YADAMU_01-SHARED:c:\mount
-      - ORA2103-01-ADMIN:c:\oracle\admin
-      - ORA2103-01-DATA:c:\oracle\oradata
-      - ORA2103-01-DIAG:c:\oracle\diag
-    restart: always
-
   ORA1903-01: 
     container_name: ORA1903-01
     image:  yadamu/oracle:19.3.0
     isolation: hyperv
     mem_limit: 8192M
     networks:
-      - YADAMU-NET
+      - YADAMU-HOST
+    ports:
+      - "1521:1521"
     environment:
       DELAY: 0
       ORACLE_SID: CDB19300 
@@ -51,7 +31,9 @@ services:
       - ORA1903-01    
     mem_limit: 8192M
     networks:
-      - YADAMU-NET
+      - YADAMU-HOST
+    ports:
+      - "1522:1521"
     environment:
       DELAY: 1800
       ORACLE_SID: CDB18300 
@@ -73,7 +55,9 @@ services:
       - ORA1803-01    
     mem_limit: 8192M
     networks:
-      - YADAMU-NET
+      - YADAMU-HOST
+    ports:
+      - "1523:1521"
     environment:
       DELAY: 3600
       ORACLE_SID: CDB12200
@@ -95,7 +79,9 @@ services:
       - ORA1220-01    
     mem_limit: 8192M
     networks:
-      - YADAMU-NET
+      - YADAMU-HOST
+    ports:
+      - "1525:1521"
     environment:
       DELAY: 5400
       ORACLE_SID: ORA11200 
@@ -117,7 +103,9 @@ services:
       - ORA1120-01    
     mem_limit: 4096M
     networks:
-      - YADAMU-NET
+      - YADAMU-HOST
+    ports:
+      - "3306:3306"
     environment:
       DELAY: 7200
     volumes:
@@ -133,7 +121,9 @@ services:
       - MYSQL80-01    
     mem_limit: 4096M
     networks:
-      - YADAMU-NET
+      - YADAMU-HOST
+    ports:
+      - "3307:3306"
     environment:
       DELAY: 7200
       MYSQL_ROOT_PASSWORD: oracle  
@@ -143,97 +133,13 @@ services:
       - MARIA10-01-DATA:C:\ProgramData\MariaDB\10\Data
     restart: always
 
-  MSSQL14-01: 
-      container_name: MSSQL14-01
-      image:  yadamu/svr-2016/mssql:2014
-      isolation: hyperv
-      mem_limit: 6144M
-      networks:
-        - YADAMU-NET
-      ports: 
-        - "1435:1433"
-      environment:
-        ACCEPT_EULA: Y
-        SA_PASSWORD: oracle#1
-      volumes:
-        - YADAMU_01-SHARED:c:\mount
-        - MSSQL14-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\DATA
-        - MSSQL14-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL12.MSSQLSERVER\MSSQL\LOG
-      restart: always
-  
-  MSSQL17-01: 
-    container_name: MSSQL17-01
-    image:  yadamu/mssql:2017-CU26
-    isolation: hyperv
-    mem_limit: 6144M
-    networks:
-      - YADAMU-NET
-    environment:
-      DELAY: 0
-      ACCEPT_EULA: Y
-      SA_PASSWORD: oracle#1
-    volumes:
-      - YADAMU_01-SHARED:c:\mount
-      - MSSQL17-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\DATA
-      - MSSQL17-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\LOG
-    restart: always
-
-  MSSQL19-01: 
-      container_name: MSSQL19-01
-      image:  yadamu/mssql:2019-CU13
-      isolation: hyperv
-      mem_limit: 6144M
-      networks:
-        - YADAMU-NET
-      environment:
-        DELAY: 0
-        ACCEPT_EULA: Y
-        SA_PASSWORD: oracle#1
-      volumes:
-        - YADAMU_01-SHARED:c:\mount
-        - MSSQL19-01-DATA:C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\DATA
-        - MSSQL19-01-LOG:C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\LOG
-      restart: always
-  
-  PGSQL14-01: 
-    container_name: PGSQL14-01
-    image:  yadamu/postgres:14 
-    isolation: hyperv
-    mem_limit: 4096M
-    networks:
-      - YADAMU-NET
-    environment:
-      DELAY: 0
-      POSTGRES_PASSWORD: oracle 
-    volumes:
-      - YADAMU_01-SHARED:c:\mount
-      - PGSQL14-01-VOLUME:C:\ProgramData\PostgreSQL\14\data\
-    restart: always
-    
-  MONGO50-01: 
-    container_name: MONGO50-01
-    image:  yadamu/mongodb:5
-    isolation: hyperv
-    mem_limit: 4096M
-    networks:
-      - YADAMU-NET
-    environment:
-      DELAY: 0
-    volumes:
-      - YADAMU_01-SHARED:c:\shared
-      - MONGO50-01-VOLUME:c:\ProgramData\MongoDB\Server\5.0
-    restart: always
-    
 networks: 
-  YADAMU-NET:
-     name: YADAMU-NET
-
+  YADAMU-HOST:
+     name: YADAMU-HOST
+     
 volumes:
   YADAMU_01-SHARED:
     name: YADAMU_01-SHARED
-  ORA2103-01-ADMIN:
-  ORA2103-01-DATA:
-  ORA2103-01-DIAG:
   ORA1903-01-ADMIN:
   ORA1903-01-DATA:
   ORA1903-01-DIAG:
@@ -246,15 +152,7 @@ volumes:
   ORA1120-01-ADMIN:
   ORA1120-01-DATA:
   ORA1120-01-DIAG:
-  MSSQL14-01-DATA:
-  MSSQL14-01-LOG:
-  MSSQL17-01-DATA:
-  MSSQL17-01-LOG:
-  MSSQL19-01-DATA:
-  MSSQL19-01-LOG:
-  PGSQL14-01-VOLUME:
   MYSQL80-01-VOLUME:
   MARIA10-01-CONF:
   MARIA10-01-DATA:
-  MONGO50-01-VOLUME:
      

@@ -276,7 +276,7 @@ class OracleDBI extends YadamuDBI {
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
 
 	//  Do not Configure Connection here.
-
+	
 	let stack;
     this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
 	try {
@@ -1335,8 +1335,7 @@ class OracleDBI extends YadamuDBI {
     if (tableInfo.partitionInfo?.PARTITION_NAME) {
 	  tableInfo.SQL_STATEMENT = `${tableInfo.SQL_STATEMENT.slice(0,-1)} PARTITION("${tableInfo.partitionInfo.PARTITION_NAME}") t`
 	}
-
-
+	
     if (tableInfo.WITH_CLAUSE !== null) {
       if (this.DB_VERSION < 12) {
 		// The "WITH_CLAUSE" is a create procedure statement that creates a stored procedure that wraps the required conversions
@@ -1361,9 +1360,10 @@ class OracleDBI extends YadamuDBI {
 		this.streamingStackTrace = new Error().stack
         this.inputStream = await this.connection.queryStream(tableInfo.SQL_STATEMENT,[],{extendedMetaData: true})
 	    this.traceTiming(sqlStartTime,performance.now())
+		this.inputStream.on('end',() => {
+		})
 	    return this.inputStream
 	  } catch (e) {
-		  console.log(e)
 		const cause = new OracleError(e,this.streamingStackTrace ,tableInfo.SQL_STATEMENT,{},{})
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
@@ -1406,6 +1406,7 @@ class OracleDBI extends YadamuDBI {
 	this.SQL_DIRECTORY_PATH = this.manager.SQL_DIRECTORY_PATH
 	this.LOCAL_DIRECTORY_PATH = this.manager.LOCAL_DIRECTORY_PATH
 	this.partitionLists = this.manager.partitionLists
+	this.dropWrapperStatements = this.manager.dropWrapperStatements
   }
 
   async getConnectionID() {
@@ -1466,6 +1467,7 @@ class OracleDBI extends YadamuDBI {
 
   async initializeCopy() {
 	 await this.executeSQL(`create or replace directory ${this.SQL_DIRECTORY_NAME} as '${this.SQL_DIRECTORY_PATH}/'`);
+	 await this.initializeData()
   }
 
   async copyOperation(tableName,copy) {
@@ -1476,19 +1478,44 @@ class OracleDBI extends YadamuDBI {
     **
     */
 
+
+    if (copy.dml.startsWith('insert /*+ WITH_PLSQL */') && (this.DB_VERSION < 12)) {
+		/*
+		// The "WITH_CLAUSE" is a create procedure statement that creates a stored procedure that wraps the required conversions
+		await this.executeSQL(tableInfo.WITH_CLAUSE,{})
+		// The procedure needs to be dropped once the operation is complete.
+		const wrapperName = tableInfo.WITH_CLAUSE.substring(tableInfo.WITH_CLAUSE.indexOf('"."')+3,tableInfo.WITH_CLAUSE.indexOf('"('))
+		const sqlStatement = this.StatementLibrary.SQL_DROP_WRAPPERS.replace(':1:',this.parameters.FROM_USER).replace(':2:',wrapperName);
+		this.dropWrapperStatements.push(sqlStatement);
+		*/
+    }
+
 	try {
 	  const startTime = performance.now();
 	  const stack = new Error().stack
+	  await this.disableTriggers(this.parameters.TO_USER,tableName)
 	  let results = await this.beginTransaction();
 	  results = await this.executeSQL(copy.ddl);
+	  if (copy.hasOwnProperty("createFunctions")) {
+		const results = await Promise.all(copy.createFunctions.map((func) => {
+		  return this.executeSQL(func)
+		}))
+	  }
 	  results = await this.executeSQL(copy.dml);
 	  const rowsRead = results.rowsAffected
-	  results = await this.executeSQL(copy.drop);
-	  const endTime = performance.now();
 	  results = await this.commitTransaction()
+	  const endTime = performance.now();
+	  results = await this.executeSQL(copy.drop);
+	  if (copy.hasOwnProperty("dropFunctions")) {
+		const results = await Promise.all(copy.dropFunctions.map((func) => {
+		  return this.executeSQL(func)
+		}))
+	  }
+	  await this.enableTriggers(this.parameters.TO_USER,tableName)
   	  await this.reportCopyResults(tableName,rowsRead,0,startTime,endTime,copy.dml,stack)
 	} catch(e) {
-      if (e.copyFileNotFoundError()) {
+      await this.enableTriggers(this.parameters.TO_USER,tableName)
+	  if (e.copyFileNotFoundError()) {
 		e = new StagingFileError(this.LOCAL_DIRECTORY_PATH,this.SQL_DIRECTORY_PATH,e)
 	  }
 	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
@@ -1498,6 +1525,7 @@ class OracleDBI extends YadamuDBI {
 
   async finalizeCopy() {
 	 await this.executeSQL(`drop directory ${this.SQL_DIRECTORY_NAME}`);
+	 await this.finalizeData()
   }
 
   async copyStagedData(vendor,controlFile,metadata,credentials) {

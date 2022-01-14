@@ -28,10 +28,6 @@ class MySQLQA extends MySQLDBI {
        super(yadamu,settings,parameters)
     }
 	
-    setMetadata(metadata) {
-      super.setMetadata(metadata)
-    }
-
     doTimeout(milliseconds) {
 		
 	  // Overdide YadamuDBI. No Messages
@@ -48,14 +44,18 @@ class MySQLQA extends MySQLDBI {
    
 	async initialize() {
 	  await super.initialize();
-	  if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
 	  if (this.terminateConnection()) {
         const pid = await this.getConnectionID();
 	    this.scheduleTermination(pid,this.getWorkerNumber());
 	  }
 	}
+	
+    async initializeImport() {
+      if (this.options.recreateSchema === true) {
+ 	    await this.recreateSchema();
+	  }
+      await super.initializeImport();
+    }	
 	
     // ### Hack to avoid missng rows when using a new connection to read previously written rows using new connection immediately after closing current connection.....'
 

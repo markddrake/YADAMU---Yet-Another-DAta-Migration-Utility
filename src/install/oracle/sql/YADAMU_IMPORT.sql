@@ -1343,7 +1343,7 @@ $END
          || ' PATH ''$[' || (IDX - 1) || ']'' ERROR ON ERROR' || YADAMU_UTILITIES.C_NEWLINE
 		 "COLUMN_PATTERNS"
         ,case 
-           when TYPE_EXISTS = 1 then 
+           when TYPE_EXISTS = 1 and TYPE_OWNER not in ('MDSYS') then 
              OBJECT_SERIALIZATION.DESERIALIZE_TYPE(TYPE_OWNER,TYPE_NAME) 
            else 
              NULL 

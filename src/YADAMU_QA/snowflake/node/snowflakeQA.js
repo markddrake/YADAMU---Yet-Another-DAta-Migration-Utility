@@ -25,15 +25,8 @@ class SnowflakeQA extends SnowflakeDBI {
     constructor(yadamu,settings,parameters) {
        super(yadamu,settings,parameters)
     }
-    
-	setMetadata(metadata) {
-      super.setMetadata(metadata)
-    }
-	 
+
     async initialize() {
-      if (this.options.recreateSchema === true) {
-        await this.recreateSchema();
-      }
       await super.initialize();
 	  if (this.terminateConnection()) {
         const pid = await this.getConnectionID();
@@ -41,39 +34,23 @@ class SnowflakeQA extends SnowflakeDBI {
 	  }
     }
 
-    async recreateSchema() {
-        
-      const database = this.vendorProperties.database;
-      const YADAMU_DATABASE = this.parameters.YADAMU_DATABASE;
-      delete this.parameters.YADAMU_DATABASE;
-      
-      this.vendorProperties.database = '';
-      await this.createConnectionPool(); 
-      this.connection = await this.getConnectionFromPool();
-        
-      let results
-      try {
-        const createDatabase = `create transient database if not exists "${YADAMU_DATABASE}" DATA_RETENTION_TIME_IN_DAYS = 0;`;
-        results =  await this.executeSQL(createDatabase,[]);      
-        const useDatabase = `USE DATABASE "${YADAMU_DATABASE}";`;
-        results =  await this.executeSQL(useDatabase,[]);      
-        const dropSchema = `drop schema if exists "${YADAMU_DATABASE}"."${this.parameters.TO_USER}";`;
-        results =  await this.executeSQL(dropSchema,[]);      
-        const createSchema = `create transient schema "${YADAMU_DATABASE}"."${this.parameters.TO_USER}" DATA_RETENTION_TIME_IN_DAYS=0;`;
-        results =  await this.executeSQL(createSchema,[]);      
-      } catch (e) {
-        console.log(e)
-        if (e.errorNum && (e.errorNum === 1918)) {
-        }
-        else {
-          throw e;
-        }
+    async initializeImport() {
+	  if (this.options.recreateSchema === true) {
+		await this.recreateDatabase();
+	  }
+	  await super.initializeImport();
+    }	
+
+	async recreateDatabase() {
+
+      try {	
+	    const connectionProperties = Object.assign({},this.vendorProperties)
+	    const dbi = new SnowflakeMgr(this.yadamuLogger,this.status, connectionProperties)
+	    await dbi.recreateDatabase(this.parameters.YADAMU_DATABASE,this.parameters.TO_USER)
+	  }	catch (e) {
+		console.log(e)
       }
-      
-      await this.finalize()
-      this.parameters.YADAMU_DATABASE = YADAMU_DATABASE
-      this.vendorProperties.database = database;
-    }   
+	}
 
     async getRowCounts(target) {
 
@@ -173,6 +150,46 @@ class SnowflakeQA extends SnowflakeDBI {
       super.verifyStagingSource(SnowflakeConstants.STAGED_DATA_SOURCES,source)
     }       
 }
+
+class SnowflakeMgr extends SnowflakeDBI {
+	
+	constructor(logger,status,vendorProperties) {
+	  super({})
+	  this.yadamuLogger = logger;
+  	  this.status = status
+	  this.vendorProperties = vendorProperties
+      this.vendorProperties.database = '';
+	}
+	
+    async initialize() {
+      await this._getDatabaseConnection()
+    }
+  
+    async recreateDatabase(database,schema) {
+		     
+      this.vendorProperties.database = '';
+      await this.createConnectionPool(); 
+      this.connection = await this.getConnectionFromPool();
+        
+      let results
+      try {
+        const createDatabase = `create transient database if not exists "${database}" DATA_RETENTION_TIME_IN_DAYS = 0`;
+        results =  await this.executeSQL(createDatabase,[]);      
+        const useDatabase = `USE DATABASE "${database}"`;
+        results =  await this.executeSQL(useDatabase,[]);      
+        const dropSchema = `drop schema if exists "${database}"."${schema}"`;
+        results =  await this.executeSQL(dropSchema,[]);      
+        const createSchema = `create transient schema "${database}"."${schema}" DATA_RETENTION_TIME_IN_DAYS=0`;
+        results =  await this.executeSQL(createSchema,[]);      
+      } catch (e) {
+        if (e.errorNum && (e.errorNum === 1918)) {
+        }
+        else {
+          throw e;
+        }
+      }
+	}
+}  
 
 module.exports = SnowflakeQA
 
