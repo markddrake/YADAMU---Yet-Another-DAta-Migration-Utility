@@ -8,7 +8,9 @@ RUN apt update \
  && alien -i --scripts ./oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm \
  && npm install --global electron \
  && npm install
- ENV YADAMU_HOME=/usr/src/YADAMU
+COPY src src
+COPY bin bin
+ENV YADAMU_HOME=/usr/src/YADAMU
 ENV YADAMU_BIN=$YADAMU_HOME/bin
 ENV YADAMU_SRC=$YADAMU_HOME/src
 ENV PATH=$PATH:$YADAMU_BIN
