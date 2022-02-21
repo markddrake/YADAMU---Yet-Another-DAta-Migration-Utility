@@ -1,14 +1,15 @@
 "use strict" 
 
-const oracledb = require('oracledb');
+import oracledb from 'oracledb';
 
-const OracleDBI = require('../../../YADAMU/oracle/node/oracleDBI.js');
-const OracleError = require('../../../YADAMU/oracle/node/oracleException.js')
-const OracleConstants = require('../../../YADAMU/oracle/node/oracleConstants.js');
+import OracleDBI       from '../../../YADAMU/oracle/node/oracleDBI.js';
+import { OracleError } from '../../../YADAMU/oracle/node/oracleException.js'
+import OracleConstants from '../../../YADAMU/oracle/node/oracleConstants.js';
 
-const YadamuTest = require('../../common/node/yadamuTest.js');
+import YadamuTest      from '../../common/node/yadamuTest.js';
+import YadamuQALibrary from '../../common/node/yadamuQALibrary.js'
 
-class OracleQA extends OracleDBI {
+class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
     			
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
@@ -27,25 +28,10 @@ class OracleQA extends OracleDBI {
       return OracleQA.YADAMU_DBI_PARAMETERS
     }	
 	
-    constructor(yadamu,settings,parameters) {
-       super(yadamu,settings,parameters)
+    constructor(yadamu,manager,connectionSettings,parameters) {
+       super(yadamu,manager,connectionSettings,parameters)
     }
 
-	async initialize() {
-	  await super.initialize();
-	  if (this.terminateConnection()) {
-        const pid = await this.getConnectionID();
-	    this.scheduleTermination(pid,this.getWorkerNumber());
-	  }
-	}
-	
-    async initializeImport() {
-      if (this.options.recreateSchema === true) {
- 	    await this.recreateSchema();
-	  }
-      await super.initializeImport();
-    }	
-	
  	async recreateSchema() {
         
       try {
@@ -115,27 +101,18 @@ class OracleQA extends OracleDBI {
 	  
       return report
     }
-      
-    async workerDBI(idx)  {
-	  const workerDBI = await super.workerDBI(idx);
-      // Manager needs to schedule termination of worker.
-	  if (this.terminateConnection(idx)) {
-        const pid = await workerDBI.getConnectionID();
-	    this.scheduleTermination(pid,idx);
-	  }
-	  return workerDBI
-    }
-
+     
     classFactory(yadamu) {
-      return new OracleQA(yadamu)
+      return new OracleQA(yadamu,this)
     }
 	
     async scheduleTermination(pid,workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Termination Scheduled.`);
+	  const tags = this.getTerminationTags(workerId,`${pid.sid},${pid.serial}`)
+	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
       this.assassin = setTimeout(
         async (pid) => {
 	      if ((this.pool instanceof this.oracledb.Pool) && (this.pool.status === this.oracledb.POOL_STATUS_OPEN)) {
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Killing connection.`);
+		    this.yadamuLogger.log(tags,`Killing connection.`);
 			const conn = await this.getConnection();
 			const sqlStatement = `ALTER SYSTEM KILL SESSION '${pid.sid}, ${pid.serial}'`
 			let stack
@@ -146,24 +123,24 @@ class OracleQA extends OracleDBI {
 			} catch (e) {
 			  if ((e.errorNum && ((e.errorNum === 27) || (e.errorNum === 31))) || (e.message.startsWith('DPI-1010'))) {
 				// The Worker has finished and it's SID and SERIAL# appears to have been assigned to the connection being used to issue the KILLL SESSION and you can't kill yourself (Error 27)
-			    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Worker finished prior to termination.`)
+			    this.yadamuLogger.log(tags,`Worker finished prior to termination.`)
  			  }
 			  else {
-				const cause = new OracleError(e,stack,sqlStatement)
-			    this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],cause)
+				const cause = new OracleError(this.DRIVER_ID,e,stack,sqlStatement)
+			    this.yadamuLogger.handleException(tags,cause)
 			  }
               if (!e.message.startsWith('DPI-1010')) {
                 try {
      		      await conn.close()
 	            } catch (closeError) {
                   closeError.cause = e;
- 			      this.yadamuLogger.handleException(['KILL','CLOSE',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],cause)
+ 			      this.yadamuLogger.handleException(tags,cause)
                 }
 		      }    
 			}
 		  }
 		  else {
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,`${pid.sid},${pid.serial}`],`Unable to Kill Connection: Connection Pool no longer available.`);
+		    this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
 		  }
 		},
 		this.killConfiguration.delay,
@@ -178,7 +155,7 @@ class OracleQA extends OracleDBI {
 }
 	
 
-module.exports = OracleQA
+export { OracleQA as default }
 
 const _SQL_COMPARE_SCHEMAS = `begin YADAMU_TEST.COMPARE_SCHEMAS(:P_SOURCE_SCHEMA, :P_TARGET_SCHEMA, :P_RULES); end;`;
 

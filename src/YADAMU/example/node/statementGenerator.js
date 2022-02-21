@@ -29,4 +29,4 @@ class StatementGenerator {
   }
 }
 
-module.exports = StatementGenerator;
+export {StatementGenerator as default }

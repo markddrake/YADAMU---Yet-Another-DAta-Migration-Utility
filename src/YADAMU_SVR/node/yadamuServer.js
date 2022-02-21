@@ -1,14 +1,14 @@
 "use strict"
 
-const fs = require('fs')
-const path = require('path')
-const { performance } = require('perf_hooks');
+import fs from 'fs'
+import path from 'path'
+import { performance } from 'perf_hooks';
 
-const Yadamu = require('../../YADAMU/common/yadamu.js');
-const YadamuLogger = require('../../YADAMU/common/yadamuLogger.js');
-const YadamuLibraray = require('../../YADAMU/common/yadamuLibrary.js');
-const HttpDBI = require('./httpDBI.js');
-const FileDBI = require('../../YADAMU/file/node/fileDBI.js')
+import Yadamu from '../../YADAMU/common/yadamu.js';
+import YadamuLogger from '../../YADAMU/common/yadamuLogger.js';
+import YadamuLibraray from '../../YADAMU/common/yadamuLibrary.js';
+import HttpDBI from './httpDBI.js';
+import FileDBI from '../../YADAMU/file/node/fileDBI.js'
 
 class YadamuServer {
 
@@ -240,4 +240,4 @@ class YadamuServer {
 	  
 }
 
-module.exports = YadamuServer;
+export { YadamuServer as default }

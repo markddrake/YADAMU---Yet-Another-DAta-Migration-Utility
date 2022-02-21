@@ -1,11 +1,11 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
+import {DatabaseError} from '../../common/yadamuException.js'
 
 class RedshiftError extends DatabaseError {
-  //  const err = new RedshiftError(cause,stack,sql)
-  constructor(cause,stack,sql) {
-    super(cause,stack,sql);
+
+  constructor(driverId,cause,stack,sql) {
+    super(driverId,cause,stack,sql);
 	// Abbreviate Long Lists of Place Holders ...
 	if ((typeof this.sql === 'string') && (this.sql.indexOf('),($')) > 0) {
 	  const startElipises = this.sql.indexOf('),($') + 2 
@@ -37,4 +37,4 @@ class RedshiftError extends DatabaseError {
   }
 }
 
-module.exports = RedshiftError
+export { RedshiftError as default }

@@ -656,3 +656,5 @@ else env = window;
   }
 
 })(typeof exports === "undefined" ? clarinet = {} : exports);
+
+export  { clarinet as default }

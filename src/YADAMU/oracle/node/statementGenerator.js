@@ -1,14 +1,14 @@
 "use strict";
 
-const path = require('path');
-const crypto = require('crypto');
-const { performance } = require('perf_hooks');
+import path from 'path';
+import crypto from 'crypto';
+import { performance } from 'perf_hooks';
 
-const oracledb = require('oracledb');
+import oracledb from 'oracledb';
 oracledb.fetchAsString = [ oracledb.DATE, oracledb.NUMBER ]
 
-const Yadamu = require('../../common/yadamu.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
+import Yadamu from '../../common/yadamu.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js';
      
 class StatementGenerator {
 
@@ -31,8 +31,8 @@ class StatementGenerator {
 	, BOOLEAN       : 1  // Mappped to RAW(1)
     , BFILE         : 4096
     , DATE          : 24
-    , TIMESTAMP     : 30
-    , INTERVAL      : 16
+    , TIMESTAMP     : 35
+    , INTERVAL      : 12
     })
     return StatementGenerator._BIND_LENGTH
   }
@@ -63,7 +63,7 @@ class StatementGenerator {
     this.dbi = dbi;
     this.targetSchema = targetSchema
     this.metadata = metadata
-    this.yadamuLogger = yadamuLogger;
+    this.yadamuLogger = yadamuLogger
   }
    
   generateBinds(dataTypes, tableInfo, metadata) {
@@ -76,7 +76,8 @@ class StatementGenerator {
        }
        switch (dataType.type) {
          case 'NUMBER':
-		   return { type: oracledb.DB_TYPE_NUMBER }
+           return { type: oracledb.DB_TYPE_NUMBER }
+		   // return { type: oracledb.STRING, maxSize : this.BIND_LENGTH.NUMBER}
          case 'FLOAT':
          case 'BINARY_FLOAT':
            return { type: oracledb.DB_TYPE_BINARY_FLOAT }
@@ -101,9 +102,9 @@ class StatementGenerator {
            return { type: oracledb.DB_TYPE_VARCHAR, maxSize : dataType.length * 2}
          case 'DATE':
          case 'TIMESTAMP':
-           return { type: oracledb.STRING, maxSize : 35}
+           return { type: oracledb.STRING, maxSize : this.BIND_LENGTH.TIMESTAMP}
          case 'INTERVAL':
-            return { type: oracledb.STRING, maxSize : 12}
+            return { type: oracledb.STRING, maxSize : this.BIND_LENGTH.INTERVAL}
          case 'CLOB':
            tableInfo.lobColumns = true;
            return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.CLOB }
@@ -148,7 +149,7 @@ class StatementGenerator {
          case "\"MDSYS\".\"SDO_GEOMETRY\"":
            tableInfo.lobColumns = true;
            // return {type : oracledb.CLOB}
-           switch (this.dbi.INBOUND_SPATIAL_FORMAT) { 
+           switch (this.SPATIAL_FORMAT) { 
              case "WKB":
              case "EWKB":
                return {type : oracledb.DB_TYPE_BLOB, maxSize : this.BIND_LENGTH.GEOMETRY}
@@ -260,7 +261,7 @@ class StatementGenerator {
   getTypeMappings() {
 
     const typeMappings = {
-	  spatialFormat    : this.dbi.INBOUND_SPATIAL_FORMAT
+	  spatialFormat    : this.SPATIAL_FORMAT
 	, raw1AsBoolean    : new Boolean(this.dbi.TREAT_RAW1_AS_BOOLEAN).toString().toUpperCase()
 	, jsonDataType     : this.dbi.JSON_DATA_TYPE
 	, xmlStorageModel  : this.dbi.XML_STORAGE_CLAUSE
@@ -320,6 +321,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
      ** Turn the generated DDL Statements into an array and execute them as single batch via YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS()
      **
      */
+	 
 	this.SQL_DIRECTORY_NAME = `"YDIR-${crypto.randomBytes(this.RANDOM_OBJECT_LENGTH).toString("hex").toUpperCase()}"`
 	
     const sourceDateFormatMask = this.dbi.getDateFormatMask(vendor);
@@ -356,20 +358,20 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
     
     const tables = Object.keys(this.metadata); 
     tables.forEach((table,idx) => {
-      const tableMetadata = this.metadata[table];
-      const tableName = tableMetadata.tableName;
-      const tableInfo = statementCache[tableName];
-      tableInfo.columnNames = tableMetadata.columnNames
-	  tableInfo.sizeConstraints = tableMetadata.sizeConstraints
-      const dataTypes = YadamuLibrary.decomposeDataTypes(tableInfo.targetDataTypes)
       
-      tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
-      tableInfo._COMMIT_COUNT   = this.dbi.COMMIT_COUNT
-      tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
+	  const tableMetadata = this.metadata[table];
+      const tableName = tableMetadata.tableName;
+	  const tableInfo = statementCache[tableName];
+	  
+      tableInfo.columnNames     = tableMetadata.columnNames
+      tableInfo.sizeConstraints = tableMetadata.sizeConstraints
       tableInfo.insertMode      = 'Batch';      
 	  tableInfo.dataFile        = tableMetadata.dataFile
-		
-  	  tableInfo.binds = this.generateBinds(dataTypes,tableInfo,tableMetadata);
+      tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
+      tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
+      
+	  const dataTypes           = YadamuLibrary.decomposeDataTypes(tableInfo.targetDataTypes)
+      tableInfo.binds           = this.generateBinds(dataTypes,tableInfo,tableMetadata);
 
 	  if (tableInfo.lobColumns) {
 		// Do not 'copy' binds to lobBinds. binds is a collection of objects and we do not want to change properties of the objects in binds when we modify corresponding properties in lobBinds.
@@ -407,8 +409,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 		   tableInfo.numericBindPositions.push(idx)
 		 }
 	  })
-	  
-	
+	 
       let includesObjectTypes = false;        
       
 	  // const nullSettings =  ' NULLIF ${copyColumnDefinition}=BLANKS'
@@ -436,7 +437,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
           case "\"MDSYS\".\"SDO_GEOMETRY\"":
 		     externalDataType = "CLOB"
 			 copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
-		     switch (this.dbi.INBOUND_SPATIAL_FORMAT) {       
+		     switch (this.SPATIAL_FORMAT) {       
                case "WKB":
                case "EWKB":
                  value = `OBJECT_SERIALIZATION.DESERIALIZE_WKBGEOMETRY(:${(idx+1)})`;
@@ -591,4 +592,4 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
   }  
 }
 
-module.exports = StatementGenerator;
+export {StatementGenerator as default }

@@ -1,13 +1,12 @@
 "use strict" 
 
-const YadamuParser = require('../../common/yadamuParser.js')
+import YadamuParser from '../../common/yadamuParser.js'
 
 class MongoParser extends YadamuParser {
   
-  constructor(tableInfo,yadamuLogger) {
-    super(tableInfo,yadamuLogger); 
-	
-	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType) => {
+  generateTransformations(queryInfo) {
+
+	return queryInfo.DATA_TYPE_ARRAY.map((dataType) => {
 	  switch (dataType) {
 		 case 'binData':
 		   return (row,idx)  => {
@@ -33,38 +32,29 @@ class MongoParser extends YadamuParser {
 		   return null;
       }
     })
-	
-	// Use a dummy rowTransformation function if there are no transformations required.
-	
-    this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
-      this.transformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-          transformation(row,idx)
-        }
-      }) 
-    }
-		
   }
   
-  async _transform (data,encoding,callback) {
-	this.rowCount++;
-	if (this.tableInfo.ID_TRANSFORMATION === 'STRIP') {
+  constructor(queryInfo,yadamuLogger) {
+    super(queryInfo,yadamuLogger); 	
+  }
+  
+  async doTransform(data) {
+
+	if (this.queryInfo.ID_TRANSFORMATION === 'STRIP') {
       delete data._id
     }
 	
-    switch (this.tableInfo.READ_TRANSFORMATION) {
+    switch (this.queryInfo.READ_TRANSFORMATION) {
 	  case 'DOCUMENT_TO_ARRAY' :
 	    // Need to assemble array in correct order.
-	    data = this.tableInfo.JSON_KEY_NAME_ARRAY.map((c) => { return data[c] })
-      	this.rowTransformation(data)
+	    data = this.queryInfo.JSON_KEY_NAME_ARRAY.map((c) => { return data[c] })
 		break;
       default:
     }
 	// if (this.rowCount === 1) console.log(data)
 		
-    this.push({data:data})
-    callback();
+    return await super.doTransform(data)
   }
 }
 
-module.exports = MongoParser
+export { MongoParser as default }

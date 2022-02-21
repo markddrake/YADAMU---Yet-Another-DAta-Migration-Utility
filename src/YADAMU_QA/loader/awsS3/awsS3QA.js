@@ -1,15 +1,12 @@
 "use strict" 
 
-const path = require('path')
+import AWSS3DBI          from '../../../YADAMU//loader/awsS3/awsS3DBI.js';
+import AWSS3Constants    from '../../../YADAMU/loader/awsS3/awsS3Constants.js';
 
-const AWSS3DBI = require('../../../YADAMU//loader/awsS3/awsS3DBI.js');
-const AWSS3Constants = require('../../../YADAMU/loader/awsS3/awsS3Constants.js');
+import YadamuTest        from '../../common/node/yadamuTest.js';
+import YadamuQALibrary   from '../../common/node/yadamuQALibrary.js'
 
-const YadamuTest = require('../../common/node/yadamuTest.js');
-
-class AWSS3QA extends AWSS3DBI {
-
-  static MIXINS = Object.freeze([path.resolve(__filename,'../../node/mixinCloudQA.js')])
+class AWSS3QA extends YadamuQALibrary.loaderQAMixin(AWSS3DBI) {
 
   static #_YADAMU_DBI_PARAMETERS
   
@@ -22,8 +19,8 @@ class AWSS3QA extends AWSS3DBI {
     return AWSS3QA.YADAMU_DBI_PARAMETERS
   }	
 	 	
-  constructor(yadamu,settings,parameters) {
-    super(yadamu,settings,parameters)
+  constructor(yadamu,manager,connectionSettings,parameters) {
+    super(yadamu,manager,connectionSettings,parameters)
   }
 
   async initializeImport() {
@@ -44,6 +41,9 @@ class AWSS3QA extends AWSS3DBI {
   getContentLength(props) {
     return props.ContentLength
   }
-}
+
+  classFactory(yadamu) {
+    return new AWSS3QA(yadamu,this)
+  }}
  
-module.exports = AWSS3QA
+export { AWSS3QA as default }

@@ -1,12 +1,14 @@
 "use strict"
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class MsSQLConstants {
 
   static get DATABASE_KEY()           { return 'mssql' };
   static get DATABASE_VENDOR()        { return 'MSSQLSERVER' };
   static get SOFTWARE_VENDOR()        { return 'Microsoft Corporation' };
+
+  static get REQUEST_CANCELLED()      { return 'cancelationComplete' };
 
     
   static get STATIC_PARAMETERS() { 
@@ -80,4 +82,4 @@ class MsSQLConstants {
 
 }
 
-module.exports = MsSQLConstants
+export { MsSQLConstants as default }

@@ -1,16 +1,15 @@
 "use strict" 
 
-const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js')
 
-const RedshiftDBI = require('../../../YADAMU/redshift/node/redshiftDBI.js');
-const RedshiftError = require('../../../YADAMU/redshift/node/redshiftException.js')
-const RedshiftConstants = require('../../../YADAMU/redshift/node/redshiftConstants.js');
+import RedshiftDBI       from '../../../YADAMU/redshift/node/redshiftDBI.js';
+import RedshiftError     from '../../../YADAMU/redshift/node/redshiftException.js'
+import RedshiftConstants from '../../../YADAMU/redshift/node/redshiftConstants.js';
 
-const YadamuTest = require('../../common/node/yadamuTest.js');
+import YadamuTest        from '../../common/node/yadamuTest.js';
+import YadamuQALibrary   from '../../common/node/yadamuQALibrary.js'
 
-
-class RedshiftQA extends RedshiftDBI {
-    
+class RedshiftQA extends YadamuQALibrary.qaMixin(RedshiftDBI) {
+	
     // static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
@@ -56,25 +55,10 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
 `
     }
     
-    constructor(yadamu,settings,parameters) {
-       super(yadamu,settings,parameters);
+    constructor(yadamu,manager,connectionSettings,parameters) {
+       super(yadamu,manager,connectionSettings,parameters);
     }
-    
-    async initialize() {
-      await super.initialize();
-      if (this.terminateConnection()) {
-        const pid = await this.getConnectionID();
-        this.scheduleTermination(pid,this.getWorkerNumber());
-      }
-    }
-    
-    async initializeImport() {
-      if (this.options.recreateSchema === true) {
- 	    await this.recreateSchema();
-	  }
-      await super.initializeImport();
-    }	
-	
+       
     async recreateSchema() {
       try {
         const dropSchema = `drop schema if exists "${this.parameters.TO_USER}" cascade`;
@@ -190,29 +174,20 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
       return report
     }
         
-    async workerDBI(idx)  {
-      const workerDBI = await super.workerDBI(idx);
-      // Manager needs to schedule termination of worker.
-      if (this.terminateConnection(idx)) {
-        const pid = await workerDBI.getConnectionID();
-        this.scheduleTermination(pid,idx);
-      }
-      return workerDBI
-    }
-
     async scheduleTermination(pid,workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
+	  const tags = this.getTerminationTags(workerId,pid)
+	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
       const timer = setTimeout(
         async (pid) => {
           try {
             if (this.pool !== undefined && this.pool.end) {
-              this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
+              this.yadamuLogger.log(tags,`Killing connection.`);
               const conn = await this.getConnectionFromPool();
               const res = await conn.query(`select pg_terminate_backend(${pid})`);
               await conn.release()
             }
             else {
-              this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+              this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
             }
            } catch (e) {
              console.log(e);
@@ -227,9 +202,13 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
     verifyStagingSource(source) {  
       super.verifyStagingSource(RedshiftConstants.STAGED_DATA_SOURCES,source)
     }    
+	 
+    classFactory(yadamu) {
+      return new RedshiftQA(yadamu,this)
+    }
 }
 
-module.exports = RedshiftQA
+export { RedshiftQA as default }
 
 const _SQL_SUCCESS =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT

@@ -1,6 +1,6 @@
 "use strict"
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class MariadbConstants {
 
@@ -46,4 +46,4 @@ class MariadbConstants {
 
 }
 
-module.exports = MariadbConstants
+export { MariadbConstants as default }

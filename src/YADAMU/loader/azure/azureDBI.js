@@ -1,17 +1,17 @@
 "use strict" 
 
-const { BlobServiceClient } = require('@azure/storage-blob');
-const path = require('path')
-const Stream = require('stream')
+import { BlobServiceClient } from '@azure/storage-blob';
+import path from 'path'
+import Stream from 'stream'
 
 
-const CloudDBI = require('../node/cloudDBI.js');
-const DBIConstants = require('../../common/dbiConstants.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js')
+import CloudDBI from '../node/cloudDBI.js';
+import DBIConstants from '../../common/dbiConstants.js';
+import YadamuConstants from '../../common/yadamuConstants.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js'
 
-const AzureConstants = require('./azureConstants.js');
-const AzureStorageService = require('./azureStorageService.js');
+import AzureConstants from './azureConstants.js';
+import AzureStorageService from './azureStorageService.js';
 
 /*
 **
@@ -59,9 +59,9 @@ class AzureDBI extends CloudDBI {
   
   get STORAGE_ID() { return this.CONTAINER }
 													
-  constructor(yadamu,settings,parameters) {
+  constructor(yadamu,manager,connectionSettings,parameters) {
     // Export File Path is a Directory for in Load/Unload Mode
-    super(yadamu,settings,parameters)
+    super(yadamu,manager,connectionSettings,parameters)
   }   
   
   
@@ -120,23 +120,17 @@ class AzureDBI extends CloudDBI {
   async createConnectionPool() {
 	// this.yadamuLogger.trace([this.constructor.name],`BlobServiceClient.fromConnectionString()`)
     this.cloudConnection = BlobServiceClient.fromConnectionString(this.vendorProperties);
-	this.cloudService = new AzureStorageService(this.cloudConnection,this.CONTAINER,{},this.yadamuLogger)
+	this.cloudService = new AzureStorageService(this,{})
   }
   
-  parseContents(fileContents) {
+  parseJSON(fileContents) {
     return JSON.parse(fileContents.toString())
   }
   
-  async finalize() {
-	await Promise.all(Array.from(this.cloudService.writeOperations));
-	super.finalize()
-  }
-  
   classFactory(yadamu) {
-	return new AzureDBI(yadamu)
+	return new AzureDBI(yadamu,this)
   }
     
 }
 
-module.exports = AzureDBI
- 
+export {AzureDBI as default }

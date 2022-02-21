@@ -1,8 +1,8 @@
 "use strict"
 
-const path = require('path');
-const Yadamu = require('./yadamu.js');
-const YadamuCLI = require('./yadamuCLI.js')
+import path from 'path';
+import Yadamu from './yadamu.js';
+import YadamuCLI from './yadamuCLI.js'
 
 class YadamuCmd extends YadamuCLI {}
 

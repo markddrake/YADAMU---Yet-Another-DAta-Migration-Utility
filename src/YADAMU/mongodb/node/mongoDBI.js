@@ -1,28 +1,29 @@
 
 "use strict" 
-const fs = require('fs');
-const util = require('util')
-const Readable = require('stream').Readable;
-const { performance } = require('perf_hooks');
+import fs from 'fs';
+import { performance } from 'perf_hooks';
 
 /* 
 **
-** Require Database Vendors API 
+** from  Database Vendors API 
 **
 */
 
-const MongoClient = require('mongodb').MongoClient
+import mongodb from 'mongodb'
+const { MongoClient } = mongodb;
 
-const YadamuDBI = require('../../common/yadamuDBI.js');
-const DBIConstants = require('../../common/dbiConstants.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js')
+import YadamuDBI from '../../common/yadamuDBI.js';
+import DBIConstants from '../../common/dbiConstants.js';
+import YadamuConstants from '../../common/yadamuConstants.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js'
+import {CopyOperationAborted} from '../../common/yadamuException.js'
 
-const MongoConstants = require('./mongoConstants.js')
-const MongoError = require('./mongoException.js')
-const MongoWriter = require('./mongoWriter.js');
-const MongoParser = require('./mongoParser.js');
-const StatementGenerator = require('./statementGenerator.js');
+import MongoConstants from './mongoConstants.js'
+import MongoError from './mongoException.js'
+import MongoOutputManager from './mongoOutputManager.js';
+import MongoWriter from './mongoWriter.js';
+import MongoParser from './mongoParser.js';
+import StatementGenerator from './statementGenerator.js';
 
 /*
 **
@@ -120,8 +121,8 @@ class MongoDBI extends YadamuDBI {
     return this._WRITE_TRANSFORMATION 
   }
     
-  constructor(yadamu,settings,parameters) {	  
-    super(yadamu,settings,parameters)
+  constructor(yadamu,manager,connectionSettings,parameters) {	  
+    super(yadamu,manager,connectionSettings,parameters)
   }
                                                              ;
   async _executeDDL(collectionList) {
@@ -173,7 +174,7 @@ class MongoDBI extends YadamuDBI {
       await this.client.connect();   
       this.traceTiming(sqlStartTime,performance.now())
      } catch (e) {
-       throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
      }
   }
 
@@ -194,7 +195,7 @@ class MongoDBI extends YadamuDBI {
       this.dbname = dbname;
       return this.connection
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
 
@@ -214,7 +215,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
 
@@ -237,7 +238,7 @@ class MongoDBI extends YadamuDBI {
       let results = await this.connection.dropDatabase() 
       this.traceTiming(sqlStartTime,performance.now())
      } catch (e) {
-       throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
      }
   }
 
@@ -256,7 +257,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
 
@@ -288,7 +289,7 @@ class MongoDBI extends YadamuDBI {
 	  this.traceTiming(sqlStartTime,performance.now())
       return results[0]
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
   
@@ -307,7 +308,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
   
@@ -326,7 +327,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
 	  return results
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
 
@@ -344,7 +345,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return collection
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
 
@@ -362,7 +363,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return collection
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
 
@@ -382,7 +383,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return count
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
 
@@ -401,7 +402,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return collections;
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
   
@@ -420,7 +421,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return collectionList;
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
   
@@ -441,7 +442,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
 
@@ -461,7 +462,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
     
@@ -516,7 +517,7 @@ class MongoDBI extends YadamuDBI {
       await this.client.close();   
       this.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
 
@@ -558,12 +559,12 @@ class MongoDBI extends YadamuDBI {
   
   async initializeExport() {
      super.initializeExport();
-     await this.use(this.parameters.FROM_USER);
+     await this.use(this.CURRENT_SCHEMA);
   }
   
   async initializeImport() {
      super.initializeImport();
-     await this.use(this.parameters.TO_USER);
+     await this.use(this.CURRENT_SCHEMA);
   }
 
   // ### ToDO Support Mongo Transactions
@@ -663,9 +664,12 @@ class MongoDBI extends YadamuDBI {
     return result.toString()
   }
 
-  async getSchemaInfo(keyName) {
+  async getSchemaMetadata() {
       
-    const collections = await this.collections();
+    const collections = (await this.collections()).filter((collection) => {
+      return ((this.TABLE_FILTER.length === 0) || (this.TABLE_FILTER.includes(collection.collectionName)))
+	})
+	
     const loopStartTime = performance.now();
     const schemaInfo = await Promise.all(collections.map(async (collection,idx) => {    // const dbMetadata = await Promise.all(collections.map(async (collection) => {    
       const tableInfo = {TABLE_SCHEMA: this.connection.databaseName, TABLE_NAME: collection.collectionName, COLUMN_NAME_ARRAY: ["JSON_DATA"], DATA_TYPE_ARRAY: ["json"], SIZE_CONSTRAINT_ARRAY: [""]}
@@ -832,7 +836,7 @@ class MongoDBI extends YadamuDBI {
             }
           }
         } catch(e) {		
-          throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+          throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
         }
       }
       if (this.ID_TRANSFORMATION === 'STRIP') {
@@ -846,7 +850,7 @@ class MongoDBI extends YadamuDBI {
 	  tableInfo.JSON_KEY_NAME_ARRAY = [...tableInfo.COLUMN_NAME_ARRAY]
       return tableInfo
     }))
-    // this.yadamuLogger.trace([`${this.constructor.name}.getSchemaInfo()`,],`Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - loopStartTime)}s.`)
+    // this.yadamuLogger.trace([`${this.constructor.name}.getSchemaMetadata()`,],`Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - loopStartTime)}s.`)
     return schemaInfo
   }
 
@@ -863,7 +867,7 @@ class MongoDBI extends YadamuDBI {
   }   
   
   inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(new MongoError(cause,this.streamingStackTrace,sqlStatement))
+    return this.trackExceptions(((cause instanceof MongoError) || (cause instanceof CopyOperationAborted)) ? cause : new MongoError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(collectionInfo,parser) {
@@ -879,7 +883,7 @@ class MongoDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return mongoStream;      
     } catch (e) {
-      throw this.trackExceptions(new MongoError(e,stack,this.traceMongo(operation)))
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }      
    
@@ -893,8 +897,12 @@ class MongoDBI extends YadamuDBI {
     return await super.generateStatementCache(StatementGenerator,schema) 
   }
   
-  getOutputStream(collectionName,ddlComplete) {
-     return super.getOutputStream(MongoWriter,collectionName,ddlComplete)
+  getOutputStream(collectionName,metrics) {
+     return super.getOutputStream(MongoWriter,collectionName,metrics)
+  }
+  
+  getOutputManager(tableName,metrics) {
+	 return super.getOutputManager(MongoOutputManager,tableName,metrics)
   }
   
   async createSchema(schema) {  
@@ -920,7 +928,8 @@ class MongoDBI extends YadamuDBI {
       }
     })
     return dbMappings;    
-  }    
+  } 
+  
 }
 
-module.exports = MongoDBI
+export { MongoDBI as default }

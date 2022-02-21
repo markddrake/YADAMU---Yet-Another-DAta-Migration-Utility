@@ -1,16 +1,13 @@
 "use strict" 
 
-const path = require('path')
+import AzureDBI          from '../../../YADAMU//loader/azure/azureDBI.js';
+import AzureConstants    from '../../../YADAMU/loader/azure/azureConstants.js';
 
-const AzureDBI = require('../../../YADAMU//loader/azure/azureDBI.js');
-const AzureConstants = require('../../../YADAMU/loader/azure/azureConstants.js');
+import YadamuTest        from '../../common/node/yadamuTest.js';
+import YadamuQALibrary   from '../../common/node/yadamuQALibrary.js'
 
-const YadamuTest = require('../../common/node/yadamuTest.js');
-
-class AzureQA extends AzureDBI {
+class AzureQA extends YadamuQALibrary.loaderQAMixin(AzureDBI) {
   
-  static MIXINS = Object.freeze([path.resolve(__filename,'../../node/mixinCloudQA.js')])
-
   static #_YADAMU_DBI_PARAMETERS
 	
   static get YADAMU_DBI_PARAMETERS()  { 
@@ -22,8 +19,8 @@ class AzureQA extends AzureDBI {
     return AzureQA.YADAMU_DBI_PARAMETERS
   }	
 			
-  constructor(yadamu,settings,parameters) {
-     super(yadamu,settings,parameters)
+  constructor(yadamu,manager,connectionSettings,parameters) {
+     super(yadamu,manager,connectionSettings,parameters)
   }
   
   async initializeImport() {
@@ -45,5 +42,10 @@ class AzureQA extends AzureDBI {
     return props.contentLength
   }
 
+  
+  classFactory(yadamu) {
+    return new AzureQA(yadamu,this)
+  }
+  
 }
-module.exports = AzureQA
+export { AzureQA as default }

@@ -1,14 +1,14 @@
 "use strict";
 
-const path = require('path');
-const http = require('http');
-const express = require('express');
-const cookieParser = require('cookie-parser');
-const session = require('express-session');
-const bodyParser = require('body-parser');
-const serveStatic = require('serve-static');
+import path from 'path';
+import http from 'http';
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
+import bodyParser from 'body-parser';
+import serveStatic from 'serve-static';
 
-const router = require('./yadamuRouter.js');
+import router from './yadamuRouter.js';
 
 const app  = express();
 

@@ -1,6 +1,6 @@
 "use strict" 
 
-const DefaultStatmentLibrary = require('../mssqlStatementLibrary.js')
+import DefaultStatmentLibrary from '../mssqlStatementLibrary.js'
 
 class MsSQLStatementLibrary extends DefaultStatmentLibrary {
 
@@ -113,7 +113,7 @@ class MsSQLStatementLibrary extends DefaultStatmentLibrary {
   }
 }
 
-module.exports = MsSQLStatementLibrary
+export { MsSQLStatementLibrary as default }
 
 const _SQL_SYSTEM_INFORMATION = 
 `select db_Name() "DATABASE_NAME)", 

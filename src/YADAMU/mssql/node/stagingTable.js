@@ -1,12 +1,12 @@
 "use strict";
 
-const fs = require('fs');
-const { performance } = require('perf_hooks');
+import fs from 'fs';
+import { performance } from 'perf_hooks';
 
-const sql = require('mssql');
+import sql from 'mssql';
 
-const DBFileLoader = require('./dbFileLoader');
-const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js')
+import DBFileLoader from './dbFileLoader.js';
+import {FileError, FileNotFound, DirectoryNotFound} from '../../file/node/fileException.js'
 
 class StagingTable {
 
@@ -64,5 +64,5 @@ class StagingTable {
   }
 }
  
-module.exports = StagingTable;
+export { StagingTable as default }
 

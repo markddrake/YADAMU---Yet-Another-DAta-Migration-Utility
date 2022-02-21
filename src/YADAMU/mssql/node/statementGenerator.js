@@ -1,10 +1,10 @@
 "use strict";
 
-const sql = require('mssql');
-const path = require('path');
+import sql from 'mssql';
+import path from 'path';
 
-const Yadamu = require('../../common/yadamu.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
+import Yadamu from '../../common/yadamu.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js';
 
 class StatementGenerator {
   
@@ -26,7 +26,7 @@ class StatementGenerator {
           // TypeError: parameter.type.validate is not a function
           return false;
 	    case 'xml':
-          // Unsupported Data Type for Bulk Load
+          // Unsupported Data Type for BCP
           return false;		
         /*
  	    ** Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
@@ -127,7 +127,7 @@ class StatementGenerator {
           break;
         case 'xml':
           // Added to Unsupported
-          // Invalid column data type for bulk load
+          // Invalid column data type for BCP
           table.columns.add(columnList[idx],sql.Xml, {nullable: true});
           break;
         case 'time':
@@ -185,7 +185,7 @@ class StatementGenerator {
            table.columns.add(columnList[idx],sql.VarBinary(length), {nullable: true});
           break;
         case 'image':
-  	      // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
+  	      // Upload images as VarBinary(MAX). Convert data to Buffer. This enables BCP operationa and avoids Collation issues...
           // table.columns.add(columnList[idx],sql.Image, {nullable: true});
           table.columns.add(columnList[idx],sql.VarBinary(sql.MAX), {nullable: true});
           break;
@@ -196,7 +196,7 @@ class StatementGenerator {
           // Added to Unsupported
           // TypeError: parameter.type.validate is not a function
           // table.columns.add(columnList[idx],sql.Geography, {nullable: true});
-  	      // Upload geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables bulk upload.
+  	      // Upload geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables BCP Operations.
 		  switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
 			case "WKB":
             case "EWKB":
@@ -210,7 +210,7 @@ class StatementGenerator {
           // Added to Unsupported
           // TypeError: parameter.type.validate is not a function
           // table.columns.add(columnList[idx],sql.Geometry, {nullable: true});
-  	      // Upload geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables bulk upload.
+  	      // Upload geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables BCP Operations.
 		  switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
 			case "WKB":
             case "EWKB":
@@ -224,7 +224,7 @@ class StatementGenerator {
           table.columns.add(columnList[idx],sql.VarChar(4000),{nullable: true});
           break;
         default:
-          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,`BULK OPERATION`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
+          this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,`BCP`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
       }
     })
     return table
@@ -263,15 +263,14 @@ class StatementGenerator {
       const dataTypes  = YadamuLibrary.decomposeDataTypes(tableInfo.targetDataTypes)
       
       tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
-      tableInfo._COMMIT_COUNT   = this.dbi.COMMIT_COUNT
       tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
-       
+	  
       // Create table before attempting to Prepare Statement..
       tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf(') select')+1) + "\nVALUES (";
       dataTypes.forEach((dataType,idx) => {
         switch(dataType.type) {
           case 'image':
-		    // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
+		    // Upload images as VarBinary(MAX). Convert data to Buffer. This enables BCP Operations and avoids Collation issues...
             tableInfo.dml = tableInfo.dml + 'convert(image,@C' + idx + ')' + ','
             break;
           case "xml":
@@ -327,27 +326,11 @@ class StatementGenerator {
         }
       })
       tableInfo.dml = tableInfo.dml.slice(0,-1) + ")";
-      tableInfo.bulkSupported = this.bulkSupported(dataTypes);
  	  tableInfo.dataTypes = dataTypes
+	  tableInfo.insertMode = this.bulkSupported(dataTypes) ? 'BCP' : 'Iterative'
 
 	  try {
-		
-		/*
-        if (tableInfo.bulkSupported) {
-		  tableInfo.bulkOperations = [
-		    this.createBulkOperation(database, tableName, tableMetadata.columnNames, dataTypes)
-          , this.createBulkOperation(database, tableName, tableMetadata.columnNames, dataTypes)
-		  ]
-        }
-        else {
-          // Place holder for caching rows.
-          tableInfo.bulkOperations = [
-		    new sql.Table()                                            
-          , new sql.Table()                                            
-		  ]
-        }
-		*/
-		
+	
 		if (tableMetadata.dataFile) {
 		  const loadColumnNames = []
 		  const setOperations = []
@@ -448,4 +431,4 @@ class StatementGenerator {
   }
 }
 
-module.exports = StatementGenerator
+export { StatementGenerator as default }

@@ -1,5 +1,6 @@
 "use strict" 
-const Readable = require('stream').Readable;
+
+import {Readable} from 'stream';
 
 class SnowflakeReader extends Readable {
       
@@ -64,4 +65,4 @@ class SnowflakeReader extends Readable {
 	}
 }
 
-module.exports = SnowflakeReader
+export { SnowflakeReader as default }

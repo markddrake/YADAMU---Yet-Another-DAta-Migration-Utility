@@ -1,26 +1,28 @@
 "use strict" 
-const fs = require('fs');
-const Readable = require('stream').Readable;
-const { performance } = require('perf_hooks');
+
+import fs from 'fs';
+import { performance } from 'perf_hooks';
 
 /* 
 **
-** Require Database Vendors API 
+** from  Database Vendors API 
 **
 */
-const mysql = require('mysql');
+import mysql from 'mysql';
 
-const YadamuDBI = require('../../common/yadamuDBI.js');
-const DBIConstants = require('../../common/dbiConstants.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js')
+import YadamuDBI from '../../common/yadamuDBI.js';
+import DBIConstants from '../../common/dbiConstants.js';
+import YadamuConstants from '../../common/yadamuConstants.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js'
+import {CopyOperationAborted} from '../../common/yadamuException.js'
 
-const MySQLConstants = require('./mysqlConstants.js')
-const MySQLError = require('./mysqlException.js')
-const MySQLParser = require('./mysqlParser.js');
-const MySQLWriter = require('./mysqlWriter.js');
-const StatementGenerator = require('./statementGenerator.js');
-const MySQLStatementLibrary = require('./mysqlStatementLibrary.js');
+import MySQLConstants from './mysqlConstants.js'
+import MySQLError from './mysqlException.js'
+import MySQLParser from './mysqlParser.js';
+import MySQLWriter from './mysqlWriter.js';
+import MySQLOutputManager from './mysqlOutputManager.js';
+import StatementGenerator from './statementGenerator.js';
+import MySQLStatementLibrary from './mysqlStatementLibrary.js';
 
 class MySQLDBI extends YadamuDBI {
    
@@ -60,8 +62,8 @@ class MySQLDBI extends YadamuDBI {
   set LOWER_CASE_TABLE_NAMES(v)      { this._LOWER_CASE_TABLE_NAMES = v }
   get IDENTIFIER_TRANSFORMATION()    { return (this._LOWER_CASE_TABLE_NAMES> 0) ? 'LOWERCASE_TABLE_NAMES' : super.IDENTIFIER_TRANSFORMATION }
   
-  constructor(yadamu,settings,parameters) {
-    super(yadamu,settings,parameters)
+  constructor(yadamu,manager,connectionSettings,parameters) {
+    super(yadamu,manager,connectionSettings,parameters)
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
     this.keepAliveHdl = undefined
 	
@@ -159,7 +161,7 @@ class MySQLDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       await this.checkMaxAllowedPacketSize()
     } catch (e) {
-      throw this.trackExceptions(new MySQLError(e,stack,operation))
+      throw this.trackExceptions(new MySQLError(this.DRIVER_ID,e,stack,operation))
     }
     
     
@@ -177,7 +179,7 @@ class MySQLDBI extends YadamuDBI {
       this.pool.getConnection((err,connection) => {
         this.traceTiming(sqlStartTime,performance.now())
         if (err) {
-          reject(this.trackExceptions(new MySQLError(err,stack,'mysql.Pool.getConnection()')))
+          reject(this.trackExceptions(new MySQLError(this.DRIVER_ID,err,stack,'mysql.Pool.getConnection()')))
         }
         resolve(connection);
       })
@@ -206,7 +208,7 @@ class MySQLDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-        throw this.trackExceptions(new MySQLError(e,stack,'MySQL.Connection.end()'))
+        throw this.trackExceptions(new MySQLError(this.DRIVER_ID,e,stack,'MySQL.Connection.end()'))
       }
     }
   };
@@ -223,7 +225,7 @@ class MySQLDBI extends YadamuDBI {
         this.pool = undefined;
       } catch (e) {
         this.pool = undefined;
-        throw this.trackExceptions(new MySQLError(e,stack,'MySQL.Pool.end()'))
+        throw this.trackExceptions(new MySQLError(this.DRIVER_ID,e,stack,'MySQL.Pool.end()'))
       }
     }
     
@@ -256,7 +258,7 @@ class MySQLDBI extends YadamuDBI {
       this.connection.query(sqlStatement,args,async (err,results,fields) => {
         const sqlEndTime = performance.now()
         if (err) {
-          const cause = this.trackExceptions(new MySQLError(err,stack,sqlStatement))
+          const cause = this.trackExceptions(new MySQLError(this.DRIVER_ID,err,stack,sqlStatement))
           if (attemptReconnect && cause.lostConnection()) {
             attemptReconnect = false
             try {
@@ -319,9 +321,9 @@ class MySQLDBI extends YadamuDBI {
   }
   
   async _executeDDL(ddl) {
-    await this.createSchema(this.parameters.TO_USER);
+    await this.createSchema(this.CURRENT_SCHEMA);
     const ddlResults = await Promise.all(ddl.map((ddlStatement) => {
-      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
+      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA);
       return this.executeSQL(ddlStatement) 
     })) 
     return ddlResults;
@@ -381,8 +383,8 @@ class MySQLDBI extends YadamuDBI {
     this.setSpatialSerializer(this.SPATIAL_FORMAT);
 	switch (true) {
 	  case (this.DB_VERSION < 8.0):
-	    this.StatementLibrary = require('./57/mssqlStatementLibrary.js')
-		this.StatementGenerator = require('../../dbShared/mysql/57statementGenerator.js');
+	    this.StatementLibrary = (await import('./57/mssqlStatementLibrary.js')).default
+		this.StatementGenerator = (await import('../../dbShared/mysql/57statementGenerator.js')).default;
 	    break;
       default:
 	}
@@ -414,7 +416,7 @@ class MySQLDBI extends YadamuDBI {
       await this.connection.beginTransaction();
       super.beginTransaction();
     } catch (e) {
-      throw this.trackExceptions(new MySQLError(e,stack,'mysql.Connection.beginTransaction()'))
+      throw this.trackExceptions(new MySQLError(this.DRIVER_ID,e,stack,'mysql.Connection.beginTransaction()'))
     } 
 
   }
@@ -437,7 +439,7 @@ class MySQLDBI extends YadamuDBI {
       stack = new Error().stack
       await this.connection.commit();
     } catch (e) {
-      throw this.trackExceptions(new MySQLError(e,stack,'mysql.Connection.commit()'))
+      throw this.trackExceptions(new MySQLError(this.DRIVER_ID,e,stack,'mysql.Connection.commit()'))
     } 
 
   }
@@ -465,7 +467,7 @@ class MySQLDBI extends YadamuDBI {
       stack = new Error().stack
       await this.connection.rollback();
     } catch (e) {
-      const newIssue = this.trackExceptions(new MySQLError(e,stack,'mysql.Connection.rollback()'))
+      const newIssue = this.trackExceptions(new MySQLError(this.DRIVER_ID,e,stack,'mysql.Connection.rollback()'))
       this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
     }
   }
@@ -517,7 +519,6 @@ class MySQLDBI extends YadamuDBI {
  
   async uploadFile(importFilePath) {
 
-	this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
     let results = await this.createStagingTable();
     results = await this.loadStagingTable(importFilePath,true);
     return results;
@@ -542,7 +543,7 @@ class MySQLDBI extends YadamuDBI {
 
   async processFile(hndl) {
     const sqlStatement = `SET @RESULTS = ''; CALL YADAMU_IMPORT(?,@RESULTS); SELECT @RESULTS "logRecords";`;                     
-    let results = await  this.executeSQL(sqlStatement,this.parameters.TO_USER);
+    let results = await  this.executeSQL(sqlStatement,this.CURRENT_SCHEMA);
     results = results.pop();
     return this.processLog(results,'JSON_TABLE');
   }
@@ -592,17 +593,17 @@ class MySQLDBI extends YadamuDBI {
     return undefined
   }
     
-  async getSchemaInfo(keyName) {
+  async getSchemaMetadata() {
       
-    return await this.executeSQL(this.statementLibrary.SQL_SCHEMA_INFORMATION,[this.parameters[keyName]]);
+    return await this.executeSQL(this.statementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA]);
 
   }
   
-  inputStreamError(err,sqlStatement) {
-     return this.trackExceptions(new MySQLError(err,this.streamingStackTrace,sqlStatement))
+  inputStreamError(cause,sqlStatement) {
+     return this.trackExceptions(((cause instanceof MySQLError) || (cause instanceof CopyOperationAborted)) ? cause : new MySQLError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
   }
 
-  async getInputStream(tableInfo) {
+  async getInputStream(queryInfo) {
 	  
     // if the previous pipleline operation failed, it appears that the postgres driver will hang when creating a new QueryStream...
     
@@ -631,17 +632,17 @@ class MySQLDBI extends YadamuDBI {
     }
 
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
+    this.status.sqlTrace.write(this.traceSQL(queryInfo.SQL_STATEMENT))
     while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
         this.streamingStackTrace = new Error().stack
         this.activeInputStream = true;
-        const is = this.connection.query(tableInfo.SQL_STATEMENT).stream();
+        const is = this.connection.query(queryInfo.SQL_STATEMENT).stream();
         is.on('end',() => {
 		  this.activeInputStream = false;
-          // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,`${is.constructor.name}.onEnd()`,`${tableInfo.TABLE_NAME}`],``); 
+          // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,`${is.constructor.name}.onEnd()`,`${queryInfo.TABLE_NAME}`],``); 
           if (keepAliveHdl !== undefined) {
             clearInterval(keepAliveHdl);
             keepAliveHdl = undefined
@@ -649,7 +650,7 @@ class MySQLDBI extends YadamuDBI {
         })
         return is;
       } catch (e) {
-        const cause = this.trackExceptions(new MySQLError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
+        const cause = this.trackExceptions(new MySQLError(this.DRIVER_ID,e,this.streamingStackTrace,queryInfo.SQL_STATEMENT))
         if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
           // reconnect() throws cause if it cannot reconnect...
@@ -665,13 +666,17 @@ class MySQLDBI extends YadamuDBI {
   async generateStatementCache(schema) {
     return await super.generateStatementCache(this.StatementGenerator, schema)
   }
+
+  getOutputManager(tableName,metrics) {
+	 return super.getOutputManager(MySQLOutputManager,tableName,metrics)
+  }
   
-  getOutputStream(tableName,ddlComplete) {
-     return super.getOutputStream(MySQLWriter,tableName,ddlComplete)
+  getOutputStream(tableName,metrics) {
+     return super.getOutputStream(MySQLWriter,tableName,metrics)
   }
 
-  createParser(tableInfo) {
-    this.parser = new MySQLParser(tableInfo,this.yadamuLogger,this);
+  createParser(queryInfo) {
+    this.parser = new MySQLParser(queryInfo,this.yadamuLogger,this);
     return this.parser;
   }  
     
@@ -686,7 +691,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-    return new MySQLDBI(yadamu)
+    return new MySQLDBI(yadamu,this)
   }
   
   async getConnectionID() {
@@ -713,35 +718,6 @@ class MySQLDBI extends YadamuDBI {
 	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
   }
    
-  
-  async copyOperation(tableName,copy) {
-	
-    /*
-    **
-    ** Generic Basic Imementation - Override as required for error reporting etc
-    **
-    */
-	
-	try {
-	  const stack = new Error().stack
-	  const startTime = performance.now();
-	  let results = await this.beginTransaction();
-	  results = await this.executeSQL(copy.dml);
-	  const rowsRead = results.affectedRows
-	  const endTime = performance.now();
-	  results = await this.commitTransaction()
-	  await this.reportCopyResults(tableName,rowsRead,0,startTime,endTime,copy,stack)
-	} catch(e) {
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
-	  let results = await this.rollbackTransaction()
-	}
-  }
-  
-  async finalizeCopy() {
-	await this.finalizeImport();
-  }
-
-
 }
 
-module.exports = MySQLDBI
+export { MySQLDBI as default }

@@ -1,13 +1,14 @@
 "use strict" 
 
-const MsSQLDBI = require('../../../YADAMU/mssql/node/mssqlDBI.js');
-const MsSQLError = require('../../../YADAMU/mssql/node/mssqlException.js')
-const MsSQLConstants = require('../../../YADAMU/mssql/node/mssqlConstants.js');
+import MsSQLDBI        from '../../../YADAMU/mssql/node/mssqlDBI.js';
+import MsSQLError      from '../../../YADAMU/mssql/node/mssqlException.js'
+import MsSQLConstants  from '../../../YADAMU/mssql/node/mssqlConstants.js';
 
-const YadamuTest = require('../../common/node/yadamuTest.js');
+import YadamuTest      from '../../common/node/yadamuTest.js';
+import YadamuQALibrary from '../../common/node/yadamuQALibrary.js'
 
-class MsSQLQA extends MsSQLDBI {
-    
+class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
+
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
 
@@ -22,22 +23,19 @@ class MsSQLQA extends MsSQLDBI {
       return MsSQLQA.YADAMU_DBI_PARAMETERS
     }	
 		
-    constructor(yadamu,settings,parameters) {
-       super(yadamu,settings,parameters)
+    constructor(yadamu,manager,connectionSettings,parameters) {
+       super(yadamu,manager,connectionSettings,parameters)
     }
 	 
 	async initialize() {
 				
 	  // Must (re) create the database before attempting to connection. initialize() will fail if the database does not exist.
-				
 	  if (this.options.recreateSchema === true) {
 		await this.recreateDatabase();
+		this.options.recreateSchema = false
 	  }
 	  await super.initialize();
-	  if (this.terminateConnection()) {
-        const pid = await this.getConnectionID();
-	    this.scheduleTermination(pid,this.getWorkerNumber());
-	  }
+	  
     }	   
 	
     /*
@@ -66,25 +64,15 @@ class MsSQLQA extends MsSQLDBI {
       const results = await this.executeSQL(statement);
     } 
 
-    async getRowCounts(connectInfo) {
+   async getRowCounts(connectInfo) {
         
-      await this.useDatabase(connectInfo.database);
-      const results = await this.pool.request().input('SCHEMA',this.sql.VarChar,connectInfo.owner).query(MsSQLQA.SQL_SCHEMA_TABLE_ROWS);
+     await this.useDatabase(connectInfo.database);
+     const results = await this.pool.request().input('SCHEMA',this.sql.VarChar,connectInfo.owner).query(MsSQLQA.SQL_SCHEMA_TABLE_ROWS);
       
-      return results.recordset.map((row,idx) => {          
-        return [connectInfo.owner === 'dbo' ? connectInfo.database : connectInfo.owner,row.TableName,parseInt(row.RowCount)]
-      })
-    }
-	
-    async workerDBI(idx)  {
-	  const workerDBI = await super.workerDBI(idx);
-      // Manager needs to schedule termination of worker.
-	  if (this.terminateConnection(idx)) {
-        const pid = await workerDBI.getConnectionID();
-	    this.scheduleTermination(pid,idx);
-	  }
-	  return workerDBI
-    }
+     return results.recordset.map((row,idx) => {          
+       return [connectInfo.owner === 'dbo' ? connectInfo.database : connectInfo.owner,row.TableName,parseInt(row.RowCount)]
+     })
+   }
 
    async compareSchemas(source,target,rules) {
 	   
@@ -140,13 +128,18 @@ class MsSQLQA extends MsSQLDBI {
 
       return report
     }
-   
+
+    classFactory(yadamu) {
+      return new MsSQLQA(yadamu,this)
+    }
+	   
 	async scheduleTermination(pid,workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
+	  const tags = this.getTerminationTags(workerId,pid)
+      this.yadamuLogger.qa(tags,`Termination Scheduled.`);
       const timer = setTimeout(
         async (pid) => {
 		  if (this.pool !== undefined) {
-		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
+		     this.yadamuLogger.log(tags,`Killing connection.`);
 			 // Do not use getRequest() as it will fail with "There is a request in progress during write opeations. Get a non pooled request
 		     // const request = new this.sql.Request(this.pool);
 			 const request = await this.sql.connect(this.vendorProperties);
@@ -158,20 +151,20 @@ class MsSQLQA extends MsSQLDBI {
 			 } catch (e) {
 			   if (e.number && (e.number === 6104)) {
 				 // Msg 6104, Level 16, State 1, Line 1 Cannot use KILL to kill your own process
-			     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Worker finished prior to termination.`)
+			     this.yadamuLogger.log(tags,`Worker finished prior to termination.`)
  			   }
 			   else if (e.number && (e.number === 6106)) {
 				 // Msg 6106, Level 16, State 2, Line 1 Process ID 54 is not an active process ID.
-			     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Worker finished prior to termination.`)
+			     this.yadamuLogger.log(tags,`Worker finished prior to termination.`)
  			   }
 			   else {
-				 const cause = new MsSQLError(e,stack,sqlStatement)
-			     this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],cause)
+				 const cause = new MsSQLError(this.DRIVER_ID,e,stack,sqlStatement)
+			     this.yadamuLogger.handleException(tags,cause)
 			   }
 			 } 
 		   }
 		   else {
-		     this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+		     this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
 		   }
 		},
 		this.killConfiguration.delay,
@@ -204,6 +197,7 @@ class MsSQLDBMgr extends MsSQLDBI {
 
 	   const SINGLE_USER_MODE = `if DB_ID('${database}') IS NOT NULL alter database [${database}] set single_user with rollback immediate` 
        const DROP_DATABASE = `if DB_ID('${database}') IS NOT NULL drop database [${database}]`
+  
 	
       try {
         await this.initialize()
@@ -228,7 +222,7 @@ class MsSQLDBMgr extends MsSQLDBI {
     }	
 }  
 
-module.exports = MsSQLQA
+export { MsSQLQA as default }
 
 const _SQL_SCHEMA_TABLE_ROWS = `SELECT sOBJ.name AS [TableName], SUM(sPTN.Rows) AS [RowCount] 
    FROM sys.objects AS sOBJ 

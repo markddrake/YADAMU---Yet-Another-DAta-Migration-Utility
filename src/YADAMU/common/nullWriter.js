@@ -1,6 +1,6 @@
 "use strict"
 
-const path=require('path');
+import path from 'path';
 
 class NullWriter {
 
@@ -23,4 +23,4 @@ class NullWriter {
  
 }
 
-module.exports = NullWriter
+export { NullWriter as default}

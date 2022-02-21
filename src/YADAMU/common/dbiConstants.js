@@ -1,6 +1,6 @@
 "use strict"
 
-const YadamuConstants = require('./yadamuConstants.js');
+import YadamuConstants from './yadamuConstants.js';
 
 class DBIConstants {
 
@@ -23,18 +23,36 @@ class DBIConstants {
     return this._STATIC_PARAMETERS;
   }
 
-  static get NEW_TIMINGS() {
-    this._NEW_TIMINGS = this._NEW_TIMINGS || Object.freeze({
-      rowsRead        : 0
-    , pipeStartTime   : undefined
-    , readerStartTime : undefined
-    , readerEndTime   : undefined
-	, parserStartTime : undefined
-    , parserEndTime   : undefined
-	, lost            : 0
-	, failed          : false
+  static get NEW_COPY_METRICS() {
+	this._EMPTY_COPY_METRICS = this._EMPTY_COPY_METRICS || Object.freeze({
+      pipeStartTime     : undefined
+    , readerStartTime   : undefined
+    , readerEndTime     : undefined
+	, parserStartTime   : undefined
+    , parserEndTime     : undefined
+	, managerStartTime  : undefined
+	, managerEndTime    : undefined
+	, writerStartTime   : undefined
+	, writerEndTime     : undefined
+	, pipeEndTime       : undefined
+	, failed            : false
+	, readerError       : undefined
+	, parserError       : undefined
+	, managerError      : undefined
+	, writerError       : undefined
+	, read              : 0 // Rows read by the reader. Some Readers may not be able to supply a count. Cummulative
+	, parsed            : 0 // Rows recieved he parser. Cummulative
+	, received          : 0 // Rows encounted by the Output Manager. Cummulative
+    , cached            : 0 // Rows cached in the current batch.
+    , written           : 0 // Rows written to the database during the current transaction. Cummulative. Reset on each New Transaction
+    , committed         : 0 // Rows written to the databsase and committed. Cummulative
+    , skipped           : 0 // Rows not written due to unrecoverable write errors, eg Row is not valid per the target database. Includes any rows in-flight when a fatal error is reported
+    , lost              : 0 // Rows written to the database but not yet committed when a rollback tooks place.
+    , batchNumber       : 0 // Batch Number
+	, pending           : 0 // Rows cached in batches that have not yet been written to disk
+	, idleTime          : 0 // Time writer was not actively engaged in writing a batch E.g.Time between calls to processBatch()
     })
-    return this._NEW_TIMINGS;
+    return Object.assign({},this._EMPTY_COPY_METRICS);
   }
 
   static #_YADAMU_DBI_PARAMETERS
@@ -58,6 +76,10 @@ class DBIConstants {
   static get TIMESTAMP_PRECISION()        { return this.YADAMU_DBI_PARAMETERS.TIMESTAMP_PRECISION };
   static get BYTE_TO_CHAR_RATIO()         { return this.YADAMU_DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
   
+  static get BATCH_WRITTEN()              { return 'batchSuccess' }
+  static get BATCH_FAILED()               { return 'batchFailed' }
+  static get BATCH_IDLE()                 { return 'batchIdle' }
+  
 }
 
-module.exports = DBIConstants;
+export { DBIConstants as default}

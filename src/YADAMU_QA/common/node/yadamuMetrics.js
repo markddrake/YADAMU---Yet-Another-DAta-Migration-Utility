@@ -109,4 +109,4 @@ class YadamuMetrics {
 
 }
 
-module.exports = YadamuMetrics
+export { YadamuMetrics as default}

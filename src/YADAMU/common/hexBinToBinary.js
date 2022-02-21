@@ -1,5 +1,5 @@
 "use strict"
-const Transform = require('stream').Transform
+import {Transform} from 'stream'
 
 class HexBinToBinary extends Transform {
   
@@ -15,4 +15,4 @@ class HexBinToBinary extends Transform {
   
 }
 
-module.exports = HexBinToBinary
+export { HexBinToBinary as default}

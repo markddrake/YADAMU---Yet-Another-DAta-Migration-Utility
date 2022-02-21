@@ -1,12 +1,11 @@
 "use strict" 
 
-const YadamuParser = require('../../common/yadamuParser.js')
+import YadamuParser from '../../common/yadamuParser.js'
 
 class MySQLParser extends YadamuParser {
-  
-  constructor(tableInfo,yadamuLogger) {
-    super(tableInfo,yadamuLogger);      
-    this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType) => {
+
+  generateTransformations(queryInfo) {
+    return queryInfo.DATA_TYPE_ARRAY.map((dataType) => {
 	  switch (dataType.toLowerCase()) {
 		 case "decimal":
 		   return (row,idx) => {
@@ -21,29 +20,16 @@ class MySQLParser extends YadamuParser {
 		   return null
 	  }
 	})
-	
-	// Use a dummy rowTransformation function if there are no transformations required.
-
-    this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
-      this.transformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-          transformation(row,idx)
-        }
-      }) 
-    }
-
   }
 
-  async _transform (data,encoding,callback) {
-    this.rowCount++
+  constructor(queryInfo,yadamuLogger) {
+    super(queryInfo,yadamuLogger);      
+  }
+
+  async doTransform(data) {
     data = Object.values(data)    
-    // if (this.rowCount === 1) console.log(data)
-    this.rowTransformation(data)
-    // if (this.rowCount === 1) console.log(data)
-    this.push({data:data})
-    callback();
+	return await super.doTransform(data)
   }
 }
 
-module.exports = MySQLParser
-	
+export { MySQLParser as default }

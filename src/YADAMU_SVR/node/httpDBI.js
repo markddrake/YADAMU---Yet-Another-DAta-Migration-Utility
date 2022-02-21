@@ -1,6 +1,6 @@
 "use strict" 
 
-const FileDBI = require('../../YADAMU/file/node/fileDBI.js');
+import FileDBI from '../../YADAMU/file/node/fileDBI.js';
 
 /*
 **
@@ -39,4 +39,4 @@ class HttpDBI extends FileDBI {
   
 }
 
-module.exports = HttpDBI
+export { HttpDBI as default }

@@ -1,38 +1,35 @@
 "use strict" 
-const fs = require('fs');
-const Readable = require('stream').Readable;
-const { performance } = require('perf_hooks');
-
-const util = require('util')
-const stream = require('stream')
-// const pipeline = util.promisify(stream.pipeline);
-const { pipeline } = require('stream/promises');
+import fs from 'fs';
+import { performance } from 'perf_hooks';
+import { pipeline } from 'stream/promises';
 
 /* 
 **
-** Require Database Vendors API 
+** from  Database Vendors API 
 **
 */
-const {Client,Pool} = require('pg')
-const CopyFrom = require('pg-copy-streams').from;
-const QueryStream = require('pg-query-stream')
-const types = require('pg').types;
+import pg from 'pg';
+const {Client,Pool} = pg;
+import QueryStream from 'pg-query-stream'
+import types from 'pg-types';
 
-const YadamuDBI = require('../../common/yadamuDBI.js');
-const DBIConstants = require('../../common/dbiConstants.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
-const AWSS3Constants = require('../../loader/awsS3/awsS3Constants.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js')
+import YadamuDBI from '../../common/yadamuDBI.js';
+import DBIConstants from '../../common/dbiConstants.js';
+import YadamuConstants from '../../common/yadamuConstants.js';
+import AWSS3Constants from '../../loader/awsS3/awsS3Constants.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js'
+import {CopyOperationAborted} from '../../common/yadamuException.js'
 
-const RedshiftConstants = require('./redshiftConstants.js')
-const RedshiftError = require('./redshiftException.js')
-const RedshiftParser = require('./redshiftParser.js');
-const RedshiftWriter = require('./redshiftWriter.js');
-const StatementGenerator = require('./statementGenerator.js');
-const RedshiftStatementLibrary = require('./redshiftStatementLibrary.js');
+import RedshiftConstants from './redshiftConstants.js'
+import RedshiftError from './redshiftException.js'
+import RedshiftParser from './redshiftParser.js';
+import RedshiftWriter from './redshiftWriter.js';
+import RedshiftOutputManager from './redshiftOutputManager.js';
+import StatementGenerator from './statementGenerator.js';
+import RedshiftStatementLibrary from './redshiftStatementLibrary.js';
 
-const {YadamuError} = require('../../common/yadamuException.js');
-const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
+import {YadamuError} from '../../common/yadamuException.js';
+import {FileError, FileNotFound, DirectoryNotFound} from '../../file/node/fileException.js';
 
 class RedshiftDBI extends YadamuDBI {
     
@@ -81,8 +78,8 @@ class RedshiftDBI extends YadamuDBI {
 
   get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM || VerticaConstants.STAGING_PLATFORM } 
 
-  constructor(yadamu,settings,parameters) {
-    super(yadamu,settings,parameters);
+  constructor(yadamu,manager,connectionSettings,parameters) {
+    super(yadamu,manager,connectionSettings,parameters);
        
     this.pgClient = undefined;
     this.useBinaryJSON = false
@@ -127,7 +124,7 @@ class RedshiftDBI extends YadamuDBI {
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const pgErr = this.trackExceptions(new RedshiftError(err,this.redshiftStack,this.redshiftsOperation))
+	  const pgErr = this.trackExceptions(new RedshiftError(this.DRIVER_ID,err,this.redshiftStack,this.redshiftsOperation))
       this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`POOL_ON_ERROR`],pgErr);
       // throw pgErr
     })
@@ -149,7 +146,7 @@ class RedshiftDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
-	  throw this.trackExceptions(new RedshiftError(e,stack,'pg.Pool.connect()'))
+	  throw this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,stack,'pg.Pool.connect()'))
 	}
   }
 
@@ -192,7 +189,7 @@ class RedshiftDBI extends YadamuDBI {
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const pgErr = this.trackExceptions(new RedshiftError(err,this.redshiftStack,this.redshiftsOperation))
+	  const pgErr = this.trackExceptions(new RedshiftError(this.DRIVER_ID,err,this.redshiftStack,this.redshiftsOperation))
       this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`CONNECTION_ON_ERROR`],pgErr);
       // throw pgErr
     })
@@ -216,7 +213,7 @@ class RedshiftDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-		const err = this.trackExceptions(new RedshiftError(e,stack,'Client.release()'))
+		const err = this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,stack,'Client.release()'))
 		throw err
       }
 	}
@@ -234,7 +231,7 @@ class RedshiftDBI extends YadamuDBI {
         this.pool = undefined
   	  } catch (e) {
         this.pool = undefined
-	    throw this.trackExceptions(new RedshiftError(e,stack,'pg.Pool.close()'))
+	    throw this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,stack,'pg.Pool.close()'))
 	  }
 	}
   }
@@ -285,7 +282,7 @@ class RedshiftDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.trackExceptions(new RedshiftError(e,stack,sqlStatement))
+		const cause = this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,stack,sqlStatement))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -432,7 +429,7 @@ class RedshiftDBI extends YadamuDBI {
   }
 
   async processFile(hndl) {
-     return await this.processStagingTable(this.parameters.TO_USER)
+     return await this.processStagingTable(this.CURRENT_SCHEMA)
   }
   
   /*
@@ -507,8 +504,8 @@ class RedshiftDBI extends YadamuDBI {
     }
   }
   
-  async getSchemaInfo(keyName) {
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.parameters[keyName]]) // ,[this.parameters[keyName],this.SPATIAL_FORMAT,{"circleAsPolygon": this.INBOUND_CIRCLE_FORMAT === 'POLYGON',"calculateByteaSize":true}]);
+  async getSchemaMetadata() {
+    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[]) // ,[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT,{"circleAsPolygon": this.INBOUND_CIRCLE_FORMAT === 'POLYGON',"calculateByteaSize":true}]);
 	const schemaInfo = this.buildSchemaInfo(results.rows)
 	return schemaInfo
   }
@@ -517,8 +514,8 @@ class RedshiftDBI extends YadamuDBI {
     return new RedshiftParser(tableInfo,this.yadamuLogger);
   }  
   
-  inputStreamError(e,sqlStatement) {
-    return this.trackExceptions(new RedshiftError(e,this.streamingStackTrace,sqlStatement))
+  inputStreamError(cause,sqlStatement) {
+    return this.trackExceptions(((cause instanceof RedshiftError) || (cause instanceof CopyOperationAborted)) ? cause : new RedshiftError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
   }
 
   async getInputStream(tableInfo) {       
@@ -563,7 +560,7 @@ class RedshiftDBI extends YadamuDBI {
   		
 		return inputStream
       } catch (e) {
-		const cause = this.trackExceptions(new RedshiftError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
+		const cause = this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -589,11 +586,11 @@ class RedshiftDBI extends YadamuDBI {
   async _executeDDL(ddl) {
 	
 	let results = []
-    await this.createSchema(this.parameters.TO_USER);
+    await this.createSchema(this.CURRENT_SCHEMA);
 	
 	try {
       results = await Promise.all(ddl.map((ddlStatement) => {
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
+        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA);
 		// this.status.sqlTrace.write(this.traceSQL(ddlStatement));
         return this.executeSQL(ddlStatement);
       }))
@@ -608,12 +605,16 @@ class RedshiftDBI extends YadamuDBI {
     return await super.generateStatementCache(StatementGenerator, schema)
   }
 
-  getOutputStream(tableName,ddlComplete) {
-	 return super.getOutputStream(RedshiftWriter,tableName,ddlComplete)
+  getOutputStream(tableName,metrics) {
+	 return super.getOutputStream(RedshiftWriter,tableName,metrics)
+  }
+
+  getOutputStream(tableName,metrics) {
+	 return super.getOutputStream(RedshiftOutputManager,tableName,metrics)
   }
  
   classFactory(yadamu) {
-	return new RedshiftDBI(yadamu)
+	return new RedshiftDBI(yadamu,this)
   }
 
   validStagedDataSet(vendor,controlFilePath,controlFile) {
@@ -634,7 +635,7 @@ class RedshiftDBI extends YadamuDBI {
 	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
   }
   
-  async reportCopyErrors(tableName,stack,copyStatement) {
+  async reportCopyErrors(tableName,metrics) {
 	  
 	 const causes = []
 	 let sizeIssue = 0;
@@ -648,7 +649,7 @@ class RedshiftDBI extends YadamuDBI {
 	 results.rows.forEach((r) => {
 	   const err = new Error()
 	   err.code = r[3]
-	   err.stack =  `${stack.slice(0,5)}: ${r[2]}${stack.slice(5)}`
+	   err.stack =  `${metrics.stack.slice(0,5)}: ${r[2]}${stack.slice(5)}`
 	   err.columnName = r[1]
 	   err.recordNumber = r[0]
 	   err.dataLength = parseInt(r[4])
@@ -665,37 +666,45 @@ class RedshiftDBI extends YadamuDBI {
 	    err.tags.push("CONTENT_TOO_LARGE")
 	 } 
      err.cause = causes;	 
-	 err.sql = copyStatement;
+	 err.sql = metrics.sql;
 	 this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)
   }
-  
-  async copyOperation(tableName,copy) {
-	let stack
+
+  async copyOperation(tableName,copyOperation,metrics) {
+	
 	try {
-	  stack = new Error().stack;
-	  const startTime = performance.now();
- 	  await this.commitTransaction()
-	  let results = await this.executeSQL(copy.dml);
-	  const elapsedTime = performance.now() - startTime;
-	  await this.commitTransaction()
+	  metrics.stack = new Error().stack;
+	  metrics.writerStartTime = performance.now();
+	  let results = await this.beginTransaction();
+	  results = await this.executeSQL(copyOperation.dml);
+  	  results = await this.commitTransaction()
+	  metrics.writerEndTime = performance.now();
 	  results = await this.executeSQL(this.StatementLibrary.SQL_COPY_STATUS);
-	  const rowsRead = results.rows[0][0]
+	  metrics.committed = parseInt(results.rows[0][0])
 	  results = await this.executeSQL(this.StatementLibrary.SQL_COPY_ERRORS);
-	  const failed = parseInt(results.rows[0][0])
-	  await this.reportCopyResults(tableName,rowsRead,failed,elapsedTime,copy.dml,stack)
-	} catch(cause) {
-      await this.rollbackTransaction(cause)
-      if ((cause instanceof RedshiftError) && cause.detailedErrorAvailable()) {
-		try {
-	      await this.reportCopyErrors(tableName,stack,copy.dml,failed)
-	  	  return
-	    } catch (e) {
-		  cause.cause = e
-	    }
-      }
-      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'Copy',tableName],cause)
-	} 
+	  metrics.skipped = parseInt(results.rows[0][0])
+	  metrics.read = metrics.committed + metrics.skipped
+  	} catch(cause) {
+	  metrics.writerError = e
+	  try {
+        if ((cause instanceof RedshiftError) && cause.detailedErrorAvailable()) {
+		  try {
+	        await this.reportCopyErrors(tableName,copy.dml,metrics.failed)
+	  	    return
+	      } catch (e) {
+  		    cause.cause = e
+	      }
+        }
+        this.yadamuLogger.handleException([this.DATABASE_VENDOR,'Copy',tableName],cause)
+	    let results = await this.rollbackTransaction()
+	  } catch (e) {
+		e.cause = metrics.writerError
+		metrics.writerError = e
+	  }
+	}
+	return metrics
   }
+  
 }
 
-module.exports = RedshiftDBI
+export { RedshiftDBI as default }

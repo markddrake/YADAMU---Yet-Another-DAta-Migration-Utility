@@ -1,12 +1,13 @@
 "use strict" 
 
-const MariadbDBI = require('../../../YADAMU/mariadb/node/mariadbDBI.js');
-const MariadbError = require('../../../YADAMU/mariadb/node/mariadbException.js')
-const MariadbConstants = require('../../../YADAMU/mariadb/node/mariadbConstants.js');
+import MariadbDBI       from '../../../YADAMU/mariadb/node/mariadbDBI.js';
+import MariadbError     from '../../../YADAMU/mariadb/node/mariadbException.js'
+import MariadbConstants from '../../../YADAMU/mariadb/node/mariadbConstants.js';
 
-const YadamuTest = require('../../common/node/yadamuTest.js');
+import YadamuTest       from '../../common/node/yadamuTest.js';
+import YadamuQALibrary  from '../../common/node/yadamuQALibrary.js'
 
-class MariadbQA extends MariadbDBI {
+class MariadbQA extends YadamuQALibrary.qaMixin(MariadbDBI) {
 
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
@@ -24,24 +25,9 @@ class MariadbQA extends MariadbDBI {
       return MariadbQA.YADAMU_DBI_PARAMETERS
     }	
 			    
-	constructor(yadamu,settings,parameters) {
-       super(yadamu,settings,parameters)
+	constructor(yadamu,manager,connectionSettings,parameters) {
+       super(yadamu,manager,connectionSettings,parameters)
     }
-
-	async initialize() {
-	  await super.initialize();
-	  if (this.terminateConnection()) {
-        const pid = await this.getConnectionID();
-	    this.scheduleTermination(pid,this.getWorkerNumber());
-	  }
-	}
- 
-    async initializeImport() {
-	  if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
-	  await super.initializeImport();
-    }	
 
     async recreateSchema() {
         
@@ -85,29 +71,24 @@ class MariadbQA extends MariadbDBI {
       
     }
     
-    async workerDBI(idx)  {
-	  const workerDBI = await super.workerDBI(idx);
-      // Manager needs to schedule termination of worker.
-	  if (this.terminateConnection(idx)) {
-        const pid = await workerDBI.getConnectionID();
-	    this.scheduleTermination(pid,idx);
-	  }
-	  return workerDBI
+	classFactory(yadamu) {
+      return new MariadbQA(yadamu,this)
     }
-      
+	
 	async scheduleTermination(pid,workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
+	  const tags = this.getTerminationTags(workerId,pid)
+	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
 	  const timer = setTimeout(
         async (pid) => {
           if (this.pool !== undefined && this.pool.end) {
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
+		    this.yadamuLogger.log(tags,`Killing connection.`);
 	        const conn = await this.getConnectionFromPool();
 			const sqlStatement = `kill hard ${pid}`
 			const res = await conn.query(sqlStatement);
 			await conn.release()
 		  }
 		  else {
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+		    this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
 		  }
 		},
 		this.killConfiguration.delay,
@@ -121,7 +102,7 @@ class MariadbQA extends MariadbDBI {
     } 
 }
 
-module.exports = MariadbQA
+export { MariadbQA as default }
 
 const _SQL_SUCCESS =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT

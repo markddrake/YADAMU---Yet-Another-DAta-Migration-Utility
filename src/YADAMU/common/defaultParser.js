@@ -1,7 +1,6 @@
 "use strict" 
 
-
-const YadamuParser = require('./yadamuParser.js')
+import YadamuParser from './yadamuParser.js'
 
 class DefaultParser extends YadamuParser {
   
@@ -10,4 +9,4 @@ class DefaultParser extends YadamuParser {
   } 
 }
 
-module.exports = DefaultParser
+export { DefaultParser as default}

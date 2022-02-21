@@ -1,58 +1,102 @@
 "use strict" 
 
-const Transform = require('stream').Transform;
-const { performance } = require('perf_hooks');
+import { Transform } from 'stream';
+import { performance } from 'perf_hooks';
 
 class YadamuParser extends Transform {
-    
-  constructor(tableInfo,yadamuLogger) {
+
+  get COPY_METRICS()       { return this._COPY_METRICS }
+  set COPY_METRICS(v)      { this._COPY_METRICS =  v }
+      
+  generateTransformations(queryInfo) {
+	
+	return queryInfo.DATA_TYPE_ARRAY.map((dataTypes,idx) => {
+	  return null
+	})
+
+  }
+  
+  setTransformations(queryInfo) {
+
+	this.transformations = this.generateTransformations(queryInfo)
+
+	// Use a dummy rowTransformation function if there are no transformations required.
+
+    this.rowTransformation = this.transformations.every((currentValue) => { return currentValue === null}) ? (row) => {} : (row) => {
+    this.transformations.forEach((transformation,idx) => {
+        if ((transformation !== null) && (row[idx] !== null)) {
+          transformation(row,idx)
+        }
+      }) 
+    }
+  }
+  
+  constructor(queryInfo,yadamuLogger) {
     super({objectMode: true });  
-    this.tableInfo = tableInfo;
+    this.queryInfo = queryInfo;
     this.yadamuLogger = yadamuLogger
 	this.startTime = performance.now()
-    this.rowCount = 0
-	
-	// Push the table name into the stream before sending the data.
-	
-	// Push a Partition Object or a Table Object
-	
-    if (tableInfo.PARTITION_COUNT) {
-	  // console.log('YadamuParser()','PUSH','PARTITION',tableInfo.MAPPED_TABLE_NAME,tableInfo.partitionInfo.PARTITION_NUMBER,tableInfo.partitionPARTITION_NAME)
-	  this.push({
-		partition: {
-	      tableName          : tableInfo.MAPPED_TABLE_NAME
-	    , partitionCount     : tableInfo.PARTITION_COUNT
-		, partitionNumber    : tableInfo.partitionInfo.PARTITION_NUMBER
-		, partitionName      : tableInfo.partitionInfo.PARTITION_NAME
-  	    }
-	  })				
-	}
-	else {
-	  // console.log('YadamuParser()','PUSH','TABLE',tableInfo.MAPPED_TABLE_NAME)
-      this.push({table: tableInfo.MAPPED_TABLE_NAME})
-	}
+	this.setTransformations(queryInfo)
   }
     
-  getRowCount() {
-    return this.rowCount;
+  sendTableMessage() {
+	
+	// Push a Table Object or a Partition Object. If the this.queryInfo has a PARTITION_NUMBER property assume this is a partition level operation, rather than a table level operation
+	
+	// Push the table name into the stream before sending the data.
+
+    if (this.queryInfo.hasOwnProperty('PARTITION_NUMBER')) {
+      // console.log('YadamuParser()','PUSH','PARTITION',this.queryInfo.MAPPED_TABLE_NAME,this.queryInfo.PARTITION_NUMBER,this.queryInfo.PARTITION_NAME)
+      const padSize = this.queryInfo.PARTITION_COUNT.toString().length
+	  this.partitionInfo =  {
+	    tableName          : this.queryInfo.MAPPED_TABLE_NAME
+      , displayName        : `${this.queryInfo.MAPPED_TABLE_NAME}(${this.queryInfo.PARTITION_NAME || `#${this.queryInfo.PARTITION_NUMBER.toString().padStart(padSize,"0")}`})`
+	  , partitionCount     : this.queryInfo.PARTITION_COUNT
+	  , partitionNumber    : this.queryInfo.PARTITION_NUMBER
+      , partitionName      : this.queryInfo.PARTITION_NAME || ''
+  	  }
+		   
+	  this.push({partition: this.partitionInfo})	
+	}
+	else {
+  	  // console.log('YadamuParser()','PUSH','TABLE',this.queryInfo.MAPPED_TABLE_NAME)
+      this.push({table: this.queryInfo.MAPPED_TABLE_NAME})
+	}
+	  
+  }
+	
+  async doConstruct() {
+	this.sendTableMessage()
   }
 
-  // For use in cases where the database generates a single column containing a serialized JSON reprensentation of the row.
+  _construct(callback) {
+	this.doConstruct().then(() => { callback() }).catch((e) => { callback(e) })
+  }
   
-  async _transform (data,encoding,callback) {
-    this.rowCount++;
-	if (!Array.isArray(data)) {
-	  data = Object.values(data)
-	}
-    this.push({data:data.json})
-    callback();
+  async doTransform(data) {
+    this.rowTransformation(data)
+	return data 
+  }
+
+  _transform(data,enc,callback) {
+
+    this.COPY_METRICS.parsed++
+
+    this.doTransform(data).then((row) => { 
+	  this.push({data:row})
+	  callback() 
+    }).catch((e) => { 
+	  callback(e) 
+	})
+  
   }
 
    _final(callback) {
-	// this.yadamuLogger.trace([this.constructor.name,this.tableInfo.TABLE_NAME],'_final()');
+	// this.yadamuLogger.trace([this.constructor.name,this.queryInfo.TABLE_NAME],'_final()');
 	this.endTime = performance.now();
 	callback()
   } 
+  
 }
 
-module.exports = YadamuParser
+export { YadamuParser as default}

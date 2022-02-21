@@ -1,12 +1,12 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
-const MySQLConstants = require('./mysqlConstants.js')
+import {DatabaseError} from '../../common/yadamuException.js'
+import MySQLConstants from './mysqlConstants.js'
 
 class MySQLError extends DatabaseError {
-  //  const err = new MySQLError(cause,stack,sql)
-  constructor(cause,stack,sql) {
-    super(cause,stack,sql);
+  
+  constructor(driverId,cause,stack,sql) {
+    super(driverId,cause,stack,sql);
 	// Abbreviate Long Lists of Place Holders ...
 	if (this.sql.indexOf('),(') > 0) {
 	  const startElipises = this.sql.indexOf('),(') + 2
@@ -43,4 +43,4 @@ class MySQLError extends DatabaseError {
 
 }
 
-module.exports = MySQLError
+export { MySQLError as default }

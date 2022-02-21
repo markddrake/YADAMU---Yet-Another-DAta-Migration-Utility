@@ -1,12 +1,12 @@
 "use strict" 
 
-const YadamuParser = require('../../common/yadamuParser.js')
+import YadamuParser from '../../common/yadamuParser.js'
 
 class SnowflakeParser extends YadamuParser {
-  
-  constructor(tableInfo,yadamuLogger) {
-    super(tableInfo,yadamuLogger);      
-    this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
+
+  generateTransformations(queryInfo) {
+	  
+    return queryInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 	  switch (dataType) {
 		 case 'XML':
 		    // Replace xsl:space with xml:space
@@ -16,7 +16,7 @@ class SnowflakeParser extends YadamuParser {
          case 'TIMESTAMP_NTZ':		   
 		    // Replace 10000-01-01 with
 		   return (row,idx)  => {
-             row[idx] = row[idx].startsWith('10000-01-01') ? `9999-12-31T23:59:59.${'9'.repeat(parseInt(tableInfo.SIZE_CONSTRAINT_ARRAY[idx]))}+00:00` : row[idx]
+             row[idx] = row[idx].startsWith('10000-01-01') ? `9999-12-31T23:59:59.${'9'.repeat(parseInt(queryInfo.SIZE_CONSTRAINT_ARRAY[idx]))}+00:00` : row[idx]
 		   }     
  		case "REAL":
         case "FLOAT":
@@ -46,7 +46,15 @@ class SnowflakeParser extends YadamuParser {
       }
     })
 
-    this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+  }
+
+  setTransformations(queryInfo) {
+
+	this.transformations = this.generateTransformations(queryInfo)
+
+	// Use a dummy rowTransformation function if there are no transformations required.
+
+    this.rowTransformation = this.transformations.every((currentValue) => { return currentValue === null}) ? (row) => {} : (row) => {
       this.transformations.forEach((transformation,idx) => {
 	    if (row[idx] === 'NULL') {
 		  row[idx] = null;
@@ -64,14 +72,15 @@ class SnowflakeParser extends YadamuParser {
     }
   }
   
-  async _transform (data,encoding,callback) {
+  constructor(queryInfo,yadamuLogger) {
+    super(queryInfo,yadamuLogger);      	
+  }
+  
+  async doTransform(data) {
     // Snowflake generates o4bject based output, not array based outout. Transform object to array based on columnList
-    this.rowCount++;
     data = Object.values(data)
-    this.rowTransformation(data)
-	this.push({data : data})
-    callback();
+	return super.doTransform(data)
   }
 }
 
-module.exports = SnowflakeParser
+export { SnowflakeParser as default }

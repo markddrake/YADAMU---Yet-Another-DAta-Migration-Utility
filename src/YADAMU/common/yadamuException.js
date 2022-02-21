@@ -1,10 +1,7 @@
 "use strict"
 
 class YadamuError extends Error {
-  constructor(message) {
-    super(message);
-  }
-  
+
   static lostConnection(e) {
 	return ((e instanceof DatabaseError) && e.lostConnection())
   }
@@ -20,14 +17,66 @@ class YadamuError extends Error {
   static missingTable(e) {
 	return ((e instanceof DatabaseError) && e.missingTable())
   }
-    
+     
+  static createIterativeException(dbi,tableInfo,cause,batchSize,rowNumber,row,info) {
+
+	const tableName = tableInfo.tableName
+	
+    try {
+      const details = {
+        currentSettings        : {
+          yadamu               : dbi.yadamu
+        , systemInformation    : dbi.systemInformation
+        , metadata             : { 
+            [tableName]        : dbi.metadata[tableName]
+          }
+        }
+      , columnNames            : tableInfo.columnNames
+      , targetDataTypes        : tableInfo.targetDataTypes 
+      }
+      Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
+      return new IterativeInsertError(cause,tableName,batchSize,rowNumber,row,details)
+    } catch (e) {
+	  cause.IterativeErrorIssue = e
+      return cause
+    }
+  }
+  
+  static createBatchException(dbi,tableInfo,cause,batchNumber,batchSize,firstRow,lastRow,info) {
+
+	const tableName = tableInfo.tableName
+
+    try {
+      const details = {
+        currentSettings        : {
+          yadamu               : dbi.yadamu
+        , systemInformation    : dbi.systemInformation
+        , metadata             : { 
+            [tableName]        : dbi.metadata[tableName]
+          }
+        }
+      , columnNames          : tableInfo.columnNames
+      , targetDataTypes      : tableInfo.targetDataTypes 
+      }
+      Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
+      return new BatchInsertError(cause,tableName,batchNumber,batchSize,firstRow,lastRow,details)
+    } catch (e) {
+	  cause.batchErrorIssue = e
+      return cause
+    }
+  }
+  
+  constructor(message) {
+    super(message);
+  }
+
   cloneStack(stack) {
 	return stack && stack.indexOf('Error') === 0 ? `${stack.slice(0,5)}: ${this.cause.message}${stack.slice(5)}` : stack
   }
   
 }
 
-class InternalError extends Error {
+class InternalError extends YadamuError {
   constructor(message,args,info) {
     super(message);
 	this.args = args
@@ -46,9 +95,15 @@ class ExportError extends YadamuError {
 
 
 
-class UserError extends Error {
+class UserError extends YadamuError {
   constructor(message) {
     super(message);
+  }
+}
+
+class CopyOperationAborted extends YadamuError {
+  constructor() {
+    super('Copy operation aborted: Error raised by sibling operation.');
   }
 }
 
@@ -73,7 +128,7 @@ class ConnectionError extends UserError {
   }
 }
 
-class ContentTooLarge extends Error {
+class ContentTooLarge extends YadamuError {
   constructor(cause,vendor,operation,maxSize) {
     super(`Source record too large for Target Database`);
 	this.cause=cause
@@ -92,11 +147,12 @@ class ContentTooLarge extends Error {
   
 }
 
-class BatchInsertError extends Error {
-  constructor(cause,tableName,batchSize,firstRow,lastRow,info) {
+class BatchInsertError extends YadamuError {
+  constructor(cause,tableName,batchNumber,batchSize,firstRow,lastRow,info) {
 	super(cause.message)
 	this.cause = cause
     this.tableName = tableName
+	this.batchNumber = batchNumber
 	this.batchSize = batchSize
 	this.rows = [firstRow,lastRow]
 	if (typeof info === 'object') {
@@ -105,7 +161,7 @@ class BatchInsertError extends Error {
   }
 }
 
-class IterativeInsertError extends Error {
+class IterativeInsertError extends YadamuError {
   constructor(cause,tableName,batchSize,rowNumber,row,info) {
 	super(cause.message)
 	this.cause = cause
@@ -118,18 +174,36 @@ class IterativeInsertError extends Error {
   }
 }
 
-class RejectedColumnValue extends Error {
+class RejectedColumnValue extends YadamuError {
   constructor (columnName, value) {
 	super(`Column "${columnName}" contains unsupported value "${value}". Row Rejected.`);
   }
 }
-  
+ 
+
+class InvalidMessageSequence extends YadamuError {
+  constructor(tableName,found,expected) {
+	super(`Error while processing table "${tableName}": Incorrect sequenece of messages. Found "${found}" when expecting "${expected}".`)
+  }
+}
+
+class UnimplementedMethod extends YadamuError {
+  constructor(method, superclass, subclass) {
+	super(`Abstract method "${method}" expected by "${superclass}" not implemented by subclass "${subclass}".`)
+  }
+}
 
 class DatabaseError extends YadamuError {
-  constructor(cause,stack,sql) {
+	
+	
+  get DRIVER_ID()  { return this._DRIVER_ID }
+  set DRIVER_ID(v) { this._DRIVER_ID = v }
+  
+  constructor(driverId,cause,stack,sql) {
 	let oneLineMessage = cause.message.indexOf('\r') > 0 ? cause.message.substr(0,cause.message.indexOf('\r')) : cause.message 
 	oneLineMessage = oneLineMessage.indexOf('\n') > 0 ? oneLineMessage.substr(0,oneLineMessage.indexOf('\n')) : oneLineMessage
     super(oneLineMessage);
+	this._DRIVER_ID = driverId
 	this.cause = cause
 	this.stack = this.cloneStack(stack)
 	this.sql = sql
@@ -194,19 +268,22 @@ class InputStreamError extends DatabaseError {
   }
 }
 	
-module.exports = {
+export { 
   YadamuError
 , InternalError
 , UserError
+, CommandLineError  
 , BatchInsertError
 , IterativeInsertError
 , RejectedColumnValue
 , DatabaseError
 , InputStreamError
-, CommandLineError  
 , ConfigurationFileError
 , ConnectionError
 , ContentTooLarge
 , ExportError
+, InvalidMessageSequence
+, CopyOperationAborted
+, UnimplementedMethod
 }
 

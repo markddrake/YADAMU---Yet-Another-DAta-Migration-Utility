@@ -1,48 +1,49 @@
 "use strict"
 
-const Stream = require('stream');
-const PassThrough = Stream.PassThrough;
-const util = require('util')
-// const pipeline = util.promisify(stream.pipeline);
-const { pipeline } = require('stream/promises');
+import {PassThrough} from 'stream';
+import { pipeline } from 'stream/promises';
 
 
-const StringWriter = require('../../common/stringWriter.js');
-const StringDecoderStream = require('../../common/stringDecoderStream.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
-const AzureConstants = require('./azureConstants.js');
-const AzureError = require('./azureException.js')
+import StringWriter from '../../common/stringWriter.js';
+import StringDecoderStream from '../../common/stringDecoderStream.js';
+import YadamuConstants from '../../common/yadamuConstants.js';
+import AzureConstants from './azureConstants.js';
+import AzureError from './azureException.js'
 
 class AzureStorageService {
 
   get CHUNK_SIZE()     { return this.parameters.CHUNK_SIZE  || AzureConstants.CHUNK_SIZE }  
-  get CONTAINER() { return this._CONTAINER }
    
-  constructor(blobServiceClient,container,parameters,yadamuLogger) {
-	// super()
-    this.blobServiceClient = blobServiceClient
-	this._CONTAINER = container
+  constructor(dbi,parameters) {
+	this.dbi = dbi
+	this.blobServiceClient = dbi.cloudConnection
+	this.yadamuLogger = dbi.yadamuLogger
 	this.parameters = parameters || {}
-	this.yadamuLogger = yadamuLogger
 
-	this.containerClient = blobServiceClient.getContainerClient(this.CONTAINER);
+	this.containerClient = this.blobServiceClient.getContainerClient(this.dbi.CONTAINER);
 	this.buffer = Buffer.allocUnsafe(this.CHUNK_SIZE);
 	this.offset = 0;
 	
-	this.writeOperations = new Set()
   }
   
   isTextContent(contentType) {
     return contentType.startsWith('text/') || YadamuConstants.TEXTUAL_MIME_TYPES.includes(contentType)
   }
    
-  createWriteStream(key,contentType) {
+  createWriteStream(key,contentType,activeWriters) {
 	// this.yadamuLogger.trace([this.constructor.name],`createWriteStream(${key})`)
-	const passThrough = new PassThrough();
+	const passThrough =  new PassThrough()
 	const blockBlobClient = this.containerClient.getBlockBlobClient(key);
 	const writeOperation = blockBlobClient.uploadStream(passThrough, undefined, undefined, { blobHTTPHeaders: { blobContentType: contentType}})
-	this.writeOperations.add(writeOperation);
-    writeOperation.then(() => {this.writeOperations.delete(writeOperation)})    
+	activeWriters.add(writeOperation);
+    writeOperation.then(() => {
+      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',key],`SUCCESS : Removing Active Writer for "${key}"`);		
+      activeWriters.delete(writeOperation)
+	}).catch((err) => {
+      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',key],`SUCCESS : Removing Active Writer for "${key}"`);		
+      activeWriters.delete(writeOperation)
+      console.log(err)
+    })	  
 	return passThrough;
   }
   
@@ -51,10 +52,10 @@ class AzureStorageService {
 	let stack;
     try {
       stack = new Error().stack
-	  const createContainerResponse = await this.containerClient.createIfNotExists();
+	  const createContainerResponse = await this.containerClient.createIfNotExists(this.dbi.CONTAINER);
       return createContainerResponse
 	} catch (e) { 
-      throw new AzureError(e,stack,`Azure.containerClient.createIfNotExists(${this.CONTAINER})`)
+      throw new AzureError(this.dbi.DRIVER_ID,e,stack,`Azure.containerClient.createIfNotExists(${this.dbi.CONTAINER})`)
 	}
   }
 
@@ -65,7 +66,7 @@ class AzureStorageService {
       stack = new Error().stack
 	  return await this.containerClient.exists()
 	} catch (e) { 
-      throw new AzureError(e,stack,`Azure.containerClient.createIfNotExists(${this.CONTAINER})`)
+      throw new AzureError(this.dbi.DRIVER_ID,e,stack,`Azure.containerClient.createIfNotExists(${this.dbi.CONTAINER})`)
 	}
   }
   
@@ -89,7 +90,7 @@ class AzureStorageService {
 	  const uploadBlobResponse = await blockBlobClient.upload(content, content.length);
 	  return uploadBlobResponse
 	} catch (e) {
-      throw new AzureError(e,stack,operation)
+      throw new AzureError(this.dbi.DRIVER_ID,e,stack,operation)
 	}
   }
   
@@ -103,7 +104,7 @@ class AzureStorageService {
       const properties = await blockBlobClient.getProperties();
 	  return properties
 	} catch (e) {
-      throw new AzureError(e,stack,operation)
+      throw new AzureError(this.dbi.DRIVER_ID,e,stack,operation)
 	}
   }
 
@@ -128,7 +129,7 @@ class AzureStorageService {
 	  return downloadBlockBlobResponse.readableStreamBody.pipe(this.isTextContent(props.contentType) ? new StringDecoderStream() : new PassThrough())
 	  return downloadBlockBlobResponse.readableStreamBody.pipe(new PassThrough())
 	} catch (e) {
-      throw new AzureError(e,stack,operation)
+	  throw new AzureError(this.dbi.DRIVER_ID,e,stack,operation)
 	}
   }
   
@@ -144,10 +145,10 @@ class AzureStorageService {
 	    this.containerClient.deleteBlob(blob.name, {deleteSnapshots : "include"})
 	  }  
     } catch (e) {
-	  throw new AzureError(e,stack,operation)
+	  throw new AzureError(this.dbi.DRIVER_ID,e,stack,operation)
     }
   }
 
 }
 
-module.exports = AzureStorageService;
+export {AzureStorageService as default }

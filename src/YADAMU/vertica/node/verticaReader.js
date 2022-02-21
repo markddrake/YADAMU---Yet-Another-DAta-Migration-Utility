@@ -1,9 +1,11 @@
 "use strict" 
-const Readable = require('stream').Readable;
-const {Query, types} = require('pg')
+import {Readable} from 'stream';
+import pg from 'pg';
+const {Query,Pool} = pg;
+import types from 'pg-types';
 
-const array = require('postgres-array')
-const parseByteA = require('postgres-bytea')
+import array from 'postgres-array'
+import parseByteA from 'postgres-bytea'
 
 /*
 **
@@ -218,4 +220,4 @@ class VerticaReader extends Readable {
 	
 }
 
-module.exports = VerticaReader
+export { VerticaReader as default }

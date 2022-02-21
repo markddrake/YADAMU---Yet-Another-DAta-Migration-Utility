@@ -1,14 +1,14 @@
 "use strict" 
 
-const fs = require('fs');
-const fsp = require('fs').promises;
-const path = require('path');
-const crypto = require('crypto');
-const { performance } = require('perf_hooks');
+import fs from 'fs';
+import fsp from 'fs/promises';
+import path from 'path';
+import crypto from 'crypto';
+import { performance } from 'perf_hooks';
 
-const {finished, Readable, PassThrough} = require('stream')
-const {pipeline} = require('stream/promises')
-const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib');
+import {finished, compose,  Readable, PassThrough} from 'stream'
+import {pipeline} from 'stream/promises'
+import { createGzip, createGunzip, createDeflate, createInflate } from 'zlib';
 
 /*
 **
@@ -17,18 +17,19 @@ const { createGzip, createGunzip, createDeflate, createInflate } = require('zlib
 ** static GETTER methods result in undefined values.
 **
 
-const Yadamu = require('../../common/yadamu.js');
+import Yadamu from '../../common/yadamu.js';
 
 **
 */
-const YadamuConstants = require('../../common/yadamuConstants.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
-const YadamuDBI = require('../../common/yadamuDBI.js');
-const DBIConstants = require('../../common/dbiConstants.js');
-const JSONParser = require('./jsonParser.js');
-const EventStream = require('./eventStream.js');
-const JSONWriter = require('./jsonWriter.js');
-const {FileError, FileNotFound, DirectoryNotFound} = require('./fileException.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
+import { YadamuError } from '../../common/yadamuException.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js';
+import YadamuDBI from '../../common/yadamuDBI.js';
+import DBIConstants from '../../common/dbiConstants.js';
+import JSONParser from './jsonParser.js';
+import StreamSwitcher from './streamSwitcher.js';
+import JSONOutputManager from './jsonOutputManager.js';
+import {FileError, FileNotFound, DirectoryNotFound} from './fileException.js';
 
 
 /*
@@ -37,44 +38,18 @@ const {FileError, FileNotFound, DirectoryNotFound} = require('./fileException.js
 **
 */
 
-class TableSwitcher extends PassThrough {
 
-  constructor() {
-	super()
-  }
-  
-  pipe(os,options) {
-    options = options || {}
-	options.end = false;
-	return super.pipe(os,options)
-  }
-  
-  _transform(data,enc,callback) {
-    this.push(data)
-    callback()
-  }
- 
-}
-
-class FirstTableSwitcher extends TableSwitcher {
+class ExportWriter extends Readable {
 
   constructor(exportFileHeader) {
 	super()
     this.push(exportFileHeader) 
   }
- 
-}
-
-class EndExportOperation extends Readable {
-
-  constructor(exportFileFooter) {
-	super()
-    this.push(exportFileFooter) 
-  }
-
+  
   _read() {
    this.push(null)
   }
+ 
  
 }
 
@@ -147,9 +122,6 @@ class FileDBI extends YadamuDBI {
   get COMPRESSED_FILE()            { return this.yadamu.COMPRESSION !== 'NONE' }
   get ENCRYPTED_FILE()             { return this.yadamu.ENCRYPTION }
 							      
-  set PIPELINE_ENTRY_POINT(v)      { this._PIPELINE_ENTRY_POINT = v }
-  get PIPELINE_ENTRY_POINT()       { return this._PIPELINE_ENTRY_POINT }
-							      
   set EXPORT_FILE_HEADER(v)        { this._EXPORT_FILE_HEADER = v }
   get EXPORT_FILE_HEADER()         { return this._EXPORT_FILE_HEADER }
 							      
@@ -203,8 +175,8 @@ class FileDBI extends YadamuDBI {
   
   set FILE(v)           { this._FILE = v }
   
-  constructor(yadamu,settings,parameters) {
-    super(yadamu,settings,parameters)
+  constructor(yadamu,manager,connectionSettings,parameters) {
+    super(yadamu,manager,connectionSettings,parameters)
     this.outputStream = undefined;
     this.inputStream = undefined;
 	this.firstTable = true;
@@ -215,14 +187,12 @@ class FileDBI extends YadamuDBI {
   setDescription(description) {
     this.DESCRIPTION = description.indexOf(this.baseDirectory) === 0 ? description.substring(this.baseDirectory.length+1) : description
   }
-
-  generateStatementCache() {
-	this.statementCache = {}
-  }
-      
+  
   executeDDL(ddl) {
+	const startTime = performance.now()
 	this.ddl = ddl
-    return ddl
+    this.emit(YadamuConstants.DDL_UNNECESSARY)
+	return ddl
   }
   
   updateVendorProperties(vendorProperties) {
@@ -290,17 +260,18 @@ class FileDBI extends YadamuDBI {
 	
   }
 
-  createInputStream() {
+  async createInputStream() {
     return new Promise((resolve,reject) => {
-      this.inputStream = fs.createReadStream(this.FILE);
 	  const stack = new Error().stack
-      this.inputStream.on('open',() => {resolve()}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,this.FILE) : new FileError(err,stack,this.FILE) )})
+      const is = fs.createReadStream(this.FILE);
+      is.once('open',() => {resolve(is)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,this.FILE) : new FileError(this.DRIVER_ID,err,stack,this.FILE) )})
     })
   }
   
   async initializeExport() {
 
-    // For FileDBI Import is Reading data from the file system.
+    // For FileDBI Export is Reading data from the file system.
+	
 	this.DIRECTORY = this.SOURCE_DIRECTORY
 	
 	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
@@ -311,7 +282,7 @@ class FileDBI extends YadamuDBI {
       await this.loadInitializationVector();
     }
 
-	await this.createInputStream()
+	this.inputStream = await this.createInputStream()
   }
 
   finalizeExport() {
@@ -329,45 +300,37 @@ class FileDBI extends YadamuDBI {
 	})	    
   } 
   
-  createOutputStream() {
-    return new Promise((resolve,reject) => {
-      this.outputStream = fs.createWriteStream(this.FILE,{flags :"w"})
-	  const stack = new Error().stack
-      this.outputStream.on('open',() => {resolve()}).on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(err,stack,this.FILE) : new FileError(err,stack,this.FILE) )})
-	})
-  }
-
   getFileOutputStream(tableName) {
     return this.outputStream
   }
 
-  createOutputStreams() {
+  async createOutputStream() {
 
-    this.outputStreams = []
+    const streams = []
 	
     if (this.COMPRESSED_FILE) {
-      this.outputStreams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
+      streams.push(this.yadamu.COMPRESSION === 'GZIP' ? createGzip() : createDeflate())
     }
 	
     if (this.ENCRYPTED_FILE) {
-  	  // console.log('Cipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR);
+      await this.createInitializationVector();
+      // console.log('Cipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR);
 	  const cipherStream = crypto.createCipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
-	  this.outputStreams.push(cipherStream)
-	  this.outputStreams.push(new IVWriter(this.INITIALIZATION_VECTOR))
+	  streams.push(cipherStream)
+	  streams.push(new IVWriter(this.INITIALIZATION_VECTOR))
 	}
 	
-	this.outputStreams.push(this.getFileOutputStream())
-	
-    // this.outputStreams.forEach((s) => { console.log(s.constructor.name, s.eventNames().map((e) => {return `"${e}(${s.listenerCount(e)})"`}).join(','))})
-	
-	// Cache the set of listeners for the outputStreams. This allows the listeners to be restored. 
+	const ws = await new Promise((resolve,reject) => {
+      const ws = fs.createWriteStream(this.FILE,{flags :"w"})
+	  const stack = new Error().stack
+      ws.on('open',() => {resolve(ws)})
+	    .on('error',(err) => {reject(err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,this.FILE) : new FileError(this.DRIVER_ID,err,stack,this.FILE) )})
+	})
+    
+	streams.push(ws)
+	const os = streams.length === 1 ? streams[0] : compose(...streams);
+	return os;
 
-	this.defaultListeners = this.outputStreams.map((s) => { 
-	   const eventList = {} 
-	   s.eventNames().forEach((e) => { eventList[e] = s.listeners(e)})
-	   return eventList
-	 })
-	 
   }
 
   checkDirectory() {
@@ -383,12 +346,7 @@ class FileDBI extends YadamuDBI {
 	super.initializeImport()
     this.setDescription(this.FILE)
 
-	await this.createOutputStream()
-	if (this.ENCRYPTED_FILE) {
-      await this.createInitializationVector();
-    }
-	this.createOutputStreams()
-	this.PIPELINE_ENTRY_POINT = this.outputStreams[0]
+	this.outputStream = await this.createOutputStream()
     this.yadamuLogger.info([this.DATABASE_VENDOR],`Writing data to "${this.FILE}".`)
   }
   
@@ -400,23 +358,31 @@ class FileDBI extends YadamuDBI {
     // Remove the source structure from each metadata object prior to serializing it. Put it back after the serialization has been completed.
 
     const sourceInfo = {}
-    Object.keys(this.metadata).forEach((key) => {if (this.metadata[key].source) sourceInfo[key] = this.metadata[key].source; delete this.metadata[key].source})
+    Object.keys(this.metadata).forEach((key) => {
+	  if (this.metadata[key].source) {
+		sourceInfo[key] = this.metadata[key].source; 
+	    delete this.metadata[key].source
+		delete this.metadata[key].partitionCount
+	  }
+	})
     let exportFileHeader = `{"systemInformation":${JSON.stringify(this.systemInformation)}${this.ddl ? `,"ddl":${JSON.stringify(this.ddl)}` : ''},"metadata":${JSON.stringify(this.metadata)}`
 	Object.keys(sourceInfo).forEach((key) => {this.metadata[key].source = sourceInfo[key]})
 
     if ((this.MODE === 'DDL_ONLY') || (YadamuLibrary.isEmpty(this.metadata))) {
 	  const exportFileContents = `${exportFileHeader}}`
-      const finalize = new EndExportOperation(exportFileContents)
-      await pipeline(finalize,...this.outputStreams)
+      const finalizeExport = new ExportWriter(exportFileContents)
+      await pipeline(finalizeExport,this.outputStream)
 	}
     else {
 	  exportFileHeader = `${exportFileHeader},"data":{` 
 	} 
 	 
 	this.EXPORT_FILE_HEADER = exportFileHeader
+	const initializeExport = new ExportWriter(this.EXPORT_FILE_HEADER)
+	await pipeline(initializeExport,this.outputStream,{end: false})
+  
+  }	
 	
-  }
-
   traceStreamEvents(streams) {
 
     // Add event tracing to the streams
@@ -443,18 +409,13 @@ class FileDBI extends YadamuDBI {
 	// this.yadamuLogger.trace([this.constructor.name],`finalizeData(${YadamuLibrary.isEmpty(this.metadata)})`)
 	
 	if (!YadamuLibrary.isEmpty(this.metadata)) {
-      const finalize = new EndExportOperation('}}')
+      const finalizeExport = new ExportWriter('}}')
 	  // Restore the default listeners to the outputStreams
       // this.traceStreamEvents([finalize,...this.outputStreams])
-	  this.outputStreams.forEach((s,i) => { 
-	    if (!YadamuLibrary.isEmpty(this.defaultListeners[i])) {
-		  Object.keys(this.defaultListeners[i]).forEach((e) => {this.defaultListeners[i][e].forEach((l) => {s.on(e,l)})})
-		}
-	  })
-      await pipeline(finalize,...this.outputStreams)
+      await pipeline(finalizeExport,this.outputStream)
     }
   }
-	
+  
   finalizeImport() {}
 
     
@@ -495,8 +456,9 @@ class FileDBI extends YadamuDBI {
   **
   */
       
-   generateStatementCache(schema,executeDDL) {
+  async generateStatementCache(schema,executeDDL) {
     this.statementCache = []
+	this.emit(YadamuConstants.CACHE_LOADED)
 	return this.statementCache
   }
 
@@ -504,8 +466,7 @@ class FileDBI extends YadamuDBI {
     return []
   }
   
-  
-  getSchemaInfo(schema) {
+  getSchemaMetadata(){
     return []
   }
   
@@ -531,6 +492,8 @@ class FileDBI extends YadamuDBI {
 	  tableName         : tableName
 	, _SPATIAL_FORMAT   : this.systemInformation.typeMappings.spatialFormat 
     , columnNames       : [... this.metadata[tableName].columnNames]
+	, insertMode        : 'Batch'
+	, columnCount       : this.metadata[tableName].columnNames.length
     , targetDataTypes   : [... this.metadata[tableName].dataTypes]
     }
   }
@@ -547,7 +510,7 @@ class FileDBI extends YadamuDBI {
 
     let cause	  
 	try {
-      cause = new FileError(new Error(`Unable to load Initialization Vector from "${this.FILE}".`))
+      cause = new FileError(this.DRIVER_ID,new Error(`Unable to load Initialization Vector from "${this.FILE}".`))
 	  const fd = await fsp.open(this.FILE)
       const iv = new Uint8Array(this.IV_LENGTH)
 	  const results = await fd.read(iv,0,this.IV_LENGTH,0)
@@ -562,17 +525,19 @@ class FileDBI extends YadamuDBI {
 	  
   getInputStreams() {
 	const streams = []
-	this.INPUT_METRICS = DBIConstants.NEW_TIMINGS
-	this.INPUT_METRICS.DATABASE_VENDOR = this.DATABASE_VENDOR
-	const is = this.getInputStream();
+	const metrics = DBIConstants.NEW_COPY_METRICS
+	metrics.SOURCE_DATABASE_VENDOR = this.DATABASE_VENDOR
+    const is = this.getInputStream();
+	is.COPY_METRICS = metrics
 	is.once('readable',() => {
-	  this.INPUT_METRICS.readerStartTime = performance.now()
+	  metrics.pipeStartTime   = performance.now()
+	  metrics.readerStartTime = performance.now()
 	}).on('error',(err) => { 
-      this.INPUT_METRICS.readerEndTime = performance.now()
-	  this.INPUT_METRICS.readerError = err
-	  this.INPUT_METRICS.failed = true
+	  metrics.failed          = true
+      metrics.readerEndTime   = performance.now()
+	  metrics.readerError     = err
     }).on('end',() => {
-      this.INPUT_METRICS.readerEndTime = performance.now()
+      metrics.readerEndTime   = performance.now()
     })
 	streams.push(is)
 	
@@ -588,50 +553,57 @@ class FileDBI extends YadamuDBI {
 	}
 	
 	const jsonParser = new JSONParser(this.yadamuLogger, this.MODE, this.FILE)
+    jsonParser.COPY_METRICS = metrics
 	jsonParser.once('readable',() => {
-	  this.INPUT_METRICS.parserStartTime = performance.now()
+	  metrics.parserStartTime = performance.now()
 	}).on('error',(err) => { 
-      this.INPUT_METRICS.parserEndTime = performance.now()
-	  this.INPUT_METRICS.parserError = err
-	  this.INPUT_METRICS.failed = true
+	  metrics.failed          = true
+      metrics.parserEndTime   = performance.now()
+	  metrics.parserError     = err
     })
 	streams.push(jsonParser);
 	
-	const eventStream = new EventStream(this.yadamu)
-	eventStream.on('error',(err) => { 
-      this.INPUT_METRICS.parserEndTime = performance.now()
-	  this.INPUT_METRICS.parserError =
-	  err
-	  this.INPUT_METRICS.failed = true
+	const streamSwitcher = new StreamSwitcher(this.yadamu,metrics)
+    streamSwitcher.on('error',(err) => { 
+	  metrics.failed          = true
+      metrics.parserEndTime   = performance.now()
+	  metrics.parserError     = err
     }).on('end',() => {
-      this.INPUT_METRICS.parserEndTime = performance.now()
+      metrics.parserEndTime   = performance.now()
     })
-	streams.push(eventStream)
+	streams.push(streamSwitcher)
 
     // console.log(streams.map((s) => { return s.constructor.name }).join(' ==> '))
 	return streams;
   }
 
-  getOutputStream(tableName,ddlComplete) {
+  getOutputStream(tableName,metrics) {
     // Override parent method to allow output stream to be passed to worker
     // this.yadamuLogger.trace([this.constructor.name],`getOutputStream(${tableName},${this.firstTable})`)
-	const os =  new JSONWriter(this,tableName,ddlComplete,this.firstTable,this.status,this.yadamuLogger)
-	return os
+	const jw =  new JSONOutputManager(this,tableName,metrics,this.firstTable,this.status,this.yadamuLogger)
+	return jw
   }
       
-  getOutputStreams(tableName) {
+  getOutputStreams(tableName,metrics) {
 
     const outputStreams = []
 
     // Create a JSON Writer
-    const jsonWriter = this.getOutputStream(tableName,undefined)
-    outputStreams.push(jsonWriter)
+    const jsonWriter = this.getOutputStream(tableName,metrics)
+	jsonWriter.once('readable',() => {
+	  metrics.writerStartTime = performance.now()
+	}).on('finish',() => { 
+ 	  metrics.writerEndTime = performance.now()
+      metrics.lost += jsonWriter.writableLength
+	}).on('error',(err) => {
+ 	  metrics.writerEndTime = performance.now()
+	  metrics.failed = true;
+	  metrics.writerError = YadamuError.prematureClose(err) ? null : err
+      metrics.lost += jsonWriter.writableLength
+    })    
+	outputStreams.push(jsonWriter)
 	 
-    // The TableSwitcher is used to prevent 'end' events propegating to the output stream
-    const tableSwitcher = this.firstTable ? new FirstTableSwitcher(this.EXPORT_FILE_HEADER) : new TableSwitcher() 
-    outputStreams.push(tableSwitcher)
-	
-	outputStreams.push(...this.outputStreams)
+	outputStreams.push(this.outputStream)
 	this.firstTable = false;
     // console.log(outputStreams.map((s) => { return s.constructor.name }).join(' ==> '))
     return outputStreams	
@@ -641,7 +613,7 @@ class FileDBI extends YadamuDBI {
   async createCloneStream(options) {
 	await this.initialize()
 	const streams = []
-	await this.createInputStream();
+	this.inputStream = await this.createInputStream();
 	streams.push(this.inputStream)
 	
 	if (options.encryptedInput) {
@@ -682,4 +654,4 @@ class FileDBI extends YadamuDBI {
   
 }
 
-module.exports = FileDBI
+export { FileDBI as default }

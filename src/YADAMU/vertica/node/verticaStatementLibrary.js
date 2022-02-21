@@ -1,6 +1,6 @@
 "use strict" 
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class VerticaStatementLibrary {
     
@@ -52,7 +52,7 @@ class VerticaStatementLibrary {
   }
 }
 
-module.exports = VerticaStatementLibrary
+export { VerticaStatementLibrary as default }
 
 const _SQL_CONFIGURE_CONNECTION = `SET SESSION AUTOCOMMIT TO OFF`
 

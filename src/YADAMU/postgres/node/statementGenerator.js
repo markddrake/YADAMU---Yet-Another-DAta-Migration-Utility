@@ -1,8 +1,8 @@
 "use strict";
 
-const path = require('path');
-const crypto = require('crypto');
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
+import path from 'path';
+import crypto from 'crypto';
+import YadamuLibrary from '../../common/yadamuLibrary.js';
 
 class StatementGenerator {
 
@@ -41,7 +41,6 @@ class StatementGenerator {
 
         const maxBatchSize        = Math.trunc(45000 / tableInfo.targetDataTypes.length);
         tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE > maxBatchSize ? maxBatchSize : this.dbi.BATCH_SIZE
-        tableInfo._COMMIT_COUNT   = this.dbi.COMMIT_COUNT
         tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
         tableInfo.insertMode      = 'Batch';
         
@@ -225,4 +224,4 @@ class StatementGenerator {
   }
 }
 
-module.exports = StatementGenerator;
+export { StatementGenerator as default }

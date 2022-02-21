@@ -1,11 +1,11 @@
 "use  strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
+import {DatabaseError} from '../../common/yadamuException.js'
 
 class VerticaError extends DatabaseError {
-  //  const err = new VerticaError(cause,stack,sql)
-  constructor(cause,stack,sql) {
-    super(cause,stack,sql);
+
+  constructor(driverId,cause,stack,sql) {
+    super(driverId,cause,stack,sql);
 	// Abbreviate Long Lists of Place Holders ...
 	if ((typeof this.sql === 'string') && (this.sql.indexOf('),($')) > 0) {
 	  const startElipises = this.sql.indexOf('),($') + 2 
@@ -35,8 +35,8 @@ class VerticaError extends DatabaseError {
 }
 
 class StagingAreaMisMatch extends VerticaError {
-  constructor(local,remote,cause) {
-	super( new Error(`Vertica Copy Operation Failed. File Not Found. Please ensure folder "${local}" maps to folder "${remote}" on the server hosting your Vertica databases.`))
+  constructor(driverId,filename,local,remote,cause) {
+	super(driverId, new Error(`Vertica Copy Operation Failed. File "${filename}" Not Found. Please ensure folder "${local}" maps to folder "${remote}" on the server hosting your Vertica databases.`))
     this.cause = cause
     this.local_staging_area = local
     this.remote_staging_area = remote
@@ -45,12 +45,13 @@ class StagingAreaMisMatch extends VerticaError {
   
 class VertiaCopyOperationFailure extends VerticaError {
 
-  constructor(accepted, rejected, stack, sql) {
-	super( new Error(`Vertica Copy Operation Failed. ${accepted} rows accepted. ${rejected} rows rejected`),stack,sql)
+  constructor(driverId, accepted, rejected, stack, sql) {
+	super(driverId,  new Error(`Vertica Copy Operation Failed. ${accepted} rows accepted. ${rejected} rows rejected`),stack,sql)
   }
 }
 
 class WhitespaceIssue extends Error {
+
   constructor(columnName) {
     super(`Empty String Detected: "${columnName}"`)
   }
@@ -75,7 +76,7 @@ class ContentTooLarge extends Error {
    }
 }
 
-module.exports = {
+export {
   VerticaError
 , VertiaCopyOperationFailure
 , WhitespaceIssue

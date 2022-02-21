@@ -1,6 +1,6 @@
 "use strict" 
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class MsSQLStatementLibrary {
 
@@ -107,7 +107,7 @@ class MsSQLStatementLibrary {
   
 }
 
-module.exports = MsSQLStatementLibrary
+export { MsSQLStatementLibrary as default }
 
 const _SQL_SYSTEM_INFORMATION = 
 `select db_Name() "DATABASE_NAME", 

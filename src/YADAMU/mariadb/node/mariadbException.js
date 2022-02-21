@@ -1,11 +1,11 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
+import {DatabaseError} from '../../common/yadamuException.js'
 
 class MariadbError extends DatabaseError {
-  //  const err = new MariadbError(cause,stack,sql)
-  constructor(cause,stack,sql) {
-    super(cause,stack,sql);
+
+  constructor(driverId,cause,stack,sql) {
+    super(driverId,cause,stack,sql);
 	if (this.sql.indexOf('?),(?') > 0) {
 	  const startElipises = this.sql.indexOf('?),(?') + 3
 	  const endElipises =  this.sql.lastIndexOf('?),(?') + 3
@@ -28,4 +28,4 @@ class MariadbError extends DatabaseError {
   }
 
 }
-module.exports = MariadbError
+export { MariadbError as default }

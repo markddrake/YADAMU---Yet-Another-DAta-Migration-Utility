@@ -1,20 +1,20 @@
 "use strict" 
 
-const fs = require('fs');
-const path = require('path');
-const { performance } = require('perf_hooks');
-const assert = require('assert');
+import fs from 'fs';
+import path from 'path';
+import { performance } from 'perf_hooks';
+import assert from 'assert';
 
-const Yadamu = require('./yadamu.js');
-const YadamuConstants = require('./yadamuConstants.js');
-const YadamuLibrary = require('./yadamuLibrary.js');
-const YadamuLogger = require('./yadamuLogger.js');
+import Yadamu from './yadamu.js';
+import YadamuConstants from './yadamuConstants.js';
+import YadamuLibrary from './yadamuLibrary.js';
+import YadamuLogger from './yadamuLogger.js';
 
-const {CommandLineError, ConfigurationFileError}  = require('./yadamuException.js');
+import {CommandLineError, ConfigurationFileError}  from './yadamuException.js';
 
-const {FileNotFound} = require('../file/node/fileException.js');
+import {FileNotFound} from '../file/node/fileException.js';
 
-const YadamuCompare = require('../../YADAMU_QA/common/node/yadamuQA.js')
+import YadamuCompare from '../../YADAMU_QA/common/node/yadamuQA.js'
 
 
 /*
@@ -394,18 +394,18 @@ class YadamuCLI {
 	}
   }
   
-  getDatabaseInterface(yadamu,driver,connectionSettings,configurationparameters) {
+  async getDatabaseInterface(yadamu,driver,connectionSettings,configurationparameters) {
 
     let dbi = undefined
     
 	const parameters = Object.assign({}, configurationparameters || {})
     
 	// clone the connectionSettings
-	const connection = Object.assign({}, connectionSettings);
+	const connectionInfo = Object.assign({}, connectionSettings);
 	
     if (YadamuConstants.YADAMU_DRIVERS.hasOwnProperty(driver)) { 
-	  const DBI = require(YadamuConstants.YADAMU_DRIVERS[driver])
-	  dbi = new DBI(this.yadamu,connection,parameters);
+	  const DBI = (await import(YadamuConstants.YADAMU_DRIVERS[driver])).default
+	  dbi = new DBI(this.yadamu,null,connectionInfo,parameters);
     }	
     else {   
 	  const message = `Unsupported database vendor "${driver}".`
@@ -432,7 +432,7 @@ class YadamuCLI {
   
   async doImport() {
 	await this.yadamu.initialize()
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+	const dbi = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
     const startTime = performance.now();
     await this.yadamu.doImport(dbi);
     const elapsedTime = performance.now() - startTime;
@@ -441,8 +441,8 @@ class YadamuCLI {
 
   async doCopyStagedData() {
 	await this.yadamu.initialize()
-    const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
-    const stage = this.getDatabaseInterface(this.yadamu,dbi.STAGING_PLATFORM,{},{})
+    const dbi = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const stage = await this.getDatabaseInterface(this.yadamu,dbi.STAGING_PLATFORM,{},{})
 	const startTime = performance.now();
     await this.yadamu.doCopy(stage,dbi);      
     const elapsedTime = performance.now() - startTime;
@@ -451,8 +451,8 @@ class YadamuCLI {
 
   async doLoad() {
 	await this.yadamu.initialize()
-    const fs = this.getDatabaseInterface(this.yadamu,'loader',{},{})
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const fs = await this.getDatabaseInterface(this.yadamu,'loader',{},{})
+	const dbi = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
     const startTime = performance.now();
     await this.yadamu.doCopy(fs,dbi);      
     const elapsedTime = performance.now() - startTime;
@@ -461,7 +461,7 @@ class YadamuCLI {
   
   async doUpload() {
 	await this.yadamu.initialize()
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+	const dbi = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
     const startTime = performance.now();
     await this.yadamu.doUpload(dbi);
     const elapsedTime = performance.now() - startTime;
@@ -470,7 +470,7 @@ class YadamuCLI {
   
   async doExport() {
 	await this.yadamu.initialize()
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+	const dbi = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
     const startTime = performance.now();
     await this.yadamu.doExport(dbi);
     const elapsedTime = performance.now() - startTime;
@@ -479,8 +479,8 @@ class YadamuCLI {
   
   async doUnload() {
 	await this.yadamu.initialize()
-    const fs = this.getDatabaseInterface(this.yadamu,'loader',{},{})
-	const dbi = this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
+    const fs = await this.getDatabaseInterface(this.yadamu,'loader',{},{})
+	const dbi = await this.getDatabaseInterface(this.yadamu,this.yadamu.RDBMS,{},{})
     const startTime = performance.now();
     await this.yadamu.doCopy(dbi,fs);      
     const elapsedTime = performance.now() - startTime;
@@ -562,8 +562,8 @@ class YadamuCLI {
 	    await compare.doCompare(this.yadamu,sourceConnection,targetConnection,sourceSchema,targetSchema)
 	  }
 	  else {
-	    const sourceDBI = this.getDatabaseInterface(this.yadamu,sourceDatabase,sourceConnection,sourceParameters)
-        const targetDBI = this.getDatabaseInterface(this.yadamu,targetDatabase,targetConnection,targetParameters)    
+	    const sourceDBI = await this.getDatabaseInterface(this.yadamu,sourceDatabase,sourceConnection,sourceParameters)
+        const targetDBI = await this.getDatabaseInterface(this.yadamu,targetDatabase,targetConnection,targetParameters)    
         await this.yadamu.doCopy(sourceDBI,targetDBI);      
       }
       this.yadamuLogger.info([`YADAMU`,`COPY`],`Operation complete. Source:[${sourceDescription}]. Target:[${targetDescription}].`);
@@ -575,16 +575,16 @@ class YadamuCLI {
   async doTests() {
     
 	const configuration = this.loadConfigurationFile()
-    const YadamuQA = require('../../YADAMU_QA/common/node/yadamuQA.js');
-	const yadamuQA = new YadamuQA(configuration,this.yadamu.activeConnections);
+    const YadamuQA = await import('../../YADAMU_QA/common/node/yadamuQA.js');
+	const yadamuQA = new YadamuQA.default(configuration,this.yadamu.activeConnections);
     await yadamuQA.initialize()
 	const startTime = performance.now();
 	const results = await yadamuQA.doTests(configuration);
 	const elapsedTime = performance.now() - startTime;
-    this.yadamuLogger.qa([`YADAMU`,`REGRESSION`,`${this.yadamu.CONFIG}`],`${results} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
+    this.yadamuLogger.log([`QA`,`YADAMU`,`REGRESSION`,`${this.yadamu.CONFIG}`],`${results} Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.`);
 
   }
   
 }
 
-module.exports = YadamuCLI;
+export { YadamuCLI as default}

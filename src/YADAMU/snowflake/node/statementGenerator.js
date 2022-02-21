@@ -1,10 +1,10 @@
 "use strict";
 
-const path = require('path')
+import path from 'path'
 
-const Yadamu = require('../../common/yadamu.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
-const SnowflakeConstants = require('./snowflakeConstants.js');
+import Yadamu from '../../common/yadamu.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js';
+import SnowflakeConstants from './snowflakeConstants.js';
 
 class StatementGenerator {
 
@@ -544,7 +544,6 @@ class StatementGenerator {
        insertMode      : 'Batch',
        parserRequired  : parserRequired,
        _BATCH_SIZE     : this.dbi.BATCH_SIZE,
-       _COMMIT_COUNT   : this.dbi.COMMIT_COUNT,
        _SPATIAL_FORMAT : this.dbi.INBOUND_SPATIAL_FORMAT
     }
   }
@@ -563,4 +562,4 @@ class StatementGenerator {
   }
 }
 
-module.exports = StatementGenerator;
+export { StatementGenerator as default }

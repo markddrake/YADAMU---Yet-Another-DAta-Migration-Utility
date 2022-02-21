@@ -1,16 +1,15 @@
 "use strict"   
 
-const fs = require('fs');
-const path = require('path');
-const util = require('util');
+import fs from 'fs';
+import path from 'path';
 
-const {pipeline, finished} = require('stream')
+import {Readable} from 'stream'
+import {pipeline} from 'stream/promises'
 
-const DBWriter = require('./dbWriter.js');
-const YadamuLogger = require('./yadamuLogger.js');
-
-const Pushable = require('./pushable.js');
-const ErrorDBI = require('../file/node/errorDBI.js');
+import DBWriter from './dbWriter.js';
+import YadamuLogger from './yadamuLogger.js'
+import ArrayReadable from './arrayReadable.js'
+import ErrorDBI from '../file/node/errorDBI.js';
 
 class YadamuRejectManager {
   
@@ -19,6 +18,7 @@ class YadamuRejectManager {
     this.yadamu = yadamu
     this.usage = usage
     this.filename = filename;
+	
 	this.dbi = new ErrorDBI(yadamu,filename)
 	this.dbi.initialize()
 
@@ -30,10 +30,15 @@ class YadamuRejectManager {
     fs.mkdirSync(errorFolderPath, { recursive: true });
 
 	this.recordCount = 0
-    this.currentPipeline = []
-	this.currentTable = undefined
+	this.tableName = undefined
+	this.outputStreams = undefined
+	this.currentOperation = new Promise((resolve,reject) => { resolve() })
 
-	this.dataStream = new Pushable({objectMode: true},true);
+    this.is = new ArrayReadable()	  
+    this.initialziationCoomplete = new Promise((resolve,reject) => {
+	  this.setInitializationComplete = resolve
+    })
+
   }	
   
   setSystemInformation(systemInformation) {
@@ -44,62 +49,46 @@ class YadamuRejectManager {
   setMetadata(metadata) {
     this.dbi.setMetadata(metadata)
   }
-
-  async initializePipeline(tableName) {
+  
+  sendEndOfData() {
+    this.is.addContent([{eod:{startTime:this.tableStartTime,endTime:performance.now()}}])
+  }
+  
+  async initialize(tableName) {
+	this.initialize = async () => { this.sendEndOfData() }
     await this.dbi.initializeImport();
 	await this.dbi.initializeData()
-	this.currentPipeline = new Array(this.dataStream,...this.dbi.getOutputStreams(tableName))
-    // console.log(this.currentPipeline.map((s) => { return s.constructor.name }).join(' ==> '))
-    pipeline(this.currentPipeline,(err) => {
-	  if (err && (err.code === 'ERR_STREAM_PREMATURE_CLOSE')) {
-	    this.currentPipeline.forEach((stream) => {
-	      if (stream.underlyingError instanceof Error) {
-	        console.log(stream.constructor.name,stream.underlyingError)
-	      }
-	    })
-	  }
-	})
+	this.pipeline = pipeline(this.is,...this.dbi.getOutputStreams(tableName,{}),{end:false})
   }
-  
-  async checkTableName(tableName) {
-	if (this.currentTable !== tableName) {
-      this.dataStream.pump({table:tableName})
-	  this.currentTable = tableName
-	  if (this.recordCount === 0) {
-        await this.initializePipeline(tableName)
-      }
-    }
-  }
-  
-  async rejectRow(tableName,data) {
 	
-	await this.checkTableName(tableName)
-    this.recordCount++;
-    this.dataStream.pump({data:data})
-  
+  async rejectData(tableName,data) {	
+	if (this.tableName !== tableName) {
+	  this.tableName = tableName
+	  this.tableStartTime = performance.now()
+      await this.initialize(tableName)
+      this.is.addContent([{table:tableName}])
+	  this.setInitializationComplete()
+	  this.setInitializationComplete = () => {}
+    }
+	await this.initialziationCoomplete
+    this.recordCount+= data.length
+	this.is.addContent(data.map((d) => {return {data:d}}))
+  }
+	
+  async rejectRow(tableName,data) {
+	await this.rejectData(tableName,[data])
   }
   
   async rejectRows(tableName,data) {
-
-	await this.checkTableName(tableName)
-	data.forEach((row) => {
-      this.recordCount++;
-      this.dataStream.pump({data:row})
-	})
+	await this.rejectData(tableName,data)
   }
   
   async close() {
 
 	if (this.recordCount > 0) {
- 	  const tableSwitcher = this.currentPipeline[2]
-	  const tableComplete = new Promise((resolve,reject) => {
-	    finished(tableSwitcher,() => {
-          resolve()
-         })
-      })
-	  
-      this.dataStream.pump(null)	  
-  	  await tableComplete;
+	  // this.sendEndOfData() 
+	  this.is.addContent([null])
+	  await this.pipeline
 	  await this.dbi.finalizeData();
 	  await this.dbi.finalizeImport();
 	  await this.dbi.finalize();
@@ -109,6 +98,6 @@ class YadamuRejectManager {
   }
 }
     
-module.exports = YadamuRejectManager;
+export { YadamuRejectManager as default}
 
 

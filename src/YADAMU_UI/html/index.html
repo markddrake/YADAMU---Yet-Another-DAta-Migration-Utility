@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <title>YADAMU - Yet Another DAta Migration Utility</title>
     <link rel="stylesheet" href="../../node_modules/bootstrap/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
-    <!-- <link rel="stylesheet" href="../node_modules/font-awesome/css/font-awesome.min.css"> -->
+    <link rel="stylesheet" href="../../node_modules/bootstrap-icons/font/bootstrap-icons.css">
   </head>
   <body>
   <div class="container-fluid">
@@ -15,35 +14,35 @@
         <label>Source</label>
         <ul class="nav nav-pills mb-3" id="source-tab" role=tablist">
           <li class="nav-item">
-            <a class="nav-link active" id="source-tab-file" data-toggle="pill" href="#source-file" role="tab" aria-controls="source-pane-file" aria-selected="true">File</a>
+            <a class="nav-link active" id="source-tab-file" data-bs-toggle="pill" href="#source-file" role="tab" aria-controls="source-pane-file" aria-selected="true">File</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="source-tab-oracle" data-toggle="pill" href="#source-oracle" role="tab" aria-controls="source-pane-oracle" aria-selected="false">Oracle</a>
+            <a class="nav-link" id="source-tab-oracle" data-bs-toggle="pill" href="#source-oracle" role="tab" aria-controls="source-pane-oracle" aria-selected="false">Oracle</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="source-tab-postgres" data-toggle="pill" href="#source-postgres" role="tab" aria-controls="source-pane-postgres" aria-selected="false">Postgres</a>
+            <a class="nav-link" id="source-tab-postgres" data-bs-toggle="pill" href="#source-postgres" role="tab" aria-controls="source-pane-postgres" aria-selected="false">Postgres</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="source-tab-mssql" data-toggle="pill" href="#source-mssql" role="tab" aria-controls="source-pane-mssql" aria-selected="false">SQL Server</a>
+            <a class="nav-link" id="source-tab-mssql" data-bs-toggle="pill" href="#source-mssql" role="tab" aria-controls="source-pane-mssql" aria-selected="false">SQL Server</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="source-tab-mysql" data-toggle="pill" href="#source-mysql" role="tab" aria-controls="source-pane-mysql" aria-selected="false">MySQL</a>
+            <a class="nav-link" id="source-tab-mysql" data-bs-toggle="pill" href="#source-mysql" role="tab" aria-controls="source-pane-mysql" aria-selected="false">MySQL</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="source-tab-mariadb" data-toggle="pill" href="#source-mariadb" role="tab" aria-controls="source-pane-mariadb" aria-selected="false">MariaDB</a>
+            <a class="nav-link" id="source-tab-mariadb" data-bs-toggle="pill" href="#source-mariadb" role="tab" aria-controls="source-pane-mariadb" aria-selected="false">MariaDB</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="source-tab-snowflake" data-toggle="pill" href="#source-snowflake" role="tab" aria-controls="source-pane-snowflake" aria-selected="false">SnowFlake</a>
+            <a class="nav-link" id="source-tab-snowflake" data-bs-toggle="pill" href="#source-snowflake" role="tab" aria-controls="source-pane-snowflake" aria-selected="false">SnowFlake</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="source-tab-mongodb" data-toggle="pill" href="#source-mongodb" role="tab" aria-controls="source-pane-mongodb" aria-selected="false">MongoDB</a>
+            <a class="nav-link" id="source-tab-mongodb" data-bs-toggle="pill" href="#source-mongodb" role="tab" aria-controls="source-pane-mongodb" aria-selected="false">MongoDB</a>
           </li>
         </ul>
         <div class="tab-content" id="source-tab-content">
           <div class="tab-pane fade show active" id="source-file" role="tabpanel" aria-labelledby="source-tab-file">
             <div class="input-group mb-3">
                 <input type="text" id="source-filename" name="source-filename" class="form-control" placeholder="File" aria-label="File" aria-describedby="basic-addon1">
-            <button onclick="selectSourceFile(this)"><span class="fas fa-file-upload"></span></button>
+            <button onclick="selectSourceFile(this)"><i class="bi bi-file-earmark-arrow-up"></i></button>
             </div>
           </div>
           <div class="tab-pane fade" id="source-oracle" role="tabpanel" aria-labelledby="source-tab-oracle">
@@ -66,7 +65,7 @@
 			</div>
 			<div class="float-right">
             <button type="button" id="source-oracle-testConnection"onclick="validateOracleSource(this)" class="btn btn-primary">Test Connection
-              <span id="source-oracle-status" class="fas fa-question-circle"></span>
+			  <i id="source-oracle-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -93,7 +92,7 @@
             </div>
 			<div class="float-right">
 			<button id="source-postgres-testConnection" type="button" onclick="validatePostgresSource(this)" class="btn btn-primary pull-right">Test Connection
-			  <span id="source-postgres-status" class="fas fa-question-circle"></span>
+			  <i id="source-postgres-status"class="bi bi-question-circle"></i>
 			</button>
 			</div>
             </form>
@@ -117,7 +116,7 @@
             </div>
 			<div class="float-right">
             <button id="source-mssql-testConnection" type="button" onclick="validateMsSQLSource(this)" class="btn btn-primary">Test Connection
-			  <span id="source-mssql-status" class="fas fa-question-circle"></span>
+			  <i id="source-mssql-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -144,7 +143,7 @@
             </div>          
 			<div class="float-right">
             <button  id="source-mysql-testConnection" type="button" onclick="validateMySQLSource(this)" class="btn btn-primary">Test Connection
-			  <span id="source-mysql-status" class="fas fa-question-circle"></span>
+			  <i id="source-mysql-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -171,7 +170,7 @@
             </div>
 			<div class="float-right">
             <button id="source-mariadb-testConnection"  type="button" onclick="validateMariaDBSource(this)" class="btn btn-primary">Test Connection
-			  <span id="source-mariadb-status" class="fas fa-question-circle"></span>
+			  <i id="source-mariadb-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -198,12 +197,12 @@
             </div>
 			<div class="float-right">
             <button id="source-snowflake-testConnection"  type="button" onclick="validatesnowflakeSource(this)" class="btn btn-primary">Test Connection
-			  <span id="source-snowflake-status" class="fas fa-question-circle"></span>
+			  <i id="source-snowflake-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
           </div>
-		            <div class="tab-pane fade" id="source-mongodb" role="tabpanel" aria-labelledby="source-tab-mongodb">
+		  <div class="tab-pane fade" id="source-mongodb" role="tabpanel" aria-labelledby="source-tab-mongodb">
             <form id="source-mongodb" oninput="resetSourceState('source-mongodb-status')">
             <div class="input-group mb-3">
                 <input type="text" id="source-mongodb-host" class="form-control" placeholder="Host" aria-label="Host" aria-describedby="basic-addon1">
@@ -216,7 +215,7 @@
             </div>
 			<div class="float-right">
             <button id="source-mongodb-testConnection"  type="button" onclick="validateMongoDBSource(this)" class="btn btn-primary">Test Connection
-			  <span id="source-mongodb-status" class="fas fa-question-circle"></span>
+			  <i id="source-mongodb-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -230,35 +229,35 @@
        <label>Target</label>
         <ul class="nav nav-pills mb-3" id="target-tab" role=tablist">
           <li class="nav-item">
-            <a class="nav-link active" id="target-tab-file" data-toggle="pill" href="#target-file" role="tab" aria-controls="target-pane-file" aria-selected="true">File</a>
+            <a class="nav-link active" id="target-tab-file" data-bs-toggle="pill" href="#target-file" role="tab" aria-controls="target-pane-file" aria-selected="true">File</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="target-tab-oracle" data-toggle="pill" href="#target-oracle" role="tab" aria-controls="target-pane-oracle" aria-selected="false">Oracle</a>
+            <a class="nav-link" id="target-tab-oracle" data-bs-toggle="pill" href="#target-oracle" role="tab" aria-controls="target-pane-oracle" aria-selected="false">Oracle</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="target-tab-postgres" data-toggle="pill" href="#target-postgres" role="tab" aria-controls="target-pane-postgres" aria-selected="false">Postgres</a>
+            <a class="nav-link" id="target-tab-postgres" data-bs-toggle="pill" href="#target-postgres" role="tab" aria-controls="target-pane-postgres" aria-selected="false">Postgres</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="target-tab-oracle" data-toggle="pill" href="#target-mssql" role="tab" aria-controls="target-pane-mssql" aria-selected="false">SQL Server</a>
+            <a class="nav-link" id="target-tab-oracle" data-bs-toggle="pill" href="#target-mssql" role="tab" aria-controls="target-pane-mssql" aria-selected="false">SQL Server</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="target-tab-oracle" data-toggle="pill" href="#target-mysql" role="tab" aria-controls="target-pane-mysql" aria-selected="false">MySQL</a>
+            <a class="nav-link" id="target-tab-oracle" data-bs-toggle="pill" href="#target-mysql" role="tab" aria-controls="target-pane-mysql" aria-selected="false">MySQL</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="target-tab-oracle" data-toggle="pill" href="#target-mariadb" role="tab" aria-controls="target-pane-mariadb" aria-selected="false">MariaDB</a>
+            <a class="nav-link" id="target-tab-oracle" data-bs-toggle="pill" href="#target-mariadb" role="tab" aria-controls="target-pane-mariadb" aria-selected="false">MariaDB</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="target-tab-snowflake" data-toggle="pill" href="#target-snowflake" role="tab" aria-controls="target-pane-snowflake" aria-selected="false">SnowFlake</a>
+            <a class="nav-link" id="target-tab-snowflake" data-bs-toggle="pill" href="#target-snowflake" role="tab" aria-controls="target-pane-snowflake" aria-selected="false">SnowFlake</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="target-tab-mongodb" data-toggle="pill" href="#target-mongodb" role="tab" aria-controls="target-pane-mongodb" aria-selected="false">MongoDB</a>
+            <a class="nav-link" id="target-tab-mongodb" data-bs-toggle="pill" href="#target-mongodb" role="tab" aria-controls="target-pane-mongodb" aria-selected="false">MongoDB</a>
           </li>
         </ul>
         <div class="tab-content" id="target-tab-content">
           <div class="tab-pane fade show active" id="target-file" role="tabpanel" aria-labelledby="target-tab-file">
             <div class="input-group mb-3">
                 <input type="text" id="target-filename" name="target-filename" class="form-control" placeholder="File" aria-label="File" aria-describedby="basic-addon1">
-            <button onclick="selectTargetFile(this);"><span class="fas fa-file-upload"></span></button>
+            <button onclick="selectTargetFile(this);"><i class="bi bi-file-earmark-arrow-up"></i></button>
             </div>
           </div>
           <div class="tab-pane fade" id="target-oracle" role="tabpanel" aria-labelledby="target-tab-oracle">
@@ -281,7 +280,7 @@
 			</div>
 			<div class="float-right">
             <button id="target-oracle-testConnection"  type="button" onclick="validateOracleTarget(this)" class="btn btn-primary">Test Connection
-			  <span id="target-oracle-status" class="fas fa-question-circle"></span>
+			  <i id="target-oracle-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -308,7 +307,7 @@
             </div>
 			<div class="float-right">
             <button id="target-postgres-testConnection" type="button" onclick="validatePostgresTarget(this)" class="btn btn-primary">Test Connection
-			  <span id="target-postgres-status" class="fas fa-question-circle"></span>
+			  <i id="target-postgres-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -332,7 +331,7 @@
             </div>
 			<div class="float-right">
             <button id="target-mssql-testConnection" type="button" onclick="validateMsSQLTarget(this)" class="btn btn-primary">Test Connection
-			  <span id="target-mssql-status" class="fas fa-question-circle"></span>
+			  <i id="target-mssql-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -359,7 +358,7 @@
             </div>          
 			<div class="float-right">
             <button id="target-mysql-testConnection" type="button" onclick="validateMySQLTarget(this)" class="btn btn-primary">Test Connection
-			  <span id="target-mysql-status" class="fas fa-question-circle"></span>
+			  <i id="target-mysql-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -386,7 +385,7 @@
             </div>
 			<div class="float-right">
             <button id="target-mariadb-testConnection" type="button" onclick="validateMariaDBTarget(this)" class="btn btn-primary">Test Connection
-			  <span id="target-mariadb-status" class="fas fa-question-circle"></span>
+			  <i id="target-mariadb-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -413,7 +412,7 @@
             </div>
 			<div class="float-right">
             <button id="target-snowflake-testConnection" type="button" onclick="validatesnowflakeTarget(this)" class="btn btn-primary">Test Connection
-			  <span id="target-snowflake-status" class="fas fa-question-circle"></span>
+			  <i id="target-snowflake-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -431,7 +430,7 @@
             </div>
 			<div class="float-right">
             <button id="target-mongodb-testConnection" type="button" onclick="validateMongoDBTarget(this)" class="btn btn-primary">Test Connection
-			  <span id="target-mongodb-status" class="fas fa-question-circle"></span>
+			  <i id="target-mongodb-status"class="bi bi-question-circle"></i>
 			</button>
             </div>
             </form>
@@ -445,19 +444,19 @@
       <div class="col">
   	    <div class="form-group mb-3">
 	      <button id="openLogWindow" type="button" onclick="openLogWindow()" class="btn btn-primary">
-		    <span class="fas fa-binoculars"></span>
+			<i class="bi bi-binoculars-fill"></i>
 	      </button>
 	      <button id="doCopy" type="button" onclick="doCopy()" class="btn btn-primary" disabled>
-		    <span class="fas fa-cogs"></span>
+		    <i class="bi bi-gear-fill"></i>
 	      </button>
 	      <button id="save-config" type="button" onclick="saveConfiguration(this)" class="btn btn-primary" disabled>
-	     	<span class="fa fa-save"></span>
+	     	<i class="bi bi-save2-fill"></i>
 	      </button>
 	    </div>
 	  </div>
 	</div> 
   </div>
-  <!-- <script>require('./yuiControls.js')</script> -->
-  <script src="../node/yuiControls.js"></script>
+  <script src="../../node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../js/yuiControls.cjs"></script>
   </body>
 </html>

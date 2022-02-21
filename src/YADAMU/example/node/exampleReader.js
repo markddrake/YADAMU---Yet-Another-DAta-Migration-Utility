@@ -1,5 +1,5 @@
 "use strict" 
-const Readable = require('stream').Readable;
+import {Readable} from 'stream';
 
 class ExampleReader extends Readable {
       
@@ -67,4 +67,4 @@ class ExampleReader extends Readable {
 	}
 }
 
-module.exports = ExampleReader
+export { ExampleReader

@@ -1,24 +1,29 @@
 "use strict"    
 
-const path = require('path')
-const fs = require('fs');
-const fsp = require('fs').promises;
-const { performance } = require('perf_hooks');
-const Transform = require('stream').Transform;
+import path from 'path'
+import fs from 'fs';
+import fsp from 'fs/promises';
+import { fileURLToPath } from 'url';
+import { performance } from 'perf_hooks';
 
-const util = require('util')
-const stream = require('stream')
-const pipeline = util.promisify(stream.pipeline);
+import { Transform } from 'stream'
+import { pipeline } from 'stream/promises'
 
-const YadamuTest = require('./yadamuTest.js');
-const LoaderDBI = require('../../../YADAMU/loader/node/loaderDBI.js');
-const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
-const JSONParser = require('../../../YADAMU/file/node/jsonParser.js');
-const {ConfigurationFileError} = require('../../../YADAMU/common/yadamuException.js');
-const YadamuDefaults = require('./yadamuDefaults.json')
+import YadamuTest from './yadamuTest.js';
+import LoaderDBI from '../../../YADAMU/loader/node/loaderDBI.js';
+import YadamuConstants from '../../../YADAMU/common/yadamuConstants.js';
+import YadamuLibrary from '../../../YADAMU/common/yadamuLibrary.js';
+import JSONParser from '../../../YADAMU/file/node/jsonParser.js';
+import {ConfigurationFileError} from '../../../YADAMU/common/yadamuException.js';
 
-// const wtf = require('wtfnode');
+// import wtf from 'wtfnode';
 
+// const YadamuDefaults = require('./yadamuDefaults.json')
+
+const  __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const YadamuDefaults = fs.readFileSync(path.join(__dirname,'./yadamuDefaults.json'),'utf-8');
+  
 class YadamuQA {
 
   get VERIFY_OPERATION()                          { return this.test.hasOwnProperty('verifyOperation') ? this.test.verifyOperation : this.configuration.hasOwnProperty('verifyOperation') ? this.configuration.verifyOperation : false }
@@ -64,12 +69,10 @@ class YadamuQA {
     await this.yadamu.reset(parameters);
     
     // clone the connectionSettings
-    const connection = Object.assign({}, connectionSettings);
-    
+    const connectionInfo = Object.assign({}, connectionSettings);
     if (YadamuTest.QA_DRIVER_MAPPINGS.hasOwnProperty(driver)) { 
-      const DBI = require(YadamuTest.QA_DRIVER_MAPPINGS[driver]);
-      YadamuLibrary.applyMixins(DBI)
-      dbi = new DBI(this.yadamu,connection,parameters);
+      const DBI = (await import(YadamuTest.QA_DRIVER_MAPPINGS[driver])).default
+      dbi = new DBI(this.yadamu,null,connectionInfo,parameters);
     }   
     else {   
       const err = new ConfigurationFileError(`[${this.constructor.name}.getDatabaseInterface()]: Unsupported database vendor "${driver}".`);  
@@ -323,7 +326,7 @@ class YadamuQA {
   getCompareRules(sourceVendor,sourceVersion,targetVendor,targetVersion,targetParameters) {
       
     const compareRules = {
-	  OPERATION        : this.OPERATION_NAME
+      OPERATION        : this.OPERATION_NAME
     , MODE             : this.yadamu.MODE
     , TABLES           : targetParameters.TABLES || []
     }
@@ -343,8 +346,8 @@ class YadamuQA {
     
     compareRules.INFINITY_IS_NULL = compareRules.INFINITY_IS_NULL && (targetParameters.INFINITY_MANAGEMENT === 'NULLIFY')
     compareRules.EMPTY_STRING_IS_NULL = this.EMPTY_STRING_IS_NULL !== undefined ? this.EMPTY_STRING_IS_NULL : compareRules.EMPTY_STRING_IS_NULL 
-	
-	compareRules.DLL_COMPATBILITY = ((sourceVendor === targetVendor) && (sourceVersion <= targetVersion))
+    
+    compareRules.DLL_COMPATBILITY = ((sourceVendor === targetVendor) && (sourceVersion <= targetVersion))
     
     if (YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[sourceVendor] > YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[targetVendor]) {
       compareRules.TIMESTAMP_PRECISION = YadamuTest.COMPARE_RULES.TIMESTAMP_PRECISION[targetVendor]
@@ -509,17 +512,17 @@ class YadamuQA {
       this.yadamu.LOGGER.handleException([`COMPARE`],e)
       await compareDBI.abort();
       this.yadamu.activeConnections.delete(compareDBI)
-	  return {}
+      return {}
       // throw e
     } 
   }
   
   printCompareResults(sourceConnectionName,targetConnectionName,testId,results) {
-	  
-	if (YadamuLibrary.isEmpty(results)) {
+      
+    if (YadamuLibrary.isEmpty(results)) {
       this.yadamu.LOGGER.qa(['COMPARE',sourceConnectionName,targetConnectionName,testId],'Compare Operation failed')
-	  return;
-	}
+      return;
+    }
      
     let colSizes = [12, 32, 32, 48, 14, 14, 14]
     
@@ -557,7 +560,7 @@ class YadamuQA {
       this.yadamu.LOGGER.writeDirect(` ${row[2].padStart(colSizes[3])} |` 
                                    + ` ${row[3].toString().padStart(colSizes[4])} |` 
                                    + ` ${YadamuLibrary.stringifyDuration(parseInt(row[4])).padStart(colSizes[5])} |` 
-                                   + ` ${(row[5] === 'NaN/s' ? '' : row[5]).padStart(colSizes[6])} |` 
+                                   + ` ${(row[5] === 'NaN/s' ? '' : row[5]+"/s").padStart(colSizes[6])} |` 
                                    + '\n');
     })
         
@@ -678,7 +681,7 @@ class YadamuQA {
   }
   
   dbRoundtripResults(operationsList,elapsedTime) {
-    
+          
     if (this.yadamu.LOGGER.FILE_LOGGER) {
       
       const colSizes = [24,128,14]
@@ -728,41 +731,32 @@ class YadamuQA {
   **
   */
   
-  async validateStagedData(sourceDBI,stagingDBI) {
+  async validateStagedData(source,staging) {
      try {
-       const source = sourceDBI.classFactory(this.yadamu)  
-       source.parameters = Object.assign({},sourceDBI.parameters);
-       source.vendorProperties = Object.assign({},sourceDBI.vendorProperties);
-       source.vendorSettings = Object.assign({},sourceDBI.vendorSettings);
        await source.initialize()
        const sourceInstance = await source.getYadamuInstanceInfo() 
        await source.finalize()
      
-       const staging = stagingDBI.classFactory(this.yadamu)  
-       staging.parameters = Object.assign({},stagingDBI.parameters);
-       staging.vendorProperties = Object.assign({},stagingDBI.vendorProperties);
-       staging.vendorSettings = Object.assign({},stagingDBI.vendorSettings);
        staging.parameters.FROM_USER = staging.parameters.TO_USER
        delete staging.parameters.TO_USER
        await staging.initialize()
        await staging.loadControlFile()
        const targetInstance = await staging.getYadamuInstanceInfo();
-       await source.finalize()
-     
-       if (staging.controlFile.settings.contentType === 'CSV') {
+       await staging.finalize()
+	   
+	   if (staging.controlFile.settings.contentType === 'CSV') {
          if ((sourceInstance.yadamuInstanceID === targetInstance.yadamuInstanceID) && (sourceInstance.yadamuInstallationTimestamp === targetInstance.yadamuInstallationTimestamp)) {
-           this.yadamu.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY',stagingDBI.DATABASE_KEY],`Using existing Data Set "${staging.CONTROL_FILE_PATH}" with ID "${targetInstance.yadamuInstanceID}".`);
+           this.yadamu.LOGGER.qa([source.DATABASE_VENDOR,staging.DATABASE_VENDOR,'COPY',staging.DATABASE_KEY],`Using existing Data Set "${staging.CONTROL_FILE_PATH}" with ID "${targetInstance.yadamuInstanceID}".`);
            return true;
          } 
          else {
-           this.yadamu.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY',stagingDBI.DATABASE_KEY],`Cannot use existing Data Set "${staging.CONTROL_FILE_PATH}". Exepected ID "${sourceInstance.yadamuInstanceID}", found ID "${targetInstance.yadamuInstanceID}".`);
+           this.yadamu.LOGGER.qa([source.DATABASE_VENDOR,staging.DATABASE_VENDOR,'COPY',staging.DATABASE_KEY],`Cannot use existing Data Set "${staging.CONTROL_FILE_PATH}". Exepected ID "${sourceInstance.yadamuInstanceID}", found ID "${targetInstance.yadamuInstanceID}".`);
          }
        }
        else {
-         this.yadamu.LOGGER.qa([sourceDBI.DATABASE_VENDOR,stagingDBI.DATABASE_VENDOR,'COPY',stagingDBI.DATABASE_KEY],`Cannot use existing Data Set "${staging.CONTROL_FILE_PATH}". Exepected format "CSV", found format "${staging.controlFile.settings.contentType}".`);
+         this.yadamu.LOGGER.qa([source.DATABASE_VENDOR,staging.DATABASE_VENDOR,'COPY',staging.DATABASE_KEY],`Cannot use existing Data Set "${staging.CONTROL_FILE_PATH}". Exepected format "CSV", found format "${staging.controlFile.settings.contentType}".`);
        }
-     } catch (e) {
-     }
+     } catch (e) {/* If anything goes wrong the staged data is not valid  console.log(e) */}
      return false
      
   }
@@ -896,7 +890,7 @@ class YadamuQA {
     
     STAGED: The database loads the data directly from the staging area. 
     
-    To enable STAGED copy mode usethe setting "stagingArea" to specify the connection to be used for data staging 
+    To enable STAGED copy mode use the setting "stagingArea" to specify the connection to be used for data staging 
     To temporarily disable data staging and force a conventional copy with a 'STAGED' configuration file use the setting "skipDataStaging: true"
 
     +-------------------+-----------------------------------+--------------------------------+
@@ -905,33 +899,33 @@ class YadamuQA {
     |                   |                                   |                                |
     +-------------------+-----------------------------------+--------------------------------+
     |                   |                                   | Source --[DDL_ONLY]--> Compare |
+    | Homogeneous       | Source --[DDL_AND_DATA]-> Compare | Source --[MODE]------> Stage   |
+    |                   |                                   | Stage  --[DATA_ONLY]-> Compare |
+    +-------------------+-----------------------------------+--------------------------------+
+    |                   |                                   | Source --[DDL_ONLY]--> Compare |
     | Hetrogeneous      | Source --[DDL_ONLY]--> Compare    | Source --[MODE]------> Stage   |   
     |                   | Source --[DATA_ONLY]-> Target     | Stage  --[DATA_ONLY]-> Target  |
     |                   | Target --[DATA_ONLY]-> Compare    | Target --[DATA_ONLY]-> Compare |
     +-------------------+-----------------------------------+--------------------------------+
-    |                   |                                   | Source --[DDL_ONLY]--> Compare |
-    | Homogeneous       | Source --[DDL_AND_DATA]-> Compare | Source --[MODE]------> Stage   |
-    |                   |                                   | Stage  --[DATA_ONLY]-> Compare |
-    +-------------------+-----------------------------------+--------------------------------+
 
-    ** If the source and target connections are different then aditional copy operatons are performed. 
-    ** The first operation copies the data from the source schema in the source database to a intermeidate schema in the target database.
-    ** The second operaiton copies the database from intermediate schema in the target database to the clone schema in the source database.
+    If the source and target connections are different then aditional copy operatons are performed. 
+    The first operation copies the data from the source schema in the source database to a intermeidate schema in the target database.
+    The second operaiton copies the database from intermediate schema in the target database to the clone schema in the source database.
+    
+    If a staging schema is specified then three operations are required
+    The first operation stages the data from the source database in the staging area.
+    The second operation uses a database COPY to load the database from the statging area directly into the intermediate schema in the target database.
+    The third operaiton then copies the database from intermediate schema in the target database directly into the clone schema in the source database.
+     
+    When all copy operations are complete the contents of the source schema are compared with the contents of the cloned schema.
+    
+    Each database interface must be used for a single operation. It is not valid to use the same DBI for more than operation due to state that may be initialized during instance creation.
+    
     **
-    ** If a staging schema is specified then three operations are required
-    ** The first operation stages the data from the source database in the staging area.
-    ** The second operation uses a database COPY to load the database from the statging area directly into the intermediate schema in the target database.
-    ** The third operaiton then copies the database from intermediate schema in the target database directly into the clone schema in the source database.
-    **
-    ** When all copy operations are complete the contents of the source schema are compared with the contents of the cloned schema.
-    **
-        
-    **
-    */
+    */        
                      
     let sourceConnectionName = test.source
-	let intermediateName = targetConnectionName
-
+    
     const stagedCopy = (this.STAGING_AREA !== undefined) && !this.SKIP_DATA_STAGING
     const homogeneousCopy = sourceConnectionName === targetConnectionName
     const taskMode = this.yadamu.MODE
@@ -955,11 +949,16 @@ class YadamuQA {
     const compareSchema = this.getTargetMapping(sourceDatabase,task,this.COMPARE_SCHEMA_SUFFIX);
         
     const sourceParameters  = Object.assign({},parameters)
-    const compareParameters = Object.assign({},parameters)
-    const targetParameters  = Object.assign({},parameters)
-	
-	delete compareParameters.IDENTIFIER_MAPPING_FILE
+    sourceParameters.MODE = (homogeneousCopy && !stagedCopy && (taskMode !== 'DDL_ONLY')) ? 'DDL_AND_DATA' : 'DDL_ONLY'
+
+    // Do not apply IDENTIFIER MAPPINGS during the 'CLONE' phase
     
+    const compareParameters = Object.assign({},parameters)
+    compareParameters.MODE = sourceParameters.MODE;
+    delete compareParameters.IDENTIFIER_MAPPING_FILE
+
+    const targetParameters  = Object.assign({},parameters)
+       
     this.setUser(sourceParameters,'FROM_USER',sourceDatabase, sourceSchema)
     this.setUser(compareParameters,'TO_USER', sourceDatabase, compareSchema)
     this.setUser(targetParameters,'TO_USER', targetDatabase, targetSchema)
@@ -986,25 +985,21 @@ class YadamuQA {
     */
                 
     sourceParameters.MODE = (homogeneousCopy && !stagedCopy && (taskMode !== 'DDL_ONLY')) ? 'DDL_AND_DATA' : 'DDL_ONLY'
-    compareParameters.MODE = sourceParameters.MODE;
-
-    // Do not apply IDENTIFIER MAPPINGS during a 'CLONE' operation  
-    
-    delete compareParameters.IDENTIFIER_MAPPING_FILE
 
     let sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
-    let compareDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,true) 
+    let targetDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,this.RECREATE_SCHEMA) 
+
     const taskStartTime = performance.now();
     let stepStartTime = taskStartTime
-    keyMetrics = await this.yadamu.pumpData(sourceDBI,compareDBI);
+    keyMetrics = await this.yadamu.pumpData(sourceDBI,targetDBI);
 
     let stepElapsedTime = performance.now() - stepStartTime
     let sourceVersion = sourceDBI.DB_VERSION;
-    let targetVersion = compareDBI.DB_VERSION;
-    const sourceDescription = this.getDescription(sourceConnectionName,sourceDBI)  
-    const compareDescription = this.getDescription(sourceConnectionName,compareDBI)  
+    let targetVersion = targetDBI.DB_VERSION;
+    let sourceDescription = this.getDescription(sourceConnectionName,sourceDBI)  
+    let targetDescription = this.getDescription(sourceConnectionName,targetDBI)  
     
-    this.metrics.recordTaskTimings([task.taskName,'COPY',compareParameters.MODE,sourceConnectionName,sourceConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
+    this.metrics.recordTaskTimings([task.taskName,'COPY',sourceParameters.MODE,sourceConnectionName,sourceConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
     if (keyMetrics instanceof Error) {
       const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
       const compareResults = await this.compareSchemas(sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules, this.yadamu.metrics, false, undefined)
@@ -1015,8 +1010,8 @@ class YadamuQA {
     }
        
     operationsList.push(sourceDescription)
-    operationsList.push(compareDescription)
-    this.printResults(this.OPERATION_NAME,sourceDescription,compareDescription,stepElapsedTime) 
+    operationsList.push(targetDescription)
+    this.printResults(this.OPERATION_NAME,sourceDescription,targetDescription,stepElapsedTime) 
         
     /*
     **
@@ -1024,26 +1019,26 @@ class YadamuQA {
     **
     */
     
-    if ((taskMode === 'DDL_ONLY') &&  homogeneousCopy) {
+    if ((taskMode === 'DDL_ONLY') && homogeneousCopy) {
       return
     }
 
     if (sourceParameters.MODE !== 'DDL_AND_DATA') {
-      
+
       // Reset the Operations List to avoid reporting the Schema Clone operation.
-      
+   
       operationsList.length = 0   
-      sourceDBI.parameters.MODE = taskMode      
-      
-      let targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA) 
-      let targetDescription
+      sourceParameters.MODE = 'DATA_ONLY'    
+      compareParameters.MODE = 'DATA_ONLY'
+   
+      sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
+	  targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA)
+   
       if (stagedCopy) { 
-
-        // Source --[MODE]------> Stage
-
+       
         /*
         **
-        ** Construct a DBI for the staging area.
+        ** Construct a DBI for the staging platform.
         **
         */
             
@@ -1057,27 +1052,30 @@ class YadamuQA {
         const stagingParameters         = Object.assign({},targetParameters)
         stagingParameters.OUTPUT_FORMAT = 'CSV'
         this.setUser(stagingParameters,'TO_USER',stagingDatabase,stagingSchema)
-     
-        const stagingDBI                = await this.getDatabaseInterface(stagingDatabase,stagingConnection,stagingParameters,this.RELOAD_STAGING_AREA)
+        const stagingDBI = await this.getDatabaseInterface(stagingDatabase,stagingConnection,stagingParameters,this.RELOAD_STAGING_AREA)
+        
+   
         targetDBI.verifyStagingSource(stagingDBI.DATABASE_KEY)
         
         /*
         **
-        ** YADAMU only re1loads the staging area when the required data set in not aleady present in the staging area. 
+        ** YADAMU re1oads the staging platform when the required data is not aleady present 
         **
         ** This behavoir can be overridden usimg the setting "realoadStagingArea: true"
         **
         */
-
+   
         // Use YADAMU_INSTANCE_ID to check if the required data set is already available in the staging area. 
         
         stepStartTime = performance.now();
-        const dataStagingRequired = this.RELOAD_STAGING_AREA || !await this.validateStagedData(sourceDBI,stagingDBI)
+        const vSourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
+        const vStageDBI = await this.getDatabaseInterface(stagingDatabase,stagingConnection,stagingParameters,false)
+        const dataStagingRequired = this.RELOAD_STAGING_AREA || !await this.validateStagedData(vSourceDBI,vStageDBI)
         stepElapsedTime = performance.now() - stepStartTime
-        
         if (dataStagingRequired) {
         
-          // Stage the dataset to the staging environment
+          // Stage the dataset to the staging platform
+
           stepStartTime = performance.now();
           results = await this.yadamu.pumpData(sourceDBI,stagingDBI);
           stepElapsedTime = performance.now() - stepStartTime
@@ -1094,60 +1092,30 @@ class YadamuQA {
           operationsList.push(sourceDescription)
           operationsList.push(stagingDescription)
           this.printResults(this.OPERATION_NAME,sourceDescription,stagingDescription,stepElapsedTime)
-
-        }
-		else {
-          this.metrics.recordTaskTimings([task.taskName,'STAGE','VERIFY',sourceConnectionName,stagingConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
-        }			
-        
-        if (!homogeneousCopy) {
-            
-          // Stage  --[DATA_ONLY]-> Target  
-          stagingDBI.parameters.FROM_USER = stagingDBI.parameters.TO_USER
-          delete stagingDBI.parameters.TO_USER
-
-          stepStartTime = performance.now();
-          keyMetrics = await this.yadamu.pumpData(stagingDBI,targetDBI);
-          stepElapsedTime = performance.now() - stepStartTime
-          stagingDescription = this.getDescription(stagingConnectionName,stagingDBI)  
-          targetDescription = this.getDescription(targetConnectionName,targetDBI)  
-          identifierMappings = targetDBI.getIdentifierMappings()
-		  
-          this.metrics.recordTaskTimings([task.taskName,'COPY',targetDBI.MODE,stagingConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
-          if (keyMetrics instanceof Error) {
-            const compareRules = this.getCompareRules(stagingDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
-            const compareResults = await this.compareSchemas( stagingDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules, this.yadamu.metrics, false, undefined)
-            this.printCompareResults(stagingConnectionName,targetConnectionName,task.taskName,compareResults)
-            this.metrics.recordTaskTimings([task.taskName,'COMPARE','',stagingConnectionName,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
-            this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
-            return;
-          }
-
-          operationsList.push(stagingDescription)
-          operationsList.push(targetDescription)
-          this.printResults(this.OPERATION_NAME,stagingDescription,targetDescription,stepElapsedTime)
-
-                    
         }
         else {
-            
-          // The stagingDBI now becmes the source for the final copy.
-        
-          targetDBI = await this.getDatabaseInterface(stagingDatabase,stagingConnection,stagingParameters,false)
-          intermediateName = stagingConnectionName
-        }
-         
-      }
+          this.metrics.recordTaskTimings([task.taskName,'STAGE','VERIFY',sourceConnectionName,stagingConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
+        }   
+        stagingParameters.FROM_USER = stagingParameters.TO_USER
+        delete stagingParameters.TO_USER
+        sourceDBI =  await this.getDatabaseInterface(stagingDatabase,stagingConnection,stagingParameters,false)
+		sourceConnectionName = stagingConnectionName
+      }  
       else {
+        sourceDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,false)
+      }
+   
+      if (!homogeneousCopy) {
           
-        //  Source --[DATA_ONLY]-> Target   
-          
+        // Move the source / staged data to the target.
+        
         stepStartTime = performance.now();        
         keyMetrics = await this.yadamu.pumpData(sourceDBI,targetDBI);
+        sourceDescription = this.getDescription(sourceConnectionName,sourceDBI) 
         stepElapsedTime = performance.now() - stepStartTime
         targetDescription = this.getDescription(targetConnectionName,targetDBI) 
         identifierMappings = targetDBI.getIdentifierMappings()
-		  
+          
         this.metrics.recordTaskTimings([task.taskName,'COPY',targetDBI.MODE,sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
         if (keyMetrics instanceof Error) {
           const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
@@ -1157,55 +1125,51 @@ class YadamuQA {
           this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
           return;
         }
-
+   
         operationsList.push(sourceDescription)
         operationsList.push(targetDescription)
         this.printResults(this.OPERATION_NAME,sourceDescription,targetDescription,stepElapsedTime)
-        
-        // Cannnot round trip CSV formatted data except via a COPY operation.
           
-        if ((targetDBI instanceof LoaderDBI) && (targetDBI.OUTPUT_FORMAT === 'CSV')) {
-          return
-        }         
-         
+        targetParameters.FROM_USER = targetParameters.TO_USER
+        delete targetParameters.TO_USER
+        
+        /*
+        **
+        ** If a TABLES filter was supplied generate an updated TABLES filter for the reverse copy by applying identifier mappings to the original set of tables.
+        **      
+        */
+   
+        if (sourceParameters.TABLES && !YadamuLibrary.isEmpty(identifierMappings)) {
+          targetParameters.TABLES = sourceParameters.TABLES.map((tableName) => { return identifierMappings.hasOwnProperty(tableName) ? identifierMappings[tableName]?.tableName : tableName})
+        }     
+   
+        sourceDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,false)
+		sourceConnectionName = targetConnectionName
       }
       
-      targetDBI.parameters.MODE  = (taskMode === 'DDL_ONLY') ? 'DDL_ONLY' : 'DATA_ONLY'
-      targetDBI.parameters.FROM_USER = targetDBI.parameters.TO_USER
-      delete targetDBI.parameters.TO_USER
-      targetDBI.setOption('recreateSchema',false)
-      
-      /*
-      **
-      ** If a TABLES filter was supplied generate an updated TABLES filter for the reverse copy by applying identifier mappings to the original set of tables.
-      **      
-      */
-      
-      if (sourceParameters.TABLES && !YadamuLibrary.isEmpty(identifierMappings)) {
-        targetDBI.parameters.TABLES = sourceParameters.TABLES.map((tableName) => { return identifierMappings[tableName].tableName || tableName})
-      }     
-
-      compareDBI.parameters.MODE  = (taskMode === 'DDL_ONLY') ? 'DDL_ONLY' : 'DATA_ONLY'
-	  compareDBI.setOption( 'recreateSchema',false)
 	  
-	  await this.yadamu.reset(compareParameters);
+      targetDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,false) 
+        
+      await this.yadamu.reset(compareParameters);
       this.yadamu.IDENTIFIER_MAPPINGS = this.reverseIdentifierMappings(identifierMappings)
-	  
-      if ((sourceDBI instanceof LoaderDBI) && (compareDBI instanceof LoaderDBI)) {
+        
+      if ((sourceDBI instanceof LoaderDBI) && (targetDBI instanceof LoaderDBI)) {
         // Configure the the OUTPUT_FORMAT, COMPRESSION AND ENCRYPTION settings to the target Parameters
-        compareDBI.setControlFileSettings(sourceDBI.getControlFileSettings())
+        targetDBI.setControlFileSettings(sourceDBI.getControlFileSettings())
       }   
-      
+        
       stepStartTime = performance.now();
-      results = await this.yadamu.pumpData(targetDBI,compareDBI);
+      results = await this.yadamu.pumpData(sourceDBI,targetDBI);
       stepElapsedTime = performance.now() - stepStartTime
+      sourceDescription = this.getDescription(sourceConnectionName,sourceDBI)  
       targetDescription = this.getDescription(targetConnectionName,targetDBI)  
-      targetVersion = targetDBI.DB_VERSION
-
-      this.metrics.recordTaskTimings([task.taskName,'COPY',compareDBI.MODE,intermediateName,test.source,YadamuLibrary.stringifyDuration(stepElapsedTime)])
+      targetVersion = sourceDBI.DB_VERSION
+      sourceVersion = targetDBI.DB_VERSION
+      
+      this.metrics.recordTaskTimings([task.taskName,'COPY',targetDBI.MODE,sourceConnectionName,test.source,YadamuLibrary.stringifyDuration(stepElapsedTime)])
       if (results instanceof Error) {
         const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
-        const compareResults = await this.compareSchemas( sourceDatabase, compareDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules,  this.yadamu.metrics, false, {})
+        const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules,  this.yadamu.metrics, false, {})
         this.printCompareResults(test.source,targetConnectionName,task.taskName,compareResults)
         this.metrics.recordTaskTimings([task.taskName,'COMPARE','',test.source,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
         this.metrics.recordError(this.yadamu.LOGGER.getMetrics(true))
@@ -1216,26 +1180,23 @@ class YadamuQA {
         keyMetrics = results
       }
         
-      operationsList.push(compareDescription)
-      this.printResults(this.OPERATION_NAME,targetDescription,compareDescription,stepElapsedTime)
+      operationsList.push(targetDescription)
+      this.printResults(this.OPERATION_NAME,sourceDescription,targetDescription,stepElapsedTime)
        
       const taskElapsedTime =  performance.now() - taskStartTime
       this.metrics.recordTaskTimings([task.taskName,'TASK','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(taskElapsedTime)])
-    }
+    } 
     
-    if (taskMode !== 'DDL_ONLY') {
-	  this.yadamu.parameters.MODE = taskMode
-      const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
-      const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules, keyMetrics, false, identifierMappings)
-      this.printCompareResults(test.source,targetConnectionName,task.taskName,compareResults)
-      this.metrics.recordFailed(compareResults.failed.length)
-      this.metrics.recordTaskTimings([task.taskName,'COMPARE','',test.source,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
-      const elapsedTime =  performance.now() - taskStartTime
-      this.metrics.recordTaskTimings([task.taskName,'TOTAL','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])
-      this.dbRoundtripResults(operationsList,elapsedTime)
-    }
-    
+    this.yadamu.parameters.MODE = taskMode
+    const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
+    const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules, keyMetrics, false, identifierMappings)
+    this.printCompareResults(test.source,targetConnectionName,task.taskName,compareResults)
+    this.metrics.recordFailed(compareResults.failed.length)
+    this.metrics.recordTaskTimings([task.taskName,'COMPARE','',test.source,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
     const elapsedTime =  performance.now() - taskStartTime
+    this.metrics.recordTaskTimings([task.taskName,'TOTAL','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])
+    this.dbRoundtripResults(operationsList,elapsedTime)
+   
     return;
     
   }
@@ -2075,9 +2036,9 @@ class YadamuQA {
     return this.metrics.formatMetrics(this.metrics.suite)
   } 
 
-  configureTermination(dbi,parameters) {
+  configureTermination(dbi) {
 
-    if ((this.KILL_READER && parameters.FROM_USER) || (this.KILL_WRITER && parameters.TO_USER)) {
+    if ((this.KILL_READER && dbi.ROLE === YadamuConstants.READER_ROLE) || (this.KILL_WRITER && dbi.ROLE === YadamuConstants.WRITER_ROLE)) {
       dbi.configureTermination(this.KILL_CONNECTION)
     }       
   } 
@@ -2129,4 +2090,4 @@ class YadamuExportParser extends Transform {
   }
 }
  
-module.exports = YadamuQA
+export { YadamuQA as default}

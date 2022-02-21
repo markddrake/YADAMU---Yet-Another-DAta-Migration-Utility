@@ -1,144 +1,20 @@
 "use strict"
 
-const { performance } = require('perf_hooks');
+import { performance } from 'perf_hooks';
 
-const Yadamu = require('../../common/yadamu.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
-const NullWriter = require('../../common/nullWriter.js');
-const YadamuSpatialLibrary = require('../../common/yadamuSpatialLibrary.js');
-const YadamuWriter = require('../../common/yadamuWriter.js');
-const {BatchInsertError} = require('../../common/yadamuException.js')
+import Yadamu from '../../common/yadamu.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js';
+import NullWriter from '../../common/nullWriter.js';
+import YadamuSpatialLibrary from '../../common/yadamuSpatialLibrary.js';
+import YadamuWriter from '../../common/yadamuWriter.js';
+import {BatchInsertError} from '../../common/yadamuException.js'
 
 class SnowflakeWriter extends YadamuWriter {
 
-  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {  
-	super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
+  constructor(dbi,tableName,metrics,status,yadamuLogger) {  
+	super(dbi,tableName,metrics,status,yadamuLogger)
   }
 
-  setTransformations(targetDataTypes) {
-
-    // Set up Transformation functions to be applied to the incoming rows
- 	 	  
-    const transformations  = targetDataTypes.map((targetDataType,idx) => {      
-      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-	
-	  if (YadamuLibrary.isBinaryType(dataType.type)) {
-		return (col,idx) =>  {
-          return col.toString('hex')
-		}
-      }
-
-	  switch (dataType.type.toUpperCase()) {
-        case 'GEOMETRY': 
-        case 'GEOGRAPHY':
-        case '"MDSYS"."SDO_GEOMETRY"':
-          if (this.SPATIAL_FORMAT.endsWith('WKB')) {
-            return (col,idx)  => {
-		       return Buffer.isBuffer(col) ? col.toString('hex') : col
-			}
-          }
-		  return null
-		case 'JSON':
-		case 'OBJECT':
-		case 'ARRAY':
-          return (col,idx) => {
-            return JSON.stringify(col)
-		  }
-        case 'VARIANT':
-          return (col,idx) => {
-            return typeof col === 'object' ? JSON.stringify(col) : col
-		  }
-        case "BOOLEAN" :
- 		  return (col,idx) => {
-             return YadamuLibrary.toBoolean(col)
-          }
-          break;
-		case "TIME" :
-		  return (col,idx) => {
-            if (typeof col === 'string') {
-              let components = col.split('T')
-              col = components.length === 1 ? components[0] : components[1]
-			  col = col.split('Z')[0]
-			  col = col.split('+')[0]
-			  col = col.split('-')[0]
-			  return col
-            }
-            else {
-              return `${col.getUTCHours()}:${col.getUTCMinutes()}:${col.getUTCSeconds()}.${col.getUTCMilliseconds()}`;  
-            }
-		  }
-          break;
-        /*
-        **
-        ** Snowflake-sdk appears to have some issues around Infinity, -Infinity and NaN.
-        **
-        ** Convert Infinity, -Infinity and NaN to 'Inf', '-Inf' & 'NaN'
-        ** However this seems to then require all finite values be passed as strings.
-        **
-        */
- 		case "REAL":
-        case "FLOAT":
-		case "DOUBLE":
-		case "DOUBLE PRECISION":
-		case "BINARY_FLOAT":
-		case "BINARY_DOUBLE":
-		  return (col,idx) => {
-	        if (!isFinite(col)) {
-			  switch(col) {				
-				case Infinity:
-			    case 'Infinity':
-			      return 'Inf'
-			    case '-Infinity':
-		     	case -Infinity:
-				  return '-Inf'
-			    default:
-				  return 'NaN'
-			  }
-		    }
-            return col.toString()
-	      }
-        default :
-		  return null
-      }
-    })
-	
-    // Use a dummy rowTransformation function if there are no transformations required.
-
-	return transformations.every((currentValue) => { currentValue === null}) 
-	? (row) => {} 
-	: (row) => {
-      transformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-          row[idx] = transformation(row[idx],idx)
-        }
-      }) 
-    }
-  }
-  
-  setTableInfo(tableName) {
-	super.setTableInfo(tableName)
-    this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
-  }
-        
-  cacheRow(row) {
-	  
-	// Use forEach not Map as transformations are not required for most columns. 
-	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
-	
-    this.rowTransformation(row)
-
-    if (this.tableInfo.parserRequired) {
-      this.batch.push(...row);
-    }
-    else {
-  	  this.batch.push(row);
-    }
-	
-    this.metrics.cached++
-	return this.skipTable
-	
-  }
-  
   reportBatchError(batch,operation,cause) {
 	if (this.tableInfo.parserRequired) {
       super.reportBatchError(operation,cause,batch.slice(0,this.tableInfo.columnCount),batch.slice(batch.length-this.tableInfo.columnCount,batch.length))
@@ -150,7 +26,7 @@ class SnowflakeWriter extends YadamuWriter {
    
   recodeSpatialColumns(batch,msg) {
 	const targetFormat = "WKT"
-    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,`INSERT MANY`,this.tableInfo.parserRequired,this.metrics.cached,this.SPATIAL_FORMAT],`${msg} Converting to "${targetFormat}".`);
+    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,`INSERT MANY`,this.tableInfo.parserRequired,this.COPY_METRICS.cached,this.SPATIAL_FORMAT],`${msg} Converting to "${targetFormat}".`);
     YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,targetFormat,this.tableInfo.targetDataTypes,batch,!this.tableInfo.parserRequired)
   }  
  
@@ -163,7 +39,6 @@ class SnowflakeWriter extends YadamuWriter {
     }
 	
 	let sqlStatement
-    this.metrics.batchCount++;
     if (this.tableInfo.insertMode === 'Batch') {
       try {
 		sqlStatement = this.tableInfo.dml
@@ -172,7 +47,7 @@ class SnowflakeWriter extends YadamuWriter {
 		}
 		const result = await this.dbi.executeSQL(sqlStatement,batch);
         this.endTime = performance.now();
-        this.metrics.written += rowCount;
+        this.adjustRowCounts(rowCount);
         this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
@@ -228,7 +103,7 @@ class SnowflakeWriter extends YadamuWriter {
           const result = await this.dbi.executeSQL(sqlStatement,nextBatch);
 		  sqlExectionTime+= performance.now() - opStartTime
           this.status.sqlTrace = NullWriter.NULL_WRITER
-	      this.metrics.written += batchRowCount
+	      this.adjustRowCounts(batchRowCount)
 	    } catch (cause) {
 		  this.status.sqlTrace = NullWriter.NULL_WRITER
 	      if ((batchRowCount > 1 ) && (!cause.lostConnection())){
@@ -262,7 +137,7 @@ class SnowflakeWriter extends YadamuWriter {
 		  const result = await this.dbi.executeSQL(sqlStatement,nextBatch)
 		  sqlExectionTime+= performance.now() - opStartTime
           this.status.sqlTrace = NullWriter.NULL_WRITER
-	      this.metrics.written += nextBatch.length
+	      this.adjustRowCounts(nextBatch.length)
         } catch (cause) {
           this.status.sqlTrace = NullWriter.NULL_WRITER
 	      if ((nextBatch.length > 1) && (!cause.lostConnection())){
@@ -284,7 +159,7 @@ class SnowflakeWriter extends YadamuWriter {
       }
     }
 
-    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowCount,this.metrics.skipped],`Binary insert required ${operationCount} operations`)
+    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowCount,this.COPY_METRICS.skipped],`Binary insert required ${operationCount} operations`)
 	this.status.sqlTrace = sqlTrace    
     this.endTime = performance.now();
     this.releaseBatch(batch)
@@ -292,4 +167,4 @@ class SnowflakeWriter extends YadamuWriter {
   }
 }
 
-module.exports = SnowflakeWriter;
+export { SnowflakeWriter as default }

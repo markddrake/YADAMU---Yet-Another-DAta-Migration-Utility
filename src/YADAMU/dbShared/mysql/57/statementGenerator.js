@@ -1,8 +1,8 @@
 "use strict";
 
-const path = require('path');
+import path from 'path';
 
-const YadamuLibrary = require('../../../common/yadamuLibrary.js');
+import YadamuLibrary from '../../../common/yadamuLibrary.js';
 
 // Code Shared by MySQL 5.7 and MariaDB. 
 
@@ -525,7 +525,6 @@ class StatementGenerator {
        targetDataTypes : targetDataTypes, 
        insertMode      : insertMode,
        _BATCH_SIZE     : this.dbi.BATCH_SIZE,
-       _COMMIT_COUNT   : this.dbi.COMMIT_COUNT,
        _SPATIAL_FORMAT : this.dbi.INBOUND_SPATIAL_FORMAT
     }
     
@@ -654,4 +653,4 @@ class StatementGenerator {
 
 }
 
-module.exports = StatementGenerator
+export { StatementGenerator as default }

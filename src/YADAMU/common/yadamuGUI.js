@@ -1,8 +1,8 @@
-"use strict"
+"us0e strict"
 
-const YadamuCLI = require('./yadamuCLI.js')
-const Yadamu = require('./yadamu.js')
+import YadamuCLI from './yadamuCLI.js'
+import Yadamu from './yadamu.js'
 
 class YadamuGUI extends YadamuCLI {}
 
-module.exports = YadamuGUI
+export { YadamuGUI as default}

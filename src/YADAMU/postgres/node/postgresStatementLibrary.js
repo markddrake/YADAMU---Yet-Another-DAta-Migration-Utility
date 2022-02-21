@@ -1,6 +1,6 @@
 "use strict" 
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class PostgresStatementLibrary {
     
@@ -18,7 +18,7 @@ class PostgresStatementLibrary {
 
 }
 
-module.exports = PostgresStatementLibrary
+export { PostgresStatementLibrary as default }
 
 const _SQL_CONFIGURE_CONNECTION = `set timezone to 'UTC'; SET extra_float_digits to 3; SET Intervalstyle = 'iso_8601'`
 

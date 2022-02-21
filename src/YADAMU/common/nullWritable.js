@@ -1,7 +1,7 @@
 "use strict"
 
-const path=require('path');
-const Writable = require('stream').Writable
+import path from 'path';
+import {Writable} from 'stream'
 
 class NullWritable extends Writable {
 
@@ -29,4 +29,4 @@ class NullWritable extends Writable {
 
 }
 
-module.exports = NullWritable
+export { NullWritable as default}

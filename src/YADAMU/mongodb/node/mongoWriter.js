@@ -1,17 +1,16 @@
 "use strict"
 
-const { performance } = require('perf_hooks');
+import { performance } from 'perf_hooks';
 
-const WKX = require('wkx');
+import WKX from 'wkx';
 
-const ObjectID = require('mongodb').ObjectID
-const Decimal128 = require('mongodb').Decimal128
-const Long = require('mongodb').Long
+import mongodb from 'mongodb'
+const { ObjectID, Decimal128, Long} = mongodb
 
-const Yadamu = require('../../common/yadamu.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
-const YadamuWriter = require('../../common/yadamuWriter.js');
-const {BatchInsertError} = require('../../common/yadamuException.js')
+import Yadamu from '../../common/yadamu.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js';
+import YadamuWriter from '../../common/yadamuWriter.js';
+import {BatchInsertError} from '../../common/yadamuException.js'
 
 class MongoWriter extends YadamuWriter {
 
@@ -38,149 +37,15 @@ class MongoWriter extends YadamuWriter {
   **  
   */
 
-  constructor(dbi,tableName,ddlComplete,status,yadamuLogger) {
-    super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
+  constructor(dbi,tableName,metrics,status,yadamuLogger) {
+    super(dbi,tableName,metrics,status,yadamuLogger)
   }
   
-  setTransformations(targetDataTypes) {
-
-    // Set up Transformation functions to be applied to the incoming rows
- 	  
-	const transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
-	   switch(targetDataType.toLowerCase()){
-        case 'objectid':
-	      return (col,idx) => {
-			return ObjectID(col)
-	      }
-          break;
-		case 'numeric':
-		case 'decimal':
-		  return (col,idx) => {
-			 return Decimal128.fromString(col)
-	      }
-          break;
-		case 'long':
-		  return (col,idx) => {
-			 return Long.fromString(col)
-	      }
-          break;
-        case 'geometry':
-        case 'geography':
-		case 'point':
-        case 'lseg':
-		case 'box':
-		case 'path':
-		case 'polygon':
-		case 'circle':
-        case 'linestring':
-		case 'multipoint':
-        case 'multilinestring':
-		case 'multipolygon':
-        case 'geometrycollection':
-        case 'geomcollection':
-        case '"MDSYS"."SDO_GEOMETRY"':
-          switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
-            case "WKB":
-            case "EWKB":
-              return (col,idx) => {
-				// Handle case where incoming format is already GeoJSON
-			    return Buffer.isBuffer(col) ? WKX.Geometry.parse(col).toGeoJSON() : col
-			  }
- 			  return null
-            case "WKT":
-            case "EWKT":
-              return (col,idx) => {
-        	    return WKX.Geometry.parse(col).toGeoJSON()
-              }
-            default:
-          }
-		  return null
-        case 'boolean':
-          return (col,idx) => {
-            return YadamuLibrary.toBoolean(col)
-	      }
-        case 'object':
-          return (col,idx) => {
-            return typeof col === 'string' && (col.length > 0) ? JSON.parse(col) : col
-	      }
-		case 'bindata':
-		  if ((this.tableInfo.columnNames[idx] === '_id') && (this.tableInfo.sizeConstraints[idx] === '12')) {
-  	        return (col,idx) => {
-              return ObjectID(col)
-	        }
-		  }
-		  return null
-		case 'date':
-		  if (this.dbi.MONGO_NATIVEJS_DATE) {
-	        return (col,idx) => {
-              return new Date(col)
-	        }		
-          }			
-		  return null
-		default:
-		  if (YadamuLibrary.isNumericType(targetDataType)) {
-			return (col,idx) => {
-			  if (typeof col === 'string') {
-			    transformations[idx] = (col,idx) => {
-				  return Number(col)
-				}
-			    return Number(col)
-			  }
-			  else {
-                transformations[idx] = null
-				return col
-			  }
-			}
-          }			
-          // First time through test if data is string and first character is '[' or ']'
-		  // TODO ### Trim and test last character is matching ']' or '}'
-		  if (this.dbi.MONGO_PARSE_STRINGS) {
-		    return (col,idx) => {
-			  if (typeof col === 'string' && ((col.indexOf('[') === 0) || (col.indexOf('{') === 0))) {
-			    try {
-			      const res = JSON.parse(col)
-				  // If the parse succeeds remove the test for the remaining records.
-				  transformations[idx] = (col,idx) => {
-				    try {
-  			          return JSON.parse(col)
-				    } catch (e) {
-					  // If the parse fails disable the parse on the remaining records.
-		              transformations[idx] = null
-					  return col
-			        }
-				  }	
-                  return res				
-			    } catch (e) {
-				  // If the parse fails remove the parse 
-		          transformations[idx] = null
-			    }
-			  }
-  		      return col
-			}
-		  }
-		  return null
-	  }
-	})
-
-    // Use a dummy rowTransformation function if there are no transformations required.
-
-    return transformations.every((currentValue) => { currentValue === null}) 
-	? (row) => {} 
-	: (row) => {
-      transformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-          row[idx] = transformation(row[idx],idx)
-        }
-      }) 
-    }
-  }
-
   setTableInfo(tableName) {
 	super.setTableInfo(tableName)
-    this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
-	    
+        
 	// Set up the batchRow() function used by cacheRow...
-	
+
 	switch (this.tableInfo.insertMode) {
       case 'DOCUMENT' :
 	    this.batchRow = (row) => {
@@ -237,7 +102,7 @@ class MongoWriter extends YadamuWriter {
 	
 	this.rowTransformation(row)
 	this.batchRow(row)
-    this.metrics.cached++
+    this.COPY_METRICS.cached++
     return this.skipTable
 
   }
@@ -257,10 +122,9 @@ class MongoWriter extends YadamuWriter {
     // ### Todo: ERROR HANDLING and Iterative Mode.
 	
     try {
-      this.metrics.batchCount++
 	  const results = await this.dbi.insertMany(this.tableInfo.tableName,batch);
       this.endTime = performance.now();
-      this.metrics.written += rowCount;
+      this.adjustRowCounts(rowCount);
       this.releaseBatch(batch)
 	  return this.skipTable
     } catch (cause) {
@@ -272,7 +136,7 @@ class MongoWriter extends YadamuWriter {
 	for (const row in batch) {
       try {
         const results = await this.dbi.insertOne(this.tableInfo.tableName,batch[row]);
-        this.metrics.written++;
+        this.adjustRowCounts(1);
       } catch(cause) {
         this.handleIterativeError(`INSERT ONE`,cause,row,Object.values(batch[row]));
         if (this.skipTable) {
@@ -288,4 +152,4 @@ class MongoWriter extends YadamuWriter {
   }
 }
 
-module.exports = MongoWriter;
+export { MongoWriter as default }

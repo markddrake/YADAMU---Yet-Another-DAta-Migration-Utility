@@ -1,6 +1,6 @@
 "use strict"
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class MongoConstants {
 
@@ -48,4 +48,4 @@ class MongoConstants {
 
 }
 
-module.exports = MongoConstants
+export { MongoConstants as default }

@@ -1,9 +1,10 @@
 "use strict"
 
-const fs = require('fs');
-const path = require('path');
-const {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} = require('./yadamuException.js');
-const {FileNotFound} = require('../file/node/fileException.js');
+import fs from 'fs';
+import path from 'path';
+import url from 'url';
+import {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} from './yadamuException.js';
+import {FileNotFound} from '../file/node/fileException.js';1
 
 class YadamuLibrary {
 
@@ -481,17 +482,7 @@ class YadamuLibrary {
   static getVendorSettings(connectionProperties) {
     return connectionProperties(this.getVendorName(connectionProperties))
   }
-  
-  static applyMixins(targetClass) {
-	if (Array.isArray(targetClass.MIXINS)) {
-	  for (const mixinPath of targetClass.MIXINS) {
-	    const mixin =  require(mixinPath);
-        for (const key of Object.getOwnPropertyNames(mixin.prototype)) {
-          targetClass.prototype[key] = mixin.prototype[key]
-        }
-      }
-    }
-  }
+
 }
 
-module.exports = YadamuLibrary
+export { YadamuLibrary as default}

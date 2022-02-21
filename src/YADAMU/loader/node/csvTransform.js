@@ -1,7 +1,7 @@
 "use strict" 
 
-const YadamuParser = require('../../common/yadamuParser.js')
-const YadamuLibrary = require('../../common/yadamuLibrary.js')
+import YadamuParser from '../../common/yadamuParser.js'
+import YadamuLibrary from '../../common/yadamuLibrary.js'
 
 class CSVTransform extends YadamuParser {
 
@@ -33,7 +33,7 @@ class CSVTransform extends YadamuParser {
 	
 	// Use a dummy rowTransformation function if there are no transformations required.
 
-	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+	this.rowTransformation = this.transformations.every((currentValue) => { return currentValue === null}) ? (row) => {} : (row) => {
       this.transformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
           transformation(row,idx)
@@ -41,20 +41,16 @@ class CSVTransform extends YadamuParser {
       }) 
     }
    }
-
-  _transform(data,enc,callback) {
-	// console.log(Object.values(data))
-	this.rowCount++
-	data = Object.values(data)
+   
+  async doTransform(data) {
+    data = Object.values(data)
 	data.forEach((col,idx) => {
 	  if (col.length === 0) {
 		data[idx] = null;
 	  }
 	})
 	this.rowTransformation(data)
-	this.push({data: data})
-    callback()
-  }
+  } 
   
   _final(callback) {
 	// this.yadamuLogger.trace([this.constructor.name,this.tableInfo.TABLE_NAME],'_final()');
@@ -69,4 +65,4 @@ class CSVTransform extends YadamuParser {
   } 
 }
 
-module.exports = CSVTransform
+export {CSVTransform as default }

@@ -1,8 +1,8 @@
 "use strict"
 
-const oracledb = require('oracledb');
+import oracledb from 'oracledb';
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class OracleConstants {
 
@@ -192,7 +192,9 @@ class OracleConstants {
 
 }
 
-module.exports = OracleConstants// Driver defined constants
+export {OracleConstants as default }
+
+// Driver defined constants
 
 const _LOB_STRING_MAX_LENGTH    = 16 * 1024 * 1024;
 // const _LOB_STRING_MAX_LENGTH    = 64 * 1024;

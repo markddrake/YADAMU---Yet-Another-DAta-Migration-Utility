@@ -1,27 +1,29 @@
 "use strict" 
-const fs = require('fs');
-const { performance } = require('perf_hooks');
+import fs from 'fs';
+import { performance } from 'perf_hooks';
 
 /* 
 **
-** Require Database Vendors API 
+** from  Database Vendors API 
 **
 */
-const snowflake = require('snowflake-sdk');
+import snowflake from 'snowflake-sdk';
 
 
-const YadamuDBI = require('../../common/yadamuDBI.js');
-const DBIConstants = require('../../common/dbiConstants.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js')
+import YadamuDBI from '../../common/yadamuDBI.js';
+import DBIConstants from '../../common/dbiConstants.js';
+import YadamuConstants from '../../common/yadamuConstants.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js'
+import {CopyOperationAborted} from '../../common/yadamuException.js'
 
-const SnowflakeConstants = require('./snowflakeConstants.js');
-const SnowflakeError = require('./snowflakeException.js')
-const SnowflakeReader = require('./snowflakeReader.js');
-const SnowflakeParser = require('./snowflakeParser.js');
-const SnowflakeWriter = require('./snowflakeWriter.js');
-const StatementGenerator = require('./statementGenerator.js');
-const SnowflakeStatementLibrary = require('./snowflakeStatementLibrary.js');
+import SnowflakeConstants from './snowflakeConstants.js';
+import SnowflakeError from './snowflakeException.js'
+import SnowflakeReader from './snowflakeReader.js';
+import SnowflakeParser from './snowflakeParser.js';
+import SnowflakeWriter from './snowflakeWriter.js';
+import SnowflakeOutputManager from './snowflakeOutputManager.js';
+import StatementGenerator from './statementGenerator.js';
+import SnowflakeStatementLibrary from './snowflakeStatementLibrary.js';
 
 class SnowflakeDBI extends YadamuDBI {
 
@@ -84,14 +86,14 @@ class SnowflakeDBI extends YadamuDBI {
     }  
   }    
 
-  constructor(yadamu,settings,parameters) {	  
-    super(yadamu,settings,parameters);
+  constructor(yadamu,manager,connectionSettings,parameters) {	  
+    super(yadamu,manager,connectionSettings,parameters);
 	this.StatementLibrary = SnowflakeStatementLibrary
 	this.statementLibrary = undefined
   }
 
-  getSchemaIdentifer(key) {
-	return `${this.parameters.YADAMU_DATABASE}"."${this.parameters[key]}`
+  getSchemaIdentifer() {
+	return `${this.parameters.YADAMU_DATABASE}"."${this.CURRENT_SCHEMA}`
   }  
   
   /*
@@ -106,7 +108,7 @@ class SnowflakeDBI extends YadamuDBI {
 	  const stack = new Error().stack
       connection.connect((err,connection) => {
         if (err) {
-          reject(this.trackExceptions(new SnowflakeError(err,stack,`snowflake-sdk.Connection.connect()`)))
+          reject(this.trackExceptions(new SnowflakeError(this.DRIVER_ID,err,stack,`snowflake-sdk.Connection.connect()`)))
         }
         resolve(connection);
       })
@@ -214,7 +216,7 @@ class SnowflakeDBI extends YadamuDBI {
       , complete       : async (err,statement,rows) => {
 		                   const sqlEndTime = performance.now()
                            if (err) {
-              		         const cause = this.trackExceptions(new SnowflakeError(err,stack,sqlStatement))
+              		         const cause = this.trackExceptions(new SnowflakeError(this.DRIVER_ID,err,stack,sqlStatement))
     		                 if (attemptReconnect && cause.lostConnection()) {
 	      				       attemptReconnect = false
 			   			       try {
@@ -243,7 +245,7 @@ class SnowflakeDBI extends YadamuDBI {
 	try {
       results = await Promise.all(ddl.map((ddlStatement) => {
         ddlStatement = ddlStatement.replace(/%%YADAMU_DATABASE%%/g,this.parameters.YADAMU_DATABASE);
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
+        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA);
         return this.executeSQL(ddlStatement,[]);
       }))
     } catch (e) { 
@@ -464,9 +466,9 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	}))
   }
 
-  async getSchemaInfo(keyName) {
+  async getSchemaMetadata() {
 	  
-	let schemaInfo = await this.executeSQL(this.statementLibrary.SQL_SCHEMA_INFORMATION,[this.parameters[keyName]])
+	let schemaInfo = await this.executeSQL(this.statementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA])
     schemaInfo = await this.describeVariantColumns(schemaInfo)
     return schemaInfo
   }
@@ -475,8 +477,8 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     return new SnowflakeParser(tableInfo,this.yadamuLogger);
   }  
   
-  inputStreamError(e,sqlStatement) {
-    return this.trackExceptions(new SnowflakeError(e,this.streamingStackTrace,sqlStatement))
+  inputStreamError(cause,sqlStatement) {
+    return this.trackExceptions(((cause instanceof SnowflakeError) || (cause instanceof CopyOperationAborted)) ? cause : new SnowflakeError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
   }
   
   generateQueryInformation(tableMetadata) { 
@@ -509,13 +511,17 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     return await super.generateStatementCache(StatementGenerator,schema) 
   }
  
-  getOutputStream(tableName,ddlComplete) {
+  getOutputStream(tableName,metrics) {
 	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(SnowflakeWriter,tableName,ddlComplete)
+	 return super.getOutputStream(SnowflakeWriter,tableName,metrics)
   }
   
-  classFactory(yadamu) {
-	return new SnowflakeDBI(yadamu)
+  getOutputManager(tableName,metrics) {
+	 return super.getOutputStream(SnowflakeOutputManager,tableName,metrics)
+  }
+ 
+ classFactory(yadamu) {
+	return new SnowflakeDBI(yadamu,this)
   }
   
   async getConnectionID() {
@@ -547,14 +553,14 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
   }
   
-  async reportCopyErrors(tableName,stack,copyStatement,failed) {
+  async reportCopyErrors(tableName,metrics) {
 	  
     const err = new Error(`Errors detected durng COPY operation: ${failed} records rejected.`);
-    err.sql = copyStatement;
+    err.sql = metrics.sql;
 	err.tags = []
 
 	try {
-	  const results = await this.executeSQL(`select * from table(validate("${this.parameters.YADAMU_DATABASE}"."${this.parameters.TO_USER}"."${tableName}", job_id => '_last'))`);
+	  const results = await this.executeSQL(`select * from table(validate("${this.parameters.YADAMU_DATABASE}"."${this.CURRENT_SCHEMA}"."${tableName}", job_id => '_last'))`);
       err.cause = results.map((err) => {
 	    const loadError = new Error(err.error)
 		Object.assign(loadError,err);
@@ -567,39 +573,45 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   }  
     
   async initializeCopy(credentials) {
+    await super.initializeCopy()
     let results = await this.executeSQL(this.statementLibrary.SQL_CREATE_STAGE);
   }
   
-  async copyOperation(tableName,copy) {
-
+  async copyOperation(tableName,copyOperation,metrics) {
+	
 	try {
-	  const stack = new Error().stack
-      await this.beginTransaction()
-      const startTime = performance.now();
-	  let results = await this.executeSQL(`alter session set TIME_INPUT_FORMAT='${SnowflakeConstants.TIME_INPUT_FORMAT[this.systemInformation.vendor]}'`);
-	  results = await this.executeSQL(copy.dml);
-	  const endTime = performance.now();
-	  await this.commitTransaction();
-	  let rowsParsed = 0
-	  let rowsLoaded = 0
-	  let errors = 0
+	  metrics.writerStartTime = performance.now();
+	  let results = await this.beginTransaction();
+	  results = await this.executeSQL(`alter session set TIME_INPUT_FORMAT='${SnowflakeConstants.TIME_INPUT_FORMAT[this.systemInformation.vendor]}'`);
+	  results = await this.executeSQL(copyOperation.dml);
 	  results.forEach((file) => {
-	    rowsParsed += parseInt(file.rows_parsed)
-	    rowsLoaded += parseInt(file.rows_loaded)
-	    errors += parseInt(file.errors_seen)
+	    metrics.read += parseInt(file.rows_parsed)
+	    metrics.written += parseInt(file.rows_loaded)
+	    metrics.skipped += parseInt(file.errors_seen)
 	  })
-	  await this.reportCopyResults(tableName,rowsLoaded,rowsParsed - rowsLoaded,startTime,endTime,copy,stack)
-	} catch(cause) {
-	  await this.rollbackTransaction(cause);
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],cause)
-	}	
+	  metrics.writerEndTime = performance.now();
+	  results = await this.commitTransaction()
+	  metrics.committed = metrics.written 
+	  metrics.written = 0
+  	} catch(e) {
+	  metrics.writerError = e
+	  try {
+  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+	    let results = await this.rollbackTransaction()
+	  } catch (e) {
+		e.cause = metrics.writerError
+		metrics.writerError = e
+	  }
+	}
+	return metrics
   }
   
-  async fianlizeeCopy() {
+  async finalizeCopy() {
+    await super.finalizeCopy()
 	const sqlStatement = this.statementLibrary.SQL_DROP_STAGE
     const  results = await this.executeSQL(sqlStatement);
   }
     
 }
 
-module.exports = SnowflakeDBI
+export { SnowflakeDBI as default }

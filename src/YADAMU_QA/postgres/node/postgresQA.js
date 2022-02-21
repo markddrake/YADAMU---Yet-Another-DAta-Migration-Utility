@@ -1,13 +1,14 @@
 "use strict" 
 
-const PostgresDBI = require('../../../YADAMU/postgres/node/postgresDBI.js');
-const PostgresError = require('../../../YADAMU/postgres/node/postgresException.js')
-const PostgresConstants = require('../../../YADAMU/postgres/node/postgresConstants.js');
+import PostgresDBI       from '../../../YADAMU/postgres/node/postgresDBI.js';
+import PostgresError     from '../../../YADAMU/postgres/node/postgresException.js'
+import PostgresConstants from '../../../YADAMU/postgres/node/postgresConstants.js';
 
-const YadamuTest = require('../../common/node/yadamuTest.js');
+import YadamuTest        from '../../common/node/yadamuTest.js';
+import YadamuQALibrary   from '../../common/node/yadamuQALibrary.js'
 
 
-class PostgresQA extends PostgresDBI {
+class PostgresQA extends YadamuQALibrary.qaMixin(PostgresDBI) {
     
     static get SQL_SCHEMA_TABLE_NAMES()    { return _SQL_SCHEMA_TABLE_NAMES }
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
@@ -26,24 +27,9 @@ class PostgresQA extends PostgresDBI {
       return PostgresQA.YADAMU_DBI_PARAMETERS
     }	
 		
-    constructor(yadamu,settings,parameters) {
-       super(yadamu,settings,parameters);
+    constructor(yadamu,manager,connectionSettings,parameters) {
+       super(yadamu,manager,connectionSettings,parameters);
     }
-    
-	async initialize() {
-	  await super.initialize();
-	  if (this.terminateConnection()) {
-        const pid = await this.getConnectionID();
-	    this.scheduleTermination(pid,this.getWorkerNumber());
-	  }
-	}
-	
-    async initializeImport() {
-	  if (this.options.recreateSchema === true) {
-		await this.recreateSchema();
-	  }
-	  await super.initializeImport();
-    }	
 
  	async recreateSchema() {
       try {
@@ -85,29 +71,24 @@ class PostgresQA extends PostgresDBI {
       return report
     }
 		
-    async workerDBI(idx)  {
-	  const workerDBI = await super.workerDBI(idx);
-      // Manager needs to schedule termination of worker.
-	  if (this.terminateConnection(idx)) {
-        const pid = await workerDBI.getConnectionID();
-	    this.scheduleTermination(pid,idx);
-	  }
-	  return workerDBI
+    classFactory(yadamu) {
+      return new PostgresQA(yadamu,this)
     }
-
+	
 	async scheduleTermination(pid,workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
+	  const tags = this.getTerminationTags(workerId,pid)
+	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
 	  const timer = setTimeout(
         async (pid) => {
           try {
 		    if (this.pool !== undefined && this.pool.end) {
-		      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
+		      this.yadamuLogger.log(tags,`Killing connection.`);
 	          const conn = await this.getConnectionFromPool();
 		      const res = await conn.query(`select pg_terminate_backend(${pid})`);
 		      await conn.release()
 		    }
 		    else {
-		      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+		      this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
 		    }
            } catch (e) {
              console.log(e);
@@ -125,7 +106,7 @@ class PostgresQA extends PostgresDBI {
 
 }
 
-module.exports = PostgresQA
+export { PostgresQA as default }
 
 const _SQL_SUCCESS =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, TARGET_ROW_COUNT

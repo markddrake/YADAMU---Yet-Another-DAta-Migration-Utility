@@ -1,9 +1,9 @@
 "use strict"
 
-const { Transform } = require('stream');
-const { performance } = require('perf_hooks');
+import { Transform } from 'stream';
+import { performance } from 'perf_hooks';
 
-const Parser = require('../../clarinet/clarinet.js');
+import Parser from '../../clarinet/clarinet.cjs';
 
 class JSONParser extends Transform {
  
@@ -217,12 +217,6 @@ class JSONParser extends Transform {
     });     
   }     
 
-  _transform(data,enc,callback) {
-	// console.log("\n###CHUNK###:",data.toString())
-    this.parser.write(data);
-    callback();
-  };
-
   async nextObject(name) {
     // this.yadamuLogger.trace([this.constructor.name,name],'nextObject()')
     this.push({[name]: this.currentObject})
@@ -242,6 +236,7 @@ class JSONParser extends Transform {
   endTable() {
     // this.yadamuLogger.trace([this.constructor.name,this.currentTable],'endTable()')
     this.tableList.delete(this.currentTable);
+	// Snapshot the table start and end times.
 	this.push({
       eod: {
 	    startTime : this.readerStartTime
@@ -260,6 +255,15 @@ class JSONParser extends Transform {
 	this.push({eof: true})
   }
   
+  
+  _transform(data,enc,callback) {
+	// console.log("\n###CHUNK###:",data.toString())
+	this.parser.write(data);
+	// Current logic may push() one or more times after the callback() has been invoked..
+    callback();
+  };
+
+  
 }
    
-module.exports = JSONParser
+export { JSONParser as default }

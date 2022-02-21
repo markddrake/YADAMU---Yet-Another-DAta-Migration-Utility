@@ -1,11 +1,13 @@
 "use strict" 
 
-const path = require('path')
-const mime = require('mime-types');
+import path          from 'path'
+import mime          from 'mime-types';
+import {PassThrough} from "stream"
 
-const LoaderDBI = require('../node/loaderDBI.js');
-const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js');
-const {YadamuError} = require('../../../YADAMU/common/yadamuException.js');
+import LoaderDBI     from '../node/loaderDBI.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js';
+import NullWritable  from '../../common/nullWritable.js';
+import {YadamuError} from '../../common/yadamuException.js';
 
 /*
 **
@@ -57,9 +59,17 @@ class CloudDBI extends LoaderDBI {
     })()
   }
   
-  constructor(yadamu,settings,parameters) {
+  set CONTROL_FILE_PATH(v)       { super.CONTROL_FILE_PATH = v }   
+  get CONTROL_FILE_PATH()        { return this.makeCloudPath(super.CONTROL_FILE_PATH) } 
+  get CONTROL_FILE_FOLDER()      { return this.makeCloudPath(super.CONTROL_FILE_FOLDER) }
+  get METADATA_FOLDER()          { return this.makeCloudPath(super.METADATA_FOLDER) }
+  get DATA_FOLDER()              { return this.makeCloudPath(super.DATA_FOLDER) }
+  get IMPORT_FOLDER()            { return this.makeCloudPath(super.IMPORT_FOLDER) }
+  get EXPORT_FOLDER()            { return this.makeCloudPath(super.EXPORT_FOLDER) }
+
+  constructor(yadamu,manager,settings,parameters) {
     // Export File Path is a Directory for in Load/Unload Mode
-    super(yadamu,settings,parameters)
+    super(yadamu,manager,settings,parameters)
   }    
   
   async createInitializationVector() {
@@ -88,7 +98,7 @@ class CloudDBI extends LoaderDBI {
 		return this.cloudService.getObject(this.makeAbsolute(this.controlFile.metadata[tableName].file))
       }))
 	  metdataRecords.forEach((content) =>  {
-        const json = this.parseContents(content)
+        const json = this.parseJSON(content)
         metadata[json.tableName] = json;
         // json.dataFile = this.getDataFileName(json.tableName)
         if (copyStagedData) {
@@ -118,9 +128,9 @@ class CloudDBI extends LoaderDBI {
   }
   
   writeFile(filename,content) {
-	const res = this.cloudService.putObject(filename,content)
-    this.cloudService.writeOperations.add(res)
-	res.then(() => { this.cloudService.writeOperations.delete(res)})
+	const res = this.cloudService.putObject(this.makeCloudPath(filename),content)
+    this.activeWriters.add(res)
+	res.then(() => {this.activeWriters.delete(res)})
     return res;
   }
   
@@ -147,12 +157,13 @@ class CloudDBI extends LoaderDBI {
     
   }
   
-  getFileOutputStream(tableName) {
+  getFileOutputStream(tableName,activeWorkers) {
     // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,tableName],`Creating readable stream on getFileOutputStream(${this.getDataFileName(tableName)})`)
 	const file = this.makeAbsolute(this.getDataFileName(tableName))
 	const extension = path.extname(file);
 	const contentType = mime.lookup(extension) || 'application/octet-stream'
-	return this.cloudService.createWriteStream(file,contentType)
+	return this.cloudService.createWriteStream(file,contentType,this.activeWriters)
+	
   }  
   
   /*
@@ -169,7 +180,7 @@ class CloudDBI extends LoaderDBI {
     this.setFolderPaths(this.EXPORT_FOLDER,this.parameters.FROM_USER)
 
 	const fileContents = await this.cloudService.getObject(this.CONTROL_FILE_PATH)
-	this.controlFile = this.parseContents(fileContents)
+	this.controlFile = this.parseJSON(fileContents)
   }
 
   async getInputStream(filename) {
@@ -185,10 +196,20 @@ class CloudDBI extends LoaderDBI {
 	this.cloudService = this.manager.cloudService
   }
   
-  classFactory(yadamu) {
-	return new S3DBI(yadamu)
-  }
-    
+  async getOutputStreams(tableName,metrics) {
+	  
+	const streams = await super.getOutputStreams(tableName,metrics) 
+	
+	// Source data sources (Azure) return ain instance of PassThrough sas the Final Output Stream. Pipeline does not 'finsih' properly unless the last components of the pipeline is a 'Writable'
+
+	if (streams[streams.length-1] instanceof PassThrough) {
+	  streams.push(new NullWritable())
+	}
+	
+	return streams;
+	
+  }	
+   
 }
 
-module.exports = CloudDBI
+export {CloudDBI as default }

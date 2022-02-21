@@ -1,6 +1,6 @@
 "use strict"
 
-const Writable = require('stream').Writable
+import {Writable} from 'stream'
 
 class LogWriter extends Writable {
 
@@ -16,5 +16,5 @@ class LogWriter extends Writable {
 
 }
 
-module.exports = LogWriter
+export { LogWriter as default }
     

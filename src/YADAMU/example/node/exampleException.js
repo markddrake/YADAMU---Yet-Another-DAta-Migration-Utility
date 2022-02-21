@@ -1,6 +1,6 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
+import {DatabaseError} from '../../common/yadamuException.js'
 
 class ExampleError extends DatabaseError {
   
@@ -10,4 +10,4 @@ class ExampleError extends DatabaseError {
 
 }
 
-module.exports = ExampleError
+export { ExampleError

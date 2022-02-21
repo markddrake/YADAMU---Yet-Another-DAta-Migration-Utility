@@ -1,6 +1,6 @@
 "use strict"
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class SnowflakeConstants {
 
@@ -78,4 +78,4 @@ class SnowflakeConstants {
 
 }
 
-module.exports = SnowflakeConstants
+export { SnowflakeConstants as default }

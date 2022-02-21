@@ -1,10 +1,29 @@
 "use strict"
 
-const crypto = require('crypto');
+import crypto from 'crypto';
 
-const YadamuDefaults = require('./yadamuDefaults.json');
+import fs from 'fs'
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
+// const YadamuDefaults = require('./yadamuDefaults.json');
+
+const  __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const YadamuDefaults = JSON.parse(fs.readFileSync(join(__dirname,'./yadamuDefaults.json'),'utf-8'));
+  
 class YadamuConstants {
+
+  static get DESTROYED()              { return 'destroyed' }
+  static get DDL_COMPLETE()           { return 'ddlComplete' }
+  static get DDL_UNNECESSARY()        { return 'ddlUnnecessary' }
+  static get CACHE_LOADED()           { return 'cacheLoaded'  }
+  static get DB_CONNECTED()           { return 'dbConnected'}
+  static get END_OF_DATA()            { return 'eod'}
+  static get END_OF_FILE()            { return 'eof'}
+  
+  static get READER_ROLE()            { return 'READER' }
+  static get WRITER_ROLE()            { return 'WRITER' }
 
   static get YADAMU_CONFIGURATION() { return YadamuDefaults };
 
@@ -121,4 +140,4 @@ class YadamuConstants {
 
 }
 
-module.exports = YadamuConstants
+export { YadamuConstants as default}

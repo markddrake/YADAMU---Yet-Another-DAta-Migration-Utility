@@ -1,6 +1,6 @@
 "use strict" 
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class MySQLStatementLibrary {
     
@@ -94,7 +94,7 @@ class MySQLStatementLibrary {
   }
 }  
 
-module.exports = MySQLStatementLibrary
+export { MySQLStatementLibrary as default }
 
 const _SQL_CONFIGURE_CONNECTION       = `SET AUTOCOMMIT = 0, TIME_ZONE = '+00:00',SESSION INTERACTIVE_TIMEOUT = 600000, WAIT_TIMEOUT = 600000, SQL_MODE='ANSI_QUOTES,PAD_CHAR_TO_FULL_LENGTH', GROUP_CONCAT_MAX_LEN = 1024000, GLOBAL LOCAL_INFILE = 'ON'`
 

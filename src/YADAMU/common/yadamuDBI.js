@@ -1,25 +1,25 @@
 "use strict" 
 
-const fs = require('fs');
-const path = require('path');
-const Readable = require('stream').Readable;
-const util = require('util')
-const { performance } = require('perf_hooks');
+import fs from 'fs';
+import path from 'path';
+import { performance } from 'perf_hooks';
+import EventEmitter from 'events'
 
 /* 
 **
-** Require Database Vendors API 
+** from  Database Vendors API 
 **
 */
 
-const Yadamu = require('./yadamu.js');
-const DBIConstants = require('./dbiConstants.js');
-const YadamuConstants = require('./yadamuConstants.js');
-const YadamuLibrary = require('./yadamuLibrary.js')
-const {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError, BatchInsertError, IterativeInsertError, InputStreamError} =  require('./yadamuException.js');
-const {FileNotFound, FileError} = require('../file/node/fileException.js');
-const DefaultParser = require('./defaultParser.js');
-const DummyWritable = require('./nullWritable.js')
+import Yadamu from './yadamu.js';
+import DBIConstants from './dbiConstants.js';
+import YadamuConstants from './yadamuConstants.js';
+import YadamuLibrary from './yadamuLibrary.js'
+import NullWriteable from './nullWritable.js'
+import {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError, BatchInsertError, IterativeInsertError, InputStreamError, UnimplementedMethod} from './yadamuException.js';
+import {FileNotFound, FileError} from '../file/node/fileException.js';
+import DefaultParser from './defaultParser.js';
+
 
 /*
 **
@@ -28,14 +28,18 @@ const DummyWritable = require('./nullWritable.js')
 **
 */
   
-class YadamuDBI {
+class YadamuDBI extends EventEmitter {
 
   // Instance level getters.. invoke as this.METHOD
+
 
   get DATABASE_KEY()                 { return 'yadamu' };
   get DATABASE_VENDOR()              { return 'YADAMU' };
   get SOFTWARE_VENDOR()              { return 'YABASC - Yet Another Bay Area Software Company'};
- 
+
+  get DRIVER_ID()                    { return this._DRIVER_ID }
+  set DRIVER_ID(v)                   { this._DRIVER_ID = v }
+  
   get DATA_STAGING_SUPPORTED()       { return false } 
   get SQL_COPY_OPERATIONS()          { return false }
   get PARALLEL_READ_OPERATIONS()     { return true };
@@ -61,6 +65,9 @@ class YadamuDBI {
   get RETRY_COUNT()                  { return 3 }
   get IDENTIFIER_TRANSFORMATION()    { return this.yadamu.IDENTIFIER_TRANSFORMATION }
   get PARTITION_LEVEL_OPERATIONS()   { return this.parameters.PARTITION_LEVEL_OPERATIONS  || DBIConstants.PARTITION_LEVEL_OPERATIONS }
+  
+  get RECONNECT_ON_ABORT()           { const retVal = this._RECONNECT_ON_ABORT; this._RECONNECT_ON_ABORT = false; return retVal }
+  set RECONNECT_ON_ABORT(v)          { this._RECONNECT_ON_ABORT = v }
 
   get BATCH_SIZE() {
     this._BATCH_SIZE = this._BATCH_SIZE || (() => {
@@ -68,12 +75,13 @@ class YadamuDBI {
       batchSize = isNaN(batchSize) ? this.parameters.BATCH_SIZE : batchSize
       batchSize = Math.abs(Math.ceil(batchSize))
       return batchSize
+
     })();
     return this._BATCH_SIZE 
   }
 
   get COMMIT_COUNT() {    
-    this._COMMIT_COUNT = this._COMMIT_COUNT !== undefined ? this._COMMIT_COUNT : (() => {
+    this._COMMIT_COUNT = this._COMMIT_COUNT || (() => {
       let commitCount = isNaN(this.COMMIT_RATIO) ? DBIConstants.COMMIT_RATIO : this.COMMIT_RATIO
       commitCount = Math.abs(Math.ceil(commitCount))
       commitCount = commitCount * this.BATCH_SIZE
@@ -93,11 +101,6 @@ class YadamuDBI {
   get REJECTION_FILE_PREFIX()         { return this.parameters.FILE     || this.yadamu.REJECTION_FILE_PREFIX }
   get WARNING_FOLDER()                { return this.parameters.FILE     || this.yadamu.WARNING_FOLDER }
   get WARNING_FILE_PREFIX()           { return this.parameters.FILE     || this.yadamu.WARNING_FILE_PREFIX }
-
-  get INPUT_METRICS()                 { return this._INPUT_METRICS }
-  set INPUT_METRICS(v) {
-	this._INPUT_METRICS =  Object.assign({},v);
-  }
   
   get TRANSACTION_IN_PROGRESS()       { return this._TRANSACTION_IN_PROGRESS === true }
   set TRANSACTION_IN_PROGRESS(v)      { this._TRANSACTION_IN_PROGRESS = v }
@@ -108,10 +111,42 @@ class YadamuDBI {
   get SAVE_POINT_SET()                { return this._SAVE_POINT_SET === true }
   set SAVE_POINT_SET(v)               { this._SAVE_POINT_SET = v }
 
-  get ATTEMPT_RECONNECTION()          { return !this.RECONNECT_IN_PROGRESS }
+  // get ATTEMPT_RECONNECTION()          { return ((this.ON_ERROR !== 'ABORT' || this.RECONNECT_ON_ABORT)) && !this.RECONNECT_IN_PROGRESS}
+  get ATTEMPT_RECONNECTION()          { return !this.RECONNECT_IN_PROGRESS}
 
   get SOURCE_DIRECTORY()              { return this.parameters.SOURCE_DIRECTORY || this.parameters.DIRECTORY }
   get TARGET_DIRECTORY()              { return this.parameters.TARGET_DIRECTORY || this.parameters.DIRECTORY }
+
+  get IS_READER()                     { return this.parameters.hasOwnProperty('FROM_USER') && !this.parameters.hasOwnProperty('TO_USER') }
+  get IS_WRITER()                     { return !this.parameters.hasOwnProperty('FROM_USER') && this.parameters.hasOwnProperty('TO_USER') }
+
+  get CURRENT_SCHEMA()                { 
+    this._CURRENT_SCHEMA = this._CURRENT_SCHEMA || (() => {
+      switch (true) { 
+	    case this.IS_READER: 
+		  return this.parameters.FROM_USER; 
+		case this.IS_WRITER: 
+		  return this.parameters.TO_USER; 
+		default: 
+		  return undefined 
+	  }
+    })();
+    return this._CURRENT_SCHEMA 
+  }
+  
+  get ROLE()                          {                     
+    this._ROLE = this._ROLE || (() => {
+      switch (true) { 
+	    case this.IS_READER: 
+		  return YadamuConstants.READER_ROLE; 
+		case this.IS_WRITER: 
+		  return YadamuConstants.WRITER_ROLE; 
+		default: 
+		  return undefined 
+	  }
+    })();
+    return this._ROLE  
+  }
 
   // Not available until configureConnection() has been called 
 
@@ -167,25 +202,60 @@ class YadamuDBI {
   get DESCRIPTION()                   { return this._DESCRIPTION }
   set DESCRIPTION(v)                  { this._DESCRIPTION = v }
 
-  constructor(yadamu,settings,parameters) {
+  get FEEDBACK_MODEL()     { return this._FEEDBACK_MODEL }
+  get FEEDBACK_INTERVAL()  { return this._FEEDBACK_INTERVAL }
+  get FEEDBACK_DISABLED()  { return this.FEEDBACK_MODEL === undefined }
+  
+  get REPORT_COMMITS()     { 
+    return this._REPORT_COMMITS || (() => { 
+	  this._REPORT_COMMITS = ((this._FEEDBACK_MODEL === 'COMMIT') || (this._FEEDBACK_MODEL === 'ALL')); 
+	  return this._REPORT_COMMITS
+	})() 
+  }
+  
+  get REPORT_BATCHES()     { 
+     return this._REPORT_BATCHES || (() => { 
+	   this._REPORT_BATCHES = ((this._FEEDBACK_MODEL === 'BATCH') || (this._FEEDBACK_MODEL === 'ALL')); 
+	   return this._REPORT_BATCHES
+	 })() 
+  }
+  
+  set FEEDBACK_MODEL(feedback)  {
+    if (!isNaN(feedback)) {
+	  this._FEEDBACK_MODEL    = 'ALL'
+	  this._FEEDBACK_INTERVAL = parseInt(feedback)
+	}
+	else {
+	  this._FEEDBACK_MODEL    = feedback
+	  this._FEEDBACK_INTERVAL = 0
+    }
+  } 
+  
+  constructor(yadamu,manager,connectionSettings,parameters) {
     
+	super()
+	this.DRIVER_ID = performance.now()
+
+    this.yadamu = yadamu;
+    this.manager = manager
+	this.setConnectionProperties(connectionSettings || {})
+    this.status = yadamu.STATUS
+    this.yadamuLogger = yadamu.LOGGER;
+	this.initializeParameters(parameters || {});
+    this.FEEDBACK_MODEL = this.parameters.FEEDBACK
+
     this.options = {
       recreateSchema : false
     }
-    
+
     this._DB_VERSION = 'N/A'    
-    this.yadamu = yadamu;
-    
     this.sqlTraceTag = '';
-    this.status = yadamu.STATUS
-    this.yadamuLogger = yadamu.LOGGER;
-	this.setConnectionProperties(settings || {})
-	this.initializeParameters(parameters || {});
+    
     this.vendorProperties = this.getVendorProperties()   
+
 	this.systemInformation = undefined;
     this.metadata = undefined;
-    this.connection = undefined;
-	
+    this.connection = undefined;	
     this.statementCache = undefined;
 	
 	// Track Transaction and Savepoint state.
@@ -194,21 +264,94 @@ class YadamuDBI {
     this.RECONNECT_IN_PROGRESS = false
 	this.TRANSACTION_IN_PROGRESS = false;
 	this.SAVE_POINT_SET = false;
- 
-    this.tableName  = undefined;
+    this.DESCRIPTION = this.getSchemaIdentifer()
+	
     this.tableInfo  = undefined;
-    this.insertMode = 'Empty';
+    this.insertMode = 'Batch'
     this.skipTable = true;
 
     this.sqlTraceTag = `/* Manager */`;	
     this.sqlCumlativeTime = 0
 	this.firstError = undefined
 	this.latestError = undefined    
+	
+	this.ddlInProgress = false;
+    this.activeWriters = new Set()
     
+    if (manager) {
+      const workerState = new Promise((resolve,reject) => {
+        this.on(YadamuConstants.DESTROYED,() => {
+		   manager.activeWorkers.delete(workerState)
+		   resolve(YadamuConstants.DESTROYED)
+	    })
+	  })
+      manager.activeWorkers.add(workerState)
+	  this.workerNumber = -1
+      this.dbConnected = manager.dbConnected
+	  this.cacheLoaded = manager.cacheLoaded
+      this.ddlComplete = manager.ddlComplete
+	  this.workerReady = new Promise((resolve,reject) => {
+	    this.initializeWorker().then(() => { resolve() }).catch((e) => { console.log(e); reject(e) })
+      })
+	}
+	else {
+    
+      this.activeWorkers = new Set()
+  
+	  // dbConnected will resolve when the database connection has been established
+	
+      this.dbConnected = new Promise((resolve,reject) => {
+		if (this.isDatabase()) {
+          this.once(YadamuConstants.DB_CONNECTED,() => {
+		    resolve(true)
+	      })
+		}
+		else {
+		  resolve(true)
+		}
+      })
+   
+	  // cacheLoaded will resolve when the statement Cache has been generated 
+	
+      this.cacheLoaded = new Promise((resolve,reject) => {
+        this.once(YadamuConstants.CACHE_LOADED  ,() => {
+		  resolve(true)
+	    })
+      })
+    
+      this.ddlComplete = new Promise((resolve,reject) => {
+	    this.once(YadamuConstants.DDL_COMPLETE,(startTime,state) => {
+          // this.yadamuLogger.trace([this.constructor.name],`${this.constructor.name}.on(ddlComplete): (${state instanceof Error}) "${state ? `${state.constructor.name}(${state.message})` : state}"`)
+   	      this.ddlInProgress = false
+		  if (state instanceof Error) {
+	        this.yadamuLogger.ddl([this.DATABASE_VENDOR],`One or more DDL operations Failed. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+	        this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],state);
+		    state.ignoreUnhandledRejection = true;
+            reject(state)
+          }
+		  else {
+    	    this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Executed ${Array.isArray(state) ? state.length : undefined} DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+			if (this.PARTITION_LEVEL_OPERATIONS) {
+			  // Need target schema metadata to determine if we can perform partition level write operations.
+			  this.getSchemaMetadata().then((metadata) => { this.partitionMetadata = this.getPartitionMetadata(metadata) ;resolve(true) }).catch((e) => { reject(e) })
+			}
+			else {
+		      resolve(true);
+			}
+	      }
+	    })
+	    this.once(YadamuConstants.DDL_UNNECESSARY,() => {
+		  resolve(true)
+		})
+	  })	  
+	}
+	
 	this.failedPrematureClose = false;
 
-	// Used in testing
+	// Used in QA
     this.killConfiguration = {}
+    // this.yadamuLogger.info([this.ROLE,this.DATABASE_VENDOR,this.DB_VERSION,this.MODE,this.getWorkerNumber()],`Ready.`)
+
   }
 
   loadTableList(tableListPath) {
@@ -222,11 +365,15 @@ class YadamuDBI {
 	  throw new CommandLineError(`Expected a JSON array containig a case sensitive list of table names e.g. ["Table1","Table2"]. Encountered errror "${e.message}" while loading "${tableListPath}.`)
 	}
   }
+  
+  getPartitionMetadata(metadata) {
+	return {}
+  }
 
   setOption(name,value) {
     this.options[name] = value;
   }
-      
+        
   initializeParameters(parameters){
 
 	// Merge default parameters for this driver with parameters from configuration files and command line parameters.
@@ -237,6 +384,7 @@ class YadamuDBI {
 	// Used when creating a worker.
 	Object.assign(this.parameters, parameters || {})
 	this._COMMIT_COUNT = undefined
+	this.FEEDBACK_MODEL = this.parameters.FEEDBACK
   }
   
   traceSQL(msg,rows,lobCount) {
@@ -460,11 +608,6 @@ class YadamuDBI {
 	this.latestError = undefined
   }
    
-  setMetrics(metrics) {
-	// Share metrics with the Writer so adjustments can be made if the connection is lost.
-    this.metrics = metrics
-  }
-  
   setSystemInformation(systemInformation) {
     this.systemInformation = systemInformation
   }
@@ -661,9 +804,10 @@ class YadamuDBI {
 	  
   async _executeDDL(ddl) {
 	let results
+	const startTime = performance.now();
 	try {
       results = await Promise.all(ddl.map((ddlStatement) => {
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
+        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA);
 		// this.status.sqlTrace.write(this.traceSQL(ddlStatement));
         return this.executeSQL(ddlStatement,{});
       }))
@@ -674,18 +818,48 @@ class YadamuDBI {
     return results;
   }
   
-  prepareDDLStatements(ddlStatements) {
-	return ddlStatements
+  async skipDDLOperations() {
+	 this.emit(YadamuConstants.DDL_UNNECESSARY,performance.now,[])
   }
   
   async executeDDL(ddl) {
 	if (ddl.length > 0) {
       const startTime = performance.now();
-      const results = await this._executeDDL(ddl);
-	  return results
+	  this.ddlInProgress = true
+	  try {
+        const results = await this._executeDDL(ddl);
+	    this.emit(YadamuConstants.DDL_COMPLETE,startTime,results)
+	    return results
+      } catch (e) {
+  	    this.emit(YadamuConstants.DDL_COMPLETE,startTime,e)
+	  }
 	}
-	return []
+	else {
+      this.emit(YadamuConstants.DDL_UNNECESSARY)
+	  return []
+	}
   }
+
+  prepareDDLStatements(ddlStatements) {
+	return ddlStatements
+  }
+  	
+  analyzeStatementCache(statementCache,startTime) {
+  
+	let dmlStatementCount = 0
+	let ddlStatements = []
+	Object.values(statementCache).forEach((tableInfo) => {
+	  if (tableInfo.ddl !== null) {
+		ddlStatements.push(tableInfo.ddl)
+	  }
+	  if (tableInfo.dml !== null) {
+		dmlStatementCount++;
+      }
+    })	 
+	this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Generated ${ddlStatements.length === 0 ? 'no' : ddlStatements.length} "Create Table" statements and ${dmlStatementCount === 0 ? 'no' : dmlStatementCount} DML statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+    ddlStatements = this.prepareDDLStatements(ddlStatements)	
+	return ddlStatements	
+  }  
   
   async _getDatabaseConnection() {
 	  
@@ -720,27 +894,28 @@ class YadamuDBI {
    
     /*
     **
-    ** Invoked when the connection is lost. Assume a rollback took place. Any rows written but not committed are lost. 
+    ** Invoked when the connection is lost. A lost connection scenario is an implicit rollback. All uncommitted rows are lost. 
     **
     */
-
-  	if ((this.metrics !== undefined) && (this.metrics.lost  !== undefined) && (this.metrics.written  !== undefined)) {
-      if (this.metrics.written > 0) {
-        this.yadamuLogger.error([`RECONNECT`,this.DATABASE_VENDOR],`${this.metrics.written} uncommitted rows discarded when connection lost.`);
-        this.metrics.lost += this.metrics.written;
-	    this.metrics.written = 0;
+ 
+  	if ((this.COPY_METRICS !== undefined) && (this.COPY_METRICS.lost  !== undefined) && (this.COPY_METRICS.written  !== undefined)) {
+      if (this.COPY_METRICS.written > 0) {
+        this.yadamuLogger.error([`RECONNECT`,this.DATABASE_VENDOR],`${this.COPY_METRICS.written} uncommitted rows discarded when connection lost.`);
+        this.COPY_METRICS.lost += this.COPY_METRICS.written;
+	    this.COPY_METRICS.written = 0;
       }
 	}
   }	  
   
   async reconnect(cause,operation) {
 
-    
+    // Reconnect. If rows were lost as a result of the reconnect, the original error will be thrown after the reconnection is complete
+	
     cause.yadamuReconnected = false;
 
     this.RECONNECT_IN_PROGRESS = true;
     const TRANSACTION_IN_PROGRESS = this.TRANSACTION_IN_PROGRESS 
-    const SAVE_POINT_SET = this.SAVE_POINT_SET
+	const SAVE_POINT_SET = this.SAVE_POINT_SET
 
     this.yadamuLogger.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`Connection Lost: Attemping reconnection.`);
 	
@@ -752,7 +927,6 @@ class YadamuDBI {
 	**
 	** If a connection is lost while performing batched insert operatons using a table writer, adjust the table writers running total of records written but not committed. 
 	** When a connection is lost records that have written but not committed will be lost (rolled back by the database) when cleaning up after the lost connection.
-	** Writers must invoke setMetrics() passing the writer's counter object to the database interface before consuming rows. 
 	** To avoid the possibility of lost batches set COMMIT_RATIO to 1, so each batch is committed as soon as it is written.
 	**
 	*/
@@ -766,6 +940,7 @@ class YadamuDBI {
       /*
       **
       ** Attempt to close the connection. Handle but do not throw any errors...
+	  ** This is important for MsSQL which has transaction housekeeping state that needs to be updated even through the connection is dead..
       **
       */	
 	
@@ -801,7 +976,7 @@ class YadamuDBI {
           continue;
         }
         else {
-          // Reconnectiona attempt failed for some other reason. Throws the error
+          // Reconnection attempt failed for some other reason. Throw the error
    	      this.RECONNECT_IN_PROGRESS = false;
           this.yadamuLogger.handleException([`RECONNECT`,this.DATABASE_VENDOR,operation],connectionFailure);
           throw cause;
@@ -809,7 +984,7 @@ class YadamuDBI {
       }
       // Sucessfully reonnected. Throw the original error if rows were lost as a result of the lost connection
       this.RECONNECT_IN_PROGRESS = false;
-      if ((this.metrics !== undefined) && (this.metrics.lost > 0)) { 
+      if ((this.COPY_METRICS !== undefined) && (this.COPY_METRICS.lost > 0)) { 
         throw cause
       }
       return
@@ -843,6 +1018,7 @@ class YadamuDBI {
       }
       try {
         await this._getDatabaseConnection()  
+		this.emit(YadamuConstants.DB_CONNECTED)
         return;
       } catch (e) {     
         switch (retryCount) {
@@ -905,14 +1081,58 @@ class YadamuDBI {
 	await this.closeConnection()
   }
   
+  async doFinal() {
+	  
+	 if (this.isManager()) {
+       // this.yadamuLogger.trace([this.constructor.name,'doFinal()',this.ROLE,'ACTIVE_WORKERS'],`WAITING [${this.activeWorkers.size}]`)
+	   await Promise.all(Array.from(this.activeWorkers));
+       // this.yadamuLogger.trace([this.constructor.name,'doFinal()',this.ROLE,'ACTIVE_WORKERS'],'PROCESSING')
+	 }	  
+	 
+  }	
+  
+  newBatch() {
+	return []
+  }
+
+  releaseBatch(batch) {
+	if (Array.isArray(batch)) {
+	  batch.length = 0;
+	}
+  }
+  
   async finalize(options) {
-	// this.yadamuLogger.trace([this.constructor.name,`finalize(${poolOptions})`],'')
+	  
+	// this.yadamuLogger.trace([this.constructor.name,'finalize()'],`Waiting for ${this.activeWriters.size} Writers to terminate. [${this.activeWriters}]`);
+	if (this.ddlInProgress) {
+	  await this.ddlComplete
+	}
+    // this.yadamuLogger.trace([this.constructor.name,'finalize()','ACTIVE_WRITERS',this.getWorkerNumber()],'WAITING')
+    await Promise.allSettled(this.activeWriters)
+    // this.yadamuLogger.trace([this.constructor.name,'finalize()','ACTIVE_WRITERS',this.getWorkerNumber()],'PROCESSING')
 	options = options === undefined ? {abort: false} : Object.assign(options,{abort:false})
     await this.closeConnection(options)
     await this.closePool(options);
     this.logDisconnect();
+	  
   }
 
+  async doDestroy() {
+
+	// this.yadamuLogger.trace([this.constructor.name,this.ROLE,this.getWorkerNumber()],`doDestroy(${this.activeWorkers.size})`)
+	
+	if ((this.isManager()) &&  (this.activeWorkers.size > 0))  {
+      this.yadamuLogger.error([this.DATABASE_VENDOR,'DESTROY'],`Aborting ${this.activeWorkers.size} active workers).`)
+	  this.activeWorkers.forEach((worker) => {
+	    try {
+		  worker.destroy()
+		} catch(e) {
+          this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'DESTROY','Worker',worker.getWorkerNumber()],e);
+		}
+	  })
+	}
+  }	
+		
   /*
   **
   **  Abort the database connection and pool
@@ -921,7 +1141,7 @@ class YadamuDBI {
   
   async abort(e,options) {
 	
-	// this.yadamuLogger.trace([this.constructor.name,`abort(${poolOptions})`],'')
+	// this.yadamuLogger.trace([this.constructor.name,this.ROLE,`abort(${poolOptions})`],'')
 
 	// Log all errors other than lost connection errors. Do not throw otherwise underlying cause of the abort will be lost. 
 				
@@ -1035,7 +1255,6 @@ class YadamuDBI {
   ** The following methods are used by JSON_TABLE() style import operations  
   **
   */
-
   
   async upload() {
 
@@ -1054,7 +1273,7 @@ class YadamuDBI {
 	  await this.finalizeImport()
 	  return log
     } catch (err) {
-      throw err.code === 'ENOENT' ? new FileNotFound(err,stack,this.UPLOAD_FILE) : new FileError(err,stack,this.UPLOAD_FILE)
+      throw err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,this.UPLOAD_FILE) : new FileError(this.DRIVER_ID,err,stack,this.UPLOAD_FILE)
 	}
   }
 
@@ -1066,7 +1285,7 @@ class YadamuDBI {
   */
   
   async uploadFile(importFilePath) {
-    throw new Error('Unimplemented Method')
+    throw new UnimplementedMethod('uploadFile()',`YadamuDBI`,this.constructor.name)
   }
   
   /*
@@ -1076,7 +1295,7 @@ class YadamuDBI {
   */
 
   async processFile(hndl) {
-    throw new Error('Unimplemented Method')
+    throw new UnimplementedMethod('processFile()',`YadamuDBI`,this.constructor.name)
   }
   
   /*
@@ -1105,7 +1324,7 @@ class YadamuDBI {
     , timeZoneOffset     : new Date().getTimezoneOffset()
     , typeMappings       : this.getTypeMappings()
 	, tableFilter        : this.getTABLE_FILTER
-    , schema             : this.parameters.FROM_USER ? this.parameters.FROM_USER : this.parameters.TO_USER
+    , schema             : this.CURRENT_SCHEMA ? this.CURRENT_SCHEMA : this.CURRENT_SCHEMA
     , vendor             : this.DATABASE_VENDOR
 	, dbVersion          : this.DB_VERSION
 	, softwareVendor     : this.SOFTWARE_VENDOR
@@ -1137,7 +1356,7 @@ class YadamuDBI {
   }
   
   generateSchemaInfo(schemaInfo) {
-	this.schemaInfo = schemaInfo.map((table) => {
+	this.schemaMetadata = schemaInfo.map((table) => {
 	  return {
 	    TABLE_SCHEMA          : table[0]
 	  , TABLE_NAME            : table[1]
@@ -1148,12 +1367,11 @@ class YadamuDBI {
 	  }
     })
 
-	return this.schemaInfo;
+	return this.schemaMetadata;
   }
   
   applyTableFilter(schemaInformation) {
 	    
-		
     // Restrict operations to the list of tables specified.
 	// Order operations according to the order in which the tables were specified
 		
@@ -1177,12 +1395,16 @@ class YadamuDBI {
 	
       this.yadamuLogger.info([this.DATABASE_VENDOR],`Operations restricted to the following tables: ${JSON.stringify(this.TABLE_FILTER)}.`)
 	  	 
-	  schemaInformation = this.TABLE_FILTER.map((tableName) => {
+	  schemaInformation = this.TABLE_FILTER.flatMap((tableName) => {
         return schemaInformation.filter((tableInformation) => {
 		   return (tableInformation.TABLE_NAME === tableName)
-		 })[0]
+		 })
 	  })
     }
+	return schemaInformation
+  }
+  
+  expandTaskList(schemaInformation) {
     return schemaInformation
   }
   
@@ -1248,7 +1470,7 @@ class YadamuDBI {
 	return schemaInfo
   }
   
-  async getSchemaInfo(keyName) {
+  async getSchemaMetadata() {
     
     /*
     ** Returns an array of information about each table in the schema being exported.
@@ -1260,13 +1482,13 @@ class YadamuDBI {
     **
     ** The Arrays are expected to be valid JSON arrays.
     **
-    ** The query may also return additional information about the SQL that should be used to retieve the data from the schema
+    ** The query may also return the SQL that should be used to retieve the data from the schema
     **
     ** Implimentations should provde a custom impliemtnation of generateMetadata() if they need more than the minimum set of information about the schema.
     **
     */
           
-    throw new Error('Unimplemented Method')
+    throw new UnimplementedMethod('getSchemaMetadata()',`YadamuDBI`,this.constructor.name)
     return []
   }
      
@@ -1277,12 +1499,11 @@ class YadamuDBI {
   **
   */
   
-  getSchemaIdentifer(key) {
-	return this.parameters[key]
+  getSchemaIdentifer() {
+	return this.CURRENT_SCHEMA
   }
 
   async initializeExport() {
-	this.DESCRIPTION = this.getSchemaIdentifer('FROM_USER')
   }
   
   async finalizeExport() {
@@ -1295,7 +1516,6 @@ class YadamuDBI {
   */
   
   async initializeImport() {
-	this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
   }
   
   async initializeData() {
@@ -1308,16 +1528,18 @@ class YadamuDBI {
   }
     
   async generateStatementCache(StatementGenerator,schema) {
-	const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.yadamuLogger);
-    this.statementCache = await statementGenerator.generateStatementCache()
+	const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.yadamuLogger)
+    this.statementCache = await statementGenerator.generateStatementCache(this.systemInformation.vendor)
+	this.emit(YadamuConstants.CACHE_LOADED  )
 	return this.statementCache
+
   }
 
   async finalizeRead(tableInfo) {
   }
   
   getTableInfo(tableName) {
-	
+	  
     if (this.statementCache === undefined) {
       this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName],`Statement Cache undefined. Cannot obtain required information.`)
 	}
@@ -1326,6 +1548,13 @@ class YadamuDBI {
 
 	let mappedTableName = this.getMappedTableName(tableName,this.identifierMappings)
   	const tableInfo = this.statementCache[mappedTableName]
+	
+	// Add Some Common Settings
+	
+	tableInfo.insertMode = tableInfo.insertMode || 'Batch';    
+	
+	tableInfo.columnCount = tableInfo.columnCount || tableInfo.columnNames.length;      
+    tableInfo.skipTable = tableInfo.skipTable || this.MODE === 'DDL_ONLY';    
 
 	if (tableInfo === undefined) {
       this.yadamuLogger.logInternalError([this.constructor.name,`getTableInfo()`,tableName,mappedTableName],`No Statement Cache entry for "${mappedTableName}". Current entries: ${JSON.stringify(Object.keys(this.statementCache))}`)
@@ -1335,77 +1564,108 @@ class YadamuDBI {
 	return tableInfo
   }
 
-  generateQueryInformation(tableMetadata) {
-    const tableInfo = Object.assign({},tableMetadata);   
-	tableInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
+  generateSQLQuery(tableMetadata) {
+    const queryInfo = Object.assign({},tableMetadata);   
+	queryInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
 	
     // ### TESTING ONLY: Uncomment folllowing line to force Table Not Found condition
-    // tableInfo.SQL_STATEMENT = tableInfo.SQL_STATEMENT.replace(tableInfo.TABLE_NAME,tableInfo.TABLE_NAME + "1")
+    // queryInfo.SQL_STATEMENT = queryInfo.SQL_STATEMENT.replace(queryInfo.TABLE_NAME,queryInfo.TABLE_NAME + "1")
 
-	tableInfo.MAPPED_TABLE_NAME = this.getMappedTableName(tableInfo.TABLE_NAME,this.identifierMappings) || tableInfo.TABLE_NAME
-    return tableInfo
+	queryInfo.MAPPED_TABLE_NAME = this.getMappedTableName(queryInfo.TABLE_NAME,this.identifierMappings) || queryInfo.TABLE_NAME
+    return queryInfo
   }   
 
-  createParser(tableInfo) {
-    return new DefaultParser(tableInfo,this.yadamuLogger);      
+  createParser(queryInfo) {
+    return new DefaultParser(queryInfo,this.yadamuLogger);      
   }
  
   inputStreamError(cause,sqlStatement) {
     return this.trackExceptions(new InputStreamError(cause,this.streamingStackTrace,sqlStatement))
   }
   
-  async getInputStream(tableInfo) {
-	throw new Error('Unimplemented Method')
+  async getInputStream(queryInfo) {
 	this.streamingStackTrace = new Error().stack;
+    throw new UnimplementedMethod('getInputStream()',`YadamuDBI`,this.constructor.name)
 	return inputStream;
   }      
 
-  async getInputStreams(tableInfo) {
+  async getInputStreams(queryInfo) {
 	const streams = []
-	this.INPUT_METRICS = DBIConstants.NEW_TIMINGS
-	this.INPUT_METRICS.DATABASE_VENDOR = this.DATABASE_VENDOR
-	const inputStream = await this.getInputStream(tableInfo)
+	const metrics = DBIConstants.NEW_COPY_METRICS
+	metrics.SOURCE_DATABASE_VENDOR = this.DATABASE_VENDOR
+	const inputStream = await this.getInputStream(queryInfo)
+	inputStream.COPY_METRICS = metrics
     inputStream.once('readable',() => {
-	  this.INPUT_METRICS.readerStartTime = performance.now()
+	  inputStream.COPY_METRICS.readerStartTime = performance.now()
 	}).on('error',(err) => { 
-	  this.underlyingCause = YadamuError.prematureClose(err) ? null : this.inputStreamError(err,tableInfo.SQL_STATEMENT)
-      this.INPUT_METRICS.readerEndTime = performance.now()
-	  this.INPUT_METRICS.readerError = this.underlyingCause
-	  this.INPUT_METRICS.failed = true;
-	  this.failedPrematureClose = err.code === 'ERR_STREAM_PREMATURE_CLOSE'
+      metrics.readerEndTime = performance.now()
+	  metrics.failed = true;
+	  this.failedPrematureClose = YadamuError.prematureClose(err)
+	  this.underlyingCause =  this.failedPrematureClose ? null : this.inputStreamError(err,queryInfo.SQL_STATEMENT)
+	  metrics.readerError = this.underlyingCause
     }).on('end',() => {
-	  this.INPUT_METRICS.readerEndTime = performance.now()
+	  inputStream.COPY_METRICS.readerEndTime = performance.now()
     })
 	streams.push(inputStream)
 	
-	const parser = this.createParser(tableInfo)
+	const parser = this.createParser(queryInfo)
+	parser.COPY_METRICS = metrics
 	parser.once('readable',() => {
-	  this.INPUT_METRICS.parserStartTime = performance.now()
-	}).on('end',() => {
-	  this.INPUT_METRICS.parserEndTime = performance.now()
-	  this.INPUT_METRICS.rowsRead = parser.getRowCount()
-      this.INPUT_METRICS.lost = parser.writableLength
+	  metrics.parserStartTime = performance.now()
+	}).on('finish',() => {
+	  metrics.parserEndTime = performance.now()
 	}).on('error',(err) => {
-	  this.INPUT_METRICS.parserEndTime = performance.now()
-	  this.INPUT_METRICS.rowsRead = parser.getRowCount()
-      this.INPUT_METRICS.lost = parser.writableLength
-	  this.INPUT_METRICS.parserError = YadamuError.prematureClose(err) ? null : err
-	  this.INPUT_METRICS.failed = true;
+	  metrics.parserEndTime = performance.now()
+	  metrics.failed = true;
+	  metrics.parserError = YadamuError.prematureClose(err) ? null : err
 	})
 	
 	streams.push(parser)
     return streams;
   }
   
-  getOutputStream(TableWriter,tableName,ddlComplete) {
+  getOutputManager(OutputManager,tableName,metrics) {
+    return new OutputManager(this,tableName,metrics,this.status,this.yadamuLogger)
+  }
+
+  getOutputStream(TableWriter,tableName,metrics) {
     // this.yadamuLogger.trace([this.constructor.name,`getOutputStream(${tableName})`],'')
-    const os = new TableWriter(this,tableName,ddlComplete,this.status,this.yadamuLogger)
-	return os;
+    return new TableWriter(this,tableName,metrics,this.status,this.yadamuLogger)
   }
   
-  getOutputStreams(tableName,ddlComplete) {
-	return [this.getOutputStream(tableName,ddlComplete)]
-    // return [this.getOutputStream(tableName,ddlComplete),new DummyWritable()]
+  
+  getOutputStreams(tableName,metrics) {
+	// A Writer needs to track the metrics do it can make decisions about whether or not to honor a reconnect() request following a lost connection. 
+	this.COPY_METRICS = metrics
+    const streams = []
+	metrics.TARGET_DATABASE_VENDOR = this.DATABASE_VENDOR
+	const outputManager = this.getOutputManager(tableName,metrics)
+	outputManager.once('readable',() => {
+	  metrics.managerStartTime = performance.now()
+	}).on('finish',() => { 
+ 	  metrics.managerEndTime = performance.now()
+	}).on('error',(err) => {
+ 	  metrics.managerEndTime = performance.now()
+	  metrics.failed = true;
+	  metrics.managerError = YadamuError.prematureClose(err) ? null : err
+    })
+	streams.push(outputManager)
+	
+	const tableWriter = this.getOutputStream(tableName,metrics)
+	tableWriter.once('pipe',() => {
+	  metrics.writerStartTime = performance.now()
+	}).on('error',(err) => {
+	  metrics.writerEndTime = performance.now()
+	  metrics.failed = true;
+	  metrics.writerError = YadamuError.prematureClose(err) ? null : err
+	})
+	
+	streams.push(tableWriter)
+	
+    return streams;
+  	
+	
+	return [,]
   }
   
   keepAlive(rowCount) {
@@ -1417,7 +1677,6 @@ class YadamuDBI {
 	}	 
   }
   
-
   isManager() {
 
     return (this.workerNumber === undefined)
@@ -1440,47 +1699,49 @@ class YadamuDBI {
   }
 
   async cloneCurrentSettings(manager) {
+	  
 	this.StatementLibrary   = manager.StatementLibrary
 	this.StatementGenerator = manager.StatementGenerator
 	
 	this.systemInformation  = manager.systemInformation
     this.metadata           = manager.metadata
-    this.schemaCache        = manager.schemaCache
+    this.statementCache     = manager.statementCache
     this.statementGenerator = manager.statementGenerator
-    
+	this.ddlComplete        = manager.ddlComplete
+	this.partitionMetadata  = manager.partitionMetadata
+	
     this.setParameters(manager.parameters);
 	this.setIdentifierMappings(manager.getIdentifierMappings())
-
+	
   }   
 
-  async workerDBI(workerNumber) {
+  async initializeWorker() {
+	await this.setWorkerConnection()
+	await this.configureConnection();
+	await this.cloneCurrentSettings(this.manager);
+  }
+  
+  workerDBI(workerNumber) {
       
     // Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
 	
 	const dbi = this.classFactory(this.yadamu)  
-	dbi.manager = this
     dbi.workerNumber = workerNumber
     dbi.sqlTraceTag = ` /* Worker [${dbi.getWorkerNumber()}] */`;
-	await dbi.setWorkerConnection()
-	await dbi.configureConnection();
-	await dbi.cloneCurrentSettings(this);
 	return dbi
   }
  
   async getConnectionID() {
 	// ### Get a Unique ID for the connection
-    throw new Error('Unimplemented Method')
+    throw new UnimplementedMethod('getConnectionID()',`YadamuDBI`,this.constructor.name)
+  }
+  
+  async destroyWorker() {
+    // this.yadamuLogger.trace([this.constructor.name,this.ROLE,this.getWorkerNumber(),`destroyWorker()`],'')
+	await this.releaseWorkerConnection() 
+	this.emit(YadamuConstants.DESTROYED)
   }
 
-  configureTermination(configuration) {
-    // Kill Configuration is added to the MasterDBI by YADAMU-QA
-    this.killConfiguration = configuration
-  }
-
-  terminateConnection(idx) {
-    return (!YadamuLibrary.isEmpty(this.killConfiguration) && ((this.isManager() && this.killConfiguration.worker === undefined) || (this.killConfiguration.worker === idx)))
-  }
- 
   /*
   **
   ** Copy-based Import Operations - Experimental
@@ -1491,106 +1752,31 @@ class YadamuDBI {
     return ''
   }
 	
+  /*
+  **
+  ** Copy Operation Support.
+  **
+  */
+
   reportCopyOperationMode(copyEnabled,controlFilePath,contentType) {
     this.yadamuLogger.info([this.DATABASE_VENDOR,'COPY',`${contentType}`],`Processing ${controlFilePath}" using ${copyEnabled ? 'COPY' : 'PIPELINE' } mode.`)
 	return copyEnabled
   } 
-	
-	
-  validStagedDataSet(source,controlFilePath,controlFile) {   
+  
+  verifyStagingSource(validSources,source) {   
+    if (!validSources.includes(source)) {
+      throw new YadamuError(`COPY operations not supported between "${source}" and "${this.dbi.DATABASE_VENDOR}".`)
+	}
+  }
 
-    /*
-	**
-    ** Does the Target support copy operations from this source / control file ?
-    **
-	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
-	** Return false if the data set cannot be consumed using a Copy operation
-	** Do not throw errors if the data set cannot be used for a COPY operatio
-	** Generate Info messages to explain why COPY cannot be used.
-	**
-  
-    return true
-	
-	**
-	*/
-	
-    throw new YadamuError(`Unsupported Feature for Driver "${this.DATABASE_KEY}".`)
-	
+  async reportCopyErrors(tableName,metrics) {
   }
-  
-  analyzeStatementCache(statementCache,startTime) {
-  
-	let dmlStatementCount = 0
-	let ddlStatements = []
-	Object.values(statementCache).forEach((tableInfo) => {
-	  if (tableInfo.ddl !== null) {
-		ddlStatements.push(tableInfo.ddl)
-	  }
-	  if (tableInfo.dml !== null) {
-		dmlStatementCount++;
-      }
-    })	 
-	this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Generated ${ddlStatements.length === 0 ? 'no' : ddlStatements.length} "Create Table" statements and ${dmlStatementCount === 0 ? 'no' : dmlStatementCount} DML statements. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
-    ddlStatements = this.prepareDDLStatements(ddlStatements)	
-	return ddlStatements	
-  }  
-  
-  async generateCopyStatements(metadata) {
-    const startTime = performance.now()
-    await this.setMetadata(metadata)   
-    const statementCache = await this.generateStatementCache(this.parameters.TO_USER)
-	return statementCache
-  }     
-  
-  async reportCopyErrors(tableName,stack,sqlStatement,failed) {
-  }
-  
-  async reportCopyResults(tableName,rowsRead,failed,startTime,endTime,copyStatements,stack) {
-	 
-	const elapsedTime = endTime - startTime
-	const throughput = Math.round((rowsRead/elapsedTime) * 1000)
-    const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s. Throughput: ${throughput} rows/s.`
-   
-    let rowCountSummary
-    switch (failed) {
-	  case 0:
-	    rowCountSummary = `Rows ${rowsRead}.`
-        this.yadamuLogger.info([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
-        break
-      default:
-	    rowCountSummary = `Read ${rowsRead}. Written ${rowsRead - failed}.`
-        this.yadamuLogger.error([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
-        await this.reportCopyErrors(tableName,stack,copyStatements.dml,failed)
-	}
-	
-	if (copyStatements.hasOwnProperty('partitionCount')) {
-	   const metrics = {
-		  rowCount       : rowsRead
-	    , insertMode     : 'copy'
-	    , startTime      : startTime
-		, endTime        : endTime
-	    , partitionCount : copyStatements.partitionCount
-		, partitionID    : copyStatements.partitionID
-	    }
-	  this.yadamu.recordPartitionMetrics(tableName,metrics);  
-	}   
-	else {
-      const metrics = {
-	    [tableName] : {
-		  rowCount    : rowsRead
-	    , insertMode  : 'copy'
-	    , elapsedTime : elapsedTime
-	    , throughput  : `${throughput}/s`
-	    }
-      }
-	  this.yadamu.recordMetrics(metrics);  
-	}
-  }
-  
+ 
   async initializeCopy() {
+	await this.initializeImport()
   }
   
-  async copyOperation(tableName,statement) {
+  async copyOperation(tableName,copyOperation,metrics) {
 	
     /*
     **
@@ -1598,126 +1784,33 @@ class YadamuDBI {
     **
     */
 	
-	let startTime 
 	try {
-	  startTime = performance.now();
-	  let results = await this.beginTransaction()
-	  results = await this.executeSQL(statement);
-	  const elapsedTime = performance.now() - startTime;
+	  metrics.writerStartTime = performance.now();
+	  let results = await this.beginTransaction();
+	  results = await this.executeSQL(copyOperation.dml);
+  	  metrics.read = results.affectedRows
+	  metrics.written = results.affectedRows
+	  metrics.writerEndTime = performance.now();
 	  results = await this.commitTransaction()
-      const writerTimings = `Elapsed Time: ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  rows/s.`
-      this.yadamuLogger.info([tableName,'Copy'],`${writerTimings}`)  
-	} catch(e) {
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
-	  let results = await this.rollbackTransaction()
+	  metrics.committed = metrics.written 
+	  metrics.written = 0
+  	} catch(e) {
+	  metrics.writerError = e
+	  try {
+  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+	    let results = await this.rollbackTransaction()
+	  } catch (e) {
+		e.cause = metrics.writerError
+		metrics.writerError = e
+	  }
 	}
+	return metrics
   }
   		  
   async finalizeCopy() {
-  }
-
-  async copyOperations(taskList,sourceVendor) {
-	 
-    this.activeWorkers = new Set()
-    const taskCount = taskList.length
-    const maxWorkerCount = parseInt(this.yadamu.PARALLEL)
-    const workerCount = taskList.length < maxWorkerCount ? taskList.length : maxWorkerCount
-  
-    const workers = workerCount === 0 ? [this] : await Promise.all(new Array(workerCount).fill(0).map((x,idx) => { return this.workerDBI(idx) }))
-	const concurrency = workerCount > 0 ? 'PARALLEL' : 'SERIAL'
-	
-	let operationAborted = false;
-	let fatalError = undefined
-    const copyOperations = workers.map((worker,idx) => { 
-	  return new Promise(async (resolve,reject) => {
-        // ### Await inside a Promise is an anti-pattern ???
-        let result = undefined
-        try {
-     	  while (taskList.length > 0) {
-	        const task = taskList.shift();
-		    await worker.copyOperation(task.TABLE_NAME,task.copyStatement)
-          }
-		} catch (cause) {
-		  result = cause
-		  // this.yadamuLogger.trace(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,this.getWorkerNumber()],cause)
-		  this.yadamuLogger.handleException(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,this.getWorkerNumber()],cause)
-		  if ((this.ON_ERROR === 'ABORT') && !operationAborted) {
-			fatalError = result
-    	    operationAborted = true
-			if (taskList.length > 0) {
-		      this.yadamuLogger.error(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,worker.ON_ERROR],`Operation failed: Skipping ${taskList.length} Tables`);
-			}
-			else {
-		      this.yadamuLogger.warning(['PIPELINE','COPY',concurrency,sourceVendor,worker.DATABASE_VENDOR,worker.ON_ERROR],`Operation failed.`);
-			}		
-            taskList.length = 0;
-          }
-		}
-        if (!worker.isManager()) {
-		  await worker.releaseWorkerConnection()
-	    }
-		resolve(result) 
-      })
-    })
-	  
-    this.yadamuLogger.info(['PIPELINE','COPY',concurrency,workerCount,sourceVendor,this.DATABASE_VENDOR],`Processing ${taskCount} Tables`);
-    const results = await Promise.allSettled(copyOperations)
-	if (operationAborted) throw fatalError
-    // this.yadamuLogger.trace(['PIPELINE','COPY',concurrency,workerCount,sourceVendor,this.DATABASE_VENDOR,taskList.length],`Processing Complete`);
-	return results
-  }  
-  
-  verifyStagingSource(validSources,source) {   
-    if (!validSources.includes(source)) {
-      throw new YadamuError(`COPY operations not supported between "${source}" and "${this.DATABASE_VENDOR}".`)
-	}
-  }
-   
-  async copyStagedData(vendor,controlFile,metadata,credentials) {
-
-	this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
-	this.setSystemInformation(controlFile.systemInformation)
-
-    const startTime = performance.now()	
-	await this.initializeImport()
-
-	const statementCache = await this.generateCopyStatements(metadata,credentials);
-	const ddlStatements = this.analyzeStatementCache(statementCache,startTime)
-	let results = await this.executeDDL(ddlStatements)
-    if (results instanceof Error) {
-	  this.yadamuLogger.ddl([this.DATABASE_VENDOR],`DDL Failure. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
-	  return results
-    }
-	else {
-  	  this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Executed ${Array.isArray(results) ? results.length : undefined} DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
-	}
-    
-	if (this.MODE != 'DDL_ONLY') {
-	  const taskList = Object.keys(statementCache).flatMap((table) => {
-		if (Array.isArray(statementCache[table].copy)) {
-	      return statementCache[table].copy.map((copyOperation) => { 
-		     return { 
-	           TABLE_NAME    : table
-	         , copyStatement : copyOperation
-		     }
-		  })
-		}  
-		else {
-		  return {
-  	        TABLE_NAME    : table
-	      , copyStatement : statementCache[table].copy
-          }
-		}
-	  })
-	  await this.initializeCopy()
-      results = await this.copyOperations(taskList,vendor)
-	  await this.finalizeCopy()
-	  
-	}
-	await this.finalizeImport()
-    return results
+	await this.finalizeImport();
   }
   
 }
 
-module.exports = YadamuDBI
+export { YadamuDBI as default}

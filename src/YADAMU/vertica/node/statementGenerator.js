@@ -1,9 +1,9 @@
 "use strict";
 
-const crypto = require('crypto');
-const path = require('path');
+import crypto from 'crypto';
+import path from 'path';
 
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
+import YadamuLibrary from '../../common/yadamuLibrary.js';
 
 class StatementGenerator {
 
@@ -766,9 +766,7 @@ class StatementGenerator {
 	const stagingFileName =  `YST-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
 	const stagingFilePath =  path.join(this.dbi.LOCAL_STAGING_AREA,stagingFileName)
 	const localPath       =  path.resolve(stagingFilePath); 
-	let remotePath        =  tableMetadata.dataFile || path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName)
-	// remotePath            =  Array.isArray(remotePath) ? remotePath.map((p) => { return p.split(path.sep).join(path.posix.sep)}).join("','") : remotePath.split(path.sep).join(path.posix.sep); 
-	// remotePath         =   =  Array.isArray(remotePath) ? remotePath.map((p) => { return p.split(path.sep).join(path.posix.sep)}).join("','") : remotePath.split(path.sep).join(path.posix.sep); 
+	let remotePath        =  tableMetadata.dataFile || path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName).split(path.sep).join(path.posix.sep)
 	
     const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
     const insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values `;
@@ -778,7 +776,7 @@ class StatementGenerator {
 	if (Array.isArray(tableMetadata.dataFile)) {
       copy = tableMetadata.dataFile.map((remotePath,idx) => {
 	    return  {
-	      dml             : `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath.split(path.sep).join(path.posix.sep)}' PARSER fcsvparser(type='rfc4180', header=false, trim=${this.dbi.COPY_TRIM_WHITEPSPACE===true}) NULL ''`
+	      dml             : `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath}' PARSER fcsvparser(type='rfc4180', header=false, trim=${this.dbi.COPY_TRIM_WHITEPSPACE===true}) NULL ''`
 		, partitionCount  : tableMetadata.partitionCount
 		, partitionID     : idx+1
 	    }
@@ -786,7 +784,7 @@ class StatementGenerator {
 	}
     else {
 	  copy = {
-	   dml         : `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath.split(path.sep).join(path.posix.sep)}' PARSER fcsvparser(type='rfc4180', header=false, trim=${this.dbi.COPY_TRIM_WHITEPSPACE===true}) NULL ''`
+	   dml         : `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath}' PARSER fcsvparser(type='rfc4180', header=false, trim=${this.dbi.COPY_TRIM_WHITEPSPACE===true}) NULL ''`
 	  }
     }
 	
@@ -797,13 +795,13 @@ class StatementGenerator {
 	   mergeout        : mergeoutStatement,
 	   stagingFileName : stagingFileName,
 	   localPath       : localPath,
+	   remotePath      : remotePath,
 	   columnNames     : columnNames,
        targetDataTypes : targetDataTypes, 
 	   sizeConstraints : sizeConstraints,
 	   insertOperators : insertOperators,
        insertMode      : insertMode,
        _BATCH_SIZE     : this.dbi.BATCH_SIZE,
-       _COMMIT_COUNT   : this.dbi.COMMIT_COUNT,
        _SPATIAL_FORMAT : this.dbi.INBOUND_SPATIAL_FORMAT,
 	   _SCHEMA_NAME    : this.targetSchema,
 	   _TABLE_NAME     : tableMetadata.tableName
@@ -826,4 +824,4 @@ class StatementGenerator {
 
 }
 
-module.exports = StatementGenerator
+export { StatementGenerator as default }

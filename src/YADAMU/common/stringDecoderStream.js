@@ -1,7 +1,7 @@
 "use strict"
 
-const { StringDecoder } = require('string_decoder');
-const {Transform} = require('stream');
+import { StringDecoder } from 'string_decoder';
+import {Transform} from 'stream';
 
 class StringDecoderStream extends Transform {
 
@@ -25,4 +25,4 @@ class StringDecoderStream extends Transform {
   
 }
 
-module.exports = StringDecoderStream
+export { StringDecoderStream as default}

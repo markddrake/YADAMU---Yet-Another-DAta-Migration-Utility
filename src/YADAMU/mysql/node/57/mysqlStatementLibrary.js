@@ -1,7 +1,7 @@
 "use strict" 
 
-const YadamuConstants = require('../../../common/yadamuConstants.js');
-const DefaultStatmentLibrary = require('../mysqlStatementLibrary.js')
+import YadamuConstants from '../../../common/yadamuConstants.js';
+import DefaultStatmentLibrary from '../mysqlStatementLibrary.js'
 
 class MySQLStatementLibrary extends DefaultStatmentLibrary {   
 
@@ -16,7 +16,7 @@ class MySQLStatementLibrary extends DefaultStatmentLibrary {
   }
 }
 
-module.exports = MySQLStatementLibrary
+export { MySQLStatementLibrary  as default }
 
 /*
 **

@@ -1,12 +1,12 @@
 "use strict";
 
-const express = require('express');
-const cookieParser = require('cookie-parser');
-const YadamuServer = require('./yadamuServer.js');
-const YadamuLogger = require('../../YADAMU/common/yadamuLogger.js');
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import YadamuServer from './yadamuServer.js';
+import YadamuLogger from '../../YADAMU/common/yadamuLogger.js';
 
-const yadamuServer = new YadamuServer();
-const yadamuLogger = new YadamuLogger(process.stdout,{});
+import yadamuServer from new YadamuServer;
+import yadamuLogger from new YadamuLoggerprocess.stdout,{};
 
 function setSessionId(cookies,sessionState) {
   
@@ -148,11 +148,13 @@ async function about(request,response,next) {
   }
 }
 
-module.exports.getRouter = getRouter
-module.exports.exportStream = exportStream
-module.exports.importStream = importStream
-module.exports.exportFile = exportFile
-module.exports.importFile = importFile
-module.exports.copy = copy
-module.exports.uploadSchemaMappings = uploadSchemaMappings
-module.exports.uploadConnectionDefinitions = uploadConnectionDefinitions
+export  {
+  getRouter
+, exportStream
+, importStream
+, exportFile
+, importFile
+, copy
+, uploadSchemaMappings
+, uploadConnectionDefinitions
+}

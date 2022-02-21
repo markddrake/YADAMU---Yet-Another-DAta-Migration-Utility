@@ -1,17 +1,27 @@
 "use strict"
 
-const fs = require('fs');
-const path = require('path');
-const { performance } = require('perf_hooks');
+import fs from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
-const Yadamu = require('../../../YADAMU/common/yadamu.js');
-const DBIConstants = require('../../../YADAMU/common/dbiConstants.js');
-const YadamuMetrics = require('./yadamuMetrics.js');
-const YadamuDefaults = require('./yadamuDefaults.json')
-const CompareRules = require('./compareRules.json')
-const NullWriter =  require('../../../YADAMU/common/nullWriter.js');
+import { performance } from 'perf_hooks';
+
+import Yadamu from '../../../YADAMU/common/yadamu.js';
+import DBIConstants from '../../../YADAMU/common/dbiConstants.js';
+import YadamuMetrics from './yadamuMetrics.js';
+import YadamuLogger from './yadamuLogger.js';
+import NullWriter from  '../../../YADAMU/common/nullWriter.js';
+
+// const YadamuDefaults = require('./yadamuDefaults.json')
+// const CompareRules = require('./compareRules.json')
+
+const  __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const YadamuDefaults = JSON.parse(fs.readFileSync(join(__dirname,'./yadamuDefaults.json'),'utf-8'));
+const CompareRules = JSON.parse(fs.readFileSync(join(__dirname,'./compareRules.json'),'utf-8'));
+
 class YadamuTest extends Yadamu {
-
+  
   static #_YADAMU_PARAMETERS
   static #_YADAMU_DBI_PARAMETERS
     
@@ -30,6 +40,14 @@ class YadamuTest extends Yadamu {
     return this.#_YADAMU_DBI_PARAMETERS
   }
 
+  get LOGGER() {
+    this._LOGGER = this._LOGGER || (() => {
+      const logger = this.LOG_FILE === undefined ? YadamuLogger.consoleLogger(this.STATUS,this.EXCEPTION_FOLDER,this.EXCEPTION_FILE_PREFIX) : YadamuLogger.fileLogger(this.LOG_FILE,this.STATUS,this.EXCEPTION_FOLDER,this.EXCEPTION_FILE_PREFIX)
+      return logger
+    })();
+    return this._LOGGER
+  }
+  
   get YADAMU_PARAMETERS()     { return YadamuTest.YADAMU_PARAMETERS }
   get YADAMU_DBI_PARAMETERS() { return YadamuTest.YADAMU_DBI_PARAMETERS }
 
@@ -128,7 +146,17 @@ class YadamuTest extends Yadamu {
   makeXML(rules) {
     return `<rules>${Object.keys(rules).map((tag) => { return `<${tag}>${rules[tag] === null ? '' : rules[tag]}</${tag}>` }).join()}</rules>`
   }
+  
+  recordMetrics(tableName,metrics) {    
 
+    if (metrics.read - metrics.committed - metrics.lost - metrics.skipped !== 0) {
+	  this.LOGGER.qaWarning([`${tableName}`,`${metrics.insertMode}`,`INCONSISTENT METRICS`],`read: ${metrics.read}, parsed: ${metrics.pared}, received:  ${metrics.received}, committed: ${metrics.committed}, skipped: ${metrics.skipped}, lost: ${metrics.lost}, pending: {metrics.pending}, written: ${metrics.written}, cached: ${metrics.cached}.`)  
+    } 
+	
+	return super.recordMetrics(tableName,metrics)
+  
+  }
+  
 }  
      
-module.exports = YadamuTest;
+export { YadamuTest as default}

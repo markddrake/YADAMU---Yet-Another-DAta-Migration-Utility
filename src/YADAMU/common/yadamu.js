@@ -1,31 +1,29 @@
 "use strict"
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const readline = require('readline');
-const { performance } = require('perf_hooks');
-const assert = require('assert');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import readline from 'readline';
+import { performance } from 'perf_hooks';
+import assert from 'assert';
+import { pipeline,finished } from 'stream/promises';
 
-const util = require('util')
-const stream = require('stream')
-// const pipeline = util.promisify(stream.pipeline);
-const { pipeline } = require('stream/promises');
-const finished = stream.finished
+import FileDBI from '../file/node/fileDBI.js';
+import DBReader from './dbReader.js';
+import DBWriter from './dbWriter.js';
+import DBReaderParallel from './dbReaderParallel.js';
+import DBReaderFile from './dbReaderFile.js';
 
-const FileDBI = require('../file/node/fileDBI.js');
-const DBReader = require('./dbReader.js');
-const DBWriter = require('./dbWriter.js');
-const DBReaderParallel = require('./dbReaderParallel.js');
+import YadamuConstants from './yadamuConstants.js';
+import DBIConstants from './dbiConstants.js';
+import NullWriter from './nullWriter.js';
+import YadamuLogger from './yadamuLogger.js';
+import YadamuLibrary from './yadamuLibrary.js';
+import {YadamuError, UserError, CommandLineError, ConfigurationFileError, DatabaseError, ConnectionError} from './yadamuException.js';
+import {FileNotFound, FileError} from '../file/node/fileException.js';
+import YadamuRejectManager from './yadamuRejectManager.js';
 
-const YadamuConstants = require('./yadamuConstants.js');
-const DBIConstants = require('./dbiConstants.js');
-const NullWriter = require('./nullWriter.js');
-const YadamuLogger = require('./yadamuLogger.js');
-const YadamuLibrary = require('./yadamuLibrary.js');
-const {YadamuError, UserError, CommandLineError, ConfigurationFileError, DatabaseError, ConnectionError} = require('./yadamuException.js');
-const {FileNotFound, FileError} = require('../file/node/fileException.js');
-const YadamuRejectManager = require('./yadamuRejectManager.js');
+import YadamuCopyManager from './yadamuCopyManager.js';
 
 class Yadamu {
 
@@ -153,6 +151,7 @@ class Yadamu {
 	      
 	if (process.listenerCount('unhandledRejection') === 0) { 
 	  process.on('unhandledRejection', this.yadamuAbort.bind(this))
+	  // process.on('unhandledRejection', this.yadamuAbort)
 	}
     // Configure Paramters
     this.initializeParameters(configParameters || {})
@@ -178,28 +177,29 @@ class Yadamu {
 
   }
   
-  yadamuAbort(err,p) {
+  yadamuAbort(err,promise) {
+	 
     if (err.ignoreUnhandledRejection === true) {
-	    // this.LOGGER.trace(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],'IGNORED'],err);
-	   return;
+	  // this.LOGGER.trace(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],'IGNORED'],err);
+	  return;
 	}
 
-	this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
-    this.LOGGER.handleException(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
+	this.LOGGER.error(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
+    this.LOGGER.handleException(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],err);
 	this.STATUS.errorRaised = true;
     this.reportStatus(this.STATUS,this.LOGGER)
 	this.close();
     if (!this.INTERACTIVE) {
   	  this.terminator = setTimeout(
 	    async () => {
-		  this.LOGGER.trace(['UHANDLED REJECTION','YADAMU',this.STATUS.operation],`Active Connections: ${this.activeConnections.size}`);
-   	      this.LOGGER.error(['UHANDLED REJECTION','YADAMU',this.STATUS.operation,'TIMEOUT'],'Closing connections and shutting down.')
+		  // this.LOGGER.trace(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],`Active Connections: ${this.activeConnections.size}`);
+   	      this.LOGGER.error(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,'TIMEOUT'],'Closing connections and shutting down.')
   	      for (const conn of this.activeConnections) {
 		    try {
 		      await conn.abort()
-		      this.LOGGER.info(['UHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],'Aborted Connection')
+		      this.LOGGER.info(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],'Aborted Connection')
 		    } catch(e) {
-			  this.LOGGER.handleWarning(['UHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],e)
+			  this.LOGGER.handleWarning(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],e)
 			}			
 		  }
 		  this.terminator = undefined
@@ -314,9 +314,8 @@ class Yadamu {
         metrics.elapsedTime = metrics.endTime - metrics.startTime
 		delete metrics.startTime
 		delete metrics.endTime
-		const throughput = Math.round((metrics.rowCount/metrics.elapsedTime) * 1000)
-		metrics.throughput =  throughput  + "/s"
-	    const timings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(metrics.elapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(metrics.sqlExecutionTime))}s. Throughput: ${throughput} rows/s.`
+		metrics.throughput = Math.round((metrics.rowCount/metrics.elapsedTime) * 1000)
+	    const timings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(metrics.elapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(metrics.sqlExecutionTime))}s. Throughput: ${metrics.throughput} rows/s.`
 	    this.LOGGER.info([`${table}`],`Total Rows ${metrics.rowCount}. ${timings}`)  
       }
 	}
@@ -325,8 +324,22 @@ class Yadamu {
 	}
   }
   
-  recordMetrics(metrics) {
-	Object.assign(this.metrics,metrics)
+  recordMetrics(tableName,metrics) {
+	 
+	const elapsedTime =  Math.round(metrics.writerEndTime - metrics.pipeStartTime)
+	const tableSummary = {
+	  elapsedTime       : elapsedTime
+	, throughput        : Math.round((metrics.committed/elapsedTime) * 1000)
+    , rowCount          : metrics.committed
+	, rowsSkipped       : metrics.skipped
+	, sqlExecutionTime  : metrics.sqlTime
+	}
+	
+	// console.log(metrics,tableSummary)
+
+	Object.assign(this.metrics,{[tableName]:tableSummary})
+	
+	return tableSummary
   }
   
   reportStatus(status,yadamuLogger) {
@@ -731,8 +744,8 @@ class Yadamu {
 
   }
 
-  async getDBReader(dbi) {
-	const dbReader = this.PARALLEL_ENABLED ? new DBReaderParallel(dbi, this.LOGGER) : new DBReader(dbi, this.LOGGER);
+  async getDBReader(dbi,isDatabase) {
+	const dbReader = isDatabase ? this.PARALLEL_ENABLED ? new DBReaderParallel(dbi, this.LOGGER) : new DBReader(dbi, this.LOGGER) : new DBReaderFile(dbi, this.LOGGER)
 	await dbReader.initialize();
     return dbReader;
   }
@@ -784,7 +797,8 @@ class Yadamu {
 	await source.finalize();
     this.activeConnections.delete(source);
 
-	const results = await target.copyStagedData(source.DATABASE_KEY,controlFile,metadata,source.getCredentials(target.DATABASE_KEY))
+    const copyManager = new YadamuCopyManager(target,this.LOGGER);
+	const results = await copyManager.copyStagedData(source.DATABASE_KEY,controlFile,metadata,source.getCredentials(target.DATABASE_KEY))
     await target.finalize();
     this.activeConnections.delete(target);
     this.reportStatus(this.STATUS,this.LOGGER)
@@ -802,8 +816,6 @@ class Yadamu {
 	**
 	*/
 
-	let streamsCompleted
-
     /*
 	**
 	** Enabled Parallel Processing if parallel operations are support by the soure and target
@@ -812,32 +824,28 @@ class Yadamu {
 	
 	this.PARALLEL_ENABLED = source.PARALLEL_OPERATIONS && target.PARALLEL_OPERATIONS
 	
-    const dbReader = await this.getDBReader(source)
+    const dbReader = await this.getDBReader(source,target.isDatabase())
     const dbWriter = await this.getDBWriter(target) 
 
+    const yadamuPipeline = []
+    const activeStreams = []
     try {
-      const yadamuPipeline = []
       // dbReader.getInputStream() returns itself (this) for databases...	  
 	  yadamuPipeline.push(...dbReader.getInputStreams())
 	  yadamuPipeline.push(dbWriter)
 
-      // this.LOGGER.trace([this.constructor.name,'PIPELINE'],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}`}).join(' => ')}`)
+      
+      // The components that make up the pipeline may not have finished _final and destroy when the pipeline completes. Need to wait for all components to Finish before closing connections
+	  // activeStreams.push(...yadamuPipeline.map((s) => { return finished(s) }))
 
-	  streamsCompleted = yadamuPipeline.map((s) => { 
-	    return new Promise((resolve,reject) => {
-	      finished(s,(err) => {
-		    if (err) {reject(err)} else {resolve()}
-		  })
-        })
-      })
-
+      // this.LOGGER.trace([this.constructor.name,'PIPELINE'],`${yadamuPipeline.map((s) => { return `${s.constructor.name}`}).join(' => ')}`)
  	  // this.LOGGER.trace([this.constructor.name,`PIPELINE`,dbReader.dbi.DATABASE_VENDOR,dbWriter.dbi.DATABASE_VENDOR,process.arch,process.platform,process.version],'Starting Pipeline')
+	  
 	  await pipeline(...yadamuPipeline)
-      this.STATUS.operationSuccessful = true;
-   	  await Promise.allSettled(streamsCompleted)
+      // await Promise.allSettled(activeStreams)
+	  this.STATUS.operationSuccessful = true;
 
       // this.LOGGER.trace([this.constructor.name,'PIPELINE'],'Success')
-
       await source.finalize();
 	  this.activeConnections.delete(source);
    	  await target.finalize();
@@ -845,12 +853,15 @@ class Yadamu {
       this.reportStatus(this.STATUS,this.LOGGER)
     } catch (e) {
 	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
-	  await Promise.allSettled(streamsCompleted)
 	  // If the pipeline operation throws 'ERR_STREAM_PREMATURE_CLOSE' get the underlying cause from the dbReader;
 	  if (e.code === 'ERR_STREAM_PREMATURE_CLOSE') {
 	    e = dbReader.underlyingError instanceof Error ? dbReader.underlyingError : (dbWriter.underlyingError instanceof Error ? dbWriter.underlyingError : e)
 	  }
   	  // this.LOGGER.trace([this.constructor.name,'PIPELINE','FAILED'],e)
+      // this.LOGGER.trace([this.constructor.name,'doPipelineOperation()'],`Waiting for Streams to finish. [${yadamuPipeline.map((s) => { return `${s.constructor.name}`}).join(' => ')}]`);
+	  // await Promise.allSettled(activeStreams)
+	  // this.LOGGER.trace([this.constructor.name,'doPipelineOperation()'],`Streams Finished. [${yadamuPipeline.map((s) => { return `${s.constructor.name}`}).join(' => ')}]`);
+	  
 	  throw e;
 	}
   }
@@ -866,7 +877,7 @@ class Yadamu {
       await source.initialize();
 	  this.activeConnections.add(source);
       await target.initialize();
-	  this.activeConnections.add(source);
+	  this.activeConnections.add(target);
 		
       if (this.DATA_STAGING_ENABLED && source.DATA_STAGING_SUPPORTED && target.SQL_COPY_OPERATIONS) {
 		await source.loadControlFile()
@@ -885,11 +896,11 @@ class Yadamu {
 	  results = this.metrics
 	  
 	} catch (e) {		
+	  console.log(e)
 	  this.STATUS.operationSuccessful = false;
 	  this.STATUS.err = e;
       results = e;
-   
-      await source.abort(e);
+	  await source.abort(e);
       this.activeConnections.delete(source);
       await target.abort(e);
       this.activeConnections.delete(target);
@@ -930,16 +941,7 @@ class Yadamu {
 	let streamsCompleted
     try {
 	  const pipelineComponents = await fileDBI.createCloneStream(options)
-	  streamsCompleted = pipelineComponents.map((s) => { 
-	    return new Promise((resolve,reject) => {
-		  finished(s,(err) => {
-		    if (err) {reject(err)} else {resolve()}
-		  })
-        })
-      })
-	
 	  await pipeline(...pipelineComponents)
-      await Promise.allSettled(streamsCompleted)
     } catch (e) {
 	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
  	  await Promise.allSettled(streamsCompleted)
@@ -1059,6 +1061,9 @@ class Yadamu {
     return metrics
   }  
   
+  reportIncorrectMessageSequence() {
+  }
+  
 }  
      
-module.exports = Yadamu;
+export { Yadamu as default}

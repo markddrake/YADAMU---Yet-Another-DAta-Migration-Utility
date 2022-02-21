@@ -1,7 +1,7 @@
 "use strict"
 
-const YadamuCLI = require('./yadamuCLI.js')
-const YadamuLibrary = require('./yadamuLibrary.js')
+import YadamuCLI from './yadamuCLI.js'
+import YadamuLibrary from './yadamuLibrary.js'
 
 class Upload extends YadamuCLI {}
 
@@ -23,9 +23,4 @@ async function main() {
 
 main()
 
-module.exports = Upload
-
-
-
-
-
+export { Upload as default}

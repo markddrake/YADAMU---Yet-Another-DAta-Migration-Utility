@@ -1,6 +1,6 @@
 "use strict"
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class PostgresConstants {
 
@@ -47,4 +47,4 @@ class PostgresConstants {
 
 }
 
-module.exports = PostgresConstants
+export { PostgresConstants as default }

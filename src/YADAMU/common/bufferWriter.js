@@ -1,6 +1,6 @@
 "use strict"
 
-const Writable = require('stream').Writable
+import {Writable} from 'stream'
 
 class BufferWriter extends Writable {
     
@@ -25,4 +25,4 @@ class BufferWriter extends Writable {
   
 }
 
-module.exports = BufferWriter
+export { BufferWriter as default}

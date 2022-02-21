@@ -1,6 +1,6 @@
 "use strict";
 
-const StatementGenerator = require('../statementGenerator.js');
+import StatementGenerator from '../statementGenerator.js';
 
 class StatementGenerator2014 extends StatementGenerator {
   
@@ -25,4 +25,4 @@ class StatementGenerator2014 extends StatementGenerator {
 
 }
  
-module.exports = StatementGenerator2014
+export { StatementGenerator2014 as default }

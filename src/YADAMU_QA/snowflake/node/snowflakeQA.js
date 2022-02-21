@@ -1,14 +1,15 @@
 "use strict" 
 
-const SnowflakeDBI = require('../../../YADAMU/snowflake/node/snowflakeDBI.js');
-const SnowflakeConstants = require('../../../YADAMU/snowflake/node/snowflakeConstants.js');
-const SnowflakeException = require('../../../YADAMU/snowflake/node/snowflakeException.js')
+import SnowflakeDBI       from '../../../YADAMU/snowflake/node/snowflakeDBI.js';
+import SnowflakeConstants from '../../../YADAMU/snowflake/node/snowflakeConstants.js';
+import SnowflakeException from '../../../YADAMU/snowflake/node/snowflakeException.js'
 
-const YadamuTest = require('../../common/node/yadamuTest.js');
+import YadamuTest         from '../../common/node/yadamuTest.js';
+import YadamuQALibrary    from '../../common/node/yadamuQALibrary.js'
 
-class SnowflakeQA extends SnowflakeDBI {
+class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
     
-    static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
+	static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
 
 	static #_YADAMU_DBI_PARAMETERS
@@ -22,21 +23,14 @@ class SnowflakeQA extends SnowflakeDBI {
       return SnowflakeQA.YADAMU_DBI_PARAMETERS
     }	
 		
-    constructor(yadamu,settings,parameters) {
-       super(yadamu,settings,parameters)
-    }
-
-    async initialize() {
-      await super.initialize();
-	  if (this.terminateConnection()) {
-        const pid = await this.getConnectionID();
-	    this.scheduleTermination(pid,this.getWorkerNumber());
-	  }
+    constructor(yadamu,manager,connectionSettings,parameters) {
+       super(yadamu,manager,connectionSettings,parameters)
     }
 
     async initializeImport() {
 	  if (this.options.recreateSchema === true) {
 		await this.recreateDatabase();
+		this.options.recreateSchema = false
 	  }
 	  await super.initializeImport();
     }	
@@ -114,20 +108,15 @@ class SnowflakeQA extends SnowflakeDBI {
     })
   }  
 
-   async workerDBI(idx)  {
-	  const workerDBI = await super.workerDBI(idx);
-      // Manager needs to schedule termination of worker.
-	  if (this.terminateConnection(idx)) {
-        const pid = await workerDBI.getConnectionID();
-	    this.scheduleTermination(pid,idx);
-	  }
-	  return workerDBI
-    }      
-
+    classFactory(yadamu) {
+      return new SnowflakeQA(yadamu,this)
+    }
+	
     async scheduleTermination(pid,workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
+	  const tags = this.getTerminationTags(workerId,pid)
+	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
       const timer = setTimeout(async (pid) => {
-          this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
+          this.yadamuLogger.log(tags,`Killing connection.`);
           const conn = await this.getConnectionFromPool();
           const sqlStatement = `select SYSTEM$ABORT_SESSION( ${pid} );`
           let stack
@@ -136,8 +125,8 @@ class SnowflakeQA extends SnowflakeDBI {
             const res = await this.execute(conn,sqlStatement)
             await conn.destroy()
           } catch (e) {
-            const cause = new SnowflakeException(e,stack,sqlStatement)
-            this.yadamuLogger.handleException(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],cause)
+            const cause = new SnowflakeError(this.DRIVER_ID,e,stack,sqlStatement)
+            this.yadamuLogger.handleException(tags,cause)
           }
 	    },
         this.killConfiguration.delay,
@@ -191,7 +180,7 @@ class SnowflakeMgr extends SnowflakeDBI {
 	}
 }  
 
-module.exports = SnowflakeQA
+export { SnowflakeQA as default }
 
 const _SQL_COMPARE_SCHEMAS = `call YADAMU_SYSTEM.PUBLIC.COMPARE_SCHEMAS(:1,:2,:3,:4);`
 const _SQL_SCHEMA_TABLE_ROWS = `select TABLE_NAME, ROW_COUNT from INFORMATION_SCHEMA.TABLES where TABLE_TYPE = 'BASE TABLE' and TABLE_SCHEMA = ?`;

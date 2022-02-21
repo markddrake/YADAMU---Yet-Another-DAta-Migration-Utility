@@ -1,7 +1,7 @@
 "use strict"
 
-const YadamuCLI = require('../../../YADAMU/common/yadamuCLI.js')
-const YadamuLibrary = require('../../../YADAMU/common/yadamuLibrary.js')
+import YadamuCLI from '../../../YADAMU/common/yadamuCLI.js'
+import YadamuLibrary from '../../../YADAMU/common/yadamuLibrary.js'
 
 class Test extends YadamuCLI {}
 
@@ -23,4 +23,4 @@ async function main() {
 
 main()
 
-module.exports = Test
+export { Test as default}

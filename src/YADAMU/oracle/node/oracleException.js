@@ -1,11 +1,10 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
+import {DatabaseError} from '../../common/yadamuException.js'
 
-const OracleConstants = require('./oracleConstants.js')
+import OracleConstants from './oracleConstants.js'
 
 class OracleError extends DatabaseError {
-  //  const err = new OracleError(cause,stack,sql,args,outputFormat)
   
   obfuscateBindValues(args) {
     if (Array.isArray(args)) {
@@ -47,8 +46,8 @@ class OracleError extends DatabaseError {
 	return args
   }
  
-  constructor(cause,stack,sql,args,outputFormat) {
-    super(cause,stack,sql);
+  constructor(driverId,cause,stack,sql,args,outputFormat) {
+    super(driverId,cause,stack,sql);
     this.args = this.obfuscateBindValues(args)
     this.outputFormat = outputFormat
     
@@ -97,8 +96,8 @@ class OracleError extends DatabaseError {
 }
 
 class StagingFileError extends OracleError {
-  constructor(local,remote,cause) {
-	super(cause,cause.stack,cause.sql,cause.args,cause.outputFormat)
+  constructor(driverId,local,remote,cause) {
+	super(driverId,cause,cause.stack,cause.sql,cause.args,cause.outputFormat)
 	this.message = `Oracle Copy Operation Failed. File Not Found. Please ensure folder "${local}" maps to folder "${remote}" on the server hosting your Oracle databases.`
 	this.stack = cause.stack
     this.cause = cause
@@ -106,7 +105,7 @@ class StagingFileError extends OracleError {
     this.remote_staging_area = remote
   }
 }
-module.exports = {
+export {
   OracleError,
   StagingFileError
 }

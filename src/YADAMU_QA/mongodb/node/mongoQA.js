@@ -1,14 +1,15 @@
 "use strict" 
 
-const MongoDBI = require('../../../YADAMU/mongodb/node/mongoDBI.js');
-const {MongodbError, ConnectionError, DatabaseError} = require('../../../YADAMU/mongodb/node/mongoException.js')
-const MongoConstants = require('../../../YADAMU/mongodb/node/mongoConstants.js');
+import MongoDBI        from '../../../YADAMU/mongodb/node/mongoDBI.js';
+import MongoError      from '../../../YADAMU/mongodb/node/mongoException.js'
+import MongoConstants  from '../../../YADAMU/mongodb/node/mongoConstants.js';
 
-const YadamuTest = require('../../common/node/yadamuTest.js');
+import YadamuTest      from '../../common/node/yadamuTest.js';
+import YadamuQALibrary from '../../common/node/yadamuQALibrary.js'
 
-class MongoQA extends MongoDBI {
+class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
     
-    get QA_COMPARE_DBNAME() { return 'YADAMU_QA' }
+	get QA_COMPARE_DBNAME() { return 'YADAMU_QA' }
     
     static #_YADAMU_DBI_PARAMETERS
     
@@ -21,42 +22,34 @@ class MongoQA extends MongoDBI {
       return MongoQA.YADAMU_DBI_PARAMETERS
     }   
         
-    constructor(yadamu,settings,parameters) {
-       super(yadamu,settings,parameters)
+    constructor(yadamu,manager,connectionSettings,parameters) {
+       super(yadamu,manager,connectionSettings,parameters)
     }
 	
-    async initialize() {
-      await super.initialize();
-      if (this.terminateConnection()) {
-        this.scheduleTermination(this.getWorkerNumber());
-      }
-    }
-
-    async initializeImport() {
-	  if (this.options.recreateSchema === true) {
-		await this.recreateDatabase();
-	  }
-	  await super.initializeImport();
-    }	
-	
-    async recreateDatabase() {
+    async recreateSchema() {
         await this.use(this.parameters.TO_USER)
         await this.dropDatabase()
         await this.use(this.parameters.TO_USER)
     }
 
     async getRowCounts(target) {
+
        await this.use(target.schema);
-       const collections = await this.collections();
+	   
+       const collections = (await this.collections()).filter((collection) => {
+         return ((this.TABLE_FILTER.length === 0) || (this.TABLE_FILTER.includes(collection.collectionName)))
+	   })
+	
        const results = await Promise.all(collections.map(async (collection) => {
-         return [target.schema,collection.collectionName,await this.collectionCount(collection)]
+  	     return [target.schema,collection.collectionName,await this.collectionCount(collection)]
        }))
+	   	   
        return results;
     }
     
     async compareCollections(sourceDB,targetDB,collectionName,rules) {
-            
-        const comparePipeline = [{
+     
+	    const comparePipeline = [{
           "$replaceRoot": { 
             newRoot: { _id: "$_id", source: {"$objectToArray": "$$ROOT"}}
           }
@@ -374,6 +367,8 @@ class MongoQA extends MongoDBI {
         
         await this.use(this.QA_COMPARE_DBNAME)
         const compare = await this.collection("source")
+      	const operation = `${compare.collectionName}.aggregate(${JSON.stringify(comparePipeline," ",2)})`
+		this.status.sqlTrace.write(this.traceMongo(operation))    
         results = await compare.aggregate(comparePipeline).toArray()
         
         // await this.dropDatabase()
@@ -395,8 +390,7 @@ class MongoQA extends MongoDBI {
       }
 	  
       const sourceCounts = await this.getRowCounts(source)
-      
-      
+	        
       await this.use(target.schema);
       const targetHash = await this.dbHash()
       const targetHashValues = targetHash.collections;
@@ -409,7 +403,7 @@ class MongoQA extends MongoDBI {
       }
 
       const targetCounts =  await this.getRowCounts(target)
-      
+	        
       const mismatchedHashList = []
       
       const report = {
@@ -430,22 +424,26 @@ class MongoQA extends MongoDBI {
            }
          }
       })
-      
+	  	  
       for (const collectionName of mismatchedHashList) {
         const results = await this.compareCollections(source.schema,target.schema,collectionName,rules)
-        if (results.length === 0) {
+		if (results.length === 0) {
           report.successful.push([source.schema,target.schema,collectionName,sourceCounts.find(element => element[1] === collectionName)[2]])
         }
         else {
-          // console.dir(results,{depth:null})
-          report.failed.push([source.schema,target.schema,collectionName, sourceCounts.find(element => element[1] === collectionName)[2],targetCounts.find(element => element[1] === collectionName)[2],results.length,results.length,null,null])
+          report.failed.push(collectionName,[source.schema,target.schema,collectionName, sourceCounts.find(element => element[1] === collectionName)[2],targetCounts.find(element => element[1] === collectionName)[2],results.length,results.length,null,null])
         }
       }
       return report
     }
 
+    classFactory(yadamu) {
+      return new MongoQA(yadamu,this)
+    }
+	
     async scheduleTermination(workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay],`Termination Scheduled.`);
+	  const tags = this.getTerminationTags(workerId,'')
+	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
       const timer = setTimeout(
         async () => {
           if (this.client !== undefined) {
@@ -454,7 +452,7 @@ class MongoQA extends MongoDBI {
               , $all      : false
               , $ownOps   : true
             }
-            this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,this.killConfiguration.delay,null,this.getWorkerNumber()],`Killing connection.`);
+            this.yadamuLogger.log(tags,`Killing connection.`);
             let operation
             try {
               const dbAdmin = await this.client.db('admin',{returnNonCachedInstance:true});  
@@ -474,11 +472,11 @@ class MongoQA extends MongoDBI {
               const res = await  await dbAdmin.command(dropConnections)
               // await dbAdmin.close()
             } catch (e) {
-              throw new MongodbError(e,operation);
+              throw new MongoError(this.DRIVER_ID,e,operation);
             }
           }
           else {
-            this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+            this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
           }
         },
         this.killConfiguration.delay
@@ -488,4 +486,4 @@ class MongoQA extends MongoDBI {
 
 }
 
-module.exports = MongoQA
+export { MongoQA as default }

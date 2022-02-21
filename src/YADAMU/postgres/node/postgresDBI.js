@@ -1,42 +1,48 @@
 "use strict" 
-const fs = require('fs');
-const Readable = require('stream').Readable;
-const { performance } = require('perf_hooks');
 
-const util = require('util')
-const stream = require('stream')
-const Parser = require('../../clarinet/clarinet.js');
-const readline = require('readline');
-const { once } = require('events');
+import fs from 'fs';
+import {Readable} from 'stream';
+import { performance } from 'perf_hooks';
+
+import Parser from '../../clarinet/clarinet.cjs';
+import readline from 'readline';
+import { once } from 'events';
 
 
-// const pipeline = util.promisify(stream.pipeline);
-const { pipeline } = require('stream/promises');
+// import pipeline from util.promisifystream.pipeline;
+import { pipeline } from 'stream/promises';
 
 /* 
 **
-** Require Database Vendors API 
+** from  Database Vendors API 
 **
 */
-const {Client,Pool} = require('pg')
-const CopyFrom = require('pg-copy-streams').from;
-const QueryStream = require('pg-query-stream')
-const types = require('pg').types;
 
-const YadamuDBI = require('../../common/yadamuDBI.js');
-const DBIConstants = require('../../common/dbiConstants.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js')
+import pg from 'pg';
+const {Client,Pool} = pg;
 
-const PostgresConstants = require('./postgresConstants.js')
-const PostgresError = require('./postgresException.js')
-const PostgresParser = require('./postgresParser.js');
-const PostgresWriter = require('./postgresWriter.js');
-const StatementGenerator = require('./statementGenerator.js');
-const PostgresStatementLibrary = require('./postgresStatementLibrary.js');
+import QueryStream from 'pg-query-stream'
+import types from 'pg-types';
 
-const {YadamuError} = require('../../common/yadamuException.js');
-const {FileError, FileNotFound, DirectoryNotFound} = require('../../file/node/fileException.js');
+import pgCopyStreams from 'pg-copy-streams'
+const CopyFrom = pgCopyStreams.from
+
+import YadamuDBI from '../../common/yadamuDBI.js';
+import DBIConstants from '../../common/dbiConstants.js';
+import YadamuConstants from '../../common/yadamuConstants.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js'
+import {CopyOperationAborted} from '../../common/yadamuException.js'
+
+import PostgresConstants from './postgresConstants.js'
+import PostgresError from './postgresException.js'
+import PostgresParser from './postgresParser.js';
+import PostgresOutputManager from './postgresOutputManager.js';
+import PostgresWriter from './postgresWriter.js';
+import StatementGenerator from './statementGenerator.js';
+import PostgresStatementLibrary from './postgresStatementLibrary.js';
+
+import {YadamuError} from '../../common/yadamuException.js';
+import {FileError, FileNotFound, DirectoryNotFound} from '../../file/node/fileException.js';
 
 class PostgresDBI extends YadamuDBI {
     
@@ -82,8 +88,8 @@ class PostgresDBI extends YadamuDBI {
   get JSON_DATA_TYPE()         { return this.parameters.POSTGRES_JSON_TYPE || PostgresConstants.POSTGRES_JSON_TYPE }
   
 
-  constructor(yadamu,settings,parameters) {
-    super(yadamu,settings,parameters);
+  constructor(yadamu,manager,connectionSettings,parameters) {
+    super(yadamu,manager,connectionSettings,parameters);
        
     this.pgClient = undefined;
     this.useBinaryJSON = false
@@ -91,7 +97,9 @@ class PostgresDBI extends YadamuDBI {
     this.StatementLibrary = PostgresStatementLibrary
     this.statementLibrary = undefined
     this.pipelineAborted = false;
-   
+	
+	this.postgresStack = new Error().stack
+    this.postgresOperation = undefined
   }
 
   /*
@@ -122,7 +130,7 @@ class PostgresDBI extends YadamuDBI {
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const pgErr = this.trackExceptions(new PostgresError(err,this.postgresStack,this.postgressOperation))
+	  const pgErr = this.trackExceptions(new PostgresError(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation))
       this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`POOL_ON_ERROR`],pgErr);
       // throw pgErr
     })
@@ -144,7 +152,7 @@ class PostgresDBI extends YadamuDBI {
       this.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
-	  throw this.trackExceptions(new PostgresError(e,stack,'pg.Pool.connect()'))
+	  throw this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,'pg.Pool.connect()'))
 	}
   }
 
@@ -166,7 +174,7 @@ class PostgresDBI extends YadamuDBI {
     
 	  this.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
-      throw this.trackExceptions(new PostgresException(e,stack,operation))
+      throw this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,operation))
 	}
     await configureConnection();
   }
@@ -203,7 +211,7 @@ class PostgresDBI extends YadamuDBI {
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
-	  const pgErr = this.trackExceptions(new PostgresError(err,this.postgresStack,this.postgressOperation))
+	  const pgErr = this.trackExceptions(new PostgresError(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation))
       this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`CONNECTION_ON_ERROR`],pgErr);
       // throw pgErr
     })
@@ -232,7 +240,7 @@ class PostgresDBI extends YadamuDBI {
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
-		const err = this.trackExceptions(new PostgresError(e,stack,'Client.release()'))
+		const err = this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,'Client.release()'))
 		throw err
       }
 	}
@@ -250,7 +258,7 @@ class PostgresDBI extends YadamuDBI {
         this.pool = undefined
   	  } catch (e) {
         this.pool = undefined
-	    throw this.trackExceptions(new PostgresError(e,stack,'pg.Pool.close()'))
+	    throw this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,'pg.Pool.close()'))
 	  }
 	}
   }
@@ -301,7 +309,7 @@ class PostgresDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.trackExceptions(new PostgresError(e,stack,sqlStatement))
+		const cause = this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,sqlStatement))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -453,14 +461,12 @@ class PostgresDBI extends YadamuDBI {
       return elapsedTime;
     }
     catch (e) {
-      const cause = this.trackExceptions(new PostgresError(e,stack,copyStatement))
+      const cause = this.trackExceptions(new PostgresError(this.DRIVER_ID,e,stack,copyStatement))
 	  throw cause
 	}
   }
   
   async uploadFile(importFilePath) {
-
-    this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
 
     let elapsedTime;
     try {
@@ -510,7 +516,7 @@ class PostgresDBI extends YadamuDBI {
   }
 
   async processFile(hndl) {
-     return await this.processStagingTable(this.parameters.TO_USER)
+     return await this.processStagingTable(this.CURRENT_SCHEMA)
   }
   
   /*
@@ -563,27 +569,27 @@ class PostgresDBI extends YadamuDBI {
     return undefined
   }
   
-  async getSchemaInfo(keyName) {
+  async getSchemaMetadata() {
     
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.parameters[keyName],this.SPATIAL_FORMAT,{"circleAsPolygon": this.INBOUND_CIRCLE_FORMAT === 'POLYGON',"calculateByteaSize":true}]);
+    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT,{"circleAsPolygon": this.INBOUND_CIRCLE_FORMAT === 'POLYGON',"calculateByteaSize":true}]);
 	if ((results.rowCount === 1) && Array.isArray(results.rows[0][6])) { // EXPORT_JSON returned Errors
-       this.processLog(results.rows[0][6],`EXPORT_JSON('${this.parameters[keyName]}','${this.SPATIAL_FORMAT}')`)
+       this.processLog(results.rows[0][6],`EXPORT_JSON('${this.CURRENT_SCHEMA}','${this.SPATIAL_FORMAT}')`)
 	}
 	// console.dir(results,{depth:null})
     return this.generateSchemaInfo(results.rows)
   }
 
-  createParser(tableInfo) {
-    return new PostgresParser(tableInfo,this.yadamuLogger);
+  createParser(queryInfo) {
+    return new PostgresParser(queryInfo,this.yadamuLogger);
   }  
   
-  inputStreamError(e,sqlStatement) {
-    return this.trackExceptions(new PostgresError(e,this.streamingStackTrace,sqlStatement))
+  inputStreamError(cause,sqlStatement) {
+    return this.trackExceptions(((cause instanceof PostgresError) || (cause instanceof CopyOperationAborted)) ? cause : new PostgresError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
   }
 
-  async getInputStream(tableInfo) {        
+  async getInputStream(queryInfo) {        
   
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,tableInfo.TABLE_NAME],'')
+    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
     
     /*
     **
@@ -596,13 +602,13 @@ class PostgresDBI extends YadamuDBI {
 	}
  		
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
+    this.status.sqlTrace.write(this.traceSQL(queryInfo.SQL_STATEMENT))
     while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
 		this.streamingStackTrace = new Error().stack
-        const queryStream = new QueryStream(tableInfo.SQL_STATEMENT,[],{rowMode : "array"})
+        const queryStream = new QueryStream(queryInfo.SQL_STATEMENT,[],{rowMode : "array"})
         this.traceTiming(sqlStartTime,performance.now())
         const inputStream = await this.connection.query(queryStream)   
 		
@@ -615,19 +621,30 @@ class PostgresDBI extends YadamuDBI {
 		** In theory the listener should call destroy(err) on the input stream, but this does not appear to work. The workaround
 		** is to call streams destroy(err) method and then have the stream emit the error...
 		**
+		** Note that the streams finished() operator will only consider the stream as 'finished' if finished() function is listening 
+		** at the time the emit takes place. 
+		**
 		*/
 		
-        const handleConnectionError = (err) => {inputStream.destroy(err); inputStream.emit('error',err)}
+        const inputStreamError = (err) => {
+		  try {
+		    // console.log('onError',this.connection.constructor.name,inputStream.constructor.name,err.message)
+	        inputStream.destroy(err); 
+		    inputStream.emit('error',err)
+		  } catch (e) {console.log(e) }
+		}
 		
-	    this.connection.on('error',handleConnectionError)
+	    this.connection.on('error',inputStreamError)
+		
         inputStream.on('end',() => { 
-		  this.connection.removeListener('error',handleConnectionError)
+		  this.connection.removeListener('error',inputStreamError)
 		}).on('error',() => { 
-		  this.connection.removeListener('error',handleConnectionError)
+		  this.connection.removeListener('error',inputStreamError)
 		})    		
+		
 		return inputStream
       } catch (e) {
-		const cause = this.trackExceptions(new PostgresError(e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
+		const cause = this.trackExceptions(new PostgresError(this.DRIVER_ID,e,this.streamingStackTrace,queryInfo.SQL_STATEMENT))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -653,11 +670,11 @@ class PostgresDBI extends YadamuDBI {
   async _executeDDL(ddl) {
 	
    let results = []
-   //  await this.createSchema(this.parameters.TO_USER);
+   //  await this.createSchema(this.CURRENT_SCHEMA);
 	
 	try {
       results = await Promise.all(ddl.map((ddlStatement) => {
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.parameters.TO_USER);
+        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA);
 		// this.status.sqlTrace.write(this.traceSQL(ddlStatement));
         return this.executeSQL(ddlStatement);
       }))
@@ -672,12 +689,16 @@ class PostgresDBI extends YadamuDBI {
     return await super.generateStatementCache(StatementGenerator, schema)
   }
 
-  getOutputStream(tableName,ddlComplete) {
-	 return super.getOutputStream(PostgresWriter,tableName,ddlComplete)
+  getOutputManager(tableName,metrics) {
+	 return super.getOutputManager(PostgresOutputManager,tableName,metrics)
+  }
+
+  getOutputStream(tableName,metrics) {
+	 return super.getOutputStream(PostgresWriter,tableName,metrics)
   }
  
   classFactory(yadamu) {
-	return new PostgresDBI(yadamu)
+	return new PostgresDBI(yadamu,this)
   }
   
   async getConnectionID() {
@@ -705,38 +726,42 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async initializeCopy() {
+	 await super.initializeCopy()
 	 await this.executeSQL(`create server if not exists "${this.COPY_SERVER_NAME}" FOREIGN DATA WRAPPER file_fdw`)
   }
   
-  async copyOperation(tableName,copy) {
-	
-    /*
-    **
-    ** Generic Basic Imementation - Override as required for error reporting etc
-    **
-    */
+  async copyOperation(tableName,copyOperation,metrics) {
 	
 	try {
-	  const startTime = performance.now();
-	  const stack = new Error().stack
+	  metrics.writerStartTime = performance.now();
 	  let results = await this.beginTransaction();
-	  results = await this.executeSQL(copy.ddl);
-	  results = await this.executeSQL(copy.dml);
-	  const rowsRead = results.rowCount
-	  results = await this.executeSQL(copy.drop);
-	  const endTime = performance.now()
+	  results = await this.executeSQL(copyOperation.ddl);
+	  results = await this.executeSQL(copyOperation.dml);
+	  metrics.read = results.rowCount
+	  metrics.written = results.rowCount
+	  results = await this.executeSQL(copyOperation.drop);
+	  metrics.writerEndTime = performance.now();
 	  results = await this.commitTransaction()
-  	  await this.reportCopyResults(tableName,rowsRead,0,startTime,endTime,copy,stack)
-	} catch(e) {
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
-	  let results = await this.rollbackTransaction()
+	  metrics.committed = metrics.written 
+	  metrics.written = 0
+  	} catch(e) {
+	  metrics.writerError = e
+	  try {
+  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+	    let results = await this.rollbackTransaction()
+	  } catch (e) {
+		e.cause = metrics.writerError
+		metrics.writerError = e
+	  }
 	}
+	return metrics
   }
 
   async finalizeCopy() {
+	 await super.finalizeCopy()
 	 await this.executeSQL(`drop server "${this.COPY_SERVER_NAME}" `);
   }
 
 }
 
-module.exports = PostgresDBI
+export { PostgresDBI as default }

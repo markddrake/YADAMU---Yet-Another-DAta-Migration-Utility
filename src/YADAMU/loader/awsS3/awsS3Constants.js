@@ -1,8 +1,8 @@
 "use strict"
 
-const HTTP = require('http')
+import HTTP from 'http'
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class AWSS3Constants {
 
@@ -45,4 +45,4 @@ class AWSS3Constants {
   
 }
 
-module.exports = AWSS3Constants;
+export {AWSS3Constants as default }

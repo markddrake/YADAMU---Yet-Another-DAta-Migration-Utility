@@ -1,7 +1,7 @@
 "use strict" 
 
-const YadamuConstants = require('../../../common/yadamuConstants.js');
-const DefaultStatmentLibrary = require('../oracleStatementLibrary.js')
+import YadamuConstants from '../../../common/yadamuConstants.js';
+import DefaultStatmentLibrary from '../oracleStatementLibrary.js'
 
 class OracleStatementLibrary extends DefaultStatmentLibrary{
 
@@ -15,7 +15,7 @@ class OracleStatementLibrary extends DefaultStatmentLibrary{
 
 }
 
-module.exports = OracleStatementLibrary
+export {OracleStatementLibrary as default }
 
 // SQL Statements
 

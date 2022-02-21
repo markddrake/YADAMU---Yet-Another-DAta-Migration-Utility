@@ -1,333 +1,142 @@
 "use strict"
 
-const fs = require('fs')
-const assert = require('assert').strict;
-const {Readable, Writable, Transform, pipeline } = require('stream')
-const { performance } = require('perf_hooks');
+import fs from 'fs'
+import assert from 'assert'
+import {Readable, Writable, Transform, pipeline } from 'stream'
+import { performance } from 'perf_hooks';
 
-const YadamuConstants = require('./yadamuConstants.js');
-const YadamuLibrary = require('./yadamuLibrary.js');
-const {YadamuError, BatchInsertError, IterativeInsertError, DatabaseError} = require('./yadamuException.js')
+import DBIConstants from './dbiConstants.js';
+import YadamuConstants from './yadamuConstants.js';
+import YadamuParser from './yadamuParser.js';
+import YadamuLibrary from './yadamuLibrary.js';
+import {YadamuError, BatchInsertError, IterativeInsertError, DatabaseError} from './yadamuException.js'
 
-class YadamuWriter extends Transform {
+class YadamuWriter extends Writable {
 
-  get BATCH_SIZE()     {  return this.tableInfo._BATCH_SIZE }
-  get COMMIT_COUNT()   {  return this.tableInfo._COMMIT_COUNT }
-  get SPATIAL_FORMAT() {  return this.tableInfo._SPATIAL_FORMAT }
-  get SOURCE_VENDOR()  {  return this.readerMetrics?.DATABASE_VENDOR || 'YABASC'}
+  get COPY_METRICS()       { return this._COPY_METRICS }
+  set COPY_METRICS(v)      { this._COPY_METRICS =  v }
+
+  get SPATIAL_FORMAT()     { return this.tableInfo._SPATIAL_FORMAT }
   
-  get FEEDBACK_MODEL()     { return this._FEEDBACK_MODEL }
-  get FEEDBACK_INTERVAL()  { return this._FEEDBACK_INTERVAL }
-  get FEEDBACK_DISABLED()  { return this.FEEDBACK_MODEL === undefined }
-  get PARTITIONED_TABLE()  { return this.partitionInfo ? true : false }
-  
-  get REPORT_COMMITS()     { 
-    return this._REPORT_COMMITS || (() => { 
-	  this._REPORT_COMMITS = ((this._FEEDBACK_MODEL === 'COMMIT') || (this._FEEDBACK_MODEL === 'ALL')); 
-	  return this._REPORT_COMMITS
-	})() 
-  }
-  
-  get REPORT_BATCHES()     { 
-     return this._REPORT_BATCHES || (() => { 
-	   this._REPORT_BATCHES = (((this._FEEDBACK_MODEL === 'BATCH') || (this._FEEDBACK_MODEL === 'ALL')) && (this.BATCH_SIZE === this.COMMIT_COUNT)); 
-	   return this._REPORT_BATCHES
-	 })() 
-  }
-  
-  set FEEDBACK_MODEL(feedback)  {
-    if (!isNaN(feedback)) {
-	  this._FEEDBACK_MODEL    = 'ALL'
-	  this._FEEDBACK_INTERVAL = parseInt(feedback)
-	}
-	else {
-	  this._FEEDBACK_MODEL    = feedback
-	  this._FEEDBACK_INTERVAL = 0
+  get PARTITIONED_TABLE()  { return this.tableInfo?.hasOwnProperty('partitionCount')}
+
+  constructor(dbi,tableName,metrics,status,yadamuLogger) {
+	const options = {
+      highWaterMark : 10
+	, objectMode    : true
     }
-  } 
-  
-  constructor(options,dbi,tableName,ddlComplete,status,yadamuLogger) {
-    options.highWaterMark = 64
-	options.emitClose = true
-    super(options)
+	super(options)
+
     this.dbi = dbi;
-    this.schema = this.dbi.parameters.TO_USER;
-    this.ddlComplete = ddlComplete;
+    this.tableName = tableName
+	this.displayName = this.tableName
+    this.partitionInfo = undefined
+
+	this.COPY_METRICS = metrics
     this.status = status;
     this.yadamuLogger = yadamuLogger;    
     
-	this.FEEDBACK_MODEL = this.dbi.parameters.FEEDBACK
-	
-    this.tableName = tableName  
-	this.displayName = tableName
-	this.partitionInfo = undefined
-	
-    this.metrics = {
-      received   : 0 // Rows accepted
-    , batchCount : 0 // Batches created
-    , cached     : 0 // Rows received and cached by appendRow(). Reset every time a batch of cached rows is written to disk
-    , written    : 0 // Rows written to disk in the current transaction
-    , committed  : 0 // Rows successfully committed to disk
-    , skipped    : 0 // Rows not written to disk due to unrecoverable write errors
-    , lost       : 0 // Rows written to disk and thene lost as a result of a rollback or lost connnection 
-	, idleTime   : 0 // Time spent waiting for previous batch to complete before writing new batch
-    }
-    
-    this.dbi.setMetrics(this.metrics)
-    
-    this.batch = [];
-    this.skipTable = this.dbi.MODE === 'DDL_ONLY';
     this.sqlInitialTime = this.dbi.sqlCumlativeTime
-    this.startTime = performance.now();
-	this.endTime = undefined
-    this.batchOperations = new Set()
-    
-    this.on('pipe',(src)=>  {
-	  this.eventSource = src 
+    this.skipTable = this.dbi.MODE === 'DDL_ONLY';    
+
+    const writeOperation = new Promise((resolve,reject) => {
+      this.on('close',() => {
+		 resolve()
+		 this.dbi.activeWriters.delete(writeOperation)
+	  })
 	})
-    // this.on('unpipe',(src)=>{console.log('unpipe',src.constructor.name)})
+    this.dbi.activeWriters.add(writeOperation)	
+	this.setNotWriting()
+  }
+
+  setTableInfo(tableName) {
+    this.tableInfo = this.dbi.getTableInfo(tableName)
   }
   
-  setTableInfo(tableName) {
-    this.skipTable = true
-    this.tableInfo = this.dbi.getTableInfo(tableName)
-    this.tableInfo.insertMode = this.tableInfo.insertMode || 'Batch';    
-    this.skipTable = false;
+  setNotWriting() {
+	this.batchCompleted = new Promise((resolve,reject) => {
+      resolve(DBIConstants.BATCH_IDLE)
+	})
+  }	
+  
+  setWriting() {
+  	this.batchCompleted = new Promise((resolve,reject) => {
+	  this.once(DBIConstants.BATCH_WRITTEN,() => {
+		 this.setNotWriting()
+		 resolve(DBIConstants.BATCH_WRITTEN)
+	  }).once(DBIConstants.BATCH_FAILED,() => {
+		 this.setNotWriting()
+		 resolve(DBIConstants.BATCH_FAILED)
+	  })
+	})
+  }  	  
+  
+  async initializeTable() {
+    this.setTableInfo(this.tableName)	
   }
    
-  async initialize(tableName) { 	
-    // Do not start processing table until all DDL operations have completed.
-    // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'WAITING')
-	await this.ddlComplete
-	// this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber(),tableName],'PROCESSING')
-	
-	// Workers need to reload their copy of the Statement Cache from the Manager before processing can begin
-    this.dbi.reloadStatementCache()
-	
-    this.setTableInfo(tableName);
-	
-	// Partition based insert operations require a partition specific variable of the tales DML statement.
-	this.dml = this.tableInfo.dml
-	await this.beginTransaction()
+  isValidPartition(partitionInfo) {
+	 return false
   }
   
-  async initializePartition(partitionInfo) {
+  async initializePartition(partitionInfo) {	
 	this.partitionInfo = partitionInfo
-	const padSize = this.partitionInfo.partitionCount.toString().length
-    await this.initialize(partitionInfo.tableName)
-	if (partitionInfo.partitionNumber === 1) {
-  	  this.tableInfo.partitionCount = partitionInfo.partitionCount
-	  this.tableInfo.partitionsRemaining = partitionInfo.partitionCount
-	}
-	this.displayName = `${this.displayName}(${this.partitionInfo.partitionName || `#${partitionInfo.partitionNumber.toString().padStart(padSize,"0")}`})`
+	this.displayName = partitionInfo.displayName
+	await this.initializeTable()
+	this.tableInfo.partitionCount = partitionInfo.partitionCount
+	this.tableInfo.partitionsRemaining = this.tableInfo.partitionsRemaining || partitionInfo.partitionCount
   }
-  
-  rowsLost() {
-	return this.metrics.lost > 0
-  }
-        
-  newBatch() {
-	// this.batch.length = 0;
-	this.batch = []
-	this.metrics.cached = 0;
-  }
-  
+     
   releaseBatch(batch) {
-	if (Array.isArray(batch)) {
-	  batch.length = 0;
-	}
+	this.dbi.releaseBatch(batch)
   }
   
   abortTable() {
+	  
     // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber()],'abortTable()')
 	
-   
-    this.skipTable = true;
-	
-	// Abort means that records written but not committed are lost
-	// If rollback occurs prior to abort, written is already added to lost and set to zero.
+	// Abort means that records cached will never be written
+	// If a rollback occurs prior to abort, written is already added to lost and set to zero.
 	// If abort occurs prior to rollback or abort is called multiple times written is already zeroed out.
 
-    this.metrics.lost += this.metrics.written;
-    this.metrics.written = 0;
-	// this.releaseBatch(this.batch)	  
-
-    // Disable the processRow() function.
-    this.processRow = async () => {}
-  }
- 
-  flushBatch() {
-    return ((this.metrics.cached === this.BATCH_SIZE) && !this.skipTable)
-  }
-  
-  batchRowCount() {
-    return this.metrics.cached
-  }
-  
-  commitWork() {
-    // While COMMIT is defined as a multiple of BATCH_SIZE some drivers may write smaller batches.
-    return (((this.COMMIT_COUNT > 0) && (this.metrics.written >= this.COMMIT_COUNT)) && !this.skipTable)
-  }
-
-  hasPendingRows() {
-    return ((this.metrics.cached > 0) && !this.skipTable)
-  }
-              
-  createBatchException(cause,batchSize,firstRow,lastRow,info) {
-
-    try {
-      const details = {
-        currentSettings        : {
-          yadamu               : this.dbi.yadamu
-        , systemInformation    : this.dbi.systemInformation
-        , metadata             : { 
-            [this.tableName]   : this.dbi.metadata[this.tableName]
-          }
-        }
-      , columnNames          : this.tableInfo.columnNames
-      , targetDataTypes      : this.tableInfo.targetDataTypes 
-      }
-      Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
-      return new BatchInsertError(cause,this.tableName,batchSize,firstRow,lastRow,details)
-    } catch (e) {
-	  cause.batchErrorIssue = e
-      return cause
-    }
-  }
-  
-  createIterativeException(cause,batchSize,rowNumber,row,info) {
-    // String to Object conversion takes place in the handleIterativeError since the JSON record is written to the Rejected Records file
-    try {
-      const details = {
-        currentSettings        : {
-          yadamu               : this.dbi.yadamu
-        , systemInformation    : this.dbi.systemInformation
-        , metadata             : { 
-            [this.tableName]   : this.dbi.metadata[this.tableName]
-          }
-        }
-      , columnNames            : this.tableInfo.columnNames
-      , targetDataTypes        : this.tableInfo.targetDataTypes 
-      }
-      Object.assign(details, info === undefined ? {} : typeof info === 'object' ? info : {info: info})
-      return new IterativeInsertError(cause,this.tableName,batchSize,rowNumber,row,details)
-    } catch (e) {
-	  cause.IterativeErrorIssue = e
-      return cause
-    }
-  }
-    
-  async rejectRow(tableName,row) {
-    // Allows the rejection process to be overridden by a particular driver.
-    await this.dbi.yadamu.REJECTION_MANAGER.rejectRow(tableName,row);
-  }
-  
-  handleIterativeError(operation,cause,rowNumber,record,info) {
-	  
-	if (this.rowsLost()) {
-	  throw cause
-	}
+    this.skipTable = true;
+	this.COPY_METRICS.lost += this.COPY_METRICS.written;
+	this.COPY_METRICS.skipped += this.COPY_METRICS.cached;
+	this.COPY_METRICS.written = 0;
+	this.COPY_METRICS.cached = 0;
 	
-    this.metrics.skipped++;
-    
-    try {
-      this.rejectRow(this.tableName,record);
-      const iterativeError = this.createIterativeException(cause,this.metrics.cached,rowNumber,record,info)
-	  this.dbi.trackExceptions(iterativeError);
-      this.yadamuLogger.logRejected([...(typeof cause.getTags === 'function' ? cause.getTags() : []),this.dbi.DATABASE_VENDOR,this.displayName,operation,this.metrics.cached,rowNumber],iterativeError);
-    } catch (e) {
-      this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.displayName,this.tableInfo.insertMode],e)
-    }
-    
-    if (this.metrics.skipped === this.dbi.TABLE_MAX_ERRORS) {
-      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
-      this.abortTable()
-    }
-  }
-
-  handleSpatialError(operation,cause,rowNumber,record,info) {
-      
-    this.metrics.skipped++;
-    
-    try {
-      this.rejectRow(this.tableName,record);
-      const iterativeError = this.createIterativeException(cause,this.metrics.cached,rowNumber,record,info)
-	  this.dbi.trackExceptions(iterativeError);
-      this.yadamuLogger.logRejectedAsWarning([this.dbi.DATABASE_VENDOR,this.displayName,operation,this.metrics.cached,rowNumber],iterativeError);
-    } catch (e) {
-      this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.displayName,this.tableInfo.insertMode],e)
-    }
-
-    
-    if (this.metrics.skipped === this.dbi.TABLE_MAX_ERRORS) {
-      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
-      this.abortTable()
-    }
-  }
-
-  reportBatchError(operation,cause,firstRow,lastRow,info) {
-	 
-    if (this.rowsLost() || YadamuError.missingTable(cause)) {
-	  throw cause
-    }
-    const batchException = this.createBatchException(cause,this.metrics.cached,firstRow,lastRow,info)
-	this.dbi.trackExceptions(batchException);
-    this.yadamuLogger.handleWarning([...(cause.getTags?.() || []),this.dbi.DATABASE_VENDOR,this.displayName,operation,this.tableInfo.insertMode,this.metrics.cached],batchException)
   }
   
-
-  checkColumnCount(row) {
-      
-    try {
-      if (!this.skipTable) {
-        assert.strictEqual(this.tableInfo.columnNames.length,row.length,`Table ${this.tableName}. Incorrect number of columns supplied.`)
-      }
-    } catch (cause) {
-      const info = this.tableInfo === undefined  ? this.tableName : this.tableInfo
-      this.handleIterativeError('CACHE',cause,this.metrics.received+1,row,info);
-    }
+  adjustRowCounts(rowCount) {
+	this.COPY_METRICS.written+= rowCount
+	this.COPY_METRICS.pending-= rowCount
   }
-              
-  cacheRow(row) {
-	  
-    // Apply transformations and cache transformed row.
-    
-    // Use forEach not Map as transformations are not required for most columns. 
-    // Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
-
-    // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.metrics.cached],'cacheRow()')    
-      
-    this.rowTransformation(row)
-    this.batch.push(row);
-    this.metrics.cached++
-    return this.skipTable;
-  }  
-
-   async beginTransaction() {
+  
+  async beginTransaction() {
     await this.dbi.beginTransaction();
   }
   
   async commitTransaction() {
-    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber()],'commitTransaction()')
+    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.committed,this.COPY_METRICS.written],'commitTransaction()')
     if (!this.skipTable) {
       await this.dbi.commitTransaction()
-      this.metrics.committed += this.metrics.written;
-      this.metrics.written = 0;
+      this.COPY_METRICS.committed += this.COPY_METRICS.written;
+      this.COPY_METRICS.written = 0;
     }
   }
   
   async rollbackTransaction(cause) {
 	 
 	 // Rollback means that records written but not committed are lost
-	  // Accounting for in-flight records is dependant on the value of ON_ERROR.
+	 // Handing for in-flight records is dependant on the value of ON_ERROR.
 
       // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber()],'rollbackTransaction()')
 	 
-	  this.metrics.lost += this.metrics.written;
-      this.metrics.written = 0;
+	  this.COPY_METRICS.lost += this.COPY_METRICS.written;
+      this.COPY_METRICS.written = 0;
       await this.dbi.rollbackTransaction(cause)
   }
-
+ 
   createWriteStream(filename) {
   
 	return new Promise((resolve,reject) => {
@@ -342,187 +151,127 @@ class YadamuWriter extends Transform {
 	  fs.end(null,null,()=>{resolve()})
 	})
   }
-  
-  writeRowAsCSV(fs,row) {
+    
+  lostRows() {
+	return this.COPY_METRICS.lost > 0
+  }
+        
+  createIterativeException(cause,batchSize,rowNumber,row,info) {
+	 
+	return YadamuError.createIterativeException(this.dbi,this.tableInfo,cause,batchSize,rowNumber,row,info)
 
-	row.forEach((col,idx) => {
-	  if (col === null) {
-		fs.write((idx < (row.length-1)) ? ',' : '\n')
-	  }
-	  else {
-        this.csvTransformations[idx](fs,col)
-	  }
-	})
+  }
+    
+  async rejectRow(tableName,row) {
+    // Allows the rejection process to be overridden by a particular driver.
+    await this.dbi.yadamu.REJECTION_MANAGER.rejectRow(tableName,row);
   }
   
-  writeBatchAsCSV(fs,batch) {  
-    batch.forEach((row) => {
-	   this.writeRowAsCSV(fs,row)
-    })
-  }   
-
-  getCSVTransformation(col,isLastColumn) {
-
-    switch (typeof col) {
-	  case "number":
-        return (isLastColumn)
- 	    ? (fs,col) => {
-   		    fs.write(col.toString());
-			fs.write('\n');
-		  } 
-		: (fs,col) => {
-   		    fs.write(col.toString());
-			fs.write(',');
-		  }
-		case "boolean":
-		  return (isLastColumn) 
-		  ? (fs,col) => {
-  		      fs.write(col ? 'true' : 'false')
-			  fs.write('\n');
-		    } 
-		  : (fs,col) => {
-  		      fs.write(col ? 'true' : 'false')
-			  fs.write(',');
-		    } 
-		case "string":
-		  return (isLastColumn)
-		  ? (fs,col) => {
-		      // sw.write(JSON.stringify(col));
-              fs.write('"')
-	  	      fs.write(col.indexOf('"') > -1 ? col.replace(/"/g,'""') : col)
-		      fs.write('"\n')
-		    } 
-		  : (fs,col) => {
-		      // sw.write(JSON.stringify(col));
-              fs.write('"')
-	  	      fs.write(col.indexOf('"') > -1 ? col.replace(/"/g,'""') : col)
-		      fs.write('",')
-		    } 
-	    case "object":
-		  switch (true) {
-		    case (col instanceof Date):
-		      return (isLastColumn)
-		      ? (fs,col) => {
-                  fs.write('"')
-                  fs.write(col === null ? '' : col.toISOString())
-		          fs.write('"\n')
-		        } 
-		      : (fs,col) => {
-                fs.write('"')
-		        fs.write(col === null ? '' : col.toISOString())
-		        fs.write('",')
-		      } 
-		    case (Buffer.isBuffer(col)):
-		      return (isLastColumn)
-		      ? (fs,col) => {
-                  fs.write('"')
-                  fs.write(col === null ? '' : col.toString('hex'))
-		          fs.write('"\n')
-		        } 
-		      : (fs,col) => {
-                fs.write('"')
-		        fs.write(col === null ? '' : col.toString('hex'))
-		        fs.write('",')
-		      } 
-			default:
-		      return (isLastColumn)
-		      ? (fs,col) => {
-                  fs.write('"')
-		          fs.write(col === null ? '' : JSON.stringify(col).replace(/"/g,'""'))
-		          fs.write('"\n')
-		        } 
-		      : (fs,col) => {
-                  fs.write('"')
-		          fs.write(col === null ? '' : JSON.stringify(col).replace(/"/g,'""'))
-		          fs.write('",')
-		        } 
-		  }
-		default:
-		  return (isLastColumn)
-		  ? (fs,col) => {
-  		      fs.write(col);
-			  fs.write('\n');
-		    } 
-	      : (fs,col) => {
-  		      fs.write(col);
-		  	  fs.write(',');
-		    } 
+  handleIterativeError(operation,cause,rowNumber,record,info) {
+	  
+	if (this.lostRows()) {
+	  throw cause
 	}
-  }	 
+	
+    this.COPY_METRICS.skipped++;
+    
+    try {
+      this.rejectRow(this.tableName,record);
+      const iterativeError = this.createIterativeException(cause,this.COPY_METRICS.cached,rowNumber,record,info)
+	  this.dbi.trackExceptions(iterativeError);
+      this.yadamuLogger.logRejected([...(typeof cause.getTags === 'function' ? cause.getTags() : []),this.dbi.DATABASE_VENDOR,this.displayName,operation,this.COPY_METRICS.cached,rowNumber],iterativeError);
+    } catch (e) {
+      this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.displayName,this.tableInfo.insertMode],e)
+    }
+    
+    if (this.COPY_METRICS.skipped === this.dbi.TABLE_MAX_ERRORS) {
+      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
+      this.abortTable()
+    }
+  }
+
+  createBatchException(cause,batchSize,firstRow,lastRow,info) {
+
+	return YadamuError.createBatchException(this.dbi,this.tableInfo,cause,this.BATCH_METRICS.batchNumber,batchSize,firstRow,lastRow,info)
+
+  }
   
-  setCSVTransformations(batch) {
-
-    // RFC4180
-
-    // Set the CSV Transformation functions based on the first non-null value for each column.
-
-	const lastIdx = batch[0].length - 1
-	this.csvTransformations = batch[0].map((col,colIdx) => {
-       const lastColumn = colIdx === lastIdx
-	   return col !== null ? this.getCSVTransformation(col,lastColumn) : this.getCSVTransformation(batch[batch.findIndex((row) => {return row[colIdx] !== null})]?.[colIdx],lastColumn)
-	})
-		
-  }  
-
-  async _writeBatch(batch,rowCount) {
-    /*        
-    if (this.tableInfo.insertMode === 'Batch') {
-      try {    
-        await this.dbi.createSavePoint();
-        const results = await this.dbi.executeSQL(this.tableInfo.dml,batch);
-        this.endTime = performance.now();
-        await this.dbi.releaseSavePoint();
-        this.metrics.written += rowCount;
-        return this.skipTable
-      } catch (cause) {
-        await this.dbi.restoreSavePoint(cause);
-        this.reportBatchError(batch,`INSERT MANY`,cause)
-        this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
-        this.tableInfo.insertMode = 'Iterative' 
-        
-      }
+  reportBatchError(operation,cause,firstRow,lastRow,info) {
+	 
+    if (this.lostRows() || YadamuError.missingTable(cause)) {
+	  throw cause
+    }
+	
+    const batchException = this.createBatchException(cause,this.COPY_METRICS.cached,firstRow,lastRow,info)
+	this.dbi.trackExceptions(batchException);
+    this.yadamuLogger.handleWarning([...(cause.getTags?.() || []),this.dbi.DATABASE_VENDOR,this.displayName,operation,this.tableInfo.insertMode,this.BATCH_METRICS.batchNumber,this.BATCH_METRICS.cached],batchException)
+  }
+  
+  handleSpatialError(operation,cause,rowNumber,record,info) {
+      
+    this.COPY_METRICS.skipped++;
+    
+    try {
+      this.rejectRow(this.tableName,record);
+      const iterativeError = this.createIterativeException(cause,this.COPY_METRICS.cached,rowNumber,record,info)
+	  this.dbi.trackExceptions(iterativeError);
+      this.yadamuLogger.logRejectedAsWarning([this.dbi.DATABASE_VENDOR,this.displayName,operation,this.BATCH_METRICS.cached,rowNumber],iterativeError);
+    } catch (e) {
+      this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,'ITERATIVE_ERROR',this.displayName,this.tableInfo.insertMode],e)
     }
 
-    for (const row in batch) {
-      try {
-        const results = await this.dbi.executeSQL(this.tableInfo.dml,batch[row]);
-        this.metrics.written++
-      } catch (cause) {
-        const errInfo = {}
-        this.handleIterativeError(`INSERT ONE`,cause,row,batch[row],errInfo);
-        if (this.skipTable) {
-          break;
-        }
-      }
-    }     
-   
-    this.endTime = performance.now();
-    this.batch.length = 0;
-    this.metrics.cached = 0;
-    return this.skipTable          
-	*/
+    
+    if (this.COPY_METRICS.skipped === this.dbi.TABLE_MAX_ERRORS) {
+      this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],`Maximum Error Count exceeded. Skipping Table.`);
+      this.abortTable()
+    }
   }
-      
-  async processBatch(batch,rowsReceived,rowsCached) {
+    
+  async doConstruct() {
+   
+	// Workers need to reload their copy of the Statement Cache from the Manager before processing can begin
+	// this.yadamuLogger.trace([this.constructor.name,'CACHE_LOADED',this.dbi.getWorkerNumber(),this.tableName],'WAITING')
+    await this.dbi.cacheLoaded
+    this.dbi.reloadStatementCache()
+    // this.yadamuLogger.trace([this.constructor.name,'CACHE_LOADED',this.dbi.getWorkerNumber(),this.tableName],'PROCESSING')
 
-    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.displayName,rowsReceived,rowsCached],'processBatch()')
+    // Do not start processing data until all DDL operations have completed and a transaction has been started.	
+	// ### Actually must not push() until DDL_COMPLETE, however if DDL operations are transactional, then we must not start the transaction until DDL Complete.
+	
+	// this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')
+    await this.dbi.ddlComplete
+	await this.beginTransaction()
+    // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'PROCESSING')
+	
+  }
+    
+  _construct(callback) {
+	  
+	this.doConstruct().then(() => { callback() }).catch((err) => { callback(err) })
+
+  }
+
+  commitWork() {
+    // While COMMIT is defined as a multiple of BATCH_SIZE some drivers may write smaller batches.
+    return (((this.dbi.COMMIT_COUNT > 0) && (this.COPY_METRICS.written >= this.dbi.COMMIT_COUNT)) && !this.skipTable)
+  }
+	
+  async processBatch(batch, snapshot) {
+	  
+	this.BATCH_METRICS = snapshot
 	
 	if (!this.skipTable) {
 	  try {
-		 
-	    this.skipTable = await this._writeBatch(batch,rowsCached)
+	    this.skipTable = await this._writeBatch(batch,this.BATCH_METRICS.cached)
         if (this.skipTable) {
           await this.rollbackTransaction();
-        }	  
-        if (this.REPORT_BATCHES && !this.commitWork(rowsReceived)) {
-          this.yadamuLogger.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows written:  ${this.metrics.written}.`);
-        }                   
+        }	                     
 	    // Commit after a writing a batch if the Commit threshold has been reached or passed. Start a new Transaction
-        if (this.commitWork(rowsReceived)) {
+        if (this.commitWork(this.BATCH_METRICS.received)) {
 		  try {
             await this.commitTransaction()
-            if (this.REPORT_COMMITS) {
-              this.yadamuLogger.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows committed: ${this.metrics.committed}.`);
+            if (this.dbi.REPORT_COMMITS) {
+              this.yadamuLogger.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows committed: ${this.COPY_METRICS.committed}.`);
             }          
 		  } catch (commitFailure) {
 			// Attempt to start a new transaction even if the commit failed.
@@ -537,6 +286,11 @@ class YadamuWriter extends Transform {
 		  }
           await this.beginTransaction();            	  
         }
+		else {
+          if (this.dbi.REPORT_BATCHES) {
+            this.yadamuLogger.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows written:  ${this.COPY_METRICS.written}.`);
+          }
+  	    }
 	  } catch (err) { 
 
   	    /*
@@ -544,402 +298,258 @@ class YadamuWriter extends Transform {
 	    ** An unrecoverable error occured while writing a batch. Examples of unrecoverable errors include lost connections, missing tables, too many errors during iterative inserts
 	    ** or anything else that causes the _writeBach implementation to throw an error. This will also catch issues with Transaction State (Errors during COMMIT and/or BEGIN transaction operations)
         **
-	    ** processBatch() is typically executed outside of 'try', 'await', 'catch' block, so that Yadamu can prepare the next batch of rows while the current batch of rows in being written.
-	    **
-	    ** Emit 'close' here to terminate the current pipeline operation. Thowing an exception or a rejection will cause "Unhandled Exception" or "UnhandledRejection" errors.
-	    **
 	    */
-
-        if (this.metrics.lost > 0) {
-   	      this.underlyingError = err
+        if (this.lostRows()) {
           // ### Need to caculate lost rows correctly when TABLE_MAX_ERRORS exceeded
           if (YadamuConstants.ABORT_CURRENT_TABLE.includes(this.dbi.ON_ERROR)) {
 	        // Aborting the current table (ABORT,SKIP) means that no more rows will be read and any records cached but not written will be lost. 
-	        this.readerMetrics.rowsRead = this.eventSource.getRowCount()
-			this.readerMetrics.lost = this.eventSource.writableLength
-	        this.metrics.lost+= rowsCached
    	        this.releaseBatch(batch)
       	    this.abortTable()
-      	    // Emit an explicit 'close' event. This will terminate the pipeline operation which will trigger 'error' and 'close' events on all of the upstream components.
-    	    this.emit('close')
 		  }
         }
+		throw err
 	  }
 	}
     else {
 	  // Entire Batch is skipped ### Log the batch ???
-	  this.metrics.lost+= rowsCached
+	  this.COPY_METRICS.lost += this.BATCH_METRICS.cached
 	  this.releaseBatch(batch)
 	}
-    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.displayName,rowsReceived,rowsCached],'processBatch(): emit('batchWritten')`)
-	this.emit('batchWritten');
+
   }
 
-  getBatchWritten(batchNumber) {
-  
-    const batchWritten = new Promise((resolve,reject) => {
-      // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'getBatchWritten()',batchNumber],'new batchWritten')
-	  this.once('batchWritten',() => {
-	    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'getBatchWritten()',batchNumber,err ? err.message : 'OK'],'batchWritten')
-	    this.batchOperations.delete(this.batchWritten)
-	    resolve();
-	  })
-    })
-	this.batchOperations.add(batchWritten)
-    return batchWritten
-  }
-  
-  uncork(expected) {
-	  
-	 // Nasty Hack to prevent end() on the upstream stream uncorking the stream before the current batch is complete.
-	 if (expected === true) {
-	   return super.uncork()
-	 }
-  }		 
-  
-  async processRow(data) {
-    // Be very careful about adding unecessary code here. This is executed once for each row processed by YADAMU. Keep it as lean as possible.
-    this.checkColumnCount(data)
-    this.cacheRow(data)
-    this.metrics.received++;
-    if ((this.metrics.received % this.FEEDBACK_INTERVAL === 0) & !this.flushBatch()) {
-      this.yadamuLogger.info([`${this.tableName}`,this.tableInfo.insertMode],`Rows Cached: ${this.metrics.cached}.`);
-    }
-	if (this.flushBatch()) {
-      this.cork()
-	  // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,'processRow()',this.metrics.received,this.metrics.cached],'Cache Full')
-	  const nextBatch = this.batch;
-	  const rowsReceived = this.metrics.received
-      const rowsCached = this.metrics.cached
-      // Wait for any pending processBatch operations to complete
-	  if (this.batchWritten) {
-	    const startTime = performance.now()
-	    await this.batchWritten;
-	    const elapsedTime = performance.now() - startTime
-	    this.metrics.idleTime+= elapsedTime;
-	  }
-      this.newBatch()
- 	  this.uncork(true)
-      this.batchWritten = this.getBatchWritten(this.metrics.batchCount)
-	  this.processBatch(nextBatch,rowsReceived,rowsCached).catch((e) => {
-        this.yadamuLogger.error([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode],'Write Batch Failed');
-	    this.yadamuLogger.handleException([this.dbi.DATABASE_VENDOR,this.displayName,this.tableInfo.insertMode,'BATCH WRITE'],e)
-      })
-    }
-  }
-  
-  getMetrics() {
-    return {
-      startTime     : this.startTime
-    , endTime       : this.endTime
-    , sqlTime       : this.dbi.sqlCumlativeTime - this.sqlInitialTime
-    , insertMode    : this.tableInfo.insertMode
-    , skipTable     : this.skipTable
-    , metrics       : this.metrics
-    }    
-  }
-  
-  async endTable() {
-  }
-    
-  async _write(obj, encoding, callback) {
-    const messageType = Object.keys(obj)[0]
-    try {
-      // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),messageType,this.metrics.received,this.writableLength,this.writableHighWaterMark],'_write()')
-      switch (messageType) {
-        case 'data':
-          // processRow() becomes a No-op after calling abortTable()
-          this.processRow(obj.data)
-          break;
-        case 'table':
-	      await this.initialize(obj.table)
-          // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),messageType,this.metrics.received],'initialized')
-          break;  
-        case 'partition':
-          // this.yadamuLogger.trace([this.constructor.name,this.displayName,obj.partition.partitionName,this.dbi.getWorkerNumber(),this.metrics.received],'Start ')
-		  await this.initializePartition(obj.partition)
-		  break;  
-      case 'eod':
-	  
-	  
-	  
-        // Used when processing serial data sources such as files to indicate that all records have been processed by the writer
-        // this.yadamuLogger.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType,this.displayName,'EMIT'],`"allDataReceived"`)  
-		// await this.endTable()
-        this.emit('allDataReceived')
-        break;  
+  async doWrite(obj) {
+	
+    // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.displayName || this.tableName,],`doWrite(${Object.keys(obj)[0]})`)
+		
+	switch (true) {
+	  case obj.hasOwnProperty('batch'):
+        // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.displayName,obj.this.BATCH_METRICS.received,obj.this.BATCH_METRICS.cached],'doWrite()')
+	    this.COPY_METRICS.idleTime+= ( this.waitTime - performance.now() )  
+		this.setWriting();
+	    await this.processBatch(obj.batch,obj.snapshot)
+		this.emit(DBIConstants.BATCH_WRITTEN)
+		this.waitTime = performance.now()
+		break
+	  case obj.hasOwnProperty('table'):
+	    await this.initializeTable()
+		this.waitTime = performance.now()
+		return
+	  case obj.hasOwnProperty('partition'):
+	    await this.initializePartition(obj.partition)
+        break
       default:
-      }
-      callback();
-    } catch (e) {
-      // this.yadamuLogger.trace([`WRITER`,this.dbi.DATABASE_VENDOR,this.displayName,this.dbi.ON_ERROR,this.dbi.getWorkerNumber(),messageType],e);    
-	  this.yadamuLogger.handleException([`PIPELINE`,`WRITER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,messageType,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);    
-	  try {
-        switch (messageType) {
-          case 'data':
-            /*
-            **
-            ** Read Error Handling. 
-            **   ABORT: Rollback the current transaction. Pass the exception to the callback function, which should propogate the exception.
-            **   SKIP:  
-            **   FLUSH: 
-            **
-            */
-            try {
-              switch (this.dbi.ON_ERROR) {
-                case 'SKIP':
-                case 'FLUSH':
-                callback();
-                break;
-              case 'ABORT': 
-                // Treat anything but SKIP or FLUSH, including undefined as ABORT
-              default:
-                if (this.dbi.TRANSACTION_IN_PROGRESS === true) {
-                  // No need to check for lost connction. Rollback will pass through a lost connection error without attempting to perform the rollback operation 
-                  await this.rollbackTransaction(e)
-                }
-                // Passing the exception to callback triggers the onError() event
-                callback(e);
-                break;
-              }
-            } catch (e) {
-              // Passing the exception to callback triggers the onError() event
-              callback(e)   
-			  return
-            } 
-          case 'table':
-          case 'eod':
-          default:
-		    /*
-			**
-			** The pipeline operation does not appear to terminate after invoking the callback and passing an exception
-		    ** emitting 'end' or 'finish' does not terminate the pipeline and causes the operation to hang.
-			** emitting 'error' results in 'UNHANDLED REJECTION' conditions coming from each stream bit does cause the stream to stop
-			** emitting 'close' results in 'PREMATURE CLOSE' getting thrown by the pipeline operation, so we need to make the underlying cause availalbe.
-			**
-			*/
-		    // this.abortTable()
-			this.underlyingError = e;
-			// this.emit('close')
-			callback(e)
-        }
-      } catch (err) {
-		err.cause = e
-		callback(err)    
-      }
-    }
+	}
+	   
   }
 
-  setReaderMetrics(readerMetrics) {
-    this.readerMetrics = readerMetrics
+ 
+  _write(batch, encoding, callback) {
+	 
+    // this.yadamuLogger.trace([this.constructor.name,this.dbi.ROLE,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost,this.writableEnded,this.writableFinished],'YadamuWriter._write()')
+    this.doWrite(batch).then(()=> { callback() }).catch((e) => { this.emit(DBIConstants.BATCH_FAILED); callback(e) })
+
   }
   
-  recordPartitionMetrics(partitionMetrics) {
-	if (this.tableInfo.hasOwnProperty('metrics')) {
-	  this.tableInfo.metrics.startTime = partitionMetrics.startTime < this.tableInfo.metrics.startTime ? partitionMetrics.startTime : this.tableInfo.metrics.startTime
-	  this.tableInfo.metrics.endTime = partitionMetrics.endTime > this.tableInfo.metrics.endTime ? partitionMetrics.endTime : this.tableInfo.metrics.endTime
-	  this.tableInfo.metrics.rowCount+= partitionMetrics.rowCount
-	  this.tableInfo.metrics.rowsSkipped+= partitionMetrics.rowsSkipped
-	  this.tableInfo.metrics.sqlExecutionTime+= partitionMetrics.sqlExecutionTime
+  setReader(reader) {
+	this.reader = reader
+  }
+
+  recordPartitionMetrics() {
+
+    if (this.tableInfo.partitionsRemaining == this.tableInfo.partitionCount) {
+	  this.tableInfo.TABLE_METRICS = Object.assign({},this.COPY_METRICS)
 	}
 	else {
-	 this.tableInfo.metrics = partitionMetrics
+	  this.tableInfo.TABLE_METRICS.pipeStartTime = this.COPY_METRICS.pipeStartTime < this.tableInfo.TABLE_METRICS.pipeStartTime ? this.COPY_METRICS.pipeStartTime : this.tableInfo.TABLE_METRICS.pipeStartTime
+	  this.tableInfo.TABLE_METRICS.writerEndTime = this.COPY_METRICS.writerEndTime > this.tableInfo.TABLE_METRICS.writerEndTime ? this.COPY_METRICS.writerEndTime : this.tableInfo.TABLE_METRICS.writerEndTime
+	  this.tableInfo.TABLE_METRICS.read+=      this.COPY_METRICS.read
+	  this.tableInfo.TABLE_METRICS.committed+= this.COPY_METRICS.committed
+	  this.tableInfo.TABLE_METRICS.lost +=     this.COPY_METRICS.lost
+	  this.tableInfo.TABLE_METRICS.skipped+=   this.COPY_METRICS.skipped
+	  this.tableInfo.TABLE_METRICS.sqlTime+=   this.COPY_METRICS.sqlTime
 	}
+    this.tableInfo.partitionsRemaining--
   }
   
   reportPerformance(err) {
+	  
+	this.COPY_METRICS.writerEndTime = performance.now()
+	this.COPY_METRICS.read = this.COPY_METRICS.read || this.COPY_METRICS.parsed
+
+    // console.log(this.COPY_METRICS)
 	
-	const writerMetrics = this.getMetrics();
-    writerMetrics.metrics.lost+= this.readerMetrics.lost + this.writableLength
-	const readElapsedTime = this.readerMetrics.parserEndTime - this.readerMetrics.readerStartTime;
-    const writerElapsedTime = writerMetrics.endTime - writerMetrics.startTime;        
-    const pipeElapsedTime = writerMetrics.endTime - this.readerMetrics.pipeStartTime;
-    const readThroughput = isNaN(readElapsedTime) ? 'N/A' : Math.round((this.readerMetrics.rowsRead/readElapsedTime) * 1000)
-    const writerThroughput = isNaN(writerElapsedTime) ? 'N/A' : Math.round((writerMetrics.metrics.committed/writerElapsedTime) * 1000)
+	if (err) {
+	  if (this.reader && this.reader.readableLength && !isNaN(this.reader.readableLength)) {
+		// 'readable-stream' based Readble implementations (e.g. MySQL) may not maintain this value.
+        this.COPY_METRICS.read  += this.reader.readableLength
+	  }
+      this.COPY_METRICS.skipped += this.COPY_METRICS.cached   // .cached will be zero following AbortTable()
+	  this.COPY_METRICS.cached  = 0
+      this.COPY_METRICS.skipped += this.COPY_METRICS.pending  // .pending will be zero if all batches have been written
+	  this.COPY_METRICS.pending = 0
+	  this.COPY_METRICS.lost    += this.COPY_METRICS.written  // .written will be zero following a commit or rollback transaction or following AbortTable()
+	  this.COPY_METRICS.written = 0
+      this.COPY_METRICS.skipped += (this.COPY_METRICS.read - this.COPY_METRICS.parsed) 
+	  this.COPY_METRICS.skipped += (this.COPY_METRICS.parsed - this.COPY_METRICS.received)
+    }
+
+	this.COPY_METRICS.sqlTime       = this.dbi.sqlCumlativeTime - this.sqlInitialTime
+    this.COPY_METRICS.insertMode    = this.tableInfo?.insertMode
+    this.COPY_METRICS.skipTable     = this.skipTable
+ 	    
+	const readElapsedTime = this.COPY_METRICS.parserEndTime - this.COPY_METRICS.readerStartTime;
+    const writerElapsedTime = this.COPY_METRICS.writerEndTime - this.COPY_METRICS.writerStartTime;        
+    const pipeElapsedTime = this.COPY_METRICS.writerEndTime - this.COPY_METRICS.pipeStartTime;
+    const readThroughput = isNaN(readElapsedTime) ? 'N/A' : Math.round((this.COPY_METRICS.read/readElapsedTime) * 1000)
+    const writerThroughput = isNaN(writerElapsedTime) ? 'N/A' : Math.round((this.COPY_METRICS.committed/writerElapsedTime) * 1000)
     
     let readStatus = ''
     let rowCountSummary = ''
-    let idleTime = 0;
     
-    const readerTimings = `Reader Elapsed Time: ${YadamuLibrary.stringifyDuration(readElapsedTime)}s. Throughput ${Math.round(readThroughput)} rows/s. ${(writerMetrics.metrics.idleTime * 20) > writerElapsedTime ? ` Idle Time: ${YadamuLibrary.stringifyDuration(writerMetrics.metrics.idleTime)}s.` : ''}`
-    const writerTimings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(writerElapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(writerMetrics.sqlTime))}s. Throughput: ${Math.round(writerThroughput)} rows/s.`
+    const readerTimings = `Reader Elapsed Time: ${YadamuLibrary.stringifyDuration(readElapsedTime)}s. Throughput ${Math.round(readThroughput)} rows/s.`
+    const writerTimings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(writerElapsedTime)}s.  Idle Time: ${YadamuLibrary.stringifyDuration(this.COPY_METRICS.idleTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(this.COPY_METRICS.sqlTime))}s. Throughput: ${Math.round(writerThroughput)} rows/s.`
     
-    if ((this.readerMetrics.rowsRead === 0) || (this.readerMetrics.rowsRead === writerMetrics.metrics.committed)) {
-      rowCountSummary = `Rows ${this.readerMetrics.rowsRead}.`
+    if ((this.COPY_METRICS.read === 0) || (this.COPY_METRICS.read === this.COPY_METRICS.committed)) {
+      rowCountSummary = `Rows ${this.COPY_METRICS.read}.`
     }
     else {
-      rowCountSummary = `Read ${this.readerMetrics.rowsRead}. Written ${writerMetrics.metrics.committed}.`
+      rowCountSummary = `Read ${this.COPY_METRICS.read}. Written ${this.COPY_METRICS.committed}.`
     }
-    rowCountSummary = writerMetrics.metrics.skipped > 0 ? `${rowCountSummary} Skipped ${writerMetrics.metrics.skipped}.` : rowCountSummary
-    rowCountSummary = writerMetrics.metrics.lost > 0 ? `${rowCountSummary} Lost ${writerMetrics.metrics.lost}.` : rowCountSummary
+    rowCountSummary = this.COPY_METRICS.skipped > 0 ? `${rowCountSummary} Skipped ${this.COPY_METRICS.skipped}.` : rowCountSummary
+    rowCountSummary = this.COPY_METRICS.lost > 0 ? `${rowCountSummary} Lost ${this.COPY_METRICS.lost}.` : rowCountSummary
     
-    const cause = this.readerMetrics.readerError || this.readerMetrics.parserError ||  this.underlyingError || err
+    const cause = this.COPY_METRICS.readerError || this.COPY_METRICS.parserError ||  this.underlyingError || err
 	if (cause) {
 	  const tags = YadamuError.lostConnection(cause) ? ['LOST CONNECTION'] : []
-      tags.push(this.readerMetrics.readerError || this.readerMetrics.parserError ? 'STREAM READER' : 'STREAM WRITER')
-	  this.yadamuLogger.handleException(['PIPELINE',...tags,this.displayName,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],cause)
+      tags.push(this.COPY_METRICS.readerError || this.COPY_METRICS.parserError ? 'STREAM READER' : 'STREAM WRITER')
+	  this.yadamuLogger.handleException(['PIPELINE',...tags,this.displayName,this.COPY_METRICS.SOURCE_DATABASE_VENDOR,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],cause)
 	}
-
-	// console.log(writerMetrics.metrics)
 	
-	if (this.readerMetrics.failed) {
-      rowCountSummary = this.readerMetrics.tableNotFound === true ? `Table not found.` : `Read operation failed. ${rowCountSummary} `  
-      this.yadamuLogger.error([`${this.displayName}`,`${writerMetrics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+	if (this.COPY_METRICS.failed) {
+      rowCountSummary = this.COPY_METRICS.tableNotFound === true ? `Table not found.` : `Read operation failed. ${rowCountSummary} `  
+      this.yadamuLogger.error([`${this.displayName}`,`${this.COPY_METRICS.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
     }
     else {
 	  switch (true) {
-		case (this.readerMetrics.rowsRead == writerMetrics.metrics.committed):
-          this.yadamuLogger.info([`${this.displayName}`,`${writerMetrics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+		case (this.COPY_METRICS.read == this.COPY_METRICS.committed):
+          this.yadamuLogger.info([`${this.displayName}`,`${this.COPY_METRICS.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
 		  break
-	    case (this.readerMetrics.rowsRead === (writerMetrics.metrics.committed + writerMetrics.metrics.skipped)):
-          this.yadamuLogger.warning([`${this.displayName}`,`${writerMetrics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
-		  break
-	    case (this.readerMetrics.rowsRead === (writerMetrics.metrics.committed + writerMetrics.metrics.lost)):
-          this.yadamuLogger.error([`${this.displayName}`,`${writerMetrics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+	    case (this.COPY_METRICS.read === (this.COPY_METRICS.committed + this.COPY_METRICS.skipped)):
+          this.yadamuLogger.warning([`${this.displayName}`,`${this.COPY_METRICS.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
 		  break
 		default:
-          this.yadamuLogger.error([`${this.displayName}`,`${writerMetrics.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
+          this.yadamuLogger.error([`${this.displayName}`,`${this.COPY_METRICS.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
       }
     }     
-    
-	let metrics = {
-      rowCount: writerMetrics.metrics.committed
-	, insertMode: writerMetrics.insertMode
-	, rowsSkipped: writerMetrics.metrics.skipped
-	, elapsedTime: Math.round(writerElapsedTime).toString() + "ms"
-	, throughput: Math.round(writerThroughput).toString() + "/s"
-	, sqlExecutionTime: Math.round(writerMetrics.sqlTime)
-	}
 	
-    if (this.dbi.yadamu.YADAMU_QA && ((this.readerMetrics.rowsRead - (writerMetrics.metrics.committed + writerMetrics.metrics.lost + writerMetrics.metrics.skipped))!== 0)) {
-      this.yadamuLogger.qa([`${this.displayName}`,`${writerMetrics.insertMode}`,this.readerMetrics.rowsRead,writerMetrics.metrics.committed,writerMetrics.metrics.lost,writerMetrics.metrics.skipped,this.writableLength,this.readerMetrics.lost],`Inconsistent Metrics detected.`)  
-    } 
-
     if (this.PARTITIONED_TABLE) {
-      this.tableInfo.partitionsRemaining--
-	  metrics.startTime = writerMetrics.startTime
-	  metrics.endTime =  writerMetrics.endTime
-	  this.recordPartitionMetrics(metrics); 
+	  this.recordPartitionMetrics()
 	  if (this.tableInfo.partitionsRemaining === 0) {
-		metrics = this.tableInfo.metrics
-		metrics.elapsedTime = metrics.endTime - metrics.startTime
-		const throughput = Math.round((metrics.rowCount/metrics.elapsedTime) * 1000)
-		metrics.throughput =  throughput  + "/s"
-	    const timings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(metrics.elapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(metrics.sqlExecutionTime))}s. Throughput: ${throughput} rows/s.`
-	    this.yadamuLogger.info([`${this.tableName}`],`Total Rows ${metrics.rowCount}. ${timings}`)  
-		delete metrics.startTime
-		delete metrics.endTime
-		delete metrics.partitionCount
-        const tableMetrics = {[this.tableName] : metrics};
-	    this.dbi.yadamu.recordMetrics(tableMetrics);  
+		const summary = this.dbi.yadamu.recordMetrics(this.tableName,this.tableInfo.TABLE_METRICS);  
+	    const timings = `Writer Elapsed Time: ${YadamuLibrary.stringifyDuration(summary.elapsedTime)}s. SQL Exection Time: ${YadamuLibrary.stringifyDuration(Math.round(this.tableInfo.TABLE_METRICS.sqlExecutionTime))}s. Throughput: ${summary.throughput} rows/s.`
+	    this.yadamuLogger.info([`${this.tableName}`,`${this.COPY_METRICS.insertMode}`],`Total Rows ${this.tableInfo.TABLE_METRICS.committed}. ${timings}`)  
 	  }
     }
     else {
-      const tableMetrics = {[this.tableName] : metrics};
-      this.dbi.yadamu.recordMetrics(tableMetrics);  
+      this.dbi.yadamu.recordMetrics(this.tableName,this.COPY_METRICS)
 	}
-    return (this.readerMetrics.failed || (this.readerMetrics.rowsRead !== (writerMetrics.metrics.committed + writerMetrics.metrics.skipped)))
+	
+    return (this.COPY_METRICS.failed || (this.COPY_METRICS.read !== (this.COPY_METRICS.committed + this.COPY_METRICS.skipped)))
   }
   
-  async finalize(cause) {
-    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.skipTable,this.dbi.TRANSACTION_IN_PROGRESS,this.writableEnded,this.writableFinished,this.destroyed,this.hasPendingRows(),this.metrics.received,this.metrics.committed,this.metrics.written,this.metrics.cached],'finalize()')
-	// Wait for any pending writeBatch operations to complete before proceeding 
-    await this.batchWritten;
-   
-    if (this.hasPendingRows() && !this.skipTable) {
-	  const nextBatch = this.batch;
-	  const rowsReceived = this.metrics.received
-      const rowsCached = this.metrics.cached
-      this.batchWritten = this.getBatchWritten(this.metrics.batchCount)
-	  this.processBatch(nextBatch,rowsReceived,rowsCached).catch((e) => {console.log(e)})
- 	}
-	else {
-	  this.metrics.lost+= this.metrics.cached
-	  this.releaseBatch(this.batch)
-	}
-
-    // Ensure all batchOperations are complete
-    await Promise.allSettled(Array.from(this.batchOperations))
-	
-	/*
-	**
-	** Handle any errors raised during the final processBatch() operations.
-	**
-	*/
-	
-	this.underlyingError = this.underlyingError || cause
-    if (this.dbi.TRANSACTION_IN_PROGRESS === true) {
+  async endTransaction(err) {
+	  
+	if (this.dbi.TRANSACTION_IN_PROGRESS === true) {
       if (this.skipTable === true) {
-		await this.rollbackTransaction(this.underlyingError)
+		await this.rollbackTransaction(err)
       }
       else {
         await this.commitTransaction()
       }
     }
+  }
+  
+  async doFinal() {
+
+    // this.yadamuLogger.trace([this.constructor.name,'doFinal()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')
+    await this.batchCompleted
+    // this.yadamuLogger.trace([this.constructor.name,'doFinal()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'PROCESSING')
+
+    await this.endTransaction()
+    this.reportPerformance()
+  }
+
+  _final(callback) {
+
+    // this.yadamuLogger.trace([this.constructor.name,this.dbi.ROLE,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost,this.writableEnded,this.writableFinished],'YadamuWriter._final()')
+    this.doFinal().then(() => { callback() }).catch((e) => { callback(e) })
 	
-  }   
-         
-  async __destroy() { /* Proivde implementation where nescessary * */  }
-    
-  async _destroy (err,callback)  {
-
-	/*
-	**
-	** _destroy is called when the stream terminates as a result of an error
-	**
-	** The pipeline operation may terminate and throw an exception before _destroy has completed....
-	**
-	*/
-	  
-	// this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber()],`_destroy(${err ? err.message : 'Normal'})`)
-
-    if (err && YadamuConstants.ABORT_CURRENT_TABLE.includes(this.dbi.ON_ERROR)) {
-      this.abortTable()
-	}	
-    let source
-
-	try {
-      await this.__destroy()
-      await this.finalize(err)
-	} catch (e) {
-      // Handle Error during Finalize
-	  source = 'STREAM WRITER'
-	  err = e 
-	  this.underlyingError = e
-	  this.yadamuLogger.handleException([`PIPELINE`,`STREAM WRITER`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],e);
-    }
-    this.endTime = performance.now()
-	try {
-	  await this.ddlComplete
-	  this.reportPerformance(err)
-    } catch (ddlFailure) {
-	  err = ddlFailure
+  }
+  
+  async doDestroy(err) {
+  
+    if (err) {
+	  try {
+        // this.yadamuLogger.trace([this.constructor.name,'doDestroy()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')
+		await this.batchCompleted
+        // this.yadamuLogger.trace([this.constructor.name,'doDestroy()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'PROCESSING')
+	    await this.endTransaction(err)
+        this.reportPerformance(err)
+	  }
+	  catch (e) {
+		console.log(e)
+		e.rootCause = err
+        this.reportPerformance(e)
+		throw e
+	  }
 	}
-	callback(err)
-  } 
 
-  async __final() { /* Proivde implementation where nescessary * */  }
- 
-  async _final(callback) {
+  }
+
+  _destroy(err,callback)  {
 	  
-	/*
-	**
-	** _final is called when the stream terminates without an error
-	**
-	*/
+    // this.yadamuLogger.trace([this.constructor.name,this.dbi.ROLE,this.displayName,this.dbi.getWorkerNumber(),this.writableLength],`YadamuWriter._destroy(${err ? err.message : 'Normal'})`)
+    this.doDestroy(err).then(() => { callback(err) }).catch((e) => { e.rootCause = err; callback(e) })
 	
-    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),,this.metrics.received,this.metrics.cached],'_final()')
-	await this.__final()
-	let exception
-	try {
-      await this.destroy()
-	} catch (err) {
-      this.yadamuLogger.handleException([`PIPELINE`,`WRITER`,`FINAL`,this.SOURCE_VENDOR,this.dbi.DATABASE_VENDOR,`"${this.tableName}"`,this.dbi.ON_ERROR,this.dbi.getWorkerNumber()],err);
-	  exception = err
-    } 
-	callback(exception)
-  } 
-    
+  }
+
+  _writeBatch(batch,cached) {
+  
+    /*
+	**
+	**
+	
+    Writes a batch of records to the database using an appropriate multirow insert.
+	If the multi-row insert fails, should fall back to an interative approach.
+	
+	Throw an exception under the follwing conditions
+	 - The implementer forgets to implement this method :)
+	 - The target table cannot be found
+	 - The Maximum Number of iterative errors threshold is exceeded
+	 - The connection fails and rows have been lost e.g. rows have been written successfully but not yet committed and the ON_ERROR option is ABORT or SKIP
+	   Errors encountered during Begin Transaction and CREATE SAVE POINT operations errors are retryable
+	   Errors encountered during Commit Transaction records are not retryable.
+	   Rows written but not committed are treated as LOST if a commit operations fails. 
+	   Save Point errors are treated as recoverable but may lead to unrecoverable errors during subsequent commit or rollback operations
+	   Rows from prior batches that have not been committed are not recoverable. Setting COMMIT_RATIO to 1 prevents multiple batch transactions.
+	   Currently rows from the current batch are considered unreocverable in the event of a rollback. 
+	   
+	 
+	 It is critical that the method throws in these circumstances so that the _write callback is invoked with the exception.
+	 This ensures that the pipeline terminates and additional records are not processed.
+	 
+	 Note that when the ON_ERROR behavoir is FLUSH _writeBatch should not throw unless it is absolutely certain that it will not be possible to
+	 process addtional batches of records. Lost records are an acceptable consequence of under FLUSH.
+	 
+	 LOST rows are not skipped records, lost records are records written to the database but not committed at the point an unrecoverable error occurred.
+
+    **
+    */
+
+    throw new UnimplementedMethod('_writeBatch()',`YadamuWriter`,this.constructor.name)
+  }
+
 }
 
-module.exports = YadamuWriter;
+export { YadamuWriter as default}

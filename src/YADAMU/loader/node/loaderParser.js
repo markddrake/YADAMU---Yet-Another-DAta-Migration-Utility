@@ -1,13 +1,12 @@
 "use strict" 
 
-const YadamuParser = require('../../common/yadamuParser.js')
-const YadamuLibrary = require('../../common/yadamuLibrary.js')
+import YadamuParser from '../../common/yadamuParser.js'
+import YadamuLibrary from '../../common/yadamuLibrary.js'
 
-class EventStream extends YadamuParser {
+class LoaderParser extends YadamuParser {
   
   constructor(tableInfo,yadamuLogger) {
-    
-	super(tableInfo,yadamuLogger);      
+    super(tableInfo,yadamuLogger);      
 
 	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 
@@ -34,7 +33,7 @@ class EventStream extends YadamuParser {
 	
 	// Use a dummy rowTransformation function if there are no transformations required.
 
-	this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+	this.rowTransformation = this.transformations.every((currentValue) => { return currentValue === null}) ? (row) => {} : (row) => {
       this.transformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
           transformation(row,idx)
@@ -44,18 +43,13 @@ class EventStream extends YadamuParser {
     
   }
 
-  async _transform (data,encoding,callback) {
-	try {
-      this.rowCount++
-      // if (this.rowCount === 1) console.log('_transform',data)	
-      this.rowTransformation(data.data)
-      // if (this.rowCount === 1) console.log('Push',data)
-      this.push(data)
-      callback();  
-	} catch (e) {
-      callback(e)
-	}
+  async doTransform(data) {
+    // if (this.rowCount === 1) console.log('_transform',data)	
+    this.rowTransformation(data.data)
+    // if (this.rowCount === 1) console.log('Push',data)
+    return data.data
   }
+  
 }
 
-module.exports = EventStream
+export {LoaderParser as default }

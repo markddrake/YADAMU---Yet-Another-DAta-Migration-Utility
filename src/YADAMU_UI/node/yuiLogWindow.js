@@ -4,9 +4,9 @@
 // be executed in the renderer process for that window.
 // All of the Node.js APIs are available in this process.
 
-const { dialog } = require('electron').remote
-const { ipcRenderer} = require('electron')
-const fs = require('fs');
+import { dialog } from 'electron/remote'
+import { ipcRenderer} from 'electron'
+import fs from 'fs';
 
 window.$ = window.jQuery = require('jquery')
 window.popper = require('popper.js');

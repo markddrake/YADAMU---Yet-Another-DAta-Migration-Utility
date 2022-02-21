@@ -1,8 +1,8 @@
 "use strict"
 
-const HTTP = require('http')
+import HTTP from 'http'
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class AzureConstants {
 
@@ -30,6 +30,18 @@ class AzureConstants {
   static get CONTAINER()                  { return this.DBI_PARAMETERS.CONTAINER }
   static get CHUNK_SIZE()                 { return this.DBI_PARAMETERS.CHUNK_SIZE }
 
+  
+  static get HTTP_NAMED_STATUS_CODES()       {
+	 this._HTTP_NAMED_STATUS_CODES = this._HTTP_NAMED_STATUS_CODES || (() => {
+	   const httpCodes = {}
+	   Object.keys(HTTP.STATUS_CODES).forEach((code) => {
+		 httpCodes[HTTP.STATUS_CODES[code].toUpperCase().replace(/ /g,"_").replace(/-/g,"_").replace(/'/g,"")] = parseInt(code)
+	   })
+	   return Object.freeze(httpCodes)
+     })();
+	 return this._HTTP_NAMED_STATUS_CODES
+  }
+  
 }
 
-module.exports = AzureConstants;
+export {AzureConstants as default }

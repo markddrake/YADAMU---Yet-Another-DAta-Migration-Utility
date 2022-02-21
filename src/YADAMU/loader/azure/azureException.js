@@ -1,19 +1,26 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
+import HTTP from 'http'
+
+import {DatabaseError} from '../../common/yadamuException.js'
+import AzureConstants from './azureConstants.js'
 
 class AzureError extends DatabaseError {
   
-  constructor(cause,stack,url) {
-    super(cause,stack,url);
+  constructor(driverId,cause,stack,url) {
+	if (cause.message === '' && HTTP.STATUS_CODES.hasOwnProperty(cause.statusCode.toString())) {
+	 const message = `${HTTP.STATUS_CODES[cause.statusCode.toString()]} [${url}]`
+     cause.message = message
+	}  
+    super(driverId,cause,stack,url);
 	this.path = this.sql
 	delete this.sql
   }
 
-  possibleConsistencyError() {
-	return ((this.cause.statusCode === 404) && (this.cause.details.errorCode = 'BlobNotFound'))
+  FileNotFound() {
+	return (this.cause.statusCode === 404)
   }
 
 }
 
-module.exports = AzureError
+export {AzureError as default }

@@ -1,28 +1,28 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
+import {DatabaseError} from '../../common/yadamuException.js'
 
 class FileError extends DatabaseError {
-  constructor(cause,stack,file) {
-    super(cause,stack,file);
+  constructor(driverId,cause,stack,file) {
+    super(driverId,cause,stack,file);
 	this.path = this.sql
 	delete this.sql
   }
 }
 
 class FileNotFound extends FileError {
-  constructor(cause,stack,file) {
-    super(cause,stack,file);
+  constructor(driverId,cause,stack,file) {
+    super(driverId,cause,stack,file);
   }
 }
 
 class DirectoryNotFound extends FileError {
-  constructor(cause,stack,file) {
-    super(cause,stack,file);
+  constructor(driverId,cause,stack,file) {
+    super(cdriverId,ause,stack,file);
   }
 }
 
-module.exports = {
+export {
   FileError
 , FileNotFound
 , DirectoryNotFound

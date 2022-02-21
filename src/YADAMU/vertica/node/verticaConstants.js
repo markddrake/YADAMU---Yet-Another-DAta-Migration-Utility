@@ -1,6 +1,6 @@
 "use strict"
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class VerticaConstants {
 
@@ -34,4 +34,4 @@ class VerticaConstants {
 
 }
 
-module.exports = VerticaConstants;
+export { VerticaConstants as default }

@@ -1,6 +1,6 @@
 "use strict"
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class LoaderConstants {
 
@@ -23,4 +23,4 @@ class LoaderConstants {
      
 }
 
-module.exports = LoaderConstants;
+export {LoaderConstants as default }

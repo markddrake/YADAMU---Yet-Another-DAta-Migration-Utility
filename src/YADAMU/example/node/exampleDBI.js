@@ -1,25 +1,27 @@
 "use strict" 
-const fs = require('fs');
-const { performance } = require('perf_hooks');
+
+import fs from 'fs';
+import { performance } from 'perf_hooks';
 
 /* 
 **
-** Require Database Vendors API 
+** from  Database Vendors API 
 **
 */
 
-const YadamuDBI = require('../../common/yadamuDBI.js');
-const DBIConstants = require('../../common/dbiConstants.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js')
+import YadamuDBI from '../../common/yadamuDBI.js';
+import DBIConstants from '../../common/dbiConstants.js';
+import YadamuConstants from '../../common/yadamuConstants.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js'
+import {CopyOperationAborted} from '../../common/yadamuException.js'
 
-const ExampleConstants = require('./ExampleConstants.js');
-const ExampleError = require('./exampleException.js')
-const ExampleParser = require('./exampleParser.js');
-const ExampleWriter = require('./exampleWriter.js');
-const ExampleReader = require('./exampleReader.js');
-const ExampleStatementLibrary = require('./exampleStatementLibrary.js')
-const StatementGenerator = require('./statementGenerator.js');
+import ExampleConstants from './ExampleConstants.js';
+import ExampleError from './exampleException.js'
+import ExampleParser from './exampleParser.js';
+import ExampleWriter from './exampleWriter.js';
+import ExampleReader from './exampleReader.js';
+import ExampleStatementLibrary from './exampleStatementLibrary.js'
+import StatementGenerator from './statementGenerator.js';
 
 class ExampleDBI extends YadamuDBI {
    
@@ -62,8 +64,8 @@ class ExampleDBI extends YadamuDBI {
 
   get SPATIAL_FORMAT()        { return this.parameters.SPATIAL_FORMAT || ExampleConstants.SPATIAL_FORMAT };
 
-  constructor(yadamu,settings,parameters) {
-    super(yadamu,settings,parameters);
+  constructor(yadamu,manager,connectionSettings,parameters) {
+    super(yadamu,manager,connectionSettings,parameters);
 	this.StatementLibary = StatementLibary
   }
 
@@ -321,8 +323,6 @@ class ExampleDBI extends YadamuDBI {
 	// using client side implementaions are faster, more efficient and can handle much larger files. 
 	// The default implementation throws an unsupport feature exception
 
-	 this.DESCRIPTION = this.getSchemaIdentifer('TO_USER')
-
      super.uploadFile()
   }
   
@@ -359,7 +359,7 @@ class ExampleDBI extends YadamuDBI {
   }
 
   async processFile(hndl) {
-     return await this.processStagingTable(this.parameters.TO_USER)
+     return await this.processStagingTable(this.CURRENT_SCHEMA)
   }
   
   /*
@@ -407,7 +407,7 @@ class ExampleDBI extends YadamuDBI {
     
   }
   
-  async getSchemaInfo(keyName) {
+  async getSchemaMetadata() {
     
     /*
     ** Returns an array of information about each table in the schema being exported.
@@ -425,7 +425,7 @@ class ExampleDBI extends YadamuDBI {
     **
     */
           
-    return await this.executeSQL('GENERATE METADATA FROM SCHEMA',this.parameters[keyName])
+    return await this.executeSQL('GENERATE METADATA FROM SCHEMA',this.CURRENT_SCHEMA)
   }
    
   generateSelectStatement(tableMetadata) {
@@ -436,8 +436,8 @@ class ExampleDBI extends YadamuDBI {
     return new ExampleParser(tableInfo,this.yadamuLogger);
   }  
   
-  inputStreamError(e,sqlStatement) {
-    return this.trackExceptions(new ExampleError(e,this.streamingStackTrace,sqlStatement))
+  inputStreamError(cause,sqlStatement) {
+    return this.trackExceptions(((cause instanceof ExampleError) || (cause instanceof CopyOperationAborted)) ? cause : new ExampleError(cause,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(tableInfo) {
@@ -469,15 +469,20 @@ class ExampleDBI extends YadamuDBI {
     return await super.generateStatementCache(StatementGenerator, schema)
   }
 
-  getOutputStream(tableName,ddlComplete) {
+  getOutputStream(tableName,metrics) {
 	 // Get an instance of the YadamuWriter implementation associated for this database
-	 return super.getOutputStream(ExampleWriter,tableName,ddlComplete)
+	 return super.getOutputStream(ExampleWriter,tableName,metrics)
+  }
+
+  getOutputManager(tableName,metrics) {
+	 // Get an instance of the YadamuWriter implementation associated for this database
+	 return super.getOutputStream(ExampleOutputManager,tableName,metrics)
   }
 
   classFactory(yadamu) {
 	// Create a worker DBI that has it's own connection to the database (eg can begin and end transactions of it's own. 
 	// Ideally the connection should come from the same connection pool that provided the connection to this DBI.
-	return new ExampleDBI(yadamu)
+	return new ExampleDBI(yadamu,this)
   }
   
   async getConnectionID() {
@@ -487,4 +492,4 @@ class ExampleDBI extends YadamuDBI {
 	  
 }
 
-module.exports = ExampleDBI
+export { ExampleDBI

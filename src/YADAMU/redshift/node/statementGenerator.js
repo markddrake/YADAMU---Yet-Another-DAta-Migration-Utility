@@ -1,9 +1,9 @@
 "use strict";
 
-const crypto = require('crypto');
-const path = require('path');
+import crypto from 'crypto';
+import path from 'path';
 
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
+import YadamuLibrary from '../../common/yadamuLibrary.js';
 
 class StatementGenerator {
 
@@ -440,7 +440,6 @@ class StatementGenerator {
 	   insertOperators : insertOperators,
        insertMode      : insertMode,
        _BATCH_SIZE     : maxBatchSize,
-       _COMMIT_COUNT   : this.dbi.COMMIT_COUNT,
        _SPATIAL_FORMAT : this.dbi.INBOUND_SPATIAL_FORMAT,
 	   _SCHEMA_NAME    : this.targetSchema,
 	   _TABLE_NAME     : tableMetadata.tableName
@@ -472,5 +471,4 @@ class StatementGenerator {
 
 }
 
-module.exports = StatementGenerator
-
+export { StatementGenerator as default }

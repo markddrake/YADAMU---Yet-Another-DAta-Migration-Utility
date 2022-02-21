@@ -1,7 +1,7 @@
 "use strict" 
 
-const YadamuConstants = require('../../../common/yadamuConstants.js');
-const DefaultStatmentLibrary = require('../oracleStatementLibrary.js')
+import YadamuConstants from '../../../common/yadamuConstants.js';
+import DefaultStatmentLibrary from '../oracleStatementLibrary.js'
 
 class OracleStatementLibrary extends DefaultStatmentLibrary{
 
@@ -14,7 +14,7 @@ class OracleStatementLibrary extends DefaultStatmentLibrary{
 
 }
  
-module.exports = OracleStatementLibrary
+export {OracleStatementLibrary as default }
 
 const _SQL_GET_DLL_STATEMENTS   = `select COLUMN_VALUE JSON from TABLE(YADAMU_EXPORT_DDL.FETCH_DDL_STATEMENTS(:schema))`;
 

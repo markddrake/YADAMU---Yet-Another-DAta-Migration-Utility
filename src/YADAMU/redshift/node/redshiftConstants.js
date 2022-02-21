@@ -1,6 +1,6 @@
 "use strict"
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class RedshiftConstants {
 
@@ -38,4 +38,4 @@ class RedshiftConstants {
 
 }
 
-module.exports = RedshiftConstants
+export { RedshiftConstants as default }

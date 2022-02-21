@@ -1,12 +1,13 @@
 "use strict" 
 
-const MySQLDBI = require('../../../YADAMU/mysql/node/mysqlDBI.js');
-const MySQLError = require('../../../YADAMU/mysql/node/mysqlException.js')
-const MySQLConstants = require('../../../YADAMU/mysql/node/mysqlConstants.js');
+import MySQLDBI        from '../../../YADAMU/mysql/node/mysqlDBI.js';
+import MySQLError      from '../../../YADAMU/mysql/node/mysqlException.js'
+import MySQLConstants  from '../../../YADAMU/mysql/node/mysqlConstants.js';
 
-const YadamuTest = require('../../common/node/yadamuTest.js');
+import YadamuTest      from '../../common/node/yadamuTest.js';
+import YadamuQALibrary from '../../common/node/yadamuQALibrary.js'
 
-class MySQLQA extends MySQLDBI {
+class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
 
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
@@ -24,8 +25,8 @@ class MySQLQA extends MySQLDBI {
       return MySQLQA.YADAMU_DBI_PARAMETERS
     }	
 			
-    constructor(yadamu,settings,parameters) {
-       super(yadamu,settings,parameters)
+    constructor(yadamu,manager,connectionSettings,parameters) {
+       super(yadamu,manager,connectionSettings,parameters)
     }
 	
     doTimeout(milliseconds) {
@@ -42,28 +43,6 @@ class MySQLQA extends MySQLDBI {
       })  
     }
    
-	async initialize() {
-	  await super.initialize();
-	  if (this.terminateConnection()) {
-        const pid = await this.getConnectionID();
-	    this.scheduleTermination(pid,this.getWorkerNumber());
-	  }
-	}
-	
-    async initializeImport() {
-      if (this.options.recreateSchema === true) {
- 	    await this.recreateSchema();
-	  }
-      await super.initializeImport();
-    }	
-	
-    // ### Hack to avoid missng rows when using a new connection to read previously written rows using new connection immediately after closing current connection.....'
-
-	async finalizeImport() {
-	  await this.doTimeout(1000);
-	  super.finalizeImport()
-    }
-	
     async recreateSchema() {
         
       try {
@@ -78,7 +57,16 @@ class MySQLQA extends MySQLDBI {
       }
       const createSchema = `create schema "${this.parameters.TO_USER}"`;
       await this.executeSQL(createSchema,{});      
-    }    
+    }  
+
+    // ### Hack to avoid missng rows when using a new connection to read previously written rows using new connection immediately after closing current connection.....'
+
+	async finalizeImport() {
+	  await this.doTimeout(1000);
+	  super.finalizeImport()
+    }
+	
+  
 	
     async getRowCounts(target) {
 
@@ -117,28 +105,23 @@ class MySQLQA extends MySQLDBI {
       return report
     }
    
-    async workerDBI(idx)  {
-	  const workerDBI = await super.workerDBI(idx);
-      // Manager needs to schedule termination of worker.
-	  if (this.terminateConnection(idx)) {
-        const pid = await workerDBI.getConnectionID();
-	    this.scheduleTermination(pid,idx);
-	  }
-	  return workerDBI
+   classFactory(yadamu) {
+      return new MySQLQA(yadamu,this)
     }
-
+	
 	async scheduleTermination(pid,workerId) {
-      this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Termination Scheduled.`);
+	  const tags = this.getTerminationTags(workerId,pid)
+	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
 	  const timer = setTimeout(
         async (pid) => {
    	      if (this.pool !== undefined && this.pool.end) {
-    	    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Killing connection.`);
+    	    this.yadamuLogger.log(tags,`Killing connection.`);
      	    const conn = await this.getConnectionFromPool();
 		    const res = await conn.query(`kill ${pid}`);
 		    await conn.release()
 		  }
 		  else {
-		    this.yadamuLogger.qa(['KILL',this.ON_ERROR,this.DATABASE_VENDOR,this.killConfiguration.process,workerId,this.killConfiguration.delay,pid],`Unable to Kill Connection: Connection Pool no longer available.`);
+		    this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
 		  }
         },
 		this.killConfiguration.delay,
@@ -153,7 +136,7 @@ class MySQLQA extends MySQLDBI {
 	
 }
 
-module.exports = MySQLQA
+export { MySQLQA as default }
 
 const _SQL_SUCCESS =
 `select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, 'SUCCESSFUL' as "RESULTS", TARGET_ROW_COUNT

@@ -1,19 +1,19 @@
 "use strict" 
-const fs = require('fs');
-const fsp = require('fs').promises
-const path = require('path');
 
-const util = require('util')
-const stream = require('stream')
-const pipeline = util.promisify(stream.pipeline);
+import fs from 'fs';
+import fsp from 'fs/promises';
+import path from 'path';
 
-const DBWriter = require('../../../YADAMU/common/dbWriter.js');
-const YadamuLogger = require('../../../YADAMU/common/yadamuLogger.js');
-const FileDBI = require('../../../YADAMU/file/node/fileDBI.js');
-const JSONParser = require('../../../YADAMU/file/node/jsonParser.js');
-const StatisticsCollector = require('./statisticsCollector.js');
+import {pipeline}          from 'stream/promises';
 
-const YadamuTest = require('../../common/node/yadamuTest.js');
+import DBWriter            from '../../../YADAMU/common/dbWriter.js';
+import YadamuLogger        from '../../../YADAMU/common/yadamuLogger.js';
+import YadamuLibrary       from '../../../YADAMU/common/yadamuLibrary.js';
+import FileDBI             from '../../../YADAMU/file/node/fileDBI.js';
+import JSONParser          from '../../../YADAMU/file/node/jsonParser.js';
+import StatisticsCollector from './statisticsCollector.js';
+
+import YadamuTest          from '../../common/node/yadamuTest.js';
 
 class FileQA extends FileDBI {
    
@@ -76,12 +76,12 @@ class FileQA extends FileDBI {
       files[fidx].size = -1;
     }
 
-    const statisticsCollector = new StatisticsCollector(this,this.yadamuLogger)  	
+    const statisticsCollector = new StatisticsCollector()  	
      
     try {
 	  await pipeline(readStream,jsonParser,statisticsCollector);
-	  await statisticsCollector.finalize();
-      return statisticsCollector.tableInfo
+	  // await statisticsCollector.finalize();
+      return statisticsCollector.getStatistics()
     } catch (err) {
 	  console.log('Pipeline Failed',err)
       this.yadamuLogger.logException([`${this.constructor.name}.getConentMetadata()`],err);
@@ -92,8 +92,8 @@ class FileQA extends FileDBI {
     super.configureTest(recreateSchema);
   }
     
-  constructor(yadamu,settings,parameters) {
-     super(yadamu,settings,parameters)
+  constructor(yadamu,manager,connectionSettings,parameters) {
+     super(yadamu,manager,connectionSettings,parameters)
      this.deepCompare = false;
      this.sort = false;
   }
@@ -119,6 +119,7 @@ class FileQA extends FileDBI {
   }
 
   async compareFiles(yadamuLogger,grandparent,parent,child,metrics) {
+	  
     let colSizes = [128, 18, 12, 12, 12, 12]
  
     let seperatorSize = (colSizes.length * 3) - 1;
@@ -175,18 +176,17 @@ class FileQA extends FileDBI {
 	const gMetadata = await this.getContentMetadata(grandparent)
     const pMetadata = await this.getContentMetadata(parent)
     const cMetadata = await this.getContentMetadata(child);
-	
-    const tables = Object.keys(gMetadata).sort();     
+	const tables = Object.keys(gMetadata).sort();     
 
     const failedOperations = []
  
     tables.forEach((table,idx) => {
 	  const tableName = table;
  	  const mappedTableName = this.getMappedTableName(tableName,this.identifierMappings)
-      const tableTimings = metrics[0][tableName].elapsedTime.padStart(10) 
-                         + (metrics[1][mappedTableName] ? metrics[1][mappedTableName].elapsedTime : "-1").padStart(10)
-                         + (metrics[2][mappedTableName] ? metrics[2][mappedTableName].elapsedTime : "-1").padStart(10) 
-                         + (metrics[3][mappedTableName] ? metrics[3][mappedTableName].elapsedTime : "-1").padStart(10);
+      const tableTimings = (metrics[0][tableName].elapsedTime.toString() + "ms").padStart(10) 
+                         + (metrics[1][mappedTableName] ? (metrics[1][mappedTableName].elapsedTime.toString() + "ms") : "N/A").padStart(10)
+                         + (metrics[2][mappedTableName] ? (metrics[2][mappedTableName].elapsedTime.toString() + "ms") : "N/A").padStart(10) 
+                         + (metrics[3][mappedTableName] ? (metrics[3][mappedTableName].elapsedTime.toString() + "ms") : "N/A").padStart(10);
  
       if (idx === 0) {                            
         this.yadamuLogger.writeDirect('+' + '-'.repeat(seperatorSize) + '+' + '\n') 
@@ -244,9 +244,9 @@ class FileQA extends FileDBI {
 	if (this.options.recreateSchema === true) {
   	  await fsp.mkdir(path.dirname(this.FILE),{recursive: true})
 	}
-  	await super.createOutputStream()
+  	return await super.createOutputStream()
   }
   
 }
 
-module.exports = FileQA
+export { FileQA as default }

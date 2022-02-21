@@ -1,16 +1,20 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
+import {DatabaseError} from '../../common/yadamuException.js'
 
 class AWSS3Error extends DatabaseError {
   
-  constructor(cause,stack,url) {
-	if ((cause.message === null) && (cause.code = 'NotFound')) {
-	  cause.message = 'Resource Not Found';
+  constructor(driverId,cause,stack,url) {
+	if ((cause.message === null) && (cause.code === 'NotFound')) {
+	  cause.message = `Resource "${url}" Not Found`;
 	}
-    super(cause,stack,url);
+    super(driverId,cause,stack,url);
 	this.path = this.sql
 	delete this.sql
+  }
+
+  FileNotFound() {
+	return this.cause.code === 'NotFound'
   }
 
   possibleConsistencyError() {
@@ -18,4 +22,4 @@ class AWSS3Error extends DatabaseError {
   }
 }
 
-module.exports = AWSS3Error
+export {AWSS3Error as default }

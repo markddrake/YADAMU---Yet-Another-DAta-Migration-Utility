@@ -1,7 +1,8 @@
 "use strict";
-const sql = require('mssql');
-const Writable = require('stream').Writable
-const { StringDecoder } = require('string_decoder');
+
+import sql from 'mssql';
+import {Writable} from 'stream';
+import { StringDecoder } from 'string_decoder';
 
 class DBFileLoader extends Writable {
      
@@ -34,4 +35,4 @@ class DBFileLoader extends Writable {
   }
 }   
  
-module.exports = DBFileLoader
+export { DBFileLoader as default }

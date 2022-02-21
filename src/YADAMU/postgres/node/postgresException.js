@@ -1,11 +1,11 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
+import {DatabaseError} from '../../common/yadamuException.js'
 
 class PostgresError extends DatabaseError {
-  //  const err = new PostgresError(cause,stack,sql)
-  constructor(cause,stack,sql) {
-    super(cause,stack,sql);
+  //  const err = new PostgresError(driverId,driverId,cause,stack,sql)
+  constructor(driverId,cause,stack,sql) {
+    super(driverId,cause,stack,sql);
 	// Abbreviate Long Lists of Place Holders ...
 	if ((typeof this.sql === 'string') && (this.sql.indexOf('),($')) > 0) {
 	  const startElipises = this.sql.indexOf('),($') + 2 
@@ -41,4 +41,4 @@ class PostgresError extends DatabaseError {
   }
 }
 
-module.exports = PostgresError
+export { PostgresError as default }

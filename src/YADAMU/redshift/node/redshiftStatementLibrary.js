@@ -1,6 +1,6 @@
 "use strict" 
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class RedshiftStatementLibrary {
     
@@ -21,7 +21,7 @@ class RedshiftStatementLibrary {
   static get SQL_SUPER_ERROR_SUMMARY()        { return _SQL_SUPER_ERROR_SUMMARY }
 }
 
-module.exports = RedshiftStatementLibrary
+export { RedshiftStatementLibrary as default }
 
 const _SQL_CONFIGURE_CONNECTION = `set timezone to 'UTC'; SET extra_float_digits to 2; SET enable_case_sensitive_identifier TO true;`
 

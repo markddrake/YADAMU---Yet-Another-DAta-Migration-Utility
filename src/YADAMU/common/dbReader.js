@@ -1,20 +1,15 @@
 "use strict";
 
-const { performance } = require('perf_hooks');
-const util = require('util')
-const Readable = require('stream').Readable;
-const stream = require('stream')
-const PassThrough = stream.PassThrough
-//const pipeline = util.promisify(stream.pipeline);
-const { pipeline } = require('stream/promises');
-const finished = stream.finished
+import { performance } from 'perf_hooks';
+import { Readable, PassThrough  } from 'stream'
+import { pipeline, finished } from 'stream/promises';
 
-const Yadamu = require('./yadamu.js')
-const YadamuLibrary = require('./yadamuLibrary.js')
-const YadamuWriter = require('./yadamuWriter.js')
-const {YadamuError, ExportError, DatabaseError, IterativeInsertError, InputStreamError} = require('./yadamuException.js')
+import Yadamu from './yadamu.js'
+import YadamuLibrary from './yadamuLibrary.js'
+import YadamuWriter from './yadamuWriter.js'
+import {YadamuError, ExportError, DatabaseError, IterativeInsertError, InputStreamError} from './yadamuException.js'
 
-const YadamuConstants = require('./yadamuConstants.js')
+import YadamuConstants from './yadamuConstants.js'
 
 class DBReader extends Readable {  
 
@@ -44,10 +39,11 @@ class DBReader extends Readable {
     this.yadamuLogger.info([`Reader`,dbi.DATABASE_VENDOR,dbi.DB_VERSION,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
   
     this.metadata = undefined
-    this.schemaInfo = [];
+    this.schemaMetadata = [];
   
     this.nextPhase = 'systemInformation'
     this.dbWriter = undefined;		
+	this.activeReaders = new Set()
   }
 
   isDatabase() {
@@ -81,12 +77,12 @@ class DBReader extends Readable {
 	return ddl
   }
   
-  async getMetadata() {
+  async getSourceMetadata() {
       
      const startTime = performance.now();
-     this.schemaInfo = this.dbi.applyTableFilter(await this.dbi.getSchemaInfo('FROM_USER'))
-     this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`Generated metadata for ${this.schemaInfo.length} tables. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
-     return this.dbi.generateMetadata(this.schemaInfo)
+     this.schemaMetadata = this.dbi.applyTableFilter(await this.dbi.getSchemaMetadata())
+     this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR],`Loaded metadata for ${this.schemaMetadata.length} tables. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+     return this.dbi.generateMetadata(this.schemaMetadata)
   }
   
   traceStreamEvents(streams,tableName) {
@@ -118,89 +114,93 @@ class DBReader extends Readable {
 	}) 
   }
   
+  setReader(pipeline) {
+	const writer = pipeline.find((s) => { return s instanceof YadamuWriter})
+	if (writer) {
+      writer.setReader(pipeline[0])
+	}
+  }
+  
   async pipelineTable(task,readerDBI,writerDBI) {
 	  
-    let tableInfo
-	let tableOutputStream
+    let queryInfo
 
 	const yadamuPipeline = []
-	let streamEnded
-	let streamFailed
-   
+    const activeStreams = []
+    let pipelineMetrics
+	
     try {
-      tableInfo = readerDBI.generateQueryInformation(task)
-	  tableInfo.TARGET_DATA_TYPES = writerDBI.metadata?.[tableInfo.TABLE_NAME]?.dataTypes ?? []
-	  
-	  // ### TODO: Pass partitioning information to getOutputStreams() ???
-	  
-	  const inputStreams = await readerDBI.getInputStreams(tableInfo)
+      queryInfo = readerDBI.generateSQLQuery(task)
+	  queryInfo.TARGET_DATA_TYPES = writerDBI.metadata?.[queryInfo.TABLE_NAME]?.dataTypes ?? []  
+	  const inputStreams = await readerDBI.getInputStreams(queryInfo)
+	  pipelineMetrics = inputStreams[0].COPY_METRICS
       yadamuPipeline.push(...inputStreams)
-	  const outputStreams = await writerDBI.getOutputStreams(tableInfo.MAPPED_TABLE_NAME,this.dbWriter.ddlComplete)
+	  const outputStreams = await writerDBI.getOutputStreams(queryInfo.MAPPED_TABLE_NAME,pipelineMetrics)
 	  yadamuPipeline.push(...outputStreams)
-
-      tableOutputStream = outputStreams[0]
-      tableOutputStream.setReaderMetrics(readerDBI.INPUT_METRICS)
-
+      activeStreams.push(...yadamuPipeline.map((s) => { return finished(s) }))
     } catch (e) {
       this.yadamuLogger.handleException(['PIPELINE','STREAM INITIALIZATION',task.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],e)
       throw (e)
     }
-
-    // this.traceStreamEvents(yadamuPipeline,task.TABLE_NAME)
-	// yadamuPipeline.forEach((s) => { console.log(task.TABLE_NAME,s.constructor.name, s.eventNames().map((e) => {return `"${e}(${s.listenerCount(e)})"`}).join(','))})
-	const streamsCompleted = yadamuPipeline.map((s) => { 
-	  return new Promise((resolve,reject) => {
-		finished(s,(err) => {
-          resolve()
-		  // if (err) {reject(err)} else {resolve()}
-		})
-      })
-    })
-	
+ 	
 	try {
-	  this.activeWorkers.add(yadamuPipeline[0])
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return proc.constructor.name }).join(' => ')}`)
-      readerDBI.INPUT_METRICS.pipeStartTime = performance.now();
+	  // Track active read streams.. Used to when aborting parallel operations
+	  const activeReader = yadamuPipeline[0]
+	  activeReader.once('close',() => {
+		  
+		 this.activeReaders.delete(activeReader)
+	  })
+	  this.activeReaders.add(activeReader)
+	  // Pass the Reader to the YadamuWriter instance so it can calculate lost rows correctly in the event of an error
+	  this.setReader(yadamuPipeline)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((s) => { return s.constructor.name }).join(' => ')}`)
+      pipelineMetrics.pipeStartTime = performance.now();
 	  await pipeline(...yadamuPipeline)
-	  readerDBI.INPUT_METRICS.pipeEndTime = performance.now();
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
-      this.activeWorkers.delete(yadamuPipeline[0])  
-	  // console.log(task.TABLE_NAME,streamsCompleted)
-	  await Promise.allSettled(streamsCompleted)
-	  // console.log(task.TABLE_NAME,streamsCompleted)
+	  pipelineMetrics.pipeEndTime = performance.now();
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:${s.destroyed}` }).join(' => ')}`)
+	  
+	  
 	} catch (err) {
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.yadamu.ON_ERROR,'FAILED'],`${err.constructor.name},${err.message}`)
-	 
-	  // Wait for DDL operations to complete. Catch, Report and Throw DDL errors. If DDL is successful this becomes a no-op.
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.yadamu.ON_ERROR,'FAILED'],`${err.constructor.name},${err.message}`)
+	  
+	  // Wait for any outstanding DDL operations to complete. Throw DDL errors. If the DDL phase was successful this becomes a no-op.
+	  
 	  try {
-		await this.dbWriter.ddlComplete
+        // this.yadamuLogger.trace([this.constructor.name,'PIPELINE','FAILED','DDL_COMPLETE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR,readerDBI.getWorkerNumber(),task.TABLE_NAME],'WAITING')
+		await this.dbWriter.dbi.ddlComplete
+    	// this.yadamuLogger.trace([this.constructor.name,'PIPELINE','FAILED','DDL_COMPLETE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR,readerDBI.getWorkerNumber(),task.TABLE_NAME],'PROCESSING')
 	  } catch (err) {
-	    this.yadamuLogger.handleException(['PIPELINE','DDL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR,readerDBI.getWorkerNumber()],err);
 		throw err
       }
-
-	  // When an the pipleline throws an exception not all componants of the pipeline have been finished processing. Wait all the streams to complete
-      await Promise.allSettled(streamsCompleted)
-	  this.activeWorkers.delete(yadamuPipeline[0])  
 	  
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return `${proc.constructor.name}:${proc.destroyed}` }).join(' => ')}`)
-	    
-	  const cause = readerDBI.INPUT_METRICS.readerError || readerDBI.INPUT_METRICS.parserError || yadamuPipeline.find((s) => {return s.underlyingError instanceof Error}).underlyingError || err
+	  // Wait for all components of the pipeline to finish before closing connections
+	  
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE','FAILED','STREAMS_COMPLETE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR,readerDBI.getWorkerNumber(),task.TABLE_NAME,`${yadamuPipeline.map((s) => { return `${s.constructor.name}`}).join(' => ')}`],'WAITING')
+	  await Promise.allSettled(activeStreams)
+      // this.yadamuLogger.trace([this.constructor.name,'PIPELINE','FAILED','STREAMS_COMPLETE',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR,readerDBI.getWorkerNumber(),task.TABLE_NAME,`${yadamuPipeline.map((s) => { return `${s.constructor.name}`}).join(' => ')}`],'COMPLETED')
+      
+      // console.log(pipelineMetrics)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:[${s.readableLength},${s.writableLength}]` }).join(',')}`)
+	  
+	  // Determine the underlying cause of the error.
+	  const cause = pipelineMetrics.readerError || pipelineMetrics.parserError || yadamuPipeline.find((s) => {return s.underlyingError instanceof Error})?.underlyingError || err
+
+	  // Verify all components of the pipeline have been destroyed. 
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((s) => { return `${s.constructor.name}:${s.destroyed}` }).join(' => ')}`)
+      // yadamuPipeline.map((s) => { if (!s.destroyed){ s.destroy(cause)})	    
+
       if (readerDBI.ON_ERROR === 'ABORT') {
   	    // Throw the underlying cause if ON_ERROR handling is ABORT
         throw cause;
       }
 
-      if (YadamuError.lostConnection(readerDBI.INPUT_METRICS.readerError) || YadamuError.lostConnection(readerDBI.INPUT_METRICS.parserError)) {
+      if (YadamuError.lostConnection(pipelineMetrics.readerError) || YadamuError.lostConnection(pipelineMetrics.parserError)) {
         // If the reader or parser failed with a lost connection error re-establish the input stream connection 
   	    await readerDBI.reconnect(cause,'READER')
       }
-	  /*
 	  else {
-        this.yadamuLogger.handleException(['PIPELINE',tableInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
-		tableOutputStream.destroy(cause);
+        this.yadamuLogger.handleException(['PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
 	  }
-	  */
 	  
       this.dbi.resetExceptionTracking()
     }
@@ -232,74 +232,6 @@ class DBReader extends Readable {
     }
   }
   
-  async pipelineTableToFile(readerDBI,writerDBI,task) {
-      
-     // this.yadamuLogger.trace(['PIPELINE','SERIAL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,task.TABLE_NAME],`Processing Table`);
-	 
-	 const tableInfo = readerDBI.generateQueryInformation(task)
-	 
-	 // Get the Table Readers 
-	 const sourcePipeline = await readerDBI.getInputStreams(tableInfo)
-     const targetPipeline = writerDBI.getOutputStreams(tableInfo.MAPPED_TABLE_NAME)
-
-     // targetPipeline.forEach((s) => { console.log( task.TABLE_NAME,s.constructor.name, s.eventNames().map((e) => {return `"${e}(${s.listenerCount(e)})"`}).join(','))})
-
-	 targetPipeline[0].setReaderMetrics(readerDBI.INPUT_METRICS)
-	 const tableSwitcher = targetPipeline[1]
-	 const yadamuPipeline = new Array(...sourcePipeline,...targetPipeline)
-
-     // this.traceStreamEvents(yadamuPipeline,task.TABLE_NAME)
-
-   	 // console.log(yadamuPipeline.map((s) => { return s.constructor.name }).join(' ==> '))
-	
-	 const stack = new Error().stack
-	 const tableComplete = new Promise((resolve,reject) => {
-	   finished(tableSwitcher,(cause) => {
-	     // Manually clean up the previous pipeline since it never completely ended. Prevents excessive memory usage and dangling listeners
-		 // Remove unpipe listeners on targets, unpipe all target streams
-	     targetPipeline.forEach((s,i) => { 
-           s.removeAllListeners('unpipe')
-		   if (i < targetPipeline.length-1) {
-		     s.unpipe(targetPipeline[i+1])
-		   }
-		   s.removeAllListeners(); 
-		 })
-	   
-	     // Destroy the source streams
-	     sourcePipeline.forEach((s) => { s.destroy() })
-		 if (cause instanceof Error) reject(new ExportError(task.TABLE_NAME,cause,stack))
-         resolve()
-  	   })
-     })
-   
-     // targetPipeline.forEach((s) => { console.log(task.TABLE_NAME,s.constructor.name, s.eventNames().map((e) => {return `"${e}(${s.listenerCount(e)})"`}).join(','))})
-     // this.traceStreamEvents(yadamuPipeline,task.TABLE_NAME)
-	  
-     // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${yadamuPipeline.map((proc) => { return proc.constructor.name }).join(' => ')}`)
-     pipeline(...yadamuPipeline).catch((cause) => {
-	   // console.log('EMIT','ExportFailed')
-	 })
-	 
-     await tableComplete
-	 	 
-  }
-
-  async pipelineTablesToFile(taskList,readerDBI,writerDBI) {
-	
-  	  await this.dbWriter.ddlComplete
-      this.yadamuLogger.info(['PIPELINE','SERIAL',this.dbi.DATABASE_VENDOR,this.dbWriter.dbi.DATABASE_VENDOR],`Processing ${taskList.length} Tables`);
-	  
-	  while (taskList.length > 0) {
-	    const task = taskList.shift()
-		try {
-  	      await this.pipelineTableToFile(readerDBI,writerDBI,task)
-		} catch (cause) {
-		  this.yadamuLogger.handleException(['PIPELINE','SERIAL',task.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],cause)
-		  taskList.length = 0
-		}
-	  }
-  }
-
   async generateStatementCache(metadata) {
     if (!YadamuLibrary.isEmpty(metadata)) {   
       // ### if the import already processed a DDL object do not execute DDL when generating statements.
@@ -316,10 +248,11 @@ class DBReader extends Readable {
 	/*
 	**
 	** For a database the DBReader class is repsonsible for generating the events in the required order. This is handled via the 'nextPhase' setting in the _read method.
-	** Thus the DBReader becomes the event stream.
+	** Thus the DBReader becomes the source of the events for the operation
 	**
 	** For a File the events are generated according to the contents of the file.
-	** The file parser becomes the event stream.
+	** Thus File Parser becomes the source of the events for the operation
+	**
 	*/
 	
     if (this.dbi.isDatabase()){
@@ -331,85 +264,89 @@ class DBReader extends Readable {
 
   }
  
-  async _read() {
-    try {
- 	  // this.yadamuLogger.trace([this.constructor.name,`_READ()`,this.dbi.DATABASE_VENDOR],this.nextPhase)
-      switch (this.nextPhase) {
-         case 'systemInformation' :
-           const systemInformation = await this.getSystemInformation();
-		   // Needed in case we have to generate DDL from the system information and metadata.
-           this.dbi.setSystemInformation(systemInformation);
-		   this.dbi.yadamu.REJECTION_MANAGER.setSystemInformation(systemInformation)
-		   this.dbi.yadamu.WARNING_MANAGER.setSystemInformation(systemInformation)
-           this.push({systemInformation : systemInformation});
-           if (this.dbi.MODE === 'DATA_ONLY') {
-             this.nextPhase = 'metadata';
-           }
-           else { 
-             this.nextPhase = 'ddl';
-           }
-           break;
-         case 'ddl' :
-           let ddl = await this.getDDLOperations();
-           if (ddl === undefined) {
-             // Database does not provide mechansim to retrieve DDL statements used to create a schema (eg Oracle's DBMS_METADATA package)
-             // Reverse Engineer DDL from metadata.
-             this.metadata = await this.getMetadata();
-             await this.generateStatementCache(this.metadata)
-             ddl = Object.values(this.dbi.statementCache).map((table) => {
-               return table.ddl
-             })
-           } 
-           this.push({ddl: ddl});
-		   this.nextPhase = 'metadata';
-           break;
-         case 'metadata' :
-           this.metadata = this.metadata ? this.metadata : await this.getMetadata();
-           this.push({metadata: this.dbi.transformMetadata(this.metadata,this.dbi.inverseTableMappings)});
-		   this.dbi.yadamu.REJECTION_MANAGER.setMetadata(this.metadata)
-		   this.dbi.yadamu.WARNING_MANAGER.setMetadata(this.metadata)
-		   this.nextPhase = ((this.dbi.MODE === 'DDL_ONLY') || (this.schemaInfo.length === 0)) ? 'exportComplete' : 'copyData';
-		   break;
-		 case 'copyData':	   
-           if (this.dbWriter.dbi.isDatabase()) {
-		     await this.pipelineTables(this.schemaInfo,this.dbi,this.dbWriter.dbi);
-	       }
-	       else {
-		     await this.pipelineTablesToFile(this.schemaInfo,this.dbi,this.dbWriter.dbi);
-           }
-		   // No 'break' - fall through to 'exportComplete'.
-		 case 'exportComplete':
-	       // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'DDL COMPLETE: WAITING')
-	       await this.dbWriter.ddlComplete
-           // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber()],'DDL COMPLETE: PROCESSING')
-		   this.dbWriter.callDeferredCallback()
-		   this.push(null);
-       	   break;
-	    default:
-      }
-    } catch (cause) {
-  	  this.yadamuLogger.handleException([`READER`,`READ`,this.nextPhase,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],cause);
-	  this.underlyingError = cause;
-      this.destroy(cause)
+  async doRead() {
+ 
+    switch (this.nextPhase) {
+       case 'systemInformation' :
+         const systemInformation = await this.getSystemInformation();
+	     // Needed in case we have to generate DDL from the system information and metadata.
+         this.dbi.setSystemInformation(systemInformation);
+		 this.dbi.yadamu.REJECTION_MANAGER.setSystemInformation(systemInformation)
+		 this.dbi.yadamu.WARNING_MANAGER.setSystemInformation(systemInformation)
+         this.push({systemInformation : systemInformation});
+         if (this.dbi.MODE === 'DATA_ONLY') {
+           this.nextPhase = 'metadata';
+         }
+         else { 
+           this.nextPhase = 'ddl';
+         }
+         break;
+       case 'ddl' :
+         let ddl = await this.getDDLOperations();
+         if (ddl === undefined) {
+           // Database does not provide mechansim to retrieve DDL statements used to create a schema (eg Oracle's DBMS_METADATA package)
+           // Reverse Engineer DDL from metadata.
+           this.metadata = await this.getSourceMetadata();
+           await this.generateStatementCache(this.metadata)
+           ddl = Object.values(this.dbi.statementCache).map((table) => {
+             return table.ddl
+           })
+         } 
+         this.push({ddl: ddl});
+		 this.nextPhase = 'metadata';
+         break;
+       case 'metadata' :
+         this.metadata = this.metadata ? this.metadata : await this.getSourceMetadata();
+		 this.push({metadata: this.dbi.transformMetadata(this.metadata,this.dbi.inverseTableMappings)});
+		 this.dbi.yadamu.REJECTION_MANAGER.setMetadata(this.metadata)
+		 this.dbi.yadamu.WARNING_MANAGER.setMetadata(this.metadata)
+		 this.nextPhase = ((this.dbi.MODE === 'DDL_ONLY') || (this.schemaMetadata.length === 0)) ? 'exportComplete' : 'copyData';
+	     break;
+       case 'copyData':	   
+    	 await this.pipelineTables(this.schemaMetadata,this.dbi,this.dbWriter.dbi);
+		 // No 'break' - fall through to 'exportComplete'.
+       case 'exportComplete':
+	     // this.yadamuLogger.trace([this.constructor.name,this.nextPhase],'DDL COMPLETE: WAITING')
+	     await this.dbWriter.dbi.ddlComplete
+         // this.yadamuLogger.trace([this.constructor.name,this.nextPhase],'DDL COMPLETE: PROCESSING')
+		 // All data has been processed. The DBReader has beem reattched to the DBWriter. Release the DBWriter by invoking the pending callback.
+		 // this.yadamuLogger.trace([this.constructor.name,this.nextPhase],'CALLBACK COMPLETE')
+		 this.push(null);
+       	 break;
+	   default:
     }
   }  
    
-  async _destroy(cause,callback) {
-    // this.yadamuLogger.trace([this.constructor.name,this.dbi.isDatabase()],'_destroy()')
-    try {
-	  await this.dbi.finalizeExport();
-	  callback()
-	} catch (e) {
+  _read() {
+    // this.yadamuLogger.trace([this.constructor.name,`READ`,this.dbi.DATABASE_VENDOR],this.nextPhase)
+	this.doRead().then(() => {}).catch((cause) => {
+	  this.yadamuLogger.handleException([`READER`,`READ`,this.nextPhase,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],cause);
+	  this.underlyingError = cause;
+      this.destroy(cause)
+    })
+  }
+  
+  async doDestroy(err) {
+    // this.yadamuLogger.trace([this.constructor.name,`destroy`,this.dbi.DATABASE_VENDOR],``)
+    await this.dbi.finalizeExport();
+	await this.dbi.doFinal()
+	await this.dbi.doDestroy()
+  }
+   
+  _destroy(err,callback) {
+	  
+	this.doDestroy().then(() => {
+	  callback(err)
+	}).catch((cause) => {
       if (YadamuError.lostConnection(cause)) {
         callback(cause)
 	  }
 	  else {
-        this.yadamuLogger.handleException([`READER`,`DESTROY`,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],e);		
-        callback(e)
+        this.yadamuLogger.handleException([`READER`,`FINAL`,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],cause);		
+        callback(err)
       }
-    }
-  }
-  
+    })
+  }  
 }
 
-module.exports = DBReader;
+export { DBReader as default}

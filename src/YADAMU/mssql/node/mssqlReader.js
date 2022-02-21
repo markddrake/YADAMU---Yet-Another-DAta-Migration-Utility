@@ -1,5 +1,6 @@
 "use strict" 
-const Readable = require('stream').Readable;
+
+import {Readable} from 'stream'
 
 class MsSQLReader extends Readable {
       
@@ -85,4 +86,4 @@ class MsSQLReader extends Readable {
 	
 }
 
-module.exports = MsSQLReader
+export { MsSQLReader as default }

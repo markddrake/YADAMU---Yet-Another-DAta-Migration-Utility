@@ -1,20 +1,21 @@
 "use strict"
 
-const fs = require('fs');
-const path = require('path');
-const util = require('util');
+import fs from 'fs';
+import path from 'path';
+import util from 'util';
 
-const {Readable, pipeline, finished} = require('stream')
+import {Readable} from 'stream'
+import {pipeline} from 'stream/promises'
 
-const DBWriter = require('./dbWriter.js');
-const YadamuLibrary = require('./yadamuLibrary.js');
-const StringWriter = require('./stringWriter.js')
-const NullWriter = require('./nullWriter.js');
-const {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  = require('./yadamuException.js');
-const {OracleError} = require('../oracle/node/oracleException.js');
-const {FileError} = require('../file/node/fileException.js');
+import DBWriter from './dbWriter.js';
+import YadamuLibrary from './yadamuLibrary.js';
+import StringWriter from './stringWriter.js'
+import NullWriter from './nullWriter.js';
+import {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  from './yadamuException.js';
+import {OracleError} from '../oracle/node/oracleException.js';
+import {FileError} from '../file/node/fileException.js';
 
-const ErrorDBI = require('../file/node/errorDBI.js');
+import ErrorDBI from '../file/node/errorDBI.js';
 
 class YadamuLogger {
   
@@ -28,6 +29,8 @@ class YadamuLogger {
   **  
   **
   */
+  
+  static get LOGGER_CLASS() { return YadamuLogger }
 
   static get LOGGER_DEFAULTS() {
     this._LOGGER_DEFAULTS = this._LOGGER_DEFAULTS || Object.freeze({
@@ -41,7 +44,7 @@ class YadamuLogger {
   static  get EXCEPTION_FILE_PREFIX() { return this.LOGGER_DEFAULTS.EXCEPTION_FILE_PREFIX }
   
   static get NULL_LOGGER() {
-    this._NULL_LOGGGER = this._NULL_LOGGGER || new YadamuLogger(NullWriter.NULL_WRITER,{})
+    this._NULL_LOGGGER = this._NULL_LOGGGER || new this.LOGGER_CLASS(NullWriter.NULL_WRITER,{})
     return this._NULL_LOGGGER;
   }
 
@@ -116,7 +119,7 @@ class YadamuLogger {
     const absolutePath = path.resolve(logFilePath);	
     try {
       const os = fs.createWriteStream(absolutePath,{flags : "a"})
-      return new YadamuLogger(os,state,exceptionFolder,exceptionFilePrefix)
+      return new this.LOGGER_CLASS(os,state,exceptionFolder,exceptionFilePrefix)
     } catch (e) {
 	  console.log(`${new Date().toISOString()}[YADAMU][LOGGER]: Unable to create log file "${absolutePath}". Logging to console`); 
       return this.console.Logger(state,exceptionFolder,exceptionFilePrefix)
@@ -124,7 +127,7 @@ class YadamuLogger {
   }
   
   static consoleLogger(state,exceptionFolder,exceptionFilePrefix) {
-    return new YadamuLogger(process.stdout,state,exceptionFolder,exceptionFilePrefix)
+    return new this.LOGGER_CLASS(process.stdout,state,exceptionFolder,exceptionFilePrefix)
   }
   
   constructor(outputStream,state,exceptionFolder,exceptionFilePrefix) {
@@ -181,11 +184,6 @@ class YadamuLogger {
 	  }
 	}    
     return ts
-  }
-  
-  qa(args,msg) {
-    args.unshift('QA')
-    return this.log(args,msg)
   }
   
   info(args,msg) {
@@ -308,63 +306,24 @@ class YadamuLogger {
   }	  
 	  
   async writeDataFile(dataFilePath,tableName,currentSettings,data) {
-	let errorPipeline
+	const errorPipeline = []
     try {
       const dbi = new ErrorDBI(currentSettings.yadamu,dataFilePath)
       await dbi.initialize()
       await dbi.initializeImport();
-	  
-      // const logger = this
-      const logger = YadamuLogger.NULL_LOGGER;
-      
       dbi.setSystemInformation(currentSettings.systemInformation)
       dbi.setMetadata(currentSettings.metadata)
-      
 	  await dbi.initializeData()
-      const dataObjects = data.map((d) => { return {data: d}})
-	  dataObjects.unshift({table: tableName})
-	  const dataStream = Readable.from(dataObjects);
-      
-      const targetPipeline = dbi.getOutputStreams(tableName)
-	  const tableSwitcher = targetPipeline[1]
-	  const errorPipeline = new Array(dataStream,...targetPipeline)
-   	  // console.log(errorPipeline.map((s) => { return s.constructor.name }).join(' ==> '))
-	
-	
-	  const tableComplete = new Promise((resolve,reject) => {
-	    finished(tableSwitcher,() => {
-	      // Manually clean up the previous pipeline since it never completely ended. Prevents excessive memory usage..
-	      // Remove unpipe listeners on targets
-	      targetPipeline.forEach((s) => { s.removeAllListeners('unpipe') })
-	     
-		  // Unpipe all target streams
-	      targetPipeline.forEach((s,i) => { if (i < targetPipeline.length - 1) {s.unpipe(targetPipeline[i+1])} })
-	   
-	      // Destroy the source streams
-	      dataStream.destroy()
-          resolve()
-  	    })
-      })
-
-      // this.traceSteamEvents(errorPipeline,task.TABLE_NAME)
-	  
-      // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',tableInfo.TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR],`${errorPipeline.map((proc) => { return proc.constructor.name }).join(' => ')}`)
-	  pipeline(errorPipeline,(err) => {
-		if (err && (err.code === 'ERR_STREAM_PREMATURE_CLOSE')) {
-		  errorPipeline.forEach((stream) => {
-			if (stream.underlyingError instanceof Error) {
-		      console.log(stream.constructor.name,stream.underlyingError)
-			}
-	      })
-	    }
-	  })
-	  
-	  await tableComplete
+	  const is = Readable.from([{table:tableName},...data.map((d) => { return {data:d}})])
+	  const outputStreams = dbi.getOutputStreams(tableName,{})
+	  errorPipeline.push(is)
+      errorPipeline.push(...outputStreams)
+      await pipeline(errorPipeline,{end:false})
       await dbi.finalizeData();
 	  await dbi.finalizeImport();
 	  await dbi.finalize();
-      await logger.close();
     } catch (err) {    
+	  console.log(err)
 	  const loggerError = new Error(`Error creating data file "${dataFilePath}".`)
 	  loggerError.cause = err
 	  loggerError.systemInformation = currentSettings.systemInformation
@@ -411,7 +370,7 @@ class YadamuLogger {
     // Handle Exception does not produce any output if the exception has already been processed by handleException or logException
     if (e.yadamuAlreadyReported === true) {
       if (this.YADAMU_STACK_TRACE === true) {
-        this.trace(args,e)
+        this.log(['YADAMU_STACK_TRACE',...args],e)
       }
     }
     else {
@@ -492,7 +451,15 @@ class YadamuLogger {
       this.os = process.stdout
     }    
   }
+   
+  qa(args,msg) {}
+  
+  qaInfo(args,msg) {}
+  
+  qaWarning(args,msg) {}
+
+  qaError(args,msg) {}
   
 }
 
-module.exports = YadamuLogger
+export { YadamuLogger as default}

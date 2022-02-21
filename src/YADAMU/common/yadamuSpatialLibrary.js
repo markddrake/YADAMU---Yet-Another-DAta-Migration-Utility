@@ -1,6 +1,6 @@
 "use strict"
 
-const WKX = require('wkx');
+import WKX from 'wkx';
 
 class YadamuSpatialLibrary {
   
@@ -156,7 +156,7 @@ class YadamuSpatialLibrary {
       }
     })
     
-    if (spatialConversions.every((currentValue) => { currentValue === null})) {
+    if (spatialConversions.every((currentValue) => { return currentValue === null})) {
       return
     }
     
@@ -184,4 +184,4 @@ class YadamuSpatialLibrary {
   }
 }
   
-module.exports = YadamuSpatialLibrary
+export { YadamuSpatialLibrary as default}

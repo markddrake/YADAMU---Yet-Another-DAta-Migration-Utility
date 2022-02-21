@@ -1,12 +1,12 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
-const MsSQLConstants = require('./mssqlConstants.js')
+import {DatabaseError} from '../../common/yadamuException.js'
+import MsSQLConstants from './mssqlConstants.js'
 
 class MsSQLError extends DatabaseError {
-  //  const err = new MsSQLError(cause,stack,sql)
-  constructor(cause,stack,sql) {
-    super(cause,stack,sql);
+
+  constructor(driverId,cause,stack,sql) {
+    super(driverId,cause,stack,sql);
   }
 
   getUnderlyingError() {
@@ -25,6 +25,14 @@ class MsSQLError extends DatabaseError {
 	return ((cause.code &&  MsSQLConstants.LOST_CONNECTION_ERROR.includes(cause.code)) || ((this.cause.number) && (this.cause.number === 596)))
   }
 
+  requestInProgress() {
+	return ((this.cause.name === 'TransactionError') && (this.cause.code && (this.cause.code === 'EREQINPROG')) )
+  }
+
+  cancelledOperation() {
+	return ((this.cause.name === 'RequestError') && (this.cause.code && (this.cause.code === 'ECANCEL')) )
+  }
+  
   serverUnavailable() {
     let cause = this.getUnderlyingError()
 	return ((cause.code &&  MsSQLConstants.LOST_CONNECTION_ERROR.includes(cause.code)) || ((this.cause.number) && (this.cause.number === 596)))
@@ -39,4 +47,4 @@ class MsSQLError extends DatabaseError {
   }
 }
 
-module.exports = MsSQLError
+export { MsSQLError as default }

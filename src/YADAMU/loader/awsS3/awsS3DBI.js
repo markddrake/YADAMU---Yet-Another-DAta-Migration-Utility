@@ -1,16 +1,16 @@
 "use strict" 
 
-const AWS = require('aws-sdk');
-const path = require('path')
-const Stream = require('stream')
+import AWS    from 'aws-sdk';
+import path   from 'path'
+import Stream from 'stream'
 
-const CloudDBI = require('../node/cloudDBI.js');
-const DBIConstants = require('../../common/dbiConstants.js');
-const YadamuConstants = require('../../common/yadamuConstants.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js')
+import CloudDBI            from '../node/cloudDBI.js';
+import DBIConstants        from '../../common/dbiConstants.js';
+import YadamuConstants     from '../../common/yadamuConstants.js';
+import YadamuLibrary       from '../../common/yadamuLibrary.js'
 
-const AWSS3Constants = require('./awsS3Constants.js');
-const AWSS3StorageService = require('./awsS3StorageService.js');
+import AWSS3Constants      from './awsS3Constants.js';
+import AWSS3StorageService from './awsS3StorageService.js';
 
 /*
 **
@@ -58,15 +58,10 @@ class AWSS3DBI extends CloudDBI {
   
   get STORAGE_ID()            { return this.BUCKET }
   
-  constructor(yadamu,settings,parameters) {
-    super(yadamu,settings,parameters)
+  constructor(yadamu,manager,connectionSettings,parameters) {
+    super(yadamu,manager,connectionSettings,parameters)
   }    
- 
-  async finalize() {
-	await Promise.all(Array.from(this.cloudService.writeOperations))
-	super.finalize()
-  }
-  
+   
   updateVendorProperties(vendorProperties) {
 	
 	let url = vendorProperties.endpoint
@@ -105,7 +100,7 @@ class AWSS3DBI extends CloudDBI {
   async createConnectionPool() {
 	// this.yadamuLogger.trace([this.constructor.name],`new AWS.S3()`)
 	this.cloudConnection = await new AWS.S3(this.vendorProperties)
-	this.cloudService = new AWSS3StorageService(this.cloudConnection,this.BUCKET,{},this.yadamuLogger)
+	this.cloudService = new AWSS3StorageService(this,{})
   }
 
 
@@ -115,12 +110,12 @@ class AWSS3DBI extends CloudDBI {
   **
   */
   
-  parseContents(fileContents) {
+  parseJSON(fileContents) {
     return JSON.parse(fileContents.Body.toString())
   }
 
   classFactory(yadamu) {
-	return new AWSS3DBI(yadamu)
+	return new AWSS3DBI(yadamu,this)
   }
    
   getCredentials(vendorKey) {
@@ -134,4 +129,4 @@ class AWSS3DBI extends CloudDBI {
 	  
 }
 
-module.exports = AWSS3DBI
+export {AWSS3DBI as default }

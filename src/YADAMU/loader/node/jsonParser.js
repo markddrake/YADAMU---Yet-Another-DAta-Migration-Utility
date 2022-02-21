@@ -1,10 +1,10 @@
 "use strict" 
 
-const { performance } = require('perf_hooks');
+import { performance } from 'perf_hooks';
 
-const FileJSONParser = require('../../file/node/jsonParser.js');
+import _JSONParser from '../../file/node/jsonParser.js';
 
-class JSONParser extends FileJSONParser {
+class JSONParser extends _JSONParser {
   
   constructor(yadamuLogger, mode, exportFilePath) {    
     super(yadamuLogger, mode, exportFilePath);  
@@ -123,7 +123,7 @@ class JSONParser extends FileJSONParser {
       }   
     });  
   }    
-	
+ 	
 }
 
-module.exports = JSONParser;
+export {JSONParser as default }

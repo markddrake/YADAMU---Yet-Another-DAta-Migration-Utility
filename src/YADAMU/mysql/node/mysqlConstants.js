@@ -1,6 +1,6 @@
 "use strict"
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class MySQLConstants {
 
@@ -75,4 +75,4 @@ class MySQLConstants {
   static get STAGED_DATA_SOURCES()    { return Object.freeze(['loader']) }
 }
 
-module.exports = MySQLConstants
+export { MySQLConstants as default }

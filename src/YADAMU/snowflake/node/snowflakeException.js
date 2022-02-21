@@ -1,7 +1,7 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
-const SnowflakeConstants = require('./snowflakeConstants.js')
+import {DatabaseError} from '../../common/yadamuException.js'
+import SnowflakeConstants from './snowflakeConstants.js'
 
 class SnowflakeError extends DatabaseError {
   
@@ -29,4 +29,4 @@ class SnowflakeError extends DatabaseError {
 
 }
 
-module.exports = SnowflakeError
+export { SnowflakeError as default }

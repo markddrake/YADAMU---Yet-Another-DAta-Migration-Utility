@@ -973,6 +973,7 @@ begin
          select distinct DATA_TYPE_OWNER,  DATA_TYPE
            from ALL_TAB_COLS atc
           where atc.DATA_TYPE_OWNER is not NULL
+		    and atc.DATA_TYPE_OWNER not in 'MDSYS'
             and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
 	        and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
             and atc.OWNER = P_TABLE_OWNER

@@ -1,13 +1,13 @@
 "use strict" 
 
-const YadamuParser = require('../../common/yadamuParser.js')
-const YadamuLibrary = require('../../common/yadamuLibrary.js')
+import YadamuParser from '../../common/yadamuParser.js'
+import YadamuLibrary from '../../common/yadamuLibrary.js'
 
 class VerticaParser extends YadamuParser {
-  
-  constructor(tableInfo,yadamuLogger) {
-    super(tableInfo,yadamuLogger);     
-	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
+
+  generateTransformations(queryInfo) {
+	  
+    return queryInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
       switch (dataType.toLowerCase()) {
 	    case 'geometry':
 	    case 'geography':
@@ -24,15 +24,15 @@ class VerticaParser extends YadamuParser {
 		  }
 		case 'interval':
           switch (true) {
-            case (tableInfo.TARGET_DATA_TYPE.length === 0):
+            case (queryInfo.TARGET_DATA_TYPE.length === 0):
 		      return (row,idx) => {
 			    row[idx] = YadamuLibrary.intervalYearMonthTo8601(row[idx])
 		      }
-            case (tableInfo.TARGET_DATA_TYPES[idx].toLowerCase().startsWith('interval year')):
+            case (queryInfo.TARGET_DATA_TYPES[idx].toLowerCase().startsWith('interval year')):
 		      return (row,idx) => {
 			    row[idx] = YadamuLibrary.intervalYearMonthTo8601(row[idx])
 		     }
-		   case (tableInfo.TARGET_DATA_TYPES[idx].startsWith('interval day')):
+		   case (queryInfo.TARGET_DATA_TYPES[idx].startsWith('interval day')):
    		     return (row,idx) => {
 			   row[idx] = YadamuLibrary.intervaDaySecondTo8601(row[idx])
 		     }
@@ -45,8 +45,12 @@ class VerticaParser extends YadamuParser {
 		  return null;
       }
     })
+  }
+
+  constructor(queryInfo,yadamuLogger) {
+    super(queryInfo,yadamuLogger);     
 	
-    tableInfo.TARGET_DATA_TYPES?.forEach((dataType,idx) => {
+    queryInfo.TARGET_DATA_TYPES?.forEach((dataType,idx) => {
 	  switch (dataType.toUpperCase()) {
 		 case 'XML':
 		 case 'XMLTYPE':
@@ -58,25 +62,7 @@ class VerticaParser extends YadamuParser {
   		   return null;
       }
     })
-
-    this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
-      this.transformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-          transformation(row,idx)
-        }
-     
-	 }) 
-    }
-  }
-    
-  async _transform (data,encoding,callback) {
-    this.rowCount++;
-	// data = Object.values(data)
-    this.rowTransformation(data)
-    // if (this.rowCount===1) console.log('verticaParser',data)	
-	this.push({data:data})
-    callback();
   }
 }
 
-module.exports = VerticaParser
+export { VerticaParser as default }

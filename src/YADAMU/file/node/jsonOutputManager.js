@@ -1,23 +1,26 @@
 "use strict"
 
-const { performance } = require('perf_hooks');
+import { performance } from 'perf_hooks';
 
-const Yadamu = require('../../common/yadamu.js');
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
-const YadamuWriter = require('../../common/yadamuWriter.js');
+import Yadamu from '../../common/yadamu.js';
+import YadamuLibrary from '../../common/yadamuLibrary.js';
+import YadamuConstants from '../../common/yadamuConstants.js';
+import YadamuOutputManager from '../../common/yadamuOutputManager.js';
+import PerformanceReporter from '../../common/performanceReporter.js';
 
-class JSONWriter extends YadamuWriter {
+class JSONOutputManager extends YadamuOutputManager {
 	     
-  constructor(dbi,tableName,ddlComplete,firstTable,status,yadamuLogger) {
-	super({objectMode: true},dbi,tableName,ddlComplete,status,yadamuLogger)
+  constructor(dbi,tableName,metrics,firstTable,status,yadamuLogger) {
+    super(dbi,tableName,metrics,status,yadamuLogger)
 	this.startTable = firstTable ? `"${tableName}":[` :  `,"${tableName}":[`
 	this.rowSeperator = '';
+	this.rowCount = 0
   }
-        
-  setTransformations(targetDataTypes) {
+    
+  generateTransformations(targetDataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
-    const transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
+    return this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
 	  if (YadamuLibrary.isBinaryType(dataType.type)) {
 		return (col,idx) =>  {
@@ -156,34 +159,23 @@ class JSONWriter extends YadamuWriter {
 	
     // Use a dummy rowTransformation function if there are no transformations required.
 
-	return transformations.every((currentValue) => { currentValue === null}) 
-	? (row) => {} 
-	: (row) => {
-      transformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-          row[idx] = transformation(row[idx],idx)
-        }
-      }) 
-    }	
-
   }
 		
-  setTableInfo(tableName) {
-	super.setTableInfo(tableName)
-    this.tableInfo.insertMode = 'JSON';    
-    if (this.dbi.tableMappings && this.dbi.tableMappings.hasOwnProperty(tableName)) {
-	  tableName = this.dbi.tableMappings[tableName].tableName
+  async setTableInfo(tableName) {
+	  
+	await super.setTableInfo(tableName)
+	if (this.dbi.tableMappings && this.dbi.tableMappings.hasOwnProperty(tableName)) {
+	  this.tableName = this.dbi.tableMappings[tableName].tableName
 	}
-    this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
   }
   
-  beginTable() {
+  beginTable()  {
 	this.push(this.startTable)  
   }
-
-  async initialize(tableName) {
-	await super.initialize(tableName)
-	this.beginTable();
+  
+  async initializeTable(tableName) {
+	this.beginTable()
+    await super.initializeTable(tableName)
   }
   
   batchComplete() {
@@ -197,53 +189,76 @@ class JSONWriter extends YadamuWriter {
   formatRow(row) {
     return `${this.rowSeperator}${JSON.stringify(row)}`
   }
-
-  processRow(row) {
+  
+  _processRow(row) {
     // Be very careful about adding unecessary code here. This is executed once for each row processed by YADAMU. Keep it as lean as possible.
+	this.rowCount++
 	this.checkColumnCount(row)
 
 	this.rowTransformation(row)
 
-	/*
-	this.transformations.forEach((transformation,idx) => {
-      if ((transformation !== null) && (row[idx] !== null)) {
-        transformation(row,idx)
-      }
-    })
-	*/
-	
-    const x = this.push(this.formatRow(row));
+    this.push(this.formatRow(row));
 	this.rowSeperator = ','
-    this.metrics.committed++;
-    if ((this.FEEDBACK_INTERVAL > 0) && ((this.metrics.committed % this.FEEDBACK_INTERVAL) === 0)) {
-      this.yadamuLogger.info([`${this.tableName}`,this.dbi.OUTPUT_FORMAT],`Rows Written: ${this.metrics.committed}.`);
+    this.COPY_METRICS.committed++;
+    if ((this.FEEDBACK_INTERVAL > 0) && ((this.COPY_METRICS.committed % this.FEEDBACK_INTERVAL) === 0)) {
+      this.yadamuLogger.info([`${this.tableName}`,this.dbi.OUTPUT_FORMAT],`Rows Written: ${this.COPY_METRICS.committed}.`);
     }
   }
-
-  endTable() {
-    // Called from YadamuWriter when 'eod' is recieved during import or from _final during direct copy
+  
+  async doTransform(messageType,obj) {
+	 
+    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),messageType,this.COPY_METRICS.received,this.writableLength,this.writableHighWaterMark],'doTransform()')
+	
+    switch (messageType) {
+      case 'data':
+        // processRow() becomes a No-op after calling abortTable()
+	    await this.processRow(obj.data)
+		break
+      case 'table':
+        // processRow() becomes a No-op after calling abortTable()
+        await this.initializeTable(obj.table)
+		break
+	  case 'partition':
+        await this.initializePartition(obj.partition)
+	    break;  
+      case 'eod':
+        // Used when processing serial data sources such as files to indicate that all records have been processed by the writer
+        // this.yadamuLogger.trace([this.constructor.name,`_write()`,this.dbi.DATABASE_VENDOR,messageType,this.displayName,this.rowCount],`${YadamuConstants.END_OF_DATA}`)  
+        this.emit(YadamuConstants.END_OF_DATA)
+      default:
+    }
+		
+  }
+  
+  finalizeTable() {
 	this.push(']')
   }
-
-  _final(callback) {
-	 /* OVERRIDE */ 
-	this.endTable()
-    callback()
-  }	  
   
-  _destroy(err,callback) {
-	 /* OVERRIDE */ 
-	this.endTime = performance.now()
-    this.reportPerformance(err)
-	callback()
-  }	  
+  processPendingRows() {
+	 
+	// Called from _flush() when there are no more rows to process for the current table.
+	// Generate the required reporting based on this component having no further data, since the downstream pipeline components remain open.
+	  
+    // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.skipTable,this.dbi.TRANSACTION_IN_PROGRESS,this.writableEnded,this.writableFinished,this.destroyed,this.hasPendingRows(),this.COPY_METRICS.received,this.COPY_METRICS.committed,this.COPY_METRICS.written,this.COPY_METRICS.cached],`JSONOutputManager.processPendingRows(${this.hasPendingRows()})`)
+	this.COPY_METRICS.managerEndTime = performance.now()
+	this.finalizeTable()
+  }
   
-  _writeBatch /* OVERRIDE */ () {}
-
-  commitTransaction() { /* OVERRIDE */ }
-
-  rollbackTransaction() { /* OVERRIDE */ }
+  async doDestroy(err) {
+    // Workaround for unexpected "[ERR_STREAM_DESTROYED]: Cannot call pipe after a stream was destroyed" exceptions	 
+    if (this.writableEnded && this.writableFinished && err?.code === 'ERR_STREAM_DESTROYED') {
+      // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost,this.writableEnded,this.writableFinished,err.code],`JSON_Writer_destroy(): Swallowed error "${err.message}".`)
+      err = undefined
+	}
+	
+	// Defer performance reporting to here... Ensures parser 'finish' event has occurred.
+	const reportGenerator = new PerformanceReporter(this.dbi,this.tableInfo,this.COPY_METRICS,{},this.yadamuLogger)
+	reportGenerator.reportPerformance(err)
+	reportGenerator.end()
+	await super.doDestroy(err)
+  }
   
+
 }
 
-module.exports = JSONWriter;
+export {JSONOutputManager as default }

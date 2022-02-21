@@ -1,21 +1,18 @@
 "use strict";
 
-// const const { v4: uuidv4 } = require('uuid'); = require('uuid/v1');
-const { v1: uuidv1 } = require('uuid');
-
 // Support for Oracle 11.2 
 // Oracle 11g has not support for parsing JSON so we send the metadata as XML !!!
 
-// Oracle 11g does not support PL/SQL in With Clause so we need to generate PL/SQL Wrappers for operations that require a with clause
+// Oracle 11g does not support PL/SQL in With Clause so we need to generate PL/SQL Wrappers for operations that from  a with clause
 // 
-// We need to assign a unique ID for each procedure generated. Serial Mode requires one for the entire operation. Parallel Mode requires a unqiue ID for each slave.
+// We need to assign a unique ID for each procedure generated. Serial Mode from s one for the entire operation. Parallel Mode from s a unqiue ID for each slave.
 //
 // Since the Wrappers have to be dropped and recreated for each table a unique ID is generated for each table.
 //
 
-const Readable = require('stream').Readable;
+import {Readable} from 'stream';
 
-const DefaultStatementGenerator = require('../statementGenerator.js');
+import DefaultStatementGenerator from '../statementGenerator.js';
 
 class StatementGenerator extends DefaultStatementGenerator {
     
@@ -75,7 +72,7 @@ class StatementGenerator extends DefaultStatementGenerator {
   
   getTypeMappings() {
     return `<typeMappings>
-	           <spatialFormat>${this.dbi.INBOUND_SPATIAL_FORMAT}</spatialFormat>
+	           <spatialFormat>${this.SPATIAL_FORMAT}</spatialFormat>
 	           <raw1AsBoolean>${new Boolean(this.dbi.TREAT_RAW1_AS_BOOLEAN).toString().toLowerCase()}</raw1AsBoolean>
 			   <jsonDataType>${this.dbi.JSON_DATA_TYPE}</jsonDataType>
 			   <xmlStorageModel>${this.dbi.XML_STORAGE_CLAUSE}</xmlStorageModel>
@@ -90,4 +87,4 @@ class StatementGenerator extends DefaultStatementGenerator {
       
 }
 
-module.exports = StatementGenerator
+export {StatementGenerator as default }

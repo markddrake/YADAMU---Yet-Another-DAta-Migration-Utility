@@ -1,20 +1,31 @@
+
 // Modules to control application life and create native browser window
+const path = require('path')
+
 const {app, BrowserWindow, ipcMain} = require('electron')
-const path = require('path');
+const remoteMain = require('@electron/remote/main')
+remoteMain.initialize()
 
-const LogWriter = require('./YADAMU_UI/node/logWriter.js');
+app.on('ready', main)
 
-const YadamuLibrary = require('./YADAMU/common/yadamuLibrary.js');
-const Yadamu = require('./YADAMU/common/yadamu.js')
-const YadamuGUI = require('./YADAMU/common/yadamuGUI.js')
-const FileDBI = require('./YADAMU/file/node/fileDBI.js');
+app.on('activate', async () => {
+  // On macOS it's common to re-create a window in the app when the
+  // dock icon is clicked and there are no other windows open.
+  if (mainWindow === null) {
+    await createWindow()
+  }
+})
 
-let sourceDBI = undefined
-let targetDBI = undefined;
+// Quit when all windows are closed.
 
-
-// Keep a global reference of the window object, if you don't, the window will
-// be closed automatically when the JavaScript object is garbage collected.
+app.on('window-all-closed', () => {
+  // On macOS it is common for applications and their menu bar
+  // to stay active until the user quits explicitly with Cmd + Q
+  if (process.platform !== 'darwin') {
+    finalize(yadamu)
+    app.quit()
+  }
+})    
 
 async function finalize(yadamu) {
 	
@@ -28,7 +39,15 @@ async function main() {
   try {
 	// Override default Electron processing of uncaughtException
     process.on('uncaughtException', function (e) { console.log(e);finalize()});
-    electronCmd = new YadamuGUI();
+	let importedModule = await import('./YADAMU/common/yadamuGUI.js')
+	YadamuGUI = importedModule.default
+	importedModule = await import('./YADAMU_UI/node/logWriter.js');
+	LogWriter = importedModule.default
+	importedModule = await import('./YADAMU/common/yadamuLibrary.js')
+	YadamuLibrary = importedModule.default
+	importedModule = await import('./YADAMU/file/node/fileDBI.js')
+	FileDBI = importedModule.default
+	electronCmd = new YadamuGUI();
     try {
       const commamd = electronCmd.getCommand()
       switch (commamd) {
@@ -55,7 +74,7 @@ async function main() {
   	    default:
 		  yadamu = electronCmd.getYadamu()
 		  yadamuLogger = yadamu.LOGGER
-	      createWindow(commamd,electronCmd.loadConfigurationFile())
+	      await createWindow(commamd,electronCmd.loadConfigurationFile())
       } 
 	} catch (e) {
       console.log(e)
@@ -68,7 +87,8 @@ async function main() {
 
 }
 
-function createWindow (operation,configuration) {
+async function createWindow (operation,configuration) {
+
   // Create the browser window.
 
   mainWindow = new BrowserWindow({
@@ -76,9 +96,14 @@ function createWindow (operation,configuration) {
     height: 600,    
     webPreferences: {
       nodeIntegration: true
-  }})
+	, contextIsolation: false
+	//,  preload: path.join(__dirname,'YADAMU_UI/js/preload.js')
+    } 
+  })
   // and load the index.html of the app.
 
+  remoteMain.enable(mainWindow.webContents)     
+  
   mainWindow.webContents.on('did-finish-load',function(event) {
     if (operation === 'INIT') {
       mainWindow.webContents.send('load-config',configuration);
@@ -87,7 +112,18 @@ function createWindow (operation,configuration) {
 
   mainWindow.loadFile('./YADAMU_UI/html/index.html')
 
-  logWindow = new BrowserWindow({ parent: mainWindow, show:false, webPreferences: { nodeIntegration: true }})
+  logWindow = new BrowserWindow({ 
+    parent: mainWindow, 
+	show:false, 
+	webPreferences: { 
+	  nodeIntegration: true
+	, contextIsolation: false
+    // ,preload: path.resolve(__dirname,'YADAMU_UI/js/preload.js')	 
+	}
+  })
+  
+  remoteMain.enable(logWindow.webContents)     
+
   logWindow.loadFile('./YADAMU_UI/html/logWindow.html')
   logWindow.on('close', function (event) {
     event.preventDefault();
@@ -98,7 +134,7 @@ function createWindow (operation,configuration) {
 	yadamuLogger.switchOutputStream(process.stdout);
   })
 
-  const logWriter = new LogWriter(logWindow);
+  logWriter = new LogWriter(logWindow);
   yadamuLogger.switchOutputStream(logWriter);
 
   // Open the DevTools.
@@ -113,40 +149,15 @@ function createWindow (operation,configuration) {
   })
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', main)
-
-// Quit when all windows are closed.
-app.on('window-all-closed', function () {
-  // On macOS it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
-  if (process.platform !== 'darwin') {
-	finalize(yadamu)
-    app.quit()
-  }
-})
-
-app.on('activate', function () {
-  // On macOS it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (mainWindow === null) {
-    createWindow()
-  }
-})
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
-
 async function validateOracle(connectionProps,parameters) {
 
-  const OracleDBI = require('./YADAMU/oracle/node/oracleDBI')
-  const oracleDBI = new OracleDBI(yadamu);
+  const OracleDBI = await import('./YADAMU/oracle/node/oracleDBI.js')
+  const oracleDBI = new OracleDBI.default(yadamu);
   await oracleDBI.testConnection(connectionProps,parameters)
   return oracleDBI
 }
 
+ 
 ipcMain.on('source-oracle', async function (event, connectionProps, parameters) {
   try{
 	sourceDBI = await validateOracle(connectionProps,parameters);
@@ -167,8 +178,8 @@ ipcMain.on('target-oracle', async function (event, connectionProps, parameters) 
 
 async function validatePostgres(connectionProps,parameters) {
 
-  const PostgresDBI = require('./YADAMU/postgres/node/postgresDBI')
-  const postgresDBI = new PostgresDBI(yadamu);
+  const PostgresDBI = await import('./YADAMU/postgres/node/postgresDBI.js')
+  const postgresDBI = new PostgresDBI.default(yadamu);
   await postgresDBI.testConnection(connectionProps,parameters)
   return postgresDBI
 }
@@ -193,8 +204,8 @@ ipcMain.on('target-postgres', async function (event, connectionProps, parameters
 
 async function validateMsSQL(connectionProps,parameters) {
 
-  const MsSQLDBI = require('./YADAMU/mssql/node/mssqlDBI')
-  const mssqlDBI = new MsSQLDBI(yadamu);
+  const MsSQLDBI = await import('./YADAMU/mssql/node/mssqlDBI.js')
+  const mssqlDBI = new MsSQLDBI.default(yadamu);
   await mssqlDBI.testConnection(connectionProps,parameters)
   return mssqlDBI
 }
@@ -219,8 +230,8 @@ ipcMain.on('target-mssql', async function (event, connectionProps, parameters) {
 
 async function validateMySQL(connectionProps,parameters) {
 
-  const MySQLDBI = require('./YADAMU/mysql/node/mysqlDBI')
-  const mysqlDBI = new MySQLDBI(yadamu);
+  const MySQLDBI = await import('./YADAMU/mysql/node/mysqlDBI.js')
+  const mysqlDBI = new MySQLDBI.default(yadamu);
   await mysqlDBI.testConnection(connectionProps,parameters)
   return mysqlDBI
 }
@@ -245,8 +256,8 @@ ipcMain.on('target-mysql', async function (event, connectionProps, parameters) {
 
 async function validateMariaDB(connectionProps,parameters) {
 
-  const MariaDBI = require('./YADAMU/mariadb/node/mariadbDBI')
-  const mariaDBI = new MariaDBI(yadamu);
+  const MariaDBI = await import('./YADAMU/mariadb/node/mariadbDBI.js')
+  const mariaDBI = new MariaDBI.default(yadamu);
   await mariaDBI.testConnection(connectionProps,parameters)
   return mariaDBI
 }
@@ -271,8 +282,8 @@ ipcMain.on('target-mariadb', async function (event, connectionProps, parameters)
 
 async function validatesnowflake(connectionProps,parameters) {
 
-  const SnowflakeDBI = require('./YADAMU/snowflake/node/snowflakeDBI')
-  const snowflakeDBI = new SnowflakeDBI(yadamu);
+  const SnowflakeDBI = await import('./YADAMU/snowflake/node/snowflakeDBI.js')
+  const snowflakeDBI = new SnowflakeDBI.default(yadamu);
   await snowflakeDBI.testConnection(connectionProps,parameters)
   return snowflakeDBI
 }
@@ -297,8 +308,8 @@ ipcMain.on('target-snowflake', async function (event, connectionProps, parameter
 
 async function validateMongoDB(connectionProps,parameters) {
 
-  const MongoDBI = require('./YADAMU/mongodb/node/mongoDBI')
-  const mongoDBI = new MongoDBI(yadamu);
+  const MongoDBI = await import('./YADAMU/mongodb/node/mongoDBI.js')
+  const mongoDBI = new MongoDBI.default(yadamu);
   await mongoDBI.testConnection(connectionProps,parameters)
   return mongoDBI
 }
@@ -340,6 +351,7 @@ function setFileWriter(parameters) {
 ipcMain.on('target-filename',function (event, parameters) {
    targetDBI = setFileWriter(parameters);
 })
+
 
 ipcMain.on('copy', async function (event) {
 	

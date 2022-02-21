@@ -1,13 +1,12 @@
 "use strict" 
 
-const YadamuParser = require('../../common/yadamuParser.js')
+import YadamuParser from '../../common/yadamuParser.js'
 
 class MsSQLParser extends YadamuParser {
   
-  constructor(tableInfo,yadamuLogger) {
-    super(tableInfo,yadamuLogger);   
+  generateTransformations(queryInfo) {
   
-    this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
+    return queryInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 	  switch (dataType) {
 		 case 'xml':
 		   // Replace Entities for Non-Breaking space with ' ' and New Line with `\n' 
@@ -21,24 +20,18 @@ class MsSQLParser extends YadamuParser {
       }
     })
 
-    this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
-      this.transformations.forEach((transformation,idx) => {
-        if ((transformation !== null) && (row[idx] !== null)) {
-          transformation(row,idx)
-        }
-      }) 
-    }
+  }
+  
+  constructor(queryInfo,yadamuLogger) {
+    super(queryInfo,yadamuLogger);   
+  
   }
 
-  async _transform (data,encoding,callback) {
-  	this.rowCount++
+  async doTransform(data) {
 	data = Object.values(data)    
-	this.rowTransformation(data)
-    // if (this.rowCount === 1) console.log(data)
-    this.push({data: data})
-    callback();
+	return super.doTransform(data)
   }
 }
 
 
-module.exports = MsSQLParser
+export { MsSQLParser as default }

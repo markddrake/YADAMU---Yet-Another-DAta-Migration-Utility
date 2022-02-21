@@ -1,9 +1,9 @@
 "use strict"
 
-const {DatabaseError} = require('../../common/yadamuException.js')
+import {DatabaseError} from '../../common/yadamuException.js'
 
 class MongoError extends DatabaseError {
-  //  const err = new MongodbError(cause,stack,operation)
+
   constructor(cause,stack,operation) {
     super(cause,stack,operation)
   }
@@ -27,4 +27,4 @@ class MongoError extends DatabaseError {
   }		   
 }
 
-module.exports = MongoError
+export { MongoError as default }

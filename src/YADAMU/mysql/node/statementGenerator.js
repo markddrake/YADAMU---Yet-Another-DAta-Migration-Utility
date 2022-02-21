@@ -1,8 +1,8 @@
 "use strict";
 
-const path = require('path');
+import path from 'path';
 
-const YadamuLibrary = require('../../common/yadamuLibrary.js');
+import YadamuLibrary from '../../common/yadamuLibrary.js';
 
 class StatementGenerator {
   
@@ -44,10 +44,8 @@ class StatementGenerator {
         const dataTypes = YadamuLibrary.decomposeDataTypes(tableInfo.targetDataTypes)
 		
         tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
-        tableInfo._COMMIT_COUNT   = this.dbi.COMMIT_COUNT
         tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
         tableInfo.insertMode      = 'Batch';
-  
         /*
         **
         ** Avoid use of Iterative Mode where possible due to significant performance impact.
@@ -130,6 +128,8 @@ class StatementGenerator {
             }
           }
         }) 
+
+        
 
         tableInfo.rowConstructor = `(${setOperators.join(',')})`
         switch (tableInfo.insertMode) {
@@ -249,9 +249,9 @@ class StatementGenerator {
         return tableInfo.ddl;
       });
     }
-    return statementCache;
+	return statementCache;
   }
  
 }
 
-module.exports = StatementGenerator;
+export { StatementGenerator as default }

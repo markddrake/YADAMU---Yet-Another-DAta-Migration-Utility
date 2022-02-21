@@ -1,6 +1,6 @@
 "use strict" 
 
-const YadamuConstants = require('../../common/yadamuConstants.js');
+import YadamuConstants from '../../common/yadamuConstants.js';
 
 class SnowflakeStatementLibrary {
 
@@ -79,7 +79,7 @@ class SnowflakeStatementLibrary {
   }
   
 }
-module.exports = SnowflakeStatementLibrary
+export { SnowflakeStatementLibrary as default }
 
 const _SQL_CONFIGURE_CONNECTION = `alter session set autocommit=false timezone='UTC' TIMESTAMP_OUTPUT_FORMAT='YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM' TIMESTAMP_NTZ_OUTPUT_FORMAT='YYYY-MM-DDTHH24:MI:SS.FF9TZH:TZM' TIME_INPUT_FORMAT='HH24:MI:SS.FF9' GEOGRAPHY_OUTPUT_FORMAT ='WKB'`
 

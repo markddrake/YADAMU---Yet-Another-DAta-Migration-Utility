@@ -1,29 +1,27 @@
 "use strict" 
-const util = require('util')
-const stream = require('stream')
-// const pipeline = util.promisify(stream.pipeline);
-const { pipeline } = require('stream/promises');
 
-const oracledb = require('oracledb');
+import { pipeline } from 'stream/promises';
 
-const YadamuParser = require('../../common/yadamuParser.js')
-const StringWriter = require('../../common/stringWriter.js');
-const BufferWriter = require('../../common/bufferWriter.js');
+import oracledb from 'oracledb';
 
-const {OracleError} = require('./oracleException.js');
+import YadamuParser from '../../common/yadamuParser.js'
+import StringWriter from '../../common/stringWriter.js';
+import BufferWriter from '../../common/bufferWriter.js';
+
+import {OracleError} from './oracleException.js';
 
 class OracleParser extends YadamuParser {
   
-  constructor(tableInfo,yadamuLogger) {
-    super(tableInfo,yadamuLogger); 
-	// console.log(tableInfo)
+  constructor(queryInfo,yadamuLogger) {
+    super(queryInfo,yadamuLogger); 
+	// console.log(queryInfo)
   }
 
-  setColumnMetadata(metadata) { 
-
-    this.jsonTransformations = new Array(metadata.length).fill(null)
+  setColumnMetadata(resultSetMetadata) { 
     
-    this.transformations = metadata.map((column,idx) => {
+	this.jsonTransformations = new Array(resultSetMetadata.length).fill(null)
+    
+    this.transformations = resultSetMetadata.map((column,idx) => {
 	  switch (column.fetchType) {
 		case oracledb.DB_TYPE_NCLOB:
 		case oracledb.DB_TYPE_CLOB:
@@ -32,7 +30,7 @@ class OracleParser extends YadamuParser {
 			row[idx] = row[idx].getData()
 		  }           
 	    case oracledb.DB_TYPE_BLOB:	
-          if (this.tableInfo.jsonColumns.includes(idx)) {
+          if (this.queryInfo.jsonColumns.includes(idx)) {
             // Convert JSON store as BLOB to string
 		    this.jsonTransformations[idx] = (row,idx)  => {
               row[idx] = row[idx].toString('utf8')
@@ -43,7 +41,7 @@ class OracleParser extends YadamuParser {
 			row[idx] = row[idx].getData()
 		  }
         default:
- 		  switch (this.tableInfo.DATA_TYPE_ARRAY[idx].toUpperCase()) {
+ 		  switch (this.queryInfo.DATA_TYPE_ARRAY[idx].toUpperCase()) {
 		    case 'BINARY_FLOAT':
 			case 'BINARY_DOUBLE':
 		      return (row,idx)  => {
@@ -68,7 +66,7 @@ class OracleParser extends YadamuParser {
 	
 	// Use a dummy rowTransformation function if there are no transformations required.
 	
-    this.rowTransformation = this.transformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+    this.rowTransformation = this.transformations.every((currentValue) => { return currentValue === null}) ? (row) => {} : (row) => {
       this.transformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
           transformation(row,idx)
@@ -76,7 +74,7 @@ class OracleParser extends YadamuParser {
       }) 
     }
 	
-    this.jsonTransformation = this.jsonTransformations.every((currentValue) => { currentValue === null}) ? (row) => {} : (row) => {
+    this.jsonTransformation = this.jsonTransformations.every((currentValue) => { return currentValue === null}) ? (row) => {} : (row) => {
       this.jsonTransformations.forEach((transformation,idx) => {
         if ((transformation !== null) && (row[idx] !== null)) {
           transformation(row,idx)
@@ -86,66 +84,12 @@ class OracleParser extends YadamuParser {
     
   }
   
-  async _transform (data,encoding,callback) {
-	try {
-      this.rowCount++;
-	  this.rowTransformation(data)
-	  const row = await Promise.all(data)
-	  this.jsonTransformation(row)
-      // if (this.rowCount === 1) console.log(row)
-	  this.push({data:row})
-      callback();
-	} catch (e) {
-      callback(e)
-	}
+  async doTransform(data) {  
+    data = await super.doTransform(data)
+	const row = await Promise.all(data)
+	this.jsonTransformation(row)
+    return row
   }
-
 }
 
-module.exports = OracleParser
-
-/*
-  async closeLob(lob) {
-	let stack
-	const operation = 'oracledb.Lob.close()'
-    try {
-	  stack = new Error().stack
-      await lob.close()
-	} catch (e) {
-      this.yadamuLogger.handleException([this.constructor.name,'CLOSE_LOB'],new OracleError(e,stack,operation))
-    }
-  }	 
-
-  async blobToBuffer(blob) {
-	  
-	let stack
-	const operation = 'oracledb.Lob.pipe(Buffer)'
-    try {
-      const bufferWriter = new  BufferWriter();
-	  stack = new Error().stack
-  	  await pipeline(blob,bufferWriter)
-	  await this.closeLob(blob)
-      return bufferWriter.toBuffer()
-	} catch(e) {
-	  await this.closeLob(blob)
-	  throw new OracleError(e,stack,operation)
-	}
-  }	
-  
-  async clobToString(clob) {
-     
-    let stack
-	const operation = 'oracledb.Lob.pipe(String)'
-	try {
-      const stringWriter = new  StringWriter();
-      clob.setEncoding('utf8');  // set the encoding so we get a 'string' not a 'buffer'
-	  stack = new Error().stack
-  	  await pipeline(clob,stringWriter)
-	  await this.closeLob(clob)
-	  return stringWriter.toString()
-	} catch(e) {
-	  await this.closeLob(clob)
-	  throw new OracleError(e,stack,operation)
-	}
-  };
-*/
+export {OracleParser as default }
