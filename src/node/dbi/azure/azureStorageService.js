@@ -1,14 +1,15 @@
 "use strict"
 
-import {PassThrough} from 'stream';
-import { pipeline } from 'stream/promises';
+import { PassThrough, compose } from 'stream';
+import { pipeline }             from 'stream/promises';
+import { setTimeout }           from 'timers/promises'
 
 
-import StringWriter from '../../common/stringWriter.js';
-import StringDecoderStream from '../../common/stringDecoderStream.js';
-import YadamuConstants from '../../common/yadamuConstants.js';
-import AzureConstants from './azureConstants.js';
-import AzureError from './azureException.js'
+import StringWriter             from '../../util/stringWriter.js';
+import StringDecoderStream      from '../../util/stringDecoderStream.js';
+import YadamuConstants          from '../../lib/yadamuConstants.js';
+import AzureConstants           from './azureConstants.js';
+import AzureError               from './azureException.js'
 
 class AzureStorageService {
 
@@ -37,12 +38,12 @@ class AzureStorageService {
 	const writeOperation = blockBlobClient.uploadStream(passThrough, undefined, undefined, { blobHTTPHeaders: { blobContentType: contentType}})
 	activeWriters.add(writeOperation);
     writeOperation.then(() => {
-      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',key],`SUCCESS : Removing Active Writer for "${key}"`);		
+      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',`SUCCESS`,key],`Removing Active Writer`);		
       activeWriters.delete(writeOperation)
 	}).catch((err) => {
-      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',key],`SUCCESS : Removing Active Writer for "${key}"`);		
+      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',`FAILED`,key],`Removing Active Writer`);		
+      this.yadamuLogger.handleException([AzureConstants.DATABASE_VENDOR,'UPLOAD',`FAILED`,key],err);
       activeWriters.delete(writeOperation)
-      console.log(err)
     })	  
 	return passThrough;
   }
@@ -118,18 +119,26 @@ class AzureStorageService {
   async createReadStream(key,params) {
 	  
 	let operation
+    let retryOn404 = true
 	const stack = new Error().stack
-    try {
-  	  operation = `Azure.containerClient.getBlockBlobClient(${key})`
-      const blockBlobClient = this.containerClient.getBlockBlobClient(key);
-  	  operation = `Azure.blockBlobClient.getProperties(${key})`
-	  const props = await blockBlobClient.getProperties()
-  	  operation = `Azure.blockBlobClient.download(${key})`
-	  const downloadBlockBlobResponse = await blockBlobClient.download(0);
-	  return downloadBlockBlobResponse.readableStreamBody.pipe(this.isTextContent(props.contentType) ? new StringDecoderStream() : new PassThrough())
-	  return downloadBlockBlobResponse.readableStreamBody.pipe(new PassThrough())
-	} catch (e) {
-	  throw new AzureError(this.dbi.DRIVER_ID,e,stack,operation)
+	while (true) {
+      try {
+		operation = `Azure.containerClient.getBlockBlobClient(${key})`
+        const blockBlobClient = this.containerClient.getBlockBlobClient(key);
+  	    operation = `Azure.blockBlobClient.getProperties(${key})`
+	    const props = await blockBlobClient.getProperties()
+  	    operation = `Azure.blockBlobClient.download(${key})`
+	    const downloadBlockBlobResponse = await blockBlobClient.download(0);
+		return compose(downloadBlockBlobResponse.readableStreamBody,this.isTextContent(props.contentType) ? new StringDecoderStream() : new PassThrough())
+	  } catch (e) {
+		if ((retryOn404) && (e.statusCode && (e.statusCode === 404))) {
+   		  retryOn404 = false
+  		  await setTimeout(100)
+		  this.yadamuLogger.qaWarning([AzureConstants.DATABASE_VENDOR,'READ',`RETRY`,key],`Retrying after 404`);		
+		  continue
+		}
+	    throw new AzureError(this.dbi.DRIVER_ID,e,stack,operation)
+	  }
 	}
   }
   

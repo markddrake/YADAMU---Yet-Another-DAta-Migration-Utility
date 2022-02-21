@@ -1,15 +1,15 @@
 "use strict"   
 
-import fs from 'fs';
-import path from 'path';
+import fs            from 'fs';
+import path          from 'path';
+import {Readable}    from 'stream'
+import {pipeline}    from 'stream/promises'
 
-import {Readable} from 'stream'
-import {pipeline} from 'stream/promises'
+import ArrayReadable from '../util/arrayReadable.js'
+import ErrorDBI      from '../dbi/file/errorDBI.js';
 
-import DBWriter from './dbWriter.js';
-import YadamuLogger from './yadamuLogger.js'
-import ArrayReadable from './arrayReadable.js'
-import ErrorDBI from '../file/node/errorDBI.js';
+import DBWriter      from './dbWriter.js';
+import YadamuLogger  from './yadamuLogger.js'
 
 class YadamuRejectManager {
   

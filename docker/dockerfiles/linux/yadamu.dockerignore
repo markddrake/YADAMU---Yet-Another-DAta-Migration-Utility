@@ -1,4 +1,7 @@
 *
 !bin/*.sh
 !src/install
-!src/YADAMU
+!src/node
+src/deprecated
+src/gui
+src/server

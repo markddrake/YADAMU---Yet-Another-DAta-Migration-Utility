@@ -1,6 +1,6 @@
 "use strict"
 
-import {DatabaseError} from '../../common/yadamuException.js'
+import {DatabaseError} from '../../core/yadamuException.js'
 
 class ExampleError extends DatabaseError {
   
@@ -10,4 +10,4 @@ class ExampleError extends DatabaseError {
 
 }
 
-export { ExampleError
+export { ExampleError as default }

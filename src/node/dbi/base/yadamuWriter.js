@@ -1,15 +1,18 @@
 "use strict"
 
-import fs from 'fs'
-import assert from 'assert'
-import {Readable, Writable, Transform, pipeline } from 'stream'
+import fs              from 'fs'
+import assert          from 'assert'
 import { performance } from 'perf_hooks';
 
-import DBIConstants from './dbiConstants.js';
-import YadamuConstants from './yadamuConstants.js';
-import YadamuParser from './yadamuParser.js';
-import YadamuLibrary from './yadamuLibrary.js';
-import {YadamuError, BatchInsertError, IterativeInsertError, DatabaseError} from './yadamuException.js'
+import {Readable, Writable, Transform, pipeline } from 'stream'
+
+import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuLibrary   from '../../lib/yadamuLibrary.js';
+
+import {YadamuError, BatchInsertError, IterativeInsertError, DatabaseError} from '../../core/yadamuException.js'
+
+import DBIConstants    from './dbiConstants.js';
+
 
 class YadamuWriter extends Writable {
 
@@ -296,7 +299,7 @@ class YadamuWriter extends Writable {
   	    /*
 	    **
 	    ** An unrecoverable error occured while writing a batch. Examples of unrecoverable errors include lost connections, missing tables, too many errors during iterative inserts
-	    ** or anything else that causes the _writeBach implementation to throw an error. This will also catch issues with Transaction State (Errors during COMMIT and/or BEGIN transaction operations)
+	    ** or anything else that causes the _writeBach implementation to throw an error. Also catches issues with Transaction State (Errors during COMMIT and/or BEGIN transaction operations)
         **
 	    */
         if (this.lostRows()) {
@@ -307,7 +310,10 @@ class YadamuWriter extends Writable {
       	    this.abortTable()
 		  }
         }
-		throw err
+		// If we cannot continue processing the table for any reason throw the err to abort the current pipeline operation.
+		if (this.skipTable) {
+	      throw err
+		}
 	  }
 	}
     else {
@@ -498,7 +504,6 @@ class YadamuWriter extends Writable {
         this.reportPerformance(err)
 	  }
 	  catch (e) {
-		console.log(e)
 		e.rootCause = err
         this.reportPerformance(e)
 		throw e

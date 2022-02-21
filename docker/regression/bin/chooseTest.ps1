@@ -32,7 +32,7 @@ function runRegressionTest($TESTNAME) {
 
   resetFolder $YADAMU_LOG_PATH
   $YADAMU_LOG_FILE = join-path $YADAMU_LOG_PATH ($TESTNAME + ".log")
-  node $YADAMU_HOME\src\YADAMU_QA\common\node\test.js CONFIG=$YADAMU_QA_HOME\regression\$TESTNAME.json EXCEPTION_FOLDER=$YADAMU_LOG_PATH 2>&1 | tee-Object -FilePath $YADAMU_LOG_FILE
+  node $YADAMU_HOME\src\qa\cli\test.js CONFIG=$YADAMU_QA_HOME\regression\$TESTNAME.json EXCEPTION_FOLDER=$YADAMU_LOG_PATH 2>&1 | tee-Object -FilePath $YADAMU_LOG_FILE
 }
 
 function createOutputFolders($PATH) {

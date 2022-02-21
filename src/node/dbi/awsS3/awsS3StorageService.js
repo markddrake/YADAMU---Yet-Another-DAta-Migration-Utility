@@ -1,9 +1,10 @@
 "use strict"
 
-import {PassThrough, finished} from 'stream';
-import path from 'path'
-import AWSS3Constants from './awsS3Constants.js';
-import AWSS3Error from './awsS3Exception.js'
+import path                    from 'path'
+import {PassThrough}           from 'stream';
+
+import AWSS3Constants          from './awsS3Constants.js';
+import AWSS3Error              from './awsS3Exception.js'
 
 class AWSS3StorageService {
 
@@ -35,14 +36,15 @@ class AWSS3StorageService {
 	const writeOperation = new Promise((resolve,reject) => {
 	  this.s3Connection.upload(params).send((err, data) => {
  	    if (err) {
-          this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',key],`FAILED`);
+          // this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,`FAILED`,'UPLOAD',params.Key],`Removing Active Writer`);
 		  reject(err)
 	    } 
 	    else {
-          // this.yadamuLogger.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',key],`SUCCESS : File uploaded to "${data.Location}"`);
+          // this.yadamuLogger.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,params.Key],`Removing Active Writer`);		
+          this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,params.Key],err);
+          activeWriters.delete(writeOperation)
 		  resolve(params.Key)
 	    }
-        // this.yadamuLogger.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',key],`SUCCESS : Removing Active Writer for "${data.Location}"`);		
         activeWriters.delete(writeOperation)
 	    params.Body.destroy(err);
       })
@@ -158,8 +160,8 @@ class AWSS3StorageService {
     try {
       const stream = await this.s3Connection.getObject(params).createReadStream()
 	  return stream;
-    } catch (e) {
-      throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.getObject(s3://${this.dbi.BUCKET}/${params.Key})`)
+	} catch (e) {
+	  throw new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.getObject(s3://${this.dbi.BUCKET}/${params.Key})`)
 	}
   }
   

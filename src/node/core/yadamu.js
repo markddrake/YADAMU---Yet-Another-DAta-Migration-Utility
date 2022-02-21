@@ -1,29 +1,30 @@
 "use strict"
 
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
-import readline from 'readline';
-import { performance } from 'perf_hooks';
-import assert from 'assert';
-import { pipeline,finished } from 'stream/promises';
+import fs                     from 'fs';
+import path                   from 'path';
+import crypto                 from 'crypto';
+import readline               from 'readline';
+import { performance }        from 'perf_hooks';
+import assert                 from 'assert';
+import { pipeline,finished }  from 'stream/promises';
 
-import FileDBI from '../file/node/fileDBI.js';
-import DBReader from './dbReader.js';
-import DBWriter from './dbWriter.js';
-import DBReaderParallel from './dbReaderParallel.js';
-import DBReaderFile from './dbReaderFile.js';
+import YadamuConstants        from '../lib/yadamuConstants.js';
+import YadamuLibrary          from '../lib/yadamuLibrary.js';
+import FileDBI                from '../dbi/file/fileDBI.js';
+import DBIConstants           from '../dbi/base/dbiConstants.js';
+import YadamuCopyManager      from '../dbi/base/yadamuCopyManager.js';
+import NullWriter             from '../util/nullWriter.js';
 
-import YadamuConstants from './yadamuConstants.js';
-import DBIConstants from './dbiConstants.js';
-import NullWriter from './nullWriter.js';
-import YadamuLogger from './yadamuLogger.js';
-import YadamuLibrary from './yadamuLibrary.js';
+import {FileNotFound, FileError} from '../dbi/file/fileException.js';
+
+import DBReader               from './dbReader.js';
+import DBWriter               from './dbWriter.js';
+import DBReaderParallel       from './dbReaderParallel.js';
+import DBReaderFile           from './dbReaderFile.js';
+import YadamuLogger           from './yadamuLogger.js';
+import YadamuRejectManager    from './yadamuRejectManager.js';
+
 import {YadamuError, UserError, CommandLineError, ConfigurationFileError, DatabaseError, ConnectionError} from './yadamuException.js';
-import {FileNotFound, FileError} from '../file/node/fileException.js';
-import YadamuRejectManager from './yadamuRejectManager.js';
-
-import YadamuCopyManager from './yadamuCopyManager.js';
 
 class Yadamu {
 
@@ -896,7 +897,6 @@ class Yadamu {
 	  results = this.metrics
 	  
 	} catch (e) {		
-	  console.log(e)
 	  this.STATUS.operationSuccessful = false;
 	  this.STATUS.err = e;
       results = e;

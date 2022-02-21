@@ -1,6 +1,6 @@
 "use strict" 
 
-import YadamuConstants from '../../../common/yadamuConstants.js';
+import YadamuConstants from '../../../lib/yadamuConstants.js';
 import DefaultStatmentLibrary from '../oracleStatementLibrary.js'
 
 class OracleStatementLibrary extends DefaultStatmentLibrary{

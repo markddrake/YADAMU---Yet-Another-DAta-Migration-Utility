@@ -1,15 +1,16 @@
 "use strict";
 
-import { performance } from 'perf_hooks';
+import { performance }            from 'perf_hooks';
 import { Readable, PassThrough  } from 'stream'
-import { pipeline, finished } from 'stream/promises';
+import { pipeline, finished }     from 'stream/promises';
 
-import Yadamu from './yadamu.js'
-import YadamuLibrary from './yadamuLibrary.js'
-import YadamuWriter from './yadamuWriter.js'
+import YadamuLibrary              from '../lib/yadamuLibrary.js'
+import YadamuConstants            from '../lib/yadamuConstants.js'
+import YadamuWriter               from '../dbi/base/yadamuWriter.js'
+
+import Yadamu                     from './yadamu.js'
 import {YadamuError, ExportError, DatabaseError, IterativeInsertError, InputStreamError} from './yadamuException.js'
 
-import YadamuConstants from './yadamuConstants.js'
 
 class DBReader extends Readable {  
 

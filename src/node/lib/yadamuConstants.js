@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 
 const  __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const YadamuDefaults = JSON.parse(fs.readFileSync(join(__dirname,'./yadamuDefaults.json'),'utf-8'));
+const YadamuDefaults = JSON.parse(fs.readFileSync(join(__dirname,'../cfg/yadamuDefaults.json'),'utf-8'));
   
 class YadamuConstants {
 

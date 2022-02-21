@@ -3,8 +3,8 @@
 import sql from 'mssql';
 import path from 'path';
 
-import Yadamu from '../../common/yadamu.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
+import Yadamu from '../../core/yadamu.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
 
 class StatementGenerator {
   

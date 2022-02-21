@@ -2,7 +2,7 @@
 
 import { performance } from 'perf_hooks';
 
-import _JSONParser from '../../file/node/jsonParser.js';
+import _JSONParser from '../file/jsonParser.js';
 
 class JSONParser extends _JSONParser {
   

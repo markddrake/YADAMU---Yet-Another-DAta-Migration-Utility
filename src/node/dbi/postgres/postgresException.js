@@ -1,6 +1,6 @@
 "use strict"
 
-import {DatabaseError} from '../../common/yadamuException.js'
+import {DatabaseError} from '../../core/yadamuException.js'
 
 class PostgresError extends DatabaseError {
   //  const err = new PostgresError(driverId,driverId,cause,stack,sql)

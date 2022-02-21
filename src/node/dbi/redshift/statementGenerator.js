@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 import path from 'path';
 
-import YadamuLibrary from '../../common/yadamuLibrary.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
 
 class StatementGenerator {
 

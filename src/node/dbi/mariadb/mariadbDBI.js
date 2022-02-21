@@ -1,7 +1,7 @@
 "use strict" 
 
-import fs from 'fs';
-import { performance } from 'perf_hooks';
+import fs                      from 'fs';
+import { performance }         from 'perf_hooks';
 
 /* 
 **
@@ -9,21 +9,21 @@ import { performance } from 'perf_hooks';
 **
 */
 
-import mariadb from 'mariadb';
+import mariadb                 from 'mariadb';
 
-import YadamuDBI from '../../common/yadamuDBI.js';
-import DBIConstants from '../../common/dbiConstants.js';
-import YadamuConstants from '../../common/yadamuConstants.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../common/yadamuException.js'
+import YadamuDBI               from '../base/yadamuDBI.js';
+import DBIConstants            from '../base/dbiConstants.js';
+import YadamuConstants         from '../../lib/yadamuConstants.js';
+import YadamuLibrary           from '../../lib/yadamuLibrary.js'
+import {CopyOperationAborted}  from '../../core/yadamuException.js'
 
-import MariadbConstants from './mariadbConstants.js'
-import MariadbError from './mariadbException.js'
-import MariadbParser from './mariadbParser.js';
-import MariadbOutputManager from './mariadbOutputManager.js';
-import MariadbWriter from './mariadbWriter.js';
-import StatementGenerator from '../../dbShared/mysql/57/statementGenerator.js';
+import MariadbConstants        from './mariadbConstants.js'
+import MariadbError            from './mariadbException.js'
+import MariadbParser           from './mariadbParser.js';
+import MariadbOutputManager    from './mariadbOutputManager.js';
+import MariadbWriter           from './mariadbWriter.js';
 import MariadbStatementLibrary from './mariadbStatementLibrary.js';
+import StatementGenerator      from '../shared/mysql/57/statementGenerator.js';
 
 class MariadbDBI extends YadamuDBI {
     

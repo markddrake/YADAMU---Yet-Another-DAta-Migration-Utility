@@ -6,7 +6,7 @@ import { performance } from 'perf_hooks';
 import sql from 'mssql';
 
 import DBFileLoader from './dbFileLoader.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../../file/node/fileException.js'
+import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js'
 
 class StagingTable {
 

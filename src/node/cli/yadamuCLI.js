@@ -1,20 +1,20 @@
 "use strict" 
 
-import fs from 'fs';
-import path from 'path';
-import { performance } from 'perf_hooks';
-import assert from 'assert';
+import fs               from 'fs';
+import path             from 'path';
+import { performance }  from 'perf_hooks';
+import assert           from 'assert';
 
-import Yadamu from './yadamu.js';
-import YadamuConstants from './yadamuConstants.js';
-import YadamuLibrary from './yadamuLibrary.js';
-import YadamuLogger from './yadamuLogger.js';
+import Yadamu           from '../core/yadamu.js';
+import YadamuLogger     from '../core/yadamuLogger.js';
+import YadamuConstants  from '../lib/yadamuConstants.js';
+import YadamuLibrary    from '../lib/yadamuLibrary.js';
 
-import {CommandLineError, ConfigurationFileError}  from './yadamuException.js';
+import {CommandLineError, ConfigurationFileError}  from '../core/yadamuException.js';
 
-import {FileNotFound} from '../file/node/fileException.js';
+import {FileNotFound} from '../dbi/file/fileException.js';
 
-import YadamuCompare from '../../YADAMU_QA/common/node/yadamuQA.js'
+import YadamuCompare from '../../qa/core/yadamuQA.js'
 
 
 /*
@@ -575,7 +575,7 @@ class YadamuCLI {
   async doTests() {
     
 	const configuration = this.loadConfigurationFile()
-    const YadamuQA = await import('../../YADAMU_QA/common/node/yadamuQA.js');
+    const YadamuQA = await import('../../qa/core/yadamuQA.js');
 	const yadamuQA = new YadamuQA.default(configuration,this.yadamu.activeConnections);
     await yadamuQA.initialize()
 	const startTime = performance.now();
@@ -586,5 +586,6 @@ class YadamuCLI {
   }
   
 }
+
 
 export { YadamuCLI as default}

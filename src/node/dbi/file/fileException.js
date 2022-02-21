@@ -1,6 +1,6 @@
 "use strict"
 
-import {DatabaseError} from '../../common/yadamuException.js'
+import {DatabaseError} from '../../core/yadamuException.js'
 
 class FileError extends DatabaseError {
   constructor(driverId,cause,stack,file) {

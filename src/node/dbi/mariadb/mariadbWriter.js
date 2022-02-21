@@ -2,9 +2,9 @@
 
 import { performance } from 'perf_hooks';
 
-import YadamuWriter from '../../common/yadamuWriter.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import {DatabaseError,RejectedColumnValue} from '../../common/yadamuException.js';
+import YadamuWriter from '../base/yadamuWriter.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import {DatabaseError,RejectedColumnValue} from '../../core/yadamuException.js';
 																				   
 
 class MariadbWriter extends YadamuWriter {

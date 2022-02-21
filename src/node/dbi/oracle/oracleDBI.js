@@ -14,11 +14,11 @@ import { pipeline } from 'stream/promises';
 import oracledb from 'oracledb';
 oracledb.fetchAsString = [ oracledb.DATE, oracledb.NUMBER ]
 
-import YadamuDBI from '../../common/yadamuDBI.js';
-import DBIConstants from '../../common/dbiConstants.js';
-import YadamuConstants from '../../common/yadamuConstants.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../common/yadamuException.js'
+import YadamuDBI from '../base/yadamuDBI.js';
+import DBIConstants from '../base/dbiConstants.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js'
+import {CopyOperationAborted} from '../../core/yadamuException.js'
 
 import OracleConstants from './oracleConstants.js';
 import {OracleError, StagingFileError} from './oracleException.js'
@@ -28,11 +28,11 @@ import OracleWriter from './oracleWriter.js';
 import OracleStatementLibrary from './oracleStatementLibrary.js';
 import StatementGenerator from './statementGenerator.js';
 
-import StringWriter from '../../common/stringWriter.js';
-import BufferWriter from '../../common/bufferWriter.js';
-import HexBinToBinary from '../../common/hexBinToBinary.js';
-import JSONParser from '../../file/node/jsonParser.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../../file/node/fileException.js';
+import StringWriter from '../../util/stringWriter.js';
+import BufferWriter from '../../util/bufferWriter.js';
+import HexBinToBinary from '../../util/hexBinToBinary.js';
+import JSONParser from '../file/jsonParser.js';
+import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
 
 class OracleDBI extends YadamuDBI {
 

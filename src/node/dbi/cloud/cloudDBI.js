@@ -4,10 +4,10 @@ import path          from 'path'
 import mime          from 'mime-types';
 import {PassThrough} from "stream"
 
-import LoaderDBI     from '../node/loaderDBI.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import NullWritable  from '../../common/nullWritable.js';
-import {YadamuError} from '../../common/yadamuException.js';
+import LoaderDBI     from '../loader/loaderDBI.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import NullWritable  from '../../util/nullWritable.js';
+import {YadamuError} from '../../core/yadamuException.js';
 
 /*
 **

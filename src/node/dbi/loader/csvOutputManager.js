@@ -1,9 +1,9 @@
 "use strict"
 
-import { performance } from 'perf_hooks';
+import { performance }   from 'perf_hooks';
 
-import JSONOutputManager from '../../file/node/jsonOutputManager.js';
-import StringWriter      from '../../../YADAMU/common/stringWriter.js'
+import JSONOutputManager from '../file/jsonOutputManager.js';
+import StringWriter      from '../../util/stringWriter.js'
 
 import CSVLibrary        from './csvLibrary.js';
 

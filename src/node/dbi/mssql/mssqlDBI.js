@@ -25,11 +25,11 @@ import sql from 'mssql';
 **
 */
 
-import YadamuDBI from '../../common/yadamuDBI.js';
-import DBIConstants from '../../common/dbiConstants.js';
-import YadamuConstants from '../../common/yadamuConstants.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../common/yadamuException.js'
+import YadamuDBI from '../base/yadamuDBI.js';
+import DBIConstants from '../base/dbiConstants.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js'
+import {CopyOperationAborted} from '../../core/yadamuException.js'
 
 import MsSQLConstants from './mssqlConstants.js'
 import MsSQLError from './mssqlException.js'
@@ -41,7 +41,7 @@ import StagingTable from './stagingTable.js';
 import MsSQLReader from './mssqlReader.js';
 import StatementLibrary from './mssqlStatementLibrary.js'
 
-import {ConnectionError} from '../../common/yadamuException.js'
+import {ConnectionError} from '../../core/yadamuException.js'
 
 
 class MsSQLDBI extends YadamuDBI {

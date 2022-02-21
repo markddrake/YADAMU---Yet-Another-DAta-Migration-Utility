@@ -19,11 +19,11 @@ import Cursor  from 'pg-cursor'
 import QueryStream from 'pg-query-stream'
 import types from 'pg-types';
 
-import YadamuDBI from '../../common/yadamuDBI.js';
-import DBIConstants from '../../common/dbiConstants.js';
-import YadamuConstants from '../../common/yadamuConstants.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../common/yadamuException.js'
+import YadamuDBI from '../base/yadamuDBI.js';
+import DBIConstants from '../base/dbiConstants.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js'
+import {CopyOperationAborted} from '../../core/yadamuException.js'
 
 import VerticaConstants from './verticaConstants.js'
 import VerticaInputStream from './verticaReader.js'
@@ -34,8 +34,8 @@ import VerticaOutputManager from './verticaOutputManager.js'
 import StatementGenerator from './statementGenerator.js';
 import VerticaStatementLibrary from './verticaStatementLibrary.js';
 
-import {YadamuError} from '../../common/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../../file/node/fileException.js';
+import {YadamuError} from '../../core/yadamuException.js';
+import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
 
 class VerticaDBI extends YadamuDBI {
     

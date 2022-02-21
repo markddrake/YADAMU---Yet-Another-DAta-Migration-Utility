@@ -4,10 +4,10 @@ import { performance } from 'perf_hooks';
 
 import oracledb from 'oracledb';
 
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import YadamuSpatialLibrary from '../../common/yadamuSpatialLibrary.js';
-import YadamuOutputManager from '../../common/yadamuOutputManager.js';
-import {DatabaseError} from '../../common/yadamuException.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
+import YadamuOutputManager from '../base/yadamuOutputManager.js';
+import {DatabaseError} from '../../core/yadamuException.js';
 
 class OracleOutputManager extends YadamuOutputManager {
 

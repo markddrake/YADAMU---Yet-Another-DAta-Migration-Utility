@@ -2,12 +2,12 @@
 
 import { performance } from 'perf_hooks';
 
-import Yadamu from '../../common/yadamu.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import NullWriter from '../../common/nullWriter.js';
-import YadamuSpatialLibrary from '../../common/yadamuSpatialLibrary.js';
-import YadamuWriter from '../../common/yadamuWriter.js';
-import {BatchInsertError} from '../../common/yadamuException.js'
+import Yadamu from '../../core/yadamu.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import NullWriter from '../../util/nullWriter.js';
+import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
+import YadamuWriter from '../base/yadamuWriter.js';
+import {BatchInsertError} from '../../core/yadamuException.js'
 
 class SnowflakeWriter extends YadamuWriter {
 

@@ -1,13 +1,15 @@
 "use strict"
 
-import fs from 'fs'
-import assert from 'assert'
-import {Readable, Writable, Transform, pipeline } from 'stream'
+import fs              from 'fs'
+import assert          from 'assert'
 import { performance } from 'perf_hooks';
 
-import YadamuLibrary from './yadamuLibrary.js';
-import YadamuConstants from './yadamuConstants.js';
-import {YadamuError, BatchInsertError, IterativeInsertError, DatabaseError, InvalidMessageSequence} from './yadamuException.js'
+import {Readable, Writable, Transform, pipeline } from 'stream'
+
+import YadamuLibrary   from '../../lib/yadamuLibrary.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
+
+import {YadamuError, BatchInsertError, IterativeInsertError, DatabaseError, InvalidMessageSequence} from '../../core/yadamuException.js'
 
 class YadamuOutputManager extends Transform {
 

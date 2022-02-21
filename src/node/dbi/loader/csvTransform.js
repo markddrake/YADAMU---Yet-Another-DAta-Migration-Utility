@@ -1,7 +1,7 @@
 "use strict" 
 
-import YadamuParser from '../../common/yadamuParser.js'
-import YadamuLibrary from '../../common/yadamuLibrary.js'
+import YadamuParser from '../base/yadamuParser.js'
+import YadamuLibrary from '../../lib/yadamuLibrary.js'
 
 class CSVTransform extends YadamuParser {
 

@@ -1,5 +1,5 @@
 
-import YadamuWriter from './yadamuWriter.js';
+import YadamuWriter from '../dbi/base/yadamuWriter.js';
 
 class PerformanceReporter extends YadamuWriter {
 

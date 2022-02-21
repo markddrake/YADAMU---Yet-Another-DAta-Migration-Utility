@@ -3,11 +3,11 @@
 import sql from 'mssql';
 
 import { performance } from 'perf_hooks';
-import YadamuWriter from '../../common/yadamuWriter.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import NullWriter from '../../common/nullWriter.js';
-import YadamuSpatialLibrary from '../../common/yadamuSpatialLibrary.js';
-import {DatabaseError,RejectedColumnValue} from '../../common/yadamuException.js';
+import YadamuWriter from '../base/yadamuWriter.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import NullWriter from '../../util/nullWriter.js';
+import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
+import {DatabaseError,RejectedColumnValue} from '../../core/yadamuException.js';
 
 import MsSQLConstants from './mssqlConstants.js'
 

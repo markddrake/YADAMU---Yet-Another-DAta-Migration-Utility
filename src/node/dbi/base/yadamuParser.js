@@ -1,7 +1,8 @@
 "use strict" 
 
-import { Transform } from 'stream';
-import { performance } from 'perf_hooks';
+import { Transform }    from 'stream';
+import { performance }  from 'perf_hooks';
+import { setTimeout }   from 'timers/promises'
 
 class YadamuParser extends Transform {
 
@@ -67,6 +68,11 @@ class YadamuParser extends Transform {
 	
   async doConstruct() {
 	this.sendTableMessage()
+  
+    // Workaround for issue with 'data' messages sometime (very, very rarely) appearing before 'table' messages
+    // To-date issue has only been observed when writing to Loader based drivers
+    await setTimeout(100) 
+  
   }
 
   _construct(callback) {

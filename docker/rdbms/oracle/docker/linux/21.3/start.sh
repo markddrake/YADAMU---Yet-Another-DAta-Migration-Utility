@@ -49,7 +49,7 @@ then
   ln -s $ORACLE_BASE/oradata/dbconfig/network/admin/sqlnet.ora    $ORACLE_BASE/homes/OraDB21Home1/network/admin/sqlnet.ora
   ln -s $ORACLE_BASE/oradata/dbconfig/network/admin//listener.ora $ORACLE_BASE/homes/OraDB21Home1/network/admin/listener.ora
   ln -s $ORACLE_BASE/oradata/dbconfig/network/admin//tnsnames.ora $ORACLE_BASE/homes/OraDB21Home1/network/admin/tnsnames.ora
-  sqlplus -s / as sysdba <<-EOF
+  sqlplus -s / as sysdba <<EOF
 
   alter Pluggable Database all save state
   /
@@ -64,4 +64,4 @@ fi
 LOWER_SID=`echo $ORACLE_SID | tr "[:upper:]" "[:lower:]"`
 tail -f $ORACLE_BASE/diag/rdbms/$LOWER_SID/$ORACLE_SID/trace/alert_$ORACLE_SID.log &
 childPID=$!
-wait $childPID
+wait $childPI

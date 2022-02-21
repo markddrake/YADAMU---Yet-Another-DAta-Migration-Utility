@@ -5,12 +5,12 @@ import { performance } from 'perf_hooks';
 import fsp from 'fs/promises';
 import path from 'path'
 
-import Yadamu from '../../common/yadamu.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import YadamuSpatialLibrary from '../../common/yadamuSpatialLibrary.js';
-import YadamuOutputManager from '../../common/yadamuOutputManager.js';
-import StringWriter from '../../common/stringWriter.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../../file/node/fileException.js';
+import Yadamu from '../../core/yadamu.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
+import YadamuOutputManager from '../base/yadamuOutputManager.js';
+import StringWriter from '../../util/stringWriter.js';
+import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
 import {WhitespaceIssue, EmptyStringDetected, ContentTooLarge, StagingAreaMisMatch} from './verticaException.js'
 import { VerticaError, VertiaCopyOperationFailure } from './verticaException.js'
 

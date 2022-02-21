@@ -1,19 +1,19 @@
 "use strict"
 
-import crypto from 'crypto';
-import { performance } from 'perf_hooks';
-import fsp from 'fs/promises';
-import path from 'path'
+import crypto                   from 'crypto';
+import { performance }          from 'perf_hooks';
+import fsp                      from 'fs/promises';
+import path                     from 'path'
 
-import Yadamu from '../../common/yadamu.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import CSVLibrary from '../../loader/node/csvLibrary.js';
-import YadamuSpatialLibrary from '../../common/yadamuSpatialLibrary.js';
-import YadamuWriter from '../../common/yadamuWriter.js';
-import StringWriter from '../../common/stringWriter.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../../file/node/fileException.js';
-import {WhitespaceIssue, EmptyStringDetected, ContentTooLarge, StagingAreaMisMatch} from './verticaException.js'
-import { VerticaError, VertiaCopyOperationFailure } from './verticaException.js'
+import Yadamu                   from '../../core/yadamu.js';
+import YadamuLibrary            from '../../lib/yadamuLibrary.js';
+import StringWriter             from '../../util/stringWriter.js';
+import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js';
+import CSVLibrary               from '../loader/csvLibrary.js';
+import YadamuWriter             from '../base/yadamuWriter.js';
+
+import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
+import {WhitespaceIssue, EmptyStringDetected, ContentTooLarge, StagingAreaMisMatch,  VerticaError, VertiaCopyOperationFailure } from './verticaException.js'
 
 class VerticaWriter extends YadamuWriter {
 

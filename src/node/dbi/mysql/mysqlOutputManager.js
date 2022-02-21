@@ -2,10 +2,10 @@
 
 import { performance } from 'perf_hooks';
 
-import YadamuOutputManager from '../../common/yadamuOutputManager.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import YadamuSpatialLibrary from '../../common/yadamuSpatialLibrary.js';
-import {DatabaseError,RejectedColumnValue} from '../../common/yadamuException.js';
+import YadamuOutputManager from '../base/yadamuOutputManager.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
+import {DatabaseError,RejectedColumnValue} from '../../core/yadamuException.js';
 
 class MySQLOutputManager extends YadamuOutputManager {
 

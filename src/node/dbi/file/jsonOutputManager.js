@@ -2,11 +2,11 @@
 
 import { performance } from 'perf_hooks';
 
-import Yadamu from '../../common/yadamu.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import YadamuConstants from '../../common/yadamuConstants.js';
-import YadamuOutputManager from '../../common/yadamuOutputManager.js';
-import PerformanceReporter from '../../common/performanceReporter.js';
+import Yadamu from '../../core/yadamu.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuOutputManager from '../base/yadamuOutputManager.js';
+import PerformanceReporter from '../../util/performanceReporter.js';
 
 class JSONOutputManager extends YadamuOutputManager {
 	     

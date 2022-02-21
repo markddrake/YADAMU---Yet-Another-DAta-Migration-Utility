@@ -2,10 +2,10 @@
 
 import { performance } from 'perf_hooks';
 
-import YadamuWriter from '../../common/yadamuWriter.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import YadamuSpatialLibrary from '../../common/yadamuSpatialLibrary.js';
-import {DatabaseError,RejectedColumnValue} from '../../common/yadamuException.js';
+import YadamuWriter from '../base/yadamuWriter.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
+import {DatabaseError,RejectedColumnValue} from '../../core/yadamuException.js';
 
 class MySQLWriter extends YadamuWriter {
 
@@ -92,13 +92,11 @@ class MySQLWriter extends YadamuWriter {
           batch = batch.flat()
         }
       case 'Rows':
-	    try {
 	    if (this.SPATIAL_FORMAT === 'GeoJSON') {
 	      recodedBatch = true
           this.recodeSpatialColumns(batch,'Recoding GeoJSON as WKT')
 		  this.tableInfo.rowConstructor = this.tableInfo.rowConstructor.replace(/ST_GeomFromGeoJSON\(\?\)/g,'ST_GeomFromText(?)')
 		}
-		} catch (e) {console.log(e)}
 	    while (true) {
           try {
             await this.dbi.createSavePoint();    

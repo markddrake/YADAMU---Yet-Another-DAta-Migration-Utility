@@ -1,35 +1,35 @@
 "use strict" 
-import fs from 'fs';
-import { performance } from 'perf_hooks';
-import { pipeline } from 'stream/promises';
+import                          fs from 'fs';
+import { performance }          from 'perf_hooks';
+import { pipeline }             from 'stream/promises';
 
 /* 
 **
 ** from  Database Vendors API 
 **
 */
-import pg from 'pg';
+import pg                       from 'pg';
 const {Client,Pool} = pg;
-import QueryStream from 'pg-query-stream'
+import QueryStream              from 'pg-query-stream'
 import types from 'pg-types';
 
-import YadamuDBI from '../../common/yadamuDBI.js';
-import DBIConstants from '../../common/dbiConstants.js';
-import YadamuConstants from '../../common/yadamuConstants.js';
-import AWSS3Constants from '../../loader/awsS3/awsS3Constants.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../common/yadamuException.js'
+import YadamuDBI                from '../base/yadamuDBI.js';
+import DBIConstants             from '../base/dbiConstants.js';
+import YadamuConstants          from '../../lib/yadamuConstants.js';
+import AWSS3Constants           from '../awsS3/awsS3Constants.js';
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
+import {CopyOperationAborted}   from '../../core/yadamuException.js'
+import {YadamuError}            from '../../core/yadamuException.js';
+import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
 
-import RedshiftConstants from './redshiftConstants.js'
-import RedshiftError from './redshiftException.js'
-import RedshiftParser from './redshiftParser.js';
-import RedshiftWriter from './redshiftWriter.js';
-import RedshiftOutputManager from './redshiftOutputManager.js';
-import StatementGenerator from './statementGenerator.js';
+import RedshiftConstants        from './redshiftConstants.js'
+import RedshiftError            from './redshiftException.js'
+import RedshiftParser           from './redshiftParser.js';
+import RedshiftWriter           from './redshiftWriter.js';
+import RedshiftOutputManager    from './redshiftOutputManager.js';
+import StatementGenerator       from './statementGenerator.js';
 import RedshiftStatementLibrary from './redshiftStatementLibrary.js';
 
-import {YadamuError} from '../../common/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../../file/node/fileException.js';
 
 class RedshiftDBI extends YadamuDBI {
     

@@ -9,11 +9,11 @@ import { PassThrough, finished} from 'stream'
 
 import { createGzip, createGunzip, createDeflate, createInflate } from 'zlib';
 
-import YadamuDBI from '../../common/yadamuDBI.js';
-import DBIConstants from '../../common/dbiConstants.js';
-import YadamuConstants from '../../common/yadamuConstants.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../common/yadamuException.js'
+import YadamuDBI from '../base/yadamuDBI.js';
+import DBIConstants from '../base/dbiConstants.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js'
+import {CopyOperationAborted} from '../../core/yadamuException.js'
 
 import LoaderConstants from './loaderConstants.js';
 import JSONParser from './jsonParser.js';
@@ -22,8 +22,8 @@ import JSONOutputManager from './jsonOutputManager.js';
 import ArrayOutputManager from './arrayOutputManager.js';
 import CSVOutputManager from './csvOutputManager.js';
 import CSVTransform from './csvTransform.js';
-import {YadamuError, CommandLineError} from '../../common/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../../file/node/fileException.js';
+import {YadamuError, CommandLineError} from '../../core/yadamuException.js';
+import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
 
 /*
 **

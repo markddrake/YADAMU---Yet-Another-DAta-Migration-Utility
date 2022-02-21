@@ -39,13 +39,13 @@ async function main() {
   try {
 	// Override default Electron processing of uncaughtException
     process.on('uncaughtException', function (e) { console.log(e);finalize()});
-	let importedModule = await import('./YADAMU/common/yadamuGUI.js')
+	let importedModule = await import('./node/gui/yadamuGUI.js')
 	YadamuGUI = importedModule.default
-	importedModule = await import('./YADAMU_UI/node/logWriter.js');
+	importedModule = await import('./node/gui/logWriter.js');
 	LogWriter = importedModule.default
-	importedModule = await import('./YADAMU/common/yadamuLibrary.js')
+	importedModule = await import('./node/lib/yadamuLibrary.js')
 	YadamuLibrary = importedModule.default
-	importedModule = await import('./YADAMU/file/node/fileDBI.js')
+	importedModule = await import('./node/dbi/file/fileDBI.js')
 	FileDBI = importedModule.default
 	electronCmd = new YadamuGUI();
     try {
@@ -110,7 +110,7 @@ async function createWindow (operation,configuration) {
     }
   })
 
-  mainWindow.loadFile('./YADAMU_UI/html/index.html')
+  mainWindow.loadFile('./html/gui/index.html')
 
   logWindow = new BrowserWindow({ 
     parent: mainWindow, 
@@ -124,7 +124,7 @@ async function createWindow (operation,configuration) {
   
   remoteMain.enable(logWindow.webContents)     
 
-  logWindow.loadFile('./YADAMU_UI/html/logWindow.html')
+  logWindow.loadFile('./html/gui/logWindow.html')
   logWindow.on('close', function (event) {
     event.preventDefault();
 	logWindow.hide();
@@ -151,7 +151,7 @@ async function createWindow (operation,configuration) {
 
 async function validateOracle(connectionProps,parameters) {
 
-  const OracleDBI = await import('./YADAMU/oracle/node/oracleDBI.js')
+  const OracleDBI = await import('./dbi/oracle/oracleDBI.js')
   const oracleDBI = new OracleDBI.default(yadamu);
   await oracleDBI.testConnection(connectionProps,parameters)
   return oracleDBI
@@ -178,7 +178,7 @@ ipcMain.on('target-oracle', async function (event, connectionProps, parameters) 
 
 async function validatePostgres(connectionProps,parameters) {
 
-  const PostgresDBI = await import('./YADAMU/postgres/node/postgresDBI.js')
+  const PostgresDBI = await import('./dbi/postgres/postgresDBI.js')
   const postgresDBI = new PostgresDBI.default(yadamu);
   await postgresDBI.testConnection(connectionProps,parameters)
   return postgresDBI
@@ -204,7 +204,7 @@ ipcMain.on('target-postgres', async function (event, connectionProps, parameters
 
 async function validateMsSQL(connectionProps,parameters) {
 
-  const MsSQLDBI = await import('./YADAMU/mssql/node/mssqlDBI.js')
+  const MsSQLDBI = await import('./dbi/mssql/mssqlDBI.js')
   const mssqlDBI = new MsSQLDBI.default(yadamu);
   await mssqlDBI.testConnection(connectionProps,parameters)
   return mssqlDBI
@@ -230,7 +230,7 @@ ipcMain.on('target-mssql', async function (event, connectionProps, parameters) {
 
 async function validateMySQL(connectionProps,parameters) {
 
-  const MySQLDBI = await import('./YADAMU/mysql/node/mysqlDBI.js')
+  const MySQLDBI = await import('./dbi/mysql/mysqlDBI.js')
   const mysqlDBI = new MySQLDBI.default(yadamu);
   await mysqlDBI.testConnection(connectionProps,parameters)
   return mysqlDBI
@@ -256,7 +256,7 @@ ipcMain.on('target-mysql', async function (event, connectionProps, parameters) {
 
 async function validateMariaDB(connectionProps,parameters) {
 
-  const MariaDBI = await import('./YADAMU/mariadb/node/mariadbDBI.js')
+  const MariaDBI = await import('./dbi/mariadb/mariadbDBI.js')
   const mariaDBI = new MariaDBI.default(yadamu);
   await mariaDBI.testConnection(connectionProps,parameters)
   return mariaDBI
@@ -282,7 +282,7 @@ ipcMain.on('target-mariadb', async function (event, connectionProps, parameters)
 
 async function validatesnowflake(connectionProps,parameters) {
 
-  const SnowflakeDBI = await import('./YADAMU/snowflake/node/snowflakeDBI.js')
+  const SnowflakeDBI = await import('./dbi/snowflake/snowflakeDBI.js')
   const snowflakeDBI = new SnowflakeDBI.default(yadamu);
   await snowflakeDBI.testConnection(connectionProps,parameters)
   return snowflakeDBI
@@ -308,7 +308,7 @@ ipcMain.on('target-snowflake', async function (event, connectionProps, parameter
 
 async function validateMongoDB(connectionProps,parameters) {
 
-  const MongoDBI = await import('./YADAMU/mongodb/node/mongoDBI.js')
+  const MongoDBI = await import('./dbi/mongodb/mongoDBI.js')
   const mongoDBI = new MongoDBI.default(yadamu);
   await mongoDBI.testConnection(connectionProps,parameters)
   return mongoDBI

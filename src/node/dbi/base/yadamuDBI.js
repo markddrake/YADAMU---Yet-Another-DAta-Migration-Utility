@@ -1,24 +1,19 @@
 "use strict" 
 
-import fs from 'fs';
-import path from 'path';
+import fs              from 'fs';
+import path            from 'path';
 import { performance } from 'perf_hooks';
-import EventEmitter from 'events'
+import EventEmitter    from 'events'
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
+import Yadamu          from '../../core/yadamu.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuLibrary   from '../../lib/yadamuLibrary.js'
+import NullWriteable   from '../../util/nullWritable.js'
 
-import Yadamu from './yadamu.js';
-import DBIConstants from './dbiConstants.js';
-import YadamuConstants from './yadamuConstants.js';
-import YadamuLibrary from './yadamuLibrary.js'
-import NullWriteable from './nullWritable.js'
-import {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError, BatchInsertError, IterativeInsertError, InputStreamError, UnimplementedMethod} from './yadamuException.js';
-import {FileNotFound, FileError} from '../file/node/fileException.js';
-import DefaultParser from './defaultParser.js';
+import {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError, BatchInsertError, IterativeInsertError, InputStreamError, UnimplementedMethod} from '../../core/yadamuException.js';
+
+import DBIConstants    from './dbiConstants.js';
+import {FileNotFound, FileError} from '../file/fileException.js';
 
 
 /*
@@ -347,10 +342,6 @@ class YadamuDBI extends EventEmitter {
 	}
 	
 	this.failedPrematureClose = false;
-
-	// Used in QA
-    this.killConfiguration = {}
-    // this.yadamuLogger.info([this.ROLE,this.DATABASE_VENDOR,this.DB_VERSION,this.MODE,this.getWorkerNumber()],`Ready.`)
 
   }
 
@@ -1109,7 +1100,7 @@ class YadamuDBI extends EventEmitter {
 	}
     // this.yadamuLogger.trace([this.constructor.name,'finalize()','ACTIVE_WRITERS',this.getWorkerNumber()],'WAITING')
     await Promise.allSettled(this.activeWriters)
-    // this.yadamuLogger.trace([this.constructor.name,'finalize()','ACTIVE_WRITERS',this.getWorkerNumber()],'PROCESSING')
+   //  this.yadamuLogger.trace([this.constructor.name,'finalize()','ACTIVE_WRITERS',this.getWorkerNumber()],'PROCESSING')
 	options = options === undefined ? {abort: false} : Object.assign(options,{abort:false})
     await this.closeConnection(options)
     await this.closePool(options);

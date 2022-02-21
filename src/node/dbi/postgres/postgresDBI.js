@@ -27,11 +27,11 @@ import types from 'pg-types';
 import pgCopyStreams from 'pg-copy-streams'
 const CopyFrom = pgCopyStreams.from
 
-import YadamuDBI from '../../common/yadamuDBI.js';
-import DBIConstants from '../../common/dbiConstants.js';
-import YadamuConstants from '../../common/yadamuConstants.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../common/yadamuException.js'
+import YadamuDBI from '../base/yadamuDBI.js';
+import DBIConstants from '../base/dbiConstants.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js'
+import {CopyOperationAborted} from '../../core/yadamuException.js'
 
 import PostgresConstants from './postgresConstants.js'
 import PostgresError from './postgresException.js'
@@ -41,8 +41,8 @@ import PostgresWriter from './postgresWriter.js';
 import StatementGenerator from './statementGenerator.js';
 import PostgresStatementLibrary from './postgresStatementLibrary.js';
 
-import {YadamuError} from '../../common/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../../file/node/fileException.js';
+import {YadamuError} from '../../core/yadamuException.js';
+import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
 
 class PostgresDBI extends YadamuDBI {
     

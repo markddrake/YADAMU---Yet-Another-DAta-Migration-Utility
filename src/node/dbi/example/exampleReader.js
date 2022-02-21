@@ -67,4 +67,4 @@ class ExampleReader extends Readable {
 	}
 }
 
-export { ExampleReader
+export { ExampleReader as default }

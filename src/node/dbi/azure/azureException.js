@@ -2,7 +2,7 @@
 
 import HTTP from 'http'
 
-import {DatabaseError} from '../../common/yadamuException.js'
+import {DatabaseError} from '../../core/yadamuException.js'
 import AzureConstants from './azureConstants.js'
 
 class AzureError extends DatabaseError {

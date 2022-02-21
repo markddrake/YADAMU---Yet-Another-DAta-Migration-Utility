@@ -1,10 +1,15 @@
 "use strict";
 
-import { performance } from 'perf_hooks';
+import { performance }            from 'perf_hooks';
 
-import Yadamu from './yadamu.js'
-import YadamuLibrary from './yadamuLibrary.js'
+import YadamuLibrary              from '../lib/yadamuLibrary.js'
+import YadamuConstants            from '../lib/yadamuConstants.js'
+import YadamuWriter               from '../dbi/base/yadamuWriter.js'
+
+import Yadamu                     from './yadamu.js'
+
 import {YadamuError, CopyOperationAborted} from './yadamuException.js'
+
 import DBReader from './dbReader.js';									 
 
 class DBReaderParallel extends DBReader {  
@@ -53,7 +58,10 @@ class DBReaderParallel extends DBReader {
 		    try {
 		      reader.destroy(new CopyOperationAborted())
 		    } catch(e) { 
-			  this.yadamuLogger.handleWarning(['PIPELINE','PARALLEL','ABORT READER',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR,],e) 			}
+			  if (!(cause instanceof CopyOperationAborted)) {
+			    this.yadamuLogger.handleWarning(['PIPELINE','PARALLEL','ABORT READER',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR,],e) 			
+			  }
+			}
 		  })
 		}
       }

@@ -1,6 +1,6 @@
 "use strict"
 
-import {DatabaseError} from '../../common/yadamuException.js'
+import {DatabaseError} from '../../core/yadamuException.js'
 import MsSQLConstants from './mssqlConstants.js'
 
 class MsSQLError extends DatabaseError {

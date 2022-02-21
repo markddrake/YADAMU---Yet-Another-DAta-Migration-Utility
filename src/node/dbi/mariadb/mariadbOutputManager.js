@@ -2,9 +2,9 @@
 
 import { performance } from 'perf_hooks';
 
-import YadamuOutputManger from '../../common/yadamuOutputManager.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import {DatabaseError,RejectedColumnValue} from '../../common/yadamuException.js';
+import YadamuOutputManger from '../base/yadamuOutputManager.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import {DatabaseError,RejectedColumnValue} from '../../core/yadamuException.js';
 																				   
 
 class MariadbOutputManger extends YadamuOutputManger {

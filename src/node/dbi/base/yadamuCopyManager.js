@@ -1,5 +1,6 @@
-import DBIConstants from './dbiConstants.js';
-import YadamuLibrary from './yadamuLibrary.js'
+import YadamuLibrary       from '../../lib/yadamuLibrary.js'
+
+import DBIConstants        from './dbiConstants.js';
 
 class YadamuCopyManager {
  

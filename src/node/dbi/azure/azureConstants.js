@@ -2,7 +2,7 @@
 
 import HTTP from 'http'
 
-import YadamuConstants from '../../common/yadamuConstants.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
 
 class AzureConstants {
 

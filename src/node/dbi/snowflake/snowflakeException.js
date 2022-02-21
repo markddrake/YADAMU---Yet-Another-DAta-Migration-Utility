@@ -1,6 +1,6 @@
 "use strict"
 
-import {DatabaseError} from '../../common/yadamuException.js'
+import {DatabaseError} from '../../core/yadamuException.js'
 import SnowflakeConstants from './snowflakeConstants.js'
 
 class SnowflakeError extends DatabaseError {

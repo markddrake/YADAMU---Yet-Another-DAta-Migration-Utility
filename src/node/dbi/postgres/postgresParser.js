@@ -1,6 +1,6 @@
 "use strict" 
 
-import YadamuParser from '../../common/yadamuParser.js'
+import YadamuParser from '../base/yadamuParser.js'
 
 class PostgresParser extends YadamuParser {
     

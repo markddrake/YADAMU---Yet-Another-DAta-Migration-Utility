@@ -1,7 +1,7 @@
 "use strict"
 
 import YadamuCLI from './yadamuCLI.js'
-import YadamuLibrary from './yadamuLibrary.js'
+import YadamuLibrary from '../lib/yadamuLibrary.js'
 
 class Upload extends YadamuCLI {}
 

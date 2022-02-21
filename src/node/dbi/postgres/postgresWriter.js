@@ -2,9 +2,9 @@
 
 import { performance } from 'perf_hooks';
 
-import Yadamu from '../../common/yadamu.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import YadamuWriter from '../../common/yadamuWriter.js';
+import Yadamu from '../../core/yadamu.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuWriter from '../base/yadamuWriter.js';
 
 class PostgresWriter extends YadamuWriter {
 

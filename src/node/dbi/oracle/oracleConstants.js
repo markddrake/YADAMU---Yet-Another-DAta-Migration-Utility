@@ -2,7 +2,7 @@
 
 import oracledb from 'oracledb';
 
-import YadamuConstants from '../../common/yadamuConstants.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
 
 class OracleConstants {
 

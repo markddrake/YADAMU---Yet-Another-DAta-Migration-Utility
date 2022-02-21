@@ -1,10 +1,10 @@
 "use strict" 
 
-import {Writable} from 'stream'
-import { performance } from 'perf_hooks';
+import {Writable}                 from 'stream'
+import { performance }            from 'perf_hooks';
 
-import YadamuLibrary from './yadamuLibrary.js';
-import YadamuConstants from './yadamuConstants.js';
+import YadamuLibrary              from '../lib/yadamuLibrary.js'
+import YadamuConstants            from '../lib/yadamuConstants.js'
 
 class DBWriter extends Writable {
   

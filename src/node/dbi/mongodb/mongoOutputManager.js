@@ -7,10 +7,10 @@ import WKX from 'wkx';
 import mongodb from 'mongodb'
 const { ObjectID, Decimal128, Long} = mongodb
 
-import Yadamu from '../../common/yadamu.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import YadamuOutputManager from '../../common/yadamuOutputManager.js';
-import {BatchInsertError} from '../../common/yadamuException.js'
+import Yadamu from '../../core/yadamu.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuOutputManager from '../base/yadamuOutputManager.js';
+import {BatchInsertError} from '../../core/yadamuException.js'
 
 class MongoOutputManager extends YadamuOutputManager {
 

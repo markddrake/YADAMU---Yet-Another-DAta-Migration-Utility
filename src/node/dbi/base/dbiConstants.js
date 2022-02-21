@@ -1,6 +1,6 @@
 "use strict"
 
-import YadamuConstants from './yadamuConstants.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
 
 class DBIConstants {
 

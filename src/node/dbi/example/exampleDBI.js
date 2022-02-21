@@ -1,7 +1,7 @@
 "use strict" 
 
-import fs from 'fs';
-import { performance } from 'perf_hooks';
+import fs                      from 'fs';
+import { performance }         from 'perf_hooks';
 
 /* 
 **
@@ -9,19 +9,20 @@ import { performance } from 'perf_hooks';
 **
 */
 
-import YadamuDBI from '../../common/yadamuDBI.js';
-import DBIConstants from '../../common/dbiConstants.js';
-import YadamuConstants from '../../common/yadamuConstants.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../common/yadamuException.js'
+import YadamuDBI               from '../base/yadamuDBI.js';
+import DBIConstants            from '../base/dbiConstants.js';
+import YadamuConstants         from '../../lib/yadamuConstants.js';
+import YadamuLibrary           from '../../lib/yadamuLibrary.js'
 
-import ExampleConstants from './ExampleConstants.js';
-import ExampleError from './exampleException.js'
-import ExampleParser from './exampleParser.js';
-import ExampleWriter from './exampleWriter.js';
-import ExampleReader from './exampleReader.js';
+import {CopyOperationAborted, UnimplementedMethod} from '../../core/yadamuException.js'
+
+import ExampleConstants        from './ExampleConstants.js';
+import ExampleError            from './exampleException.js'
+import ExampleParser           from './exampleParser.js';
+import ExampleWriter           from './exampleWriter.js';
+import ExampleReader           from './exampleReader.js';
 import ExampleStatementLibrary from './exampleStatementLibrary.js'
-import StatementGenerator from './statementGenerator.js';
+import StatementGenerator      from './statementGenerator.js';
 
 class ExampleDBI extends YadamuDBI {
    
@@ -77,38 +78,38 @@ class ExampleDBI extends YadamuDBI {
   
   async testConnection(connectionProperties) {   
     // Validate the supplied connection properties
-	throw new Error('Unimplemented Method')
+    throw new UnimplementedMethod('testConnection()',`YadamuDBI`,this.constructor.name)
   }
   
   async createConnectionPool() {	
     // Create a connection pool.
-	throw new Error('Unimplemented Method')
+    throw new UnimplementedMethod('createConnectionPool()',`YadamuDBI`,this.constructor.name)
   }
   
   async getConnectionFromPool() {
     // Get a connection from the connection pool
-    throw new Error('Unimplemented Method')
+    throw new UnimplementedMethod('getConnectionFromPool()',`YadamuDBI`,this.constructor.name)
   }
 
   async getConnection() {
     // Get a direct connection to the database bypassing the connection pool.
-    throw new Error('Unimplemented Method')
+    throw new UnimplementedMethod('getConnection()',`YadamuDBI`,this.constructor.name)
   }
   
   async configureConnection() {    
     // Perform connection specific configuration such as setting sesssion time zone to UTC...
-	throw new Error('Unimplemented Method')
+    throw new UnimplementedMethod('configureConnection()',`YadamuDBI`,this.constructor.name)
   }
 
   async closeConnection(options) {
     // Close a connection and return it to the connection pool
-	throw new Error('Unimplemented Method')
+    throw new UnimplementedMethod('closeConnection()',`YadamuDBI`,this.constructor.name)
   }
 	
   async closePool(options) {
     // Close the connection pool
-	throw new Error('Unimplemented Method')
-  }
+    throw new UnimplementedMethod('closePool()',`YadamuDBI`,this.constructor.name)
+ }
 
   updateVendorProperties(vendorProperties) {
   }
@@ -133,7 +134,7 @@ class ExampleDBI extends YadamuDBI {
         this.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.trackExceptions(this.trackExceptions(new ExampleError(e,stack,sqlStatement))
+		const cause = this.trackExceptions(this.trackExceptions(new ExampleError(e,stack,sqlStatement)))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -308,14 +309,15 @@ class ExampleDBI extends YadamuDBI {
   **
   */
 
-	super.createStagingTable()
+  async createStagingTable() { 
+    await super.createStagingTable()
   }
   
   async loadStagingTable(importFilePath) {
 	// Process a JSON file that has been uploaded to the server using the database's native JSON capabilities. In most use cases 
 	// using client side implementaions are faster, more efficient and can handle much larger files. 
 	// The default implementation throws an unsupport feature exception
-	super.loadStagingTable()
+	await super.loadStagingTable()
   }
   
   async uploadFile(importFilePath) {
@@ -323,7 +325,7 @@ class ExampleDBI extends YadamuDBI {
 	// using client side implementaions are faster, more efficient and can handle much larger files. 
 	// The default implementation throws an unsupport feature exception
 
-     super.uploadFile()
+    await super.uploadFile()
   }
   
   /*
@@ -400,10 +402,10 @@ class ExampleDBI extends YadamuDBI {
     
     // Psuedo Code shown below..
 	
-    const tableInfo = Object.keys(this.metadata).map((value) => {
+    const queryInfo = Object.keys(this.metadata).map((value) => {
       return {TABLE_NAME : value, SQL_STATEMENT : this.metadata[value].sqlStatemeent}
     })
-    return tableInfo;    
+    return queryInfo;    
     
   }
   
@@ -428,32 +430,29 @@ class ExampleDBI extends YadamuDBI {
     return await this.executeSQL('GENERATE METADATA FROM SCHEMA',this.CURRENT_SCHEMA)
   }
    
-  generateSelectStatement(tableMetadata) {
-     return tableMetadata;
+  generateSQLQuery(tableMetadata) {
+     const queryInfo = super.generateSQLQuery(tableMetadata)
+     return queryInfo;
   }   
 
-  createParser(tableInfo) {
-    return new ExampleParser(tableInfo,this.yadamuLogger);
+  createParser(queryInfo) {
+    return new ExampleParser(queryInfo,this.yadamuLogger);
   }  
   
   inputStreamError(cause,sqlStatement) {
     return this.trackExceptions(((cause instanceof ExampleError) || (cause instanceof CopyOperationAborted)) ? cause : new ExampleError(cause,this.streamingStackTrace,sqlStatement))
   }
   
-  async getInputStream(tableInfo) {
+  async getInputStream(queryInfo) {
 
     // Either return the databases native readable stream or use the ExampleReader to create a class that wraps a cursor or event stream in a Readable
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
+    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
-    return new ExampleReader(this.connection,tableInfo.SQL_STATEMENT);
+    return new ExampleReader(this.connection,queryInfo.SQL_STATEMENT);
 	
   }  
-  
-  
-    throw new Error('Unimplemented Method')
-  }      
-
+    
   /*
   **
   ** The following methods are used by the YADAMU DBwriter class
@@ -492,4 +491,4 @@ class ExampleDBI extends YadamuDBI {
 	  
 }
 
-export { ExampleDBI
+export { ExampleDBI }

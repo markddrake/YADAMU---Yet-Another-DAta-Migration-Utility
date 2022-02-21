@@ -3,8 +3,8 @@
 import fs from 'fs';
 import path from 'path';
 import url from 'url';
-import {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} from './yadamuException.js';
-import {FileNotFound} from '../file/node/fileException.js';1
+import {YadamuError, UserError, CommandLineError, ConfigurationFileError, ConnectionError} from '../core/yadamuException.js';
+import {FileNotFound} from '../dbi/file/fileException.js';1
 
 class YadamuLibrary {
 

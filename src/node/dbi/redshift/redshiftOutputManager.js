@@ -2,9 +2,9 @@
 
 import { performance } from 'perf_hooks';
 
-import Yadamu from '../../common/yadamu.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import YadamuOutputManager from '../../common/yadamuWriter.js';
+import Yadamu from '../../core/yadamu.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuOutputManager from '../base/yadamuWriter.js';
 
 class RedshiftWriter extends YadamuOutputManager {
 

@@ -1,7 +1,7 @@
 "us0e strict"
 
-import YadamuCLI from './yadamuCLI.js'
-import Yadamu from './yadamu.js'
+import YadamuCLI from '../cli/yadamuCLI.js'
+import Yadamu    from '../core/yadamu.js'
 
 class YadamuGUI extends YadamuCLI {}
 

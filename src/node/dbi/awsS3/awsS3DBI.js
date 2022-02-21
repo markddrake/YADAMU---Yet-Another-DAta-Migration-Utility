@@ -1,13 +1,13 @@
 "use strict" 
 
-import AWS    from 'aws-sdk';
-import path   from 'path'
-import Stream from 'stream'
+import path                from 'path'
 
-import CloudDBI            from '../node/cloudDBI.js';
-import DBIConstants        from '../../common/dbiConstants.js';
-import YadamuConstants     from '../../common/yadamuConstants.js';
-import YadamuLibrary       from '../../common/yadamuLibrary.js'
+import AWS                 from 'aws-sdk';
+
+import CloudDBI            from '../cloud/cloudDBI.js';
+import DBIConstants        from '../base/dbiConstants.js';
+import YadamuConstants     from '../../lib/yadamuConstants.js';
+import YadamuLibrary       from '../../lib/yadamuLibrary.js'
 
 import AWSS3Constants      from './awsS3Constants.js';
 import AWSS3StorageService from './awsS3StorageService.js';

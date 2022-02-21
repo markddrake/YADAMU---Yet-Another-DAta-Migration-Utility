@@ -6,11 +6,11 @@ import {compose} from 'stream';
 
 import { performance } from 'perf_hooks';
 
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import YadamuConstants from '../../common/yadamuConstants.js';
-import DBIConstants from '../../common/dbiConstants.js';
-import {CommandLineError} from '../../common/yadamuException.js';
-import NullWritable from '../../common/nullWritable.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
+import DBIConstants from '../base/dbiConstants.js';
+import {CommandLineError} from '../../core/yadamuException.js';
+import NullWritable from '../../util/nullWritable.js';
 
 class StreamSwitcher extends Transform {
   

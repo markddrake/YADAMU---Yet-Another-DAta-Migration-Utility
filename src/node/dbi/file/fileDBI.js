@@ -17,15 +17,15 @@ import { createGzip, createGunzip, createDeflate, createInflate } from 'zlib';
 ** static GETTER methods result in undefined values.
 **
 
-import Yadamu from '../../common/yadamu.js';
+import Yadamu from '../../core/yadamu.js';
 
 **
 */
-import YadamuConstants from '../../common/yadamuConstants.js';
-import { YadamuError } from '../../common/yadamuException.js';
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import YadamuDBI from '../../common/yadamuDBI.js';
-import DBIConstants from '../../common/dbiConstants.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
+import { YadamuError } from '../../core/yadamuException.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuDBI from '../base/yadamuDBI.js';
+import DBIConstants from '../base/dbiConstants.js';
 import JSONParser from './jsonParser.js';
 import StreamSwitcher from './streamSwitcher.js';
 import JSONOutputManager from './jsonOutputManager.js';

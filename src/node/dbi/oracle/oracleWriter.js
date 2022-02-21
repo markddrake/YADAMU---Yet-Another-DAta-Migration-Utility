@@ -5,10 +5,10 @@ import { Writable} from "stream";
 
 import oracledb from 'oracledb';
 
-import YadamuLibrary from '../../common/yadamuLibrary.js';
-import YadamuSpatialLibrary from '../../common/yadamuSpatialLibrary.js';
-import YadamuWriter from '../../common/yadamuWriter.js';
-import {DatabaseError} from '../../common/yadamuException.js';
+import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
+import YadamuWriter from '../base/yadamuWriter.js';
+import {DatabaseError} from '../../core/yadamuException.js';
 
 class OracleWriter extends YadamuWriter {
 

@@ -1,21 +1,22 @@
 "use strict"
 
-import fs from 'fs';
-import path from 'path';
-import util from 'util';
+import fs            from 'fs';
+import path          from 'path';
+import util          from 'util';
 
-import {Readable} from 'stream'
-import {pipeline} from 'stream/promises'
+import {Readable}    from 'stream'
+import {pipeline}    from 'stream/promises'
 
-import DBWriter from './dbWriter.js';
-import YadamuLibrary from './yadamuLibrary.js';
-import StringWriter from './stringWriter.js'
-import NullWriter from './nullWriter.js';
+import YadamuLibrary from '../lib/yadamuLibrary.js';
+import StringWriter  from '../util//stringWriter.js'
+import NullWriter    from '../util//nullWriter.js';
+import {OracleError} from '../dbi/oracle/oracleException.js';
+import ErrorDBI      from '../dbi/file/errorDBI.js';
+import {FileError}   from '../dbi/file/fileException.js';
+
+import DBWriter      from './dbWriter.js';
 import {InternalError, DatabaseError, IterativeInsertError, BatchInsertError}  from './yadamuException.js';
-import {OracleError} from '../oracle/node/oracleException.js';
-import {FileError} from '../file/node/fileException.js';
 
-import ErrorDBI from '../file/node/errorDBI.js';
 
 class YadamuLogger {
   

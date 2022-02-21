@@ -4,9 +4,9 @@ import { pipeline } from 'stream/promises';
 
 import oracledb from 'oracledb';
 
-import YadamuParser from '../../common/yadamuParser.js'
-import StringWriter from '../../common/stringWriter.js';
-import BufferWriter from '../../common/bufferWriter.js';
+import YadamuParser from '../base/yadamuParser.js'
+import StringWriter from '../../util/stringWriter.js';
+import BufferWriter from '../../util/bufferWriter.js';
 
 import {OracleError} from './oracleException.js';
 
@@ -83,7 +83,7 @@ class OracleParser extends YadamuParser {
     }
     
   }
-  
+  	  
   async doTransform(data) {  
     data = await super.doTransform(data)
 	const row = await Promise.all(data)

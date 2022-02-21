@@ -1,6 +1,6 @@
 "use strict"
 
-import YadamuConstants from '../../common/yadamuConstants.js';
+import YadamuConstants from '../../lib/yadamuConstants.js';
 
 class ExampleConstants {
 
@@ -27,4 +27,4 @@ class ExampleConstants {
 
 }
 
-export { ExampleConstants
+export { ExampleConstants as default }
