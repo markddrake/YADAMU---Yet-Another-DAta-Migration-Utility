@@ -19,7 +19,7 @@ import YadamuLibrary    from '../../../node/lib/yadamuLibrary.js';
 import LoaderDBI        from '../../../node/dbi/loader/loaderDBI.js';
 import JSONParser       from '../../../node/dbi/loader/jsonParser.js';
 import YadamuTest       from '../../core/yadamu.js';
-import RowCounter       from '../../core/rowCounter.js';
+import RowCounter       from '../../util/rowCounter.js';
 import YadamuQALibrary  from '../../lib/yadamuQALibrary.js'
 import ArrayWriter      from './arrayWriter.js';
 

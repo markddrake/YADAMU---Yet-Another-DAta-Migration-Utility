@@ -37,11 +37,11 @@ class AWSS3StorageService {
 	  this.s3Connection.upload(params).send((err, data) => {
  	    if (err) {
           // this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,`FAILED`,'UPLOAD',params.Key],`Removing Active Writer`);
+          this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,params.Key],err);
 		  reject(err)
 	    } 
 	    else {
-          // this.yadamuLogger.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,params.Key],`Removing Active Writer`);		
-          this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,params.Key],err);
+          // this.yadamuLogger.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`SUCCESS`,params.Key],`Removing Active Writer`);		
           activeWriters.delete(writeOperation)
 		  resolve(params.Key)
 	    }

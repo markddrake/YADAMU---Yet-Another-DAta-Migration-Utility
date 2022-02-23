@@ -3,10 +3,9 @@ import path from 'path';
 import assert from 'assert';
 import crypto from 'crypto';
 
-import YadamuLibrary from '../../../YADAMU/common/yadamuLibrary.js';
-import NullWriter    from '../../../YADAMU/common/nullWritable.js';
-
-import RowCounter    from '../../common/node/rowCounter.js';
+import YadamuLibrary   from '../../node/lib/yadamuLibrary.js';
+import NullWriter      from '../../node/util/nullWritable.js';
+import RowCounter      from '../util/rowCounter.js';
 
 class YadamuQALibrary {
 
@@ -14,7 +13,7 @@ class YadamuQALibrary {
     
     async initialize() {
 	  await super.initialize();
-      if (this.terminateConnection()) {
+      if (this.yadamu.terminateConnection(this.ROLE,this.getWorkerNumber())) {
         const pid = await this.getConnectionID();
         this.scheduleTermination(pid,this.getWorkerNumber());
       }
@@ -24,7 +23,7 @@ class YadamuQALibrary {
       await super.initializeWorker();
       const idx = this.getWorkerNumber()
       // Manager needs to schedule termination of worker.
-      if (this.manager.terminateConnection(idx)) {
+      if (this.yadamu.terminateConnection(this.ROLE,idx)) {
         const pid = await this.getConnectionID();
         this.manager.scheduleTermination(pid,idx);
       }
@@ -36,20 +35,11 @@ class YadamuQALibrary {
       }
       await super.initializeImport();
     }   
-
-    configureTermination(configuration) {
-      // Kill Configuration is added to the MasterDBI by YADAMU-QA
-      this.killConfiguration = configuration
-    }
 	
 	getTerminationTags(workerId,processId) {
-	  return ['KILL',this.DATABASE_VENDOR,this.killConfiguration.process,isNaN(workerId) ? 'SEQUENTIAL' : 'PARALLEL',this.ON_ERROR,workerId,this.killConfiguration.delay,processId]
+	  return ['KILL',this.DATABASE_VENDOR,this.yadamu.killConfiguration.process,isNaN(workerId) ? 'SEQUENTIAL' : 'PARALLEL',this.ON_ERROR,workerId,this.yadamu.killConfiguration.delay,processId]
     }
 
-    terminateConnection(idx) {
-      return (!YadamuLibrary.isEmpty(this.killConfiguration) && ((this.isManager() && this.killConfiguration.worker === undefined) || (this.killConfiguration.worker === idx)))
-    }
- 
   }
   
   static loaderQAMixin = (superclass) => class extends superclass {

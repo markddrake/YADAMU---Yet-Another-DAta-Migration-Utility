@@ -3,7 +3,7 @@
 import { Transform } from 'stream';
 import { performance } from 'perf_hooks';
 
-import Parser from '../../../YADAMU/clarinet/clarinet.cjs';
+import Parser from '../../node/clarinet/clarinet.cjs';
 
 class RowCounter extends Transform {
 
