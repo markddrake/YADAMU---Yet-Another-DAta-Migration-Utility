@@ -1,8 +1,16 @@
 "use strict" 
 
-import { Transform }    from 'stream';
-import { performance }  from 'perf_hooks';
-import { setTimeout }   from 'timers/promises'
+import { 
+  performance
+}                       from 'perf_hooks';
+
+import {
+  setTimeout 
+}                       from 'timers/promises'
+
+import { 
+  Transform 
+}                       from 'stream';
 
 class YadamuParser extends Transform {
 
@@ -32,12 +40,14 @@ class YadamuParser extends Transform {
     }
   }
   
-  constructor(queryInfo,yadamuLogger) {
+  constructor(queryInfo,yadamuLogger, parseDelay) {
     super({objectMode: true });  
     this.queryInfo = queryInfo;
     this.yadamuLogger = yadamuLogger
 	this.startTime = performance.now()
 	this.setTransformations(queryInfo)
+	this.parseDelay = parseDelay
+	this.timings = []
   }
     
   sendTableMessage() {
@@ -49,7 +59,7 @@ class YadamuParser extends Transform {
     if (this.queryInfo.hasOwnProperty('PARTITION_NUMBER')) {
       // console.log('YadamuParser()','PUSH','PARTITION',this.queryInfo.MAPPED_TABLE_NAME,this.queryInfo.PARTITION_NUMBER,this.queryInfo.PARTITION_NAME)
       const padSize = this.queryInfo.PARTITION_COUNT.toString().length
-	  this.partitionInfo =  {
+	  const partitionInfo =  {
 	    tableName          : this.queryInfo.MAPPED_TABLE_NAME
       , displayName        : `${this.queryInfo.MAPPED_TABLE_NAME}(${this.queryInfo.PARTITION_NAME || `#${this.queryInfo.PARTITION_NUMBER.toString().padStart(padSize,"0")}`})`
 	  , partitionCount     : this.queryInfo.PARTITION_COUNT
@@ -57,21 +67,25 @@ class YadamuParser extends Transform {
       , partitionName      : this.queryInfo.PARTITION_NAME || ''
   	  }
 		   
-	  this.push({partition: this.partitionInfo})	
-	}
+	  this.push({partition: partitionInfo})	
+	  this.timings.push(['PARTITION',performance.now()])
+    }
 	else {
   	  // console.log('YadamuParser()','PUSH','TABLE',this.queryInfo.MAPPED_TABLE_NAME)
       this.push({table: this.queryInfo.MAPPED_TABLE_NAME})
-	}
+      // this.timings.push(['TABLE',performance.now()])
+    }
 	  
   }
 	
   async doConstruct() {
 	this.sendTableMessage()
-  
     // Workaround for issue with 'data' messages sometime (very, very rarely) appearing before 'table' messages
     // To-date issue has only been observed when writing to Loader based drivers
-    await setTimeout(100) 
+
+	if (this.parseDelay) {
+      await setTimeout(this.parseDelay) 
+	}
   
   }
 
@@ -90,7 +104,9 @@ class YadamuParser extends Transform {
 
     this.doTransform(data).then((row) => { 
 	  this.push({data:row})
+      // this.timings.push(['DATA',performance.now()])
 	  callback() 
+	  // if (this.timings.length === 3) {console.log( this.timings )}
     }).catch((e) => { 
 	  callback(e) 
 	})

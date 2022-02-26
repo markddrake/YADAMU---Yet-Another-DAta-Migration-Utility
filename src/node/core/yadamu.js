@@ -4,9 +4,20 @@ import fs                     from 'fs';
 import path                   from 'path';
 import crypto                 from 'crypto';
 import readline               from 'readline';
-import { performance }        from 'perf_hooks';
 import assert                 from 'assert';
-import { pipeline,finished }  from 'stream/promises';
+
+import {
+  performance 
+}                             from 'perf_hooks';
+
+import {
+  setTimeout 
+}                             from "timers/promises"
+
+import { 
+  pipeline,
+  finished 
+}                             from 'stream/promises';
 
 import YadamuConstants        from '../lib/yadamuConstants.js';
 import YadamuLibrary          from '../lib/yadamuLibrary.js';
@@ -15,7 +26,10 @@ import DBIConstants           from '../dbi/base/dbiConstants.js';
 import YadamuCopyManager      from '../dbi/base/yadamuCopyManager.js';
 import NullWriter             from '../util/nullWriter.js';
 
-import {FileNotFound, FileError} from '../dbi/file/fileException.js';
+import {
+  FileNotFound, 
+  FileError
+}                             from '../dbi/file/fileException.js';
 
 import DBReader               from './dbReader.js';
 import DBWriter               from './dbWriter.js';
@@ -24,7 +38,14 @@ import DBReaderFile           from './dbReaderFile.js';
 import YadamuLogger           from './yadamuLogger.js';
 import YadamuRejectManager    from './yadamuRejectManager.js';
 
-import {YadamuError, UserError, CommandLineError, ConfigurationFileError, DatabaseError, ConnectionError} from './yadamuException.js';
+import {
+  YadamuError, 
+  UserError, 
+  CommandLineError, 
+  ConfigurationFileError, 
+  DatabaseError, 
+  ConnectionError
+}                             from './yadamuException.js';
 
 class Yadamu {
 
@@ -38,6 +59,8 @@ class Yadamu {
   static get YADAMU_PARAMETERS()      { return YadamuConstants.YADAMU_PARAMETERS }  
 
   static get YADAMU_DBI_PARAMETERS()  { return DBIConstants.YADAMU_DBI_PARAMETERS }  
+
+  get QA_TEST()                       { return false }
 
   get YADAMU_PARAMETERS()             { return Yadamu.YADAMU_PARAMETERS }
 
@@ -191,23 +214,19 @@ class Yadamu {
     this.reportStatus(this.STATUS,this.LOGGER)
 	this.close();
     if (!this.INTERACTIVE) {
-  	  this.terminator = setTimeout(
-	    async () => {
-		  // this.LOGGER.trace(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],`Active Connections: ${this.activeConnections.size}`);
-   	      this.LOGGER.error(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,'TIMEOUT'],'Closing connections and shutting down.')
-  	      for (const conn of this.activeConnections) {
-		    try {
-		      await conn.abort()
-		      this.LOGGER.info(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],'Aborted Connection')
-		    } catch(e) {
-			  this.LOGGER.handleWarning(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],e)
-			}			
-		  }
-		  this.terminator = undefined
-          process.exit()
-        },
-		5000
-	  )
+  	  setTimeout(5000,null,{ref: false}).then(() => {
+	    // this.LOGGER.trace(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],`Active Connections: ${this.activeConnections.size}`);
+   	    this.LOGGER.error(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,'TIMEOUT'],'Closing connections and shutting down.')
+  	    for (const conn of this.activeConnections) {
+		  conn.abort().then(() => {
+		    this.LOGGER.info(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],'Aborted Connection')
+		  }).catch((e) => {
+		    this.LOGGER.handleWarning(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],e)
+		  }).finally(() => {
+	  	    process.exit()
+          })
+		}
+	  })
     }  
   }  
   
@@ -794,13 +813,10 @@ class Yadamu {
 
 	const metadata = await source.loadMetadataFiles(true)
 	
-	await source.finalizeExport();
-	await source.finalize();
-    this.activeConnections.delete(source);
+	this.activeConnections.delete(source);
 
     const copyManager = new YadamuCopyManager(target,this.LOGGER);
 	const results = await copyManager.copyStagedData(source.DATABASE_KEY,controlFile,metadata,source.getCredentials(target.DATABASE_KEY))
-    await target.finalize();
     this.activeConnections.delete(target);
     this.reportStatus(this.STATUS,this.LOGGER)
 
@@ -847,9 +863,7 @@ class Yadamu {
 	  this.STATUS.operationSuccessful = true;
 
       // this.LOGGER.trace([this.constructor.name,'PIPELINE'],'Success')
-      await source.finalize();
 	  this.activeConnections.delete(source);
-   	  await target.finalize();
 	  this.activeConnections.delete(target);
       this.reportStatus(this.STATUS,this.LOGGER)
     } catch (e) {
@@ -1016,8 +1030,7 @@ class Yadamu {
 	  this.activeConnections.add(dbi)
       this.STATUS.operationSuccessful = false;
 	  const log = await dbi.upload()
-      await dbi.finalize();
-	  this.activeConnections.delete(dbi)
+      this.activeConnections.delete(dbi)
 	  const metrics = this.getMetrics(log);  
 	  this.STATUS.operationSuccessful = true;
       return metrics

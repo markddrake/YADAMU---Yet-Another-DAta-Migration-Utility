@@ -275,7 +275,7 @@ class DBWriter extends Writable {
 	  }
     }
     await this.dbi.finalizeImport();
-	await this.dbi.doFinal()
+	await this.dbi.final()
   } 
   
   _final(callback) {
@@ -290,7 +290,8 @@ class DBWriter extends Writable {
   
   async doDestroy(err) {
     // this.yadamuLogger.trace([this.constructor.name,`DESTORY`,this.dbi.DATABASE_VENDOR],``)
-	await this.dbi.doDestroy()
+    // Forced clean-up of the DBI
+    await this.dbi.destroy(err)
   }
   
   _destroy(err,callback) {

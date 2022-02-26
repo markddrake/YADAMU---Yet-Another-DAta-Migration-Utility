@@ -96,6 +96,7 @@ class JSONParser extends _JSONParser {
     
       switch (this.jDepth){
 		case 0:
+	      this.parseComplete = true
           break;
         case 1:
 		  this.nextRow(this.currentObject)
@@ -121,7 +122,9 @@ class JSONParser extends _JSONParser {
         this.currentObject = parentObject;
 		
       }   
-    });  
+    }).on('end',(key) => {
+	  this.parseComplete = true
+	});  
   }    
  	
 }

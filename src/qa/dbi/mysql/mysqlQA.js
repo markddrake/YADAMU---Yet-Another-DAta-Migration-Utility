@@ -1,5 +1,9 @@
 "use strict" 
 
+import {
+  setTimeout 
+}                      from "timers/promises"
+
 import MySQLDBI        from '../../../node/dbi//mysql/mysqlDBI.js';
 import MySQLError      from '../../../node/dbi//mysql/mysqlException.js'
 import MySQLConstants  from '../../../node/dbi//mysql/mysqlConstants.js';
@@ -28,20 +32,6 @@ class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
     constructor(yadamu,manager,connectionSettings,parameters) {
        super(yadamu,manager,connectionSettings,parameters)
     }
-	
-    doTimeout(milliseconds) {
-		
-	  // Overdide YadamuDBI. No Messages
-      
-	  return new Promise((resolve,reject) => {
-        setTimeout(
-          () => {
-           resolve();
-          },
-          milliseconds
-        )
-      })  
-    }
    
     async recreateSchema() {
         
@@ -62,7 +52,7 @@ class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
     // ### Hack to avoid missng rows when using a new connection to read previously written rows using new connection immediately after closing current connection.....'
 
 	async finalizeImport() {
-	  await this.doTimeout(1000);
+	  await setTimeout(1000);
 	  super.finalizeImport()
     }
 	
@@ -110,24 +100,25 @@ class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
     }
 	
 	async scheduleTermination(pid,workerId) {
+	  let stack
+	  const operation = `kill ${pid}`
 	  const tags = this.getTerminationTags(workerId,pid)
 	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
-	  const timer = setTimeout(
-        async (pid) => {
-   	      if (this.pool !== undefined && this.pool.end) {
-    	    this.yadamuLogger.log(tags,`Killing connection.`);
-     	    const conn = await this.getConnectionFromPool();
-		    const res = await conn.query(`kill ${pid}`);
-		    await conn.release()
-		  }
-		  else {
-		    this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
-		  }
-        },
-		this.yadamu.KILL_DELAY,
-        pid
-      )
-	  timer.unref()
+	  setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
+   	    if (this.pool !== undefined && this.pool.end) {
+		  stack = new Error().stack
+    	  this.yadamuLogger.log(tags,`Killing connection.`);
+     	  const conn = await this.getConnectionFromPool();
+		  
+		  const res = await conn.query(operation);
+		  await conn.release()
+		}
+		else {
+		  this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
+		}
+      }).catch((e) => {
+        this.yadamu.LOGGER.handleException(tags,new MySQLError(this.DRIVER_ID,e,stack,operation));
+      })
 	}	
 
     verifyStagingSource(source) {  

@@ -1,5 +1,9 @@
 "use strict" 
 
+import {
+  setTimeout 
+}                        from "timers/promises"
+
 import PostgresDBI       from '../../../node/dbi//postgres/postgresDBI.js';
 import PostgresError     from '../../../node/dbi//postgres/postgresException.js'
 import PostgresConstants from '../../../node/dbi//postgres/postgresConstants.js';
@@ -76,28 +80,24 @@ class PostgresQA extends YadamuQALibrary.qaMixin(PostgresDBI) {
     }
 	
 	async scheduleTermination(pid,workerId) {
+	  let stack
+	  const operation = `select pg_terminate_backend(${pid})`
 	  const tags = this.getTerminationTags(workerId,pid)
 	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
-	  const timer = setTimeout(
-        async (pid) => {
-          try {
-		    if (this.pool !== undefined && this.pool.end) {
-		      this.yadamuLogger.log(tags,`Killing connection.`);
-	          const conn = await this.getConnectionFromPool();
-		      const res = await conn.query(`select pg_terminate_backend(${pid})`);
-		      await conn.release()
-		    }
-		    else {
-		      this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
-		    }
-           } catch (e) {
-             this.yadamu.LOGGER.handleException(tags,e);
-           }
-		},
-		this.yadamu.KILL_DELAY,
-	    pid
-      )
-	  timer.unref()
+	  setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
+        if (this.pool !== undefined && this.pool.end) {
+	      stack = new Error().stack
+		  this.yadamuLogger.log(tags,`Killing connection.`);
+	      const conn = await this.getConnectionFromPool();
+		  const res = await conn.query(operation);
+		  await conn.release()
+		}
+		else {
+		  this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
+		}
+      }).catch((e) => {
+        this.yadamu.LOGGER.handleException(tags,new PostgresError(this.DRIVER_ID,e,stack,operation));
+      })
 	}
 
     verifyStagingSource(source) {  

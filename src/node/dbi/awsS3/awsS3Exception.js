@@ -13,7 +13,7 @@ class AWSS3Error extends DatabaseError {
 	delete this.sql
   }
 
-  FileNotFound() {
+  urlNotFound() {
 	return this.cause.code === 'NotFound'
   }
 

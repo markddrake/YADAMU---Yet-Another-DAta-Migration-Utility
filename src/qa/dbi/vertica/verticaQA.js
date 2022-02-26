@@ -1,10 +1,12 @@
 "use strict" 
 
-import YadamuLibrary from '../../../node/dbi//common/yadamuLibrary.js'
+import {
+  setTimeout 
+}                       from "timers/promises"
 
-import VerticaDBI       from '../../../node/dbi//vertica/verticaDBI.js';
-import {VerticaError}   from '../../../node/dbi//vertica/verticaException.js'
-import VerticaConstants from '../../../node/dbi//vertica/verticaConstants.js';
+import VerticaDBI       from '../../../node/dbi/vertica/verticaDBI.js';
+import {VerticaError}   from '../../../node/dbi/vertica/verticaException.js'
+import VerticaConstants from '../../../node/dbi/vertica/verticaConstants.js';
 
 import YadamuTest       from '../../core/yadamu.js';
 import YadamuQALibrary  from '../../lib/yadamuQALibrary.js'
@@ -178,28 +180,24 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
     }
 	
     async scheduleTermination(pid,workerId) {
+      let stack
+	  const operation = `select pg_terminate_backend(${pid})`
 	  const tags = this.getTerminationTags(workerId,pid)
 	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
-      const timer = setTimeout(
-        async (pid) => {
-          try {
-            if (this.pool !== undefined && this.pool.end) {
-              this.yadamuLogger.log(tags,`Killing connection.`);
-              const conn = await this.getConnectionFromPool();
-              const res = await conn.query(`select pg_terminate_backend(${pid})`);
-              await conn.release()
-            }
-            else {
-              this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
-            }
-           } catch (e) {
-             this.yadamu.LOGGER.handleException(tags,e);
-           }
-        },
-        this.yadamu.KILL_DELAY,
-        pid
-      )
-      timer.unref()
+      setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
+        if (this.pool !== undefined && this.pool.end) {
+          stack = new Error().stack
+          this.yadamuLogger.log(tags,`Killing connection.`);
+          const conn = await this.getConnectionFromPool();
+		  const res = await conn.query(operation);
+          await conn.release()
+        }
+        else {
+          this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
+        }
+      }).catch((e) => {
+        this.yadamu.LOGGER.handleException(tags,new VerticaError(this.DRIVER_ID,e,stack,operation));
+      })
     }
   
     verifyStagingSource(source) {  

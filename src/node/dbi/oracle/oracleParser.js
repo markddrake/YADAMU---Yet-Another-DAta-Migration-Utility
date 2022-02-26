@@ -12,8 +12,8 @@ import {OracleError} from './oracleException.js';
 
 class OracleParser extends YadamuParser {
   
-  constructor(queryInfo,yadamuLogger) {
-    super(queryInfo,yadamuLogger); 
+  constructor(queryInfo,yadamuLogger,parseDelay) {
+    super(queryInfo,yadamuLogger,parseDelay); 
 	// console.log(queryInfo)
   }
 

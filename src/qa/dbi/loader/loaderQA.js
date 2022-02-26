@@ -1,14 +1,19 @@
 "use strict" 
 
-import fs from 'fs';
-import fsp from 'fs/promises';
-import path from 'path';
-import crypto from 'crypto';
-import csv from 'csv-parser';
-import assert from 'assert';
-import { createGzip, createGunzip, createDeflate, createInflate } from 'zlib';
-import { PassThrough } from 'stream';
-import { pipeline } from 'stream/promises';
+import {
+  setTimeout 
+}                       from "timers/promises"
+
+import fs               from 'fs';
+import fsp              from 'fs/promises';
+import path             from 'path';
+import crypto           from 'crypto';
+import csv              from 'csv-parser';
+
+
+import { 
+  pipeline 
+}                       from 'stream/promises';
 
 // import Parser from '../../../node/dbi//clarinet/clarinet.cjs';
 
@@ -24,7 +29,11 @@ import YadamuQALibrary  from '../../lib/yadamuQALibrary.js'
 import ArrayWriter      from './arrayWriter.js';
 
 
-import {FileError, FileNotFound, DirectoryNotFound} from '../../../node/dbi//file/fileException.js';
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                       from '../../../node/dbi//file/fileException.js';
 
 class CloudService {
 	
@@ -151,6 +160,8 @@ class LoaderQA extends YadamuQALibrary.loaderQAMixin(LoaderDBI) {
   getCSVParser() {
 	 return csv({headers: false})
   }
+
+  async finalize() { /* OVERRIDE */ }
   
 }
 

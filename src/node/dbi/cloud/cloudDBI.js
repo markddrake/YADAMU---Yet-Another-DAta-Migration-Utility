@@ -7,7 +7,14 @@ import {PassThrough} from "stream"
 import LoaderDBI     from '../loader/loaderDBI.js';
 import YadamuLibrary from '../../lib/yadamuLibrary.js';
 import NullWritable  from '../../util/nullWritable.js';
-import {YadamuError} from '../../core/yadamuException.js';
+
+import {
+  YadamuError
+}                    from '../../core/yadamuException.js';
+
+import {
+  FileNotFound
+}                    from '../file/fileException.js';
 
 /*
 **
@@ -157,7 +164,7 @@ class CloudDBI extends LoaderDBI {
     
   }
   
-  getFileOutputStream(tableName,activeWorkers) {
+  getFileOutputStream(tableName) {
     // this.yadamuLogger.trace([this.constructor.name,this.DATABASE_VENDOR,tableName],`Creating readable stream on getFileOutputStream(${this.getDataFileName(tableName)})`)
 	const file = this.makeAbsolute(this.getDataFileName(tableName))
 	const extension = path.extname(file);
@@ -179,8 +186,14 @@ class CloudDBI extends LoaderDBI {
     this.DIRECTORY = this.SOURCE_DIRECTORY
     this.setFolderPaths(this.EXPORT_FOLDER,this.parameters.FROM_USER)
 
-	const fileContents = await this.cloudService.getObject(this.CONTROL_FILE_PATH)
-	this.controlFile = this.parseJSON(fileContents)
+    let stack
+    try {
+	  stack = new Error().stack
+	  const fileContents = await this.cloudService.getObject(this.CONTROL_FILE_PATH)
+  	  this.controlFile = this.parseJSON(fileContents)
+	} catch (err) {
+     throw (err.urlNotFound && err.urlNotFound()) ? new FileNotFound(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH) : new FileError(this.DRIVER_ID,err,stack,this.CONTROL_FILE_PATH)
+	}
   }
 
   async getInputStream(filename) {
@@ -195,21 +208,7 @@ class CloudDBI extends LoaderDBI {
 	this.cloudConnection = this.manager.cloudConnection
 	this.cloudService = this.manager.cloudService
   }
-  
-  async getOutputStreams(tableName,metrics) {
-	  
-	const streams = await super.getOutputStreams(tableName,metrics) 
-	
-	// Source data sources (Azure) return ain instance of PassThrough sas the Final Output Stream. Pipeline does not 'finsih' properly unless the last components of the pipeline is a 'Writable'
 
-	if (streams[streams.length-1] instanceof PassThrough) {
-	  streams.push(new NullWritable())
-	}
-	
-	return streams;
-	
-  }	
-   
 }
 
 export {CloudDBI as default }

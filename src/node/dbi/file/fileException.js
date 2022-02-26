@@ -1,6 +1,9 @@
 "use strict"
 
-import {DatabaseError} from '../../core/yadamuException.js'
+import {
+  YadamuError,
+  DatabaseError
+}                  from '../../core/yadamuException.js'
 
 class FileError extends DatabaseError {
   constructor(driverId,cause,stack,file) {
@@ -18,12 +21,19 @@ class FileNotFound extends FileError {
 
 class DirectoryNotFound extends FileError {
   constructor(driverId,cause,stack,file) {
-    super(cdriverId,ause,stack,file);
+    super(driverId,cause,stack,file);
   }
 }
+
+class IncompleteJSON extends YadamuError {
+  constructor(file) {
+	super(`JSON parsing failed: Incomplete JSON Document. Unexpected EOF encountered while parsing "${file}"`)
+  }
+}	  
 
 export {
   FileError
 , FileNotFound
 , DirectoryNotFound
+, IncompleteJSON
 }

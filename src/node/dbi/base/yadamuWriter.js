@@ -33,8 +33,7 @@ class YadamuWriter extends Writable {
     this.dbi = dbi;
     this.tableName = tableName
 	this.displayName = this.tableName
-    this.partitionInfo = undefined
-
+    
 	this.COPY_METRICS = metrics
     this.status = status;
     this.yadamuLogger = yadamuLogger;    
@@ -309,6 +308,10 @@ class YadamuWriter extends Writable {
    	        this.releaseBatch(batch)
       	    this.abortTable()
 		  }
+		  else {
+			this.COPY_METRICS.lost+= this.COPY_METRICS.pending
+			this.COPY_METRICS.pending = 0
+		  }
         }
 		// If we cannot continue processing the table for any reason throw the err to abort the current pipeline operation.
 		if (this.skipTable) {
@@ -424,6 +427,7 @@ class YadamuWriter extends Writable {
     }
     rowCountSummary = this.COPY_METRICS.skipped > 0 ? `${rowCountSummary} Skipped ${this.COPY_METRICS.skipped}.` : rowCountSummary
     rowCountSummary = this.COPY_METRICS.lost > 0 ? `${rowCountSummary} Lost ${this.COPY_METRICS.lost}.` : rowCountSummary
+    rowCountSummary = (this.dbi.yadamu.QA_TEST && this.COPY_METRICS.receivedOoS > 0) ? `${rowCountSummary} [Out of Sequence ${this.COPY_METRICS.receivedOoS}].` : rowCountSummary
     
     const cause = this.COPY_METRICS.readerError || this.COPY_METRICS.parserError ||  this.underlyingError || err
 	if (cause) {

@@ -936,12 +936,12 @@ class OracleDBI extends YadamuDBI {
   **
   */
 
-  async finalize() {
+  async doFinal() {
 	// Oracle11g: Drop any wrappers that were created
 	await Promise.all(this.dropWrapperStatements.map((sqlStatement) => {
 	  return this.executeSQL(sqlStatement,{})
 	}))
-    await super.finalize();
+    await super.doFinal();
   }
 
   /*
@@ -1277,8 +1277,8 @@ class OracleDBI extends YadamuDBI {
 	return partitionMetadata
   }
 		
-  createParser(queryInfo) {
-	const parser = new OracleParser(queryInfo,this.yadamuLogger);
+  createParser(queryInfo,parseDelay) {
+	const parser = new OracleParser(queryInfo,this.yadamuLogger,parseDelay);
     this.inputStream.on('metadata',(resultSetMetadata) => {parser.setColumnMetadata(resultSetMetadata)})
 	return parser;
   }

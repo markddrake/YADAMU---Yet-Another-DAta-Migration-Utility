@@ -252,9 +252,9 @@ class JSONOutputManager extends YadamuOutputManager {
 	}
 	
 	// Defer performance reporting to here... Ensures parser 'finish' event has occurred.
-	const reportGenerator = new PerformanceReporter(this.dbi,this.tableInfo,this.COPY_METRICS,{},this.yadamuLogger)
-	reportGenerator.reportPerformance(err)
-	reportGenerator.end()
+	this.reportGenerator = new PerformanceReporter(this.dbi,this.tableInfo,this.COPY_METRICS,{},this.yadamuLogger)
+	this.reportGenerator.reportPerformance(err)
+	this.reportGenerator.end()
 	await super.doDestroy(err)
   }
   

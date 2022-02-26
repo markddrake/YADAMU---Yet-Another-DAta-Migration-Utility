@@ -19,7 +19,9 @@ class YadamuOutputManager extends Transform {
   
   get COPY_METRICS()       { return this._COPY_METRICS }
   set COPY_METRICS(v)      { this._COPY_METRICS =  v }
-    
+
+  get PARTITIONED_TABLE()  { return this.tableInfo?.hasOwnProperty('partitionCount')}    
+  
   constructor(dbi,tableName,metrics,status,yadamuLogger) {
     const options = {
 	  objectMode             : true
@@ -196,7 +198,8 @@ class YadamuOutputManager extends Transform {
   processOutOfSequenceMessages() {
 
     if (this.outOfSequenceMessageCache.length > 0) {
-  	  this.yadamuLogger.qaWarning([`INCORRECT MESSAGE SEQUENCE`],`Encounted ${this.outOfSequenceMessageCache.length} out of sequence 'data' messages prior to receiving 'table' message.`)  
+  	  // this.yadamuLogger.qa(['WARNING',this.tableName,`INCORRECT MESSAGE SEQUENCE`],`Encounted ${this.outOfSequenceMessageCache.length} out of sequence 'data' messages prior to receiving 'table' message.`)  
+	  this.COPY_METRICS.receivedOoS = this.outOfSequenceMessageCache.length
 	}
 	
     for (const data of this.outOfSequenceMessageCache) {
@@ -242,16 +245,19 @@ class YadamuOutputManager extends Transform {
 	
   }
   
-  async initializeTable(tableName) {
-    await this.setTableInfo(tableName)
+  async initializeTable() {
+    await this.setTableInfo(this.tableName)
     this.processRow =  this._processRow
 	this.processOutOfSequenceMessages()
 	this.processRow =  this._processRow
   }
  
   async initializePartition(partitionInfo) {
-	await this.initializeTable(partitionInfo.tableName)
-    this.displayName = partitionInfo.partitionName
+	this.partitionInfo = partitionInfo
+	this.displayName = partitionInfo.displayName
+	await this.initializeTable()
+	this.tableInfo.partitionCount = partitionInfo.partitionCount
+	this.tableInfo.partitionsRemaining = this.tableInfo.partitionsRemaining || partitionInfo.partitionCount
   }
  
   async doTransform(messageType,obj) {

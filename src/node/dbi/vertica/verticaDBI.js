@@ -502,8 +502,8 @@ class VerticaDBI extends YadamuDBI {
 	return schemaInfo
   }
 
-  createParser(tableInfo) {
-    return new VerticaParser(tableInfo,this.yadamuLogger);
+  createParser(queryInfo,parseDelay) {
+    return new VerticaParser(queryInfo,this.yadamuLogger,parseDelay);
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -536,16 +536,16 @@ class VerticaDBI extends YadamuDBI {
     }
   }
 
-  async getInputStream(tableInfo) {        
+  async getInputStream(queryInfo) {        
   
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,tableInfo.TABLE_NAME],'')
+    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
     
 	if (this.failedPrematureClose) {
 	  await this.reconnect(new Error('Previous Pipeline Aborted. Switching database connection'),'INPUT STREAM')
 	}
  		
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
+    this.status.sqlTrace.write(this.traceSQL(queryInfo.SQL_STATEMENT))
 	
 	/*
 	**
@@ -562,10 +562,10 @@ class VerticaDBI extends YadamuDBI {
       try {
         const sqlStartTime = performance.now();
 		this.streamingStackTrace = new Error().stack
-		const inputStream = new VerticaInputStream(this.connection,tableInfo.SQL_STATEMENT,this.yadamuLogger)
+		const inputStream = new VerticaInputStream(this.connection,queryInfo.SQL_STATEMENT,this.yadamuLogger)
 		return inputStream
       } catch (e) {
-		const cause = this.trackExceptions(new VerticaError(this.DRIVER_ID,e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
+		const cause = this.trackExceptions(new VerticaError(this.DRIVER_ID,e,this.streamingStackTrace,queryInfo.SQL_STATEMENT))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

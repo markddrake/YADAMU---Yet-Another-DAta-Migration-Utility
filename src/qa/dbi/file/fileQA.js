@@ -1,5 +1,9 @@
 "use strict" 
 
+import {
+  setTimeout 
+}                          from "timers/promises"
+
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
@@ -246,6 +250,8 @@ class FileQA extends FileDBI {
 	}
   	return await super.createOutputStream()
   }
+  
+  async finalize() { /* OVERRIDE */ }
   
 }
 

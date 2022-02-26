@@ -4,8 +4,8 @@ import {DatabaseError} from '../../core/yadamuException.js'
 
 class MongoError extends DatabaseError {
 
-  constructor(cause,stack,operation) {
-    super(cause,stack,operation)
+  constructor(driverId,cause,stack,operation) {
+    super(driverId,cause,stack,operation)
   }
     
   lostConnection() {

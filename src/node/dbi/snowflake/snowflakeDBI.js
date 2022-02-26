@@ -473,29 +473,27 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     return schemaInfo
   }
   
-  createParser(tableInfo) {
-    return new SnowflakeParser(tableInfo,this.yadamuLogger);
+  generateQueryInformation(tableMetadata) { 
+    const tableInfo = super.generateQueryInformation(tableMetadata)
+	tableInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${this.parameters.YADAMU_DATABASE}"."${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
+	return tableInfo
+  }     
+  createParser(queryInfo) {
+    return new SnowflakeParser(queryInfo,this.yadamuLogger);
   }  
   
   inputStreamError(cause,sqlStatement) {
     return this.trackExceptions(((cause instanceof SnowflakeError) || (cause instanceof CopyOperationAborted)) ? cause : new SnowflakeError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
   }
   
-  generateQueryInformation(tableMetadata) { 
-    const tableInfo = super.generateQueryInformation(tableMetadata)
-	tableInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${this.parameters.YADAMU_DATABASE}"."${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
-	return tableInfo
-  }   
-
-  async getInputStream(tableInfo) {
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],tableInfo.TABLE_NAME)
+  async getInputStream(queryInfo) {
+    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
-    this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT));
-    return new SnowflakeReader(this.connection,tableInfo.SQL_STATEMENT);
+    this.status.sqlTrace.write(this.traceSQL(queryInfo.SQL_STATEMENT));
+    return new SnowflakeReader(this.connection,queryInfo.SQL_STATEMENT);
 	
   }  
   
-
   /*
   **
   ** The following methods are used by the YADAMU DBwriter class

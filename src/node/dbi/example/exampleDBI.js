@@ -163,8 +163,8 @@ class ExampleDBI extends YadamuDBI {
   **  Gracefully close down the database connection and pool.
   **
   
-  async finalize() {
-	await super.finalize()
+  async dofinal() {
+	await super.doFinal()
   } 
 
   */
@@ -435,8 +435,8 @@ class ExampleDBI extends YadamuDBI {
      return queryInfo;
   }   
 
-  createParser(queryInfo) {
-    return new ExampleParser(queryInfo,this.yadamuLogger);
+  createParser(queryInfo,parseDelay) {
+    return new ExampleParser(queryInfo,this.yadamuLogger,parseDelay);
   }  
   
   inputStreamError(cause,sqlStatement) {

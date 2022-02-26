@@ -1,16 +1,45 @@
 "use strict"
 
-import { PassThrough, compose } from 'stream';
-import { pipeline }             from 'stream/promises';
-import { setTimeout }           from 'timers/promises'
+import { 
+  compose,
+  PassThrough
+}                               from 'stream';
 
+import { 
+  pipeline 
+
+}                               from 'stream/promises';
+
+import { 
+  setTimeout 
+}                               from 'timers/promises'
 
 import StringWriter             from '../../util/stringWriter.js';
 import StringDecoderStream      from '../../util/stringDecoderStream.js';
 import YadamuConstants          from '../../lib/yadamuConstants.js';
 import AzureConstants           from './azureConstants.js';
 import AzureError               from './azureException.js'
+import NullWritable             from '../../util/nullWritable.js';
 
+class ByteCounter extends PassThrough {
+
+  constructor(options) {
+    super(options) 
+	this.byteCount = 0
+  }
+  
+  _transform (data, enc, callback) {
+	this.byteCount+= data.length
+	this.push(data)
+    callback()
+  }
+  
+  _flush(callback) {
+	console.log('Bytes Written:',this.byteCount)
+    callback()
+  }
+}
+ 
 class AzureStorageService {
 
   get CHUNK_SIZE()     { return this.parameters.CHUNK_SIZE  || AzureConstants.CHUNK_SIZE }  
@@ -33,19 +62,22 @@ class AzureStorageService {
    
   createWriteStream(key,contentType,activeWriters) {
 	// this.yadamuLogger.trace([this.constructor.name],`createWriteStream(${key})`)
+	// const passThrough =  new ByteCounter()
 	const passThrough =  new PassThrough()
 	const blockBlobClient = this.containerClient.getBlockBlobClient(key);
 	const writeOperation = blockBlobClient.uploadStream(passThrough, undefined, undefined, { blobHTTPHeaders: { blobContentType: contentType}})
 	activeWriters.add(writeOperation);
     writeOperation.then(() => {
-      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',`SUCCESS`,key],`Removing Active Writer`);		
+      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',`SUCCESS`,key],``);		
       activeWriters.delete(writeOperation)
 	}).catch((err) => {
-      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',`FAILED`,key],`Removing Active Writer`);		
+      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',`FAILED`,key],``);		
       this.yadamuLogger.handleException([AzureConstants.DATABASE_VENDOR,'UPLOAD',`FAILED`,key],err);
+    }).finally(() => {
+      // this.yadamuLogger.trace([AzureConstants.DATABASE_VENDOR,'UPLOAD',key],`Removing Active Writer`);		
       activeWriters.delete(writeOperation)
-    })	  
-	return passThrough;
+	})
+	return compose(passThrough, new NullWritable())
   }
   
   async createBucketContainer() {

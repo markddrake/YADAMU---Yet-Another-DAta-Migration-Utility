@@ -1,5 +1,9 @@
 "use strict" 
 
+import {
+  setTimeout 
+}                      from "timers/promises"
+
 import MsSQLDBI        from '../../../node/dbi//mssql/mssqlDBI.js';
 import MsSQLError      from '../../../node/dbi//mssql/mssqlException.js'
 import MsSQLConstants  from '../../../node/dbi//mssql/mssqlConstants.js';
@@ -12,55 +16,55 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
 
-	static #_YADAMU_DBI_PARAMETERS
-	
-	static get YADAMU_DBI_PARAMETERS()  { 
-	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[MsSQLConstants.DATABASE_KEY] || {},{RDBMS: MsSQLConstants.DATABASE_KEY}))
-	   return this.#_YADAMU_DBI_PARAMETERS
+    static #_YADAMU_DBI_PARAMETERS
+    
+    static get YADAMU_DBI_PARAMETERS()  { 
+       this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[MsSQLConstants.DATABASE_KEY] || {},{RDBMS: MsSQLConstants.DATABASE_KEY}))
+       return this.#_YADAMU_DBI_PARAMETERS
     }
    
     get YADAMU_DBI_PARAMETERS() {
       return MsSQLQA.YADAMU_DBI_PARAMETERS
-    }	
-		
+    }   
+        
     constructor(yadamu,manager,connectionSettings,parameters) {
        super(yadamu,manager,connectionSettings,parameters)
     }
-	 
-	async initialize() {
-				
-	  // Must (re) create the database before attempting to connection. initialize() will fail if the database does not exist.
-	  if (this.options.recreateSchema === true) {
-		await this.recreateDatabase();
-		this.options.recreateSchema = false
-	  }
-	  await super.initialize();
-	  
-    }	   
-	
+     
+    async initialize() {
+                
+      // Must (re) create the database before attempting to connection. initialize() will fail if the database does not exist.
+      if (this.options.recreateSchema === true) {
+        await this.recreateDatabase();
+        this.options.recreateSchema = false
+      }
+      await super.initialize();
+      
+    }      
+    
     /*
     **
     ** The "Recreate Schema" option is problematic with SQL Server. 
     ** In SQL Server testing Schemas are mapped to databases, since there is no simple mechanism for dropping a schema cleanly in SQL Server.
-	** This means we have to deal with two scenarios when recreating a schema. First the required database may not exist, second it exists and needs to be dropped and recreated.
+    ** This means we have to deal with two scenarios when recreating a schema. First the required database may not exist, second it exists and needs to be dropped and recreated.
     ** Connect attempts fail if the target database does exist. This means that it necessary to connect to a known good database while the target database is recreated.
-	** After creating the database the connection must be closed and a new connection opened to the target database.
+    ** After creating the database the connection must be closed and a new connection opened to the target database.
     **
-    */	  
+    */    
 
-	async recreateDatabase() {
+    async recreateDatabase() {
 
-      try {	
-	    const connectionProperties = Object.assign({},this.vendorProperties)
-	    const dbi = new MsSQLDBMgr(this.yadamuLogger,this.status, connectionProperties)
-	    await dbi.recreateDatabase(this.parameters.YADAMU_DATABASE)
-	  }	catch (e) {
+      try { 
+        const connectionProperties = Object.assign({},this.vendorProperties)
+        const dbi = new MsSQLDBMgr(this.yadamuLogger,this.status, connectionProperties)
+        await dbi.recreateDatabase(this.parameters.YADAMU_DATABASE)
+      } catch (e) {
         this.yadamu.LOGGER.handleException([this.DATABASE_VENDOR,'RECREATE DATABASE',this.parameters.YADAMU_DATABASE],e);
-		throw e
+        throw e
       }
-	}
+    }
 
-	async useDatabase(databaseName) {     
+    async useDatabase(databaseName) {     
       const statement = `use ${databaseName}`
       const results = await this.executeSQL(statement);
     } 
@@ -76,18 +80,18 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
    }
 
    async compareSchemas(source,target,rules) {
-	   
+       
       const report = {
         successful : []
        ,failed     : []
       }
 
       await this.useDatabase(source.database);
-	  
-	  let compareRules = this.yadamu.getCompareRules(rules)	  
-	  compareRules = this.DB_VERSION  > 12 ? JSON.stringify(compareRules) : this.yadamu.makeXML(compareRules)
+      
+      let compareRules = this.yadamu.getCompareRules(rules)   
+      compareRules = this.DB_VERSION  > 12 ? JSON.stringify(compareRules) : this.yadamu.makeXML(compareRules)
 
-	  
+      
       let args = 
 `--
 -- declare @FORMAT_RESULTS         bit           = 0;
@@ -102,7 +106,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
       this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION,@DATE_TIME_PRECISION)\ngo\n`)
 
       const request = this.getRequest();
-	  
+      
       let results = await request
                           .input('FORMAT_RESULTS',this.sql.Bit,false)
                           .input('SOURCE_DATABASE',this.sql.VarChar,source.database)
@@ -114,9 +118,9 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
                           .execute(MsSQLQA.SQL_COMPARE_SCHEMAS,{},{resultSet: true});
 
       // Use length-2 and length-1 to allow Debugging info to be included in the output
-	  
-	  // console.log(results.recordsets[0])
-	  
+      
+      // console.log(results.recordsets[0])
+      
       const successful = results.recordsets[results.recordsets.length-2]      
       report.successful = successful.map((row,idx) => {          
         return [row.SOURCE_SCHEMA,row.TARGET_SCHEMA,row.TABLE_NAME,row.TARGET_ROW_COUNT,]
@@ -133,94 +137,89 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
     classFactory(yadamu) {
       return new MsSQLQA(yadamu,this)
     }
-	   
-	async scheduleTermination(pid,workerId) {
-	  const tags = this.getTerminationTags(workerId,pid)
+       
+    async scheduleTermination(pid,workerId) {
+      const tags = this.getTerminationTags(workerId,pid)
       this.yadamuLogger.qa(tags,`Termination Scheduled.`);
-      const timer = setTimeout(
-        async (pid) => {
-		  if (this.pool !== undefined) {
-		     this.yadamuLogger.log(tags,`Killing connection.`);
-			 // Do not use getRequest() as it will fail with "There is a request in progress during write opeations. Get a non pooled request
-		     // const request = new this.sql.Request(this.pool);
-			 const request = await this.sql.connect(this.vendorProperties);
-			 let stack
-			 const sqlStatement = `kill ${pid}`
-			 try {
-			   stack = new Error().stack
-  		       const res = await request.query(sqlStatement);
-			 } catch (e) {
-			   if (e.number && (e.number === 6104)) {
-				 // Msg 6104, Level 16, State 1, Line 1 Cannot use KILL to kill your own process
-			     this.yadamuLogger.log(tags,`Worker finished prior to termination.`)
- 			   }
-			   else if (e.number && (e.number === 6106)) {
-				 // Msg 6106, Level 16, State 2, Line 1 Process ID 54 is not an active process ID.
-			     this.yadamuLogger.log(tags,`Worker finished prior to termination.`)
- 			   }
-			   else {
-				 const cause = new MsSQLError(this.DRIVER_ID,e,stack,sqlStatement)
-			     this.yadamuLogger.handleException(tags,cause)
-			   }
-			 } 
-		   }
-		   else {
-		     this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
-		   }
-		},
-		this.yadamu.KILL_DELAY,
-	    pid
-      )
-	  timer.unref()
-	}
+      setTimeout(this.yadamu.KILL_DELAY,pid,{ref: false}).then(async (pid) => {
+        if (this.pool !== undefined) {
+          this.yadamuLogger.log(tags,`Killing connection.`);
+          // Do not use getRequest() as it will fail with "There is a request in progress during write opeations. Get a non pooled request
+          // const request = new this.sql.Request(this.pool);
+          const request = await this.sql.connect(this.vendorProperties);
+          let stack
+          const sqlStatement = `kill ${pid}`
+          try {
+            stack = new Error().stack
+            const res = await request.query(sqlStatement);
+          } catch (e) {
+            if (e.number && (e.number === 6104)) {
+              // Msg 6104, Level 16, State 1, Line 1 Cannot use KILL to kill your own process
+              this.yadamuLogger.log(tags,`Worker finished prior to termination.`)
+            }
+            else if (e.number && (e.number === 6106)) {
+              // Msg 6106, Level 16, State 2, Line 1 Process ID 54 is not an active process ID.
+              this.yadamuLogger.log(tags,`Worker finished prior to termination.`)
+            }
+            else {
+              const cause = new MsSQLError(this.DRIVER_ID,e,stack,sqlStatement)
+              this.yadamuLogger.handleException(tags,cause)
+            }
+          } 
+        }
+        else {
+          this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
+        }
+	  })
+    }
 
     verifyStagingSource(source) {  
       super.verifyStagingSource(MsSQLConstants.STAGED_DATA_SOURCES,source)
     } 
-	
+    
 }
 
-class MsSQLDBMgr extends MsSQLDBI {
-	
-	constructor(logger,status,vendorProperties) {
-	  super({})
-	  this.yadamuLogger = logger;
-  	  this.status = status
-	  this.vendorProperties = vendorProperties
+class MsSQLDBMgr extends MsSQLQA {
+    
+    constructor(logger,status,vendorProperties) {
+      super({})
+      this.yadamuLogger = logger;
+      this.status = status
+      this.vendorProperties = vendorProperties
       this.vendorProperties.database = 'master';
-	}
-	
+    }
+    
     async initialize() {
       await this._getDatabaseConnection()
     }
   
     async recreateDatabase(database) {
 
-	   const SINGLE_USER_MODE = `if DB_ID('${database}') IS NOT NULL alter database [${database}] set single_user with rollback immediate` 
+       const SINGLE_USER_MODE = `if DB_ID('${database}') IS NOT NULL alter database [${database}] set single_user with rollback immediate` 
        const DROP_DATABASE = `if DB_ID('${database}') IS NOT NULL drop database [${database}]`
   
-	
+    
       try {
         await this.initialize()
-	    // Create a connection pool using a well known database that must exist	  
-	    this.vendorProperties.database = 'master';
+        // Create a connection pool using a well known database that must exist   
+        this.vendorProperties.database = 'master';
         // await super.initialize();
 
         let results;       
-		
+        
         results =  await this.executeSQL(SINGLE_USER_MODE);      
         results =  await this.executeSQL(DROP_DATABASE);      
         const CREATE_DATABASE = `create database "${database}" COLLATE ${this.DB_COLLATION}`;
         results =  await this.executeSQL(CREATE_DATABASE);      
+		
+		await this.finalize()
 
-        await this.finalize()
-
-	  } catch (e) {
-		console.log([this.DATABASE_VENDOR,'recreateDatabase()'],e);
-		throw e
-	  }
-	  
-    }	
+      } catch (e) {
+        console.log([this.DATABASE_VENDOR,'recreateDatabase()'],e);
+        throw e
+      }
+      
+    }   
 }  
 
 export { MsSQLQA as default }

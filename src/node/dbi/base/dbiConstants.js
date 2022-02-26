@@ -13,6 +13,7 @@ class DBIConstants {
     , "TOTAL_MAX_ERRORS"           : 100
     , "BATCH_SIZE"                 : 10000
     , "COMMIT_RATIO"               : 1    
+	, "PARSE_DELAY"                : 0
 	, "INFINITY_MANAGEMENT"        : undefined
 	, "LOCAL_STAGING_AREA"         : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
 	, "REMOTE_STAGING_AREA"        : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
@@ -65,6 +66,7 @@ class DBIConstants {
   static get MODE()                       { return this.YADAMU_DBI_PARAMETERS.MODE }
   static get ON_ERROR()                   { return this.YADAMU_DBI_PARAMETERS.ON_ERROR }
   static get SPATIAL_FORMAT()             { return this.YADAMU_DBI_PARAMETERS.SPATIAL_FORMAT };
+  static get PARSE_DELAY()                { return this.YADAMU_DBI_PARAMETERS.PARSE_DELAY };
   static get TABLE_MAX_ERRORS()           { return this.YADAMU_DBI_PARAMETERS.TABLE_MAX_ERRORS };
   static get TOTAL_MAX_ERRORS()           { return this.YADAMU_DBI_PARAMETERS.TOTAL_MAX_ERRORS };
   static get BATCH_SIZE()                 { return this.YADAMU_DBI_PARAMETERS.BATCH_SIZE };

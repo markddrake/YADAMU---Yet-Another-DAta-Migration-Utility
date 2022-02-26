@@ -517,6 +517,14 @@ class MariadbDBI extends YadamuDBI {
 
   }
 
+  async generateStatementCache(schema) {
+    return await super.generateStatementCache(StatementGenerator,schema) 
+  }
+
+  createParser(queryInfo,parseDelay) {
+    return new MariadbParser(queryInfo,this.yadamuLogger,parseDelay);
+  }  
+
   inputStreamError(cause,sqlStatement) {
 	 return this.trackExceptions(((cause instanceof MariadbError) || (cause instanceof CopyOperationAborted)) ? cause : new MariadbError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
   }
@@ -548,14 +556,6 @@ class MariadbDBI extends YadamuDBI {
 	
   }
   
-  async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator,schema) 
-  }
-
-  createParser(tableInfo) {
-    return new MariadbParser(tableInfo,this.yadamuLogger);
-  }  
-
   getOutputStream(tableName,metrics) {
 	 return super.getOutputStream(MariadbWriter,tableName,metrics)
   }
@@ -563,6 +563,7 @@ class MariadbDBI extends YadamuDBI {
   getOutputManager(tableName,metrics) {
 	 return super.getOutputManager(MariadbOutputManager,tableName,metrics)
   }
+  
   classFactory(yadamu) {
 	return new MariadbDBI(yadamu,this)
   }

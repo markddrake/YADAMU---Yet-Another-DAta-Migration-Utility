@@ -25,8 +25,8 @@ class MariadbParser extends YadamuParser {
 	})	 
   }
   
-  constructor(queryInfo,yadamuLogger) {
-    super(queryInfo,yadamuLogger);    
+  constructor(queryInfo,yadamuLogger,parseDelay) {
+    super(queryInfo,yadamuLogger,parseDelay);    
   }
   
 }

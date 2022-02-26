@@ -1,22 +1,32 @@
 "use strict"
 
-import { Transform } from 'stream';
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                from 'perf_hooks';
 
-import Parser from '../../clarinet/clarinet.cjs';
+import { 
+  Transform 
+}                from 'stream';
+
+import Parser    from '../../clarinet/clarinet.cjs';
+
+import {
+  IncompleteJSON 
+}                from './fileException.js'
 
 class JSONParser extends Transform {
  
   constructor(yadamuLogger, mode, exportFilePath) {
 
     super({objectMode: true });  
-
+    
     this.yadamuLogger = yadamuLogger;
     this.mode = mode;
 	this.exportFilePath = exportFilePath
 	
 	this.parser = Parser.createStream()
-  
+    this.parseCompelte = false;
+	
     this.tableList  = new Set();
     this.objectStack = [];
     this.dataPhase = false;     
@@ -252,6 +262,7 @@ class JSONParser extends Transform {
   
   endOfFile() {
 	// this.yadamuLogger.trace([this.constructor.name],'eof()')
+	this.parseComplete = true
 	this.push({eof: true})
   }
   
@@ -263,6 +274,16 @@ class JSONParser extends Transform {
     callback();
   };
 
+  _flush(callback) {
+	
+    if (!this.parseComplete) {
+	  callback(new IncompleteJSON(this.exportFilePath))
+    }
+	else {
+	  callback()
+	}
+  }
+	 
   
 }
    

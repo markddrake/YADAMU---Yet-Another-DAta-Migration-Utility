@@ -79,7 +79,7 @@ class AWSS3DBI extends CloudDBI {
 	url.port                          = this.parameters.PORT      || url.port
 	url                               = url.toString()
 	
-    vendorProperties.accessKeyId       = this.parameters.USERNAME  || vendorProperties.accessKeyId 
+    vendorProperties.accessKeyId       = this.parameters.USERNAME || vendorProperties.accessKeyId 
     vendorProperties.secretAccessKey  = this.parameters.PASSWORD  || vendorProperties.secretAccessKey	
 	vendorProperties.region           = this.parameters.REGION    || vendorProperties.region
 	vendorProperties.endpoint         = url

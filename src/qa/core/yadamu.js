@@ -51,6 +51,8 @@ class Yadamu extends _Yadamu {
     return this._LOGGER
   }
   
+  get QA_TEST()               { return true }
+  
   get YADAMU_PARAMETERS()     { return Yadamu.YADAMU_PARAMETERS }
   get YADAMU_DBI_PARAMETERS() { return Yadamu.YADAMU_DBI_PARAMETERS }
 
@@ -81,14 +83,6 @@ class Yadamu extends _Yadamu {
 	// console.log('Yadamu.YADAMU_DBI_PARAMETERS:',Yadamu.YADAMU_DBI_PARAMETERS)
 	// console.log('YadamuTest this.YADAMU_DBI_PARAMETERS:',this.YADAMU_DBI_PARAMETERS)
 	
-  }
-  
-  setTeradataWorker(worker) {
-	this.teradateWorker = worker
-  }
-  
-  getTeradataWorker() {
-	 return this.teradateWorker
   }
   
   async reset(testParameters) {

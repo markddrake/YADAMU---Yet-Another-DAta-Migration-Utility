@@ -1,5 +1,9 @@
 "use strict" 
 
+import {
+  setTimeout 
+}                       from "timers/promises"
+
 import MariadbDBI       from '../../../node/dbi//mariadb/mariadbDBI.js';
 import MariadbError     from '../../../node/dbi//mariadb/mariadbException.js'
 import MariadbConstants from '../../../node/dbi//mariadb/mariadbConstants.js';
@@ -76,25 +80,24 @@ class MariadbQA extends YadamuQALibrary.qaMixin(MariadbDBI) {
     }
 	
 	async scheduleTermination(pid,workerId) {
+	  let stack
+	  const operation = `kill hard ${pid}`
 	  const tags = this.getTerminationTags(workerId,pid)
 	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
-	  const timer = setTimeout(
-        async (pid) => {
-          if (this.pool !== undefined && this.pool.end) {
-		    this.yadamuLogger.log(tags,`Killing connection.`);
-	        const conn = await this.getConnectionFromPool();
-			const sqlStatement = `kill hard ${pid}`
-			const res = await conn.query(sqlStatement);
-			await conn.release()
-		  }
-		  else {
-		    this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
-		  }
-		},
-		this.yadamu.KILL_DELAY,
-	    pid
-      )
-	  timer.unref()
+	  setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
+        if (this.pool !== undefined && this.pool.end) {
+		  stack = new Error().stack
+		  this.yadamuLogger.log(tags,`Killing connection.`);
+	      const conn = await this.getConnectionFromPool();
+		  const res = await conn.query(operation);
+		  await conn.release()
+		}
+		else {
+		  this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
+        }
+      }).catch((e) => {
+        this.yadamu.LOGGER.handleException(tags,new MariadbError(this.DRIVER_ID,e,stack,operation));
+      })
 	}	
 
     verifyStagingSource(source) {  

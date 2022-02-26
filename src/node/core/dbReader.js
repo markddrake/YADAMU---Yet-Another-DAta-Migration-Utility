@@ -133,7 +133,7 @@ class DBReader extends Readable {
     try {
       queryInfo = readerDBI.generateSQLQuery(task)
 	  queryInfo.TARGET_DATA_TYPES = writerDBI.metadata?.[queryInfo.TABLE_NAME]?.dataTypes ?? []  
-	  const inputStreams = await readerDBI.getInputStreams(queryInfo)
+	  const inputStreams = await readerDBI.getInputStreams(queryInfo,writerDBI.PARSE_DELAY)
 	  pipelineMetrics = inputStreams[0].COPY_METRICS
       yadamuPipeline.push(...inputStreams)
 	  const outputStreams = await writerDBI.getOutputStreams(queryInfo.MAPPED_TABLE_NAME,pipelineMetrics)
@@ -329,14 +329,23 @@ class DBReader extends Readable {
   
   async doDestroy(err) {
     // this.yadamuLogger.trace([this.constructor.name,`destroy`,this.dbi.DATABASE_VENDOR],``)
-    await this.dbi.finalizeExport();
-	await this.dbi.doFinal()
-	await this.dbi.doDestroy()
+	try {
+	  // Try to clean up the DBI gracefully
+      await this.dbi.finalizeExport();
+	  await this.dbi.final()
+	}
+	catch (e) {
+	  err = err || e
+	}
+	finally {
+      // Forced clean-up of the DBI
+	  await this.dbi.destroy(err)
+	}
   }
    
   _destroy(err,callback) {
 	  
-	this.doDestroy().then(() => {
+	this.doDestroy(err).then(() => {
 	  callback(err)
 	}).catch((cause) => {
       if (YadamuError.lostConnection(cause)) {

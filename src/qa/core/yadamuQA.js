@@ -3,18 +3,29 @@
 import path               from 'path'
 import fs                 from 'fs';
 import fsp                from 'fs/promises';
-import { fileURLToPath }  from 'url';
-import { performance }    from 'perf_hooks';
+import { 
+  fileURLToPath }         from 'url';
 
-import { Transform }      from 'stream'
-import { pipeline }       from 'stream/promises'
+import { 
+  performance 
+}                         from 'perf_hooks';
+
+import { 
+  Transform 
+}                         from 'stream'
+
+import { 
+  pipeline 
+}                         from 'stream/promises'
 
 import YadamuConstants    from '../..//node/lib/yadamuConstants.js';
 import YadamuLibrary      from '../..//node/lib/yadamuLibrary.js';
 import JSONParser         from '../..//node/dbi/file/jsonParser.js';
 import LoaderDBI          from '../..//node/dbi/loader/loaderDBI.js';
 
-import {ConfigurationFileError} from '../..//node/core/yadamuException.js';
+import {
+  ConfigurationFileError
+}                         from '../..//node/core/yadamuException.js';
 
 import Yadamu             from './yadamu.js';
 
@@ -101,7 +112,6 @@ class YadamuQA {
     this.expandedTaskList = []
     this.operationsList = []
     this.failedOperations = {}
-    
   }
   
   async initialize() {
@@ -541,7 +551,6 @@ class YadamuQA {
       
       compareResults.elapsedTime = performance.now() - startTime;
       // this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Elapsed Time: ${YadamuLibrary.stringifyDuration(compareResults.elapsedTime)}s`);
-
       await compareDBI.finalize();
       this.yadamu.activeConnections.delete(compareDBI)
       
@@ -782,14 +791,12 @@ class YadamuQA {
      try {
        await source.initialize()
        const sourceInstance = await source.getYadamuInstanceInfo() 
-       await source.finalize()
-     
+       
        staging.parameters.FROM_USER = staging.parameters.TO_USER
        delete staging.parameters.TO_USER
        await staging.initialize()
        await staging.loadControlFile()
        const targetInstance = await staging.getYadamuInstanceInfo();
-       await staging.finalize()
 	   
 	   if (staging.controlFile.settings.contentType === 'CSV') {
          if ((sourceInstance.yadamuInstanceID === targetInstance.yadamuInstanceID) && (sourceInstance.yadamuInstallationTimestamp === targetInstance.yadamuInstallationTimestamp)) {
@@ -877,15 +884,13 @@ class YadamuQA {
     stepStartTime = performance.now()
     const sourceRowCounts = await sourceDBI.getRowCounts(sourceSchema)
     stepElapsedTime = performance.now() - stepStartTime 
-    await sourceDBI.finalize();
-
+    
     targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,false) 
     await targetDBI.initialize();
     stepStartTime = performance.now()
     const targetRowCounts = await targetDBI.getRowCounts(targetSchema)
     stepElapsedTime = performance.now() - stepStartTime 
-    await targetDBI.finalize();
-
+   
     const elapsedTime = performance.now() - taskStartTime
     
     const compareResults = {
@@ -1472,7 +1477,6 @@ class YadamuQA {
     this.reportRowCounts(await compareDBI.getRowCounts(targetSchema2),metrics[2],parameters,identifierMappings) 
     stepElapsedTime = performance.now() - stepStartTime 
     this.metrics.recordTaskTimings([task.taskName,'COUNT','',targetConnectionName,'',YadamuLibrary.stringifyDuration(stepElapsedTime)])
-   
     await compareDBI.finalize();
     this.yadamu.activeConnections.delete(compareDBI);
     
@@ -1611,7 +1615,7 @@ class YadamuQA {
       stepStartTime = performance.now()
       this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),metrics,parameters,identifierMappings) 
       stepElapsedTime = performance.now() - stepStartTime 
-      await compareDBI.finalize();
+	  await compareDBI.finalize()
       this.metrics.recordTaskTimings([task.taskName,'COUNT','',targetConnectionName,'',YadamuLibrary.stringifyDuration(stepElapsedTime)])
     }       
 

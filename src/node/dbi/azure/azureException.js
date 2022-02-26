@@ -17,7 +17,7 @@ class AzureError extends DatabaseError {
 	delete this.sql
   }
 
-  FileNotFound() {
+  urlNotFound() {
 	return (this.cause.statusCode === 404)
   }
 

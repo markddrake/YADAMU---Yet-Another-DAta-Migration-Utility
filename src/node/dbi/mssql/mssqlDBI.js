@@ -1,7 +1,14 @@
 "use strict" 
 
-import fs from 'fs';
-import { performance } from 'perf_hooks';
+import fs                     from 'fs';
+
+import { 
+  performance 
+}                             from 'perf_hooks';
+
+import {
+  setTimeout 
+}                             from "timers/promises"
 
 /* 
 **
@@ -452,8 +459,10 @@ class MsSQLDBI extends YadamuDBI {
   }
 
   async _getDatabaseConnection() {
+	  
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`_getDatabaseConnection()`)
+	
     try {
-      // this.yadamuLogger.trace(this.DATABASE_VENDOR,this.getWorkerNumber()],`_getDatabaseConnection()`)
       await this.createConnectionPool();
     } catch (e) {
       const err = new ConnectionError(e,this.vendorProperties);
@@ -499,17 +508,14 @@ class MsSQLDBI extends YadamuDBI {
  	  ** Set a timer to deal with pool.close() hanging
 	  **
 	  */
-		  
-      const timer = setTimeout(
-	    () => {
-          this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL',this.BEGIN_TRANSACTION_ISSUE],`Close pool operation timed out`)
+		
+	  const timerAbort = new AbortController()
+      setTimeout(1000,null,{ref: false, signal: timerAbort.signal}).then(() => {
+        this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL',this.BEGIN_TRANSACTION_ISSUE],`Close pool operation timed out`)
 		  // console.dir(this.pool.pool.used,{depth:null})
-		  return
-	    }
- 	  , 1000
-	  )
-	 
-		 		  
+		 return
+	  }).catch((e) => { /* console.log(e) */ })
+	 	 		  
       let stack
       let psudeoSQL
       try {
@@ -535,7 +541,7 @@ class MsSQLDBI extends YadamuDBI {
 		process.prependOnceListener('unhandledRejection',this.unhandledRejectionHandler)		
 		// this.yadamuLogger.trace([this.DATABASE_VENDOR,'CLOSE POOL'],`Closing pool`)
 		await this.pool.close();
-		clearTimeout(timer)
+		timerAbort.abort()
         // this.yadamuLogger.trace([this.DATABASE_VENDOR,'CLOSE POOL'],`Pool Closed`)
 		process.removeListener('unhandledRejection',this.unhandledRejectionHandler)
 
@@ -553,7 +559,7 @@ class MsSQLDBI extends YadamuDBI {
 		*/
 		return
       } catch(e) {
-		clearTimeout(timer)
+		timerAbort.abort()
         // this.pool = undefined
         this.yadamuLogger.info([this.DATABASE_VENDOR],`Error Closing Pool`)
         throw this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,psudeoSQL))
@@ -1092,10 +1098,6 @@ class MsSQLDBI extends YadamuDBI {
   **
   */
 
-  async finalize(options) {
-    await super.finalize(options)
-  }
-
   /*
   **
   **  Abort the database connection and pool.
@@ -1407,8 +1409,8 @@ class MsSQLDBI extends YadamuDBI {
   
   }
   
-  createParser(queryInfo) {
-    return new MsSQLParser(queryInfo,this.yadamuLogger);
+  createParser(queryInfo,parseDelay) {
+    return new MsSQLParser(queryInfo,this.yadamuLogger,parseDelay);
   }  
   
   inputStreamError(cause,sqlStatement) {

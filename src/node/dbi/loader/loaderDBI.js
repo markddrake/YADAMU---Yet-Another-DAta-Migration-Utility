@@ -668,16 +668,15 @@ class LoaderDBI extends YadamuDBI {
 
   async getConnectionID() { /* OVERRIDE */ }
   
-  createConnectionPool() { /* OVERRIDE */ }
+  async configureConnection() { /* OVERRIDE */ }
   
-  getConnectionFromPool() { /* OVERRIDE */ }
+  async createConnectionPool() { /* OVERRIDE */ }
   
-  configureConnection() { /* OVERRIDE */ }
+  async getConnectionFromPool() { /* OVERRIDE */ }
   
-  closeConnection(options) { /* OVERRIDE */ }
-
-  closePool(options) { /* OVERRIDE */ }
-
+  async closeConnection() { /* OVERRIDE */ }
+  
+  async closePool() { /* OVERRIDE */ }
 }
 
 export {LoaderDBI as default }

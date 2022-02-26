@@ -510,17 +510,17 @@ class RedshiftDBI extends YadamuDBI {
 	return schemaInfo
   }
 
-  createParser(tableInfo) {
-    return new RedshiftParser(tableInfo,this.yadamuLogger);
+  createParser(tableInfo,parseDelay) {
+    return new RedshiftParser(tableInfo,this.yadamuLogger,parseDelay);
   }  
   
   inputStreamError(cause,sqlStatement) {
     return this.trackExceptions(((cause instanceof RedshiftError) || (cause instanceof CopyOperationAborted)) ? cause : new RedshiftError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
   }
 
-  async getInputStream(tableInfo) {       
+  async getInputStream(queyInfo) {       
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,tableInfo.TABLE_NAME],'')
+    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,queyInfo.TABLE_NAME],'')
     
     /*
     **
@@ -533,13 +533,13 @@ class RedshiftDBI extends YadamuDBI {
 	}
  		
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.status.sqlTrace.write(this.traceSQL(tableInfo.SQL_STATEMENT))
+    this.status.sqlTrace.write(this.traceSQL(queyInfo.SQL_STATEMENT))
     while (true) {
       // Exit with result or exception.  
       try {
         const sqlStartTime = performance.now();
 		this.streamingStackTrace = new Error().stack
-        const queryStream = new QueryStream(tableInfo.SQL_STATEMENT,[],{rowMode : "array"})
+        const queryStream = new QueryStream(queyInfo.SQL_STATEMENT,[],{rowMode : "array"})
         this.traceTiming(sqlStartTime,performance.now())
         const inputStream = await this.connection.query(queryStream)   
 		
@@ -560,7 +560,7 @@ class RedshiftDBI extends YadamuDBI {
   		
 		return inputStream
       } catch (e) {
-		const cause = this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,this.streamingStackTrace,tableInfo.SQL_STATEMENT))
+		const cause = this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,this.streamingStackTrace,queyInfo.SQL_STATEMENT))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...

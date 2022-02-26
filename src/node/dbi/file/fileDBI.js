@@ -647,10 +647,13 @@ class FileDBI extends YadamuDBI {
 	return streams;
   }
     
-  getDatabaseConnection() { /* OVERRIDE */ }
+  async createConnectionPool() { /* OVERRIDE */ }
   
-  closeConnection() { /* OVERRIDE */ }
- 
+  async getConnectionFromPool() { /* OVERRIDE */ }
+  
+  async closeConnection() { /* OVERRIDE */ }
+  
+  async closePool() { /* OVERRIDE */ }
   
 }
 

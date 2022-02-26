@@ -47,8 +47,8 @@ class VerticaParser extends YadamuParser {
     })
   }
 
-  constructor(queryInfo,yadamuLogger) {
-    super(queryInfo,yadamuLogger);     
+  constructor(queryInfo,yadamuLogger,parseDelay) {
+    super(queryInfo,yadamuLogger,parseDelay);     
 	
     queryInfo.TARGET_DATA_TYPES?.forEach((dataType,idx) => {
 	  switch (dataType.toUpperCase()) {

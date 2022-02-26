@@ -1,5 +1,9 @@
 "use strict" 
 
+import {
+  setTimeout 
+}                         from "timers/promises"
+
 import SnowflakeDBI       from '../../../node/dbi//snowflake/snowflakeDBI.js';
 import SnowflakeConstants from '../../../node/dbi//snowflake/snowflakeConstants.js';
 import SnowflakeException from '../../../node/dbi//snowflake/snowflakeException.js'
@@ -113,26 +117,19 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
     }
 	
     async scheduleTermination(pid,workerId) {
+      let stack
+	  const operation = `select SYSTEM$ABORT_SESSION( ${pid} );`
 	  const tags = this.getTerminationTags(workerId,pid)
 	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
-      const timer = setTimeout(async (pid) => {
-          this.yadamuLogger.log(tags,`Killing connection.`);
-          const conn = await this.getConnectionFromPool();
-          const sqlStatement = `select SYSTEM$ABORT_SESSION( ${pid} );`
-          let stack
-          try {
-            stack = new Error().stack
-            const res = await this.execute(conn,sqlStatement)
-            await conn.destroy()
-          } catch (e) {
-            const cause = new SnowflakeError(this.DRIVER_ID,e,stack,sqlStatement)
-            this.yadamuLogger.handleException(tags,cause)
-          }
-	    },
-        this.yadamu.KILL_DELAY,
-        pid
-      )
-      timer.unref()
+      setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
+        this.yadamuLogger.log(tags,`Killing connection.`);
+        stack = new Error().stack
+        const conn = await this.getConnectionFromPool();
+        const res = await this.execute(conn,operation)
+        await conn.destroy()
+      }).catch((e) => {
+        this.yadamu.LOGGER.handleException(tags,new SnowflakeError(this.DRIVER_ID,e,stack,operation));
+      })
     }
 
     verifyStagingSource(source) {  

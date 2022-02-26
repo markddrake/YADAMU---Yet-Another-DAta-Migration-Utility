@@ -675,8 +675,8 @@ class MySQLDBI extends YadamuDBI {
      return super.getOutputStream(MySQLWriter,tableName,metrics)
   }
 
-  createParser(queryInfo) {
-    this.parser = new MySQLParser(queryInfo,this.yadamuLogger,this);
+  createParser(queryInfo,parseDelay) {
+    this.parser = new MySQLParser(queryInfo,this.yadamuLogger,parseDelay);
     return this.parser;
   }  
     

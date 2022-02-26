@@ -854,10 +854,10 @@ class MongoDBI extends YadamuDBI {
     return schemaInfo
   }
 
-  createParser(tableInfo) {
+  createParser(tableInfo,parseDelay) {
     tableInfo.READ_TRANSFORMATION = this.READ_TRANSFORMATION
     tableInfo.ID_TRANSFORMATION = this.ID_TRANSFORMATION
-    return new MongoParser(tableInfo,this.yadamuLogger);
+    return new MongoParser(tableInfo,this.yadamuLogger,parseDelay);
   }  
 
   generateQueryInformation(tableMetadata) {

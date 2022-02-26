@@ -1,11 +1,35 @@
 "use strict"
 
-import path                    from 'path'
-import {PassThrough}           from 'stream';
+import path                   from 'path'
+import {
+  PassThrough
+}                             from 'stream';
+import {
+  setTimeout 
+}                             from "timers/promises"
 
-import AWSS3Constants          from './awsS3Constants.js';
-import AWSS3Error              from './awsS3Exception.js'
+import AWSS3Constants         from './awsS3Constants.js';
+import AWSS3Error             from './awsS3Exception.js';
 
+class ByteCounter extends PassThrough {
+
+  constructor(options) {
+    super(options) 
+	this.byteCount = 0
+  }
+  
+  _transform (data, enc, callback) {
+	this.byteCount+= data.length
+	this.push(data)
+    callback()
+  }
+  
+  _flush(callback) {
+	console.log('Bytes Written:',this.byteCount)
+    callback()
+  }
+}
+ 
 class AWSS3StorageService {
 
   get CHUNK_SIZE()   { return this.parameters.CHUNK_SIZE  || AWSS3Constants.CHUNK_SIZE }  
@@ -23,7 +47,7 @@ class AWSS3StorageService {
   retryOperation(retryCount) {
 	return retryCount < this.RETRY_COUNT 
   }
-	   
+  	   
   createWriteStream(key,contentType,activeWriters) {
 	// this.yadamuLogger.trace([this.constructor.name],`createWriteStream(${key})`)
   
@@ -31,22 +55,22 @@ class AWSS3StorageService {
 	  Bucket      : this.dbi.BUCKET
 	, Key         : key
 	, ContentType : contentType
-	, Body        : new PassThrough()
+    , Body        : new PassThrough()
     }	
 	const writeOperation = new Promise((resolve,reject) => {
 	  this.s3Connection.upload(params).send((err, data) => {
- 	    if (err) {
-          // this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,`FAILED`,'UPLOAD',params.Key],`Removing Active Writer`);
+		if (err) {
+   	      // this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,`FAILED`,'UPLOAD',params.Key],`Removing Active Writer`);
           this.yadamuLogger.handleException([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`FAILED`,params.Key],err);
-		  reject(err)
+		  // Destroying Body with err should terminate the current pipeline
+		  params.Body.destroy(err);
+          // reject(err)
 	    } 
 	    else {
           // this.yadamuLogger.trace([AWSS3Constants.DATABASE_VENDOR,'UPLOAD',`SUCCESS`,params.Key],`Removing Active Writer`);		
-          activeWriters.delete(writeOperation)
-		  resolve(params.Key)
 	    }
         activeWriters.delete(writeOperation)
-	    params.Body.destroy(err);
+        resolve(params.Key)
       })
     })	  
 	activeWriters.add(writeOperation)
@@ -138,9 +162,7 @@ class AWSS3StorageService {
 	  } catch (e) {
 	    const awsError = new AWSS3Error(this.dbi.DRIVER_ID,e,stack,`AWS.S3.headObject(s3://${this.dbi.BUCKET}/${params.Key})`)
         if (awsError.FileNotFound() && this.retryOperation(retryCount)) { 
-		  await new Promise((resolve,reject) => {
-		    setTimeout(() => {resolve()},e.retryDelay)
-	      })
+		  await setTimeout(e.retryDelay)
 		  retryCount++
 		  continue
 		}

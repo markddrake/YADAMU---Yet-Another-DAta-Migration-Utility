@@ -579,8 +579,8 @@ class PostgresDBI extends YadamuDBI {
     return this.generateSchemaInfo(results.rows)
   }
 
-  createParser(queryInfo) {
-    return new PostgresParser(queryInfo,this.yadamuLogger);
+  createParser(queryInfo,parseDelay) {
+    return new PostgresParser(queryInfo,this.yadamuLogger,parseDelay);
   }  
   
   inputStreamError(cause,sqlStatement) {

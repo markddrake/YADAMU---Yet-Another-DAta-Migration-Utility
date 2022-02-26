@@ -1,19 +1,41 @@
 "use strict" 
 
-import fs              from 'fs';
-import path            from 'path';
-import { performance } from 'perf_hooks';
-import EventEmitter    from 'events'
+import fs                 from 'fs';
+import path               from 'path';
 
-import Yadamu          from '../../core/yadamu.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary   from '../../lib/yadamuLibrary.js'
-import NullWriteable   from '../../util/nullWritable.js'
+import { 
+  performance 
+}                         from 'perf_hooks';
+import EventEmitter       from 'events'
 
-import {YadamuError, InternalError, CommandLineError, ConfigurationFileError, ConnectionError, DatabaseError, BatchInsertError, IterativeInsertError, InputStreamError, UnimplementedMethod} from '../../core/yadamuException.js';
+import {
+  setTimeout 
+}                         from 'timers/promises'
 
-import DBIConstants    from './dbiConstants.js';
-import {FileNotFound, FileError} from '../file/fileException.js';
+import Yadamu             from '../../core/yadamu.js';
+import YadamuConstants    from '../../lib/yadamuConstants.js';
+import YadamuLibrary      from '../../lib/yadamuLibrary.js'
+import NullWriteable      from '../../util/nullWritable.js'
+
+import {
+  YadamuError, 
+  InternalError, 
+  CommandLineError, 
+  ConfigurationFileError, 
+  ConnectionError, 
+  DatabaseError, 
+  BatchInsertError, 
+  IterativeInsertError, 
+  InputStreamError, 
+  UnimplementedMethod
+}                         from '../../core/yadamuException.js';
+
+import DBIConstants       from './dbiConstants.js';
+
+import {
+  FileNotFound, 
+  FileError
+}                         from '../file/fileException.js';
 
 
 /*
@@ -46,6 +68,7 @@ class YadamuDBI extends EventEmitter {
   get STATEMENT_SEPERATOR()          { return '\n--\n' }
 
   get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT              || DBIConstants.SPATIAL_FORMAT };
+  get PARSE_DELAY()                  { return this.parameters.PARSE_DELAY                 || DBIConstants.PARSE_DELAY };
   get TABLE_MAX_ERRORS()             { return this.parameters.TABLE_MAX_ERRORS            || DBIConstants.TABLE_MAX_ERRORS };
   get TOTAL_MAX_ERRORS()             { return this.parameters.TOTAL_MAX_ERRORS            || DBIConstants.TOTAL_MAX_ERRORS };
   get COMMIT_RATIO()                 { return this.parameters.hasOwnProperty('COMMIT_RATIO') ?  this.parameters.COMMIT_RATIO : DBIConstants.COMMIT_RATIO };
@@ -274,13 +297,18 @@ class YadamuDBI extends EventEmitter {
     this.activeWriters = new Set()
     
     if (manager) {
-      const workerState = new Promise((resolve,reject) => {
+		
+	  // Set up a promise to make it possible to wait on AllSettled..
+	  
+      this.workerState = new Promise((resolve,reject) => {
         this.on(YadamuConstants.DESTROYED,() => {
-		   manager.activeWorkers.delete(workerState)
+		   manager.activeWorkers.delete(this)
 		   resolve(YadamuConstants.DESTROYED)
 	    })
 	  })
-      manager.activeWorkers.add(workerState)
+      
+	  manager.activeWorkers.add(this)
+	  
 	  this.workerNumber = -1
       this.dbConnected = manager.dbConnected
 	  this.cacheLoaded = manager.cacheLoaded
@@ -415,20 +443,6 @@ class YadamuDBI extends EventEmitter {
 	}
   }
 
-  doTimeout(milliseconds) {
-    
-	return new Promise((resolve,reject) => {
-        this.yadamuLogger.info([`${this.constructor.name}.doTimeout()`],`Sleeping for ${YadamuLibrary.stringifyDuration(milliseconds)}ms.`);
-        setTimeout(
-          () => {
-           this.yadamuLogger.info([`${this.constructor.name}.doTimeout()`],`Awake.`);
-           resolve();
-          },
-          milliseconds
-       )
-     })  
-  }
-    
   processError(yadamuLogger,logEntry,summary,logDDL) {
 	 
 	let warning = true;
@@ -539,6 +553,22 @@ class YadamuDBI extends EventEmitter {
     }
 	return summary;
   }    
+  
+  async createConnectionPool() {
+    throw new UnimplementedMethod('createConnectionPool()',`YadamuDBI`,this.constructor.name)
+  }
+  
+  async getConnectionFromPool() {
+    throw new UnimplementedMethod('getConnectionFromPool()',`YadamuDBI`,this.constructor.name)
+  }
+  
+  async closeConnection() {
+    throw new UnimplementedMethod('closeConnection()',`YadamuDBI`,this.constructor.name)
+  }
+  
+  async closePool() {
+    throw new UnimplementedMethod('closePool()',`YadamuDBI`,this.constructor.name)
+  }
 
   logDisconnect() {
     const pwRedacted = Object.assign({},this.vendorProperties)
@@ -866,13 +896,7 @@ class YadamuDBI extends EventEmitter {
     }
 
   }  
-
-  waitForRestart(delayms) {
-    return new Promise((resolve, reject) => {
-        setTimeout(resolve, delayms);
-    });
-  }
-    
+  
   async _reconnect() {
     throw new Error(`Database Reconnection Not Implimented for ${this.DATABASE_VENDOR}`)
 	
@@ -962,7 +986,7 @@ class YadamuDBI extends EventEmitter {
 		if (YadamuError.serverUnavailable(connectionFailure)) {
 		  connectionUnavailable = connectionFailure;
           this.yadamuLogger.info([`RECONNECT`,this.DATABASE_VENDOR,operation],`Waiting for restart.`)
-          await this.waitForRestart(5000);
+          await setTimeout(5000);
           retryCount++;
           continue;
         }
@@ -1072,15 +1096,7 @@ class YadamuDBI extends EventEmitter {
 	await this.closeConnection()
   }
   
-  async doFinal() {
-	  
-	 if (this.isManager()) {
-       // this.yadamuLogger.trace([this.constructor.name,'doFinal()',this.ROLE,'ACTIVE_WORKERS'],`WAITING [${this.activeWorkers.size}]`)
-	   await Promise.all(Array.from(this.activeWorkers));
-       // this.yadamuLogger.trace([this.constructor.name,'doFinal()',this.ROLE,'ACTIVE_WORKERS'],'PROCESSING')
-	 }	  
-	 
-  }	
+
   
   newBatch() {
 	return []
@@ -1091,39 +1107,53 @@ class YadamuDBI extends EventEmitter {
 	  batch.length = 0;
 	}
   }
-  
-  async finalize(options) {
+
+  async final(){
+	
+    // this.yadamuLogger.trace([this.constructor.name,'final()',this.ROLE,],`Waiting for ${this.activeWorkers.size} Writers to terminate. [${this.activeWorkers}]`);
 	  
-	// this.yadamuLogger.trace([this.constructor.name,'finalize()'],`Waiting for ${this.activeWriters.size} Writers to terminate. [${this.activeWriters}]`);
 	if (this.ddlInProgress) {
 	  await this.ddlComplete
 	}
-    // this.yadamuLogger.trace([this.constructor.name,'finalize()','ACTIVE_WRITERS',this.getWorkerNumber()],'WAITING')
-    await Promise.allSettled(this.activeWriters)
-   //  this.yadamuLogger.trace([this.constructor.name,'finalize()','ACTIVE_WRITERS',this.getWorkerNumber()],'PROCESSING')
-	options = options === undefined ? {abort: false} : Object.assign(options,{abort:false})
-    await this.closeConnection(options)
-    await this.closePool(options);
+
     this.logDisconnect();
-	  
-  }
+		
+	if (this.isManager()) {
+      // this.yadamuLogger.trace([this.constructor.name,'final()',this.ROLE,'ACTIVE_WORKERS'],`WAITING [${this.activeWorkers.size}]`)
+	  const stillWorking = Array.from(this.activeWorkers).map((worker) => { return worker.workerState })
+	  await Promise.all(stillWorking);
+      // this.yadamuLogger.trace([this.constructor.name,'final()',this.ROLE,'ACTIVE_WORKERS'],'PROCESSING')
+	}	  
+	
+  }	
 
-  async doDestroy() {
-
+  async destroy(err) {
+ 
 	// this.yadamuLogger.trace([this.constructor.name,this.ROLE,this.getWorkerNumber()],`doDestroy(${this.activeWorkers.size})`)
 	
 	if ((this.isManager()) &&  (this.activeWorkers.size > 0))  {
-      this.yadamuLogger.error([this.DATABASE_VENDOR,'DESTROY'],`Aborting ${this.activeWorkers.size} active workers).`)
+      // Active WorkersTHE set of Workers that have not terminated.
+	  // We need to force them to terminate and release any database connections they own.
+	  this.yadamuLogger.error([this.DATABASE_VENDOR,'destroy()',this.ROLE],`Aborting ${this.activeWorkers.size} active workers).`)
 	  this.activeWorkers.forEach((worker) => {
 	    try {
-		  worker.destroy()
+          this.yadamuLogger.log([`${this.DATABASE_VENDOR}`,'destroy()','Worker',this.getWorkerNumber()],`Found Active Worker ${worker.getWorkerNumber()}`);
+	      worker.abort()
 		} catch(e) {
-          this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'DESTROY','Worker',worker.getWorkerNumber()],e);
+          this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'destroy()','Worker',worker.getWorkerNumber()],e);
 		}
 	  })
 	}
+	
+	await this.writersFinished()
+
+    const options = { abort: (err ? true : false) }
+	await this.closeConnection(options);
+    await this.closePool(options);	 
+
   }	
-		
+  
+  	
   /*
   **
   **  Abort the database connection and pool
@@ -1566,8 +1596,8 @@ class YadamuDBI extends EventEmitter {
     return queryInfo
   }   
 
-  createParser(queryInfo) {
-    return new DefaultParser(queryInfo,this.yadamuLogger);      
+  createParser(queryInfo,parseDelay) {
+    return new DefaultParser(queryInfo,this.yadamuLogger,parseDelay);      
   }
  
   inputStreamError(cause,sqlStatement) {
@@ -1580,7 +1610,7 @@ class YadamuDBI extends EventEmitter {
 	return inputStream;
   }      
 
-  async getInputStreams(queryInfo) {
+  async getInputStreams(queryInfo,parseDelay) {
 	const streams = []
 	const metrics = DBIConstants.NEW_COPY_METRICS
 	metrics.SOURCE_DATABASE_VENDOR = this.DATABASE_VENDOR
@@ -1599,7 +1629,7 @@ class YadamuDBI extends EventEmitter {
     })
 	streams.push(inputStream)
 	
-	const parser = this.createParser(queryInfo)
+	const parser = this.createParser(queryInfo,parseDelay)
 	parser.COPY_METRICS = metrics
 	parser.once('readable',() => {
 	  metrics.parserStartTime = performance.now()
@@ -1652,11 +1682,7 @@ class YadamuDBI extends EventEmitter {
 	})
 	
 	streams.push(tableWriter)
-	
     return streams;
-  	
-	
-	return [,]
   }
   
   keepAlive(rowCount) {
@@ -1727,8 +1753,18 @@ class YadamuDBI extends EventEmitter {
     throw new UnimplementedMethod('getConnectionID()',`YadamuDBI`,this.constructor.name)
   }
   
+  async writersFinished() {
+	  
+    // this.yadamuLogger.trace([this.constructor.name,'writersFinished()',this.ROLE,this.getWorkerNumber(),`destroyWorker()`],`Waiting for ${this.activeWriters.size} Writers to terminate. [${this.activeWriters}]`)
+
+    // this.yadamuLogger.trace([this.constructor.name,'writersFinished()','ACTIVE_WRITERS',this.getWorkerNumber()],'WAITING')
+    await Promise.allSettled(this.activeWriters)
+    // this.yadamuLogger.trace([this.constructor.name,'writersFinished()','ACTIVE_WRITERS',this.getWorkerNumber()],'PROCESSING')
+
+  }
+  
   async destroyWorker() {
-    // this.yadamuLogger.trace([this.constructor.name,this.ROLE,this.getWorkerNumber(),`destroyWorker()`],'')
+	await this.writersFinished()
 	await this.releaseWorkerConnection() 
 	this.emit(YadamuConstants.DESTROYED)
   }

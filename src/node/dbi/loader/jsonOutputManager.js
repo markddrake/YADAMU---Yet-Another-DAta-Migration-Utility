@@ -15,6 +15,20 @@ class JSONOutputManager extends _JSONOutputManager{
 	this.startTable = '['
   }
   
+  async initializePartition(partitionInfo) {
+	await super.initializePartition(partitionInfo)
+  	this.tableInfo.partitionsRemaining = this.tableInfo.partitionsRemaining || partitionInfo.partitionCount
+  }
+  
+  /*
+  async doDestroy() {
+	await super.doDestroy();
+    console.log(this.PARTITIONED_TABLE,this.tableInfo,this.COPY_METRICS)
+	if (this.PARTITITONED_TABLE) {
+	}
+  }
+  */
+  
 }
 
 export {JSONOutputManager as default }

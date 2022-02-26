@@ -1,5 +1,9 @@
 "use strict" 
 
+import {
+  setTimeout 
+}                      from "timers/promises"
+
 import MongoDBI        from '../../../node/dbi//mongodb/mongoDBI.js';
 import MongoError      from '../../../node/dbi//mongodb/mongoException.js'
 import MongoConstants  from '../../../node/dbi//mongodb/mongoConstants.js';
@@ -442,48 +446,44 @@ class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
     }
 	
     async scheduleTermination(workerId) {
+      let stack
+      let operation
 	  const tags = this.getTerminationTags(workerId,'')
 	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
-      const timer = setTimeout(
-        async () => {
-          if (this.client !== undefined) {
-            const currentOp = {
-                currentOp : true
-              , $all      : false
-              , $ownOps   : true
-            }
-            this.yadamuLogger.log(tags,`Killing connection.`);
-            let operation
-            try {
-              const dbAdmin = await this.client.db('admin',{returnNonCachedInstance:true});  
-              operation = `mongoClient.db('admin').command(${currentOp})`
-              const ops = await dbAdmin.command(currentOp)
-              const hostList = []
-              ops.inprog.forEach((op) => {
-                if (op.client && (op.client.startsWith('172.18.0.1'))) {
-                  hostList.push(op.client);
-                }
-              })
-              const dropConnections = {
-                  dropConnections: 1,
-                    hostAndPort : hostList
-              }
-              operation = `mongoClient.db('admin').command(${JSON.stringify(dropConnections)})`
-              const res = await  await dbAdmin.command(dropConnections)
-              // await dbAdmin.close()
-            } catch (e) {
-              throw new MongoError(this.DRIVER_ID,e,operation);
-            }
+	  setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
+        if (this.client !== undefined) {
+          const currentOp = {
+            currentOp : true
+          , $all      : false
+          , $ownOps   : true
           }
-          else {
-            this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
+          this.yadamuLogger.log(tags,`Killing connection.`);
+		  stack = new Error().stack
+          const dbAdmin = await this.client.db('admin',{returnNonCachedInstance:true});  
+          operation = `mongoClient.db('admin').command(${currentOp})`
+          const ops = await dbAdmin.command(currentOp)
+          const hostList = []
+          ops.inprog.forEach((op) => {
+            if (op.client && (op.client.startsWith('172.18.0.1'))) {
+              hostList.push(op.client);
+            }
+          })
+          const dropConnections = {
+            dropConnections: 1
+          , hostAndPort : hostList
           }
-        },
-        this.yadamu.KILL_DELAY
-      )
-      timer.unref()
+		  stack = new Error().stack
+          operation = `mongoClient.db('admin').command(${JSON.stringify(dropConnections)})`
+          const res = await  await dbAdmin.command(dropConnections)
+          // await dbAdmin.close()
+        }
+        else {
+          this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
+        }
+      }).catch((e) => {
+          this.yadamu.LOGGER.handleException(tags,new MongoErrorr(this.DRIVER_ID,e,stack,operation));
+      })
     }
-
 }
 
 export { MongoQA as default }
