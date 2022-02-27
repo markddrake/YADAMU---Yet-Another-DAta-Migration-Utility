@@ -39,12 +39,6 @@ class YadamuQALibrary {
 	getTerminationTags(workerId,processId) {
 	  return ['KILL',this.DATABASE_VENDOR,this.yadamu.killConfiguration.process,isNaN(workerId) ? 'SEQUENTIAL' : 'PARALLEL',this.ON_ERROR,workerId,this.yadamu.killConfiguration.delay,processId]
     }
-
-    async finalize() {
-	  // Used to close down the connectionw when the DBI is used for performing QA tasks such as compareSchemas and getRowCounts
-	  await this.final()
-	  await this.destroy()
-	}
 	
   }
   
@@ -276,14 +270,7 @@ class YadamuQALibrary {
       this.yadamu.parameters.COMPRESSION = options.compression
       this.yadamu.parameters.ENCRYPTION = options.encryption
     }
-
-    async finalize() {
-	  // Used to close down the connectionw when the DBI is used for performing QA tasks such as compareSchemas and getRowCounts
-	  await this.final()
-	  await this.destroy()
-	}
-  }
-  
+  }  
 }
 
 export { YadamuQALibrary as default}

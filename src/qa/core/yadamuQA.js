@@ -103,10 +103,10 @@ class YadamuQA {
   get OPERATION()                                 { return this.test.operation  || this.configuration.operation }
   get OPERATION_NAME()                            { return this.OPERATION.toUpperCase() }
 
-  constructor(configuration,activeConnections) {
+  constructor(configuration) {
       
     this.configuration = configuration
-    this.yadamu = new Yadamu(configuration.parameters,activeConnections)
+    this.yadamu = new Yadamu(configuration.parameters)
     this.metrics = this.yadamu.testMetrics;
     
     this.expandedTaskList = []
@@ -542,7 +542,6 @@ class YadamuQA {
     try {
       compareDBI.setParameters(testParameters);
       await compareDBI.initialize();
-      this.yadamu.activeConnections.add(compareDBI)
       if (reportRowCounts) {
         this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),metrics,rules,identifierMappings) 
       } 
@@ -551,8 +550,7 @@ class YadamuQA {
       
       compareResults.elapsedTime = performance.now() - startTime;
       // this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Elapsed Time: ${YadamuLibrary.stringifyDuration(compareResults.elapsedTime)}s`);
-      await compareDBI.finalize();
-      this.yadamu.activeConnections.delete(compareDBI)
+      await compareDBI.final();
       
       compareResults.successful.forEach((row,idx) => {          
         const mappedTableName = metrics.hasOwnProperty(row[2]) ? row[2] : compareDBI.getMappedTableName(row[2],identifierMappings)
@@ -566,8 +564,7 @@ class YadamuQA {
 
     } catch (e) {
       this.yadamu.LOGGER.handleException([`COMPARE`],e)
-      await compareDBI.abort();
-      this.yadamu.activeConnections.delete(compareDBI)
+      await compareDBI.destroy(e);
       return {}
       // throw e
     } 
@@ -816,6 +813,9 @@ class YadamuQA {
   }
 
   async copy(task,configuration,test,targetConnectionName,parameters) {
+	
+	// Used by Initialize.. Simulates a pure one direction copy between any two supported environments
+	
     let results
     let keyMetrics
     
@@ -884,12 +884,14 @@ class YadamuQA {
     stepStartTime = performance.now()
     const sourceRowCounts = await sourceDBI.getRowCounts(sourceSchema)
     stepElapsedTime = performance.now() - stepStartTime 
+    await sourceDBI.final();
     
     targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,false) 
     await targetDBI.initialize();
     stepStartTime = performance.now()
     const targetRowCounts = await targetDBI.getRowCounts(targetSchema)
     stepElapsedTime = performance.now() - stepStartTime 
+    await targetDBI.final();
    
     const elapsedTime = performance.now() - taskStartTime
     
@@ -1466,7 +1468,6 @@ class YadamuQA {
     
     let compareDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,{},false)
     await compareDBI.initialize();
-    this.yadamu.activeConnections.add(compareDBI);
     
     stepStartTime = performance.now();
     this.reportRowCounts(await compareDBI.getRowCounts(targetSchema1),metrics[0],parameters,identifierMappings) 
@@ -1477,8 +1478,7 @@ class YadamuQA {
     this.reportRowCounts(await compareDBI.getRowCounts(targetSchema2),metrics[2],parameters,identifierMappings) 
     stepElapsedTime = performance.now() - stepStartTime 
     this.metrics.recordTaskTimings([task.taskName,'COUNT','',targetConnectionName,'',YadamuLibrary.stringifyDuration(stepElapsedTime)])
-    await compareDBI.finalize();
-    this.yadamu.activeConnections.delete(compareDBI);
+    await compareDBI.final();
     
     
     // If the content of the export file originated in the target database compare the imported schema with the source schema.
@@ -1615,7 +1615,7 @@ class YadamuQA {
       stepStartTime = performance.now()
       this.reportRowCounts(await compareDBI.getRowCounts(targetSchema),metrics,parameters,identifierMappings) 
       stepElapsedTime = performance.now() - stepStartTime 
-	  await compareDBI.finalize()
+	  await compareDBI.final()
       this.metrics.recordTaskTimings([task.taskName,'COUNT','',targetConnectionName,'',YadamuLibrary.stringifyDuration(stepElapsedTime)])
     }       
 

@@ -136,7 +136,7 @@ class VerticaDBI extends YadamuDBI {
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const verticaError = this.trackExceptions(new VerticaError(this.DRIVER_ID,err,this.verticaStack,this.verticaOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`POOL_ON_ERROR`],verticaError);
+      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],verticaError);
       // throw verticaError
     })
 
@@ -144,7 +144,7 @@ class VerticaDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
 	  
 	let stack
     this.status.sqlTrace.write(this.traceComment(`Getting Connection From Pool.`));
@@ -193,14 +193,14 @@ class VerticaDBI extends YadamuDBI {
         case '00000': // Table not found on Drop Table if exists
 	      break;
         default:
-          this.yadamuLogger.info([this.DATABASE_VENDOR,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`);
+          this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`);
       }
     })  
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const verticaError = this.trackExceptions(new VerticaError(this.DRIVER_ID,err,this.verticaStack,this.verticaOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`CONNECTION_ON_ERROR`],verticaError);
+      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],verticaError);
       // throw verticaError
     })
    
@@ -213,7 +213,7 @@ class VerticaDBI extends YadamuDBI {
   
   async closeConnection(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection()`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
 	  
     if (this.connection !== undefined && this.connection.release) {
 	  let stack
@@ -231,7 +231,7 @@ class VerticaDBI extends YadamuDBI {
   
   async closePool(options) {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR],`closePool(${(this.pool !== undefined && this.pool.end)})`)
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],`closePool(${(this.pool !== undefined && this.pool.end)})`)
 
     if (this.pool !== undefined && this.pool.end) {
       let stack
@@ -599,7 +599,7 @@ class VerticaDBI extends YadamuDBI {
         return this.executeSQL(ddlStatement);
       }))
     } catch (e) {
-	 this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	 this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	 results = e;
     }
 	return results;
@@ -696,7 +696,7 @@ class VerticaDBI extends YadamuDBI {
   	} catch(e) {
 	  metrics.writerError = e
 	  try {
-  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
 		e.cause = metrics.writerError

@@ -218,7 +218,7 @@ class Yadamu {
 	    // this.LOGGER.trace(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation],`Active Connections: ${this.activeConnections.size}`);
    	    this.LOGGER.error(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,'TIMEOUT'],'Closing connections and shutting down.')
   	    for (const conn of this.activeConnections) {
-		  conn.abort().then(() => {
+		  conn.destroy(err).then(() => {
 		    this.LOGGER.info(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],'Aborted Connection')
 		  }).catch((e) => {
 		    this.LOGGER.handleWarning(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],e)
@@ -813,11 +813,9 @@ class Yadamu {
 
 	const metadata = await source.loadMetadataFiles(true)
 	
-	this.activeConnections.delete(source);
 
     const copyManager = new YadamuCopyManager(target,this.LOGGER);
 	const results = await copyManager.copyStagedData(source.DATABASE_KEY,controlFile,metadata,source.getCredentials(target.DATABASE_KEY))
-    this.activeConnections.delete(target);
     this.reportStatus(this.STATUS,this.LOGGER)
 
 	return results;
@@ -863,8 +861,6 @@ class Yadamu {
 	  this.STATUS.operationSuccessful = true;
 
       // this.LOGGER.trace([this.constructor.name,'PIPELINE'],'Success')
-	  this.activeConnections.delete(source);
-	  this.activeConnections.delete(target);
       this.reportStatus(this.STATUS,this.LOGGER)
     } catch (e) {
 	  this.LOGGER.handleException(['YADAMU','PIPELINE'],e)
@@ -890,9 +886,7 @@ class Yadamu {
 	  let cause = undefined;
 
       await source.initialize();
-	  this.activeConnections.add(source);
       await target.initialize();
-	  this.activeConnections.add(target);
 		
       if (this.DATA_STAGING_ENABLED && source.DATA_STAGING_SUPPORTED && target.SQL_COPY_OPERATIONS) {
 		await source.loadControlFile()
@@ -914,17 +908,14 @@ class Yadamu {
 	  this.STATUS.operationSuccessful = false;
 	  this.STATUS.err = e;
       results = e;
-	  await source.abort(e);
-      this.activeConnections.delete(source);
-      await target.abort(e);
-      this.activeConnections.delete(target);
 	  if (!((e instanceof UserError) && (e instanceof FileNotFound))) {
         this.reportError(e,this.parameters,this.STATUS,this.LOGGER);
 	  }
-    }
+    } finally { 
+      await this.REJECTION_MANAGER.close();
+      await this.WARNING_MANAGER.close();
+	}
 
-    await this.REJECTION_MANAGER.close();
-    await this.WARNING_MANAGER.close();
     return results;
   }
     
@@ -1027,17 +1018,16 @@ class Yadamu {
 
     try {
       await dbi.initialize();
-	  this.activeConnections.add(dbi)
       this.STATUS.operationSuccessful = false;
 	  const log = await dbi.upload()
-      this.activeConnections.delete(dbi)
+      await dbi.final();
 	  const metrics = this.getMetrics(log);  
 	  this.STATUS.operationSuccessful = true;
       return metrics
     } catch (e) {
 	  this.STATUS.operationSuccessful = false;
 	  this.STATUS.err = e;
-      await dbi.abort(e)
+      await dbi.destroy(e)
     }
     return {};
   }

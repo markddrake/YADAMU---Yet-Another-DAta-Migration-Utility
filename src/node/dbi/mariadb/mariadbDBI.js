@@ -106,7 +106,7 @@ class MariadbDBI extends YadamuDBI {
 		case 'lower_case_table_names':
           this.LOWER_CASE_TABLE_NAMES = parseInt(row[1])
           if (this.isManager() && (this.LOWERCASE_TABLE_NAMES > 0)) {
-	        this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`);
+	        this.yadamuLogger.info([this.DATABASE_VENDOR,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`);
 	      }
         break;
 	  }
@@ -130,7 +130,7 @@ class MariadbDBI extends YadamuDBI {
 		
 	  // Need to change the setting.
 		
-      this.yadamuLogger.info([`${this.DATABASE_VENDOR}`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
+      this.yadamuLogger.qaInfo([this.DATABASE_VENDOR,this.ROLE],`Increasing MAX_ALLOWED_PACKET to 1G.`);
       results = await this.executeSQL(sqlSetPacketSize);
 	  
 	  if (existingConnection) {
@@ -155,6 +155,8 @@ class MariadbDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,,this.getWorkerNumber()],`getConnectionFromPool()`)
+
     let stack
     this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
 	try {
@@ -171,9 +173,9 @@ class MariadbDBI extends YadamuDBI {
 
   async closeConnection(options) {
 	  
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined && this.connection.end)})`)
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined)},${(typeof this.connection.end === 'function')})`)
 	  
-    if (this.connection !== undefined && this.connection.end) {
+    if ((this.connection !== undefined) && (typeof this.connection.end === 'function')) {
       let stack;
       try {
         stack = new Error().stack
@@ -188,9 +190,9 @@ class MariadbDBI extends YadamuDBI {
    
   async closePool(options) {
 	  
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR],`closePool(${(this.pool !== undefined && this.pool.end)})`)
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,],`closePool(${this.pool !== undefined)},${(typeof this.pool.end === 'function')})`)
 	  
-    if (this.pool !== undefined && this.pool.end) {
+    if ((this.pool !== undefined) && (typeof this.pool.end === 'function')) {
       let stack;
       try {
         stack = new Error().stack
@@ -555,7 +557,7 @@ class MariadbDBI extends YadamuDBI {
     } 	
 	
   }
-  
+
   getOutputStream(tableName,metrics) {
 	 return super.getOutputStream(MariadbWriter,tableName,metrics)
   }
@@ -563,7 +565,7 @@ class MariadbDBI extends YadamuDBI {
   getOutputManager(tableName,metrics) {
 	 return super.getOutputManager(MariadbOutputManager,tableName,metrics)
   }
-  
+
   classFactory(yadamu) {
 	return new MariadbDBI(yadamu,this)
   }

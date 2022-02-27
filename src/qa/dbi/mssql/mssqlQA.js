@@ -182,7 +182,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
 class MsSQLDBMgr extends MsSQLQA {
     
     constructor(logger,status,vendorProperties) {
-      super({})
+      super({activeConnections: new Set()})
       this.yadamuLogger = logger;
       this.status = status
       this.vendorProperties = vendorProperties
@@ -212,10 +212,11 @@ class MsSQLDBMgr extends MsSQLQA {
         const CREATE_DATABASE = `create database "${database}" COLLATE ${this.DB_COLLATION}`;
         results =  await this.executeSQL(CREATE_DATABASE);      
 		
-		await this.finalize()
+		await this.final()
 
       } catch (e) {
         console.log([this.DATABASE_VENDOR,'recreateDatabase()'],e);
+		await this.destroy(e)
         throw e
       }
       

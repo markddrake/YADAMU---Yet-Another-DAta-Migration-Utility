@@ -131,7 +131,7 @@ class PostgresDBI extends YadamuDBI {
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const pgErr = this.trackExceptions(new PostgresError(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`POOL_ON_ERROR`],pgErr);
+      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],pgErr);
       // throw pgErr
     })
 
@@ -139,7 +139,7 @@ class PostgresDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
 
 	
 	let stack
@@ -205,14 +205,14 @@ class PostgresDBI extends YadamuDBI {
         case '00000': // Table not found on Drop Table if exists
 	      break;
         default:
-          this.yadamuLogger.info([this.DATABASE_VENDOR,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`);
+          this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`);
       }
     })  
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const pgErr = this.trackExceptions(new PostgresError(this.DRIVER_ID,err,this.postgresStack,this.postgresOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,`CONNECTION_ON_ERROR`],pgErr);
+      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],pgErr);
       // throw pgErr
     })
    
@@ -224,13 +224,13 @@ class PostgresDBI extends YadamuDBI {
 	this.POSTGIS_VERSION = await this.getPostgisInfo();
 	
 	if (this.isManager()) {
-      this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`${this.DB_VERSION}`,`Configuration`],`PostGIS Version: ${this.POSTGIS_VERSION}.`)
+      this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`PostGIS Version: ${this.POSTGIS_VERSION}.`)
 	}
   }
   
   async closeConnection(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection()`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
 	  
     if (this.connection !== undefined && this.connection.release) {
 	  let stack
@@ -248,7 +248,7 @@ class PostgresDBI extends YadamuDBI {
   
   async closePool(options) {
 
-	// this.yadamuLogger.trace([this.DATABASE_VENDOR],`closePool(${(this.pool !== undefined && this.pool.end)})`)
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],`closePool(${(this.pool !== undefined && this.pool.end)})`)
 
     if (this.pool !== undefined && this.pool.end) {
       let stack
@@ -475,7 +475,7 @@ class PostgresDBI extends YadamuDBI {
     }
     catch (e) {
 	  if ((e instanceof PostgresError) && e.bjsonTooLarge()) {
-        this.yadamuLogger.info([this.DATABASE_VENDOR,`UPLOAD`],`Cannot process file using Binary JSON. Switching to textual JSON.`)
+        this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,`UPLOAD`],`Cannot process file using Binary JSON. Switching to textual JSON.`)
         this.useBinaryJSON = false;
         await this.createStagingTable();
         elapsedTime = await this.loadStagingTable(importFilePath);	
@@ -509,7 +509,7 @@ class PostgresDBI extends YadamuDBI {
       }
     }
     else {
-      this.yadamuLogger.error([this.DATABASE_VENDOR,`UPLOAD`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL YADAMU_IMPORT_JSONB()' : 'CALL_YADAMU_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`);
+      this.yadamuLogger.error([this.DATABASE_VENDOR,this.ROLE,`UPLOAD`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL YADAMU_IMPORT_JSONB()' : 'CALL_YADAMU_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`);
       // Return value will be parsed....
       return [];
     }
@@ -679,7 +679,7 @@ class PostgresDBI extends YadamuDBI {
         return this.executeSQL(ddlStatement);
       }))
     } catch (e) {
-	 this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	 this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	 results = e;
     }
 	return results;
@@ -747,7 +747,7 @@ class PostgresDBI extends YadamuDBI {
   	} catch(e) {
 	  metrics.writerError = e
 	  try {
-  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
 		e.cause = metrics.writerError

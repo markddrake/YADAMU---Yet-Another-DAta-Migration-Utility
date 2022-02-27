@@ -112,7 +112,7 @@ class MsSQLDBI extends YadamuDBI {
     this.statementLibrary = undefined
     
     sql.on('error',(err, p) => {
-      this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,`mssql.onError()`],err);
+      this.yadamuLogger.handleException([this.DATABASE_VENDOR,`mssql.onError()`],err);
       throw err
     })
 	
@@ -179,7 +179,7 @@ class MsSQLDBI extends YadamuDBI {
   
   reportTransactionState(operation) {
     const e = new Error(`Unexpected ${operation} operation`)
-    this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,'TRANSACTION MANAGER',operation],new MsSQLError(this.DRIVER_ID,e,e.stack,this.constructor.name))    
+    this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER',operation],new MsSQLError(this.DRIVER_ID,e,e.stack,this.constructor.name))    
   }
   
   getTransactionManager() {
@@ -216,7 +216,7 @@ class MsSQLDBI extends YadamuDBI {
       this.request = new sql.Request(this.requestProvider)
       this.CANCEL_REQUESTED = false
       this.request.on('info',(infoMsg) => { 
-        this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`MESSAGE`],`${infoMsg.message}`);
+        this.yadamuLogger.info([this.DATABASE_VENDOR,`MESSAGE`],`${infoMsg.message}`);
       })
       return this.request;
     } catch (e) {
@@ -405,7 +405,7 @@ class MsSQLDBI extends YadamuDBI {
             statement.input(column,sql.VarChar(4000));
             break;
           default:
-            this.yadamuLogger.warning([this.DATABASE_VENDOR,`PREPARED STATEMENT`],`Unmapped data type [${dataType.type}].`);
+            this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,`PREPARED STATEMENT`],`Unmapped data type [${dataType.type}].`);
         }
       })
       
@@ -422,7 +422,7 @@ class MsSQLDBI extends YadamuDBI {
 
   async createConnectionPool() {
       
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR],`createConnectionPool()`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],`createConnectionPool()`)
   
     this.setTargetDatabase();
     this.logConnectionProperties();
@@ -437,7 +437,7 @@ class MsSQLDBI extends YadamuDBI {
       this.pool.on('error',(err, p) => {
         const cause = err instanceof MsSQLError ? err : this.trackExceptions(new MsSQLError(this.DRIVER_ID,err,stack,`${operation}.onError()`))
         if (!cause.suppressedError())  {
-          this.yadamuLogger.handleException([this.DATABASE_VENDOR,`sql.ConnectionPool.onError()`],cause);
+          this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,`sql.ConnectionPool.onError()`],cause);
           if (!this.RECONNECT_IN_PROGRESS) {
             throw cause
           }
@@ -460,7 +460,7 @@ class MsSQLDBI extends YadamuDBI {
 
   async _getDatabaseConnection() {
 	  
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`_getDatabaseConnection()`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`_getDatabaseConnection()`)
 	
     try {
       await this.createConnectionPool();
@@ -472,7 +472,7 @@ class MsSQLDBI extends YadamuDBI {
   
   async closeConnection(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${(this.preparedStatement !== undefined)},${this.TRANSACTION_IN_PROGRESS})`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,,this.getWorkerNumber()],`closeConnection(${(this.preparedStatement !== undefined)},${this.TRANSACTION_IN_PROGRESS})`)
     
     if (this.preparedStatement !== undefined ) {
       await this.clearCachedStatement()
@@ -493,7 +493,7 @@ class MsSQLDBI extends YadamuDBI {
 
   async closePool(options) {
     
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL'],`closePool(${(this.pool !== undefined)})`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,,'CLOSE POOL'],`closePool(${(this.pool !== undefined)})`)
 	
 	/*
 	**
@@ -511,7 +511,7 @@ class MsSQLDBI extends YadamuDBI {
 		
 	  const timerAbort = new AbortController()
       setTimeout(1000,null,{ref: false, signal: timerAbort.signal}).then(() => {
-        this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL',this.BEGIN_TRANSACTION_ISSUE],`Close pool operation timed out`)
+        this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,,'CLOSE POOL',this.BEGIN_TRANSACTION_ISSUE],`Close pool operation timed out`)
 		  // console.dir(this.pool.pool.used,{depth:null})
 		 return
 	  }).catch((e) => { /* console.log(e) */ })
@@ -523,7 +523,7 @@ class MsSQLDBI extends YadamuDBI {
 		  try {
     		this.cancelRequest(true)
 		  } catch(e) {
-			this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL'],e)
+			this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,,'CLOSE POOL'],e)
 		  }
 		}
 			  
@@ -539,10 +539,10 @@ class MsSQLDBI extends YadamuDBI {
 		*/
 		   
 		process.prependOnceListener('unhandledRejection',this.unhandledRejectionHandler)		
-		// this.yadamuLogger.trace([this.DATABASE_VENDOR,'CLOSE POOL'],`Closing pool`)
+		// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL'],`Closing pool`)
 		await this.pool.close();
 		timerAbort.abort()
-        // this.yadamuLogger.trace([this.DATABASE_VENDOR,'CLOSE POOL'],`Pool Closed`)
+        // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,'CLOSE POOL'],`Pool Closed`)
 		process.removeListener('unhandledRejection',this.unhandledRejectionHandler)
 
         stack = new Error().stack
@@ -561,7 +561,7 @@ class MsSQLDBI extends YadamuDBI {
       } catch(e) {
 		timerAbort.abort()
         // this.pool = undefined
-        this.yadamuLogger.info([this.DATABASE_VENDOR],`Error Closing Pool`)
+        this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE],`Error Closing Pool`)
         throw this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,psudeoSQL))
       }
 	} 
@@ -591,7 +591,7 @@ class MsSQLDBI extends YadamuDBI {
       try {
 		if (!expected) {
 	      const e = new Error(`Unexpected Cancel Request`)
-          this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,'REQUEST MANAGER'],new MsSQLError(this.DRIVER_ID,e,e.stack,this.constructor.name))    
+          this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,'REQUEST MANAGER'],new MsSQLError(this.DRIVER_ID,e,e.stack,this.constructor.name))    
         }
         const sqlStartTime = performance.now();
         stack = new Error().stack;
@@ -796,7 +796,7 @@ class MsSQLDBI extends YadamuDBI {
           table.columns.add(columnList[idx],sql.VarChar(4000),{nullable: true});
           break;
         default:
-          this.yadamuLogger.warning([this.DATABASE_VENDOR,`BULK OPERATION`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
+          this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,`BULK OPERATION`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
       }
     })
     return table
@@ -997,7 +997,7 @@ class MsSQLDBI extends YadamuDBI {
         // May need to use executeBatch if we support SQL Server 2000.
         results.push(await this.executeSQL(ddlStatement))
       } catch (e) {
-  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
+  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	    return e
       } 
     }
@@ -1091,23 +1091,7 @@ class MsSQLDBI extends YadamuDBI {
 	  delete vendorProperties.port
 	}
   }
-      
-  /*
-  **
-  **  Gracefully close down the database connection and pool
-  **
-  */
-
-  /*
-  **
-  **  Abort the database connection and pool.
-  **
-  */
-
-  async abort(e) {
-    await super.abort(e);
-  }
-
+  
   /*
   **
   ** Begin the current transaction
@@ -1136,7 +1120,7 @@ class MsSQLDBI extends YadamuDBI {
         this.requestProvider = this.transaction
         super.beginTransaction()
         if (logSuccess) {
-		  this.yadamuLogger.info([this.DATABASE_VENDOR,'TRANSACTION MANAGER','BEGIN','RECONNECTION'],'Success')
+		  this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER','BEGIN','RECONNECTION'],'Success')
         }
         break;
       } catch (e) {
@@ -1155,7 +1139,7 @@ class MsSQLDBI extends YadamuDBI {
 	      } catch (e) {
 			if (e.code && (e.code !== 'EINVALIDSTATE')) {
               stack = new Error().stack
-  		      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'TRANSACTION MANAGER','BEGIN','ERROR_CLEAN_UP]'],new MsSQLError(this.DRIVER_ID,e,stack,'sql.Transaction.rollback()'))
+  		      this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER','BEGIN','ERROR_CLEAN_UP]'],new MsSQLError(this.DRIVER_ID,e,stack,'sql.Transaction.rollback()'))
 			}
 	      }
 
@@ -1180,7 +1164,7 @@ class MsSQLDBI extends YadamuDBI {
     // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.TRANSACTION_IN_PROGRESS,this.getWorkerNumber()],``)
 
     if (this.TEDIOUS_TRANSACTION_ISSUE) {
-	  this.yadamuLogger.warning([this.DATABASE_VENDOR,'TRANSACTION MANAGER','COMMIT'],`Unable to COMMIT following TEDIOUS FORCED ROLLBACK operation.`)
+	  this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER','COMMIT'],`Unable to COMMIT following TEDIOUS FORCED ROLLBACK operation.`)
 	  return;
 	}
 

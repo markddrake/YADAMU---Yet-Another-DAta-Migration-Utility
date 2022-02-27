@@ -105,7 +105,7 @@ class MySQLDBI extends YadamuDBI {
         case 'lower_case_table_names':
           this.LOWER_CASE_TABLE_NAMES = row.Value
           if (this.isManager() && (this.LOWERCASE_TABLE_NAMES > 0)) {
-			this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`);
+			this.yadamuLogger.info([this.DATABASE_VENDOR,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`);
 	      }
           break;
        }
@@ -130,7 +130,7 @@ class MySQLDBI extends YadamuDBI {
 		
 	  // Need to change the setting.
 		
-      this.yadamuLogger.info([`${this.DATABASE_VENDOR}`],`Increasing MAX_ALLOWED_PACKET to 1G.`);
+      this.yadamuLogger.info([this.DATABASE_VENDOR],`Increasing MAX_ALLOWED_PACKET to 1G.`);
       results = await this.executeSQL(sqlSetPacketSize);
 	  
 	  if (existingConnection) {
@@ -169,7 +169,7 @@ class MySQLDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
     
     this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
     
@@ -189,7 +189,7 @@ class MySQLDBI extends YadamuDBI {
   
   async closeConnection(options) {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection(${((this.connection !== undefined) && (typeof this.connection.release === 'function'))})`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection(${(this.connection !== undefined)},${(typeof this.connection.release === 'function')})`)
 
     if (this.keepAliveHdl) {
       clearInterval(this.keepAliveHdl)
@@ -215,8 +215,8 @@ class MySQLDBI extends YadamuDBI {
       
   async closePool(options) {
       
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR],`closePool(${(this.pool !== undefined && this.pool.end)})`)
-      
+	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,],`closePool(${this.pool !== undefined)},${(typeof this.pool.end === 'function')})`)
+	      
     if ((this.pool !== undefined) && (typeof this.pool.end === 'function')) {
       let stack;
       try {

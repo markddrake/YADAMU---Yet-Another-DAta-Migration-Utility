@@ -163,8 +163,8 @@ class ExampleDBI extends YadamuDBI {
   **  Gracefully close down the database connection and pool.
   **
   
-  async dofinal() {
-	await super.doFinal()
+  async final() {
+	await super.final()
   } 
 
   */
@@ -173,9 +173,9 @@ class ExampleDBI extends YadamuDBI {
   **
   **  Abort the database connection and pool.
   **
- 
-  async abort(e) {
-    await super.abort(e);
+   
+  async destroy(e) {
+    await super.destroy(e);
   }
 
   */

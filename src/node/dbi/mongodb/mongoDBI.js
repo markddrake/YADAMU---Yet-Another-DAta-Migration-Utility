@@ -137,7 +137,7 @@ class MongoDBI extends YadamuDBI {
         return this.createCollection(collectionName)
       }))
     } catch (e) { 
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	  results = e
     }
     return results;
@@ -182,7 +182,7 @@ class MongoDBI extends YadamuDBI {
 
     // Wrapper for client.db(). db becomes the YADAMU connection. Needs to set this.connection for when it is used to change databases, and but also needs to return the connection for when it invoked by getConnectionFromPool()
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`mongoClient.db(${dbname})`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`mongoClient.db(${dbname})`)
 	let stack
     const operation = `MongoClient.db(${dbname})\n`
     try {   
@@ -203,7 +203,7 @@ class MongoDBI extends YadamuDBI {
 
     // Wrapper for db.command().
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`mongoClient.db(${dbname})`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`mongoClient.db(${dbname})`)
     
 	let stack
     const operation = `command(${JSON.stringify(command)})`
@@ -480,7 +480,7 @@ class MongoDBI extends YadamuDBI {
         
   async createConnectionPool() {
 
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`createConnectionPool()`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`createConnectionPool()`)
       
     this.logConnectionProperties();
     const poolSize = this.yadamu.PARALLEL ? parseInt(this.yadamu.PARALLEL) + 1 : 5
@@ -497,7 +497,7 @@ class MongoDBI extends YadamuDBI {
   
   async configureConnection() {
       
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`configureConnection()`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`configureConnection()`)
 
     const serverInfo = await this.serverInfo()
     this._DB_VERSION = serverInfo.version
@@ -546,9 +546,9 @@ class MongoDBI extends YadamuDBI {
 	
 	await super.initialize(false);   
     
-    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Document ID Tranformation: ${this.ID_TRANSFORMATION}.`)
-    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Read Tranformation: ${this.READ_TRANSFORMATION}.`)
-    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Write Tranformation: ${this.WRITE_TRANSFORMATION}.`)    
+    this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,this.DB_VERSION,`Configuration`],`Document ID Tranformation: ${this.ID_TRANSFORMATION}.`)
+    this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,this.DB_VERSION,`Configuration`],`Read Tranformation: ${this.READ_TRANSFORMATION}.`)
+    this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,this.DB_VERSION,`Configuration`],`Write Tranformation: ${this.WRITE_TRANSFORMATION}.`)    
   }
 
   /*
@@ -921,7 +921,7 @@ class MongoDBI extends YadamuDBI {
     Object.keys(metadata).forEach((table) => {
       const mappedTableName = metadata[table].tableName.indexOf('$') > -1 ? metadata[table].tableName.replace(/\$/g,'') : undefined
       if (mappedTableName) {
-		this.yadamuLogger.warning([this.DATABASE_VENDOR,this.DB_VERSION,'IDENTIFIER INVALID',metadata[table].tableName],`Identifier contains invalid character "$". Identifier re-mapped as "${mappedTableName}".`)
+		this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,this.DB_VERSION,'IDENTIFIER INVALID',metadata[table].tableName],`Identifier contains invalid character "$". Identifier re-mapped as "${mappedTableName}".`)
         dbMappings[table] = {
   	      tableName : mappedTableName
 		}

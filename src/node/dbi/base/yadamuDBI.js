@@ -253,6 +253,8 @@ class YadamuDBI extends EventEmitter {
     
 	super()
 	this.DRIVER_ID = performance.now()
+	
+	yadamu.activeConnections.add(this)
 
     this.yadamu = yadamu;
     this.manager = manager
@@ -449,10 +451,10 @@ class YadamuDBI extends EventEmitter {
 	  
     switch (logEntry.severity) {
       case 'CONTENT_TOO_LARGE' :
-        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`Exceeded maximum string size [${this.MAX_STRING_SIZE} bytes].`)
+        yadamuLogger.error([this.DATABASE_VENDOR,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`Exceeded maximum string size [${this.MAX_STRING_SIZE} bytes].`)
         return;
       case 'SQL_TOO_LARGE':
-        yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`Exceeded maximum DDL statement length [${this.MAX_STRING_SIZE} bytes].`)
+        yadamuLogger.error([this.DATABASE_VENDOR,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''} `],`Exceeded maximum DDL statement length [${this.MAX_STRING_SIZE} bytes].`)
         return;
       case 'FATAL':
         summary.errors++
@@ -460,7 +462,7 @@ class YadamuDBI extends EventEmitter {
 		err.SQL = logEntry.sqlStatement
 		err.details = logEntry.details
 		summary.exceptions.push(err)
-        // yadamuLogger.error([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}`)
+        // yadamuLogger.error([this.DATABASE_VENDOR,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}\n${logEntry.sqlStatement}`)
         return
       case 'WARNING':
         summary.warnings++
@@ -485,10 +487,10 @@ class YadamuDBI extends EventEmitter {
     }
     if (logDDL) { 
 	  if (warning) {
-        yadamuLogger.warning([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
+        yadamuLogger.warning([this.DATABASE_VENDOR,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
 	  }
 	  else {
-        yadamuLogger.ddl([`${this.DATABASE_VENDOR}`,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
+        yadamuLogger.ddl([this.DATABASE_VENDOR,`${logEntry.severity}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`Details: ${logEntry.msg}\n${logEntry.details}${logEntry.sqlStatement}`)
 	  }
 	}
   }
@@ -520,22 +522,22 @@ class YadamuDBI extends EventEmitter {
       const logEntry = result[logEntryType];
       switch (true) {
         case (logEntryType === "message") : 
-          yadamuLogger.info([`${this.DATABASE_VENDOR}`],`${logEntry}.`)
+          yadamuLogger.info([this.DATABASE_VENDOR],`${logEntry}.`)
           break;
         case (logEntryType === "dml") : 
           yadamuLogger.info([`${logEntry.tableName}`,`SQL`],`Rows ${logEntry.rowCount}. Elaspsed Time ${YadamuLibrary.stringifyDuration(Math.round(logEntry.elapsedTime))}s. Throughput ${Math.round((logEntry.rowCount/Math.round(logEntry.elapsedTime)) * 1000)} rows/s.`)
           break;
         case (logEntryType === "info") :
-          yadamuLogger.info([`${this.DATABASE_VENDOR}`],`"${JSON.stringify(logEntry)}".`);
+          yadamuLogger.info([this.DATABASE_VENDOR],`"${JSON.stringify(logEntry)}".`);
           break;
         case (logDML && (logEntryType === "dml")) :
-          yadamuLogger.dml([`${this.DATABASE_VENDOR}`,`${logEntry.tableName}`,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`)
+          yadamuLogger.dml([this.DATABASE_VENDOR,`${logEntry.tableName}`,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`)
           break;
         case (logDDL && (logEntryType === "ddl")) :
-          yadamuLogger.ddl([`${this.DATABASE_VENDOR}`,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`) 
+          yadamuLogger.ddl([this.DATABASE_VENDOR,`${logEntry.tableName}`],`\n${logEntry.sqlStatement}.`) 
           break;
         case (logTrace && (logEntryType === "trace")) :
-          yadamuLogger.trace([`${this.DATABASE_VENDOR}`,`${logEntry.tableName ? logEntry.tableName : ''}`],`\n${logEntry.sqlStatement}.`)
+          yadamuLogger.trace([this.DATABASE_VENDOR,`${logEntry.tableName ? logEntry.tableName : ''}`],`\n${logEntry.sqlStatement}.`)
           break;
         case (logEntryType === "error"):
 		  this.processError(yadamuLogger,logEntry,summary,logDDLMsgs);
@@ -1108,6 +1110,12 @@ class YadamuDBI extends EventEmitter {
 	}
   }
 
+  getCloseOptions(err) {
+	 	
+	return err ? {abort  : false } : { abort : true, error : err }
+
+  }
+  
   async final(){
 	
     // this.yadamuLogger.trace([this.constructor.name,'final()',this.ROLE,],`Waiting for ${this.activeWorkers.size} Writers to terminate. [${this.activeWorkers}]`);
@@ -1116,80 +1124,75 @@ class YadamuDBI extends EventEmitter {
 	  await this.ddlComplete
 	}
 
-    this.logDisconnect();
-		
+	const closeOptions = this.getCloseOptions()
+				
+	await this.writersFinished()
+
 	if (this.isManager()) {
       // this.yadamuLogger.trace([this.constructor.name,'final()',this.ROLE,'ACTIVE_WORKERS'],`WAITING [${this.activeWorkers.size}]`)
 	  const stillWorking = Array.from(this.activeWorkers).map((worker) => { return worker.workerState })
 	  await Promise.all(stillWorking);
       // this.yadamuLogger.trace([this.constructor.name,'final()',this.ROLE,'ACTIVE_WORKERS'],'PROCESSING')
 	}	  
-	
+
+    await this.closeConnection(closeOptions);
+    this.logDisconnect();
+	await this.closePool(closeOptions);
+		
   }	
 
   async destroy(err) {
  
-	// this.yadamuLogger.trace([this.constructor.name,this.ROLE,this.getWorkerNumber()],`doDestroy(${this.activeWorkers.size})`)
+	// this.yadamuLogger.trace([this.constructor.name,this.ROLE,this.getWorkerNumber()],`doDestroy(${this.activeWorkers.size},${(this.err ? this.err.message : 'normal'})})`)
 	
-	if ((this.isManager()) &&  (this.activeWorkers.size > 0))  {
-      // Active WorkersTHE set of Workers that have not terminated.
+    /*
+    **
+    **  Abort the database connection and pool
+    **
+    */
+
+    if ((this.isManager()) &&  (this.activeWorkers.size > 0))  {
+      // Active Workers contains the set of Workers that have not terminated.
 	  // We need to force them to terminate and release any database connections they own.
-	  this.yadamuLogger.error([this.DATABASE_VENDOR,'destroy()',this.ROLE],`Aborting ${this.activeWorkers.size} active workers).`)
+	  this.yadamuLogger.error([this.DATABASE_VENDOR,this.ROLE,'destroy()'],`Aborting ${this.activeWorkers.size} active workers).`)
 	  this.activeWorkers.forEach((worker) => {
 	    try {
-          this.yadamuLogger.log([`${this.DATABASE_VENDOR}`,'destroy()','Worker',this.getWorkerNumber()],`Found Active Worker ${worker.getWorkerNumber()}`);
-	      worker.abort()
+          this.yadamuLogger.log([this.DATABASE_VENDOR,this.ROLE,'destroy()','Worker',this.getWorkerNumber()],`Found Active Worker ${worker.getWorkerNumber()}`);
+	      worker.destroy()
 		} catch(e) {
-          this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'destroy()','Worker',worker.getWorkerNumber()],e);
+          this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'destroy()','Worker',worker.getWorkerNumber()],e);
 		}
 	  })
 	}
+
+	const closeOptions = this.getCloseOptions(err)
 	
-	await this.writersFinished()
-
-    const options = { abort: (err ? true : false) }
-	await this.closeConnection(options);
-    await this.closePool(options);	 
-
+	if (this.connection) {		
+      try {
+        await this.closeConnection(closeOptions);
+    	this.logDisconnect();
+	  } catch (e) {
+	    if (!YadamuError.lostConnection(e)) {
+          this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'destroy()','closeConnection()'],e);
+	    }
+	  }
+	}
+	
+	if (this.pool) {
+      try {
+	    // Force Termnination of All Current Connections.
+	    await this.closePool(closeOptions);
+	  } catch (e) {
+	    if (!YadamuError.lostConnection(e)) {
+          this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'destroy()','closePool()'],e);
+	    }
+	  }
+	}
+	
+	this.yadamu.activeConnections.delete(this)
+	
   }	
-  
-  	
-  /*
-  **
-  **  Abort the database connection and pool
-  **
-  */
-  
-  async abort(e,options) {
-	
-	// this.yadamuLogger.trace([this.constructor.name,this.ROLE,`abort(${poolOptions})`],'')
-
-	// Log all errors other than lost connection errors. Do not throw otherwise underlying cause of the abort will be lost. 
-				
-	options = options === undefined ? {abort: true} : Object.assign(options,{abort:true})
-    options.err = e
-				
-    try {
-      await this.closeConnection(options);
-	} catch (e) {
-	  if (!YadamuError.lostConnection(e)) {
-        this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','Connection'],e);
-	  }
-	}
-	
-    try {
-	  // Force Termnination of All Current Connections.
-	  await this.closePool(options);
-	} catch (e) {
-	  if (!YadamuError.lostConnection(e)) {
-        this.yadamuLogger.handleException([`${this.DATABASE_VENDOR}`,'ABORT','Pool'],e);
-	  }
-	}
-	
-	this.logDisconnect();
-	
-  }
-  
+    
   checkConnectionState(cause) {
 	 
 	// Throw cause if cause is a lost connection. Used by drivers to prevent attempting rollback or restore save point operations when the connection is lost.
@@ -1288,7 +1291,7 @@ class YadamuDBI extends EventEmitter {
       const startTime = performance.now();
       const jsonHndl = await this.uploadFile(this.UPLOAD_FILE);
       const elapsedTime = performance.now() - startTime;
-      this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`UPLOAD`],`File "${this.UPLOAD_FILE}". Size ${fileSizeInBytes}. Elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
+      this.yadamuLogger.info([this.DATABASE_VENDOR,`UPLOAD`],`File "${this.UPLOAD_FILE}". Size ${fileSizeInBytes}. Elapsed time ${YadamuLibrary.stringifyDuration(elapsedTime)}s.  Throughput ${Math.round((fileSizeInBytes/elapsedTime) * 1000)} bytes/s.`)
 	  await this.initializeImport()
       const log = await this.processFile(jsonHndl)
 	  await this.finalizeImport()

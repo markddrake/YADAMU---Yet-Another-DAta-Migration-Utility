@@ -138,7 +138,7 @@ class SnowflakeDBI extends YadamuDBI {
   
   async getConnectionFromPool() {
   	// Snowflake-SDK does not support connection pooling
-  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`getConnectionFromPool()`)
+  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
     
     this.setDatabase();
     this.logConnectionProperties();
@@ -162,18 +162,18 @@ class SnowflakeDBI extends YadamuDBI {
     this._DB_VERSION = results[0].DATABASE_VERSION
 
     if ((this.isManager()) && (this.SNOWFLAKE_XML_TYPE !== SnowflakeConstants.SNOWFLAKE_XML_TYPE )) {
-       this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`${this.DB_VERSION}`,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_XML_TYPE}.`)
+       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_XML_TYPE}.`)
     }	
 
     if ((this.isManager()) && (this.SNOWFLAKE_JSON_TYPE !== SnowflakeConstants.SNOWFLAKE_JSON_TYPE )) {
-       this.yadamuLogger.info([`${this.DATABASE_VENDOR}`,`${this.DB_VERSION}`,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_JSON_TYPE}.`)
+       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_JSON_TYPE}.`)
     }	
 
   }
 
   async closeConnection(options) {
 	  
-  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.getWorkerNumber()],`closeConnection()`)
+  	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
 	  
     if (this.connection !== undefined && this.connection.destroy) {
       await this.connection.destroy();
@@ -249,7 +249,7 @@ class SnowflakeDBI extends YadamuDBI {
         return this.executeSQL(ddlStatement,[]);
       }))
     } catch (e) { 
-	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	  results = e
     }
     return results;
@@ -594,7 +594,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   	} catch(e) {
 	  metrics.writerError = e
 	  try {
-  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,'COPY',tableName],e)
+  	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'COPY',tableName],e)
 	    let results = await this.rollbackTransaction()
 	  } catch (e) {
 		e.cause = metrics.writerError

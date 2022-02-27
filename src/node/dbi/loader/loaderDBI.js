@@ -528,7 +528,7 @@ class LoaderDBI extends YadamuDBI {
   }
 
   async getInputStream(filename) {
-    // this.yadamuLogger.trace([this.DATABASE_VENDOR,tableInfo.TABLE_NAME],`Creating input stream on ${filename}`)
+    // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,tableInfo.TABLE_NAME],`Creating input stream on ${filename}`)
     const stream = fs.createReadStream(filename);
     const stack = new Error().stack;
     await new Promise((resolve,reject) => {
