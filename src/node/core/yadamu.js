@@ -222,10 +222,9 @@ class Yadamu {
 		    this.LOGGER.info(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],'Aborted Connection')
 		  }).catch((e) => {
 		    this.LOGGER.handleWarning(['UNHANDLED REJECTION','YADAMU',this.STATUS.operation,conn.DATABASE_VENDOR],e)
-		  }).finally(() => {
-	  	    process.exit()
-          })
+		  })
 		}
+        process.exit()
 	  })
     }  
   }  

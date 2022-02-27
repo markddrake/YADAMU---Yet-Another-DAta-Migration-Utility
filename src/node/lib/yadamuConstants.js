@@ -29,7 +29,7 @@ class YadamuConstants {
 
   static get STATIC_PARAMETERS() {
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
-       "YADAMU_VERSION"            : '2.0'
+       "YADAMU_VERSION"            : '3.0'
      , "FILE"                      : "yadamu.json"
 	 , "CONFIG"                    : "config.json"
      , "RDBMS"                     : "file"

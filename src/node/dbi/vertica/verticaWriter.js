@@ -146,7 +146,7 @@ class VerticaWriter extends YadamuWriter {
   }
   
   async _writeBatch(batch,rowCount) {
-	// try {
+    // try {
       
     // console.log('Write Batch',this.tableName,this.COPY_METRICS.batchNumber,rowCount,'Copy',batch.copy.length,'Insert',batch.insert.length)
     
@@ -215,7 +215,7 @@ class VerticaWriter extends YadamuWriter {
         await this.dbi.releaseSavePoint(); 
       } catch (cause) {
         if (cause.missingFile && cause.missingFile()) {
-          cause = new StagingAreaMisMatch(this.dbi.DRIVER_ID,batchStagingFile,this.dbi.LOCAL_STAGING_AREA, this.dbi.REMOTE_STAGING_AREA,cause)
+          cause = new StagingAreaMisMatch(this.dbi.DRIVER_ID,batchStagingFileName,this.dbi.LOCAL_STAGING_AREA, this.dbi.REMOTE_STAGING_AREA,cause)
         } 
         this.cleanupStagingFile(stagingFilePath,false);
         await this.reportBatchError(batch[key],`COPY`,cause)

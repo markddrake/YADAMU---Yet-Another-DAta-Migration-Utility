@@ -127,7 +127,7 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
         const conn = await this.getConnectionFromPool();
         const res = await this.execute(conn,operation)
         await this.final()
-      }).catch((e) => {
+      }).catch(async (e) => {
         this.yadamu.LOGGER.handleException(tags,new SnowflakeError(this.DRIVER_ID,e,stack,operation));
 		await this.destroy(e)
       })
@@ -141,7 +141,7 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
 class SnowflakeMgr extends SnowflakeDBI {
 	
 	constructor(logger,status,vendorProperties) {
-	  super({activeConnection : new Set()})
+	  super({activeConnections : new Set()})
 	  this.yadamuLogger = logger;
   	  this.status = status
 	  this.vendorProperties = vendorProperties

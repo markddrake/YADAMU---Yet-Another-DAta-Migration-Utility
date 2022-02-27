@@ -84,15 +84,13 @@ class YadamuRejectManager {
   }
   
   async close() {
-
-	if (this.recordCount > 0) {
+    if (this.recordCount > 0) {
 	  // this.sendEndOfData() 
 	  this.is.addContent([null])
 	  await this.pipeline
 	  await this.dbi.finalizeData();
 	  await this.dbi.finalizeImport();
-	  await this.dbi.finalize();
-      await this.logger.close()
+	  await this.logger.close()
       this.yadamu.LOGGER.info([this.usage],`${this.recordCount} records written to "${this.filename}"`)
 	}
   }

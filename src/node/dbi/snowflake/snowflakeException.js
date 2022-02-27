@@ -5,8 +5,8 @@ import SnowflakeConstants from './snowflakeConstants.js'
 
 class SnowflakeError extends DatabaseError {
   
-  constructor(cause,stack,sql) {
-    super(cause,stack,sql);
+  constructor(drvierID,cause,stack,sql) {
+    super(drvierID,cause,stack,sql);
     if (this.sql.indexOf('),(?') > 0) {
 	  const startElipises = this.sql.indexOf('),(?') + 2 
 	  const endElipises =  this.sql.lastIndexOf('),(?') + 2

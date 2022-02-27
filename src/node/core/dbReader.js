@@ -37,7 +37,7 @@ class DBReader extends Readable {
     this.dbi = dbi;
     this.status = dbi.yadamu.STATUS
     this.yadamuLogger = yadamuLogger;
-    this.yadamuLogger.info([`Reader`,dbi.DATABASE_VENDOR,dbi.DB_VERSION,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
+    this.yadamuLogger.info([YadamuConstants.READER_ROLE,dbi.DATABASE_VENDOR,dbi.DB_VERSION,this.dbi.getWorkerNumber()],`Ready.`)
   
     this.metadata = undefined
     this.schemaMetadata = [];

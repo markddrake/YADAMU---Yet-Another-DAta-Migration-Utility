@@ -322,9 +322,7 @@ class YadamuLogger {
       await pipeline(errorPipeline,{end:false})
       await dbi.finalizeData();
 	  await dbi.finalizeImport();
-	  await dbi.finalize();
     } catch (err) {    
-	  console.log(err)
 	  const loggerError = new Error(`Error creating data file "${dataFilePath}".`)
 	  loggerError.cause = err
 	  loggerError.systemInformation = currentSettings.systemInformation

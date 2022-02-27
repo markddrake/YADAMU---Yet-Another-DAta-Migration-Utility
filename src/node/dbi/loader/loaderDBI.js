@@ -214,6 +214,7 @@ class LoaderDBI extends YadamuDBI {
     super(yadamu,manager,connectionSettings,parameters)
 	this.yadamuProperties = {}
 	this.baseDirectory = path.resolve(this.vendorProperties.directory || "")
+	this._DB_VERSION = YadamuConstants.YADAMU_VERSION
   }    	
  
   isValidDDL() {

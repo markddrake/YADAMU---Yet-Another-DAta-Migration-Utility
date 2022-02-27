@@ -182,6 +182,7 @@ class FileDBI extends YadamuDBI {
 	this.firstTable = true;
 	this.ddl = undefined;
 	this.baseDirectory = path.resolve(this.vendorProperties.directory || "")
+	this._DB_VERSION = YadamuConstants.YADAMU_VERSION
   }
 
   setDescription(description) {
@@ -347,7 +348,7 @@ class FileDBI extends YadamuDBI {
     this.setDescription(this.FILE)
 
 	this.outputStream = await this.createOutputStream()
-    this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE],`Writing data to "${this.FILE}".`)
+    this.yadamuLogger.info([this.DATABASE_VENDOR,YadamuConstants.WRITER_ROLE],`Writing data to "${this.FILE}".`)
   }
   
   async initializeData() {
@@ -502,7 +503,7 @@ class FileDBI extends YadamuDBI {
     // Return the inputStream and the transform streams required to process it.
     const stats = fs.statSync(this.FILE)
     const fileSizeInBytes = stats.size
-    this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE],`Processing file "${this.FILE}". Size ${fileSizeInBytes} bytes.`)
+    this.yadamuLogger.info([this.DATABASE_VENDOR,YadamuConstants.READER_ROLE],`Processing file "${this.FILE}". Size ${fileSizeInBytes} bytes.`)
 	return this.inputStream
   }
   
@@ -643,7 +644,7 @@ class FileDBI extends YadamuDBI {
     this.FILE = outputFilePath
 	await this.createOutputStream();
 	streams.push(this.outputStream)
-	this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,options.encryptedInput ? 'DECRYPT' : 'ENCRYPT'],`File: "${inputFilePath}" ==> "${outputFilePath}"`)
+	this.yadamuLogger.info([this.DATABASE_VENDOR,YadamuConstants.WRITER_ROLE,options.encryptedInput ? 'DECRYPT' : 'ENCRYPT'],`File: "${inputFilePath}" ==> "${outputFilePath}"`)
 	return streams;
   }
     

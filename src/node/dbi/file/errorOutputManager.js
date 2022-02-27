@@ -13,15 +13,17 @@ class ErrorOutputManager extends JSONOutputManager {
 	
   }
 
-      
   async doConstruct() { 
   }
 
   beginTable(tableName) {
-	this.startTable = this.firstTable ? `"${tableName}":[` :  `,"${tableName}":[`
+    this.startTable = this.firstTable ? `"${tableName}":[` :  `,"${tableName}":[`
 	this.firstTable = false;
 	this.rowSeperator = '';
 	super.beginTable() 
+    this.rowTransformation  = () => {}
+	this.processRow =  this._processRow
+	this.processOutOfSequenceMessages()
   }
 
   processRow(row) {
@@ -40,7 +42,6 @@ class ErrorOutputManager extends JSONOutputManager {
         this.processRow(obj.data)
 		break
 	  case 'table':
-        // Used when processing serial data sources such as files to indicate that all records have been processed by the writer
         this.beginTable(obj.table)
         break
 	  case 'eod':

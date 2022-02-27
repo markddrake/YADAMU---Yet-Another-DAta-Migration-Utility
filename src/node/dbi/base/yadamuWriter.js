@@ -103,9 +103,12 @@ class YadamuWriter extends Writable {
 
     this.skipTable = true;
 	this.COPY_METRICS.lost += this.COPY_METRICS.written;
-	this.COPY_METRICS.skipped += this.COPY_METRICS.cached;
+	this.COPY_METRICS.skipped += (this.COPY_METRICS.pending - this.COPY_METRICS.cached);
+	this.COPY_METRICS.pending = 0;
 	this.COPY_METRICS.written = 0;
 	this.COPY_METRICS.cached = 0;
+
+
 	
   }
   
@@ -176,6 +179,7 @@ class YadamuWriter extends Writable {
 	}
 	
     this.COPY_METRICS.skipped++;
+	this.COPY_METRICS.pending--
     
     try {
       this.rejectRow(this.tableName,record);

@@ -205,6 +205,8 @@ class YadamuOutputManager extends Transform {
     for (const data of this.outOfSequenceMessageCache) {
 	  this.processRow(data)
 	}
+	
+	// this.outOfSequenceMessageCache.length = 0
   }
   
   async _invalidMessageSequence(data) {
@@ -249,7 +251,6 @@ class YadamuOutputManager extends Transform {
     await this.setTableInfo(this.tableName)
     this.processRow =  this._processRow
 	this.processOutOfSequenceMessages()
-	this.processRow =  this._processRow
   }
  
   async initializePartition(partitionInfo) {

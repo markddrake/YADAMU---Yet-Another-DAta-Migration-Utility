@@ -504,7 +504,7 @@ class OracleDBI extends YadamuDBI {
         this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`XMLType storage model is ${this.XML_STORAGE_CLAUSE}.`)
       }
 
-	  this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,this.DB_VERSION,`Configuration`],`JSON storage model is ${this.JSON_DATA_TYPE}.`)
+	  this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`JSON storage model is ${this.JSON_DATA_TYPE}.`)
     }
   }
 

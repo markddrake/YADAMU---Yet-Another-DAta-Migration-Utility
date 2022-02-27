@@ -36,11 +36,20 @@ class SnowflakeParser extends YadamuParser {
 		     	case 'NAN':
 				  row[idx] = NaN
 				  break;
+				case 'NULL':
+				  row[idx] = null
+				  break;
 			    default:
 				  row[idx] = Number(row[idx])
 			  }
 		    }
-	      }         
+	      }
+        case "NUMBER":
+		  return (row, idx) => {
+	        if ((typeof row[idx] === 'string') && (row[idx] === 'NULL')) {
+     		  row[idx] = null
+			}
+		  }		
 		default:
   		   return null;
       }
