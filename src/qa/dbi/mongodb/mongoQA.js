@@ -4,6 +4,13 @@ import {
   setTimeout 
 }                      from "timers/promises"
 
+import {
+  networkInterfaces 
+}                      from 'os';
+
+import mongodb from 'mongodb'
+const { MongoClient } = mongodb;
+
 import MongoDBI        from '../../../node/dbi//mongodb/mongoDBI.js';
 import MongoError      from '../../../node/dbi//mongodb/mongoException.js'
 import MongoConstants  from '../../../node/dbi//mongodb/mongoConstants.js';
@@ -393,8 +400,6 @@ class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
         })
       }
 	  
-      const sourceCounts = await this.getRowCounts(source)
-	        
       await this.use(target.schema);
       const targetHash = await this.dbHash()
       const targetHashValues = targetHash.collections;
@@ -405,10 +410,11 @@ class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
           }
         })
       }
-
-      const targetCounts =  await this.getRowCounts(target)
-	        
-      const mismatchedHashList = []
+	  
+      const sourceCounts = await this.getRowCounts(source)
+	  const targetCounts =  await this.getRowCounts(target)
+	  
+	  const mismatchedHashList = []
       
       const report = {
         successful : []
@@ -428,15 +434,22 @@ class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
            }
          }
       })
-	  	  
+	  
       for (const collectionName of mismatchedHashList) {
-        const results = await this.compareCollections(source.schema,target.schema,collectionName,rules)
-		if (results.length === 0) {
-          report.successful.push([source.schema,target.schema,collectionName,sourceCounts.find(element => element[1] === collectionName)[2]])
-        }
-        else {
-          report.failed.push(collectionName,[source.schema,target.schema,collectionName, sourceCounts.find(element => element[1] === collectionName)[2],targetCounts.find(element => element[1] === collectionName)[2],results.length,results.length,null,null])
-        }
+		const sourceRowCount = sourceCounts.find((row) => { return row[1] === collectionName })[2]
+		const targetRowCount = targetCounts.find((row) => { return row[1] === collectionName })[2]
+	    if (sourceRowCount === targetRowCount) {
+          const results = await this.compareCollections(source.schema,target.schema,collectionName,rules)
+		  if (results.length === 0) {
+            report.successful.push([source.schema,target.schema,collectionName,targetRowCount])
+          }
+          else {
+            report.failed.push([source.schema,target.schema,collectionName, sourceRowCount, targetRowCount, results.length, results.length, null,null])
+          }
+		}
+		else {
+  		  report.failed.push([source.schema,target.schema,collectionName,sourceRowCount, targetRowCount, -1, -1,null,null])
+		}
       }
       return report
     }
@@ -445,43 +458,66 @@ class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
       return new MongoQA(yadamu,this)
     }
 	
-    async scheduleTermination(workerId) {
-      let stack
+	async getConnectionID() {
+	  let stack
       let operation
-	  const tags = this.getTerminationTags(workerId,'')
-	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
-	  setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
-        if (this.client !== undefined) {
-          const currentOp = {
+		  const currentOp = {
             currentOp : true
           , $all      : false
           , $ownOps   : true
           }
-          this.yadamuLogger.log(tags,`Killing connection.`);
 		  stack = new Error().stack
           const dbAdmin = await this.client.db('admin',{returnNonCachedInstance:true});  
           operation = `mongoClient.db('admin').command(${currentOp})`
           const ops = await dbAdmin.command(currentOp)
-          const hostList = []
-          ops.inprog.forEach((op) => {
-            if (op.client && (op.client.startsWith('172.18.0.1'))) {
-              hostList.push(op.client);
-            }
-          })
+          const cmd = ops.inprog.filter((op) => {
+			 // Filter by IP Address matching value from op.networkInterfaces()
+			 return op.command.hasOwnProperty('currentOp')
+		  })
+		  const pid = cmd[0].client
+		  return pid
+	}
+	
+	async listCurrentOps() {
+	
+      const currentOp = {
+        currentOp : true
+      , $all      : true
+	  , $ownOps   : true
+      }
+      const dbAdmin = await this.client.db('admin',{returnNonCachedInstance:true});  
+      const ops = await dbAdmin.command(currentOp)
+      console.log(ops)     
+    }
+	
+    async scheduleTermination(pid,workerId) {
+      let stack
+      let operation
+	  const tags = this.getTerminationTags(workerId,pid)
+	  this.yadamuLogger.qa(tags,`Termination Scheduled.`);
+	  setTimeout(this.yadamu.KILL_DELAY,pid,{ref : false}).then(async (pid) => {
+        if (this.client !== undefined) {
+		  
+		  // this.listCurrentOps()
+		  
+		  this.yadamuLogger.log(tags,`Killing connection.`);
+          const killClient = await new MongoClient(this.getMongoURL(),{ useUnifiedTopology: true});
+          await killClient.connect();
+          const dbAdmin = await killClient.db('admin',{returnNonCachedInstance:true});  
           const dropConnections = {
             dropConnections: 1
-          , hostAndPort : hostList
+          , hostAndPort : [pid]
           }
 		  stack = new Error().stack
           operation = `mongoClient.db('admin').command(${JSON.stringify(dropConnections)})`
-          const res = await  await dbAdmin.command(dropConnections)
-          // await dbAdmin.close()
+          const res = await dbAdmin.command(dropConnections)
+		  await killClient.close()
         }
         else {
           this.yadamuLogger.log(tags,`Unable to Kill Connection: Connection Pool no longer available.`);
         }
       }).catch((e) => {
-          this.yadamu.LOGGER.handleException(tags,new MongoErrorr(this.DRIVER_ID,e,stack,operation));
+          this.yadamu.LOGGER.handleException(tags,new MongoError(this.DRIVER_ID,e,stack,operation));
       })
     }
 }

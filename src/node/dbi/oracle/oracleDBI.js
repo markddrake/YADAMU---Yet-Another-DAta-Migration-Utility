@@ -195,18 +195,20 @@ class OracleDBI extends YadamuDBI {
 
     this.ddl = [];
 	this.dropWrapperStatements = []
-    this.systemInformation = undefined;
 
-	this.StatementGenerator = StatementGenerator
-	this.StatementLibrary = OracleStatementLibrary
-	this.statementLibrary = undefined
-
-	// Oracle always has a transaction in progress, so beginTransaction is a no-op
+    // Oracle always has a transaction in progress, so beginTransaction is a no-op
 
 	this.TRANSACTION_IN_PROGRESS = true;
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Constructor Complete');
 	
   }
+  
+  initializeManager() {
+	super.initializeManager()
+	this.StatementGenerator = StatementGenerator
+	this.StatementLibrary = OracleStatementLibrary
+	this.statementLibrary = undefined
+  }	 
 
   parseConnectionString(vendorProperties, connectionString) {
 
@@ -335,11 +337,7 @@ class OracleDBI extends YadamuDBI {
       }
     }
   }
-
-  async _reconnect() {
-    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
-  }
-
+  
   async createLob(lobType) {
 
     let stack
@@ -884,9 +882,8 @@ class OracleDBI extends YadamuDBI {
   **  Connect to the database. Set global setttings
   **
   */
-
-  async initialize() {
-    await super.initialize(true);
+  
+  async setLibraries() {
     switch (true) {
       case this.DB_VERSION < 12:
 	    this.StatementLibrary = (await import('./112/oracleStatementLibrary.js')).default
@@ -897,6 +894,10 @@ class OracleDBI extends YadamuDBI {
         break;
       default:
 	}
+  }
+  
+  async initialize() {
+    await super.initialize(true);
   }
   
   async initializeExport() {
@@ -1307,7 +1308,7 @@ class OracleDBI extends YadamuDBI {
 	    // Procedures are created on on the fly but cleaned up once all copy operations are complete. 
 	    // This ensures that the procedure can safely be used with mulitple partitions
 	    const wrapperName = queryInfo.WITH_CLAUSE.substring(queryInfo.WITH_CLAUSE.indexOf('"."')+3,queryInfo.WITH_CLAUSE.indexOf('"('))
-	    const sqlStatement = this.StatementLibrary.SQL_DROP_WRAPPERS.replace(':1:',this.CURRENT_SCHEMA).replace(':2:',wrapperName);
+		const sqlStatement = this.StatementLibrary.SQL_DROP_WRAPPERS.replace(':1:',this.CURRENT_SCHEMA).replace(':2:',wrapperName);
 	    this.dropWrapperStatements.push(sqlStatement);
 	  }
 	  else {
@@ -1415,11 +1416,17 @@ class OracleDBI extends YadamuDBI {
   classFactory(yadamu) {
 	return new OracleDBI(yadamu,this)
   }
+    
+  async initializeWorker(manager) {
+	await super.initializeWorker(manager)
+	await this.setCurrentSchema(this.CURRENT_SCHEMA);
+	await this.setDateFormatMask(this.systemInformation.vendor);
+  }
 
-  async cloneCurrentSettings(manager) {
-    await super.cloneCurrentSettings(manager)
-	await this.setCurrentSchema(manager.currentSchema);
-    await this.setDateFormatMask(this.systemInformation.vendor);
+  cloneSettings() {
+	
+    super.cloneSettings()
+	
 	this.SQL_DIRECTORY_PATH = this.manager.SQL_DIRECTORY_PATH
 	this.LOCAL_DIRECTORY_PATH = this.manager.LOCAL_DIRECTORY_PATH
 	this.partitionLists = this.manager.partitionLists

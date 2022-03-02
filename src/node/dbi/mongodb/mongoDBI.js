@@ -192,7 +192,6 @@ class MongoDBI extends YadamuDBI {
 	  stack =  new Error().stack
       this.connection = await this.client.db(dbname,options);    
       this.traceTiming(sqlStartTime,performance.now())
-      this.dbname = dbname;
       return this.connection
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -492,7 +491,7 @@ class MongoDBI extends YadamuDBI {
   }
   
   async getConnectionFromPool() {
-     return await this.use(this.dbname || this.vendorProperties.database || this.DEFAULT_DATABASE)
+	 return await this.use(this.CURRENT_SCHEMA || this.vendorProperties.database || this.DEFAULT_DATABASE)
   } 
   
   async configureConnection() {
@@ -520,12 +519,6 @@ class MongoDBI extends YadamuDBI {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
-
-  async _reconnect() {
-    // Default code for databases that support reconnection
-    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
-
-  }
   
   updateVendorProperties(vendorProperties) {
 
@@ -546,9 +539,9 @@ class MongoDBI extends YadamuDBI {
 	
 	await super.initialize(false);   
     
-    this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,this.DB_VERSION,`Configuration`],`Document ID Tranformation: ${this.ID_TRANSFORMATION}.`)
-    this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,this.DB_VERSION,`Configuration`],`Read Tranformation: ${this.READ_TRANSFORMATION}.`)
-    this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,this.DB_VERSION,`Configuration`],`Write Tranformation: ${this.WRITE_TRANSFORMATION}.`)    
+    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Document ID Tranformation: ${this.ID_TRANSFORMATION}.`)
+    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Read Tranformation: ${this.READ_TRANSFORMATION}.`)
+    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Write Tranformation: ${this.WRITE_TRANSFORMATION}.`)    
   }
 
   /*
@@ -908,6 +901,12 @@ class MongoDBI extends YadamuDBI {
   async createSchema(schema) {  
     // ### Create a Database Schema or equivilant
     await this.use(schema)
+  }
+
+  async setWorkerConnection() {    
+    // ### Should worker share client with manager or create a new one ?
+    this.client = this.manager.client
+	await this.getConnectionFromPool()
   }
 
   classFactory(yadamu) {

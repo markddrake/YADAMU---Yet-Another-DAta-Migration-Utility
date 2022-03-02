@@ -107,10 +107,7 @@ class MsSQLDBI extends YadamuDBI {
 	
     // Allow subclasses to access constants defined by the sql object. Redeclaring the SQL object in a subclass causes strange behavoir
     this.sql = sql
-	this.StatementGenerator = StatementGenerator
-	this.StatementLibrary = StatementLibrary
-    this.statementLibrary = undefined
-    
+	
     sql.on('error',(err, p) => {
       this.yadamuLogger.handleException([this.DATABASE_VENDOR,`mssql.onError()`],err);
       throw err
@@ -122,6 +119,13 @@ class MsSQLDBI extends YadamuDBI {
 	        
   }
   
+  initializeManager() {
+	super.initializeManager()
+	this.StatementGenerator = StatementGenerator
+    this.StatementLibrary = StatementLibrary
+    this.statementLibrary = undefined
+  }	 
+
   getSchemaIdentifer() {
 	return `${this.parameters.YADAMU_DATABASE}"."${this.CURRENT_SCHEMA}`
   }  
@@ -1057,9 +1061,9 @@ class MsSQLDBI extends YadamuDBI {
     }  
     
   }   
-  
-  async initialize() {
-    await super.initialize(true);   
+
+  async setLibraries() {
+	  
 	switch (this.DB_VERSION) {
 	  case 12:
 	    this.StatementLibrary = (await import('./2014/mssqlStatementLibrary.js')).default
@@ -1069,8 +1073,8 @@ class MsSQLDBI extends YadamuDBI {
 	}
 	this.setSpatialSerializer(this.SPATIAL_FORMAT);
 	this.statementLibrary = new this.StatementLibrary(this)
-  }    
-
+  }
+  
   updateVendorProperties(vendorProperties) {
 
     vendorProperties.server          = this.parameters.HOSTNAME        || vendorProperties.server 

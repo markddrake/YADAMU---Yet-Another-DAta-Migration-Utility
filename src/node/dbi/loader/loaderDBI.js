@@ -555,7 +555,7 @@ class LoaderDBI extends YadamuDBI {
 	const filename = this.makeAbsolute(this.getDataFileName(tableInfo.TABLE_NAME))
 
     const metrics = DBIConstants.NEW_COPY_METRICS
-	metrics.DATABASE_VENDOR = this.DATABASE_VENDOR
+	metrics.SOURCE_DATABASE_VENDOR = this.DATABASE_VENDOR
 
 	const is = await this.getInputStream(filename);
 	is.COPY_METRICS = metrics
@@ -650,11 +650,11 @@ class LoaderDBI extends YadamuDBI {
 	return new LoaderDBI(yadamu,this)
   }
   
-  async cloneCurrentSettings(manager) {
-    await super.cloneCurrentSettings(manager)
+  async cloneSettings() {
+    await super.cloneSettings()
     this.CONTROL_FILE_PATH = this.manager.CONTROL_FILE_PATH
-	this.controlFile = manager.controlFile
-	this.statementCache = manager.statementCache
+	this.controlFile = this.manager.controlFile
+	this.statementCache = this.manager.statementCache
   }
   
   reloadControlFile() {

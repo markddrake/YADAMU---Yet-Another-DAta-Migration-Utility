@@ -15,6 +15,9 @@ goto :eof
   REM call %~dp0\linux\configurePostgres.bat PGSQL12-01
   REM call %~dp0\linux\configurePostgres.bat PGSQL13-01
   call %~dp0\linux\configurePostgres.bat PGSQL14-01
+  call %~dp0\linux\configureMongoDB.bat  MONGO50-01
+  call %~dp0\linux\configureVertica.bat  VRTCA10-01
+  call %~dp0\linux\configureVertica.bat  VRTCA11-01
   exit /b
 :end
 
@@ -32,6 +35,9 @@ goto :eof
   REM call %~dp0\windows\configurePostgres.bat PGSQL12-01
   REM call %~dp0\windows\configurePostgres.bat PGSQL13-01
   call %~dp0\windows\configurePostgres.bat PGSQL14-01
+  call %~dp0\linux\configureMongoDB.bat    MONGO50-01
+  REM call %~dp0\windows\configureVertica.bat  VRTCA10-01
+  REM call %~dp0\windows\configureVertica.bat  VRTCA11-01
   exit /b
 :end
 

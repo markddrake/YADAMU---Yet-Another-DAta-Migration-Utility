@@ -257,8 +257,7 @@ class YadamuDBI extends EventEmitter {
 	yadamu.activeConnections.add(this)
 
     this.yadamu = yadamu;
-    this.manager = manager
-	this.setConnectionProperties(connectionSettings || {})
+    this.setConnectionProperties(connectionSettings || {})
     this.status = yadamu.STATUS
     this.yadamuLogger = yadamu.LOGGER;
 	this.initializeParameters(parameters || {});
@@ -299,82 +298,88 @@ class YadamuDBI extends EventEmitter {
     this.activeWriters = new Set()
     
     if (manager) {
-		
-	  // Set up a promise to make it possible to wait on AllSettled..
-	  
-      this.workerState = new Promise((resolve,reject) => {
-        this.on(YadamuConstants.DESTROYED,() => {
-		   manager.activeWorkers.delete(this)
-		   resolve(YadamuConstants.DESTROYED)
-	    })
-	  })
-      
-	  manager.activeWorkers.add(this)
-	  
-	  this.workerNumber = -1
-      this.dbConnected = manager.dbConnected
-	  this.cacheLoaded = manager.cacheLoaded
-      this.ddlComplete = manager.ddlComplete
 	  this.workerReady = new Promise((resolve,reject) => {
-	    this.initializeWorker().then(() => { resolve() }).catch((e) => { console.log(e); reject(e) })
+	    this.initializeWorker(manager).then(() => { resolve() }).catch((e) => { console.log(e); reject(e) })
       })
 	}
 	else {
-    
-      this.activeWorkers = new Set()
-  
-	  // dbConnected will resolve when the database connection has been established
-	
-      this.dbConnected = new Promise((resolve,reject) => {
-		if (this.isDatabase()) {
-          this.once(YadamuConstants.DB_CONNECTED,() => {
-		    resolve(true)
-	      })
-		}
-		else {
-		  resolve(true)
-		}
-      })
-   
-	  // cacheLoaded will resolve when the statement Cache has been generated 
-	
-      this.cacheLoaded = new Promise((resolve,reject) => {
-        this.once(YadamuConstants.CACHE_LOADED  ,() => {
-		  resolve(true)
-	    })
-      })
-    
-      this.ddlComplete = new Promise((resolve,reject) => {
-	    this.once(YadamuConstants.DDL_COMPLETE,(startTime,state) => {
-          // this.yadamuLogger.trace([this.constructor.name],`${this.constructor.name}.on(ddlComplete): (${state instanceof Error}) "${state ? `${state.constructor.name}(${state.message})` : state}"`)
-   	      this.ddlInProgress = false
-		  if (state instanceof Error) {
-	        this.yadamuLogger.ddl([this.DATABASE_VENDOR],`One or more DDL operations Failed. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
-	        this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],state);
-		    state.ignoreUnhandledRejection = true;
-            reject(state)
-          }
-		  else {
-    	    this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Executed ${Array.isArray(state) ? state.length : undefined} DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
-			if (this.PARTITION_LEVEL_OPERATIONS) {
-			  // Need target schema metadata to determine if we can perform partition level write operations.
-			  this.getSchemaMetadata().then((metadata) => { this.partitionMetadata = this.getPartitionMetadata(metadata) ;resolve(true) }).catch((e) => { reject(e) })
-			}
-			else {
-		      resolve(true);
-			}
-	      }
-	    })
-	    this.once(YadamuConstants.DDL_UNNECESSARY,() => {
-		  resolve(true)
-		})
-	  })	  
+      this.initializeManager() 
 	}
 	
 	this.failedPrematureClose = false;
 
   }
+  
+  initializeManager() {
+    this.activeWorkers = new Set()
+  
+	// dbConnected will resolve when the database connection has been established
+	
+    this.dbConnected = new Promise((resolve,reject) => {
+	  if (this.isDatabase()) {
+        this.once(YadamuConstants.DB_CONNECTED,() => {
+		  resolve(true)
+	    })
+	  }
+	  else {
+		resolve(true)
+	  }
+    })
+   
+	  // cacheLoaded will resolve when the statement Cache has been generated 
+	
+    this.cacheLoaded = new Promise((resolve,reject) => {
+      this.once(YadamuConstants.CACHE_LOADED  ,() => {
+	    resolve(true)
+	  })
+    })
+    
+    this.ddlComplete = new Promise((resolve,reject) => {
+	  this.once(YadamuConstants.DDL_COMPLETE,(startTime,state) => {
+        // this.yadamuLogger.trace([this.constructor.name],`${this.constructor.name}.on(ddlComplete): (${state instanceof Error}) "${state ? `${state.constructor.name}(${state.message})` : state}"`)
+   	    this.ddlInProgress = false
+	    if (state instanceof Error) {
+	      this.yadamuLogger.ddl([this.DATABASE_VENDOR],`One or more DDL operations Failed. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+	      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],state);
+		  state.ignoreUnhandledRejection = true;
+          reject(state)
+        }
+		else {
+    	  this.yadamuLogger.ddl([this.DATABASE_VENDOR],`Executed ${Array.isArray(state) ? state.length : undefined} DDL operations. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+		  if (this.PARTITION_LEVEL_OPERATIONS) {
+		    // Need target schema metadata to determine if we can perform partition level write operations.
+			this.getSchemaMetadata().then((metadata) => { this.partitionMetadata = this.getPartitionMetadata(metadata) ;resolve(true) }).catch((e) => { reject(e) })
+		  }
+		  else {
+		    resolve(true);
+		  }
+	    }
+	  })
+	  this.once(YadamuConstants.DDL_UNNECESSARY,() => {
+	    resolve(true)
+	  })
+	})
+  }
 
+  async initializeWorker(manager) {
+    this.manager = manager
+	this.workerNumber = -1
+    this.cloneSettings();
+	 
+	// Set up a promise to make it possible to wait on AllSettled..	  
+    this.workerState = new Promise((resolve,reject) => {
+      this.on(YadamuConstants.DESTROYED,() => {
+	    manager.activeWorkers.delete(this)
+		resolve(YadamuConstants.DESTROYED)
+	  })
+	})
+      
+	manager.activeWorkers.add(this)
+	  
+	await this.setWorkerConnection()
+	await this.configureConnection();
+  }
+  
   loadTableList(tableListPath) {
 	try {
       const tableList = YadamuLibrary.loadJSON(tableListPath,this.yadamuLogger) 
@@ -900,11 +905,7 @@ class YadamuDBI extends EventEmitter {
   }  
   
   async _reconnect() {
-    throw new Error(`Database Reconnection Not Implimented for ${this.DATABASE_VENDOR}`)
-	
-	// Default code for databases that support reconnection
     this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
-
   }
 
   trackLostConnection() {
@@ -1070,6 +1071,9 @@ class YadamuDBI extends EventEmitter {
   **
   */
 
+  async setLibraries() {
+  }
+  
   async initialize(requirePassword) {
 
     this.yadamu.initializeSQLTrace();  
@@ -1085,7 +1089,10 @@ class YadamuDBI extends EventEmitter {
     
     if (this.isDatabase()) {
       await this.getDatabaseConnection(requirePassword);
+   	  await this.setLibraries()
     }
+	
+	
   }
 
   /*
@@ -1718,29 +1725,26 @@ class YadamuDBI extends EventEmitter {
 	this.connection = await this.manager.getConnectionFromPool()	
   }
 
-  async cloneCurrentSettings(manager) {
-	  
-	this.StatementLibrary   = manager.StatementLibrary
-	this.StatementGenerator = manager.StatementGenerator
+  cloneSettings() {
+    this.dbConnected = this.manager.dbConnected
+	this.cacheLoaded = this.manager.cacheLoaded
+    this.ddlComplete = this.manager.ddlComplete
+		  
+	this.StatementLibrary   = this.manager.StatementLibrary
+	this.StatementGenerator = this.manager.StatementGenerator
+
+    this.setParameters(this.manager.parameters);
 	
-	this.systemInformation  = manager.systemInformation
-    this.metadata           = manager.metadata
-    this.statementCache     = manager.statementCache
-    this.statementGenerator = manager.statementGenerator
-	this.ddlComplete        = manager.ddlComplete
-	this.partitionMetadata  = manager.partitionMetadata
+	this.systemInformation  = this.manager.systemInformation
+	this.metadata           = this.manager.metadata
+    this.statementCache     = this.manager.statementCache
+    this.statementGenerator = this.manager.statementGenerator
+	this.ddlComplete        = this.manager.ddlComplete
+	this.partitionMetadata  = this.manager.partitionMetadata
 	
-    this.setParameters(manager.parameters);
-	this.setIdentifierMappings(manager.getIdentifierMappings())
-	
+	this.setIdentifierMappings(this.manager.getIdentifierMappings())
   }   
 
-  async initializeWorker() {
-	await this.setWorkerConnection()
-	await this.configureConnection();
-	await this.cloneCurrentSettings(this.manager);
-  }
-  
   workerDBI(workerNumber) {
       
     // Invoked on the DBI that is being cloned. Parameter dbi is the cloned interface.
@@ -1758,7 +1762,7 @@ class YadamuDBI extends EventEmitter {
   
   async writersFinished() {
 	  
-    // this.yadamuLogger.trace([this.constructor.name,'writersFinished()',this.ROLE,this.getWorkerNumber(),`destroyWorker()`],`Waiting for ${this.activeWriters.size} Writers to terminate. [${this.activeWriters}]`)
+    // this.yadamuLogger.trace([this.constructor.name,'writersFinished()',this.ROLE,this.getWorkerNumber()],`Waiting for ${this.activeWriters.size} Writers to terminate. [${this.activeWriters}]`)
 
     // this.yadamuLogger.trace([this.constructor.name,'writersFinished()','ACTIVE_WRITERS',this.getWorkerNumber()],'WAITING')
     await Promise.allSettled(this.activeWriters)

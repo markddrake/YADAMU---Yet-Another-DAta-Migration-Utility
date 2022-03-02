@@ -19,8 +19,8 @@ class YadamuQALibrary {
       }
     }
     
-    async initializeWorker()  {
-      await super.initializeWorker();
+    async initializeWorker(manager)  {
+      await super.initializeWorker(manager);
       const idx = this.getWorkerNumber()
       // Manager needs to schedule termination of worker.
       if (this.yadamu.terminateConnection(this.ROLE,idx)) {

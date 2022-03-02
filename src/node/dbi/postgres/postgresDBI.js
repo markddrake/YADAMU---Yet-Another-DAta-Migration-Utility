@@ -264,7 +264,7 @@ class PostgresDBI extends YadamuDBI {
   }
   
   async _reconnect() {
-    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
+    await super._reconnect()
     const results = await this.executeSQL('select now()')
   }
   

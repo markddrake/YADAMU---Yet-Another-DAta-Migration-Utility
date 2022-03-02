@@ -154,7 +154,7 @@ class Yadamu extends _Yadamu {
   }
 
   terminateConnection(role,workerNumber) {
-    return (this.killConfiguration && (this.killConfiguration.process === role) && ((this.killConfiguration.worker === workerNumber )  || ((this.killConfiguration.worker === undefined) && (this.workerNumber = 'Manager'))))
+    return (this.killConfiguration && (this.killConfiguration.process === role) && ((this.killConfiguration.worker === workerNumber )  || ((this.killConfiguration.worker === undefined) && (this.workerNumber === 'Manager'))))
   } 
   
   recordMetrics(tableName,metrics) {    

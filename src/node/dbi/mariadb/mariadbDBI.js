@@ -208,7 +208,7 @@ class MariadbDBI extends YadamuDBI {
    
   async _reconnect() {
 	  
-    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
+	super._reconnect()
 	await this.checkMaxAllowedPacketSize()
 	
   }

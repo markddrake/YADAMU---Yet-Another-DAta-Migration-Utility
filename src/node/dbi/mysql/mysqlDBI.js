@@ -67,13 +67,17 @@ class MySQLDBI extends YadamuDBI {
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
     this.keepAliveHdl = undefined
 	
-	this.StatementGenerator = StatementGenerator
-    this.StatementLibrary = MySQLStatementLibrary
-    this.statementLibrary = undefined
-	
 	this.activeInputStream = false;
 
   }
+
+  initializeManager() {
+	super.initializeManager()
+	this.StatementGenerator = StatementGenerator
+	this.StatementLibrary = MySQLStatementLibrary
+	this.statementLibrary = undefined
+  }	 
+
 
   /*
   **
@@ -233,8 +237,9 @@ class MySQLDBI extends YadamuDBI {
 
   async _reconnect() {
 	  
-    this.connection = this.isManager() ? await this.getConnectionFromPool() : await this.manager.getConnectionFromPool()
+	super._reconnect()
     await this.connection.ping()
+	await this.checkMaxAllowedPacketSize()
 	
 	/*
 	**
@@ -377,10 +382,9 @@ class MySQLDBI extends YadamuDBI {
         this.SPATIAL_SERIALIZER = "ST_AsBinary(";
     }  
   }    
-  
-  async initialize() {
-    await super.initialize(true);   
-    this.setSpatialSerializer(this.SPATIAL_FORMAT);
+
+  async setLibraries() {
+	this.setSpatialSerializer(this.SPATIAL_FORMAT);
 	switch (true) {
 	  case (this.DB_VERSION < 8.0):
 	    this.StatementLibrary = (await import('./57/mssqlStatementLibrary.js')).default
@@ -390,6 +394,10 @@ class MySQLDBI extends YadamuDBI {
 	}
 	this.setSpatialSerializer(this.SPATIAL_FORMAT);
 	this.statementLibrary = new this.StatementLibrary(this)
+  }
+  
+  async initialize() {
+    await super.initialize(true);   
   }
 
   async finalizeRead(tableInfo) {
