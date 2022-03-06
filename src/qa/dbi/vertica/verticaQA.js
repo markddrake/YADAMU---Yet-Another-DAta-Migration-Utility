@@ -200,9 +200,6 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
       })
     }
   
-    verifyStagingSource(source) {  
-      super.verifyStagingSource(VerticaConstants.STAGED_DATA_SOURCES,source)
-    }    
 }
 
 export { VerticaQA as default }

@@ -100,9 +100,6 @@ class MariadbQA extends YadamuQALibrary.qaMixin(MariadbDBI) {
       })
 	}	
 
-    verifyStagingSource(source) {  
-      super.verifyStagingSource(MariadbConstants.STAGED_DATA_SOURCES,source)
-    } 
 }
 
 export { MariadbQA as default }

@@ -30,7 +30,7 @@ class DBReaderParallel extends DBReader {
     await Promise.all([readerDBI.workerReady,writerDBI.workerReady])
 	// this.yadamuLogger.trace([this.constructor.name,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),'WORKERS READY'],'PROCESSING')
 	
-	let fatalError = undefined
+	let status = undefined
 	let task
     try {
       while (taskList.length > 0) {
@@ -42,7 +42,7 @@ class DBReaderParallel extends DBReader {
 	} catch (cause) {
 	  // this.yadamuLogger.trace(['PIPELINE','PARALLEL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),task.TABLE_NAME],'Failed')
       if (!(cause instanceof CopyOperationAborted)) {
-   	    fatalError = cause
+   	    status = cause
 	    this.yadamuLogger.handleException(['PIPELINE','PARALLEL',readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),task.TABLE_NAME],cause)
 	    if ((this.dbi.ON_ERROR === 'ABORT') && !operationAborted) {
           operationAborted = true
@@ -71,7 +71,7 @@ class DBReaderParallel extends DBReader {
 	}	
     readerDBI.destroyWorker()
 	writerDBI.destroyWorker()
-	return fatalError
+	return status
   }
   
   async pipelineTables(taskList,readerDBI,writerDBI) {

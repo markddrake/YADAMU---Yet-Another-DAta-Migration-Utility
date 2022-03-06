@@ -43,8 +43,6 @@ class PostgresConstants {
   static get COPY_SERVER_NAME()       { return this.DBI_PARAMETERS.COPY_SERVER_NAME };
   static get STATEMENT_TERMINATOR()   { return ';' }
 
-  static get STAGED_DATA_SOURCES()    { return Object.freeze(['loader']) }
-
 }
 
 export { PostgresConstants as default }

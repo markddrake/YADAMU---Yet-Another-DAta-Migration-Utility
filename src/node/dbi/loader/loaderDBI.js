@@ -432,7 +432,7 @@ class LoaderDBI extends YadamuDBI {
     await fsp.mkdir(this.METADATA_FOLDER, { recursive: true });
     await fsp.mkdir(this.DATA_FOLDER, { recursive: true });
     
-	this.yadamuLogger.info(['Import',this.DATABASE_VENDOR],`Created directory: "${this.PROTOCOL}${this.resolve(this.IMPORT_FOLDER)}"`);
+	this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created directory: "${this.PROTOCOL}${this.resolve(this.IMPORT_FOLDER)}"`);
     this.createControlFile()
   }
   
@@ -520,7 +520,7 @@ class LoaderDBI extends YadamuDBI {
     if ((this.MODE != 'DDL_ONLY') && (this.controlFile.settings.contentType === 'CSV')) {
       throw new YadamuError('Loading of "CSV" data sets not supported')
     }
-	this.yadamuLogger.info(['Export',this.DATABASE_VENDOR],`Using Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`);
+	this.yadamuLogger.info(['EXPORT',this.DATABASE_VENDOR],`Using Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`);
 
   }
   

@@ -100,10 +100,6 @@ class PostgresQA extends YadamuQALibrary.qaMixin(PostgresDBI) {
       })
 	}
 
-    verifyStagingSource(source) {  
-      super.verifyStagingSource(PostgresConstants.STAGED_DATA_SOURCES,source)
-    } 
-
 }
 
 export { PostgresQA as default }

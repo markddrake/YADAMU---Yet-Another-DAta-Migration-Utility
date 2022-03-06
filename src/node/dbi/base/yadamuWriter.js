@@ -246,8 +246,8 @@ class YadamuWriter extends Writable {
 	
 	// this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')
     await this.dbi.ddlComplete
-	await this.beginTransaction()
     // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'PROCESSING')
+	await this.beginTransaction()
 	
   }
     
@@ -386,7 +386,7 @@ class YadamuWriter extends Writable {
   }
   
   reportPerformance(err) {
-	  
+	
 	this.COPY_METRICS.writerEndTime = performance.now()
 	this.COPY_METRICS.read = this.COPY_METRICS.read || this.COPY_METRICS.parsed
 
@@ -408,7 +408,7 @@ class YadamuWriter extends Writable {
     }
 
 	this.COPY_METRICS.sqlTime       = this.dbi.sqlCumlativeTime - this.sqlInitialTime
-    this.COPY_METRICS.insertMode    = this.tableInfo?.insertMode
+    this.COPY_METRICS.insertMode    = this.COPY_METRICS.insertMode || this.tableInfo?.insertMode || 'DDL Error'
     this.COPY_METRICS.skipTable     = this.skipTable
  	    
 	const readElapsedTime = this.COPY_METRICS.parserEndTime - this.COPY_METRICS.readerStartTime;
@@ -441,7 +441,7 @@ class YadamuWriter extends Writable {
 	}
 	
 	if (this.COPY_METRICS.failed) {
-      rowCountSummary = this.COPY_METRICS.tableNotFound === true ? `Table not found.` : `Read operation failed. ${rowCountSummary} `  
+      rowCountSummary = ((this.tableInfo === undefined) || (this.COPY_METRICS.tableNotFound === true)) ? `Table not found.` : `Read operation failed. ${rowCountSummary} ` 
       this.yadamuLogger.error([`${this.displayName}`,`${this.COPY_METRICS.insertMode}`],`${rowCountSummary} ${readerTimings} ${writerTimings}`)  
     }
     else {
@@ -502,8 +502,10 @@ class YadamuWriter extends Writable {
   }
   
   async doDestroy(err) {
-  
     if (err) {
+	  this.COPY_METRICS.failed = true
+      this.COPY_METRICS.writerError = err
+      this.COPY_METRICS.writerEndTime = performance.now()	  
 	  try {
         // this.yadamuLogger.trace([this.constructor.name,'doDestroy()','BATCH_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')
 		await this.batchCompleted
@@ -521,7 +523,7 @@ class YadamuWriter extends Writable {
   }
 
   _destroy(err,callback)  {
-	  
+	
     // this.yadamuLogger.trace([this.constructor.name,this.dbi.ROLE,this.displayName,this.dbi.getWorkerNumber(),this.writableLength],`YadamuWriter._destroy(${err ? err.message : 'Normal'})`)
     this.doDestroy(err).then(() => { callback(err) }).catch((e) => { e.rootCause = err; callback(e) })
 	

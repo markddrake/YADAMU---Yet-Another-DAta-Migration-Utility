@@ -305,6 +305,36 @@ class YadamuLogger {
 	  console.log(loggerError)
 	}
   }	  
+  
+  async writeMetadata(exceptionFile,yadamu,systemInformation,metadata) {
+	const errorPipeline = []
+ 	const metadataFile = exceptionFile.replace(`${yadamu.EXCEPTION_FILE_PREFIX}_`,`metadata_`).replace('.trace','.json')
+    try {
+	 
+      const dbi = new ErrorDBI(yadamu,metadataFile)
+      await dbi.initialize()
+      await dbi.initializeImport();
+      dbi.setSystemInformation(systemInformation)
+      dbi.setMetadata(metadata)
+	  await dbi.initializeData()
+	  await dbi.finalizeData();
+	  await dbi.finalizeImport();
+    } catch (err) {    
+	  const loggerError = new Error(`Error creating data file "${metadataFile}".`)
+	  loggerError.cause = err
+	  loggerError.systemInformation = currentSettings.systemInformation
+      loggerError.metadata = currentSettings.metadataings
+	  loggerError.data = currentSettings.data
+      if (err.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+        errorPipeline.forEach((stream) => {
+  		  if (stream.underlyingError instanceof Error) {
+		    loggerError.cause[stream.constructor.name] = stream.underlyingError
+		   }
+	    })
+      }
+	  this.reportLoggerError(loggerError)
+    }
+  }
 	  
   async writeDataFile(dataFilePath,tableName,currentSettings,data) {
 	const errorPipeline = []
@@ -380,6 +410,7 @@ class YadamuLogger {
       this.writeExceptionToFile(exceptionFile,ts,args,e)
       this.info(largs,`Exception logged to "${exceptionFile}".`)
       e.yadamuAlreadyReported = true;
+	  return exceptionFile
     }
   }
   
@@ -400,6 +431,7 @@ class YadamuLogger {
       this.writeExceptionToFile(exceptionFile,ts,args,e)
       this.info(largs,`Exception logged to "${exceptionFile}".`)
       e.yadamuAlreadyReported = true;
+	  return exceptionFile
     }
   }
 

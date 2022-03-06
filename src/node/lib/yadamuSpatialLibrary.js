@@ -99,6 +99,7 @@ class YadamuSpatialLibrary {
 		case 'MULTIPOLYGON':
 		case 'GEOMCOLLECTION':
 		case 'GEOMETRYCOLLECTION':
+        case 'ST_GEOMETRY':
         case '"MDSYS"."SDO_GEOMETRY"':
           spatialColumnList.push(idx)
           break;

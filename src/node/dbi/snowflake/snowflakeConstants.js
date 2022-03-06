@@ -74,8 +74,6 @@ class SnowflakeConstants {
 	return this.LOST_CONNECTION_STATE()
   }
 
-  static get STAGED_DATA_SOURCES()    { return Object.freeze(['awsS3']) }
-
 }
 
 export { SnowflakeConstants as default }

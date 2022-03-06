@@ -132,10 +132,7 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
 		await this.destroy(e)
       })
     }
-
-    verifyStagingSource(source) {  
-      super.verifyStagingSource(SnowflakeConstants.STAGED_DATA_SOURCES,source)
-    }       
+	
 }
 
 class SnowflakeMgr extends SnowflakeDBI {

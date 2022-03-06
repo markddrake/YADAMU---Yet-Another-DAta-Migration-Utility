@@ -66,7 +66,7 @@ class YadamuDBI extends EventEmitter {
   get PASSWORD_KEY_NAME()            { return 'password' };
   get STATEMENT_TERMINATOR()         { return ';' }
   get STATEMENT_SEPERATOR()          { return '\n--\n' }
-
+  
   get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT              || DBIConstants.SPATIAL_FORMAT };
   get PARSE_DELAY()                  { return this.parameters.PARSE_DELAY                 || DBIConstants.PARSE_DELAY };
   get TABLE_MAX_ERRORS()             { return this.parameters.TABLE_MAX_ERRORS            || DBIConstants.TABLE_MAX_ERRORS };
@@ -165,6 +165,8 @@ class YadamuDBI extends EventEmitter {
     })();
     return this._ROLE  
   }
+  
+  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.STAGING_UNSUPPORTED }
 
   // Not available until configureConnection() has been called 
 
@@ -340,7 +342,7 @@ class YadamuDBI extends EventEmitter {
    	    this.ddlInProgress = false
 	    if (state instanceof Error) {
 	      this.yadamuLogger.ddl([this.DATABASE_VENDOR],`One or more DDL operations Failed. Elapsed time: ${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
-	      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],state);
+		  this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],state);
 		  state.ignoreUnhandledRejection = true;
           reject(state)
         }
@@ -840,7 +842,8 @@ class YadamuDBI extends EventEmitter {
         return this.executeSQL(ddlStatement,{});
       }))
     } catch (e) {
-	 this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	 const exceptionFile = this.yadamuLogger.handleException([this.DATABASE_VENDOR,'DDL'],e)
+	 await this.yadamuLogger.writeMetadata(exceptionFile,this.yadamu,this.systemInformation,this.metadata)
 	 results = e;
     }
     return results;
@@ -850,6 +853,7 @@ class YadamuDBI extends EventEmitter {
 	 this.emit(YadamuConstants.DDL_UNNECESSARY,performance.now,[])
   }
   
+ 
   async executeDDL(ddl) {
 	if (ddl.length > 0) {
       const startTime = performance.now();
@@ -1125,7 +1129,7 @@ class YadamuDBI extends EventEmitter {
   
   async final(){
 	
-    // this.yadamuLogger.trace([this.constructor.name,'final()',this.ROLE,],`Waiting for ${this.activeWorkers.size} Writers to terminate. [${this.activeWorkers}]`);
+    // this.yadamuLogger.trace([this.constructor.name,'final()',this.ROLE],`Waiting for ${this.activeWorkers.size} Writers to terminate. [${this.activeWorkers}]`);
 	  
 	if (this.ddlInProgress) {
 	  await this.ddlComplete
@@ -1771,14 +1775,16 @@ class YadamuDBI extends EventEmitter {
   }
   
   async destroyWorker() {
+	// this.yadamuLogger.trace([this.constructor.name,'destroyWorker()',this.ROLE,this.getWorkerNumber()],`Termianting Worker`);
 	await this.writersFinished()
 	await this.releaseWorkerConnection() 
 	this.emit(YadamuConstants.DESTROYED)
   }
-
+  
+  
   /*
   **
-  ** Copy-based Import Operations - Experimental
+  ** Copy Operation Support.
   **
   */
   
@@ -1786,20 +1792,33 @@ class YadamuDBI extends EventEmitter {
     return ''
   }
 	
-  /*
-  **
-  ** Copy Operation Support.
-  **
-  */
+	
+  validStagedDataSet(vendor,controlFilePath,controlFile) {
+
+    /*
+	**
+	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
+	** Return false if the data set cannot be consumed using a Copy operation
+	** Do not throw errors if the data set cannot be used for a COPY operatio
+	** Generate Info messages to explain why COPY cannot be used.
+	**
+	*/
+
+    if (!this.SUPPORTED_STAGING_PLATFORMS.includes(vendor)) {
+       return false;
+	}
+
+	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
+  }
 
   reportCopyOperationMode(copyEnabled,controlFilePath,contentType) {
     this.yadamuLogger.info([this.DATABASE_VENDOR,'COPY',`${contentType}`],`Processing ${controlFilePath}" using ${copyEnabled ? 'COPY' : 'PIPELINE' } mode.`)
 	return copyEnabled
   } 
   
-  verifyStagingSource(validSources,source) {   
-    if (!validSources.includes(source)) {
-      throw new YadamuError(`COPY operations not supported between "${source}" and "${this.dbi.DATABASE_VENDOR}".`)
+  verifyStagingSource(source) {   
+    if (!this.SUPPORTED_STAGING_PLATFORMS.includes(source)) {
+      throw new YadamuError(`COPY operations not supported between "${source}" and "${this.DATABASE_VENDOR}".`)
 	}
   }
 

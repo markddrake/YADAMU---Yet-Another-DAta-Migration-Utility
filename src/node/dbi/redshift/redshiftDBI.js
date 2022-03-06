@@ -76,7 +76,7 @@ class RedshiftDBI extends YadamuDBI {
 	return this._BUCKET
   }
 
-  get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM || VerticaConstants.STAGING_PLATFORM } 
+  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.CLOUD_STAGING }
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters);
@@ -617,24 +617,6 @@ class RedshiftDBI extends YadamuDBI {
 	return new RedshiftDBI(yadamu,this)
   }
 
-  validStagedDataSet(vendor,controlFilePath,controlFile) {
-
-    /*
-	**
-	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
-	** Return false if the data set cannot be consumed using a Copy operation
-	** Do not throw errors if the data set cannot be used for a COPY operatio
-	** Generate Info messages to explain why COPY cannot be used.
-	**
-	*/
-
-    if (!RedshiftConstants.STAGED_DATA_SOURCES.includes(vendor)) {
-       return false;
-	}
-	
-	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
-  }
-  
   async reportCopyErrors(tableName,metrics) {
 	  
 	 const causes = []

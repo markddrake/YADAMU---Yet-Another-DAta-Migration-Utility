@@ -814,10 +814,17 @@ class Yadamu {
 	
 
     const copyManager = new YadamuCopyManager(target,this.LOGGER);
-	const results = await copyManager.copyStagedData(source.DATABASE_KEY,controlFile,metadata,source.getCredentials(target.DATABASE_KEY))
-    this.reportStatus(this.STATUS,this.LOGGER)
-
-	return results;
+	try {
+	  const results = await copyManager.copyStagedData(source.DATABASE_KEY,controlFile,metadata,source.getCredentials(target.DATABASE_KEY))
+      this.reportStatus(this.STATUS,this.LOGGER)
+	  await source.final()
+	  await target.final()
+	  return results;
+    } catch (e) {
+	  await source.destroy(e)
+	  await target.destroy(e)
+	  throw (e)
+	}
   }
 
   async doPipelineOperation(source,target) {
@@ -891,8 +898,8 @@ class Yadamu {
 		await source.loadControlFile()
 		if (target.validStagedDataSet(source.DATABASE_KEY,source.CONTROL_FILE_PATH,source.controlFile)) {
 		  // TODO: If all copy operations fail due to issues accessing file fallback to Pipeline.
-		  await this.doCopyOperation(source,target)
-	    }
+          await this.doCopyOperation(source,target)
+		}
 		else {
 		  await this.doPipelineOperation(source,target)
 	    }

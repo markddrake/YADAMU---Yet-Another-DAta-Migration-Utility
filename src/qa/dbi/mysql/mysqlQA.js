@@ -120,10 +120,6 @@ class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
         this.yadamu.LOGGER.handleException(tags,new MySQLError(this.DRIVER_ID,e,stack,operation));
       })
 	}	
-
-    verifyStagingSource(source) {  
-      super.verifyStagingSource(MySQLConstants.STAGED_DATA_SOURCES,source)
-    } 
 	
 }
 

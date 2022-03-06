@@ -150,10 +150,6 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
 		}
       })
     }
-	
-    verifyStagingSource(source) {  
-      super.verifyStagingSource(OracleConstants.STAGED_DATA_SOURCES,source)
-    } 
 }
 	
 

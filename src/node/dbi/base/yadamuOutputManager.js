@@ -166,6 +166,11 @@ class YadamuOutputManager extends Transform {
         assert.strictEqual(row.length,this.tableInfo.columnCount,`Table ${this.tableName}. Incorrect number of columns supplied.`)
       }
     } catch (cause) {
+	  if (row === undefined) {
+        this.yadamuLogger.logInternalError([this.constructor.name,`checkColumnCount()`,this.tableName,],`${this.constructor.name}.checkColumnCount(). Received "undefined" row.`)
+		this.abortTable()
+		row = []
+	  }
 	  const info = this.tableInfo === undefined  ? this.tableName : this.tableInfo
       this.handleIterativeError('CACHE',cause,this.COPY_METRICS.received+1,row,info);
     }
@@ -365,7 +370,7 @@ class YadamuOutputManager extends Transform {
 	try {
 	  await this.dbi.ddlComplete
 	} catch (ddlFailure) {
-	  if (err) ddlFailure.cause = err
+	  if (err && !Object.is(ddlFailure,err)) ddlFailure.cause = err
 	  throw ddlFailure
 	}
 	

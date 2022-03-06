@@ -173,9 +173,6 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
 	  })
     }
 
-    verifyStagingSource(source) {  
-      super.verifyStagingSource(MsSQLConstants.STAGED_DATA_SOURCES,source)
-    } 
     
 }
 

@@ -71,6 +71,8 @@ class VerticaDBI extends YadamuDBI {
   get COPY_TRIM_WHITEPSPACE()  { return this.parameters.COPY_TRIM_WHITEPSPACE || VerticaConstants.COPY_TRIM_WHITEPSPACE }
   get MERGEOUT_INSERT_COUNT()  { return this.parameters.MERGEOUT_INSERT_COUNT || VerticaConstants.MERGEOUT_INSERT_COUNT }
   
+  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
+
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters);
        
@@ -627,24 +629,6 @@ class VerticaDBI extends YadamuDBI {
     return pid
   }
     
-  validStagedDataSet(vendor,controlFilePath,controlFile) {
-
-    /*
-	**
-	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
-	** Return false if the data set cannot be consumed using a Copy operation
-	** Do not throw errors if the data set cannot be used for a COPY operatio
-	** Generate Info messages to explain why COPY cannot be used.
-	**
-	*/
-
-    if (!VerticaConstants.STAGED_DATA_SOURCES.includes(vendor)) {
-       return false;
-	}
-	
-	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
-  }
-  
   async reportCopyErrors(tableName,metrics) {
 	  
 	 const causes = []

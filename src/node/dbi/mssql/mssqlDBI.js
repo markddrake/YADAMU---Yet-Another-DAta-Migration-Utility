@@ -1458,24 +1458,6 @@ class MsSQLDBI extends YadamuDBI {
     return pid
   }  
   
-    validStagedDataSet(vendor,controlFilePath,controlFile) {
-
-    /*
-	**
-	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
-	** Return false if the data set cannot be consumed using a Copy operation
-	** Do not throw errors if the data set cannot be used for a COPY operatio
-	** Generate Info messages to explain why COPY cannot be used.
-	**
-	*/
-
-    if (!MsSQLConstants.STAGED_DATA_SOURCES.includes(vendor)) {
-       return false;
-	}
-	
-	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
-  }
-  
 }
 
 export { MsSQLDBI as default }

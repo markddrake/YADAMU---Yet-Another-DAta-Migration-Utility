@@ -197,10 +197,6 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
       })
 	}
 	
-    verifyStagingSource(source) {  
-      super.verifyStagingSource(RedshiftConstants.STAGED_DATA_SOURCES,source)
-    }    
-	 
     classFactory(yadamu) {
       return new RedshiftQA(yadamu,this)
     }

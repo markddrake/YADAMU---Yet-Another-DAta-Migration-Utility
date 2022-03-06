@@ -81,7 +81,29 @@ class DBIConstants {
   static get BATCH_WRITTEN()              { return 'batchSuccess' }
   static get BATCH_FAILED()               { return 'batchFailed' }
   static get BATCH_IDLE()                 { return 'batchIdle' }
+
+  static #_STAGING_UNSUPPORTED
+
+  static get STAGING_UNSUPPORTED()        { 
+     this.#_STAGING_UNSUPPORTED  = this.#_STAGING_UNSUPPORTED || Object.freeze([]) 
+	 return this.#_STAGING_UNSUPPORTED
+  }
   
+  static #_LOADER_STAGING
+
+  static get LOADER_STAGING()             { 
+     this.#_LOADER_STAGING  = this.#_LOADER_STAGING || Object.freeze(['loader'])
+	 return this.#_LOADER_STAGING
+  }
+
+  static #_CLOUD_STAGING
+
+  static get CLOUD_STAGING()             { 
+     this.#_CLOUD_STAGING  = this.#_CLOUD_STAGING || Object.freeze(['awsS3','azure'])
+	 return this.#_CLOUD_STAGING
+  }
+ 
+ 
 }
 
 export { DBIConstants as default}

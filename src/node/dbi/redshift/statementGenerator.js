@@ -426,7 +426,6 @@ class StatementGenerator {
 	
     const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
     const insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values `;
-	const mergeoutStatement = `select do_tm_task('mergeout','${this.targetSchema}.${tableMetadata.tableName}')`
 
     const maxBatchSize        = Math.trunc(32768 / tableMetadata.columnNames.length);
 

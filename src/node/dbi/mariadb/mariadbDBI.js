@@ -73,6 +73,8 @@ class MariadbDBI extends YadamuDBI {
   set LOWER_CASE_TABLE_NAMES(v)      { this._LOWER_CASE_TABLE_NAMES = v }
   get IDENTIFIER_TRANSFORMATION()    { return (this._LOWER_CASE_TABLE_NAMES> 0) ? 'LOWERCASE_TABLE_NAMES' : super.IDENTIFIER_TRANSFORMATION }
 
+  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
+
   constructor(yadamu,manager,connectionSettings,parameters) {
 
     super(yadamu,manager,connectionSettings,parameters);
@@ -208,7 +210,7 @@ class MariadbDBI extends YadamuDBI {
    
   async _reconnect() {
 	  
-	super._reconnect()
+	await super._reconnect()
 	await this.checkMaxAllowedPacketSize()
 	
   }
@@ -574,24 +576,6 @@ class MariadbDBI extends YadamuDBI {
 	const results = await this.executeSQL(`select connection_id() "pid"`)
 	const pid = results[0][0];
     return pid
-  }
-  
-  validStagedDataSet(vendor,controlFilePath,controlFile) {
-
-    /*
-	**
-	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
-	** Return false if the data set cannot be consumed using a Copy operation
-	** Do not throw errors if the data set cannot be used for a COPY operatio
-	** Generate Info messages to explain why COPY cannot be used.
-	**
-	*/
-
-    if (!MariadbConstants.STAGED_DATA_SOURCES.includes(vendor)) {
-       return false;
-	}
-	
-	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
   }
   
 }

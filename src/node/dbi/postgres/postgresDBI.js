@@ -87,6 +87,7 @@ class PostgresDBI extends YadamuDBI {
 
   get JSON_DATA_TYPE()         { return this.parameters.POSTGRES_JSON_TYPE || PostgresConstants.POSTGRES_JSON_TYPE }
   
+  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters);
@@ -707,24 +708,6 @@ class PostgresDBI extends YadamuDBI {
     return pid
   }
 
-  validStagedDataSet(vendor,controlFilePath,controlFile) {
-
-    /*
-	**
-	** Return true if, based on te contents of the control file, the data set can be consumed directly by the RDBMS using a COPY operation.
-	** Return false if the data set cannot be consumed using a Copy operation
-	** Do not throw errors if the data set cannot be used for a COPY operatio
-	** Generate Info messages to explain why COPY cannot be used.
-	**
-	*/
-
-    if (!PostgresConstants.STAGED_DATA_SOURCES.includes(vendor)) {
-       return false;
-	}
-	
-	return this.reportCopyOperationMode(controlFile.settings.contentType === 'CSV',controlFilePath,controlFile.settings.contentType)
-  }
-  
   async initializeCopy() {
 	 await super.initializeCopy()
 	 await this.executeSQL(`create server if not exists "${this.COPY_SERVER_NAME}" FOREIGN DATA WRAPPER file_fdw`)

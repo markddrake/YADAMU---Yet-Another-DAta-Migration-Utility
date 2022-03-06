@@ -112,15 +112,21 @@ class YadamuCopyManager {
   
   async copyStagedData(vendor,controlFile,metadata,credentials) {
 
-	this.dbi.setSystemInformation(controlFile.systemInformation)
+    // this.yadamuLogger.trace([this.constructor.name,'COPY',this.dbi.DATABASE_VENDOR],'copyStagedData()')
 
-    const startTime = performance.now()	
+    this.dbi.verifyStagingSource(vendor)
+	
 	await this.dbi.initializeCopy(controlFile)
-
+    
+	this.dbi.setSystemInformation(controlFile.systemInformation)
+	
+    const startTime = performance.now()	
 	const statementCache = await this.generateCopyStatements(metadata,credentials);
 	const ddlStatements = this.dbi.analyzeStatementCache(statementCache,startTime)
 	let results = await this.dbi.executeDDL(ddlStatements)
-    
+    await this.dbi.ddlComplete
+	
+	
 	if (this.dbi.MODE != 'DDL_ONLY') {
 	  const taskList = Object.keys(statementCache).flatMap((table) => {
 		if (Array.isArray(statementCache[table].copy)) {
@@ -139,10 +145,9 @@ class YadamuCopyManager {
 		}
 	  })
       results = await this.copyOperations(taskList,vendor)
-	  await this.dbi.finalizeCopy()	  
 	}
-	await this.dbi.finalizeImport()
-    return results
+    await this.dbi.finalizeCopy()	  
+	return results
   }
   
 }

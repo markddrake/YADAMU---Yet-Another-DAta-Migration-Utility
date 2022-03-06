@@ -788,12 +788,14 @@ class YadamuQA {
      try {
        await source.initialize()
        const sourceInstance = await source.getYadamuInstanceInfo() 
-       
+       await source.final()
+	   
        staging.parameters.FROM_USER = staging.parameters.TO_USER
        delete staging.parameters.TO_USER
        await staging.initialize()
        await staging.loadControlFile()
        const targetInstance = await staging.getYadamuInstanceInfo();
+	   await target.final()
 	   
 	   if (staging.controlFile.settings.contentType === 'CSV') {
          if ((sourceInstance.yadamuInstanceID === targetInstance.yadamuInstanceID) && (sourceInstance.yadamuInstallationTimestamp === targetInstance.yadamuInstallationTimestamp)) {
@@ -807,10 +809,16 @@ class YadamuQA {
        else {
          this.yadamu.LOGGER.qa([source.DATABASE_VENDOR,staging.DATABASE_VENDOR,'COPY',staging.DATABASE_KEY],`Cannot use existing Data Set "${staging.CONTROL_FILE_PATH}". Exepected format "CSV", found format "${staging.controlFile.settings.contentType}".`);
        }
-     } catch (e) {/* If anything goes wrong the staged data is not valid  console.log(e) */}
-     return false
-     
+     } catch (e) {
+	   try {
+		 await source.destroy(e);
+		 await target.destroy(e)
+	   } catch (e) {}
+	   /* If anything goes wrong the staged data is not valid  console.log(e) */
+	 }
+     return false     
   }
+
 
   async copy(task,configuration,test,targetConnectionName,parameters) {
 	
@@ -1108,8 +1116,7 @@ class YadamuQA {
         this.setUser(stagingParameters,'TO_USER',stagingDatabase,stagingSchema)
         const stagingDBI = await this.getDatabaseInterface(stagingDatabase,stagingConnection,stagingParameters,this.RELOAD_STAGING_AREA)
         
-   
-        targetDBI.verifyStagingSource(stagingDBI.DATABASE_KEY)
+	    targetDBI.verifyStagingSource(stagingDBI.DATABASE_KEY)
         
         /*
         **
@@ -1150,6 +1157,7 @@ class YadamuQA {
         else {
           this.metrics.recordTaskTimings([task.taskName,'STAGE','VERIFY',sourceConnectionName,stagingConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
         }   
+		// Staging becomes the sourceDBI
         stagingParameters.FROM_USER = stagingParameters.TO_USER
         delete stagingParameters.TO_USER
         sourceDBI =  await this.getDatabaseInterface(stagingDatabase,stagingConnection,stagingParameters,false)
@@ -1164,7 +1172,7 @@ class YadamuQA {
         // Move the source / staged data to the target.
         
         stepStartTime = performance.now();        
-        keyMetrics = await this.yadamu.pumpData(sourceDBI,targetDBI);
+		keyMetrics = await this.yadamu.pumpData(sourceDBI,targetDBI);
         sourceDescription = this.getDescription(sourceConnectionName,sourceDBI) 
         stepElapsedTime = performance.now() - stepStartTime
         targetDescription = this.getDescription(targetConnectionName,targetDBI) 

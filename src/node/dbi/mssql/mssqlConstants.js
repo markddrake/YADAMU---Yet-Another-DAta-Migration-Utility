@@ -78,8 +78,6 @@ class MsSQLConstants {
 	return this._SUPPRESSED_ERROR
   }
 
-  static get STAGED_DATA_SOURCES()    { return Object.freeze(['loader']) }
-
 }
 
 export { MsSQLConstants as default }

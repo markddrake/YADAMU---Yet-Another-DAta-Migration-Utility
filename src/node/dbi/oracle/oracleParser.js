@@ -18,6 +18,11 @@ class OracleParser extends YadamuParser {
   }
 
   setColumnMetadata(resultSetMetadata) { 
+ 
+    if (this.COPY_METRICS.failed && resultSetMetadata === undefined) {
+	  // Oracle appears to raise the metadatata event appears to raised and supply undefined metadata if an error (such as A DDL error) terminates the pipeline
+	  return
+	}
     
 	this.jsonTransformations = new Array(resultSetMetadata.length).fill(null)
     

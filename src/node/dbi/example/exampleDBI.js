@@ -65,6 +65,8 @@ class ExampleDBI extends YadamuDBI {
 
   get SPATIAL_FORMAT()        { return this.parameters.SPATIAL_FORMAT || ExampleConstants.SPATIAL_FORMAT };
 
+  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
+
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters);
 	this.StatementLibary = StatementLibary
@@ -340,24 +342,6 @@ class ExampleDBI extends YadamuDBI {
   }
 
   async processStagingTable(schema) {  	
-  	const sqlStatement = `select ${this.useBinaryJSON ? 'import_jsonb' : 'import_json'}(data,$1) from "YADAMU_STAGING"`;
-							   
-														   
-		 
-  	var results = await this.executeSQL(sqlStatement,[schema]);
-    if (results.rows.length > 0) {
-      if (this.useBinaryJSON  === true) {
-	    return this.processLog(results.rows[0].import_jsonb,'JSONB_EACH');  
-      }
-      else {
-	    return this.processLog(results.rows[0].import_json,'JSON_EACH');  
-      }
-    }
-    else {
-      this.yadamuLogger.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL IMPORT_JSONB()' : 'CALL_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`);
-      // Return value will be parsed....
-      return [];
-    }
   }
 
   async processFile(hndl) {
