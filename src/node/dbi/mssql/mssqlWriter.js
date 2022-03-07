@@ -5,7 +5,6 @@ import sql from 'mssql';
 import { performance } from 'perf_hooks';
 import YadamuWriter from '../base/yadamuWriter.js';
 import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import NullWriter from '../../util/nullWriter.js';
 import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
 import {DatabaseError,RejectedColumnValue} from '../../core/yadamuException.js';
 
@@ -76,7 +75,7 @@ class MsSQLWriter extends YadamuWriter {
       return this.skipTable          
     }	
 	
-	const sqlTrace = this.status.sqlTrace
+	this.dbi.SQL_TRACE.enable()
 
     for (const row in batch.rows) {
       try {
@@ -86,7 +85,7 @@ class MsSQLWriter extends YadamuWriter {
         }
         const results = await this.dbi.executeCachedStatement(args);
 		this.adjustRowCounts(1)
-        this.status.sqlTrace = NullWriter.NULL_WRITER;
+        this.dbi.SQL_TRACE.disable()
       } catch (cause) {
 		if (this.dbi.TRANSACTION_IN_PROGRESS && this.dbi.tediousTransactionError) {
 		  // this.yadamuLogger.trace([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],`Unexpected ROLLBACK during BCP Operation. Starting new Transaction`);          
@@ -98,9 +97,10 @@ class MsSQLWriter extends YadamuWriter {
 		}
       }
     }       
-      
-	this.status.sqlTrace = sqlTrace
-	this.status.sqlTrace.write(this.dbi.traceComment(`Previous Statement repeated ${rowCount} times.`))
+
+    this.dbi.SQL_TRACE.comment(`Previous Statement repeated ${rowCount} times.`)
+    this.dbi.SQL_TRACE.enable()
+
 	await this.dbi.clearCachedStatement();   
     this.endTime = performance.now();
     this.releaseBatch(batch)

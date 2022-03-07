@@ -4,7 +4,6 @@ import { performance } from 'perf_hooks';
 
 import Yadamu from '../../core/yadamu.js';
 import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import NullWriter from '../../util/nullWriter.js';
 import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
 import YadamuWriter from '../base/yadamuWriter.js';
 import {BatchInsertError} from '../../core/yadamuException.js'
@@ -60,7 +59,6 @@ class SnowflakeWriter extends YadamuWriter {
     // Suppress SQL Trace after first Iterative operation
 
     let sqlExectionTime = 0
-	const sqlTrace = this.status.sqlTrace
     const startTime = performance.now()
 	
 	/*
@@ -102,10 +100,10 @@ class SnowflakeWriter extends YadamuWriter {
           // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowNumbers[0],rowNumbers[rowNumbers.length-1],batchRowCount],`Operation ${operationCount}`)
           const result = await this.dbi.executeSQL(sqlStatement,nextBatch);
 		  sqlExectionTime+= performance.now() - opStartTime
-          this.status.sqlTrace = NullWriter.NULL_WRITER
+          this.dbi.SQL_TRACE.disable()
 	      this.adjustRowCounts(batchRowCount)
 	    } catch (cause) {
-		  this.status.sqlTrace = NullWriter.NULL_WRITER
+		  this.dbi.SQL_TRACE.disable()
 	      if ((batchRowCount > 1 ) && (!cause.lostConnection())){
             batches.push(nextBatch.splice(0,(Math.ceil(batchRowCount/2)*columnCount)),nextBatch)			  
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
@@ -136,10 +134,10 @@ class SnowflakeWriter extends YadamuWriter {
        	  sqlStatement = this.tableInfo.dml
 		  const result = await this.dbi.executeSQL(sqlStatement,nextBatch)
 		  sqlExectionTime+= performance.now() - opStartTime
-          this.status.sqlTrace = NullWriter.NULL_WRITER
+          this.dbi.SQL_TRACE.disable()
 	      this.adjustRowCounts(nextBatch.length)
         } catch (cause) {
-          this.status.sqlTrace = NullWriter.NULL_WRITER
+          this.dbi.SQL_TRACE.disable()
 	      if ((nextBatch.length > 1) && (!cause.lostConnection())){
             batches.push(nextBatch.splice(0,Math.ceil(nextBatch.length/2)),nextBatch)
             rowTracking.push(rowNumbers.splice(0,Math.ceil(rowNumbers.length/2)),rowNumbers)
@@ -160,7 +158,8 @@ class SnowflakeWriter extends YadamuWriter {
     }
 
     // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowCount,this.COPY_METRICS.skipped],`Binary insert required ${operationCount} operations`)
-	this.status.sqlTrace = sqlTrace    
+	this.dbi.SQL_TRACE.enable()
+	
     this.endTime = performance.now();
     this.releaseBatch(batch)
     return this.skipTable

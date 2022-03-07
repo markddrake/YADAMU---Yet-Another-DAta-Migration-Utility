@@ -203,15 +203,15 @@ class FileDBI extends YadamuDBI {
   }
   
   exportComplete(message) {
-	this.eventManager.exportComplete(message);
+	this.eventManager.exportComplete(message)
   }
   
   closeInputStream() {      
-    this.inputStream.close();
+    this.inputStream.close()
   }
 
   closeOutputStream() {
-    this.outputStream.close();
+    this.outputStream.close()
   }
   
   // Override YadamuDBI - Any DDL is considered valid and written to the export file.
@@ -257,14 +257,14 @@ class FileDBI extends YadamuDBI {
  
   initialize() {
     
-    super.initialize(false);
+    super.initialize(false)
 	
   }
 
   async createInputStream() {
     return new Promise((resolve,reject) => {
 	  const stack = new Error().stack
-      const is = fs.createReadStream(this.FILE);
+      const is = fs.createReadStream(this.FILE)
       is.once('open',() => {resolve(is)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,this.FILE) : new FileError(this.DRIVER_ID,err,stack,this.FILE) )})
     })
   }
@@ -276,11 +276,11 @@ class FileDBI extends YadamuDBI {
 	this.DIRECTORY = this.SOURCE_DIRECTORY
 	
 	// this.yadamuLogger.trace([this.constructor.name],`initializeExport()`)
-	super.initializeExport();
+	super.initializeExport()
 	this.setDescription(this.FILE)
 	
 	if (this.ENCRYPTED_FILE) {
-      await this.loadInitializationVector();
+      await this.loadInitializationVector()
     }
 
 	this.inputStream = await this.createInputStream()
@@ -296,7 +296,7 @@ class FileDBI extends YadamuDBI {
 	this.INITIALIZATION_VECTOR = await new Promise((resolve,reject) => {
       crypto.randomFill(new Uint8Array(this.IV_LENGTH), (err, iv) => {
 		if (err) reject(err)
-	    resolve(iv);
+	    resolve(iv)
       })
 	})	    
   } 
@@ -314,8 +314,8 @@ class FileDBI extends YadamuDBI {
     }
 	
     if (this.ENCRYPTED_FILE) {
-      await this.createInitializationVector();
-      // console.log('Cipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR);
+      await this.createInitializationVector()
+      // console.log('Cipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
 	  const cipherStream = crypto.createCipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
 	  streams.push(cipherStream)
 	  streams.push(new IVWriter(this.INITIALIZATION_VECTOR))
@@ -329,7 +329,7 @@ class FileDBI extends YadamuDBI {
 	})
     
 	streams.push(ws)
-	const os = streams.length === 1 ? streams[0] : compose(...streams);
+	const os = streams.length === 1 ? streams[0] : compose(...streams)
 	return os;
 
   }
@@ -439,7 +439,7 @@ class FileDBI extends YadamuDBI {
         this.closeInputStream()
 	  }
     } catch (err) {
-      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'ABORT','InputStream'],err);
+      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'ABORT','InputStream'],err)
     }
 	 
     try {
@@ -447,7 +447,7 @@ class FileDBI extends YadamuDBI {
         this.closeOutputStream()
 	  }
     } catch (err) {
-      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'ABORT','OutputStream'],err);
+      this.yadamuLogger.handleException([this.DATABASE_VENDOR,'ABORT','OutputStream'],err)
     }
   }
 
@@ -516,7 +516,7 @@ class FileDBI extends YadamuDBI {
       const iv = new Uint8Array(this.IV_LENGTH)
 	  const results = await fd.read(iv,0,this.IV_LENGTH,0)
 	  this.INITIALIZATION_VECTOR = iv;
-	  await fd.close();
+	  await fd.close()
 	} catch (e) {
 	  cause.cause = e
 	  throw cause
@@ -528,7 +528,7 @@ class FileDBI extends YadamuDBI {
 	const streams = []
 	const metrics = DBIConstants.NEW_COPY_METRICS
 	metrics.SOURCE_DATABASE_VENDOR = this.DATABASE_VENDOR
-    const is = this.getInputStream();
+    const is = this.getInputStream()
 	is.COPY_METRICS = metrics
 	is.once('readable',() => {
 	  metrics.pipeStartTime   = performance.now()
@@ -544,9 +544,9 @@ class FileDBI extends YadamuDBI {
 	
 	if (this.ENCRYPTED_FILE) {
 	  streams.push(new IVReader(this.IV_LENGTH))
-  	  // console.log('Decipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR);
+  	  // console.log('Decipher',this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
 	  const decipherStream = crypto.createDecipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
-	  streams.push(decipherStream);
+	  streams.push(decipherStream)
 	}
 
 	if (this.COMPRESSED_FILE) {
@@ -562,7 +562,7 @@ class FileDBI extends YadamuDBI {
       metrics.parserEndTime   = performance.now()
 	  metrics.parserError     = err
     })
-	streams.push(jsonParser);
+	streams.push(jsonParser)
 	
 	const streamSwitcher = new StreamSwitcher(this.yadamu,metrics)
     streamSwitcher.on('error',(err) => { 
@@ -614,14 +614,14 @@ class FileDBI extends YadamuDBI {
   async createCloneStream(options) {
 	await this.initialize()
 	const streams = []
-	this.inputStream = await this.createInputStream();
+	this.inputStream = await this.createInputStream()
 	streams.push(this.inputStream)
 	
 	if (options.encryptedInput) {
-	  await this.loadInitializationVector();
+	  await this.loadInitializationVector()
 	  streams.push(new IVReader(this.IV_LENGTH))
 	  const decipherStream = crypto.createDecipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,this.INITIALIZATION_VECTOR)
-	  streams.push(decipherStream);
+	  streams.push(decipherStream)
 	}
 	
 	if (options.compressedInput) {
@@ -639,10 +639,10 @@ class FileDBI extends YadamuDBI {
 	  streams.push(new IVWriter(this.INITIALIZATION_VECTOR))
 	}
 
-    const outputFilePath = path.resolve(options.filename);
+    const outputFilePath = path.resolve(options.filename)
 	const inputFilePath = this.FILE;
     this.FILE = outputFilePath
-	await this.createOutputStream();
+	await this.createOutputStream()
 	streams.push(this.outputStream)
 	this.yadamuLogger.info([this.DATABASE_VENDOR,YadamuConstants.WRITER_ROLE,options.encryptedInput ? 'DECRYPT' : 'ENCRYPT'],`File: "${inputFilePath}" ==> "${outputFilePath}"`)
 	return streams;

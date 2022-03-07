@@ -176,7 +176,7 @@ class LoaderDBI extends YadamuDBI {
 		  this._OUTPUT_MANAGER = JSONOutputManager
 	  }
 	  return this._OUTPUT_FORMAT
-	})();
+	})()
     return this._OUTPUT_FORMAT
   }
 
@@ -185,7 +185,7 @@ class LoaderDBI extends YadamuDBI {
 	  // Referencing _OUTPUT_FORMAT sets _OUTPUT_MANAGER
 	  const outputformat = this.OUTPUT_FORMAT; 
 	  return this._OUTPUT_MANAGER
-	})();
+	})()
 	return this._OUTPUT_MANAGER
   }
   
@@ -194,7 +194,7 @@ class LoaderDBI extends YadamuDBI {
 	  // Referencing _OUTPUT_FORMAT sets _FILE_EXTENSION
 	  const outputformat = this.OUTPUT_FORMAT; 
 	  return this._FILE_EXTENSION
-	})();
+	})()
 	return this._FILE_EXTENSION
   }
 
@@ -400,7 +400,7 @@ class LoaderDBI extends YadamuDBI {
 	} catch (err) {
       throw err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,file) : new FileError(this.DRIVER_ID,err,stack,file)
 	}
-	this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`);
+	this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`)
   }
 
   async setMetadata(metadata) {
@@ -428,11 +428,11 @@ class LoaderDBI extends YadamuDBI {
 	this.setFolderPaths(this.IMPORT_FOLDER,this.CURRENT_SCHEMA)
 	
     // Create the Upload, Metadata and Data folders
-	await fsp.mkdir(this.IMPORT_FOLDER, { recursive: true });
-    await fsp.mkdir(this.METADATA_FOLDER, { recursive: true });
-    await fsp.mkdir(this.DATA_FOLDER, { recursive: true });
+	await fsp.mkdir(this.IMPORT_FOLDER, { recursive: true })
+    await fsp.mkdir(this.METADATA_FOLDER, { recursive: true })
+    await fsp.mkdir(this.DATA_FOLDER, { recursive: true })
     
-	this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created directory: "${this.PROTOCOL}${this.resolve(this.IMPORT_FOLDER)}"`);
+	this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created directory: "${this.PROTOCOL}${this.resolve(this.IMPORT_FOLDER)}"`)
     this.createControlFile()
   }
   
@@ -453,15 +453,15 @@ class LoaderDBI extends YadamuDBI {
 	return await new Promise((resolve,reject) => {
       crypto.randomFill(new Uint8Array(this.IV_LENGTH), (err, iv) => {
 		if (err) reject(err)
-	    resolve(iv);
+	    resolve(iv)
       })
 	})	    
   } 
  
   async getOutputStreams(tableName,metrics) {
-    // this.yadamuLogger.trace([this.constructor.name,'getOutputStreams()'],`Waiting on DDL Complete. [${this.ddlComplete}]`);
+    // this.yadamuLogger.trace([this.constructor.name,'getOutputStreams()'],`Waiting on DDL Complete. [${this.ddlComplete}]`)
 	await this.ddlComplete;
-    // this.yadamuLogger.trace([this.constructor.name,'getOutputStreams()'],`DDL Complete. [${this.ddlComplete}]`);
+    // this.yadamuLogger.trace([this.constructor.name,'getOutputStreams()'],`DDL Complete. [${this.ddlComplete}]`)
 	this.reloadControlFile()
 	const streams = []
 	
@@ -477,7 +477,7 @@ class LoaderDBI extends YadamuDBI {
 	
 	if (this.ENCRYPTED_CONTENT) {
 	  const iv = await this.createInitializationVector()
-	  // console.log('Cipher',this.getDataFileName(tableName),this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv);
+	  // console.log('Cipher',this.getDataFileName(tableName),this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv)
 	  const cipherStream = crypto.createCipheriv(this.yadamu.CIPHER,this.yadamu.ENCRYPTION_KEY,iv)
 	  streams.push(cipherStream)
 	  streams.push(new IVWriter(iv))
@@ -520,7 +520,7 @@ class LoaderDBI extends YadamuDBI {
     if ((this.MODE != 'DDL_ONLY') && (this.controlFile.settings.contentType === 'CSV')) {
       throw new YadamuError('Loading of "CSV" data sets not supported')
     }
-	this.yadamuLogger.info(['EXPORT',this.DATABASE_VENDOR],`Using Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`);
+	this.yadamuLogger.info(['EXPORT',this.DATABASE_VENDOR],`Using Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`)
 
   }
   
@@ -530,7 +530,7 @@ class LoaderDBI extends YadamuDBI {
 
   async getInputStream(filename) {
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,tableInfo.TABLE_NAME],`Creating input stream on ${filename}`)
-    const stream = fs.createReadStream(filename);
+    const stream = fs.createReadStream(filename)
     const stack = new Error().stack;
     await new Promise((resolve,reject) => {
 	  stream.on('open',() => {resolve(stream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,filename) : new FileError(this.DRIVER_ID,err,stack,filename))})
@@ -542,7 +542,7 @@ class LoaderDBI extends YadamuDBI {
 	const fd = await fsp.open(filename)
 	const iv = new Uint8Array(this.IV_LENGTH)
 	const results = await fd.read(iv,0,this.IV_LENGTH,0)
-	await fd.close();
+	await fd.close()
 	return iv;
   }	
   
@@ -557,7 +557,7 @@ class LoaderDBI extends YadamuDBI {
     const metrics = DBIConstants.NEW_COPY_METRICS
 	metrics.SOURCE_DATABASE_VENDOR = this.DATABASE_VENDOR
 
-	const is = await this.getInputStream(filename);
+	const is = await this.getInputStream(filename)
 	is.COPY_METRICS = metrics
 	is.once('readable',() => {
 	  metrics.readerStartTime = performance.now()
@@ -573,9 +573,9 @@ class LoaderDBI extends YadamuDBI {
 	if (this.ENCRYPTED_INPUT) {
 	  const iv = await this.loadInitializationVector(filename)
 	  streams.push(new IVReader(this.IV_LENGTH))
-  	  // console.log('Decipher',filename,this.controlFile.settings.encryption,this.yadamu.ENCRYPTION_KEY,iv);
+  	  // console.log('Decipher',filename,this.controlFile.settings.encryption,this.yadamu.ENCRYPTION_KEY,iv)
 	  const decipherStream = crypto.createDecipheriv(this.controlFile.settings.encryption,this.yadamu.ENCRYPTION_KEY,iv)
-	  streams.push(decipherStream);
+	  streams.push(decipherStream)
 	}
 
 	if (this.COMPRESSED_INPUT) {
@@ -599,7 +599,7 @@ class LoaderDBI extends YadamuDBI {
     parser.once('readable',() => {
 	  metrics.parserStartTime = performance.now()
 	})
-    streams.push(parser);  
+    streams.push(parser)  
 	  
 	transform.COPY_METRICS = metrics
     transform.on('end',() => {
@@ -609,7 +609,7 @@ class LoaderDBI extends YadamuDBI {
 	  metrics.parserError = err
 	  metrics.failed = true;
     })
-    streams.push(transform);
+    streams.push(transform)
 	
 	// console.log(streams.map((s) => { return s.constructor.name }).join(' ==> '))
 	return streams;

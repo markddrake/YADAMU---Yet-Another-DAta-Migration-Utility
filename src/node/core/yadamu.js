@@ -508,6 +508,7 @@ class Yadamu {
 	  flags : (this.STATUS.sqlTrace && this.STATUS.sqlTrace.writableEnded) ? "a" : "w"
 	}
 	this.STATUS.sqlTrace = this.STATUS.sqlTrace || (this.parameters.SQL_TRACE ? fs.createWriteStream(this.parameters.SQL_TRACE,options) : NullWriter.NULL_WRITER )
+	this.STATUS.sqlTrace.enabled = true
   }
   
   createQuestion(prompt) {	
@@ -813,9 +814,9 @@ class Yadamu {
 	const metadata = await source.loadMetadataFiles(true)
 	
 
-    const copyManager = new YadamuCopyManager(target,this.LOGGER);
+    const copyManager = new YadamuCopyManager(target,source.getCredentials(target.DATABASE_KEY),this.LOGGER);
 	try {
-	  const results = await copyManager.copyStagedData(source.DATABASE_KEY,controlFile,metadata,source.getCredentials(target.DATABASE_KEY))
+	  const results = await copyManager.copyStagedData(source.DATABASE_KEY,controlFile,metadata)
       this.reportStatus(this.STATUS,this.LOGGER)
 	  await source.final()
 	  await target.final()

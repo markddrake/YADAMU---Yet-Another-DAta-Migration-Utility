@@ -89,7 +89,7 @@ class SnowflakeDBI extends YadamuDBI {
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.CLOUD_STAGING }
 
   constructor(yadamu,manager,connectionSettings,parameters) {	  
-    super(yadamu,manager,connectionSettings,parameters);
+    super(yadamu,manager,connectionSettings,parameters)
 	this.StatementLibrary = SnowflakeStatementLibrary
 	this.statementLibrary = undefined
   }
@@ -112,17 +112,17 @@ class SnowflakeDBI extends YadamuDBI {
         if (err) {
           reject(this.trackExceptions(new SnowflakeError(this.DRIVER_ID,err,stack,`snowflake-sdk.Connection.connect()`)))
         }
-        resolve(connection);
+        resolve(connection)
       })
     })
   } 
 
   async testConnection(connectionProperties,parameters) {   
-    super.setConnectionProperties(connectionProperties);
-	this.setDatabase();
+    super.setConnectionProperties(connectionProperties)
+	this.setDatabase()
 	try {
-      let connection = snowflake.createConnection(this.vendorProperties);
-      connection = await this.establishConnection(connection);
+      let connection = snowflake.createConnection(this.vendorProperties)
+      connection = await this.establishConnection(connection)
       connection.destroy()
 	  super.setParameters(parameters)
 	} catch (e) {
@@ -142,12 +142,12 @@ class SnowflakeDBI extends YadamuDBI {
   	// Snowflake-SDK does not support connection pooling
   	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`getConnectionFromPool()`)
     
-    this.setDatabase();
-    this.logConnectionProperties();
-    let connection = snowflake.createConnection(this.vendorProperties);
-    connection = await this.establishConnection(connection);
-    const sqlStartTime = performance.now();
-    this.traceTiming(sqlStartTime,performance.now())
+    this.setDatabase()
+    this.logConnectionProperties()
+    let connection = snowflake.createConnection(this.vendorProperties)
+    connection = await this.establishConnection(connection)
+    const sqlStartTime = performance.now()
+    this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     return connection
   }
 
@@ -159,8 +159,8 @@ class SnowflakeDBI extends YadamuDBI {
   async configureConnection() {    
 
     // Perform connection specific configuration such as setting sesssion time zone to UTC...
-	let results = await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION);
-    results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[]);    
+	let results = await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)
+    results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[])    
     this._DB_VERSION = results[0].DATABASE_VERSION
 
     if ((this.isManager()) && (this.SNOWFLAKE_XML_TYPE !== SnowflakeConstants.SNOWFLAKE_XML_TYPE )) {
@@ -178,7 +178,7 @@ class SnowflakeDBI extends YadamuDBI {
   	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`closeConnection()`)
 	  
     if (this.connection !== undefined && this.connection.destroy) {
-      await this.connection.destroy();
+      await this.connection.destroy()
 	}
 	
   }
@@ -207,10 +207,10 @@ class SnowflakeDBI extends YadamuDBI {
 
     return new Promise((resolve,reject) => {
 
-      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
+      this.SQL_TRACE.traceSQL(sqlStatement)
 
 	  const stack = new Error().stack;
-      const sqlStartTime = performance.now();
+      const sqlStartTime = performance.now()
 	  this.connection.execute({
         sqlText        : sqlStatement
       , binds          : args
@@ -223,19 +223,19 @@ class SnowflakeDBI extends YadamuDBI {
 	      				       attemptReconnect = false
 			   			       try {
                                  await this.reconnect(cause,'SQL')
-                                 results = await this.executeSQL(sqlStatement,args);
+                                 results = await this.executeSQL(sqlStatement,args)
 							     resolve(results)
 						       } catch (e) {
-                                 reject(e);
+                                 reject(e)
                                } 							 
                              }
                              else {
-                               reject(cause);
+                               reject(cause)
                              }
 						   }
 						   else {
-					         // this.traceTiming(sqlStartTime,sqlEndTime)
-                             resolve(rows);
+					         // this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,sqlEndTime)
+                             resolve(rows)
 						   }
 				         }    
       })
@@ -246,9 +246,9 @@ class SnowflakeDBI extends YadamuDBI {
 	let results = []
 	try {
       results = await Promise.all(ddl.map((ddlStatement) => {
-        ddlStatement = ddlStatement.replace(/%%YADAMU_DATABASE%%/g,this.parameters.YADAMU_DATABASE);
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA);
-        return this.executeSQL(ddlStatement,[]);
+        ddlStatement = ddlStatement.replace(/%%YADAMU_DATABASE%%/g,this.parameters.YADAMU_DATABASE)
+        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA)
+        return this.executeSQL(ddlStatement,[])
       }))
     } catch (e) { 
 	  this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
@@ -264,7 +264,7 @@ class SnowflakeDBI extends YadamuDBI {
   }  
   
   async initialize() {
-    await super.initialize(true);   
+    await super.initialize(true)   
 	this.statementLibrary = new this.StatementLibrary(this)
 	this.SPATIAL_SERIALIZER = this.SPATIAL_FORMAT
   }
@@ -286,8 +286,8 @@ class SnowflakeDBI extends YadamuDBI {
 	**
 	*/
 	
-     await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION,[]);
-     super.beginTransaction();
+     await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION,[])
+     super.beginTransaction()
 
   }
 
@@ -308,8 +308,8 @@ class SnowflakeDBI extends YadamuDBI {
 	**
 	*/
 
-	 super.commitTransaction();
-     await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION,[]);
+	 super.commitTransaction()
+     await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION,[])
 	
   }
 
@@ -338,9 +338,9 @@ class SnowflakeDBI extends YadamuDBI {
      
 	try {
       super.rollbackTransaction()
-      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION,[]);
+      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION,[])
     } catch (newIssue) {
-	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue);								   
+	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)								   
 	}
   }
 
@@ -370,9 +370,9 @@ class SnowflakeDBI extends YadamuDBI {
 	
   
     
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[]);
-    const yadamuInstanceId = await this.executeSQL(`call YADAMU_SYSTEM.PUBLIC.YADAMU_INSTANCE_ID()`,[]);
-    const yadamuInstallationTimestamp = await this.executeSQL(`call YADAMU_SYSTEM.PUBLIC.YADAMU_INSTALLATION_TIMESTAMP()`,[]);
+    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[])
+    const yadamuInstanceId = await this.executeSQL(`call YADAMU_SYSTEM.PUBLIC.YADAMU_INSTANCE_ID()`,[])
+    const yadamuInstallationTimestamp = await this.executeSQL(`call YADAMU_SYSTEM.PUBLIC.YADAMU_INSTALLATION_TIMESTAMP()`,[])
     
     const sysInfo = results[0];
 
@@ -417,7 +417,7 @@ class SnowflakeDBI extends YadamuDBI {
       
       if (dataTypes.includes('USER_DEFINED_TYPE') || dataTypes.includes('BINARY')) {
 	    // Perform a describe to get more info about the USER_DEFINED_TYPE and BINARY
-	    const descOutput = await this.executeSQL(SQL_DESCRIBE_TABLE);
+	    const descOutput = await this.executeSQL(SQL_DESCRIBE_TABLE)
 	    dataTypes.forEach((dataType,idx) => {
           dataTypes[idx] = dataType === 'USER_DEFINED_TYPE' ? descOutput[idx].type : dataType
           sizeConstraints[idx] = dataType === 'BINARY' ? '' + YadamuLibrary.decomposeDataType(descOutput[idx].type).length : sizeConstraints[idx] 
@@ -481,7 +481,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	return tableInfo
   }     
   createParser(queryInfo) {
-    return new SnowflakeParser(queryInfo,this.yadamuLogger);
+    return new SnowflakeParser(queryInfo,this.yadamuLogger)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -491,8 +491,8 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   async getInputStream(queryInfo) {
     // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
-    this.status.sqlTrace.write(this.traceSQL(queryInfo.SQL_STATEMENT));
-    return new SnowflakeReader(this.connection,queryInfo.SQL_STATEMENT);
+    this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
+    return new SnowflakeReader(this.connection,queryInfo.SQL_STATEMENT)
 	
   }  
   
@@ -520,7 +520,12 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	 return super.getOutputStream(SnowflakeOutputManager,tableName,metrics)
   }
  
- classFactory(yadamu) {
+  async initializeWorker(manager) {
+	await super.initializeWorker(manager)
+	await this.useDatabase(this.parameters.YADAMU_DATABASE)
+  }
+  
+  classFactory(yadamu) {
 	return new SnowflakeDBI(yadamu,this)
   }
   
@@ -537,15 +542,15 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
  
   async reportCopyErrors(tableName,metrics) {
 	  
-    const err = new Error(`Errors detected durng COPY operation: ${failed} records rejected.`);
+    const err = new Error(`Errors detected durng COPY operation: ${metrics.skipped} records rejected.`)
     err.sql = metrics.sql;
 	err.tags = []
 
 	try {
-	  const results = await this.executeSQL(`select * from table(validate("${this.parameters.YADAMU_DATABASE}"."${this.CURRENT_SCHEMA}"."${tableName}", job_id => '_last'))`);
+	  const results = await this.executeSQL(`select * from table(validate("${this.parameters.YADAMU_DATABASE}"."${this.CURRENT_SCHEMA}"."${tableName}", job_id => '_last'))`)
       err.cause = results.map((err) => {
 	    const loadError = new Error(err.error)
-		Object.assign(loadError,err);
+		Object.assign(loadError,err)
 		return loadError
 	  })
 	} catch (e) {
@@ -554,24 +559,24 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	this.yadamuLogger.handleException([...err.tags,this.DATABASE_VENDOR,tableName],err)	   	
   }  
     
-  async initializeCopy(credentials) {
+  async initializeCopy() {
     await super.initializeCopy()
-    let results = await this.executeSQL(this.statementLibrary.SQL_CREATE_STAGE);
+    let results = await this.executeSQL(this.statementLibrary.SQL_CREATE_STAGE)
   }
   
   async copyOperation(tableName,copyOperation,metrics) {
 	
 	try {
-	  metrics.writerStartTime = performance.now();
-	  let results = await this.beginTransaction();
-	  results = await this.executeSQL(`alter session set TIME_INPUT_FORMAT='${SnowflakeConstants.TIME_INPUT_FORMAT[this.systemInformation.vendor]}'`);
-	  results = await this.executeSQL(copyOperation.dml);
+	  metrics.writerStartTime = performance.now()
+	  let results = await this.beginTransaction()
+	  results = await this.executeSQL(`alter session set TIME_INPUT_FORMAT='${SnowflakeConstants.TIME_INPUT_FORMAT[this.systemInformation.vendor]}'`)
+	  results = await this.executeSQL(copyOperation.dml)
 	  results.forEach((file) => {
 	    metrics.read += parseInt(file.rows_parsed)
 	    metrics.written += parseInt(file.rows_loaded)
 	    metrics.skipped += parseInt(file.errors_seen)
 	  })
-	  metrics.writerEndTime = performance.now();
+	  metrics.writerEndTime = performance.now()
 	  results = await this.commitTransaction()
 	  metrics.committed = metrics.written 
 	  metrics.written = 0
@@ -591,7 +596,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   async finalizeCopy() {
     await super.finalizeCopy()
 	const sqlStatement = this.statementLibrary.SQL_DROP_STAGE
-    const  results = await this.executeSQL(sqlStatement);
+    const  results = await this.executeSQL(sqlStatement)
   }
     
 }

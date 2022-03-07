@@ -103,7 +103,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
 -- declare @RULES                  narchar(4000) = '${compareRules}';
 --`;
             
-      this.status.sqlTrace.write(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION,@DATE_TIME_PRECISION)\ngo\n`)
+      this.SQL_TRACE.trace(`${args}\nexecute sp_COMPARE_SCHEMA(@FORMAT_RESULTS,@SOURCE_DATABASE,@SOURCE_SCHEMA,@TARGET_DATABASE,@TARGET_SCHEMA,@COMMENT,@EMPTY_STRING_IS_NULL,@SPATIAL_PRECISION,@DATE_TIME_PRECISION)\ngo\n`)
 
       const request = this.getRequest();
       
@@ -179,7 +179,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
 class MsSQLDBMgr extends MsSQLQA {
     
     constructor(logger,status,vendorProperties) {
-      super({activeConnections: new Set()})
+      super({activeConnections: new Set(), STATUS: status},undefined,{},{})
       this.yadamuLogger = logger;
       this.status = status
       this.vendorProperties = vendorProperties

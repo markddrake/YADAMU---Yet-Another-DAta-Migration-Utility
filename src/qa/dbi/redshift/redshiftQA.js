@@ -65,7 +65,7 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
     async recreateSchema() {
       try {
         const dropSchema = `drop schema if exists "${this.parameters.TO_USER}" cascade`;
-        this.status.sqlTrace.write(`${dropSchema};\n--\n`)
+        this.SQL_TRACE.traceSQL(dropSchema)
         await this.executeSQL(dropSchema);      
       } catch (e) {
         if (e.errorNum && (e.errorNum === 1918)) {

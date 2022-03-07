@@ -78,6 +78,7 @@ class MariadbWriter extends YadamuWriter {
         }
         break;  
       case 'Iterative':     
+        const sqlStatement = `${this.tableInfo.dml} ${this.tableInfo.rowConstructor}`
         for (let row =0; row < rowCount; row++) {
           const nextRow = repackBatch ?  batch.splice(0,this.tableInfo.columnCount) : batch[row]
           try {

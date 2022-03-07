@@ -4,20 +4,11 @@ import DBIConstants        from './dbiConstants.js';
 
 class YadamuCopyManager {
  
-  constructor(dbi,yadamuLogger) {
+  constructor(dbi,credentials,yadamuLogger) {
     this.dbi = dbi
+	this.credentials = credentials
 	this.yadamuLogger = yadamuLogger
   } 
-  
-  async generateCopyStatements(metadata) {
-    const startTime = performance.now()
-    await this.dbi.setMetadata(metadata)   
-    const statementCache = await this.dbi.generateStatementCache(this.dbi.CURRENT_SCHEMA)
-	return statementCache
-  }     
-  
-  async reportCopyErrors(tableName,stack,sqlStatement,failed) {
-  }
   
   async reportCopyResults(tableName,metrics) {
 
@@ -34,20 +25,19 @@ class YadamuCopyManager {
       default:
 	    rowCountSummary = `Read ${metrics.read}. Written ${metrics.read - metrics.skipped}.`
         this.yadamuLogger.error([`${tableName}`,`Copy`],`${rowCountSummary} ${writerTimings}`)  
-        await this.dbi.reportCopyErrors(tableName,stack,copyStatements.dml,failed)
+        await this.dbi.reportCopyErrors(tableName,metrics)
 	}
 	
-	await this.dbi.reportCopyErrors(tableName,metrics) 
-
 	/*
 	if (copyStatements.hasOwnProperty('partitionCount')) {
 	  this.dbi.yadamu.recordPartitionMetrics(tableName,metrics);  
 	}   
 	else {
+	}
 	*/
-	  metrics.pipeStartTime = metrics.writerStartTime
-	  this.dbi.yadamu.recordMetrics(tableName,metrics);  
-	// }
+	
+    metrics.pipeStartTime = metrics.writerStartTime
+	this.dbi.yadamu.recordMetrics(tableName,metrics);  
   }
   
   async copyOperation(taskList,worker,mode,sourceVendor) {
@@ -110,23 +100,22 @@ class YadamuCopyManager {
 	return results
   }  
   
-  async copyStagedData(vendor,controlFile,metadata,credentials) {
+  async copyStagedData(vendor,controlFile,metadata) {
 
     // this.yadamuLogger.trace([this.constructor.name,'COPY',this.dbi.DATABASE_VENDOR],'copyStagedData()')
 
     this.dbi.verifyStagingSource(vendor)
 	
-	await this.dbi.initializeCopy(controlFile)
-    
 	this.dbi.setSystemInformation(controlFile.systemInformation)
-	
+	await this.dbi.initializeImport()
+
     const startTime = performance.now()	
-	const statementCache = await this.generateCopyStatements(metadata,credentials);
+	const statementCache = await this.dbi.generateCopyStatements(metadata,this.credentials);
 	const ddlStatements = this.dbi.analyzeStatementCache(statementCache,startTime)
 	let results = await this.dbi.executeDDL(ddlStatements)
-    await this.dbi.ddlComplete
-	
-	
+
+	await this.dbi.initializeCopy(controlFile)
+    
 	if (this.dbi.MODE != 'DDL_ONLY') {
 	  const taskList = Object.keys(statementCache).flatMap((table) => {
 		if (Array.isArray(statementCache[table].copy)) {
@@ -145,9 +134,10 @@ class YadamuCopyManager {
 		}
 	  })
       results = await this.copyOperations(taskList,vendor)
+	  await this.dbi.finalizeCopy()	  
 	}
-    await this.dbi.finalizeCopy()	  
-	return results
+	await this.dbi.finalizeImport()
+    return results
   }
   
 }

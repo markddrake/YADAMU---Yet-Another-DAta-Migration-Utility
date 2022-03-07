@@ -77,7 +77,7 @@ class MariadbDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
 
-    super(yadamu,manager,connectionSettings,parameters);
+    super(yadamu,manager,connectionSettings,parameters)
     this.pool = undefined;
 	
     this.StatementLibrary = MariadbStatementLibrary
@@ -86,9 +86,9 @@ class MariadbDBI extends YadamuDBI {
   
   async testConnection(connectionProperties,parameters) {   
     try {
-	  this.setConnectionProperties(connectionProperties);
-      this.connection = await mariadb.createConnection(this.vendorProperties);
-	  await this.connection.end();
+	  this.setConnectionProperties(connectionProperties)
+      this.connection = await mariadb.createConnection(this.vendorProperties)
+	  await this.connection.end()
 	  super.setParameters(parameters)
 	} catch (e) {
 	  throw (e)
@@ -97,9 +97,9 @@ class MariadbDBI extends YadamuDBI {
 	     
   async configureConnection() {  
 
-    await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION);
+    await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)
 
-    let results = await this.executeSQL(this.StatementLibrary.SQL_GET_CONNECTION_INFORMATION);
+    let results = await this.executeSQL(this.StatementLibrary.SQL_GET_CONNECTION_INFORMATION)
     this._DB_VERSION = results[0]
 
     results = await this.executeSQL(this.StatementLibrary.SQL_SHOW_SYSTEM_VARIABLES)
@@ -108,7 +108,7 @@ class MariadbDBI extends YadamuDBI {
 		case 'lower_case_table_names':
           this.LOWER_CASE_TABLE_NAMES = parseInt(row[1])
           if (this.isManager() && (this.LOWERCASE_TABLE_NAMES > 0)) {
-	        this.yadamuLogger.info([this.DATABASE_VENDOR,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`);
+	        this.yadamuLogger.info([this.DATABASE_VENDOR,`LOWER_CASE_TABLE_NAMES`],`Table names mapped to lowercase`)
 	      }
         break;
 	  }
@@ -127,13 +127,13 @@ class MariadbDBI extends YadamuDBI {
     const sqlQueryPacketSize = `SELECT @@max_allowed_packet`;
     const sqlSetPacketSize = `SET GLOBAL max_allowed_packet=${maxAllowedPacketSize}`
       
-    let results = await this.executeSQL(sqlQueryPacketSize);
+    let results = await this.executeSQL(sqlQueryPacketSize)
     if (parseInt(results[0][0]) <  maxAllowedPacketSize) {
 		
 	  // Need to change the setting.
 		
-      this.yadamuLogger.qaInfo([this.DATABASE_VENDOR,this.ROLE],`Increasing MAX_ALLOWED_PACKET to 1G.`);
-      results = await this.executeSQL(sqlSetPacketSize);
+      this.yadamuLogger.qaInfo([this.DATABASE_VENDOR,this.ROLE],`Increasing MAX_ALLOWED_PACKET to 1G.`)
+      results = await this.executeSQL(sqlSetPacketSize)
 	  
 	  if (existingConnection) {
 		// Need to repalce the existsing connection to pick up the change. 
@@ -142,17 +142,17 @@ class MariadbDBI extends YadamuDBI {
     }    
     
 	if (!existingConnection) {    
-      await this.closeConnection();
+      await this.closeConnection()
 	}
 
   }
   
   async createConnectionPool() {
-    this.logConnectionProperties();
-	let sqlStartTime = performance.now();
-	this.pool = mariadb.createPool(this.vendorProperties);
-	this.traceTiming(sqlStartTime,performance.now())
-    await this.checkMaxAllowedPacketSize();
+    this.logConnectionProperties()
+	let sqlStartTime = performance.now()
+	this.pool = mariadb.createPool(this.vendorProperties)
+	this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+    await this.checkMaxAllowedPacketSize()
   }
   
   async getConnectionFromPool() {
@@ -160,12 +160,12 @@ class MariadbDBI extends YadamuDBI {
 	// this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,,this.getWorkerNumber()],`getConnectionFromPool()`)
 
     let stack
-    this.status.sqlTrace.write(this.traceComment(`Gettting Connection From Pool.`));
+    this.SQL_TRACE.comment(`Gettting Connection From Pool.`)
 	try {
-      const sqlStartTime = performance.now();
+      const sqlStartTime = performance.now()
 	  stack = new Error().stack
-	  const connection = await this.pool.getConnection();
-	  this.traceTiming(sqlStartTime,performance.now())
+	  const connection = await this.pool.getConnection()
+	  this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	  connection.ping()
       return connection
 	} catch (e) {
@@ -181,7 +181,7 @@ class MariadbDBI extends YadamuDBI {
       let stack;
       try {
         stack = new Error().stack
-        await this.connection.end();
+        await this.connection.end()
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
@@ -198,7 +198,7 @@ class MariadbDBI extends YadamuDBI {
       let stack;
       try {
         stack = new Error().stack
-        await this.pool.end();
+        await this.pool.end()
         this.pool = undefined;
       } catch (e) {
         this.pool = undefined;
@@ -217,7 +217,7 @@ class MariadbDBI extends YadamuDBI {
   async createSchema(schema) {    	
   
 	const sqlStatement = `CREATE DATABASE IF NOT EXISTS "${schema}"`;					   
-	const results = await this.executeSQL(sqlStatement,schema);
+	const results = await this.executeSQL(sqlStatement,schema)
 	return results;
     
   }
@@ -227,15 +227,15 @@ class MariadbDBI extends YadamuDBI {
 	
     let stack
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.status.sqlTrace.write(this.traceSQL(sqlStatement));
+    this.SQL_TRACE.traceSQL(sqlStatement)
     
 	while (true) {
       // Exit with result or exception.  
       try {
-        const sqlStartTime = performance.now();
+        const sqlStartTime = performance.now()
 		stack = new Error().stack
         const results = await this.connection.query(sqlStatement,args)
-        this.traceTiming(sqlStartTime,performance.now())
+        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
 		const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,sqlStatement))
@@ -251,9 +251,9 @@ class MariadbDBI extends YadamuDBI {
   }  
 
   async _executeDDL(ddl) {
-    await this.createSchema(this.CURRENT_SCHEMA);
+    await this.createSchema(this.CURRENT_SCHEMA)
     const ddlResults = await Promise.all(ddl.map((ddlStatement) => {
-      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA);
+      ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA)
       return this.executeSQL(ddlStatement) 
     }))
 	return ddlResults;
@@ -308,8 +308,8 @@ class MariadbDBI extends YadamuDBI {
   }  
     
   async initialize() {
-    await super.initialize(true);
-    this.setSpatialSerializer(this.SPATIAL_FORMAT);
+    await super.initialize(true)
+    this.setSpatialSerializer(this.SPATIAL_FORMAT)
 	this.statementLibrary = new this.StatementLibrary(this)
   }
 
@@ -330,19 +330,19 @@ class MariadbDBI extends YadamuDBI {
 
     let stack
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.status.sqlTrace.write(this.traceSQL(`begin transaction`));
+    this.SQL_TRACE.traceSQL(`begin transaction`)
     
     while (true) {
       // Exit with result or exception.  
       try {
-        const sqlStartTime = performance.now();
+        const sqlStartTime = performance.now()
 		stack = new Error().stack
-        await this.connection.beginTransaction();
-        this.traceTiming(sqlStartTime,performance.now())
+        await this.connection.beginTransaction()
+        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		super.beginTransaction()
 		break
       } catch (e) {
-		const cause = MariadbError(e,stack,'mariadb.Connection.beginTransaction()');
+		const cause = MariadbError(e,stack,'mariadb.Connection.beginTransaction()')
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -366,14 +366,14 @@ class MariadbDBI extends YadamuDBI {
     // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
     let stack
-    this.status.sqlTrace.write(this.traceSQL(`commit transaction`));
+    this.SQL_TRACE.traceSQL(`commit transaction`)
    
     try {
 	  super.commitTransaction()
-      const sqlStartTime = performance.now();
+      const sqlStartTime = performance.now()
       stack = new Error().stack
-      await this.connection.commit();
-      this.traceTiming(sqlStartTime,performance.now())
+      await this.connection.commit()
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
 	  const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,'mariadb.Connection.commit()'))
 	  if (cause.lostConnection()) {
@@ -402,13 +402,13 @@ class MariadbDBI extends YadamuDBI {
 	// Note the underlying error is not thrown unless the rollback itself fails. This makes sure that the underlying error is not swallowed if the rollback operation fails.
 
     let stack
-    this.status.sqlTrace.write(this.traceSQL(`rollback transaction`));
+    this.SQL_TRACE.traceSQL(`rollback transaction`)
     try {
 	  super.rollbackTransaction()
-      const sqlStartTime = performance.now();
+      const sqlStartTime = performance.now()
       stack = new Error().stack
-      await this.connection.rollback();
-      this.traceTiming(sqlStartTime,performance.now())
+      await this.connection.rollback()
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
 	  const newIssue = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,'mariadb.Connection.rollback()'))
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
@@ -419,7 +419,7 @@ class MariadbDBI extends YadamuDBI {
   async createSavePoint() {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
-    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT);
+    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
 	super.createSavePoint()
   }
   
@@ -427,14 +427,14 @@ class MariadbDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.restoreSavePoint()`,this.getWorkerNumber()],``)
 
-    this.checkConnectionState();
+    this.checkConnectionState()
 
 	// If restoreSavePoint was invoked due to encounterng an error and the restore operation results in a second exception being raised, log the exception raised by the restore operation and throw the original error.
 	// Note the underlying error is not thrown unless the restore itself fails. This makes sure that the underlying error is not swallowed if the restore operation fails.
 
 	try {
-      await this.executeSQL(this.StatementLibrary.SQL_RESTORE_SAVE_POINT);
-	  super.restoreSavePoint();
+      await this.executeSQL(this.StatementLibrary.SQL_RESTORE_SAVE_POINT)
+	  super.restoreSavePoint()
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVPOINT',cause,newIssue)
 	}
@@ -444,8 +444,8 @@ class MariadbDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
-    await this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT);    
-	super.releaseSavePoint();
+    await this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT)    
+	super.releaseSavePoint()
   } 
 
   /*
@@ -480,7 +480,7 @@ class MariadbDBI extends YadamuDBI {
   
   async getSystemInformation() {     
   
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION); 
+    const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION) 
     const sysInfo = results[0];
 	
 	return Object.assign(
@@ -515,7 +515,7 @@ class MariadbDBI extends YadamuDBI {
 
     // Cannot use JSON_ARRAYAGG for DATA_TYPES and SIZE_CONSTRAINTS beacuse MYSQL implementation of JSON_ARRAYAGG does not support ordering
 
-    const results = await this.executeSQL(this.statementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA]);
+    const results = await this.executeSQL(this.statementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA])
     const schemaInfo = this.generateSchemaInfo(results) 
     return schemaInfo
 
@@ -526,7 +526,7 @@ class MariadbDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    return new MariadbParser(queryInfo,this.yadamuLogger,parseDelay);
+    return new MariadbParser(queryInfo,this.yadamuLogger,parseDelay)
   }  
 
   inputStreamError(cause,sqlStatement) {
@@ -536,15 +536,15 @@ class MariadbDBI extends YadamuDBI {
   async getInputStream(queryInfo) {
     
 	let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.status.sqlTrace.write(this.traceSQL(queryInfo.SQL_STATEMENT));
+    this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
     
     while (true) {
       // Exit with result or exception.  
       try {
-        const sqlStartTime = performance.now();
+        const sqlStartTime = performance.now()
 		this.streamingStackTrace = new Error().stack
-		const is = this.connection.queryStream(queryInfo.SQL_STATEMENT);
-	    this.traceTiming(sqlStartTime,performance.now())
+		const is = this.connection.queryStream(queryInfo.SQL_STATEMENT)
+	    this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
 		const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,this.streamingStackTrace,sqlStatement))

@@ -72,14 +72,14 @@ class RedshiftDBI extends YadamuDBI {
 	  const bucket = this.parameters.BUCKET || AWSS3Constants.BUCKET
 	  this._BUCKET = YadamuLibrary.macroSubstitions(bucket, this.yadamu.MACROS)
 	  return this._BUCKET
-	})();
+	})()
 	return this._BUCKET
   }
 
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.CLOUD_STAGING }
 
   constructor(yadamu,manager,connectionSettings,parameters) {
-    super(yadamu,manager,connectionSettings,parameters);
+    super(yadamu,manager,connectionSettings,parameters)
        
     this.pgClient = undefined;
     this.useBinaryJSON = false
@@ -103,11 +103,11 @@ class RedshiftDBI extends YadamuDBI {
   */
   
   async testConnection(connectionProperties) {   
-    super.setConnectionProperties(connectionProperties);
+    super.setConnectionProperties(connectionProperties)
 	try {
-      const pgClient = new Client(this.vendorProperties);
-      await pgClient.connect();
-      await pgClient.end();     
+      const pgClient = new Client(this.vendorProperties)
+      await pgClient.connect()
+      await pgClient.end()     
 								  
 	} catch (e) {
       throw e;
@@ -117,15 +117,15 @@ class RedshiftDBI extends YadamuDBI {
   
   async createConnectionPool() {
 	
-    this.logConnectionProperties();
-	let sqlStartTime = performance.now();
-	this.pool = new Pool(this.vendorProperties);
-    this.traceTiming(sqlStartTime,performance.now())
+    this.logConnectionProperties()
+	let sqlStartTime = performance.now()
+	this.pool = new Pool(this.vendorProperties)
+    this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const pgErr = this.trackExceptions(new RedshiftError(this.DRIVER_ID,err,this.redshiftStack,this.redshiftsOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],pgErr);
+      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`POOL_ON_ERROR`],pgErr)
       // throw pgErr
     })
 
@@ -137,13 +137,13 @@ class RedshiftDBI extends YadamuDBI {
 
 	
 	let stack
-    this.status.sqlTrace.write(this.traceComment(`Getting Connection From Pool.`));
+    this.SQL_TRACE.comment(`Getting Connection From Pool.`)
 
 	try {
-      const sqlStartTime = performance.now();
+      const sqlStartTime = performance.now()
 	  stack = new Error().stack;
-	  const connection = await this.pool.connect();
-      this.traceTiming(sqlStartTime,performance.now())
+	  const connection = await this.pool.connect()
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
 	  throw this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,stack,'pg.Pool.connect()'))
@@ -151,8 +151,8 @@ class RedshiftDBI extends YadamuDBI {
   }
 
   async getConnection() {
-	this.logConnectionProperties();
-    const sqlStartTime = performance.now();
+	this.logConnectionProperties()
+    const sqlStartTime = performance.now()
 	
 	let stack 
 	let operation
@@ -160,41 +160,41 @@ class RedshiftDBI extends YadamuDBI {
 	try {
 	  operation = 'pg.Client()'
 	  stack = new Error().stack;
-      const pgClient = new Client(this.vendorProperties);
+      const pgClient = new Client(this.vendorProperties)
 					
 	  operation = 'Client.connect()'
 	  stack = new Error().stack;
-      this.connection = await pgClient.connect();
+      this.connection = await pgClient.connect()
     
-	  this.traceTiming(sqlStartTime,performance.now())
+	  this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
       throw this.trackExceptions(new RedshiftException(e,stack,operation))
 	}
-    await configureConnection();
+    await configureConnection()
   }
   
   async configureConnection() {
      
     this.connection.on('notice',(n) => { 
-      const notice = JSON.parse(JSON.stringify(n));
+      const notice = JSON.parse(JSON.stringify(n))
       switch (notice.code) {
         case '42P07': // Table exists on Create Table if not exists
           break;
         case '00000': // Table not found on Drop Table if exists
 	      break;
         default:
-          this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`);
+          this.yadamuLogger.info([this.DATABASE_VENDOR,this.ROLE,`NOTICE`],`${n.message ? n.message : JSON.stringify(n)}`)
       }
     })  
   
 	this.connection.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
 	  const pgErr = this.trackExceptions(new RedshiftError(this.DRIVER_ID,err,this.redshiftStack,this.redshiftsOperation))
-      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],pgErr);
+      this.yadamuLogger.handleWarning([this.DATABASE_VENDOR,this.ROLE,`CONNECTION_ON_ERROR`],pgErr)
       // throw pgErr
     })
    
-    await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION);				
+    await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
 	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
 	this._DB_VERSION = results.rows[0][3];
@@ -209,7 +209,7 @@ class RedshiftDBI extends YadamuDBI {
 	  let stack
       try {
      	stack = new Error().stack;
-        await this.connection.release();
+        await this.connection.release()
         this.connection = undefined;
       } catch (e) {
         this.connection = undefined;
@@ -227,7 +227,7 @@ class RedshiftDBI extends YadamuDBI {
       let stack
 	  try {
 	    stack = new Error().stack
-	    await this.pool.end();
+	    await this.pool.end()
         this.pool = undefined
   	  } catch (e) {
         this.pool = undefined
@@ -261,25 +261,25 @@ class RedshiftDBI extends YadamuDBI {
 	
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
-	if (this.status.sqlTrace  &&(typeof sqlStatement === 'string')){
+	if (typeof sqlStatement === 'string') {
 	  let sql = sqlStatement
 	  if (sql.indexOf('),($') > 0) {
 	    const startElipises = sql.indexOf('),($') + 2 
 	    const endElipises =  sql.lastIndexOf('),($') + 2
-	    sql = sql.substring(0,startElipises) + '(...),' + sql.substring(endElipises);
+	    sql = sql.substring(0,startElipises) + '(...),' + sql.substring(endElipises)
 	  }
-      this.status.sqlTrace.write(this.traceSQL(sql));
+      this.SQL_TRACE.traceSQL(sql)
     }
 
     let stack
     while (true) {
       // Exit with result or exception.  
       try {
-        const sqlStartTime = performance.now();
+        const sqlStartTime = performance.now()
 		stack = new Error().stack
         const sqlQuery = typeof sqlStatement === 'string' ? {text : sqlStatement, values: args, rowMode : 'array'} : sqlStatement
         const results = await this.connection.query(sqlQuery)
-        this.traceTiming(sqlStartTime,performance.now())
+        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
 		const cause = this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,stack,sqlStatement))
@@ -302,7 +302,7 @@ class RedshiftDBI extends YadamuDBI {
   }
 
   async initialize() {
-    await super.initialize(true);
+    await super.initialize(true)
   }
   
   /*
@@ -315,8 +315,8 @@ class RedshiftDBI extends YadamuDBI {
 
      // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.getWorkerNumber()],``)
 
-     await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION);
-	 super.beginTransaction();
+     await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION)
+	 super.beginTransaction()
 
   }
 
@@ -331,7 +331,7 @@ class RedshiftDBI extends YadamuDBI {
     // this.yadamuLogger.trace([`${this.constructor.name}.commitTransaction()`,this.getWorkerNumber()],``)
 
 	super.commitTransaction()
-    await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION);
+    await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION)
 	
   }
 
@@ -352,9 +352,9 @@ class RedshiftDBI extends YadamuDBI {
 
 	try {
       super.rollbackTransaction()
-      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION);
+      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION)
 	} catch (newIssue) {
-	  this.checkCause('ROLBACK TRANSACTION',cause,newIssue);								   
+	  this.checkCause('ROLBACK TRANSACTION',cause,newIssue)								   
 	}
   }
 
@@ -362,8 +362,8 @@ class RedshiftDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.createSavePoint()`,this.getWorkerNumber()],``)
 															
-    // await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT);
-    super.createSavePoint();
+    // await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
+    super.createSavePoint()
   }
   
   async restoreSavePoint(cause) {
@@ -377,10 +377,10 @@ class RedshiftDBI extends YadamuDBI {
 		
     let stack
     try {
-      // await this.executeSQL(this.StatementLibrary.SQL_RESTORE_SAVE_POINT);
-      super.restoreSavePoint();
+      // await this.executeSQL(this.StatementLibrary.SQL_RESTORE_SAVE_POINT)
+      super.restoreSavePoint()
 	} catch (newIssue) {
-	  this.checkCause('RESTORE SAVEPOINT',cause,newIssue);
+	  this.checkCause('RESTORE SAVEPOINT',cause,newIssue)
 	}
   }  
 
@@ -388,8 +388,8 @@ class RedshiftDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.releaseSavePoint()`,this.getWorkerNumber()],``)
 
-    await // this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT);    
-    super.releaseSavePoint();
+    await // this.executeSQL(this.StatementLibrary.SQL_RELEASE_SAVE_POINT)    
+    super.releaseSavePoint()
 
   } 
   
@@ -412,17 +412,17 @@ class RedshiftDBI extends YadamuDBI {
 
   async processStagingTable(schema) {  	
   	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1) from "YADAMU_STAGING"`;
-  	var results = await this.executeSQL(sqlStatement,[schema]);
+  	var results = await this.executeSQL(sqlStatement,[schema])
     if (results.rows.length > 0) {
       if (this.useBinaryJSON  === true) {
-	    return this.processLog(results.rows[0][0],'JSONB_EACH');  
+	    return this.processLog(results.rows[0][0],'JSONB_EACH')  
       }
       else {
-	    return this.processLog(results.rows[0][0],'JSON_EACH');  
+	    return this.processLog(results.rows[0][0],'JSON_EACH')  
       }
     }
     else {
-      this.yadamuLogger.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL YADAMU_IMPORT_JSONB()' : 'CALL_YADAMU_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`);
+      this.yadamuLogger.error([`${this.constructor.name}.processStagingTable()`],`Unexpected Error. No response from ${ this.useBinaryJSON === true ? 'CALL YADAMU_IMPORT_JSONB()' : 'CALL_YADAMU_IMPORT_JSON()'}. Please ensure file is valid JSON and NOT pretty printed.`)
       // Return value will be parsed....
       return [];
     }
@@ -446,7 +446,7 @@ class RedshiftDBI extends YadamuDBI {
   
   getTypeMappings() {
    
-    const typeMappings = super.getTypeMappings();
+    const typeMappings = super.getTypeMappings()
 	typeMappings.circleFormat = this.CIRCLE_FORMAT 
     return typeMappings; 
   }
@@ -505,22 +505,22 @@ class RedshiftDBI extends YadamuDBI {
   }
   
   async getSchemaMetadata() {
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[]) // ,[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT,{"circleAsPolygon": this.INBOUND_CIRCLE_FORMAT === 'POLYGON',"calculateByteaSize":true}]);
+    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[]) // ,[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT,{"circleAsPolygon": this.INBOUND_CIRCLE_FORMAT === 'POLYGON',"calculateByteaSize":true}])
 	const schemaInfo = this.buildSchemaInfo(results.rows)
 	return schemaInfo
   }
 
   createParser(tableInfo,parseDelay) {
-    return new RedshiftParser(tableInfo,this.yadamuLogger,parseDelay);
+    return new RedshiftParser(tableInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
     return this.trackExceptions(((cause instanceof RedshiftError) || (cause instanceof CopyOperationAborted)) ? cause : new RedshiftError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
   }
 
-  async getInputStream(queyInfo) {       
+  async getInputStream(queryInfo) {       
 
-    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,queyInfo.TABLE_NAME],'')
+    // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,queryInfo.TABLE_NAME],'')
     
     /*
     **
@@ -533,14 +533,14 @@ class RedshiftDBI extends YadamuDBI {
 	}
  		
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
-    this.status.sqlTrace.write(this.traceSQL(queyInfo.SQL_STATEMENT))
+    this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
     while (true) {
       // Exit with result or exception.  
       try {
-        const sqlStartTime = performance.now();
+        const sqlStartTime = performance.now()
 		this.streamingStackTrace = new Error().stack
-        const queryStream = new QueryStream(queyInfo.SQL_STATEMENT,[],{rowMode : "array"})
-        this.traceTiming(sqlStartTime,performance.now())
+        const queryStream = new QueryStream(queryInfo.SQL_STATEMENT,[],{rowMode : "array"})
+        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         const inputStream = await this.connection.query(queryStream)   
 		
 		/*
@@ -560,7 +560,7 @@ class RedshiftDBI extends YadamuDBI {
   		
 		return inputStream
       } catch (e) {
-		const cause = this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,this.streamingStackTrace,queyInfo.SQL_STATEMENT))
+		const cause = this.trackExceptions(new RedshiftError(this.DRIVER_ID,e,this.streamingStackTrace,queryInfo.SQL_STATEMENT))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -580,19 +580,19 @@ class RedshiftDBI extends YadamuDBI {
    
   async createSchema(schema) {
     const createSchema = `create schema if not exists "${schema}"`;
-	await this.executeSQL(createSchema);   
+	await this.executeSQL(createSchema)   
   }
   
   async _executeDDL(ddl) {
 	
 	let results = []
-    await this.createSchema(this.CURRENT_SCHEMA);
+    await this.createSchema(this.CURRENT_SCHEMA)
 	
 	try {
       results = await Promise.all(ddl.map((ddlStatement) => {
-        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA);
-		// this.status.sqlTrace.write(this.traceSQL(ddlStatement));
-        return this.executeSQL(ddlStatement);
+        ddlStatement = ddlStatement.replace(/%%SCHEMA%%/g,this.CURRENT_SCHEMA)
+		// this.SQL_TRACE.traceSQL(ddlStatement)
+        return this.executeSQL(ddlStatement)
       }))
     } catch (e) {
 	 this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
@@ -642,7 +642,7 @@ class RedshiftDBI extends YadamuDBI {
 	   }
   	   causes.push(err)
 	 })
-     const err = new Error(`Errors detected durng COPY operation: ${results.rows.length} records rejected.`);
+     const err = new Error(`Errors detected durng COPY operation: ${results.rows.length} records rejected.`)
 	 err.tags = []
 	 if (causes.length === sizeIssue) {
 	    err.tags.push("CONTENT_TOO_LARGE")
@@ -656,14 +656,14 @@ class RedshiftDBI extends YadamuDBI {
 	
 	try {
 	  metrics.stack = new Error().stack;
-	  metrics.writerStartTime = performance.now();
-	  let results = await this.beginTransaction();
-	  results = await this.executeSQL(copyOperation.dml);
+	  metrics.writerStartTime = performance.now()
+	  let results = await this.beginTransaction()
+	  results = await this.executeSQL(copyOperation.dml)
   	  results = await this.commitTransaction()
-	  metrics.writerEndTime = performance.now();
-	  results = await this.executeSQL(this.StatementLibrary.SQL_COPY_STATUS);
+	  metrics.writerEndTime = performance.now()
+	  results = await this.executeSQL(this.StatementLibrary.SQL_COPY_STATUS)
 	  metrics.committed = parseInt(results.rows[0][0])
-	  results = await this.executeSQL(this.StatementLibrary.SQL_COPY_ERRORS);
+	  results = await this.executeSQL(this.StatementLibrary.SQL_COPY_ERRORS)
 	  metrics.skipped = parseInt(results.rows[0][0])
 	  metrics.read = metrics.committed + metrics.skipped
   	} catch(cause) {

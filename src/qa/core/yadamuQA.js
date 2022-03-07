@@ -795,7 +795,7 @@ class YadamuQA {
        await staging.initialize()
        await staging.loadControlFile()
        const targetInstance = await staging.getYadamuInstanceInfo();
-	   await target.final()
+	   await staging.final()
 	   
 	   if (staging.controlFile.settings.contentType === 'CSV') {
          if ((sourceInstance.yadamuInstanceID === targetInstance.yadamuInstanceID) && (sourceInstance.yadamuInstallationTimestamp === targetInstance.yadamuInstallationTimestamp)) {
@@ -813,8 +813,8 @@ class YadamuQA {
 	   try {
 		 await source.destroy(e);
 		 await target.destroy(e)
-	   } catch (e) {}
-	   /* If anything goes wrong the staged data is not valid  console.log(e) */
+	   } catch (e) { /* If anything goes wrong the staged data is not valid  */ console.log(e) }
+	   
 	 }
      return false     
   }

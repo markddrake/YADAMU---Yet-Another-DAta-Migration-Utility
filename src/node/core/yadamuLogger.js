@@ -322,9 +322,8 @@ class YadamuLogger {
     } catch (err) {    
 	  const loggerError = new Error(`Error creating data file "${metadataFile}".`)
 	  loggerError.cause = err
-	  loggerError.systemInformation = currentSettings.systemInformation
-      loggerError.metadata = currentSettings.metadataings
-	  loggerError.data = currentSettings.data
+	  loggerError.systemInformation = systemInformation
+      loggerError.metadata = metadata
       if (err.code === 'ERR_STREAM_PREMATURE_CLOSE') {
         errorPipeline.forEach((stream) => {
   		  if (stream.underlyingError instanceof Error) {
@@ -356,7 +355,7 @@ class YadamuLogger {
 	  const loggerError = new Error(`Error creating data file "${dataFilePath}".`)
 	  loggerError.cause = err
 	  loggerError.systemInformation = currentSettings.systemInformation
-      loggerError.metadata = currentSettings.metadataings
+      loggerError.metadata = currentSettings.metadata
 	  loggerError.data = currentSettings.data
       if (err.code === 'ERR_STREAM_PREMATURE_CLOSE') {
         errorPipeline.forEach((stream) => {

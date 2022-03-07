@@ -93,7 +93,7 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
     
     return new Promise((resolve,reject) => {
 
-      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
+      this.SQL_TRACE.traceSQL(sqlStatement);
 
 	  const stack = new Error().stack;
 	  conn.execute({

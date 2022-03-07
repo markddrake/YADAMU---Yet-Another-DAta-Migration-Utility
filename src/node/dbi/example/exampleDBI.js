@@ -68,7 +68,7 @@ class ExampleDBI extends YadamuDBI {
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
   constructor(yadamu,manager,connectionSettings,parameters) {
-    super(yadamu,manager,connectionSettings,parameters);
+    super(yadamu,manager,connectionSettings,parameters)
 	this.StatementLibary = StatementLibary
   }
 
@@ -122,18 +122,18 @@ class ExampleDBI extends YadamuDBI {
 	
     let attemptReconnect = this.ATTEMPT_RECONNECTION;
 
-	if ((this.status.sqlTrace) && (typeof sqlStatemeent === 'string')) {
-      this.status.sqlTrace.write(this.traceSQL(sqlStatement));
+	if (typeof sqlStatement === 'string') {
+      this.SQL_TRACE.traceSQL(sqlStatement)
     }
 
     let stack
     while (true) {
       // Exit with result or exception.  
       try {
-        const sqlStartTime = performance.now();
+        const sqlStartTime = performance.now()
 		stack = new Error().stack
         const results = await /* EXECUTE_SQL_STATEMENT */
-        this.traceTiming(sqlStartTime,performance.now())
+        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
 		const cause = this.trackExceptions(this.trackExceptions(new ExampleError(e,stack,sqlStatement)))
@@ -155,7 +155,7 @@ class ExampleDBI extends YadamuDBI {
   **
   
   async initialize() {
-    await super.initialize(true);   
+    await super.initialize(true)   
   }
    
   */   
@@ -177,7 +177,7 @@ class ExampleDBI extends YadamuDBI {
   **
    
   async destroy(e) {
-    await super.destroy(e);
+    await super.destroy(e)
   }
 
   */
@@ -199,8 +199,8 @@ class ExampleDBI extends YadamuDBI {
 	**
 	*/
 	
-    await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION);
-	super.beginTransaction();
+    await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION)
+	super.beginTransaction()
 
   }
 
@@ -222,7 +222,7 @@ class ExampleDBI extends YadamuDBI {
 	*/
 	
 	super.commitTransaction()
-    await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION);
+    await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION)
 	
   }
 
@@ -251,9 +251,9 @@ class ExampleDBI extends YadamuDBI {
      
 	try {
       super.rollbackTransaction()
-      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION);
+      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION)
 	} catch (newIssue) {
-	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue);								   
+	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)								   
 	}
   }
 
@@ -268,8 +268,8 @@ class ExampleDBI extends YadamuDBI {
 	**
 	*/
 	 
-    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT);
-    super.createSavePoint();
+    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
+    super.createSavePoint()
   }
   
   async restoreSavePoint(cause) {
@@ -292,10 +292,10 @@ class ExampleDBI extends YadamuDBI {
 		
     let stack
     try {
-      await this.executeSQL(his.StatementLibrary.SQL_RESTORE_SAVE_POINT);
-      super.restoreSavePoint();
+      await this.executeSQL(his.StatementLibrary.SQL_RESTORE_SAVE_POINT)
+      super.restoreSavePoint()
 	} catch (newIssue) {
-	  this.checkCause('RESTORE SAVPOINT',cause,newIssue);
+	  this.checkCause('RESTORE SAVPOINT',cause,newIssue)
 	}
   }  
   
@@ -420,7 +420,7 @@ class ExampleDBI extends YadamuDBI {
   }   
 
   createParser(queryInfo,parseDelay) {
-    return new ExampleParser(queryInfo,this.yadamuLogger,parseDelay);
+    return new ExampleParser(queryInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -433,7 +433,7 @@ class ExampleDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
-    return new ExampleReader(this.connection,queryInfo.SQL_STATEMENT);
+    return new ExampleReader(this.connection,queryInfo.SQL_STATEMENT)
 	
   }  
     

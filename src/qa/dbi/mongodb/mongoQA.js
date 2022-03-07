@@ -379,7 +379,7 @@ class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
         await this.use(this.QA_COMPARE_DBNAME)
         const compare = await this.collection("source")
       	const operation = `${compare.collectionName}.aggregate(${JSON.stringify(comparePipeline," ",2)})`
-		this.status.sqlTrace.write(this.traceMongo(operation))    
+		this.SQL_TRACE.trace(this.traceMongo(operation))    
         results = await compare.aggregate(comparePipeline).toArray()
         
         // await this.dropDatabase()

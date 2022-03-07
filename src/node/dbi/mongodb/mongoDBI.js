@@ -112,7 +112,7 @@ class MongoDBI extends YadamuDBI {
           this._READ_TRANSFORMATION  = 'PRESERVE'
       } 
     return this._READ_TRANSFORMATION
-    })();
+    })()
     return this._READ_TRANSFORMATION
   }
 
@@ -167,12 +167,12 @@ class MongoDBI extends YadamuDBI {
     options.useUnifiedTopology = true
     const operation = `new MongoClient.connect(${this.getMongoURL()}))\n`
     try {   
-      this.status.sqlTrace.write(operation)
-      let sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(operation)
+      let sqlStartTime = performance.now()
 	  stack = new Error().stack
-      this.client = new MongoClient(this.getMongoURL(),options);
-      await this.client.connect();   
-      this.traceTiming(sqlStartTime,performance.now())
+      this.client = new MongoClient(this.getMongoURL(),options)
+      await this.client.connect()   
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
      } catch (e) {
        throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
      }
@@ -186,12 +186,12 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `MongoClient.db(${dbname})\n`
     try {   
-      this.status.sqlTrace.write(operation)
+      this.SQL_TRACE.trace(operation)
       options = options === undefined ? {returnNonCachedInstance:true} : (options.returnNonCachedInstance === undefined ? Object.assign (options, {returnNonCachedInstance:true} ) : options)
-      let sqlStartTime = performance.now();
+      let sqlStartTime = performance.now()
 	  stack =  new Error().stack
-      this.connection = await this.client.db(dbname,options);    
-      this.traceTiming(sqlStartTime,performance.now())
+      this.connection = await this.client.db(dbname,options)    
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return this.connection
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -207,11 +207,11 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `command(${JSON.stringify(command)})`
     try {   
-      this.status.sqlTrace.write(this.traceMongo(operation)) 
-      let sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation)) 
+      let sqlStartTime = performance.now()
 	  stack =  new Error().stack
-      const results = await this.connection.command(command,options);    
-      this.traceTiming(sqlStartTime,performance.now())
+      const results = await this.connection.command(command,options)    
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -231,11 +231,11 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `dropDatabase()`
     try {   
-      this.status.sqlTrace.write(this.traceMongo(operation)) 
-      let sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation)) 
+      let sqlStartTime = performance.now()
    	  stack =  new Error().stack
       let results = await this.connection.dropDatabase() 
-      this.traceTiming(sqlStartTime,performance.now())
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
      } catch (e) {
        throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
      }
@@ -249,11 +249,11 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `admin().buildInfo()`
     try {
-      this.status.sqlTrace.write(this.traceMongo(operation))    
-      const sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
+      const sqlStartTime = performance.now()
       
       const results = await this.connection.admin().buildInfo()
-      this.traceTiming(sqlStartTime,performance.now())
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -268,8 +268,8 @@ class MongoDBI extends YadamuDBI {
     const operation = `db().collection('system.js').mapReduce()`
     try {
 	  const ydb = await this.client.db('yadamu')
-      this.status.sqlTrace.write(this.traceMongo(operation))    
-      const sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
+      const sqlStartTime = performance.now()
    
       const results = await ydb.collection('system.js').aggregate(
 	  [
@@ -285,7 +285,7 @@ class MongoDBI extends YadamuDBI {
        }},
        { "$project" : { _id : 0, instance_id: "$instance_id", timestamp: { $first : "$timestamp.timestamp"}}}
       ]).toArray()
-	  this.traceTiming(sqlStartTime,performance.now())
+	  this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results[0]
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -300,11 +300,11 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `admin().serverInfo()`
     try {
-      this.status.sqlTrace.write(this.traceMongo(operation))    
-      const sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
+      const sqlStartTime = performance.now()
       
       const results = await this.connection.admin().serverInfo()
-      this.traceTiming(sqlStartTime,performance.now())
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -319,11 +319,11 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `stats()`
     try {  
-      this.status.sqlTrace.write(this.traceMongo(operation)) 
-      let sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation)) 
+      let sqlStartTime = performance.now()
 	  stack =  new Error().stack      
-      const results = await this.connection.stats(options);    
-      this.traceTiming(sqlStartTime,performance.now())
+      const results = await this.connection.stats(options)    
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	  return results
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -337,11 +337,11 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `createCollection(${collectionName})`
     try {       
-      this.status.sqlTrace.write(this.traceMongo(operation))    
-      let sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
+      let sqlStartTime = performance.now()
 	  stack =  new Error().stack
-      const collection = await this.connection.createCollection(collectionName);
-      this.traceTiming(sqlStartTime,performance.now())
+      const collection = await this.connection.createCollection(collectionName)
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collection
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -355,11 +355,11 @@ class MongoDBI extends YadamuDBI {
     let stack   
     const operation = `collection(${collectionName})`
     try {       
-      this.status.sqlTrace.write(this.traceMongo(operation))    
-      let sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
+      let sqlStartTime = performance.now()
 	  stack =  new Error().stack
-      const collection = await this.connection.collection(collectionName,options);
-      this.traceTiming(sqlStartTime,performance.now())
+      const collection = await this.connection.collection(collectionName,options)
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collection
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -375,11 +375,11 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `collection.countDocuments(${collection.namespace})`
     try {
-      this.status.sqlTrace.write(this.traceMongo(operation))    
-      let sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
+      let sqlStartTime = performance.now()
   	  stack =  new Error().stack    
       const count = await collection.countDocuments(query,options)
-      this.traceTiming(sqlStartTime,performance.now())
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return count
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -394,11 +394,11 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `collections()`
     try {
-      this.status.sqlTrace.write(this.traceMongo(operation))    
-      let sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
+      let sqlStartTime = performance.now()
 	  stack =  new Error().stack      
       const collections = await this.connection.collections(options)
-      this.traceTiming(sqlStartTime,performance.now())
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collections;
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -413,11 +413,11 @@ class MongoDBI extends YadamuDBI {
 	let stack
     const operation = `listCollections()`
     try {
-      this.status.sqlTrace.write(this.traceMongo(operation))    
-      let sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
+      let sqlStartTime = performance.now()
 	  stack =  new Error().stack      
       const collectionList = await this.connection.listCollections(filter,options).toArray()
-      this.traceTiming(sqlStartTime,performance.now())
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collectionList;
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -433,12 +433,12 @@ class MongoDBI extends YadamuDBI {
     const operation = `${collectionName}.insertOne()`
     const writeConcern = options?.writeConcern || {w:1} 
     try {
-      this.status.sqlTrace.write(this.traceMongo(operation))    
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
       options = options === undefined ? {writeConcern: writeConcern} : (options.writeConcern === undefined ? Object.assign (options, {writeConcern:writeConcern} ) : options)
-      let sqlStartTime = performance.now();
+      let sqlStartTime = performance.now()
 	  stack =  new Error().stack      
-      const results = await this.connection.collection(collectionName).insertOne(doc,options);
-      this.traceTiming(sqlStartTime,performance.now())
+      const results = await this.connection.collection(collectionName).insertOne(doc,options)
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -453,12 +453,12 @@ class MongoDBI extends YadamuDBI {
     const operation = `${collectionName}.insertMany(${array.length})`
 	const writeConcern = options?.writeConcern || {w:1} 
     try {
-      this.status.sqlTrace.write(this.traceMongo(operation))    
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
       options = options === undefined ? {writeConcern: writeConcern} : (options.writeConcern === undefined ? Object.assign (options, {writeConcern:writeConcern} ) : options)
-      let sqlStartTime = performance.now();
+      let sqlStartTime = performance.now()
 	  stack =  new Error().stack
-      const results = await this.connection.collection(collectionName).insertMany(array,options);
-      this.traceTiming(sqlStartTime,performance.now())
+      const results = await this.connection.collection(collectionName).insertMany(array,options)
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -466,7 +466,7 @@ class MongoDBI extends YadamuDBI {
   }
     
   async testConnection(connectionProperties) {   
-    super.setConnectionProperties(connectionProperties);
+    super.setConnectionProperties(connectionProperties)
     // ### Test Database connection
 	try {
       await this.connect()
@@ -481,7 +481,7 @@ class MongoDBI extends YadamuDBI {
 
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`createConnectionPool()`)
       
-    this.logConnectionProperties();
+    this.logConnectionProperties()
     const poolSize = this.yadamu.PARALLEL ? parseInt(this.yadamu.PARALLEL) + 1 : 5
     this.vendorProperties.options = typeof this.vendorProperties.options === 'object' ? this.vendorProperties.options : {}
     if (poolSize > 5) {
@@ -511,10 +511,10 @@ class MongoDBI extends YadamuDBI {
    	let stack
 	let operation = 'MongoClient.close()'
     try {
-      let sqlStartTime = performance.now();
+      let sqlStartTime = performance.now()
 	  stack =  new Error().stack
-      await this.client.close();   
-      this.traceTiming(sqlStartTime,performance.now())
+      await this.client.close()   
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
@@ -537,7 +537,7 @@ class MongoDBI extends YadamuDBI {
 
     // TODO : Support for Mongo Authentication ???
 	
-	await super.initialize(false);   
+	await super.initialize(false)   
     
     this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Document ID Tranformation: ${this.ID_TRANSFORMATION}.`)
     this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Read Tranformation: ${this.READ_TRANSFORMATION}.`)
@@ -551,13 +551,13 @@ class MongoDBI extends YadamuDBI {
   */
   
   async initializeExport() {
-     super.initializeExport();
-     await this.use(this.CURRENT_SCHEMA);
+     super.initializeExport()
+     await this.use(this.CURRENT_SCHEMA)
   }
   
   async initializeImport() {
-     super.initializeImport();
-     await this.use(this.CURRENT_SCHEMA);
+     super.initializeImport()
+     await this.use(this.CURRENT_SCHEMA)
   }
 
   // ### ToDO Support Mongo Transactions
@@ -589,11 +589,11 @@ class MongoDBI extends YadamuDBI {
  
    const results = await this.yadamuInstanceId()
 
-   const stats = await this.stats();
+   const stats = await this.stats()
    const serverInfo = await this.serverInfo()
    const buildInfo = await this.builInfo
    const clientMetadata = this.client.topology.s.options.metadata;
-   // Object.getOwnPropertySymbols(this.client).forEach((k) => {console.log(this.client[k]);clientMetadata = clientMetadata || (this.client[k]?.metadata)})
+   // Object.getOwnPropertySymbols(this.client).forEach((k) => {console.log(this.client[k])clientMetadata = clientMetadata || (this.client[k]?.metadata)})
    return Object.assign(
 	  super.getSystemInformation()
 	, {
@@ -621,7 +621,7 @@ class MongoDBI extends YadamuDBI {
     // Check for NULL and something. Remove NULL and returns what's left Note we _ARE_ searching for the string 'null' not the value null
 	const nullIdx = typeInfo.indexOf('null')
 	if (nullIdx >= 0) {
-      typeInfo.splice( nullIdx, 1 );
+      typeInfo.splice( nullIdx, 1 )
 	  if (typeInfo.length === 1) {
 		return typeInfo[0]
 	  }
@@ -651,7 +651,7 @@ class MongoDBI extends YadamuDBI {
   }	  
 
   roundP2(s) {
-    let result = s === 0 ? MongoConstants.DEFAULT_STRING_LENGTH :  Math.pow(2, Math.ceil(Math.log(s)/Math.log(2)));
+    let result = s === 0 ? MongoConstants.DEFAULT_STRING_LENGTH :  Math.pow(2, Math.ceil(Math.log(s)/Math.log(2)))
     result = ((result === 4096) && (s < 4001)) ? 4000 : result
     result = ((result === 32768) && (s < 32768)) ? 32767 : result
     return result.toString()
@@ -663,7 +663,7 @@ class MongoDBI extends YadamuDBI {
       return ((this.TABLE_FILTER.length === 0) || (this.TABLE_FILTER.includes(collection.collectionName)))
 	})
 	
-    const loopStartTime = performance.now();
+    const loopStartTime = performance.now()
     const schemaInfo = await Promise.all(collections.map(async (collection,idx) => {    // const dbMetadata = await Promise.all(collections.map(async (collection) => {    
       const tableInfo = {TABLE_SCHEMA: this.connection.databaseName, TABLE_NAME: collection.collectionName, COLUMN_NAME_ARRAY: ["JSON_DATA"], DATA_TYPE_ARRAY: ["json"], SIZE_CONSTRAINT_ARRAY: [""]}
       if ((this.MONGO_STORAGE_FORMAT === 'DOCUMENT') && (this.MONGO_EXPORT_FORMAT === 'ARRAY')) {       
@@ -704,12 +704,12 @@ class MongoDBI extends YadamuDBI {
 		  }
 			
           operation = `db(${this.connection.databaseName}).collection(${collection.collectionName}.aggregate(${JSON.stringify(keyNamePipeline," ",2)})`
-          this.status.sqlTrace.write(this.traceMongo(operation))    
-          let sqlStartTime = performance.now();
+          this.SQL_TRACE.trace(this.traceMongo(operation))    
+          let sqlStartTime = performance.now()
     	  stack =  new Error().stack
 		  
 		  const keys = await collection.aggregate(keyNamePipeline).toArray()
-		  this.traceTiming(sqlStartTime,performance.now())
+		  this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
           
 		  if (keys.length > 0) {
    		    const collectionMetadata = {COLUMN_NAME_ARRAY : keys[0].keys, DATA_TYPE_ARRAY: [], SIZE_CONSTRAINT_ARRAY: []}         
@@ -719,8 +719,8 @@ class MongoDBI extends YadamuDBI {
           */		  
 	
           operation = `${collection.collectionName}.mapReduce()`;
-          this.status.sqlTrace.write(this.traceMongo(operation))    
-          let sqlStartTime = performance.now();
+          this.SQL_TRACE.trace(this.traceMongo(operation))    
+          let sqlStartTime = performance.now()
     	  stack =  new Error().stack
           const collectionMetadata = await collection.mapReduce(
             // ### Do not try to use arrow functions or other ES2015+ features here...
@@ -755,7 +755,7 @@ class MongoDBI extends YadamuDBI {
                keys              : {}
             }
           })
-          this.traceTiming(sqlStartTime,performance.now())
+          this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		  
           if (collectionMetadata.length === 1) {
             // Uncomnent to debug MapReduce results
@@ -809,10 +809,10 @@ class MongoDBI extends YadamuDBI {
 			*/
 
   			operation = `${collection.collectionName}.aggregate(${JSON.stringify(dataTypePipeline," ",2)})`
-            this.status.sqlTrace.write(this.traceMongo(operation))    
-            let sqlStartTime = performance.now();
+            this.SQL_TRACE.trace(this.traceMongo(operation))    
+            let sqlStartTime = performance.now()
     	    stack =  new Error().stack
-   	        const typeInformation = await collection.aggregate(dataTypePipeline).toArray();
+   	        const typeInformation = await collection.aggregate(dataTypePipeline).toArray()
 			// console.dir(typeInformation,{depth:null})
 			if (typeInformation.length > 0) {
 			  tableInfo.COLUMN_NAME_ARRAY.forEach((col,idx) => {
@@ -820,12 +820,12 @@ class MongoDBI extends YadamuDBI {
                 let size = typeInformation[0][col].size
                 size = dataType ===  'null' ? MongoConstants.DEFAULT_STRING_LENGTH : size                  
 			    dataType = dataType ===  'null' ? 'string' : dataType                  
-			    tableInfo.DATA_TYPE_ARRAY.push(dataType);
+			    tableInfo.DATA_TYPE_ARRAY.push(dataType)
 			    tableInfo.SIZE_CONSTRAINT_ARRAY.push (dataType === 'string' || dataType === 'binData' ? this.roundP2(size) : '')
 			  })
             }
             else {
-              tableInfo.SIZE_CONSTRAINT_ARRAY = new Array(tableInfo.COLUMN_NAME_ARRAY.length).fill('');
+              tableInfo.SIZE_CONSTRAINT_ARRAY = new Array(tableInfo.COLUMN_NAME_ARRAY.length).fill('')
             }
           }
         } catch(e) {		
@@ -833,11 +833,11 @@ class MongoDBI extends YadamuDBI {
         }
       }
       if (this.ID_TRANSFORMATION === 'STRIP') {
-        const idx = tableInfo.COLUMN_NAME_ARRAY.indexOf('_id');
+        const idx = tableInfo.COLUMN_NAME_ARRAY.indexOf('_id')
         if (idx > -1) {
-          tableInfo.COLUMN_NAME_ARRAY.splice(idx,1);
-          tableInfo.DATA_TYPE_ARRAY.splice(idx,1);
-          tableInfo.SIZE_CONSTRAINT_ARRAY.splice(idx,1);
+          tableInfo.COLUMN_NAME_ARRAY.splice(idx,1)
+          tableInfo.DATA_TYPE_ARRAY.splice(idx,1)
+          tableInfo.SIZE_CONSTRAINT_ARRAY.splice(idx,1)
         }
       }
 	  tableInfo.JSON_KEY_NAME_ARRAY = [...tableInfo.COLUMN_NAME_ARRAY]
@@ -850,12 +850,12 @@ class MongoDBI extends YadamuDBI {
   createParser(tableInfo,parseDelay) {
     tableInfo.READ_TRANSFORMATION = this.READ_TRANSFORMATION
     tableInfo.ID_TRANSFORMATION = this.ID_TRANSFORMATION
-    return new MongoParser(tableInfo,this.yadamuLogger,parseDelay);
+    return new MongoParser(tableInfo,this.yadamuLogger,parseDelay)
   }  
 
   generateQueryInformation(tableMetadata) {
     const tableInfo = super.generateQueryInformation(tableMetadata)
-	tableInfo.SQL_STATEMENT = this.traceMongo(`${tableMetadata.TABLE_NAME}.find().stream()`); 
+	tableInfo.SQL_STATEMENT = this.traceMongo(`${tableMetadata.TABLE_NAME}.find().stream()`) 
     return tableInfo
   }   
   
@@ -869,11 +869,11 @@ class MongoDBI extends YadamuDBI {
     let stack
     const operation = `${collectionName}.find().stream()`
     try {
-      this.status.sqlTrace.write(this.traceMongo(operation))
-      let sqlStartTime = performance.now();
+      this.SQL_TRACE.trace(this.traceMongo(operation))
+      let sqlStartTime = performance.now()
       stack =  new Error().stack
-      const mongoStream = await this.connection.collection(collectionName).find().stream();
-      this.traceTiming(sqlStartTime,performance.now())
+      const mongoStream = await this.connection.collection(collectionName).find().stream()
+      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return mongoStream;      
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
