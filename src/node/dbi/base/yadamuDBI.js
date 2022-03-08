@@ -47,11 +47,23 @@ import {
 */
 
 class SQLTrace {
+	
+  get SQL_CUMLATIVE_TIME()      { return this._SQL_CUMLATIVE_TIME }
 
-  constructor(writer) {
+  constructor(writer,seperator,terminator,role) {
 	this.writer = writer
+	this.STATEMENT_SEPERATOR = seperator
+	this.STATEMENT_TERMINATOR = terminator
+	this.ROLE = role
+	this.MARKER =  `/* [${role}] Manager */` 
+	this._SQL_CUMLATIVE_TIME = 0
+	
 	this.disabledWriter = undefined;
 	this.enabled = true;
+  }
+  
+  setWorkderId(id) {
+    this.MARKER =  ` /* [${this.ROLE}] Worker(${id})] */`;
   }
   
   trace(msg) {
@@ -65,18 +77,23 @@ class SQLTrace {
   }
   
   enable() {
-	this.writer = this.disabledWriter
+	this.writer = this.disabledWriter || this.writer
 	this.disabledWriter = undefined
 	this.enabled = true
   }
 	
   traceSQL(msg,rows,lobCount) {
-     this.trace(`${msg.trim()}${this.STATEMENT_TERMINATOR} ${rows ? `/* Rows: ${rows}. */ ` : ''} ${lobCount ? `/* LOBS: ${lobCount}. */ ` : ''}${this.sqlTraceTag}${this.STATEMENT_SEPERATOR}`)
+     this.trace(`${msg.trim()}${this.STATEMENT_TERMINATOR} ${rows ? `/* Rows: ${rows}. */ ` : ''} ${lobCount ? `/* LOBS: ${lobCount}. */ ` : ''}${this.MARKER}${this.STATEMENT_SEPERATOR}`)
+  }
+  
+  recordTime(time) {
+    this._SQL_CUMLATIVE_TIME+= time
   }
   
   traceTiming(startTime,endTime) {      
     const sqlOperationTime = endTime - startTime;
-    this.trace(`--\n-- ${this.sqlTraceTag} Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlOperationTime)}s.\n--\n`)
+    this.trace(`--\n-- ${this.MARKER} Elapsed Time: ${YadamuLibrary.stringifyDuration(sqlOperationTime)}s.}${this.STATEMENT_SEPERATOR}`)
+	this.recordTime(sqlOperationTime)
     return sqlOperationTime
   }
  
@@ -129,8 +146,9 @@ class YadamuDBI extends EventEmitter {
   set RECONNECT_ON_ABORT(v)          { this._RECONNECT_ON_ABORT = v }
 
   get SQL_TRACE()                    { return this._SQL_TRACE }
-  set SQL_TRACE(writer)              { this._SQL_TRACE = this._SQL_TRACE || new SQLTrace(writer)}
-	  
+  set SQL_TRACE(writer)              { this._SQL_TRACE = this._SQL_TRACE || new SQLTrace(writer,this.STATEMENT_SEPERATOR,this.STATEMENT_TERMINATOR,this.ROLE)}
+  get SQL_CUMLATIVE_TIME()           { return this.SQL_TRACE.SQL_CUMLATIVE_TIME }
+  
   get BATCH_SIZE() {
     this._BATCH_SIZE = this._BATCH_SIZE || (() => {
       let batchSize =  this.parameters.BATCH_SIZE || DBIConstants.BATCH_SIZE
@@ -305,20 +323,18 @@ class YadamuDBI extends EventEmitter {
     this.yadamu = yadamu;
     this.setConnectionProperties(connectionSettings || {})
     this.status = yadamu.STATUS
-
-	this.SQL_TRACE = this.status.sqlTrace
 	
     this.yadamuLogger = yadamu.LOGGER;
 	this.initializeParameters(parameters || {})
     this.FEEDBACK_MODEL = this.parameters.FEEDBACK
+	this.SQL_TRACE = this.status.sqlTrace
 
     this.options = {
       recreateSchema : false
     }
 
     this._DB_VERSION = 'N/A'    
-    this.sqlTraceTag = '';
-    
+
     this.vendorProperties = this.getVendorProperties()   
 
 	this.systemInformation = undefined;
@@ -338,8 +354,6 @@ class YadamuDBI extends EventEmitter {
     this.insertMode = 'Batch'
     this.skipTable = true;
 
-    this.sqlTraceTag = `/* Manager */`;	
-    this.sqlCumlativeTime = 0
 	this.firstError = undefined
 	this.latestError = undefined    
 	
@@ -403,8 +417,7 @@ class YadamuDBI extends EventEmitter {
 		    resolve(true)
 		  }
 	    }
-	  })
-	  this.once(YadamuConstants.DDL_UNNECESSARY,() => {
+	  }).once(YadamuConstants.DDL_UNNECESSARY,() => {
 	    resolve(true)
 	  })
 	})
@@ -1773,7 +1786,6 @@ class YadamuDBI extends EventEmitter {
 	this.metadata           = this.manager.metadata
     this.statementCache     = this.manager.statementCache
     this.statementGenerator = this.manager.statementGenerator
-	this.ddlComplete        = this.manager.ddlComplete
 	this.partitionMetadata  = this.manager.partitionMetadata
 	
 	this.setIdentifierMappings(this.manager.getIdentifierMappings())
@@ -1785,8 +1797,8 @@ class YadamuDBI extends EventEmitter {
 	
 	const dbi = this.classFactory(this.yadamu)  
     dbi.workerNumber = workerNumber
-    dbi.sqlTraceTag = ` /* Worker [${dbi.getWorkerNumber()}] */`;
-	return dbi
+	dbi.SQL_TRACE.setWorkderId(workerNumber)
+    return dbi
   }
  
   async getConnectionID() {

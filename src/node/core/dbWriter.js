@@ -60,13 +60,9 @@ class DBWriter extends Writable {
     await this.dbi.setMetadata(metadata)     
     const statementCache = await this.dbi.generateStatementCache(this.dbi.parameters.TO_USER)
 	const ddlStatements = this.dbi.analyzeStatementCache(statementCache,startTime)
-	
-	if (this.ddlCompleted) {
-      // this.yadamuLogger.trace([this.constructor.name,`generateStatementCache()`,this.dbi.DATABASE_VENDOR,],`DDL already completed. Emit ddlComplete(SUCCESS))`)  
-	}
-	else {
-  	  // Execute DDL Statements Asynchronously - Emit dllComplete when ddl execution is finished. 
-      this.executeDDL(ddlStatements)
+	if (!this.ddlCompleted) {
+      // Execute DDL Statements Asynchronously - Emit dllComplete when ddl execution is finished. 
+      this.executeDDL(ddlStatements).then(() => {}).catch((e) => {console.log(e)})
     }
   }   
 
@@ -195,16 +191,18 @@ class DBWriter extends Writable {
           this.dbi.setSystemInformation(obj.systemInformation)
           break;
         case 'ddl':
-          if ((this.ddlRequired) && (obj.ddl.length > 0) && (this.dbi.isValidDDL())) { 
-	        const startTime = performance.now()
-            const results = await this.dbi.executeDDL(obj.ddl);
-		    if (results instanceof Error) {
-			  throw results;
-	        }
-		    this.ddlCompleted = true
-          }
+		  if (!this.ddlRequired) {
+    	    this.dbi.skipDDLOperations()
+		  }
 		  else {
-			this.dbi.skipDDLOperations()
+			if ((obj.ddl.length > 0) && (this.dbi.isValidDDL())) { 
+	          const startTime = performance.now()
+              const results = await this.dbi.executeDDL(obj.ddl);
+		      if (results instanceof Error) {
+			    throw results;
+	          }
+		      this.ddlCompleted = true
+            }
 		  }
           break;
         case 'metadata':

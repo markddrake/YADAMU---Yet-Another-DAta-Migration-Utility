@@ -164,7 +164,7 @@ class MySQLDBI extends YadamuDBI {
       operation = 'mysql.createPool()'  
       const sqlStartTime = performance.now()
       this.pool = new mysql.createPool(this.vendorProperties)
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       await this.checkMaxAllowedPacketSize()
     } catch (e) {
       throw this.trackExceptions(new MySQLError(this.DRIVER_ID,e,stack,operation))
@@ -183,7 +183,7 @@ class MySQLDBI extends YadamuDBI {
     const connection = await new Promise((resolve,reject) => {
       const sqlStartTime = performance.now()
       this.pool.getConnection((err,connection) => {
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         if (err) {
           reject(this.trackExceptions(new MySQLError(this.DRIVER_ID,err,stack,'mysql.Pool.getConnection()')))
         }
@@ -281,7 +281,7 @@ class MySQLDBI extends YadamuDBI {
           }
         }
 		else {
-          this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,sqlEndTime)
+          this.SQL_TRACE.traceTiming(sqlStartTime,sqlEndTime)
           resolve(results)
 		}
       })

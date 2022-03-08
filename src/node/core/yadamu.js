@@ -928,12 +928,10 @@ class Yadamu {
     
   async pumpData(source,target) {
      
-	this.setDefaultParameter(source.parameters,'YADAMU_USER','FROM_USER')
     if ((source.isDatabase() === true) && (source.parameters.FROM_USER === undefined)) {
       throw new Error('Missing mandatory parameter FROM_USER');
     }
 
-	this.setDefaultParameter(target.parameters,'YADAMU_USER','TO_USER')
     if ((target.isDatabase() === true) && (target.parameters.TO_USER === undefined)) {
       throw new Error('Missing mandatory parameter TO_USER');
     }
@@ -962,28 +960,28 @@ class Yadamu {
   }
   
   async doImport(dbi) {
-    const fileReader = new FileDBI(this)
+    const fileReader = new FileDBI(this,YadamuConstants.READER_ROLE)
     const metrics = await this.pumpData(fileReader,dbi);
     await this.close();
     return metrics
   }  
  
   async doExport(dbi) {
-    const fileWriter = new FileDBI(this)
+    const fileWriter = new FileDBI(this,YadamuConstants.WRITER_ROLE)
     const metrics = await this.pumpData(dbi,fileWriter);
     await this.close();
     return metrics
   }  
   
   async doEncrypt() {
-    const fileDBI = new FileDBI(this)
+    const fileDBI = new FileDBI(this,YadamuConstants.READER_ROLE)
     await this.convertFile(fileDBI,true);
     await this.close();
     return
   }  
 
   async doDecrypt() {
-    const fileDBI = new FileDBI(this)
+    const fileDBI = new FileDBI(this,this.YadamuConstants.WRITER_ROLE)
     await this.convertFile(fileDBI,false);
     await this.close();
     return
@@ -997,8 +995,8 @@ class Yadamu {
   
   async cloneFile(pathToFile) {
 
-    const fileReader = new FileDBI(this)
-    const fileWriter = new fileDBI(this)
+    const fileReader = new FileDBI(this,this.YadamuConstants.READER_ROLE)
+    const fileWriter = new fileDBI(this,this.YadamuConstants.WRITER_ROLE)
     const metrics = await this.pumpData(fileReader,fileWriter);
     await this.close();
     return metrics

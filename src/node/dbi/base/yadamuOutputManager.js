@@ -15,7 +15,7 @@ class YadamuOutputManager extends Transform {
 
   get BATCH_SIZE()         { return this.tableInfo._BATCH_SIZE }
   get SPATIAL_FORMAT()     { return this.tableInfo._SPATIAL_FORMAT }
-  get SOURCE_VENDOR()      { return this.COPY_METRICS?.DATABASE_VENDOR || 'YABASC'  }
+  get SOURCE_VENDOR()      { return this.COPY_METRICS?.SOURCE_DATABASE_VENDOR || 'YABASC'  }
   
   get COPY_METRICS()       { return this._COPY_METRICS }
   set COPY_METRICS(v)      { this._COPY_METRICS =  v }

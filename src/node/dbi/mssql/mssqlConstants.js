@@ -13,8 +13,7 @@ class MsSQLConstants {
     
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
-      "YADAMU_USER"              : "dbo"
-    , "SPATIAL_MAKE_VALID"        : false
+      "SPATIAL_MAKE_VALID"        : false
     , "SPATIAL_FORMAT"            : "WKB"
     })
     return this._STATIC_PARAMETERS;
@@ -27,7 +26,6 @@ class MsSQLConstants {
     return this.#_DBI_PARAMETERS
   }
 
-  static get YADAMU_USER()            { return this.DBI_PARAMETERS.YADAMU_USER}
   static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get SPATIAL_MAKE_VALID()     { return this.DBI_PARAMETERS.SPATIAL_MAKE_VALID };
   static get STATEMENT_TERMINATOR()   { return ';' }

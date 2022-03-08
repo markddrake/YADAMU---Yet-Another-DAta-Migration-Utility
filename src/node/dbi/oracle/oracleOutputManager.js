@@ -353,7 +353,7 @@ class OracleOutputManager extends YadamuOutputManager {
 	 if (Array.isArray(cause.args)) {
 	   cause.args = await this.dbi.serializeLobBinds(cause.args)
 	 }
-	 await super.handleIterativeError(operation,cause,batchSize,rowNumber,newRecord) 
+	 await super.handleIterativeError(operation,cause,rowNumber,newRecord) 
   }
   
   async serializeLobColumns(row) {

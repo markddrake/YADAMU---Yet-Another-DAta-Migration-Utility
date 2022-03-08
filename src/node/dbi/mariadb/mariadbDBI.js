@@ -151,7 +151,7 @@ class MariadbDBI extends YadamuDBI {
     this.logConnectionProperties()
 	let sqlStartTime = performance.now()
 	this.pool = mariadb.createPool(this.vendorProperties)
-	this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+	this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     await this.checkMaxAllowedPacketSize()
   }
   
@@ -165,7 +165,7 @@ class MariadbDBI extends YadamuDBI {
       const sqlStartTime = performance.now()
 	  stack = new Error().stack
 	  const connection = await this.pool.getConnection()
-	  this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	  connection.ping()
       return connection
 	} catch (e) {
@@ -235,7 +235,7 @@ class MariadbDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
 		stack = new Error().stack
         const results = await this.connection.query(sqlStatement,args)
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
 		const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,sqlStatement))
@@ -338,7 +338,7 @@ class MariadbDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
 		stack = new Error().stack
         await this.connection.beginTransaction()
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		super.beginTransaction()
 		break
       } catch (e) {
@@ -373,7 +373,7 @@ class MariadbDBI extends YadamuDBI {
       const sqlStartTime = performance.now()
       stack = new Error().stack
       await this.connection.commit()
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
 	  const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,'mariadb.Connection.commit()'))
 	  if (cause.lostConnection()) {
@@ -408,7 +408,7 @@ class MariadbDBI extends YadamuDBI {
       const sqlStartTime = performance.now()
       stack = new Error().stack
       await this.connection.rollback()
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
 	  const newIssue = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,stack,'mariadb.Connection.rollback()'))
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
@@ -544,7 +544,7 @@ class MariadbDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
 		this.streamingStackTrace = new Error().stack
 		const is = this.connection.queryStream(queryInfo.SQL_STATEMENT)
-	    this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return is;
       } catch (e) {
 		const cause = this.trackExceptions(new MariadbError(this.DRIVER_ID,e,this.streamingStackTrace,sqlStatement))

@@ -147,7 +147,7 @@ class SnowflakeDBI extends YadamuDBI {
     let connection = snowflake.createConnection(this.vendorProperties)
     connection = await this.establishConnection(connection)
     const sqlStartTime = performance.now()
-    this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     return connection
   }
 
@@ -234,7 +234,7 @@ class SnowflakeDBI extends YadamuDBI {
                              }
 						   }
 						   else {
-					         // this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,sqlEndTime)
+					         // this.SQL_TRACE.traceTiming(sqlStartTime,sqlEndTime)
                              resolve(rows)
 						   }
 				         }    

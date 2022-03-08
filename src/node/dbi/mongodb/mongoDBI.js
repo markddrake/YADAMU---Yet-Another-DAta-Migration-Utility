@@ -172,7 +172,7 @@ class MongoDBI extends YadamuDBI {
 	  stack = new Error().stack
       this.client = new MongoClient(this.getMongoURL(),options)
       await this.client.connect()   
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
      } catch (e) {
        throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
      }
@@ -191,7 +191,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
 	  stack =  new Error().stack
       this.connection = await this.client.db(dbname,options)    
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return this.connection
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -211,7 +211,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
 	  stack =  new Error().stack
       const results = await this.connection.command(command,options)    
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -235,7 +235,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
    	  stack =  new Error().stack
       let results = await this.connection.dropDatabase() 
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
      } catch (e) {
        throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
      }
@@ -253,7 +253,7 @@ class MongoDBI extends YadamuDBI {
       const sqlStartTime = performance.now()
       
       const results = await this.connection.admin().buildInfo()
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -285,7 +285,7 @@ class MongoDBI extends YadamuDBI {
        }},
        { "$project" : { _id : 0, instance_id: "$instance_id", timestamp: { $first : "$timestamp.timestamp"}}}
       ]).toArray()
-	  this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results[0]
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -304,7 +304,7 @@ class MongoDBI extends YadamuDBI {
       const sqlStartTime = performance.now()
       
       const results = await this.connection.admin().serverInfo()
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -323,7 +323,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
 	  stack =  new Error().stack      
       const results = await this.connection.stats(options)    
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	  return results
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -341,7 +341,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
 	  stack =  new Error().stack
       const collection = await this.connection.createCollection(collectionName)
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collection
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -359,7 +359,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
 	  stack =  new Error().stack
       const collection = await this.connection.collection(collectionName,options)
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collection
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -379,7 +379,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
   	  stack =  new Error().stack    
       const count = await collection.countDocuments(query,options)
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return count
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -398,7 +398,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
 	  stack =  new Error().stack      
       const collections = await this.connection.collections(options)
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collections;
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -417,7 +417,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
 	  stack =  new Error().stack      
       const collectionList = await this.connection.listCollections(filter,options).toArray()
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return collectionList;
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -438,7 +438,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
 	  stack =  new Error().stack      
       const results = await this.connection.collection(collectionName).insertOne(doc,options)
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -458,7 +458,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
 	  stack =  new Error().stack
       const results = await this.connection.collection(collectionName).insertMany(array,options)
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return results;
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
@@ -514,7 +514,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
 	  stack =  new Error().stack
       await this.client.close()   
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
@@ -709,7 +709,7 @@ class MongoDBI extends YadamuDBI {
     	  stack =  new Error().stack
 		  
 		  const keys = await collection.aggregate(keyNamePipeline).toArray()
-		  this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+		  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
           
 		  if (keys.length > 0) {
    		    const collectionMetadata = {COLUMN_NAME_ARRAY : keys[0].keys, DATA_TYPE_ARRAY: [], SIZE_CONSTRAINT_ARRAY: []}         
@@ -755,7 +755,7 @@ class MongoDBI extends YadamuDBI {
                keys              : {}
             }
           })
-          this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+          this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		  
           if (collectionMetadata.length === 1) {
             // Uncomnent to debug MapReduce results
@@ -873,7 +873,7 @@ class MongoDBI extends YadamuDBI {
       let sqlStartTime = performance.now()
       stack =  new Error().stack
       const mongoStream = await this.connection.collection(collectionName).find().stream()
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return mongoStream;      
     } catch (e) {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))

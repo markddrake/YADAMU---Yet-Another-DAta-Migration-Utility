@@ -138,7 +138,7 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
 class SnowflakeMgr extends SnowflakeDBI {
 	
 	constructor(logger,status,vendorProperties) {
-	  super({activeConnections : new Set()})
+	  super({activeConnections : new Set(), STATUS: status})
 	  this.yadamuLogger = logger;
   	  this.status = status
 	  this.vendorProperties = vendorProperties

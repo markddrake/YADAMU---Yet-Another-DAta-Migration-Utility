@@ -264,7 +264,7 @@ class OracleDBI extends YadamuDBI {
       // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Creating Pool')
 	  this.pool = await oracledb.createPool(this.vendorProperties)
       // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Pool Created')
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     } catch (e) {
 	  throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,'Oracledb.createPool()'))
 	}
@@ -284,7 +284,7 @@ class OracleDBI extends YadamuDBI {
       // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Requestng Connection From Pool')
 	  const connection = await this.pool.getConnection()
       // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE],'Connection Assigned')
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	  return connection
     } catch (e) {
 	  throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,'Oracledb.Pool.getConnection()'))
@@ -296,7 +296,7 @@ class OracleDBI extends YadamuDBI {
     this.logConnectionProperties()
 	const sqlStartTime = performance.now()
 	const connection = await oracledb.getConnection(this.vendorProperties)
-	this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+	this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
     return connection
   }
 
@@ -347,7 +347,7 @@ class OracleDBI extends YadamuDBI {
       const sqlStartTime = performance.now()
 	  stack = new Error().stack
       const lob =  await this.connection.createLob(lobType)
-      // this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      // this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	  return lob;
    	} catch (e) {
 	  throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,`Oracledb.Connection.createLob()`))
@@ -595,7 +595,7 @@ class OracleDBI extends YadamuDBI {
           const sqlStartTime = performance.now()
           stack = new Error().stack
           results = await this.connection.executeMany(sqlStatement,rows,binds)
-	      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+	      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		  return results;
         } catch (e) {
 		  const cause = new OracleError(this.DRIVER_ID,e,stack,sqlStatement,binds,{rows : rows.length})
@@ -723,7 +723,7 @@ class OracleDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
         stack = new Error().stack
         results = await this.connection.execute(sqlStatement,args,outputFormat)
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
 		const cause = new OracleError(this.DRIVER_ID,e,stack,sqlStatement,args,outputFormat)
@@ -970,7 +970,7 @@ class OracleDBI extends YadamuDBI {
 	  super.commitTransaction()
       stack = new Error().stack
       await this.connection.commit()
-  	  this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+  	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
 	  throw this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,`Oracledb.Transaction.commit()`))
 	}
@@ -998,7 +998,7 @@ class OracleDBI extends YadamuDBI {
 	  super.rollbackTransaction()
       stack = new Error().stack
       await this.connection.rollback()
-  	  this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+  	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
 	  const newIssue = this.trackExceptions(new OracleError(this.DRIVER_ID,e,stack,`Oracledb.Transaction.rollback()`))
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)
@@ -1098,23 +1098,23 @@ class OracleDBI extends YadamuDBI {
          if (this.ddl.length > 0) {
            // Execute the DDL statement by statement.
            await this.applyDDL(this.ddl)
-           settings = `YADAMU_IMPORT.DATA_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE)`;
+           settings = `YADAMU_IMPORT.DATA_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
          }
          else {
-           settings = `YADAMU_IMPORT.DATA_ONLY_MODE(FALSE)\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE)`;
+           settings = `YADAMU_IMPORT.DATA_ONLY_MODE(FALSE)\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
          }
 	     break;
 	   case 'DATA_ONLY':
-         settings = `YADAMU_IMPORT.DATA_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE)`;
+         settings = `YADAMU_IMPORT.DATA_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
          break;
 	   case 'DDL_ONLY':
          if (this.ddl.length > 0) {
            // Execute the DDL statement by statement
           await his.applyDDL(this.ddl)
-           settings = `YADAMU_IMPORT.DDL_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DATA_ONLY_MODE(TRUE)`;
+           settings = `YADAMU_IMPORT.DDL_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DATA_ONLY_MODE(TRUE);`;
          }
          else {
-           settings = `YADAMU_IMPORT.DDL_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DATA_ONLY_MODE(FALSE)`;
+           settings = `YADAMU_IMPORT.DDL_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DATA_ONLY_MODE(FALSE);`;
          }
 	     break;
     }
@@ -1370,7 +1370,7 @@ class OracleDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
 		this.streamingStackTrace = new Error().stack
         this.inputStream = await this.connection.queryStream(queryInfo.SQL_STATEMENT,[],{extendedMetaData: true})
-	    this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+	    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		this.inputStream.on('end',() => {
 		})
 	    return this.inputStream

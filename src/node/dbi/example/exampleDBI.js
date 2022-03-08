@@ -133,7 +133,7 @@ class ExampleDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
 		stack = new Error().stack
         const results = await /* EXECUTE_SQL_STATEMENT */
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
 		const cause = this.trackExceptions(this.trackExceptions(new ExampleError(e,stack,sqlStatement)))

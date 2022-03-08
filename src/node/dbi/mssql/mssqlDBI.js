@@ -451,7 +451,7 @@ class MsSQLDBI extends YadamuDBI {
       stack = new Error().stack;
       operation = 'sql.ConnectionPool.connect()'
       await this.pool.connect()
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.pool;
       this.transaction = this.getTransactionManager()
       
@@ -601,7 +601,7 @@ class MsSQLDBI extends YadamuDBI {
         stack = new Error().stack;
 		this.CANCEL_REQUESTED = true;
         await this.request.cancel()
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       } catch (e) {
         const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,'sql.request.cancel()'))
         throw cause
@@ -825,7 +825,7 @@ class MsSQLDBI extends YadamuDBI {
         stack = new Error().stack
         const request = this.getRequest()
         const results = await request.batch(sqlStatment)  
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
         const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,sqlStatment))
@@ -854,7 +854,7 @@ class MsSQLDBI extends YadamuDBI {
         stack = new Error().stack
         const request = this.getRequestWithArgs(args)
         const results = await request.execute(procedure)
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
         const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,psuedoSQL))
@@ -890,7 +890,7 @@ class MsSQLDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
         stack = new Error().stack
         const results = await this.preparedStatement.statement.execute(args)
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
         const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,this.preparedStatement.sqlStatement))
@@ -944,7 +944,7 @@ class MsSQLDBI extends YadamuDBI {
         const request = this.getRequest()
         const results = await request.bulk(bulkOperation)
         // this.yadamuLogger.trace([`${this.constructor.name}.bulkInsert()`,this.getWorkerNumber()],`done`)
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
 		const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,operation))
@@ -973,7 +973,7 @@ class MsSQLDBI extends YadamuDBI {
         const request = this.getRequestWithArgs(args)
         this.currentRequest = request
         const results = await request.query(sqlStatement)  
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         return results;
       } catch (e) {
 		const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,sqlStatement))
@@ -1001,6 +1001,8 @@ class MsSQLDBI extends YadamuDBI {
         // May need to use executeBatch if we support SQL Server 2000.
         results.push(await this.executeSQL(ddlStatement))
       } catch (e) {
+		console.log(e)
+        await this.rollbackTransaction()   
   	    this.yadamuLogger.handleException([this.DATABASE_VENDOR,this.ROLE,'DDL'],e)
 	    return e
       } 
@@ -1105,7 +1107,7 @@ class MsSQLDBI extends YadamuDBI {
   async beginTransaction() {
 
     // this.yadamuLogger.trace([`${this.constructor.name}.beginTransaction()`,this.ROLE,this.TRANSACTION_IN_PROGRESS,this.getWorkerNumber()],``)
-          
+
     let stack
     const psuedoSQL = 'begin transaction'
     this.SQL_TRACE.traceSQL(psuedoSQL)
@@ -1119,7 +1121,7 @@ class MsSQLDBI extends YadamuDBI {
         const sqlStartTime = performance.now()
         stack = new Error().stack
         await this.transaction.begin()
-		this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+		this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         this.TEDIOUS_TRANSACTION_ISSUE = false;
         this.requestProvider = this.transaction
         super.beginTransaction()
@@ -1183,7 +1185,7 @@ class MsSQLDBI extends YadamuDBI {
       const sqlStartTime = performance.now()
       stack = new Error().stack;
       await this.transaction.commit()
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       this.requestProvider = this.pool
     } catch (e) {
       const cause = this.trackExceptions(new MsSQLError(this.DRIVER_ID,e,stack,'sql.Transaction.commit()'))
@@ -1235,7 +1237,7 @@ class MsSQLDBI extends YadamuDBI {
         this.EXPECTED_ROLLBACK = true;
         await this.transaction.rollback()
         this.EXPECTED_ROLLBACK = false;
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
         this.requestProvider = this.pool
 		return
       } catch (e) {

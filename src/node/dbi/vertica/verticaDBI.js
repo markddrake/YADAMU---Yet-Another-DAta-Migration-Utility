@@ -133,7 +133,7 @@ class VerticaDBI extends YadamuDBI {
     this.logConnectionProperties()
 	let sqlStartTime = performance.now()
 	this.pool = new Pool(this.vendorProperties)
-    this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+    this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	
 	this.pool.on('error',(err, p) => {
 	  // Do not throw errors here.. Node will terminate immediately
@@ -155,7 +155,7 @@ class VerticaDBI extends YadamuDBI {
       const sqlStartTime = performance.now()
 	  stack = new Error().stack;
 	  const connection = await this.pool.connect()
-      this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
       return connection
 	} catch (e) {
 	  throw this.trackExceptions(new VerticaError(this.DRIVER_ID,e,stack,'pg.Pool.connect()'))
@@ -178,7 +178,7 @@ class VerticaDBI extends YadamuDBI {
 	  stack = new Error().stack;
       this.connection = await pgClient.connect()
     
-	  this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 	} catch (e) {
       throw this.trackExceptions(new VerticaError(this.DRIVER_ID,e,stack,operation))
 	}
@@ -290,7 +290,7 @@ class VerticaDBI extends YadamuDBI {
 		stack = new Error().stack
         const sqlQuery = typeof sqlStatement === 'string' ? {text : sqlStatement, values: args, rowMode : 'array'} : sqlStatement
         const results = await this.connection.query(sqlQuery)
-        this.sqlCummulativeTime+= this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+        this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
 		const cause = this.trackExceptions(new VerticaError(this.DRIVER_ID,e,stack,sqlStatement))

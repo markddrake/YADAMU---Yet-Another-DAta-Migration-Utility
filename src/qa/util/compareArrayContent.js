@@ -1,9 +1,9 @@
 "use strict";
-const fs = require('fs').promises
-const f = require('fs');
-const path = require('path')
-const assert = require('assert')
-const crypto = require('crypto');
+import fs          from 'fs/promises'
+import f           from 'fs'
+import path        from 'path'
+import assert      from 'assert'
+import crypto      from 'crypto'
 
 const logFile = f.createWriteStream(process.argv[2] + path.sep + 'arrayContent.log',{flags: "a"});
 const sourceDir = process.argv[3];
@@ -106,13 +106,13 @@ function compareArrayMetadata(files){
           
   const regExp =  new RegExp("\B(?=(\d{3})+(?!\d))","g");
 
-  let content = require(files[0].path);  
+  let content = f.readFileSync(files[0].path);  
   const tables = Object.keys(content.metadata).sort();
                           
   files[0].metadata = processContent(tables,content);
 
   try {
-    content = require(files[1].path);
+    content = f.readFileSync(files[1].path);
     files[1].metadata = processContent(tables,content);
   } catch (e) {
     if (e.code !== 'MODULE_NOT_FOUND') {
@@ -122,7 +122,7 @@ function compareArrayMetadata(files){
   }
   
   try {
-    content = require(files[2].path);
+    content = f.readFileSync(files[2].path);
     files[2].metadata = processContent(tables,content);
   } catch (e) {
     if (e.code !== 'MODULE_NOT_FOUND') {

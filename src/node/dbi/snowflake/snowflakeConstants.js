@@ -11,8 +11,7 @@ class SnowflakeConstants {
 
   static get STATIC_PARAMETERS()      { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
-      "YADAMU_USER"              : "public"
-    , "MAX_CHARACTER_SIZE"        : 16777216
+      "MAX_CHARACTER_SIZE"        : 16777216
 	, "MAX_BINARY_SIZE"           : 8388608 
     , "TRANSIENT_TABLES"          : true
     , "DATA_RETENTION_TIME"       : 0
@@ -43,7 +42,6 @@ class SnowflakeConstants {
 	return this.#_DBI_PARAMETERS
   }
 
-  static get YADAMU_USER()            { return this.DBI_PARAMETERS.YADAMU_USER}
   static get MAX_CHARACTER_SIZE()     { return this.DBI_PARAMETERS.MAX_CHARACTER_SIZE}
   static get MAX_BINARY_SIZE()        { return this.DBI_PARAMETERS.MAX_BINARY_SIZE}
   static get TRANSIENT_TABLES()       { return this.DBI_PARAMETERS.TRANSIENT_TABLES}

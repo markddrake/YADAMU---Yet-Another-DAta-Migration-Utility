@@ -812,7 +812,7 @@ class YadamuQA {
      } catch (e) {
 	   try {
 		 await source.destroy(e);
-		 await target.destroy(e)
+		 await staging.destroy(e)
 	   } catch (e) { /* If anything goes wrong the staged data is not valid  */ console.log(e) }
 	   
 	 }
@@ -1336,6 +1336,7 @@ class YadamuQA {
     }
     
     let fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null)
+	fileReader.ROLE = YadamuConstants.READER_ROLE
     
     let targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema1)
@@ -1389,6 +1390,7 @@ class YadamuQA {
     targetParameters.TARGET_DIRECTORY = exportDirectory
     
     let fileWriter = await this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,this.RECREATE_SCHEMA,{})
+	fileWriter.ROLE = YadamuConstants.WRITER_ROLE
 
     stepStartTime = performance.now();
     metrics.push(await this.yadamu.pumpData(sourceDBI,fileWriter))
@@ -1410,6 +1412,7 @@ class YadamuQA {
     sourceParameters.FILE = filename1
     sourceParameters.SOURCE_DIRECTORY = exportDirectory
     fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null,{})
+	fileReader.ROLE = YadamuConstants.READER_ROLE
     
     targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema2)
@@ -1446,7 +1449,8 @@ class YadamuQA {
     targetParameters.FILE = filename2
     targetParameters.TARGET_DIRECTORY = exportDirectory
     fileWriter = await this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,null,{})
-
+    fileWriter.ROLE = YadamuConstants.WRITER_ROLE
+	
     stepStartTime = performance.now();
     metrics.push(await this.yadamu.pumpData(sourceDBI,fileWriter))
     stepElapsedTime = performance.now() - stepStartTime
@@ -1587,6 +1591,7 @@ class YadamuQA {
     }
     
     const fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null)
+	fileReader.ROLE = YadamuConstants.READER_ROLE
 
     const targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase,targetSchema)
@@ -1681,6 +1686,7 @@ class YadamuQA {
     }
     
     const fileWriter = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA)
+	fileWriter.ROLE = YadamuConstants.WRITER_ROLE
 
     const taskStartTime = performance.now();
     let stepStartTime = taskStartTime;

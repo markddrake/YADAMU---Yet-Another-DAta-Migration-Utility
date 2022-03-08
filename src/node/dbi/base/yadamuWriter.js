@@ -38,7 +38,7 @@ class YadamuWriter extends Writable {
     this.status = status;
     this.yadamuLogger = yadamuLogger;    
     
-    this.sqlInitialTime = this.dbi.sqlCumlativeTime
+    this.sqlInitialTime = this.dbi.SQL_CUMULATIVE_TIME
     this.skipTable = this.dbi.MODE === 'DDL_ONLY';    
 
     const writeOperation = new Promise((resolve,reject) => {
@@ -247,6 +247,7 @@ class YadamuWriter extends Writable {
 	// this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'WAITING')
     await this.dbi.ddlComplete
     // this.yadamuLogger.trace([this.constructor.name,'DLL_COMPLETE',this.dbi.getWorkerNumber(),this.tableName],'PROCESSING')
+
 	await this.beginTransaction()
 	
   }
@@ -407,7 +408,7 @@ class YadamuWriter extends Writable {
 	  this.COPY_METRICS.skipped += (this.COPY_METRICS.parsed - this.COPY_METRICS.received)
     }
 
-	this.COPY_METRICS.sqlTime       = this.dbi.sqlCumlativeTime - this.sqlInitialTime
+	this.COPY_METRICS.sqlTime       = this.dbi.SQL_CUMULATIVE_TIME - this.sqlInitialTime
     this.COPY_METRICS.insertMode    = this.COPY_METRICS.insertMode || this.tableInfo?.insertMode || 'DDL Error'
     this.COPY_METRICS.skipTable     = this.skipTable
  	    

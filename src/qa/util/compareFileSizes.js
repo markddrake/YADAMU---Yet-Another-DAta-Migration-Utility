@@ -1,8 +1,8 @@
 "use strict";
-const fs = require('fs').promises
-const f = require('fs');
-const path = require('path')
-const assert = require('assert')
+import fs          from 'fs/promises'
+import f           from 'fs'
+import path        from  'path'
+import assert      from  'assert'
 
 const logFile = f.createWriteStream(process.argv[2] + path.sep + 'fileSizes.log',{flags: "a"});
 const sourceDir = process.argv[3];
