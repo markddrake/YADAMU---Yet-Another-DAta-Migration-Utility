@@ -1,7 +1,17 @@
-import { pipeline } from 'stream/promises';
-import path from 'path';
-import assert from 'assert';
-import crypto from 'crypto';
+import path            from 'path';
+import assert          from 'assert';
+import { 
+  pipeline,
+  finished
+}                      from 'stream/promises';
+
+import {  
+  createHash
+}                      from 'crypto'
+
+import {
+  Writable
+}                      from 'stream'
 
 import YadamuLibrary   from '../../node/lib/yadamuLibrary.js';
 import NullWriter      from '../../node/util/nullWritable.js';
@@ -29,18 +39,18 @@ class YadamuQALibrary {
       }
     }
     
-   async initializeImport() {
+    async initializeImport() {
       if (this.options.recreateSchema === true) {
         await this.recreateSchema();
       }
       await super.initializeImport();
     }   
 	
-	getTerminationTags(workerId,processId) {
+    getTerminationTags(workerId,processId) {
 	  return ['KILL',this.DATABASE_VENDOR,this.yadamu.killConfiguration.process,isNaN(workerId) ? 'SEQUENTIAL' : 'PARALLEL',this.ON_ERROR,workerId,this.yadamu.killConfiguration.delay,processId]
     }
-	
-  }
+
+  }	
   
   static loaderQAMixin = (superclass) => class extends superclass {
 
@@ -62,12 +72,12 @@ class YadamuQALibrary {
         }
         return 0
       })
-      return crypto.createHash('sha256').update(JSON.stringify(array)).digest('hex');
+      return createHash('sha256').update(JSON.stringify(array)).digest('hex');
     } 
    
     async calculateHash(file) {
         
-      const hash = crypto.createHash('sha256');
+      const hash = createHash('sha256');
       const is = await this.cloudService.createReadStream(file)
       await pipeline(is,hash)
       hash.end();

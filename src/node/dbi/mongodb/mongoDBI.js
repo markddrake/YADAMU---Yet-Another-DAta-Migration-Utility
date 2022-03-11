@@ -593,7 +593,7 @@ class MongoDBI extends YadamuDBI {
    const serverInfo = await this.serverInfo()
    const buildInfo = await this.builInfo
    const clientMetadata = this.client.topology.s.options.metadata;
-   // Object.getOwnPropertySymbols(this.client).forEach((k) => {console.log(this.client[k])clientMetadata = clientMetadata || (this.client[k]?.metadata)})
+   // Object.getOwnPropertySymbols(this.client).forEach((k) => {console.log(this.client[k]); clientMetadata = clientMetadata || (this.client[k]?.metadata)})
    return Object.assign(
 	  super.getSystemInformation()
 	, {
