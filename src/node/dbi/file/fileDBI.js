@@ -179,15 +179,15 @@ class FileDBI extends YadamuDBI {
   get IS_READER()        { this._ROLE === YadamuConstants.READER_ROLE }
   get IS_WRITER()        { this._ROLE === YadamuConstants.WRITER_ROLE}
   
-  constructor(yadamu,role,parameters) {
-    super(yadamu,undefined,{},parameters)
+  constructor(yadamu,role,connectionSettings,parameters) {
+    super(yadamu,null,connectionSettings,parameters)
+	this.ROLE = role
     this.outputStream = undefined;
     this.inputStream = undefined;
 	this.firstTable = true;
 	this.ddl = undefined;
 	this.baseDirectory = path.resolve(this.vendorProperties.directory || "")
 	this._DB_VERSION = YadamuConstants.YADAMU_VERSION
-	this.ROLE = role
   }
 
   setDescription(description) {

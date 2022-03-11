@@ -133,7 +133,7 @@ class YadamuQA {
     const connectionInfo = Object.assign({}, connectionSettings);
     if (Yadamu.QA_DRIVER_MAPPINGS.hasOwnProperty(driver)) { 
       const DBI = (await import(Yadamu.QA_DRIVER_MAPPINGS[driver])).default
-      dbi = new DBI(this.yadamu,null,connectionInfo,parameters);
+      dbi = driver === 'file' ? new DBI(this.yadamu,YadamuConstants.WRTIER_ROLE,connectionInfo,parameters) : new DBI(this.yadamu,null,connectionInfo,parameters)
     }   
     else {   
       const err = new ConfigurationFileError(`[${this.constructor.name}.getDatabaseInterface()]: Unsupported database vendor "${driver}".`);  

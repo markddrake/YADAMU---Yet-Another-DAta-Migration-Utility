@@ -104,16 +104,16 @@ function generateMissingMetadata(tables) {
 
 function compareArrayMetadata(files){
           
-  const regExp =  new RegExp("\B(?=(\d{3})+(?!\d))","g");
+  const regExp =  new RegExp("\B(?=(\d{3})+(?!\d))","g")
 
-  let content = f.readFileSync(files[0].path);  
-  const tables = Object.keys(content.metadata).sort();
+  let content = JSON.parse(f.readFileSync(files[0].path))
+  const tables = Object.keys(content.metadata).sort()
                           
   files[0].metadata = processContent(tables,content);
 
   try {
-    content = f.readFileSync(files[1].path);
-    files[1].metadata = processContent(tables,content);
+    content = JSON.parse(f.readFileSync(files[1].path))
+    files[1].metadata = processContent(tables,content)
   } catch (e) {
     if (e.code !== 'MODULE_NOT_FOUND') {
       throw e;
@@ -122,8 +122,8 @@ function compareArrayMetadata(files){
   }
   
   try {
-    content = f.readFileSync(files[2].path);
-    files[2].metadata = processContent(tables,content);
+    content = JSON.parse(f.readFileSync(files[2].path))
+    files[2].metadata = processContent(tables,content)
   } catch (e) {
     if (e.code !== 'MODULE_NOT_FOUND') {
       throw e;

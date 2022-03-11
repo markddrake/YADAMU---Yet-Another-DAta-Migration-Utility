@@ -96,8 +96,8 @@ class FileQA extends FileDBI {
     super.configureTest(recreateSchema);
   }
     
-  constructor(yadamu,manager,connectionSettings,parameters) {
-     super(yadamu,manager,connectionSettings,parameters)
+  constructor(yadamu,role,connectionSettings,parameters) {
+     super(yadamu,role,connectionSettings,parameters)
      this.deepCompare = false;
      this.sort = false;
   }

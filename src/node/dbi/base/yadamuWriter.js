@@ -2,9 +2,15 @@
 
 import fs              from 'fs'
 import assert          from 'assert'
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                      from 'perf_hooks';
 
-import {Readable, Writable, Transform, pipeline } from 'stream'
+import {
+  Readable, 
+  Writable, 
+  Transform 
+}                      from 'stream'
 
 import YadamuConstants from '../../lib/yadamuConstants.js';
 import YadamuLibrary   from '../../lib/yadamuLibrary.js';
@@ -106,10 +112,7 @@ class YadamuWriter extends Writable {
 	this.COPY_METRICS.skipped += (this.COPY_METRICS.pending - this.COPY_METRICS.cached);
 	this.COPY_METRICS.pending = 0;
 	this.COPY_METRICS.written = 0;
-	this.COPY_METRICS.cached = 0;
-
-
-	
+	this.COPY_METRICS.cached = 0;	
   }
   
   adjustRowCounts(rowCount) {

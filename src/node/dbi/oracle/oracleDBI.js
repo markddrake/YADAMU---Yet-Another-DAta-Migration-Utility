@@ -1098,23 +1098,23 @@ class OracleDBI extends YadamuDBI {
          if (this.ddl.length > 0) {
            // Execute the DDL statement by statement.
            await this.applyDDL(this.ddl)
-           settings = `YADAMU_IMPORT.DATA_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
+           settings = `YADAMU_IMPORT.DATA_ONLY_MODE(TRUE);\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
          }
          else {
-           settings = `YADAMU_IMPORT.DATA_ONLY_MODE(FALSE)\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
+           settings = `YADAMU_IMPORT.DATA_ONLY_MODE(FALSE);\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
          }
 	     break;
 	   case 'DATA_ONLY':
-         settings = `YADAMU_IMPORT.DATA_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
+         settings = `YADAMU_IMPORT.DATA_ONLY_MODE(TRUE);\n  YADAMU_IMPORT.DDL_ONLY_MODE(FALSE);`;
          break;
 	   case 'DDL_ONLY':
          if (this.ddl.length > 0) {
            // Execute the DDL statement by statement
           await his.applyDDL(this.ddl)
-           settings = `YADAMU_IMPORT.DDL_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DATA_ONLY_MODE(TRUE);`;
+           settings = `YADAMU_IMPORT.DDL_ONLY_MODE(TRUE);\n  YADAMU_IMPORT.DATA_ONLY_MODE(TRUE);`;
          }
          else {
-           settings = `YADAMU_IMPORT.DDL_ONLY_MODE(TRUE)\n  YADAMU_IMPORT.DATA_ONLY_MODE(FALSE);`;
+           settings = `YADAMU_IMPORT.DDL_ONLY_MODE(TRUE);\n  YADAMU_IMPORT.DATA_ONLY_MODE(FALSE);`;
          }
 	     break;
     }

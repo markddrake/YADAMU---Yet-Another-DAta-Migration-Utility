@@ -1,12 +1,13 @@
 "use strict"
 
-import FileDBI from './fileDBI.js'
+import FileDBI            from './fileDBI.js'
 import ErrorOutputManager from './errorOutputManager.js';
+import YadamuConstants    from '../../lib/yadamuConstants.js';
 
 class ErrorDBI extends FileDBI {
   
   constructor(yadamu,filename) {
-    super(yadamu,null,{},{FILE : filename})
+    super(yadamu,YadamuConstants.WRITER_ROLE,{},{FILE : filename})
 	this.FILE = filename
   }
  

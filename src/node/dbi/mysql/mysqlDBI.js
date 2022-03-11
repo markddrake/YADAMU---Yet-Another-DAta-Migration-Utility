@@ -552,7 +552,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   async processFile(hndl) {
-    const sqlStatement = `SET @RESULTS = ''; CALL YADAMU_IMPORT(?,@RESULTS) SELECT @RESULTS "logRecords";`;                     
+    const sqlStatement = `SET @RESULTS = ''; CALL YADAMU_IMPORT(?,@RESULTS); SELECT @RESULTS "logRecords";`;                     
     let results = await  this.executeSQL(sqlStatement,this.CURRENT_SCHEMA)
     results = results.pop()
     return this.processLog(results,'JSON_TABLE')
