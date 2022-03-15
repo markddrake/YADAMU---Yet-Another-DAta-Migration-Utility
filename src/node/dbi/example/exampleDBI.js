@@ -465,7 +465,7 @@ class ExampleDBI extends YadamuDBI {
   classFactory(yadamu) {
 	// Create a worker DBI that has it's own connection to the database (eg can begin and end transactions of it's own. 
 	// Ideally the connection should come from the same connection pool that provided the connection to this DBI.
-	return new ExampleDBI(yadamu,this)
+	return new ExampleDBI(yadamu,this,this.connectionSettings,this.parameters)
   }
   
   async getConnectionID() {

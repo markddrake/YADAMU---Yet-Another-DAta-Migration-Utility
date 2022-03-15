@@ -154,7 +154,7 @@ class LoaderQA extends YadamuQALibrary.loaderQAMixin(LoaderDBI) {
   }
   
   classFactory(yadamu) {
-    return new LoaderQA(yadamu,this)
+    return new LoaderQA(yadamu,this,this.connectionSettings,this.parameters)
   }
   
   getCSVParser() {

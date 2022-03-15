@@ -647,7 +647,7 @@ class LoaderDBI extends YadamuDBI {
   }  
   
   classFactory(yadamu) {
-	return new LoaderDBI(yadamu,this)
+	return new LoaderDBI(yadamu,this,this.connectionSettings,this.parameters)
   }
   
   async cloneSettings() {

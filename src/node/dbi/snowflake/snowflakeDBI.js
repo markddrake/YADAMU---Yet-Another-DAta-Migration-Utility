@@ -526,7 +526,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   }
   
   classFactory(yadamu) {
-	return new SnowflakeDBI(yadamu,this)
+	return new SnowflakeDBI(yadamu,this,this.connectionSettings,this.parameters)
   }
   
   async getConnectionID() {

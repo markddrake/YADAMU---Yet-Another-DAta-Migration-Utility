@@ -1780,7 +1780,7 @@ class YadamuDBI extends EventEmitter {
 	this.StatementLibrary   = this.manager.StatementLibrary
 	this.StatementGenerator = this.manager.StatementGenerator
 
-    this.setParameters(this.manager.parameters)
+    // this.setParameters(this.manager.parameters)
 	
 	this.systemInformation  = this.manager.systemInformation
 	this.metadata           = this.manager.metadata

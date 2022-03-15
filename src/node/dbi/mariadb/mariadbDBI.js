@@ -569,7 +569,7 @@ class MariadbDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-	return new MariadbDBI(yadamu,this)
+	return new MariadbDBI(yadamu,this,this.connectionSettings,this.parameters)
   }
   
   async getConnectionID() {

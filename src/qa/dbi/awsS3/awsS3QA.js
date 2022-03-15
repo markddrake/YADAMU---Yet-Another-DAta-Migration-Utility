@@ -43,7 +43,7 @@ class AWSS3QA extends YadamuQALibrary.loaderQAMixin(AWSS3DBI) {
   }
 
   classFactory(yadamu) {
-    return new AWSS3QA(yadamu,this)
+    return new AWSS3QA(yadamu,this,this.connectionSettings,this.parameters)
   }}
  
 export { AWSS3QA as default }

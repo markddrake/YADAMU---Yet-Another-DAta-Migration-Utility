@@ -614,7 +614,7 @@ class RedshiftDBI extends YadamuDBI {
   }
  
   classFactory(yadamu) {
-	return new RedshiftDBI(yadamu,this)
+	return new RedshiftDBI(yadamu,this,this.connectionSettings,this.parameters)
   }
 
   async reportCopyErrors(tableName,metrics) {

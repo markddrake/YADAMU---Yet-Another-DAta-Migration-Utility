@@ -115,7 +115,7 @@ class AWSS3DBI extends CloudDBI {
   }
 
   classFactory(yadamu) {
-	return new AWSS3DBI(yadamu,this)
+	return new AWSS3DBI(yadamu,this,this.connectionSettings,this.parameters)
   }
    
   getCredentials(vendorKey) {

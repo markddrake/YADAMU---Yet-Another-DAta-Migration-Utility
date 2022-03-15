@@ -198,7 +198,7 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
 	}
 	
     classFactory(yadamu) {
-      return new RedshiftQA(yadamu,this)
+      return new RedshiftQA(yadamu,this,this.connectionSettings,this.parameters)
     }
 }
 

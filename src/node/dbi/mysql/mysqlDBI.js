@@ -701,7 +701,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-    return new MySQLDBI(yadamu,this)
+    return new MySQLDBI(yadamu,this,this.connectionSettings,this.parameters)
   }
   
   async getConnectionID() {

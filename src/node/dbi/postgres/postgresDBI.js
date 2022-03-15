@@ -699,7 +699,7 @@ class PostgresDBI extends YadamuDBI {
   }
  
   classFactory(yadamu) {
-	return new PostgresDBI(yadamu,this)
+	return new PostgresDBI(yadamu,this,this.connectionSettings,this.parameters)
   }
   
   async getConnectionID() {

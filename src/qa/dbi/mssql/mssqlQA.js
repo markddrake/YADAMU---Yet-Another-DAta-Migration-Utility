@@ -135,7 +135,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
     }
 
     classFactory(yadamu) {
-      return new MsSQLQA(yadamu,this)
+      return new MsSQLQA(yadamu,this,this.connectionSettings,this.parameters)
     }
        
     async scheduleTermination(pid,workerId) {

@@ -620,7 +620,7 @@ class VerticaDBI extends YadamuDBI {
   }
  
   classFactory(yadamu) {
-	return new VerticaDBI(yadamu,this)
+	return new VerticaDBI(yadamu,this,this.connectionSettings,this.parameters)
   }
   
   async getConnectionID() {

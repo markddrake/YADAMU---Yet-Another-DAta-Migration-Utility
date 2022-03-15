@@ -1416,7 +1416,7 @@ class OracleDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-	return new OracleDBI(yadamu,this)
+	return new OracleDBI(yadamu,this,this.connectionSettings,this.parameters)
   }
     
   async initializeWorker(manager) {

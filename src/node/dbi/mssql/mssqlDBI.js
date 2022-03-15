@@ -1451,7 +1451,7 @@ class MsSQLDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-    return new MsSQLDBI(yadamu,this)
+    return new MsSQLDBI(yadamu,this,this.connectionSettings,this.parameters)
   }
   
   async getConnectionID() {

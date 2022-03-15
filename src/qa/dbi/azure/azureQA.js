@@ -44,7 +44,7 @@ class AzureQA extends YadamuQALibrary.loaderQAMixin(AzureDBI) {
 
   
   classFactory(yadamu) {
-    return new AzureQA(yadamu,this)
+    return new AzureQA(yadamu,this,this.connectionSettings,this.parameters)
   }
   
 }

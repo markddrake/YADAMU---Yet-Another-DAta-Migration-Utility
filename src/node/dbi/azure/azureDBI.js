@@ -127,7 +127,7 @@ class AzureDBI extends CloudDBI {
   }
   
   classFactory(yadamu) {
-	return new AzureDBI(yadamu,this)
+	return new AzureDBI(yadamu,this,this.connectionSettings,this.parameters)
   }
     
 }

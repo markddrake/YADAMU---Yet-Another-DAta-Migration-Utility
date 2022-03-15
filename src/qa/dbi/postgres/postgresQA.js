@@ -76,7 +76,7 @@ class PostgresQA extends YadamuQALibrary.qaMixin(PostgresDBI) {
     }
 		
     classFactory(yadamu) {
-      return new PostgresQA(yadamu,this)
+      return new PostgresQA(yadamu,this,this.connectionSettings,this.parameters)
     }
 	
 	async scheduleTermination(pid,workerId) {

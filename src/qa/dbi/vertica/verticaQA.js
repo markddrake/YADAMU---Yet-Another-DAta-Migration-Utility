@@ -176,7 +176,7 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
     }
         
     classFactory(yadamu) {
-      return new VerticaQA(yadamu,this)
+      return new VerticaQA(yadamu,this,this.connectionSettings,this.parameters)
     }
 	
     async scheduleTermination(pid,workerId) {
