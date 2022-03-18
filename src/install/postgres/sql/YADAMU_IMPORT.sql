@@ -260,17 +260,19 @@ create or replace function YADAMU_EXPORT(P_SCHEMA VARCHAR, P_SPATIAL_FORMAT VARC
 returns TABLE ( TABLE_SCHEMA VARCHAR, TABLE_NAME VARCHAR, COLUMN_NAME_ARRAY JSONB, DATA_TYPE_ARRAY JSONB, SIZE_CONSTRAINT_ARRAY JSONB, CLIENT_SELECT_LIST TEXT, ERRORS JSONB)
 as $$
 declare
-  R                  RECORD;
-  V_SQL_STATEMENT    TEXT = NULL;
-  PLPGSQL_CTX        TEXT;
-  
-  V_SIZE_CONSTRAINTS JSONB;
+  R                       RECORD;
+  V_SQL_STATEMENT         TEXT = NULL;
+  PLPGSQL_CTX             TEXT;
+  C_CHARACTER_MAX_LENGTH  character varying (20) = cast(1*1024*1024*1024 as character varying(20));
+  V_SIZE_CONSTRAINTS      JSONB;
 begin
 
   for r in select t.table_schema "TABLE_SCHEMA"
                  ,t.table_name "TABLE_NAME"
 	             ,jsonb_agg(column_name order by ordinal_position) "COLUMN_NAME_ARRAY"
 	             ,jsonb_agg(case 
+				              when ((c.data_type = 'character') and (c.udt_name = 'bpchar')) then
+                                c.udt_name 
                               when c.data_type = 'USER-DEFINED' then
                                 c.udt_name 
                               when c.data_type = 'ARRAY' then
@@ -291,6 +293,8 @@ begin
                                 cast(c.character_maximum_length as varchar)
                               when (c.datetime_precision is not null) then 
                                 cast(c.datetime_precision as varchar)
+							  when ((c.data_type in ('character','character varying','text')) and (c.character_maximum_length is null)) then
+							    C_CHARACTER_MAX_LENGTH
                             end
                             order by ordinal_position
                           ) "SIZE_CONSTRAINT_ARRAY"
@@ -479,11 +483,14 @@ create or replace function MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR  VARCHAR, P_DAT
 returns VARCHAR
 as $$
 declare
-  C_GEOMETRY_TYPE                     VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geometry' ELSE 'JSON' END;
+  C_CHAR_TYPE                         VARCHAR(32) = 'character';
+  C_CLOB_TYPE                         VARCHAR(32) = 'text';
+  
+  C_GEOMETRY_TYPE                     VARCHAR(32) 
+  = CASE WHEN P_POSTGIS_INSTALLED THEN 'geometry' ELSE 'JSON' END;
   C_GEOGRAPHY_TYPE                    VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geography' ELSE 'JSON' END;
   C_MAX_CHARACTER_VARYING_TYPE_LENGTH INT         = 10 * 1024 * 1024;
   C_MAX_CHARACTER_VARYING_TYPE        VARCHAR(32) = 'character varying(' || C_MAX_CHARACTER_VARYING_TYPE_LENGTH || ')';
-  C_CLOB_TYPE                         VARCHAR(32) = 'text';
   C_BFILE_TYPE                        VARCHAR(32) = 'character varying(2048)';
   C_ROWID_TYPE                        VARCHAR(32) = 'character varying(18)';
   C_MYSQL_TINY_TEXT_TYPE              VARCHAR(32) = 'character varying(256)';
@@ -508,7 +515,7 @@ begin
   case P_SOURCE_VENDOR 
     when 'Postgres' then
       case V_DATA_TYPE 
-	    when 'character'                                                                         then return case when P_DATA_TYPE_LENGTH is NULL then 'bpchar' else V_DATA_TYPE end;                                                
+	    when 'character'                                                                         then return case when P_DATA_TYPE_LENGTH is NULL then 'bpchar' else C_CHAR_TYPE end;                                                
         when 'timestamp with time zone'                                                          then return 'timestamp(' || P_DATA_TYPE_LENGTH || ') with time zone';
         when 'timestamp without time zone'                                                       then return 'timestamp(' || P_DATA_TYPE_LENGTH || ') without time zone';
         when 'time with time zone'                                                               then return 'time(' || P_DATA_TYPE_LENGTH || ') with time zone';
@@ -517,8 +524,8 @@ begin
       end case;
     when 'Oracle' then
       case V_DATA_TYPE
-        when 'CHAR'                                                                              then return 'character';
-        when 'NCHAR'                                                                             then return 'character';
+        when 'CHAR'                                                                              then return C_CHAR_TYPE;
+        when 'NCHAR'                                                                             then return C_CHAR_TYPE;
         when 'VARCHAR2'                                                                          then return 'character varying';
 		when 'NVARCHAR2'                                                                         then return 'character varying';
         when 'CLOB'                                                                              then return C_CLOB_TYPE;
@@ -647,6 +654,67 @@ begin
                                                                                                  else return lower(V_DATA_TYPE);
       end case;
     when  'Vertica' then
+/*
+           case 'char':
+             switch (true) {
+               case (length > this.DataTypes.CHAR_LENGTH) :                        return this.DataTypes.CLOB_TYPE
+               default:                                                            return this.DataTypes.CHAR_TYPE
+             }
+
+           case 'varchar':
+           case 'long varchar':
+             switch (true) {
+               case (length > this.DataTypes.VARCHAR_LENGTH):                      return this.DataTypes.CLOB_TYPE
+               default:                                                            return this.DataTypes.VARCHAR_TYPE
+             }
+
+           case 'binary':
+             switch (true) {
+               case (length > this.DataTypes.BINARY_LENGTH):                       return this.DataTypes.BLOB_TYPE
+               default:                                                            return this.DataTypes.BINARY_TYPE
+             }
+
+           case 'varbinary':
+           case 'long varbinary':
+             switch (true) {
+               case (length > this.DataTypes.VARBINARY_LENGTH):                    return this.DataTypes.BLOB_TYPE
+               default:                                                            return this.DataTypes.VARBINARY_TYPE
+             }
+
+           case 'numeric':
+             switch (true) {
+               default:                                                            return this.DataTypes.NUMERIC_TYPE
+             }
+
+           case 'boolean':                                                         return this.DataTypes.BOOLEAN_TYPE
+
+
+           case 'int':                                                             return this.DataTypes.BIGINT_TYPE
+           case 'float':                                                           return this.DataTypes.DOUBLE_TYPE
+
+           case 'date':                                                            return this.DataTypes.DATE_TYPE
+           case 'time':                                                            return this.DataTypes.TIME_TYPE
+           case 'timetz':                                                          return this.DataTypes.TIME_TZ_TYPE
+           case 'timestamptz':                                                     return this.DataTypes.TIMESTAMP_TZ_TYPE
+           case 'timestamp':                                                       return this.DataTypes.TIMESTAMP_TYPE
+           case 'year':                                                            return this.DataTypes.VERTICA_YEAR_TYPE || this.YEAR_TYPE
+
+           case 'xml':                                                             return this.DataTypes.XML_TYPE
+           case 'json':                                                            return this.DataTypes.JSON_TYPE
+           case 'uuid':                                                            return this.DataTypes.UUID_TYPE
+		   
+           case 'geometry':                                                        return this.DataTypes.SPATIAL_TYPE
+           case 'geography':                                                       return this.DataTypes.GEOGRAPHY_TYPE
+		   
+           default:
+             if (dataType.startsWith('interval')) {
+               return this.DataTypes.INTERVAL_TYPE
+             }
+             this.yadamuLogger.qaWarning([this.dbi.DATABASE_VENDOR,vendor,dataType],'Explicit mapping not found')
+             return dataType.toLowerCase();
+         }
+*/
+
       case V_DATA_TYPE
         -- MySQL Direct Mappings
         when 'binary'                                                                            then return 'bytea';
@@ -709,6 +777,7 @@ declare
   V_TARGET_DATA_TYPES  JSONB;
   V_POSTGIS_VERSION    VARCHAR(512);
   V_POSTGIS_ENABLED    BOOLEAN = FALSE;
+  C_MAX_BOUNDED_LENGTH INT = 10 * 1024 * 1024;
 begin
 
   begin
@@ -762,6 +831,8 @@ begin
                       when TARGET_DATA_TYPE like '%without time zone' then 
                         ''
                       when TARGET_DATA_TYPE in ('boolean','smallint', 'mediumint', 'int', 'bigint','real','text','bytea','integer','money','xml','json','jsonb','image','date','double precision','geography','geometry') then 
+                        ''
+                      when ((TARGET_DATA_TYPE in ('character','character varying','text','bpchar')) and (cast(DATA_TYPE_LENGTH as INT) > C_MAX_BOUNDED_LENGTH)) then 
                         ''
                       when (TARGET_DATA_TYPE = 'time' and DATA_TYPE_LENGTH::INT > 6) then 
                         '(6)'

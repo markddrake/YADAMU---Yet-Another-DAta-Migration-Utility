@@ -12,13 +12,13 @@ class PostgresOutputManager extends YadamuOutputManager  {
     super(dbi,tableName,metrics,status,yadamuLogger)
   }
   
-    generateTransformations(targetDataTypes) {
+    generateTransformations(dataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
- 	  
-  	return targetDataTypes.map((targetDataType,idx) => {
+ 	
+  	return dataTypes.map((targetDataType,idx) => {
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-      switch (dataType.type.toLowerCase()) {
+	  switch (dataType.type.toLowerCase()) {
 		case "tsvector":
         case "json" :
 		case "jsonb":
@@ -31,19 +31,19 @@ class PostgresOutputManager extends YadamuOutputManager  {
              return YadamuLibrary.toBoolean(col)
           }
           break;
-        case "time" :
+        case "time without time zone" :
 		  return (col,idx) => {
             if (typeof col === 'string') {
               let components = col.split('T')
               col = components.length === 1 ? components[0] : components[1]
-              return col.split('Z')[0]
+              return col.split('Z')[0].split('+')[0]
             }
             else {
               return col.getUTCHours() + ':' + col.getUTCMinutes() + ':' + col.getUTCSeconds() + '.' + col.getUTCMilliseconds();  
             }
 		  }
           break;
-        case "timetz" :
+        case "time with time zone" :
 		  return (col,idx) => {
             if (typeof col === 'string') {
               let components = col.split('T')
@@ -56,7 +56,8 @@ class PostgresOutputManager extends YadamuOutputManager  {
           break;
         case 'date':
         case 'datetime':
-        case 'timestamp':
+        case 'timestamp with time zone':
+        case 'timestamp without time zone':
 		  return (col,idx) => {
             if (typeof col === 'string') {
               if (col.endsWith('Z') && col.length === 28) {

@@ -11,6 +11,7 @@ import Yadamu from '../../core/yadamu.js';
 import YadamuLibrary from '../../lib/yadamuLibrary.js';
 import YadamuOutputManager from '../base/yadamuOutputManager.js';
 import {BatchInsertError} from '../../core/yadamuException.js'
+import DataTypes from './mongoDataTypes.js';
 
 class MongoOutputManager extends YadamuOutputManager {
 
@@ -43,8 +44,10 @@ class MongoOutputManager extends YadamuOutputManager {
   
   generateTransformations(targetDataTypes) {
 
+
+    console.log(targetDataTypes)
     // Set up Transformation functions to be applied to the incoming rows
- 	  
+	
 	const transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
 	   switch(targetDataType.toLowerCase()){
         case 'objectid':
@@ -64,20 +67,6 @@ class MongoOutputManager extends YadamuOutputManager {
 	      }
           break;
         case 'geometry':
-        case 'geography':
-		case 'point':
-        case 'lseg':
-		case 'box':
-		case 'path':
-		case 'polygon':
-		case 'circle':
-        case 'linestring':
-		case 'multipoint':
-        case 'multilinestring':
-		case 'multipolygon':
-        case 'geometrycollection':
-        case 'geomcollection':
-        case '"MDSYS"."SDO_GEOMETRY"':
           switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
             case "WKB":
             case "EWKB":
@@ -117,7 +106,7 @@ class MongoOutputManager extends YadamuOutputManager {
           }			
 		  return null
 		default:
-		  if (YadamuLibrary.isNumericType(targetDataType)) {
+		  if (DataTypes.isNumericType(targetDataType)) {
 			return (col,idx) => {
 			  if (typeof col === 'string') {
 			    transformations[idx] = (col,idx) => {

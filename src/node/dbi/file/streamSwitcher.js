@@ -1,16 +1,28 @@
-"use strict" 
 
-import { Readable, Transform} from 'stream';
-import { pipeline } from 'stream/promises';
-import {compose} from 'stream';
+import { 
+  performance 
+}                          from 'perf_hooks';
 
-import { performance } from 'perf_hooks';
+import { 
+  Readable, 
+  Transform
+}                          from 'stream';
 
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import DBIConstants from '../base/dbiConstants.js';
-import {CommandLineError} from '../../core/yadamuException.js';
-import NullWritable from '../../util/nullWritable.js';
+import { 
+  pipeline 
+}                          from 'stream/promises'
+
+import { 
+  compose
+}                          from 'stream'
+
+import {CommandLineError}  from '../../core/yadamuException.js';
+import YadamuLibrary       from '../../lib/yadamuLibrary.js';
+import YadamuConstants     from '../../lib/yadamuConstants.js';
+import NullWritable        from '../../util/nullWritable.js';
+
+import DBIConstants        from '../base/dbiConstants.js';
+import YadamuDataTypes     from '../base/yadamuDataTypes.js';
 
 class StreamSwitcher extends Transform {
   
@@ -51,7 +63,7 @@ class StreamSwitcher extends Transform {
 	
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
 
-	  if (YadamuLibrary.isBinaryType(dataType.type)) {
+	  if (YadamuDataTypes.isBinary(dataType.type)) {
         return (row,idx) =>  {
   		  row[idx] = Buffer.from(row[idx],'hex')
 		}

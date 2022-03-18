@@ -20,7 +20,7 @@ class ExampleWriter extends YadamuOutputManager {
     return  this.tableInfo.targetDataTypes.map((targetDataType,idx) => {        
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
       /*    
-      if (YadamuLibrary.isBinaryType(dataType.type)){
+      if (YadamuLibrary.isBinary(dataType.type)){
         // For Interfaces that what Binary content rendered as hexBinary string 
         return (col,idx) => {
           return (Buffer.isBuffer(col)) return col.toString('hex') : col

@@ -24,8 +24,8 @@ class RedshiftParser extends YadamuParser {
 	})
   }
   
-  constructor(queryInfo,yadamuLogger,parseDelay) {
-    super(queryInfo,yadamuLogger,parseDelay);     
+  constructor(dbi,queryInfo,yadamuLogger,parseDelay) {
+    super(dbi,queryInfo,yadamuLogger,parseDelay)    
   }
     
 }

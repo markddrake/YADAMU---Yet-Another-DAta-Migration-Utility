@@ -113,7 +113,7 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
   }  
 
     classFactory(yadamu) {
-      return new SnowflakeQA(yadamu,this,this.connectionSettings,this.parameters)
+      return new SnowflakeQA(yadamu,this,this.connectionParameters,this.parameters)
     }
 	
     async scheduleTermination(pid,workerId) {

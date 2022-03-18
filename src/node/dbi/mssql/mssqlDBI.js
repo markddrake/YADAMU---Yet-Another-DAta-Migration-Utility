@@ -1,20 +1,15 @@
-"use strict" 
 
-import fs                     from 'fs';
-
-import { 
-  performance 
-}                             from 'perf_hooks';
+import fs                             from 'fs';
 
 import {
   setTimeout 
 }                             from "timers/promises"
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
 
 import sql from 'mssql';
 
@@ -32,21 +27,32 @@ import sql from 'mssql';
 **
 */
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import MsSQLConstants from './mssqlConstants.js'
-import MsSQLError from './mssqlException.js'
-import MsSQLParser from './mssqlParser.js';
-import MsSQLOutputManager from './mssqlOutputManager.js';
-import MsSQLWriter from './mssqlWriter.js';
-import StatementGenerator from './statementGenerator.js';
-import StagingTable from './stagingTable.js';
-import MsSQLReader from './mssqlReader.js';
-import StatementLibrary from './mssqlStatementLibrary.js'
+import {
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+					
+import MsSQLConstants                 from './mssqlConstants.js'
+import MsSQLDataTypes                 from './mssqlDataTypes.js'
+import MsSQLError                     from './mssqlException.js'
+import MsSQLParser                    from './mssqlParser.js'
+import MsSQLOutputManager             from './mssqlOutputManager.js'
+import MsSQLWriter                    from './mssqlWriter.js'
+import MsSQLStatementGenerator        from './mssqlStatementGenerator.js'
+import StagingTable                   from './stagingTable.js'
+import MsSQLReader                    from './mssqlReader.js'
+import MsSQLStatementLibrary          from './mssqlStatementLibrary.js'
 
 import {ConnectionError} from '../../core/yadamuException.js'
 
@@ -98,8 +104,11 @@ class MsSQLDBI extends YadamuDBI {
   get BEGIN_TRANSACTION_ISSUE()       { return this._BEGIN_TRANSACTION_ISSUE }
   set BEGIN_TRANSACTION_ISSUE(v)      { this._BEGIN_TRANSACTION_ISSUE = v }
 
+  get DATA_TYPES()                    { return MsSQLDataTypes }
+
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
+	yadamu.initializeTypeMapping(MsSQLDataTypes,this.TYPE_MAPPINGS)
 
     this.yadamuRollack = false
 
@@ -121,9 +130,9 @@ class MsSQLDBI extends YadamuDBI {
   
   initializeManager() {
 	super.initializeManager()
-	this.StatementGenerator = StatementGenerator
-    this.StatementLibrary = StatementLibrary
-    this.statementLibrary = undefined
+	this.StatementGenerator = MsSQLStatementGenerator
+    this.StatementLibrary   = MsSQLStatementLibrary
+    this.statementLibrary   = undefined
   }	 
 
   getSchemaIdentifer() {
@@ -1400,7 +1409,7 @@ class MsSQLDBI extends YadamuDBI {
   }
   
   createParser(queryInfo,parseDelay) {
-    return new MsSQLParser(queryInfo,this.yadamuLogger,parseDelay)
+    return new MsSQLParser(this,queryInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -1428,7 +1437,7 @@ class MsSQLDBI extends YadamuDBI {
     
   async generateStatementCache(schema) {
     /* ### OVERRIDE ### Pass additional parameter Database Name */
-    const statementGenerator = new this.StatementGenerator(this, schema, this.metadata ,this.yadamuLogger)
+    const statementGenerator = new this.StatementGenerator(this, this.systemInformation.vendor, schema, this.metadata ,this.yadamuLogger)
     this.statementCache = await statementGenerator.generateStatementCache(this.DATABASE_NAME)
 	this.emit(YadamuConstants.CACHE_LOADED)
 	return this.statementCache
@@ -1451,7 +1460,7 @@ class MsSQLDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-    return new MsSQLDBI(yadamu,this,this.connectionSettings,this.parameters)
+    return new MsSQLDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {

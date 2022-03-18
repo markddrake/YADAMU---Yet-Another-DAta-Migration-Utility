@@ -1,14 +1,28 @@
-"use strict" 
-
-import fs from 'fs';
-import fsp from 'fs/promises';
-import path from 'path';
-import crypto from 'crypto';
-import { performance } from 'perf_hooks';
-
-import {finished, compose,  Readable, PassThrough} from 'stream'
-import {pipeline} from 'stream/promises'
-import { createGzip, createGunzip, createDeflate, createInflate } from 'zlib';
+					                  
+import fs                             from 'fs';
+import fsp                            from 'fs/promises';
+import path                           from 'path';
+import crypto                         from 'crypto';
+					                  
+import {                              
+  finished,                           
+  compose,                            
+  Readable,                           
+  PassThrough                         
+}                                     from 'stream'
+import {                              
+  pipeline                            
+}                                     from 'stream/promises'
+import {                              
+  createGzip,                         
+  createGunzip,                       
+  createDeflate,                      
+  createInflate                       
+}                                     from 'zlib';
+					                  
+import {                              
+  performance                         
+}                                     from 'perf_hooks';
 
 /*
 **
@@ -17,27 +31,36 @@ import { createGzip, createGunzip, createDeflate, createInflate } from 'zlib';
 ** static GETTER methods result in undefined values.
 **
 
-import Yadamu from '../../core/yadamu.js';
+import Yadamu from '../../core/yadamu.js'
 
 **
 */
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import { YadamuError } from '../../core/yadamuException.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import JSONParser from './jsonParser.js';
-import StreamSwitcher from './streamSwitcher.js';
-import JSONOutputManager from './jsonOutputManager.js';
-import {FileError, FileNotFound, DirectoryNotFound} from './fileException.js';
 
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-/*
-**
-** YADAMU Database Inteface class skeleton
-**
-*/
+import {
+  YadamuError
+}                                     from '../../core/yadamuException.js'
 
+/* Yadamu DBI */                                    
+
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+
+import JSONParser                     from './jsonParser.js'
+import StreamSwitcher                 from './streamSwitcher.js'
+import JSONOutputManager              from './jsonOutputManager.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                     from './fileException.js'
 
 class ExportWriter extends Readable {
 
@@ -174,15 +197,10 @@ class FileDBI extends YadamuDBI {
   }
   
   set FILE(v)            { this._FILE = v }
-  set ROLE(v)            { this._ROLE = v }
   
-  get IS_READER()        { this._ROLE === YadamuConstants.READER_ROLE }
-  get IS_WRITER()        { this._ROLE === YadamuConstants.WRITER_ROLE}
-  
-  constructor(yadamu,role,connectionSettings,parameters) {
-    super(yadamu,null,connectionSettings,parameters)
-	this.ROLE = role
-    this.outputStream = undefined;
+  constructor(yadamu,connectionSettings,parameters) {
+	super(yadamu,null,connectionSettings,parameters)
+	this.outputStream = undefined;
     this.inputStream = undefined;
 	this.firstTable = true;
 	this.ddl = undefined;

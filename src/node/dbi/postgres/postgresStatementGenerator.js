@@ -1,19 +1,16 @@
-"use strict";
 
-import path from 'path';
-import crypto from 'crypto';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import path                     from 'path';
+import crypto                   from 'crypto';
 
-class StatementGenerator {
+import YadamuLibrary            from '../../lib/yadamuLibrary.js';
+import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
 
-  constructor(dbi, targetSchema, metadata, yadamuLogger) {  
-    this.dbi = dbi;
-    this.targetSchema = targetSchema
-    this.metadata = metadata
-    this.yadamuLogger = yadamuLogger;
+class PostgresStatementGenerator extends YadamuStatementGenerator {
+
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {  
+    super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
   
-
   async generateStatementCache () {    
     
     const sqlStatement = `select GENERATE_SQL($1,$2,$3)`
@@ -25,6 +22,7 @@ class StatementGenerator {
 	
     const results = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, this.targetSchema, options])
     let statementCache = results.rows[0][0]
+	
 	if (statementCache === null) {
       statementCache = {}
     }
@@ -224,4 +222,4 @@ class StatementGenerator {
   }
 }
 
-export { StatementGenerator as default }
+export { PostgresStatementGenerator as default }

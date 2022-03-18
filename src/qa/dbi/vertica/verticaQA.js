@@ -66,7 +66,6 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
     async recreateSchema() {
       try {
         const dropSchema = `drop schema if exists "${this.parameters.TO_USER}" cascade`;
-        this.SQL_TRACE.traceSQL(dropSchema)
         await this.executeSQL(dropSchema);      
       } catch (e) {
         if (e.errorNum && (e.errorNum === 1918)) {
@@ -176,7 +175,7 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
     }
         
     classFactory(yadamu) {
-      return new VerticaQA(yadamu,this,this.connectionSettings,this.parameters)
+      return new VerticaQA(yadamu,this,this.connectionParameters,this.parameters)
     }
 	
     async scheduleTermination(pid,workerId) {

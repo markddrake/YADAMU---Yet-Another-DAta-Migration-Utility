@@ -1,4 +1,3 @@
-"use strict"
 
 import crypto                   from 'crypto';
 import { performance }          from 'perf_hooks';
@@ -146,10 +145,9 @@ class VerticaWriter extends YadamuWriter {
   }
   
   async _writeBatch(batch,rowCount) {
-    // try {
       
     // console.log('Write Batch',this.tableName,this.COPY_METRICS.batchNumber,rowCount,'Copy',batch.copy.length,'Insert',batch.insert.length)
-    
+
     const emptyStringDataSets = Object.keys(batch).filter((key) => {return ((key !== 'copy') && (key !== 'insert'))})
     delete emptyStringDataSets.copy
     delete emptyStringDataSets.insert
@@ -267,7 +265,6 @@ class VerticaWriter extends YadamuWriter {
     }
     this.releaseBatch(batch)
     return this.skipTable   
-	// } catch(e) { console.log(e); throw(e) }
     
   }
 

@@ -1,12 +1,15 @@
-"use strict"
 
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                          from 'perf_hooks';
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuOutputManager from '../base/yadamuOutputManager.js';
+import Yadamu              from '../../core/yadamu.js';
+import YadamuLibrary       from '../../lib/yadamuLibrary.js';
+import YadamuConstants     from '../../lib/yadamuConstants.js';
 import PerformanceReporter from '../../util/performanceReporter.js';
+
+import YadamuDataTypes     from '../base/yadamuDataTypes.js';
+import YadamuOutputManager from '../base/yadamuOutputManager.js';
 
 class JSONOutputManager extends YadamuOutputManager {
 	     
@@ -17,18 +20,20 @@ class JSONOutputManager extends YadamuOutputManager {
 	this.rowCount = 0
   }
     
-  generateTransformations(targetDataTypes) {
+  generateTransformations(dataTypes) {
+	  
+	console.log(dataTypes)
 
     // Set up Transformation functions to be applied to the incoming rows
-    return this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
-      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-	  if (YadamuLibrary.isBinaryType(dataType.type)) {
+    return this.tableInfo.targetDataTypes.map((dataType,idx) => {      
+      const dataTypeDefinition = YadamuLibrary.decomposeDataType(dataType);
+	  if (YadamuDataTypes.isBinary(dataTypeDefinition.type)) {
 		return (col,idx) =>  {
           return col.toString('hex')
 		}
       }
       
-	  switch (dataType.type.toUpperCase()) {
+	  switch (dataTypeDefinition.type.toUpperCase()) {
         case "GEOMETRY":
         case "GEOGRAPHY":
         case "POINT":

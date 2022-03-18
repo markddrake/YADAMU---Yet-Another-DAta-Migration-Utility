@@ -1,15 +1,12 @@
-"use strict";
 
-class StatementGenerator {
+import YadamuStatementGenerator  from '../base/yadamuStatementGenerator.js'
+
+class ExampleStatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, yadamuLogger) { 
-    this.dbi = dbi;
-    this.targetSchema = targetSchema
-    this.metadata = metadata
-    this.yadamuLogger = yadamuLogger;
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
+    super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
   
-
   async generateStatementCache () {    
 
     /*
@@ -29,4 +26,4 @@ class StatementGenerator {
   }
 }
 
-export {StatementGenerator as default }
+export { ExampleStatementGenerator as default }

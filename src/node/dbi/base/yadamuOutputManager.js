@@ -64,15 +64,15 @@ class YadamuOutputManager extends Transform {
 	this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
   }
      
-  generateTransformations(targetDataTypes) {
+  generateTransformations(dataTypes) {
 	
-	return Array(targetDataTypes.columnNames.length).fill(null);
+	return Array(dataTypes.columnNames.length).fill(null);
 
   }
   
-  setTransformations(targetDataTypes) {
+  setTransformations(dataTypes) {
 	 	  
-	this.transformations = this.generateTransformations(targetDataTypes) 
+	this.transformations = this.generateTransformations(dataTypes) 
 	
      // Use a dummy rowTransformation function if there are no transformations required.
 

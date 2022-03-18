@@ -1,18 +1,16 @@
-"use strict";
 
-import sql from 'mssql';
-import path from 'path';
+import path                     from 'path';
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import sql                      from 'mssql';
 
-class StatementGenerator {
+import YadamuLibrary            from '../../lib/yadamuLibrary.js';
+
+import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
+
+class MsSQLStatementGenerator extends YadamuStatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, yadamuLogger) {
-    this.dbi = dbi;
-    this.targetSchema = targetSchema
-    this.metadata = metadata
-    this.yadamuLogger = yadamuLogger;
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {  
+    super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
   
   bulkSupported(dataTypes) {
@@ -234,7 +232,7 @@ class StatementGenerator {
 	return JSON.stringify({metadata : this.metadata})
   }
 
-  async generateStatementCache (database) {
+  async generateStatementCache () {
  
     const args = { 
 	        inputs: [{
@@ -431,4 +429,4 @@ class StatementGenerator {
   }
 }
 
-export { StatementGenerator as default }
+export { MsSQLStatementGenerator as default }

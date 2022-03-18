@@ -1,24 +1,22 @@
-"use strict";
 
-import path from 'path';
-import crypto from 'crypto';
-import { performance } from 'perf_hooks';
+import path                           from 'path';
+import crypto                         from 'crypto';
+
+import { 
+  performance 
+}                                     from 'perf_hooks';
 
 import oracledb from 'oracledb';
 oracledb.fetchAsString = [ oracledb.DATE, oracledb.NUMBER ]
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-     
-class StatementGenerator {
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js';
 
-  static get LOB_TYPES()   { 
-    StatementGenerator._LOB_TYPES = StatementGenerator._LOB_TYPES || Object.freeze([oracledb.CLOB,oracledb.BLOB])
-    return StatementGenerator._LOB_TYPES
-  }
+import YadamuStatementGenerator       from '../base/yadamuStatementGenerator.js'
+
+class OracleStatementGenerator extends YadamuStatementGenerator {
 
   get BIND_LENGTH() {     
-    StatementGenerator._BIND_LENGTH = StatementGenerator._BIND_LENGTH || Object.freeze({
+    this._BIND_LENGTH = this._BIND_LENGTH || Object.freeze({
       BLOB          : this.dbi.LOB_MAX_SIZE
     , CLOB          : this.dbi.LOB_MAX_SIZE
     , JSON          : this.dbi.LOB_MAX_SIZE
@@ -34,16 +32,11 @@ class StatementGenerator {
     , TIMESTAMP     : 35
     , INTERVAL      : 12
     })
-    return StatementGenerator._BIND_LENGTH
+    return this._BIND_LENGTH
   }
   
-  static get BOUNDED_TYPES() { 
-    StatementGenerator._BOUNDED_TYPES = StatementGenerator._BOUNDED_TYPES || Object.freeze( ['CHAR','NCHAR','VARCHAR2','NVARCHAR2','RAW'])
-    return StatementGenerator._BOUNDED_TYPES;
-  }
-
-
   // This is the spatial format of the incoming data, not the format used by this driver
+  
   get SPATIAL_FORMAT()               { return this.dbi.INBOUND_SPATIAL_FORMAT } 
   get OBJECTS_AS_JSON()              { return this.dbi.systemInformation.objectFormat === 'JSON'}
 
@@ -59,18 +52,19 @@ class StatementGenerator {
   get LOADER_CLOB_SIZE()             { return 67108864 }
   get LOADER_CLOB_TYPE()             { return `CHAR(${this.LOADER_CLOB_SIZE})`}
     
-  constructor(dbi, targetSchema, metadata, yadamuLogger) {
-    this.dbi = dbi;
-    this.targetSchema = targetSchema
-    this.metadata = metadata
-    this.yadamuLogger = yadamuLogger
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {  
+    super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
-   
+ 
+     
   generateBinds(dataTypes, tableInfo, metadata) {
       
      // Binds describe the format that will be used to supply the data. Eg with SQLServer BIGINT values will be presented as String
 	 tableInfo.lobColumns = false;
      return dataTypes.map((dataType,idx) => {
+
+
+
        if (!dataType.length) {
           dataType.length = parseInt(metadata.sizeConstraints[idx]);
        }
@@ -102,8 +96,12 @@ class StatementGenerator {
            return { type: oracledb.DB_TYPE_VARCHAR, maxSize : dataType.length * 2}
          case 'DATE':
          case 'TIMESTAMP':
+         case 'TIMESTAMP WITH TIME ZONE':
+         case 'TIMESTAMP WITH LOCAL TIME ZONE':
            return { type: oracledb.STRING, maxSize : this.BIND_LENGTH.TIMESTAMP}
-         case 'INTERVAL':
+         case 'INTERVAL': // Legacy
+         case 'INTERVAL DAY TO SECOND':
+         case 'INTERVAL YEAR TO MONTH':
             return { type: oracledb.STRING, maxSize : this.BIND_LENGTH.INTERVAL}
          case 'CLOB':
            tableInfo.lobColumns = true;
@@ -218,7 +216,7 @@ class StatementGenerator {
 		  bindOrdering.push(parseInt(colIdx))
 		  break
 		default:
-          if (!StatementGenerator.LOB_TYPES.includes(tableInfo.lobBinds[colIdx].type)) {
+          if (!this.dbi.DATA_TYPES.LOB_TYPES.includes(tableInfo.lobBinds[colIdx].type)) {
             bindOrdering.push(parseInt(colIdx))
 		  }
 	  }
@@ -314,7 +312,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 	}
   }
 
-  async generateStatementCache(vendor) {
+  async generateStatementCache() {
 	  
      /*
      **
@@ -324,8 +322,8 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 	 
 	this.SQL_DIRECTORY_NAME = `"YDIR-${crypto.randomBytes(this.RANDOM_OBJECT_LENGTH).toString("hex").toUpperCase()}"`
 	
-    const sourceDateFormatMask = this.dbi.getDateFormatMask(vendor);
-    const sourceTimeStampFormatMask = this.dbi.getTimeStampFormatMask(vendor);
+    const sourceDateFormatMask = this.dbi.getDateFormatMask(this.SOURCE_VENDOR);
+    const sourceTimeStampFormatMask = this.dbi.getTimeStampFormatMask(this.SOURCE_VENDOR);
     const oracleDateFormatMask = this.dbi.getDateFormatMask('Oracle');
     const oracleTimeStampFormatMask = this.dbi.getTimeStampFormatMask('Oracle');
     
@@ -558,7 +556,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 		    }
         } 
         // Append length to bounded datatypes if necessary
-        targetDataType = (StatementGenerator.BOUNDED_TYPES.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]})` : targetDataType;
+        targetDataType = (this.dbi.DATA_TYPES.BOUNDED_TYPES.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]})` : targetDataType;
 		values.push(value)
 		copyColumnDefinitions[tableInfo.bindOrdering[idx]]     = copyColumnDefinition
 		externalColumnDefinitions[tableInfo.bindOrdering[idx]] = `"${column}" ${externalDataType || targetDataType}`
@@ -592,4 +590,4 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
   }  
 }
 
-export {StatementGenerator as default }
+export { OracleStatementGenerator as default }

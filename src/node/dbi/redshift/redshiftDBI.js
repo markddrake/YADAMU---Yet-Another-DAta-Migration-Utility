@@ -1,34 +1,60 @@
-"use strict" 
-import                          fs from 'fs';
-import { performance }          from 'perf_hooks';
-import { pipeline }             from 'stream/promises';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
-import pg                       from 'pg';
+import fs                             from 'fs';
+import readline                       from 'readline';
+
+import { 
+  once 
+}                                     from 'events';
+
+import {
+  Readable
+}                                     from 'stream';
+
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
+							          
+import pg                             from 'pg';
 const {Client,Pool} = pg;
-import QueryStream              from 'pg-query-stream'
-import types from 'pg-types';
 
-import YadamuDBI                from '../base/yadamuDBI.js';
-import DBIConstants             from '../base/dbiConstants.js';
-import YadamuConstants          from '../../lib/yadamuConstants.js';
-import AWSS3Constants           from '../awsS3/awsS3Constants.js';
-import YadamuLibrary            from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted}   from '../../core/yadamuException.js'
-import {YadamuError}            from '../../core/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
+import QueryStream                    from 'pg-query-stream'
+import types                          from 'pg-types';
 
-import RedshiftConstants        from './redshiftConstants.js'
-import RedshiftError            from './redshiftException.js'
-import RedshiftParser           from './redshiftParser.js';
-import RedshiftWriter           from './redshiftWriter.js';
-import RedshiftOutputManager    from './redshiftOutputManager.js';
-import StatementGenerator       from './statementGenerator.js';
-import RedshiftStatementLibrary from './redshiftStatementLibrary.js';
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
+
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                    from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+import {
+	
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                    from '../file/fileException.js'
+
+import AWSS3Constants                from '../awsS3/awsS3Constants.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+						          
+import RedshiftConstants             from './redshiftConstants.js'
+import RedshiftError                 from './redshiftException.js'
+import RedshiftParser                from './redshiftParser.js'
+import RedshiftWriter                from './redshiftWriter.js'
+import RedshiftOutputManager         from './redshiftOutputManager.js'
+import StatementGenerator            from './statementGenerator.js'
+import RedshiftStatementLibrary      from './redshiftStatementLibrary.js'
 
 
 class RedshiftDBI extends YadamuDBI {
@@ -511,7 +537,7 @@ class RedshiftDBI extends YadamuDBI {
   }
 
   createParser(tableInfo,parseDelay) {
-    return new RedshiftParser(tableInfo,this.yadamuLogger,parseDelay)
+    return new RedshiftParser(this,tableInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -602,7 +628,7 @@ class RedshiftDBI extends YadamuDBI {
   }
    
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator, schema)
+    return await super.generateStatementCache(RedshiftStatementGenerator, schema)
   }
 
   getOutputStream(tableName,metrics) {
@@ -614,7 +640,7 @@ class RedshiftDBI extends YadamuDBI {
   }
  
   classFactory(yadamu) {
-	return new RedshiftDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new RedshiftDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
 
   async reportCopyErrors(tableName,metrics) {

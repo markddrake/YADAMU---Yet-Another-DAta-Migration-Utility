@@ -597,7 +597,9 @@ begin
                     || 'select SOURCE_SCHEMA, TARGET_SCHEMA, TABLE_NAME, SOURCE_ROWS, TARGET_ROWS, MISSING_ROWS, EXTRA_ROWS, NULL' || YADAMU_UTILITIES.C_NEWLINE                    
                     || '  from TABLE_COMPARE_RESULTS';
 
+    
     begin 
+	  -- DBMS_OUTPUT.PUT_LINE(V_SQL_STATEMENT);
 	  begin
         EXECUTE IMMEDIATE V_SQL_STATEMENT;
       exception 

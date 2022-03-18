@@ -110,7 +110,7 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
     }
      
     classFactory(yadamu) {
-      return new OracleQA(yadamu,this,this.connectionSettings,this.parameters)
+      return new OracleQA(yadamu,this,this.connectionParameters,this.parameters)
     }
 	
     async scheduleTermination(pid,workerId) {

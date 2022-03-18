@@ -1,29 +1,56 @@
-"use strict" 
+					                  
+import fs                             from 'fs';
+import fsp                            from 'fs/promises';
+import path                           from 'path';
+import crypto                         from 'crypto';
+					                  
+import {                              
+  finished,                           
+  PassThrough                         
+}                                     from 'stream'
+import {                              
+  pipeline                            
+}                                     from 'stream/promises'
+import {                              
+  createGzip,                         
+  createGunzip,                       
+  createDeflate,                      
+  createInflate                       
+}                                     from 'zlib';
+					                  
+import {                              
+  performance                         
+}                                     from 'perf_hooks';
 
-import fs from 'fs';
-import fsp from 'fs/promises';
-import path from 'path';
-import { performance } from 'perf_hooks';
-import crypto from 'crypto';
-import { PassThrough, finished} from 'stream'
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import { createGzip, createGunzip, createDeflate, createInflate } from 'zlib';
+import {
+  YadamuError
+}                                     from '../../core/yadamuException.js'
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+/* Yadamu DBI */                                    
 
-import LoaderConstants from './loaderConstants.js';
-import JSONParser from './jsonParser.js';
-import LoaderParser from './loaderParser.js';
-import JSONOutputManager from './jsonOutputManager.js';
-import ArrayOutputManager from './arrayOutputManager.js';
-import CSVOutputManager from './csvOutputManager.js';
-import CSVTransform from './csvTransform.js';
-import {YadamuError, CommandLineError} from '../../core/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                    from '../file/fileException.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+
+import LoaderConstants                from './loaderConstants.js'
+import JSONParser                     from './jsonParser.js'
+import LoaderParser                   from './loaderParser.js'
+import JSONOutputManager              from './jsonOutputManager.js'
+import ArrayOutputManager             from './arrayOutputManager.js'
+import CSVOutputManager               from './csvOutputManager.js'
+import CSVTransform                   from './csvTransform.js'
 
 /*
 **
@@ -647,7 +674,7 @@ class LoaderDBI extends YadamuDBI {
   }  
   
   classFactory(yadamu) {
-	return new LoaderDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new LoaderDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async cloneSettings() {

@@ -1,4 +1,3 @@
-"use strict" 
 
 import fs                 from 'fs';
 import path               from 'path';
@@ -12,8 +11,8 @@ import {
   setTimeout 
 }                         from 'timers/promises'
 
-import Yadamu             from '../../core/yadamu.js';
-import YadamuConstants    from '../../lib/yadamuConstants.js';
+import Yadamu             from '../../core/yadamu.js'
+import YadamuConstants    from '../../lib/yadamuConstants.js'
 import YadamuLibrary      from '../../lib/yadamuLibrary.js'
 import NullWriter         from '../../util/nullWriter.js'
 import NullWritable       from '../../util/nullWritable.js'
@@ -29,22 +28,15 @@ import {
   IterativeInsertError, 
   InputStreamError, 
   UnimplementedMethod
-}                         from '../../core/yadamuException.js';
+}                         from '../../core/yadamuException.js'
 
-import DBIConstants       from './dbiConstants.js';
+import DBIConstants       from './dbiConstants.js'
+import YadamuDataTypes    from './yadamuDataTypes.js'
 
 import {
   FileNotFound, 
   FileError
-}                         from '../file/fileException.js';
-
-
-/*
-**
-** YADAMU Database Interface class 
-**
-**
-*/
+}                         from '../file/fileException.js'
 
 class SQLTrace {
 	
@@ -103,6 +95,16 @@ class SQLTrace {
 
 }
   
+/*
+**
+** YADAMU Database Interface class 
+**
+** Notes:
+**
+**   The SQL used to fetch metadata about the database schema should generate virtualized Data Types, eg JSON, XML, BOOLEAN rather than actual types.
+**   This is done by inspecting constraints etc where the actual type can contain different types of content.
+*/
+
 class YadamuDBI extends EventEmitter {
 
   // Instance level getters.. invoke as this.METHOD
@@ -111,6 +113,7 @@ class YadamuDBI extends EventEmitter {
   get DATABASE_KEY()                 { return 'yadamu' };
   get DATABASE_VENDOR()              { return 'YADAMU' };
   get SOFTWARE_VENDOR()              { return 'YABASC - Yet Another Bay Area Software Company'};
+  get DATATYPE_IDENTITY_MAPPING()    { return true }
 
   get DRIVER_ID()                    { return this._DRIVER_ID }
   set DRIVER_ID(v)                   { this._DRIVER_ID = v }
@@ -149,6 +152,8 @@ class YadamuDBI extends EventEmitter {
   set SQL_TRACE(writer)              { this._SQL_TRACE = this._SQL_TRACE || new SQLTrace(writer,this.STATEMENT_SEPERATOR,this.STATEMENT_TERMINATOR,this.ROLE)}
   get SQL_CUMLATIVE_TIME()           { return this.SQL_TRACE.SQL_CUMLATIVE_TIME }
   
+  get TYPE_MAPPINGS()                { return YadamuDataTypes.DATA_TYPE_MAPPINGS[this.DATABASE_VENDOR].mappings }
+    
   get BATCH_SIZE() {
     this._BATCH_SIZE = this._BATCH_SIZE || (() => {
       let batchSize =  this.parameters.BATCH_SIZE || DBIConstants.BATCH_SIZE
@@ -317,9 +322,8 @@ class YadamuDBI extends EventEmitter {
     
 	super()
 	this.DRIVER_ID = performance.now()
-	
 	yadamu.activeConnections.add(this)
-
+    // console.log(DataTypeMappings[this.DATABASE_VENDOR].mappings)
     this.yadamu = yadamu;
     this.setConnectionProperties(connectionSettings || {})
     this.status = yadamu.STATUS
@@ -327,7 +331,8 @@ class YadamuDBI extends EventEmitter {
     this.yadamuLogger = yadamu.LOGGER;
 	this.initializeParameters(parameters || {})
     this.FEEDBACK_MODEL = this.parameters.FEEDBACK
-	this.SQL_TRACE = this.status.sqlTrace
+	// if (manager) console.log(this.parameters,this.constructor.name,manager.ROLE,manager.CURRENT_SCHEMA,manager.FROM_USER,manager.TO_USER,this.parameters.FROM_USER,this.parameters.TO_USER,this.IS_READER,this.IS_WRITER,this.ROLE)
+	this.SQL_TRACE = this.status.sqlLogger
 
     this.options = {
       recreateSchema : false
@@ -1497,11 +1502,12 @@ class YadamuDBI extends EventEmitter {
       table.SIZE_CONSTRAINT_ARRAY = typeof table.SIZE_CONSTRAINT_ARRAY === 'string' ? JSON.parse(table.SIZE_CONSTRAINT_ARRAY) : table.SIZE_CONSTRAINT_ARRAY
       const tableMetadata =  {
         tableSchema              : table.TABLE_SCHEMA
-       ,tableName                : table.TABLE_NAME
-       ,columnNames              : table.COLUMN_NAME_ARRAY
-       ,dataTypes                : table.DATA_TYPE_ARRAY
-       ,storageTypes             : table.STORAGE_TYPE_ARRAY
-       ,sizeConstraints          : table.SIZE_CONSTRAINT_ARRAY
+      , tableName                : table.TABLE_NAME
+      , columnNames              : table.COLUMN_NAME_ARRAY
+      , dataTypes                : table.DATA_TYPE_ARRAY
+      , storageTypes             : table.STORAGE_TYPE_ARRAY
+      , sizeConstraints          : table.SIZE_CONSTRAINT_ARRAY
+	  , vendor                   : this.DATABASE_VENDOR 
       }
 	  if (table.PARTITION_COUNT) {
 		tableMetadata.partitionCount = table.PARTITION_COUNT
@@ -1606,8 +1612,8 @@ class YadamuDBI extends EventEmitter {
   }
     
   async generateStatementCache(StatementGenerator,schema) {
-	const statementGenerator = new StatementGenerator(this,schema,this.metadata,this.yadamuLogger)
-    this.statementCache = await statementGenerator.generateStatementCache(this.systemInformation.vendor)
+	const statementGenerator = new StatementGenerator(this,this.systemInformation.vendor,schema,this.metadata,this.yadamuLogger)
+    this.statementCache = await statementGenerator.generateStatementCache()
 	this.emit(YadamuConstants.CACHE_LOADED  )
 	return this.statementCache
 
@@ -1654,7 +1660,7 @@ class YadamuDBI extends EventEmitter {
   }   
 
   createParser(queryInfo,parseDelay) {
-    return new DefaultParser(queryInfo,this.yadamuLogger,parseDelay)      
+    return new DefaultParser(this,queryInfo,this.yadamuLogger,parseDelay)      
   }
  
   inputStreamError(cause,sqlStatement) {
@@ -1780,7 +1786,7 @@ class YadamuDBI extends EventEmitter {
 	this.StatementLibrary   = this.manager.StatementLibrary
 	this.StatementGenerator = this.manager.StatementGenerator
 
-    // this.setParameters(this.manager.parameters)
+    this.setParameters(this.manager.parameters)
 	
 	this.systemInformation  = this.manager.systemInformation
 	this.metadata           = this.manager.metadata

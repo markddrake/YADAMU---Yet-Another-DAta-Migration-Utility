@@ -1,28 +1,17 @@
-"use strict";
+import path                     from 'path';
 
-import path from 'path'
+import YadamuLibrary            from '../../lib/yadamuLibrary.js';
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
+
 import SnowflakeConstants from './snowflakeConstants.js';
 
-class StatementGenerator {
+class SnowflakeStatementGenerator extends YadamuStatementGenerator {
 
   static get LARGEST_VARCHAR_SIZE()    { return SnowflakeConstants.MAX_CHARACTER_SIZE }
   static get LARGEST_VARBINARY_SIZE()  { return SnowflakeConstants.MAX_BINARY_SIZE }
   static get LARGEST_VARCHAR_TYPE()    { return SnowflakeConstants.CLOB_TYPE }
   static get LARGEST_VARBINARY_TYPE()  { return SnowflakeConstants.BLOB_TYPE }
-
-  /*
-  **
-  ** MySQL BIT Column truncates leading '0's 
-  **
-  
-  static get LARGEST_BIT_TYPE()        { return 'varchar(64)'      }
-  static get BIT_TYPE()                { return 'varchar'          }
-
-  **
-  */
 
   static get LARGEST_NUMERIC_TYPE()                { return 'NUMBER(38)' }
 									             
@@ -85,11 +74,8 @@ class StatementGenerator {
     return this._STRONGLY_TYPED_VARIANTS;
   }
   
-  constructor(dbi, targetSchema, metadata, yadamuLogger) {
-    this.dbi = dbi;
-    this.targetSchema = targetSchema
-    this.metadata = metadata
-    this.yadamuLogger = yadamuLogger;
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
+    super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
   
    mapForeignDataType(vendor, dataType, dataTypeLength, dataTypeScale) {
@@ -562,4 +548,4 @@ class StatementGenerator {
   }
 }
 
-export { StatementGenerator as default }
+export { SnowflakeStatementGenerator as default }

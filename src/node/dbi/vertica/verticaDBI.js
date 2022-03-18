@@ -1,41 +1,65 @@
-"use strict" 
 
-import fs from 'fs';
-import fsp from 'fs/promises';
-import { performance } from 'perf_hooks';
-import crypto from 'crypto';
+import fs                             from 'fs';
+import fsp                            from 'fs/promises';
+import crypto                         from 'crypto';
 
-import { pipeline } from 'stream/promises';
+import { 
+  pipeline 
+}                                     from 'stream/promises';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
-
-import pg from 'pg';
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
+							          
+import pg                             from 'pg';
 const {Client,Pool} = pg;
-import Cursor  from 'pg-cursor'
-import QueryStream from 'pg-query-stream'
-import types from 'pg-types';
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+import QueryStream                    from 'pg-query-stream'
+import types                          from 'pg-types';
 
-import VerticaConstants from './verticaConstants.js'
-import VerticaInputStream from './verticaReader.js'
-import { VerticaError, VertiaCopyOperationFailure } from './verticaException.js'
-import VerticaParser from './verticaParser.js';
-import VerticaWriter from './verticaWriter.js';
-import VerticaOutputManager from './verticaOutputManager.js'
-import StatementGenerator from './statementGenerator.js';
-import VerticaStatementLibrary from './verticaStatementLibrary.js';
+import pgCopyStreams                  from 'pg-copy-streams'
+const CopyFrom = pgCopyStreams.from
 
-import {YadamuError} from '../../core/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
+/* Yadamu Core */                                    
+
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
+
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                    from '../file/fileException.js'
+
+/* Vendor Specific DBI Implimentation */                                   						          
+
+import VerticaConstants              from './verticaConstants.js'
+import VerticaDataTypes              from './verticaDataTypes.js'
+import VerticaInputStream            from './verticaReader.js'
+import VerticaParser                 from './verticaParser.js'
+import VerticaWriter                 from './verticaWriter.js'
+import VerticaOutputManager          from './verticaOutputManager.js'
+import VerticaStatementGenerator     from './verticaStatementGenerator.js'
+import VerticaStatementLibrary       from './verticaStatementLibrary.js'
+
+import { 
+  VerticaError,
+  VertiaCopyOperationFailure
+}                                    from './verticaException.js'
+
+
 
 class VerticaDBI extends YadamuDBI {
     
@@ -73,8 +97,11 @@ class VerticaDBI extends YadamuDBI {
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
+  get DATA_TYPES()                    { return VerticaDataTypes }
+
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
+	yadamu.initializeTypeMapping(VerticaDataTypes,this.TYPE_MAPPINGS)
        
     this.pgClient = undefined;
     
@@ -505,7 +532,7 @@ class VerticaDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    return new VerticaParser(queryInfo,this.yadamuLogger,parseDelay)
+    return new VerticaParser(this,queryInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -608,7 +635,7 @@ class VerticaDBI extends YadamuDBI {
   }
    
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator, schema)
+    return await super.generateStatementCache(VerticaStatementGenerator, schema)
   }
 
   getOutputStream(tableName,metrics) {
@@ -620,7 +647,7 @@ class VerticaDBI extends YadamuDBI {
   }
  
   classFactory(yadamu) {
-	return new VerticaDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new VerticaDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {

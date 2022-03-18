@@ -16,11 +16,13 @@ class MongoConstants {
     , "MONGO_EXPORT_FORMAT"       : "ARRAY"
     , "MONGO_STRIP_ID"            : false
     , "MONGO_PARSE_STRINGS"       : true
-    , "DEFAULT_STRING_LENGTH"     : "32"
-    , "MAX_STRING_LENGTH"         : "16777216"
-    , "SPATIAL_FORMAT"            : "GeoJSON"
-	, "MAX_DOCUMENT_SIZE"         : "16777216"
+    , "DEFAULT_STRING_LENGTH"     : 32
+	, "DOCUMENT_SIZE"             : 16777216
+	, "CHAR_SIZE"                 : 16777216
+	, "BINARY_SIZE"               : 16777216
 	, "TIMESTAMP_PRECISION"       : 6
+	, "NUMERIC_PRECISION"         : 53
+    , "SPATIAL_FORMAT"            : "GeoJSON"
 	, "DEFAULT_DATABASE"          : "admin"
     })
     return this._STATIC_PARAMETERS
@@ -40,11 +42,15 @@ class MongoConstants {
   static get MONGO_STRIP_ID()         { return this.DBI_PARAMETERS.MONGO_STRIP_ID}
   static get MONGO_PARSE_STRINGS()    { return this.DBI_PARAMETERS.MONGO_PARSE_STRINGS}
   static get DEFAULT_STRING_LENGTH()  { return this.DBI_PARAMETERS.DEFAULT_STRING_LENGTH}
-  static get MAX_STRING_LENGTH()      { return this.DBI_PARAMETERS.MAX_STRING_LENGTH}
-  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
-  static get STATEMENT_TERMINATOR()   { return ';' }
-  static get MAX_DOCUMENT_SIZE()      { return this.DBI_PARAMETERS.MAX_DOCUMENT_SIZE}
+  static get DOCUMENT_SIZE()          { return this.DBI_PARAMETERS.DOCUMENT_SIZE}
+  static get CHAR_SIZE()              { return this.DBI_PARAMETERS.CHAR_SIZE}
+  static get BINARY_SIZE()            { return this.DBI_PARAMETERS.BINARY_SIZE}
+  static get TIMESTAMP_PRECISION()    { return this.DBI_PARAMETERS.TIMESTAMP_PRECISION}
+  static get NUMERIC_PRECISION()      { return this.DBI_PARAMETERS.NUMERIC_PRECISION}
   static get DEFAULT_DATABASE()       { return this.DBI_PARAMETERS.DEFAULT_DATABASE };
+  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
+
+  static get STATEMENT_TERMINATOR()   { return ';' }
 
 }
 

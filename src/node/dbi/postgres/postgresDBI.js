@@ -1,48 +1,61 @@
-"use strict" 
 
-import fs from 'fs';
-import {Readable} from 'stream';
-import { performance } from 'perf_hooks';
+import fs                             from 'fs';
+import readline                       from 'readline';
 
-import Parser from '../../clarinet/clarinet.cjs';
-import readline from 'readline';
-import { once } from 'events';
+import { 
+  once 
+}                                     from 'events';
 
+import {
+  Readable
+}                                     from 'stream';
 
-// import pipeline from util.promisifystream.pipeline;
-import { pipeline } from 'stream/promises';
-
-/* 
-**
-** from  Database Vendors API 
-**
-*/
-
-import pg from 'pg';
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
+							          
+import pg                             from 'pg';
 const {Client,Pool} = pg;
 
-import QueryStream from 'pg-query-stream'
-import types from 'pg-types';
+import QueryStream                    from 'pg-query-stream'
+import types                          from 'pg-types';
 
-import pgCopyStreams from 'pg-copy-streams'
+import pgCopyStreams                  from 'pg-copy-streams'
 const CopyFrom = pgCopyStreams.from
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import PostgresConstants from './postgresConstants.js'
-import PostgresError from './postgresException.js'
-import PostgresParser from './postgresParser.js';
-import PostgresOutputManager from './postgresOutputManager.js';
-import PostgresWriter from './postgresWriter.js';
-import StatementGenerator from './statementGenerator.js';
-import PostgresStatementLibrary from './postgresStatementLibrary.js';
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                    from '../../core/yadamuException.js'
 
-import {YadamuError} from '../../core/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                    from '../file/fileException.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+						          
+import PostgresConstants             from './postgresConstants.js'
+import PostgresDataTypes             from './postgresDataTypes.js'
+import PostgresError                 from './postgresException.js'
+import PostgresParser                from './postgresParser.js'
+import PostgresOutputManager         from './postgresOutputManager.js'
+import PostgresWriter                from './postgresWriter.js'
+import PostgresStatementGenerator    from './postgresStatementGenerator.js'
+import PostgresStatementLibrary      from './postgresStatementLibrary.js'
 
 class PostgresDBI extends YadamuDBI {
     
@@ -89,9 +102,12 @@ class PostgresDBI extends YadamuDBI {
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
+  get DATA_TYPES()                    { return PostgresDataTypes }
+
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-       
+	yadamu.initializeTypeMapping(PostgresDataTypes,this.TYPE_MAPPINGS)
+  
     this.pgClient = undefined;
     this.useBinaryJSON = false
     
@@ -581,7 +597,7 @@ class PostgresDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    return new PostgresParser(queryInfo,this.yadamuLogger,parseDelay)
+    return new PostgresParser(this,queryInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -638,9 +654,9 @@ class PostgresDBI extends YadamuDBI {
 	    this.connection.on('error',inputStreamError)
 		
         inputStream.on('end',() => { 
-		  this.connection.removeListener('error',inputStreamError)
+		  this.connection?.removeListener('error',inputStreamError)
 		}).on('error',() => { 
-		  this.connection.removeListener('error',inputStreamError)
+		  this.connection?.removeListener('error',inputStreamError)
 		})    		
 		
 		return inputStream
@@ -687,7 +703,7 @@ class PostgresDBI extends YadamuDBI {
   }
    
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator, schema)
+    return await super.generateStatementCache(PostgresStatementGenerator, schema)
   }
 
   getOutputManager(tableName,metrics) {
@@ -699,7 +715,7 @@ class PostgresDBI extends YadamuDBI {
   }
  
   classFactory(yadamu) {
-	return new PostgresDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new PostgresDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {

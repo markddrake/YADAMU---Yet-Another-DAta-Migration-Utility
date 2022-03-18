@@ -76,7 +76,7 @@ class MariadbQA extends YadamuQALibrary.qaMixin(MariadbDBI) {
     }
     
 	classFactory(yadamu) {
-      return new MariadbQA(yadamu,this,this.connectionSettings,this.parameters)
+      return new MariadbQA(yadamu,this,this.connectionParameters,this.parameters)
     }
 	
 	async scheduleTermination(pid,workerId) {

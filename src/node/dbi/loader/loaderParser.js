@@ -1,7 +1,6 @@
-"use strict" 
 
-import YadamuParser from '../base/yadamuParser.js'
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
+import YadamuDataTypes  from '../base/yadamuDataTypes.js'
+import YadamuParser     from '../base/yadamuParser.js'
 
 class LoaderParser extends YadamuParser {
   
@@ -10,16 +9,12 @@ class LoaderParser extends YadamuParser {
 
 	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 
-      if (YadamuLibrary.isBinaryType(dataType)) {
-        return (row,idx) =>  {
-  		  row[idx] = Buffer.from(row[idx],'hex')
-		}
-      }
-
-	  switch (dataType.toUpperCase()) {
-        case "GEOMETRY":
-        case "GEOGRAPHY":
-        case '"MDSYS"."SDO_GEOMETRY"':
+      switch (true) {
+        case (YadamuDataTypes.isBinary(dataType)) :
+          return (row,idx) =>  {
+  		    row[idx] = Buffer.from(row[idx],'hex')
+		  }
+		case (YadamuDataTypes.isSpatial(dataType)) :
           if (tableInfo.SPATIAL_FORMAT.endsWith('WKB')) {
             return (row,idx)  => {
   		      row[idx] = row[idx] === null ? null : Buffer.from(row[idx],'hex')

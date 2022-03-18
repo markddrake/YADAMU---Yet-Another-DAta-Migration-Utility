@@ -2,10 +2,19 @@
 "use strict"
 
 import fs                     from 'fs';
-import { dirname, join }      from 'path';
-import { fileURLToPath }      from 'url';
 
-import { performance }        from 'perf_hooks';
+import { 
+  dirname, 
+  join 
+}                             from 'path';
+
+import { 
+  fileURLToPath 
+}                             from 'url';
+
+import { 
+  performance 
+}                             from 'perf_hooks';
 
 import _Yadamu                from '../../node/core/yadamu.js';
 import YadamuConstants        from '../../node/lib/yadamuConstants.js';
@@ -96,7 +105,7 @@ class Yadamu extends _Yadamu {
 	this.metrics = {}
     	
 	this.initializeParameters(testParameters)
-	this.processParameters();
+	this.initializeLogging();
 	
     if (testParameters.PASSPHRASE || testParameters.ENCRYPTION === true) {		
 	  await this.generateCryptoKey()
@@ -104,8 +113,8 @@ class Yadamu extends _Yadamu {
   }
 
   initializeSQLTrace() {
-	if ((this.STATUS.sqlTrace instanceof NullWriter) && this.parameters.SQL_TRACE) {
-       this.STATUS.sqlTrace = undefined
+	if ((this.STATUS.sqlLogger instanceof NullWriter) && this.parameters.SQL_TRACE) {
+       this.STATUS.sqlLogger = undefined
 	}
 	super.initializeSQLTrace()
   } 

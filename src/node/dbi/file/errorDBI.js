@@ -7,7 +7,7 @@ import YadamuConstants    from '../../lib/yadamuConstants.js';
 class ErrorDBI extends FileDBI {
   
   constructor(yadamu,filename) {
-    super(yadamu,YadamuConstants.WRITER_ROLE,{},{FILE : filename})
+    super(yadamu,{},{FILE : filename,TO_USER: 'YADAMU_ERROR'})
 	this.FILE = filename
   }
  

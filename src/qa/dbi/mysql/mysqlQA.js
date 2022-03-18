@@ -96,7 +96,7 @@ class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
     }
    
    classFactory(yadamu) {
-      return new MySQLQA(yadamu,this,this.connectionSettings,this.parameters)
+      return new MySQLQA(yadamu,this,this.connectionParameters,this.parameters)
     }
 	
 	async scheduleTermination(pid,workerId) {

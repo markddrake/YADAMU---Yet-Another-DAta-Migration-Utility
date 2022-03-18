@@ -8,67 +8,60 @@ import {FileNotFound} from '../dbi/file/fileException.js';1
 
 class YadamuLibrary {
 
-  static get BOOLEAN_TYPES() {
-     this._BOOLEAN_TYPES = this._BOOLEAN_TYPES || Object.freeze(['BOOLEAN','BIT','RAW','TINYINT'])
-	 return this._BOOLEAN_TYPES;
-  }
+  static composeDataType(dataType, sizeConstraint) {
+    
+    const dataTypDefiniton = {
+      type : dataType
+    }    
 
-  static get BOOLEAN_SIZE_CONSTRAINTS() {
-     this._BOOLEAN_SIZE_CONSTRAINTS = this._BOOLEAN_SIZE_CONSTRAINTS || Object.freeze(['','','1','1'])
-     return this._BOOLEAN_SIZE_CONSTRAINTS;
+    if ((sizeConstraint !== null) && (sizeConstraint.length > 0)) {
+      const components = sizeConstraint.split(',');
+      dataTypDefiniton.length = parseInt(components[0])
+      if (components.length > 1) {
+        dataTypDefiniton.scale = parseInt(components[1])
+      }
+    }
+    
+    return dataTypDefiniton
   }
-  static get BINARY_TYPES() {
-     this._BINARY_TYPES = this._BINARY_TYPES || Object.freeze(["RAW","BLOB","BINARY","VARBINARY","LONG VARBINARY","IMAGE","BYTEA","TINYBLOB","MEDIUMBLOB","LONGBLOB","ROWVERSION","OBJECTID","BINDATA"])
-     return this._BINARY_TYPES;
-  }
+  
+  static decomposeDataType(dataType) {
+	  
+	// NUMBER(n,m) => {type:"NUMBER", length:n, scale:m}
+	// VARCHAR(n)  => {type:"VARCHAR", length:n}
+	// LONG VARCHAR(n) => {type:"LONG VARCHAR", length:n}
+	// TIMETSTAMP(n) WITH TIME ZONE => {type:"TIMESTAMP WITH TIME ZONE": length:n}
 
-  static get DATE_TIME_TYPES() {
-     this._DATE_TIME_TYPES = this._DATE_TIME_TYPES || Object.freeze(["DATE","TIME","TIMESTAMP","TIMEZONETZ","DATETIME","DATETIME2",,"TIMESTAMP WITH TIME ZONE","TIMESTAMP WITH LOCAL TIME ZONE","TIMESTAMP WITHOUT TIME ZONE","DATETIMEOFFSET","SMALLDATE","TIME WITHOUT TIME ZONE",""])
-     return this._DATE_TIME_TYPES;
-  }
+    const typeDefinition = {};
+    let components = dataType.split('(');
+	switch (components.length) {
+	  case 1:
+	    typeDefinition.type = dataType
+	    return typeDefinition
+    }	    
+    
+    typeDefinition.type = components[0]
+    let sizeComponents = components[1].split(')')
+    typeDefinition.type = ((sizeComponents.length > 1 ) ? `${typeDefinition.type.trim()} ${sizeComponents[1].trim()}` : typeDefinition.type.trim()).trim()
 
-  static get FLOATING_POINT_TYPES() {
-     this._FLOATING_POINT_TYPES = this._FLOATING_POINT_TYPES || Object.freeze(["BINARY_FLOAT","BINARY_DOUBLE","REAL","FLOAT","DOUBLE","DOUBLE PRECISION"])
-     return this._FLOATING_POINT_TYPES;
+    sizeComponents = sizeComponents[0].split(',')
+    typeDefinition.length = sizeComponents[0] === 'max' ? -1 :  parseInt(sizeComponents[0])
+	if (sizeComponents.length > 1) {
+      typeDefinition.scale = parseInt(sizeComponents[1])
+    }	 	
+	
+    return typeDefinition;      
+    
+  } 
+  
+  static decomposeDataTypes(dataTypes) {
+     return dataTypes.map((dataType) => {
+       return this.decomposeDataType(dataType)
+     })
   }
-
-  static get INTEGER_TYPES() {
-     this._INTEGER_TYPES = this._INTEGER_TYPES || Object.freeze(["TINYINT","SMALLINT","INT","BIGINT","INTEGER","LONG"])
-     return this._INTEGER_TYPES;
-  }
-
-  static get NUMERIC_TYPES() {
-     this._NUMERIC_TYPES = this._NUMERIC_TYPES || Object.freeze([...this.FLOATING_POINT_TYPES,...this.INTEGER_TYPES,"NUMERIC","DECIMAL","NUMBER","MONEY","SMALLMONEY"])
-     return this._NUMERIC_TYPES;
-  }
-
-  static get XML_TYPES() {
-     this._XML_TYPES = this._XML_TYPES || Object.freeze(["XML","XMLTYPE"])
-     return this._XML_TYPES;
-  }
-
-  static get JSON_TYPES() {
-     this._JSON_TYPES = this._JSON_TYPES || Object.freeze(["JSON","JSONB","SET","BFILE","OBJECT","ARRAY"])
-     return this._JSON_TYPES;
-  }
-
-  static get CLOB_TYPES() {
-     this._CLOB_TYPES = this._CLOB_TYPES || Object.freeze(["CLOB","NCLOB","JAVASCRIPTWITHSCOPE","LONGTEXT","MEDIUMTEXT","TEXT"])
-     return this._CLOB_TYPES;
-  }
-
-  static get BLOB_TYPES() {
-     this._BLOB_TYPES = this._BLOB_TYPES || Object.freeze(["BLOB","LONGBINARY","MEDIUMBINARY","IMAGE"])
-     return this._BLOB_TYPES;
-  }
-
-  static get SPATIAL_TYPES() {
-     this._SPATIAL_TYPES = this._SPATIAL_TYPES || Object.freeze(["\"MDSYS\".\"SDO_GEOMETRY\"","GEOGRAPHY","GEOMETRY","POINT","LSEG","BOX","PATH","POLYGON","CIRCLE","LINESTRING","GEOMCOLLECTION","GEOMETRYCOLLECTION","MULTIPOINT","MULTILINESTRING","MULTIPOLYGON"])
-     return this._SPATIAL_TYPES;
-  }
+  
 
   static stringifyDuration(duration) {
-
   
    let milliseconds = 0
    let seconds = 0
@@ -133,108 +126,7 @@ class YadamuLibrary {
     return path.replace(/%date%/g,).replace(/%time%/g,).replace(/%isoDateTime%/,new Date().toISOString().replace(/:/g,'.'))
   }
 
-  static isBooleanType(dataType,sizeConstraint) {
-	const idx = this.BOOLEAN_TYPES.indexOf(dataType.toUpperCase())
-	return ((idx > -1) && (this.BOOLEAN_SIZE_CONSTRAINTS[idx] === sizeConstraint))
-  }
-  
-  static isBinaryType(dataType) {
-	return this.BINARY_TYPES.includes(dataType.toUpperCase());
-  }
-   
-  static isDateTimeType(dataType) {
-	return this.DATE_TIME_TYPES.includes(dataType.toUpperCase());
-  }
-   
-  static isFloatingPointType(dataType) {
-	return this.FLOATING_POINT_TYPES.includes(dataType.toUpperCase());
-  }
 
-  static isIntegerType(dataType) {
-	return this.INTEGER_TYPES.includes(dataType.toUpperCase());
-  }
-
-  static isNumericType(dataType) {
-	return this.NUMERIC_TYPES.includes(dataType.toUpperCase());
-  }
-
-  static isXML(dataType) {
-    return this.XML_TYPES.includes(dataType.toUpperCase());
-  }
-
-  static isJSON(dataType) {
-    return this.JSON_TYPES.includes(dataType.toUpperCase());
-  }
-  
-  static isCLOB(dataType) {
-    return this.CLOB_TYPES.includes(dataType.toUpperCase());
-  }
-
-  static isBLOB(dataType) {
-    return this.BLOB_TYPES.includes(dataType.toUpperCase());
-  }
-
-  static isLOB(dataType) {
-    return this.BLOB_TYPES.includes(dataType.toUpperCase()) || this.CLOB_TYPES.includes(dataType.toUpperCase());
-  }
-
-  static isSpatialType(dataType) {
-	return this.SPATIAL_TYPES.includes(dataType.toUpperCase());
-  }
-
-  static composeDataType(sourceDataType, sizeConstraint) {
-    
-    const dataType = {
-      type : sourceDataType
-    }    
-
-    if ((sizeConstraint !== null) && (sizeConstraint.length > 0)) {
-      const components = sizeConstraint.split(',');
-      dataType.length = parseInt(components[0])
-      if (components.length > 1) {
-        dataType.scale = parseInt(components[1])
-      }
-    }
-    
-    return dataType
-  }
-  
-  static decomposeDataType(targetDataType) {
-    
-    const results = {};
-    let components = targetDataType.split('(');
-	let typeNameComponents = components[0].split(' ')
-    results.type = typeNameComponents.shift();
-	results.typeQualifier = typeNameComponents.length > 0 ? typeNameComponents.join(' ') : null
-    if (components.length > 1 ) {
-      components = components[1].split(')');
-      if (components.length > 1 ) {
-        results.qualifier = components[1]
-      }
-      components = components[0].split(',');
-      if (components.length > 1 ) {
-        results.length = parseInt(components[0]);
-        results.scale = parseInt(components[1]);
-      }
-      else {
-        if (components[0] === 'max') {
-          results.length = -1;
-        }
-        else {
-          results.length = parseInt(components[0])
-        }
-      }
-    }           
-    return results;      
-    
-  } 
-  
-  static decomposeDataTypes(targetDataTypes) {
-     return targetDataTypes.map((targetDataType) => {
-       return this.decomposeDataType(targetDataType)
-     })
-  }
-  
   static bfileToJSON(bfile) {
     return {dir: bfile.substr(bfile.indexOf("'"),bfile.indexOf(',')-2), file: bfile.substr(bfile.indexOf(',')+2,bfile.length-2)}
   }
@@ -382,9 +274,16 @@ class YadamuLibrary {
   }
   
   static intervalDaySecondTo8601(interval) {
-    let components = interval.split('-')
-	return `P${components[0]}YT${components[1]}H${components[2] || 0}M${components[3] || 0}S`
-	
+	let components = interval.split(' ')
+	// Length > 1 Days and Time
+	const days = components[0].includes(':') ? undefined : components[0]
+	const time = components[0].includes(':') ? components[0] : components.length === 2 ? components[1] : undefined
+	components = time ? time.split(':') : []
+	const hours = components.length > 0 ? components[0] : undefined
+	const mins  = components.length > 1 ? components[1] : undefined
+	let secs  = components.length > 2 ? components[2] : undefined
+    const interval8601 = `P${days ? `${days}D` : ''}${time ? `T${hours ? `${hours}H${mins ? `${mins}M` : ''}${secs ? `${secs}S` : ''}` : ''}` : ''}`
+	return interval8601
   }
   
   static parse8601Interval(interval) {

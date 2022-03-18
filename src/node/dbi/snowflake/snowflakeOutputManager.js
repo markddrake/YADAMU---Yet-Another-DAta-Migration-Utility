@@ -22,7 +22,7 @@ class SnowflakeWriter extends YadamuOutputManager {
     return targetDataTypes.map((targetDataType,idx) => {      
       const dataType = YadamuLibrary.decomposeDataType(targetDataType);
 	
-	  if (YadamuLibrary.isBinaryType(dataType.type)) {
+	  if (YadamuLibrary.isBinary(dataType.type)) {
 		return (col,idx) =>  {
           return col.toString('hex')
 		}

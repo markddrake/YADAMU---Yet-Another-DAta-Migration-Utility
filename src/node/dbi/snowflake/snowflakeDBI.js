@@ -1,29 +1,40 @@
-"use strict" 
-import fs from 'fs';
-import { performance } from 'perf_hooks';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
+import fs                             from 'fs';
+
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
+		
 import snowflake from 'snowflake-sdk';
 
+/* Yadamu Core */                                    
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import SnowflakeConstants from './snowflakeConstants.js';
-import SnowflakeError from './snowflakeException.js'
-import SnowflakeReader from './snowflakeReader.js';
-import SnowflakeParser from './snowflakeParser.js';
-import SnowflakeWriter from './snowflakeWriter.js';
-import SnowflakeOutputManager from './snowflakeOutputManager.js';
-import StatementGenerator from './statementGenerator.js';
-import SnowflakeStatementLibrary from './snowflakeStatementLibrary.js';
+/* Yadamu DBI */  
+
+import YadamuDBI from '../base/yadamuDBI.js'
+import DBIConstants from '../base/dbiConstants.js'
+
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
+
+/* Vendor Specific DBI Implimentation */  
+
+import SnowflakeConstants             from './snowflakeConstants.js'
+import SnowflakeDataTypes             from './snowflakeDataTypes.js'
+import SnowflakeError                 from './snowflakeException.js'
+import SnowflakeReader                from './snowflakeReader.js'
+import SnowflakeParser                from './snowflakeParser.js'
+import SnowflakeWriter                from './snowflakeWriter.js'
+import SnowflakeOutputManager         from './snowflakeOutputManager.js'
+import StatementGenerator             from './statementGenerator.js'
+import SnowflakeStatementLibrary      from './snowflakeStatementLibrary.js'
 
 class SnowflakeDBI extends YadamuDBI {
 
@@ -87,6 +98,8 @@ class SnowflakeDBI extends YadamuDBI {
   }    
 
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.CLOUD_STAGING }
+    
+  get DATA_TYPES()                    { return SnowflakeDataTypes }
 
   constructor(yadamu,manager,connectionSettings,parameters) {	  
     super(yadamu,manager,connectionSettings,parameters)
@@ -480,8 +493,9 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	tableInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${this.parameters.YADAMU_DATABASE}"."${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
 	return tableInfo
   }     
-  createParser(queryInfo) {
-    return new SnowflakeParser(queryInfo,this.yadamuLogger)
+  
+  createParser(queryInfo,parseDelay) {
+    return new SnowflakeParser(this,queryInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -508,7 +522,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   }
    
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator,schema) 
+    return await super.generateStatementCache(SnowflakeStatementGenerator,schema) 
   }
  
   getOutputStream(tableName,metrics) {
@@ -526,7 +540,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   }
   
   classFactory(yadamu) {
-	return new SnowflakeDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new SnowflakeDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {

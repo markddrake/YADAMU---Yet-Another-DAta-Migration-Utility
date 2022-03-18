@@ -1,29 +1,39 @@
 
-"use strict" 
-import fs from 'fs';
-import { performance } from 'perf_hooks';
+import fs                             from 'fs';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
 
 import mongodb from 'mongodb'
 const { MongoClient } = mongodb;
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import MongoConstants from './mongoConstants.js'
-import MongoError from './mongoException.js'
-import MongoOutputManager from './mongoOutputManager.js';
-import MongoWriter from './mongoWriter.js';
-import MongoParser from './mongoParser.js';
-import StatementGenerator from './statementGenerator.js';
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+					
+import MongoConstants 				 from './mongoConstants.js'
+import MongoDataTypes 				 from './mongoDataTypes.js'
+import MongoError                    from './mongoException.js'
+import MongoOutputManager            from './mongoOutputManager.js'
+import MongoWriter                   from './mongoWriter.js'
+import MongoParser                   from './mongoParser.js'
+import MongoStatementGenerator       from './mongoStatementGenerator.js'
 
 /*
 **
@@ -121,8 +131,11 @@ class MongoDBI extends YadamuDBI {
     return this._WRITE_TRANSFORMATION 
   }
     
+  get DATA_TYPES()                    { return MongoDataTypes }
+
   constructor(yadamu,manager,connectionSettings,parameters) {	  
     super(yadamu,manager,connectionSettings,parameters)
+    yadamu.initializeTypeMapping(MongoDataTypes,this.TYPE_MAPPINGS)
   }
                                                              ;
   async _executeDDL(collectionList) {
@@ -850,7 +863,7 @@ class MongoDBI extends YadamuDBI {
   createParser(tableInfo,parseDelay) {
     tableInfo.READ_TRANSFORMATION = this.READ_TRANSFORMATION
     tableInfo.ID_TRANSFORMATION = this.ID_TRANSFORMATION
-    return new MongoParser(tableInfo,this.yadamuLogger,parseDelay)
+    return new MongoParser(this,tableInfo,this.yadamuLogger,parseDelay)
   }  
 
   generateQueryInformation(tableMetadata) {
@@ -887,7 +900,7 @@ class MongoDBI extends YadamuDBI {
   */
     
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator,schema) 
+    return await super.generateStatementCache(MongoStatementGenerator,schema) 
   }
   
   getOutputStream(collectionName,metrics) {

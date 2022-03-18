@@ -1,28 +1,39 @@
-"use strict" 
 
-import fs from 'fs';
-import { performance } from 'perf_hooks';
+import fs                             from 'fs';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
-import mysql from 'mysql';
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+import mysql from 'mysql';	          
 
-import MySQLConstants from './mysqlConstants.js'
-import MySQLError from './mysqlException.js'
-import MySQLParser from './mysqlParser.js';
-import MySQLWriter from './mysqlWriter.js';
-import MySQLOutputManager from './mysqlOutputManager.js';
-import StatementGenerator from './statementGenerator.js';
-import MySQLStatementLibrary from './mysqlStatementLibrary.js';
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
+
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+	
+import MySQLConstants                 from './mysqlConstants.js'
+import MySQLDataTypes                 from './mysqlDataTypes.js'
+import MySQLError                     from './mysqlException.js'
+import MySQLParser                    from './mysqlParser.js'
+import MySQLWriter                    from './mysqlWriter.js'
+import MySQLOutputManager             from './mysqlOutputManager.js'
+import MySQLStatementGenerator        from './mysqlStatementGenerator.js'
+import MySQLStatementLibrary          from './mysqlStatementLibrary.js'
 
 class MySQLDBI extends YadamuDBI {
    
@@ -64,8 +75,11 @@ class MySQLDBI extends YadamuDBI {
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
+  get DATA_TYPES()                    { return MySQLDataTypes }
+
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
+	yadamu.initializeTypeMapping(MySQLDataTypes,this.TYPE_MAPPINGS)
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
     this.keepAliveHdl = undefined
 	
@@ -75,7 +89,7 @@ class MySQLDBI extends YadamuDBI {
 
   initializeManager() {
 	super.initializeManager()
-	this.StatementGenerator = StatementGenerator
+	this.StatementGenerator = MySQLStatementGenerator
 	this.StatementLibrary = MySQLStatementLibrary
 	this.statementLibrary = undefined
   }	 
@@ -686,7 +700,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    this.parser = new MySQLParser(queryInfo,this.yadamuLogger,parseDelay)
+    this.parser = new MySQLParser(this,queryInfo,this.yadamuLogger,parseDelay)
     return this.parser;
   }  
     
@@ -701,7 +715,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-    return new MySQLDBI(yadamu,this,this.connectionSettings,this.parameters)
+    return new MySQLDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {

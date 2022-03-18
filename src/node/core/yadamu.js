@@ -21,8 +21,10 @@ import {
 
 import YadamuConstants        from '../lib/yadamuConstants.js';
 import YadamuLibrary          from '../lib/yadamuLibrary.js';
+
 import FileDBI                from '../dbi/file/fileDBI.js';
 import DBIConstants           from '../dbi/base/dbiConstants.js';
+import YadamuDataTypes        from '../dbi/base/yadamuDataTypes.js';
 import YadamuCopyManager      from '../dbi/base/yadamuCopyManager.js';
 import NullWriter             from '../util/nullWriter.js';
 
@@ -46,6 +48,7 @@ import {
   DatabaseError, 
   ConnectionError
 }                             from './yadamuException.js';
+
 
 class Yadamu {
 
@@ -167,11 +170,12 @@ class Yadamu {
     })();
     return this._WARNING_MANAGER
   }
-
+  
   constructor(operation,configParameters) {
 	 
     this._OPERATION = operation
     this.activeConnections = new Set();
+	this.mappedDataTypes = new Set();
 	      
 	if (process.listenerCount('unhandledRejection') === 0) { 
 	  process.on('unhandledRejection', this.yadamuAbort.bind(this))
@@ -179,7 +183,7 @@ class Yadamu {
 	}
     // Configure Paramters
     this.initializeParameters(configParameters || {})
-    this.processParameters();    
+    this.initializeLogging();    
 	
 	this.metrics = {}
 	
@@ -232,13 +236,23 @@ class Yadamu {
   reloadParameters(parameters) {
   
     this.initializeParameters(parameters || {})
-    this.processParameters();    
+    this.initializeLogging();    
   }
   
   appendSynonym(argument,value) {
 	this._COMMAND_LINE_PARAMETERS[argument] = value
   }
   
+  initializeTypeMapping(DataTypes,mappings) {
+	
+	if (!this.mappedDataTypes.has(DataTypes.name)) {
+	  this.mappedDataTypes.add(DataTypes.name) 
+      Object.assign(DataTypes,mappings)
+    }
+	
+  }	
+  
+ 	  
   initializeParameters(configParameters) {
 
     // Start with Yadamu Defaults
@@ -252,7 +266,15 @@ class Yadamu {
    
   }
   
-  processParameters() {
+  initializeSQLTrace() {
+	  
+	const options = {
+	  flags : (this.STATUS.sqlLogger && this.STATUS.sqlLogger.writableEnded) ? "a" : "w"
+	}
+	this.STATUS.sqlLogger = this.STATUS.sqlLogger || (this.parameters.SQL_TRACE ? fs.createWriteStream(this.parameters.SQL_TRACE,options) : NullWriter.NULL_WRITER )
+  }
+  
+  initializeLogging() {
 
     // this.LOGGER = this.setYadamuLogger(this.parameters,this.STATUS);
 
@@ -496,21 +518,13 @@ class Yadamu {
 
     this.commandPrompt.close();
     await yadamuLogger.close();
-    status.sqlTrace.end();
+    status.sqlLogger.end();
   }
   
   async close() {
     await this.finalize(this.STATUS,this.LOGGER);
   }
     
-  initializeSQLTrace() {
-	const options = {
-	  flags : (this.STATUS.sqlTrace && this.STATUS.sqlTrace.writableEnded) ? "a" : "w"
-	}
-	this.STATUS.sqlTrace = this.STATUS.sqlTrace || (this.parameters.SQL_TRACE ? fs.createWriteStream(this.parameters.SQL_TRACE,options) : NullWriter.NULL_WRITER )
-	this.STATUS.sqlTrace.enabled = true
-  }
-  
   createQuestion(prompt) {	
 	this.cli.prompt = prompt;
     return new Promise((resolve,reject) => {
@@ -960,28 +974,28 @@ class Yadamu {
   }
   
   async doImport(dbi) {
-    const fileReader = new FileDBI(this,YadamuConstants.READER_ROLE)
+    const fileReader = new FileDBI(this,null,{},{FROM_USER: 'YADAMU'})
     const metrics = await this.pumpData(fileReader,dbi);
     await this.close();
     return metrics
   }  
  
   async doExport(dbi) {
-    const fileWriter = new FileDBI(this,YadamuConstants.WRITER_ROLE)
+    const fileWriter = new FileDBI(this,null,{},{TO_USER: 'YADAMU'})
     const metrics = await this.pumpData(dbi,fileWriter);
     await this.close();
     return metrics
   }  
   
   async doEncrypt() {
-    const fileDBI = new FileDBI(this,YadamuConstants.READER_ROLE)
+    const fileDBI = new FileDBI(this,null,{},{FROM_USER: 'YADAMU'})
     await this.convertFile(fileDBI,true);
     await this.close();
     return
   }  
 
   async doDecrypt() {
-    const fileDBI = new FileDBI(this,this.YadamuConstants.WRITER_ROLE)
+    const fileDBI = new FileDBI(this,null,{},{TO_USER: 'YADAMU'})
     await this.convertFile(fileDBI,false);
     await this.close();
     return
@@ -995,8 +1009,8 @@ class Yadamu {
   
   async cloneFile(pathToFile) {
 
-    const fileReader = new FileDBI(this,this.YadamuConstants.READER_ROLE)
-    const fileWriter = new fileDBI(this,this.YadamuConstants.WRITER_ROLE)
+    const fileReader = new FileDBI(this,null,{},{FROM_USER: 'YADAMU'})
+    const fileWriter = new FileDBI(this,null,{},{TO_USER: 'YADAMU'})
     const metrics = await this.pumpData(fileReader,fileWriter);
     await this.close();
     return metrics

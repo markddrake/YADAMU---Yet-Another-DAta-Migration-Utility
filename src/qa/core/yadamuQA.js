@@ -133,7 +133,7 @@ class YadamuQA {
     const connectionInfo = Object.assign({}, connectionSettings);
     if (Yadamu.QA_DRIVER_MAPPINGS.hasOwnProperty(driver)) { 
       const DBI = (await import(Yadamu.QA_DRIVER_MAPPINGS[driver])).default
-      dbi = driver === 'file' ? new DBI(this.yadamu,YadamuConstants.WRTIER_ROLE,connectionInfo,parameters) : new DBI(this.yadamu,null,connectionInfo,parameters)
+      dbi = driver === 'file' ? new DBI(this.yadamu,connectionInfo,parameters) : new DBI(this.yadamu,null,connectionInfo,parameters)
     }   
     else {   
       const err = new ConfigurationFileError(`[${this.constructor.name}.getDatabaseInterface()]: Unsupported database vendor "${driver}".`);  
@@ -1253,7 +1253,7 @@ class YadamuQA {
     const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
     const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules, keyMetrics, false, identifierMappings)
     this.printCompareResults(test.source,targetConnectionName,task.taskName,compareResults)
-    this.metrics.recordFailed(compareResults.failed.length)
+	this.metrics.recordFailed(compareResults.failed.length || 0)
     this.metrics.recordTaskTimings([task.taskName,'COMPARE','',test.source,'',YadamuLibrary.stringifyDuration(compareResults.elapsedTime)])
     const elapsedTime =  performance.now() - taskStartTime
     this.metrics.recordTaskTimings([task.taskName,'TOTAL','',test.source,targetConnectionName,YadamuLibrary.stringifyDuration(elapsedTime)])
@@ -1333,10 +1333,10 @@ class YadamuQA {
     if (sourceDatabase === "file") {
       sourceParameters.FILE = filename
       sourceParameters.SOURCE_DIRECTORY = importDirectory
+	  sourceParameters.FROM_USER = YadamuConstants.READER_ROLE
     }
     
     let fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null)
-	fileReader.ROLE = YadamuConstants.READER_ROLE
     
     let targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema1)
@@ -1388,10 +1388,10 @@ class YadamuQA {
     targetParameters  = Object.assign({},parameters)
     targetParameters.FILE = filename1
     targetParameters.TARGET_DIRECTORY = exportDirectory
+	targetParameters.TO_USER = YadamuConstants.WRITER_ROLE
     
     let fileWriter = await this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,this.RECREATE_SCHEMA,{})
-	fileWriter.ROLE = YadamuConstants.WRITER_ROLE
-
+	
     stepStartTime = performance.now();
     metrics.push(await this.yadamu.pumpData(sourceDBI,fileWriter))
     stepElapsedTime = performance.now() - stepStartTime
@@ -1411,9 +1411,10 @@ class YadamuQA {
     sourceParameters  = Object.assign({},parameters)
     sourceParameters.FILE = filename1
     sourceParameters.SOURCE_DIRECTORY = exportDirectory
-    fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null,{})
-	fileReader.ROLE = YadamuConstants.READER_ROLE
+	sourceParameters.FROM_USER = YadamuConstants.READER_ROLE
     
+    fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null,{})
+	
     targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema2)
     targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA,{})
@@ -1448,9 +1449,9 @@ class YadamuQA {
     targetParameters  = Object.assign({},parameters)
     targetParameters.FILE = filename2
     targetParameters.TARGET_DIRECTORY = exportDirectory
+    targetParameters.TO_USER =  YadamuConstants.WRITER_ROLE
     fileWriter = await this.getDatabaseInterface(sourceDatabase,sourceConnection,targetParameters,null,{})
-    fileWriter.ROLE = YadamuConstants.WRITER_ROLE
-	
+    
     stepStartTime = performance.now();
     metrics.push(await this.yadamu.pumpData(sourceDBI,fileWriter))
     stepElapsedTime = performance.now() - stepStartTime
@@ -1585,13 +1586,13 @@ class YadamuQA {
     sourceParameters.SOURCE_DIRECTORY = importDirectory
     if ( sourceDatabase === "file" ) {
       sourceParameters.FILE = filename
+      sourceParameters.FROM_USER = 'YADAMU'
     }
     else {
       this.setUser(sourceParameters,'FROM_USER', sourceDatabase, this.getSourceMapping(targetDatabase, task))
     }
     
     const fileReader = await this.getDatabaseInterface(sourceDatabase,sourceConnection,sourceParameters,null)
-	fileReader.ROLE = YadamuConstants.READER_ROLE
 
     const targetParameters  = Object.assign({},parameters)
     this.setUser(targetParameters,'TO_USER',targetDatabase,targetSchema)
@@ -1681,12 +1682,12 @@ class YadamuQA {
     if (targetDatabase === "file") {
       targetParameters.FILE =  filename
       targetParameters.TARGET_DIRECTORY = exportDirectory               
+      targetParameters.TO_USER = 'YADAMU'
     }
     else {
     }
     
     const fileWriter = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA)
-	fileWriter.ROLE = YadamuConstants.WRITER_ROLE
 
     const taskStartTime = performance.now();
     let stepStartTime = taskStartTime;

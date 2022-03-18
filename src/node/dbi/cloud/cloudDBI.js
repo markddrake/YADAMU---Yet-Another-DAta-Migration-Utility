@@ -1,10 +1,14 @@
-"use strict" 
 
-import path          from 'path'
-import mime          from 'mime-types';
+import path                           from 'path';
+import mime                          from 'mime-types';
 import {PassThrough} from "stream"
 
-import LoaderDBI     from '../loader/loaderDBI.js';
+import { 
+  performance 
+}                                     from 'perf_hooks';
+
+/* Yadamu Core */                                    
+							          
 import YadamuLibrary from '../../lib/yadamuLibrary.js';
 import NullWritable  from '../../util/nullWritable.js';
 
@@ -12,15 +16,13 @@ import {
   YadamuError
 }                    from '../../core/yadamuException.js';
 
+
+/* Yadamu DBI */                                    
+
+import LoaderDBI     from '../loader/loaderDBI.js';
 import {
   FileNotFound
 }                    from '../file/fileException.js';
-
-/*
-**
-** YADAMU Database Inteface class skeleton
-**
-*/
 
 class CloudDBI extends LoaderDBI {
  

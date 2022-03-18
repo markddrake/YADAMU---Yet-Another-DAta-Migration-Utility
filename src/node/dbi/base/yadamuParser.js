@@ -40,8 +40,9 @@ class YadamuParser extends Transform {
     }
   }
   
-  constructor(queryInfo,yadamuLogger, parseDelay) {
+  constructor(dbi,queryInfo,yadamuLogger, parseDelay) {
     super({objectMode: true });  
+	this.dbi = dbi
     this.queryInfo = queryInfo;
     this.yadamuLogger = yadamuLogger
 	this.startTime = performance.now()

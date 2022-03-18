@@ -1,11 +1,10 @@
-"use strict";
 
-import StatementGenerator from '../statementGenerator.js';
+import _MsSQLStatementGenerator from '../mssqlStatementGenerator.js';
 
-class StatementGenerator2014 extends StatementGenerator {
+class MsSQLStatementGenerator extends _MsSQLStatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, yadamuLogger) {
-    super(dbi, targetSchema, metadata, yadamuLogger)
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
+    super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
 
  getMetadata() {
@@ -25,4 +24,4 @@ class StatementGenerator2014 extends StatementGenerator {
 
 }
  
-export { StatementGenerator2014 as default }
+export { MsSQLStatementGenerator as default }

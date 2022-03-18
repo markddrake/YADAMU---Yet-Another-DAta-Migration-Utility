@@ -1,38 +1,65 @@
-"use strict"
-import fs from 'fs';
-import path from 'path';
-import { performance } from 'perf_hooks';
-import {Readable, Writable, Transform, PassThrough} from 'stream'
-import { pipeline } from 'stream/promises';
 
-/*
-**
-** Require Database Vendors API
-**
-*/
+import fs                             from 'fs';
+import path                           from 'path';
+
+import { 
+  performance 
+}                                     from 'perf_hooks';
+
+import {
+  Readable, 
+  Writable, 
+  Transform, 
+  PassThrough
+}                                     from 'stream'
+import { 
+  pipeline 
+}                                     from 'stream/promises';
+
+/* Database Vendors API */                                    
 
 import oracledb from 'oracledb';
 oracledb.fetchAsString = [ oracledb.DATE, oracledb.NUMBER ]
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
+import StringWriter                   from '../../util/stringWriter.js'
+import BufferWriter                   from '../../util/bufferWriter.js'
+import HexBinToBinary                 from '../../util/hexBinToBinary.js'
 
-import OracleConstants from './oracleConstants.js';
-import {OracleError, StagingFileError} from './oracleException.js'
-import OracleParser from './oracleParser.js';
-import OracleOutputManager from './oracleOutputManager.js';
-import OracleWriter from './oracleWriter.js';
-import OracleStatementLibrary from './oracleStatementLibrary.js';
-import StatementGenerator from './statementGenerator.js';
 
-import StringWriter from '../../util/stringWriter.js';
-import BufferWriter from '../../util/bufferWriter.js';
-import HexBinToBinary from '../../util/hexBinToBinary.js';
-import JSONParser from '../file/jsonParser.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
+import {
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+import JSONParser                     from '../file/jsonParser.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+ }                                    from '../file/fileException.js'
+ 
+/* Vendor Specific DBI Implimentation */                                   
+					
+import OracleConstants                from './oracleConstants.js'
+import OracleDataTypes                from './oracleDataTypes.js'
+import OracleParser                   from './oracleParser.js'
+import OracleOutputManager            from './oracleOutputManager.js'
+import OracleWriter                   from './oracleWriter.js'
+import OracleStatementLibrary         from './oracleStatementLibrary.js'
+import OracleStatementGenerator       from './oracleStatementGenerator.js'
+
+import {
+  OracleError, 
+  StagingFileError
+}                                     from './oracleException.js'
 
 class OracleDBI extends YadamuDBI {
 
@@ -188,10 +215,13 @@ class OracleDBI extends YadamuDBI {
   }
 
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
+  
+  get DATA_TYPES()                    { return OracleDataTypes }
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-
+	yadamu.initializeTypeMapping(OracleDataTypes,this.TYPE_MAPPINGS)
+	
 	// make oracledb constants available to decendants of OracleDBI
 	this.oracledb = oracledb
 
@@ -207,9 +237,9 @@ class OracleDBI extends YadamuDBI {
   
   initializeManager() {
 	super.initializeManager()
-	this.StatementGenerator = StatementGenerator
-	this.StatementLibrary = OracleStatementLibrary
-	this.statementLibrary = undefined
+	this.StatementGenerator = OracleStatementGenerator
+	this.StatementLibrary   = OracleStatementLibrary
+	this.statementLibrary   = undefined
   }	 
 
   parseConnectionString(vendorProperties, connectionString) {
@@ -889,7 +919,7 @@ class OracleDBI extends YadamuDBI {
     switch (true) {
       case this.DB_VERSION < 12:
 	    this.StatementLibrary = (await import('./112/oracleStatementLibrary.js')).default
-		this.StatementGenerator = (await import('./112/statementGenerator.js')).default
+		this.StatementGenerator = (await import('./112/oracleStatementGenerator.js')).default
         break;
       case this.DB_VERSION < 19:
 	    this.StatementLibrary = (await import('./18/oracleStatementLibrary.js')).default
@@ -1273,7 +1303,7 @@ class OracleDBI extends YadamuDBI {
   }
 		
   createParser(queryInfo,parseDelay) {
-	const parser = new OracleParser(queryInfo,this.yadamuLogger,parseDelay)
+	const parser = new OracleParser(this,queryInfo,this.yadamuLogger,parseDelay)
     this.inputStream.on('metadata',(resultSetMetadata) => {parser.setColumnMetadata(resultSetMetadata)})
 	return parser;
   }
@@ -1401,8 +1431,8 @@ class OracleDBI extends YadamuDBI {
   */
 
   async generateStatementCache(schema) {
-    const statementGenerator = new this.StatementGenerator(this,schema,this.metadata,this.yadamuLogger)
-    this.statementCache = await statementGenerator.generateStatementCache(this.systemInformation.vendor)
+    const statementGenerator = new this.StatementGenerator(this,this.systemInformation.vendor,schema,this.metadata,this.yadamuLogger)
+    this.statementCache = await statementGenerator.generateStatementCache()
 	this.emit(YadamuConstants.CACHE_LOADED)
 	return this.statementCache
   }
@@ -1416,7 +1446,7 @@ class OracleDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-	return new OracleDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new OracleDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
     
   async initializeWorker(manager) {

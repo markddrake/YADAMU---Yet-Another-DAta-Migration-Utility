@@ -16,7 +16,6 @@ class DBReaderParallel extends DBReader {
 
   constructor(dbi,yadamuLogger,options) {
     super(dbi,yadamuLogger,options); 
-    this.dbi.sqlTraceTag = `/* Manager */`;	
   }
   
   async doCopyOperations(taskList,worker,idx) {

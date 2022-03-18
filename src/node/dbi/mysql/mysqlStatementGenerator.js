@@ -1,19 +1,16 @@
-"use strict";
 
-import path from 'path';
+import path                     from 'path';
 
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuLibrary            from '../../lib/yadamuLibrary.js';
 
-class StatementGenerator {
+import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
+
+class MySQLStatementGenerator extends YadamuStatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, yadamuLogger) {    
-    this.dbi = dbi;
-    this.targetSchema = targetSchema
-    this.metadata = metadata
-    this.yadamuLogger = yadamuLogger;
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {  
+    super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
-  
-
+ 
   async generateStatementCache() {    
   
     const typeMappings = {
@@ -31,8 +28,6 @@ class StatementGenerator {
       statementCache = {}      
     }
     else {
-	
-		
       const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map((table,idx) => {
         const tableMetadata = this.metadata[table];
@@ -254,4 +249,4 @@ class StatementGenerator {
  
 }
 
-export { StatementGenerator as default }
+export { MySQLStatementGenerator as default }

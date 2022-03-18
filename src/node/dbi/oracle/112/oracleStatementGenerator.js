@@ -1,4 +1,3 @@
-"use strict";
 
 // Support for Oracle 11.2 
 // Oracle 11g has not support for parsing JSON so we send the metadata as XML !!!
@@ -12,9 +11,9 @@
 
 import {Readable} from 'stream';
 
-import DefaultStatementGenerator from '../statementGenerator.js';
+import _OracleStatementGenerator from '../oracleStatementGenerator.js';
 
-class StatementGenerator extends DefaultStatementGenerator {
+class OracleStatementGenerator extends _OracleStatementGenerator {
     
   // 11.x does not support GeoJSON. We need to use WKX to convert GeoJSON to WKT
 
@@ -22,8 +21,8 @@ class StatementGenerator extends DefaultStatementGenerator {
   get RANDOM_OBJECT_LENGTH()         { return 12 }
   get ORACLE_CSV_SPECIFICATION()     { return `TERMINATED  BY ',' OPTIONALLY ENCLOSED BY '"'` }
   
-  constructor(dbi, targetSchema, metadata, yadamuLogger) {
-    super(dbi, targetSchema, metadata, yadamuLogger)
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
+    super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
 
   // In 11g the seperator character appears to be \r rather than \n
@@ -87,4 +86,4 @@ class StatementGenerator extends DefaultStatementGenerator {
       
 }
 
-export {StatementGenerator as default }
+export { OracleStatementGenerator as default } 

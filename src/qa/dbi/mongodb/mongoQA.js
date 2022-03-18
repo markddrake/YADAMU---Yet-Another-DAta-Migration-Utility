@@ -455,7 +455,7 @@ class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
     }
 
     classFactory(yadamu) {
-      return new MongoQA(yadamu,this,this.connectionSettings,this.parameters)
+      return new MongoQA(yadamu,this,this.connectionParameters,this.parameters)
     }
 	
 	async getConnectionID() {
