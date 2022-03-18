@@ -6,6 +6,6 @@
 !qa\mappings
 !qa\regression
 !qa\sql
-!src\YADAMU_QA
+!src\qa
 !utilities\bin\*.bat
 utilities\bin\deploy.bat

@@ -1,0 +1,118 @@
+{
+  "connections"                       : "connections.json"
+, "operation"                         : "dbRoundtrip"
+, "tasks"                             : "tasks.json"
+, "recreateSchema"                    : true
+, "createDirectory"                   : true
+, "verifyOperation"                   : true
+, "recreateSchema"                    : true
+, "createDirectory"                   : true
+, "verifyOperation"                   : true
+, "parameters": {
+    "REMOTE_STAGING_AREA"      : "/mnt/shared/stagingArea/db/vertica"
+    "REMOTE_STAGING_AREA"      : "/mnt/shared/stagingArea/db/vertica"
+  , "LOCAL_STAGING_AREA"       : "/usr/src/YADAMU/stagingArea/db/vertica"
+  , "INFINITY_MANAGEMENT"      : "NULLIFY"
+  , "CIRCLE_FORMAT"            : "CIRCLE"
+  }
+, "tests" : [{
+	"operation" : "export"
+  , "source": "oracle19c"
+  , "target": "file-staging"
+  , "tasks": [
+      "HR", "BI"
+    ]
+  },{
+	"operation" : "import"
+  , "source": "file-staging"
+  , "target": "vertica11"
+  , "parameters"                      : {
+      "DIRECTORY"                     : "export/json/oracle19c"
+    }
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "export"
+  , "source": "vertica11"
+  , "target": "file-staging"
+  , "tasks": [
+      "HR", "BI"
+    ]
+  },{
+    "source": "vertica11"
+  , "target": "vertica11"
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "import"
+  , "source": "file-staging"
+  , "target": "snow#1"
+  , "parameters"                      : {
+      "DIRECTORY"                     : "export/json/oracle19c"
+    }
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "export"
+  , "source": "snow#1"
+  , "target": "file-staging"
+  , "tasks": [
+      "HR", "BI"
+    ]
+  },{
+    "source": "snow#1"
+  , "target": "snow#1"
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "import"
+  , "source": "file-staging"
+  , "target": "tera#1"
+  , "parameters"                      : {
+      "DIRECTORY"                     : "export/json/oracle19c"
+    }
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "export"
+  , "source": "tera#1"
+  , "target": "file-staging"
+  , "tasks": [
+      "HR", "BI"
+    ]
+  },{
+    "source": "tera#1"
+  , "target": "tera#1"
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "import"
+  , "source": "file-staging"
+  , "target": "redshift#1"
+  , "parameters"                      : {
+      "DIRECTORY"                     : "export/json/oracle19c"
+    }
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "export"
+  , "source": "redshift#1"
+  , "target": "file-staging"
+  , "tasks": [
+      "HR", "BI"
+    ]
+  },{
+    "source": "redshift#1"
+  , "target": "redshift#1"
+  , "tasks": [
+       "HR","BI"
+    ]
+  }]
+}

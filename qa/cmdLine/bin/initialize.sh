@@ -15,7 +15,7 @@ export YADAMU_SCRIPT_PATH=$(dirname "$2")
 export YADAMU_BIN=$YADAMU_HOME/bin
 export YADAMU_LOG_ROOT=$YADAMU_HOME/log
 source $YADAMU_SHARED_PATH/initializeLogging.sh $YADAMU_TESTNAME
-export YADAMU_QA_JSPATH=$YADAMU_HOME/utilities/node
+export YADAMU_QA_JSPATH=$YADAMU_HOME/src/qa/util
 export YADAMU_ENV_PATH=$YADAMU_HOME/src/install/$YADAMU_DATABASE
 source $YADAMU_ENV_PATH/env/dbConnection.sh
 export YADAMU_SQL_PATH=$YADAMU_HOME/qa/sql/$YADAMU_VENDOR

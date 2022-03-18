@@ -1,4 +1,4 @@
 *
 !docker/regression/tnsnames.ora
 !docker/regression/server
-!src/YADAMU_SVR
+!src/server

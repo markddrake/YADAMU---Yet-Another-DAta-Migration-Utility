@@ -14,7 +14,7 @@
     "operation"       : "import"
   , "source"          : "file-staging"
   , "targets"         : [
-       "vertica10","vertica11","vertica11"
+       "vertica10","vertica11"
 	]
   , "verifyOperation" : true
   , "parameters"      : {

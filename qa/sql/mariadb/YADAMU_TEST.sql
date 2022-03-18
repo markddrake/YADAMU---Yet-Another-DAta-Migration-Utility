@@ -465,23 +465,23 @@ begin
 
   insert into KV_PAIR_CACHE   
   with recursive KV_ARRAYS as (
-    select 1 ROW_NUMBER
+    select 1 "ROW_NUMBER"
           ,JSON_EXTRACT("P_VALUE",'$[*]') "VALUE_ARRAY"
   )
   ,KV_PAIRS as (
-    select ROW_NUMBER,
+    select "ROW_NUMBER",
 	       JSON_EXTRACT("VALUE_ARRAY",'$[0]') "VALUE"
   		  ,JSON_REMOVE("VALUE_ARRAY",'$[0]') "VALUE_ARRAY"
       from KV_ARRAYS
      where JSON_EXTRACT("VALUE_ARRAY",'$[0]') is not NULL
      union all
-    select ROW_NUMBER + 1,
+    select "ROW_NUMBER" + 1,
 	       JSON_EXTRACT("VALUE_ARRAY",'$[0]') "VALUE"
   		  ,JSON_REMOVE("VALUE_ARRAY",'$[0]') "VALUE_ARRAY"
    	  from KV_PAIRS
      where JSON_EXTRACT("VALUE_ARRAY",'$[0]') is not NULL
   )
-  select V_ID, ROW_NUMBER, "VALUE"
+  select V_ID, "ROW_NUMBER", "VALUE"
     from KV_PAIRS;
 
   call ORDER_JSON_VALUES(V_ID);

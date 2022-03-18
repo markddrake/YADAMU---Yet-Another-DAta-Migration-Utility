@@ -1,0 +1,38 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>YADAMU - Operation Log</title>
+    <link rel="stylesheet" href="../../node_modules/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../../node_modules/bootstrap-icons/font/bootstrap-icons.css">
+</head>
+<body>
+  <div class="container-fluid">
+	<div style="margin:0; padding:0; height:10px;"></div>
+    <div class="row">
+	  <div class="col">
+        <div class="mb-12">
+	      <div style="overflow:auto;width:95vw;height:90vh;white-space:nowrap;">
+		    <pre class="center-block" id="log"></pre>
+		  </div>
+	    </div>
+	  </div>
+	</div>
+	<div style="margin:0; padding:0; height:10px;"></div>
+    <div class="row float-right">
+      <div class="col">
+		<div class="mb-12">
+		  <button id="reset-log-window" type="button" onclick="resetLog(this)" class="btn btn-primary">
+			<i class="bi bi-eraser-fill"></i>
+	      </button>
+          <button id="save-log" type="button" onclick="saveLogFile(this)" class="btn btn-primary">
+	     	<i class="bi bi-save2-fill"></i>
+	      </button>
+		</div>
+	  </div>
+    </div>
+	<div style="margin:0; padding:0; height:10px;"></div>
+  </div>
+  <!-- <script>require('./yuiLogWindow.js')</script> -->
+  <script src="../../js/gui/yuiLogWindow.cjs")></script>
+</body>
+</html>

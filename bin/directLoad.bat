@@ -1,4 +1,4 @@
 @echo off
 REM Run from YADAMU_HOME
 set YADAMU_HOME=%CD%
-node %YADAMU_HOME%\src\YADAMU\common\directLoad.js %*
+node %YADAMU_HOME%\src\node\cli\directLoad.js %*

@@ -78,7 +78,7 @@
       "postgresDataTypes"
 	]
   },{
-    "source"          : "vertica11"
+    "source"          : "vertica10"
   , "target"          : "vertica11"
   , "tasks": [ 
       "postgresDataTypes"
