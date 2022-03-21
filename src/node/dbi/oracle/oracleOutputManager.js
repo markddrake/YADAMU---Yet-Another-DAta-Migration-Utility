@@ -39,9 +39,25 @@ class OracleOutputManager extends YadamuOutputManager {
 	this.lobList = []
     this.lobCumlativeTime = 0;
     this.includeTestcase = this.dbi.parameters.EXPORT_TESTCASE === true
-
   }
   
+  createBatch() {
+	return   {	  
+      rows           : []
+	, lobRows        : []
+	, tempLobCount   : 0
+	, cachedLobCount : 0
+	, ts             : performance.now()
+	}
+  }
+
+  resetBatch(batch) {
+    batch.rows.length    = 0;
+	batch.lobRows.length = 0;
+    batch.tempLobCount   = 0
+	batch.cachedLobCount = 0
+  }    
+       
   generateTransformations(targetDataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
@@ -196,7 +212,7 @@ class OracleOutputManager extends YadamuOutputManager {
 	
     await super.setTableInfo(tableName)   
 	this.generateLobTransformations()
-	
+    
   }
   
   trackStringToClob(s) {
@@ -242,8 +258,8 @@ class OracleOutputManager extends YadamuOutputManager {
     if (this.tableInfo.numericBindPositions.length === 0) {
       this.checkNumericBinds = (row) => {}
     }
-
   } 
+  
   cacheRow(row) {  
 	  
     /*

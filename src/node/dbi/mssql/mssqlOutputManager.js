@@ -15,6 +15,19 @@ class MsSQLOutputManager extends YadamuOutputManager {
     super(dbi,tableName,metrics,status,yadamuLogger)
   }
   
+  createBatch() {
+	if (this.tableInfo.insertMode === 'BCP') {
+	  return this.dbi.createBulkOperation(this.dbi.DATABASE_NAME, this.tableInfo.tableName, this.tableInfo.columnNames, this.tableInfo.dataTypes) 
+	}
+	else {
+      return new sql.Table()
+	}
+  }
+  
+  resetBatch(batch) {
+	batch.rows.length = 0;
+  }
+    
   generateTransformations(targetDataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
@@ -96,17 +109,6 @@ class MsSQLOutputManager extends YadamuOutputManager {
 	
   }	  
 
-  newBatch() {
-	this.COPY_METRICS.cached = 0;
-    this.COPY_METRICS.batchNumber++;
-	if (this.tableInfo.insertMode === 'BCP') {
-	  return this.dbi.createBulkOperation(this.dbi.DATABASE_NAME, this.tableInfo.tableName, this.tableInfo.columnNames, this.tableInfo.dataTypes) 
-	}
-	else {
-      return new sql.Table()
-	}
-  }
-  
   cacheRow(row) {
       
 	// Use forEach not Map as transformations are not required for most columns. 

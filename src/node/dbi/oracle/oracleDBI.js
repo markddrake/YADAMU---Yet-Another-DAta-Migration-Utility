@@ -194,7 +194,7 @@ class OracleDBI extends YadamuDBI {
 
 	// make oracledb constants available to decendants of OracleDBI
 	this.oracledb = oracledb
-
+    
     this.ddl = [];
 	this.dropWrapperStatements = []
 
@@ -914,7 +914,7 @@ class OracleDBI extends YadamuDBI {
 
   async initializeImport() {
 	super.initializeImport()
-    await this.setCurrentSchema(this.CURRENT_SCHEMA)
+	await this.setCurrentSchema(this.CURRENT_SCHEMA)
   }
 
   async initializeData() {
@@ -1471,22 +1471,6 @@ class OracleDBI extends YadamuDBI {
       })
     }
     return dbMappings;
-  }
-  
-  newBatch() {
-  	return {
-	  rows           : []
-	, lobRows        : []
-	, tempLobCount   : 0
-	, cachedLobCount : 0
-    }
-  }
-  
-  releaseBatch(batch) {
-	if (Array.isArray(batch?.rows)) {
-	  batch.rows.length = 0;
-	  batch.lobRows.length = 0;
-	}
   }
   
   async serializeLob(lob) {

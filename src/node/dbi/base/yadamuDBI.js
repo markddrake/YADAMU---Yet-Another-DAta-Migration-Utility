@@ -129,16 +129,21 @@ class YadamuDBI extends EventEmitter {
   get PARSE_DELAY()                  { return this.parameters.PARSE_DELAY                 || DBIConstants.PARSE_DELAY };
   get TABLE_MAX_ERRORS()             { return this.parameters.TABLE_MAX_ERRORS            || DBIConstants.TABLE_MAX_ERRORS };
   get TOTAL_MAX_ERRORS()             { return this.parameters.TOTAL_MAX_ERRORS            || DBIConstants.TOTAL_MAX_ERRORS };
-  get COMMIT_RATIO()                 { return this.parameters.hasOwnProperty('COMMIT_RATIO') ?  this.parameters.COMMIT_RATIO : DBIConstants.COMMIT_RATIO };
   get MODE()                         { return this.parameters.MODE                        || DBIConstants.MODE }
   get ON_ERROR()                     { return this.parameters.ON_ERROR                    || DBIConstants.ON_ERROR }
   get INFINITY_MANAGEMENT()          { return this.parameters.INFINITY_MANAGEMENT         || DBIConstants.INFINITY_MANAGEMENT };
-  get LOCAL_STAGING_AREA()           { return YadamuLibrary.macroSubstitions((this.parameters.LOCAL_STAGING_AREA     || DBIConstants.LOCAL_STAGING_AREA || ''), this.yadamu.MACROS || '') }
-  get REMOTE_STAGING_AREA()          { return YadamuLibrary.macroSubstitions((this.parameters.REMOTE_STAGING_AREA    || DBIConstants.REMOTE_STAGING_AREA || ''), this.yadamu.MACROS || '') }
   get STAGING_FILE_RETENTION()       { return this.parameters.STAGING_FILE_RETENTION      || DBIConstants.STAGING_FILE_RETENTION }
   get TIMESTAMP_PRECISION()          { return this.parameters.TIMESTAMP_PRECISION         || DBIConstants.TIMESTAMP_PRECISION }
   get BYTE_TO_CHAR_RATIO()           { return this.parameters.BYTE_TO_CHAR_RATIO          || DBIConstants.BYTE_TO_CHAR_RATIO }
   get RETRY_COUNT()                  { return 3 }
+
+  get COMMIT_RATIO()                 { return this.parameters.hasOwnProperty('COMMIT_RATIO') ?  this.parameters.COMMIT_RATIO : DBIConstants.COMMIT_RATIO };
+  get BATCH_LIMIT()                  { return this.parameters.hasOwnProperty('BATCH_LIMIT') ?  this.parameters.COMMIT_RATIO : DBIConstants.BATCH_LIMIT };
+
+  get LOCAL_STAGING_AREA()           { return YadamuLibrary.macroSubstitions((this.parameters.LOCAL_STAGING_AREA     || DBIConstants.LOCAL_STAGING_AREA || ''), this.yadamu.MACROS || '') }
+  get REMOTE_STAGING_AREA()          { return YadamuLibrary.macroSubstitions((this.parameters.REMOTE_STAGING_AREA    || DBIConstants.REMOTE_STAGING_AREA || ''), this.yadamu.MACROS || '') }
+
+
   get IDENTIFIER_TRANSFORMATION()    { return this.yadamu.IDENTIFIER_TRANSFORMATION }
   get PARTITION_LEVEL_OPERATIONS()   { return this.parameters.PARTITION_LEVEL_OPERATIONS  || DBIConstants.PARTITION_LEVEL_OPERATIONS }
   
@@ -359,7 +364,7 @@ class YadamuDBI extends EventEmitter {
 	
 	this.ddlInProgress = false;
     this.activeWriters = new Set()
-    
+
     if (manager) {
 	  this.workerReady = new Promise((resolve,reject) => {
 	    this.initializeWorker(manager).then(() => { resolve() }).catch((e) => { reject(e) })
@@ -1151,23 +1156,9 @@ class YadamuDBI extends EventEmitter {
   async releaseWorkerConnection() {
 	await this.closeConnection()
   }
-  
-
-  
-  newBatch() {
-	return []
-  }
-
-  releaseBatch(batch) {
-	if (Array.isArray(batch)) {
-	  batch.length = 0;
-	}
-  }
-
+ 
   getCloseOptions(err) {
-	 	
 	return err ? {abort  : false } : { abort : true, error : err }
-
   }
   
   async final(){

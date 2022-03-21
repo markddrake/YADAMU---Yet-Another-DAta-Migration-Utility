@@ -18,7 +18,6 @@ import {CopyOperationAborted} from '../../core/yadamuException.js'
 
 import SnowflakeConstants from './snowflakeConstants.js';
 import SnowflakeError from './snowflakeException.js'
-import SnowflakeReader from './snowflakeReader.js';
 import SnowflakeParser from './snowflakeParser.js';
 import SnowflakeWriter from './snowflakeWriter.js';
 import SnowflakeOutputManager from './snowflakeOutputManager.js';
@@ -265,10 +264,11 @@ class SnowflakeDBI extends YadamuDBI {
   
   async initialize() {
     await super.initialize(true)   
+	await this.useDatabase(this.parameters.YADAMU_DATABASE)
 	this.statementLibrary = new this.StatementLibrary(this)
 	this.SPATIAL_SERIALIZER = this.SPATIAL_FORMAT
   }
-    
+
   /*
   **
   ** Begin a transaction
@@ -492,8 +492,9 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     // this.yadamuLogger.trace([`${this.constructor.name}.getInputStream()`,this.getWorkerNumber()],queryInfo.TABLE_NAME)
     this.streamingStackTrace = new Error().stack;
     this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
-    return new SnowflakeReader(this.connection,queryInfo.SQL_STATEMENT)
-	
+    const statement = this.connection.execute({sqlText: queryInfo.SQL_STATEMENT,  fetchAsString: ['Number','Date'], streamResult: true})
+    return statement.streamRows();
+    // return new SnowflakeReader(this.connection,queryInfo.SQL_STATEMENT)
   }  
   
   /*

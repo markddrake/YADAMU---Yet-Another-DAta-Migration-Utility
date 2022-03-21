@@ -763,10 +763,12 @@ class StatementGenerator {
 	  })
 	}
 
+    // All remote paths must use POSIX/Linux seperators (Vertica does not run on MS-Windows)
+
 	const stagingFileName =  `YST-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
 	const stagingFilePath =  path.join(this.dbi.LOCAL_STAGING_AREA,stagingFileName)
 	const localPath       =  path.resolve(stagingFilePath); 
-	let remotePath        =  tableMetadata.dataFile || path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName).split(path.sep).join(path.posix.sep)
+	let remotePath        =  path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName).split(path.sep).join(path.posix.sep)
 	
     const createStatement = `create table if not exists "${this.targetSchema}"."${tableMetadata.tableName}"(\n  ${columnClauses.join(',')})`;
     const insertStatement = `insert into "${this.targetSchema}"."${tableMetadata.tableName}" ("${columnNames.join('","')}") values `;
@@ -775,6 +777,7 @@ class StatementGenerator {
     let copy
 	if (Array.isArray(tableMetadata.dataFile)) {
       copy = tableMetadata.dataFile.map((remotePath,idx) => {
+        remotePath = remotePath.split(path.sep).join(path.posix.sep)
 	    return  {
 	      dml             : `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath}' PARSER fcsvparser(type='rfc4180', header=false, trim=${this.dbi.COPY_TRIM_WHITEPSPACE===true}) NULL ''`
 		, partitionCount  : tableMetadata.partitionCount
@@ -783,8 +786,9 @@ class StatementGenerator {
 	  })
 	}
     else {
-	  copy = {
-	   dml         : `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath}' PARSER fcsvparser(type='rfc4180', header=false, trim=${this.dbi.COPY_TRIM_WHITEPSPACE===true}) NULL ''`
+      remotePath = tableMetadata.dataFile ? tableMetadata.dataFile.split(path.sep).join(path.posix.sep) : remotePath
+      copy = {
+	    dml         : `copy "${this.targetSchema}"."${tableMetadata.tableName}" (${copyColumnList.join(',')}) from '${remotePath}' PARSER fcsvparser(type='rfc4180', header=false, trim=${this.dbi.COPY_TRIM_WHITEPSPACE===true}) NULL ''`
 	  }
     }
 	

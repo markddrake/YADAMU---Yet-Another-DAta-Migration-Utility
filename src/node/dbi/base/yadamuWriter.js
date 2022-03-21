@@ -31,7 +31,7 @@ class YadamuWriter extends Writable {
 
   constructor(dbi,tableName,metrics,status,yadamuLogger) {
 	const options = {
-      highWaterMark : 10
+      highWaterMark : dbi.BATCH_LIMIT
 	, objectMode    : true
     }
 	super(options)
@@ -53,6 +53,11 @@ class YadamuWriter extends Writable {
 		 this.dbi.activeWriters.delete(writeOperation)
 	  })
 	})
+
+    this.on('pipe',(src) => {
+      this.batchManager = src
+    })
+
     this.dbi.activeWriters.add(writeOperation)	
 	this.setNotWriting()
   }
@@ -69,12 +74,9 @@ class YadamuWriter extends Writable {
   
   setWriting() {
   	this.batchCompleted = new Promise((resolve,reject) => {
-	  this.once(DBIConstants.BATCH_WRITTEN,() => {
+	  this.once(DBIConstants.BATCH_COMPLETED,(result) => {
 		 this.setNotWriting()
-		 resolve(DBIConstants.BATCH_WRITTEN)
-	  }).once(DBIConstants.BATCH_FAILED,() => {
-		 this.setNotWriting()
-		 resolve(DBIConstants.BATCH_FAILED)
+		 resolve(result)
 	  })
 	})
   }  	  
@@ -94,11 +96,11 @@ class YadamuWriter extends Writable {
 	this.tableInfo.partitionCount = partitionInfo.partitionCount
 	this.tableInfo.partitionsRemaining = this.tableInfo.partitionsRemaining || partitionInfo.partitionCount
   }
-     
+   
   releaseBatch(batch) {
-	this.dbi.releaseBatch(batch)
+	this.batchManager.releaseBatch(batch)
   }
-  
+   
   abortTable() {
 	  
     // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber()],'abortTable()')
@@ -273,6 +275,7 @@ class YadamuWriter extends Writable {
 	if (!this.skipTable) {
 	  try {
 	    this.skipTable = await this._writeBatch(batch,this.BATCH_METRICS.cached)
+        this.COPY_METRICS.batchWritten++
         if (this.skipTable) {
           await this.rollbackTransaction();
         }	                     
@@ -345,7 +348,7 @@ class YadamuWriter extends Writable {
 	    this.COPY_METRICS.idleTime+= ( this.waitTime - performance.now() )  
 		this.setWriting();
 	    await this.processBatch(obj.batch,obj.snapshot)
-		this.emit(DBIConstants.BATCH_WRITTEN)
+        this.emit(DBIConstants.BATCH_COMPLETED,DBIConstants.BATCH_WRITTEN)
 		this.waitTime = performance.now()
 		break
 	  case obj.hasOwnProperty('table'):
@@ -364,7 +367,7 @@ class YadamuWriter extends Writable {
   _write(batch, encoding, callback) {
 	 
     // this.yadamuLogger.trace([this.constructor.name,this.dbi.ROLE,this.displayName,this.dbi.getWorkerNumber(),this.COPY_METRICS.received,this.COPY_METRICS.cached,this.COPY_METRICS.written,this.COPY_METRICS.skipped,this.COPY_METRICS.lost,this.writableEnded,this.writableFinished],'YadamuWriter._write()')
-    this.doWrite(batch).then(()=> { callback() }).catch((e) => { this.emit(DBIConstants.BATCH_FAILED); callback(e) })
+    this.doWrite(batch).then(()=> { callback() }).catch((e) => { this.emit(DBIConstants.BATCH_COMPLETED,DBIConstants.BATCH_FAILED); callback(e) })
 
   }
   

@@ -20,6 +20,18 @@ class VerticaOutputManager extends YadamuOutputManager {
     super(dbi,tableName,metrics,status,yadamuLogger)
   }
 
+  createBatch() {
+	return {
+	  copy          : []
+	, insert        : []
+    }
+  }  
+    
+  resetBatch(batch) {
+    batch.copy.length = 0;
+	batch.insert.length = 0;
+  }
+  
   toSQLInterval(interval) {
     const jsInterval = YadamuLibrary.parse8601Interval(interval)
 	switch (jsInterval.type) {

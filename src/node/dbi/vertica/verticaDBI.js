@@ -94,21 +94,6 @@ class VerticaDBI extends YadamuDBI {
  
   }
 
-  newBatch() {
-	return {
-	  copy          : []
-	, insert        : []
-    }
-  }  
-    
-
-  releaseBatch(batch) {
-	if (Array.isArray(batch.copy)) {
-	  batch.copy.length = 0;
-	  batch.insert.length = 0;
-	}
-  }
-  
   /*
   **
   ** Local methods 
@@ -630,12 +615,12 @@ class VerticaDBI extends YadamuDBI {
   }
     
   async reportCopyErrors(tableName,metrics) {
-	  
+
 	 const causes = []
 	 let sizeIssue = 0;
 	 metrics.rejected.forEach((r) => {
 	   const err = new Error()
-	   err.stack =  `${metrics.stack.slice(0,5)}: ${r[1]}${stack.slice(5)}`
+	   err.stack =  `${metrics.stack.slice(0,5)}: ${r[1]}${metrics.stack.slice(5)}`
 	   err.recordNumber = r[0]
 	   const columnNameOffset = r[1].indexOf('column: [') + 9
 	   /*
@@ -651,7 +636,7 @@ class VerticaDBI extends YadamuDBI {
 	   }
   	   causes.push(err)
 	 })
-	 const err = new Error(`Errors detected durng COPY operation: ${results.length} records rejected.`)
+	 const err = new Error(`Errors detected durng COPY operation: ${metrics.rejected.length} records rejected.`)
 	 err.tags = []
 	 if (causes.length === sizeIssue) {
 	    err.tags.push("CONTENT_TOO_LARGE")
@@ -668,6 +653,7 @@ class VerticaDBI extends YadamuDBI {
 	  const sqlStatement = `${copyOperation.dml} REJECTED DATA AS TABLE "${rejectedRecordsTableName}"  NO COMMIT`;
 	  metrics.writerStartTime = performance.now()
 	  let results = await this.beginTransaction()
+      metrics.stack = new Error().stack
 	  results = await this.insertBatch(sqlStatement,rejectedRecordsTableName)
 	  metrics.writerEndTime = performance.now()
 	  metrics.written = results.inserted

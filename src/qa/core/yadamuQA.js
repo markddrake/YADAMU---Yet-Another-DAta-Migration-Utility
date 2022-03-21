@@ -140,9 +140,11 @@ class YadamuQA {
       throw err
     }
     
-    this.yadamu.IDENTIFIER_MAPPINGS = identifierMappings 
+    if (identifierMappings) {
+      this.yadamu.IDENTIFIER_MAPPINGS = identifierMappings 
+    }
     
-    dbi.setIdentifierMappings(identifierMappings);
+    // dbi.setIdentifierMappings(identifierMappings);
     dbi.setOption('recreateSchema',recreateSchema);
  
     return dbi;

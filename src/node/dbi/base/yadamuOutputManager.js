@@ -9,6 +9,8 @@ import {Readable, Writable, Transform, pipeline } from 'stream'
 import YadamuLibrary   from '../../lib/yadamuLibrary.js';
 import YadamuConstants from '../../lib/yadamuConstants.js';
 
+import DBIConstants    from './dbiConstants.js'
+
 import {YadamuError, BatchInsertError, IterativeInsertError, DatabaseError, InvalidMessageSequence} from '../../core/yadamuException.js'
 
 class YadamuOutputManager extends Transform {
@@ -25,8 +27,8 @@ class YadamuOutputManager extends Transform {
   constructor(dbi,tableName,metrics,status,yadamuLogger) {
     const options = {
 	  objectMode             : true
-	// , readableHighWaterMark  : 1024
-	// , writableHighWaterMark  : 16
+	  , readableHighWaterMark  : 1024
+	  , writableHighWaterMark  : dbi.BATCH_LIMIT
 	}
     super(options)
     this.dbi = dbi;
@@ -45,21 +47,46 @@ class YadamuOutputManager extends Transform {
 	this.processRow = this._cacheOutOfSequenceMessages
     this.outOfSequenceMessageCache = []
   }
+
+  createBatch() {
+	return []
+  }
   
-  newBatch() {
-	this.COPY_METRICS.cached = 0;
+  resetBatch(batch) {
+	batch.length = 0
+  }
+
+  initializeBatchCache() {
+	this.batchCache = Array(this.dbi.BATCH_LIMIT).fill(0).map((x) => { return this.createBatch()})	
+  }	  
+  
+  async nextBatch() {
     this.COPY_METRICS.batchNumber++;
-	return this.dbi.newBatch()
+	if (this.batchCache.length === 0) {  
+      // this.yadamuLogger.trace([this.constructor.name,'newBatch()','BATCH_RELEASED',this.dbi.getWorkerNumber(),this.Name,this.COPY_METRICS.batchNumber],'WAITING')       
+	  await new Promise((resolve,reject) => {
+		this.once(DBIConstants.BATCH_RELEASED,() => {
+	      resolve()
+		})
+	  })
+      // this.yadamuLogger.trace([this.constructor.name,'newBatch()','BATCH_RELEASED',this.dbi.getWorkerNumber(),this.tableName,this.COPY_METRICS.batchNumber],'PROCESSING')
+	}
+	this.COPY_METRICS.cached = 0;
+	const nextBatch = this.batchCache.shift()
+  	return nextBatch
   }
   
   releaseBatch(batch) {
-	this.dbi.releaseBatch(batch)
+	this.resetBatch(batch)
+	this.batchCache.push(batch)
+	this.emit(DBIConstants.BATCH_RELEASED)
   }
-
+  
   async setTableInfo(tableName) {
 	await this.dbi.cacheLoaded
     this.tableInfo = this.dbi.getTableInfo(tableName)
-    this.batch = this.newBatch()
+    this.initializeBatchCache() 
+    this.batch = await this.nextBatch()
 	this.skipTable = this.dbi.MODE === 'DDL_ONLY';	
 	this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
   }
@@ -86,6 +113,21 @@ class YadamuOutputManager extends Transform {
       }) 
     }
 
+  }
+
+  setWriter(writer) {
+    this.writer = writer
+  }
+
+  async throttleThroughput() {
+
+    while ((this.COPY_METRICS.batchNumber - this.COPY_METRICS.batchWritten) > this.writableHighWaterMark) {
+      await new Promise((resolve, reject) => {
+        this.writer.on(DBIConstants.BATCH_COMPLETED,() => {
+          resolve() 
+        })
+      })
+    }
   }
    
   abortTable() {
@@ -172,7 +214,7 @@ class YadamuOutputManager extends Transform {
 		row = []
 	  }
 	  const info = this.tableInfo === undefined  ? this.tableName : this.tableInfo
-      this.handleIterativeError('CACHE',cause,this.COPY_METRICS.received+1,row,info);
+      this.handleIterativeError('CACHE',cause,this.COPY_METRICS.received,row,info);
     }
   }
               
@@ -223,16 +265,16 @@ class YadamuOutputManager extends Transform {
   
   async _processRow(data) {
     // Be very careful about adding unecessary code here. This is executed once for each row processed by YADAMU. Keep it as lean as possible.
-    this.checkColumnCount(data)
-    this.cacheRow(data)
     this.COPY_METRICS.received++;
-	if (this.flushBatch()) {
+	this.checkColumnCount(data)
+    this.cacheRow(data)
+    if (this.flushBatch()) {
       if (this.dbi.REPORT_BATCHES) {
         this.yadamuLogger.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows written:  ${this.COPY_METRICS.written}.`);
 	  }
 	  this.COPY_METRICS.pending+= this.COPY_METRICS.cached
-	  this.push({batch:this.batch, snapshot: Object.assign({}, this.COPY_METRICS)})
-      this.batch = this.newBatch();	
+	  const pushResult = this.push({batch:this.batch, snapshot: Object.assign({}, this.COPY_METRICS)})
+      this.batch = await this.nextBatch();	
     }	  
     else {
 	  if ((this.dbi.FEEDBACK_MODEL === 'ALL') && (this.COPY_METRICS.received % this.dbi.FEEDBACK_INTERVAL === 0)) {

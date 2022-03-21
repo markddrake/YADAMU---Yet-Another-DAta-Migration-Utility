@@ -40,7 +40,7 @@ class OracleWriter extends YadamuWriter {
 	this.partitionInfo = undefined;
     this.triggersDisabled = false
   }
-  
+
   async beginTransaction() {
     this.tempLobCount = 0
 	this.cacheLobCount = 0
