@@ -6,8 +6,6 @@ class MongoParser extends YadamuParser {
   
   generateTransformations(queryInfo) {
 
-
-
 	return queryInfo.DATA_TYPE_ARRAY.map((dataType) => {
 	  switch (dataType) {
 		 case 'binData':

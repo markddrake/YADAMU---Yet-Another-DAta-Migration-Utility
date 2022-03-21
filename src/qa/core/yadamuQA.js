@@ -1,8 +1,8 @@
-"use strict"    
 
 import path               from 'path'
 import fs                 from 'fs';
 import fsp                from 'fs/promises';
+
 import { 
   fileURLToPath }         from 'url';
 
@@ -140,8 +140,10 @@ class YadamuQA {
       throw err
     }
     
-    this.yadamu.IDENTIFIER_MAPPINGS = identifierMappings 
-    
+    if (identifierMappings) {
+      this.yadamu.IDENTIFIER_MAPPINGS = identifierMappings 
+    }
+
     dbi.setIdentifierMappings(identifierMappings);
     dbi.setOption('recreateSchema',recreateSchema);
  

@@ -1,6 +1,9 @@
-"use strict"
 
-import {DatabaseError} from '../../core/yadamuException.js'
+import {
+  DatabaseError
+}                       from '../../core/yadamuException.js'
+
+import MongoConstants   from './mongoConstants.js'
 
 class MongoError extends DatabaseError {
 
@@ -9,21 +12,15 @@ class MongoError extends DatabaseError {
   }
     
   lostConnection() {
-	const knownErrors = Object.freeze([11600])
-    const knownMessages = Object.freeze(["Cannot use a session that has ended"])
-    return ((this.cause.code && (knownErrors.includes(this.cause.code)) || knownMessages.includes(this.message)))
+	return ((this.cause.code && (MongoConstants.SESSION_ENDED_ERROR.includes(this.cause.code)) || MongoConstants.SESSION_ENDED_MESSAGE.includes(this.message)))
   }
 
   serverUnavailable() {
-	const knownErrors = Object.freeze([11600])
-	const knownMessages = Object.freeze(["pool is draining, new operations prohibited"])
-    return ((this.cause.code && (knownErrors.includes(this.cause.code)) || knownMessages.includes(this.message)))
+    return ((this.cause.code && (MongoConstants.SERVER_UNAVAILABLE_ERROR.includes(this.cause.code)) || MongoConstants.SERVER_UNAVAILABLE_MESSAGE(this.message)))
   }
     	   
   contentTooLarge() {
-    const knownCodes = Object.freeze(['ERR_OUT_OF_RANGE'])
-    const knownMessages = Object.freeze(['document is larger than the maximum size 16777216'])
-    return ((this.cause.code && knownCodes.includes(this.cause.code)) || (knownMessages.includes(this.cause.message)))
+    return ((this.cause.code && MongoConstants.CONTENT_TOO_LARGE_ERROR.includes(this.cause.code)) || (MongoConstants.CONTENT_TOO_LARGE_MESSAGE.includes(this.cause.message)))
   }		   
 }
 

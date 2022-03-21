@@ -14,7 +14,7 @@
   "author": "Mark D Drake",
   "license": "SEE LICENSE IN TDB.txt",
   "dependencies": {
-    "@azure/storage-blob": "^12.2.0-preview.1",
+    "@azure/storage-blob": "12.8",
     "@electron/remote": "^2.0.1",
     "aws-sdk": "^2.731.0",
     "bootstrap": "^5.1.3",

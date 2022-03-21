@@ -1503,22 +1503,6 @@ class OracleDBI extends YadamuDBI {
     return dbMappings;
   }
   
-  newBatch() {
-  	return {
-	  rows           : []
-	, lobRows        : []
-	, tempLobCount   : 0
-	, cachedLobCount : 0
-    }
-  }
-  
-  releaseBatch(batch) {
-	if (Array.isArray(batch?.rows)) {
-	  batch.rows.length = 0;
-	  batch.lobRows.length = 0;
-	}
-  }
-  
   async serializeLob(lob) {
 	switch (lob.type) {
       case oracledb.CLOB:

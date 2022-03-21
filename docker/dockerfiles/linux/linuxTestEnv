@@ -3,10 +3,15 @@ FROM node:$NODE_VERSION
 WORKDIR /usr/src/YADAMU
 ADD https://download.oracle.com/otn_software/linux/instantclient/213000/oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm .
 COPY src/package*.json ./
+ENV YADAMU_HOME=/usr/src/YADAMU
+ENV YADAMU_BIN=$YADAMU_HOME/bin
+ENV YADAMU_SRC=$YADAMU_HOME/src
+ENV PATH=$PATH:$YADAMU_BIN
+ENV TNS_ADMIN=$YADAMU_HOME/work/network/admin
 RUN apt update \
- && apt-get -y install alien \
+ && apt-get -y install libaio1 alien iputils-ping vim \
  && alien -i --scripts ./oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm \
  && npm install --global electron \
  && npm install \
- && node --version
- 
+ && node --version 
+ENTRYPOINT bash

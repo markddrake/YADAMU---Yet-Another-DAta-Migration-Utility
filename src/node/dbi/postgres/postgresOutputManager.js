@@ -1,10 +1,12 @@
-"use strict"
 
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                            from 'perf_hooks';
+						
+import YadamuLibrary         from '../../lib/yadamuLibrary.js'
+import YadamuSpatialLibrary  from '../../lib/yadamuSpatialLibrary.js'
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuOutputManager from '../base/yadamuOutputManager.js';
+import YadamuOutputManager   from '../base/yadamuOutputManager.js'
 
 class PostgresOutputManager extends YadamuOutputManager  {
 

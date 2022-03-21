@@ -509,9 +509,9 @@ class YadamuDataTypes {
 
   // Mongo Specific Types                          
                                                    
-  static get MONGO_OBJECT_ID()                     { return `${this.BINARY_TYPE}(12)` }
+  static get MONGO_OBJECTID_TYPE()                 { return `${this.BINARY_TYPE}(12)` }
                                                    
-  static set MONGO_OBJECT_ID(v)                    { Object.defineProperty(this,'MONGO_OBJECT_ID', { get() { return(v) }, configurable: true })}
+  static set MONGO_OBJECTID_TYPE(v)                { Object.defineProperty(this,'MONGO_OBJECTID_TYPE', { get() { return(v) }, configurable: true })}
 
   static get MONGO_DECIMAL128_TYPE()               { return this.MAX_NUMERIC_TYPE }
                                                    
@@ -671,17 +671,73 @@ class YadamuDataTypes {
     return this.KNOWN_BINARY_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_TEMPORAL_TYPES() {
-    return this._KNOWN_TEMPORAL_TYPES || (() => {
-	  this._KNOWN_TEMPORAL_TYPES = Object.freeze([...TypeClassification.temporal])
-	  return this._KNOWN_TEMPORAL_TYPES
+  static get KNOWN_DATE_TYPES() {
+    return this._KNOWN_DATE_TYPES || (() => {
+	  this._KNOWN_DATE_TYPES = Object.freeze([...TypeClassification.date])
+	  return this._KNOWN_DATE_TYPES
 	})()
   }
    
-  static isTemporal(dataType) {
-    return this._KNOWN_TEMPORAL_TYPES.includes(dataType.toUpperCase());
+  static isDate(dataType) {
+	return this.KNOWN_DATE_TYPES.includes(dataType.toUpperCase());
   }
    
+  static get KNOWN_TIME_TYPES() {
+    return this._KNOWN_TIME_TYPES || (() => {
+	  this._KNOWN_TIME_TYPES = Object.freeze([...TypeClassification.time])
+	  return this._KNOWN_TIME_TYPES
+	})()
+  }
+   
+  static isTime(dataType) {
+    return this.KNOWN_TIME_TYPES.includes(dataType.toUpperCase());
+  }
+
+  static get KNOWN_DATETIME_TYPES() {
+    return this._KNOWN_DATETIME_TYPES || (() => {
+	  this._KNOWN_DATETIME_TYPES = Object.freeze([...TypeClassification.datetime])
+	  return this._KNOWN_DATETIME_TYPES
+	})()
+  }
+   
+  static isDateTime(dataType) {
+    return this.KNOWN_DATETIME_TYPES.includes(dataType.toUpperCase());
+  }
+      
+  static get KNOWN_TIMESTAMP_TYPES() {
+	return this._KNOWN_TIMESTAMP_TYPES || (() => {
+	  this._KNOWN_TIMESTAMP_TYPES = Object.freeze([...TypeClassification.timestamp])
+	  return this._KNOWN_TIMESTAMP_TYPES
+	})()
+  }
+   
+  static isTimestamp(dataType) {
+    return this.KNOWN_TIMESTAMP_TYPES.includes(dataType.toUpperCase());
+  }
+      
+  static get KNOWN_TEMPORAL_TYPES() {
+    return this._KNOWN_TEMPORAL_TYPES || (() => {
+	  this._KNOWN_TEMPORAL_TYPES = Object.freeze([...this.KNOWN_DATE_TYPES,...this.KNOWN_TIME_TYPES,...this.KNOWN_DATETIME_TYPES,...this.KNOWN_TIMESTAMP_TYPES])
+	  return this._KNOWN_TEMPORAL_TYPES
+	})()
+  }
+      
+  static isTemporal(dataType) {
+    return this.KNOWN_TEMPORAL_TYPES.includes(dataType.toUpperCase());
+  }
+
+  static get KNOWN_INTERVAL_TYPES() {
+    return this._KNOWN_INTERVAL_TYPES || (() => {
+	  this._KNOWN_INTERVAL_TYPES = Object.freeze([...TypeClassification.interval])
+	  return this._KNOWN_INTERVAL_TYPES
+	})()
+  }
+   
+  static isInterval(dataType) {
+    return this.KNOWN_INTERVAL_TYPES.includes(dataType.toUpperCase());
+  }
+   
+
   static get KNOWN_INTEGER_TYPES() {
     return this._KNOWN_INTEGER_TYPES || (() => {
 	  this._KNOWN_INTEGER_TYPES = Object.freeze([...TypeClassification.integer])
@@ -722,7 +778,7 @@ class YadamuDataTypes {
 	})()
   }
 
-  static isNumericType(dataType) {
+  static isNumeric(dataType) {
     return this.KNOWN_NUMERIC_TYPES.includes(dataType.toUpperCase());
   }
 
@@ -788,7 +844,7 @@ class YadamuDataTypes {
 	})()
   }
 
-  static isSpatialType(dataType) {
+  static isSpatial(dataType) {
     return this.KNOWN_SPATIAL_TYPES.includes(dataType.toUpperCase());
   }
 

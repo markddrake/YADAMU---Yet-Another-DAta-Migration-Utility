@@ -1,6 +1,9 @@
-"use strict" 
 
-import YadamuParser from '../base/yadamuParser.js'
+import { 
+  performance 
+}                        from 'perf_hooks'
+
+import YadamuParser      from '../base/yadamuParser.js'
 
 class SnowflakeParser extends YadamuParser {
 
@@ -83,10 +86,22 @@ class SnowflakeParser extends YadamuParser {
   
   constructor(dbi,queryInfo,yadamuLogger,parseDelay) {
     super(dbi,queryInfo,yadamuLogger,parseDelay)     	
+  	if (global.gc) {
+      this.collectTheGarbage = () => {
+	    if ((this.COPY_METRICS.parsed % 100000) === 0) {
+	      const startTime = performance.now()
+	      global.gc()
+	      console.log('Forced Garbage Collection. Elapsed Time',performance.now() - startTime) 
+		}
+	  }
+	}
   }
+  
+  collectTheGarbage() {}
   
   async doTransform(data) {
     // Snowflake generates o4bject based output, not array based outout. Transform object to array based on columnList
+	// this.collectTheGarbage()
     data = Object.values(data)
 	return super.doTransform(data)
   }

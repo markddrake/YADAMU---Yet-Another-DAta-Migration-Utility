@@ -1,6 +1,7 @@
-"use  strict"
 
-import {DatabaseError} from '../../core/yadamuException.js'
+import {
+  DatabaseError
+}                  from '../../core/yadamuException.js'
 
 class VerticaError extends DatabaseError {
 
@@ -67,7 +68,7 @@ class EmptyStringDetected extends Error {
 class ContentTooLarge extends Error {
 
    constructor(columnName,length,maxLength) {
-	 super(`Column "${columnName}: Comtent length ${length} exceeeds maximum permitted (${maxLength}).`)
+	 super(`Column "${columnName}: Content length ${length} exceeeds maximum permitted (${maxLength}).`)
 	 this.tags = ["CONTENT_TOO_LARGE"]
    }
    

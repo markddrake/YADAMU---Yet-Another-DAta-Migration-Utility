@@ -577,7 +577,7 @@ class LoaderDBI extends YadamuDBI {
     throw new YadamuError('Loading of "CSV" data sets not supported')
   }
   
-  async getInputStreams(tableInfo) {
+  async getInputStreams(tableInfo,parseDelay) {
 	const streams = []
 	const filename = this.makeAbsolute(this.getDataFileName(tableInfo.TABLE_NAME))
 
@@ -615,11 +615,11 @@ class LoaderDBI extends YadamuDBI {
 	switch (this.controlFile.settings.contentType) {
 	  case 'CSV':
 	    parser = this.getCSVParser()
-		transform =  new CSVTransform(tableInfo,this.yadamuLogger)
+		transform =  new CSVTransform(this,tableInfo,this.yadamuLogger,parseDelay)
 		break;
 	  case 'JSON':
 	    parser =  new JSONParser(this.yadamuLogger, this.MODE, filename)
-	    transform = new LoaderParser(tableInfo,this.yadamuLogger)
+	    transform = new LoaderParser(this,tableInfo,this.yadamuLogger,parseDelay)
 	}  
 	  
     parser.COPY_METRICS = metrics

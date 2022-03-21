@@ -1,11 +1,12 @@
-  "use strict"
 
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                            from 'perf_hooks';
+						
+import YadamuLibrary         from '../../lib/yadamuLibrary.js'
+import YadamuSpatialLibrary  from '../../lib/yadamuSpatialLibrary.js'
 
-import YadamuOutputManager from '../base/yadamuOutputManager.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuSpatialLibrary from '../../lib/yadamuSpatialLibrary.js';
-import {DatabaseError,RejectedColumnValue} from '../../core/yadamuException.js';
+import YadamuOutputManager   from '../base/yadamuOutputManager.js'
 
 class MySQLOutputManager extends YadamuOutputManager {
 

@@ -1,32 +1,17 @@
- "use strict"
 
-import crypto                                from 'crypto';
 import { 
   performance 
-}          
-                                             from 'perf_hooks';
-import fsp                                   from 'fs/promises';
-import path                                  from 'path'
+}                            from 'perf_hooks';
+						
+import YadamuLibrary         from '../../lib/yadamuLibrary.js'
+import YadamuSpatialLibrary  from '../../lib/yadamuSpatialLibrary.js'
 
-import Yadamu                                from '../../core/yadamu.js';
-import YadamuLibrary                         from '../../lib/yadamuLibrary.js';
-import YadamuSpatialLibrary                  from '../../lib/yadamuSpatialLibrary.js';
-import YadamuOutputManager                   from '../base/yadamuOutputManager.js';
-import StringWriter                          from '../../util/stringWriter.js';
+import YadamuOutputManager   from '../base/yadamuOutputManager.js'
+
 import {
-  FileError, 
-  FileNotFound, 
-  DirectoryNotFound
-}                                            from '../file/fileException.js';
-import {
-  WhitespaceIssue, 
-  EmptyStringDetected, 
-  ContentTooLarge, 
-  StagingAreaMisMatch,
-  VerticaError, 
-  VertiaCopyOperationFailure
-}                                            from './verticaException.js'
-import DataTypes                             from './verticaDataTypes.js'
+  EmptyStringDetected 
+}                            from './verticaException.js'
+
 
 class VerticaOutputManager extends YadamuOutputManager {
 
@@ -45,6 +30,18 @@ class VerticaOutputManager extends YadamuOutputManager {
 	    return interval;
 	}
   }	
+  
+  createBatch() {
+	return {
+	  copy          : []
+	, insert        : []
+    }
+  }  
+    
+  resetBatch(batch) {
+    batch.copy.length = 0;
+	batch.insert.length = 0;
+  }
   
   toSQLIntervalYM(interval) {
     const jsInterval = YadamuLibrary.parse8601Interval(interval)
@@ -77,22 +74,22 @@ class VerticaOutputManager extends YadamuOutputManager {
 	  const dataTypeDefinition = YadamuLibrary.decomposeDataType(dataType);
 	  
 	  switch (dataTypeDefinition.type.toLowerCase()) {
-		case DataTypes.BINARY_TYPE:
-		case DataTypes.VARBINARY_TYPE:
+		case this.dbi.DATA_TYPES.BINARY_TYPE:
+		case this.dbi.DATA_TYPES.VARBINARY_TYPE:
 		  return (col,idx) =>  {
 		    return col.toString('hex')
 		  }
-		case DataTypes.CHAR_TYPE:
-		case DataTypes.VARCHAR_TYPE:
-		case DataTypes.CLOB_TYPE:
+		case this.dbi.DATA_TYPES.CHAR_TYPE:
+		case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+		case this.dbi.DATA_TYPES.CLOB_TYPE:
 	      if (this.dbi.COPY_TRIM_WHITEPSPACE) {
             return null		  
 		  }
           // Track Indexes of columns Needed Whitespace preservation
 	      stringColumns.push(idx);
 		  return null
-		case DataTypes.GEOMETRY_TYPE:
-        case DataTypes.GEOGRAPHY_TYPE:
+		case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
+        case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
           if (this.SPATIAL_FORMAT.endsWith('WKB')) {
 		    return (col,idx) =>  {
 		     return col.toString('hex')
@@ -115,7 +112,7 @@ class VerticaOutputManager extends YadamuOutputManager {
           }
 		  */
 		  return null;
-        case DataTypes.BOOLEAN_TYPE:
+        case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
           return (col,idx) =>  {
 		    const bool = (typeof col === 'string') ? col.toUpperCase() : (Buffer.isBuffer(col)) ? col.toString('hex') : col
 			switch(bool) {
@@ -137,14 +134,14 @@ class VerticaOutputManager extends YadamuOutputManager {
             }
 			return col
           }
-        case DataTypes.DATE_TYPE:
+        case this.dbi.DATA_TYPES.DATE_TYPE:
           return (col,idx) =>  { 
             if (col instanceof Date) {
               return col.toISOString()
             }
 			return col
           }
-        case DataTypes.TIME_TYPE:
+        case this.dbi.DATA_TYPES.TIME_TYPE:
 		  return (col,idx) => {
             if (typeof col === 'string') {
               let components = col.split('T')
@@ -156,7 +153,7 @@ class VerticaOutputManager extends YadamuOutputManager {
             }
 		  }
           break;
-        case DataTypes.TIME_TZ_TYPE :
+        case this.dbi.DATA_TYPES.TIME_TZ_TYPE :
 		  return (col,idx) => {
             if (typeof col === 'string') {
               let components = col.split('T')
@@ -166,9 +163,9 @@ class VerticaOutputManager extends YadamuOutputManager {
               return col.getUTCHours() + ':' + col.getUTCMinutes() + ':' + col.getUTCSeconds() + '.' + col.getUTCMilliseconds()
             }
 		  }
-        case DataTypes.DATETIME_TYPE:
-        case DataTypes.TIMESTAMP_TYPE:
-        case DataTypes.TIMESTAMP_TZ_TYPE:
+        case this.dbi.DATA_TYPES.DATETIME_TYPE:
+        case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
+        case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
 		  // Timestamps are truncated to a maximum of 6 digits
           // Timestamps not explicitly marked as UTC are coerced to UTC.
 		  // Timestamps using a '+00:00' are converted are converted to 'Z'
@@ -187,16 +184,16 @@ class VerticaOutputManager extends YadamuOutputManager {
 			    return `${col.slice(0,26)}Z`
             }
           }
-        case DataTypes.INTERVAL_TYPE:
+        case this.dbi.DATA_TYPES.INTERVAL_TYPE:
   		  return (col,idx) => {
 			return this.toSQLInterval(col)
 		  }
-        case DataTypes.INTERVAL_DAY_TO_SECOND_TYPE:
+        case this.dbi.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
   		case "interval day to second":
 		  return (col,idx) => {
 		    return this.toSQLIntervalDMS(col)
 		  }
-        case DataTypes.INTERVAL_YEAR_TO_MONTH_TYPE:
+        case this.dbi.DATA_TYPES.INTERVAL_YEAR_TO_MONTH_TYPE:
           return (col,idx) => {
 		    return this.toSQLIntervalYM(col)
 		  }

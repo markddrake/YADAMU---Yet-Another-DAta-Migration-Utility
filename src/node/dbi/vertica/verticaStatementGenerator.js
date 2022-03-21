@@ -26,14 +26,12 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
   getMappedDataType(dataType,sizeConstraint) {
  
     if (this.SOURCE_VENDOR === this.dbi.DATABASE_VENDOR) {
-      /*
-	  switch (dataType.toUpperCase()) {
+      switch (dataType.toUpperCase()) {
         case 'JSON':                                                                  return this.dbi.DATA_TYPES.JSON_TYPE;
         case 'XML':                                                                   return this.dbi.DATA_TYPES.XML_TYPE;
 	    default:                                                                      return dataType
 	   }
-      */
-	  return dataType
+      return dataType
 	}
     const mappedDataType = super.getMappedDataType(dataType,sizeConstraint)
     const length = parseInt(sizeConstraint)
@@ -94,7 +92,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
         case this.dbi.DATA_TYPES.EIGHT_BYTE_TYPES.includes(mappedDataType):
           bytesUsed+=8
           break;
-        case this.dbi.DATA_TYPES.isSpatialType(mappedDataType):
+        case this.dbi.DATA_TYPES.isSpatial(mappedDataType):
           bytesUsed+=this.dbi.DATA_TYPES.DEFAULT_SPATIAL_LENGTH
           break;
 		case (typeDefinition.hasOwnProperty('scale')):
@@ -171,7 +169,9 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
   generateTableInfo(tableMetadata) {
 	
     let insertMode = 'Copy';
-
+	
+	console.log(new Error().stack)
+	
     const columnNames = tableMetadata.columnNames
 	const sizeConstraints = tableMetadata.sizeConstraints
     
@@ -187,6 +187,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
    	  jsonColumns[idx] =  this.isJSON(tableMetadata.dataTypes[idx])
    	  xmlColumns[idx] =  this.isXML(tableMetadata.dataTypes[idx])
       let mappedDataType = (tableMetadata.source) ? tableMetadata.dataTypes[idx] : this.getMappedDataType(tableMetadata.dataTypes[idx],tableMetadata.sizeConstraints[idx])
+	  console.log(tableMetadata.dataTypes[idx],mappedDataType,jsonColumns,xmlColumns)
 	  // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,tableMetadata.vendor,tableMetadata.dataTypes[idx],tableMetadata.sizeConstraints[idx]],`Mapped to "${mappedDataType}".`)
 
 	  const columnStorageClause = this.generateStorageClause(mappedDataType,tableMetadata.sizeConstraints[idx])
@@ -374,22 +375,30 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
 	  if (xmlColumns[idx]) {
         checkConstraint = `check(YADAMU.IS_XML("${columnName}"))`
       }
+	  console.log(mappedDataType)
       mappedDataTypes.push(mappedDataType)      
       return `"${columnName}" ${this.generateStorageClause(mappedDataType,sizeConstraints[idx])}${checkConstraint ? ` ${checkConstraint}` : ''}`
     })
 	
 	// Check and Adjust Row Size
-	
+	console.log(columnDefinitions)
     const lobList = []
 	let bytesUsed = this.calculateFixedRowSize(mappedDataTypes,sizeConstraints,lobList)
 	if (bytesUsed > this.dbi.DATA_TYPES.ROW_SIZE) {
 	  this.adjustLobSizes(tableMetadata.tableName,bytesUsed,lobList,columnDefinitions,sizeConstraints)
 	}
 	
+    // All remote paths must use POSIX/Linux seperators (Vertica does not run on MS-Windows)
+
+	const stagingFileName =  `YST-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
+	const stagingFilePath =  path.join(this.dbi.LOCAL_STAGING_AREA,stagingFileName)
+	const localPath       =  path.resolve(stagingFilePath); 
+	let remotePath        =  path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName).split(path.sep).join(path.posix.sep)
+	
     const stagingFileName =  `YST-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
     const stagingFilePath =  path.join(this.dbi.LOCAL_STAGING_AREA,stagingFileName)
     const localPath       =  path.resolve(stagingFilePath); 
-    const remotePath      =  tableMetadata.dataFile || path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName).split(path.sep).join(path.posix.sep)
+    const remotePath      =  tableMetadata.dataFile || path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName)
     
     const tableInfo =  { 
       ddl             : this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,mappedDataTypes)
@@ -411,9 +420,9 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
     , _TABLE_NAME     : tableMetadata.tableName
     }
 	
-
     if (Array.isArray(tableMetadata.dataFile)) {
       tableInfo.copy = tableMetadata.dataFile.map((remotePath,idx) => {
+        remotePath = remotePath.split(path.sep).join(path.posix.sep)
         return  {
           dml             : this.generateCopyStatement(this.targetSchema,tableMetadata.tableName,remotePath,copyColumnDefinitions)
         , partitionCount  : tableMetadata.partitionCount
@@ -422,8 +431,9 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
       })
     }
     else {
-      tableInfo.copy = {
-       dml         :  this.generateCopyStatement(this.targetSchema,tableMetadata.tableName,remotePath,copyColumnDefinitions)
+       remotePath = tableMetadata.dataFile ? tableMetadata.dataFile.split(path.sep).join(path.posix.sep) : remotePath
+	   tableInfo.copy = {
+        dml         :  this.generateCopyStatement(this.targetSchema,tableMetadata.tableName,remotePath,copyColumnDefinitions)
       }
     }
 

@@ -54,7 +54,7 @@ class YadamuStatementGenerator {
 		 break
 	   default:
 	 }
-     // console.log(key,':',dataType,length,'==>',mappedDataType)
+     console.log(key,':',dataType,length,'==>',mappedDataType)
 	 return mappedDataType
 	 
   }
