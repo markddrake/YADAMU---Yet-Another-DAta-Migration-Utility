@@ -144,7 +144,7 @@ class YadamuQA {
       this.yadamu.IDENTIFIER_MAPPINGS = identifierMappings 
     }
     
-    // dbi.setIdentifierMappings(identifierMappings);
+    dbi.setIdentifierMappings(identifierMappings);
     dbi.setOption('recreateSchema',recreateSchema);
  
     return dbi;

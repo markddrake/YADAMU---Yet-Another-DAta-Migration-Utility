@@ -67,7 +67,7 @@ class EmptyStringDetected extends Error {
 class ContentTooLarge extends Error {
 
    constructor(columnName,length,maxLength) {
-	 super(`Column "${columnName}: Comtent length ${length} exceeeds maximum permitted (${maxLength}).`)
+	 super(`Column "${columnName}: Content length ${length} exceeeds maximum permitted (${maxLength}).`)
 	 this.tags = ["CONTENT_TOO_LARGE"]
    }
    

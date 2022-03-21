@@ -13,5 +13,5 @@ RUN apt update \
  && alien -i --scripts ./oracle-instantclient-basic-21.3.0.0.0-1.x86_64.rpm \
  && npm install --global electron \
  && npm install \
- %% node --version 
+ && node --version 
 ENTRYPOINT bash

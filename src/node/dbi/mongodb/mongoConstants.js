@@ -1,4 +1,3 @@
-"use strict"
 
 import YadamuConstants from '../../lib/yadamuConstants.js';
 
@@ -45,6 +44,36 @@ class MongoConstants {
   static get STATEMENT_TERMINATOR()   { return ';' }
   static get MAX_DOCUMENT_SIZE()      { return this.DBI_PARAMETERS.MAX_DOCUMENT_SIZE}
   static get DEFAULT_DATABASE()       { return this.DBI_PARAMETERS.DEFAULT_DATABASE };
+
+  static get SESSION_ENDED_ERROR() {
+    this._SESSION_ENDED_ERROR = this._SESSION_ENDED_ERROR || Object.freeze([11600])
+    return this._SESSION_ENDED_ERROR
+  }
+
+  static get SESSION_ENDED_MESSAGE() {
+    this._SESSION_ENDED_MESSAGE = this._SESSION_ENDED_MESSAGE || Object.freeze(["Cannot use a session that has ended"])
+    return this._SESSION_ENDED_MESSAGE
+  }
+  
+  static get SERVER_UNAVAILABLE_ERROR() {
+    this._SERVER_UNAVAILABLE_ERROR = this._SERVER_UNAVAILABLE_ERROR || Object.freeze([11600])
+    return this._SERVER_UNAVAILABLE_ERROR
+  }
+
+  static get SERVER_UNAVAILABLE_MESSAGE() {
+    this._SERVER_UNAVAILABLE_MESSAGE = this._SERVER_UNAVAILABLE_MESSAGE || Object.freeze(["pool is draining, new operations prohibited"])
+    return this._SERVER_UNAVAILABLE_MESSAGE
+  }
+
+  static get CONTENT_TOO_LARGE_ERROR() {
+    this._CONTENT_TOO_LARGE_ERROR = this._CONTENT_TOO_LARGE_ERROR || Object.freeze(['ERR_OUT_OF_RANGE'])
+    return this._CONTENT_TOO_LARGE_ERROR
+  }
+
+  static get CONTENT_TOO_LARGE_MESSAGE() {
+    this._CONTENT_TOO_LARGE_MESSAGE = this._CONTENT_TOO_LARGE_MESSAGE || Object.freeze(["document is larger than the maximum size 16777216"])
+    return this._CONTENT_TOO_LARGE_MESSAGE
+  }
 
 }
 

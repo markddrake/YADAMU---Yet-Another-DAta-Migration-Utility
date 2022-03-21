@@ -1,17 +1,21 @@
-"use strict"
 
-import {Readable} from 'stream'
+import {
+  Readable
+}                   from 'stream'
 
 class ArrayReadable extends Readable {
 
   constructor(data) {
 	 super({objectMode:true});
 	 this.data = data || []
+	 // Node 17.7.2 - isPaused() seems to unexpectedly change state from true to false
+	 this.pendingRead = false;
   }
   
   _read() {
 	 if (this.data.length === 0) {
 	   this.pause()
+       this.pendingRead = true;
      }
 	 else {
 	   this.push(this.data.shift())
@@ -19,11 +23,11 @@ class ArrayReadable extends Readable {
   }
   
   addContent(data) {
-    // console.log('pump()',this.isPaused(),this.readableFlowing,this.data.length,data === null ? 'NULL' : Object.keys(data)[0])
+	// console.log('pump()',this.isPaused(),this.pendingRead,this.readableFlowing,this.data.length,data === null ? 'NULL' : Object.keys(data)[0])
     this.data.push(...data)
-    if (this.isPaused()) {
-       // console.log('_read()',this.data.length,this.data[0] === null ? ' END' : Object.keys(this.data[0])[0])
-	   this.push(this.data.shift())
+    if (this.isPaused() || this.pendingRead) {
+       this.push(this.data.shift())
+	   this.pendingRead = false;
 	   this.resume();
 	}
   }

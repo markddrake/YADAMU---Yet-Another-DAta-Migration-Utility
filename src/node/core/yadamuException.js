@@ -1,4 +1,3 @@
-"use strict"
 
 class YadamuError extends Error {
 
@@ -128,25 +127,6 @@ class ConnectionError extends UserError {
   }
 }
 
-class ContentTooLarge extends YadamuError {
-  constructor(cause,vendor,operation,maxSize) {
-    super(`Source record too large for Target Database`);
-	this.cause=cause
-	this.vendor = vendor
-	this.operation = operation
-	this.maxSize = maxSize
-  }
-  
-  getTags() {
-	return [this.vendor,this.tableName,this.operation,this.maxSize]
-  }
-  
-  setTableName(tableName) {
-	this.tableName = tableName
-  }
-  
-}
-
 class BatchInsertError extends YadamuError {
   constructor(cause,tableName,batchNumber,batchSize,firstRow,lastRow,info) {
 	super(cause.message)
@@ -207,6 +187,14 @@ class DatabaseError extends YadamuError {
 	this.cause = cause
 	this.stack = this.cloneStack(stack)
 	this.sql = sql
+
+	this.tags = []
+
+    /*
+	**
+	** Check for Knwown Errors (eg Content Too Large). 
+	**
+	*/
 	
 	this.setTags()
 	/*
@@ -221,7 +209,6 @@ class DatabaseError extends YadamuError {
   }
   
   setTags() {
-	this.tags = []
 	switch (true) {
 	  case (this.contentTooLarge()):
 	     this.tags.push('CONTENT_TOO_LARGE');
@@ -262,6 +249,29 @@ class DatabaseError extends YadamuError {
   
 }
 
+class ContentTooLarge extends DatabaseError {
+  constructor(driverId,cause,stack,operation,vendor,tableName,maxLength) {
+    super(driverId,cause,stack,operation);
+	this.message = `Table "${tableName}": Row length ${length} exceeeds maximum permitted (${maxLength}).`
+	this.vendor = vendor
+	this.tableName = tableName
+	this.maxLength = maxLength
+	this.tags = ['CONTENT_TOO_LARGE',this.vendor,this.tableName,this.maxLength]
+  }
+  
+}
+
+class ColumnTooLarge extends ContentTooLarge {
+  constructor(driverId,cause,stack,operation,vendor,tableName,maxLength,columnName,dataLength) {
+    super(driverId,cause,stack,operation,vendor,tableName,maxLength);
+	this.message = `Column "${columnName}" in table "${tableName}": Content length ${length} exceeeds maximum permitted (${maxLength}).`
+	this.columnName = columnName
+	this.dataLength = dataLength
+	this.tags.push(this.columnName,this.dataLength)
+  }
+   
+}
+
 class InputStreamError extends DatabaseError {
   constructor(cause,stack,sql) {
     super(cause,stack,sql)
@@ -286,4 +296,3 @@ export {
 , CopyOperationAborted
 , UnimplementedMethod
 }
-

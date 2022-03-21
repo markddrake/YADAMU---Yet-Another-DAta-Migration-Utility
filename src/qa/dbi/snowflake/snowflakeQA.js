@@ -1,4 +1,3 @@
-"use strict" 
 
 import {
   setTimeout 
@@ -42,8 +41,8 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
 	async recreateDatabase() {
 
       try {	
-	    const connectionProperties = Object.assign({},this.vendorProperties)
-	    const dbi = new SnowflakeMgr(this.yadamu,this.yadamuLogger,this.status, connectionProperties)
+	    const vendorProperties = Object.assign({},this.vendorProperties)
+	    const dbi = new SnowflakeMgr(this.yadamu, vendorProperties)
 	    await dbi.recreateDatabase(this.parameters.YADAMU_DATABASE,this.parameters.TO_USER)
 	  }	catch (e) {
         this.yadamu.LOGGER.handleException([this.DATABASE_VENDOR,'RECREATE DATABASE',this.parameters.TO_USER],e);
@@ -137,10 +136,8 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
 
 class SnowflakeMgr extends SnowflakeDBI {
 	
-	constructor(yadamu,logger,status,vendorProperties) {
+	constructor(yadamu,vendorProperties) {
 	  super(yadamu)
-	  this.yadamuLogger = logger;
-  	  this.status = status
 	  this.vendorProperties = vendorProperties
       this.vendorProperties.database = '';
 	}

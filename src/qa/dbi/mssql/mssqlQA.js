@@ -1,4 +1,3 @@
-"use strict" 
 
 import {
   setTimeout 
@@ -55,8 +54,8 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
     async recreateDatabase() {
 
       try { 
-        const connectionProperties = Object.assign({},this.vendorProperties)
-        const dbi = new MsSQLDBMgr(this.yadamuLogger,this.status, connectionProperties)
+        const vendorProperties = Object.assign({},this.vendorProperties)
+        const dbi = new MsSQLDBMgr(this.yadamu, vendorProperties)
         await dbi.recreateDatabase(this.parameters.YADAMU_DATABASE)
       } catch (e) {
         this.yadamu.LOGGER.handleException([this.DATABASE_VENDOR,'RECREATE DATABASE',this.parameters.YADAMU_DATABASE],e);
@@ -135,7 +134,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
     }
 
     classFactory(yadamu) {
-      return new MsSQLQA(yadamu,this,this.connectionSettings,this.parameters)
+      return new MsSQLQA(yadamu,this,this.connectionParameters,this.parameters)
     }
        
     async scheduleTermination(pid,workerId) {
@@ -178,10 +177,8 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
 
 class MsSQLDBMgr extends MsSQLQA {
     
-    constructor(logger,status,vendorProperties) {
-      super({activeConnections: new Set(), STATUS: status},undefined,{},{})
-      this.yadamuLogger = logger;
-      this.status = status
+    constructor(yadamu,vendorProperties) {
+      super(yadamu)
       this.vendorProperties = vendorProperties
       this.vendorProperties.database = 'master';
     }
