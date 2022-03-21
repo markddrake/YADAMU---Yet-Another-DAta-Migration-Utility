@@ -224,7 +224,7 @@ class OracleDBI extends YadamuDBI {
 	
 	// make oracledb constants available to decendants of OracleDBI
 	this.oracledb = oracledb
-
+    
     this.ddl = [];
 	this.dropWrapperStatements = []
 
@@ -944,7 +944,7 @@ class OracleDBI extends YadamuDBI {
 
   async initializeImport() {
 	super.initializeImport()
-    await this.setCurrentSchema(this.CURRENT_SCHEMA)
+	await this.setCurrentSchema(this.CURRENT_SCHEMA)
   }
 
   async initializeData() {
