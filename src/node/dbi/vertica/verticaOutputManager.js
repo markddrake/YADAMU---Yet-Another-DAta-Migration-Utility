@@ -29,6 +29,9 @@ class VerticaOutputManager extends YadamuOutputManager {
   resetBatch(batch) {
     batch.copy.length = 0;
 	batch.insert.length = 0;
+	Object.keys(batch).filter((key) => {return ((key !== 'copy') && (key !== 'insert'))}).forEach((key) => {
+	  delete batch[key]
+	})
   }
   
   toSQLInterval(interval) {
