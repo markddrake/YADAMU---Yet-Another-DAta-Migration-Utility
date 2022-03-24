@@ -16,8 +16,6 @@ class MongoError extends DatabaseError {
   }
 
   serverUnavailable() {
-	const knownErrors = Object.freeze([11600])
-	const knownMessages = Object.freeze(["pool is draining, new operations prohibited"])
     return ((this.cause.code && (MongoConstants.SERVER_UNAVAILABLE_ERROR.includes(this.cause.code)) || MongoConstants.SERVER_UNAVAILABLE_MESSAGE(this.message)))
   }
     	   
