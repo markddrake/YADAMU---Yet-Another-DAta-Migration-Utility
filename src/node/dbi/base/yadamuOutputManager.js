@@ -76,8 +76,10 @@ class YadamuOutputManager extends Transform {
   }
   
   releaseBatch(batch) {
-	this.resetBatch(batch)
-	this.batchCache.push(batch)
+	if (batch) {
+	  this.resetBatch(batch)
+	  this.batchCache.push(batch)
+	}
 	this.emit(DBIConstants.BATCH_RELEASED)
   }
 

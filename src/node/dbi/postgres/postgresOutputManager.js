@@ -1,12 +1,13 @@
 
 import { 
   performance 
-}                            from 'perf_hooks';
+}                               from 'perf_hooks';
 						
-import YadamuLibrary         from '../../lib/yadamuLibrary.js'
-import YadamuSpatialLibrary  from '../../lib/yadamuSpatialLibrary.js'
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
+import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js'
 
-import YadamuOutputManager   from '../base/yadamuOutputManager.js'
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class PostgresOutputManager extends YadamuOutputManager  {
 
@@ -14,26 +15,29 @@ class PostgresOutputManager extends YadamuOutputManager  {
     super(dbi,tableName,metrics,status,yadamuLogger)
   }
   
-    generateTransformations(dataTypes) {
+  generateTransformations(dataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
- 	
-  	return dataTypes.map((targetDataType,idx) => {
-      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-	  switch (dataType.type.toLowerCase()) {
-		case "tsvector":
-        case "json" :
-		case "jsonb":
-	      // https://github.com/brianc/node-postgres/issues/442
-	      return (col,idx) => {
-            return typeof col === 'object' ? JSON.stringify(col) : col
-          }
-        case "boolean" :
+	
+	return dataTypes.map((dataType,idx) => {
+      
+	  const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType)
+	  
+	  // Conversion from JSON to PGSQL specific data types is handled by Functions loaded into the database.
+     
+	  if (this.dbi.DATA_TYPES.isJSON(dataTypeDefinition.type)) {
+		// https://github.com/brianc/node-postgres/issues/442
+        return (col,idx) => {
+          return typeof col === 'object' ? JSON.stringify(col) : col
+        }
+	  }	  
+	  
+	  switch (dataTypeDefinition.type.toLowerCase()) {
+        case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
  		  return (col,idx) => {
              return YadamuLibrary.toBoolean(col)
           }
-          break;
-        case "time without time zone" :
+        case this.dbi.DATA_TYPES.TIME_TYPE:
 		  return (col,idx) => {
             if (typeof col === 'string') {
               let components = col.split('T')
@@ -44,9 +48,8 @@ class PostgresOutputManager extends YadamuOutputManager  {
               return col.getUTCHours() + ':' + col.getUTCMinutes() + ':' + col.getUTCSeconds() + '.' + col.getUTCMilliseconds();  
             }
 		  }
-          break;
-        case "time with time zone" :
-		  return (col,idx) => {
+        case this.dbi.DATA_TYPES.TIME_TZ_TYPE:
+          return (col,idx) => {
             if (typeof col === 'string') {
               let components = col.split('T')
               return components.length === 1 ? components[0] : components[1]
@@ -55,11 +58,10 @@ class PostgresOutputManager extends YadamuOutputManager  {
               return col.getUTCHours() + ':' + col.getUTCMinutes() + ':' + col.getUTCSeconds() + '.' + col.getUTCMilliseconds();
             }
 		  }
-          break;
-        case 'date':
-        case 'datetime':
-        case 'timestamp with time zone':
-        case 'timestamp without time zone':
+        case this.dbi.DATA_TYPES.DATE_TYPE:
+        case this.dbi.DATA_TYPES.DATETIME_TYPE:
+        case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
+        case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
 		  return (col,idx) => {
             if (typeof col === 'string') {
               if (col.endsWith('Z') && col.length === 28) {
@@ -84,7 +86,26 @@ class PostgresOutputManager extends YadamuOutputManager  {
             }
 			return col
 		  }
-          break;
+        case this.dbi.DATA_TYPES.BIT_STRING_TYPE:
+	      const fixedLength = this.tableInfo.sizeConstraints[idx]
+		  return (col,idx) => {
+			return col.padStart(fixedLength,'0')
+		  }
+        case this.dbi.DATA_TYPES.PGSQL_OID_TYPE:                     
+        case this.dbi.DATA_TYPES.PGSQL_REG_CLASS_TYPE:               
+		case this.dbi.DATA_TYPES.PGSQL_REG_COLLATION_TYPE:           
+		case this.dbi.DATA_TYPES.PGSQL_REG_TEXTSEARCH_CONFIG_TYPE:   
+		case this.dbi.DATA_TYPES.PGSQL_REG_TEXTSEARCH_DICT_TYPE:     
+		case this.dbi.DATA_TYPES.PGSQL_REG_NAMESPACE_TYPE:           
+		case this.dbi.DATA_TYPES.PGSQL_REG_OPERATOR_NAME_TYPE:       
+		case this.dbi.DATA_TYPES.PGSQL_REG_OPERATOR_ARGS_TYPE:       
+		case this.dbi.DATA_TYPES.PGSQL_REG_FUNCTION_NAME_TYPE:       
+		case this.dbi.DATA_TYPES.PGSQL_REG_FUNCTION_ARGS_TYPE:       
+		case this.dbi.DATA_TYPES.PGSQL_REG_ROLE_TYPE:                
+	    case this.dbi.DATA_TYPES.PGSQL_REG_TYPE_TYPE:
+		  return (col,idx) => {
+			return Buffer.isBuffer(col) ? col.readUInt32BE(0) : col
+		  }
         default :
 		  return null
       }
@@ -98,8 +119,7 @@ class PostgresOutputManager extends YadamuOutputManager  {
 		
 	// Use forEach not Map as transformations are not required for most columns. 
 	// Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
-  	
-    this.rowTransformation(row)
+	this.rowTransformation(row)
     this.batch.push(...row);
     this.COPY_METRICS.cached++
 	return this.skipTable

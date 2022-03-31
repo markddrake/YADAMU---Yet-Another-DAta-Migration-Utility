@@ -76,29 +76,29 @@ class PostgresDBI extends YadamuDBI {
  
   // Define Getters based on configuration settings here
  
-  get DATABASE_KEY()           { return PostgresConstants.DATABASE_KEY};
-  get DATABASE_VENDOR()        { return PostgresConstants.DATABASE_VENDOR};
-  get SOFTWARE_VENDOR()        { return PostgresConstants.SOFTWARE_VENDOR};
-  get SQL_COPY_OPERATIONS()    { return true }
-  get STATEMENT_TERMINATOR()   { return PostgresConstants.STATEMENT_TERMINATOR };
+  get DATABASE_KEY()                  { return PostgresConstants.DATABASE_KEY};
+  get DATABASE_VENDOR()               { return PostgresConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()               { return PostgresConstants.SOFTWARE_VENDOR};
+  get SQL_COPY_OPERATIONS()           { return true }
+  get STATEMENT_TERMINATOR()          { return PostgresConstants.STATEMENT_TERMINATOR };
    
   // Enable configuration via command line parameters
   
-  get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT || PostgresConstants.CIRCLE_FORMAT }
-  get BYTEA_SIZING_MODEL()     { return this.parameters.BYTEA_SIZING_MODEL || PostgresConstants.BYTEA_SIZING_MODEL }
-  get COPY_SERVER_NAME()       { return this.parameters.COPY_SERVER_NAME || PostgresConstants.COPY_SERVER_NAME }
-   
-  get POSTGIS_VERSION()        { return this._POSTGIS_VERSION || "Not Installed" }
-  set POSTGIS_VERSION(v)       { this._POSTGIS_VERSION = v }
-  
-  get POSTGIS_INSTALLED()      { return this.POSTGIS_VERSION !== "Not Installed" }
+  get CIRCLE_FORMAT()                 { return this.parameters.CIRCLE_FORMAT || PostgresConstants.CIRCLE_FORMAT }
+  get BYTEA_SIZING_MODEL()            { return this.parameters.BYTEA_SIZING_MODEL || PostgresConstants.BYTEA_SIZING_MODEL }
+  get COPY_SERVER_NAME()              { return this.parameters.COPY_SERVER_NAME || PostgresConstants.COPY_SERVER_NAME }
+							         
+  get POSTGIS_VERSION()               { return this._POSTGIS_VERSION || "Not Installed" }
+  set POSTGIS_VERSION(v)              { this._POSTGIS_VERSION = v }
+							         
+  get POSTGIS_INSTALLED()             { return this.POSTGIS_VERSION !== "Not Installed" }
 
   // Standard Spatial formatting only available when PostGIS is installed.
 
-  get SPATIAL_FORMAT()         { return this.POSTGIS_INSTALLED === true ? this.parameters.SPATIAL_FORMAT || DBIConstants.SPATIAL_FORMAT :  "Native" };
-  get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
-
-  get JSON_DATA_TYPE()         { return this.parameters.POSTGRES_JSON_TYPE || PostgresConstants.POSTGRES_JSON_TYPE }
+  get SPATIAL_FORMAT()                { return this.POSTGIS_INSTALLED === true ? this.parameters.SPATIAL_FORMAT || DBIConstants.SPATIAL_FORMAT :  "Native" };
+  get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
+							          
+  get JSON_DATA_TYPE()                { return this.parameters.POSTGRES_JSON_TYPE || PostgresDataTypes.storageOptions.JSON_TYPE }
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
@@ -106,7 +106,7 @@ class PostgresDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	yadamu.initializeTypeMapping(PostgresDataTypes,this.TYPE_MAPPINGS)
+	this.initializeDataTypes(PostgresDataTypes)
   
     this.pgClient = undefined;
     this.useBinaryJSON = false
@@ -516,7 +516,11 @@ class PostgresDBI extends YadamuDBI {
 
   async processStagingTable(schema) {  	
   	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1) from "YADAMU_STAGING"`;
-  	var results = await this.executeSQL(sqlStatement,[schema])
+
+    const statementGenerator = new PostgresStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
+    const typeMappings = statementGenerator.getVendorTypeMappings()
+
+  	var results = await this.executeSQL(sqlStatement,[typeMappings,schema])
     if (results.rows.length > 0) {
       if (this.useBinaryJSON  === true) {
 	    return this.processLog(results.rows[0][0],'JSONB_EACH')  

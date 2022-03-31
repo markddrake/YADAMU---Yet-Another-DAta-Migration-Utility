@@ -100,11 +100,11 @@ class OracleDBI extends YadamuDBI {
   // Enable configuration via command line parameters
 
   get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT              || OracleConstants.SPATIAL_FORMAT }
-  get OBJECT_FORMAT()              { return this.parameters.OBJECT_FORMAT               || OracleConstants.OBJECT_FORMAT }
+  // get OBJECT_FORMAT()              { return this.parameters.OBJECT_FORMAT               || OracleConstants.OBJECT_FORMAT }
   get ORACLE_XML_TYPE()            { return this.parameters.ORACLE_XML_TYPE             || OracleConstants.ORACLE_XML_TYPE}
   get ORACLE_JSON_TYPE()           { return this.parameters.ORACLE_JSON_TYPE            || OracleConstants.ORACLE_JSON_TYPE}
   get MIGRATE_JSON_STORAGE()       { return this.parameters.MIGRATE_JSON_STORAGE        || OracleConstants.MIGRATE_JSON_STORAGE}
-  get TREAT_RAW1_AS_BOOLEAN()      { return this.parameters.TREAT_RAW1_AS_BOOLEAN       || OracleConstants.TREAT_RAW1_AS_BOOLEAN }
+  // get BOOLEAN_AS_RAW1()      { return this.parameters.BOOLEAN_AS_RAW1       || OracleConstants.BOOLEAN_AS_RAW1 }
   get BYTE_TO_CHAR_RATIO()         { return this.parameters.BYTE_TO_CHAR_RATIO          || OracleConstants.BYTE_TO_CHAR_RATIO };
   get COPY_LOGFILE_DIRNAME()       { return this.parameters.COPY_LOGFILE_DIRNAME        || OracleConstants.COPY_LOGFILE_DIRNAME };
   get COPY_BADFILE_DIRNAME()       { return this.parameters.COPY_BADFILE_DIRNAME        || OracleConstants.COPY_BADFILE_DIRNAME };
@@ -112,6 +112,9 @@ class OracleDBI extends YadamuDBI {
   get CACHELOB_BATCH_LIMIT()       { return this.parameters.CACHELOB_BATCH_LIMIT        || OracleConstants.CACHELOB_BATCH_LIMIT}
   get LOB_MAX_SIZE()               { return this.parameters.LOB_MAX_SIZE                || OracleConstants.LOB_MAX_SIZE}
 
+  get BOOLEAN_AS_RAW1()      { return OracleDataTypes.BOOLEAN_AS_RAW1 }
+  get OBJECT_FORMAT()              { return OracleDataTypes.OBJECT_FORMAT }
+  
   get CACHELOB_MAX_SIZE ()         { return this.EXTENDED_STRING ? OracleConstants.VARCHAR_MAX_SIZE_EXTENDED : OracleConstants.VARCHAR_MAX_SIZE_STANDARD}
 
   get VARCHAR_MAX_SIZE() {
@@ -220,11 +223,11 @@ class OracleDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	yadamu.initializeTypeMapping(OracleDataTypes,this.TYPE_MAPPINGS)
-	
+	this.initializeDataTypes(OracleDataTypes)
+
 	// make oracledb constants available to decendants of OracleDBI
 	this.oracledb = oracledb
-    
+
     this.ddl = [];
 	this.dropWrapperStatements = []
 
@@ -944,7 +947,7 @@ class OracleDBI extends YadamuDBI {
 
   async initializeImport() {
 	super.initializeImport()
-	await this.setCurrentSchema(this.CURRENT_SCHEMA)
+    await this.setCurrentSchema(this.CURRENT_SCHEMA)
   }
 
   async initializeData() {
@@ -1149,15 +1152,18 @@ class OracleDBI extends YadamuDBI {
 	     break;
     }
 
-
-	const typeMappings = {
-	  raw1AsBoolean    : new Boolean(this.TREAT_RAW1_AS_BOOLEAN).toString().toLowerCase()
+    const statementGenerator = new OracleStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
+    const typeMappings = statementGenerator.getVendorTypeMappings()
+	
+	const options = {
+	  raw1AsBoolean    : new Boolean(this.BOOLEAN_AS_RAW1).toString().toLowerCase()
 	, jsonDataType     : this.JSON_DATA_TYPE
 	, xmlStorageModel  : this.XML_STORAGE_CLAUSE
 	}
 
-	const sqlStatement = `begin\n  ${settings}\n  :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema, :typeMappings);\nend;`;
-	const results = await this.executeSQL(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH}, json:hndl, schema:this.CURRENT_SCHEMA, typeMappings: JSON.stringify(typeMappings)})
+	const sqlStatement = `begin\n  ${settings}\n  :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema, :options);\nend;`;
+	const results = await this.executeSQL(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH}, json:hndl, typeMappings: typeMapping, schema:this.CURRENT_SCHEMA, options: JSON.stringify(options)})
+	await this.typeMappings.close();
     return this.processLog(results,'JSON_TABLE')
   }
 
@@ -1247,7 +1253,7 @@ class OracleDBI extends YadamuDBI {
   async getSchemaMetadata() {
 
     const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION
-	                                     ,{schema: this.CURRENT_SCHEMA, spatialFormat: this.SPATIAL_FORMAT, objectsAsJSON : new Boolean(this.OBJECTS_AS_JSON).toString().toUpperCase(), raw1AsBoolean: new Boolean(this.TREAT_RAW1_AS_BOOLEAN).toString().toUpperCase()}
+	                                     ,{schema: this.CURRENT_SCHEMA, spatialFormat: this.SPATIAL_FORMAT, objectsAsJSON : new Boolean(this.OBJECTS_AS_JSON).toString().toUpperCase(), raw1AsBoolean: new Boolean(this.BOOLEAN_AS_RAW1).toString().toUpperCase()}
 										 ,{outFormat:
 										    oracledb.OBJECT
 										   ,fetchInfo: {

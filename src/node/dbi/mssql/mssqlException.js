@@ -45,6 +45,12 @@ class MsSQLError extends DatabaseError {
   suppressedError() {
 	return (MsSQLConstants.SUPPRESSED_ERROR.includes(this.cause.message))
   }
+  
+  contentTooLarge() {
+    let cause = this.getUnderlyingError()
+    return ((cause?.info?.number &&  MsSQLConstants.CONTENT_TOO_LARGE_ERROR.includes(cause.info.number))) 
+  }
+
 }
 
 export { MsSQLError as default }

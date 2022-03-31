@@ -1,18 +1,19 @@
 
 import { 
   performance 
-}                            from 'perf_hooks';
+}                               from 'perf_hooks';
 
 import sql from 'mssql';						
 
-import YadamuLibrary         from '../../lib/yadamuLibrary.js'
-import YadamuSpatialLibrary  from '../../lib/yadamuSpatialLibrary.js'
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
+import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js'
 
 import {
   RejectedColumnValue
-}                            from '../../core/yadamuException.js';
+}                               from '../../core/yadamuException.js';
 
-import YadamuOutputManager   from '../base/yadamuOutputManager.js'
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class MsSQLOutputManager extends YadamuOutputManager {
     
@@ -21,8 +22,9 @@ class MsSQLOutputManager extends YadamuOutputManager {
   }
   
   createBatch() {
+	 
 	if (this.tableInfo.insertMode === 'BCP') {
-	  return this.dbi.createBulkOperation(this.dbi.DATABASE_NAME, this.tableInfo.tableName, this.tableInfo.columnNames, this.tableInfo.dataTypes) 
+	  return this.dbi.createBulkOperation(this.dbi.DATABASE_NAME, this.tableInfo.tableName, this.tableInfo.columnNames, this.tableInfo.dataTypeDefinitions) 
 	}
 	else {
       return new sql.Table()
@@ -33,15 +35,15 @@ class MsSQLOutputManager extends YadamuOutputManager {
 	batch.rows.length = 0;
   }
 
-  generateTransformations(targetDataTypes) {
+  generateTransformations(dataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
 
-	const decomposedDataTypes  = YadamuLibrary.decomposeDataTypes(this.tableInfo.targetDataTypes)		
-    this.tableInfo.decomposedDataTypes = decomposedDataTypes
-	return decomposedDataTypes.map((dataType,idx) => {      
+	const dataTypeDefinitions  = YadamuDataTypes.decomposeDataTypes(dataTypes)		
+    this.tableInfo.dataTypeDefinitions = dataTypeDefinitions
+	return dataTypeDefinitions.map((dataType,idx) => {      
 	  switch (dataType.type.toLowerCase()) {
-        case "json":
+        case this.dbi.DATA_TYPES.JSON_TYPE.toLowerCase():
 		  return (col,idx) => {
             return typeof col === 'object' ? JSON.stringify(col) : col
 		  }
@@ -52,7 +54,7 @@ class MsSQLOutputManager extends YadamuOutputManager {
             return YadamuLibrary.toBoolean(col)
 		  }
           break;
-        case "datetime":
+        case this.dbi.DATA_TYPES.DATETIME_TYPE:
 		  return (col,idx) => {
             if (typeof col === 'string') {
               col = col.endsWith('Z') ? col : (col.endsWith('+00:00') ? `${col.slice(0,-6)}Z` : `${col}Z`)
@@ -67,10 +69,10 @@ class MsSQLOutputManager extends YadamuOutputManager {
 			return col;
 		  }
           break;
-		case "time":
-        case "date":
-        case "datetime2":
-        case "datetimeoffset":
+		case this.dbi.DATA_TYPES.TIME_TYPE:
+        case this.dbi.DATA_TYPES.DATE_TYPE:
+        case this.dbi.DATA_TYPES.MSSQL_DATETIME2_TYPE:
+        case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
 		  return (col,idx) => {
             if (typeof col === 'string') {
               col = col.endsWith('Z') ? col : (col.endsWith('+00:00') ? `${col.slice(0,-6)}Z` : `${col}Z`)
@@ -82,12 +84,8 @@ class MsSQLOutputManager extends YadamuOutputManager {
 			return col;
 		  }
           break;
- 		case "real":
-        case "float":
-		case "double":
-		case "double precision":
-		case "binary_float":
-		case "binary_double":
+ 		case this.dbi.DATA_TYPES.FLOAT_TYPE:
+        case this.dbi.DATA_TYPES.DOUBLE_TYPE:
 		  switch (this.dbi.INFINITY_MANAGEMENT) {
 		    case 'REJECT':
               return (col, idx) => {

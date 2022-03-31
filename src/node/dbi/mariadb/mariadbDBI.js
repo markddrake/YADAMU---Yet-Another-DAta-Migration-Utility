@@ -75,7 +75,8 @@ class MariadbDBI extends YadamuDBI {
   // Enable configuration via command line parameters
 
   get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT            || MariadbConstants.SPATIAL_FORMAT }
-  get TREAT_TINYINT1_AS_BOOLEAN()    { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MariadbConstants.TREAT_TINYINT1_AS_BOOLEAN }
+  
+  get TREAT_TINYINT1_AS_BOOLEAN()    { return MariadbDataTypes.TREAT_TINYINT1_AS_BOOLEAN }
 
   // Not available until configureConnection() has been called 
 
@@ -90,7 +91,7 @@ class MariadbDBI extends YadamuDBI {
   constructor(yadamu,manager,connectionSettings,parameters) {
 
     super(yadamu,manager,connectionSettings,parameters)
-	yadamu.initializeTypeMapping(MariadbDataTypes,this.TYPE_MAPPINGS)
+	this.initializeDataTypes(MariadbDataTypes)
     this.pool = undefined;
 	
     this.StatementLibrary = MariadbStatementLibrary

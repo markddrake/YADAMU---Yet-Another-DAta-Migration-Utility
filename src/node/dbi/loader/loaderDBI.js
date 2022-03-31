@@ -283,10 +283,8 @@ class LoaderDBI extends YadamuDBI {
 	return path.join(this.EXPORT_FOLDER,path.relative(this.controlFile.settings.baseFolder,target))
   }
   
-  getDataFileName(tableName,partitionNumber) {
-	 
-	 return Array.isArray(this.controlFile.data[tableName].files) ?  this.controlFile.data[tableName].files.shift() : this.controlFile.data[tableName].file 
-	 
+  getDataFileName(tableName,partitionNumber) {	 
+    return Array.isArray(this.controlFile.data[tableName].files) ?  this.controlFile.data[tableName].files.shift() : this.controlFile.data[tableName].file 
   }
 
   async loadMetadataFiles(copyStagedData) {
@@ -346,7 +344,7 @@ class LoaderDBI extends YadamuDBI {
   **
   */
 
-  async createControlFile() {
+  createControlFile() {
 
 	this.controlFile = { 
   	  settings : {
@@ -380,8 +378,8 @@ class LoaderDBI extends YadamuDBI {
   }
   
   async writeMetadata() {
-    
-    // this.yadamuLogger.trace([this.constructor.name],`writeMetadata()`)
+	  
+	// this.yadamuLogger.trace([this.constructor.name],`writeMetadata()`)
     Object.values(this.metadata).forEach((table) => {delete table.source})
 
     this.controlFile.systemInformation = this.systemInformation
@@ -427,6 +425,7 @@ class LoaderDBI extends YadamuDBI {
 	} catch (err) {
       throw err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,file) : new FileError(this.DRIVER_ID,err,stack,file)
 	}
+	this.emit(YadamuConstants.DDL_UNNECESSARY)
 	this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`)
   }
 
@@ -461,6 +460,10 @@ class LoaderDBI extends YadamuDBI {
     
 	this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created directory: "${this.PROTOCOL}${this.resolve(this.IMPORT_FOLDER)}"`)
     this.createControlFile()
+  }
+  
+  async initializeData() {
+    const result = await this.writeMetadata()
   }
   
   getOutputStream(tableName,metrics) {
@@ -664,9 +667,7 @@ class LoaderDBI extends YadamuDBI {
 
   async executeDDL(ddl) {
 	this.ddl = ddl
-    const result = await this.writeMetadata()
-	this.emit(YadamuConstants.DDL_UNNECESSARY)
-	return [result]
+    return [true]
   }
   
   parseJSON(fileContents) {

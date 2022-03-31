@@ -24,8 +24,8 @@ class OracleConstants {
     , "ORACLE_XML_TYPE"            : "XML"
     , "ORACLE_JSON_TYPE"           : "JSON"
     , "MIGRATE_JSON_STORAGE"       : false
-    , "OBJECT_FORMAT"              : "NATIVE"
-    , "TREAT_RAW1_AS_BOOLEAN"      : true
+    // , "OBJECT_FORMAT"              : "NATIVE"
+    // , "BOOLEAN_AS_RAW1"      : true
 	, "PARTITION_LEVEL_OPERATIONS" : true
 	, "BYTE_TO_CHAR_RATIO"         : 4
 	, "COPY_LOGFILE_DIRNAME"       : null
@@ -52,8 +52,8 @@ class OracleConstants {
   static get ORACLE_XML_TYPE()            { return this.DBI_PARAMETERS.ORACLE_XML_TYPE}
   static get ORACLE_JSON_TYPE()           { return this.DBI_PARAMETERS.ORACLE_JSON_TYPE}
   static get MIGRATE_JSON_STORAGE()       { return this.DBI_PARAMETERS.MIGRATE_JSON_STORAGE}
-  static get OBJECT_FORMAT()              { return this.DBI_PARAMETERS.OBJECT_FORMAT}
-  static get TREAT_RAW1_AS_BOOLEAN()      { return this.DBI_PARAMETERS.TREAT_RAW1_AS_BOOLEAN}
+  // static get OBJECT_FORMAT()              { return this.DBI_PARAMETERS.OBJECT_FORMAT}
+  // static get BOOLEAN_AS_RAW1()      { return this.DBI_PARAMETERS.BOOLEAN_AS_RAW1}
   static get PARTITION_LEVEL_OPERATIONS() { return this.DBI_PARAMETERS.PARTITION_LEVEL_OPERATIONS };
   static get BYTE_TO_CHAR_RATIO()         { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
   static get COPY_LOGFILE_DIRNAME()       { return this.DBI_PARAMETERS.COPY_LOGFILE_DIRNAME };

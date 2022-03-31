@@ -8,59 +8,6 @@ import {FileNotFound} from '../dbi/file/fileException.js';1
 
 class YadamuLibrary {
 
-  static composeDataType(dataType, sizeConstraint) {
-    
-    const dataTypDefiniton = {
-      type : dataType
-    }    
-
-    if ((sizeConstraint !== null) && (sizeConstraint.length > 0)) {
-      const components = sizeConstraint.split(',');
-      dataTypDefiniton.length = parseInt(components[0])
-      if (components.length > 1) {
-        dataTypDefiniton.scale = parseInt(components[1])
-      }
-    }
-    
-    return dataTypDefiniton
-  }
-  
-  static decomposeDataType(dataType) {
-	  
-	// NUMBER(n,m) => {type:"NUMBER", length:n, scale:m}
-	// VARCHAR(n)  => {type:"VARCHAR", length:n}
-	// LONG VARCHAR(n) => {type:"LONG VARCHAR", length:n}
-	// TIMETSTAMP(n) WITH TIME ZONE => {type:"TIMESTAMP WITH TIME ZONE": length:n}
-
-    const typeDefinition = {};
-    let components = dataType.split('(');
-	switch (components.length) {
-	  case 1:
-	    typeDefinition.type = dataType
-	    return typeDefinition
-    }	    
-    
-    typeDefinition.type = components[0]
-    let sizeComponents = components[1].split(')')
-    typeDefinition.type = ((sizeComponents.length > 1 ) ? `${typeDefinition.type.trim()} ${sizeComponents[1].trim()}` : typeDefinition.type.trim()).trim()
-
-    sizeComponents = sizeComponents[0].split(',')
-    typeDefinition.length = sizeComponents[0] === 'max' ? -1 :  parseInt(sizeComponents[0])
-	if (sizeComponents.length > 1) {
-      typeDefinition.scale = parseInt(sizeComponents[1])
-    }	 	
-	
-    return typeDefinition;      
-    
-  } 
-  
-  static decomposeDataTypes(dataTypes) {
-     return dataTypes.map((dataType) => {
-       return this.decomposeDataType(dataType)
-     })
-  }
-  
-
   static stringifyDuration(duration) {
   
    let milliseconds = 0

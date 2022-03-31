@@ -1,0 +1,55 @@
+{
+  "mappings": {
+    "CHAR_TYPE"                                            : "char"                                                                      
+  , "NCHAR_TYPE"                                           : "nchar"                                                           
+  , "VARCHAR_TYPE"                                         : "varchar"                                                         
+  , "NVARCHAR_TYPE"                                        : "nvarchar"                                                        
+                                                        
+  , "TINYINT_TYPE"                                         : "tinyint"                                                         
+  , "SMALLINT_TYPE"                                        : "smallint"                                                        
+  , "MEDIUMINT_TYPE"                                       : "mediumint"                                                       
+  , "INTEGER_TYPE"                                         : "int"                                                             
+  , "BIGINT_TYPE"                                          : "bigint"                                                          
+  , "MSSQL_SMALLMONEY_TYPE"                                : "smallmoney"                                                      
+  , "MSSQL_MONEY_TYPE"                                     : "money"                                                           
+  , "FLOAT_TYPE"                                           : "real"                                                            
+  , "DOUBLE_TYPE"                                          : "float"                                                           
+  , "NUMERIC_TYPE"                                         : "numeric"                                                         
+                                                                                                                           
+  , "DATE_TYPE"                                            : "date"                                                            
+  , "TIME_TYPE"                                            : "time"                                                            
+  , "DATETIME_TYPE"                                        : "datetime"                                                        
+  , "TIMESTAMP_TYPE"                                       : "datetimeoffset"                                                  
+  , "MSSQL_SMALLDATETIME_TYPE"                             : "smalldatetime"                                                       
+  , "MSSQL_DATETIME2_TYPE"                                 : "datetime2"                                                       
+                                                                                                                           
+  , "BOOLEAN_TYPE"                                         : "bit"                                                             
+  , "BINARY_TYPE"                                          : "binary"                                                          
+  , "VARBINARY_TYPE"                                       : "varbinary"                                                       
+                                                                                                                           
+  , "CLOB_TYPE"                                            : "varchar(max)"                                                            
+  , "NCLOB_TYPE"                                           : "nvarchar(max)"                                                           
+  , "BLOB_TYPE"                                            : "varbinary(max)"                                                           
+                                                                                                                           
+  , "XML_TYPE"                                             : "xml"                                                             
+  , "JSON_TYPE"                                            : "json"                                                           
+                                                                                                                           
+  , "SPATIAL_TYPE"                                         : "geometry"                                                        
+  , "GEOMETRY_TYPE"                                        : "geometry"                                                        
+  , "GEOGRAPHY_TYPE"                                       : "geography"                                                       
+                                                                                                                           
+  , "MSSQL_ROWVERSION_TYPE"                                : "rowversion"                                                      
+  , "MSSQL_HIERARCHY_ID_TYPE"                              : "hierarchyid"                                                     
+  , "UUID_TYPE"                                            : "uniqueidentifier"      
+
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "numeric(38,19)"
+  }
+, "limits": {
+    "SCALAR_LENGTH"                                        : 4000
+  , "NUMERIC_PRECISION"                                    : 38
+  , "NUMERIC_SCALE"                                        : 38
+  }
+, "storageOptions": {
+	"SPATIAL_FORMAT"                                       : "WKB"
+  }
+}                                                        

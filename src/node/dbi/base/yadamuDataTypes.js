@@ -16,13 +16,27 @@ import {
 
 const  __filename             = fileURLToPath(import.meta.url)
 const __dirname               = dirname(__filename)
-const DataTypeMapping         = JSON.parse(fs.readFileSync(join(__dirname,'../cfg/typeMapping.json'),'utf-8'))
-const TypeClassification      = JSON.parse(fs.readFileSync(join(__dirname,'../cfg/typeClassification.json'),'utf-8'))
+const DataTypeConfiguration   = JSON.parse(fs.readFileSync(join(__dirname,'../cfg/dataTypeConfiguration.json'),'utf-8'))
+const DataTypeClassification  = JSON.parse(fs.readFileSync(join(__dirname,'../cfg/dataTypeClassification.json'),'utf-8'))
+
+class StorageOptions {
+
+  static get SPATIAL_FORMAT()                      { return 'WKB' }
+  
+  static set SPATIAL_FORMAT(v)                     { Object.defineProperty(this,'SPATIAL_FORMAT',   { get() { return(v) }, configurable: true })}
+
+  static get CIRCLE_FORMAT()                       { return 'JSON' }
+
+  static set CIRCLE_FORMAT(v)                      { Object.defineProperty(this,'CIRCLE_FORMAT',   { get() { return(v) }, configurable: true })}
+
+}
 
 class YadamuDataTypes {
+
+  static storageOptions = StorageOptions
     
-  static get DATA_TYPE_MAPPINGS() {
-    return DataTypeMapping
+  static get DATA_TYPE_CONFIGURATION() {
+    return DataTypeConfiguration
   }
   
   static get CHAR_TYPE()                           {
@@ -49,14 +63,15 @@ class YadamuDataTypes {
   
   static set NUMERIC_TYPE(v)                       { Object.defineProperty(this,'NUMERIC_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get MAX_NUMERIC_TYPE()               {
-    throw new YadamuError(`Must supply explicit data type mapping for 'MAX_NUMERIC_TYPE'`)
+  static get UNBOUNDED_NUMERIC_TYPE()              {
+	  
+    throw new YadamuError(`Must supply explicit data type mapping for 'UNBOUNDED_NUMERIC_TYPE'`)
   }
   
-  static set MAX_NUMERIC_TYPE(v)                   { Object.defineProperty(this,'MAX_NUMERIC_TYPE', { get() { return(v) }, configurable: true })}
+  static set UNBOUNDED_NUMERIC_TYPE(v)             { Object.defineProperty(this,'UNBOUNDED_NUMERIC_TYPE', { get() { return(v) }, configurable: true })}
   
   static get TIMESTAMP_TYPE()                      {
-    throw new YadamuError(`Must supply explicit data type mapping for 'TIMESTAMPTYPE_'`)
+    throw new YadamuError(`Must supply explicit data type mapping for 'TIMESTAMP_TYPE'`)
   }
    
   static set TIMESTAMP_TYPE(v)                     { Object.defineProperty(this,'TIMESTAMP_TYPE', { get() { return(v) }, configurable: true })}
@@ -79,7 +94,7 @@ class YadamuDataTypes {
                                                    
   // Boolean Types                                 
                                                    
-  static get BOOLEAN_TYPE()                        { return `${this.BINARY_TYPE}(1)` }
+  static get BOOLEAN_TYPE()                        { return 'BOOLEAN' }
                                                    
   static set BOOLEAN_TYPE(v)                       { Object.defineProperty(this,'BOOLEAN_TYPE', { get() { return(v) }, configurable: true })}
                                                    
@@ -129,11 +144,11 @@ class YadamuDataTypes {
                                                    
   static set INTEGER_TYPE(v)                       { Object.defineProperty(this,'INTEGER_TYPE', { get() { return(v) }, configurable: true })}
                                                    
-  static get TINYINT_TYPE()                        { return this.INTEGER_TYPE }
+  static get TINYINT_TYPE()                        { return this.SMALLINT_TYPE }
                                                    
   static set TINYINT_TYPE(v)                       { Object.defineProperty(this,'TINYINT_TYPE', { get() { return(v) }, configurable: true })}
                                                    
-  static get SMALLINT_TYPE()                       { return this.INTEGER_TYPE }
+  static get SMALLINT_TYPE()                       { return this.MEDIUMINT_TYPE }
                                                    
   static set SMALLINT_TYPE(v)                      { Object.defineProperty(this,'SMALLINT_TYPE', { get() { return(v) }, configurable: true })}
                                                    
@@ -173,7 +188,7 @@ class YadamuDataTypes {
                                                    
   static set TIME_TYPE(v)                          { Object.defineProperty(this,'TIME_TYPE', { get() { return(v) }, configurable: true })}
                                                    
-  static get TIME_TZ_TYPE()                        { return this.TIME_TYPE }
+  static get TIME_TZ_TYPE()                        { return this.TIMESTAMP_TZ_TYPE }
                                                    
   static set TIME_TZ_TYPE(v)                       { Object.defineProperty(this,'TIME_TZ_TYPE', { get() { return(v) }, configurable: true })}
                                                    
@@ -267,6 +282,12 @@ class YadamuDataTypes {
                                                    
   static set UUID_TYPE(v)                          { Object.defineProperty(this,'UUID_TYPE', { get() { return(v) }, configurable: true })}
                                                    
+  // User Defined Types                            
+                                                   
+  static get USER_DEFINED_TYPE()                   { return this.CLOB_TYPE }
+                                                   
+  static set USER_DEFINED_TYPE(v)                  { Object.defineProperty(this,'USER_DEFINED_TYPE', { get() { return(v) }, configurable: true })}
+
   // Oracle Specific Types                         
                                                    
   static get ORACLE_ROWID_TYPE()                   { return `${this.VARCHAR_TYPE}(32)` }
@@ -295,17 +316,25 @@ class YadamuDataTypes {
                                                    
   static set MSSQL_MONEY_TYPE(v)                   { Object.defineProperty(this,'MSSQL_MONEY_TYPE', { get() { return(v) }, configurable: true })}
 
-  static get MSSQL_SMALL_MONEY_TYPE()              { return `${this.NUMERIC_TYPE}(10,4)` }
+  static get MSSQL_SMALLMONEY_TYPE()               { return `${this.NUMERIC_TYPE}(10,4)` }
+                                                    
+  static set MSSQL_SMALLMONEY_TYPE(v)              { Object.defineProperty(this,'MSSQL_SMALLMONEY_TYPE', { get() { return(v) }, configurable: true })}
+
+  static get MSSQL_SMALLDATETIME_TYPE()            { return this.DATETIME_TYPE }
                                                    
-  static set MSSQL_SMALL_MONEY_TYPE(v)             { Object.defineProperty(this,'MSSQL_SMALL_MONEY_TYPE', { get() { return(v) }, configurable: true })}
+  static set MSSQL_SMALLDATETIME_TYPE(v)           { Object.defineProperty(this,'MSSQL_SMALLDATETIME_TYPE', { get() { return(v) }, configurable: true })}
+
+  static get MSSQL_DATETIME2_TYPE()                { return this.DATETIME_TYPE }
+                                                   
+  static set MSSQL_DATETIME2_TYPE(v)               { Object.defineProperty(this,'MSSQL_DATETIME2_TYPE', { get() { return(v) }, configurable: true })}
 
   static get MSSQL_ROWVERSION_TYPE()               { return `${this.BINARY_TYPE}(8)` }
                                                    
   static set MSSQL_ROWVERSION_TYPE(v)              { Object.defineProperty(this,'MSSQL_ROWVERSION_TYPE', { get() { return(v) }, configurable: true })}
 
-  static get MSSQL_HIERARCHY_TYPE()                { return `${this.VARCHAR_TYPE}(2048)` }
+  static get MSSQL_HIERARCHY_ID_TYPE()             { return `${this.VARCHAR_TYPE}(2048)` }
                                                    
-  static set MSSQL_HIERARCHY_TYPE(v)               { Object.defineProperty(this,'MSSQL_HIERARCHY_TYPE', { get() { return(v) }, configurable: true })}
+  static set MSSQL_HIERARCHY_ID_TYPE(v)            { Object.defineProperty(this,'MSSQL_HIERARCHY_ID_TYPE', { get() { return(v) }, configurable: true })}
 
   // Postgres Specific Types                       
                                                    
@@ -385,77 +414,81 @@ class YadamuDataTypes {
   
   static set PGSQL_TEXTSEACH_VECTOR_TYPE(v)        { Object.defineProperty(this,'PGSQL_TEXTSEACH_VECTOR_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_TEXTSEACH_QUERY_TYPE()          { return this.JSON_TYPE } //  "tdquery"                                                       
+  static get PGSQL_TEXTSEACH_QUERY_TYPE()          { return this.MAX_VARCHAR_TYPE} // "tsquery"                                                       
   
   static set PGSQL_TEXTSEACH_QUERY_TYPE(v)         { Object.defineProperty(this,'PGSQL_TEXTSEACH_QUERY_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_IDENTIFIER()                    { return `${this.BINARY_TYPE}(4)` }
+  static get PGSQL_IDENTIFIER_TYPE()               { return `${this.NUMERIC_TYPE}(10,0)` } // Unsigned 4 Byte (32 bit Integer). Alternates include BIGINT, Unsigned Int. Byte[4]
                                                    
-  static set PGSQL_IDENTIFIER(v)                   { Object.defineProperty(this,'PGSQL_IDENTIFIER', { get() { return(v) }, configurable: true })}
+  static set PGSQL_IDENTIFIER_TYPE(v)              { Object.defineProperty(this,'PGSQL_IDENTIFIER_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_OID_TYPE()                      { return this.PGSQL_IDENTIFIER } // "oid"                                              
+  static get PGSQL_OID_TYPE()                      { return this.PGSQL_IDENTIFIER_TYPE } // "oid"                                              
   
   static set PGSQL_OID_TYPE(v)                     { Object.defineProperty(this,'PGSQL_OID_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_REG_CLASS_TYPE()                { return this.PGSQL_IDENTIFIER } // "regclass"                                         
+  static get PGSQL_REG_CLASS_TYPE()                { return this.PGSQL_IDENTIFIER_TYPE } // "regclass"                                         
   
   static set PGSQL_REG_CLASS_TYPE(v)               { Object.defineProperty(this,'PGSQL_REG_CLASS_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_REG_COLLATION_TYPE()            { return this.PGSQL_IDENTIFIER } // "regcollation"                                     
+  static get PGSQL_REG_COLLATION_TYPE()            { return this.PGSQL_IDENTIFIER_TYPE } // "regcollation"                                     
   
   static set PGSQL_REG_COLLATION_TYPE(v)           { Object.defineProperty(this,'PGSQL_REG_COLLATION_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_REG_TEXTSEARCH_CONFIG_TYPE()    { return this.PGSQL_IDENTIFIER } // "regconfig"                                        
+  static get PGSQL_REG_TEXTSEARCH_CONFIG_TYPE()    { return this.PGSQL_IDENTIFIER_TYPE } // "regconfig"                                        
   
   static set PGSQL_REG_TEXTSEARCH_CONFIG_TYPE(v)   { Object.defineProperty(this,'PGSQL_REG_TEXTSEARCH_CONFIG_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_REG_TEXTSEARCH_DICT_TYPE()      { return this.PGSQL_IDENTIFIER } // "regdictionary"                                    
+  static get PGSQL_REG_TEXTSEARCH_DICT_TYPE()      { return this.PGSQL_IDENTIFIER_TYPE } // "regdictionary"                                    
   
   static set PGSQL_REG_TEXTSEARCH_DICT_TYPE(v)     { Object.defineProperty(this,'PGSQL_REG_TEXTSEARCH_DICT_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_REG_NAMESPACE_TYPE()            { return this.PGSQL_IDENTIFIER } // "regnamespace"                                     
+  static get PGSQL_REG_NAMESPACE_TYPE()            { return this.PGSQL_IDENTIFIER_TYPE } // "regnamespace"                                     
   
   static set PGSQL_REG_NAMESPACE_TYPE(v)           { Object.defineProperty(this,'PGSQL_REG_NAMESPACE_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_REG_OPERATOR_NAME_TYPE()        { return this.PGSQL_IDENTIFIER } // "regoper"                                          
+  static get PGSQL_REG_OPERATOR_NAME_TYPE()        { return this.PGSQL_IDENTIFIER_TYPE } // "regoper"                                          
   
   static set PGSQL_REG_OPERATOR_NAME_TYPE(v)       { Object.defineProperty(this,'PGSQL_REG_OPERATOR_NAME_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_REG_OPERATOR_ARGS_TYPE()        { return this.PGSQL_IDENTIFIER } // "regoperator"                                      
+  static get PGSQL_REG_OPERATOR_ARGS_TYPE()        { return this.PGSQL_IDENTIFIER_TYPE } // "regoperator"                                      
   
   static set PGSQL_REG_OPERATOR_ARGS_TYPE(v)       { Object.defineProperty(this,'PGSQL_REG_OPERATOR_ARGS_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_REG_FUNCTION_NAME_TYPE()        { return this.PGSQL_IDENTIFIER } // "regproc"                                          
+  static get PGSQL_REG_FUNCTION_NAME_TYPE()        { return this.PGSQL_IDENTIFIER_TYPE } // "regproc"                                          
   
   static set PGSQL_REG_FUNCTION_NAME_TYPE(v)       { Object.defineProperty(this,'PGSQL_REG_FUNCTION_NAME_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_REG_FUNCTION_ARGS_TYPE()        { return this.PGSQL_IDENTIFIER } // "regprocedure"                                     
+  static get PGSQL_REG_FUNCTION_ARGS_TYPE()        { return this.PGSQL_IDENTIFIER_TYPE } // "regprocedure"                                     
   
   static set PGSQL_REG_FUNCTION_ARGS_TYPE(v)       { Object.defineProperty(this,'PGSQL_REG_FUNCTION_ARGS_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_REG_ROLE_TYPE()                 { return this.PGSQL_IDENTIFIER } // "regrole"                                          
+  static get PGSQL_REG_ROLE_TYPE()                 { return this.PGSQL_IDENTIFIER_TYPE } // "regrole"                                          
   
   static set PGSQL_REG_ROLE_TYPE(v)                { Object.defineProperty(this,'PGSQL_REG_ROLE_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_REG_TYPE_TYPE()                 { return this.PGSQL_IDENTIFIER } // "regtype"                                          0
+  static get PGSQL_REG_TYPE_TYPE()                 { return this.PGSQL_IDENTIFIER_TYPE } // "regtype"                                          0
   
   static set PGSQL_REG_TYPE_TYPE(v)                { Object.defineProperty(this,'PGSQL_REG_TYPE_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_TID_TYPE()                      { return this.PGSQL_IDENTIFIER } // tid"                                              
+  static get PGSQL_TID_TYPE()                      { return this.PGSQL_IDENTIFIER_TYPE } // tid"                                              
   
   static set PGSQL_TID_TYPE(v)                     { Object.defineProperty(this,'PGSQL_TID_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_XID_TYPE()                      { return this.PGSQL_IDENTIFIER } // "xid"                                              
+  static get PGSQL_XID_TYPE()                      { return this.PGSQL_IDENTIFIER_TYPE } // "xid"                                              
   
   static set PGSQL_XID_TYPE(v)                     { Object.defineProperty(this,'PGSQL_XID_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_CID_TYPE()                      { return this.PGSQL_IDENTIFIER } // "cid"                                              
+  static get PGSQL_CID_TYPE()                      { return this.PGSQL_IDENTIFIER_TYPE } // "cid"                                              
   
   static set PGSQL_CID_TYPE(v)                     { Object.defineProperty(this,'PGSQL_CID_TYPE', { get() { return(v) }, configurable: true })}
   
-  static get PGSQL_TXID_SNAPSHOT_TYPE()            { return this.PGSQL_IDENTIFIER } // "txid_snapshot"                                    
+  static get PGSQL_TXID_SNAPSHOT_TYPE()            { return this.PGSQL_IDENTIFIER_TYPE } // "txid_snapshot"                                    
   
   static set PGSQL_TXID_SNAPSHOT_TYPE(v)           { Object.defineProperty(this,'PGSQL_TXID_SNAPSHOT_TYPE', { get() { return(v) }, configurable: true })}
+  
+  static get PGSQL_GTSVECTOR_TYPE()                { return this.JSON_TYPE } // "gtsvector"                                    
+  
+  static set PGSQL_GTSVECTOR_TYPE(v)               { Object.defineProperty(this,'PGSQL_GTSVECTOR_TYPE', { get() { return(v) }, configurable: true })}
   
   static get PGSQL_ACLITEM()                       { return this.JSON_TYPE } // "aclitem"                                          
   
@@ -605,8 +638,12 @@ class YadamuDataTypes {
                                                    
   static set NUMERIC_PRECISION(v)                  { Object.defineProperty(this,'NUMERIC_PRECISION',   { get() { return(v) }, configurable: true })}
                                                    
-  static get TIMESTAMP_PRECISION()                 { return 38 }
+  static get NUMERIC_SCALE()                       { return 38 }
                                                    
+  static set NUMERIC_SCALE(v)                      { Object.defineProperty(this,'NUMERIC_SCALE',   { get() { return(v) }, configurable: true })}
+                                                   
+  static get TIMESTAMP_PRECISION()                 { return 6 }
+
   static set TIMESTAMP_PRECISION(v)                { Object.defineProperty(this,'TIMESTAMP_PRECISION',   { get() { return(v) }, configurable: true })}
                                                    
   static get LOB_LENGTH()                          { return -1 }      
@@ -649,205 +686,308 @@ class YadamuDataTypes {
 	})()
   }
 
-  static get KNOWN_BOOLEAN_TYPES() {
-    return this._KNOWN_BOOLEAN_TYPES || (() => {
-	  this._KNOWN_BOOLEAN_TYPES = Object.freeze([...TypeClassification.boolean])
-	  return this._KNOWN_BOOLEAN_TYPES
+  static get WELLKNOWN_BOOLEAN_TYPES() {
+    return this._WELLKNOWN_BOOLEAN_TYPES || (() => {
+	  this._WELLKNOWN_BOOLEAN_TYPES = Object.freeze([...DataTypeClassification.boolean])
+	  return this._WELLKNOWN_BOOLEAN_TYPES
 	})()
   }
 
-  static isBoolean(dataType) {
-    return this.KNOWN_BOOLEAN_TYPES.includes(dataType.toUpperCase());
+  static isBoolean(dataType,length,vendor) {
+	//BIT is boolean in SQL Server, bit BIT STRING in Postgres
+    if ((vendor === 'Postgres') && (dataType.toUpperCase() === 'BIT')) return false
+    return (this.WELLKNOWN_BOOLEAN_TYPES.includes(dataType.toUpperCase()) && ((length === 1) || (isNaN(length))));
   }
 
-  static get KNOWN_BINARY_TYPES() {
-    return this._KNOWN_BOOLEAN_TYPES || (() => {
-	  this._KNOWN_KNOWN_BINARY_TYPES = Object.freeze([...TypeClassification.binary])
-	  return this._KNOWN_KNOWN_BINARY_TYPES
+  static get WELLKNOWN_BINARY_TYPES() {
+    return this._WELLKNOWN_BINARY_TYPES || (() => {
+	  this._WELLKNOWN_BINARY_TYPES = Object.freeze([...DataTypeClassification.binary])
+	  return this._WELLKNOWN_BINARY_TYPES
 	})()
   }
 
   static isBinary(dataType) {
-    return this.KNOWN_BINARY_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_BINARY_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_DATE_TYPES() {
-    return this._KNOWN_DATE_TYPES || (() => {
-	  this._KNOWN_DATE_TYPES = Object.freeze([...TypeClassification.date])
-	  return this._KNOWN_DATE_TYPES
+  static get WELLKNOWN_DATE_TYPES() {
+    return this._WELLKNOWN_DATE_TYPES || (() => {
+	  this._WELLKNOWN_DATE_TYPES = Object.freeze([...DataTypeClassification.date])
+	  return this._WELLKNOWN_DATE_TYPES
 	})()
   }
    
   static isDate(dataType) {
-	return this.KNOWN_DATE_TYPES.includes(dataType.toUpperCase());
+	return this.WELLKNOWN_DATE_TYPES.includes(dataType.toUpperCase());
   }
    
-  static get KNOWN_TIME_TYPES() {
-    return this._KNOWN_TIME_TYPES || (() => {
-	  this._KNOWN_TIME_TYPES = Object.freeze([...TypeClassification.time])
-	  return this._KNOWN_TIME_TYPES
+  static get WELLKNOWN_TIME_TYPES() {
+    return this._WELLKNOWN_TIME_TYPES || (() => {
+	  this._WELLKNOWN_TIME_TYPES = Object.freeze([...DataTypeClassification.time])
+	  return this._WELLKNOWN_TIME_TYPES
 	})()
   }
    
   static isTime(dataType) {
-    return this.KNOWN_TIME_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_TIME_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_DATETIME_TYPES() {
-    return this._KNOWN_DATETIME_TYPES || (() => {
-	  this._KNOWN_DATETIME_TYPES = Object.freeze([...TypeClassification.datetime])
-	  return this._KNOWN_DATETIME_TYPES
+  static get WELLKNOWN_DATETIME_TYPES() {
+    return this._WELLKNOWN_DATETIME_TYPES || (() => {
+	  this._WELLKNOWN_DATETIME_TYPES = Object.freeze([...DataTypeClassification.datetime])
+	  return this._WELLKNOWN_DATETIME_TYPES
 	})()
   }
    
   static isDateTime(dataType) {
-    return this.KNOWN_DATETIME_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_DATETIME_TYPES.includes(dataType.toUpperCase());
   }
       
-  static get KNOWN_TIMESTAMP_TYPES() {
-	return this._KNOWN_TIMESTAMP_TYPES || (() => {
-	  this._KNOWN_TIMESTAMP_TYPES = Object.freeze([...TypeClassification.timestamp])
-	  return this._KNOWN_TIMESTAMP_TYPES
+  static get WELLKNOWN_TIMESTAMP_TYPES() {
+	return this._WELLKNOWN_TIMESTAMP_TYPES || (() => {
+	  this._WELLKNOWN_TIMESTAMP_TYPES = Object.freeze([...DataTypeClassification.timestamp])
+	  return this._WELLKNOWN_TIMESTAMP_TYPES
 	})()
   }
    
   static isTimestamp(dataType) {
-    return this.KNOWN_TIMESTAMP_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_TIMESTAMP_TYPES.includes(dataType.toUpperCase());
   }
       
-  static get KNOWN_TEMPORAL_TYPES() {
-    return this._KNOWN_TEMPORAL_TYPES || (() => {
-	  this._KNOWN_TEMPORAL_TYPES = Object.freeze([...this.KNOWN_DATE_TYPES,...this.KNOWN_TIME_TYPES,...this.KNOWN_DATETIME_TYPES,...this.KNOWN_TIMESTAMP_TYPES])
-	  return this._KNOWN_TEMPORAL_TYPES
+  static get WELLKNOWN_TEMPORAL_TYPES() {
+    return this._WELLKNOWN_TEMPORAL_TYPES || (() => {
+	  this._WELLKNOWN_TEMPORAL_TYPES = Object.freeze([...this.WELLKNOWN_DATE_TYPES,...this.WELLKNOWN_TIME_TYPES,...this.WELLKNOWN_DATETIME_TYPES,...this.WELLKNOWN_TIMESTAMP_TYPES])
+	  return this._WELLKNOWN_TEMPORAL_TYPES
 	})()
   }
       
   static isTemporal(dataType) {
-    return this.KNOWN_TEMPORAL_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_TEMPORAL_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_INTERVAL_TYPES() {
-    return this._KNOWN_INTERVAL_TYPES || (() => {
-	  this._KNOWN_INTERVAL_TYPES = Object.freeze([...TypeClassification.interval])
-	  return this._KNOWN_INTERVAL_TYPES
+  static get WELLKNOWN_INTERVAL_TYPES() {
+    return this._WELLKNOWN_INTERVAL_TYPES || (() => {
+	  this._WELLKNOWN_INTERVAL_TYPES = Object.freeze([...DataTypeClassification.interval])
+	  return this._WELLKNOWN_INTERVAL_TYPES
 	})()
   }
    
   static isInterval(dataType) {
-    return this.KNOWN_INTERVAL_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_INTERVAL_TYPES.includes(dataType.toUpperCase());
   }
    
 
-  static get KNOWN_INTEGER_TYPES() {
-    return this._KNOWN_INTEGER_TYPES || (() => {
-	  this._KNOWN_INTEGER_TYPES = Object.freeze([...TypeClassification.integer])
-	  return this._KNOWN_INTEGER_TYPES
+  static get WELLKNOWN_INTEGER_TYPES() {
+    return this._WELLKNOWN_INTEGER_TYPES || (() => {
+	  this._WELLKNOWN_INTEGER_TYPES = Object.freeze([...DataTypeClassification.integer])
+	  return this._WELLKNOWN_INTEGER_TYPES
 	})()
   }
 
   static isInteger(dataType) {
-    return this.KNOWN_INTEGER_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_INTEGER_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_FLOATING_POINT_TYPES() {
-    return this._KNOWN_FLOATING_POINT_TYPES || (() => {
-	  this._KNOWN_FLOATING_POINT_TYPES = Object.freeze([...TypeClassification.floatingPoint])
-	  return this._KNOWN_FLOATING_POINT_TYPES
+  static get WELLKNOWN_FLOATING_POINT_TYPES() {
+    return this._WELLKNOWN_FLOATING_POINT_TYPES || (() => {
+	  this._WELLKNOWN_FLOATING_POINT_TYPES = Object.freeze([...DataTypeClassification.floatingPoint])
+	  return this._WELLKNOWN_FLOATING_POINT_TYPES
 	})()
   }
 
   static isFloatingPoint(dataType) {
-    return this.KNOWN_FLOATING_POINT_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_FLOATING_POINT_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_BCD_TYPES() {
-    return this._KNOWN_BCD_TYPES || (() => {
-	  this._KNOWN_BCD_TYPES = Object.freeze([...TypeClassification.bcd])
-	  return this._KNOWN_BCD_TYPES
+  static get WELLKNOWN_BCD_TYPES() {
+    return this._WELLKNOWN_BCD_TYPES || (() => {
+	  this._WELLKNOWN_BCD_TYPES = Object.freeze([...DataTypeClassification.bcd])
+	  return this._WELLKNOWN_BCD_TYPES
 	})()
   }
 
   static isBCD(dataType) {
-    return this.KNOWN_BCD_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_BCD_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_NUMERIC_TYPES() {
-    return this._KNOWN_NUMERIC_TYPES || (() => {
-	  this._KNOWN_NUMERIC_TYPES = Object.freeze([...this.KNOWN_INTEGER_TYPES,...this.KNOWN_FLOATING_POINT_TYPES,...this.KNOWN_BCD_TYPES])
-	  return this._KNOWN_NUMERIC_TYPES
+  static get WELLKNOWN_NUMERIC_TYPES() {
+    return this._WELLKNOWN_NUMERIC_TYPES || (() => {
+	  this._WELLKNOWN_NUMERIC_TYPES = Object.freeze([...this.WELLKNOWN_INTEGER_TYPES,...this.WELLKNOWN_FLOATING_POINT_TYPES,...this.WELLKNOWN_BCD_TYPES])
+	  return this._WELLKNOWN_NUMERIC_TYPES
 	})()
   }
 
   static isNumeric(dataType) {
-    return this.KNOWN_NUMERIC_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_NUMERIC_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_XML_TYPES() {
-    return this._KNOWN_XML_TYPES || (() => {
-	  this._KNOWN_XML_TYPES = Object.freeze([...TypeClassification.xml])
-	  return this._KNOWN_XML_TYPES
+  static get WELLKNOWN_XML_TYPES() {
+    return this._WELLKNOWN_XML_TYPES || (() => {
+	  this._WELLKNOWN_XML_TYPES = Object.freeze([...DataTypeClassification.xml])
+	  return this._WELLKNOWN_XML_TYPES
 	})()
   }
 
   static isXML(dataType) {
-    return this.KNOWN_XML_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_XML_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_JSON_TYPES() {
-    return this._KNOWN_JSON_TYPES || (() => {
-	  this._KNOWN_JSON_TYPES = Object.freeze([...TypeClassification.json])
-	  return this._KNOWN_JSON_TYPES
+  static get WELLKNOWN_JSON_TYPES() {
+    return this._WELLKNOWN_JSON_TYPES || (() => {
+	  this._WELLKNOWN_JSON_TYPES = Object.freeze([...DataTypeClassification.json])
+	  return this._WELLKNOWN_JSON_TYPES
 	})()
   }
 
   static isJSON(dataType) {
-    return this.KNOWN_JSON_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_JSON_TYPES.includes(dataType.toUpperCase());
   }
   
-  static get KNOWN_CLOB_TYPES() {
-    return this._KNOWN_CLOB_TYPES || (() => {
-	  this._KNOWN_CLOB_TYPES = Object.freeze([...TypeClassification.clob])
-	  return this._KNOWN_CLOB_TYPES
+  static get WELLKNOWN_CLOB_TYPES() {
+    return this._WELLKNOWN_CLOB_TYPES || (() => {
+	  this._WELLKNOWN_CLOB_TYPES = Object.freeze([...DataTypeClassification.clob])
+	  return this._WELLKNOWN_CLOB_TYPES
 	})()
   }
 
   static isCLOB(dataType) {
-    return this.KNOWN_CLOB_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_CLOB_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_BLOB_TYPES() {
-    return this._KNOWN_BLOB_TYPES || (() => {
-	  this._KNOWN_BLOB_TYPES = Object.freeze([...TypeClassification.blob])
-	  return this._KNOWN_BLOB_TYPES
+  static get WELLKNOWN_BLOB_TYPES() {
+    return this._WELLKNOWN_BLOB_TYPES || (() => {
+	  this._WELLKNOWN_BLOB_TYPES = Object.freeze([...DataTypeClassification.blob])
+	  return this._WELLKNOWN_BLOB_TYPES
 	})()
   }
 
   static isBLOB(dataType) {
-    return this.KNOWN_BLOB_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_BLOB_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_LOB_TYPES() {
-    return this._KNOWN_LOB_TYPES || (() => {
-	  this._KNOWN_LOB_TYPES = Object.freeze([...this.KNOWN_CLOB_TYPES,this.KNOWN_BLOB_TYPES])
-	  return this._KNOWN_LOB_TYPES
+  static get WELLKNOWN_LOB_TYPES() {
+    return this._WELLKNOWN_LOB_TYPES || (() => {
+	  this._WELLKNOWN_LOB_TYPES = Object.freeze([...this.WELLKNOWN_CLOB_TYPES,this.WELLKNOWN_BLOB_TYPES])
+	  return this._WELLKNOWN_LOB_TYPES
 	})()
   }
 
   static isLOB(dataType) {
-    return this.KNOWN_BLOB_TYPES.includes(dataType.toUpperCase()) || this.KNOWN_CLOB_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_BLOB_TYPES.includes(dataType.toUpperCase()) || this.WELLKNOWN_CLOB_TYPES.includes(dataType.toUpperCase());
   }
 
-  static get KNOWN_SPATIAL_TYPES() {
-    return this._KNOWN_SPATIAL_TYPES || (() => {
-	  this._KNOWN_SPATIAL_TYPES = Object.freeze([...TypeClassification.spatial])
-	  return this._KNOWN_SPATIAL_TYPES
+  static get WELLKNOWN_SPATIAL_TYPES() {
+    return this._WELLKNOWN_SPATIAL_TYPES || (() => {
+	  this._WELLKNOWN_SPATIAL_TYPES = Object.freeze([...DataTypeClassification.spatial])
+	  return this._WELLKNOWN_SPATIAL_TYPES
 	})()
   }
 
   static isSpatial(dataType) {
-    return this.KNOWN_SPATIAL_TYPES.includes(dataType.toUpperCase());
+    return this.WELLKNOWN_SPATIAL_TYPES.includes(dataType.toUpperCase());
   }
 
+  static composeDataType(dataType, sizeConstraint) {
+    
+    const dataTypDefiniton = {
+      type : dataType
+    }    
+
+    if ((sizeConstraint !== null) && (sizeConstraint.length > 0)) {
+      const components = sizeConstraint.split(',');
+      dataTypDefiniton.length = parseInt(components[0])
+      if (components.length > 1) {
+        dataTypDefiniton.scale = parseInt(components[1])
+      }
+    }
+    
+    return dataTypDefiniton
+  }
+  
+  static decomposeDataType(dataType) {
+	  
+	// NUMBER(n,m) => {type:"NUMBER", length:n, scale:m}
+	// VARCHAR(n)  => {type:"VARCHAR", length:n}
+	// LONG VARCHAR(n) => {type:"LONG VARCHAR", length:n}
+	// TIMETSTAMP(n) WITH TIME ZONE => {type:"TIMESTAMP WITH TIME ZONE": length:n}
+	
+	// ### Need to test with "interval year(4) to month (2)"
+
+    const typeDefinition = {};
+    let components = dataType.split('(');
+	switch (components.length) {
+	  case 1:
+	    typeDefinition.type = dataType.trim().replace(/  +/g, ' ')
+	    return typeDefinition
+    }	    
+    
+    typeDefinition.type = components[0]
+    let sizeComponents = components[1].split(')')
+    typeDefinition.type = (sizeComponents.length > 1 ) ? `${typeDefinition.type} ${sizeComponents[1]}` : typeDefinition.type.trim()
+	typeDefinition.type = typeDefinition.type.trim().replace(/  +/g, ' ')
+
+    sizeComponents = sizeComponents[0].split(',')
+    typeDefinition.length = sizeComponents[0] === 'max' ? -1 :  parseInt(sizeComponents[0])
+	if (sizeComponents.length > 1) {
+      typeDefinition.scale = parseInt(sizeComponents[1])
+    }	 	
+	
+    return typeDefinition;      
+    
+  } 
+  
+  static decomposeDataTypes(dataTypes) {
+     return dataTypes.map((dataType) => {
+       return this.decomposeDataType(dataType)
+     })
+  }
+
+  static coalesceTypeMappings(typeList) {
+	
+	switch (true) {
+	  case typeList.includes(this.SPATIAL_TYPE):
+	    return this.SPATIAL_TYPE
+	  case typeList.includes(this.GEOMETRY_TYPE):
+	    return this.GEOMETRY_TYPE
+      case typeList.includes(this.GEOGRAPHY_TYPE):
+	    return this.GEOGRAPHY_TYPE
+      case typeList.includes(this.JSON_TYPE):
+	    return this.JSON_TYPE
+      case typeList.includes(this.CLOB_TYPE):
+	    return this.CLOB_TYPE
+      case typeList.includes(this.VARCHAR_TYPE):
+	    return this.VARCHAR_TYPE
+      case typeList.includes(this.CHAR_TYPE):
+	    return this.CHAR_TYPE
+      case typeList.includes(this.BLOB_TYPE):
+	    return this.BLOB_TYPE
+      case typeList.includes(this.VARBINARY_TYPE):
+	    return this.VARBINARY_TYPE
+      case typeList.includes(this.BINARY_TYPE):
+	    return this.BINARY_TYPE
+	  case typeList.includes(this.BIGINT_TYPE):
+	    return this.BIGINT_TYPE		
+	  case typeList.includes(this.INTEGER_TYPE):
+	    return this.INTEGER_TYPE		
+	  case typeList.includes(this.MEDIUMINT_TYPE):
+	    return this.MEDIUMINT_TYPE		
+	  case typeList.includes(this.SMALLINT_TYPE):
+	    return this.SMALLINT_TYPE		
+      case typeList.includes(this.DOUBLE_TYPE):
+	    return this.DOUBLE_TYPE
+      case typeList.includes(this.NUMERIC_TYPE):
+	    return this.NUMERIC_TYPE
+      case typeList.includes(this.TIMESTAMP_TZ_TYPE):
+	    return this.TIMESTAMP_TZ_TYPE
+      case typeList.includes(this.TIMESTAMP_TYPE):
+	    return this.TIMESTAMP_TYPE
+      case typeList.includes(this.TIME_TZ_TYPE):
+	    return this.TIME_TZ_TYPE
+	  default:
+        console.log(this.name,'Type List Reduction failed for ',typeList)
+	}
+  }
+  
 }
 
 export { YadamuDataTypes as default }

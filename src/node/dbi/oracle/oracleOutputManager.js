@@ -1,14 +1,17 @@
 
-import {
-  performance
-}                            from 'perf_hooks';
+import { 
+  performance 
+}                               from 'perf_hooks';
+						
 
 import oracledb from 'oracledb';
+oracledb.fetchAsString = [ oracledb.DATE, oracledb.NUMBER ]
 
-import YadamuLibrary         from '../../lib/yadamuLibrary.js'
-import YadamuSpatialLibrary  from '../../lib/yadamuSpatialLibrary.js'
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
+import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js'
 
-import YadamuOutputManager   from '../base/yadamuOutputManager.js'
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class OracleOutputManager extends YadamuOutputManager {
 
@@ -64,11 +67,11 @@ class OracleOutputManager extends YadamuOutputManager {
     // Set up Transformation functions to be applied to the incoming rows
 
     return targetDataTypes.map((targetDataType,idx) => {
-      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-      switch (dataType.type.toUpperCase()) {
-        case "GEOMETRY":
-        case "GEOGRAPHY":
-        case '"MDSYS"."SDO_GEOMETRY"':
+
+      const dataType = YadamuDataTypes.decomposeDataType(targetDataType);
+	
+	  switch (dataType.type.toUpperCase()) {
+       case this.dbi.DATA_TYPES.SPATIAL_TYPE:
           // Metadata based decision
           if ((this.dbi.DB_VERSION < 12) && (this.SPATIAL_FORMAT === 'GeoJSON')) {
             // SDO_UTIL does not support GeoJSON in 11.x database
@@ -80,19 +83,19 @@ class OracleOutputManager extends YadamuOutputManager {
             return null
           }
           break;
-        case "BFILE":
+       case this.dbi.DATA_TYPES.ORACLE_BFILE_TYPE:
             // Convert JSON representation to String.
-        case "SET":
-        case "JSON":
+       case this.dbi.DATA_TYPES.SET_TYPE:
+       case this.dbi.DATA_TYPES.JSON_TYPE:
           return (col,jdx) =>  {
             // row[idx] = Buffer.from(JSON.stringify(row[idx]))
             // JSON must be shipped in Serialized Form
             return typeof col === 'object' ? JSON.stringify(col) : col
           }
           break;
-        case "RAW":
+       case this.dbi.DATA_TYPES.BINARY_TYPE:
           /*
-          if (this.dbi.TREAT_RAW1_AS_BOOLEAN) {
+          if (this.dbi.BOOLEAN_AS_RAW1) {
             if (typeof col === 'boolean') {
               return  new Buffer.from(col === true ? [1] : [0])
             }
@@ -101,12 +104,12 @@ class OracleOutputManager extends YadamuOutputManager {
             return typeof col === 'boolean' ? new Buffer.from(col === true ? [1] : [0]) :  col
           }
           break;
-        case "BOOLEAN":
+       case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
           return (col,jdx) =>  {
             return YadamuLibrary.booleanToBuffer(col)
           }
           break;
-        case "DATE":
+       case this.dbi.DATA_TYPES.DATE_TYPE:
           return (col,jdx) =>  {
             if (col instanceof Date) {
               return col.toISOString()
@@ -114,7 +117,7 @@ class OracleOutputManager extends YadamuOutputManager {
             return col;
           }
           break;
-        case "TIMESTAMP":
+       case this.dbi.DATA_TYPES.TIMESTAMP_TIMESTAMP_TYPE:
           return (col,jdx) =>  {
             // A Timestamp not explicitly marked as UTC should be coerced to UTC.
             // Avoid Javascript dates due to lost of precsion.
@@ -128,7 +131,7 @@ class OracleOutputManager extends YadamuOutputManager {
             return col
           }
           break;
-        case "XMLTYPE" :
+       case this.dbi.DATA_TYPES.XML_TYPE :
           /*
           // Cannot passs XMLTYPE as BUFFER: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
           return (col,jdx) =>  {
@@ -190,7 +193,7 @@ class OracleOutputManager extends YadamuOutputManager {
                 col = Buffer.from(JSON.stringify(col),'utf-8')
               }
               if ((typeof col === "string") /* && ((col.length/2) <= this.dbi.CACHELOB_MAX_SIZE) */) {
-                if (YadamuLibrary.decomposeDataType(this.tableInfo.targetDataTypes[idx]).type === 'JSON') {
+                if (YadamuDataTypes.decomposeDataType(this.tableInfo.targetDataTypes[idx]).type === 'JSON') {
                   col = Buffer.from(col,'utf-8')
                 }
                 else {

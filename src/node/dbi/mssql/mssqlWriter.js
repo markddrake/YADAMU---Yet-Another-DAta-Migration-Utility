@@ -64,7 +64,7 @@ class MsSQLWriter extends YadamuWriter {
     // Cannot process table using BCP Mode. Prepare a statement use with record by record processing.
  
     try {
-      await this.dbi.cachePreparedStatement(this.tableInfo.dml, this.tableInfo.decomposedDataTypes, this.SPATIAL_FORMAT) 
+      await this.dbi.cachePreparedStatement(this.tableInfo.dml, this.tableInfo.dataTypeDefinitions, this.SPATIAL_FORMAT) 
     } catch (cause) {
       if (this.rowsLost()) {
 		throw cause

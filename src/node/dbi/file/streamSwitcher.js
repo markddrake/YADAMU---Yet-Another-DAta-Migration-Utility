@@ -59,71 +59,52 @@ class StreamSwitcher extends Transform {
     // this.yadamuLogger.trace([this.constructor.name,tableName],'generateTransformations()')
 	 
 	const tableMetadata = this.metadata[tableName]
-	return tableMetadata.dataTypes.map((targetDataType,idx) => {	  
+	return tableMetadata.dataTypes.map((dataType,idx) => {	  
 	
-      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-
-	  if (YadamuDataTypes.isBinary(dataType.type)) {
-        return (row,idx) =>  {
-  		  row[idx] = Buffer.from(row[idx],'hex')
-		}
-      }
-
-	  switch (dataType.type.toUpperCase()) {
-        case "GEOMETRY":
-        case "GEOGRAPHY":
-		case "POINT":
-        case "LSEG":
-        case "BOX":
-        case "PATH":
-        case "POLYGON":
-        case "LINESTRING":
-		case "MULTIPOINT":
-        case "MULTILINESTRING":
-        case "MULTIPOLYGON":
-        case "GEOMETRYCOLLECTION":
-        case "GEOMCOLLECTION":
-        case '"MDSYS"."SDO_GEOMETRY"':
-          if (this.spatialFormat.endsWith('WKB')) {
-            return (row,idx)  => {
-  		      row[idx] = Buffer.from(row[idx],'hex')
-			}
-          }
-		  return null;
-        case "CIRCLE":
-		  if (this.circleFormat === 'CIRCLE') { 
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
+	 
+	  switch (true) {
+        case (dataTypeDefinition.type.toUpperCase() === "CIRCLE"):
+   		  if (this.circleFormat === 'CIRCLE') {
+			// console.log(tableMetadata.columnNames[idx],dataType,'==>','CIRCLE')
             return null;
 		  }
+		  // Deliberate FALL through to SPATIAL 
+	    case (YadamuDataTypes.isSpatial(dataTypeDefinition.type)):
+          // console.log(tableMetadata.columnNames[idx],dataType,'==>','isSpatial')
           if (this.spatialFormat.endsWith('WKB')) {
             return (row,idx)  => {
   		      row[idx] = Buffer.from(row[idx],'hex')
 			}
           }
+		  return null
+	    case (YadamuDataTypes.isBoolean(dataTypeDefinition.type,parseInt(tableMetadata.sizeConstraints[idx]),tableMetadata.vendor)):
+          // console.log(tableMetadata.columnNames[idx],dataType,'==>','isBoolean')
 		  return null;
-		case "REAL":
-        case "FLOAT":
-		case "DOUBLE":
-		case "DOUBLE PRECISION":
-		case "BINARY_FLOAT":
-		case "BINARY_DOUBLE":
-		   return (row, idx) => {
-//			 if (!isFinite(row[idx])) {
-			   switch (row[idx]) {
-		         case "NaN":
-		   	       row[idx] = NaN
-				   break;
-			     case "Infinity":
-				   row[idx] = Number.POSITIVE_INFINITY
-				   break;
-				 case "-Infinity":
-				   row[idx] = Number.NEGATIVE_INFINITY
-				   break;
-				 default:
-			   }   
-//		     }
-		   }			 
-   		 default:
-		   return null
+	    case (YadamuDataTypes.isBinary(dataTypeDefinition.type)):
+          // console.log(tableMetadata.columnNames[idx],dataType,'==>','isBinary')
+  		  return (row,idx) =>  {
+			row[idx] = Buffer.from(row[idx],'hex')
+		  }
+	    case (YadamuDataTypes.isFloatingPoint(dataTypeDefinition.type)):
+  		  // console.log(tableMetadata.columnNames[idx],dataType,'==>','isFloatingPoint')
+  		  return (row, idx) => {
+		    switch (row[idx]) {
+		      case "NaN":
+			    row[idx] = NaN
+			    break;
+			  case "Infinity":
+				row[idx] = Number.POSITIVE_INFINITY
+				break;
+		      case "-Infinity":
+				row[idx] = Number.NEGATIVE_INFINITY
+				break;
+		      default:
+			}
+          }			
+		default:
+  		  // console.log(tableMetadata.columnNames[idx],dataType,'==>','isDefault')
+		  return null
       }
     }) 
 		

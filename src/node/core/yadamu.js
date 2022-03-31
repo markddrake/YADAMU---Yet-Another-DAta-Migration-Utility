@@ -243,11 +243,20 @@ class Yadamu {
 	this._COMMAND_LINE_PARAMETERS[argument] = value
   }
   
-  initializeTypeMapping(DataTypes,mappings) {
+  initializeDataTypes(DataTypes,dataTypeConfiguration) {
+	  
+	/*
+	**
+	** Avoid error: "Cannot set property CHAR_TYPE of class ... which has only a getter"
+    ** by ensuring each Class object is only initialized once regardless of how many times it is used
+	**
+	*/
 	
 	if (!this.mappedDataTypes.has(DataTypes.name)) {
-	  this.mappedDataTypes.add(DataTypes.name) 
-      Object.assign(DataTypes,mappings)
+	  this.mappedDataTypes.add(DataTypes.name)     	 
+      Object.assign(DataTypes,dataTypeConfiguration.mappings);
+      Object.assign(DataTypes,dataTypeConfiguration.limits);
+	  Object.assign(DataTypes.storageOptions,dataTypeConfiguration.storageOptions || {});	  
     }
 	
   }	

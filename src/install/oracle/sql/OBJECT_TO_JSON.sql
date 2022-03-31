@@ -1,32 +1,39 @@
 create or replace package OBJECT_TO_JSON
 AUTHID CURRENT_USER
 as
-  TYPE T_TABLE_INFO_RECORD is RECORD (
+--
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+--
+$ELSE
+--
+  TYPE TABLE_INFO_RECORD is RECORD (
     OWNER      VARCHAR2(128)
    ,TABLE_NAME VARCHAR2(128)
    );  
 
-  TYPE T_TABLE_INFO_TABLE is TABLE of T_TABLE_INFO_RECORD;
+  TYPE TABLE_INFO_TABLE is TABLE of TABLE_INFO_RECORD;
   
-  TYPE TYPE_LIST_T is RECORD (
+  TYPE TYPE_LIST is RECORD (
     OWNER               VARCHAR2(128)
   , TYPE_NAME           VARCHAR2(128)
   , ATTR_COUNT          NUMBER
   , TYPECODE            VARCHAR2(32)
   );
 
-  TYPE TYPE_LIST_TAB is TABLE of TYPE_LIST_T;
-  
+  TYPE TYPE_LIST_TABLE is TABLE of TYPE_LIST;
+--
+$END
+--  
   function SERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2) return CLOB;
   function SERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
-  function SERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE) return CLOB;
+  function SERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE) return CLOB;
 
   function DESERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2) return VARCHAR2;
   function DESERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
-  function DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE) return CLOB;
+  function DESERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE) return CLOB;
   procedure DESERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2, P_PLSQL_BLOCK IN OUT NOCOPY CLOB);
   procedure DESERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_PLSQL_BLOCK IN OUT NOCOPY CLOB);
-  procedure DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE, P_PLSQL_BLOCK IN OUT NOCOPY CLOB);
+  procedure DESERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE, P_PLSQL_BLOCK IN OUT NOCOPY CLOB);
 
   function SERIALIZE_BFILE(P_BFILE BFILE) return VARCHAR2;
   function DESERIALIZE_BFILE(P_SERIALIZATION VARCHAR2) return BFILE;
@@ -339,7 +346,7 @@ begin
   end loop;
 end;
 --
-function extendTypeList(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB, P_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2)
+function extendTypeList(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE, P_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2)
 return VARCHAR2
 as
   V_COUNT     NUMBER;
@@ -404,7 +411,7 @@ $END
   return V_TYPECODE;
 end;
 --
-function serializeAttr(P_ATTR_NAME VARCHAR2, P_ATTR_TYPE_OWNER VARCHAR2, P_ATTR_TYPE_NAME VARCHAR2, P_ATTR_TYPE_MOD VARCHAR2, P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function serializeAttr(P_ATTR_NAME VARCHAR2, P_ATTR_TYPE_OWNER VARCHAR2, P_ATTR_TYPE_NAME VARCHAR2, P_ATTR_TYPE_MOD VARCHAR2, P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE)
 return VARCHAR2
 as
   V_PLSQL VARCHAR2(32767);
@@ -550,7 +557,7 @@ begin
 
 end;
 
-function serializeType(P_TYPE_RECORD TYPE_LIST_T,P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function serializeType(P_TYPE_RECORD TYPE_LIST,P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE)
 return CLOB
 /*
 **
@@ -670,7 +677,7 @@ begin
 
 end;
 --
-function serializeTypes(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function serializeTypes(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE)
 return CLOB
 as
 --
@@ -713,43 +720,65 @@ end;
 function SERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2)
 return CLOB
 as
-  V_TYPE_LIST TYPE_LIST_TAB;
+  V_TYPE_LIST TYPE_LIST_TABLE;
 begin
-   select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
-     bulk collect into V_TYPE_LIST
-     from ALL_TYPES
-          start with OWNER = P_TYPE_OWNER and TYPE_NAME = P_TYPE_NAME
-          connect by prior TYPE_NAME = SUPERTYPE_NAME
-                 and prior OWNER = SUPERTYPE_OWNER;
+  --
+  $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  select TYPE_LIST(OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE)
+  --
+  $ELSE
+  --
+  select OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  $END
+  --
+    bulk collect into V_TYPE_LIST
+    from (
+	  select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+        from ALL_TYPES
+       start with OWNER = P_TYPE_OWNER and TYPE_NAME = P_TYPE_NAME
+             connect by prior TYPE_NAME = SUPERTYPE_NAME
+                 and prior OWNER = SUPERTYPE_OWNER
+	);
+	
   return serializeTypes(V_TYPE_LIST);
 end;
 --
 function SERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2)
 return CLOB
 as
-  V_TYPE_LIST TYPE_LIST_TAB;
+  V_TYPE_LIST TYPE_LIST_TABLE;
 begin
-  select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  --
+  $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  select TYPE_LIST(OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE)
+  --
+  $ELSE
+  --
+  select OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  $END
+  --
     bulk collect into V_TYPE_LIST
-  from ALL_TYPES at,
-       (
-         select distinct DATA_TYPE_OWNER,  DATA_TYPE
-           from ALL_TAB_COLS atc
-          where atc.DATA_TYPE_OWNER is not NULL
-            and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-	        and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-            and atc.OWNER = P_TABLE_OWNER
-            and atc.TABLE_NAME = P_TABLE_NAME
-       ) tlt
-       start with at.TYPE_NAME = tlt.DATA_TYPE
-              and at.OWNER = tlt.DATA_TYPE_OWNER
-                  connect by prior at.TYPE_NAME = SUPERTYPE_NAME
-                         and prior at.OWNER = SUPERTYPE_OWNER;
-
+	from (
+      select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+        from ALL_TYPES at, (
+          select distinct DATA_TYPE_OWNER,  DATA_TYPE
+            from ALL_TAB_COLS atc
+           where atc.DATA_TYPE_OWNER is not NULL
+             and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
+	         and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+             and atc.OWNER = P_TABLE_OWNER
+             and atc.TABLE_NAME = P_TABLE_NAME
+        ) tlt
+        start with at.TYPE_NAME = tlt.DATA_TYPE
+          and at.OWNER = tlt.DATA_TYPE_OWNER
+              connect by prior at.TYPE_NAME = SUPERTYPE_NAME
+                  and prior at.OWNER = SUPERTYPE_OWNER
+	);
+	
   return serializeTypes(V_TYPE_LIST);
 end;
 --
-function SERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE)
+function SERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE)
 /*
 **
 ** Fetch the Type Heirachy of all types that are used by the columns in the table.
@@ -757,36 +786,46 @@ function SERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE)
 */
 return CLOB
 as
-  V_TYPE_LIST TYPE_LIST_TAB;
+  V_TYPE_LIST TYPE_LIST_TABLE;
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
   -- Cannot use local types in SQL in 11.2.x
-  V_TABLE_LIST TABLE_INFO_TABLE_GT := TABLE_INFO_TABLE_GT();
+  V_TABLE_LIST TABLE_INFO_TABLE := TABLE_INFO_TABLE();
 begin
   V_TABLE_LIST.extend(P_TABLE_LIST.count);
   for i in P_TABLE_LIST.first .. P_TABLE_LIST.last loop
-     V_TABLE_LIST(i) := TABLE_INFO_RECORD_GT(P_TABLE_LIST(i).OWNER,P_TABLE_LIST(i).TABLE_NAME);
+     V_TABLE_LIST(i) := TABLE_INFO_RECORD(P_TABLE_LIST(i).OWNER,P_TABLE_LIST(i).TABLE_NAME);
   end loop;
 $ELSE
-  V_TABLE_LIST T_TABLE_INFO_TABLE := P_TABLE_LIST;
+  V_TABLE_LIST TABLE_INFO_TABLE := P_TABLE_LIST;
 begin
 $END  
-  select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  --
+  $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  select TYPE_LIST(OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE)
+  --
+  $ELSE
+  --
+  select OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  $END
+  --
     bulk collect into V_TYPE_LIST
-  from ALL_TYPES at,
-       (
-         select distinct DATA_TYPE_OWNER,  DATA_TYPE
-           from ALL_TAB_COLS atc, TABLE(V_TABLE_LIST) tl
-          where atc.DATA_TYPE_OWNER is not NULL
-            and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-	        and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-            and atc.OWNER = tl.OWNER
-            and atc.TABLE_NAME = tl.TABLE_NAME
-       ) tlt
-       start with at.TYPE_NAME = tlt.DATA_TYPE
-              and at.OWNER = tlt.DATA_TYPE_OWNER
-                  connect by prior at.TYPE_NAME = SUPERTYPE_NAME
-                         and prior at.OWNER = SUPERTYPE_OWNER;
-
+    from (
+	    select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+          from ALL_TYPES at, (
+            select distinct DATA_TYPE_OWNER,  DATA_TYPE
+              from ALL_TAB_COLS atc, TABLE(V_TABLE_LIST) tl
+             where atc.DATA_TYPE_OWNER is not NULL
+               and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
+	           and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+               and atc.OWNER = tl.OWNER
+               and atc.TABLE_NAME = tl.TABLE_NAME
+          ) tlt
+      start with at.TYPE_NAME = tlt.DATA_TYPE
+        and at.OWNER = tlt.DATA_TYPE_OWNER
+            connect by prior at.TYPE_NAME = SUPERTYPE_NAME
+                and prior at.OWNER = SUPERTYPE_OWNER
+	);
+	
   return serializeTypes(V_TYPE_LIST);
 end;
 --
@@ -820,7 +859,7 @@ begin
   DBMS_LOB.WRITEAPPEND(P_PLSQL_BLOCK,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
 end;
 --
-procedure DESERIALIZE_TYPES(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB, P_PLSQL_BLOCK IN OUT NOCOPY CLOB)
+procedure DESERIALIZE_TYPES(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE, P_PLSQL_BLOCK IN OUT NOCOPY CLOB)
 as
 --
   V_SQL_FRAGMENT   VARCHAR2(4000);
@@ -838,7 +877,7 @@ begin
 
 end;
 --
-function DESERIALIZE_TYPES(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function DESERIALIZE_TYPES(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE)
 return CLOB
 as
   V_PLSQL_BLOCK    CLOB;
@@ -850,16 +889,28 @@ end;
 --
 procedure DESERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2,P_TABLE_NAME VARCHAR2, P_PLSQL_BLOCK IN OUT NOCOPY CLOB)
 as
-  V_TYPE_LIST TYPE_LIST_TAB;
+  V_TYPE_LIST TYPE_LIST_TABLE;
 begin
-  select distinct DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+  --
+  $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  select TYPE_LIST(DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL)
+  --
+  $ELSE
+  --
+  select DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+  $END
+  --
     bulk collect into V_TYPE_LIST
-    from ALL_TAB_COLS atc
-   where atc.DATA_TYPE_OWNER is not NULL
-     and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-     and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-     and atc.OWNER = P_TABLE_OWNER
-     and atc.TABLE_NAME = P_TABLE_NAME;
+	from (
+      select distinct DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+        from ALL_TAB_COLS atc
+       where atc.DATA_TYPE_OWNER is not NULL
+         and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
+         and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+         and atc.OWNER = P_TABLE_OWNER
+         and atc.TABLE_NAME = P_TABLE_NAME
+	);
+	
   DESERIALIZE_TYPES(V_TYPE_LIST, P_PLSQL_BLOCK);
 end;
 --
@@ -873,33 +924,45 @@ begin
   return V_PLSQL_BLOCK;
 end;
 --
-procedure DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE,P_PLSQL_BLOCK IN OUT NOCOPY CLOB)
+procedure DESERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE,P_PLSQL_BLOCK IN OUT NOCOPY CLOB)
 as
-  V_TYPE_LIST TYPE_LIST_TAB;
+  V_TYPE_LIST TYPE_LIST_TABLE;
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
   -- Cannot use local types in SQL in 11.2.x
-  V_TABLE_LIST TABLE_INFO_TABLE_GT := TABLE_INFO_TABLE_GT();
+  V_TABLE_LIST TABLE_INFO_TABLE := TABLE_INFO_TABLE();
 begin
   V_TABLE_LIST.extend(P_TABLE_LIST.count);
   for i in P_TABLE_LIST.first .. P_TABLE_LIST.last loop
-     V_TABLE_LIST(i) := TABLE_INFO_RECORD_GT(P_TABLE_LIST(i).OWNER,P_TABLE_LIST(i).TABLE_NAME);
+     V_TABLE_LIST(i) := TABLE_INFO_RECORD(P_TABLE_LIST(i).OWNER,P_TABLE_LIST(i).TABLE_NAME);
   end loop;
 $ELSE
-  V_TABLE_LIST T_TABLE_INFO_TABLE := P_TABLE_LIST;
+  V_TABLE_LIST TABLE_INFO_TABLE := P_TABLE_LIST;
 begin
 $END  
-  select distinct DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+  --
+  $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  select TYPE_LIST(DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL)
+  --
+  $ELSE
+  --
+  select DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+  $END
+  --
     bulk collect into V_TYPE_LIST
-    from ALL_TAB_COLS atc, TABLE(V_TABLE_LIST) tl
-   where atc.DATA_TYPE_OWNER is not NULL
-     and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-    and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-     and atc.OWNER = tl.OWNER
-     and atc.TABLE_NAME = tl.TABLE_NAME;
+    from (
+	  select distinct DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+        from ALL_TAB_COLS atc, TABLE(V_TABLE_LIST) tl
+       where atc.DATA_TYPE_OWNER is not NULL
+         and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
+         and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+         and atc.OWNER = tl.OWNER
+         and atc.TABLE_NAME = tl.TABLE_NAME
+	);
+		 
   DESERIALIZE_TYPES(V_TYPE_LIST, P_PLSQL_BLOCK);
 end;
 --
-function DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE)
+function DESERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE)
 return CLOB
 as
   V_PLSQL_BLOCK    CLOB;

@@ -2,6 +2,8 @@
 import YadamuDataTypes   from '../base/yadamuDataTypes.js'
 
 class MariadbDataTypes extends YadamuDataTypes {
+	
+  static get TREAT_TINYINT1_AS_BOOLEAN()   { return this.storageOptions.BOOLEAN_TYPE === "tinyint(1)" }
 
   static get UNBOUNDED_TYPES() { 
     this._UNBOUNDED_TYPES = this._UNBOUNDED_TYPES || Object.freeze([

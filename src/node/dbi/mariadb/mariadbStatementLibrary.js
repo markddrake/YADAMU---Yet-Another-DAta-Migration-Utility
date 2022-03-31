@@ -70,9 +70,12 @@ class MariadbStatementLibrary {
                       when data_type in ('time') then
                          -- Force ISO 8601 rendering of value 
                          concat('DATE_FORMAT(convert_tz(addtime(''1970-01-01 00:00:00'',"', column_name, '"), @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')',' "',column_name,'"')
-                      when data_type in ('date','datetime','timestamp') then
+                      when data_type in ('date','datetime') then
                         -- Force ISO 8601 rendering of value 
                         concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')',' "',column_name,'"')
+                      when data_type in ('date','datetime','timestamp') then
+                        -- Force ISO 8601 rendering of value 
+                        concat('case when "', column_name, '" is not null and convert_tz("', column_name, '", @@session.time_zone, ''+00:00'') is null then ''1970-01-01T00:00:00.000000Z''else DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'') end',' "',column_name,'"')
   					  when data_type = 'bit' then 
 						concat('BIN("', column_name, '") "',column_name,'"')
                       when data_type = 'year' then

@@ -1,11 +1,12 @@
 
 import { 
   performance 
-}                          from 'perf_hooks'
+}                               from 'perf_hooks'
 
-import YadamuLibrary       from '../../lib/yadamuLibrary.js'
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
 						
-import YadamuOutputManger  from '../base/yadamuOutputManager.js'
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManger       from '../base/yadamuOutputManager.js'
 
 import {
   DatabaseError,
@@ -21,9 +22,11 @@ class MariadbOutputManger extends YadamuOutputManger {
   generateTransformations(dataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
- 
+	
 	return dataTypes.map((dataType,idx) => {
-      const dataTypeDefinition = YadamuLibrary.decomposeDataType(dataType);
+
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
+
       switch (dataTypeDefinition.type.toLowerCase()) {
         case this.dbi.DATA_TYPES.JSON_TYPE:
           return (col,idx) => {

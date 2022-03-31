@@ -1,0 +1,99 @@
+{
+  "mappings": {
+    "CHAR_TYPE"                                            : "character"                                        
+  , "VARCHAR_TYPE"                                         : "character varying"                                
+  , "PGSQL_NAME_TYPE"                                      : "name"                                             
+  , "PGSQL_BPCHAR_TYPE"                                    : "bpchar"                                           
+                                                                                                             
+  , "BINARY_TYPE"                                          : "bytea"                                            
+                                                                                                             
+  , "SMALLINT_TYPE"                                        : "smallint"                                         
+  , "INTEGER_TYPE"                                         : "integer"                                          
+  , "BIGINT_TYPE"                                          : "bigint"                                           
+  , "FLOAT_TYPE"                                           : "real"                                             
+  , "DOUBLE_TYPE"                                          : "double precision"                                 
+  , "NUMERIC_TYPE"                                         : "numeric"                                          
+  , "PGSQL_MONEY_TYPE"                                     : "money"                                            
+                                                                                                             
+  , "DATE_TYPE"                                            : "date"                                             
+  , "TIMESTAMP_TYPE"                                       : "timestamp without time zone"                      
+  , "TIMESTAMP_TZ_TYPE"                                    : "timestamp with time zone"                         
+  , "TIME_TYPE"                                            : "time without time zone"                           
+  , "TIME_TZ_TYPE"                                         : "time with time zone"                              
+  , "INTERVAL_TYPE"                                        : "interval"                                                        
+  , "INTERVAL_DAY_TO_SECOND_TYPE"                          : "interval day to second"                                          
+  , "INTERVAL_YEAR_TO_MONTH_TYPE"                          : "interval year to month"                                          
+                                                                                                                         
+  , "BOOLEAN_TYPE"                                         : "boolean"                                          
+  , "BIT_STRING_TYPE"                                      : "bit"                                              
+  , "VARBIT_STRING_TYPE"                                   : "bit varying"                                      
+                                                                                                             
+  , "CLOB_TYPE"                                            : "text"                                             
+  , "BLOB_TYPE"                                            : "bytea"                                             
+                                                                                                             
+  , "XML_TYPE"                                             : "xml"                                              
+  , "JSON_TYPE"                                            : "json"                                             
+  , "PGSQL_BINARY_JSON_TYPE"                               : "jsonb"                                            
+                                                                                                             
+  , "POINT_TYPE"                                           : "point"                                            
+  , "LINE_TYPE"                                            : "lseg"                                             
+  , "PATH_TYPE"                                            : "path"                                             
+  , "BOX_TYPE"                                             : "box"                                              
+  , "POLYGON_TYPE"                                         : "polygon"                                          
+  , "SPATIAL_TYPE"                                         : "geography"                                        
+  , "PGSQL_LINE_EQ_TYPE"                                   : "line"                                             
+  , "PGSQL_CIRCLE_TYPE"                                    : "circle"                                           
+                                                                                                             
+  , "UUID_TYPE"                                            : "uuid"                                             
+                                                                                                             
+  , "PGSQL_CIDR_ADDR_TYPE"                                 : "cidr"                                             
+  , "PGSQL_INET_ADDR_TYPE"                                 : "inet"                                             
+  , "PGSQL_MAC_ADDR_TYPE"                                  : "macaddr"                                          
+  , "PGSQL_MAC_ADDR8_TYPE"                                 : "macaddr8"                                         
+                                                                                                             
+  , "PGSQL_RANGE_INT4_TYPE"                                : "int4range"                                        
+  , "PGSQL_RANGE_INT8_TYPE"                                : "int8range"                                        
+  , "PGSQL_RANGE_NUM_TYPE"                                 : "numrange"                                         
+  , "PGSQL_RANGE_TIMESTAMP_TYPE"                           : "tsrange"                                          
+  , "PGSQL_RANGE_TIMESTAMP_TZ_TYPE"                        : "tstzrange"                                        
+  , "PGSQL_RANGE_DATE_TYPE"                                : "daterange"                                        
+   
+  , "PGSQL_TEXTSEACH_VECTOR_TYPE"                          : "tsvector"                                        
+  , "PGSQL_TEXTSEACH_QUERY_TYPE"                           : "tsquery"                                        
+                                                                                                                                                                                                                         
+  , "PGSQL_OID_TYPE"                                       : "oid"                                              
+  , "PGSQL_REG_CLASS_TYPE"                                 : "regclass"                                         
+  , "PGSQL_REG_COLLATION_TYPE"                             : "regcollation"                                     
+  , "PGSQL_REG_TEXTSEARCH_CONFIG_TYPE"                     : "regconfig"                                        
+  , "PGSQL_REG_TEXTSEARCH_DICT_TYPE"                       : "regdictionary"                                    
+  , "PGSQL_REG_NAMESPACE_TYPE"                             : "regnamespace"                                     
+  , "PGSQL_REG_OPERATOR_NAME_TYPE"                         : "regoper"                                          
+  , "PGSQL_REG_OPERATOR_ARGS_TYPE"                         : "regoperator"                                      
+  , "PGSQL_REG_FUNCTION_NAME_TYPE"                         : "regproc"                                          
+  , "PGSQL_REG_FUNCTION_ARGS_TYPE"                         : "regprocedure"                                     
+  , "PGSQL_REG_ROLE_TYPE"                                  : "regrole"                                          
+  , "PGSQL_REG_TYPE_TYPE"                                  : "regtype"                                         
+   
+  , "PGSQL_TID_TYPE"                                       : "tid"                                              
+  , "PGSQL_XID_TYPE"                                       : "xid"                                              
+  , "PGSQL_CID_TYPE"                                       : "cid"                                              
+  , "PGSQL_TXID_SNAPSHOT_TYPE"                             : "txid_snapshot"                                    
+  , "PGSQL_GTSVECTOR_TYPE"                                 : "gtsvector"                                    
+                                                                                                             
+  , "PGSQL_ACLITEM"                                        : "aclitem"                                          
+  , "PGSQL_REFCURSOR"                                      : "refcursor"       
+   
+  , "MONGO_OBJECTID_TYPE"                                  : "bytea"
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "numeric"
+  }
+, "limits": {
+    "SCALAR_LENGTH"                                        : 10485760
+  , "NUMERIC_PRECISION"                                    : 131072
+  , "NUMERIC_SCALE"                                        : 16383 
+  , "TIMESTAMP_PRECISION"                                  : 6
+  }
+, "storageOptions": {
+	"SPATIAL_FORMAT"                                       : "EWKB"
+  , "JSON_TYPE"                                            : "jsonb"
+  }
+}                                                                                                              

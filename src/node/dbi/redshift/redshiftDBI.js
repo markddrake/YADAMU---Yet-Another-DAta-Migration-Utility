@@ -36,6 +36,7 @@ import {
 							          							          
 import YadamuDBI                      from '../base/yadamuDBI.js'
 import DBIConstants                   from '../base/dbiConstants.js'
+import YadamuDataTypes                from '../base/yadamuDataTypes.js'
 
 import {
 	
@@ -49,13 +50,13 @@ import AWSS3Constants                from '../awsS3/awsS3Constants.js'
 /* Vendor Specific DBI Implimentation */                                   
 						          
 import RedshiftConstants             from './redshiftConstants.js'
+import RedshiftDataTypes             from '.redshiftDataTypes.js'
 import RedshiftError                 from './redshiftException.js'
 import RedshiftParser                from './redshiftParser.js'
 import RedshiftWriter                from './redshiftWriter.js'
 import RedshiftOutputManager         from './redshiftOutputManager.js'
-import StatementGenerator            from './statementGenerator.js'
+import RedshiftStatementGenerator    from './redhiftStatementGenerator.js'
 import RedshiftStatementLibrary      from './redshiftStatementLibrary.js'
-
 
 class RedshiftDBI extends YadamuDBI {
     
@@ -508,7 +509,7 @@ class RedshiftDBI extends YadamuDBI {
   }
   
   generateSelectListEntry(columnInfo) {
-	const dataType = YadamuLibrary.decomposeDataType(columnInfo[3])
+	const dataType = RedshiftDataTypes.decomposeDataType(columnInfo[3])
 	switch (dataType.type) {
 	  case 'date':
 		return `TO_CHAR("${columnInfo[2]}",'YYYY-MM-DD"T"HH24:MI:SS"Z"') "${columnInfo[2]}"`

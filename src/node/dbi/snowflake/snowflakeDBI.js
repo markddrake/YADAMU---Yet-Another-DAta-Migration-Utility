@@ -16,8 +16,8 @@ import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
 /* Yadamu DBI */  
 
-import YadamuDBI from '../base/yadamuDBI.js'
-import DBIConstants from '../base/dbiConstants.js'
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
 
 import {
   YadamuError,
@@ -32,7 +32,7 @@ import SnowflakeError                 from './snowflakeException.js'
 import SnowflakeParser                from './snowflakeParser.js'
 import SnowflakeWriter                from './snowflakeWriter.js'
 import SnowflakeOutputManager         from './snowflakeOutputManager.js'
-import StatementGenerator             from './statementGenerator.js'
+import SnowflakeStatementGenerator    from './snowflakeStatementGenerator.js'
 import SnowflakeStatementLibrary      from './snowflakeStatementLibrary.js'
 
 class SnowflakeDBI extends YadamuDBI {
@@ -433,7 +433,7 @@ class SnowflakeDBI extends YadamuDBI {
 	    const descOutput = await this.executeSQL(SQL_DESCRIBE_TABLE)
 	    dataTypes.forEach((dataType,idx) => {
           dataTypes[idx] = dataType === 'USER_DEFINED_TYPE' ? descOutput[idx].type : dataType
-          sizeConstraints[idx] = dataType === 'BINARY' ? '' + YadamuLibrary.decomposeDataType(descOutput[idx].type).length : sizeConstraints[idx] 
+          sizeConstraints[idx] = dataType === 'BINARY' ? '' + SnowflakeDataTypes.decomposeDataType(descOutput[idx].type).length : sizeConstraints[idx] 
         })
 	  }
       /*
@@ -508,7 +508,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
     const statement = this.connection.execute({sqlText: queryInfo.SQL_STATEMENT,  fetchAsString: ['Number','Date'], streamResult: true})
     return statement.streamRows();
-|  }  
+  }  
   
   /*
   **

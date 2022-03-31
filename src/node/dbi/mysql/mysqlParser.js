@@ -3,15 +3,17 @@
 import YadamuParser from '../base/yadamuParser.js'
 
 class MySQLParser extends YadamuParser {
+	
 
   generateTransformations(queryInfo) {
+	 
     return queryInfo.DATA_TYPE_ARRAY.map((dataType) => {
 	  switch (dataType.toLowerCase()) {
-		 case "decimal":
+		 case this.dbi.DATA_TYPES.NUMERIC_TYPE:
 		   return (row,idx) => {
 			  row[idx] = typeof row[idx] === 'string' ? row[idx].replace(/(\.0*|(?<=(\..*))0*)$/, '') : row[idx]
 		   }
-		 case "set":
+		 case this.dbi.DATA_TYPES.MYSQL_SET_TYPE:
 		   // Convert comma seperated list to string array. Assume that a value cannont contain a ',' which seems to enforced at DDL time
 		   return (row,idx) => {
 			  row[idx] = row[idx].split(',')

@@ -1,8 +1,7 @@
 
 import path                     from 'path';
 
-import YadamuLibrary            from '../../lib/yadamuLibrary.js';
-
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
 import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
 
 class MySQLStatementGenerator extends YadamuStatementGenerator {
@@ -10,21 +9,25 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
   constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {  
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
- 
+
   async generateStatementCache() {    
   
-    const typeMappings = {
+    const options = {
 	  spatialFormat    : this.dbi.INBOUND_SPATIAL_FORMAT
 	, circleFormat     : this.dbi.INBOUND_CIRCLE_FORMAT
 	}
 
-    const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,@RESULTS); SELECT @RESULTS "INSERT_INFORMATION"`;                       
-    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),this.targetSchema, JSON.stringify(typeMappings)]);
+    // this.debugStatementGenerator(options)
+
+	const vendorTypeMappings = Array.from( (await this.VENDOR_TYPE_MAPPINGS).entries())
+	
+	const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,?,@RESULTS); SELECT @RESULTS "INSERT_INFORMATION"`;                       
+    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),JSON.stringify(vendorTypeMappings),this.targetSchema, JSON.stringify(options)]);
 	
     results = results.pop();
     let statementCache = JSON.parse(results[0].INSERT_INFORMATION)
 	
-   	if (statementCache === null) {
+	if (statementCache === null) {
       statementCache = {}      
     }
     else {
@@ -33,10 +36,11 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
         const tableMetadata = this.metadata[table];
 		const tableName = tableMetadata.tableName;
         const tableInfo = statementCache[tableName];
-        tableInfo.columnNames = tableMetadata.columnNames
+		tableInfo.columnNames = tableMetadata.columnNames
 		
 		tableInfo.sourceDataTypes = tableMetadata.source?.dataTypes || []
-        const dataTypes = YadamuLibrary.decomposeDataTypes(tableInfo.targetDataTypes)
+		
+        const dataTypes = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
 		
         tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
         tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
@@ -49,18 +53,15 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
         const setOperators = dataTypes.map((dataType,idx) => {
 	      if (this.dbi.DB_VERSION < '8.0.19' || false) {
             switch (dataType.type) {
-              case 'geometry':
-			  case 'point':
-			  case 'lseg':
-			  case 'linestring':
-			  case 'box':
-			  case 'path':
-			  case 'polygon':
-			  case 'multipoint':
-			  case 'multilinestring':
-			  case 'multipolygon':
-			  case 'geomcollection':
-			  case 'geometrycollection':
+              case this.dbi.DATA_TYPES.POINT_TYPE:
+			  case this.dbi.DATA_TYPES.LINE_TYPE:
+			  case this.dbi.DATA_TYPES.POLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
+			  case this.dbi.DATA_TYPES.MULTIPOINT_TYPE:
+			  case this.dbi.DATA_TYPES.MULTILINE_TYPE:
+			  case this.dbi.DATA_TYPES.MULTPOLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:
+			  case this.dbi.DATA_TYPES.SPATIAL_TYPE:
                 tableInfo.insertMode = 'Iterative'; 
                 switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
                   case "WKB":
@@ -86,19 +87,15 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
           }
           else {
             switch (dataType.type) {
-              case 'geometry':
-			  case 'point':
-			  
-			  case 'lseg':
-			  case 'linestring':
-			  case 'box':
-			  case 'path':
-			  case 'polygon':
-			  case 'multipoint':
-			  case 'multilinestring':
-			  case 'multipolygon':
-			  case 'geomcollection':
-			  case 'geometrycollection':
+              case this.dbi.DATA_TYPES.POINT_TYPE:
+			  case this.dbi.DATA_TYPES.LINE_TYPE:
+			  case this.dbi.DATA_TYPES.POLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
+			  case this.dbi.DATA_TYPES.MULTIPOINT_TYPE:
+			  case this.dbi.DATA_TYPES.MULTILINE_TYPE:
+			  case this.dbi.DATA_TYPES.MULTPOLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:
+			  case this.dbi.DATA_TYPES.SPATIAL_TYPE:
                 tableInfo.insertMode = 'Rows';  
                 switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
                   case "WKB":
@@ -147,16 +144,15 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
    	        loadColumnNames.push(psuedoColumnName);
 		    setOperations.push(`"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${psuedoColumnName})`)
 			switch (dataType.type.toLowerCase()) {
-			  case 'point':
-              case 'linestring':
-              case 'polygon':
-              case 'geometry':
-              case 'multipoint':
-              case 'multilinestring':
-              case 'multipolygon':
-              case 'geometry':                             
-              case 'geometrycollection':
-              case 'geomcollection':
+              case this.dbi.DATA_TYPES.POINT_TYPE:
+			  case this.dbi.DATA_TYPES.LINE_TYPE:
+			  case this.dbi.DATA_TYPES.POLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
+			  case this.dbi.DATA_TYPES.MULTIPOINT_TYPE:
+			  case this.dbi.DATA_TYPES.MULTILINE_TYPE:
+			  case this.dbi.DATA_TYPES.MULTPOLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:
+			  case this.dbi.DATA_TYPES.SPATIAL_TYPE:
 			    let spatialFunction
                 switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
                   case "WKB":
@@ -175,51 +171,28 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 				}
                 setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${spatialFunction})`
 			    break
-              case 'binary':                              
-              case 'varbinary':                              
-              case 'blob':                                 
-              case 'tinyblob':                             
-              case 'mediumblob':                           
-              case 'longblob':                             
+              case this.dbi.DATA_TYPES.BINARY_TYPE:
+              case this.dbi.DATA_TYPES.VARBINARY_TYPE:
+              case this.dbi.DATA_TYPES.TINYBLOB_TYPE:
+              case this.dbi.DATA_TYPES.MEDIUMBLOB_TYPE:
+              case this.dbi.DATA_TYPES.BLOB_TYPE:
+              case this.dbi.DATA_TYPES.LONGBLOB_TYPE:
                 setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, UNHEX(${psuedoColumnName}))`
 			    break;
-			  case 'time':
+              case this.dbi.DATA_TYPES.TIME_TYPE:
                 setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
 			    break;
-			  case 'datetime':
-			  case 'timestamp':
+              case this.dbi.DATA_TYPES.DATETIME_TYPE:
+              case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
                 setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
 			    break;
-  			  case 'tinyint':    
+              case this.dbi.DATA_TYPES.TINYINT_TYPE:
                 switch (true) {
                   case ((dataType.length === 1) && this.dbi.TREAT_TINYINT1_AS_BOOLEAN):
-                     setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
-				     break;
+                    setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
+				    break;
 				}
                 break;				 
-            /*
-              case 'smallint':
-              case 'mediumint':
-              case 'integer':
-              case 'bigint':
-              case 'decimal':                                           
-              case 'float':                                           
-              case 'double':                                           
-              case 'bit':
-			  case 'date':
-              case 'year':                            
-              case 'char':                              
-              case 'varchar':                              
-              case 'text':                                 
-              case 'tinytext':
-			  case 'mediumtext':                           
-              case 'longtext':                             
-              case 'set':                                  
-              case 'enum':                                 
-              case 'json':                                 
-              case 'xml':                                  
-              
-			*/
 	          default:
 			}
 		  })

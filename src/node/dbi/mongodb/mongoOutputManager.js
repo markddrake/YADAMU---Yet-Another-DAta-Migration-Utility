@@ -1,11 +1,11 @@
 
 import { 
   performance 
-}                          from 'perf_hooks';
+}                               from 'perf_hooks';
 						
 import WKX from 'wkx';
 
-import mongodb             from 'mongodb'
+import mongodb                  from 'mongodb'
 const { 
   ObjectID, 
   Decimal128, 
@@ -14,9 +14,10 @@ const {
   Double
 } = mongodb
 
-import YadamuLibrary       from '../../lib/yadamuLibrary.js'
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
 
-import YadamuOutputManager from '../base/yadamuOutputManager.js'
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class MongoOutputManager extends YadamuOutputManager {
 
@@ -50,8 +51,9 @@ class MongoOutputManager extends YadamuOutputManager {
   generateTransformations(dataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
-
+  
 	const transformations = dataTypes.map((dataType,idx) => {      
+	
 	   switch(dataType.toLowerCase()){
         case this.dbi.DATA_TYPES.MONGO_OBJECTID_TYPE:
 	      return (col,idx) => {
@@ -68,7 +70,7 @@ class MongoOutputManager extends YadamuOutputManager {
 	      }		
 		case this.dbi.DATA_TYPES.MONGO_DECIMAL128_TYPE:
 		  return (col,idx) => {
-			 return Decimal128.fromString(col)
+			 return Decimal128.fromString( typeof col === 'string' ? col : col.toString()) 
 	      }
           break;
 		case this.dbi.DATA_TYPES.MONGO_BIGINT_TYPE:
@@ -76,7 +78,7 @@ class MongoOutputManager extends YadamuOutputManager {
 			 return Long.fromString(col)
 	      }
           break;
-        case 'geometry':
+        case this.dbi.DATA_TYPES.SPATIAL_TYPE:
           switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
             case "WKB":
             case "EWKB":

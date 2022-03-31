@@ -135,7 +135,7 @@ class MongoDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {	  
     super(yadamu,manager,connectionSettings,parameters)
-    yadamu.initializeTypeMapping(MongoDataTypes,this.TYPE_MAPPINGS)
+    this.initializeDataTypes(MongoDataTypes)
   }
                                                              ;
   async _executeDDL(collectionList) {

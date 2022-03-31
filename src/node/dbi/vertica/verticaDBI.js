@@ -101,7 +101,7 @@ class VerticaDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	yadamu.initializeTypeMapping(VerticaDataTypes,this.TYPE_MAPPINGS)
+	this.initializeDataTypes(VerticaDataTypes)
        
     this.pgClient = undefined;
     
@@ -118,7 +118,6 @@ class VerticaDBI extends YadamuDBI {
     this.verticaStack = new Error().stack
     this.verticaOperation = undefined
 
- 
   }
 
   /*
@@ -524,7 +523,7 @@ class VerticaDBI extends YadamuDBI {
   }
 
   generateSelectListEntry(columnInfo) {
-	const dataType = YadamuLibrary.decomposeDataType(columnInfo[3])
+	const dataType = VerticaDataTypes.decomposeDataType(columnInfo[3])
 	switch (dataType.type) {
 	  case 'interval':
 	    return `CAST("${columnInfo[2]}" AS VARCHAR) "${columnInfo[2]}"` 

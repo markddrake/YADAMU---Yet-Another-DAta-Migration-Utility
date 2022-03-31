@@ -1,16 +1,17 @@
 
 import { 
   performance 
-}                            from 'perf_hooks';
+}                               from 'perf_hooks';
 						
-import YadamuLibrary         from '../../lib/yadamuLibrary.js'
-import YadamuSpatialLibrary  from '../../lib/yadamuSpatialLibrary.js'
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
+import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js'
 
-import YadamuOutputManager   from '../base/yadamuOutputManager.js'
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 import {
   EmptyStringDetected 
-}                            from './verticaException.js'
+}                               from './verticaException.js'
 
 
 class VerticaOutputManager extends YadamuOutputManager {
@@ -19,21 +20,6 @@ class VerticaOutputManager extends YadamuOutputManager {
     super(dbi,tableName,metrics,status,yadamuLogger)
   }
 
-  createBatch() {
-	return {
-	  copy          : []
-	, insert        : []
-    }
-  }  
-    
-  resetBatch(batch) {
-    batch.copy.length = 0;
-	batch.insert.length = 0;
-	Object.keys(batch).filter((key) => {return ((key !== 'copy') && (key !== 'insert'))}).forEach((key) => {
-	  delete batch[key]
-	})
-  }
-  
   toSQLInterval(interval) {
     const jsInterval = YadamuLibrary.parse8601Interval(interval)
 	switch (jsInterval.type) {
@@ -56,6 +42,9 @@ class VerticaOutputManager extends YadamuOutputManager {
   resetBatch(batch) {
     batch.copy.length = 0;
 	batch.insert.length = 0;
+	Object.keys(batch).filter((key) => {return ((key !== 'copy') && (key !== 'insert'))}).forEach((key) => {
+	  delete batch[key]
+	})
   }
   
   toSQLIntervalYM(interval) {
@@ -86,7 +75,7 @@ class VerticaOutputManager extends YadamuOutputManager {
    	    }
 	  }
       
-	  const dataTypeDefinition = YadamuLibrary.decomposeDataType(dataType);
+	  const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
 	  
 	  switch (dataTypeDefinition.type.toLowerCase()) {
 		case this.dbi.DATA_TYPES.BINARY_TYPE:

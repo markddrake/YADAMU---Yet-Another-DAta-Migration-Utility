@@ -12,7 +12,16 @@ begin
    SELECT count(*)::int
         , 'DROP FUNCTION ' || string_agg(oid::regprocedure::text, '; DROP FUNCTION ')
    FROM   pg_proc
-   WHERE  UPPER(proname) in ('YADAMU_EXPORT','MAP_FOREIGN_DATA_TYPE','GENERATE_STATEMENTS','YADAMU_IMPORT_JSON','YADAMU_IMPORT_JSONB','GENERATE_SQL','EXPORT_JSON','IMPORT_JSON','IMPORT_JSONB')
+   WHERE  UPPER(proname) in ('YADAMU_EXPORT','MAP_FOREIGN_DATA_TYPE','MAP_PGSQL_DATA_TYPE','GENERATE_STATEMENTS','YADAMU_IMPORT_JSON','YADAMU_IMPORT_JSONB','GENERATE_SQL','EXPORT_JSON','IMPORT_JSON','IMPORT_JSONB')
+   INTO   _count, _sql;  -- only returned if trailing DROPs succeed
+
+   if _count > 0 then
+     execute _sql;
+   end if;
+   SELECT count(*)::int
+        , 'DROP PROCEDURE ' || string_agg(oid::regprocedure::text, '; DROP PROCEDURE ')
+   FROM   pg_proc
+   WHERE  UPPER(proname) in ('SET_VENDOR_TYPE_MAPPINGS')
    INTO   _count, _sql;  -- only returned if trailing DROPs succeed
 
    if _count > 0 then
@@ -271,7 +280,7 @@ begin
                  ,t.table_name "TABLE_NAME"
 	             ,jsonb_agg(column_name order by ordinal_position) "COLUMN_NAME_ARRAY"
 	             ,jsonb_agg(case 
-				              when ((c.data_type = 'character') and (c.udt_name = 'bpchar')) then
+				              when ((c.data_type = 'character') and (c.character_maximum_length is null)) then
                                 c.udt_name 
                               when c.data_type = 'USER-DEFINED' then
                                 c.udt_name 
@@ -474,20 +483,32 @@ $$ LANGUAGE plpgsql;
 **
 */
 --
-/*
-**
-** TODO: Add support for specifying whether to map JSON to JSON or JSONB
-**
-*/
-create or replace function MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH BIGINT, P_DATA_TYPE_SCALE INT, P_JSON_DATA_TYPE VARCHAR, P_POSTGIS_INSTALLED BOOLEAN) 
+create or replace procedure SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS JSONB) 
+as $$
+begin
+
+  create temporary table if not exists TYPE_MAPPING (
+    "VENDOR_TYPE"   VARCHAR(256)
+   ,"PGSQL_TYPE"    VARCHAR(256)
+  );
+  
+  delete from TYPE_MAPPING;
+  
+  insert into TYPE_MAPPING
+  select VALUE ->> 0 "VENDOR_TYPE", value ->> 1 "PGSQL_TYPE" 
+    from jsonb_array_elements (P_TYPE_MAPPINGS);
+		 
+end;  
+$$ LANGUAGE plpgsql;
+--
+create or replace function MAP_PGSQL_DATA_TYPE(P_VENDOR VARCHAR, P_PGSQL_DATA_TYPE  VARCHAR, P_DATA_TYPE VARCHAR, P_DATA_TYPE_LENGTH BIGINT, P_DATA_TYPE_SCALE INT, P_JSON_DATA_TYPE VARCHAR, P_POSTGIS_INSTALLED BOOLEAN) 
 returns VARCHAR
 as $$
 declare
   C_CHAR_TYPE                         VARCHAR(32) = 'character';
   C_CLOB_TYPE                         VARCHAR(32) = 'text';
   
-  C_GEOMETRY_TYPE                     VARCHAR(32) 
-  = CASE WHEN P_POSTGIS_INSTALLED THEN 'geometry' ELSE 'JSON' END;
+  C_GEOMETRY_TYPE                     VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geometry' ELSE 'JSON' END;
   C_GEOGRAPHY_TYPE                    VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geography' ELSE 'JSON' END;
   C_MAX_CHARACTER_VARYING_TYPE_LENGTH INT         = 10 * 1024 * 1024;
   C_MAX_CHARACTER_VARYING_TYPE        VARCHAR(32) = 'character varying(' || C_MAX_CHARACTER_VARYING_TYPE_LENGTH || ')';
@@ -501,7 +522,7 @@ declare
   C_HIERARCHY_TYPE                    VARCHAR(32) = 'character varying(4000)';
   C_INET_ADDR_TYPE                    VARCHAR(32) = 'character varying(39)';
   C_MAC_ADDR_TYPE                     VARCHAR(32) = 'character varying(23)';
-  C_UNSIGNED_INT_TYPE                 VARCHAR(32) = 'decimal(10,0)';
+  C_UNSIGNED_INT_TYPE                 VARCHAR(32) = 'numeric(10,0)';
   C_PGSQL_IDENTIFIER                  VARCHAR(32) = 'binary(4)';
   C_MONGO_OBJECT_ID                   VARCHAR(32) = 'binary(12)';
   C_MONGO_UNKNOWN_TYPE                VARCHAR(32) = 'character varying(2048)';
@@ -510,264 +531,16 @@ declare
   V_DATA_TYPE                         VARCHAR(128);
      
 begin
-  V_DATA_TYPE := P_DATA_TYPE;
-
-  case P_SOURCE_VENDOR 
-    when 'Postgres' then
-      case V_DATA_TYPE 
-	    when 'character'                                                                         then return case when P_DATA_TYPE_LENGTH is NULL then 'bpchar' else C_CHAR_TYPE end;                                                
-        when 'timestamp with time zone'                                                          then return 'timestamp(' || P_DATA_TYPE_LENGTH || ') with time zone';
-        when 'timestamp without time zone'                                                       then return 'timestamp(' || P_DATA_TYPE_LENGTH || ') without time zone';
-        when 'time with time zone'                                                               then return 'time(' || P_DATA_TYPE_LENGTH || ') with time zone';
-        when 'time without time zone'                                                            then return 'time(' || P_DATA_TYPE_LENGTH || ') without time zone';
-                                                                                                 else return lower(V_DATA_TYPE);																					
-      end case;
-    when 'Oracle' then
-      case V_DATA_TYPE
-        when 'CHAR'                                                                              then return C_CHAR_TYPE;
-        when 'NCHAR'                                                                             then return C_CHAR_TYPE;
-        when 'VARCHAR2'                                                                          then return 'character varying';
-		when 'NVARCHAR2'                                                                         then return 'character varying';
-        when 'CLOB'                                                                              then return C_CLOB_TYPE;
-        when 'NCLOB'                                                                             then return C_CLOB_TYPE;
-		when 'NUMBER'                                                                            then return 'numeric';
-        when 'BINARY_FLOAT'                                                                      then return 'float4';
-        when 'BINARY_DOUBLE'                                                                     then return 'float8';
-        when 'RAW'                                                                               then return 'bytea';
-        when 'BLOB'                                                                              then return 'bytea';
-        when 'TIMESTAMP'                                                                         then return case when P_DATA_TYPE_LENGTH > 6  then 'timestamp(6)' else 'timestamp' end;
-        when 'BFILE'                                                                             then return C_BFILE_TYPE;
-        when 'ROWID'                                                                             then return C_ROWID_TYPE;
-        when 'ANYDATA'                                                                           then return C_CLOB_TYPE;
-        when 'XMLTYPE'                                                                           then return 'xml';
-        when '"MDSYS"."SDO_GEOMETRY"'                                                            then return C_GEOMETRY_TYPE;
-        else
-		  case 
-		    when (strpos(V_DATA_TYPE,'LOCAL TIME ZONE') > 0)                                     then return lower(replace(V_DATA_TYPE,'LOCAL TIME ZONE','TIME ZONE'));  
-            when (strpos(V_DATA_TYPE,'INTERVAL') = 1) 
-			 and (strpos(V_DATA_TYPE,'YEAR') > 0) 
-			 and (strpos(V_DATA_TYPE,'TO MONTH') > 0)                                            then return 'interval year to month';
-          when (strpos(V_DATA_TYPE,'INTERVAL') = 1) 
-		   and (strpos(V_DATA_TYPE,'DAY') > 0) 
-		   and (strpos(V_DATA_TYPE,'TO SECOND') > 0)                                             then return 'interval day to second';
-		  when (strpos(V_DATA_TYPE,'"."XMLTYPE"') > 0)                                           then return 'xml';
-          -- Map all object types to text - Store the Oracle serialized format. 
-          -- When Oracle Objects are mapped to JSON change the mapping to JSON.
-          when(V_DATA_TYPE like '"%"."%"')                                                       then return C_CLOB_TYPE;
-                                                                                                 else return lower(V_DATA_TYPE);
-		 end case;
-      end case;
-    when  'MySQL' then
-      case V_DATA_TYPE
-        -- MySQL Direct Mappings
-        when 'binary'                                                                            then return 'bytea';
-        when 'bit'                                                                               then return 'boolean';
-        when 'datetime'                                                                          then return 'timestamp';
-        when 'double'                                                                            then return 'double precision';
-        when 'enum'                                                                              then return C_ENUM_TYPE;   
-        when 'float'                                                                             then return 'real';
-        when 'point'                                                                             then return 'point';
-        when 'linestring'                                                                        then return 'path';
-        when 'polygon'                                                                           then return 'polygon';
-        when 'geometry'                                                                          then return C_GEOMETRY_TYPE;
-        when 'multipoint'                                                                        then return C_GEOMETRY_TYPE;
-        when 'multilinestring'                                                                   then return C_GEOMETRY_TYPE;
-        when 'multipolygon'                                                                      then return C_GEOMETRY_TYPE;
-        when 'geometrycollection'                                                                then return C_GEOMETRY_TYPE;
-        when 'geomcollection'                                                                    then return C_GEOMETRY_TYPE;
-        when 'tinyint'                                                                           then return 'smallint';
-        when 'mediumint'                                                                         then return 'integer';
-        when 'int unsigned'                                                                      then return 'oid';
-        when 'tinyblob'                                                                          then return 'bytea';
-        when 'blob'                                                                              then return 'bytea';
-        when 'mediumblob'                                                                        then return 'bytea';
-        when 'longblob'                                                                          then return 'bytea';
-        when 'set'                                                                               then return 'jsonb';   
-        when 'tinyint'                                                                           then return 'smallint';
-        when 'tinytext'                                                                          then return C_MYSQL_TINY_TEXT_TYPE;
-        when 'text'                                                                              then return C_MYSQL_TEXT_TYPE;
-        when 'mediumtext'                                                                        then return C_CLOB_TYPE;
-        when 'longtext'                                                                          then return C_CLOB_TYPE;
-        when 'varbinary'                                                                         then return 'bytea';
-        when 'year'                                                                              then return 'smallint';
-                                                                                                 else return lower(V_DATA_TYPE);
-      end case;
-    when  'MariaDB' then
-      case V_DATA_TYPE
-        -- MySQL Direct Mappings
-        when 'binary'                                                                            then return 'bytea';
-        when 'bit'                                                                               then return 'boolean';
-        when 'datetime'                                                                          then return 'timestamp';
-        when 'double'                                                                            then return 'double precision';
-        when  'enum'                                                                             then return 'varchar(255)';   
-        when 'float'                                                                             then return 'real';
-        when 'point'                                                                             then return 'point';
-        when 'linestring'                                                                        then return 'path';
-        when 'polygon'                                                                           then return 'polygon';
-        when 'geometry'                                                                          then return C_GEOMETRY_TYPE;
-        when 'multipoint'                                                                        then return C_GEOMETRY_TYPE;
-        when 'multilinestring'                                                                   then return C_GEOMETRY_TYPE;
-        when 'multipolygon'                                                                      then return C_GEOMETRY_TYPE;
-        when 'geometrycollection'                                                                then return C_GEOMETRY_TYPE;
-        when 'geomcollection'                                                                    then return C_GEOMETRY_TYPE;
-        when 'tinyint'                                                                           then return 'smallint';
-        when 'mediumint'                                                                         then return 'integer';
-        when 'tinyblob'                                                                          then return 'bytea';
-        when 'blob'                                                                              then return 'bytea';
-        when 'mediumblob'                                                                        then return 'bytea';
-        when 'longblob'                                                                          then return 'bytea';
-        when 'set'                                                                               then return 'jsonb';   
-        when 'tinyint'                                                                           then return 'smallint';
-        when 'tinytext'                                                                          then return C_MYSQL_TINY_TEXT_TYPE;
-        when 'text'                                                                              then return C_MYSQL_TEXT_TYPE;
-         when 'mediumtext'                                                                       then return C_CLOB_TYPE;
-        when 'longtext'                                                                          then return C_CLOB_TYPE;
-        when 'varbinary'                                                                         then return 'bytea';
-        when 'year'                                                                              then return 'smallint';
-                                                                                                 else return lower(V_DATA_TYPE);
-      end case;
-    when 'MSSQLSERVER'  then 
-      case V_DATA_TYPE         
-        -- MSSQL Direct Mappings
-        when 'varchar'                                                                           then return case when P_DATA_TYPE_LENGTH = -1 then C_CLOB_TYPE else 'character varying' end;
-        when 'nvarchar'                                                                          then return case when P_DATA_TYPE_LENGTH = -1 then C_CLOB_TYPE else 'character varying' end;
-        when 'nchar'                                                                             then return 'char';
-        when 'ntext'                                                                             then return C_CLOB_TYPE;
-        when 'bit'                                                                               then return 'boolean';
-        -- Do not use Postgres Money Type due to precision issues. 
-		-- E.G. with Locale USD Postgres only provides 2 digit precison.
-        when 'money'                                                                             then return C_MSSQL_MONEY_TYPE;
-        when 'smallmoney'                                                                        then return C_MSSQL_SMALL_MONEY_TYPE;
-        when 'tinyint'                                                                           then return 'smallint';
-        when 'datetime'                                                                          then return case when P_DATA_TYPE_LENGTH > 6 then 'timestamp(6)' else 'timestamp' end;
-        when 'datetime2'                                                                         then return case when P_DATA_TYPE_LENGTH > 6 then 'timestamp(6)' else 'timestamp' end;
-        when 'datetimeoffset'                                                                    then return case when P_DATA_TYPE_LENGTH > 6 then 'timestamp(6) with time zone' else 'timestamp  with time zone' end;
-        when 'smalldatetime'                                                                     then return 'timestamp(0)';
-        when 'binary'                                                                            then return 'bytea';
-        when 'varbinary'                                                                         then return 'bytea';
-        when 'image'                                                                             then return 'bytea';
-        when 'geometry'                                                                          then return C_GEOMETRY_TYPE;
-        when 'geography'                                                                         then return C_GEOGRAPHY_TYPE;
-        when 'rowversion'                                                                        then return 'bytea';
-        when 'hierarchyid'                                                                       then return C_HIERARCHY_TYPE;
-        when 'uniqueidentifier'                                                                  then return 'uuid';
-                                                                                                 else return lower(V_DATA_TYPE);
-      end case;
-    when  'Vertica' then
-/*
-           case 'char':
-             switch (true) {
-               case (length > this.DataTypes.CHAR_LENGTH) :                        return this.DataTypes.CLOB_TYPE
-               default:                                                            return this.DataTypes.CHAR_TYPE
-             }
-
-           case 'varchar':
-           case 'long varchar':
-             switch (true) {
-               case (length > this.DataTypes.VARCHAR_LENGTH):                      return this.DataTypes.CLOB_TYPE
-               default:                                                            return this.DataTypes.VARCHAR_TYPE
-             }
-
-           case 'binary':
-             switch (true) {
-               case (length > this.DataTypes.BINARY_LENGTH):                       return this.DataTypes.BLOB_TYPE
-               default:                                                            return this.DataTypes.BINARY_TYPE
-             }
-
-           case 'varbinary':
-           case 'long varbinary':
-             switch (true) {
-               case (length > this.DataTypes.VARBINARY_LENGTH):                    return this.DataTypes.BLOB_TYPE
-               default:                                                            return this.DataTypes.VARBINARY_TYPE
-             }
-
-           case 'numeric':
-             switch (true) {
-               default:                                                            return this.DataTypes.NUMERIC_TYPE
-             }
-
-           case 'boolean':                                                         return this.DataTypes.BOOLEAN_TYPE
-
-
-           case 'int':                                                             return this.DataTypes.BIGINT_TYPE
-           case 'float':                                                           return this.DataTypes.DOUBLE_TYPE
-
-           case 'date':                                                            return this.DataTypes.DATE_TYPE
-           case 'time':                                                            return this.DataTypes.TIME_TYPE
-           case 'timetz':                                                          return this.DataTypes.TIME_TZ_TYPE
-           case 'timestamptz':                                                     return this.DataTypes.TIMESTAMP_TZ_TYPE
-           case 'timestamp':                                                       return this.DataTypes.TIMESTAMP_TYPE
-           case 'year':                                                            return this.DataTypes.VERTICA_YEAR_TYPE || this.YEAR_TYPE
-
-           case 'xml':                                                             return this.DataTypes.XML_TYPE
-           case 'json':                                                            return this.DataTypes.JSON_TYPE
-           case 'uuid':                                                            return this.DataTypes.UUID_TYPE
-		   
-           case 'geometry':                                                        return this.DataTypes.SPATIAL_TYPE
-           case 'geography':                                                       return this.DataTypes.GEOGRAPHY_TYPE
-		   
-           default:
-             if (dataType.startsWith('interval')) {
-               return this.DataTypes.INTERVAL_TYPE
-             }
-             this.yadamuLogger.qaWarning([this.dbi.DATABASE_VENDOR,vendor,dataType],'Explicit mapping not found')
-             return dataType.toLowerCase();
-         }
-*/
-
-      case V_DATA_TYPE
-        -- MySQL Direct Mappings
-        when 'binary'                                                                            then return 'bytea';
-        when 'varbinary'                                                                         then return 'bytea';
-		when 'long varbinary'                                                                    then return 'bytea';
-		when 'varchar'                                                                           then return 'character varying';
-		when 'long varchar'                                                                      then return C_MAX_CHARACTER_VARYING_TYPE;
-		when 'int'                                                                               then return 'bigint';
-                                                                                                 else return lower(V_DATA_TYPE);
-      end case;
-	when 'MongoDB' then
-      -- MongoDB typing based on BSON type model 
-      case V_DATA_TYPE
-        when 'double'                                                                            then return 'double precision';
-        when 'string'                                                                            then return case when P_DATA_TYPE_LENGTH >  C_MAX_CHARACTER_VARYING_TYPE_LENGTH then C_CLOB_TYPE else 'character varying' end;
-        when 'object'                                                                            then return P_JSON_DATA_TYPE;
-        when 'array'                                                                             then return P_JSON_DATA_TYPE;
-        when 'binData'                                                                           then return 'bytea';
-		when 'objectId'                                                                          then return 'bytea';
-        when 'boolean'                                                                           then return 'bool';
-        when 'null'                                                                              then return C_MONGO_UNKNOWN_TYPE;
-        when 'regex'                                                                             then return C_MONGO_REGEX_TYPE;
-        when 'javascript'                                                                        then return C_MAX_CHARACTER_VARYING_TYPE;
-        when 'javascriptWithScope'                                                               then return C_MAX_CHARACTER_VARYING_TYPE;
-        when 'int'                                                                               then return 'int';
-        when 'long'                                                                              then return 'bigint';
-        when 'decimal'                                                                           then return 'numeric';
-        when 'date'                                                                              then return 'timestamp';
-        when 'timestamp'                                                                         then return 'timestamp';
-        when 'minkey'                                                                            then return P_JSON_DATA_TYPE;
-        when 'maxkey'                                                                            then return P_JSON_DATA_TYPE;
-                                                                                                 else return lower(P_DATA_TYPE);
-      end case;    
-    when 'SNOWFLAKE' then
-      case V_DATA_TYPE
-        when 'TEXT'                                                                              then return case when P_DATA_TYPE_LENGTH >  C_MAX_CHARACTER_VARYING_TYPE_LENGTH then C_CLOB_TYPE else 'character varying' end;
-        when 'NUMBER'                                                                            then return 'numeric';
-        when 'FLOAT'                                                                             then return 'double precision';
-        when 'BINARY'                                                                            then return 'bytea';
-        when 'XML'                                                                               then return 'xml';
-        when 'TIME'                                                                              then return case when P_DATA_TYPE_LENGTH > 6 then 'time(6)' else 'time' end;
-        when 'TIMESTAMP_LTZ'                                                                     then return case when P_DATA_TYPE_LENGTH > 6 then 'timestamp(6) with time zone' else 'timestamp(' || P_DATA_TYPE_LENGTH || ')  with time zone' end;
-        when 'TIMESTAMP_NTZ'                                                                     then return case when P_DATA_TYPE_LENGTH > 6 then 'timestamp(6) without time zone' else 'timestamp(' || P_DATA_TYPE_LENGTH || ')  without time zone' end;
-        when 'VARIANT'                                                                           then return 'bytea';
-                                                                                                 else return lower(P_DATA_TYPE);
-      end case;	
-    else 
-      return lower(V_DATA_TYPE);
+  case 
+    when P_PGSQL_DATA_TYPE is null then
+      raise exception 'Postgres: Missing mapping for "%" datatype "%"', P_VENDOR, P_DATA_TYPE;
+	else
+	  return P_PGSQL_DATA_TYPE;
   end case;
-end;
+end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function GENERATE_STATEMENTS(P_SOURCE_VENDOR VARCHAR, P_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_COLUMN_NAME_ARRAY JSONB, P_DATA_TYPE_ARRAY JSONB, P_SIZE_CONSTRAINT_ARRAY JSONB, P_SPATIAL_FORMAT VARCHAR, P_JSON_DATA_TYPE VARCHAR, P_BINARY_JSON BOOLEAN)
+create or replace function GENERATE_SQL(P_VENDOR VARCHAR,P_TARGET_SCHEMA VARCHAR, P_TABLE_NAME VARCHAR, P_COLUMN_NAME_ARRAY JSONB, P_DATA_TYPE_ARRAY JSONB, P_SIZE_CONSTRAINT_ARRAY JSONB, P_SPATIAL_FORMAT VARCHAR, P_JSON_DATA_TYPE VARCHAR, P_BINARY_JSON BOOLEAN)
 returns JSONB
 as $$
 declare
@@ -796,6 +569,12 @@ begin
     select c.IDX
           ,c.VALUE COLUMN_NAME
           ,t.VALUE DATA_TYPE
+		  ,case 
+		     when P_VENDOR = 'Postgres'  then
+			   t.VALUE 
+			 else 
+			   m."PGSQL_TYPE"
+		   end "PGSQL_TYPE"
           ,case
              when s.VALUE = ''
                then NULL
@@ -811,17 +590,18 @@ begin
                 NULL
            end DATA_TYPE_SCALE
       from JSONB_ARRAY_ELEMENTS_TEXT(P_COLUMN_NAME_ARRAY)     WITH ORDINALITY as c(VALUE, IDX)
-          ,JSONB_ARRAY_ELEMENTS_TEXT(P_DATA_TYPE_ARRAY)       WITH ORDINALITY as t(VALUE, IDX)
-          ,JSONB_ARRAY_ELEMENTS_TEXT(P_SIZE_CONSTRAINT_ARRAY) WITH ORDINALITY as s(VALUE, IDX)
-     where (c.IDX = t.IDX) and (c.IDX = s.IDX)
+      join JSONB_ARRAY_ELEMENTS_TEXT(P_DATA_TYPE_ARRAY)       WITH ORDINALITY as t(VALUE, IDX) on c.IDX = t.IDX
+      join JSONB_ARRAY_ELEMENTS_TEXT(P_SIZE_CONSTRAINT_ARRAY) WITH ORDINALITY as s(VALUE, IDX) on c.IDX = s.IDX
+      left outer join TYPE_MAPPING m on lower(t.VALUE) = lower(m."VENDOR_TYPE")
+	  -- left outer join TYPE_MAPPING m on t.VALUE = m."VENDOR_TYPE"
   ),
   TARGET_TABLE_DEFINITIONS
   as (
     select st.*,
-           MAP_FOREIGN_DATA_TYPE(P_SOURCE_VENDOR,DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT, P_JSON_DATA_TYPE, V_POSTGIS_ENABLED) TARGET_DATA_TYPE
+           MAP_PGSQL_DATA_TYPE(P_VENDOR,"PGSQL_TYPE",DATA_TYPE,DATA_TYPE_LENGTH::BIGINT,DATA_TYPE_SCALE::INT, P_JSON_DATA_TYPE, V_POSTGIS_ENABLED) TARGET_DATA_TYPE
       from SOURCE_TABLE_DEFINITIONS st
   ) 
-  select STRING_AGG('"' || COLUMN_NAME || '"',',') COLUMN_NAME_LIST,
+  select STRING_AGG('"' || COLUMN_NAME || '"',',' ORDER BY IDX) COLUMN_NAME_LIST,
          STRING_AGG('"' || COLUMN_NAME || '" ' || TARGET_DATA_TYPE || 
                     case 
                       when TARGET_DATA_TYPE like '%(%)' then 
@@ -838,6 +618,8 @@ begin
                         '(6)'
                       when TARGET_DATA_TYPE like 'interval%' then 
                         ''
+				      when DATA_TYPE_LENGTH::numeric < 1 then
+					    ''
                       when DATA_TYPE_LENGTH is NOT NULL and DATA_TYPE_SCALE IS NOT NULL then 
                         '(' || DATA_TYPE_LENGTH || ',' || DATA_TYPE_SCALE || ')'
                       when DATA_TYPE_LENGTH is NOT NULL then 
@@ -845,7 +627,7 @@ begin
                       else
                         ''
                     end
-                   ,CHR(10) || '  ,'
+                   ,CHR(10) || '  ,' ORDER BY IDX
                    ) COLUMNS_CLAUSE
         ,STRING_AGG(case 
                       when TARGET_DATA_TYPE = 'bytea' then  
@@ -874,21 +656,21 @@ begin
                       else
                        'cast( value ->> ' || IDX-1 || ' as ' || TARGET_DATA_TYPE || ')'
                     end 
-                    || ' "' || COLUMN_NAME || '"', CHR(10) || '  ,'
+                    || ' "' || COLUMN_NAME || '"', CHR(10) || '  ,' ORDER BY IDX
                    ) INSERT_SELECT_LIST
-        ,JSONB_AGG(TARGET_DATA_TYPE) TARGET_DATA_TYPES
+        ,JSONB_AGG(TARGET_DATA_TYPE ORDER BY IDX) TARGET_DATA_TYPES
     into V_COLUMN_LIST, V_COLUMNS_CLAUSE, V_INSERT_SELECT_LIST, V_TARGET_DATA_TYPES
     from TARGET_TABLE_DEFINITIONS;
 
   return JSONB_BUILD_OBJECT(
-                    'ddl', 'CREATE TABLE IF NOT EXISTS "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || CHR(10) || '   ' || V_COLUMNS_CLAUSE || CHR(10) || ')'
-                    ,'dml', 'INSERT into "' || P_SCHEMA || '"."' || P_TABLE_NAME || '"(' || V_COLUMN_LIST || ')' || CHR(10) || 'select ' || V_INSERT_SELECT_LIST || CHR(10) || '  from ' || case WHEN P_BINARY_JSON then 'jsonb_array_elements' else 'json_array_elements' end || '($1 -> ''data'' -> ''' || P_TABLE_NAME || ''')'
+                    'ddl', 'CREATE TABLE IF NOT EXISTS "' || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '"(' || CHR(10) || '   ' || V_COLUMNS_CLAUSE || CHR(10) || ')'
+                    ,'dml', 'INSERT into "' || P_TARGET_SCHEMA || '"."' || P_TABLE_NAME || '"(' || V_COLUMN_LIST || ')' || CHR(10) || 'select ' || V_INSERT_SELECT_LIST || CHR(10) || '  from ' || case WHEN P_BINARY_JSON then 'jsonb_array_elements' else 'json_array_elements' end || '($1 -> ''data'' -> ''' || P_TABLE_NAME || ''')'
                     ,'targetDataTypes', V_TARGET_DATA_TYPES
                );
 end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function YADAMU_IMPORT_JSONB(P_JSON jsonb, P_SCHEMA VARCHAR) 
+create or replace function YADAMU_IMPORT_JSONB(P_JSON jsonb, P_TARGET_SCHEMA VARCHAR) 
 returns JSONB
 as $$
 declare
@@ -902,7 +684,7 @@ declare
   PLPGSQL_CTX        TEXT;
 begin
   for r in select "tableName"
-                 ,GENERATE_STATEMENTS(P_JSON #>> '{systemInformation,vendor}', P_SCHEMA,"tableName", "columnNames", "dataTypes", "sizeConstraints", P_JSON #>> '{systemInformatio,typeMappings,spatialFormat}', 'jsonb', TRUE) "TABLE_INFO"
+                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName", "columnNames", "dataTypes", "sizeConstraints", P_JSON #>> '{systemInformatio,typeMappings,spatialFormat}', 'jsonb', TRUE) "TABLE_INFO"
              from JSONB_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
                                                                 "tableSchema"      VARCHAR, 
@@ -940,12 +722,12 @@ begin
 exception
   when others then
     GET STACKED DIAGNOSTICS PLPGSQL_CTX = PG_EXCEPTION_CONTEXT;
-    V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call YADAMU_IMPORT_JSONB(P_JSON jsonb,P_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
+    V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call YADAMU_IMPORT_JSONB(P_JSON jsonb,P_TARGET_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
     return V_RESULTS;
 end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function YADAMU_IMPORT_JSON(P_JSON json,P_SCHEMA VARCHAR) 
+create or replace function YADAMU_IMPORT_JSON(P_JSON json,P_TARGET_SCHEMA VARCHAR) 
 returns JSONB
 as $$
 declare
@@ -960,7 +742,7 @@ declare
 begin
 
   for r in select "tableName"
-                 ,GENERATE_STATEMENTS(P_JSON #>> '{systemInformation,vendor}',P_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_JSON #>> '{systemInformation,typeMappings,spatialFormat}', 'jsonb', FALSE) "TABLE_INFO"
+                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_JSON #>> '{systemInformation,typeMappings,spatialFormat}', 'jsonb', FALSE) "TABLE_INFO"
              from JSON_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSON_TO_RECORD(value) as METADATA(
                                                                "tableSchema"      VARCHAR, 
@@ -998,22 +780,25 @@ begin
 exception
   when others then
     GET STACKED DIAGNOSTICS PLPGSQL_CTX = PG_EXCEPTION_CONTEXT;
-    V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call YADAMU_IMPORT_JSON(P_JSON json,P_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
+    V_RESULTS := jsonb_insert(V_RESULTS, CAST('{' || jsonb_array_length(V_RESULTS) || '}' as TEXT[]), jsonb_build_object('error', jsonb_build_object('severity','FATAL','tableName','','sqlStatement','call YADAMU_IMPORT_JSON(P_JSON json,P_TARGET_SCHEMA VARCHAR)','code',SQLSTATE,'msg',SQLERRM,'details',PLPGSQL_CTX)), true);
     return V_RESULTS;
 end;  
 $$ LANGUAGE plpgsql;
 ---
-create or replace function GENERATE_SQL(P_JSON jsonb, P_SCHEMA VARCHAR, P_OPTIONS jsonb)
+create or replace function GENERATE_STATEMENTS(P_METADATA jsonb, P_TYPE_MAPPINGS jsonb, P_TARGET_SCHEMA VARCHAR, P_OPTIONS jsonb)
 returns SETOF jsonb
 as $$
 declare
 begin
+
+  call SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS);
+
   RETURN QUERY
     select jsonb_object_agg(
            "tableName",
-           GENERATE_STATEMENTS("vendor",P_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_OPTIONS ->> 'spatialFormat', P_OPTIONS ->> 'jsonDataType', FALSE)
+           GENERATE_SQL("vendor",P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_OPTIONS ->> 'spatialFormat', P_OPTIONS ->> 'jsonDataType', FALSE)
          )
-    from JSONB_EACH(P_JSON -> 'metadata')  
+    from JSONB_EACH(P_METADATA -> 'metadata')  
          CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
                                                        "vendor"           VARCHAR,
                                                        "tableSchema"      VARCHAR, 

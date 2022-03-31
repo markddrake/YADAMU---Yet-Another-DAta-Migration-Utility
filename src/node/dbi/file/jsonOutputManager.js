@@ -1,15 +1,14 @@
 
 import { 
   performance 
-}                          from 'perf_hooks';
+}                            from 'perf_hooks';
 
-import Yadamu              from '../../core/yadamu.js';
-import YadamuLibrary       from '../../lib/yadamuLibrary.js';
-import YadamuConstants     from '../../lib/yadamuConstants.js';
-import PerformanceReporter from '../../util/performanceReporter.js';
+import Yadamu                from '../../core/yadamu.js';
+import YadamuConstants       from '../../lib/yadamuConstants.js';
+import PerformanceReporter   from '../../util/performanceReporter.js';
 
-import YadamuDataTypes     from '../base/yadamuDataTypes.js';
-import YadamuOutputManager from '../base/yadamuOutputManager.js';
+import YadamuDataTypes       from '../base/yadamuDataTypes.js';
+import YadamuOutputManager   from '../base/yadamuOutputManager.js';
 
 class JSONOutputManager extends YadamuOutputManager {
 	     
@@ -28,7 +27,7 @@ class JSONOutputManager extends YadamuOutputManager {
 
     // Set up Transformation functions to be applied to the incoming rows
     return this.tableInfo.targetDataTypes.map((dataType,idx) => {      
-      const dataTypeDefinition = YadamuLibrary.decomposeDataType(dataType);
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
 	  
 	  switch (true) {
 		case (YadamuDataTypes.isBinary(dataTypeDefinition.type)):
@@ -85,7 +84,7 @@ class JSONOutputManager extends YadamuOutputManager {
 		    } catch (e) { return { "YADAMU_INVALID_JSON_VALUE" : col }}
    		    return col
           }
-        case (YadamuDataTypes.isBoolean(dataTypeDefinition.type) || YadamuDataTypes.isBoolean(dataType)):
+        case (YadamuDataTypes.isBoolean(dataTypeDefinition.type,dataTypeDefinition.length,this.tableInfo.vendor)):
           return (col,idx) =>  {
 		    const bool = (typeof col === 'string') ? col.toUpperCase() : (Buffer.isBuffer(col)) ? col.toString('hex') : col
 		    switch(bool) {

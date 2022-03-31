@@ -65,7 +65,8 @@ class MySQLDBI extends YadamuDBI {
   // Enable configuration via command line parameters
   get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT            || MySQLConstants.SPATIAL_FORMAT }
   get READ_KEEP_ALIVE()              { return this.parameters.READ_KEEP_ALIVE           || MySQLConstants.READ_KEEP_ALIVE}
-  get TREAT_TINYINT1_AS_BOOLEAN()    { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MySQLConstants.TREAT_TINYINT1_AS_BOOLEAN }
+  
+  get TREAT_TINYINT1_AS_BOOLEAN()    { return MySQLDataTypes.TREAT_TINYINT1_AS_BOOLEAN }
 
   // Not available until configureConnection() has been called 
 
@@ -79,7 +80,7 @@ class MySQLDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	yadamu.initializeTypeMapping(MySQLDataTypes,this.TYPE_MAPPINGS)
+	this.initializeDataTypes(MySQLDataTypes)
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
     this.keepAliveHdl = undefined
 	
@@ -566,8 +567,12 @@ class MySQLDBI extends YadamuDBI {
   }
 
   async processFile(hndl) {
-    const sqlStatement = `SET @RESULTS = ''; CALL YADAMU_IMPORT(?,@RESULTS); SELECT @RESULTS "logRecords";`;                     
-    let results = await  this.executeSQL(sqlStatement,this.CURRENT_SCHEMA)
+
+    const statementGenerator = new PostgresStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
+    const typeMappings = statementGenerator.getVendorTypeMappings()
+
+    const sqlStatement = `SET @RESULTS = ''; CALL YADAMU_IMPORT(?,?,@RESULTS); SELECT @RESULTS "logRecords";`;                     
+    let results = await  this.executeSQL(sqlStatement,typeMappings,this.CURRENT_SCHEMA)
     results = results.pop()
     return this.processLog(results,'JSON_TABLE')
   }

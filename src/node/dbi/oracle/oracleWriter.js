@@ -210,7 +210,7 @@ end;`
     // Unfortunately the current implimentation of the Node Driver does not support this, once the 'finish' event is emitted you cannot truncate the tempCLob and write new content to it.
     // So we have to free the current tempLob Cache and create a new one for each batch
 	
-	// console.log(batch)
+	// console.log(this.tableInfo,batch)
 
     let rows = undefined;
     let binds = undefined;

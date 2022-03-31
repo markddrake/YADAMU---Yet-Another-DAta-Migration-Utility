@@ -11,9 +11,7 @@ class MySQLConstants {
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "READ_KEEP_ALIVE"           : 0
-    , "TREAT_TINYINT1_AS_BOOLEAN" : true    
     , "SPATIAL_FORMAT"            : "WKB"
-	, "TIMESTAMP_PRECISION"       : 6
     })
     return this._STATIC_PARAMETERS;
   }
@@ -26,7 +24,6 @@ class MySQLConstants {
   }
 
   static get READ_KEEP_ALIVE()            { return this.DBI_PARAMETERS.READ_KEEP_ALIVE}
-  static get TREAT_TINYINT1_AS_BOOLEAN()  { return this.DBI_PARAMETERS.TREAT_TINYINT1_AS_BOOLEAN}
   static get SPATIAL_FORMAT()             { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get STATEMENT_TERMINATOR()       { return ';' }
  

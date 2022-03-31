@@ -18,9 +18,9 @@ class PostgresWriter extends YadamuWriter {
   }
       
   async _writeBatch(batch,rowCount) {
-    
-    let repackBatch = false;
-	
+   
+	let repackBatch = false;
+
 	if (this.tableInfo.insertMode === 'Batch') {
                
       try {

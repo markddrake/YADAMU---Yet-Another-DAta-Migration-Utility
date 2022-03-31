@@ -3,10 +3,11 @@ import {
   performance 
 }                            from 'perf_hooks';
 						
-import YadamuLibrary         from '../../lib/yadamuLibrary.js'
-import YadamuSpatialLibrary  from '../../lib/yadamuSpatialLibrary.js'
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
+import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js'
 
-import YadamuOutputManager   from '../base/yadamuOutputManager.js'
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class SnowflakeWriter extends YadamuOutputManager {
 
@@ -19,7 +20,7 @@ class SnowflakeWriter extends YadamuOutputManager {
     // Set up Transformation functions to be applied to the incoming rows
  
     return targetDataTypes.map((targetDataType,idx) => {      
-      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
+      const dataType = YadamuDataTypes.decomposeDataType(targetDataType);
 	
 	  if (YadamuLibrary.isBinary(dataType.type)) {
 		return (col,idx) =>  {

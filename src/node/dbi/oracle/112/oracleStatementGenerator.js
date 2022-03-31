@@ -9,8 +9,6 @@
 // Since the Wrappers have to be dropped and recreated for each table a unique ID is generated for each table.
 //
 
-import {Readable} from 'stream';
-
 import _OracleStatementGenerator from '../oracleStatementGenerator.js';
 
 class OracleStatementGenerator extends _OracleStatementGenerator {
@@ -47,6 +45,35 @@ class OracleStatementGenerator extends _OracleStatementGenerator {
     
   }
   
+  async getMetadata() {
+    const metadataXML = this.metadataToXML();    
+	// console.log(metadataXML)
+    return await this.dbi.stringToBlob(metadataXML);
+  }
+    
+  async typeMappingToXML() {
+	 
+	 return `<typeMappings>${Array.from((await this.VENDOR_TYPE_MAPPINGS).entries()).map((mapping) => { return `<typeMapping><vendorType>${mapping[0]}</vendorType><oracleType>${mapping[1]}</oracleType></typeMapping>` }).join('')}</typeMappings>`
+  }
+  
+  async getVendorTypeMappings() {
+
+    const typeMappingXML = await this.typeMappingToXML()
+	// console.log('TMXML',typeMappingXML)
+	return await this.dbi.stringToBlob(typeMappingXML);
+      
+  }
+  	
+  getOptions() {
+    return `<options>
+	           <spatialFormat>${this.SPATIAL_FORMAT}</spatialFormat>
+	           <raw1AsBoolean>${new Boolean(this.dbi.BOOLEAN_AS_RAW1).toString().toLowerCase()}</raw1AsBoolean>
+			   <jsonDataType>${this.dbi.JSON_DATA_TYPE}</jsonDataType>
+			   <xmlStorageModel>${this.dbi.XML_STORAGE_CLAUSE}</xmlStorageModel>
+			   <circleFormat>${this.dbi.INBOUND_CIRCLE_FORMAT}</circleFormat>
+			 </options>`;
+  }
+  
   generateCopyStatement(targetSchema,tableName,externalTableName,externalColumnNames,externalSelectList,plsql) {
 	return `insert /*+ APPEND */ into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})\nselect ${externalSelectList.join(",")} from ${externalTableName}`
   }
@@ -69,21 +96,7 @@ class OracleStatementGenerator extends _OracleStatementGenerator {
 	}
   }
   
-  getTypeMappings() {
-    return `<typeMappings>
-	           <spatialFormat>${this.SPATIAL_FORMAT}</spatialFormat>
-	           <raw1AsBoolean>${new Boolean(this.dbi.TREAT_RAW1_AS_BOOLEAN).toString().toLowerCase()}</raw1AsBoolean>
-			   <jsonDataType>${this.dbi.JSON_DATA_TYPE}</jsonDataType>
-			   <xmlStorageModel>${this.dbi.XML_STORAGE_CLAUSE}</xmlStorageModel>
-			   <circleFormat>${this.dbi.INBOUND_CIRCLE_FORMAT}</circleFormat>
-			 </typeMappings>`;
-  }
 	
-  async getMetadataLob() {
-    const metadataXML = this.metadataToXML();    
-    return await this.dbi.stringToBlob(metadataXML);
-  }
-      
 }
 
 export { OracleStatementGenerator as default } 

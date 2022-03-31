@@ -1,0 +1,41 @@
+{
+  "mappings": {
+    "CHAR_TYPE"                                            :  "string"                               
+  ,  "INTEGER_TYPE"                                         :  "int"                                  
+  ,  "BIGINT_TYPE"                                          :  "long"                                 
+  ,  "FLOAT_TYPE"                                           :  "double"                               
+  ,  "DOUBLE_TYPE"                                          :  "double"                               
+  ,  "BINARY_TYPE"                                          :  "binData"                              
+  ,  "NUMERIC_TYPE"                                         :  "decimal"
+  ,  "BOOLEAN_TYPE"                                         :  "bool"                                 
+  ,  "DATE_TYPE"                                            :  "date"                                 
+  ,  "TIMESTAMP_TYPE"                                       :  "timestamp"                            
+  ,  "MONGO_OBJECTID_TYPE"                                  :  "objectId"                             
+  ,  "MONGO_DECIMAL128_TYPE"                                :  "decimal"                              
+  ,  "MONGO_ARRAY_TYPE"                                     :  "array"                                
+  ,  "MONGO_OBJECT_TYPE"                                    :  "object"                               
+  ,  "MONGO_NULL_TYPE"                                      :  "null"                                 
+  ,  "MONGO_REGEX_TYPE"                                     :  "regex"                                
+  ,  "MONGO_JS_TYPE"                                        :  "javascript"                           
+  ,  "MONGO_SCOPED_JS_TYPE"                                 :  "javascriptWithScope"                  
+  ,  "MONGO_MINKEY_TYPE"                                    :  "minkey"                               
+  ,  "MONGO_MAXKEY_TYPE"                                    :  "maxKey"                               
+  ,  "MONGO_UNDEFINED_TYPE"                                 :  "undefined"                            
+  ,  "MONGO_DBPOINTER_TYPE"                                 :  "dbPointer"                            
+  ,  "MONGO_FUNCTION_TYPE"                                  :  "function"                             
+  ,  "MONGO_SYMBOL_TYPE"                                    :  "symbol"                               
+
+  ,  "PGSQL_IDENTIFIER_TYPE"                                :  "long"
+
+  ,  "JSON_TYPE"                                            :  "json" 
+  ,  "SPATIAL_TYPE"                                         :  "geojson"
+  
+  , "UNBOUNDED_NUMERIC_TYPE"                                :  "decimal"
+  }
+, "limits": {
+    "SCALAR_LENGTH"                                        : 16777215
+  }
+, "storageOptions": {
+	"SPATIAL_FORMAT"                                       : "GeoJSON"
+  }
+}

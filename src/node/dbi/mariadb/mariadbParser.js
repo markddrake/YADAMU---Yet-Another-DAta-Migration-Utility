@@ -1,4 +1,3 @@
-"use strict" 
 
 import YadamuParser from '../base/yadamuParser.js'
 
@@ -8,7 +7,7 @@ class MariadbParser extends YadamuParser {
 	  
 	 return queryInfo.DATA_TYPE_ARRAY.map((dataType) => {
 	  switch (dataType.toLowerCase()) {
-		 case "decimal":
+		 case this.dbi.DATA_TYPES.DECIMAL_TYPE:
 		   return (row,idx) => {
 			  row[idx] = typeof row[idx] === 'string' ? row[idx].replace(/(\.0*|(?<=(\..*))0*)$/, '') : row[idx]
 		   }

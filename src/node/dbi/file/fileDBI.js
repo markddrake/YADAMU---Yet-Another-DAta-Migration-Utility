@@ -519,6 +519,7 @@ class FileDBI extends YadamuDBI {
 	, insertMode        : 'Batch'
 	, columnCount       : this.metadata[tableName].columnNames.length
     , targetDataTypes   : [... this.metadata[tableName].dataTypes]
+	, vendor            : this.systemInformation.vendor
     }
   }
 

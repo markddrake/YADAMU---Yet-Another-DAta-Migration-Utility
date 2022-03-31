@@ -1,9 +1,5 @@
-"use strict";
 
-import Yadamu                   from '../../core/yadamu.js';
-import YadamuLibrary            from '../../lib/yadamuLibrary.js';
 import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
-import DataTypes                from './mongoDataTypes.js'
 
 class MongoStatementGenerator extends YadamuStatementGenerator {
 
@@ -81,58 +77,3 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
 
 export { MongoStatementGenerator as default }
 
-/*
-**
-
-  assignDefaultDataType(dataType, sizeConstraint, columnName) {
-
-      sizeConstraint = sizeConstraint || ''
-      
-      const precision = Number(sizeConstraint.split(',')[0])
-      switch (true) {
-        case (YadamuLibrary.isBooleanType(dataType,sizeConstraint)):                                         return 'boolean'
-        case (YadamuLibrary.isFloatingPointType(dataType)):                                                  return "number";
-        case (dataType === 'bigint'):                                                                        return 'long';
-        case (YadamuLibrary.isIntegerType(dataType) && (precision > 32)):                                    return "decimal";
-        case (YadamuLibrary.isIntegerType(dataType)):                                                        return "number";
-        case (YadamuLibrary.isNumericType(dataType) && ((sizeConstraint === '') || (precision > 15))):       return "decimal";
-        case (YadamuLibrary.isNumericType(dataType)):                                                        return 'number'
-        case YadamuLibrary.isDateTimeType(dataType):                                                         return 'date'
-        case YadamuLibrary.isBinaryType(dataType):                                                           return ((columnName === '_id' && precision === 12)) ? 'objectId' : 'binData'
-        case YadamuLibrary.isSpatialType(dataType):                                                          return 'geometry'
-        case YadamuLibrary.isJSON(dataType):                                                                 return 'object'
-        default:                                                                                             return 'string'
-      }           
-  }  
-
-  mapForeignDataType(vendor, columnName, dataType, sizeConstraint) {
-
-    switch (vendor) {
-      case "MongoDB":                                                                                        return dataType;
-      case "Postgres":                                                                                      
-        switch (dataType) {                                                                                 
-          case "money":                                                                                      return "decimal";
-          case 'circle':                                                                                    
-		    switch(true) {                                                                                  
-  		      case (this.dbi.INBOUND_CIRCLE_FORMAT === 'CIRCLE'):                                            return 'object'            
-		    }                                                                                               
-        }                                                                                                   
-		break;                                                                                              
-      case 'MSSQLSERVER':                                                                                   
-        switch (dataType) {                                                                                 
-          case "bigint":                                                                                     return "long";
-          case "numeric":                                                                                   
-          case "decimal":                                                                                   
-		    switch (true) {                                                                                 
-               case  ((sizeConstraint === null) || (sizeConstraint > 15)):                                   return "decimal";
-			}
-        }    
-        break;		
-      default:        
-       break;	  
-    }   
-	return this.assignDefaultDataType(dataType, sizeConstraint, columnName)
-  } 
-  
-**  
-*/

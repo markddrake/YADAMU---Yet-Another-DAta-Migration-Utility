@@ -156,8 +156,14 @@ class YadamuDBI extends EventEmitter {
   get SQL_TRACE()                    { return this._SQL_TRACE }
   set SQL_TRACE(writer)              { this._SQL_TRACE = this._SQL_TRACE || new SQLTrace(writer,this.STATEMENT_SEPERATOR,this.STATEMENT_TERMINATOR,this.ROLE)}
   get SQL_CUMLATIVE_TIME()           { return this.SQL_TRACE.SQL_CUMLATIVE_TIME }
-  
-  get TYPE_MAPPINGS()                { return YadamuDataTypes.DATA_TYPE_MAPPINGS[this.DATABASE_VENDOR].mappings }
+    
+  get TYPE_CONFIGURATION()        { 
+    this._TYPE_CONFIGURATION = this._TYPE_CONFIGURATION || (() => {
+      this._TYPE_CONFIGURATION = JSON.parse(fs.readFileSync(YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.DATABASE_VENDOR].file))
+	  return this._TYPE_CONFIGURATION
+    })()
+    return this._TYPE_CONFIGURATION
+  }
     
   get BATCH_SIZE() {
     this._BATCH_SIZE = this._BATCH_SIZE || (() => {
@@ -248,7 +254,7 @@ class YadamuDBI extends EventEmitter {
   set SPATIAL_SERIALIZER(v)           { this._SPATIAL_SERIALIZER = v }
    
   get INBOUND_SPATIAL_FORMAT()        { return this.systemInformation?.typeMappings?.spatialFormat || this.SPATIAL_FORMAT};
-  get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation?.typeMappings?.circleFormat || null};
+  get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation?.typeMappings?.circleFormat || null };
 
   get TABLE_FILTER()                  { 
     this._TABLE_FILTER || this._TABLE_FILTER || (() => {
@@ -431,6 +437,10 @@ class YadamuDBI extends EventEmitter {
 	    resolve(true)
 	  })
 	})
+  }
+
+  initializeDataTypes(DataTypes) {
+	this.yadamu.initializeDataTypes(DataTypes,this.TYPE_CONFIGURATION);
   }
 
   async initializeWorker(manager) {
@@ -1399,6 +1409,7 @@ class YadamuDBI extends EventEmitter {
     , typeMappings       : this.getTypeMappings()
 	, tableFilter        : this.getTABLE_FILTER
     , schema             : this.CURRENT_SCHEMA ? this.CURRENT_SCHEMA : this.CURRENT_SCHEMA
+	, dbiKey             : this.DATABASE_KEY
     , vendor             : this.DATABASE_VENDOR
 	, dbVersion          : this.DB_VERSION
 	, softwareVendor     : this.SOFTWARE_VENDOR
@@ -1489,14 +1500,12 @@ class YadamuDBI extends EventEmitter {
     schemaInformation.forEach((table,idx) => {
       table.COLUMN_NAME_ARRAY     = typeof table.COLUMN_NAME_ARRAY     === 'string' ? JSON.parse(table.COLUMN_NAME_ARRAY)     : table.COLUMN_NAME_ARRAY
       table.DATA_TYPE_ARRAY       = typeof table.DATA_TYPE_ARRAY       === 'string' ? JSON.parse(table.DATA_TYPE_ARRAY)       : table.DATA_TYPE_ARRAY
-      table.STORAGE_TYPE_ARRAY    = typeof table.STORAGE_TYPE_ARRAY    === 'string' ? JSON.parse(table.STORAGE_TYPE_ARRAY)    : table.STORAGE_TYPE_ARRAY || table.DATA_TYPE_ARRAY
       table.SIZE_CONSTRAINT_ARRAY = typeof table.SIZE_CONSTRAINT_ARRAY === 'string' ? JSON.parse(table.SIZE_CONSTRAINT_ARRAY) : table.SIZE_CONSTRAINT_ARRAY
       const tableMetadata =  {
         tableSchema              : table.TABLE_SCHEMA
       , tableName                : table.TABLE_NAME
       , columnNames              : table.COLUMN_NAME_ARRAY
-      , dataTypes                : table.DATA_TYPE_ARRAY
-      , storageTypes             : table.STORAGE_TYPE_ARRAY
+      , dataTypes                : table.DATA_TYPE_ARRAY.map((DATA_TYPE) => {return YadamuDataTypes.decomposeDataType(DATA_TYPE).type})
       , sizeConstraints          : table.SIZE_CONSTRAINT_ARRAY
 	  , vendor                   : this.DATABASE_VENDOR 
       }
@@ -1532,7 +1541,7 @@ class YadamuDBI extends EventEmitter {
 		, CLIENT_SELECT_LIST    : ""
 	    }
 	  }
-	  const dataType = YadamuLibrary.decomposeDataType(columnInfo[3])
+	  const dataType = YadamuDataTypes.decomposeDataType(columnInfo[3])
       tableInfo.COLUMN_NAME_ARRAY.push(columnInfo[2])
 	  tableInfo.DATA_TYPE_ARRAY.push(dataType.typeQualifier ? `${dataType.type} ${dataType.typeQualifier}` : dataType.type)
 	  tableInfo.SIZE_CONSTRAINT_ARRAY.push(dataType.length ? dataType.scale ? `${dataType.length},${dataType.scale}` : `${dataType.length}` : '')
