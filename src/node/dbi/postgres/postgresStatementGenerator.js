@@ -16,8 +16,8 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
     const sqlStatement = `select GENERATE_STATEMENTS($1,$2,$3,$4)`
 	
 	const options = {
-	  spatialFormat    : this.dbi.INBOUND_SPATIAL_FORMAT
-	, jsonDataType     : this.dbi.JSON_DATA_TYPE
+	  spatialFormat        : this.dbi.INBOUND_SPATIAL_FORMAT
+	, jsonStorageOption    : this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
 	}
 	
     // await this.debugStatementGenerator(options)
@@ -28,7 +28,7 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
 
     const results = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, JSON.stringify(vendorTypeMappings), this.targetSchema, options])
     let statementCache = results.rows[0][0]
-	
+	 
 	if (statementCache === null) {
       statementCache = {}
     }

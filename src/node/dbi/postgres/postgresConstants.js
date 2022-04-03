@@ -10,8 +10,7 @@ class PostgresConstants {
 
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
-      "SPATIAL_FORMAT"            : "WKB"
-	, "CIRCLE_FORMAT"             : "POLYGON"  /* Portable as spatial type by leads to loss of fidelity  */
+	  "CIRCLE_FORMAT"             : "POLYGON"  /* Portable as spatial type by leads to loss of fidelity  */
 	, "POSTGRES_JSON_TYPE"        : "JSONB"
 	, "BYTEA_SIZING_MODEL"        : "100%"
 	, "TIMESTAMP_PRECISION"       : 6
@@ -36,7 +35,6 @@ class PostgresConstants {
     return this._FETCH_AS_STRING;
   }
 
-  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get CIRCLE_FORMAT()          { return this.DBI_PARAMETERS.CIRCLE_FORMAT };
   static get BYTEA_SIZING_MODEL()     { return this.DBI_PARAMETERS.BYTEA_SIZING_MODEL };
   static get POSTGRES_JSON_TYPE()     { return this.DBI_PARAMETERS.POSTGRES_JSON_TYPE };

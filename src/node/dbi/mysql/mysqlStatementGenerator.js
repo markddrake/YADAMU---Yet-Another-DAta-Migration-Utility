@@ -40,7 +40,7 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 		
 		tableInfo.sourceDataTypes = tableMetadata.source?.dataTypes || []
 		
-        const dataTypes = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
+		const dataTypes = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
 		
         tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
         tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
@@ -51,7 +51,7 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
         **
         */
         const setOperators = dataTypes.map((dataType,idx) => {
-	      if (this.dbi.DB_VERSION < '8.0.19' || false) {
+	      if (this.dbi.DATABASE_VERSION < '8.0.19' || false) {
             switch (dataType.type) {
               case this.dbi.DATA_TYPES.POINT_TYPE:
 			  case this.dbi.DATA_TYPES.LINE_TYPE:
@@ -106,9 +106,13 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
                   case "EWRT":
                     return 'ST_GeomFromText(?)';
                     break;
+				
                   case "GeoJSON":
+				    // GeojSON recoded as WKB inMySQLOutput Manager
+ 				    /*
                     return 'ST_GeomFromGeoJSON(?)';
                     break;
+				    */
                   default:
                     return 'ST_GeomFromWKB(?)';
                 }              
@@ -188,7 +192,7 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 			    break;
               case this.dbi.DATA_TYPES.TINYINT_TYPE:
                 switch (true) {
-                  case ((dataType.length === 1) && this.dbi.TREAT_TINYINT1_AS_BOOLEAN):
+                  case ((dataType.length === 1) && this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN):
                     setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
 				    break;
 				}

@@ -10,7 +10,6 @@ class RedshiftConstants {
 
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
-      "SPATIAL_FORMAT"            : "WKB"
     , "BYTE_TO_CHAR_RATIO"        : 4
 	, "STAGING_PLATFORM"          : "awsS3"
     })
@@ -29,7 +28,6 @@ class RedshiftConstants {
     return this._FETCH_AS_STRING;
   }
 
-  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get BYTE_TO_CHAR_RATIO()     { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
   static get STAGING_PLATFORM()       { return this.DBI_PARAMETERS.STAGING_PLATFORM };
   static get STATEMENT_TERMINATOR()   { return ';' }

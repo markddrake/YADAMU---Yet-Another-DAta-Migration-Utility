@@ -8,7 +8,7 @@ import MySQLDBI        from '../../../node/dbi//mysql/mysqlDBI.js';
 import MySQLError      from '../../../node/dbi//mysql/mysqlException.js'
 import MySQLConstants  from '../../../node/dbi//mysql/mysqlConstants.js';
 
-import YadamuTest      from '../../core/yadamu.js';
+import Yadamu          from '../../core/yadamu.js';
 import YadamuQALibrary from '../../lib/yadamuQALibrary.js'
 
 class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
@@ -18,15 +18,15 @@ class MySQLQA extends YadamuQALibrary.qaMixin(MySQLDBI) {
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
     static get SQL_FAILED()                { return _SQL_FAILED }
 
-	static #_YADAMU_DBI_PARAMETERS
+	static #_DBI_PARAMETERS
 	
-	static get YADAMU_DBI_PARAMETERS()  { 
-	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,MySQLConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[MySQLConstants.DATABASE_KEY] || {},{RDBMS: MySQLConstants.DATABASE_KEY}))
-	   return this.#_YADAMU_DBI_PARAMETERS
+	static get DBI_PARAMETERS()  { 
+	   this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,MySQLConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[MySQLConstants.DATABASE_KEY] || {},{RDBMS: MySQLConstants.DATABASE_KEY}))
+	   return this.#_DBI_PARAMETERS
     }
    
-    get YADAMU_DBI_PARAMETERS() {
-      return MySQLQA.YADAMU_DBI_PARAMETERS
+    get DBI_PARAMETERS() {
+      return MySQLQA.DBI_PARAMETERS
     }	
 			
     constructor(yadamu,manager,connectionSettings,parameters) {

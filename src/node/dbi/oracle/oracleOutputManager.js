@@ -71,11 +71,11 @@ class OracleOutputManager extends YadamuOutputManager {
       const dataType = YadamuDataTypes.decomposeDataType(targetDataType);
 	
 	  switch (dataType.type.toUpperCase()) {
-       case this.dbi.DATA_TYPES.SPATIAL_TYPE:
+        case this.dbi.DATA_TYPES.SPATIAL_TYPE:
           // Metadata based decision
-          if ((this.dbi.DB_VERSION < 12) && (this.SPATIAL_FORMAT === 'GeoJSON')) {
+          if ((this.dbi.DATABASE_VERSION < 12) && (this.SPATIAL_FORMAT === 'GeoJSON')) {
             // SDO_UTIL does not support GeoJSON in 11.x database
-            return (col,jdx) =>  {
+            return (col,idx) =>  {
               return YadamuSpatialLibrary.geoJSONtoWKT(col)
             }
           }
@@ -83,42 +83,54 @@ class OracleOutputManager extends YadamuOutputManager {
             return null
           }
           break;
-       case this.dbi.DATA_TYPES.ORACLE_BFILE_TYPE:
-            // Convert JSON representation to String.
-       case this.dbi.DATA_TYPES.SET_TYPE:
-       case this.dbi.DATA_TYPES.JSON_TYPE:
-          return (col,jdx) =>  {
-            // row[idx] = Buffer.from(JSON.stringify(row[idx]))
-            // JSON must be shipped in Serialized Form
-            return typeof col === 'object' ? JSON.stringify(col) : col
-          }
+        case this.dbi.DATA_TYPES.ORACLE_BFILE_TYPE:
+          // Convert JSON representation to String.
+        case this.dbi.DATA_TYPES.SET_TYPE:
+        case this.dbi.DATA_TYPES.JSON_TYPE:
+		  switch (this.dbi.DATA_TYPES.storageOptions.JSON_TYPE) {
+			case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+		    case this.dbi.DATA_TYPES.CLOB_TYPE:
+		    case this.dbi.DATA_TYPES.BLOB_TYPE:
+              return (col,idx) =>  {
+                // JSON must be shipped in Serialized Form
+                return typeof col === 'object' ? JSON.stringify(col) : col
+              }
+		    case this.dbi.DATA_TYPES.BLOB_TYPE:
+			  if (this.dbi.DATABASE_VERSION < 19) {
+                return (col,idx) =>  {
+                  // JSON must be shipped in Serialized Form
+                  return typeof col === 'object' ? JSON.stringify(col) : col
+                }
+			  }
+			  return (col,idx) => {
+			    return Buffer.isBuffer(col) ? col : Buffer.from(JSON.stringify(col))
+			 }
+		  }
           break;
-       case this.dbi.DATA_TYPES.BINARY_TYPE:
-          /*
-          if (this.dbi.BOOLEAN_AS_RAW1) {
-            if (typeof col === 'boolean') {
-              return  new Buffer.from(col === true ? [1] : [0])
-            }
-          */
-          return (col,jdx) =>  {
+        case this.dbi.DATA_TYPES.BINARY_TYPE:
+          return (col,idx) =>  {
             return typeof col === 'boolean' ? new Buffer.from(col === true ? [1] : [0]) :  col
-          }
+          } 
           break;
-       case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
-          return (col,jdx) =>  {
-            return YadamuLibrary.booleanToBuffer(col)
-          }
-          break;
-       case this.dbi.DATA_TYPES.DATE_TYPE:
-          return (col,jdx) =>  {
+        case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
+	      switch (this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE) {
+		    case 'RAW(1)':
+		    default:
+              return (col,idx) =>  {
+                return YadamuLibrary.booleanToBuffer(col)
+              } 
+	      }
+		  break;
+        case this.dbi.DATA_TYPES.DATE_TYPE:
+          return (col,idx) =>  {
             if (col instanceof Date) {
               return col.toISOString()
             }
             return col;
           }
           break;
-       case this.dbi.DATA_TYPES.TIMESTAMP_TIMESTAMP_TYPE:
-          return (col,jdx) =>  {
+        case this.dbi.DATA_TYPES.TIMESTAMP_TIMESTAMP_TYPE:
+          return (col,idx) =>  {
             // A Timestamp not explicitly marked as UTC should be coerced to UTC.
             // Avoid Javascript dates due to lost of precsion.
             // row[bindIdx] = new Date(Date.parse(col.endsWith('Z') ? col : col + 'Z'));
@@ -131,10 +143,10 @@ class OracleOutputManager extends YadamuOutputManager {
             return col
           }
           break;
-       case this.dbi.DATA_TYPES.XML_TYPE :
+        case this.dbi.DATA_TYPES.XML_TYPE :
           /*
           // Cannot passs XMLTYPE as BUFFER: ORA-06553: PLS-307: too many declarations of 'XMLTYPE' match this call
-          return (col,jdx) =>  {
+          return (col,idx) =>  {
             // bindRow[idx] = Buffer.from(col);
             return col
           }
@@ -163,7 +175,7 @@ class OracleOutputManager extends YadamuOutputManager {
       this.lobTransformations = this.tableInfo.lobBinds.map((lobBind,idx) => {
         switch (lobBind.type) {
           case oracledb.CLOB:
-            return (col,jdx) =>  {
+            return (col,idx) =>  {
               // Determine whether to bind content as string or temporary CLOB
               if (typeof col !== "string") {
                 col = JSON.stringify(col);
@@ -174,7 +186,7 @@ class OracleOutputManager extends YadamuOutputManager {
             }
             break;
           case oracledb.BLOB:
-            return (col,jdx) =>  {
+            return (col,idx) =>  {
               /*
               **
               ** At this point we can have one of the following to deal with:

@@ -1,13 +1,27 @@
 
-import YadamuDataTypes   from '../base/yadamuDataTypes.js'
+import {
+  YadamuDataTypes
+, YadamuStorageOptions
+}                           from '../base/yadamuDataTypes.js'
+
+import MySQLConstants       from './mysqlConstants.js'
+
+class MySQLStorageOptions extends YadamuStorageOptions {
+  
+  get BOOLEAN_TYPE()                        { return MySQLConstants.BOOLEAN_STORAGE_OPTION }	
+	
+  set BOOLEAN_TYPE(v)                       { YadamuDataTypes.redefineProperty(this,'BOOLEAN_TYPE',v) }
+  
+  get TINYINT1_IS_BOOLEAN()                 { return this.BOOLEAN_TYPE === 'tinyint(1)' }
+  
+  get BIT1_IS_BOOLEAN()                     { return this.BOOLEAN_TYPE === 'bit(1)' } 
+  
+}
 
 class MySQLDataTypes extends YadamuDataTypes {
-	
-  static get TREAT_TINYINT1_AS_BOOLEAN()   { return this.storageOptions.BOOLEAN_TYPE === "tinyint(1)" }
 
-  static coalesceTypeMappings(typeList) {
-	
-	
+  coalesceTypeMappings(typeList) {
+		
 	switch (true) {
 	  case typeList.includes(this.SPATIAL_TYPE):
 	    return this.SPATIAL_TYPE
@@ -55,7 +69,13 @@ class MySQLDataTypes extends YadamuDataTypes {
 	    console.log(this.name,'Type List Reduction failed for ',typeList)
 	}
   }
-   
+
+  get DATABASE_KEY()      { return MySQLConstants.DATABASE_KEY }
+ 
+  get DATABASE_VENDOR()   { return MySQLConstants.DATABASE_VENDOR }   
+  
+  get STORAGE_OPTIONS()   { return new MySQLStorageOptions() }
+
 }
  
 export { MySQLDataTypes as default }

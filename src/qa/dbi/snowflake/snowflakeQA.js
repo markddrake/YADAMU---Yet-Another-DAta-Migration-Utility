@@ -7,7 +7,7 @@ import SnowflakeDBI       from '../../../node/dbi//snowflake/snowflakeDBI.js';
 import SnowflakeConstants from '../../../node/dbi//snowflake/snowflakeConstants.js';
 import SnowflakeException from '../../../node/dbi//snowflake/snowflakeException.js'
 
-import YadamuTest         from '../../core/yadamu.js';
+import Yadamu             from '../../core/yadamu.js';
 import YadamuQALibrary    from '../../lib/yadamuQALibrary.js'
 
 class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
@@ -15,15 +15,15 @@ class SnowflakeQA extends YadamuQALibrary.qaMixin(SnowflakeDBI) {
 	static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
 
-	static #_YADAMU_DBI_PARAMETERS
+	static #_DBI_PARAMETERS
 	
-	static get YADAMU_DBI_PARAMETERS()  { 
-	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,SnowflakeConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[SnowflakeConstants.DATABASE_KEY] || {},{RDBMS: SnowflakeConstants.DATABASE_KEY}))
-	   return this.#_YADAMU_DBI_PARAMETERS
+	static get DBI_PARAMETERS()  { 
+	   this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,SnowflakeConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[SnowflakeConstants.DATABASE_KEY] || {},{RDBMS: SnowflakeConstants.DATABASE_KEY}))
+	   return this.#_DBI_PARAMETERS
     }
    
-    get YADAMU_DBI_PARAMETERS() {
-      return SnowflakeQA.YADAMU_DBI_PARAMETERS
+    get DBI_PARAMETERS() {
+      return SnowflakeQA.DBI_PARAMETERS
     }	
 		
     constructor(yadamu,manager,connectionSettings,parameters) {

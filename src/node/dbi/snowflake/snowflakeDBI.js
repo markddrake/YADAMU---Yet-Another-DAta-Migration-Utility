@@ -37,15 +37,15 @@ import SnowflakeStatementLibrary      from './snowflakeStatementLibrary.js'
 
 class SnowflakeDBI extends YadamuDBI {
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,SnowflakeConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,SnowflakeConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return SnowflakeDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return SnowflakeDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -64,8 +64,6 @@ class SnowflakeDBI extends YadamuDBI {
 
   // Enable configuration via command line parameters
 
-  get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT || SnowflakeConstants.SPATIAL_FORMAT };
-  
   // SNOWFLAKE XML TYPE can be set to TEXT to avoid multiple XML Fidelity issues with persisting XML data as VARIANT
   
   get SNOWFLAKE_XML_TYPE()     { return this.parameters.SNOWFLAKE_XML_TYPE || SnowflakeConstants.SNOWFLAKE_XML_TYPE }
@@ -98,10 +96,9 @@ class SnowflakeDBI extends YadamuDBI {
 
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.CLOUD_STAGING }
     
-  get DATA_TYPES()                    { return SnowflakeDataTypes }
-
   constructor(yadamu,manager,connectionSettings,parameters) {	  
     super(yadamu,manager,connectionSettings,parameters)
+    this.DATA_TYPES = SnowflakeDataTypes
 	this.StatementLibrary = SnowflakeStatementLibrary
 	this.statementLibrary = undefined
   }
@@ -173,14 +170,14 @@ class SnowflakeDBI extends YadamuDBI {
     // Perform connection specific configuration such as setting sesssion time zone to UTC...
 	let results = await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)
     results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[])    
-    this._DB_VERSION = results[0].DATABASE_VERSION
+    this._DATABASE_VERSION = results[0].DATABASE_VERSION
 
     if ((this.isManager()) && (this.SNOWFLAKE_XML_TYPE !== SnowflakeConstants.SNOWFLAKE_XML_TYPE )) {
-       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_XML_TYPE}.`)
+       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_XML_TYPE}.`)
     }	
 
     if ((this.isManager()) && (this.SNOWFLAKE_JSON_TYPE !== SnowflakeConstants.SNOWFLAKE_JSON_TYPE )) {
-       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_JSON_TYPE}.`)
+       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_JSON_TYPE}.`)
     }	
 
   }

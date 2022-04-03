@@ -1,5 +1,11 @@
+import {
+  YadamuDataTypes
+, YadamuStorageOptions
+}                           from '../base/yadamuDataTypes.js'
 
-import YadamuDataTypes   from '../base/yadamuDataTypes.js'
+import VerticaConstants     from './verticaConstants.js'
+
+class VerticaStorageOptions extends YadamuStorageOptions {}
 
 class VerticaDataTypes extends YadamuDataTypes {
   
@@ -37,7 +43,13 @@ class VerticaDataTypes extends YadamuDataTypes {
      this._LOB_TYPES = this._LOB_TYPES || Object.freeze([this.CLOB_TYPE,this.BLOB_TYPE])
      return this._LOB_TYPES;
   }
-  
+
+  get DATABASE_KEY()      { return VerticaConstants.DATABASE_KEY }
+
+  get DATABASE_VENDOR()   { return VerticaConstants.DATABASE_VENDOR }
+
+  get STORAGE_OPTIONS()   { return new VerticaStorageOptions() }
+ 
 }
  
 export { VerticaDataTypes as default }

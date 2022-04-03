@@ -14,8 +14,7 @@ class MsSQLConstants {
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "SPATIAL_MAKE_VALID"        : false
-    , "SPATIAL_FORMAT"            : "WKB"
-	, "ROW_LIMIT"                 : 8060
+  , "ROW_LIMIT"                 : 8060
     })
     return this._STATIC_PARAMETERS;
   }
@@ -28,7 +27,6 @@ class MsSQLConstants {
   }
 
   static get SPATIAL_MAKE_VALID()     { return this.DBI_PARAMETERS.SPATIAL_MAKE_VALID };
-  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get ROW_LIMIT()              { return this.DBI_PARAMETERS.ROW_LIMIT };
 
   static get STATEMENT_TERMINATOR()   { return ';' }

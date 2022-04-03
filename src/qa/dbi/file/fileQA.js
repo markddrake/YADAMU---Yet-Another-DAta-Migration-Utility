@@ -14,22 +14,22 @@ import DBWriter            from '../../../node/core/dbWriter.js';
 import YadamuLibrary       from '../../../node/lib/yadamuLibrary.js';
 import FileDBI             from '../../../node/dbi/file/fileDBI.js';
 import JSONParser          from '../../../node/dbi/file/jsonParser.js';
-import YadamuTest          from '../../core/yadamu.js';
+import Yadamu              from '../../core/yadamu.js';
 
 import StatisticsCollector from './statisticsCollector.js';
 
 
 class FileQA extends FileDBI {
    
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 	
-  static get YADAMU_DBI_PARAMETERS()  { 
-	 this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,FileDBI.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[FileDBI.DATABASE_KEY] || {},{RDBMS: FileDBI.DATABASE_KEY}))
-	 return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	 this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,FileDBI.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[FileDBI.DATABASE_KEY] || {},{RDBMS: FileDBI.DATABASE_KEY}))
+	 return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-    return FileQA.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+    return FileQA.DBI_PARAMETERS
   }	
 	
   /*

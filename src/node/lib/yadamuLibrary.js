@@ -131,6 +131,10 @@ class YadamuLibrary {
     return this.toBoolean(booleanValue) === true ? 1 : 0
   }
   
+  static booleanToBit(booleanValue) {
+    return this.toBoolean(booleanValue) === true ? 1 : 0
+  }
+  
   static booleanToBuffer(booleanValue) {
     return new Buffer.from([this.booleanToInt(booleanValue)])
   }

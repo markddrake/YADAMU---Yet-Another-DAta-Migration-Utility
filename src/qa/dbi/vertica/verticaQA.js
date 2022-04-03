@@ -8,7 +8,7 @@ import VerticaDBI       from '../../../node/dbi/vertica/verticaDBI.js';
 import {VerticaError}   from '../../../node/dbi/vertica/verticaException.js'
 import VerticaConstants from '../../../node/dbi/vertica/verticaConstants.js';
 
-import YadamuTest       from '../../core/yadamu.js';
+import Yadamu           from '../../core/yadamu.js';
 import YadamuQALibrary  from '../../lib/yadamuQALibrary.js'
 
 
@@ -19,15 +19,15 @@ class VerticaQA extends YadamuQALibrary.qaMixin(VerticaDBI) {
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
     static get SQL_FAILED()                { return _SQL_FAILED }
 
-    static #_YADAMU_DBI_PARAMETERS
+    static #_DBI_PARAMETERS
     
-    static get YADAMU_DBI_PARAMETERS()  { 
-       this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,VerticaConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[VerticaConstants.DATABASE_KEY] || {},{RDBMS: VerticaConstants.DATABASE_KEY}))
-       return this.#_YADAMU_DBI_PARAMETERS
+    static get DBI_PARAMETERS()  { 
+       this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,VerticaConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[VerticaConstants.DATABASE_KEY] || {},{RDBMS: VerticaConstants.DATABASE_KEY}))
+       return this.#_DBI_PARAMETERS
     }
    
-    get YADAMU_DBI_PARAMETERS() {
-      return VerticaQA.YADAMU_DBI_PARAMETERS
+    get DBI_PARAMETERS() {
+      return VerticaQA.DBI_PARAMETERS
     }   
     
     SQL_SCHEMA_TABLE_ROWS(schema) { return `with num_rows as (

@@ -204,7 +204,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
           return `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
         case TINYINT_TYPE:
           switch (true) {
-            case ((dataType.length === 1) && this.dbi.TREAT_TINYINT1_AS_BOOLEAN):
+            case ((dataType.length === 1) && this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN):
               return `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
           }
         default:
@@ -233,7 +233,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
   generateTableInfo(tableMetadata) {
       
     let insertMode = 'Batch';
-	
+    	
     const columnNames = tableMetadata.columnNames
 
     const mappedDataTypes = [];
@@ -241,7 +241,8 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
     const columnDefinitions = columnNames.map((columnName,idx) => {
       let addNullClause = false;
       const mappedDataType = tableMetadata.source ? tableMetadata.dataTypes[idx]:  this.getMappedDataType(tableMetadata.dataTypes[idx],tableMetadata.sizeConstraints[idx])
-      mappedDataTypes.push(mappedDataType)
+      let columnDataType = mappedDataType
+	  mappedDataTypes.push(mappedDataType)
       switch (mappedDataType) {
         case this.dbi.DATA_TYPES.SPATIAL_TYPE:                
         case this.dbi.DATA_TYPES.POINT_TYPE:                
@@ -270,13 +271,17 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
         case this.dbi.DATA_TYPES.BIT_STRING_TYPE:
           insertOperators.push('conv(?,2,10)+0');
           break;
+        case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
+          let columnDataType = this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+          insertOperators.push('?')
+          break;
         case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
         case this.dbi.DATA_TYPES.TIMESTAMPTZ_TYPE:
            addNullClause = true;
         default:
           insertOperators.push('?')
       }
-  	  return `"${columnName}" ${this.generateStorageClause(mappedDataType,tableMetadata.sizeConstraints[idx])} ${addNullClause === true ? 'null':''}`      
+  	  return `"${columnName}" ${this.generateStorageClause(columnDataType,tableMetadata.sizeConstraints[idx])} ${addNullClause === true ? 'null':''}`      
 	  
     })
                                    

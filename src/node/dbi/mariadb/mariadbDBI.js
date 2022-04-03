@@ -47,15 +47,15 @@ class MariadbDBI extends YadamuDBI {
   static get SQL_RESTORE_SAVE_POINT()                         { return _SQL_RESTORE_SAVE_POINT }
   static get SQL_RELEASE_SAVE_POINT()                         { return _SQL_RELEASE_SAVE_POINT }
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,MariadbConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,MariadbConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return MariadbDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return MariadbDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -74,10 +74,6 @@ class MariadbDBI extends YadamuDBI {
 
   // Enable configuration via command line parameters
 
-  get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT            || MariadbConstants.SPATIAL_FORMAT }
-  
-  get TREAT_TINYINT1_AS_BOOLEAN()    { return MariadbDataTypes.TREAT_TINYINT1_AS_BOOLEAN }
-
   // Not available until configureConnection() has been called 
 
   get LOWER_CASE_TABLE_NAMES()       { this._LOWER_CASE_TABLE_NAMES }
@@ -86,12 +82,13 @@ class MariadbDBI extends YadamuDBI {
 
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
-  get DATA_TYPES()                    { return MariadbDataTypes }
-
   constructor(yadamu,manager,connectionSettings,parameters) {
 
     super(yadamu,manager,connectionSettings,parameters)
-	this.initializeDataTypes(MariadbDataTypes)
+	this.DATA_TYPES = MariadbDataTypes
+	
+	this.DATA_TYPES.storageOptions.BOOLEAN_TYPE = this.parameters.MARIADB_BOOLEAN_STORAGE_OPTION || this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION || this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+
     this.pool = undefined;
 	
     this.StatementLibrary = MariadbStatementLibrary
@@ -114,7 +111,7 @@ class MariadbDBI extends YadamuDBI {
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)
 
     let results = await this.executeSQL(this.StatementLibrary.SQL_GET_CONNECTION_INFORMATION)
-    this._DB_VERSION = results[0]
+    this._DATABASE_VERSION = results[0]
 
     results = await this.executeSQL(this.StatementLibrary.SQL_SHOW_SYSTEM_VARIABLES)
 	results.forEach((row,i) => { 

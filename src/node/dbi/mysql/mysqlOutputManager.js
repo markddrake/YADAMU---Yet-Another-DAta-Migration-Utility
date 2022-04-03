@@ -15,13 +15,15 @@ class MySQLOutputManager extends YadamuOutputManager {
     super(dbi,tableName,metrics,status,yadamuLogger)
   }
    
-  generateTransformations(targetDataTypes) {
+  generateTransformations(dataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
- 
-    return targetDataTypes.map((targetDataType,idx) => { 
-      const dataType = YadamuDataTypes.decomposeDataType(targetDataType);
-      switch (dataType.type.toLowerCase()) {
+	
+    const spatialFormat = this.SPATIAL_FORMAT	
+	
+    return dataTypes.map((dataType,idx) => { 
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
+      switch (dataTypeDefinition.type.toLowerCase()) {
         case "json" :
           return (col,idx) => {
             return typeof col === 'object' ? JSON.stringify(col) : col
@@ -36,15 +38,31 @@ class MySQLOutputManager extends YadamuOutputManager {
 		case this.dbi.DATA_TYPES.MULTI_POLYGON_TYPE:
 		case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:
 	      if (this.SPATIAL_FORMAT === 'GeoJSON') {
+			/*
             return (col,idx) => {
               return typeof col === 'object' ? JSON.stringify(col) : col
+            }
+			*/
+   		    // Row Mode operations have issues with GeoJSON content.
+		    // Convert GeoJSON to WKB and change SpatialFormat to WKB.
+			this.spatialFormat = 'WKB';
+			return (col,idx) => {
+              return YadamuSpatialLibrary.geoJSONtoWKB(col)
             }
           }
           return null;
         case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
-          return (col,idx) => {
-            return YadamuLibrary.booleanToInt(col)
-          }
+	      switch (this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE) {
+			case 'TINYINY(1)':
+              return (col,idx) => {
+                return YadamuLibrary.booleanToInt(col)
+              }
+			case 'BIT(1)':
+			default:
+              return (col,idx) => {
+                return YadamuLibrary.booleanToBit(col)
+              }
+		  }
           break; 
         case this.dbi.DATA_TYPES.DATE_TYPE:
         case this.dbi.DATA_TYPES.TIME_TYPE:
@@ -104,6 +122,8 @@ class MySQLOutputManager extends YadamuOutputManager {
           return null
       }
     })
+	
+	this.tableInfo._SPATIAL_FORMAT = spatialFormat
 	
   }
 

@@ -112,15 +112,15 @@ class LoaderDBI extends YadamuDBI {
   static get SOFTWARE_VENDOR()       { return LoaderConstants.SOFTWARE_VENDOR};
   static get PROTOCOL()              { return LoaderConstants.PROTOCOL }
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return LoaderDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return LoaderDBI.DBI_PARAMETERS
   }
     
   get DATABASE_KEY()               { return LoaderDBI.DATABASE_KEY };
@@ -130,9 +130,9 @@ class LoaderDBI extends YadamuDBI {
   get PARTITION_LEVEL_OPERATIONS() { return true }
   get PROTOCOL()                   { return LoaderDBI.PROTOCOL };
   
-  get YADAMU_DBI_PARAMETERS()    { 
-	this._YADAMU_DBI_PARAMETERS = this._YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},super.YADAMU_DBI_PARAMETERS,{}))
-	return this._YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS()    { 
+	this._DBI_PARAMETERS = this._DBI_PARAMETERS || Object.freeze(Object.assign({},super.DBI_PARAMETERS,{}))
+	return this._DBI_PARAMETERS
   }
   
   get JSON_OUTPUT()              { return this.OUTPUT_FORMAT === 'JSON' }
@@ -241,7 +241,7 @@ class LoaderDBI extends YadamuDBI {
     super(yadamu,manager,connectionSettings,parameters)
 	this.yadamuProperties = {}
 	this.baseDirectory = path.resolve(this.vendorProperties.directory || "")
-	this._DB_VERSION = YadamuConstants.YADAMU_VERSION
+	this._DATABASE_VERSION = YadamuConstants.YADAMU_VERSION
   }    	
  
   isValidDDL() {

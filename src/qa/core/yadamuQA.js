@@ -27,7 +27,7 @@ import {
   ConfigurationFileError
 }                         from '../..//node/core/yadamuException.js';
 
-import Yadamu             from './yadamu.js';
+import Yadamu                 from './yadamu.js';
 
 // import wtf from 'wtfnode';
 
@@ -874,8 +874,8 @@ class YadamuQA {
     keyMetrics = await this.yadamu.pumpData(sourceDBI,targetDBI);
     let stepElapsedTime = performance.now() - stepStartTime
 
-    let sourceVersion = sourceDBI.DB_VERSION;
-    let targetVersion = targetDBI.DB_VERSION;
+    let sourceVersion = sourceDBI.DATABASE_VERSION;
+    let targetVersion = targetDBI.DATABASE_VERSION;
     const sourceDescription = this.getDescription(sourceConnectionName,sourceDBI)  
     const targetDescription = this.getDescription(targetConnectionName,targetDBI)  
 
@@ -1011,7 +1011,7 @@ class YadamuQA {
     const sourceSchema  = this.getSourceMapping(sourceDatabase,task);
     const targetSchema  = this.getTargetMapping(targetDatabase,task,this.TARGET_SCHEMA_SUFFIX);
     const compareSchema = this.getTargetMapping(sourceDatabase,task,this.COMPARE_SCHEMA_SUFFIX);
-        
+       
     const sourceParameters  = Object.assign({},parameters)
     sourceParameters.MODE = (homogeneousCopy && !stagedCopy && (taskMode !== 'DDL_ONLY')) ? 'DDL_AND_DATA' : 'DDL_ONLY'
 
@@ -1058,8 +1058,8 @@ class YadamuQA {
     keyMetrics = await this.yadamu.pumpData(sourceDBI,targetDBI);
 
     let stepElapsedTime = performance.now() - stepStartTime
-    let sourceVersion = sourceDBI.DB_VERSION;
-    let targetVersion = targetDBI.DB_VERSION;
+    let sourceVersion = sourceDBI.DATABASE_VERSION;
+    let targetVersion = targetDBI.DATABASE_VERSION;
     let sourceDescription = this.getDescription(sourceConnectionName,sourceDBI)  
     let targetDescription = this.getDescription(sourceConnectionName,targetDBI)  
     
@@ -1211,11 +1211,10 @@ class YadamuQA {
 		sourceConnectionName = targetConnectionName
       }
       
-	  
       targetDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,false) 
         
-      await this.yadamu.reset(compareParameters);
-      this.yadamu.IDENTIFIER_MAPPINGS = this.reverseIdentifierMappings(identifierMappings)
+	  await this.yadamu.reset(compareParameters);
+	  this.yadamu.IDENTIFIER_MAPPINGS = this.reverseIdentifierMappings(identifierMappings)
         
       if ((sourceDBI instanceof LoaderDBI) && (targetDBI instanceof LoaderDBI)) {
         // Configure the the OUTPUT_FORMAT, COMPRESSION AND ENCRYPTION settings to the target Parameters
@@ -1227,8 +1226,8 @@ class YadamuQA {
       stepElapsedTime = performance.now() - stepStartTime
       sourceDescription = this.getDescription(sourceConnectionName,sourceDBI)  
       targetDescription = this.getDescription(targetConnectionName,targetDBI)  
-      targetVersion = sourceDBI.DB_VERSION
-      sourceVersion = targetDBI.DB_VERSION
+      targetVersion = sourceDBI.DATABASE_VERSION
+      sourceVersion = targetDBI.DATABASE_VERSION
       
       this.metrics.recordTaskTimings([task.taskName,'COPY',targetDBI.MODE,sourceConnectionName,test.source,YadamuLibrary.stringifyDuration(stepElapsedTime)])
       if (results instanceof Error) {
@@ -1344,7 +1343,7 @@ class YadamuQA {
     this.setUser(targetParameters,'TO_USER',targetDatabase, targetSchema1)
 
     let targetDBI = await this.getDatabaseInterface(targetDatabase,targetConnection,targetParameters,this.RECREATE_SCHEMA)
-    const targetDBVersion = targetDBI.DB_VERSION;
+    const targetDBVersion = targetDBI.DATABASE_VERSION;
     
     let sourceAndTargetMatch
     let stepStartTime = taskStartTime   
@@ -1356,14 +1355,14 @@ class YadamuQA {
       const parser = new YadamuExportParser(this.yadamu.LOGGER)
       await parser.parse(targetDBI.UPLOAD_FILE,'systemInformation');
       const systemInformation = parser.getTarget()
-      sourceAndTargetMatch = ((targetDBI.DATABASE_VENDOR === systemInformation.vendor) && (targetDBI.DB_VERSION === systemInformation.databaseVersion))
+      sourceAndTargetMatch = ((targetDBI.DATABASE_VENDOR === systemInformation.vendor) && (targetDBI.DATABASE_VERSION === systemInformation.databaseVersion))
     }
     else {
       let results = await this.yadamu.pumpData(fileReader,targetDBI) 
       let sourceDescription = this.getDescription('file',fileReader)
       metrics.push(results)
       if (!(results instanceof Error)) {
-        sourceAndTargetMatch = ((targetDBI.DATABASE_VENDOR === targetDBI.systemInformation.vendor) && (targetDBI.DB_VERSION === targetDBI.systemInformation.databaseVersion))
+        sourceAndTargetMatch = ((targetDBI.DATABASE_VENDOR === targetDBI.systemInformation.vendor) && (targetDBI.DATABASE_VERSION === targetDBI.systemInformation.databaseVersion))
       }
     }
     let stepElapsedTime = performance.now() - stepStartTime
@@ -1377,7 +1376,7 @@ class YadamuQA {
       return;
     }
     
-    let targetVersion = targetDBI.DB_VERSION
+    let targetVersion = targetDBI.DATABASE_VERSION
     let identifierMappings = targetDBI.getIdentifierMappings();
     this.printResults(this.OPERATION_NAME,sourceDescription,targetDescription,stepElapsedTime)
     sourceDescription = targetDescription
@@ -1438,7 +1437,7 @@ class YadamuQA {
       return;
     }
     
-    targetVersion = targetDBI.DB_VERSION
+    targetVersion = targetDBI.DATABASE_VERSION
     this.printResults(this.OPERATION_NAME,sourceDescription,targetDescription,stepElapsedTime)
     sourceDescription = targetDescription
 
@@ -1704,7 +1703,7 @@ class YadamuQA {
       return;
     }
 
-    const sourceVersion = sourceDBI.DB_VERSION;
+    const sourceVersion = sourceDBI.DATABASE_VERSION;
         
     if (this.VERIFY_OPERATION === true) {
       sourceDescription = targetDescription

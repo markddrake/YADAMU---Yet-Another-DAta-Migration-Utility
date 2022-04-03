@@ -24,8 +24,9 @@ class YadamuStatementGenerator {
 	  return new Promise(async(resolve,reject) => {
 		const classFile = YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].class
 		const VendorDataTypes = (await import(classFile)).default
-		this.dbi.yadamu.initializeDataTypes(VendorDataTypes,JSON.parse(fs.readFileSync(YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].file)))
-		resolve(VendorDataTypes)
+		const vendorDataTypes = new VendorDataTypes()
+		// this.dbi.yadamu.initializeDataTypes(VendorDataTypes,JSON.parse(fs.readFileSync(YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].file)))
+		resolve(vendorDataTypes)
       })
 	})()
     return this._VENDOR_DATA_TYPES
@@ -79,12 +80,12 @@ class YadamuStatementGenerator {
 	this._VENDOR_TYPE_MAPPINGS = this._VENDOR_TYPE_MAPPINGS || (() => {
 	  return new Promise(async(resolve,reject) => {
         const vendorTypeMappings = new Map()
-	    const VendorDataTypes = await this.VENDOR_DATA_TYPES
-		for (let c = VendorDataTypes; c.name; c = Object.getPrototypeOf(c)) {
-          Object.getOwnPropertyNames(c).filter((name) => { 
+	    const vendorDataTypes = await this.VENDOR_DATA_TYPES
+		for (let c = vendorDataTypes; c !== null ; c = Object.getPrototypeOf(c)) {
+		  Object.getOwnPropertyNames(c).filter((name) => { 
 	        return Object.getOwnPropertyDescriptor(c,name).get
 	      }).forEach((name) => { 
-		    const sourceType = VendorDataTypes[name]
+		    const sourceType = vendorDataTypes[name]
 			if (typeof sourceType === 'string') {
 	           const sourceTypeDefinition = YadamuDataTypes.decomposeDataType(sourceType)
 			   if (sourceType === sourceTypeDefinition.type) {
@@ -96,6 +97,7 @@ class YadamuStatementGenerator {
 		    }   
 	      })
 		}
+		// console.log(vendorTypeMappings)
 		vendorTypeMappings.forEach((value,key) => {
 		  vendorTypeMappings.set(key, value.size === 1 ? value.values().next().value : this.dbi.DATA_TYPES.coalesceTypeMappings(Array.from(value.values())))
 		})
@@ -121,7 +123,7 @@ class YadamuStatementGenerator {
   async debugStatementGenerator(options) {	
 	
 	console.log(JSON.stringify(this.metadata))
-	console.log(JSON.stringify(Array.from( (await(this.VENDOR_TYPE_MAPPINGS.entries())))))
+	console.log(JSON.stringify(Array.from( (await this.VENDOR_TYPE_MAPPINGS).entries())))
 	console.log(options)
 	
   }	
@@ -268,7 +270,7 @@ class YadamuStatementGenerator {
       }
 	}
 	else {
-	  if (this.dbi.DATA_TYPES.isBCD(mappedDataType)) {
+	  if (YadamuDataTypes.isBCD(mappedDataType)) {
 		return this.dbi.DATA_TYPES.UNBOUNDED_NUMERIC_TYPE
 	  }
 	}

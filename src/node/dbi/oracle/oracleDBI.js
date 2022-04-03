@@ -63,15 +63,15 @@ import {
 
 class OracleDBI extends YadamuDBI {
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  {
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,OracleConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  {
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,OracleConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
 
-  get YADAMU_DBI_PARAMETERS() {
-	return OracleDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return OracleDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -79,11 +79,16 @@ class OracleDBI extends YadamuDBI {
   // Not available until configureConnection() has been called
 
   get MAX_STRING_SIZE()            { return this._MAX_STRING_SIZE }
+  // Is VARCHAR2(32000) enabled in the target database
   get EXTENDED_STRING()            { return this._EXTENDED_STRING }
-  get JSON_STORAGE_MODEL()         { return this._JSON_STORAGE_MODEL }
-  get XML_STORAGE_MODEL()          { return this._XML_STORAGE_MODEL }
-  get NATIVE_DATA_TYPE()           { return this._NATIVE_DATA_TYPE }
-  get JSON_PARSING_SUPPORTED()     { return this._JSON_PARSER }
+  // Optimal JSON Storage model for current database
+  get JSON_DB_STORAGE_MODEL()      { return this._JSON_DB_STORAGE_MODEL }
+  // Optimal XML Storage model for current database
+  get XMLTYPE_DB_STORAGE_CLAUSE()  { return _this.XMLTYPE_DB_STORAGE_CLAUSE }
+  // Does the database support a Native JSON data type.
+  get NATIVE_JSON_TYPE()           { return this._NATIVE_JSON_TYPE }
+  // Does the database support JSON operations at some level 
+  get JSON_PARSING_SUPPORTED()     { return this._JSON_PARSING_SUPPORTED }
 
   // Override YadamuDBI
 
@@ -94,17 +99,10 @@ class OracleDBI extends YadamuDBI {
   get PARTITION_LEVEL_OPERATIONS() { return true }
   get STATEMENT_TERMINATOR()       { return OracleConstants.STATEMENT_TERMINATOR };
   get STATEMENT_SEPERATOR()        { return OracleConstants.STATEMENT_SEPERATOR };
-  get DBI_PARAMETERS()             { return OracleConstants.DBI_PARAMETERS }
-
 
   // Enable configuration via command line parameters
 
-  get SPATIAL_FORMAT()             { return this.parameters.SPATIAL_FORMAT              || OracleConstants.SPATIAL_FORMAT }
-  // get OBJECT_FORMAT()              { return this.parameters.OBJECT_FORMAT               || OracleConstants.OBJECT_FORMAT }
-  get ORACLE_XML_TYPE()            { return this.parameters.ORACLE_XML_TYPE             || OracleConstants.ORACLE_XML_TYPE}
-  get ORACLE_JSON_TYPE()           { return this.parameters.ORACLE_JSON_TYPE            || OracleConstants.ORACLE_JSON_TYPE}
   get MIGRATE_JSON_STORAGE()       { return this.parameters.MIGRATE_JSON_STORAGE        || OracleConstants.MIGRATE_JSON_STORAGE}
-  // get BOOLEAN_AS_RAW1()      { return this.parameters.BOOLEAN_AS_RAW1       || OracleConstants.BOOLEAN_AS_RAW1 }
   get BYTE_TO_CHAR_RATIO()         { return this.parameters.BYTE_TO_CHAR_RATIO          || OracleConstants.BYTE_TO_CHAR_RATIO };
   get COPY_LOGFILE_DIRNAME()       { return this.parameters.COPY_LOGFILE_DIRNAME        || OracleConstants.COPY_LOGFILE_DIRNAME };
   get COPY_BADFILE_DIRNAME()       { return this.parameters.COPY_BADFILE_DIRNAME        || OracleConstants.COPY_BADFILE_DIRNAME };
@@ -112,9 +110,83 @@ class OracleDBI extends YadamuDBI {
   get CACHELOB_BATCH_LIMIT()       { return this.parameters.CACHELOB_BATCH_LIMIT        || OracleConstants.CACHELOB_BATCH_LIMIT}
   get LOB_MAX_SIZE()               { return this.parameters.LOB_MAX_SIZE                || OracleConstants.LOB_MAX_SIZE}
 
-  get BOOLEAN_AS_RAW1()      { return OracleDataTypes.BOOLEAN_AS_RAW1 }
-  get OBJECT_FORMAT()              { return OracleDataTypes.OBJECT_FORMAT }
-  
+
+  /*
+  **
+  ** Use this.DATA_TYPES.storageOptions.XML_TYPE to determine how XML content is stored in the database.
+  **
+  ** Set to CLOB to force XMLTYPE STORE AS CLOB, which provides best chance of preserving XML Fidelity.
+  ** Set to BINARY to force XMLTYPE STORE AS BINARY XML, which provides best performance but not guarantee XML Fidelity in all use cases.
+  ** Set to XML to allow the driver to pck the storage model based on the Database Version.
+  **
+  **
+  ** OBJECT RELATAIONAL XML is only supported when migrating between Oracle Databases in DDL_AND_DATA mode
+  **
+  **  XML_STORAGE_OPTION        : Value is derived from Constants, Configuration Files and Command Line Parameters. Default is XML - meaning choose he recommended storage model for this version of the database
+  **  XMLTYPE_BB_STORAGE_CLAUSE : The recommended XML Storage Clause for this version of the database.
+  **
+  **  ### What about the actual data type when dealing with an existing table ???
+  **
+  */
+
+  get XMLTYPE_STORAGE_CLAUSE() {
+    this._XMLTYPE_STORAGE_CLAUSE = this._XMLTYPE_STORAGE_CLAUSE || (() => {
+	   switch (this.DATA_TYPES.storageOptions.XML_TYPE) {
+		 case 'XML' :
+		   switch (this.XMLTYPE_DB_STORAGE_MODEL) {
+			  case 'CLOB':
+			    return 'CLOB';
+		      case 'BINARY':
+			  default:
+			    return 'BINARY XML';
+           }
+		 case 'CLOB':
+		   return 'CLOB'
+		 case 'BINARY':
+		 default:
+		   return 'BINARY XML';
+       }
+    })()
+    return this._XMLTYPE_STORAGE_CLAUSE
+  }
+
+  /*
+  **
+  ** Use parameter ORACLE_JSON_TYPE to determine how JSON content is stored in the database.
+  **
+  ** Set to BLOB or CLOB to force BLOB or CLOB storage regardless of Database Version.
+  **
+  ** Set to JSON to allow driver to pick storage model based on Database Version. Choices are shown below:
+  **
+  **  20c : Native JSON data type
+  **  19c : BLOB with IS JSON constraint
+  **  18c : BLOB with IS JSON constraint
+  **  12c : CLOB with IS JSON constraint
+  **  11g : CLOB - No JSON support in 11g
+  **
+  **  ORACLE_JSON_TYPE       : Value is derived from Constants, Configuration Files and Command Line Parameters. Default is JSON
+  **  JSON_DB_STORAGE_MODEL  : The recommended Storage Model for this version of the database.
+  **  JSON_DATA_TYPE         : The data type that will be used by the driver.
+  **
+  **  ### What about the actual data type when dealing with an existing table ???
+  **
+  */
+
+  get JSON_DATA_TYPE() {
+    this._JSON_DATA_TYPE = this._JSON_DATA_TYPE || (() => {
+	  switch (true) {
+        case this.NATIVE_JSON_TYPE:
+          // What ever the user specified, the default is JSON, IS JSON will be specified for CLOB, BLOB or VARCHAR2
+          return this.DATA_TYPES.storageOptions.JSON_TYPE;
+        case this.JSON_PARSING_SUPPORTED:
+		  return this.DATA_TYPES.storageOptions.JSON_TYPE === 'JSON' ? this.JSON_DB_STORAGE_MODEL : this.DATA_TYPES.storageOptions.JSON_TYPE 
+        default:
+          return this.JSON_DB_STORAGE_MODEL
+      }
+    })()
+    return this._JSON_DATA_TYPE
+  }
+
   get CACHELOB_MAX_SIZE ()         { return this.EXTENDED_STRING ? OracleConstants.VARCHAR_MAX_SIZE_EXTENDED : OracleConstants.VARCHAR_MAX_SIZE_STANDARD}
 
   get VARCHAR_MAX_SIZE() {
@@ -138,92 +210,36 @@ class OracleDBI extends YadamuDBI {
     return this._COMMIT_CACHELOB_LIMIT
   }
 
-  get OBJECTS_AS_JSON()        { return this.OBJECT_FORMAT === 'JSON' }
-
-  /*
-  **
-  ** Use parameter ORACLE_JSON_TYPE to determine how JSON content is stored in the database.
-  **
-  ** Set to BLOB or CLOB to force BLOB or CLOB storage regardless of Database Version.
-  **
-  ** Set to JSON to allow driver to pick storage model based on Database Version. Choices are shown below:
-  **
-  **  20c : Native JSON data type
-  **  19c : BLOB with IS JSON constraint
-  **  18c : BLOB with IS JSON constraint
-  **  12c : CLOB with IS JSON constraint
-  **  11g : CLOB - No JSON support in 11g
-  **
-  **  ORACLE_JSON_TYPE    : Value is derived from Constants, Configuration Files and Command Line Parameters. Default is JSON
-  **  JSON_STORAGE_MODEL  : The recommended Storage Model for this version of the database.
-  **  JSON_DATA_TYPE      : The data type that will be used by the driver.
-  **
-  **  ### What about the actual data type when dealing with an existing table ???
-  **
-  */
-
-  get JSON_DATA_TYPE() {
-    this._JSON_DATA_TYPE = this._JSON_DATA_TYPE || (() => {
-      switch (true) {
-        case this.NATIVE_DATA_TYPE :
-          // What ever the user specified, the default is JSON, IS JSON will be specified for CLOB, BLOB or VARCHAR2
-          return this.ORACLE_JSON_TYPE;
-        case this.JSON_PARSING_SUPPORTED:
-          return this.ORACLE_JSON_TYPE === 'JSON' ? this.JSON_STORAGE_MODEL : this.ORACLE_JSON_TYPE
-        default:
-          return this.JSON_STORAGE_MODEL
-      }
-    })()
-    return this._JSON_DATA_TYPE
+   get SCHEMA_METADATA_OPTIONS() {
+	 return {
+		spatialFormat : this.SPATIAL_FORMAT
+   	  , booleanType   : this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	  , objectType    : this.DATA_TYPES.storageOptions.OBJECT_TYPE
+	}
   }
-
-  /*
-  **
-  ** Use parameter ORACLE_XML_TYPE to determine how XML content is stored in the database.
-  **
-  ** Set to CLOB to force XMLTYPE STORE AS CLOB, which provides best chance of preserving XML Fidelity.
-  ** Set to BINARY to force XMLTYPE STORE AS BINARY XML, which provides best performance but not guarantee XML Fidelity in all use cases.
-  ** Set to XML to allow the driver to pck the storage model based on the Database Version.
-  **
-  **
-  ** OBJECT RELATAIONAL XML is only supported when migrating between Oracle Databases in DDL_AND_DATA mode
-  **
-  **  ORACLE_XML_TYPE    : Value is derived from Constants, Configuration Files and Command Line Parameters. Default is JSON
-  **  XML_STORAGE_MODEL  : The recommended Storage Model for this version of the database.
-  **  JSON_DATA_TYPE     : The data type that will be used by the driver.
-  **
-  **  ### What about the actual data type when dealing with an existing table ???
-  **
-  */
-
-  get XML_STORAGE_CLAUSE() {
-    this._XML_STORAGE_CLAUSE = this._XML_STORAGE_CLAUSE || (() => {
-	   switch (this.ORACLE_XML_TYPE) {
-		 case 'XML' :
-		   switch (this.XML_STORAGE_MODEL) {
-			  case 'CLOB':
-			    return 'CLOB';
-		      case 'BINARY':
-			  default:
-			    return 'BINARY XML';
-           }
-		 case 'CLOB':
-		   return 'CLOB'
-		 case 'BINARY':
-		 default:
-		   return 'BINARY XML';
-       }
-    })()
-    return this._XML_STORAGE_CLAUSE
+  
+  get SCHEMA_METADATA_OPTIONS_XML() {
+	  
+	const options = 
+	   `<options>
+		 <spatialFormat>${this.SPATIAL_FORMAT}</spatialFormat>
+		 <booleanStorageOption>${this.DATA_TYPES.storageOptions.BOOLEAN_TYPE}</booleanStorageOption>
+		 <objectStorageOption>${this.DATA_TYPES.storageOptions.OBJECT_TYPE}</objectStorageOption>
+	   </options>`
+	
+	return options;
   }
-
+  
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
   
-  get DATA_TYPES()                    { return OracleDataTypes }
-
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	this.initializeDataTypes(OracleDataTypes)
+	this.DATA_TYPES = OracleDataTypes
+
+    this.DATA_TYPES.storageOptions.XML_TYPE     = this.parameters.ORACLE_XML_STORAGE_OPTION     || this.DBI_PARAMETERS.XML_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.XML_TYPE
+	this.DATA_TYPES.storageOptions.JSON_TYPE    = this.parameters.ORACLE_JSON_STORAGE_OPTION    || this.DBI_PARAMETERS.JSON_STORAGE_OPTION    || this.DATA_TYPES.storageOptions.JSON_TYPE
+	this.DATA_TYPES.storageOptions.BOOLEAN_TYPE = this.parameters.ORACLE_BOOLEAN_STORAGE_OPTION || this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION || this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	this.DATA_TYPES.storageOptions.OBJECT_TYPE  = this.parameters.ORACLE_OBJECT_STORAGE_OPTION  || this.DBI_PARAMETERS.OBJECT_STORAGE_OPTION  || this.DATA_TYPES.storageOptions.OBJECT_TYPE
 
 	// make oracledb constants available to decendants of OracleDBI
 	this.oracledb = oracledb
@@ -505,39 +521,40 @@ class OracleDBI extends YadamuDBI {
     let result = await this.executeSQL(SQL_SET_TIMESTAMP_FORMAT,{})
 
     let args = {
-		DB_VERSION:         {dir: oracledb.BIND_OUT, type: oracledb.STRING},
-		MAX_STRING_SIZE:    {dir: oracledb.BIND_OUT, type: oracledb.NUMBER},
-		EXTENDED_STRING:    {dir: oracledb.BIND_OUT, type: oracledb.STRING},
-		JSON_STORAGE_MODEL: {dir: oracledb.BIND_OUT, type: oracledb.STRING},
-    	XML_STORAGE_MODEL:  {dir: oracledb.BIND_OUT, type: oracledb.STRING},
-		JSON_PARSING:       {dir: oracledb.BIND_OUT, type: oracledb.STRING},
-		NATIVE_JSON_TYPE:   {dir: oracledb.BIND_OUT, type: oracledb.STRING}
+		DATABASE_VERSION:                {dir: oracledb.BIND_OUT, type: oracledb.STRING},
+		MAX_STRING_SIZE:           {dir: oracledb.BIND_OUT, type: oracledb.NUMBER},
+		JSON_DB_STORAGE_MODEL:     {dir: oracledb.BIND_OUT, type: oracledb.STRING},
+    	XMLTYPE_DB_STORAGE_CLAUSE: {dir: oracledb.BIND_OUT, type: oracledb.STRING},
+		EXTENDED_STRING_SUPPORTED: {dir: oracledb.BIND_OUT, type: oracledb.DB_TYPE_RAW},
+		JSON_PARSING_SUPPORTED:    {dir: oracledb.BIND_OUT, type: oracledb.DB_TYPE_RAW},
+		NATIVE_JSON_TYPE:          {dir: oracledb.BIND_OUT, type: oracledb.DB_TYPE_RAW}
 	}
 
     result = await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION,args)
 
-    this._DB_VERSION = parseFloat(result.outBinds.DB_VERSION)
-    this._MAX_STRING_SIZE = result.outBinds.MAX_STRING_SIZE;
-    this._EXTENDED_STRING = result.outBinds.EXTENDED_STRING === 'TRUE';
-    this._XML_STORAGE_MODEL = result.outBinds.XML_STORAGE_MODEL;
-	this._JSON_STORAGE_MODEL = result.outBinds.JSON_STORAGE_MODEL;
-    this._NATIVE_DATA_TYPE = result.outBinds.NATIVE_JSON_TYPE === 'TRUE';
-	this._JSON_PARSER = result.outBinds.JSON_PARSING === 'TRUE';
+    this._DATABASE_VERSION                = parseFloat(result.outBinds.DATABASE_VERSION)
+    this._MAX_STRING_SIZE           = result.outBinds.MAX_STRING_SIZE
+    this._JSON_DB_STORAGE_MODEL     = result.outBinds.JSON_DB_STORAGE_MODEL
+    this._XMLTYPE_DB_STORAGE_CLAUSE = result.outBinds.XMLTYPE_DB_STORAGE_CLAUSE
+    this._EXTENDED_STRING           = YadamuLibrary.toBoolean(result.outBinds.EXTENDED_STRING_SUPPORTED)
+	this._JSON_PARSING_SUPPORTED    = YadamuLibrary.toBoolean(result.outBinds.JSON_PARSING_SUPPORTED)
+	this._NATIVE_JSON_TYPE          = YadamuLibrary.toBoolean(result.outBinds.NATIVE_JSON_TYPE)
+
+    this.DATA_TYPES.storageOptions.JSON_TYPE = this.JSON_DATA_TYPE
 	
 	if (this.isManager()) {
       if (this.MAX_STRING_SIZE <= OracleConstants.VARCHAR_MAX_SIZE_EXTENDED) {
-        this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Maximum VARCHAR2 size for JSON operations is ${this.MAX_STRING_SIZE}.`)
+        this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Maximum VARCHAR2 size for JSON operations is ${this.MAX_STRING_SIZE}.`)
       }
 
       if (!this.EXTENDED_STRING) {
-        this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`VARCHAR MAX_SIZE set to ${this.VARCHAR_MAX_SIZE}.`)
+        this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`VARCHAR MAX_SIZE set to ${this.VARCHAR_MAX_SIZE}.`)
       }
 
-      if (this.XML_STORAGE_CLAUSE !== this.XML_STORAGE_MODEL ) {
-        this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`XMLType storage model is ${this.XML_STORAGE_CLAUSE}.`)
+      if (this.XMLTYPE_STORAGE_CLAUSE !== this.XMLTYPE_STORAGE_MODEL ) {
+        this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.XMLTYPE_STORAGE_CLAUSE}.`)
       }
-
-	  this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`JSON storage model is ${this.JSON_DATA_TYPE}.`)
+	  this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`JSON storage model is ${this.DATA_TYPES.storageOptions.JSON_TYPE}.`)
     }
   }
 
@@ -778,7 +795,7 @@ class OracleDBI extends YadamuDBI {
     let sqlStatement = `declare V_ABORT BOOLEAN;begin V_ABORT := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENT(:statement,:sourceSchema,:targetSchema) :abort := case when V_ABORT then 1 else 0 end; end;`;
     let args = {abort:{dir: oracledb.BIND_OUT, type: oracledb.NUMBER} , statement:{type: oracledb.CLOB, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH, val:null}, sourceSchema:sourceSchema, targetSchema:this.CURRENT_SCHEMA};
 
-	if ((this.DB_VERSION < 12) && (this.XML_STORAGE_CLAUSE === 'CLOB')) {
+	if ((this.DATABASE_VERSION < 12) && (this.XMLTYPE_STORAGE_CLAUSE === 'CLOB')) {
        // Force XMLType Store as CLOB ???
 	   args.statement.value = `ALTER SESSION SET EVENTS = ''1050 trace name context forever,level 0x2000'`;
        const results = await this.executeSQL(sqlStatement,args)
@@ -899,7 +916,7 @@ class OracleDBI extends YadamuDBI {
     else {
       // ### OVERRIDE ### - Send Set of DDL operations to the server for execution
       const sqlStatement = `begin :log := YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS(:ddl,:sourceSchema,:targetSchema); end;`;
-      const ddlLob = await (this.DB_VERSION < 12 ? this.convertDDL2XML(ddl) : this.jsonToBlob({ddl : ddl}))
+      const ddlLob = await (this.DATABASE_VERSION < 12 ? this.convertDDL2XML(ddl) : this.jsonToBlob({ddl : ddl}))
 
       const args = {log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH} , ddl:ddlLob, sourceSchema:this.systemInformation.schema, targetSchema:this.CURRENT_SCHEMA};
       results = await this.executeSQL(sqlStatement,args)
@@ -920,11 +937,11 @@ class OracleDBI extends YadamuDBI {
   
   async setLibraries() {
     switch (true) {
-      case this.DB_VERSION < 12:
+      case this.DATABASE_VERSION < 12:
 	    this.StatementLibrary = (await import('./112/oracleStatementLibrary.js')).default
 		this.StatementGenerator = (await import('./112/oracleStatementGenerator.js')).default
         break;
-      case this.DB_VERSION < 19:
+      case this.DATABASE_VERSION < 19:
 	    this.StatementLibrary = (await import('./18/oracleStatementLibrary.js')).default
         break;
       default:
@@ -974,7 +991,7 @@ class OracleDBI extends YadamuDBI {
 
   async final() {
 	// Oracle11g: Drop any wrappers that were created
-	if (this.DB_VERSION < 12) {
+	if (this.DATABASE_VERSION < 12) {
 	  await Promise.all(this.dropWrapperStatements.map((sqlStatement) => {
 	    return this.executeSQL(sqlStatement,{})
 	  }))
@@ -1156,9 +1173,9 @@ class OracleDBI extends YadamuDBI {
     const typeMappings = statementGenerator.getVendorTypeMappings()
 	
 	const options = {
-	  raw1AsBoolean    : new Boolean(this.BOOLEAN_AS_RAW1).toString().toLowerCase()
-	, jsonDataType     : this.JSON_DATA_TYPE
-	, xmlStorageModel  : this.XML_STORAGE_CLAUSE
+	  booleanStorgeOption  : this.this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	, jsonDataType         : this.JSON_DATA_TYPE
+	, xmlStorageModel      : this.XMLTYPE_STORAGE_CLAUSE
 	}
 
 	const sqlStatement = `begin\n  ${settings}\n  :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema, :options);\nend;`;
@@ -1182,7 +1199,7 @@ class OracleDBI extends YadamuDBI {
   getTypeMappings() {
 
     const typeMappings = super.getTypeMappings()
-	typeMappings.objectFormat = this.OBJECT_FORMAT
+	typeMappings.objectFormat = this.DATA_TYPES.OBJECT_TYPE
     return typeMappings;
   }
 
@@ -1217,7 +1234,7 @@ class OracleDBI extends YadamuDBI {
     let bindVars
 
     switch (true) {
-      case this.DB_VERSION < 12.2:
+      case this.DATABASE_VERSION < 12.2:
         /*
         **
         ** The pipelined table approach used by YADAMU_EXPORT_DDL appears to fail starting with release 19c.
@@ -1228,7 +1245,7 @@ class OracleDBI extends YadamuDBI {
         results = await this.executeSQL(this.StatementLibrary.SQL_GET_DLL_STATEMENTS,bindVars)
         ddl = JSON.parse(results.outBinds.v2)
         break;
-      case this.DB_VERSION < 19:
+      case this.DATABASE_VERSION < 19:
         results = await this.executeSQL(this.StatementLibrary.SQL_GET_DLL_STATEMENTS,{schema: this.CURRENT_SCHEMA},{outFormat: oracledb.OBJECT,fetchInfo:{JSON:{type: oracledb.STRING}}})
         ddl = results.rows.map((row) => {
           return row.JSON;
@@ -1251,24 +1268,27 @@ class OracleDBI extends YadamuDBI {
   }
 
   async getSchemaMetadata() {
-
+	  
+    const options = (this.DATABASE_VERSION < 12) ? this.SCHEMA_METADATA_OPTIONS_XML : JSON.stringify(this.SCHEMA_METADATA_OPTIONS)
+	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION
-	                                     ,{schema: this.CURRENT_SCHEMA, spatialFormat: this.SPATIAL_FORMAT, objectsAsJSON : new Boolean(this.OBJECTS_AS_JSON).toString().toUpperCase(), raw1AsBoolean: new Boolean(this.BOOLEAN_AS_RAW1).toString().toUpperCase()}
+ 	                                     ,{P_OWNER_LIST: this.CURRENT_SCHEMA, P_OPTIONS: options}
 										 ,{outFormat:
 										    oracledb.OBJECT
 										   ,fetchInfo: {
-                                              COLUMN_NAME_ARRAY:     {type: oracledb.STRING}
+                                              TABLE_SCHEMA:          {type: oracledb.STRING}
+                                             ,TABLE_NAME:            {type: oracledb.STRING}
+                                             ,COLUMN_NAME_ARRAY:     {type: oracledb.STRING}
                                              ,DATA_TYPE_ARRAY:       {type: oracledb.STRING}
                                              ,SIZE_CONSTRAINT_ARRAY: {type: oracledb.STRING}
                                              ,CLIENT_SELECT_LIST:    {type: oracledb.STRING}
                                              ,EXPORT_SELECT_LIST:    {type: oracledb.STRING}
                                              ,WITH_CLAUSE:           {type: oracledb.STRING}
-                                             ,SQL_STATEMENT:         {type: oracledb.STRING}
 											 ,PARTITION_LIST:        {type: oracledb.STRING}
 	                                        }
                                           }
     )
-
+                                
     const schemaInformation = results.rows
 	schemaInformation.forEach((tableInfo) => {
       const partitionList = JSON.parse(tableInfo.PARTITION_LIST)
@@ -1340,7 +1360,7 @@ class OracleDBI extends YadamuDBI {
     const queryInfo = super.generateSQLQuery(tableMetadata)
 
     if (queryInfo.WITH_CLAUSE) {
-      if (this.DB_VERSION < 12) {
+      if (this.DATABASE_VERSION < 12) {
   	    // The "WITH_CLAUSE" is a create procedure statement that creates a stored procedure that wraps the required conversions
 	    // The procedure needs to be dropped once the copy operation is complete.
 	    // Procedures are created on on the fly but cleaned up once all copy operations are complete. 
@@ -1392,7 +1412,7 @@ class OracleDBI extends YadamuDBI {
 
   async getInputStream(queryInfo) {
 	
-    if ((queryInfo.WITH_CLAUSE) && (this.DB_VERSION < 12) && ((!queryInfo.hasOwnProperty('PARTITION_COUNT')) || (queryInfo.PARTITION_NUMBER === 0))) {
+    if ((queryInfo.WITH_CLAUSE) && (this.DATABASE_VERSION < 12) && ((!queryInfo.hasOwnProperty('PARTITION_COUNT')) || (queryInfo.PARTITION_NUMBER === 0))) {
   	  // The "WITH_CLAUSE" is a create procedure statement that creates a stored procedure that wraps the required conversions
 	  await this.executeSQL(queryInfo.WITH_CLAUSE,{})
 	}
@@ -1480,14 +1500,14 @@ class OracleDBI extends YadamuDBI {
 
     const dbMappings = {}
 
-    if (this.DB_VERSION < 12) {
+    if (this.DATABASE_VERSION < 12) {
 
       // ### TODO: Impliment better algorithm that truncation. Check for clashes. Add Unique ID
 
       Object.keys(metadata).forEach((table) => {
         const mappedTableName = metadata[table].tableName.length > 30 ? metadata[table].tableName.substring(0,30) : undefined
         if (mappedTableName) {
-		  this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,this.DB_VERSION,'IDENTIFIER LENGTH',metadata[table].tableName],`Identifier Too Long (${metadata[table].tableName.length}). Identifier re-mapped as "${mappedTableName}".`)
+		  this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,this.DATABASE_VERSION,'IDENTIFIER LENGTH',metadata[table].tableName],`Identifier Too Long (${metadata[table].tableName.length}). Identifier re-mapped as "${mappedTableName}".`)
           dbMappings[table] = {
 			tableName : mappedTableName
 		  }
@@ -1496,7 +1516,7 @@ class OracleDBI extends YadamuDBI {
         metadata[table].columnNames.forEach((columnName) => {
 		  if (columnName.length > 30) {
 			const mappedColumnName =  columnName.substring(0,30)
-  		    this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,this.DB_VERSION,'IDENTIFIER LENGTH',metadata[table].tableName,columnName],`Identifier Too Long (${columnName.length}). Identifier re-mapped as "${mappedColumnName}".`)
+  		    this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,this.DATABASE_VERSION,'IDENTIFIER LENGTH',metadata[table].tableName,columnName],`Identifier Too Long (${columnName.length}). Identifier re-mapped as "${mappedColumnName}".`)
    		    columnMappings[columnName] = {name: mappedColumnName}
 		  }
 		})
@@ -1566,7 +1586,7 @@ class OracleDBI extends YadamuDBI {
    
 	metrics.sql = copyOperation.dml
 
-    if (copyOperation.dml.startsWith('insert /*+ WITH_PLSQL */') && (this.DB_VERSION < 12)) {
+    if (copyOperation.dml.startsWith('insert /*+ WITH_PLSQL */') && (this.DATABASE_VERSION < 12)) {
 		/*
 		// The "WITH_CLAUSE" is a create procedure statement that creates a stored procedure that wraps the required conversions
 		await this.executeSQL(tableInfo.WITH_CLAUSE,{})

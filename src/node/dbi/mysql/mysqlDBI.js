@@ -37,15 +37,15 @@ import MySQLStatementLibrary          from './mysqlStatementLibrary.js'
 
 class MySQLDBI extends YadamuDBI {
    
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,MySQLConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,MySQLConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return MySQLDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return MySQLDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -63,11 +63,8 @@ class MySQLDBI extends YadamuDBI {
   get STATEMENT_TERMINATOR()         { return MySQLConstants.STATEMENT_TERMINATOR };
   
   // Enable configuration via command line parameters
-  get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT            || MySQLConstants.SPATIAL_FORMAT }
   get READ_KEEP_ALIVE()              { return this.parameters.READ_KEEP_ALIVE           || MySQLConstants.READ_KEEP_ALIVE}
   
-  get TREAT_TINYINT1_AS_BOOLEAN()    { return MySQLDataTypes.TREAT_TINYINT1_AS_BOOLEAN }
-
   // Not available until configureConnection() has been called 
 
   get LOWER_CASE_TABLE_NAMES()       { this._LOWER_CASE_TABLE_NAMES }
@@ -76,11 +73,13 @@ class MySQLDBI extends YadamuDBI {
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
-  get DATA_TYPES()                    { return MySQLDataTypes }
-
   constructor(yadamu,manager,connectionSettings,parameters) {
+
     super(yadamu,manager,connectionSettings,parameters)
-	this.initializeDataTypes(MySQLDataTypes)
+	this.DATA_TYPES = MySQLDataTypes
+
+	this.DATA_TYPES.storageOptions.BOOLEAN_TYPE = this.parameters.MYSQL_BOOLEAN_STORAGE_OPTION || this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION || this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
     this.keepAliveHdl = undefined
 	
@@ -118,7 +117,7 @@ class MySQLDBI extends YadamuDBI {
 
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)
     let results = await this.executeSQL(this.StatementLibrary.SQL_GET_CONNECTION_INFORMATION)
-	this._DB_VERSION = results[0].DATABASE_VERSION
+	this._DATABASE_VERSION = results[0].DATABASE_VERSION
     
     results = await this.executeSQL(this.StatementLibrary.SQL_SHOW_SYSTEM_VARIABLES)
     results.forEach((row) => {
@@ -403,7 +402,7 @@ class MySQLDBI extends YadamuDBI {
   async setLibraries() {
 	this.setSpatialSerializer(this.SPATIAL_FORMAT)
 	switch (true) {
-	  case (this.DB_VERSION < 8.0):
+	  case (this.DATABASE_VERSION < 8.0):
 	    this.StatementLibrary = (await import('./57/mssqlStatementLibrary.js')).default
 		this.StatementGenerator = (await import('../../dbShared/mysql/57statementGenerator.js')).default;
 	    break;

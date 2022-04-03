@@ -53,7 +53,7 @@ import {
 class Yadamu {
 
   static #_YADAMU_PARAMETERS
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
   static get YADAMU_VERSION()         { return YadamuConstants.YADAMU_VERSION }
 
@@ -61,13 +61,13 @@ class Yadamu {
 
   static get YADAMU_PARAMETERS()      { return YadamuConstants.YADAMU_PARAMETERS }  
 
-  static get YADAMU_DBI_PARAMETERS()  { return DBIConstants.YADAMU_DBI_PARAMETERS }  
+  static get DBI_PARAMETERS()  { return DBIConstants.DBI_PARAMETERS }  
 
   get QA_TEST()                       { return false }
 
   get YADAMU_PARAMETERS()             { return Yadamu.YADAMU_PARAMETERS }
 
-  get YADAMU_DBI_PARAMETERS()         { return Yadamu.YADAMU_DBI_PARAMETERS }
+  get DBI_PARAMETERS()         { return Yadamu.DBI_PARAMETERS }
   
   get FILE()                          { return this.parameters.FILE                      || YadamuConstants.FILE }
   get CONFIG()                        { return this.parameters.CONFIG                    || YadamuConstants.CONFIG }
@@ -777,7 +777,6 @@ class Yadamu {
 	return parameters;
   }
   
-
   closeFile(outputStream) {
 	          
     return new Promise((resolve,reject) => {

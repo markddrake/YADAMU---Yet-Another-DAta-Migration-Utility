@@ -60,15 +60,15 @@ import RedshiftStatementLibrary      from './redshiftStatementLibrary.js'
 
 class RedshiftDBI extends YadamuDBI {
     
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,RedshiftConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,RedshiftConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return RedshiftDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return RedshiftDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -85,11 +85,9 @@ class RedshiftDBI extends YadamuDBI {
    
   // Enable configuration via command line parameters
   
-  get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT      || RedshiftConstants.CIRCLE_FORMAT }
   get BYTEA_SIZING_MODEL()     { return this.parameters.BYTEA_SIZING_MODEL || RedshiftConstants.BYTEA_SIZING_MODEL }
   get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM   || RedshiftConstants.STAGING_PLATFORM } 
   
-  get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT || DBIConstants.SPATIAL_FORMAT };
   get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
 
   get JSON_DATA_TYPE()         { return this.parameters.REDSHIFT_JSON_TYPE || RedshiftConstants.REDSHIFT_JSON_TYPE }
@@ -107,6 +105,7 @@ class RedshiftDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
+	this.DATA_TYPES = RedshiftDataTypes
        
     this.pgClient = undefined;
     this.useBinaryJSON = false
@@ -224,7 +223,7 @@ class RedshiftDBI extends YadamuDBI {
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
 	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
-	this._DB_VERSION = results.rows[0][3];
+	this._DATABASE_VERSION = results.rows[0][3];
 	
   }
   

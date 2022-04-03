@@ -365,7 +365,7 @@ begin
                                    when P_SPATIAL_FORMAT = 'WKT' then
                                      'case when "' || column_name || '" is NULL then NULL else ST_AsText((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry,18) end "' || COLUMN_NAME || '"' 
                                    when P_SPATIAL_FORMAT = 'EWKB' then
-                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKB((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
+                                     'case when "' || column_name || '" is NULL then NULL else ST_AsEWKB((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry)) end "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'EWKT' then
                                      'case when "' || column_name || '" is NULL then NULL else ST_AsEWKT((path(concat(''('',("' || column_name || '")[0]::VARCHAR,'','',("' || column_name || '")[1],'')''))::geometry) end "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
@@ -505,8 +505,11 @@ create or replace function MAP_PGSQL_DATA_TYPE(P_VENDOR VARCHAR, P_PGSQL_DATA_TY
 returns VARCHAR
 as $$
 declare
-  C_CHAR_TYPE                         VARCHAR(32) = 'character';
   C_CLOB_TYPE                         VARCHAR(32) = 'text';
+  C_ORACLE_OBJECT_TYPE                VARCHAR(32) = C_CLOB_TYPE;
+
+  /*
+  C_CHAR_TYPE                         VARCHAR(32) = 'character';
   
   C_GEOMETRY_TYPE                     VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geometry' ELSE 'JSON' END;
   C_GEOGRAPHY_TYPE                    VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geography' ELSE 'JSON' END;
@@ -529,10 +532,14 @@ declare
   C_MONGO_REGEX_TYPE                  VARCHAR(32) = 'character varying(2048)';
 
   V_DATA_TYPE                         VARCHAR(128);
-     
+  */
+  
 begin
   case 
+    when ((P_PGSQL_DATA_TYPE is null) and (P_VENDOR = 'Oracle') and (P_DATA_TYPE like '"%"."%"')) then
+	  return C_ORACLE_OBJECT_TYPE;
     when P_PGSQL_DATA_TYPE is null then
+	
       raise exception 'Postgres: Missing mapping for "%" datatype "%"', P_VENDOR, P_DATA_TYPE;
 	else
 	  return P_PGSQL_DATA_TYPE;
@@ -796,7 +803,7 @@ begin
   RETURN QUERY
     select jsonb_object_agg(
            "tableName",
-           GENERATE_SQL("vendor",P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_OPTIONS ->> 'spatialFormat', P_OPTIONS ->> 'jsonDataType', FALSE)
+           GENERATE_SQL("vendor",P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_OPTIONS ->> 'spatialFormat', P_OPTIONS ->> 'jsonStorageOption', FALSE)
          )
     from JSONB_EACH(P_METADATA -> 'metadata')  
          CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(

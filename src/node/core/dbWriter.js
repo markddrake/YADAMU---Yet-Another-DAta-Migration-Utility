@@ -21,7 +21,7 @@ class DBWriter extends Writable {
     this.ddlRequired = (this.dbi.MODE !== 'DATA_ONLY');    
     this.status = dbi.yadamu.STATUS
     this.yadamuLogger = yadamuLogger;
-    this.yadamuLogger.info([YadamuConstants.WRITER_ROLE,dbi.DATABASE_VENDOR,dbi.DB_VERSION,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
+    this.yadamuLogger.info([YadamuConstants.WRITER_ROLE,dbi.DATABASE_VENDOR,dbi.DATABASE_VERSION,this.dbi.MODE,this.dbi.getWorkerNumber()],`Ready.`)
         
     this.transactionManager = this.dbi
     this.currentTable   = undefined;

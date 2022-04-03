@@ -27,11 +27,17 @@
 	"mongodb": {
 		"MONGO_PARSE_STRINGS" : false
 	},
+	"mysql": {
+		"BOOLEAN_STORAGE_OPTION": "tinyint(1)"
+	},
+	"mariadb": {
+		"BOOLEAN_STORAGE_OPTION": "tinyint(1)"
+	},
 	"oracle": {
-		"ORACLE_XML_TYPE": "CLOB"
+		"XML_STORAGE_OPTION": "CLOB"
 	},
 	"snowflake": {
-		"SNOWFLAKE_XML_TYPE": "TEXT"
+		"XML_TYPE": "TEXT"
 	},
 	"vertica": {
 	   "BYTE_TO_CHAR_RATIO" : 1.5

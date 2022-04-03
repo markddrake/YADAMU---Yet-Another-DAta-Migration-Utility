@@ -41,15 +41,15 @@ class AWSS3DBI extends CloudDBI {
   **
   */
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,AWSS3Constants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,AWSS3Constants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return AWSS3DBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return AWSS3DBI.DBI_PARAMETERS
   }
 
   get DATABASE_KEY()          { return AWSS3Constants.DATABASE_KEY};

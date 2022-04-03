@@ -1,6 +1,7 @@
 create or replace package YADAMU_EXPORT
 authid CURRENT_USER
 as
+
   TYPE EXPORT_METADATA_RECORD is RECORD (
     TABLE_SCHEMA          VARCHAR2(128)
    ,TABLE_NAME            VARCHAR2(128)
@@ -18,12 +19,9 @@ as
   -- function GET_SYSTEM_INFORMATION return CLOB;
   function GET_SYSTEM_INFORMATION return VARCHAR2;
 
-  function GET_DML_STATEMENTS(
+  function GET_SCHEMA_METADATA(
     P_OWNER_LIST             VARCHAR2 
-  , P_SPATIAL_FORMAT         VARCHAR2 DEFAULT 'WKB' 
-  , P_OBJECTS_AS_JSON        VARCHAR2 DEFAULT 'FALSE' 
-  , P_TREAT_RAW1_AS_BOOLEAN  VARCHAR2 DEFAULT 'TRUE'
-  , P_RETURN_BINARY_JSON     VARCHAR2 DEFAULT 'FALSE'
+  ,	P_OPTIONS                VARCHAR2
   ) return EXPORT_METADATA_TABLE PIPELINED;
 
   function JSON_FEATURES return VARCHAR2 deterministic;
@@ -197,12 +195,9 @@ begin
   end if;
 end;
 --
-function GET_DML_STATEMENTS(
+function GET_SCHEMA_METADATA(
   P_OWNER_LIST             VARCHAR2 
-, P_SPATIAL_FORMAT         VARCHAR2 DEFAULT 'WKB' 
-, P_OBJECTS_AS_JSON        VARCHAR2 DEFAULT 'FALSE' 
-, P_TREAT_RAW1_AS_BOOLEAN  VARCHAR2 DEFAULT 'TRUE'
-, P_RETURN_BINARY_JSON     VARCHAR2 DEFAULT 'FALSE'
+, P_OPTIONS                VARCHAR2
 )
 return EXPORT_METADATA_TABLE 
 PIPELINED
@@ -213,6 +208,24 @@ as
   V_SQL_FRAGMENT  VARCHAR2(32767);
   
   V_SCHEMA_LIST   T_VC4000_TABLE;
+
+  V_RETURN_BINARY_JSON   RAW(1) := YADAMU_UTILITIES.C_FALSE;
+
+$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
+-- 
+  V_SPATIAL_FORMAT        VARCHAR2(7)    := case when JSON_EXISTS(P_OPTIONS, '$.spatialFormat')                                                                    then JSON_VALUE(P_OPTIONS, '$.spatialFormat')   else YADAMU_IMPORT.C_SPATIAL_FORMAT end;
+  V_TREAT_RAW1_AS_BOOLEAN      RAW(1)    := case when JSON_EXISTS(P_OPTIONS, '$.booleanStorgeOption') and JSON_VALUE(P_OPTIONS,'$.booleanStorgeOption') = 'RAW(1)' then YADAMU_UTILITIES.C_TRUE else YADAMU_UTILITIES.C_FALSE end; 
+  V_OBJECTS_AS_JSON            RAW(1)    := case when JSON_EXISTS(P_OPTIONS, '$.objectStorgeOption')  and JSON_VALUE(P_OPTIONS, '$.objectStorgeOption') = 'JSON'   then YADAMU_UTILITIES.C_FALSE else YADAMU_UTILITIES.C_FALSE end; 
+--
+$ELSE
+--
+  V_OPTIONS                XMLTYPE    := XMLTYPE(P_OPTIONS);
+  
+  V_SPATIAL_FORMAT      VARCHAR2(7)   := case when V_OPTIONS.EXISTSNODE('/options/spatialFormat')       = 1                                                                                           then V_OPTIONS.extract('/options/spatialFormat/text()').getStringVal()       else YADAMU_IMPORT.C_SPATIAL_FORMAT end;
+  V_TREAT_RAW1_AS_BOOLEAN    RAW(1)   := case when V_OPTIONS.EXISTSNODE('/options/booleanStorgeOption') = 1 and V_OPTIONS.extract('/options/booleanStorgeOption/text()').getStringVal()  = 'RAW(1)'   then YADAMU_UTILITIES.C_TRUE else YADAMU_UTILITIES.C_FALSE end;
+  V_OBJECTS_AS_JSON          RAW(1)   := case when V_OPTIONS.EXISTSNODE('/options/objectStorgeOption')  = 1 and V_OPTIONS.extract('/options/objectStorgeOption/text()').getNumberVal()   = 'JSON'     then YADAMU_UTILITIES.C_TRUE else YADAMU_UTILITIES.C_FALSE end; 
+--
+$END  
 
    -- ### Do not use JSON_ARRAYAGG for DATE_TYPE_LIST, SIZE_CONSTRAINTS dir to lack of CLOB support prior to release 18c.
   
@@ -231,7 +244,7 @@ as
                    -- If DDL is not included in the file import operations will default to YADAMU_IMPORT.C_JSON_DATA_TYPE storage
                    '"JSON"'
                  $END                   
-                 when (atc.DATA_TYPE = 'RAW' and atc.DATA_LENGTH = 1 and P_TREAT_RAW1_AS_BOOLEAN = 'TRUE') then
+                 when (atc.DATA_TYPE = 'RAW' and atc.DATA_LENGTH = 1 and V_TREAT_RAW1_AS_BOOLEAN = '01') then
                    '"BOOLEAN"'
                  when (atc.DATA_TYPE like 'TIMESTAMP(%)') then
                    '"TIMESTAMP"'
@@ -256,7 +269,7 @@ as
                    '"' || DATA_SCALE || '"'
                  when atc.DATA_TYPE in ('NVARCHAR2', 'NCHAR') then
                    '"' || CHAR_LENGTH || '"'
-                 when (atc.DATA_TYPE = 'RAW' and atc.DATA_LENGTH = 1 and P_TREAT_RAW1_AS_BOOLEAN = 'TRUE') then
+                 when (atc.DATA_TYPE = 'RAW' and atc.DATA_LENGTH = 1 and V_TREAT_RAW1_AS_BOOLEAN = '01') then
 				   '""'
                  when atc.DATA_TYPE in ('UROWID', 'RAW') or  atc.DATA_TYPE LIKE 'INTERVAL%' then
                    '"' || DATA_LENGTH || '"'
@@ -311,23 +324,23 @@ as
                  */
                  when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE  in ('SDO_GEOMETRY'))) then
                    -- 'case when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
-                   -- 'case when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
+                   -- 'case when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''01'' then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
                    -- 't."' ||  atc.COLUMN_NAME || '".get_WKT() "' || atc.COLUMN_NAME || '"'
                    -- 'case when t."' ||  atc.COLUMN_NAME || '" is NOT NULL then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
                    case 
-                     when P_SPATIAL_FORMAT in ('WKB','EWKB') then
+                     when V_SPATIAL_FORMAT in ('WKB','EWKB') then
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
                             'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB()' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
                             'else t."' || atc.COLUMN_NAME || '".get_WKB()' ||
                        'end "' || atc.COLUMN_NAME || '"'
-                     when P_SPATIAL_FORMAT in ('WKT','EWKT') then                   
+                     when V_SPATIAL_FORMAT in ('WKT','EWKT') then                   
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
                             'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT()' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
                             'else t."' || atc.COLUMN_NAME || '".get_WKT()' ||
                        'end "' || atc.COLUMN_NAME || '"'
-                     when P_SPATIAL_FORMAT in ('GeoJSON') then                   
+                     when V_SPATIAL_FORMAT in ('GeoJSON') then                   
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
                             'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_GeoJSON()' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
@@ -343,7 +356,7 @@ as
                  */
                  when atc.DATA_TYPE = 'BFILE' then
 				   case
-				     -- when (P_OBJECTS_AS_JSON = 'TRUE') then 
+				     -- when (V_OBJECTS_AS_JSON = '01') then 
                      when 1 = 1 then
                        'OBJECT_TO_JSON.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '")'
 				     else 					
@@ -361,7 +374,7 @@ as
 				   $IF YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON $THEN
 				   --
 				   case
-     				 when P_OBJECTS_AS_JSON = 'TRUE' then
+     				 when V_OBJECTS_AS_JSON = '01' then
 					   'JSON_ARRAY("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
 					 else
                        'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertCollection("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
@@ -377,7 +390,7 @@ as
 				   $IF YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON $THEN
 				   --
 				   case
-     				 when P_OBJECTS_AS_JSON = 'TRUE' then
+     				 when V_OBJECTS_AS_JSON = '01' then
                        '"' || atc.COLUMN_NAME || '"'
 					 else
                        'case when "' || atc.COLUMN_NAME || '" is NULL then NULL else "SERIALIZE_OBJECT"(''' || aat.OWNER || ''',ANYDATA.convertObject("' || atc.COLUMN_NAME || '")) end "' || atc.COLUMN_NAME || '"'
@@ -432,23 +445,23 @@ as
                    'TO_CHAR(SYS_EXTRACT_UTC("' || atc.COLUMN_NAME || '"),''YYYY-MM-DD"T"HH24:MI:SS' || case when atc.DATA_SCALE > 0 then '.FF' || atc.DATA_SCALE else '' end || '"Z"'')'
                  when ((atc.DATA_TYPE_OWNER = 'MDSYS') and (atc.DATA_TYPE  in ('SDO_GEOMETRY'))) then
                    -- 'case when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
-                   -- 'case when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''TRUE'' then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
+                   -- 'case when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) = ''01'' then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
                    -- 't."' ||  atc.COLUMN_NAME || '".get_WKT() "' || atc.COLUMN_NAME || '"'
                    -- 'case when t."' ||  atc.COLUMN_NAME || '" is NOT NULL then t."' ||  atc.COLUMN_NAME || '".get_WKT() else NULL end "' || atc.COLUMN_NAME || '"'
                    case 
-                     when P_SPATIAL_FORMAT in ('WKB','EWKB') then
+                     when V_SPATIAL_FORMAT in ('WKB','EWKB') then
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
                             'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKB()' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
                             'else t."' || atc.COLUMN_NAME || '".get_WKB()' ||
                        'end "' || atc.COLUMN_NAME || '"'
-                     when P_SPATIAL_FORMAT in ('WKT','EWKT') then                   
+                     when V_SPATIAL_FORMAT in ('WKT','EWKT') then                   
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
                             'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_WKT()' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
                             'else t."' || atc.COLUMN_NAME || '".get_WKT()' ||
                        'end "' || atc.COLUMN_NAME || '"'
-                     when P_SPATIAL_FORMAT in ('GeoJSON') then                   
+                     when V_SPATIAL_FORMAT in ('GeoJSON') then                   
                        'case when t."' ||  atc.COLUMN_NAME || '" is NULL then NULL ' ||
                             'when t."' ||  atc.COLUMN_NAME || '".ST_isValid() = 1 then t."' ||  atc.COLUMN_NAME || '".get_GeoJSON()' ||
                             'when SDO_GEOM.VALIDATE_GEOMETRY_WITH_CONTEXT(t."' ||  atc.COLUMN_NAME || '",0.00001) in (''NULL'',''13032'') then NULL ' ||
@@ -459,7 +472,7 @@ as
                    'case when "' ||  atc.COLUMN_NAME || '" is NULL then NULL else XMLSERIALIZE(CONTENT "' ||  atc.COLUMN_NAME || '" as CLOB) end "' || atc.COLUMN_NAME || '"'
                  when atc.DATA_TYPE = 'BFILE' then
 				   case
-				     -- when (P_OBJECTS_AS_JSON = 'TRUE') then 
+				     -- when (V_OBJECTS_AS_JSON = '01') then 
                      when (1=1) then 
                        'OBJECT_TO_JSON.SERIALIZE_BFILE("' || atc.COLUMN_NAME || '") "' || atc.COLUMN_NAME || '"'
 				     else 					
@@ -475,7 +488,7 @@ as
 				 */
 				 when atc.DATA_TYPE = 'JSON' then
 				   case
-				     when P_RETURN_BINARY_JSON = 'TRUE' then
+				     when V_RETURN_BINARY_JSON = '01' then
                        '"' || atc.COLUMN_NAME || '"'
 					 else
 					   /*
@@ -495,7 +508,7 @@ as
 				   $IF YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON $THEN
 				   --
 				   case
-     				 when P_OBJECTS_AS_JSON = 'TRUE' then
+     				 when V_OBJECTS_AS_JSON = '01' then
 					   --
 					   -- Uncomment to use Native JSON_ARRAY function to generate a JSON from a SQL collection type.. Currently this fails with an ORA-00600 if the array contains an object with a REF
 					   --
@@ -516,7 +529,7 @@ as
 				   $IF YADAMU_FEATURE_DETECTION.OBJECTS_AS_JSON $THEN
 				   --
 				   case
-     				 when P_OBJECTS_AS_JSON = 'TRUE' then
+     				 when V_OBJECTS_AS_JSON = '01' then
 					   --
 					   -- Uncomment to use Native JSON_OBJECT function to generate a JSON object from a SQL object type.. Currently this fails with an ORA-00600 if the array contains an object with a REF, and has a number of other issues.
 					   --
@@ -638,7 +651,7 @@ begin
 	  DBMS_OUTPUT.put_line(TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD"T"HH24:MI:SS.FF6') || ': PROCESSING "' || t.OWNER || '"."' || t.TABLE_NAME || '"');
 	  $END
 
-      if P_OBJECTS_AS_JSON = 'TRUE' then
+      if V_OBJECTS_AS_JSON = YADAMU_UTILITIES.C_TRUE then
 	    --
 	    -- Uncomment conditional compilation to enable use of native JSON_OBJECT functionality rather than PL/SQL package
 		--

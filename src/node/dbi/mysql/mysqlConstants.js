@@ -11,7 +11,6 @@ class MySQLConstants {
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "READ_KEEP_ALIVE"           : 0
-    , "SPATIAL_FORMAT"            : "WKB"
     })
     return this._STATIC_PARAMETERS;
   }
@@ -24,7 +23,6 @@ class MySQLConstants {
   }
 
   static get READ_KEEP_ALIVE()            { return this.DBI_PARAMETERS.READ_KEEP_ALIVE}
-  static get SPATIAL_FORMAT()             { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get STATEMENT_TERMINATOR()       { return ';' }
  
   static get CONNECTION_PROPERTY_DEFAULTS() { 

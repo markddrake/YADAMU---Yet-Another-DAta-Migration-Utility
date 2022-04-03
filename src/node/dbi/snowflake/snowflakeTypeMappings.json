@@ -13,7 +13,12 @@
   , "TIMESTAMP_LTZ_TYPE"                                   :  "TIMESTAMP_LTZ"                              
   , "SFLAKE_VARINAT_TYPE"                                  :  "VARIANT"	 
   }
+, "limits" : {
+	"SCALAR_LENGTH"                                        : 16777216
+  , "BINARY_LENGTH"                                        : 8388608
+  }
 , "storageOptions": {
 	"SPATIAL_FORMAT"                                       : "WKB"
+	"XML_TYPE"                                             : "VARIANT"
   }
 }

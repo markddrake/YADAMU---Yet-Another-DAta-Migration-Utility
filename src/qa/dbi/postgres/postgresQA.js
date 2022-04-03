@@ -8,7 +8,7 @@ import PostgresDBI       from '../../../node/dbi//postgres/postgresDBI.js';
 import PostgresError     from '../../../node/dbi//postgres/postgresException.js'
 import PostgresConstants from '../../../node/dbi//postgres/postgresConstants.js';
 
-import YadamuTest        from '../../core/yadamu.js';
+import Yadamu            from '../../core/yadamu.js';
 import YadamuQALibrary   from '../../lib/yadamuQALibrary.js'
 
 
@@ -20,15 +20,15 @@ class PostgresQA extends YadamuQALibrary.qaMixin(PostgresDBI) {
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
     static get SQL_FAILED()                { return _SQL_FAILED }
 
-	static #_YADAMU_DBI_PARAMETERS
+	static #_DBI_PARAMETERS
 	
-	static get YADAMU_DBI_PARAMETERS()  { 
-	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,PostgresConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[PostgresConstants.DATABASE_KEY] || {},{RDBMS: PostgresConstants.DATABASE_KEY}))
-	   return this.#_YADAMU_DBI_PARAMETERS
+	static get DBI_PARAMETERS()  { 
+	   this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,PostgresConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[PostgresConstants.DATABASE_KEY] || {},{RDBMS: PostgresConstants.DATABASE_KEY}))
+	   return this.#_DBI_PARAMETERS
     }
    
-    get YADAMU_DBI_PARAMETERS() {
-      return PostgresQA.YADAMU_DBI_PARAMETERS
+    get DBI_PARAMETERS() {
+      return PostgresQA.DBI_PARAMETERS
     }	
 		
     constructor(yadamu,manager,connectionSettings,parameters) {

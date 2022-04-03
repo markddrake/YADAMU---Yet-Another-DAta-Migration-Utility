@@ -26,7 +26,7 @@ import {
 
 /*
 **
-** Obtain YADAMU_DBI_PARAMETERS and YADAMU_CONFIGURATION directly from YadamuConstants to avoid circular depandancy between FileDBI.js and Yadamu.js. 
+** Obtain DBI_PARAMETERS and YADAMU_CONFIGURATION directly from YadamuConstants to avoid circular depandancy between FileDBI.js and Yadamu.js. 
 ** Importing Yadamu into FileDBI sets up a circular dependancy that causes deferred resolution of Yadamu class. This means attempts to refereence
 ** static GETTER methods result in undefined values.
 **
@@ -124,15 +124,15 @@ class FileDBI extends YadamuDBI {
   static get DATABASE_VENDOR()       { return 'YABASC' };
   static get SOFTWARE_VENDOR()       { return 'YABASC - Yet Another Bay Area Software Compsny'};
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  {
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  {
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-    return FileDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+    return FileDBI.DBI_PARAMETERS
   }
 
   get DATABASE_KEY()               { return FileDBI.DATABASE_KEY };
@@ -205,7 +205,7 @@ class FileDBI extends YadamuDBI {
 	this.firstTable = true;
 	this.ddl = undefined;
 	this.baseDirectory = path.resolve(this.vendorProperties.directory || "")
-	this._DB_VERSION = YadamuConstants.YADAMU_VERSION
+	this._DATABASE_VERSION = YadamuConstants.YADAMU_VERSION
   }
 
   setDescription(description) {

@@ -63,15 +63,15 @@ import {
 
 class VerticaDBI extends YadamuDBI {
     
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,VerticaConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,VerticaConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return VerticaDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return VerticaDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -88,20 +88,15 @@ class VerticaDBI extends YadamuDBI {
    
   // Enable configuration via command line parameters
   
-  get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT || VerticaConstants.SPATIAL_FORMAT }
-  get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT || VerticaConstants.CIRCLE_FORMAT }
-  
   get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
   get COPY_TRIM_WHITEPSPACE()  { return this.parameters.COPY_TRIM_WHITEPSPACE || VerticaConstants.COPY_TRIM_WHITEPSPACE }
   get MERGEOUT_INSERT_COUNT()  { return this.parameters.MERGEOUT_INSERT_COUNT || VerticaConstants.MERGEOUT_INSERT_COUNT }
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
-  get DATA_TYPES()                    { return VerticaDataTypes }
-
-  constructor(yadamu,manager,connectionSettings,parameters) {
+ constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	this.initializeDataTypes(VerticaDataTypes)
+	this.DATA_TYPES = VerticaDataTypes
        
     this.pgClient = undefined;
     
@@ -219,7 +214,7 @@ class VerticaDBI extends YadamuDBI {
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
 	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
-	this._DB_VERSION = results.rows[0][3];
+	this._DATABASE_VERSION = results.rows[0][3];
 	
   }
   

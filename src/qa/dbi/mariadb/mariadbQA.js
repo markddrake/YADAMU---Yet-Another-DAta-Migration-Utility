@@ -8,7 +8,7 @@ import MariadbDBI       from '../../../node/dbi//mariadb/mariadbDBI.js';
 import MariadbError     from '../../../node/dbi//mariadb/mariadbException.js'
 import MariadbConstants from '../../../node/dbi//mariadb/mariadbConstants.js';
 
-import YadamuTest       from '../../core/yadamu.js';
+import Yadamu           from '../../core/yadamu.js';
 import YadamuQALibrary  from '../../lib/yadamuQALibrary.js'
 
 class MariadbQA extends YadamuQALibrary.qaMixin(MariadbDBI) {
@@ -18,15 +18,15 @@ class MariadbQA extends YadamuQALibrary.qaMixin(MariadbDBI) {
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
     static get SQL_FAILED()                { return _SQL_FAILED }
 
-	static #_YADAMU_DBI_PARAMETERS
+	static #_DBI_PARAMETERS
 	
-	static get YADAMU_DBI_PARAMETERS()  { 
-	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,MariadbConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[MariadbConstants.DATABASE_KEY] || {},{RDBMS: MariadbConstants.DATABASE_KEY}))
-	   return this.#_YADAMU_DBI_PARAMETERS
+	static get DBI_PARAMETERS()  { 
+	   this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,MariadbConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[MariadbConstants.DATABASE_KEY] || {},{RDBMS: MariadbConstants.DATABASE_KEY}))
+	   return this.#_DBI_PARAMETERS
     }
    
-    get YADAMU_DBI_PARAMETERS() {
-      return MariadbQA.YADAMU_DBI_PARAMETERS
+    get DBI_PARAMETERS() {
+      return MariadbQA.DBI_PARAMETERS
     }	
 			    
 	constructor(yadamu,manager,connectionSettings,parameters) {

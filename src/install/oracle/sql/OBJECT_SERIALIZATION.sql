@@ -4,6 +4,8 @@ as
 --
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
 --
+   -- Cannot use package local objects from SQL in 11.2.x, so TABLE_INFO_RECORD, TABLE_INFO_TABLE and TYPE_LIST are defined as global objects in YADAMU_11020.sql in 11.2.x
+--
 $ELSE
 --
   TYPE TABLE_INFO_RECORD is RECORD (
@@ -661,10 +663,18 @@ $END
       V_TYPECODE := t.TYPECODE;
     end if;
     P_TYPE_LIST.extend();
+    $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+	--
+    P_TYPE_LIST(P_TYPE_LIST.count) := TYPE_LIST(t.OWNER,t.TYPE_NAME,t.ATTRIBUTES,t.TYPECODE);
+	--
+	$ELSE
+	--
     P_TYPE_LIST(P_TYPE_LIST.count).OWNER := t.OWNER;
     P_TYPE_LIST(P_TYPE_LIST.count).TYPE_NAME := t.TYPE_NAME;
     P_TYPE_LIST(P_TYPE_LIST.count).ATTR_COUNT := t.ATTRIBUTES;
     P_TYPE_LIST(P_TYPE_LIST.count).TYPECODE := t.TYPECODE;
+	--
+	$END
     
   end loop;
   return V_TYPECODE;
@@ -1020,7 +1030,6 @@ return CLOB
 as
   V_TYPE_LIST TYPE_LIST_TABLE;
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
-  -- Cannot use local types in SQL in 11.2.x
   V_TABLE_LIST TABLE_INFO_TABLE := TABLE_INFO_TABLE();
 begin
   V_TABLE_LIST.extend(P_TABLE_LIST.count);
@@ -1158,7 +1167,6 @@ procedure DESERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE,P_PLSQL_BLOCK IN
 as
   V_TYPE_LIST TYPE_LIST_TABLE;
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
-  -- Cannot use local types in SQL in 11.2.x
   V_TABLE_LIST TABLE_INFO_TABLE := TABLE_INFO_TABLE();
 begin
   V_TABLE_LIST.extend(P_TABLE_LIST.count);

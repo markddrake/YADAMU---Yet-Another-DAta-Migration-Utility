@@ -8,15 +8,15 @@ import YadamuQALibrary   from '../../lib/yadamuQALibrary.js'
 
 class AzureQA extends YadamuQALibrary.loaderQAMixin(AzureDBI) {
   
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 	
-  static get YADAMU_DBI_PARAMETERS()  { 
-    this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,AzureConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[AzureConstants.DATABASE_KEY] || {},{RDBMS: AzureConstants.DATABASE_KEY}))
-    return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+    this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.DBI_PARAMETERS,AzureConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[AzureConstants.DATABASE_KEY] || {},{RDBMS: AzureConstants.DATABASE_KEY}))
+    return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-    return AzureQA.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+    return AzureQA.DBI_PARAMETERS
   }	
 			
   constructor(yadamu,manager,connectionSettings,parameters) {

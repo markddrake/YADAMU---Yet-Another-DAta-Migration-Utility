@@ -18,7 +18,20 @@ class OracleStatementGenerator extends _OracleStatementGenerator {
   get GEOJSON_FUNCTION()             { return 'DESERIALIZE_WKTGEOMETRY' }
   get RANDOM_OBJECT_LENGTH()         { return 12 }
   get ORACLE_CSV_SPECIFICATION()     { return `TERMINATED  BY ',' OPTIONALLY ENCLOSED BY '"'` }
-  
+
+  	
+  get STATEMENT_GENERATOR_OPTIONS() {
+	  
+    return `<options>
+	           <spatialFormat>${this.SPATIAL_FORMAT}</spatialFormat>
+			   <circleFormat>${this.dbi.INBOUND_CIRCLE_FORMAT}</circleFormat>
+			   <xmlStorageClause>${this.dbi.XMLTYPE_STORAGE_CLAUSE}</xmlStorageClause>
+	           <jsonStorageOption>${this.dbi.DATA_TYPES.storageOptions.JSON_TYPE}</jsonStorageOption>
+			   <booleanStorgeOption>${this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE}</booleanStorgeOption>
+	           <objectStorgeOption>${this.dbi.DATA_TYPES.storageOptions.OBJECT_TYPE}</objectStorgeOption>
+			 </options>`;
+  }
+    
   constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
@@ -63,17 +76,7 @@ class OracleStatementGenerator extends _OracleStatementGenerator {
 	return await this.dbi.stringToBlob(typeMappingXML);
       
   }
-  	
-  getOptions() {
-    return `<options>
-	           <spatialFormat>${this.SPATIAL_FORMAT}</spatialFormat>
-	           <raw1AsBoolean>${new Boolean(this.dbi.BOOLEAN_AS_RAW1).toString().toLowerCase()}</raw1AsBoolean>
-			   <jsonDataType>${this.dbi.JSON_DATA_TYPE}</jsonDataType>
-			   <xmlStorageModel>${this.dbi.XML_STORAGE_CLAUSE}</xmlStorageModel>
-			   <circleFormat>${this.dbi.INBOUND_CIRCLE_FORMAT}</circleFormat>
-			 </options>`;
-  }
-  
+
   generateCopyStatement(targetSchema,tableName,externalTableName,externalColumnNames,externalSelectList,plsql) {
 	return `insert /*+ APPEND */ into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})\nselect ${externalSelectList.join(",")} from ${externalTableName}`
   }

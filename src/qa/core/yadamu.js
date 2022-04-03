@@ -35,7 +35,7 @@ const CompareRules            = JSON.parse(fs.readFileSync(join(__dirname,'../cf
 class Yadamu extends _Yadamu {
   
   static #_YADAMU_PARAMETERS
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
     
   static get QA_CONFIGURATION()   { return YadamuDefaults };    
   static get QA_DRIVER_MAPPINGS() { return this.QA_CONFIGURATION.drivers }
@@ -47,9 +47,9 @@ class Yadamu extends _Yadamu {
   }
   
   // YADAMU_PARAMETERS merged with the yadamuDBI section of the Master Configuration File and the yadamuDBI section of the QA Master Configuration File
-  static get YADAMU_DBI_PARAMETERS()  {
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},this.YADAMU_PARAMETERS,DBIConstants.YADAMU_DBI_PARAMETERS,this.QA_CONFIGURATION.yadamuDBI))
-    return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  {
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},this.YADAMU_PARAMETERS,DBIConstants.DBI_PARAMETERS,this.QA_CONFIGURATION.yadamuDBI))
+    return this.#_DBI_PARAMETERS
   }
 
   get LOGGER() {
@@ -63,14 +63,14 @@ class Yadamu extends _Yadamu {
   get QA_TEST()               { return true }
   
   get YADAMU_PARAMETERS()     { return Yadamu.YADAMU_PARAMETERS }
-  get YADAMU_DBI_PARAMETERS() { return Yadamu.YADAMU_DBI_PARAMETERS }
+  get DBI_PARAMETERS()        { return Yadamu.DBI_PARAMETERS }
 
   get YADAMU_QA()             { return true }
   
   get MACROS()                { this._MACROS = this._MACROS || { timestamp: new Date().toISOString().replace(/:/g,'.')}; return this._MACROS }
   set MACROS(v)               { this._MACROS = v }
    
-  get MODE()                  { return this.parameters.MODE  || this.YADAMU_DBI_PARAMETERS.MODE }
+  get MODE()                  { return this.parameters.MODE  || this.DBI_PARAMETERS.MODE }
 
   get KILL_READER()           { return this.killConfiguration.process  === 'READER' }
   get KILL_WRITER()           { return this.killConfiguration.process  === 'WRITER' }
@@ -87,8 +87,8 @@ class Yadamu extends _Yadamu {
     
 	// console.log('Yadamu.YADAMU_PARAMETERS:',Yadamu.YADAMU_PARAMETERS)
 	// console.log('YadamuTest this.YADAMU_PARAMETERS:',this.YADAMU_PARAMETERS)
-	// console.log('Yadamu.YADAMU_DBI_PARAMETERS:',Yadamu.YADAMU_DBI_PARAMETERS)
-	// console.log('YadamuTest this.YADAMU_DBI_PARAMETERS:',this.YADAMU_DBI_PARAMETERS)
+	// console.log('Yadamu.DBI_PARAMETERS:',Yadamu.DBI_PARAMETERS)
+	// console.log('YadamuTest this.DBI_PARAMETERS:',this.DBI_PARAMETERS)
 	
   }
   

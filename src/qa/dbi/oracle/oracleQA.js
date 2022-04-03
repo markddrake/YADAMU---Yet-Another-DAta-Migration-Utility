@@ -13,7 +13,7 @@ import {
 }                      from '../../../node/dbi//oracle/oracleException.js'
 import OracleConstants from '../../../node/dbi//oracle/oracleConstants.js';
 
-import YadamuTest      from '../../core/yadamu.js';
+import Yadamu              from '../../core/yadamu.js';
 import YadamuQALibrary from '../../lib/yadamuQALibrary.js'
 
 class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
@@ -24,15 +24,15 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
     static get SQL_FAILED()                { return _SQL_FAILED }
     static get SQL_GATHER_SCHEMA_STATS()   { return _SQL_GATHER_SCHEMA_STATS }
 
-	static #_YADAMU_DBI_PARAMETERS
+	static #_DBI_PARAMETERS
 	
-	static get YADAMU_DBI_PARAMETERS()  { 
-	   this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,OracleConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[OracleConstants.DATABASE_KEY] || {},{RDBMS: OracleConstants.DATABASE_KEY}))
-	   return this.#_YADAMU_DBI_PARAMETERS
+	static get DBI_PARAMETERS()  { 
+	   this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,OracleConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[OracleConstants.DATABASE_KEY] || {},{RDBMS: OracleConstants.DATABASE_KEY}))
+	   return this.#_DBI_PARAMETERS
     }
    
-    get YADAMU_DBI_PARAMETERS() {
-      return OracleQA.YADAMU_DBI_PARAMETERS
+    get DBI_PARAMETERS() {
+	  return OracleQA.DBI_PARAMETERS
     }	
 	
     constructor(yadamu,manager,connectionSettings,parameters) {

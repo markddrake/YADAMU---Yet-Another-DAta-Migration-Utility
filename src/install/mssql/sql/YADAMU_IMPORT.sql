@@ -58,83 +58,80 @@ begin
   declare @VARBINARY_LENGTH        NUMERIC(6) = 8000;
 							       
   declare @CLOB_TYPE               VARCHAR(32) = 'varchar(max)';
+  declare @ORACLE_OBJECT_TYPE      VARCHAR(32) = @CLOB_TYPE;
   declare @BLOB_TYPE               VARCHAR(32) = 'varbinary(max)';
   declare @NCLOB_TYPE              VARCHAR(32) = 'nvarchar(max)';
   declare @UNBOUNDED_NUMERIC_TYPE  VARCHAR(32) = 'numeric(38,19)';
   declare @MAX_NUMERIC_TYPE        VARCHAR(32) = 'numeric(38,0)';
   
   declare @TYPE_NOT_FOUND         NVARCHAR(256) = concat('MSSQLSERVER: ','Missing mapping for "',@VENDOR,'" datatype "',@DATA_TYPE,'"');
-  
-  if (@MSSQL_DATA_TYPE is NULL) begin                               
-    -- ### Cannot Raise Error in a Function 
-	-- raiserror(@TYPE_NOT_FOUND,16,1);     
-    return NULL	
-  end;                                                              
-  
+ 
   if (CHARINDEX('(max)',@MSSQL_DATA_TYPE) > 0) begin
     set @MSSQL_DATA_TYPE = LEFT(@MSSQL_DATA_TYPE, LEN(@MSSQL_DATA_TYPE)-5)
   end;
   
   return case                                                       
-    when (@MSSQL_DATA_TYPE = 'nchar')                               then
-	  case                                                          
-	    when @DATA_TYPE_LENGTH = -1                                 then @NCLOB_TYPE
-	    when @DATA_TYPE_LENGTH is NULL                              then @NCLOB_TYPE
-		when (@DATA_TYPE_LENGTH > @NVARCHAR_LENGTH)                 then @NCLOB_TYPE
-		when (@DATA_TYPE_LENGTH > @NCHAR_LENGTH)                    then 'nvarchar'
-                                                                    else @MSSQL_DATA_TYPE
-	  end                                                           
-    when (@MSSQL_DATA_TYPE = 'nvarchar')                            then
-	  case                                                          
-	    when @DATA_TYPE_LENGTH = -1                                 then @NCLOB_TYPE
-	    when @DATA_TYPE_LENGTH is NULL                              then @NCLOB_TYPE
-		when (@DATA_TYPE_LENGTH > @NVARCHAR_LENGTH)                 then @NCLOB_TYPE
-                                                                    else @MSSQL_DATA_TYPE
-	  end                                                           
-    when (@MSSQL_DATA_TYPE = 'char')                                then
-	  case                                                          
-	    when @DATA_TYPE_LENGTH = -1                                 then @CLOB_TYPE
-	    when @DATA_TYPE_LENGTH is NULL                              then @CLOB_TYPE
-		when (@DATA_TYPE_LENGTH > @VARCHAR_LENGTH)                  then @CLOB_TYPE
-		when (@DATA_TYPE_LENGTH > @CHAR_LENGTH)                     then 'varchar'
-                                                                    else @MSSQL_DATA_TYPE
-	  end                                                           
-    when (@MSSQL_DATA_TYPE = 'varchar')                             then
-	  case                                                          
-	    when @DATA_TYPE_LENGTH = -1                                 then @CLOB_TYPE
-	    when @DATA_TYPE_LENGTH is NULL                              then @CLOB_TYPE
-		when (@DATA_TYPE_LENGTH > @VARCHAR_LENGTH)                  then @CLOB_TYPE
-                                                                    else @MSSQL_DATA_TYPE
-	  end                                                           
-    when (@MSSQL_DATA_TYPE = 'binary')                              then
-	  case                                                          
-	    when @DATA_TYPE_LENGTH = -1                                 then @BLOB_TYPE
-	    when @DATA_TYPE_LENGTH is NULL                              then @BLOB_TYPE
-		when (@DATA_TYPE_LENGTH > @BINARY_LENGTH)                   then @BLOB_TYPE
-		when (@DATA_TYPE_LENGTH > @CHAR_LENGTH)                     then 'varbinary'
-                                                                    else @MSSQL_DATA_TYPE
-	  end                                                           
-    when (@MSSQL_DATA_TYPE = 'varbinary')                           then
-	  case                                                          
-	    when @DATA_TYPE_LENGTH = -1                                 then @BLOB_TYPE
-	    when @DATA_TYPE_LENGTH is NULL                              then @BLOB_TYPE
-		when (@DATA_TYPE_LENGTH > @VARBINARY_LENGTH)                then @BLOB_TYPE
-                                                                    else @MSSQL_DATA_TYPE
-	  end                                                           
-    when (@MSSQL_DATA_TYPE = 'text')                                then @CLOB_TYPE
-	when (@MSSQL_DATA_TYPE = 'ntext')                               then @NCLOB_TYPE
-    when (@MSSQL_DATA_TYPE = 'image')                               then @BLOB_TYPE
-    when @MSSQL_DATA_TYPE in (                                            
-          'numeric',                                                
-          'decimal'                                                 
-      )                                                             then
-      case
-	    when (@DATA_TYPE_LENGTH is NULL)                            then @UNBOUNDED_NUMERIC_TYPE
-        when (@DATA_TYPE_LENGTH > 38) and (@DATA_TYPE_SCALE = 0)    then @MAX_NUMERIC_TYPE
-        when (@DATA_TYPE_LENGTH > 38) and (@DATA_TYPE_SCALE > 0)    then concat('numeric(38,',cast(round(@DATA_TYPE_SCALE*(38.0/@DATA_TYPE_LENGTH),0) as NUMERIC(2)),')')
-                                                                    else @MSSQL_DATA_TYPE
-      end
-                                                                    else @MSSQL_DATA_TYPE
+    when ((@MSSQL_DATA_TYPE is NULL) and (@VENDOR = 'Oracle') and (@DATA_TYPE like '"%"."%"')) then @ORACLE_OBJECT_TYPE
+	when (@MSSQL_DATA_TYPE is NULL)                                                            then @TYPE_NOT_FOUND
+    when (@MSSQL_DATA_TYPE = 'nchar')                                                          then
+	  case                                                                                     
+	    when @DATA_TYPE_LENGTH = -1                                                            then @NCLOB_TYPE
+	    when @DATA_TYPE_LENGTH is NULL                                                         then @NCLOB_TYPE
+		when (@DATA_TYPE_LENGTH > @NVARCHAR_LENGTH)                                            then @NCLOB_TYPE
+		when (@DATA_TYPE_LENGTH > @NCHAR_LENGTH)                                               then 'nvarchar'
+                                                                                               else @MSSQL_DATA_TYPE
+	  end                                                                                      
+    when (@MSSQL_DATA_TYPE = 'nvarchar')                                                       then
+	  case                                                                                     
+	    when @DATA_TYPE_LENGTH = -1                                                            then @NCLOB_TYPE
+	    when @DATA_TYPE_LENGTH is NULL                                                         then @NCLOB_TYPE
+		when (@DATA_TYPE_LENGTH > @NVARCHAR_LENGTH)                                            then @NCLOB_TYPE
+                                                                                               else @MSSQL_DATA_TYPE
+	  end                                                                                      
+    when (@MSSQL_DATA_TYPE = 'char')                                                           then
+	  case                                                                                     
+	    when @DATA_TYPE_LENGTH = -1                                                            then @CLOB_TYPE
+	    when @DATA_TYPE_LENGTH is NULL                                                         then @CLOB_TYPE
+		when (@DATA_TYPE_LENGTH > @VARCHAR_LENGTH)                                             then @CLOB_TYPE
+		when (@DATA_TYPE_LENGTH > @CHAR_LENGTH)                                                then 'varchar'
+                                                                                               else @MSSQL_DATA_TYPE
+	  end                                                                                      
+    when (@MSSQL_DATA_TYPE = 'varchar')                                                        then
+	  case                                                                                     
+	    when @DATA_TYPE_LENGTH = -1                                                            then @CLOB_TYPE
+	    when @DATA_TYPE_LENGTH is NULL                                                         then @CLOB_TYPE
+		when (@DATA_TYPE_LENGTH > @VARCHAR_LENGTH)                                             then @CLOB_TYPE
+                                                                                               else @MSSQL_DATA_TYPE
+	  end                                                                                      
+    when (@MSSQL_DATA_TYPE = 'binary')                                                         then
+	  case                                                                                     
+	    when @DATA_TYPE_LENGTH = -1                                                            then @BLOB_TYPE
+	    when @DATA_TYPE_LENGTH is NULL                                                         then @BLOB_TYPE
+		when (@DATA_TYPE_LENGTH > @BINARY_LENGTH)                                              then @BLOB_TYPE
+		when (@DATA_TYPE_LENGTH > @CHAR_LENGTH)                                                then 'varbinary'
+                                                                                               else @MSSQL_DATA_TYPE
+	  end                                                                                      
+    when (@MSSQL_DATA_TYPE = 'varbinary')                                                      then
+	  case                                                                                     
+	    when @DATA_TYPE_LENGTH = -1                                                            then @BLOB_TYPE
+	    when @DATA_TYPE_LENGTH is NULL                                                         then @BLOB_TYPE
+		when (@DATA_TYPE_LENGTH > @VARBINARY_LENGTH)                                           then @BLOB_TYPE
+                                                                                               else @MSSQL_DATA_TYPE
+	  end                                                                                      
+    when (@MSSQL_DATA_TYPE = 'text')                                                           then @CLOB_TYPE
+	when (@MSSQL_DATA_TYPE = 'ntext')                                                          then @NCLOB_TYPE
+    when (@MSSQL_DATA_TYPE = 'image')                                                          then @BLOB_TYPE
+    when @MSSQL_DATA_TYPE in (                                                                       
+          'numeric',                                                                           
+          'decimal'                                                                            
+      )                                                                                        then
+      case                                                                                    
+	    when (@DATA_TYPE_LENGTH is NULL)                                                       then @UNBOUNDED_NUMERIC_TYPE
+        when (@DATA_TYPE_LENGTH > 38) and (@DATA_TYPE_SCALE = 0)                               then @MAX_NUMERIC_TYPE
+        when (@DATA_TYPE_LENGTH > 38) and (@DATA_TYPE_SCALE > 0)                               then concat('numeric(38,',cast(round(@DATA_TYPE_SCALE*(38.0/@DATA_TYPE_LENGTH),0) as NUMERIC(2)),')')
+                                                                                               else @MSSQL_DATA_TYPE
+      end                                                                                     
+                                                                                               else @MSSQL_DATA_TYPE
   end
 end;
 --

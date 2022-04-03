@@ -23,7 +23,7 @@ import NullWriter       from '../../../node/util/nullWritable.js';
 import YadamuLibrary    from '../../../node/lib/yadamuLibrary.js';
 import LoaderDBI        from '../../../node/dbi/loader/loaderDBI.js';
 import JSONParser       from '../../../node/dbi/loader/jsonParser.js';
-import YadamuTest       from '../../core/yadamu.js';
+import Yadamu           from '../../core/yadamu.js';
 import RowCounter       from '../../util/rowCounter.js';
 import YadamuQALibrary  from '../../lib/yadamuQALibrary.js'
 import ArrayWriter      from './arrayWriter.js';
@@ -56,15 +56,15 @@ class CloudService {
 
 class LoaderQA extends YadamuQALibrary.loaderQAMixin(LoaderDBI) {
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 	
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,LoaderDBI.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[LoaderDBI.DATABASE_KEY] || {},{RDBMS: LoaderDBI.DATABASE_KEY}))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,LoaderDBI.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[LoaderDBI.DATABASE_KEY] || {},{RDBMS: LoaderDBI.DATABASE_KEY}))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-    return LoaderQA.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+    return LoaderQA.DBI_PARAMETERS
   }	
 			
   async recreateSchema() {

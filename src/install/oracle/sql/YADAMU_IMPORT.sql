@@ -2,12 +2,18 @@
 create or replace package YADAMU_IMPORT
 AUTHID CURRENT_USER
 as
-  C_VERSION_NUMBER constant NUMBER(4,2) := 1.0;
+  C_VERSION_NUMBER constant NUMBER(4,2) := 3.0;
+
+  C_SPATIAL_FORMAT         constant VARCHAR2(7)  := 'WKB';
+  C_CIRCLE_FORMAT          constant VARCHAR2(7)  := 'POLYGON';
+  C_XMLTYPE_STORAGE_CLAUSE constant VARCHAR2(17) := 'BINARY XML';
+  C_BOOLEAN_DATA_TYPE      constant VARCHAR2(6)  := 'RAW(1)';
+  C_OBJECT_DATA_TYPE       constant VARCHAR2(6)  := 'NATIVE';
 
 --  
   $IF YADAMU_FEATURE_DETECTION.JSON_DATA_TYPE_SUPPORTED $THEN
 --
-  C_JSON_DATA_TYPE constant VARCHAR2(44) := 'JSON';
+  C_JSON_DATA_TYPE constant VARCHAR2(4) := 'JSON';
 --
   $ELSIF DBMS_DB_VERSION.VER_LE_11_2 $THEN
 --
@@ -24,22 +30,6 @@ as
 --
   $END
 --
-
-  C_SPATIAL_FORMAT         constant VARCHAR2(7)  := 'WKB';
-  C_TREAT_RAW1_AS_BOOLEAN  constant VARCHAR2(5)  := 'TRUE';
-  C_XML_STORAGE_MODEL      constant VARCHAR2(17) := 'BINARY XML';
-  C_CIRCLE_FORMAT          constant VARCHAR2(7)  := 'POLYGON';
-  
-  /*
-  C_DEFAULT_OPTIONS constant VARCHAR2(4000) := JSON_OBJECT(
-                                                 'spatialFormat'    value C_SPATIAL_FORMAT
-                                               , 'raw1AsBoolean'    value C_TREAT_RAW1_AS_BOOLEAN
-		                                       , 'jsonDataType'     value C_JSON_DATA_TYPE
-		                                       , 'xmlStorageModel'  value C_XML_STORAGE_MODEL
-                                                 returning VARCHAR2(4000)
-										       );
-  */										     
-
   C_DEFAULT_OPTIONS constant VARCHAR2(4000) := '{}';
 											 
   C_SUCCESS          constant VARCHAR2(32) := 'SUCCESS';
@@ -97,9 +87,9 @@ $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
   , P_DATA_TYPE_ARRAY              CLOB
   , P_SIZE_CONSTRAINT_ARRAY        CLOB
   , P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_DATA_TYPE
-  , P_XML_STORAGE_MODEL            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+  , P_XMLTYPE_STORAGE_CLAUSE       VARCHAR2 DEFAULT C_XMLTYPE_STORAGE_CLAUSE
   , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
-  , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  , P_BOOLEAN_DATA_TYPE        VARCHAR2 DEFAULT C_BOOLEAN_DATA_TYPE
   , P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
   ) return TABLE_INFO_RECORD;
 --
@@ -114,9 +104,9 @@ $ELSE
   , P_DATA_TYPE_XML                XMLTYPE
   , P_SIZE_CONSTRAINT_XML          XMLTYPE
   , P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_DATA_TYPE
-  , P_XML_STORAGE_MODEL            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+  , P_XMLTYPE_STORAGE_CLAUSE       VARCHAR2 DEFAULT C_XMLTYPE_STORAGE_CLAUSE
   , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
-  , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  , P_BOOLEAN_DATA_TYPE        VARCHAR2 DEFAULT C_BOOLEAN_DATA_TYPE
   , P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
   ) return TABLE_INFO_RECORD;
 --
@@ -158,7 +148,7 @@ $END
   , P_DATA_TYPE                    VARCHAR2
   , P_DATA_TYPE_LENGTH             NUMBER
   , P_DATA_TYPE_SCALE              NUMBER
-  , P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+  , P_BOOLEAN_DATA_TYPE            VARCHAR2 DEFAULT C_BOOLEAN_DATA_TYPE
   , P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
   ) return VARCHAR2;
 
@@ -711,7 +701,7 @@ function MAP_ORACLE_DATATYPE(
 , P_DATA_TYPE                    VARCHAR2
 , P_DATA_TYPE_LENGTH             NUMBER
 , P_DATA_TYPE_SCALE              NUMBER
-, P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+, P_BOOLEAN_DATA_TYPE        VARCHAR2 DEFAULT C_BOOLEAN_DATA_TYPE
 , P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
 ) 
 return VARCHAR2
@@ -787,9 +777,9 @@ function GENERATE_SQL(
 , P_DATA_TYPE_ARRAY              CLOB
 , P_SIZE_CONSTRAINT_ARRAY        CLOB
 , P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_DATA_TYPE
-, P_XML_STORAGE_MODEL            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+, P_XMLTYPE_STORAGE_CLAUSE            VARCHAR2 DEFAULT C_XMLTYPE_STORAGE_CLAUSE
 , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
-, P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+, P_BOOLEAN_DATA_TYPE        VARCHAR2 DEFAULT C_BOOLEAN_DATA_TYPE
 , P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
 )
 --
@@ -818,9 +808,9 @@ function GENERATE_SQL(
 , P_DATA_TYPE_XML                XMLTYPE
 , P_SIZE_CONSTRAINT_XML          XMLTYPE
 , P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_DATA_TYPE
-, P_XML_STORAGE_MODEL            VARCHAR2 DEFAULT C_XML_STORAGE_MODEL
+, P_XMLTYPE_STORAGE_CLAUSE       VARCHAR2 DEFAULT C_XMLTYPE_STORAGE_CLAUSE
 , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
-, P_TREAT_RAW1_AS_BOOLEAN        VARCHAR2 DEFAULT C_TREAT_RAW1_AS_BOOLEAN
+, P_BOOLEAN_DATA_TYPE            VARCHAR2 DEFAULT C_BOOLEAN_DATA_TYPE
 , P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
 )
 $END       
@@ -833,7 +823,7 @@ as
   V_COLUMN_PATTERNS           CLOB;
   V_XML_STORAGE_CLAUSES       CLOB;
   
-  V_XML_STORAGE_MODEL         VARCHAR2(17) := P_XML_STORAGE_MODEL;  
+  V_XMLTYPE_STORAGE_CLAUSE         VARCHAR2(17) := P_XMLTYPE_STORAGE_CLAUSE;  
   
   V_DESERIALIZATIONS          T_VC4000_TABLE;
 
@@ -940,7 +930,7 @@ $END
   "TARGET_TABLE_DEFINITIONS" 
   as (
     select st.*
-          ,MAP_ORACLE_DATATYPE(P_VENDOR,ORACLE_TYPE,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE",P_TREAT_RAW1_AS_BOOLEAN, P_CIRCLE_FORMAT) TARGET_DATA_TYPE
+          ,MAP_ORACLE_DATATYPE(P_VENDOR,ORACLE_TYPE,"DATA_TYPE","DATA_TYPE_LENGTH","DATA_TYPE_SCALE",P_BOOLEAN_DATA_TYPE, P_CIRCLE_FORMAT) TARGET_DATA_TYPE
           ,case
              -- Probe rather than Join since most rows are not objects.
              when (TYPE_NAME is not null) then
@@ -974,7 +964,7 @@ $END
            when TARGET_DATA_TYPE = 'JSON' then
 		     case 
 			   when P_JSON_DATA_TYPE = 'JSON' then
-                 'JSON'			 
+                 P_JSON_DATA_TYPE		 
 			   else
                  $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
                  --
@@ -988,7 +978,7 @@ $END
 			     --
 			 end
            when TARGET_DATA_TYPE = 'BOOLEAN' then
-             'RAW(1)'
+             P_BOOLEAN_DATA_TYPE
            when TARGET_DATA_TYPE in ('DATE','DATETIME','CLOB','NCLOB','BLOB','XMLTYPE','ROWID','UROWID','BINARY_FLOAT','BINARY_DOUBLE') or (TARGET_DATA_TYPE LIKE 'INTERVAL%') or (TARGET_DATA_TYPE like '% TIME ZONE') or (TARGET_DATA_TYPE LIKE '%(%)') then
              TARGET_DATA_TYPE
 		   when (TARGET_DATA_TYPE = 'NUMBER') and (DATA_TYPE_LENGTH > 38) then
@@ -1068,7 +1058,7 @@ $END
          "INSERT_SELECT_LIST"
         ,case 
            when TARGET_DATA_TYPE = 'XMLTYPE' then
-             'XMLTYPE "' || COLUMN_NAME || '" STORE AS ' || V_XML_STORAGE_MODEL
+             'XMLTYPE "' || COLUMN_NAME || '" STORE AS ' || V_XMLTYPE_STORAGE_CLAUSE
            else
              NULL
          end                
@@ -1202,15 +1192,15 @@ $END
   -- OBJECT RELATIONAL IS ONLY SUPPORTED IN CONJUNCTION VIA DDL_AND_DATA OPERATIONS 
   -- WE DO NOT NEED TO CONSIDER OBJECT RELATIONAL STORAGE OPTION WHEN GENERATING DDL STATEMENTS FROM YADAMU METADATA
   --
-  if (P_XML_STORAGE_MODEL = 'XML') then
-    V_XML_STORAGE_MODEL := C_XML_STORAGE_MODEL;
+  if (P_XMLTYPE_STORAGE_CLAUSE = 'XML') then
+    V_XMLTYPE_STORAGE_CLAUSE := C_XMLTYPE_STORAGE_CLAUSE;
   end if;
   --
   $ELSE
   --
   --  ORACLE MANAGED SERVICES ONLY SUPPORT BINRARY XML
   --
-  V_XML_STORAGE_MODEL := 'BINARY XML';
+  V_XMLTYPE_STORAGE_CLAUSE := 'BINARY XML';
   --
   $END
 
@@ -1289,7 +1279,7 @@ $END
 
     $IF (NOT YADAMU_FEATURE_DETECTION.ORACLE_MANAGED_SERVICE) $THEN
     --
-    if (V_XML_STORAGE_MODEL <> C_XML_STORAGE_MODEL) then
+    if (V_XMLTYPE_STORAGE_CLAUSE <> C_XMLTYPE_STORAGE_CLAUSE) then
       DBMS_LOB.WRITEAPPEND(V_DDL_STATEMENT,LENGTH(YADAMU_UTILITIES.C_NEWLINE),YADAMU_UTILITIES.C_NEWLINE);
       DBMS_LOB.APPEND(V_DDL_STATEMENT,V_XML_STORAGE_CLAUSES);
     end if;
@@ -1509,7 +1499,7 @@ $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
 procedure IMPORT_JSON(
   P_JSON_DUMP_FILE  IN OUT NOCOPY BLOB
-, P_TYPE_MAPPINGS  IN OUT NOCOPY BLOB
+, P_TYPE_MAPPINGS   IN OUT NOCOPY BLOB
 , P_TARGET_SCHEMA                 VARCHAR2 DEFAULT SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
 , P_OPTIONS                       CLOB DEFAULT C_DEFAULT_OPTIONS
 )
@@ -1568,11 +1558,13 @@ as
    
   V_NOTHING_DONE BOOLEAN := TRUE;
   V_ABORT_DATALOAD  BOOLEAN := FALSE;
-   
-  V_XML_STORAGE_MODEL         VARCHAR2(17) := case when JSON_EXISTS(P_TYPE_MAPPINGS, '$.xmlStorageModel') then JSON_VALUE(P_TYPE_MAPPINGS, '$.xmlStorageModel') else C_XML_STORAGE_MODEL end;
-  V_JSON_DATA_TYPE            VARCHAR(5)   := case when JSON_EXISTS(P_TYPE_MAPPINGS, '$.jsonDataType') then JSON_VALUE(P_TYPE_MAPPINGS, '$.jsonDataType') else C_JSON_DATA_TYPE end; 
-  V_TREAT_RAW1_AS_BOOLEAN     VARCHAR(5)   := case when JSON_EXISTS(P_TYPE_MAPPINGS, '$.raw1AsBoolean') then JSON_VALUE(P_TYPE_MAPPINGS, '$.raw1AsBoolean') else C_TREAT_RAW1_AS_BOOLEAN end; 
-   
+
+  V_SPATIAL_FORMAT            VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.spatialFormat')        then JSON_VALUE(P_OPTIONS, '$.spatialFormat')        else C_SPATIAL_FORMAT end; 
+  V_CIRCLE_FORMAT             VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.circleFormat')         then JSON_VALUE(P_OPTIONS, '$.circleFormat')         else C_CIRCLE_FORMAT end; 
+  V_XMLTYPE_STORAGE_CLAUSE    VARCHAR2(17)  := case when JSON_EXISTS(P_OPTIONS, '$.xmlStorageClause')     then JSON_VALUE(P_OPTIONS, '$.xmlStorageClause')     else C_XMLTYPE_STORAGE_CLAUSE end;
+  V_JSON_DATA_TYPE            VARCHAR2(5)   := case when JSON_EXISTS(P_OPTIONS, '$.jsonStorageOption')    then JSON_VALUE(P_OPTIONS, '$.jsonStorageOption')    else C_JSON_DATA_TYPE end; 
+  V_BOOLEAN_DATA_TYPE         VARCHAR2(32)  := case when JSON_EXISTS(P_OPTIONS, '$.booleanStorgeOption')  then JSON_VALUE(P_OPTIONS, '$.booleanStorgeOption')  else C_BOOLEAN_DATA_TYPE end; 
+      
 begin
   -- LOG_INFO(JSON_OBJECT('startTime' value SYSTIMESTAMP, 'includeData' value G_INCLUDE_DATA, 'includeDDL' value G_INCLUDE_DDL));
   
@@ -1600,7 +1592,7 @@ begin
      
     for o in operationsList loop
       V_NOTHING_DONE := FALSE;
-      V_TABLE_INFO := GENERATE_SQL(o.SOURCE_VENDOR, P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.COLUMN_NAME_ARRAY, o.DATA_TYPE_ARRAY, o.SIZE_CONSTRAINT_ARRAY, V_JSON_DATA_TYPE, V_XML_STORAGE_MODEL, o.SPATIAL_FORMAT,  V_TREAT_RAW1_AS_BOOLEAN, o.CIRCLE_FORMAT); 
+      V_TABLE_INFO := GENERATE_SQL(o.SOURCE_VENDOR, P_TARGET_SCHEMA, o.OWNER, o.TABLE_NAME, o.COLUMN_NAME_ARRAY, o.DATA_TYPE_ARRAY, o.SIZE_CONSTRAINT_ARRAY, V_JSON_DATA_TYPE, V_XMLTYPE_STORAGE_CLAUSE, o.SPATIAL_FORMAT,  V_BOOLEAN_DATA_TYPE, o.CIRCLE_FORMAT); 
       V_STATEMENT := V_TABLE_INFO.DDL;
       if (V_STATEMENT is not NULL) then
         begin
@@ -1685,20 +1677,21 @@ as
   
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
-  V_XML_STORAGE_MODEL         VARCHAR2(17) := case when JSON_EXISTS(P_OPTIONS, '$.xmlStorageModel') then JSON_VALUE(P_OPTIONS, '$.xmlStorageModel') else C_XML_STORAGE_MODEL end;
-  V_JSON_DATA_TYPE            VARCHAR(5)   := case when JSON_EXISTS(P_OPTIONS, '$.jsonDataType')    then JSON_VALUE(P_OPTIONS, '$.jsonDataType')    else C_JSON_DATA_TYPE end; 
-  V_SPATIAL_FORMAT            VARCHAR2(7)  := case when JSON_EXISTS(P_OPTIONS, '$.spatialFormat')   then JSON_VALUE(P_OPTIONS, '$.spatialFormat')   else C_SPATIAL_FORMAT end; 
-  V_TREAT_RAW1_AS_BOOLEAN     VARCHAR(5)   := case when JSON_EXISTS(P_OPTIONS, '$.raw1AsBoolean')   then JSON_VALUE(P_OPTIONS, '$.raw1AsBoolean')   else C_TREAT_RAW1_AS_BOOLEAN end; 
-  V_CIRCLE_FORMAT             VARCHAR(7)   := case when JSON_EXISTS(P_OPTIONS, '$.circleFormat')    then JSON_VALUE(P_OPTIONS, '$.circleFormat')    else C_CIRCLE_FORMAT end; 
+  V_SPATIAL_FORMAT            VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.spatialFormat')        then JSON_VALUE(P_OPTIONS, '$.spatialFormat')        else C_SPATIAL_FORMAT end; 
+  V_CIRCLE_FORMAT             VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.circleFormat')         then JSON_VALUE(P_OPTIONS, '$.circleFormat')         else C_CIRCLE_FORMAT end; 
+  V_XMLTYPE_STORAGE_CLAUSE    VARCHAR2(17)  := case when JSON_EXISTS(P_OPTIONS, '$.xmlStorageClause')     then JSON_VALUE(P_OPTIONS, '$.xmlStorageClause')     else C_XMLTYPE_STORAGE_CLAUSE end;
+  V_JSON_DATA_TYPE            VARCHAR2(5)   := case when JSON_EXISTS(P_OPTIONS, '$.jsonStorageOption')    then JSON_VALUE(P_OPTIONS, '$.jsonStorageOption')    else C_JSON_DATA_TYPE end; 
+  V_BOOLEAN_DATA_TYPE         VARCHAR2(32)  := case when JSON_EXISTS(P_OPTIONS, '$.booleanStorgeOption')  then JSON_VALUE(P_OPTIONS, '$.booleanStorgeOption')  else C_BOOLEAN_DATA_TYPE end; 
 --
 $ELSE
 --
   V_TYPE_MAPPINGS             XMLTYPE := XMLTYPE(P_OPTIONS);
-  V_XML_STORAGE_MODEL         VARCHAR2(17) := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/xmlStorageModel') = 1 then V_TYPE_MAPPINGS.extract('/options/xmlStorageModel/text()').getStringVal() else C_XML_STORAGE_MODEL end;
-  V_JSON_DATA_TYPE            VARCHAR(5)   := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/jsonDataType')    = 1 then V_TYPE_MAPPINGS.extract('/options/jsonDataType/text()').getStringVal()    else C_JSON_DATA_TYPE end; 
-  V_SPATIAL_FORMAT            VARCHAR2(7)  := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/spatialFormat')   = 1 then V_TYPE_MAPPINGS.extract('/options/spatialFormat/text()').getStringVal()   else C_SPATIAL_FORMAT end; 
-  V_TREAT_RAW1_AS_BOOLEAN     VARCHAR(5)   := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/raw1AsBoolean')   = 1 then V_TYPE_MAPPINGS.extract('/options/raw1AsBoolean/text()').getStringVal()  else C_TREAT_RAW1_AS_BOOLEAN end; 
-  V_CIRCLE_FORMAT             VARCHAR(7)   := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/circleFormat')    = 1 then V_TYPE_MAPPINGS.extract('/options/circleFormat/text()').getStringVal()    else C_CIRCLE_FORMAT end; 
+
+  V_SPATIAL_FORMAT            VARCHAR2(7)   := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/spatialFormat')        = 1 then V_TYPE_MAPPINGS.extract('/options/spatialFormat/text()').getStringVal()        else C_SPATIAL_FORMAT end; 
+  V_CIRCLE_FORMAT             VARCHAR2(7)   := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/circleFormat')         = 1 then V_TYPE_MAPPINGS.extract('/options/circleFormat/text()').getStringVal()         else C_CIRCLE_FORMAT end; 
+  V_XMLTYPE_STORAGE_CLAUSE    VARCHAR2(17)  := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/xmlStorageClause')     = 1 then V_TYPE_MAPPINGS.extract('/options/xmlStorageClause/text()').getStringVal()     else C_XMLTYPE_STORAGE_CLAUSE end;
+  V_JSON_DATA_TYPE            VARCHAR2(5)   := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/jsonStorageOption')    = 1 then V_TYPE_MAPPINGS.extract('/options/jsonStorageOption/text()').getStringVal()    else C_JSON_DATA_TYPE end; 
+  V_BOOLEAN_DATA_TYPE         VARCHAR2(32)  := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/booleanStorgeOption')  = 1 then V_TYPE_MAPPINGS.extract('/options/booleanStorgeOption/text()').getStringVal()  else C_BOOLEAN_DATA_TYPE end; 
 --
 $END 
 --
@@ -1772,7 +1765,7 @@ begin
       DBMS_LOB.WRITEAPPEND(V_RESULTS,1,',');
     end if;
     
-    V_TABLE_INFO := GENERATE_SQL(x.VENDOR,P_TARGET_SCHEMA, x.OWNER, x.TABLE_NAME, x.COLUMN_NAME_ARRAY, x.DATA_TYPE_ARRAY, x.SIZE_CONSTRAINT_ARRAY, V_JSON_DATA_TYPE, V_XML_STORAGE_MODEL, V_SPATIAL_FORMAT, V_TREAT_RAW1_AS_BOOLEAN, V_CIRCLE_FORMAT);
+    V_TABLE_INFO := GENERATE_SQL(x.VENDOR,P_TARGET_SCHEMA, x.OWNER, x.TABLE_NAME, x.COLUMN_NAME_ARRAY, x.DATA_TYPE_ARRAY, x.SIZE_CONSTRAINT_ARRAY, V_JSON_DATA_TYPE, V_XMLTYPE_STORAGE_CLAUSE, V_SPATIAL_FORMAT, V_BOOLEAN_DATA_TYPE, V_CIRCLE_FORMAT);
     V_FRAGMENT := '"' || x.TABLE_NAME || '" : ';
     DBMS_LOB.WRITEAPPEND(V_RESULTS,LENGTH(V_FRAGMENT),V_FRAGMENT);
     $IF YADAMU_FEATURE_DETECTION.JSON_GENERATION_SUPPORTED $THEN

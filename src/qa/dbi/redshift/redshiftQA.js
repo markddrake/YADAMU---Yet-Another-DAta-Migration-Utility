@@ -8,7 +8,7 @@ import RedshiftDBI       from '../../../node/dbi//redshift/redshiftDBI.js';
 import RedshiftError     from '../../../node/dbi//redshift/redshiftException.js'
 import RedshiftConstants from '../../../node/dbi//redshift/redshiftConstants.js';
 
-import YadamuTest        from '../../core/yadamu.js';
+import Yadamu            from '../../core/yadamu.js';
 import YadamuQALibrary   from '../../lib/yadamuQALibrary.js'
 
 class RedshiftQA extends YadamuQALibrary.qaMixin(RedshiftDBI) {
@@ -18,15 +18,15 @@ class RedshiftQA extends YadamuQALibrary.qaMixin(RedshiftDBI) {
     static get SQL_SUCCESS()               { return _SQL_SUCCESS }
     static get SQL_FAILED()                { return _SQL_FAILED }
 
-    static #_YADAMU_DBI_PARAMETERS
+    static #_DBI_PARAMETERS
     
-    static get YADAMU_DBI_PARAMETERS()  { 
-       this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,RedshiftConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[RedshiftConstants.DATABASE_KEY] || {},{RDBMS: RedshiftConstants.DATABASE_KEY}))
-       return this.#_YADAMU_DBI_PARAMETERS
+    static get DBI_PARAMETERS()  { 
+       this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,RedshiftConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[RedshiftConstants.DATABASE_KEY] || {},{RDBMS: RedshiftConstants.DATABASE_KEY}))
+       return this.#_DBI_PARAMETERS
     }
    
-    get YADAMU_DBI_PARAMETERS() {
-      return RedshiftQA.YADAMU_DBI_PARAMETERS
+    get DBI_PARAMETERS() {
+      return RedshiftQA.DBI_PARAMETERS
     }   
     
     SQL_SCHEMA_TABLE_ROWS(schema) { return `with num_rows as (

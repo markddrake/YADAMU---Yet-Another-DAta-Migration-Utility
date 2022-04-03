@@ -52,7 +52,7 @@
 	"SPATIAL_FORMAT"                                       : "WKB"
   , "BOOLEAN_TYPE"                                         : "RAW(1)"
   , "ORACLE_OBJECT_TYPE"                                   : "NATIVE"
-  , "XML_TYPE"                                             : "CLOB"
-  , "JSON_TYPE"                                            : "CLOB"
+  , "XML_TYPE"                                             : "XML"
+  , "JSON_TYPE"                                            : "JSON"
   }
 }                                                        

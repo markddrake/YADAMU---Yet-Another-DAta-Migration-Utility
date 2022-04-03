@@ -1,18 +1,40 @@
+import {
+  YadamuDataTypes
+, YadamuStorageOptions
+}                           from '../base/yadamuDataTypes.js'
 
-import YadamuDataTypes   from '../base/yadamuDataTypes.js'
+import OracleConstants      from './oracleConstants.js'
+
+class OracleStorageOptions extends YadamuStorageOptions {
+	 
+  get XML_TYPE()                            { return OracleConstants.XML_STORAGE_OPTION }	
+
+  set XML_TYPE(v)                           { YadamuDataTypes.redefineProperty(this,'XML_TYPE',v) }
+  
+  get JSON_TYPE()                           { return OracleConstants.JSON_STORAGE_OPTION }	
+
+  set JSON_TYPE(v)                          { YadamuDataTypes.redefineProperty(this,'JSON_TYPE',v) }
+  
+  get BOOLEAN_TYPE()                        { return OracleConstants.BOOLEAN_STORAGE_OPTION }	
+	
+  set BOOLEAN_TYPE(v)                       { YadamuDataTypes.redefineProperty(this,'BOOLEAN_TYPE',v) }
+  
+  get RAW1_IS_BOOLEAN()                     { return this.BOOLEAN_TYPE === 'RAW1' }
+  
+  get ORACLE_OBJECT_TYPE()                  { return OracleConstants.OBJECT_STORAGE_OPTION }	
+	
+  set ORACLE_OBJECT_TYPE(v)                 { YadamuDataTypes.redefineProperty(this,'ORACLE_OBJECT_TYPE',v) }
+  
+}
 
 class OracleDataTypes extends YadamuDataTypes {
 
-  static get BOOLEAN_AS_RAW1()         { return this.storageOptions.BOOLEAN_TYPE === 'RAW(1)' }
-
-  static get OBJECT_FORMAT()           { return this.storageOptions.ORACLE_OBJECT_TYPE }
-  
-  static get LOB_TYPES()   { 
+  get LOB_TYPES()   { 
     this._LOB_TYPES = this._LOB_TYPES || Object.freeze([this.CLOB_TYPE,this.BLOB_TYPE,this.NCLOB_TYPE])
     return this._LOB_TYPES
   }
  
-  static get BOUNDED_TYPES() { 
+  get BOUNDED_TYPES() { 
     this._BOUNDED_TYPES = this._BOUNDED_TYPES || Object.freeze([this.CHAR_TYPE,this.NCHAR_TYPE,this.VARCHAR_TYPE,this.NVARCHAR_TYPE,this.BINARY_TYPE])
     return this._BOUNDED_TYPES;
   }
@@ -73,6 +95,12 @@ class OracleDataTypes extends YadamuDataTypes {
         console.log(this.name,'Type List Reduction failed for ',typeList)
 	}
   } 
+
+  get DATABASE_KEY()      { return OracleConstants.DATABASE_KEY }
+
+  get DATABASE_VENDOR()   { return OracleConstants.DATABASE_VENDOR }
+  
+  get STORAGE_OPTIONS()   { return new OracleStorageOptions() }
   
 }
  

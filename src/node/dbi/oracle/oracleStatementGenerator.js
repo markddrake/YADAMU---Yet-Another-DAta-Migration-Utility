@@ -53,6 +53,20 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
   get LOADER_CLOB_SIZE()             { return 67108864 }
   get LOADER_CLOB_TYPE()             { return `CHAR(${this.LOADER_CLOB_SIZE})`}
     
+  get STATEMENT_GENERATOR_OPTIONS() {
+
+    const options = {
+	  spatialFormat        : this.dbi.INBOUND_SPATIAL_FORMAT
+	, circleFormat         : this.dbi.INBOUND_CIRCLE_FORMAT
+	, xmlStorageClause     : this.dbi.XMLTYPE_STORAGE_CLAUSE
+	, jsonStorageOption    : this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
+	, booleanStorgeOption  : this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	, objectStorgeOption   : this.dbi.DATA_TYPES.storageOptions.OBJECT_TYPE
+	}
+	
+	return JSON.stringify(options); 
+  }
+  	
   constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {  
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
@@ -273,19 +287,6 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
       
   }
  
-  getOptions() {
-
-    const options = {
-	  spatialFormat    : this.SPATIAL_FORMAT
-	, raw1AsBoolean    : new Boolean(this.dbi.BOOLEAN_AS_RAW1).toString().toUpperCase()
-	, jsonDataType     : this.dbi.JSON_DATA_TYPE
-	, xmlStorageModel  : this.dbi.XML_STORAGE_CLAUSE
-	, circleFormat     : this.dbi.INBOUND_CIRCLE_FORMAT
-	}
-	
-	return JSON.stringify(options); 
-  }
-  
   generateExternalTableDefinition(tableMetadata,externalTableName,externalColumnDefinitions,copyColumnDefinitions) {
 	 return `
 CREATE TABLE ${externalTableName} (
@@ -364,13 +365,12 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 
 	const metadata = await this.getMetadata()
 	const vendorTypeMappings = await this.getVendorTypeMappings();
-    const options = this.getOptions();
-
-	// await this.debugStatementGenerator(options)
+    
+	// await this.debugStatementGenerator(this.STATEMENT_GENERATOR_OPTIONS)
 	
     const startTime = performance.now()
 	
-	const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadata, typeMappings:vendorTypeMappings, schema:this.targetSchema, options:options});
+	const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadata, typeMappings:vendorTypeMappings, schema:this.targetSchema, options:this.STATEMENT_GENERATOR_OPTIONS});
 	// this.dbi.yadamuLogger.trace([this.constructor.name],`${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
     
 	await metadata.close();
@@ -512,7 +512,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
             externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
             break;
           case this.dbi.DATA_TYPES.JSON_TYPE:
-            // value = this.dbi.DB_VERSION > 19  ? `JSON(:${(idx+1)})` : value
+            // value = this.dbi.DATABASE_VERSION > 19  ? `JSON(:${(idx+1)})` : value
   	        externalDataType = this.dbi.DATA_TYPES.BLOB_TYPE
             copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
             externalSelect = `case when LENGTH("${column}") > 0 then "${column}" else NULL end`

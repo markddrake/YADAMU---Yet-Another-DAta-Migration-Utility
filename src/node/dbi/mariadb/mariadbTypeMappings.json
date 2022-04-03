@@ -22,7 +22,7 @@
   , "TIME_TYPE"                                            : "time"                                             
   , "DATETIME_TYPE"                                        : "datetime"                                         
   , "TIMESTAMP_TYPE"                                       : "timestamp"
-  , "MYSQL_YEAR_TYPE"                                      : "year"                                             
+  , "YEAR_TYPE"                                            : "year"                                             
                                                                                                            
   , "BOOLEAN_TYPE"                                         : "boolean"                                          
 
@@ -79,6 +79,6 @@
   }
 , "storageOptions": {
 	"SPATIAL_FORMAT"                                       : "WKB"
-  , "BOOLEAN_TYPE"                                         : "tinyint(1)"
+  , "BOOLEAN_TYPE"                                         : "bit(1)"
   }
 }

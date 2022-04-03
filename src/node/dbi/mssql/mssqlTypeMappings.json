@@ -15,6 +15,7 @@
   , "FLOAT_TYPE"                                           : "real"                                                            
   , "DOUBLE_TYPE"                                          : "float"                                                           
   , "NUMERIC_TYPE"                                         : "numeric"                                                         
+  , "DECIMAL_TYPE"                                         : "decimal"                                                         
                                                                                                                            
   , "DATE_TYPE"                                            : "date"                                                            
   , "TIME_TYPE"                                            : "time"                                                            

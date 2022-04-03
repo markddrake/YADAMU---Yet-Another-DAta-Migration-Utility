@@ -109,7 +109,6 @@ class YadamuDBI extends EventEmitter {
 
   // Instance level getters.. invoke as this.METHOD
 
-
   get DATABASE_KEY()                 { return 'yadamu' };
   get DATABASE_VENDOR()              { return 'YADAMU' };
   get SOFTWARE_VENDOR()              { return 'YABASC - Yet Another Bay Area Software Company'};
@@ -128,7 +127,7 @@ class YadamuDBI extends EventEmitter {
   get STATEMENT_TERMINATOR()         { return ';' }
   get STATEMENT_SEPERATOR()          { return '\n--\n' }
   
-  get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT              || DBIConstants.SPATIAL_FORMAT };
+  get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT              || this.DATA_TYPES?.storageOptions.SPATIAL_FORMAT || this.DBIConstants.SPATIAL_FORMAT };
   get PARSE_DELAY()                  { return this.parameters.PARSE_DELAY                 || DBIConstants.PARSE_DELAY };
   get TABLE_MAX_ERRORS()             { return this.parameters.TABLE_MAX_ERRORS            || DBIConstants.TABLE_MAX_ERRORS };
   get TOTAL_MAX_ERRORS()             { return this.parameters.TOTAL_MAX_ERRORS            || DBIConstants.TOTAL_MAX_ERRORS };
@@ -146,7 +145,6 @@ class YadamuDBI extends EventEmitter {
   get LOCAL_STAGING_AREA()           { return YadamuLibrary.macroSubstitions((this.parameters.LOCAL_STAGING_AREA     || DBIConstants.LOCAL_STAGING_AREA || ''), this.yadamu.MACROS || '') }
   get REMOTE_STAGING_AREA()          { return YadamuLibrary.macroSubstitions((this.parameters.REMOTE_STAGING_AREA    || DBIConstants.REMOTE_STAGING_AREA || ''), this.yadamu.MACROS || '') }
 
-
   get IDENTIFIER_TRANSFORMATION()    { return this.yadamu.IDENTIFIER_TRANSFORMATION }
   get PARTITION_LEVEL_OPERATIONS()   { return this.parameters.PARTITION_LEVEL_OPERATIONS  || DBIConstants.PARTITION_LEVEL_OPERATIONS }
   
@@ -156,15 +154,7 @@ class YadamuDBI extends EventEmitter {
   get SQL_TRACE()                    { return this._SQL_TRACE }
   set SQL_TRACE(writer)              { this._SQL_TRACE = this._SQL_TRACE || new SQLTrace(writer,this.STATEMENT_SEPERATOR,this.STATEMENT_TERMINATOR,this.ROLE)}
   get SQL_CUMLATIVE_TIME()           { return this.SQL_TRACE.SQL_CUMLATIVE_TIME }
-    
-  get TYPE_CONFIGURATION()        { 
-    this._TYPE_CONFIGURATION = this._TYPE_CONFIGURATION || (() => {
-      this._TYPE_CONFIGURATION = JSON.parse(fs.readFileSync(YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.DATABASE_VENDOR].file))
-	  return this._TYPE_CONFIGURATION
-    })()
-    return this._TYPE_CONFIGURATION
-  }
-    
+        
   get BATCH_SIZE() {
     this._BATCH_SIZE = this._BATCH_SIZE || (() => {
       let batchSize =  this.parameters.BATCH_SIZE || DBIConstants.BATCH_SIZE
@@ -230,6 +220,10 @@ class YadamuDBI extends EventEmitter {
     return this._CURRENT_SCHEMA 
   }
   
+  get DATA_TYPES()                    { return this._DATA_TYPES }
+
+  set DATA_TYPES(DriverDataTypes)     { this._DATA_TYPES = this._DATA_TYPES || new DriverDataTypes(); return this._DATA_TYPES }	
+	  
   get ROLE()                          {                     
     this._ROLE = this._ROLE || (() => {
       switch (true) { 
@@ -248,7 +242,7 @@ class YadamuDBI extends EventEmitter {
 
   // Not available until configureConnection() has been called 
 
-  get DB_VERSION()                    { return this._DB_VERSION }
+  get DATABASE_VERSION()              { return this._DATABASE_VERSION }
 
   get SPATIAL_SERIALIZER()            { return this._SPATIAL_SERIALIZER }
   set SPATIAL_SERIALIZER(v)           { this._SPATIAL_SERIALIZER = v }
@@ -334,10 +328,11 @@ class YadamuDBI extends EventEmitter {
 	super()
 	this.DRIVER_ID = performance.now()
 	yadamu.activeConnections.add(this)
-    // console.log(DataTypeMappings[this.DATABASE_VENDOR].mappings)
-    this.yadamu = yadamu;
+    
+	this.yadamu = yadamu;
     this.setConnectionProperties(connectionSettings || {})
     this.status = yadamu.STATUS
+	
 	
     this.yadamuLogger = yadamu.LOGGER;
 	this.initializeParameters(parameters || {})
@@ -348,8 +343,8 @@ class YadamuDBI extends EventEmitter {
     this.options = {
       recreateSchema : false
     }
-
-    this._DB_VERSION = 'N/A'    
+	
+    this._DATABASE_VERSION = 'N/A'    
 
     this.vendorProperties = this.getVendorProperties()   
 
@@ -440,7 +435,8 @@ class YadamuDBI extends EventEmitter {
   }
 
   initializeDataTypes(DataTypes) {
-	this.yadamu.initializeDataTypes(DataTypes,this.TYPE_CONFIGURATION);
+    
+	// this.yadamu.initializeDataTypes(DataTypes,this.TYPE_CONFIGURATION);
   }
 
   async initializeWorker(manager) {
@@ -483,9 +479,8 @@ class YadamuDBI extends EventEmitter {
   }
         
   initializeParameters(parameters){
-
 	// Merge default parameters for this driver with parameters from configuration files and command line parameters.
-    this.parameters = Object.assign({}, this.YADAMU_DBI_PARAMETERS, this.vendorParameters, parameters, this.yadamu.COMMAND_LINE_PARAMETERS)
+    this.parameters = Object.assign({}, this.DBI_PARAMETERS, this.vendorParameters, parameters, this.yadamu.COMMAND_LINE_PARAMETERS)
   }
 
   setParameters(parameters) {
@@ -682,7 +677,7 @@ class YadamuDBI extends EventEmitter {
   }
    
   isValidDDL() {
-    return ((this.systemInformation.vendor === this.DATABASE_VENDOR) && (this.systemInformation.dbVersion <= this.DB_VERSION))
+    return ((this.systemInformation.vendor === this.DATABASE_VENDOR) && (this.systemInformation.dbVersion <= this.DATABASE_VERSION))
   }
   
   isDatabase() {
@@ -1411,7 +1406,7 @@ class YadamuDBI extends EventEmitter {
     , schema             : this.CURRENT_SCHEMA ? this.CURRENT_SCHEMA : this.CURRENT_SCHEMA
 	, dbiKey             : this.DATABASE_KEY
     , vendor             : this.DATABASE_VENDOR
-	, dbVersion          : this.DB_VERSION
+	, dbVersion          : this.DATABASE_VERSION
 	, softwareVendor     : this.SOFTWARE_VENDOR
     , nodeClient         : {
         version          : process.version

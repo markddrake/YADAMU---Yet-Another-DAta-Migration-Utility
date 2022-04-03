@@ -1,9 +1,15 @@
+import {
+  YadamuDataTypes
+, YadamuStorageOptions
+}                           from '../base/yadamuDataTypes.js'
 
-import YadamuDataTypes   from '../base/yadamuDataTypes.js'
+import MsSQLConstants       from './mssqlConstants.js'
+
+class MsSQLStorageOptions extends YadamuStorageOptions {}
 
 class MsSQLDataTypes extends YadamuDataTypes {
 	
-  static coalesceTypeMappings(typeList) {
+  coalesceTypeMappings(typeList) {
 	
 	switch (true) {
 	  case typeList.includes(this.SPATIAL_TYPE):
@@ -56,6 +62,12 @@ class MsSQLDataTypes extends YadamuDataTypes {
         console.log(this.name,'Type List Reduction failed for ',typeList)
 	}
   }
+
+  get DATABASE_KEY()      { return MsSQLConstants.DATABASE_KEY }
+
+  get DATABASE_VENDOR()   { return MsSQLConstants.DATABASE_VENDOR }
+  
+  get STORAGE_OPTIONS()   { return new MsSQLStorageOptions() }
 
 }
  

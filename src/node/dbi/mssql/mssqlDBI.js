@@ -59,15 +59,15 @@ import {ConnectionError} from '../../core/yadamuException.js'
 
 class MsSQLDBI extends YadamuDBI {
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return MsSQLDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return MsSQLDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -87,7 +87,6 @@ class MsSQLDBI extends YadamuDBI {
 
   // Enable configuration via command line parameters
 
-  get SPATIAL_FORMAT()                { return this.parameters.SPATIAL_FORMAT        || MsSQLConstants.SPATIAL_FORMAT }
   get ROW_LIMIT()                     { return this.parameters.ROW_LIMIT             || MsSQLConstants.ROW_LIMIT }
   get SPATIAL_MAKE_VALID()            { return this.parameters.SPATIAL_MAKE_VALID    || MsSQLConstants.SPATIAL_MAKE_VALID }
 
@@ -105,11 +104,9 @@ class MsSQLDBI extends YadamuDBI {
   get BEGIN_TRANSACTION_ISSUE()       { return this._BEGIN_TRANSACTION_ISSUE }
   set BEGIN_TRANSACTION_ISSUE(v)      { this._BEGIN_TRANSACTION_ISSUE = v }
 
-  get DATA_TYPES()                    { return MsSQLDataTypes }
-
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-	this.initializeDataTypes(MsSQLDataTypes)
+	this.DATA_TYPES = MsSQLDataTypes
 
     this.yadamuRollack = false
 
@@ -179,10 +176,10 @@ class MsSQLDBI extends YadamuDBI {
     
     statement = `select CONVERT(NVARCHAR(20),SERVERPROPERTY('ProductVersion')) "DATABASE_VERSION", CONVERT(NVARCHAR(32),DATABASEPROPERTYEX(DB_NAME(),'collation')) "DB_COLLATION"`
     results = await this.executeSQL(statement)
-    this._DB_VERSION =  parseInt(results.recordsets[0][0].DATABASE_VERSION)
+    this._DATABASE_VERSION =  parseInt(results.recordsets[0][0].DATABASE_VERSION)
     this._DB_COLLATION = results.recordsets[0][0].DB_COLLATION
     
-    this.defaultCollation = this.DB_VERSION < 15 ? 'Latin1_General_100_CS_AS_SC' : 'Latin1_General_100_CS_AS_SC_UTF8';
+    this.defaultCollation = this.DATABASE_VERSION < 15 ? 'Latin1_General_100_CS_AS_SC' : 'Latin1_General_100_CS_AS_SC_UTF8';
   }
   
   setTargetDatabase() {  
@@ -1075,7 +1072,7 @@ class MsSQLDBI extends YadamuDBI {
 
   async setLibraries() {
 	  
-	switch (this.DB_VERSION) {
+	switch (this.DATABASE_VERSION) {
 	  case 12:
 	    this.StatementLibrary = (await import('./2014/mssqlStatementLibrary.js')).default
 		this.StatementGenerator = (await import('./2014/statementGenerator.js')).default

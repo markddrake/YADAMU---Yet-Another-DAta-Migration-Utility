@@ -26,8 +26,11 @@ class MariadbStatementLibrary {
                    json_quote(case 
                                 when cc.check_clause is not null then 
                                   'json'
-                                when c.column_type = 'tinyint(1)' then 
-                                  '${this.dbi.TREAT_TINYINT1_AS_BOOLEAN ? 'boolean' : 'tinyint(1)'}'
+                                when column_type = 'tinyint(1)' then 
+                                  -- json_quote('${this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN ? 'boolean' : 'tinyint(1)'}')
+                                  '${this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN ? 'boolean' : 'tinyint(1)'}'
+                                when column_type = 'bit(1)' then 
+                                  '${this.dbi.DATA_TYPES.storageOptions.BIT1_IS_BOOLEAN ? 'boolean' : 'bit(1)'}'
                                 else 
                                   data_type
                               end
@@ -41,7 +44,7 @@ class MariadbStatementLibrary {
                 group_concat(
                   json_quote(case 
                                when column_type = 'tinyint(1)' then
-                                 ${this.dbi.TREAT_TINYINT1_AS_BOOLEAN ? "''" : "'3'"}
+                                 ${this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN ? "''" : "'3'"}
 	   					      when (numeric_precision is not null) and (numeric_scale is not null) then
                                  concat(numeric_precision,',',numeric_scale) 
                                when (numeric_precision is not null) then 

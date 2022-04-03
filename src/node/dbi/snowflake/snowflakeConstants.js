@@ -15,7 +15,6 @@ class SnowflakeConstants {
 	, "MAX_BINARY_SIZE"           : 8388608 
     , "TRANSIENT_TABLES"          : true
     , "DATA_RETENTION_TIME"       : 0
-    , "SPATIAL_FORMAT"            : "WKB"
 	, "SNOWFLAKE_XML_TYPE"        : this.VARIANT_DATA_TYPE
 	, "SNOWFLAKE_JSON_TYPE"       : this.VARIANT_DATA_TYPE
     })
@@ -46,7 +45,6 @@ class SnowflakeConstants {
   static get MAX_BINARY_SIZE()        { return this.DBI_PARAMETERS.MAX_BINARY_SIZE}
   static get TRANSIENT_TABLES()       { return this.DBI_PARAMETERS.TRANSIENT_TABLES}
   static get DATA_RETENTION_TIME()    { return this.DBI_PARAMETERS.DATA_RETENTION_TIME}
-  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get SNOWFLAKE_XML_TYPE()     { return this.DBI_PARAMETERS.SNOWFLAKE_XML_TYPE };
   static get SNOWFLAKE_JSON_TYPE()    { return this.DBI_PARAMETERS.SNOWFLAKE_JSON_TYPE };
   static get STATEMENT_TERMINATOR()   { return ';' }

@@ -1,11 +1,25 @@
+import {
+  YadamuDataTypes
+, YadamuStorageOptions
+}                           from '../base/yadamuDataTypes.js'
 
-import YadamuDataTypes   from '../base/yadamuDataTypes.js'
+import MariadbConstants     from './mariadbConstants.js'
+
+class MariadbStorageOptions extends YadamuStorageOptions { 
+
+  get BOOLEAN_TYPE()                        { return MariadbConstants.BOOLEAN_STORAGE_OPTION }	
+	
+  set BOOLEAN_TYPE(v)                       { YadamuDataTypes.redefineProperty(this,'BOOLEAN_TYPE',v) }
+  
+  get TINYINT1_IS_BOOLEAN()                 { return this.BOOLEAN_TYPE === 'tinyint(1)' }
+  
+  get BIT1_IS_BOOLEAN()                     { return this.BOOLEAN_TYPE === 'bit(1)' } 
+  
+}
 
 class MariadbDataTypes extends YadamuDataTypes {
 	
-  static get TREAT_TINYINT1_AS_BOOLEAN()   { return this.storageOptions.BOOLEAN_TYPE === "tinyint(1)" }
-
-  static get UNBOUNDED_TYPES() { 
+  get UNBOUNDED_TYPES() { 
     this._UNBOUNDED_TYPES = this._UNBOUNDED_TYPES || Object.freeze([
       this.DATE_TYPE
     , this.MYSQL_TINYTEXT_TYPE
@@ -25,7 +39,7 @@ class MariadbDataTypes extends YadamuDataTypes {
     return this._UNBOUNDED_TYPES;
   }
   
-  static get SPATIAL_TYPES() { 
+  get SPATIAL_TYPES() { 
     this._SPATIAL_TYPES = this._SPATIAL_TYPES || Object.freeze([
       this.GEOMETRY_TYPE
     , this.GEOGRAPHY_TYPE
@@ -40,7 +54,7 @@ class MariadbDataTypes extends YadamuDataTypes {
     return this._SPATIAL_TYPES;
   }
 
-  static get INTEGER_TYPES() { 
+  get INTEGER_TYPES() { 
     this._INTEGER_TYPES = this._INTEGER_TYPES || Object.freeze([
       this.TINYINT_TYPE
     , this.SMAILLINT_TYPE
@@ -50,6 +64,12 @@ class MariadbDataTypes extends YadamuDataTypes {
 	])
     return this._INTEGER_TYPES;
   }
+
+  get DATABASE_KEY()      { return MariadbConstants.DATABASE_KEY }
+
+  get DATABASE_VENDOR()   { return MariadbConstants.DATABASE_VENDOR }
+  
+  get STORAGE_OPTIONS()   { return new MariadbStorageOptions() }
   
 }
 

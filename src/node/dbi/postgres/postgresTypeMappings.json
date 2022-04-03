@@ -40,7 +40,9 @@
   , "PATH_TYPE"                                            : "path"                                             
   , "BOX_TYPE"                                             : "box"                                              
   , "POLYGON_TYPE"                                         : "polygon"                                          
-  , "SPATIAL_TYPE"                                         : "geography"                                        
+  , "GEOGRAPHY_TYPE"                                       : "geography"                                        
+  , "GEOMETRY_TYPE"                                        : "geometry"                                        
+  , "SPATIAL_TYPE"                                         : "geometry"                                        
   , "PGSQL_LINE_EQ_TYPE"                                   : "line"                                             
   , "PGSQL_CIRCLE_TYPE"                                    : "circle"                                           
                                                                                                              

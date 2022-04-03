@@ -10,7 +10,6 @@ class MariadbConstants {
 
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
-      "SPATIAL_FORMAT"            : "WKB"
     })
     return this._STATIC_PARAMETERS;
   }
@@ -22,7 +21,6 @@ class MariadbConstants {
     return this.#_DBI_PARAMETERS
   }
 
-  static get SPATIAL_FORMAT()             { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get STATEMENT_TERMINATOR()       { return ';' }
  
   
