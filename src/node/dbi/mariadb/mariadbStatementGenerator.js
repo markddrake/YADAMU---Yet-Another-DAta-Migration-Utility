@@ -16,7 +16,6 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
 	  
       const mappedDataType = super.getMappedDataType(dataType,sizeConstraint)
       const length = parseInt(sizeConstraint)
-
       switch (mappedDataType) {
 
         case this.dbi.DATA_TYPES.CHAR_TYPE:
@@ -121,7 +120,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
         case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
         case this.dbi.DATA_TYPES.TIMESTAMPTZ_TYPE:
           switch (true) {
-            case (length > this.dbi.DATA_TYPES.TIMESTAMP_PRECISON):      return `${mappedDataType}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISON})`
+            case (length > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return `${mappedDataType}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION})`
             default:                                                     return mappedDataType
           }
 

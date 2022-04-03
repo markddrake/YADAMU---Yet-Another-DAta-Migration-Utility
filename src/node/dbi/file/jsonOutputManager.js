@@ -24,11 +24,11 @@ class JSONOutputManager extends YadamuOutputManager {
     // RDBMS based implementations are driven off metadata dericed from the database catalog
 	// File based implementatins must work with the metadata contained in the export file. 
 	// Mappings are defined in ../cfg/typeMapping.json
+    
+	// Set up Transformation functions to be applied to the incoming rows
 
-    // Set up Transformation functions to be applied to the incoming rows
     return this.tableInfo.targetDataTypes.map((dataType,idx) => {      
       const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
-	  
 	  switch (true) {
 		case (YadamuDataTypes.isBinary(dataTypeDefinition.type)):
 		  return (col,idx) =>  {
@@ -43,7 +43,7 @@ class JSONOutputManager extends YadamuOutputManager {
 			  return col
 			}
           }
-          if (this.SPATIAL_FORMAT.endsWith('GeoJSON')) {
+          if (this.SPATIAL_FORMAT === ('GeoJSON')) {
             return (col,idx)  => {
 			  if (typeof col === 'string') {
 				try {
@@ -73,7 +73,7 @@ class JSONOutputManager extends YadamuOutputManager {
   		    return col
 		  }
 	    case (YadamuDataTypes.isJSON(dataTypeDefinition.type)):
-          return (col,idx) =>  {
+		  return (col,idx) =>  {
 		    try {
               if (typeof col === 'string') {
                 return JSON.parse(col)
@@ -84,7 +84,8 @@ class JSONOutputManager extends YadamuOutputManager {
 		    } catch (e) { return { "YADAMU_INVALID_JSON_VALUE" : col }}
    		    return col
           }
-        case (YadamuDataTypes.isBoolean(dataTypeDefinition.type,dataTypeDefinition.length,this.tableInfo.vendor)):
+        // case (YadamuDataTypes.isBoolean(dataTypeDefinition.type,dataTypeDefinition.length,this.tableInfo.vendor)):
+        case dataTypeDefinition.type.toUpperCase() === 'BOOLEAN':
           return (col,idx) =>  {
 		    const bool = (typeof col === 'string') ? col.toUpperCase() : (Buffer.isBuffer(col)) ? col.toString('hex') : col
 		    switch(bool) {

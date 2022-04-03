@@ -45,7 +45,9 @@ class MariadbStatementLibrary {
                   json_quote(case 
                                when column_type = 'tinyint(1)' then
                                  ${this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN ? "''" : "'3'"}
-	   					      when (numeric_precision is not null) and (numeric_scale is not null) then
+                               when column_type = 'bit(1)' then
+                                 ${this.dbi.DATA_TYPES.storageOptions.BIT1_IS_BOOLEAN ? "''" : "'1'"}
+ 	   					       when (numeric_precision is not null) and (numeric_scale is not null) then
                                  concat(numeric_precision,',',numeric_scale) 
                                when (numeric_precision is not null) then 
                                  case

@@ -515,12 +515,17 @@ class PostgresDBI extends YadamuDBI {
   }
 
   async processStagingTable(schema) {  	
-  	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1) from "YADAMU_STAGING"`;
+  
+	const options = {
+	  jsonStorageOption    : this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
+	}
+	
+  	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1,$2,$3) from "YADAMU_STAGING"`;
 
     const statementGenerator = new PostgresStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
     const typeMappings = statementGenerator.getVendorTypeMappings()
 
-  	var results = await this.executeSQL(sqlStatement,[typeMappings,schema])
+  	var results = await this.executeSQL(sqlStatement,[typeMappings,schema,JSON.stringify(options)])
     if (results.rows.length > 0) {
       if (this.useBinaryJSON  === true) {
 	    return this.processLog(results.rows[0][0],'JSONB_EACH')  

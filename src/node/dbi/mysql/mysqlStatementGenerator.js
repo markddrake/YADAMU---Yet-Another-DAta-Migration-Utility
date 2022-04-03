@@ -38,7 +38,7 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
         const tableInfo = statementCache[tableName];
 		tableInfo.columnNames = tableMetadata.columnNames
 		
-		tableInfo.sourceDataTypes = tableMetadata.source?.dataTypes || []
+		// tableInfo.sourceDataTypes = tableMetadata.source?.dataTypes || []
 		
 		const dataTypes = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
 		
@@ -105,8 +105,7 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
                   case "WKT":
                   case "EWRT":
                     return 'ST_GeomFromText(?)';
-                    break;
-				
+                    break;			
                   case "GeoJSON":
 				    // GeojSON recoded as WKB inMySQLOutput Manager
  				    /*
@@ -124,8 +123,6 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
             }
           }
         }) 
-
-        
 
         tableInfo.rowConstructor = `(${setOperators.join(',')})`
         switch (tableInfo.insertMode) {

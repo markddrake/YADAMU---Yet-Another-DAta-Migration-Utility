@@ -12,6 +12,7 @@ class OracleStatementLibrary {
   static get SQL_SCHEMA_INFORMATION()         { return _SQL_SCHEMA_INFORMATION } 
   static get SQL_CREATE_SAVE_POINT()          { return _SQL_CREATE_SAVE_POINT }  
   static get SQL_RESTORE_SAVE_POINT()         { return _SQL_RESTORE_SAVE_POINT }
+  static get SQL_IMPORT_JSON()                { return _SQL_IMPORT_JSON }
 
   static get SQL_SET_CURRENT_SCHEMA()         { return _SQL_SET_CURRENT_SCHEMA }
   static get SQL_DISABLE_CONSTRAINTS()        { return _SQL_DISABLE_CONSTRAINTS }
@@ -231,4 +232,4 @@ const _SQL_CREATE_SAVE_POINT  = `SAVEPOINT ${YadamuConstants.SAVE_POINT_NAME}`;
 
 const _SQL_RESTORE_SAVE_POINT = `ROLLBACK TO ${YadamuConstants.SAVE_POINT_NAME}`;
 
-  
+const _SQL_IMPORT_JSON        = `:log := YADAMU_IMPORT.IMPORT_JSON(:P_JSON_DUMP_FILE, :P_TYPE_MAPPINGS, :P_TARGET_SCHEMA, :P_OPTIONS);`

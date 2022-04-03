@@ -1178,8 +1178,8 @@ class OracleDBI extends YadamuDBI {
 	, xmlStorageModel      : this.XMLTYPE_STORAGE_CLAUSE
 	}
 
-	const sqlStatement = `begin\n  ${settings}\n  :log := YADAMU_IMPORT.IMPORT_JSON(:json, :schema, :options);\nend;`;
-	const results = await this.executeSQL(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH}, json:hndl, typeMappings: typeMapping, schema:this.CURRENT_SCHEMA, options: JSON.stringify(options)})
+	const sqlStatement = `begin\n  ${settings}\n  ${this.StatementLibrary.SQL_IMPORT_JSON}\nend;`;
+	const results = await this.executeSQL(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH}, P_JSON_DUMP_FILE:hndl, P_TYPE_MAPPINGS: typeMapping, P_TARGET_SCHEMA:this.CURRENT_SCHEMA, P_OPTIONS: JSON.stringify(options)})
 	await this.typeMappings.close();
     return this.processLog(results,'JSON_TABLE')
   }

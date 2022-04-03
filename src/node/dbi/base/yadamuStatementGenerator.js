@@ -35,7 +35,7 @@ class YadamuStatementGenerator {
   get SQL_TYPE_MAPPINGS()    {	  
 	this._SQL_TYPE_MAPPINGS = this._SQL_TYPE_MAPPINGS || (() => {
   	  this._SQL_TYPE_MAPPINGS = new Map() 
-	  for (let c = this.dbi.DATA_TYPES; c.name; c = Object.getPrototypeOf(c)) {
+	  for (let c = this.dbi.DATA_TYPES; c !== null; c = Object.getPrototypeOf(c)) {
         Object.getOwnPropertyNames(c).filter((name) => { 
 	      return Object.getOwnPropertyDescriptor(c,name).get
 	    }).forEach((name) => { 
@@ -53,7 +53,7 @@ class YadamuStatementGenerator {
   get DEFINED_DATA_TYPES() {
 	this._DEFINED_DATA_TYPES = this._DEFINED_DATA_TYPES || (() => {
       this._DEFINED_DATA_TYPES = []
-	  for (let c = this.dbi.DATA_TYPES; c.name; c = Object.getPrototypeOf(c)) {
+	  for (let c = this.dbi.DATA_TYPES; c !== null; c = Object.getPrototypeOf(c)) {
         Object.getOwnPropertyNames(c).filter((name) => { 
 	      return Object.getOwnPropertyDescriptor(c,name).get
 	    }).forEach((name) => { 
@@ -81,7 +81,7 @@ class YadamuStatementGenerator {
 	  return new Promise(async(resolve,reject) => {
         const vendorTypeMappings = new Map()
 	    const vendorDataTypes = await this.VENDOR_DATA_TYPES
-		for (let c = vendorDataTypes; c !== null ; c = Object.getPrototypeOf(c)) {
+		for (let c = vendorDataTypes; c !== null; c = Object.getPrototypeOf(c)) {
 		  Object.getOwnPropertyNames(c).filter((name) => { 
 	        return Object.getOwnPropertyDescriptor(c,name).get
 	      }).forEach((name) => { 
@@ -310,14 +310,15 @@ class YadamuStatementGenerator {
     })
 	
     const tableInfo =  { 
-      ddl             : this.tableMetadata.source ? null : this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,mappedDataTypes)
-    , dml             : this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,columnNames,insertOperators)
-    , columnNames     : tableMetadata.columnNames
-    , sourceDataTypes : tableMetadata.source ? tableMetadata.source.dataTypes : dataTypes
-    , targetDataTypes : mappedDataTypes
-    , insertMode      : insertMode
-    , _BATCH_SIZE     : this.dbi.BATCH_SIZE
-    , _SPATIAL_FORMAT : this.dbi.INBOUND_SPATIAL_FORMAT
+      ddl              : this.tableMetadata.source ? null : this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,mappedDataTypes)
+    , dml              : this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,columnNames,insertOperators)
+    , columnNames      : tableMetadata.columnNames
+    , sourceDataTypes  : tableMetadata.source ? tableMetadata.source.dataTypes : dataTypes
+    , targetDataTypes  : mappedDataTypes
+	, virtualDataTypes : mappedDataTypes
+    , insertMode       : insertMode
+    , _BATCH_SIZE      : this.dbi.BATCH_SIZE
+    , _SPATIAL_FORMAT  : this.dbi.INBOUND_SPATIAL_FORMAT
     }
 	
 	return tableInfo

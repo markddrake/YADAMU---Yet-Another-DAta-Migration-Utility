@@ -677,7 +677,7 @@ begin
 end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function YADAMU_IMPORT_JSONB(P_JSON jsonb, P_TARGET_SCHEMA VARCHAR) 
+create or replace function YADAMU_IMPORT_JSONB(P_JSON jsonb, P_TYPE_MAPPINGS jsonb, P_TARGET_SCHEMA VARCHAR, P_OPTIONS jsonb) 
 returns JSONB
 as $$
 declare
@@ -690,8 +690,11 @@ declare
 
   PLPGSQL_CTX        TEXT;
 begin
+
+  call SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS);
+
   for r in select "tableName"
-                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName", "columnNames", "dataTypes", "sizeConstraints", P_JSON #>> '{systemInformatio,typeMappings,spatialFormat}', 'jsonb', TRUE) "TABLE_INFO"
+                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName", "columnNames", "dataTypes", "sizeConstraints", P_JSON #>> '{systemInformatio,typeMappings,spatialFormat}', P_OPTIONS ->> 'jsonStorageOption', TRUE) "TABLE_INFO"
              from JSONB_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
                                                                 "tableSchema"      VARCHAR, 
@@ -734,7 +737,7 @@ exception
 end;  
 $$ LANGUAGE plpgsql;
 --
-create or replace function YADAMU_IMPORT_JSON(P_JSON json,P_TARGET_SCHEMA VARCHAR) 
+create or replace function YADAMU_IMPORT_JSON(P_JSON json, P_TYPE_MAPPINGS jsonb, P_TARGET_SCHEMA VARCHAR, P_OPTIONS jsonb) 
 returns JSONB
 as $$
 declare
@@ -748,8 +751,10 @@ declare
   PLPGSQL_CTX        TEXT;
 begin
 
+  call SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS);
+
   for r in select "tableName"
-                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_JSON #>> '{systemInformation,typeMappings,spatialFormat}', 'jsonb', FALSE) "TABLE_INFO"
+                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_JSON #>> '{systemInformation,typeMappings,spatialFormat}', P_OPTIONS ->> 'jsonStorageOption', FALSE) "TABLE_INFO"
              from JSON_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSON_TO_RECORD(value) as METADATA(
                                                                "tableSchema"      VARCHAR, 

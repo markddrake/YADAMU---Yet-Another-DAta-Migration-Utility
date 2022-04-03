@@ -362,6 +362,18 @@ class YadamuDataTypes {
                                                    
   set MSSQL_HIERARCHY_ID_TYPE(v)            { YadamuDataTypes.redefineProperty(this,'MSSQL_HIERARCHY_ID_TYPE',v) }
 
+  get MSSQL_TEXT_TYPE()                     { return this.CLOB_TYPE }
+                                                   
+  set MSSQL_TEXT_TYPE(v)                    { YadamuDataTypes.redefineProperty(this,'MSSQL_TEXT_TYPE',v) }
+
+  get MSSQL_NTEXT_TYPE()                    { return this.NCLOB_TYPE }
+                                                   
+  set MSSQL_NTEXT_TYPE(v)                   { YadamuDataTypes.redefineProperty(this,'MSSQL_NTEXT_TYPE',v) }
+
+  get MSSQL_IMAGE_TYPE()                    { return this.BLOB_TYPE }
+                                                   
+  set MSSQL_IMAGE_TYPE(v)                   { YadamuDataTypes.redefineProperty(this,'MSSQL_IMAGE_TYPE',v) }
+
   // Postgres Specific Types                       
                                                    
   get PGSQL_SINGLE_CHAR_TYPE()              { return `${this.CHAR_TYPE}(1)` }
