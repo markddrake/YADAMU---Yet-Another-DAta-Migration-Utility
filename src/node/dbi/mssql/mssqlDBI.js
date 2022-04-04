@@ -8,10 +8,19 @@ import {
 import { 
   performance 
 }                                     from 'perf_hooks';
-							          
+							 
+import {
+  PassThrough
+}                                     from 'stream';
+
+import {
+  pipeline
+}                                     from 'stream/promises';
+
+							 
 /* Database Vendors API */                                    
 
-import sql from 'mssql';
+import sql                            from 'mssql';
 
 /*
 **
@@ -40,6 +49,13 @@ import {
 							          							          
 import YadamuDBI                      from '../base/yadamuDBI.js'
 import DBIConstants                   from '../base/dbiConstants.js'
+import ExportFileHeader               from '../file/exportFileHeader.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                    from '../file/fileException.js'
 
 /* Vendor Specific DBI Implimentation */                                   
 					
@@ -50,8 +66,8 @@ import MsSQLParser                    from './mssqlParser.js'
 import MsSQLOutputManager             from './mssqlOutputManager.js'
 import MsSQLWriter                    from './mssqlWriter.js'
 import MsSQLStatementGenerator        from './mssqlStatementGenerator.js'
-import StagingTable                   from './stagingTable.js'
 import MsSQLReader                    from './mssqlReader.js'
+import MsSQLFileLoader                from './mssqlFileLoader.js'
 import MsSQLStatementLibrary          from './mssqlStatementLibrary.js'
 
 import {ConnectionError} from '../../core/yadamuException.js'
@@ -91,6 +107,7 @@ class MsSQLDBI extends YadamuDBI {
   get SPATIAL_MAKE_VALID()            { return this.parameters.SPATIAL_MAKE_VALID    || MsSQLConstants.SPATIAL_MAKE_VALID }
 
   get DATABASE_NAME()                 { return this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.vendorProperties.database }
+  get DEFAULT_COLATION()              { return this.DATABASE_VERSION < 15 ? 'Latin1_General_100_CS_AS_SC' : 'Latin1_General_100_CS_AS_SC_UTF8' }
 
   // get TRANSACTION_IN_PROGRESS()       { return super.TRANSACTION_IN_PROGRESS || this.TEDIOUS_TRANSACTION_ISSUE  }
   // set TRANSACTION_IN_PROGRESS(v)      { super.TRANSACTION_IN_PROGRESS = v }
@@ -179,7 +196,6 @@ class MsSQLDBI extends YadamuDBI {
     this._DATABASE_VERSION =  parseInt(results.recordsets[0][0].DATABASE_VERSION)
     this._DB_COLLATION = results.recordsets[0][0].DB_COLLATION
     
-    this.defaultCollation = this.DATABASE_VERSION < 15 ? 'Latin1_General_100_CS_AS_SC' : 'Latin1_General_100_CS_AS_SC_UTF8';
   }
   
   setTargetDatabase() {  
@@ -1180,7 +1196,6 @@ class MsSQLDBI extends YadamuDBI {
 	  return;
 	}
 
-
     let stack
     const psuedoSQL = 'commit transaction'
     this.SQL_TRACE.traceSQL(psuedoSQL)
@@ -1312,9 +1327,47 @@ class MsSQLDBI extends YadamuDBI {
   
   async uploadFile(importFilePath) {
 
-    const stagingTable = new StagingTable(this,MsSQLConstants.STAGING_TABLE,importFilePath,this.status) 
-    let results = await stagingTable.uploadFile()
+    let results
+	let stack
+	await this.beginTransaction();
+
+    let statement = `drop table if exists "${MsSQLConstants.STAGING_TABLE.tableName}"`;
+	results = await this.executeBatch(statement)
+
+	statement = `create table "${MsSQLConstants.STAGING_TABLE.tableName}" ("${MsSQLConstants.STAGING_TABLE.columnName}" NVARCHAR(MAX) collate ${this.DEFAULT_COLATION})`;
+    results = await this.executeBatch(statement)
+
+    statement = `insert into "${MsSQLConstants.STAGING_TABLE.tableName}" values ('')`;
+    results = await this.executeBatch(statement)
+  
+    statement = `update "${MsSQLConstants.STAGING_TABLE.tableName}" set "${MsSQLConstants.STAGING_TABLE.columnName}" .write(@C0,null,null)`;  
+	await this.cachePreparedStatement(statement, [{type : "nvarchar"}]) 
+	
+    const is = await new Promise((resolve,reject) => {
+      const stack = new Error().stack
+	  const inputStream = fs.createReadStream(importFilePath);
+      inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
+    })
+
+    const loader = new MsSQLFileLoader(this,this.status);
+    const multiplexor = new PassThrough()
+    const exportFileHeader = new ExportFileHeader (multiplexor, importFilePath, this.yadamuLogger)
+
+	stack = new Error().stack		
+    const startTime = performance.now()
+	await pipeline(is,multiplexor,loader)
+
     // results = await this.verifyDataLoad(this.generateRequest(),MsSQLConstants.STAGING_TABLE)
+
+    this.setSystemInformation(exportFileHeader.SYSTEM_INFORMATION)
+	this.setMetadata(exportFileHeader.METADATA)
+	const ddl = exportFileHeader.DDL
+      
+    const elapsedTime = performance.now() - startTime
+    is.close() 
+    await this.clearCachedStatement(); 
+    await this.commitTransaction();
+	return elapsedTime;
   }
   
   /*
@@ -1325,13 +1378,14 @@ class MsSQLDBI extends YadamuDBI {
 
 
   async processFile(hndl) {
+    try {
 
-    const statementGenerator = new PostgresStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
-    const typeMappings = statementGenerator.getVendorTypeMappings()
+    const statementGenerator = new MsSQLStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
+    const typeMappings = Array.from( (await statementGenerator.VENDOR_TYPE_MAPPINGS).entries())
 
     const args = { 
             inputs: [{
-  			  name: 'TYPE_MAPPINGS',   type: sql.VarChar,  value: typeMappings
+  			  name: 'TYPE_MAPPINGS',   type: sql.VarChar,  value: JSON.stringify(typeMappings)
 			},{
               name: 'TARGET_DATABASE', type: sql.VarChar,  value: this.CURRENT_SCHEMA
             },{
@@ -1342,8 +1396,9 @@ class MsSQLDBI extends YadamuDBI {
      let results = await this.execute('sp_YADAMU_IMPORT',args,'')                   
      results = results.recordset;
      const log = JSON.parse(results[0][Object.keys(results[0])[0]])
-     super.processLog(log,'OPENJSON',this.status, this.yadamuLogger)
+	 super.processLog(log,'OPENJSON',this.status, this.yadamuLogger)
      return log
+    } catch(e) {console.log(e)}
   }
   
   /*

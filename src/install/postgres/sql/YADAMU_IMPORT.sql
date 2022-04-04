@@ -324,7 +324,7 @@ begin
 							     'to_char ((''epoch''::date + "' || COLUMN_NAME || '")::timestamptz, ''YYYY-MM-DD"T"HH24:MI:SS.US'') "' || COLUMN_NAME || '"'
 							   when c.data_type like 'interval%' then
                                  '"' || COLUMN_NAME ||'"::varchar "' || COLUMN_NAME || '"'
-                               when ((c.data_type = 'USER-DEFINED') and (c.udt_name in ('geometry','geography')))  then
+                               when ((c.data_type = 'USER-DEFINED') and (c.udt_name in ('geometry')))  then
                                  case 
                                    when P_SPATIAL_FORMAT = 'WKB' then
                                      'ST_AsBinary("' || column_name || '") "' || COLUMN_NAME || '"'
@@ -339,6 +339,21 @@ begin
                                    else
 								     '"' || column_name || '"::VARCHAR "' || COLUMN_NAME || '"'
                                  end
+                               when ((c.data_type = 'USER-DEFINED') and (c.udt_name in ('geography')))  then
+                                 case 
+                                   when P_SPATIAL_FORMAT = 'WKB' then
+                                     'ST_AsBinary("' || column_name || '") "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'WKT' then
+                                     'ST_AsText("' || column_name || '",18) "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'EWKB' then
+                                     'ST_AsBinary("' || column_name || '") "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'EWKT' then
+                                     'ST_AsText("' || column_name || '") "' || COLUMN_NAME || '"'
+                                   when P_SPATIAL_FORMAT = 'GeoJSON' then
+                                     'ST_AsGeoJSON("' || column_name || '") "' || COLUMN_NAME || '"'
+                                   else
+								     '"' || column_name || '"::VARCHAR "' || COLUMN_NAME || '"'
+                                 end
                                when (c.data_type in ('point','path','polygon')) then
                                  case 
                                    when P_SPATIAL_FORMAT = 'WKB' then
@@ -346,11 +361,11 @@ begin
                                    when P_SPATIAL_FORMAT = 'WKT' then
                                      'ST_AsText("' || column_name || '"::geometry,18) "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'EWKB' then
-                                     'ST_AsEWKB("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
+                                     'ST_AsBinary("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'EWKT' then
                                      'ST_AsEWKT("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'GeoJSON' then
-                                     'ST_AsGeoJSON("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
+                                     'ST_AsText("' || column_name || '"::geometry) "' || COLUMN_NAME || '"'
                                    when P_SPATIAL_FORMAT = 'YadamuJSON' then
 								     'YADAMU_AsGeoJSON("' || column_name || '" ) "' || COLUMN_NAME || '"'
                                    else

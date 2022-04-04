@@ -38,7 +38,7 @@ import {
 							          							          
 import YadamuDBI                      from '../base/yadamuDBI.js'
 import DBIConstants                   from '../base/dbiConstants.js'
-import JSONParser                     from '../file/jsonParser.js'
+import ExportFileHeader               from '../file/exportFileHeader.js'
 
 import {
   FileError, 
@@ -212,9 +212,9 @@ class OracleDBI extends YadamuDBI {
 
    get SCHEMA_METADATA_OPTIONS() {
 	 return {
-		spatialFormat : this.SPATIAL_FORMAT
-   	  , booleanType   : this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
-	  , objectType    : this.DATA_TYPES.storageOptions.OBJECT_TYPE
+		spatialFormat          : this.SPATIAL_FORMAT
+   	  , booleanStorageOption   : this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	  , objectStorageOption    : this.DATA_TYPES.storageOptions.OBJECT_TYPE
 	}
   }
   
@@ -435,7 +435,8 @@ class OracleDBI extends YadamuDBI {
   async fileToBlob(filename) {
      const stream = await new Promise((resolve,reject) => {
      const inputStream = fs.createReadStream(filename)
-       inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err)})
+	   const stack = new Error().stack
+	   inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,filename) )})
     })
     return this.streamToBlob(stream)
   };
@@ -1094,38 +1095,26 @@ class OracleDBI extends YadamuDBI {
 
   async uploadFile(importFilePath) {
 
-     if (this.MAX_STRING_SIZE > 32767) {
-       const json = await this.fileToBlob(importFilePath)
-       return json;
-     }
-     else {
+    const is = await new Promise((resolve,reject) => {
+      const stack = new Error().stack
+      const inputStream = fs.createReadStream(importFilePath)
+      inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,importFilePath) : new FileError(this.DRIVER_ID,err,stack,importFilePath) )})
+    })
 
-       // Need to capture the SystemInformation and DDL objects of the export file to make sure the DDL can be processed on the RDBMS.
-       // If any DDL statement exceeds MAX_STRING_SIZE then DDL will have to executed statement by statement from the client
-       // 'Tee' the input stream used to create the temporary lob that contains the export file and pass it through the JSON Parser.
-       // If any of the DDL operations exceed the maximum string size supported by server side JSON operations cache the ddl statements on the client
+	const multiplexor = new PassThrough()
+	const exportFileHeader = new ExportFileHeader (multiplexor, importFilePath, this.yadamuLogger)
 
+    const blob = await this.createLob(oracledb.BLOB)
+    await pipeline(is,multiplexor,blob)
 
-       const inputStream = await new Promise((resolve,reject) => {
-         const inputStream = fs.createReadStream(importFilePath)
-         inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(this.DRIVER_ID,err,stack,importFilePath) : new FileError(this.DRIVER_ID,err,stack,importFilePath) )})
-       })
-
-	   const multiplexor = new PassThrough()
-       const jsonParser = new JSONParser(this.yadamuLogger,'DDL_ONLY',importFilePath)
-	   const ddlCache = new DDLCache(this.yadamuLogger,multiplexor,jsonParser)
-	   multiplexor.pipe(jsonParser).pipe(ddlCache)
-
-       const blob = await this.createLob(oracledb.BLOB)
-       await pipeline(inputStream,multiplexor,blob)
-
-       const ddl = ddlCache.getDDL()
-       if ((ddl.length > 0) && this.statementTooLarge(ddl)) {
-         this.ddl = ddl
-         this.systemInformation = ddlCache.getSystemInformation()
-       }
-       return blob
-     }
+    this.setSystemInformation(exportFileHeader.SYSTEM_INFORMATION)
+	this.setMetadata(exportFileHeader.METADATA)
+	const ddl = exportFileHeader.DDL
+       
+    if ((ddl.length > 0) && this.statementTooLarge(ddl)) {
+      this.ddl = ddl
+    }
+    return blob
   }
 
   /*
@@ -1170,17 +1159,17 @@ class OracleDBI extends YadamuDBI {
     }
 
     const statementGenerator = new OracleStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
-    const typeMappings = statementGenerator.getVendorTypeMappings()
+    const typeMappings = await statementGenerator.getVendorTypeMappings()
 	
 	const options = {
-	  booleanStorgeOption  : this.this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
-	, jsonDataType         : this.JSON_DATA_TYPE
-	, xmlStorageModel      : this.XMLTYPE_STORAGE_CLAUSE
+	  xmlStorageClause     : this.XMLTYPE_STORAGE_CLAUSE
+	, booleanStorgeOption  : this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	, jsonStorageOption    : this.DATA_TYPES.storageOptions.JSON_TYPE
 	}
 
 	const sqlStatement = `begin\n  ${settings}\n  ${this.StatementLibrary.SQL_IMPORT_JSON}\nend;`;
-	const results = await this.executeSQL(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH}, P_JSON_DUMP_FILE:hndl, P_TYPE_MAPPINGS: typeMapping, P_TARGET_SCHEMA:this.CURRENT_SCHEMA, P_OPTIONS: JSON.stringify(options)})
-	await this.typeMappings.close();
+	const results = await this.executeSQL(sqlStatement,{log:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: OracleConstants.LOB_STRING_MAX_LENGTH}, P_JSON_DUMP_FILE:hndl, P_TYPE_MAPPINGS: typeMappings, P_TARGET_SCHEMA:this.CURRENT_SCHEMA, P_OPTIONS: JSON.stringify(options)})
+	await typeMappings.close();
     return this.processLog(results,'JSON_TABLE')
   }
 
@@ -1268,7 +1257,7 @@ class OracleDBI extends YadamuDBI {
   }
 
   async getSchemaMetadata() {
-	  
+
     const options = (this.DATABASE_VERSION < 12) ? this.SCHEMA_METADATA_OPTIONS_XML : JSON.stringify(this.SCHEMA_METADATA_OPTIONS)
 	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION
@@ -1290,6 +1279,7 @@ class OracleDBI extends YadamuDBI {
     )
                                 
     const schemaInformation = results.rows
+
 	schemaInformation.forEach((tableInfo) => {
       const partitionList = JSON.parse(tableInfo.PARTITION_LIST)
 	  if (partitionList.length > 0) {
@@ -1641,50 +1631,6 @@ class OracleDBI extends YadamuDBI {
   async finalizeCopy() {
 	 await this.executeSQL(`drop directory ${this.SQL_DIRECTORY_NAME}`)
 	 await this.finalizeData()
-  }
-
-}
-
-class DDLCache extends Transform {
-
-  constructor(yadamuLogger, passThrough, jsonParser) {
-    super({objectMode: true })
-	this.yadamuLogger = yadamuLogger
-    this.systemInformation = undefined;
-	this.passThrough = passThrough;
-	this.jsonParser = jsonParser;
-    this.ddl = []
-
-  }
-
-  async _transform(obj, encoding, callback) {
-    try {
-      switch (Object.keys(obj)[0]) {
-		case 'systemInformation':
-          this.systemInformation = obj.systemInformation
-          break;
-        case 'ddl':
-          this.ddl = obj.ddl;
-        case 'metadata':
-		case 'table':
-		default:
-		  this.passThrough.unpipe(this.jsonParser)
-		  this.jsonParser.destroy()
-          break;
-      }
-      callback()
-    } catch (e) {
-      this.yadamuLogger.logException([`${this.constructor.name}._transform()`],e)
-      callback(e)
-    }
-  }
-
-  getDDL() {
-    return this.ddl;
-  }
-
-  getSystemInformation() {
-    return this.systemInformation
   }
 
 }

@@ -13,8 +13,9 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
   async generateStatementCache() {    
   
     const options = {
-	  spatialFormat    : this.dbi.INBOUND_SPATIAL_FORMAT
-	, circleFormat     : this.dbi.INBOUND_CIRCLE_FORMAT
+	  spatialFormat        : this.dbi.INBOUND_SPATIAL_FORMAT
+	, circleFormat         : this.dbi.INBOUND_CIRCLE_FORMAT
+	, booleanStorgeOption  : this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE
 	}
 
     // this.debugStatementGenerator(options)

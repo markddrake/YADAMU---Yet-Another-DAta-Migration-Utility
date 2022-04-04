@@ -1,6 +1,10 @@
 
 import fs                             from 'fs';
 
+import {
+  finished
+}                                     from 'stream/promises';
+
 import { 
   performance 
 }                                     from 'perf_hooks';
@@ -23,6 +27,13 @@ import {
 							          							          
 import YadamuDBI                      from '../base/yadamuDBI.js'
 import DBIConstants                   from '../base/dbiConstants.js'
+import ExportFileHeader               from '../file/exportFileHeader.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                     from '../file/fileException.js'
 
 /* Vendor Specific DBI Implimentation */                                   
 	
@@ -543,6 +554,21 @@ class MySQLDBI extends YadamuDBI {
  
   async uploadFile(importFilePath) {
 
+	const is = await new Promise((resolve,reject) => {
+      const stack = new Error().stack
+      const inputStream = fs.createReadStream(importFilePath);
+      inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
+    })
+	
+    const exportFileHeader = new ExportFileHeader (is, importFilePath, this.yadamuLogger)
+
+	try {
+	  await finished(exportFileHeader);
+	} catch (e) { /* Expected to throw Premature Close */}
+
+    this.setSystemInformation(exportFileHeader.SYSTEM_INFORMATION)
+    this.setMetadata(exportFileHeader.METADATA)
+    
     let results = await this.createStagingTable()
     results = await this.loadStagingTable(importFilePath,true)
     return results;
@@ -567,11 +593,15 @@ class MySQLDBI extends YadamuDBI {
 
   async processFile(hndl) {
 
-    const statementGenerator = new PostgresStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
-    const typeMappings = statementGenerator.getVendorTypeMappings()
+    const options = {
+      booleanStorgeOption  : this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	}
+	 
+    const statementGenerator = new MySQLStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
+    const typeMappings = Array.from( (await statementGenerator.VENDOR_TYPE_MAPPINGS).entries())
 
-    const sqlStatement = `SET @RESULTS = ''; CALL YADAMU_IMPORT(?,?,@RESULTS); SELECT @RESULTS "logRecords";`;                     
-    let results = await  this.executeSQL(sqlStatement,typeMappings,this.CURRENT_SCHEMA)
+    const sqlStatement = `SET @RESULTS = ''; CALL YADAMU_IMPORT(?,?,?,@RESULTS); SELECT @RESULTS "logRecords";`;                     
+    let results = await  this.executeSQL(sqlStatement,[JSON.stringify(typeMappings),this.CURRENT_SCHEMA, JSON.stringify(options)])
     results = results.pop()
     return this.processLog(results,'JSON_TABLE')
   }

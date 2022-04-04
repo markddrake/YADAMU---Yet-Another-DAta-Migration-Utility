@@ -1559,11 +1559,11 @@ as
   V_NOTHING_DONE BOOLEAN := TRUE;
   V_ABORT_DATALOAD  BOOLEAN := FALSE;
 
-  V_SPATIAL_FORMAT            VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.spatialFormat')        then JSON_VALUE(P_OPTIONS, '$.spatialFormat')        else C_SPATIAL_FORMAT end; 
-  V_CIRCLE_FORMAT             VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.circleFormat')         then JSON_VALUE(P_OPTIONS, '$.circleFormat')         else C_CIRCLE_FORMAT end; 
-  V_XMLTYPE_STORAGE_CLAUSE    VARCHAR2(17)  := case when JSON_EXISTS(P_OPTIONS, '$.xmlStorageClause')     then JSON_VALUE(P_OPTIONS, '$.xmlStorageClause')     else C_XMLTYPE_STORAGE_CLAUSE end;
-  V_JSON_DATA_TYPE            VARCHAR2(5)   := case when JSON_EXISTS(P_OPTIONS, '$.jsonStorageOption')    then JSON_VALUE(P_OPTIONS, '$.jsonStorageOption')    else C_JSON_DATA_TYPE end; 
-  V_BOOLEAN_DATA_TYPE         VARCHAR2(32)  := case when JSON_EXISTS(P_OPTIONS, '$.booleanStorgeOption')  then JSON_VALUE(P_OPTIONS, '$.booleanStorgeOption')  else C_BOOLEAN_DATA_TYPE end; 
+  V_SPATIAL_FORMAT            VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.spatialFormat')         then JSON_VALUE(P_OPTIONS, '$.spatialFormat')         else C_SPATIAL_FORMAT end; 
+  V_CIRCLE_FORMAT             VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.circleFormat')          then JSON_VALUE(P_OPTIONS, '$.circleFormat')          else C_CIRCLE_FORMAT end; 
+  V_XMLTYPE_STORAGE_CLAUSE    VARCHAR2(17)  := case when JSON_EXISTS(P_OPTIONS, '$.xmlStorageClause')      then JSON_VALUE(P_OPTIONS, '$.xmlStorageClause')      else C_XMLTYPE_STORAGE_CLAUSE end;
+  V_JSON_DATA_TYPE            VARCHAR2(5)   := case when JSON_EXISTS(P_OPTIONS, '$.jsonStorageOption')     then JSON_VALUE(P_OPTIONS, '$.jsonStorageOption')     else C_JSON_DATA_TYPE end; 
+  V_BOOLEAN_DATA_TYPE         VARCHAR2(32)  := case when JSON_EXISTS(P_OPTIONS, '$.booleanStorageOption')  then JSON_VALUE(P_OPTIONS, '$.booleanStorageOption')  else C_BOOLEAN_DATA_TYPE end; 
       
 begin
   -- LOG_INFO(JSON_OBJECT('startTime' value SYSTIMESTAMP, 'includeData' value G_INCLUDE_DATA, 'includeDDL' value G_INCLUDE_DDL));
@@ -1677,11 +1677,11 @@ as
   
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
-  V_SPATIAL_FORMAT            VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.spatialFormat')        then JSON_VALUE(P_OPTIONS, '$.spatialFormat')        else C_SPATIAL_FORMAT end; 
-  V_CIRCLE_FORMAT             VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.circleFormat')         then JSON_VALUE(P_OPTIONS, '$.circleFormat')         else C_CIRCLE_FORMAT end; 
-  V_XMLTYPE_STORAGE_CLAUSE    VARCHAR2(17)  := case when JSON_EXISTS(P_OPTIONS, '$.xmlStorageClause')     then JSON_VALUE(P_OPTIONS, '$.xmlStorageClause')     else C_XMLTYPE_STORAGE_CLAUSE end;
-  V_JSON_DATA_TYPE            VARCHAR2(5)   := case when JSON_EXISTS(P_OPTIONS, '$.jsonStorageOption')    then JSON_VALUE(P_OPTIONS, '$.jsonStorageOption')    else C_JSON_DATA_TYPE end; 
-  V_BOOLEAN_DATA_TYPE         VARCHAR2(32)  := case when JSON_EXISTS(P_OPTIONS, '$.booleanStorgeOption')  then JSON_VALUE(P_OPTIONS, '$.booleanStorgeOption')  else C_BOOLEAN_DATA_TYPE end; 
+  V_SPATIAL_FORMAT            VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.spatialFormat')        then JSON_VALUE(P_OPTIONS, '$.spatialFormat')         else C_SPATIAL_FORMAT end; 
+  V_CIRCLE_FORMAT             VARCHAR2(7)   := case when JSON_EXISTS(P_OPTIONS, '$.circleFormat')         then JSON_VALUE(P_OPTIONS, '$.circleFormat')          else C_CIRCLE_FORMAT end; 
+  V_XMLTYPE_STORAGE_CLAUSE    VARCHAR2(17)  := case when JSON_EXISTS(P_OPTIONS, '$.xmlStorageClause')     then JSON_VALUE(P_OPTIONS, '$.xmlStorageClause')      else C_XMLTYPE_STORAGE_CLAUSE end;
+  V_JSON_DATA_TYPE            VARCHAR2(5)   := case when JSON_EXISTS(P_OPTIONS, '$.jsonStorageOption')    then JSON_VALUE(P_OPTIONS, '$.jsonStorageOption')     else C_JSON_DATA_TYPE end; 
+  V_BOOLEAN_DATA_TYPE         VARCHAR2(32)  := case when JSON_EXISTS(P_OPTIONS, '$.booleanStorageOption') then JSON_VALUE(P_OPTIONS, '$.booleanStorageOption')  else C_BOOLEAN_DATA_TYPE end; 
 --
 $ELSE
 --
@@ -1691,7 +1691,7 @@ $ELSE
   V_CIRCLE_FORMAT             VARCHAR2(7)   := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/circleFormat')         = 1 then V_TYPE_MAPPINGS.extract('/options/circleFormat/text()').getStringVal()         else C_CIRCLE_FORMAT end; 
   V_XMLTYPE_STORAGE_CLAUSE    VARCHAR2(17)  := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/xmlStorageClause')     = 1 then V_TYPE_MAPPINGS.extract('/options/xmlStorageClause/text()').getStringVal()     else C_XMLTYPE_STORAGE_CLAUSE end;
   V_JSON_DATA_TYPE            VARCHAR2(5)   := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/jsonStorageOption')    = 1 then V_TYPE_MAPPINGS.extract('/options/jsonStorageOption/text()').getStringVal()    else C_JSON_DATA_TYPE end; 
-  V_BOOLEAN_DATA_TYPE         VARCHAR2(32)  := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/booleanStorgeOption')  = 1 then V_TYPE_MAPPINGS.extract('/options/booleanStorgeOption/text()').getStringVal()  else C_BOOLEAN_DATA_TYPE end; 
+  V_BOOLEAN_DATA_TYPE         VARCHAR2(32)  := case when V_TYPE_MAPPINGS.EXISTSNODE('/options/booleanStorageOption') = 1 then V_TYPE_MAPPINGS.extract('/options/booleanStorageOption/text()').getStringVal() else C_BOOLEAN_DATA_TYPE end; 
 --
 $END 
 --

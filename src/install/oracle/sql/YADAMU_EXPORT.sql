@@ -213,17 +213,17 @@ as
 
 $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 -- 
-  V_SPATIAL_FORMAT        VARCHAR2(7)    := case when JSON_EXISTS(P_OPTIONS, '$.spatialFormat')                                                                    then JSON_VALUE(P_OPTIONS, '$.spatialFormat')   else YADAMU_IMPORT.C_SPATIAL_FORMAT end;
-  V_TREAT_RAW1_AS_BOOLEAN      RAW(1)    := case when JSON_EXISTS(P_OPTIONS, '$.booleanStorgeOption') and JSON_VALUE(P_OPTIONS,'$.booleanStorgeOption') = 'RAW(1)' then YADAMU_UTILITIES.C_TRUE else YADAMU_UTILITIES.C_FALSE end; 
-  V_OBJECTS_AS_JSON            RAW(1)    := case when JSON_EXISTS(P_OPTIONS, '$.objectStorgeOption')  and JSON_VALUE(P_OPTIONS, '$.objectStorgeOption') = 'JSON'   then YADAMU_UTILITIES.C_FALSE else YADAMU_UTILITIES.C_FALSE end; 
+  V_SPATIAL_FORMAT        VARCHAR2(7)    := case when JSON_EXISTS(P_OPTIONS, '$.spatialFormat')                                                                      then JSON_VALUE(P_OPTIONS, '$.spatialFormat') else YADAMU_IMPORT.C_SPATIAL_FORMAT end;
+  V_TREAT_RAW1_AS_BOOLEAN      RAW(1)    := case when JSON_EXISTS(P_OPTIONS, '$.booleanStorageOption') and JSON_VALUE(P_OPTIONS,'$.booleanStorageOption') = 'RAW(1)' then YADAMU_UTILITIES.C_TRUE else YADAMU_UTILITIES.C_FALSE end; 
+  V_OBJECTS_AS_JSON            RAW(1)    := case when JSON_EXISTS(P_OPTIONS, '$.objectStorageOption')  and JSON_VALUE(P_OPTIONS, '$.objectStorageOption') = 'JSON'   then YADAMU_UTILITIES.C_FALSE else YADAMU_UTILITIES.C_FALSE end;   
 --
 $ELSE
 --
   V_OPTIONS                XMLTYPE    := XMLTYPE(P_OPTIONS);
   
-  V_SPATIAL_FORMAT      VARCHAR2(7)   := case when V_OPTIONS.EXISTSNODE('/options/spatialFormat')       = 1                                                                                           then V_OPTIONS.extract('/options/spatialFormat/text()').getStringVal()       else YADAMU_IMPORT.C_SPATIAL_FORMAT end;
-  V_TREAT_RAW1_AS_BOOLEAN    RAW(1)   := case when V_OPTIONS.EXISTSNODE('/options/booleanStorgeOption') = 1 and V_OPTIONS.extract('/options/booleanStorgeOption/text()').getStringVal()  = 'RAW(1)'   then YADAMU_UTILITIES.C_TRUE else YADAMU_UTILITIES.C_FALSE end;
-  V_OBJECTS_AS_JSON          RAW(1)   := case when V_OPTIONS.EXISTSNODE('/options/objectStorgeOption')  = 1 and V_OPTIONS.extract('/options/objectStorgeOption/text()').getNumberVal()   = 'JSON'     then YADAMU_UTILITIES.C_TRUE else YADAMU_UTILITIES.C_FALSE end; 
+  V_SPATIAL_FORMAT      VARCHAR2(7)   := case when V_OPTIONS.EXISTSNODE('/options/spatialFormat') = 1                  then V_OPTIONS.extract('/options/spatialFormat/text()').getStringVal() else YADAMU_IMPORT.C_SPATIAL_FORMAT end;
+  V_TREAT_RAW1_AS_BOOLEAN    RAW(1)   := case when V_OPTIONS.EXISTSNODE('/options[booleanStorageOption="RAW(1)"]') = 1 then YADAMU_UTILITIES.C_TRUE else YADAMU_UTILITIES.C_FALSE end;
+  V_OBJECTS_AS_JSON          RAW(1)   := case when V_OPTIONS.EXISTSNODE('/options[objectStorageOption="JSON"]')  = 1   then YADAMU_UTILITIES.C_TRUE else YADAMU_UTILITIES.C_FALSE end; 
 --
 $END  
 
@@ -619,6 +619,8 @@ $END
 --
 begin
 --
+  DBMS_OUTPUT.PUT_LINE('TR1B:' || V_TREAT_RAW1_AS_BOOLEAN || ',' || P_OPTIONS );
+
   $IF $$DEBUG $THEN
   DBMS_OUTPUT.put_line(TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD"T"HH24:MI:SS.FF6') || ': Start');
   $END

@@ -7,8 +7,13 @@ import {
 }                                     from 'events';
 
 import {
-  Readable
+  Readable,
+  PassThrough
 }                                     from 'stream';
+
+import {
+  pipeline
+}                                     from 'stream/promises';
 
 import { 
   performance 
@@ -39,6 +44,7 @@ import {
 							          							          
 import YadamuDBI                      from '../base/yadamuDBI.js'
 import DBIConstants                   from '../base/dbiConstants.js'
+import ExportFileHeader               from '../file/exportFileHeader.js'
 
 import {
   FileError, 
@@ -463,16 +469,28 @@ class PostgresDBI extends YadamuDBI {
     this.SQL_TRACE.traceSQL(copyStatement)
 	try {
 	  // Create an Readable stream from an async interator based on the readline interface. This avoids issue with uploading Pretty Printed JSON 
-	  const is = fs.createReadStream(importFilePath)
-      await once(is, 'open')
-      const rl = readline.createInterface({input: is, crlfDelay: Infinity})
+   	  const is = await new Promise((resolve,reject) => {
+        const stack = new Error().stack
+        const inputStream = fs.createReadStream(importFilePath);
+        inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
+      })
+	  
+	  const rl = readline.createInterface({input: is, crlfDelay: Infinity})
       const rli = rl[Symbol.asyncIterator]()
       const rlis = Readable.from(rli)
+
+      const multiplexor = new PassThrough()
+	  const exportFileHeader = new ExportFileHeader (multiplexor, importFilePath, this.yadamuLogger)
 
 	  stack = new Error().stack		
       const outputStream = await this.executeSQL(CopyFrom(copyStatement))    
       const startTime = performance.now()
-	  await pipeline(rlis,outputStream)
+	  await pipeline(rlis,multiplexor,outputStream)
+
+      this.setSystemInformation(exportFileHeader.SYSTEM_INFORMATION)
+	  this.setMetadata(exportFileHeader.METADATA)
+	  const ddl = exportFileHeader.DDL
+      
       const elapsedTime = performance.now() - startTime
       is.close()
       return elapsedTime;
@@ -517,13 +535,13 @@ class PostgresDBI extends YadamuDBI {
   async processStagingTable(schema) {  	
   
 	const options = {
-	  jsonStorageOption    : this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
+	  jsonStorageOption    : this.DATA_TYPES.storageOptions.JSON_TYPE
 	}
 	
   	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1,$2,$3) from "YADAMU_STAGING"`;
 
     const statementGenerator = new PostgresStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
-    const typeMappings = statementGenerator.getVendorTypeMappings()
+    const typeMappings = JSON.stringify(Array.from( (await statementGenerator.VENDOR_TYPE_MAPPINGS).entries()))
 
   	var results = await this.executeSQL(sqlStatement,[typeMappings,schema,JSON.stringify(options)])
     if (results.rows.length > 0) {
