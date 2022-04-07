@@ -10,7 +10,8 @@ import YadamuDataTypes          from '../base/yadamuDataTypes.js'
 import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 import {
-  EmptyStringDetected 
+  EmptyStringDetected,
+  WhitespaceIssue
 }                               from './verticaException.js'
 
 
@@ -63,21 +64,20 @@ class VerticaOutputManager extends YadamuOutputManager {
 	
    return dataTypes.map((dataType,idx) => {      
 
-      if (this.tableInfo.jsonColumns[idx]) {
-        return (col,idx) =>  {
-          if (typeof col === 'string') {
-            return JSON.parse(col)
-          } 
-	      if (Buffer.isBuffer(col)) {
-		    return JSON.parse(col.toString('utf8'))
-		  }
-  	      return col
-   	    }
-	  }
-      
-	  const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
 	  
 	  switch (dataTypeDefinition.type.toLowerCase()) {
+		case this.dbi.DATA_TYPES.JSON_TYPE:
+		  return (col,idx) =>  {
+            if (typeof col === 'string') {
+              return JSON.parse(col)
+            } 
+	        if (Buffer.isBuffer(col)) {
+		      return JSON.parse(col.toString('utf8'))
+		    }
+  	        return col
+   	      }
+		  return null;
 		case this.dbi.DATA_TYPES.BINARY_TYPE:
 		case this.dbi.DATA_TYPES.VARBINARY_TYPE:
 		  return (col,idx) =>  {
@@ -101,7 +101,6 @@ class VerticaOutputManager extends YadamuOutputManager {
           }
           if (this.SPATIAL_FORMAT.endsWith('GeoJSON')) {
             return (col,idx)  => {
-		      console.log(col)
 			  return YadamuSpatialLibrary.geoJSONtoWKT(col)
 			}
           }

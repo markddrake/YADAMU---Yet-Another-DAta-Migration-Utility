@@ -11,23 +11,26 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
   }
 
   async generateStatementCache() {    
-  
+
+    await this.init()
+	
     const options = {
 	  spatialFormat        : this.dbi.INBOUND_SPATIAL_FORMAT
 	, circleFormat         : this.dbi.INBOUND_CIRCLE_FORMAT
-	, booleanStorgeOption  : this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	, booleanStorageOption    : this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	, xmlStorageOption     : this.dbi.DATA_TYPES.storageOptions.XML_TYPE
 	}
 
     // this.debugStatementGenerator(options)
 
-	const vendorTypeMappings = Array.from( (await this.VENDOR_TYPE_MAPPINGS).entries())
+	const vendorTypeMappings = Array.from(this.TYPE_MAPPINGS.entries())
 	
 	const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,?,@RESULTS); SELECT @RESULTS "INSERT_INFORMATION"`;                       
     let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),JSON.stringify(vendorTypeMappings),this.targetSchema, JSON.stringify(options)]);
 	
     results = results.pop();
     let statementCache = JSON.parse(results[0].INSERT_INFORMATION)
-	
+
 	if (statementCache === null) {
       statementCache = {}      
     }

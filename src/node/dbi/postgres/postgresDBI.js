@@ -540,9 +540,8 @@ class PostgresDBI extends YadamuDBI {
 	
   	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1,$2,$3) from "YADAMU_STAGING"`;
 
-    const statementGenerator = new PostgresStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
-    const typeMappings = JSON.stringify(Array.from( (await statementGenerator.VENDOR_TYPE_MAPPINGS).entries()))
-
+	const typeMappings = await this.getVendorDataTypeMappings(PostgresStatementGenerator)
+    
   	var results = await this.executeSQL(sqlStatement,[typeMappings,schema,JSON.stringify(options)])
     if (results.rows.length > 0) {
       if (this.useBinaryJSON  === true) {

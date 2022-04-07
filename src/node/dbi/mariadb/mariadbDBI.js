@@ -88,6 +88,9 @@ class MariadbDBI extends YadamuDBI {
 	this.DATA_TYPES = MariadbDataTypes
 	
 	this.DATA_TYPES.storageOptions.BOOLEAN_TYPE = this.parameters.MARIADB_BOOLEAN_STORAGE_OPTION || this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION || this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	this.DATA_TYPES.storageOptions.SET_TYPE     = this.parameters.MARIADB_SET_STORAGE_OPTION     || this.DBI_PARAMETERS.SET_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.SET_TYPE
+	this.DATA_TYPES.storageOptions.ENUM_TYPE    = this.parameters.MARIADB_ENUM_STORAGE_OPTION    || this.DBI_PARAMETERS.ENUM_STORAGE_OPTION    || this.DATA_TYPES.storageOptions.ENUM_TYPE
+	this.DATA_TYPES.storageOptions.XML_TYPE     = this.parameters.MARIADB_XML_STORAGE_OPTION     || this.DBI_PARAMETERS.XML_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.XML_TYPE
 
     this.pool = undefined;
 	

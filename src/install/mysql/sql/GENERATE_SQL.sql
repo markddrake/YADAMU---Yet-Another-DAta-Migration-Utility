@@ -4,7 +4,7 @@ DROP PROCEDURE IF EXISTS GENERATE_SQL;
 --
 DELIMITER $$
 --
-CREATE PROCEDURE GENERATE_SQL(P_VENDOR VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_TABLE_NAME VARCHAR(128), P_COLUMN_NAME_ARRAY JSON, P_DATA_TYPE_ARRAY JSON, P_SIZE_CONSTRAINT_ARRAY JSON, P_SPATIAL_FORMAT VARCHAR(7), P_CIRCLE_FORMAT VARCHAR(7), OUT P_TABLE_INFO JSON)
+CREATE PROCEDURE GENERATE_SQL(P_VENDOR VARCHAR(128), P_TARGET_SCHEMA VARCHAR(128), P_TABLE_NAME VARCHAR(128), P_COLUMN_NAME_ARRAY JSON, P_DATA_TYPE_ARRAY JSON, P_SIZE_CONSTRAINT_ARRAY JSON, P_SPATIAL_FORMAT VARCHAR(7), P_CIRCLE_FORMAT VARCHAR(7), P_BOOLEAN_TYPE VARCHAR(128), P_XML_TYPE VARCHAR(128), OUT P_TABLE_INFO JSON)
 BEGIN
   DECLARE V_COLUMN_LIST        TEXT;
   DECLARE V_COLUMNS_CLAUSE     TEXT;
@@ -85,7 +85,9 @@ BEGIN
           ,group_concat(concat('"',COLUMN_NAME,'" ',
                                case
                                  when TARGET_DATA_TYPE = 'boolean' then
-                                   'tinyint(1)'
+                                   P_BOOLEAN_TYPE
+                                 when TARGET_DATA_TYPE = 'xml' then
+                                   P_XML_TYPE
                                  when TARGET_DATA_TYPE like '%(%)' then
                                    TARGET_DATA_TYPE
                                  when TARGET_DATA_TYPE like '%unsigned'  then
@@ -196,7 +198,9 @@ BEGIN
           ,group_concat(concat('"',COLUMN_NAME,'" ',
                                case
                                  when TARGET_DATA_TYPE = 'boolean' then
-                                   'tinyint(1)'
+                                   P_BOOLEAN_TYPE
+                                 when TARGET_DATA_TYPE = 'xml' then
+                                   P_XML_TYPE
                                  when TARGET_DATA_TYPE like '%(%)' then
                                    TARGET_DATA_TYPE
                                  when TARGET_DATA_TYPE like '%unsigned'  then

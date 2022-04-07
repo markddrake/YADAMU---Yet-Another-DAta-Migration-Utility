@@ -29,6 +29,8 @@ class MariadbOutputManger extends YadamuOutputManger {
 
       switch (dataTypeDefinition.type.toLowerCase()) {
         case this.dbi.DATA_TYPES.JSON_TYPE:
+		case this.dbi.DATA_TYPES.MYSQL_ENUM_TYPE:
+        case this.dbi.DATA_TYPES.MYSQL_SET_TYPE:
           return (col,idx) => {
             return typeof col === 'object' ? JSON.stringify(col) : col
 	      }

@@ -1605,10 +1605,16 @@ class YadamuDBI extends EventEmitter {
 
   async finalizeImport() {
   }
-    
+  
+  async getVendorDataTypeMappings(StatementGenerator) {
+    const statementGenerator = new StatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
+	await statementGenerator.init()
+    return JSON.stringify(Array.from(statementGenerator.TYPE_MAPPINGS.entries()))
+  }
+  
   async generateStatementCache(StatementGenerator,schema) {
 	const statementGenerator = new StatementGenerator(this,this.systemInformation.vendor,schema,this.metadata,this.yadamuLogger)
-    this.statementCache = await statementGenerator.generateStatementCache()
+	this.statementCache = await statementGenerator.generateStatementCache()
 	this.emit(YadamuConstants.CACHE_LOADED  )
 	return this.statementCache
 

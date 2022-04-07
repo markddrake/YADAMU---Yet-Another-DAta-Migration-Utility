@@ -63,20 +63,15 @@ class OracleStatementGenerator extends _OracleStatementGenerator {
 	// console.log(metadataXML)
     return await this.dbi.stringToBlob(metadataXML);
   }
-    
-  async typeMappingToXML() {
-	 
-	 return `<typeMappings>${Array.from((await this.VENDOR_TYPE_MAPPINGS).entries()).map((mapping) => { return `<typeMapping><vendorType>${mapping[0]}</vendorType><oracleType>${mapping[1]}</oracleType></typeMapping>` }).join('')}</typeMappings>`
+
+  getSourceTypeMappingsXML() {
+     return `<typeMappings>${Array.from(this.TYPE_MAPPINGS.entries()).map((mapping) => { return `<typeMapping><vendorType>${mapping[0]}</vendorType><oracleType>${mapping[1]}</oracleType></typeMapping>` }).join('')}</typeMappings>`
   }
   
-  async getVendorTypeMappings() {
-
-    const typeMappingXML = await this.typeMappingToXML()
-	// console.log('TMXML',typeMappingXML)
-	return await this.dbi.stringToBlob(typeMappingXML);
-      
+  async getSourceTypeMappings() {
+	 return await this.dbi.stringToBlob(this.getSourceTypeMappingsXML())
   }
-
+ 
   generateCopyStatement(targetSchema,tableName,externalTableName,externalColumnNames,externalSelectList,plsql) {
 	return `insert /*+ APPEND */ into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})\nselect ${externalSelectList.join(",")} from ${externalTableName}`
   }

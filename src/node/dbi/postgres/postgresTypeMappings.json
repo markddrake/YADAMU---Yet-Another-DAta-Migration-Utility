@@ -90,8 +90,8 @@
   }
 , "limits": {
     "SCALAR_LENGTH"                                        : 10485760
-  , "NUMERIC_PRECISION"                                    : 131072
-  , "NUMERIC_SCALE"                                        : 16383 
+  , "NUMERIC_PRECISION"                                    : 1000
+  , "NUMERIC_SCALE"                                        : 1000
   , "TIMESTAMP_PRECISION"                                  : 6
   }
 , "storageOptions": {

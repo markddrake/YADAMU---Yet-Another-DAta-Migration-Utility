@@ -10,106 +10,65 @@ class YadamuStatementGenerator {
   get SOURCE_VENDOR()        { return this._TARGET_VENDOR }
   set SOURCE_VENDOR(v)       { this._TARGET_VENDOR = v }
   
-  get TYPE_CONFIGURATION()        { 
-    this._TYPE_CONFIGURATION = this._TYPE_CONFIGURATION || (() => {
-      this._TYPE_CONFIGURATION = JSON.parse(fs.readFileSync(YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].file))
-	  return this._TYPE_CONFIGURATION
-    })()
-    return this._TYPE_CONFIGURATION
-  }
-
-   
-  /* async */ get VENDOR_DATA_TYPES()        { 
-    this._VENDOR_DATA_TYPES = this._VENDOR_DATA_TYPES || (() => {
-	  return new Promise(async(resolve,reject) => {
-		const classFile = YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].class
-		const VendorDataTypes = (await import(classFile)).default
-		const vendorDataTypes = new VendorDataTypes()
-		// this.dbi.yadamu.initializeDataTypes(VendorDataTypes,JSON.parse(fs.readFileSync(YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].file)))
-		resolve(vendorDataTypes)
-      })
-	})()
-    return this._VENDOR_DATA_TYPES
-  }
-
-  get SQL_TYPE_MAPPINGS()    {	  
-	this._SQL_TYPE_MAPPINGS = this._SQL_TYPE_MAPPINGS || (() => {
-  	  this._SQL_TYPE_MAPPINGS = new Map() 
-	  for (let c = this.dbi.DATA_TYPES; c !== null; c = Object.getPrototypeOf(c)) {
-        Object.getOwnPropertyNames(c).filter((name) => { 
-	      return Object.getOwnPropertyDescriptor(c,name).get
-	    }).forEach((name) => { 
-	      const value = this.dbi.DATA_TYPES[name]
-		  if ((!Array.isArray(value)) && typeof value !== 'object') {
-	        this._SQL_TYPE_MAPPINGS.set(name,value)
-		  } 
-	    })
-	  }
-	  return this._SQL_TYPE_MAPPINGS
-	})()
-	return this._SQL_TYPE_MAPPINGS
+  /*
+  **
+  ** Return an instance of the YadamuDataTypes class specific to the value of SOURCE_VENDOR
+  **
+  ** Initially returns a promise (since it uses the import() function.
+  ** The promise is resolved and _SOURCE_DATA_TYPES is updated with the resolved value in init()
+  **
+  */
+  
+  get SOURCE_DATA_TYPES()    { 
+    this._SOURCE_DATA_TYPES = this._SOURCE_DATA_TYPES || new Promise(async(resolve,reject) => {
+	  const classFile = YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].class
+	  const VendorDataTypes = (await import(classFile)).default
+	  const vendorDataTypes = new VendorDataTypes()
+	  // this.dbi.yadamu.initializeDataTypes(VendorDataTypes,JSON.parse(fs.readFileSync(YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].file)))
+	  resolve(vendorDataTypes)
+    })
+    return this._SOURCE_DATA_TYPES
   }
   
-  get DEFINED_DATA_TYPES() {
-	this._DEFINED_DATA_TYPES = this._DEFINED_DATA_TYPES || (() => {
-      this._DEFINED_DATA_TYPES = []
-	  for (let c = this.dbi.DATA_TYPES; c !== null; c = Object.getPrototypeOf(c)) {
-        Object.getOwnPropertyNames(c).filter((name) => { 
+  set SOURCE_DATA_TYPES(v)    { this._SOURCE_DATA_TYPES = v }
+
+  /*
+  **
+  ** Return a data type mapping between the types supported by the source vendor to types supported by the target vendor
+  **
+  */
+
+  get TYPE_MAPPINGS() {
+
+	this._TYPE_MAPPINGS = this._TYPE_MAPPINGS || (() => {
+      const typeMappings = new Map()
+      for (let c = this.SOURCE_DATA_TYPES; c !== null; c = Object.getPrototypeOf(c)) {
+		Object.getOwnPropertyNames(c).filter((name) => { 
 	      return Object.getOwnPropertyDescriptor(c,name).get
 	    }).forEach((name) => { 
-		  const value = this.dbi.DATA_TYPES[name]
-		  if ((!Array.isArray(value)) && typeof value !== 'object') {
-	        this._DEFINED_DATA_TYPES.push(name)
-		  } 
-	    })
-	  }
-	  return this._DEFINED_DATA_TYPES
-	})()
-	return this._DEFINED_DATA_TYPES
-  }
-  
-  /* async */ get VENDOR_TYPE_MAPPINGS() {
-
-	/* 
-	**
-    const key = Object.keys(this.TYPE_CONFIGURATION).find(key => this.TYPE_CONFIGURATION[key] === dataTypeDefinition.type)
-    let mappedDataType = this.dbi.DATA_TYPES[key]
-	**
-	*/
-	
-	this._VENDOR_TYPE_MAPPINGS = this._VENDOR_TYPE_MAPPINGS || (() => {
-	  return new Promise(async(resolve,reject) => {
-        const vendorTypeMappings = new Map()
-	    const vendorDataTypes = await this.VENDOR_DATA_TYPES
-		for (let c = vendorDataTypes; c !== null; c = Object.getPrototypeOf(c)) {
-		  Object.getOwnPropertyNames(c).filter((name) => { 
-	        return Object.getOwnPropertyDescriptor(c,name).get
-	      }).forEach((name) => { 
-		    const sourceType = vendorDataTypes[name]
-			if (typeof sourceType === 'string') {
-	           const sourceTypeDefinition = YadamuDataTypes.decomposeDataType(sourceType)
-			   if (sourceType === sourceTypeDefinition.type) {
-			    const targetType = this.dbi.DATA_TYPES[name]
-		        if (typeof targetType === 'string') {
-		          vendorTypeMappings.has(sourceType) ? vendorTypeMappings.set(sourceType,vendorTypeMappings.get(sourceType).add(targetType)) : vendorTypeMappings.set(sourceType,new Set().add(targetType))
-				}
+	      const sourceType = this.SOURCE_DATA_TYPES[name]
+		  if (typeof sourceType === 'string') {
+	        const sourceTypeDefinition = YadamuDataTypes.decomposeDataType(sourceType)
+			if (sourceType === sourceTypeDefinition.type) {
+			  // const targetType = this.dbi.DATA_TYPES.storageOptions[name] || this.dbi.DATA_TYPES[name]
+			  const targetType = this.dbi.DATA_TYPES[name]
+		      if (typeof targetType === 'string') {
+		        typeMappings.has(sourceType) ? typeMappings.set(sourceType,typeMappings.get(sourceType).add(targetType)) : typeMappings.set(sourceType,new Set().add(targetType))
 			  }
-		    }   
-	      })
-		}
-		// console.log(vendorTypeMappings)
-		vendorTypeMappings.forEach((value,key) => {
-		  vendorTypeMappings.set(key, value.size === 1 ? value.values().next().value : this.dbi.DATA_TYPES.coalesceTypeMappings(Array.from(value.values())))
-		})
-		// console.log(vendorTypeMappings)
-		resolve(vendorTypeMappings)
+			}
+		  }   
+	    })
+      }
+	  // console.log(typeMappings)
+	  typeMappings.forEach((value,key) => {
+		typeMappings.set(key, value.size === 1 ? value.values().next().value : this.dbi.DATA_TYPES.coalesceTypeMappings(Array.from(value.values())))
 	  })
+	  // console.log(typeMappings)
+	  return typeMappings
 	})()
-    return this._VENDOR_TYPE_MAPPINGS
+    return this._TYPE_MAPPINGS
   }
   
-  
-
   constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
 
 	this.dbi = dbi;
@@ -117,13 +76,17 @@ class YadamuStatementGenerator {
     this.targetSchema = targetSchema
     this.metadata = metadata
     this.yadamuLogger = yadamuLogger;	
-
+	
   }
+  
+  async init() {
+	this.SOURCE_DATA_TYPES = await this.SOURCE_DATA_TYPES;
+  }  
   
   async debugStatementGenerator(options) {	
 	
 	console.log(JSON.stringify(this.metadata))
-	console.log(JSON.stringify(Array.from( (await this.VENDOR_TYPE_MAPPINGS).entries())))
+	console.log(JSON.stringify(Array.from(this.TYPE_MAPPINGS.entries())))
 	console.log(options)
 	
   }	
@@ -160,11 +123,23 @@ class YadamuStatementGenerator {
 	}
 	return undefined
   }    
+
+  isOracleObjectType(dataType) {
+	return ((dataType.indexOf('"."') > -1) && (this.SOURCE_VENDOR === "Oracle")) ? 'ORACLE_OBJECT_TYPE' : undefined
+  }
+  
+  getKeyFromDataType(dataType) {
+     const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType)
+	 try {
+	   return this.SOURCE_DATA_TYPES.REVERSE_TYPE_MAPPINGS.get(dataType) || Array.from(this.SOURCE_DATA_TYPES.YADAMU_TYPE_MAPPINGS.entries()).find((entry) => { return entry[1].toLowerCase() === dataType.toLowerCase() })[0]
+	 } catch (e) {
+	   return this.isOracleObjectType(dataType) 
+     }
+  }
   
   mapDataType(dataType, length) {
 	  
-     const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType)
-     const key = Object.keys(this.TYPE_CONFIGURATION.mappings).find(key => this.TYPE_CONFIGURATION.mappings[key].toLowerCase() === dataTypeDefinition.type.toLowerCase())
+	 const key = this.getKeyFromDataType(dataType)  
 	 let mappedDataType = this.dbi.DATA_TYPES[key]
 	 switch (mappedDataType) {
 	   case this.dbi.DATA_TYPES.CHAR_TYPE:
@@ -208,7 +183,8 @@ class YadamuStatementGenerator {
 	*/
 
     const dataTypeDefinition = YadamuDataTypes.composeDataType(dataType,sizeConstraint)
-    if ((!this.dbi.DATATYPE_IDENTITY_MAPPING) || (this.dbi.DATABASE_VENDOR !== this.SOURCE_VENDOR)) {
+	
+	if ((!this.dbi.DATATYPE_IDENTITY_MAPPING) || (this.dbi.DATABASE_VENDOR !== this.SOURCE_VENDOR)) {
 
 	  const mappedDataType = this.mapDataType(dataTypeDefinition.type,dataTypeDefinition.length);
    
@@ -229,10 +205,12 @@ class YadamuStatementGenerator {
   }
   
   validateTypeDefinition(typeDefinition) {
+
 	switch (typeDefinition.type) {
 	  case (this.dbi.DATA_TYPES.NUMERIC_TYPE):
-	    typeDefinition.length > this.dbi.DATA_TYPES.NUMERIC_PRECISION ? this.dbi.DATA_TYPES.NUMERIC_PRECISION : typeDefinition.length
-		typeDefinition.scale > this.dbi.DATA_TYPES.NUMERIC_SCALE ? this.dbi.DATA_TYPES.NUMERIC_SCALE : typeDefinition.scale
+	  case (this.dbi.DATA_TYPES.DECIMAL_TYPE):
+	    typeDefinition.length = typeDefinition.length > this.dbi.DATA_TYPES.NUMERIC_PRECISION ? this.dbi.DATA_TYPES.NUMERIC_PRECISION : typeDefinition.length
+		typeDefinition.scale = typeDefinition.scale > this.dbi.DATA_TYPES.NUMERIC_SCALE ? this.dbi.DATA_TYPES.NUMERIC_SCALE : typeDefinition.scale
 		break
 	  default:
 	}
@@ -265,8 +243,9 @@ class YadamuStatementGenerator {
         return `${dataTypeDefinition.type}(${dataTypeDefinition.length},${dataTypeDefinition.scale})`
       }                                                   
       
-      if (dataTypeDefinition.length && (dataTypeDefinition.length > 0)) {    
-        return (dataTypeDefinition.type.includes(' ') && !dataTypeDefinition.type.startsWith('long')  &&!dataTypeDefinition.type.startsWith('bit')) ? dataTypeDefinition.type.replace(' ',`(${dataTypeDefinition.length}) `) : `${dataTypeDefinition.type}(${dataTypeDefinition.length})`
+      if (dataTypeDefinition.length && (dataTypeDefinition.length > 0)) {
+        const type = dataTypeDefinition.type.toLowerCase()
+        return (type.includes(' ') && !type.toLowerCase().startsWith('long')  &&!type.startsWith('bit')) ? type.replace(' ',`(${dataTypeDefinition.length}) `) : `${dataTypeDefinition.type}(${dataTypeDefinition.length})`
       }
 	}
 	else {
@@ -325,6 +304,7 @@ class YadamuStatementGenerator {
   }
   
   async generateStatementCache() {
+	await this.init()
     const statementCache = {}
     const tables = Object.keys(this.metadata);
 	const ddlStatements = tables.map((table,idx) => {

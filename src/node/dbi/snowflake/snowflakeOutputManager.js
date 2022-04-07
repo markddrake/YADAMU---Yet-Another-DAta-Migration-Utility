@@ -18,42 +18,44 @@ class SnowflakeWriter extends YadamuOutputManager {
   generateTransformations(targetDataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
- 
-    return targetDataTypes.map((targetDataType,idx) => {      
-      const dataType = YadamuDataTypes.decomposeDataType(targetDataType);
 	
-	  if (YadamuLibrary.isBinary(dataType.type)) {
-		return (col,idx) =>  {
-          return col.toString('hex')
-		}
-      }
-
-	  switch (dataType.type.toUpperCase()) {
-        case 'GEOMETRY': 
-        case 'GEOGRAPHY':
-        case '"MDSYS"."SDO_GEOMETRY"':
+    return targetDataTypes.map((targetDataType,idx) => {      
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(targetDataType);
+      
+	  switch (dataTypeDefinition.type.toUpperCase()) {
+        case this.dbi.DATA_TYPES.BLOB_TYPE:
+  		case this.dbi.DATA_TYPES.BINARY_TYPE:
+  		  return (col,idx) =>  {
+            return col.toString('hex')
+		  }
+        case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
           if (this.SPATIAL_FORMAT.endsWith('WKB')) {
             return (col,idx)  => {
 		       return Buffer.isBuffer(col) ? col.toString('hex') : col
 			}
           }
 		  return null
-		case 'JSON':
-		case 'OBJECT':
-		case 'ARRAY':
-          return (col,idx) => {
+        case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
+          if (this.SPATIAL_FORMAT.endsWith('WKB')) {
+            return (col,idx)  => {
+		       return Buffer.isBuffer(col) ? col.toString('hex') : col
+			}
+          }
+		  return null
+		case this.dbi.DATA_TYPES.JSON_TYPE:
+		  return (col,idx) => {
             return JSON.stringify(col)
 		  }
-        case 'VARIANT':
+        case this.dbi.DATA_TYPES.SNOWFLAKE_VARIANT_TYPE:
           return (col,idx) => {
             return typeof col === 'object' ? JSON.stringify(col) : col
 		  }
-        case "BOOLEAN" :
+        case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
  		  return (col,idx) => {
              return YadamuLibrary.toBoolean(col)
           }
           break;
-		case "TIME" :
+		case this.dbi.DATA_TYPES.TIME_TYPE:
 		  return (col,idx) => {
             if (typeof col === 'string') {
               let components = col.split('T')
@@ -76,12 +78,7 @@ class SnowflakeWriter extends YadamuOutputManager {
         ** However this seems to then require all finite values be passed as strings.
         **
         */
- 		case "REAL":
-        case "FLOAT":
-		case "DOUBLE":
-		case "DOUBLE PRECISION":
-		case "BINARY_FLOAT":
-		case "BINARY_DOUBLE":
+		case this.dbi.DATA_TYPES.DOUBLE_TYPE:
 		  return (col,idx) => {
 	        if (!isFinite(col)) {
 			  switch(col) {				

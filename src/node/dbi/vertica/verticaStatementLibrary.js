@@ -22,9 +22,9 @@ class VerticaStatementLibrary {
 				  ,c.COLUMN_NAME
 				  ,case 
 				     when tc.PREDICATE like 'YADAMU.IS_JSON(%)' then 
-				       'json'
+				       'JSON'
 				     when tc.PREDICATE like 'YADAMU.IS_XML(%)' then 
-					   'xml'
+					   'XML'
 					 else
 					   DATA_TYPE 
 				   end "DATA_TYPE"

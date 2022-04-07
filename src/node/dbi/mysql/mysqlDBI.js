@@ -90,6 +90,9 @@ class MySQLDBI extends YadamuDBI {
 	this.DATA_TYPES = MySQLDataTypes
 
 	this.DATA_TYPES.storageOptions.BOOLEAN_TYPE = this.parameters.MYSQL_BOOLEAN_STORAGE_OPTION || this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION || this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	this.DATA_TYPES.storageOptions.SET_TYPE     = this.parameters.MYSQL_SET_STORAGE_OPTION     || this.DBI_PARAMETERS.SET_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.SET_TYPE
+	this.DATA_TYPES.storageOptions.ENUM_TYPE    = this.parameters.MYSQL_ENUM_STORAGE_OPTION    || this.DBI_PARAMETERS.ENUM_STORAGE_OPTION    || this.DATA_TYPES.storageOptions.ENUM_TYPE
+	this.DATA_TYPES.storageOptions.XML_TYPE     = this.parameters.MYSQL_XML_STORAGE_OPTION     || this.DBI_PARAMETERS.XML_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.XML_TYPE
 	
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
     this.keepAliveHdl = undefined
@@ -595,13 +598,13 @@ class MySQLDBI extends YadamuDBI {
 
     const options = {
       booleanStorgeOption  : this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	, xmlStorageOption     : this.DATA_TYPES.storageOptions.XML_TYPE
 	}
+	
+	const typeMappings = await this.getVendorDataTypeMappings(MySQLStatementGenerator)
 	 
-    const statementGenerator = new MySQLStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
-    const typeMappings = Array.from( (await statementGenerator.VENDOR_TYPE_MAPPINGS).entries())
-
     const sqlStatement = `SET @RESULTS = ''; CALL YADAMU_IMPORT(?,?,?,@RESULTS); SELECT @RESULTS "logRecords";`;                     
-    let results = await  this.executeSQL(sqlStatement,[JSON.stringify(typeMappings),this.CURRENT_SCHEMA, JSON.stringify(options)])
+    let results = await  this.executeSQL(sqlStatement,[typeMappings,this.CURRENT_SCHEMA, JSON.stringify(options)])
     results = results.pop()
     return this.processLog(results,'JSON_TABLE')
   }

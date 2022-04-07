@@ -28,11 +28,6 @@ class VerticaWriter extends YadamuWriter {
     this.tableInfo.insertMode = 'Copy'
     this.copyStatement = this.tableInfo.copy.dml
     this.mergeoutInsertCount = this.dbi.MERGEOUT_INSERT_COUNT;
-
-    this.maxLengths = this.tableInfo.sizeConstraints.map((sizeConstraint) => {
-      const maxLength = parseInt(sizeConstraint) 
-      return maxLength > 0 ? maxLength : undefined
-    })
   }
 
   async initializeTable() {
@@ -82,7 +77,7 @@ class VerticaWriter extends YadamuWriter {
        const columnNameOffset = r[1].indexOf('column: [') + 9
        err.columnName = r[1].substring(columnNameOffset,r[1].indexOf(']',columnNameOffset+1))
        err.columnIdx = this.tableInfo.columnNames.indexOf(err.columnName)
-       err.columnLength = this.maxLengths[err.columnIdx]
+       err.columnLength = this.tableInfo.maxLengths[err.columnIdx]
        err.dataLength = parseInt(r[2])
        err.tags = []
        if (err.dataLength > err.columnLength) {
@@ -146,8 +141,6 @@ class VerticaWriter extends YadamuWriter {
   
   async _writeBatch(batch,rowCount) {
       
-    // console.log('Write Batch',this.tableName,this.COPY_METRICS.batchNumber,rowCount,'Copy',batch.copy.length,'Insert',batch.insert.length)
-
     const emptyStringDataSets = Object.keys(batch).filter((key) => {return ((key !== 'copy') && (key !== 'insert'))})
     delete emptyStringDataSets.copy
     delete emptyStringDataSets.insert
@@ -179,7 +172,7 @@ class VerticaWriter extends YadamuWriter {
       columns.forEach((idx) => {
         const columnName = `"${this.tableInfo.columnNames[idx]}"`
         const fillerName = `"YADAMU_COL_${(parseInt(idx)+1).toString().padStart(3,"0")}"`
-        const fillerSize = this.tableInfo.sizeConstraints[idx]
+        const fillerSize = this.tableInfo.maxLengths[idx]
         const columnReplacement = `${fillerName} FILLER${fillerSize > 65000 ? ' LONG ': ' '}VARCHAR(${fillerSize}), ${columnName} AS NVL(${fillerName}, '')`
         sqlStatement = sqlStatement.replace(columnName,columnReplacement)
       }) 
@@ -190,7 +183,6 @@ class VerticaWriter extends YadamuWriter {
       }
     })
    
-
     const batchStagingFileName = `${this.STAGING_FILE}-${parseInt(this.BATCH_METRICS.batchNumber).toString().padStart(5,"0")}`
 	// results = await Promise.all(Object.keys(copyOperations).map(async(key,idx) => {
 	const keys = Object.keys(copyOperations)
@@ -265,9 +257,7 @@ class VerticaWriter extends YadamuWriter {
     }
     this.releaseBatch(batch)
     return this.skipTable   
-    
   }
-
-}
+}  
 
 export { VerticaWriter as default }

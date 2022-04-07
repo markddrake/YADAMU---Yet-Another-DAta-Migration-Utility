@@ -64,20 +64,6 @@ class StatementGenerator {
 	
   }
   
-  async generateStatementCache() {
-      
-  const statementCache = {}
-    const tables = Object.keys(this.metadata); 
-	
-    const ddlStatements = tables.map((table,idx) => {
-      const tableMetadata = this.metadata[table];
-      const tableInfo = this.generateTableInfo(tableMetadata);
-      statementCache[this.metadata[table].tableName] = tableInfo;
-      return tableInfo.ddl;
-    })
-    return statementCache;
-  }
-
 }
 
 export { StatementGenerator as default }

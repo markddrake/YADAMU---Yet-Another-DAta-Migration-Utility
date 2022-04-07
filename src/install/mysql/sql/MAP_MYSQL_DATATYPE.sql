@@ -22,6 +22,9 @@ BEGIN
   DECLARE C_VARCHAR_LENGTH             SMALLINT DEFAULT 4096;
   DECLARE C_VARBINARY_LENGTH           SMALLINT DEFAULT 8192;
   
+  DECLARE C_NUMERIC_PRECISION          SMALLINT DEFAULT 65;
+  DECLARE C_NUMERIC_SCALE              SMALLINT DEFAULT 30;
+  
   DECLARE C_CLOB_TYPE               VARCHAR(32) DEFAULT 'longtext'; 
 
   DECLARE C_LARGEST_CHAR_TYPE       VARCHAR(32) DEFAULT concat('char(',C_CHAR_LENGTH,')');
@@ -96,11 +99,15 @@ BEGIN
 
     when P_MYSQL_DATA_TYPE = 'decimal'                                then return 
 	case 
-	  when P_DATA_TYPE_LENGTH is NULL                                 then C_UNBOUNDED_NUMERIC 
+      when P_DATA_TYPE_LENGTH is NULL                                 then C_UNBOUNDED_NUMERIC 
+	  when ((P_DATA_TYPE_LENGTH > C_NUMERIC_PRECISION) 
+	   and (P_DATA_TYPE_SCALE  > C_NUMERIC_SCALE))                    then C_UNBOUNDED_NUMERIC
+	  when P_DATA_TYPE_LENGTH > C_NUMERIC_PRECISION                   then concat(P_MYSQL_DATA_TYPE,'(',cast(C_NUMERIC_PRECISION as CHAR),',',cast(P_DATA_TYPE_SCALE as CHAR),')')
+	   when P_DATA_TYPE_SCALE > C_NUMERIC_SCALE                       then concat(P_MYSQL_DATA_TYPE,'(',cast(P_DATA_TYPE_LENGTH as CHAR),',',cast(C_NUMERIC_SCALE as CHAR),')')
 	                                                                  else P_MYSQL_DATA_TYPE 
 	end;
-
-    when P_MYSQL_DATA_TYPE in (
+    
+	when P_MYSQL_DATA_TYPE in (
       'time',
 	  'datetime'
     )                                                                 then return 

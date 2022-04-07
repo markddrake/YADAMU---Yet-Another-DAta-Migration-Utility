@@ -37,7 +37,7 @@
 		"XML_STORAGE_OPTION": "CLOB"
 	},
 	"snowflake": {
-		"XML_TYPE": "TEXT"
+		"XML_STORAGE_OPTION": "TEXT"
 	},
 	"vertica": {
 	   "BYTE_TO_CHAR_RATIO" : 1.5

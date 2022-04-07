@@ -280,12 +280,6 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
     return await this.dbi.jsonToBlob({metadata: this.metadata});  
       
   }
-
-  async getVendorTypeMappings() {
-
-    return await this.dbi.jsonToBlob(Array.from((await this.VENDOR_TYPE_MAPPINGS).entries()));  
-      
-  }
  
   generateExternalTableDefinition(tableMetadata,externalTableName,externalColumnDefinitions,copyColumnDefinitions) {
 	 return `
@@ -329,7 +323,11 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 	, drop         : `drop table ${externalTableName}`
 	}
   }
-
+  
+  async getSourceTypeMappings() {
+	 return await this.dbi.jsonToBlob(Array.from(this.TYPE_MAPPINGS.entries()))
+  } 
+  
   async generateStatementCache() {
 	  
      /*
@@ -337,7 +335,8 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
      ** Turn the generated DDL Statements into an array and execute them as single batch via YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS()
      **
      */
-	 
+    await this.init()
+	
 	this.SQL_DIRECTORY_NAME = `"YDIR-${crypto.randomBytes(this.RANDOM_OBJECT_LENGTH).toString("hex").toUpperCase()}"`
 	
     const sourceDateFormatMask = this.dbi.getDateFormatMask(this.SOURCE_VENDOR);
@@ -364,7 +363,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 	const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :typeMappings, :schema, :options);end;`;
 
 	const metadata = await this.getMetadata()
-	const vendorTypeMappings = await this.getVendorTypeMappings();
+	const vendorTypeMappings = await this.getSourceTypeMappings()
     
 	// await this.debugStatementGenerator(this.STATEMENT_GENERATOR_OPTIONS)
 	

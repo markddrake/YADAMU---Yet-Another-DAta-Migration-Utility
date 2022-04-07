@@ -98,6 +98,9 @@ class VerticaDBI extends YadamuDBI {
     super(yadamu,manager,connectionSettings,parameters)
 	this.DATA_TYPES = VerticaDataTypes
        
+	this.DATA_TYPES.storageOptions.JSON_TYPE    = this.parameters.VERTICA_JSON_STORAGE_OPTION     || this.DBI_PARAMETERS.JSON_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.JSON_TYPE
+	this.DATA_TYPES.storageOptions.XML_TYPE     = this.parameters.VERTICA_XML_STORAGE_OPTION      || this.DBI_PARAMETERS.XML_STORAGE_OPTION      || this.DATA_TYPES.storageOptions.XML_TYPE
+	   
     this.pgClient = undefined;
     
     /*

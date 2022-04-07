@@ -14,6 +14,18 @@ class MariadbStorageOptions extends YadamuStorageOptions {
   get TINYINT1_IS_BOOLEAN()                 { return this.BOOLEAN_TYPE === 'tinyint(1)' }
   
   get BIT1_IS_BOOLEAN()                     { return this.BOOLEAN_TYPE === 'bit(1)' } 
+
+  get SET_TYPE()                            { return MariadbConstants.SET_STORAGE_OPTION }	
+	
+  set SET_TYPE(v)                           { YadamuDataTypes.redefineProperty(this,'SET_TYPE',v) }
+    
+  get ENUM_TYPE()                           { return MariadbConstants.ENUM_STORAGE_OPTION }	
+	
+  set ENUM_TYPE(v)                          { YadamuDataTypes.redefineProperty(this,'ENUM_TYPE',v) }
+
+  get XML_TYPE()                            { return MariadbConstants.XML_STORAGE_OPTION }	
+	
+  set XML_TYPE(v)                           { YadamuDataTypes.redefineProperty(this,'XML_TYPE',v) }
   
 }
 

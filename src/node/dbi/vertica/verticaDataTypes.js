@@ -5,11 +5,21 @@ import {
 
 import VerticaConstants     from './verticaConstants.js'
 
-class VerticaStorageOptions extends YadamuStorageOptions {}
+class VerticaStorageOptions extends YadamuStorageOptions {
+
+  get XML_TYPE()                            { return VerticaConstants.XML_STORAGE_OPTION }	
+	
+  set XML_TYPE(v)                           { YadamuDataTypes.redefineProperty(this,'XML_TYPE',v) }
+    
+  get JSON_TYPE()                           { return VerticaConstants.JSON_STORAGE_OPTION }	
+	
+  set JSON_TYPE(v)                          { YadamuDataTypes.redefineProperty(this,'JSON_TYPE',v) }
+   	
+}
 
 class VerticaDataTypes extends YadamuDataTypes {
   
-  static get UNBOUNDED_TYPES() { 
+  get UNBOUNDED_TYPES() { 
     this._UNBOUNDED_TYPES = this._UNBOUNDED_TYPES || Object.freeze([
 	  this.INTEGER_TYPE,
 	, this.FLOAT_TYPE
@@ -17,14 +27,14 @@ class VerticaDataTypes extends YadamuDataTypes {
     return this._UNBOUNDED_TYPES;
   }
 
-  static get ONE_BYTE_TYPES() {
+  get ONE_BYTE_TYPES() {
     this._ONE_BYTE_TYPES = this._ONE_BYTE_TYPES || Object.freeze([
 	  this.BOOLEAN_TYPE,
 	])
     return this._ONE_BYTE_TYPES;
   }
 
-  static get EIGHT_BYTE_TYPES() {
+  get EIGHT_BYTE_TYPES() {
     this._EIGHT_BYTE_TYPES = this._EIGHT_BYTE_TYPES || Object.freeze([
       this.DATE_TYPE
 	, this.TIME_TYPE
@@ -39,7 +49,7 @@ class VerticaDataTypes extends YadamuDataTypes {
    return this._EIGHT_BYTE_TYPES;
   }
   
-  static get LOB_TYPES() {
+  get LOB_TYPES() {
      this._LOB_TYPES = this._LOB_TYPES || Object.freeze([this.CLOB_TYPE,this.BLOB_TYPE])
      return this._LOB_TYPES;
   }

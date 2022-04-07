@@ -36,8 +36,7 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
       sizeConstraints = tableMetadata.source.sizeConstraints 
     }
      
-	 
-    const mappedDataTypes = columnNames.map((columnName,idx) => { 
+	const mappedDataTypes = columnNames.map((columnName,idx) => { 
 	  const mappedDataType = tableMetadata.source ? tableMetadata.source.dataTypes[idx] : this.getMappedDataType(dataTypes[idx],sizeConstraints[idx])
 	  return mappedDataType
 	})

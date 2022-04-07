@@ -39,6 +39,10 @@ class YadamuDataTypes {
     return DataTypeConfiguration
   }
   
+  static get IGNORE_GETTER()                { this._IGNORE_GETTER =  this._IGNORE_GETTER || Object.freeze(["TYPE_CONFIGURATION","YADAMU_TYPE_MAPPINGS","REVERSE_TYPE_MAPPINGS","KEY_PRECEDENCE"]); return this._IGNORE_GETTER }
+  
+  static get KEY_PRECEDENCE()               { this._KEY_PRECEDENCE = this._KEY_PRECEDENCE || Object.freeze(["BLOB_TYPE","BINARY_TYPE","SPATIAL_TYPE","GEOMETRIC_TYPE","GEOGRAPHY_TYPE","UNBOUNDED_NUMERIC_TYPE","BIGINT_TYPE","INTEGER_TYPE","MEDIUMINT_TYPE","SMALLINT_TYPE","DOUBLE_TYPE","TIMEZONE_TZ_TPYE","TIME_TZ_TYPE","DATETIME_TYPE"]); return this._KEY_PRECEDENCE }
+  
   static redefineProperty(instance,name,v) {
 	// Override Method in Type Hierachy 
 	let obj = instance
@@ -53,14 +57,55 @@ class YadamuDataTypes {
     })()
     return this._TYPE_CONFIGURATION
   }
-
+ 
+  get YADAMU_TYPE_MAPPINGS() {
+	this._YADAMU_TYPE_MAPPINGS = this._YADAMU_TYPE_MAPPINGS || (() => {
+      const typeMappings = new Map()
+      for (let c = this; c !== null; c = Object.getPrototypeOf(c)) {
+		Object.getOwnPropertyNames(c).filter((name) => { 
+	      return (Object.getOwnPropertyDescriptor(c,name).get && !YadamuDataTypes.IGNORE_GETTER.includes(name))
+	    }).forEach((name) => { 
+		  const value = this[name]
+		  if (typeof value === 'string') {
+	        typeMappings.set(name,value)
+		  }   
+	    })
+      }
+	  return typeMappings
+	})()
+    return this._YADAMU_TYPE_MAPPINGS
+  }
+  
+  coalesceKeys(values) {
+	for (let key of YadamuDataTypes.KEY_PRECEDENCE) {
+	  if (values.includes(key)) return key
+	}
+  }  
+  get REVERSE_TYPE_MAPPINGS()  { 
+    this._REVERSE_TYPE_MAPPINGS = this._REVERSE_TYPE_MAPPINGS || (() => {
+	  const reverseTypeMappings = new Map()
+      Object.keys(this.TYPE_CONFIGURATION.mappings).forEach((key) => {
+		 const dataType = this.TYPE_CONFIGURATION.mappings[key]		 
+		 reverseTypeMappings.has(dataType) ? reverseTypeMappings.get(dataType).push(key) : reverseTypeMappings.set(dataType,[key])
+	  })
+	  // console.log(reverseTypeMappings)
+	  reverseTypeMappings.forEach((value,key) => {
+		reverseTypeMappings.set(key, value.length === 1 ? value[0] : this.coalesceKeys(value))
+	  })
+      // console.log(reverseTypeMappings)
+	  return reverseTypeMappings
+    })()
+    return this._REVERSE_TYPE_MAPPINGS 
+  }
+ 
   constructor() {
 	Object.assign(this,this.TYPE_CONFIGURATION.mappings)
 	Object.assign(this,this.TYPE_CONFIGURATION.limits);
 	this.storageOptions = this.STORAGE_OPTIONS 
-	Object.assign(this.storageOptions,this.TYPE_CONFIGURATION.storageOptions || {});	  
+	Object.assign(this.storageOptions,this.TYPE_CONFIGURATION.storageOptions || {});	 
   }
-
+  
+  
   get CHAR_TYPE()                           {
     throw new YadamuError(`Must supply explicit data type mapping for 'CHAR_TYPE'`)
   }
@@ -244,11 +289,11 @@ class YadamuDataTypes {
 
   // JSON and XML                                  
                                                    
-  get JSON_TYPE()                           { return this.CLOB_TYPE }
+  get JSON_TYPE()                           { return 'JSON' }
                                                    
   set JSON_TYPE(v)                          { YadamuDataTypes.redefineProperty(this,'JSON_TYPE',v) }
                                                    
-  get XML_TYPE()                            { return this.CLOB_TYPE }
+  get XML_TYPE()                            { return 'XML' }
                                                    
   set XML_TYPE(v)                           { YadamuDataTypes.redefineProperty(this,'XML_TYPE',v) }
                                                    
@@ -668,7 +713,7 @@ class YadamuDataTypes {
                                                    
   set BINARY_LENGTH(v)                      { YadamuDataTypes.redefineProperty(this,'BINARY_LENGTH',v) }
                                                    
-  get VARBINARY_LENGTH()                    { this.BINARY_LENGTH }     
+  get VARBINARY_LENGTH()                    { return this.BINARY_LENGTH }     
                                                    
   set VARBINARY_LENGTH(v)                   { YadamuDataTypes.redefineProperty(this,'VARBINARY_LENGTH',v) }
                                                    

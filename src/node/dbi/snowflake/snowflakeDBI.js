@@ -99,6 +99,10 @@ class SnowflakeDBI extends YadamuDBI {
   constructor(yadamu,manager,connectionSettings,parameters) {	  
     super(yadamu,manager,connectionSettings,parameters)
     this.DATA_TYPES = SnowflakeDataTypes
+       
+	this.DATA_TYPES.storageOptions.XML_TYPE     = this.parameters.SNOWFLAKE_XML_STORAGE_OPTION      || this.DBI_PARAMETERS.XML_STORAGE_OPTION      || this.DATA_TYPES.storageOptions.XML_TYPE
+	this.DATA_TYPES.storageOptions.JSON_TYPE    = this.parameters.SNOWFLAKE_JSON_STORAGE_OPTION     || this.DBI_PARAMETERS.JSON_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.JSON_TYPE
+	
 	this.StatementLibrary = SnowflakeStatementLibrary
 	this.statementLibrary = undefined
   }
@@ -274,7 +278,7 @@ class SnowflakeDBI extends YadamuDBI {
   
   async initialize() {
     await super.initialize(true)   
-    await this.useDatabase(this.parameters.YADAMU_DATABASE)
+    await this.useDatabase(this.parameters.YADAMU_DATABASE ||this.vendorProperties.database )
 	this.statementLibrary = new this.StatementLibrary(this)
 	this.SPATIAL_SERIALIZER = this.SPATIAL_FORMAT
   }

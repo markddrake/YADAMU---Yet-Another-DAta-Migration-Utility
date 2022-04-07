@@ -1157,11 +1157,10 @@ class OracleDBI extends YadamuDBI {
          }
 	     break;
     }
-
-    const statementGenerator = new OracleStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
-    const typeMappings = await statementGenerator.getVendorTypeMappings()
 	
-	const options = {
+    const typeMappings = await this.stringToBlob(await this.getVendorDataTypeMappings(OracleStatementGenerator));  
+     
+    const options = {
 	  xmlStorageClause     : this.XMLTYPE_STORAGE_CLAUSE
 	, booleanStorgeOption  : this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
 	, jsonStorageOption    : this.DATA_TYPES.storageOptions.JSON_TYPE

@@ -1379,13 +1379,12 @@ class MsSQLDBI extends YadamuDBI {
 
   async processFile(hndl) {
     try {
-
-    const statementGenerator = new MsSQLStatementGenerator(this, this.systemInformation.vendor, this.CURRENT_SCHEMA, {}, this.yadamuLogger);
-    const typeMappings = Array.from( (await statementGenerator.VENDOR_TYPE_MAPPINGS).entries())
-
+    
+	const typeMappings = await this.getVendorDataTypeMappings(MsSQLStatementGenerator)
+    
     const args = { 
             inputs: [{
-  			  name: 'TYPE_MAPPINGS',   type: sql.VarChar,  value: JSON.stringify(typeMappings)
+  			  name: 'TYPE_MAPPINGS',   type: sql.VarChar,  value: typeMappings
 			},{
               name: 'TARGET_DATABASE', type: sql.VarChar,  value: this.CURRENT_SCHEMA
             },{

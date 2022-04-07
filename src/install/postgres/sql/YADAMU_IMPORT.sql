@@ -522,6 +522,9 @@ as $$
 declare
   C_CLOB_TYPE                         VARCHAR(32) = 'text';
   C_ORACLE_OBJECT_TYPE                VARCHAR(32) = C_CLOB_TYPE;
+  C_UNBOUNDED_NUMERIC                 VARCHAR(32) = 'numeric';
+  C_NUMERIC_PRECISION                   SMALLINT = 1000;
+  C_NUMERIC_SCALE                       SMALLINT = 1000;
 
   /*
   C_CHAR_TYPE                         VARCHAR(32) = 'character';
@@ -530,21 +533,6 @@ declare
   C_GEOGRAPHY_TYPE                    VARCHAR(32) = CASE WHEN P_POSTGIS_INSTALLED THEN 'geography' ELSE 'JSON' END;
   C_MAX_CHARACTER_VARYING_TYPE_LENGTH INT         = 10 * 1024 * 1024;
   C_MAX_CHARACTER_VARYING_TYPE        VARCHAR(32) = 'character varying(' || C_MAX_CHARACTER_VARYING_TYPE_LENGTH || ')';
-  C_BFILE_TYPE                        VARCHAR(32) = 'character varying(2048)';
-  C_ROWID_TYPE                        VARCHAR(32) = 'character varying(18)';
-  C_MYSQL_TINY_TEXT_TYPE              VARCHAR(32) = 'character varying(256)';
-  C_MYSQL_TEXT_TYPE                   VARCHAR(32) = 'character varying(65536)';
-  C_ENUM_TYPE                         VARCHAR(32) = 'character varying(255)';
-  C_MSSQL_MONEY_TYPE                  VARCHAR(32) = 'numeric(19,4)';
-  C_MSSQL_SMALL_MONEY_TYPE            VARCHAR(32) = 'numeric(10,4)';
-  C_HIERARCHY_TYPE                    VARCHAR(32) = 'character varying(4000)';
-  C_INET_ADDR_TYPE                    VARCHAR(32) = 'character varying(39)';
-  C_MAC_ADDR_TYPE                     VARCHAR(32) = 'character varying(23)';
-  C_UNSIGNED_INT_TYPE                 VARCHAR(32) = 'numeric(10,0)';
-  C_PGSQL_IDENTIFIER                  VARCHAR(32) = 'binary(4)';
-  C_MONGO_OBJECT_ID                   VARCHAR(32) = 'binary(12)';
-  C_MONGO_UNKNOWN_TYPE                VARCHAR(32) = 'character varying(2048)';
-  C_MONGO_REGEX_TYPE                  VARCHAR(32) = 'character varying(2048)';
 
   V_DATA_TYPE                         VARCHAR(128);
   */
@@ -554,10 +542,17 @@ begin
     when ((P_PGSQL_DATA_TYPE is null) and (P_VENDOR = 'Oracle') and (P_DATA_TYPE like '"%"."%"')) then
 	  return C_ORACLE_OBJECT_TYPE;
     when P_PGSQL_DATA_TYPE is null then
-	
       raise exception 'Postgres: Missing mapping for "%" datatype "%"', P_VENDOR, P_DATA_TYPE;
-	else
-	  return P_PGSQL_DATA_TYPE;
+    when P_PGSQL_DATA_TYPE = 'numeric'                                then return 
+	case 
+      when P_DATA_TYPE_LENGTH is NULL                                 then C_UNBOUNDED_NUMERIC 
+	  when ((P_DATA_TYPE_LENGTH > C_NUMERIC_PRECISION) 
+	   and (P_DATA_TYPE_SCALE  > C_NUMERIC_SCALE))                    then C_UNBOUNDED_NUMERIC
+	  when P_DATA_TYPE_LENGTH > C_NUMERIC_PRECISION                   then concat(P_PGSQL_DATA_TYPE,'(',cast(C_NUMERIC_PRECISION as CHAR(4)),',',cast(P_DATA_TYPE_SCALE as CHAR(4)),')')
+	   when P_DATA_TYPE_SCALE > C_NUMERIC_SCALE                       then concat(P_PGSQL_DATA_TYPE,'(',cast(P_DATA_TYPE_LENGTH as CHAR(4)),',',cast(C_NUMERIC_SCALE as CHAR(4)),')')
+	                                                                  else P_PGSQL_DATA_TYPE 
+	end;	
+	                                                                  else return P_PGSQL_DATA_TYPE;
   end case;
 end;  
 $$ LANGUAGE plpgsql;

@@ -13,6 +13,8 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
   
   async generateStatementCache () {    
     
+	await this.init()
+		
     const sqlStatement = `select GENERATE_STATEMENTS($1,$2,$3,$4)`
 	
 	const options = {
@@ -22,7 +24,7 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
 	
     // await this.debugStatementGenerator(options)
 	
-	const vendorTypeMappings = Array.from( (await this.VENDOR_TYPE_MAPPINGS).entries())
+	const vendorTypeMappings = Array.from(this.TYPE_MAPPINGS.entries())
 	
 	// Passing vendorTypeMappings as Native Javascript Array causes Parsing errors...
 

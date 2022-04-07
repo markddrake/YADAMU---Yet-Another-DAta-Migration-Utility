@@ -25,6 +25,11 @@ class VerticaParser extends YadamuParser {
           return (row,idx) => {
             row[idx] = YadamuLibrary.intervalDaySecondTo8601(row[idx])
 	      }
+   	    case this.dbi.DATA_TYPES.NUMERIC_TYPE:
+		  // Trim excessive insiginicant zeros resulting from mapping for unbounded numbers
+		  return (row,idx) => {
+		    row[idx] = typeof row[idx] === 'string' ? row[idx].replace(/(\.0*|(?<=(\..*))0*)$/, '') : row[idx]
+		  }
 		default:
 		  return null;
       }

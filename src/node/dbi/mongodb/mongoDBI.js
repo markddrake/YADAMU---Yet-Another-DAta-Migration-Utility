@@ -625,7 +625,7 @@ class MongoDBI extends YadamuDBI {
     return undefined
   }
 
-  normalizeTypeInfo(typeInfo) {
+  coalesceTypeInfo(typeInfo) {
     // Check for NULL and something. Remove NULL and returns what's left Note we _ARE_ searching for the string 'null' not the value null
 	const nullIdx = typeInfo.indexOf('null')
 	if (nullIdx >= 0) {
@@ -824,12 +824,23 @@ class MongoDBI extends YadamuDBI {
 			// console.dir(typeInformation,{depth:null})
 			if (typeInformation.length > 0) {
 			  tableInfo.COLUMN_NAME_ARRAY.forEach((col,idx) => {
-			    let dataType = typeInformation[0][col].type.length == 1 ? typeInformation[0][col].type[0] : this.normalizeTypeInfo(typeInformation[0][col].type)
-                let size = typeInformation[0][col].size
-                size = dataType ===  'null' ? MongoConstants.DEFAULT_STRING_LENGTH : size                  
+			    let dataType = typeInformation[0][col].type.length == 1 ? typeInformation[0][col].type[0] : this.coalesceTypeInfo(typeInformation[0][col].type)
+				switch (dataType) {
+				   case 'string':
+				   case 'binData':
+				     tableInfo.SIZE_CONSTRAINT_ARRAY.push(this.roundP2(typeInformation[0][col].size))
+					 break
+				   case 'null':
+                     tableInfo.SIZE_CONSTRAINT_ARRAY.push(MongoConstants.DEFAULT_STRING_LENGTH) 
+					 break
+				   case 'objectId':
+				     tableInfo.SIZE_CONSTRAINT_ARRAY.push('12') 
+					 break
+				   default:
+				     tableInfo.SIZE_CONSTRAINT_ARRAY.push(typeInformation[0][col].size || '')
+				}
 			    dataType = dataType ===  'null' ? 'string' : dataType                  
 			    tableInfo.DATA_TYPE_ARRAY.push(dataType)
-			    tableInfo.SIZE_CONSTRAINT_ARRAY.push (dataType === 'string' || dataType === 'binData' ? this.roundP2(size) : '')
 			  })
             }
             else {
