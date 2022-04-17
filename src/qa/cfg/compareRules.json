@@ -125,26 +125,32 @@
 		}
 	},
 	"XML_COMPARISSON_RULE": {
-		"snowflake": {
-		    "oracle" : {
-      		  "VARIANT":  "SNOWFLAKE_VARIANT"
-			},
-			"postgres": {
-			  "VARIANT":  "SNOWFLAKE_VARIANT"
-			}
-		},
-		"mssql": {
-           "oracle": "STRIP_XML_DECLARATION",
-		   "oracle#12.2": "SERIALIZE_AS_BLOB",
-		   "oracle#11.2": "SERIALIZE_AS_BLOB",
-		   "postgres": "STRIP_XML_DECLARATION",
-		   "vertica": "STRIP_XML_DECLARATION"
-		},
-		"vertica": {
-           "mssql": "DECODE_AND_STRIP_DECLARATION"
+	    "default"      : null
+	  , "oracle"       : {
+		  "mssql"      : "STRIP_XML_DECLARATION"
+        , "teradata"   : "SERIALIZE_AS_BLOB"
+        , "snowflake": {
+		    "VARIANT"  : "SNOWFLAKE_VARIANT"
 		}
-	},
-	"OBJECTS_COMPARISSON_RULE": {
-	    "default": null
+	  }
+	, "oracle#11.2": {
+		"mssql"      : "SERIALIZE_AS_BLOB"
+	  }
+	, "oracle#12.2": {
+		"mssql"      : "SERIALIZE_AS_BLOB"
+	  }
+	, "postgres"     : {
+	    "mssql"      : "STRIP_XML_DECLARATION"
+	  , "teradata"   : "STRIP_XML_DECLARATION"
+      , "snowflake": {
+	      "VARIANT"  : "SNOWFLAKE_VARIANT"
+        }
+	  }
+	, "vertica": {
+        "mssql": "DECODE_AND_STRIP_DECLARATION"
+	  }
+	}
+  , "OBJECTS_COMPARISSON_RULE": {
+	  "default": null
 	}
 }

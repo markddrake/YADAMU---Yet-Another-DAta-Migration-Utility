@@ -31,7 +31,7 @@ class MySQLConstants {
   static get SET_STORAGE_OPTION()         { return this.SET_STORAGE_OPTION}
   static get ENUM_STORAGE_OPTION()        { return this.DBI_PARAMETERS.ENUM_STORAGE_OPTION}
   static get XML_STORAGE_OPTION()         { return this.DBI_PARAMETERS.XML_STORAGE_OPTION}
-
+  
   static get STATEMENT_TERMINATOR()       { return ';' }
  
   static get CONNECTION_PROPERTY_DEFAULTS() { 

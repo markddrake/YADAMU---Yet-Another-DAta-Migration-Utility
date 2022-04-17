@@ -364,22 +364,15 @@ class YadamuQA {
     const sourceVersionKey = sourceVendor + "#" + sourceVersion;
     const targetVersionKey = targetVendor + "#" + targetVersion;
 
-    switch (true) {
-      case ((parameterDefaults[sourceVersionKey] !== undefined) && (parameterDefaults[sourceVersionKey][targetVersionKey] !== undefined)):
-        return { [parameter] : parameterDefaults[sourceVersionKey][targetVersionKey]}
-      case ((parameterDefaults[sourceVersionKey] !== undefined) && (parameterDefaults[sourceVersionKey][targetVendor] !== undefined)):
-        return { [parameter] : parameterDefaults[sourceVersionKey][targetVendor]}
-      case ((parameterDefaults[sourceVersionKey] !== undefined) && (parameterDefaults[sourceVersionKey].default !== undefined)):
-        return { [parameter] : parameterDefaults[sourceVersionKey].default}
-      case ((parameterDefaults[sourceVendor] !== undefined) && (parameterDefaults[sourceVendor][targetVersionKey] !== undefined)):
-        return { [parameter] : parameterDefaults[sourceVendor][targetVersionKey]}
-      case ((parameterDefaults[sourceVendor] !== undefined) && (parameterDefaults[sourceVendor][targetVendor] !== undefined)):
-        return { [parameter] : parameterDefaults[sourceVendor][targetVendor]}
-      case ((parameterDefaults[sourceVendor] !== undefined) && (parameterDefaults[sourceVendor].default !== undefined)):
-        return { [parameter] : parameterDefaults[sourceVendor].default}
-      default:
-        return { [parameter] : parameterDefaults.default}
-    }
+    return {
+		[parameter] : parameterDefaults?.[sourceVersionKey]?.[targetVersionKey] 
+	                  || parameterDefaults?.[sourceVersionKey]?.[targetVendor] 
+		              || parameterDefaults?.[sourceVersionKey]?.default
+		              || parameterDefaults?.[sourceVendor]?.[targetVersionKey] 
+	                  || parameterDefaults?.[sourceVendor]?.[targetVendor] 
+		              || parameterDefaults?.[sourceVendor]?.default
+		              || parameterDefaults.default
+	}
   } 
   
   getCompareRules(sourceVendor,sourceVersion,targetVendor,targetVersion,targetParameters) {
@@ -401,18 +394,21 @@ class YadamuQA {
     Object.assign(compareRules, this.getDefaultValue('SERIALIZED_JSON',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
     Object.assign(compareRules, this.getDefaultValue('EMPTY_STRING_IS_NULL',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
     Object.assign(compareRules, this.getDefaultValue('OBJECTS_COMPARISSON_RULE',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
+
     Object.assign(compareRules, this.getDefaultValue('INFINITY_IS_NULL',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion))
+	compareRules.INFINITY_IS_NULL = compareRules.INFINITY_IS_NULL && (targetParameters.INFINITY_MANAGEMENT === 'NULLIFY')
     
-    compareRules.INFINITY_IS_NULL = compareRules.INFINITY_IS_NULL && (targetParameters.INFINITY_MANAGEMENT === 'NULLIFY')
     compareRules.EMPTY_STRING_IS_NULL = this.EMPTY_STRING_IS_NULL !== undefined ? this.EMPTY_STRING_IS_NULL : compareRules.EMPTY_STRING_IS_NULL 
     
-    compareRules.DLL_COMPATBILITY = ((sourceVendor === targetVendor) && (sourceVersion <= targetVersion))
+	compareRules.DLL_COMPATBILITY = ((sourceVendor === targetVendor) && (sourceVersion <= targetVersion))
     
     if (Yadamu.COMPARE_RULES.TIMESTAMP_PRECISION[sourceVendor] > Yadamu.COMPARE_RULES.TIMESTAMP_PRECISION[targetVendor]) {
       compareRules.TIMESTAMP_PRECISION = Yadamu.COMPARE_RULES.TIMESTAMP_PRECISION[targetVendor]
     }
+	
+    compareRules.XML_COMPARISSON_RULE = this.getDefaultValue('XML_COMPARISSON_RULE',Yadamu.COMPARE_RULES,sourceVendor,sourceVersion,targetVendor,targetVersion).XML_COMPARISSON_RULE
     
-    compareRules.XML_COMPARISSON_RULE = null
+	/*
     versionSpecificKey = targetVendor + "#" + targetVersion;
     let xmlCompareRule =  Yadamu.COMPARE_RULES.XML_COMPARISSON_RULE[versionSpecificKey] ||  Yadamu.COMPARE_RULES.XML_COMPARISSON_RULE[targetVendor]
     if (xmlCompareRule) {
@@ -422,7 +418,8 @@ class YadamuQA {
         compareRules.XML_COMPARISSON_RULE = (typeof xmlCompareRule === 'object') ? xmlCompareRule[targetParameters.XML_STORAGE_MODEL] || null : xmlCompareRule
       }
     }
-        
+    */
+    
     if (compareRules.DOUBLE_PRECISION !== null) {
       this.yadamu.LOGGER.qa([`COMPARE`,`${sourceVendor}`,`${targetVendor}`],`Double precision limited to ${compareRules.DOUBLE_PRECISION} digits`);
     }
@@ -815,8 +812,7 @@ class YadamuQA {
 	   try {
 		 await source.destroy(e);
 		 await staging.destroy(e)
-	   } catch (e) { /* If anything goes wrong the staged data is not valid  */ console.log(e) }
-	   
+	   } catch (e) { /* If anything goes wrong the staged data is not valid  */ console.log(e) } 
 	 }
      return false     
   }
@@ -1054,13 +1050,15 @@ class YadamuQA {
     let targetDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,this.RECREATE_SCHEMA) 
 
     const taskStartTime = performance.now();
-    let stepStartTime = taskStartTime
+    
+	let stepStartTime = taskStartTime
     keyMetrics = await this.yadamu.pumpData(sourceDBI,targetDBI);
-
     let stepElapsedTime = performance.now() - stepStartTime
-    let sourceVersion = sourceDBI.DATABASE_VERSION;
+	
+    const sourceVersion = sourceDBI.DATABASE_VERSION;
+    const sourceDescription = this.getDescription(sourceConnectionName,sourceDBI)  
+
     let targetVersion = targetDBI.DATABASE_VERSION;
-    let sourceDescription = this.getDescription(sourceConnectionName,sourceDBI)  
     let targetDescription = this.getDescription(sourceConnectionName,targetDBI)  
     
     this.metrics.recordTaskTimings([task.taskName,'COPY',sourceParameters.MODE,sourceConnectionName,sourceConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
@@ -1135,15 +1133,17 @@ class YadamuQA {
         const vStageDBI = await this.getDatabaseInterface(stagingDatabase,stagingConnection,stagingParameters,false)
         const dataStagingRequired = this.RELOAD_STAGING_AREA || !await this.validateStagedData(vSourceDBI,vStageDBI)
         stepElapsedTime = performance.now() - stepStartTime
+		
         if (dataStagingRequired) {
-        
-          // Stage the dataset to the staging platform
+          // Copy the dataset to the staging platform
 
           stepStartTime = performance.now();
           results = await this.yadamu.pumpData(sourceDBI,stagingDBI);
           stepElapsedTime = performance.now() - stepStartTime
+
           stagingDescription = this.getDescription(stagingConnectionName,stagingDBI)  
-          this.metrics.recordTaskTimings([task.taskName,'STAGE',targetDBI.MODE,sourceConnectionName,stagingConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
+
+          this.metrics.recordTaskTimings([task.taskName,'STAGE',stagingDBI.MODE,sourceConnectionName,stagingConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
           if (results instanceof Error) {
             const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
             const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules, this.yadamu.metrics, false, undefined)
@@ -1175,9 +1175,12 @@ class YadamuQA {
         
         stepStartTime = performance.now();        
 		keyMetrics = await this.yadamu.pumpData(sourceDBI,targetDBI);
-        sourceDescription = this.getDescription(sourceConnectionName,sourceDBI) 
         stepElapsedTime = performance.now() - stepStartTime
-        targetDescription = this.getDescription(targetConnectionName,targetDBI) 
+        
+		const stepFromDescription = this.getDescription(sourceConnectionName,sourceDBI) 
+        
+		targetVersion = targetDBI.DATABASE_VERSION
+        targetDescription = this.getDescription(sourceConnectionName,targetDBI)  
         identifierMappings = targetDBI.getIdentifierMappings()
           
         this.metrics.recordTaskTimings([task.taskName,'COPY',targetDBI.MODE,sourceConnectionName,targetConnectionName,YadamuLibrary.stringifyDuration(stepElapsedTime)])
@@ -1190,9 +1193,9 @@ class YadamuQA {
           return;
         }
    
-        operationsList.push(sourceDescription)
+        operationsList.push(stepFromDescription)
         operationsList.push(targetDescription)
-        this.printResults(this.OPERATION_NAME,sourceDescription,targetDescription,stepElapsedTime)
+        this.printResults(this.OPERATION_NAME,stepFromDescription,targetDescription,stepElapsedTime)
           
         targetParameters.FROM_USER = targetParameters.TO_USER
         delete targetParameters.TO_USER
@@ -1212,7 +1215,8 @@ class YadamuQA {
       }
       
       targetDBI = await this.getDatabaseInterface(sourceDatabase,sourceConnection,compareParameters,false) 
-        
+      sourceConnectionName = test.source        
+
 	  await this.yadamu.reset(compareParameters);
 	  this.yadamu.IDENTIFIER_MAPPINGS = this.reverseIdentifierMappings(identifierMappings)
         
@@ -1221,15 +1225,13 @@ class YadamuQA {
         targetDBI.setControlFileSettings(sourceDBI.getControlFileSettings())
       }   
         
+	  // Copy the target back to the source	
+		
       stepStartTime = performance.now();
       results = await this.yadamu.pumpData(sourceDBI,targetDBI);
       stepElapsedTime = performance.now() - stepStartTime
-      sourceDescription = this.getDescription(sourceConnectionName,sourceDBI)  
-      targetDescription = this.getDescription(targetConnectionName,targetDBI)  
-      targetVersion = sourceDBI.DATABASE_VERSION
-      sourceVersion = targetDBI.DATABASE_VERSION
       
-      this.metrics.recordTaskTimings([task.taskName,'COPY',targetDBI.MODE,sourceConnectionName,test.source,YadamuLibrary.stringifyDuration(stepElapsedTime)])
+      this.metrics.recordTaskTimings([task.taskName,'COPY',targetDBI.MODE,targetConnectionName,test.source,YadamuLibrary.stringifyDuration(stepElapsedTime)])
       if (results instanceof Error) {
         const compareRules = this.getCompareRules(sourceDatabase,sourceVersion,targetDatabase,targetVersion,compareParameters)
         const compareResults = await this.compareSchemas( sourceDatabase, targetDatabase, sourceSchema, compareSchema, sourceConnection, parameters, compareRules,  this.yadamu.metrics, false, {})

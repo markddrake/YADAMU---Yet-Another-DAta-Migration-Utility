@@ -48,7 +48,7 @@ class SnowflakeConstants {
   static get STATEMENT_TERMINATOR()   { return ';' }
 
   static get LOST_CONNECTION_ERROR() {
-    this._LOST_CONNECTION_ERROR = this._LOST_CONNECTION_ERROR || Object.freeze([407002,401001])
+    this._LOST_CONNECTION_ERROR = this._LOST_CONNECTION_ERROR || Object.freeze(['407002','401001'])
     return this._LOST_CONNECTION_ERROR
   }
 
@@ -64,6 +64,19 @@ class SnowflakeConstants {
   static get SERVER_UNAVAILABLE_STATE() {
 	return this.LOST_CONNECTION_STATE()
   }
+
+  static get CONTENT_TOO_LARGE_ERROR() {
+	/*  errorCode: '100078', sqlState: '22000' */
+    this._CONTENT_TOO_LARGE_ERROR = this._CONTENT_TOO_LARGE_ERROR || Object.freeze(['100078'])
+    return this._CONTENT_TOO_LARGE_ERROR
+  }
+  
+  static get CONTENT_TOO_LARGE_STATE() {
+	/*  errorCode: '100078', sqlState: '22000' */
+    this._CONTENT_TOO_LARGE_STATE = this._CONTENT_TOO_LARGE_STATE || Object.freeze(['22000'])
+    return this._CONTENT_TOO_LARGE_STATE
+  }
+
 
 }
 

@@ -37,7 +37,6 @@ class MariadbConstants {
     this._CONNECTION_PROPERTY_DEFAULTS = this._CONNECTION_PROPERTY_DEFAULTS || Object.freeze({
       multipleStatements: true
     , typeCast          : true
-    , supportBigNumbers : true
     , bigNumberStrings  : true          
     , dateStrings       : true
     , rowsAsArray       : true

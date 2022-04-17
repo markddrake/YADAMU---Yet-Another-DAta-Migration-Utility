@@ -1,10 +1,10 @@
 "use strict"
 
-import YadamuLogger from '../..//node/core/yadamuLogger.js';
+import _YadamuLogger from '../..//node/core/yadamuLogger.js';
 
-class YadamuQALogger extends YadamuLogger {
+class YadamuLogger extends _YadamuLogger {
       
-  static get LOGGER_CLASS() { return YadamuQALogger }
+  static get LOGGER_CLASS() { return YadamuLogger }
 
   constructor(outputStream,state,exceptionFolder,exceptionFilePrefix) {
    
@@ -37,4 +37,4 @@ class YadamuQALogger extends YadamuLogger {
 
 }
 
-export { YadamuQALogger as default}
+export { YadamuLogger as default}

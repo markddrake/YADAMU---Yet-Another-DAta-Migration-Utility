@@ -10,7 +10,7 @@ class RedshiftConstants {
 
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
-    , "BYTE_TO_CHAR_RATIO"        : 4
+      "BYTE_TO_CHAR_RATIO"        : 4
 	, "STAGING_PLATFORM"          : "awsS3"
     })
     return this._STATIC_PARAMETERS;

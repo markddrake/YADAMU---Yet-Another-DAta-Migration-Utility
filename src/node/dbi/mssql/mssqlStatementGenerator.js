@@ -48,8 +48,6 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
 
     await this.init()
     
-	// await this.debugStatementGenerator(null)
-	
 	const vendorTypeMappings = Array.from(this.TYPE_MAPPINGS.entries())
 	
     const args = { 
@@ -70,6 +68,8 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
 	
+    // await this.debugStatementGenerator(null,statementCache)
+
 	const tables = Object.keys(this.metadata); 
     const ddlStatements = tables.map((table,idx) => {
       const tableMetadata = this.metadata[table];

@@ -1,15 +1,16 @@
-"use strict" 
 
 import {
   setTimeout 
-}                        from "timers/promises"
+}                               from "timers/promises"
+						       
+import RedshiftDBI              from '../../../node/dbi//redshift/redshiftDBI.js';
+import RedshiftError            from '../../../node/dbi//redshift/redshiftException.js'
+import RedshiftConstants        from '../../../node/dbi//redshift/redshiftConstants.js';
+						       
+import Yadamu                   from '../../core/yadamu.js';
+import YadamuQALibrary          from '../../lib/yadamuQALibrary.js'
 
-import RedshiftDBI       from '../../../node/dbi//redshift/redshiftDBI.js';
-import RedshiftError     from '../../../node/dbi//redshift/redshiftException.js'
-import RedshiftConstants from '../../../node/dbi//redshift/redshiftConstants.js';
-
-import Yadamu            from '../../core/yadamu.js';
-import YadamuQALibrary   from '../../lib/yadamuQALibrary.js'
+import RedshiftStatementLibrary from './pg802StatementLibrary.js'
 
 class RedshiftQA extends YadamuQALibrary.qaMixin(RedshiftDBI) {
 	
@@ -58,13 +59,18 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
 `
     }
     
+    get REDSHIFT_SIMULATION_MODE()      { return true }
+
+    get SUPPORTED_STAGING_PLATFORMS()   { return this.REDSHIFT_SIMULATION_MODE ?  ["loader"] : super.SUPPORTED_STAGING_PLATFORMS }
+    
     constructor(yadamu,manager,connectionSettings,parameters) {
-       super(yadamu,manager,connectionSettings,parameters);
+      super(yadamu,manager,connectionSettings,parameters);
+      this.StatementLibrary = this.REDSHIFT_SIMULATION_MODE ? RedshiftStatementLibrary : this.StatementLibrary
     }
        
     async recreateSchema() {
       try {
-        const dropSchema = `drop schema if exists "${this.parameters.TO_USER}" cascade`;
+        const dropSchema = this.REDSHIFT_SIMULATION_MODE ? `select execute($$drop schema "${this.parameters.TO_USER}" cascade$$) where exists (select 1 from INFORMATION_SCHEMA.SCHEMATA where schema_name = '${this.parameters.TO_USER}')` : `drop schema if exists "${this.parameters.TO_USER}" cascade`;
         this.SQL_TRACE.traceSQL(dropSchema)
         await this.executeSQL(dropSchema);      
       } catch (e) {
@@ -75,7 +81,7 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
 		  throw e
         }
       }
-      await this.createSchema(this.parameters.TO_USER);    
+      // await this.createSchema(this.parameters.TO_USER);    
     }      
 
     async getRowCounts(target) {

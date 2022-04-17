@@ -27,22 +27,27 @@
 	"mongodb": {
 		"MONGO_PARSE_STRINGS" : false
 	},
+	"mssql": {
+	  "INFINITY_MANAGEMENT": "NULLIFY"
+	},
 	"mysql": {
-		"BOOLEAN_STORAGE_OPTION": "tinyint(1)"
+	  "BOOLEAN_STORAGE_OPTION": "tinyint(1)"
+    , "INFINITY_MANAGEMENT": "NULLIFY"
 	},
 	"mariadb": {
-		"BOOLEAN_STORAGE_OPTION": "tinyint(1)"
+	  "BOOLEAN_STORAGE_OPTION": "tinyint(1)"
+    , "INFINITY_MANAGEMENT": "NULLIFY"
 	},
 	"oracle": {
-		"XML_STORAGE_OPTION": "CLOB"
+	  "XML_STORAGE_OPTION": "CLOB"
 	},
 	"snowflake": {
-		"XML_STORAGE_OPTION": "TEXT"
+	  "XML_STORAGE_OPTION": "TEXT"
 	},
 	"vertica": {
-	   "BYTE_TO_CHAR_RATIO" : 1.5
+	  "BYTE_TO_CHAR_RATIO" : 1.5
 	},
    	"redshift": {
-	   "BYTE_TO_CHAR_RATIO" : 1.5
+	  "BYTE_TO_CHAR_RATIO" : 1.5
 	}
 }

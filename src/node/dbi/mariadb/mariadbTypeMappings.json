@@ -55,7 +55,7 @@
   , "MYSQL_ENUM_TYPE"                                      : "enum"                                             
 
   , "PGSQL_IDENTIFIER_TYPE"                                : "int unsigned"
-  , "UNBOUNDED_NUMERIC_TYPE"                               : "decimal(65, 32)"
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "decimal(65,32)"
 
   }
 , "limits": {

@@ -368,12 +368,12 @@ class MsSQLDBI extends YadamuDBI {
             statement.input(column,sql.VarChar(32))
             break;
           case this.DATA_TYPES.DATETIME_TYPE:
-            // statement.input(column,sql.DateTime)
-            statement.input(column,sql.VarChar(32))
-            break;
-          case this.DATA_TYPES.MSSQL_DATETIME2_TYPE:
             // sql.DateTime2 ([scale]
             // statement.input(column,sql.DateTime2())
+            statement.input(column,sql.VarChar(32))
+            break;
+          case this.DATA_TYPES.MSSQL_DATETIME_TYPE:
+            // statement.input(column,sql.DateTime)
             statement.input(column,sql.VarChar(32))
             break;
           case this.DATA_TYPES.TIMESTAMP_TYPE:
@@ -750,15 +750,16 @@ class MsSQLDBI extends YadamuDBI {
           table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
           break;
         case this.DATA_TYPES.DATETIME_TYPE:
-          // Binding as sql.DateTime must supply values as type Date. 
-          // table.columns.add(columnList[idx],sql.DateTime, {nullable: true});
+          // Binding as sql.DateTime2 must supply values as type Date. 
+          // sql.DateTime2 ([scale]
+          // table.columns.add(columnList[idx],sql.DateTime2(), {nullable: true});
           // Use String to avoid possible loss of precision
           table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
           break;
-        case this.DATA_TYPES.MSSQL_DATETIME2_TYPE:
-          // sql.DateTime2 ([scale]
-          // Binding as sql.DateTime2 must supply values as type Date. 
-          // table.columns.add(columnList[idx],sql.DateTime2(), {nullable: true});
+        case this.DATA_TYPES.MSSQL_DATETIME_TYPE:
+          // Binding as sql.DateTime must supply values as type Date. 
+          // sql.DateTime ([scale]
+          // table.columns.add(columnList[idx],sql.DateTime, {nullable: true});
           // Use String to avoid possible loss of precision
           table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
           break;

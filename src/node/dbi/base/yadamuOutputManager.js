@@ -56,19 +56,19 @@ class YadamuOutputManager extends Transform {
   }
 
   initializeBatchCache() {
-	this.batchCache = Array(this.dbi.BATCH_LIMIT).fill(0).map((x) => { return this.createBatch()})	
+	this.batchCache = Array(this.dbi.BATCH_LIMIT || 1).fill(0).map((x) => { return this.createBatch()})	
   }	  
   
   async nextBatch() {
     this.COPY_METRICS.batchNumber++;
 	if (this.batchCache.length === 0) {  
-      // this.yadamuLogger.trace([this.constructor.name,'newBatch()','BATCH_RELEASED',this.dbi.getWorkerNumber(),this.Name,this.COPY_METRICS.batchNumber],'WAITING')       
+      // this.yadamuLogger.trace([this.constructor.name,'newBatch()',this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),this.tableName,this.COPY_METRICS.batchNumber,'BATCH_RELEASED'],'WAITING')       
 	  await new Promise((resolve,reject) => {
 		this.once(DBIConstants.BATCH_RELEASED,() => {
 	      resolve()
 		})
 	  })
-      // this.yadamuLogger.trace([this.constructor.name,'newBatch()','BATCH_RELEASED',this.dbi.getWorkerNumber(),this.tableName,this.COPY_METRICS.batchNumber],'PROCESSING')
+      // this.yadamuLogger.trace([this.constructor.name,'newBatch()',this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),this.tableName,this.COPY_METRICS.batchNumber,'BATCH_RELEASED'],'PROCESSING')
 	}
 	this.COPY_METRICS.cached = 0;
 	const nextBatch = this.batchCache.shift()
@@ -84,7 +84,9 @@ class YadamuOutputManager extends Transform {
   }
 
   async setTableInfo(tableName) {
-	await this.dbi.cacheLoaded
+    // this.yadamuLogger.trace([this.constructor.name,this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),'CACHE_LOADED'],'WAITING')
+    await this.dbi.cacheLoaded
+    // this.yadamuLogger.trace([this.constructor.name,this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),'CACHE_LOADED'],'PROCESSING')
     this.tableInfo = this.dbi.getTableInfo(tableName)
     this.initializeBatchCache() 
     this.batch = await this.nextBatch()

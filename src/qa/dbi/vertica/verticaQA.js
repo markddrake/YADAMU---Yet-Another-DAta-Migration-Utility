@@ -82,48 +82,32 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
       return results.rows
     }    
 
+    buildColumnLists(schemaMetadata,rules) {
 
-    buildColumnLists(schemaColumnInfo,rules) {
-
-      // console.log(rules)
-	  
-      const columnLists = {}
-      let tableInfo = undefined
-      let tableName = undefined
-      let columns = undefined
-      schemaColumnInfo.forEach((columnInfo) => {
-        if (tableName !== columnInfo[1] ) {
-          if (tableName) {
-            columnLists[tableName] = columns.join(',')
+	  const compareInfo = {}
+	  schemaMetadata.forEach((tableMetadata) => {
+        compareInfo[tableMetadata.TABLE_NAME] = tableMetadata.DATA_TYPE_ARRAY.map((dataType,idx) => {
+		  const columnName = tableMetadata.COLUMN_NAME_ARRAY[idx]
+		  switch (dataType) {
+			case (this.DATA_TYPES.XML_TYPE):
+			  return rules.XML_COMPARISSON_RULE === 'STRIP_XML_DECLARATION' ? `YADAMU.STRIP_XML_DECLARATION("${columnName}")` : `"${columnName}"`
+		    case this.DATA_TYPES.JSON_TYPE:
+              return `case when "${columnName}" is NULL then NULL when SUBSTR("${columnName}",1,1) = '{' then MAPTOSTRING(MAPJSONEXTRACTOR("${columnName}")) when SUBSTR("${columnName}",1,1) = '[' then MAPTOSTRING(mapDelimitedExtractor(substr("${columnName}",2,length("${columnName}")-2) using parameters delimiter=',')) else "${columnName}" end`
+            case this.DATA_TYPES.CHAR_TYPE :
+            case this.DATA_TYPES.VARCHAR_TYPE :
+            case this.DATA_TYPES.CLOB_TYPE :
+		      return rules.EMPTY_STRING_IS_NULL ? `case when "${columnName}" = '' then NULL else "${columnName}" end` : `"${columnName}"`
+		    case this.DATA_TYPES.DOUBLE_TYPE :
+              return rules.DOUBLE_PRECISION !== null ? `round("${columnName}",${rules.DOUBLE_PRECISION})` : `"${columnName}"`
+  		    case this.DATA_TYPES.GEOGRAPHY_TYPE :
+            case this.DATA_TYPES.GEOMETRY_TYPE :
+		      return `case when YADAMU.invalidGeoHash("${columnName}") then ST_AsText("${columnName}") else ${rules.SPATIAL_PRECISION < 20 ? `ST_GeoHash("${columnName}" USING PARAMETERS NUMCHARS=${rules.SPATIAL_PRECISION})` : `ST_GeoHash("${columnName}")`} end`
+            default:
+              return `"${columnName}"`
           }
-          tableName = columnInfo[1]
-          columns = []
-        }
-        
-	    switch (true) {
-		   case columnInfo[3].startsWith('xml') :
-			 columns.push(rules.XML_COMPARISSON_RULE === 'STRIP_XML_DECLARATION' ? `YADAMU.STRIP_XML_DECLARATION("${columnInfo[2]}")` : `"${columnInfo[2]}"`)
-			 break;
-           case columnInfo[3].startsWith('char') :
-           case columnInfo[3].startsWith('varchar') :
-           case columnInfo[3].startsWith('long varchar') :
-		     columns.push(rules.EMPTY_STRING_IS_NULL ? `case when "${columnInfo[2]}" = '' then NULL else "${columnInfo[2]}" end` : `"${columnInfo[2]}"`)
-             break;
-		  case columnInfo[3].startsWith('float') :
-		     columns.push(rules.DOUBLE_PRECISION !== null ? `round("${columnInfo[2]}",${rules.DOUBLE_PRECISION})` : `"${columnInfo[2]}"`)
-			 break;
-		  case columnInfo[3].startsWith('geography') :
-		  case columnInfo[3].startsWith('geometry') :
-		     columns.push(`case when YADAMU.invalidGeoHash("${columnInfo[2]}") then ST_AsText("${columnInfo[2]}") else ${rules.SPATIAL_PRECISION < 20 ? `ST_GeoHash("${columnInfo[2]}" USING PARAMETERS NUMCHARS=${rules.SPATIAL_PRECISION})` : `ST_GeoHash("${columnInfo[2]}")`} end`)
-			 break;
-           default:
-             columns.push(`"${columnInfo[2]}"`)
-        }
+	    }).join(',')
       })
-      if (tableName) {
-        columnLists[tableName] = columns.join(',')
-      }
-      return columnLists
+	  return compareInfo
     }
 
     async compareSchemas(source,target,rules) {
@@ -133,21 +117,10 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
        ,failed     : []
       }
 	  
-      const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION(source.schema));
-      
-      let columnLists = this.buildColumnLists(results.rows,rules)
-
-      let compareOperations = {}
-	  if (this.TABLE_FILTER.length === 0) {
-		compareOperations = columnLists 
-      }	   
-	  else {
-	   this.TABLE_FILTER.forEach((tableName) => {
-           compareOperations[tableName] = columnLists[tableName]
-        })  
-      }
-	  
-	  // console.log(compareOperations)
+	  const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION(source.schema))
+	  let compareInfo = this.buildSchemaInfo(results.rows)
+	 	  
+      const compareOperations = this.buildColumnLists(compareInfo,rules) 
 	  
       const compareResults = await Promise.all(Object.keys(compareOperations).map(async (TABLE_NAME) => {
         const sqlStatement =

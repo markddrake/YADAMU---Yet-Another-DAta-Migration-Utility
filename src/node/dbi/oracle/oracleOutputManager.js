@@ -122,14 +122,28 @@ class OracleOutputManager extends YadamuOutputManager {
 	      }
 		  break;
         case this.dbi.DATA_TYPES.DATE_TYPE:
+        case this.dbi.DATA_TYPES.TIME_TYPE:
+        case this.dbi.DATA_TYPES.DATETIME_TYPE:
+          // We want 'YYYY-MM-DD"T"HH24:MI:SS'
+          // Assume we get a valid 8601 Value
+          // Assume value longer than 19 contains unwanted fractional and or time zone info
+          // Assume a value with length 10 is a DATE only value that needs to have 'all:balls' time added
+          // Assume a value with length 8 is a TIME only value that needs to be baselined to the Unix epoch date.
+          // ### Negative values will screw this up. Consider using regex to try to reduce chances of invalid dates...
+          // ### Use Data Peeking to update transformation based on first value encountered
           return (col,idx) =>  {
             if (col instanceof Date) {
-              return col.toISOString()
+              col = col.toISOString()
             }
-            return col;
+            col = col.length   > 19 ? col.substring(0,19) : col
+            col = col.length === 10 ? `${col}T00:00:00` : col
+            col = col.length ===  8 ? `1970-01-01T${col}` : col
+            return col
           }
           break;
-        case this.dbi.DATA_TYPES.TIMESTAMP_TIMESTAMP_TYPE:
+        case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
+        case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
+        case this.dbi.DATA_TYPES.TIMESTAMP_LTZ_TYPE:
           return (col,idx) =>  {
             // A Timestamp not explicitly marked as UTC should be coerced to UTC.
             // Avoid Javascript dates due to lost of precsion.

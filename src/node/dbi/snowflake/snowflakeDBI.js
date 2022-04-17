@@ -66,10 +66,7 @@ class SnowflakeDBI extends YadamuDBI {
 
   // SNOWFLAKE XML TYPE can be set to TEXT to avoid multiple XML Fidelity issues with persisting XML data as VARIANT
   
-  get SNOWFLAKE_XML_TYPE()     { return this.parameters.SNOWFLAKE_XML_TYPE || SnowflakeConstants.SNOWFLAKE_XML_TYPE }
-  get SNOWFLAKE_JSON_TYPE()    { return this.parameters.SNOWFLAKE_JSON_TYPE || SnowflakeConstants.SNOWFLAKE_JSON_TYPE }
-
-  get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM || VerticaConstants.STAGING_PLATFORM } 
+  get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM || SnowflakeConstants.STAGING_PLATFORM } 
 
   get SPATIAL_SERIALIZER()     { return this._SPATIAL_SERIALIZER || "ST_AsWKB"; }
 
@@ -176,12 +173,8 @@ class SnowflakeDBI extends YadamuDBI {
     results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[])    
     this._DATABASE_VERSION = results[0].DATABASE_VERSION
 
-    if ((this.isManager()) && (this.SNOWFLAKE_XML_TYPE !== SnowflakeConstants.SNOWFLAKE_XML_TYPE )) {
-       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_XML_TYPE}.`)
-    }	
-
-    if ((this.isManager()) && (this.SNOWFLAKE_JSON_TYPE !== SnowflakeConstants.SNOWFLAKE_JSON_TYPE )) {
-       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_JSON_TYPE}.`)
+    if ((this.isManager()) && (this.DATA_TYPES.storageOptions.XML_TYPE !== SnowflakeConstants.SNOWFLAKE_XML_TYPE )) {
+       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.DATA_TYPES.storageOptions.XML_TYPE}.`)
     }	
 
   }
@@ -442,10 +435,10 @@ class SnowflakeDBI extends YadamuDBI {
       ** Sucky DUCK-TYPING of VARIANT columns.. Basically if 1000 random rows contain JSON it's JSON otherwise it's XML !
       **
       */
-      if (dataTypes.includes('VARIANT')) {
+      if (dataTypes.includes(this.DATA_TYPES.SNOWFLAKE_VARIANT_TYPE)) {
 	    // -- Use TRY_PARSE_JSON test a random sample of non null columns to see of they contain valid JSON, if so, assume JSON otherwise assume XML.
 	    dataTypes = await Promise.all(dataTypes.map(async (dataType,idx) => {
-           if (dataType === 'VARIANT') {
+           if (dataType === this.DATA_TYPES.SNOWFLAKE_VARIANT_TYPE) {
              const columnName = columnNames[idx]
              const SQL_ANALYZE_VARIANT = `with SAMPLE_DATA_SET as (
   select "${columnName}" from "${this.parameters.YADAMU_DATABASE}"."${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}" 
@@ -485,7 +478,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   async getSchemaMetadata() {
 	  
 	let schemaInfo = await this.executeSQL(this.statementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA])
-    schemaInfo = await this.describeVariantColumns(schemaInfo)
+	schemaInfo = await this.describeVariantColumns(schemaInfo)
     return schemaInfo
   }
   

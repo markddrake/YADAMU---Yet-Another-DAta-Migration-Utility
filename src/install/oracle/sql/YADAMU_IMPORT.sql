@@ -706,6 +706,17 @@ function MAP_ORACLE_DATATYPE(
 ) 
 return VARCHAR2
 as
+--
+--  Map NCHAR to CHAR, NVARCHAR2 to VARCHAR2 and NCLOB to CLOB in AL32UTF8 database.
+--
+--  C_NVARCHAR_TYPE      constant VARCHAR2(9) := $IF YADAMU_FEATURE_DETECTION.UNICODE_DATABASE $THEN case when P_VENDOR = 'Oracle' then 'NVARCHAR2' else 'VARCHAR2' end $ELSE 'NVARCHAR2' $END;
+--  C_NCHAR_TYPE         constant VARCHAR2(5) := $IF YADAMU_FEATURE_DETECTION.UNICODE_DATABASE $THEN case when P_VENDOR = 'Oracle' then 'NCHAR'     else 'CHAR'     end $ELSE 'NCHAR' $END;
+--  C_NCLOB_TYPE         constant VARCHAR2(5) := $IF YADAMU_FEATURE_DETECTION.UNICODE_DATABASE $THEN case when P_VENDOR = 'Oracle' then 'NCLOB'     else 'CLOB'     end $ELSE 'NCLOB' $END;
+--
+  C_NVARCHAR_TYPE      constant VARCHAR2(9) :=  'NVARCHAR2';
+  C_NCHAR_TYPE         constant VARCHAR2(5) :=  'NCHAR';
+  C_NCLOB_TYPE         constant VARCHAR2(5) :=  'NCLOB';
+--
 begin
   case 
     when P_ORACLE_TYPE is NULL then
@@ -717,36 +728,41 @@ begin
 	    when P_DATA_TYPE_LENGTH > C_RAW_LENGTH       then C_BLOB_TYPE  
 	                                                 else P_ORACLE_TYPE 
 	  end;
-    when P_ORACLE_TYPE = 'CHAR'                      then return 
+    when P_ORACLE_TYPE  = 'CHAR'                     then return 
       case 
         when P_DATA_TYPE_LENGTH is NULL              then C_CLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH = -1                 then C_CLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_VARCHAR_LENGTH   then C_CLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_CHAR_LENGTH      then 'VARCHAR2'
-	                                                 else P_ORACLE_TYPE
+	                                                 else 'CHAR'
       end;												   
     when P_ORACLE_TYPE = 'VARCHAR2'                  then return               
       case 
         when P_DATA_TYPE_LENGTH is NULL              then C_CLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH = -1                 then C_CLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_VARCHAR_LENGTH   then C_CLOB_TYPE  
-	                                                 else P_ORACLE_TYPE
+	                                                 else 'VARCHAR2'
       end;												   
     when P_ORACLE_TYPE = 'NCHAR'                     then return 
       case 
         when P_DATA_TYPE_LENGTH is NULL              then C_NCLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH = -1                 then C_NCLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_NVARCHAR_LENGTH  then C_NCLOB_TYPE  
-	    when P_DATA_TYPE_LENGTH > C_NCHAR_LENGTH     then 'NVARCHAR2'
-	                                                 else P_ORACLE_TYPE
+	    when P_DATA_TYPE_LENGTH > C_NCHAR_LENGTH     then C_NVARCHAR_TYPE
+	                                                 else C_NCHAR_TYPE
       end;												   
     when P_ORACLE_TYPE = 'NVARCHAR2'                 then return                  
       case 
         when P_DATA_TYPE_LENGTH is NULL              then C_NCLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH = -1                 then C_NCLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_NVARCHAR_LENGTH  then C_NCLOB_TYPE  
-	                                                 else P_ORACLE_TYPE
+	                                                 else C_NVARCHAR_TYPE
       end;
+    when P_ORACLE_TYPE = 'DATE'                      then return
+      case when P_DATA_TYPE_LENGTH > 0               then 'TIMESTAMP'
+                                                     else P_ORACLE_TYPE
+    end;
+    when P_ORACLE_TYPE = 'NCLOB'                     then return C_NCLOB_TYPE;
 	                                                 else return P_ORACLE_TYPE;
   end case;	  
 end;

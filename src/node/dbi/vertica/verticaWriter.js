@@ -1,6 +1,7 @@
 
 import crypto                   from 'crypto';
 import { performance }          from 'perf_hooks';
+import fs                       from 'fs';
 import fsp                      from 'fs/promises';
 import path                     from 'path'
 
@@ -45,13 +46,7 @@ class VerticaWriter extends YadamuWriter {
     // Use Slice to add first and last row, rather than first and last value.
     super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
   }
-  
-  recodeSpatialColumns(batch,msg) {
-    const targetFormat = 'WKT'
-    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,`COPY`,this.COPY_METRICS.cached,this.SPATIAL_FORMAT],`${msg} Converting to "${targetFormat}".`);
-    YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,targetFormat,this.tableInfo.targetDataTypes,batch,!this.tableInfo.parserRequired)
-  }  
-
+ 
   async writeBatchAsCSV(filename,batch) {
     const sw = new StringWriter();
     const csvTransformations = CSVLibrary.getCSVTransformations(batch)
@@ -140,6 +135,8 @@ class VerticaWriter extends YadamuWriter {
   }
   
   async _writeBatch(batch,rowCount) {
+
+    // console.log(batch)
       
     const emptyStringDataSets = Object.keys(batch).filter((key) => {return ((key !== 'copy') && (key !== 'insert'))})
     delete emptyStringDataSets.copy
@@ -195,6 +192,8 @@ class VerticaWriter extends YadamuWriter {
         await this.writeBatchAsCSV(stagingFilePath,batch[key])
         const stack = new Error().stack
         const sqlStatement = copyOperations[key].sql.replace(this.tableInfo.stagingFileName,stagingFileName)
+        // console.log(sqlStatement)
+        // console.log(fs.readFileSync(stagingFilePath).toString('utf8'))
         const results = await this.dbi.insertBatch(sqlStatement,copyOperations[key].errors);
 		if (results.rejected > 0) {
           await this.reportCopyErrors(results.errors,batch[key],stack,sqlStatement)

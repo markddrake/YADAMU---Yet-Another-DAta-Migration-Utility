@@ -1,12 +1,10 @@
 
-
-
 import fs                     from 'fs';
 
 import YadamuDataTypes        from './yadamuDataTypes.js'
 
 class YadamuStatementGenerator {
-	  
+      
   get SOURCE_VENDOR()        { return this._TARGET_VENDOR }
   set SOURCE_VENDOR(v)       { this._TARGET_VENDOR = v }
   
@@ -21,11 +19,11 @@ class YadamuStatementGenerator {
   
   get SOURCE_DATA_TYPES()    { 
     this._SOURCE_DATA_TYPES = this._SOURCE_DATA_TYPES || new Promise(async(resolve,reject) => {
-	  const classFile = YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].class
-	  const VendorDataTypes = (await import(classFile)).default
-	  const vendorDataTypes = new VendorDataTypes()
-	  // this.dbi.yadamu.initializeDataTypes(VendorDataTypes,JSON.parse(fs.readFileSync(YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].file)))
-	  resolve(vendorDataTypes)
+      const classFile = YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].class
+      const VendorDataTypes = (await import(classFile)).default
+      const vendorDataTypes = new VendorDataTypes()
+      // this.dbi.yadamu.initializeDataTypes(VendorDataTypes,JSON.parse(fs.readFileSync(YadamuDataTypes.DATA_TYPE_CONFIGURATION[this.SOURCE_VENDOR].file)))
+      resolve(vendorDataTypes)
     })
     return this._SOURCE_DATA_TYPES
   }
@@ -40,180 +38,195 @@ class YadamuStatementGenerator {
 
   get TYPE_MAPPINGS() {
 
-	this._TYPE_MAPPINGS = this._TYPE_MAPPINGS || (() => {
+    this._TYPE_MAPPINGS = this._TYPE_MAPPINGS || (() => {
       const typeMappings = new Map()
       for (let c = this.SOURCE_DATA_TYPES; c !== null; c = Object.getPrototypeOf(c)) {
-		Object.getOwnPropertyNames(c).filter((name) => { 
-	      return Object.getOwnPropertyDescriptor(c,name).get
-	    }).forEach((name) => { 
-	      const sourceType = this.SOURCE_DATA_TYPES[name]
-		  if (typeof sourceType === 'string') {
-	        const sourceTypeDefinition = YadamuDataTypes.decomposeDataType(sourceType)
-			if (sourceType === sourceTypeDefinition.type) {
-			  // const targetType = this.dbi.DATA_TYPES.storageOptions[name] || this.dbi.DATA_TYPES[name]
-			  const targetType = this.dbi.DATA_TYPES[name]
-		      if (typeof targetType === 'string') {
-		        typeMappings.has(sourceType) ? typeMappings.set(sourceType,typeMappings.get(sourceType).add(targetType)) : typeMappings.set(sourceType,new Set().add(targetType))
-			  }
-			}
-		  }   
-	    })
+        Object.getOwnPropertyNames(c).filter((name) => { 
+          return Object.getOwnPropertyDescriptor(c,name).get
+        }).forEach((name) => { 
+          const sourceType = this.SOURCE_DATA_TYPES[name]
+          if (typeof sourceType === 'string') {
+            const sourceTypeDefinition = YadamuDataTypes.decomposeDataType(sourceType)
+            if (sourceType === sourceTypeDefinition.type) {
+              // const targetType = this.dbi.DATA_TYPES.storageOptions[name] || this.dbi.DATA_TYPES[name]
+              const targetType = this.dbi.DATA_TYPES[name]
+              if (typeof targetType === 'string') {
+                typeMappings.has(sourceType) ? typeMappings.set(sourceType,typeMappings.get(sourceType).add(targetType)) : typeMappings.set(sourceType,new Set().add(targetType))
+              }
+            }
+          }   
+        })
       }
-	  // console.log(typeMappings)
-	  typeMappings.forEach((value,key) => {
-		typeMappings.set(key, value.size === 1 ? value.values().next().value : this.dbi.DATA_TYPES.coalesceTypeMappings(Array.from(value.values())))
-	  })
-	  // console.log(typeMappings)
-	  return typeMappings
-	})()
+      // console.log(typeMappings)
+      typeMappings.forEach((value,key) => {
+        typeMappings.set(key, value.size === 1 ? value.values().next().value : this.dbi.DATA_TYPES.coalesceTypeMappings(Array.from(value.values())))
+      })
+      // console.log(typeMappings)
+      return typeMappings
+    })()
     return this._TYPE_MAPPINGS
   }
   
   constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
 
-	this.dbi = dbi;
+    this.dbi = dbi;
     this.SOURCE_VENDOR = vendor
     this.targetSchema = targetSchema
     this.metadata = metadata
-    this.yadamuLogger = yadamuLogger;	
-	
+    this.yadamuLogger = yadamuLogger;   
+    
   }
   
   async init() {
-	this.SOURCE_DATA_TYPES = await this.SOURCE_DATA_TYPES;
+    // Set it to the value of the resolved promise..
+    this.SOURCE_DATA_TYPES = await this.SOURCE_DATA_TYPES;
   }  
   
-  async debugStatementGenerator(options) {	
-	
-	console.log(JSON.stringify(this.metadata))
-	console.log(JSON.stringify(Array.from(this.TYPE_MAPPINGS.entries())))
-	console.log(options)
-	
-  }	
+  async debugStatementGenerator(options,statementCache) {  
+    
+    console.log(JSON.stringify(this.metadata))
+    console.log(JSON.stringify(Array.from(this.TYPE_MAPPINGS.entries())))
+    console.log(options)
+    console.log(statementCache)
+    
+  } 
  
   isJSON(dataType) {
-	return YadamuDataTypes.isJSON(dataType)
+    return YadamuDataTypes.isJSON(dataType)
   }
  
   isXML(dataType) {
-	return YadamuDataTypes.isXML(dataType)
+    return YadamuDataTypes.isXML(dataType)
   }
   
+  refactorByLength(mappedDataType,length) {
+
+      switch (mappedDataType) {
+     
+        case this.dbi.DATA_TYPES.CHAR_TYPE:
+        case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+        case this.dbi.DATA_TYPES.CLOB_TYPE:
+          switch (true) {
+            case (isNaN(length)):                                        return this.dbi.DATA_TYPES.CLOB_TYPE
+            case (length === undefined):                                 return this.dbi.DATA_TYPES.CLOB_TYPE
+            case (length === -1):                                        return this.dbi.DATA_TYPES.CLOB_TYPE
+            case (length > this.dbi.DATA_TYPES.VARCHAR_LENGTH):          return this.dbi.DATA_TYPES.CLOB_TYPE
+            case (length < this.dbi.DATA_TYPES.BINARY_LENGTH):           return this.dbi.DATA_TYPES.VARCHAR_TYPE
+            default:                                                     return mappedDataType
+          }
+
+        case this.dbi.DATA_TYPES.BINARY_TYPE:
+        case this.dbi.DATA_TYPES.VARBINARY_TYPE:
+        case this.dbi.DATA_TYPES.BLOB_TYPE:
+          switch (true) {
+            case (isNaN(length)):                                        return this.dbi.DATA_TYPES.BLOB_TYPE
+            case (length === undefined):                                 return this.dbi.DATA_TYPES.BLOB_TYPE
+            case (length === -1):                                        return this.dbi.DATA_TYPES.BLOB_TYPE
+            case (length > this.dbi.DATA_TYPES.BINARY_LENGTH):           return this.dbi.DATA_TYPES.BLOB_TYPE
+            case (length < this.dbi.DATA_TYPES.BINARY_LENGTH):           return this.dbi.DATA_TYPES.VARBINARY_TYPE
+            default:                                                     return mappedDataType
+          }
+
+        case this.dbi.DATA_TYPES.NUMERIC_TYPE:        
+          switch (true) {
+            // Need to address P,S and linits on P,S
+            case (isNaN(length)):                                        
+            case (length === undefined):                                 return this.dbi.DATA_TYPES.UNBOUNDED_NUMERIC_TYPE
+            default:                                                     return mappedDataType
+          }
+          
+        case this.dbi.DATA_TYPES.TIME_TYPE:
+        case this.dbi.DATA_TYPES.DATETIME_TYPE:
+        case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
+          switch (true) {
+            case (length > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return `${mappedDataType}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION})`
+            default:                                                     return mappedDataType
+          }
+
+	   case this.dbi.DATA_TYPES.TIME_TZ_TYPE:
+	   case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
+          switch (true) {
+            case (length === undefined):                                 return mappedDataType
+            case (length > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return mappedDataType.replace(' ',`(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION}) WITH TIME ZONE`)
+            default:                                                     return mappedDataType.replace(' ',`(${length}) WITH TIME ZONE`)
+          }
+        default:                                                         return mappedDataType
+      }   
+  }
+
   mapUserDefinedDataType(dataType) {
-	  
-	/*
-	**
-	** Handle mappings for custom / user defined types. e.g. 
-	**
-	**   Oracle: Map all user defined types to CLOB ...
-	**
-	** Currently hard-wired. If most drivers require this functionality it would be better to load the Source Vendors DBI Class dynamically 
-	** and have the DBI class provide a static method that determines the mapping
-	**
-	*/
-	
-	switch (this.SOURCE_VENDOR) {
-	  case 'Oracle':
-	    switch (true) {
-	       case (dataType.indexOf('.') > -1):             
-		   return this.dbi.DATA_TYPES.USER_DEFINED_TYPE
-		}
-		break;
-	 default:
-	}
-	return undefined
+      
+    /*
+    **
+    ** Handle mappings for custom / user defined types. e.g. 
+    **
+    **   Oracle: Map all user defined types to CLOB ...
+    **
+    ** Currently hard-wired. If most drivers require this functionality it would be better to load the Source Vendors DBI Class dynamically 
+    ** and have the DBI class provide a static method that determines the mapping
+    **
+    */
+    
+    switch (this.SOURCE_VENDOR) {
+      case 'Oracle':
+        switch (true) {
+           case (dataType.indexOf('.') > -1):             
+           return this.dbi.DATA_TYPES.USER_DEFINED_TYPE
+        }
+        break;
+     default:
+    }
+    return undefined
   }    
 
   isOracleObjectType(dataType) {
-	return ((dataType.indexOf('"."') > -1) && (this.SOURCE_VENDOR === "Oracle")) ? 'ORACLE_OBJECT_TYPE' : undefined
+    return ((dataType.indexOf('"."') > -1) && (this.SOURCE_VENDOR === "Oracle")) ? 'ORACLE_OBJECT_TYPE' : undefined
   }
   
-  getKeyFromDataType(dataType) {
-     const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType)
-	 try {
-	   return this.SOURCE_DATA_TYPES.REVERSE_TYPE_MAPPINGS.get(dataType) || Array.from(this.SOURCE_DATA_TYPES.YADAMU_TYPE_MAPPINGS.entries()).find((entry) => { return entry[1].toLowerCase() === dataType.toLowerCase() })[0]
-	 } catch (e) {
-	   return this.isOracleObjectType(dataType) 
+  validateNumericProperties(typeDefinition) {
+    typeDefinition.length = typeDefinition.length > this.dbi.DATA_TYPES.NUMERIC_PRECISION ? this.dbi.DATA_TYPES.NUMERIC_PRECISION : typeDefinition.length
+    typeDefinition.scale = typeDefinition.scale > this.dbi.DATA_TYPES.NUMERIC_SCALE ? this.dbi.DATA_TYPES.NUMERIC_SCALE : typeDefinition.scale
+  }  
+  
+  mapDataType(dataTypeDefinition) {
+       
+     // Virtual data types (XML,JSON,BOOLEAN) may not match the case used by the key in the map object.
+     let mappedDataType = this.TYPE_MAPPINGS.get(dataTypeDefinition.type) ||  this.TYPE_MAPPINGS.get(dataTypeDefinition.type.toLowerCase()) || this.TYPE_MAPPINGS.get(dataTypeDefinition.type.toUpperCase()) 
+    
+     switch (mappedDataType) {
+       case this.dbi.DATA_TYPES.CHAR_TYPE:
+         switch (true) {
+           case (dataTypeDefinition.length === undefined) :
+           case (dataTypeDefinition.length < 0) :
+           case (dataTypeDefinition.length > this.dbi.DATA_TYPES.CHAR_LENGTH) :
+             mappedDataType = this.dbi.DATA_TYPES.CLOB_TYPE
+             break; 
+           default:          
+         }
+         break
+       case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+         switch (true) {
+           case (dataTypeDefinition.length === undefined) :
+           case (dataTypeDefinition.length < 0) :
+           case (dataTypeDefinition.length > this.dbi.DATA_TYPES.VARCHAR_LENGTH) :
+             mappedDataType = this.dbi.DATA_TYPES.CLOB_TYPE
+             break
+           default:          
+         }
+         break
+       case this.dbi.DATA_TYPES.NUMERIC_TYPE:
+       case this.dbi.DATA_TYPES.DEIMAL_TYPE:
+         const sourceDataType = `${dataTypeDefinition.type}(${dataTypeDefinition.length},${dataTypeDefinition.scale})`
+         if (YadamuDataTypes.isUnboundedNumeric(this.SOURCE_VENDOR,sourceDataType)) {
+           return this.dbi.DATA_TYPES.UNBOUNDED_NUMERIC_TYPE
+         }
+         this.validateNumericProperties(dataTypeDefinition)
+       default:
      }
-  }
-  
-  mapDataType(dataType, length) {
-	  
-	 const key = this.getKeyFromDataType(dataType)  
-	 let mappedDataType = this.dbi.DATA_TYPES[key]
-	 switch (mappedDataType) {
-	   case this.dbi.DATA_TYPES.CHAR_TYPE:
-	     switch (true) {
-		   case (length === undefined) :
-		   case (length < 0) :
-		   case (length > this.dbi.DATA_TYPES.CHAR_LENGTH) :
-	         mappedDataType = this.dbi.DATA_TYPES.CLOB_TYPE
-		     break; 
-           default:			 
-	     }
-		 break
-	   case this.dbi.DATA_TYPES.VARCHAR_TYPE:
-	     switch (true) {
-		   case (length === undefined) :
-		   case (length < 0) :
-		   case (length > this.dbi.DATA_TYPES.VARCHAR_LENGTH) :
-	         mappedDataType = this.dbi.DATA_TYPES.CLOB_TYPE
-		     break; 
-           default:			 
-	     }
-		 break
-	   default:
-	 }
-     // console.log(key,':',dataType,length,'==>',mappedDataType)
-	 return mappedDataType
-	 
-  }
-
-  getMappedDataType(dataType,sizeConstraint) {
-	  
-	/*
-	**
-    **  Map the source datatype to the target.
-	**
-	** If the target table already exists then the data type is defined by the target table. 
-	** If the target table does not exist use that mapping mechansim to determine the target type
-	** First objtain the name of the key that describes the source data type in the source table mapping object
-	** USe tje key to obtain the corresponding data type from the target environemnt's type mappings
-	**
-	*/
-
-    const dataTypeDefinition = YadamuDataTypes.composeDataType(dataType,sizeConstraint)
-	
-	if ((!this.dbi.DATATYPE_IDENTITY_MAPPING) || (this.dbi.DATABASE_VENDOR !== this.SOURCE_VENDOR)) {
-
-	  const mappedDataType = this.mapDataType(dataTypeDefinition.type,dataTypeDefinition.length);
-   
-      if (mappedDataType === undefined) {
-		let userDefinedDataType = this.mapUserDefinedDataType(dataType,sizeConstraint)
-	    if (userDefinedDataType === undefined) {
-          this.yadamuLogger.logInternalError([this.dbi.DATABASE_VENDOR,`MAPPING NOT FOUND`],`Missing Mapping for "${dataType}" in mappings for "${this.SOURCE_VENDOR}".`)
-	    }
-		return userDefinedDataType
-	  }
-
-	  // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.SOURCE_VENDOR,dataTypeDefinition.type,dataTypeDefinition.length,dataTypeDefinition.scale],`Mapped to "${mappedDataType}".`)
-      return mappedDataType
-	}
-	else {
-	  return this.generateStorageClause(dataType,sizeConstraint)
-	}
-  }
-  
-  validateTypeDefinition(typeDefinition) {
-
-	switch (typeDefinition.type) {
-	  case (this.dbi.DATA_TYPES.NUMERIC_TYPE):
-	  case (this.dbi.DATA_TYPES.DECIMAL_TYPE):
-	    typeDefinition.length = typeDefinition.length > this.dbi.DATA_TYPES.NUMERIC_PRECISION ? this.dbi.DATA_TYPES.NUMERIC_PRECISION : typeDefinition.length
-		typeDefinition.scale = typeDefinition.scale > this.dbi.DATA_TYPES.NUMERIC_SCALE ? this.dbi.DATA_TYPES.NUMERIC_SCALE : typeDefinition.scale
-		break
-	  default:
-	}
+     // console.log(key,':',dataTypeDefinition.type,dataTypeDefinition.length,'==>',mappedDataType)
+     // console.log(dataTypeDefinition.type,'==>',mappedDataType)
+     return mappedDataType
+     
   }
 
   generateStorageClause(mappedDataType,sizeConstraint) {
@@ -224,21 +237,20 @@ class YadamuStatementGenerator {
          /* Already has a Size specified */
          return mappedDataType
       }
-	  
+      
       if (this.dbi.DATA_TYPES.UNBOUNDED_TYPES.includes(mappedDataType)) {
         return mappedDataType
       }
-	  
-	  const dataTypeDefinition = {
-		type: mappedDataType
-	  }
       
-      const sizeComponents = sizeConstraint.split(',')
-      dataTypeDefinition.length = sizeComponents[0] === 'max' ? -1 :  parseInt(sizeComponents[0])
-      dataTypeDefinition.scale = (sizeComponents.length > 1) ? parseInt(sizeComponents[1]) : undefined
-	  
-	  this.validateTypeDefinition(dataTypeDefinition)
-	  
+      const dataTypeDefinition = YadamuDataTypes.composeDataType(mappedDataType,sizeConstraint)
+      
+      switch (mappedDataType) {
+        case this.dbi.DATA_TYPES.NUMERIC_TYPE:
+        case this.dbi.DATA_TYPES.DEIMAL_TYPE:
+          this.validateNumericProperties(dataTypeDefinition)
+        default:
+      }
+          
       if (dataTypeDefinition.scale && (dataTypeDefinition.scale > 0)) {
         return `${dataTypeDefinition.type}(${dataTypeDefinition.length},${dataTypeDefinition.scale})`
       }                                                   
@@ -247,20 +259,56 @@ class YadamuStatementGenerator {
         const type = dataTypeDefinition.type.toLowerCase()
         return (type.includes(' ') && !type.toLowerCase().startsWith('long')  &&!type.startsWith('bit')) ? type.replace(' ',`(${dataTypeDefinition.length}) `) : `${dataTypeDefinition.type}(${dataTypeDefinition.length})`
       }
-	}
-	else {
-	  if (YadamuDataTypes.isBCD(mappedDataType)) {
-		return this.dbi.DATA_TYPES.UNBOUNDED_NUMERIC_TYPE
-	  }
-	}
+    }
+    else {
+      if (YadamuDataTypes.isBCD(mappedDataType)) {
+        return this.dbi.DATA_TYPES.UNBOUNDED_NUMERIC_TYPE
+      }
+    }
 
-	return mappedDataType
+    return mappedDataType
+  }
+      
+  getMappedDataType(dataType,sizeConstraint) {
+      
+    /*
+    **
+    **  Map the source datatype to the target.
+    **
+    ** If the target table already exists then the data type is defined by the target table. 
+    ** If the target table does not exist use that mapping mechansim to determine the target type
+    ** First objtain the name of the key that describes the source data type in the source table mapping object
+    ** USe tje key to obtain the corresponding data type from the target environemnt's type mappings
+    **
+    */
+
+    const dataTypeDefinition = YadamuDataTypes.composeDataType(dataType,sizeConstraint)
+    
+    if ((!this.dbi.DATATYPE_IDENTITY_MAPPING) || (this.dbi.DATABASE_VENDOR !== this.SOURCE_VENDOR)) {
+
+      const mappedDataType = this.mapDataType(dataTypeDefinition);
+   
+      if (mappedDataType === undefined) {
+        let userDefinedDataType = this.mapUserDefinedDataType(dataType,sizeConstraint)
+        if (userDefinedDataType === undefined) {
+          // console.log(this.TYPE_MAPPINGS)
+          this.yadamuLogger.logInternalError([this.dbi.DATABASE_VENDOR,`MAPPING NOT FOUND`],`Missing Mapping for "${dataType}" in mappings for "${this.SOURCE_VENDOR}".`)
+        }
+        return userDefinedDataType
+      }
+
+      // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.SOURCE_VENDOR,dataTypeDefinition.type,dataTypeDefinition.length,dataTypeDefinition.scale],`Mapped to "${mappedDataType}".`)
+      return this.refactorByLength(mappedDataType,dataTypeDefinition.length)
+    }
+    else {
+      return this.generateStorageClause(dataType,sizeConstraint)
+    }
   }
 
   generateDDLStatement(schema,tableName,columnDefinitions,mappedDataTypes) {
-	  
+      
     return `create table "${schema}"."${tableName}"(\n  ${columnDefinitions.join(',')})`;
-	
+    
   }
 
   generateDMLStatement(schema,tableName,columnNames,insertOperators) {
@@ -274,46 +322,50 @@ class YadamuStatementGenerator {
   generateTableInfo(tableMetadata) {
 
     let insertMode = 'Batch';
-
+   
     const columnNames = tableMetadata.columnNames
     
     const mappedDataTypes = [];
-	const insertOperators = []
-	
+    const insertOperators = []
+    
     const columnDefinitions = columnNames.map((columnName,idx) => {
-				
-      const mappedDataType = tableMetadata.source ? tableMetadata.dataTypes[idx] : this.getMappedDataType(tableMetadata.dataTypes[idx],tableMetadata.sizeConstraints[idx])
+      const sourceDataType = tableMetadata.dataTypes[idx]
+      const mappedDataType = tableMetadata.source ? sourceDataType : this.getMappedDataType(sourceDataType,tableMetadata.sizeConstraints[idx])
       mappedDataTypes.push(mappedDataType)
       insertOperators.push(this.getInsertOperator(mappedDataType))
-	  return `"${columnName}" ${this.generateStorageClause(mappedDataType,tableMetadata.sizeConstraints[idx])}`	   
+      return `"${columnName}" ${this.generateStorageClause(mappedDataType,tableMetadata.sizeConstraints[idx])}`    
     })
-	
+    
     const tableInfo =  { 
-      ddl              : this.tableMetadata.source ? null : this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,mappedDataTypes)
+      ddl              : tableMetadata.source ? null : this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,mappedDataTypes)
     , dml              : this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,columnNames,insertOperators)
     , columnNames      : tableMetadata.columnNames
-    , sourceDataTypes  : tableMetadata.source ? tableMetadata.source.dataTypes : dataTypes
     , targetDataTypes  : mappedDataTypes
-	, virtualDataTypes : mappedDataTypes
+    , virtualDataTypes : mappedDataTypes
     , insertMode       : insertMode
     , _BATCH_SIZE      : this.dbi.BATCH_SIZE
     , _SPATIAL_FORMAT  : this.dbi.INBOUND_SPATIAL_FORMAT
     }
-	
-	return tableInfo
+    
+    return tableInfo
   }
   
   async generateStatementCache() {
-	await this.init()
+
+    await this.init()
+
     const statementCache = {}
     const tables = Object.keys(this.metadata);
-	const ddlStatements = tables.map((table,idx) => {
+    const ddlStatements = tables.map((table,idx) => {
       const tableMetadata = this.metadata[table];
       const tableInfo = this.generateTableInfo(tableMetadata);
       statementCache[this.metadata[table].tableName] = tableInfo;
       return tableInfo.ddl;
     })
-	return statementCache;
+   
+    // await this.debugStatementGenerator({},statementCache)
+	
+    return statementCache;
   }
 
 }

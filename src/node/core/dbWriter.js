@@ -216,7 +216,7 @@ class DBWriter extends Writable {
       }    
       return false
     } catch (err) {
-      this.yadamuLogger.handleException([`WRITER`,`WRITE`,messageType,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],err)
+      this.yadamuLogger.handleException([`WRITER`,`WRITE`,messageType,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],err)
       this.underlyingError = err;
       // Attempt a rollback, however if the rollback fails throw the err that let to the rollback operation
       try {

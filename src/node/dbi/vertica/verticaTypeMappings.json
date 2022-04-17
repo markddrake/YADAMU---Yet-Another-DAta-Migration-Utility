@@ -4,7 +4,7 @@
   , "VARCHAR_TYPE"                                         : "varchar"                                                         
                                                                                                                          
   , "INTEGER_TYPE"                                         : "int"                                                             
-  , "FLOAT_TYPE"                                           : "float"                                                           
+  , "DOUBLE_TYPE"                                          : "float"                                                           
   , "NUMERIC_TYPE"                                         : "numeric"                                                          
   , "UNBOUNDED_NUMERIC_TYPE"                               : "numeric(1024,512)"
                                                                                                                          

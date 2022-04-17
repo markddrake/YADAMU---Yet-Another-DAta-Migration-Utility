@@ -15,13 +15,14 @@ class SnowflakeWriter extends YadamuOutputManager {
 	super(dbi,tableName,metrics,status,yadamuLogger)
   }
 
-  generateTransformations(targetDataTypes) {
+  generateTransformations(dataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
-	
-    return targetDataTypes.map((targetDataType,idx) => {      
-      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(targetDataType);
-      
+
+    let spatialFormat = this.SPATIAL_FORMAT	
+
+    return dataTypes.map((dataType,idx) => {      
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
 	  switch (dataTypeDefinition.type.toUpperCase()) {
         case this.dbi.DATA_TYPES.BLOB_TYPE:
   		case this.dbi.DATA_TYPES.BINARY_TYPE:
@@ -29,22 +30,33 @@ class SnowflakeWriter extends YadamuOutputManager {
             return col.toString('hex')
 		  }
         case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
-          if (this.SPATIAL_FORMAT.endsWith('WKB')) {
-            return (col,idx)  => {
-		       return Buffer.isBuffer(col) ? col.toString('hex') : col
-			}
-          }
-		  return null
-        case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
-          if (this.SPATIAL_FORMAT.endsWith('WKB')) {
-            return (col,idx)  => {
-		       return Buffer.isBuffer(col) ? col.toString('hex') : col
-			}
-          }
-		  return null
+		  switch (this.SPATIAL_FORMAT) {
+            case "WKB":
+		    case "EWKB":
+		      // Snowflake's handling of WKB appears a little 'flaky' :) - Convert to WRT
+			  /*
+              return (col,idx)  => {
+		         return Buffer.isBuffer(col) ? col.toString('hex') : col
+		      }
+			  */
+			  spatialFormat = 'WKT'
+			  return (col,idx) => {
+                return YadamuSpatialLibrary.bufferToWKT(col)
+              }
+            case "GeoJSON":
+    		  return (col,idx) => {
+			    return typeof col === 'object' ? JSON.stringify(col) : col
+		      }
+		    default:
+		      return null
+		  }
 		case this.dbi.DATA_TYPES.JSON_TYPE:
 		  return (col,idx) => {
-            return JSON.stringify(col)
+			return typeof col === 'object' ? JSON.stringify(col) : col
+		  }
+		case this.dbi.DATA_TYPES.SNOWFLAKE_VARIANT_TYPE:
+		  return (col,idx) => {
+			return typeof col === 'object' ? JSON.stringify(col) : col
 		  }
         case this.dbi.DATA_TYPES.SNOWFLAKE_VARIANT_TYPE:
           return (col,idx) => {
@@ -98,6 +110,8 @@ class SnowflakeWriter extends YadamuOutputManager {
 		  return null
       }
     })
+		
+	this.tableInfo._SPATIAL_FORMAT = spatialFormat
 	
   }
         

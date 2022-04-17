@@ -22,14 +22,15 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
 	, jsonStorageOption    : this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
 	}
 	
-    // await this.debugStatementGenerator(options)
-	
 	const vendorTypeMappings = Array.from(this.TYPE_MAPPINGS.entries())
 	
 	// Passing vendorTypeMappings as Native Javascript Array causes Parsing errors...
 
     const results = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, JSON.stringify(vendorTypeMappings), this.targetSchema, options])
     let statementCache = results.rows[0][0]
+
+    // await this.debugStatementGenerator(options,statementCache)
+	
 	 
 	if (statementCache === null) {
       statementCache = {}
@@ -141,7 +142,7 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
                   return `YADAMU_AsLSeg(ST_GeomFromText($%)::path)`
                   break;
                 case "EWKT":
-                  return `YADAMU_AsLSeg(ST_GeomFromEWKT($%)::path}`
+                  return `YADAMU_AsLSeg(ST_GeomFromEWKT($%)::path)`
                   break;
                 case "GeoJSON":
                   return `YADAMU_AsLSeg(ST_GeomFromGeoJSON($%)::path)`

@@ -12,11 +12,9 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
 
-  getMappedDataType(dataType,sizeConstraint) {
-	  
-      const mappedDataType = super.getMappedDataType(dataType,sizeConstraint)
-      const length = parseInt(sizeConstraint)
-      switch (mappedDataType) {
+  refactorByLength(mappedDataType,length) {
+
+	  switch (mappedDataType) {
 
         case this.dbi.DATA_TYPES.CHAR_TYPE:
           switch (true) {
@@ -28,7 +26,9 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
             case (length > this.dbi.DATA_TYPES.VARCHAR_LENGTH):          return this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE
             case (length > this.dbi.DATA_TYPES.CHAR_LENGTH):             return this.dbi.DATA_TYPES.VARCHAR_TYPE
             default:                                                     return mappedDataType
-          }case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+          }
+		  
+		case this.dbi.DATA_TYPES.VARCHAR_TYPE:
           switch (true) {
             case (isNaN(length)):                                        return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
             case (length === undefined):                                 return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
@@ -63,7 +63,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
             case (length > this.dbi.DATA_TYPES.MEDIUMBLOB_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
             case (length > this.dbi.DATA_TYPES.BLOB_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMBLOB_TYPE
             case (length > this.dbi.DATA_TYPES.VARBINARY_LENGTH):        return this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE
-            case (length > this.dbi.DATA_TYPES.BINARY_LENGTH):           return this.dbi.DATA_TYPES.MYSQL_VARBINARY_TYPE
+            case (length > this.dbi.DATA_TYPES.BINARY_LENGTH):           return this.dbi.DATA_TYPES.VARBINARY_TYPE
             default:                                                     return mappedDataType
           }
 
@@ -116,10 +116,19 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
             default:                                                     return mappedDataType
           }
 
-        case this.dbi.DATA_TYPES.TIME_TYPE:
-        case this.dbi.DATA_TYPES.DATETIME_TYPE:
+	    // MySQL Timestamp limited to Unix EPOCH date range. Map to datetime when data comes from other sources.
+
         case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
         case this.dbi.DATA_TYPES.TIMESTAMPTZ_TYPE:
+          switch (true) {
+            case this.SOURCE_VENDOR ===  'MariaDB':
+            case this.SOURCE_VENDOR === 'MySQL':                         return mappedDataType
+            case (length > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return `${this.dbi.DATA_TYPES.DATETIME_TYPE}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION})`
+            default:                                                     return `${this.dbi.DATA_TYPES.DATETIME_TYPE}`
+          }
+     
+        case this.dbi.DATA_TYPES.TIME_TYPE:
+        case this.dbi.DATA_TYPES.DATETIME_TYPE:
           switch (true) {
             case (length > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return `${mappedDataType}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION})`
             default:                                                     return mappedDataType
@@ -132,7 +141,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
   getColumnDataType(mappedDataType,sizeConstraint) {
 
      if (mappedDataType === "boolean") {
-       return 'tinyint(1)'
+       return this.dbi.storageOptions.BOOLEAN_TYPE
      }
       
      return super.getColumnDataType(mappedDataType,sizeConstraint)
@@ -175,7 +184,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
               spatialFunction = `ST_GeomFromWKB(UNHEX(${psuedoColumnName}))`;
               break;
             case "WKT":
-            case "EWRT":
+            case "EWKT":
               spatialFunction = `ST_GeomFromText(${psuedoColumnName})`;
               break;
             case "GeoJSON":
@@ -227,20 +236,50 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
     }  
   }
 
+  validateRowSize(columnNames,mappedDataTypes,sizeConstraints,columnDefinitions) {
+
+    const rowSizes = sizeConstraints.map((sizeConstraint) => {
+      return parseInt(sizeConstraint)
+    })
+
+    // TODO: Add correct sizes for INT, FLOAT, NUMBER etc.
+
+    let rowSize = rowSizes.reduce((sum, cv) => { return isNaN(cv) ? sum : sum + cv },0)
+    while (rowSize > 65535) {
+      const idx = rowSizes.reduce((idx, cv, cidx ) => {return cv > rowSizes[idx] ? cidx : idx}, 0);
+      rowSize = rowSize - rowSizes[idx] + 8
+      switch(mappedDataTypes[idx]) { 
+        case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+          mappedDataTypes[idx] = this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE
+          break
+        case this.dbi.DATA_TYPES.VARBINARY_TYPE:
+          mappedDataTypes[idx] = this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE
+          break;
+        default: 
+          return
+      }
+      columnDefinitions[idx] = `"${columnNames[idx]}" ${this.generateStorageClause(mappedDataTypes[idx])}`
+    }
+  }
+
   generateTableInfo(tableMetadata) {
-      
+    
     let insertMode = 'Batch';
     	
-    const columnNames = tableMetadata.columnNames
+	const columnNames = tableMetadata.columnNames
 
     const mappedDataTypes = [];
     const insertOperators = []
     const columnDefinitions = columnNames.map((columnName,idx) => {
       let addNullClause = false;
-      const mappedDataType = tableMetadata.source ? tableMetadata.dataTypes[idx]: this.getMappedDataType(tableMetadata.dataTypes[idx],tableMetadata.sizeConstraints[idx])
-      let columnDataType = mappedDataType
+      
+	  const mappedDataType = tableMetadata.source ? tableMetadata.dataTypes[idx]: this.getMappedDataType(tableMetadata.dataTypes[idx],tableMetadata.sizeConstraints[idx])
+	  let columnDataType = mappedDataType
 	  mappedDataTypes.push(mappedDataType)
-      switch (mappedDataType) {
+	  
+	  const dataTypeDefinition = YadamuDataTypes.decomposeDataType(mappedDataType)
+	  
+	  switch (dataTypeDefinition.type) {
         case this.dbi.DATA_TYPES.SPATIAL_TYPE:                
         case this.dbi.DATA_TYPES.POINT_TYPE:                
         case this.dbi.DATA_TYPES.LINE_TYPE:                 
@@ -255,7 +294,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
               insertOperators.push('ST_GeomFromWKB(?)');
               break
             case "WKT":
-            case "EWRT":
+            case "EWKT":
               insertOperators.push('ST_GeomFromText(?)');
               break;
             case "GeoJSON":
@@ -295,7 +334,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
 	  return `"${columnName}" ${this.generateStorageClause(columnDataType,tableMetadata.sizeConstraints[idx])} ${addNullClause === true ? 'null':''}`      
     })
                                    
-  						      
+  	this.validateRowSize(tableMetadata.columnNames,mappedDataTypes,tableMetadata.sizeConstraints,columnDefinitions)					          
     								       
     const rowConstructor = `(${insertOperators.join(',')})`
 
@@ -303,7 +342,6 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
       ddl            :  this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,mappedDataTypes)
     , dml            :  this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,columnNames,insertOperators)
     , columnNames    :  tableMetadata.columnNames
-    , sourceDataTypes:  tableMetadata.source ? tableMetadata.source.dataTypes:  tableMetadata.dataTypes
     , targetDataTypes:  mappedDataTypes
     , insertMode     :  insertMode
 	, rowConstructor :  rowConstructor
@@ -316,7 +354,6 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
     if (tableMetadata.dataFile) {
       tableInfo.copy = this.generateCopyStatements(tableMetadata,mappedDataTypes) 
     }
-        
     return tableInfo
   }      
 

@@ -335,11 +335,13 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
             copyColumnDefinitions[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as cast(TO_TIMESTAMP("YADAMU_COL_${column_suffix}",'YYYY-MM-DD"T"HH24:MI:SS.US') as TIME)`
           }
           else {
-			switch (this.SOURCE_VENDOR) {
-              case "Postgres":
+			switch (this.SOURCE_VENDOR) { 
+              case "Oracle":
               case "MSSQLSERVER":
+              case "Postgres":
               case "MySQL":
               case "MariaDB":
+              case "MongoDB":
               case "Vertica":
                 copyColumnDefinitions[idx] = `"YADAMU_COL_${column_suffix}" FILLER VARCHAR(36), "${columnName}" as cast("YADAMU_COL_${column_suffix}" as TIME)`
                 break;

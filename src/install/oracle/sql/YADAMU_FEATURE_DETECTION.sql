@@ -40,6 +40,7 @@ declare
   V_PACKAGE_DEFINITION VARCHAR2(32767);
   
   V_DUMMY                  NUMBER;
+  V_UNICODE_DATABASE       VARCHAR2(5) := 'FALSE';
   V_ORACLE_MANAGED_SERVICE VARCHAR2(5);
   V_CLOB_SUPPORTED         BOOLEAN := TRUE;
   V_RDBMS_VERSION          VARCHAR2(24);
@@ -262,13 +263,36 @@ $END
   V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
 	                   || '  ORACLE_MANAGED_SERVICE           CONSTANT BOOLEAN := ' || V_ORACLE_MANAGED_SERVICE || ';' || C_NEWLINE;
 	
-  select version 
-    into V_RDBMS_VERSION
+
+--
+-- UNICODE Database
+--
+
+  SELECT CASE WHEN VALUE = 'AL32UTF8' THEN 'TRUE' else 'FALSE' END
+   INTO V_UNICODE_DATABASE
+   FROM nls_database_parameters 
+  WHERE parameter = 'NLS_CHARACTERSET';
+
+  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                   || '  UNICODE_DATABASE           CONSTANT BOOLEAN := ' || V_UNICODE_DATABASE || ';' || C_NEWLINE;
+
+--
+--  Database Version
+--
+	
+  select VERSION
+    INTO V_RDBMS_VERSION
     from product_component_version 
    where product like '%Oracle%Database%';
+
+  V_PACKAGE_DEFINITION := V_PACKAGE_DEFINITION
+	                   || '  DATABASE_VERSION           CONSTANT VARCHAR2(32) := ''' || V_RDBMS_VERSION || ''';' || C_NEWLINE;
+	
+
 --
 --  Default XML Storage Mode
 --
+
   begin
     execute immediate 'drop table YADAMU_XML_STORAGE_TEST';
   exception 
@@ -279,10 +303,9 @@ $END
   execute immediate 'create global temporary table YADAMU_XML_STORAGE_TEST(X XMLTYPE)';
   
   select STORAGE_TYPE 
-    into V_XML_STORAGE_MODEL
+    INTO V_XML_STORAGE_MODEL
 	from USER_XML_TAB_COLS
    where TABLE_NAME = 'YADAMU_XML_STORAGE_TEST' 
-  
   and COLUMN_NAME = 'X';
   
   execute immediate 'drop table YADAMU_XML_STORAGE_TEST';

@@ -56,12 +56,7 @@ BEGIN
 	                                                                  else P_MYSQL_DATA_TYPE
  	end;
 
-    when P_MYSQL_DATA_TYPE in (
-      'longtext',
-	  'mediumtext',
-      'text',
-      'varchar'
-	)                                                                 then return
+    when P_MYSQL_DATA_TYPE = 'varchar'                                then return
 	case		
 	  when P_DATA_TYPE_LENGTH = -1                                    then 'longtext'
  	  when P_DATA_TYPE_LENGTH is null                                 then 'longtext'
@@ -71,14 +66,40 @@ BEGIN
 	                                                                  else P_MYSQL_DATA_TYPE
  	end;
 
+    when P_MYSQL_DATA_TYPE in (
+      'longtext',
+	  'mediumtext',
+      'text',
+      'tinytext'
+	)                                                                 then return
+	case		
+	  when P_DATA_TYPE_LENGTH = -1                                    then 'longtext'
+ 	  when P_DATA_TYPE_LENGTH is null                                 then 'longtext'
+      when P_DATA_TYPE_LENGTH > C_MEDIUMTEXT_LENGTH                   then 'longtext'
+      when P_DATA_TYPE_LENGTH > C_TEXT_LENGTH                         then 'mediumtext'
+      when P_DATA_TYPE_LENGTH > C_TINYTEXT_LENGTH                     then 'text'
+      when P_DATA_TYPE_LENGTH < C_VARCHAR_LENGTH                      then 'varchar'
+                                                                      else P_MYSQL_DATA_TYPE
+ 	end;
+
     when P_MYSQL_DATA_TYPE = 'binary'                                 then return
  	case		
 	  when P_DATA_TYPE_LENGTH = -1                                    then 'longblob'
       when P_DATA_TYPE_LENGTH is null                                 then 'longblob'
-      when P_DATA_TYPE_LENGTH > C_MEDIUMTEXT_LENGTH                   then 'longblob'
-      when P_DATA_TYPE_LENGTH > C_TEXT_LENGTH                         then 'mediumblob'
-      when P_DATA_TYPE_LENGTH > C_VARCHAR_LENGTH                      then 'blob'
+      when P_DATA_TYPE_LENGTH > C_MEDIUMBLOB_LENGTH                   then 'longblob'
+      when P_DATA_TYPE_LENGTH > C_BLOB_LENGTH                         then 'mediumblob'
+      when P_DATA_TYPE_LENGTH > C_VARBINARY_LENGTH                    then 'blob'
 	  when P_DATA_TYPE_LENGTH > C_BINARY_LENGTH                       then 'varbinary'
+	                                                                  else P_MYSQL_DATA_TYPE
+ 	end;
+
+    when P_MYSQL_DATA_TYPE = 'varbinary'                              then return
+ 	case		
+	  when P_DATA_TYPE_LENGTH = -1                                    then 'longblob'
+      when P_DATA_TYPE_LENGTH is null                                 then 'longblob'
+      when P_DATA_TYPE_LENGTH > C_MEDIUMBLOB_LENGTH                   then 'longblob'
+      when P_DATA_TYPE_LENGTH > C_BLOB_LENGTH                         then 'mediumblob'
+      when P_DATA_TYPE_LENGTH > C_VARBINARY_LENGTH                    then 'blob'
 	                                                                  else P_MYSQL_DATA_TYPE
  	end;
 
@@ -86,14 +107,15 @@ BEGIN
 	  'longblob',
 	  'mediumblob',
       'blob',
-      'varbinary'
+      'tinyblob'
 	)                                                                 then return
     case		
 	  when P_DATA_TYPE_LENGTH = -1                                    then 'longblob'
       when P_DATA_TYPE_LENGTH is null                                 then 'longblob'
-      when P_DATA_TYPE_LENGTH > C_MEDIUMTEXT_LENGTH                   then 'longblob'
-      when P_DATA_TYPE_LENGTH > C_TEXT_LENGTH                         then 'mediumblob'
-      when P_DATA_TYPE_LENGTH > C_VARCHAR_LENGTH                      then 'blob'
+      when P_DATA_TYPE_LENGTH > C_MEDIUMBLOB_LENGTH                   then 'longblob'
+      when P_DATA_TYPE_LENGTH > C_BLOB_LENGTH                         then 'mediumblob'
+      when P_DATA_TYPE_LENGTH > C_VARBINARY_LENGTH                    then 'blob'
+      when P_DATA_TYPE_LENGTH < C_VARBINARY_LENGTH                    then 'varbinary'
 	                                                                  else P_MYSQL_DATA_TYPE
  	end;
 
@@ -119,7 +141,7 @@ BEGIN
     when P_MYSQL_DATA_TYPE = 'timestamp'                              then return
 	  -- MySQL Timestamp limited to Unix EPOCH date range. Map to datetime when data comes from other sources.
 	case 
-	  when P_VENDOR = 'MySQL'                                         then P_MYSQL_DATA_TYPE
+	  when P_VENDOR in('MySQL','MariaDB')                             then P_MYSQL_DATA_TYPE
 	  when P_DATA_TYPE_LENGTH > 6                                     then 'datetime(6)'
 		                                                              else 'datetime'
     end;

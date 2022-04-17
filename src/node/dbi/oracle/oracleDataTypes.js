@@ -92,7 +92,7 @@ class OracleDataTypes extends YadamuDataTypes {
 		if (dataTypeDefinitions.every((dataTypeDefinition) => { return ((dataTypeDefinition.type === 'NUMBER') && (dataTypeDefinition.scale === 0)) })) {
 		  return `NUMBER(${Math.max(...dataTypeDefinitions.map((dataTypeDefinition) => { return dataTypeDefinition.length }))},0)`
 		}
-        console.log(this.name,'Type List Reduction failed for ',typeList)
+        console.log(this.constructor.name,'Type List Reduction failed for ',typeList)
 	}
   } 
 

@@ -1,6 +1,7 @@
 
-import YadamuParser       from '../base/yadamuParser.js'
 import YadamuLibrary      from '../../lib/yadamuLibrary.js'
+
+import YadamuParser       from '../base/yadamuParser.js'
 
 class VerticaParser extends YadamuParser {
 

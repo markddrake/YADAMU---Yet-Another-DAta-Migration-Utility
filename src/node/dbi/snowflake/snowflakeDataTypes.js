@@ -21,7 +21,7 @@ class SnowflakeStorageOptions extends YadamuStorageOptions {
 class SnowflakeDataTypes extends YadamuDataTypes {
 
   get UNBOUNDED_TYPES() { 
-    this._UNBOUNDED_TYPES = this._UNBOUNDED_TYPES || Object.freeze([this.SNOWFLAKE_VARIANT_DATA_TYPE,this.GEOGRAPHY_TYPE,this.FLOAT_TYPE,this.BOOLEAN_TYPE,this.INTEGER_TYPE])
+    this._UNBOUNDED_TYPES = this._UNBOUNDED_TYPES || Object.freeze([this.XML_TYPE,this.JSON_TYPE,this.SNOWFLAKE_VARIANT_TYPE,this.GEOGRAPHY_TYPE,this.FLOAT_TYPE,this.BOOLEAN_TYPE,this.INTEGER_TYPE,this.CLOB_TYPE])
     return this._UNBOUNDED_TYPES;
   }
 

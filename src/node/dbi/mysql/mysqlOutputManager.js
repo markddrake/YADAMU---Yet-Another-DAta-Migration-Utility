@@ -19,12 +19,12 @@ class MySQLOutputManager extends YadamuOutputManager {
 
     // Set up Transformation functions to be applied to the incoming rows
 	
-    const spatialFormat = this.SPATIAL_FORMAT	
+    let spatialFormat = this.SPATIAL_FORMAT	
 	
     return dataTypes.map((dataType,idx) => { 
       const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
       switch (dataTypeDefinition.type.toLowerCase()) {
-        case "json" :
+        case this.dbi.DATA_TYPES.JSON_TYPE :
           return (col,idx) => {
             return typeof col === 'object' ? JSON.stringify(col) : col
           }
@@ -45,7 +45,7 @@ class MySQLOutputManager extends YadamuOutputManager {
 			*/
    		    // Row Mode operations have issues with GeoJSON content.
 		    // Convert GeoJSON to WKB and change SpatialFormat to WKB.
-			this.spatialFormat = 'WKB';
+			spatialFormat = 'WKB';
 			return (col,idx) => {
               return YadamuSpatialLibrary.geoJSONtoWKB(col)
             }
@@ -53,11 +53,11 @@ class MySQLOutputManager extends YadamuOutputManager {
           return null;
         case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
 	      switch (this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE) {
-			case 'TINYINY(1)':
+			case 'tinyint(1)':
               return (col,idx) => {
                 return YadamuLibrary.booleanToInt(col)
               }
-			case 'BIT(1)':
+			case 'bit(1)':
 			default:
               return (col,idx) => {
                 return YadamuLibrary.booleanToBit(col)
@@ -102,10 +102,11 @@ class MySQLOutputManager extends YadamuOutputManager {
 			default:
 			  return null;
 	      }
- 		case "varchar":
-		case "text":
-		case "longtext":
-		case "mediumtext":
+ 		case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+		case this.dbi.DATA_TYPES.MYSQL_TINYTEXT_TYPE:
+		case this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE:
+		case this.dbi.DATA_TYPES.MYSQL_MEDIUMTEXT_TYPE:
+		case this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE:
 		  return (col,idx) => {
 			if (typeof col === 'object') {
 			  this.transformations[idx] = (col,idx) => {

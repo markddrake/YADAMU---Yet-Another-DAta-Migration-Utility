@@ -106,7 +106,7 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
          case this.dbi.DATA_TYPES.NCHAR_TYPE:
            return { type: oracledb.DB_TYPE_NCHAR, maxSize : dataTypeDefinition.length * 2}
          case this.dbi.DATA_TYPES.NVARCHAR_TYPE:
-           return { type: oracledb.DB_TYPE_VARCHAR, maxSize : dataTypeDefinition.length * 2}
+           return { type: oracledb.DB_TYPE_NVARCHAR, maxSize : dataTypeDefinition.length * 2}
          case this.dbi.DATA_TYPES.DATE_TYPE:
          case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
          case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
@@ -372,10 +372,10 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 	const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadata, typeMappings:vendorTypeMappings, schema:this.targetSchema, options:this.STATEMENT_GENERATOR_OPTIONS});
 	// this.dbi.yadamuLogger.trace([this.constructor.name],`${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
     
-	await metadata.close();
-	await vendorTypeMappings.close();
+	await metadata.close()
+	await vendorTypeMappings.close()
 	
-    const statementCache = JSON.parse(results.outBinds.sql);
+    const statementCache = JSON.parse(results.outBinds.sql)
 	
 	const tables = Object.keys(this.metadata); 
     tables.forEach((table,idx) => {
@@ -552,24 +552,22 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
           case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
   	      case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
   	      case this.dbi.DATA_TYPES.TIMESTAMP_LTZ_TYPE:
-		    if ((targetDataType.indexOf('TIMESTAMP') === 0) ) {
-		      externalDataType = 'CHAR(36)'
-			  copyColumnDefinition = `"${column}" ${externalDataType}`
-		      externalSelect = targetDataType.indexOf('ZONE') > 0 ? `to_timestamp_tz("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM')` : `to_timestamp("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')` 
-			  /*
-			  switch (true) {
-				case (targetDataType.indexOf('LOCAL') > 0):
-				   copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP WITH LOCAL TIME ZONE 'YYYY-MM_DD"T"HH24:MI:SS.FF9"Z"'`
-    		       break;
-				case (targetDataType.indexOf('ZONE') > 0):
-				   copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP WITH TIME ZONE 'YYYY-MM_DD"T"HH24:MI:SS.FF9"Z"'`
-    		       break;
-				default:
-				   copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP 'YYYY-MM_DD"T"HH24:MI:SS.FF9'`
-    		       break;
-			  }
-			  */
-		    }
+		    externalDataType = 'CHAR(36)'
+			copyColumnDefinition = `"${column}" ${externalDataType}`
+		    externalSelect = targetDataType.indexOf('ZONE') > 0 ? `to_timestamp_tz("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM')` : `to_timestamp("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')` 
+			/*
+			switch (true) {
+			  case (targetDataType.indexOf('LOCAL') > 0):
+				copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP WITH LOCAL TIME ZONE 'YYYY-MM_DD"T"HH24:MI:SS.FF9"Z"'`
+    		    break;
+		      case (targetDataType.indexOf('ZONE') > 0):
+				copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP WITH TIME ZONE 'YYYY-MM_DD"T"HH24:MI:SS.FF9"Z"'`
+    		    break;
+			  default:
+				copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP 'YYYY-MM_DD"T"HH24:MI:SS.FF9'`
+    		    break;
+            }
+			*/
 		    break;
           case this.dbi.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
   	          externalDataType = 'CHAR(36)'

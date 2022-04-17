@@ -271,7 +271,6 @@ class FileDBI extends YadamuDBI {
   }
     
   setMetadata(metadata) {
-    // Object.values(metadata).forEach((table) => {delete table.source})
 	super.setMetadata(metadata)
   }
  
@@ -383,7 +382,7 @@ class FileDBI extends YadamuDBI {
 
     const sourceInfo = {}
     Object.keys(this.metadata).forEach((key) => {
-	  if (this.metadata[key].source) {
+	  if (this.metadata[key].source || this.metadata[key].partitionCount) {
 		sourceInfo[key] = this.metadata[key].source; 
 	    delete this.metadata[key].source
 		delete this.metadata[key].partitionCount

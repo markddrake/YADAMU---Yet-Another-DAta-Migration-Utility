@@ -96,9 +96,7 @@ class MariadbWriter extends YadamuWriter {
       default:
     }     
    
-    this.endTime = performance.now();
-    this.releaseBatch(batch)
-    return this.skipTable          
+        
 	
   }
 

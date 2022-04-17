@@ -332,7 +332,24 @@ class YadamuLibrary {
   static getVendorSettings(connectionProperties) {
     return connectionProperties(this.getVendorName(connectionProperties))
   }
-
+  
+  static stripInsignificantZeros(numericValue) {
+	return numericValue.replace(/(\.0*|(?<=(\..*))0*)$/, '')
+	/*
+	numericValue = !numericValue.includes('.') ? numericValue : (() => {
+      const v = numericValue
+	  let i = numericValue.length - 1
+      while (i > 0)  {
+        if ((numericValue[i] !== '0') || (numericValue[i-1] === '.')) {
+		  console.log(v,i,numericValue.substring(0, i + 1))
+          return numericValue.substring(0, i + 1);	  
+        }
+		i--
+	  }
+	})()
+    return numericValue;
+	*/
+  }
 }
 
 export { YadamuLibrary as default}

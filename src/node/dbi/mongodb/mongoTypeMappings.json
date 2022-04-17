@@ -3,7 +3,6 @@
     "CHAR_TYPE"                                            :  "string"                               
   ,  "INTEGER_TYPE"                                         :  "int"                                  
   ,  "BIGINT_TYPE"                                          :  "long"                                 
-  ,  "FLOAT_TYPE"                                           :  "double"                               
   ,  "DOUBLE_TYPE"                                          :  "double"                               
   ,  "BINARY_TYPE"                                          :  "binData"                              
   ,  "NUMERIC_TYPE"                                         :  "decimal"

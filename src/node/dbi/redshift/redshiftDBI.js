@@ -50,12 +50,12 @@ import AWSS3Constants                from '../awsS3/awsS3Constants.js'
 /* Vendor Specific DBI Implimentation */                                   
 						          
 import RedshiftConstants             from './redshiftConstants.js'
-import RedshiftDataTypes             from '.redshiftDataTypes.js'
+import RedshiftDataTypes             from './redshiftDataTypes.js'
 import RedshiftError                 from './redshiftException.js'
 import RedshiftParser                from './redshiftParser.js'
 import RedshiftWriter                from './redshiftWriter.js'
 import RedshiftOutputManager         from './redshiftOutputManager.js'
-import RedshiftStatementGenerator    from './redhiftStatementGenerator.js'
+import RedshiftStatementGenerator    from './redshiftStatementGenerator.js'
 import RedshiftStatementLibrary      from './redshiftStatementLibrary.js'
 
 class RedshiftDBI extends YadamuDBI {
@@ -101,7 +101,7 @@ class RedshiftDBI extends YadamuDBI {
 	return this._BUCKET
   }
 
-  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.CLOUD_STAGING }
+  get SUPPORTED_STAGING_PLATFORMS()   { return RedshiftConstants.STAGED_DATA_SOURCES }
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
@@ -693,7 +693,7 @@ class RedshiftDBI extends YadamuDBI {
 	  metrics.skipped = parseInt(results.rows[0][0])
 	  metrics.read = metrics.committed + metrics.skipped
   	} catch(cause) {
-	  metrics.writerError = e
+	  metrics.writerError = cause
 	  try {
         if ((cause instanceof RedshiftError) && cause.detailedErrorAvailable()) {
 		  try {

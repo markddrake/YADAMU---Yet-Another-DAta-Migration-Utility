@@ -21,8 +21,6 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 	, xmlStorageOption     : this.dbi.DATA_TYPES.storageOptions.XML_TYPE
 	}
 
-    // this.debugStatementGenerator(options)
-
 	const vendorTypeMappings = Array.from(this.TYPE_MAPPINGS.entries())
 	
 	const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,?,@RESULTS); SELECT @RESULTS "INSERT_INFORMATION"`;                       
@@ -30,6 +28,8 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 	
     results = results.pop();
     let statementCache = JSON.parse(results[0].INSERT_INFORMATION)
+
+    // this.debugStatementGenerator(options,statementCache)
 
 	if (statementCache === null) {
       statementCache = {}      
@@ -41,8 +41,6 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 		const tableName = tableMetadata.tableName;
         const tableInfo = statementCache[tableName];
 		tableInfo.columnNames = tableMetadata.columnNames
-		
-		// tableInfo.sourceDataTypes = tableMetadata.source?.dataTypes || []
 		
 		const dataTypes = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
 		

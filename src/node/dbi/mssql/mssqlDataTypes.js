@@ -54,8 +54,8 @@ class MsSQLDataTypes extends YadamuDataTypes {
 	    return this.TIMESTAMP_TZ_TYPE
       case typeList.includes(this.TIMESTAMP_TYPE):
 	    return this.TIMESTAMP_TYPE
-	  case typeList.includes(this.MSSQL_DATETIME2_TYPE):
-	    return this.MSSQL_DATETIME2_TYPE
+	  case typeList.includes(this.DATETIME_TYPE):
+	    return this.DATETIME_TYPE
       case typeList.includes(this.TIME_TZ_TYPE):
 	    return this.TIME_TZ_TYPE
 	  default:

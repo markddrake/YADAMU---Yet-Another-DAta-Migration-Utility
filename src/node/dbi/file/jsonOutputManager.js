@@ -27,7 +27,7 @@ class JSONOutputManager extends YadamuOutputManager {
     
 	// Set up Transformation functions to be applied to the incoming rows
 
-    return this.tableInfo.targetDataTypes.map((dataType,idx) => {      
+    return dataTypes.map((dataType,idx) => {      
       const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
 	  switch (true) {
 		case (YadamuDataTypes.isBinary(dataTypeDefinition.type)):

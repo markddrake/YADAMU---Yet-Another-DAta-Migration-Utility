@@ -20,7 +20,7 @@ class MariadbOutputManger extends YadamuOutputManger {
   }
   
   generateTransformations(dataTypes) {
-
+	  
     // Set up Transformation functions to be applied to the incoming rows
 	
 	return dataTypes.map((dataType,idx) => {
@@ -76,16 +76,22 @@ class MariadbOutputManger extends YadamuOutputManger {
 		  switch (this.dbi.INFINITY_MANAGEMENT) {
 		    case 'REJECT':
               return (col, idx) => {
-			    if (!isFinite(col)) {
-			      throw new RejectedColumnValue(this.tableInfo.columnNames[idx],col);
-			    }
+                switch (true) {
+				  // case (typeof col === "string" && !isInfite(parseInt(col))):
+			      case (!isFinite(col)):
+                    throw new RejectedColumnValue(this.tableInfo.columnNames[idx],col);
+				  default:
+				}
 				return col;
 		      }
 		    case 'NULLIFY':
 			  return (col, idx) => {
-			    if (!isFinite(col)) {
-                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
-	  		      return null;
+				switch (true) {
+				  // case (typeof col === "string" && !isInfite(parseInt(col))):
+			      case (!isFinite(col)):
+                    this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
+	  		        return null;
+				  default:
 				}
 			    return col
 		      }   

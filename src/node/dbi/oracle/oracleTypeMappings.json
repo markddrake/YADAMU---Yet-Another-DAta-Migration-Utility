@@ -14,7 +14,7 @@
   , "SMALLINT_TYPE"                                        : "NUMBER(5,0)"    
   , "TINYINT_TYPE"                                         : "NUMBER(3,0)"
   
-  , "DATE_TYPE"                                            : "DATE"                                                            
+  , "DATETIME_TYPE"                                        : "DATE"                                                            
   , "TIMESTAMP_TYPE"                                       : "TIMESTAMP"                                                       
   , "TIMESTAMP_TZ_TYPE"                                    : "TIMESTAMP WITH TIME ZONE"                                        
   , "TIMESTAMP_LTZ_TYPE"                                   : "TIMESTAMP WITH LOCAL TIME ZONE"                                  

@@ -91,7 +91,7 @@ class OracleConstants {
     , MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
     , MongoDB     : 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"'
     , SNOWFLAKE   : 'YYYY-MM-DD"T"HH24:MI:SS.FF9"+00:00"'
-    , Teradata    : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"+00:00"'
+    , Teradata    : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
     })
     return this._TIMESTAMP_FORMAT_MASKS
   }

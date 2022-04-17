@@ -34,5 +34,9 @@
 	"Teradata": {
 	  "class" : "../teradata/teradataDataTypes.js"
 	, "file": "src/node/dbi/teradata/teradataTypeMappings.json"
+	},
+	"Redshift": {
+	  "class" : "../redshift/redshiftDataTypes.js"
+	, "file": "src/node/dbi/redshift/redshiftTypeMappings.json"
 	}
 }

@@ -30,10 +30,6 @@ class MsSQLWriter extends YadamuWriter {
     // console.log(this.constructor.name,'writeBatch()',this.tableInfo.bulkSupported,)
     // console.dir(batch,{depth:null})
     
-    if (this.SPATIAL_FORMAT === 'GeoJSON') {
-      YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch.rows,true)
-    } 
-
     if (this.tableInfo.insertMode === 'BCP') {
       try {       
         await this.dbi.createSavePoint()

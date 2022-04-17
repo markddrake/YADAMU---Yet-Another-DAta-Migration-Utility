@@ -1,19 +1,19 @@
 
 import { 
   performance 
-}                               from 'perf_hooks';
+}                               from "perf_hooks";
 
-import sql from 'mssql';						
+import sql from "mssql";						
 
-import YadamuLibrary            from '../../lib/yadamuLibrary.js'
-import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js'
+import YadamuLibrary            from "../../lib/yadamuLibrary.js"
+import YadamuSpatialLibrary     from "../../lib/yadamuSpatialLibrary.js"
 
 import {
   RejectedColumnValue
-}                               from '../../core/yadamuException.js';
+}                               from "../../core/yadamuException.js";
 
-import YadamuDataTypes          from '../base/yadamuDataTypes.js'
-import YadamuOutputManager      from '../base/yadamuOutputManager.js'
+import YadamuDataTypes          from "../base/yadamuDataTypes.js"
+import YadamuOutputManager      from "../base/yadamuOutputManager.js"
 
 class MsSQLOutputManager extends YadamuOutputManager {
     
@@ -23,7 +23,7 @@ class MsSQLOutputManager extends YadamuOutputManager {
   
   createBatch() {
 	 
-	if (this.tableInfo.insertMode === 'BCP') {
+	if (this.tableInfo.insertMode === "BCP") {
 	  return this.dbi.createBulkOperation(this.dbi.DATABASE_NAME, this.tableInfo.tableName, this.tableInfo.columnNames, this.tableInfo.dataTypeDefinitions) 
 	}
 	else {
@@ -39,25 +39,36 @@ class MsSQLOutputManager extends YadamuOutputManager {
 
     // Set up Transformation functions to be applied to the incoming rows
 
+    let spatialFormat = this.SPATIAL_FORMAT
+
 	const dataTypeDefinitions  = YadamuDataTypes.decomposeDataTypes(dataTypes)		
     this.tableInfo.dataTypeDefinitions = dataTypeDefinitions
 	return dataTypeDefinitions.map((dataType,idx) => {      
 	  switch (dataType.type.toLowerCase()) {
         case this.dbi.DATA_TYPES.JSON_TYPE.toLowerCase():
 		  return (col,idx) => {
-            return typeof col === 'object' ? JSON.stringify(col) : col
+            return typeof col === "object" ? JSON.stringify(col) : col
 		  }
           break;
-		case 'bit':
-        case 'boolean':
+		case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
+		case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
+		  if (this.SPATIAL_FORMAT === "GeoJSON") {
+			spatialFormat = "WKT"
+		    return (col,idx) => {
+              return YadamuSpatialLibrary.geoJSONtoWKT(col)
+		    }
+		  }
+		  return null
+		case "bit":
+        case "boolean":
 		  return (col,idx) => {
             return YadamuLibrary.toBoolean(col)
 		  }
           break;
-        case this.dbi.DATA_TYPES.DATETIME_TYPE:
+        case this.dbi.DATA_TYPES.MSSQL_DATETIME_TYPE:
 		  return (col,idx) => {
-            if (typeof col === 'string') {
-              col = col.endsWith('Z') ? col : (col.endsWith('+00:00') ? `${col.slice(0,-6)}Z` : `${col}Z`)
+            if (typeof col === "string") {
+              col = col.endsWith("Z") ? col : (col.endsWith("+00:00") ? `${col.slice(0,-6)}Z` : `${col}Z`)
             }
             else {
               // Alternative is to rebuild the table with these data types mapped to date objects ....
@@ -71,11 +82,11 @@ class MsSQLOutputManager extends YadamuOutputManager {
           break;
 		case this.dbi.DATA_TYPES.TIME_TYPE:
         case this.dbi.DATA_TYPES.DATE_TYPE:
-        case this.dbi.DATA_TYPES.MSSQL_DATETIME2_TYPE:
+        case this.dbi.DATA_TYPES.DATETIME_TYPE:
         case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
 		  return (col,idx) => {
-            if (typeof col === 'string') {
-              col = col.endsWith('Z') ? col : (col.endsWith('+00:00') ? `${col.slice(0,-6)}Z` : `${col}Z`)
+            if (typeof col === "string") {
+              col = col.endsWith("Z") ? col : (col.endsWith("+00:00") ? `${col.slice(0,-6)}Z` : `${col}Z`)
             }
             else {
               // Alternative is to rebuild the table with these data types mapped to date objects ....
@@ -87,14 +98,14 @@ class MsSQLOutputManager extends YadamuOutputManager {
  		case this.dbi.DATA_TYPES.FLOAT_TYPE:
         case this.dbi.DATA_TYPES.DOUBLE_TYPE:
 		  switch (this.dbi.INFINITY_MANAGEMENT) {
-		    case 'REJECT':
+		    case "REJECT":
               return (col, idx) => {
 			    if (!isFinite(col)) {
 			      throw new RejectedColumnValue(this.tableInfo.columnNames[idx],col);
 			    }
 				return col;
 		      }
-		    case 'NULLIFY':
+		    case "NULLIFY":
 			  return (col, idx) => {
 			    if (!isFinite(col)) {
                   this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
@@ -109,6 +120,8 @@ class MsSQLOutputManager extends YadamuOutputManager {
 		  return null
       }
     })
+	
+	this.tableInfo._SPATIAL_FORMAT = spatialFormat
 	
   }	  
   

@@ -26,7 +26,10 @@ class ErrorOutputManager extends JSONOutputManager {
 	this.processOutOfSequenceMessages()
   }
 
-  processRow(row) {
+  _processRow(row) {
+   row = row.map((col) => {
+	 return Buffer.isBuffer(col) ? col.toString('hex') : col 
+   })
    this.push(this.formatRow(row));
    this.rowSeperator = ',';
   }

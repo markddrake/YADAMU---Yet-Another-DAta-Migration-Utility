@@ -66,6 +66,8 @@ class MySQLDataTypes extends YadamuDataTypes {
 	    return this.DOUBLE_TYPE
       case typeList.includes(this.NUMERIC_TYPE):
 	    return this.NUMERIC_TYPE
+      case typeList.includes(this.DATETIME_TYPE):
+	    return this.DATETIME_TYPE
       case typeList.includes(this.TIMESTAMP_TZ_TYPE):
 	    return this.TIMESTAMP_TZ_TYPE
       case typeList.includes(this.TIMESTAMP_TYPE):
@@ -77,7 +79,7 @@ class MySQLDataTypes extends YadamuDataTypes {
 	  case typeList.includes(this.MYSQL_ENUM_TYPE):
 	    return this.MYSQL_ENUM_TYPE		
 	  default:
-	    console.log(this.name,'Type List Reduction failed for ',typeList)
+	    console.log(this.constructor.name,'Type List Reduction failed for ',typeList)
 	}
   }
 

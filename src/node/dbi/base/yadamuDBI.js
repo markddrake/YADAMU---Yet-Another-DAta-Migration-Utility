@@ -140,7 +140,7 @@ class YadamuDBI extends EventEmitter {
   get RETRY_COUNT()                  { return 3 }
 
   get COMMIT_RATIO()                 { return this.parameters.hasOwnProperty('COMMIT_RATIO') ?  this.parameters.COMMIT_RATIO : DBIConstants.COMMIT_RATIO };
-  get BATCH_LIMIT()                  { return this.parameters.hasOwnProperty('BATCH_LIMIT') ?  this.parameters.COMMIT_RATIO : DBIConstants.BATCH_LIMIT };
+  get BATCH_LIMIT()                  { return this.parameters.hasOwnProperty('BATCH_LIMIT') ?  this.parameters.BATCH_LIMIT : DBIConstants.BATCH_LIMIT };
 
   get LOCAL_STAGING_AREA()           { return YadamuLibrary.macroSubstitions((this.parameters.LOCAL_STAGING_AREA     || DBIConstants.LOCAL_STAGING_AREA || ''), this.yadamu.MACROS || '') }
   get REMOTE_STAGING_AREA()          { return YadamuLibrary.macroSubstitions((this.parameters.REMOTE_STAGING_AREA    || DBIConstants.REMOTE_STAGING_AREA || ''), this.yadamu.MACROS || '') }
@@ -1520,7 +1520,9 @@ class YadamuDBI extends EventEmitter {
 	const schemaInfo = []
 	let tableInfo = undefined
     let tableName = undefined
-    schemaColumnInfo.forEach((columnInfo) => {
+    schemaColumnInfo.filter((columnInfo) => {
+      return ((this.TABLE_FILTER.length === 0) || (this.TABLE_FILTER.includes(columnInfo[1])))
+	}).forEach((columnInfo) => {
 	  if (tableName !== columnInfo[1] ) {
 	    if (tableName) {
 	      tableInfo.CLIENT_SELECT_LIST = tableInfo.CLIENT_SELECT_LIST.substring(1)

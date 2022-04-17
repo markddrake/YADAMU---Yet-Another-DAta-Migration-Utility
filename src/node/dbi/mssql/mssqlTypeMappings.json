@@ -18,16 +18,16 @@
                                                                                                                            
   , "DATE_TYPE"                                            : "date"                                                            
   , "TIME_TYPE"                                            : "time"                                                            
-  , "DATETIME_TYPE"                                        : "datetime"                                                        
+  , "DATETIME_TYPE"                                        : "datetime2"                                                        
   , "TIMESTAMP_TYPE"                                       : "datetimeoffset"                                                  
+  , "MSSQL_DATETIME_TYPE"                                  : "datetime"                                                       
   , "MSSQL_SMALLDATETIME_TYPE"                             : "smalldatetime"                                                       
-  , "MSSQL_DATETIME2_TYPE"                                 : "datetime2"                                                       
                                                                                                                            
   , "BOOLEAN_TYPE"                                         : "bit"                                                             
   , "BINARY_TYPE"                                          : "binary"                                                          
   , "VARBINARY_TYPE"                                       : "varbinary"                                                       
                                                                                                                            
-  , "CLOB_TYPE"                                            : "varchar(max)"                                                            
+  , "CLOB_TYPE"                                            : "nvarchar(max)"                                                            
   , "NCLOB_TYPE"                                           : "nvarchar(max)"                                                           
   , "BLOB_TYPE"                                            : "varbinary(max)"                                                           
                                                                                                                            

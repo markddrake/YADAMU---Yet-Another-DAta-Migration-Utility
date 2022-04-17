@@ -14,7 +14,7 @@ class DBIConstants {
     , "BATCH_LIMIT"                : 5
     , "COMMIT_RATIO"               : 1    
 	, "PARSE_DELAY"                : 0
-	, "INFINITY_MANAGEMENT"        : undefined
+	, "INFINITY_MANAGEMENT"        : "REJECT"
 	, "LOCAL_STAGING_AREA"         : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
 	, "REMOTE_STAGING_AREA"        : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
 	, "STAGING_FILE_RETENTION"     : "FAILED"

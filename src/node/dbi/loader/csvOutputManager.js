@@ -16,8 +16,12 @@ class CSVOutputManager extends JSONOutputManager {
    
   async setTableInfo(tableName) {
 	await super.setTableInfo(tableName)
-	this.csvTransformations = this.generateTransformations()
-    this.missingTransformations = this.csvTransformations.map((c,i) => { return i })
+    
+    // Cache the transformations and set the transformations array to NULL. Transformations are applied when converting the row to CSV in formatRow(). No transformations are required when the genereated rows of CSV encoded data is processed by processRow().
+
+	this.csvTransformations = [...this.transformations]
+    this.transformations.fill(null)
+    this.pendingTransformations = this.transformations.map((c,i) => i)
   }
   
   _updateTransformations(row) {
@@ -25,14 +29,14 @@ class CSVOutputManager extends JSONOutputManager {
     // Construct CSV Transformation Rules Incrementatlly (Row by Row). Transformations are defined basded on the first non-null column.
     // Once all columns have been processed this function beomes a No-op.
 
-    this.missingTransformations = this.missingTransformations.flatMap((idx) => {
+    this.pendingTransformations = this.pendingTransformations.flatMap((idx) => {
 	  if (row[idx] !== null) {
         this.csvTransformations[idx] = CSVLibrary.getCSVTransformation(row[idx],(idx === row.length-1)) 
 	    return []
 	  }
 	  return [idx]
 	})
-    this.updateTransformations = this.missingTransformations.length === 0 ? (row) => {} : this._updateTransformations
+    this.updateTransformations = this.pendingTransformations.length === 0 ? (row) => {} : this._updateTransformations
   }
     	
   updateTransformations = this._updateTransformations

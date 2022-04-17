@@ -5,86 +5,86 @@ class CSVLibrary {
     switch (typeof col) {
 	  case "number":
         return (isLastColumn)
- 	    ? (fs,col) => {
-   		    fs.write(col.toString());
-			fs.write('\n');
+ 	    ? (os,col) => {
+   		    os.write(col.toString());
+			os.write('\n');
 		  } 
-		: (fs,col) => {
-   		    fs.write(col.toString());
-			fs.write(',');
+		: (os,col) => {
+   		    os.write(col.toString());
+			os.write(',');
 		  }
 		case "boolean":
 		  return (isLastColumn) 
-		  ? (fs,col) => {
-  		      fs.write(col ? 'true' : 'false')
-			  fs.write('\n');
+		  ? (os,col) => {
+  		      os.write(col ? 'true' : 'false')
+			  os.write('\n');
 		    } 
-		  : (fs,col) => {
-  		      fs.write(col ? 'true' : 'false')
-			  fs.write(',');
+		  : (os,col) => {
+  		      os.write(col ? 'true' : 'false')
+			  os.write(',');
 		    } 
 		case "string":
 		  return (isLastColumn)
-		  ? (fs,col) => {
+		  ? (os,col) => {
 		      // sw.write(JSON.stringify(col));
-              fs.write('"')
-	  	      fs.write(col.indexOf('"') > -1 ? col.replace(/"/g,'""') : col)
-		      fs.write('"\n')
+              os.write('"')
+	  	      os.write(col.indexOf('"') > -1 ? col.replace(/"/g,'""') : col)
+		      os.write('"\n')
 		    } 
-		  : (fs,col) => {
+		  : (os,col) => {
 		      // sw.write(JSON.stringify(col));
-              fs.write('"')
-	  	      fs.write(col.indexOf('"') > -1 ? col.replace(/"/g,'""') : col)
-		      fs.write('",')
+              os.write('"')
+	  	      os.write(col.indexOf('"') > -1 ? col.replace(/"/g,'""') : col)
+		      os.write('",')
 		    } 
 	    case "object":
 		  switch (true) {
 		    case (col instanceof Date):
 		      return (isLastColumn)
-		      ? (fs,col) => {
-                  fs.write('"')
-                  fs.write(col === null ? '' : col.toISOString())
-		          fs.write('"\n')
+		      ? (os,col) => {
+                  os.write('"')
+                  os.write(col === null ? '' : col.toISOString())
+		          os.write('"\n')
 		        } 
-		      : (fs,col) => {
-                fs.write('"')
-		        fs.write(col === null ? '' : col.toISOString())
-		        fs.write('",')
+		      : (os,col) => {
+                os.write('"')
+		        os.write(col === null ? '' : col.toISOString())
+		        os.write('",')
 		      } 
 		    case (Buffer.isBuffer(col)):
 		      return (isLastColumn)
-		      ? (fs,col) => {
-                  fs.write('"')
-                  fs.write(col === null ? '' : col.toString('hex'))
-		          fs.write('"\n')
+		      ? (os,col) => {
+                  os.write('"')
+                  os.write(col === null ? '' : col.toString('hex'))
+		          os.write('"\n')
 		        } 
-		      : (fs,col) => {
-                fs.write('"')
-		        fs.write(col === null ? '' : col.toString('hex'))
-		        fs.write('",')
+		      : (os,col) => {
+                os.write('"')
+		        os.write(col === null ? '' : col.toString('hex'))
+		        os.write('",')
 		      } 
 			default:
 		      return (isLastColumn)
-		      ? (fs,col) => {
-                  fs.write('"')
-		          fs.write(col === null ? '' : JSON.stringify(col).replace(/"/g,'""'))
-		          fs.write('"\n')
+		      ? (os,col) => {
+                  os.write('"')
+		          os.write(col === null ? '' : JSON.stringify(col).replace(/"/g,'""'))
+		          os.write('"\n')
 		        } 
-		      : (fs,col) => {
-                  fs.write('"')
-		          fs.write(col === null ? '' : JSON.stringify(col).replace(/"/g,'""'))
-		          fs.write('",')
+		      : (os,col) => {
+                  os.write('"')
+		          os.write(col === null ? '' : JSON.stringify(col).replace(/"/g,'""'))
+		          os.write('",')
 		        } 
 		  }
 		default:
 		  return (isLastColumn)
-		  ? (fs,col) => {
-  		      fs.write(col);
-			  fs.write('\n');
+		  ? (os,col) => {
+  		      os.write(col);
+			  os.write('\n');
 		    } 
-	      : (fs,col) => {
-  		      fs.write(col);
-		  	  fs.write(',');
+	      : (os,col) => {
+  		      os.write(col);
+		  	  os.write(',');
 		    } 
 	}
   }	 
@@ -102,20 +102,20 @@ class CSVLibrary {
 	})
   }
 
-  static writeRowAsCSV(fs,row,transformations) {
+  static writeRowAsCSV(os,row,transformations) {
 	row.forEach((col,idx) => {
 	  if (col === null) {
-		fs.write((idx < (row.length-1)) ? ',' : '\n')
+		os.write((idx < (row.length-1)) ? ',' : '\n')
 	  }
 	  else {
-        transformations[idx](fs,col)
+        transformations[idx](os,col)
 	  }
 	})
   }
   
-  static writeBatchAsCSV(fs,batch,transformations) {  
+  static writeBatchAsCSV(os,batch,transformations) {  
     batch.forEach((row) => {
-	   this.writeRowAsCSV(fs,row,transformations)
+	   this.writeRowAsCSV(os,row,transformations)
     })
   }     
 }
