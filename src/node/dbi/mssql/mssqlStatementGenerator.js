@@ -45,15 +45,13 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
   }
 
   getSourceTypeMappings() {
-	 JSON.stringify(vendorTypeMappings)
+	 return JSON.stringify(Array.from(this.TYPE_MAPPINGS.entries()))
   }
   
   async generateStatementCache () {
 
     await this.init()
     
-	const vendorTypeMappings = Array.from(this.TYPE_MAPPINGS.entries())
-	
     const args = { 
 	        inputs: [{
               name: 'METADATA',        type: sql.NVARCHAR, value: this.getMetadata()
