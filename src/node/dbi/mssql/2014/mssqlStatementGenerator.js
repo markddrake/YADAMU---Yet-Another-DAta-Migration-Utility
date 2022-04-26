@@ -22,6 +22,10 @@ class MsSQLStatementGenerator extends _MsSQLStatementGenerator {
     
   }
 
+  getSourceTypeMappings() {
+     return `<typeMappings>${Array.from(this.TYPE_MAPPINGS.entries()).map((mapping) => { return `<typeMapping><vendorType>${mapping[0]}</vendorType><mssqlType>${mapping[1]}</mssqlType></typeMapping>` }).join('')}</typeMappings>`
+  }
+  
 }
  
 export { MsSQLStatementGenerator as default }

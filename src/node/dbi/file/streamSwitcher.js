@@ -27,6 +27,9 @@ import YadamuDataTypes     from '../base/yadamuDataTypes.js';
 class StreamSwitcher extends Transform {
   
   get TABLE_FILTER()                  { return this.dbWriter.dbi.TABLE_FILTER }
+  
+  get INBOUND_SPATIAL_FORMAT()        { return this.systemInformation.driverSettings.spatialFormat }
+  get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation.driverSettings.circleFormat }
 
   /*
   **
@@ -57,7 +60,7 @@ class StreamSwitcher extends Transform {
   generateTransformations(tableName) {
 
     // this.yadamuLogger.trace([this.constructor.name,tableName],'generateTransformations()')
-	 
+	
 	const tableMetadata = this.metadata[tableName]
 	return tableMetadata.dataTypes.map((dataType,idx) => {	  
 	
@@ -65,20 +68,20 @@ class StreamSwitcher extends Transform {
 	 
 	  switch (true) {
         case (dataTypeDefinition.type.toUpperCase() === "CIRCLE"):
-   		  if (this.circleFormat === 'CIRCLE') {
+   		  if (this.INBOUND_CIRCLE_FORMAT === 'CIRCLE') {
 			// console.log(tableMetadata.columnNames[idx],dataType,'==>','CIRCLE')
             return null;
 		  }
 		  // Deliberate FALL through to SPATIAL 
 	    case (YadamuDataTypes.isSpatial(dataTypeDefinition.type)):
           // console.log(tableMetadata.columnNames[idx],dataType,'==>','isSpatial')
-          if (this.spatialFormat.endsWith('WKB')) {
+          if (this.INBOUND_SPATIAL_FORMAT.endsWith('WKB')) {
             return (row,idx)  => {
   		      row[idx] = Buffer.from(row[idx],'hex')
 			}
           }
 		  return null
-	    case (YadamuDataTypes.isBoolean(dataTypeDefinition.type,parseInt(tableMetadata.sizeConstraints[idx]),tableMetadata.vendor)):
+	    case (YadamuDataTypes.isBoolean(dataTypeDefinition.type,tableMetadata.sizeConstraints[idx][0],tableMetadata.vendor)):
           // console.log(tableMetadata.columnNames[idx],dataType,'==>','isBoolean')
 		  return null;
 	    case (YadamuDataTypes.isBinary(dataTypeDefinition.type)):
@@ -200,8 +203,7 @@ class StreamSwitcher extends Transform {
  	      break;
         case 'systemInformation' :
           this.push(obj)
-	  	  this.spatialFormat = obj.systemInformation.typeMappings.spatialFormat
-		  this.circleFormat = obj.systemInformation.typeMappings.circleFormat
+		  this.systemInformation = obj.systemInformation
 	  	  this.yadamu.REJECTION_MANAGER.setSystemInformation(obj.systemInformation)
 	  	  this.yadamu.WARNING_MANAGER.setSystemInformation(obj.systemInformation)
  	      break;

@@ -513,7 +513,7 @@ class FileDBI extends YadamuDBI {
 	// Include a dummy dataTypes array of the correct length to ensure the column count assertion does not throw
 	return { 
 	  tableName         : tableName
-	, _SPATIAL_FORMAT   : this.systemInformation.typeMappings.spatialFormat 
+	, _SPATIAL_FORMAT   : this.INBOUND_SPATIAL_FORMAT
     , columnNames       : [... this.metadata[tableName].columnNames]
 	, insertMode        : 'Batch'
 	, columnCount       : this.metadata[tableName].columnNames.length

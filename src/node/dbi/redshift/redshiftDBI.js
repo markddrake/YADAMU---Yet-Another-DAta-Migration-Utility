@@ -469,14 +469,7 @@ class RedshiftDBI extends YadamuDBI {
   **  Generate the SystemInformation object for an Export operation
   **
   */
-  
-  getTypeMappings() {
-   
-    const typeMappings = super.getTypeMappings()
-	typeMappings.circleFormat = this.CIRCLE_FORMAT 
-    return typeMappings; 
-  }
-  
+
   async getSystemInformation() {     
   
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)

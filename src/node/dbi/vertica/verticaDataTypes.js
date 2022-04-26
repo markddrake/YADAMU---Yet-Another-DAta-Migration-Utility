@@ -21,8 +21,9 @@ class VerticaDataTypes extends YadamuDataTypes {
   
   get UNBOUNDED_TYPES() { 
     this._UNBOUNDED_TYPES = this._UNBOUNDED_TYPES || Object.freeze([
-	  this.INTEGER_TYPE,
+	  this.INTEGER_TYPE
 	, this.FLOAT_TYPE
+	, this.INTERVAL_YEAR_TO_MONTH_TYPE
 	])
     return this._UNBOUNDED_TYPES;
   }

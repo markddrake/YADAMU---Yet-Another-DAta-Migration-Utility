@@ -10,6 +10,8 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
   get TABLE_LOB_COUNT()         { return this._TABLE_LOB_COUNT }
   set TABLE_LOB_COUNT(v)        { this._TABLE_LOB_COUNT = v }
   
+  get MAX_POOL_USAGE()          { return 55*1024*1024 }
+  
   set TABLE_UNUSED_BYTES(v)     { this._TABLE_UNUSED_BYTES = v }
   
   get TABLE_LOB_LIMIT()          { 
@@ -21,48 +23,20 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
 
-  getMappedDataType(dataType,idx,sizeConstraints) {
- 
-    const mappedDataType = super.getMappedDataType(dataType,sizeConstraints[idx])
-    let length = parseInt(sizeConstraints[idx])
-	 
-	switch (mappedDataType) {
-	  // Disable byte length calculation for CHAR as this leads to issues related to blank padding.
-      // case this.dbi.DATA_TYPES.CHAR_TYPE:  
-      case this.dbi.DATA_TYPES.VARCHAR_TYPE:
-        // Vertica's CHAR/VARCHAR Size Constraint is size in bytes. Adjust size from other vendors to accomodate multi-byte characters by applying user controllable Fudge Factor. What percentage of the content requires more than one byte to store.      
-        length = this.SOURCE_VENDOR === this.dbi.DATABASE_VENDOR ? length :  Math.ceil(length * this.dbi.BYTE_TO_CHAR_RATIO);
-        length = length > this.dbi.DATA_TYPES.LOB_LENGTH ?  this.dbi.DATA_TYPES.LOB_LENGTH : length
-		// console.log('VARCHAR',sizeConstraints[idx],'==>',length)  
-        sizeConstraints[idx] = length.toString()		
-      case this.dbi.DATA_TYPES.CLOB_TYPE:
-		switch (true) {
-          case (isNaN(length)):                                 return this.dbi.DATA_TYPES.CLOB_TYPE
-          case (length === undefined):                          return this.dbi.DATA_TYPES.CLOB_TYPE
-          case (length === -1):                                 return this.dbi.DATA_TYPES.CLOB_TYPE
-          case (length > this.dbi.DATA_TYPES.LOB_LENGTH):       return this.dbi.DATA_TYPES.CLOB_TYPE
-		  case (length > this.dbi.DATA_TYPES.VARCHAR_LENGTH):   return this.dbi.DATA_TYPES.CLOB_TYPE
-		  default:                                              return this.dbi.DATA_TYPES.VARCHAR_TYPE
-		  
-		}
-     	break
-      case this.dbi.DATA_TYPES.BINARY_TYPE:
-      case this.dbi.DATA_TYPES.VARBINARY_TYPE:
-      case this.dbi.DATA_TYPES.BLOB_TYPE:
-  		switch (true) {
-          case (isNaN(length)):                                 return this.dbi.DATA_TYPES.BLOB_TYPE
-          case (length === undefined):                          return this.dbi.DATA_TYPES.BLOB_TYPE
-          case (length === -1):                                 return this.dbi.DATA_TYPES.BLOB_TYPE
-          case (length > this.dbi.DATA_TYPES.LOB_LENGTH):       return this.dbi.DATA_TYPES.BLOB_TYPE
-          case (length > this.dbi.DATA_TYPES.VARBINARY_LENGTH): return this.dbi.DATA_TYPES.BLOB_TYPE
-          default:                                              return this.dbi.DATA_TYPES.VARBINARY_TYPE
-		}
-      default:                                                  return mappedDataType
+  adjustCharacterSizing(dataType,sizeConstraint) {
+   
+    // Disable byte length adjustment for CHAR as this leads to issues related to blank padding.
+   
+    if (dataType !== this.dbi.DATA_TYPES.CHAR_TYPE) {
+      // Vertica's CHAR/VARCHAR Size Constraint is size in bytes. Adjust size from other vendors to accomodate multi-byte characters by applying user controllable Fudge Factor. What percentage of the content requires more than one byte to store.      
+      let length = sizeConstraint[0] || this.dbi.DATA_TYPES.LOB_LENGTH
+      length = this.SOURCE_VENDOR === this.dbi.DATABASE_VENDOR ? length :  Math.ceil(length * this.dbi.BYTE_TO_CHAR_RATIO);
+      length = length > this.dbi.DATA_TYPES.LOB_LENGTH ?  this.dbi.DATA_TYPES.LOB_LENGTH : length
+      sizeConstraint[0] = length		
 	}
   }
   
-  
-  generateDDLStatement(schema,tableName,columnDefinitions,mappedDataTypes) {
+  generateDDLStatement(schema,tableName,columnDefinitions,targetDataTypes) {
 	  
     return `create table if not exists "${schema}"."${tableName}"(\n  ${columnDefinitions.join(',')})`;
 	
@@ -78,11 +52,14 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
   
     
   generateCopyOperation(tableMetadata,remotePath,copyColumnDefinitions) {
+	
+    // Remote Path is the path to be used if data is going to be copied to a staging table by the vertica driver. 
+	
     // Partitioned Tables need one entry per partition 
 
-    if (tableMetadata.hasOwnProperty('partitionCount')) {
-      return tableMetadata.dataFile.map((remotePath,idx) => {
-        remotePath = remotePath.split(path.sep).join(path.posix.sep)
+	if (Array.isArray(tableMetadata.dataFile)) {
+      return tableMetadata.dataFile.map((dataFile,idx) => {
+        remotePath = dataFile.split(path.sep).join(path.posix.sep)
         return  {
           dml:              this.generateCopyStatement(this.targetSchema,tableMetadata.tableName,remotePath,copyColumnDefinitions)
         , partitionCount:   tableMetadata.partitionCount
@@ -127,10 +104,13 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
           } while (precision > 0) 
           break
 		case (typeDefinition.hasOwnProperty('length')) :
-		  bytesUsed = bytesUsed + typeDefinition.length
+		  bytesUsed += typeDefinition.length
+          break;
+		case (columnDataType === this.dbi.DATA_TYPES.UUID_TYPE):
+		  bytesUsed += 16
           break;
         default:
-	      bytesUsed+= parseInt(sizeConstraints[idx])
+	      bytesUsed+= sizeConstraints[idx][0]
       }        
 	  // console.log(typeDefinition,columnDataType,bytesUsed)
     })
@@ -138,7 +118,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
 	return bytesUsed
   }
 
-  adjustLobSizes(tableName,bytesUsed,lobList,columnDefinitions,sizeConstraints) {
+  adjustLobSizes(tableName,bytesUsed,lobList,columnDefinitions,copyColumnDefinitions,sizeConstraints) {
 
     /*
     **
@@ -152,7 +132,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
     **
     */
 	
-	const lobBytes = lobList.map((idx) => { return parseInt(sizeConstraints[idx])}).reduce((prev,current) => {return prev + current},0)
+	const lobBytes = lobList.map((idx) => { return sizeConstraints[idx][0]}).reduce((prev,current) => {return prev + current},0)
 	bytesUsed = bytesUsed  - lobBytes
     this.TABLE_UNUSED_BYTES = this.dbi.DATA_TYPES.ROW_SIZE - bytesUsed
 	this.TABLE_LOB_COUNT = lobList.length
@@ -160,7 +140,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
     // Filter Lob Columns that are smaller than the Lob Limit
 	  
     lobList = lobList.flatMap((idx) => {
-      const lobSize = parseInt(sizeConstraints[idx])
+      const lobSize = sizeConstraints[idx][0]
       if ((lobSize > 0) && (lobSize < this.TABLE_LOB_LIMIT)) {
         bytesUsed+=lobSize
         return []
@@ -172,25 +152,17 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
 
     this.TABLE_UNUSED_BYTES = this.dbi.DATA_TYPES.ROW_SIZE - bytesUsed 
     this.TABLE_LOB_COUNT = lobList.length
-       
+
 	if (this.TABLE_LOB_LIMIT < this.dbi.DATA_TYPES.LOB_LENGTH) {
       this.yadamuLogger.ddl([this.dbi.DATABASE_VENDOR,tableName],`LONG VARCHAR and LONG VARBINARY columns restricted to ${this.TABLE_LOB_LIMIT} bytes`);
       
       lobList.forEach((idx) => {
-		columnDefinitions[idx] = columnDefinitions[idx].replace(sizeConstraints[idx],this.TABLE_LOB_LIMIT.toString())
-        sizeConstraints[idx] = this.TABLE_LOB_LIMIT.toString()
-		/*
-        // Vertica 10.x Raises out of Memory if copy buffer is > 32M
-        if (columnDefinitions[idx].indexOf(`" ${DataTypes.BLOB_TYPE}`) > 0) {
-          copyColumnDefinitions[idx] = `"YADAMU_COL_${column_suffix}" FILLER long varchar(${this.TABLE_LOB_LIMIT}), "${columnNames[idx]}" as YADAMU.LONG_HEX_TO_BINARY("YADAMU_COL_${column_suffix}")`  
-          copyColumnDefinitions[idx] = `"YADAMU_COL_${column_suffix}" FILLER long varchar(${this.TABLE_LOB_LIMIT > 16000000 ? DataTypes.LOB_LENGTH:  (this.TABLE_LOB_LIMIT * 2)}), "${columnNames[idx]}" as YADAMU.LONG_HEX_TO_BINARY("YADAMU_COL_${column_suffix}")`  
-        } 
-        */		
-     	// console.log(columnDefinitions[idx])
+        const column_suffix = String(idx+1).padStart(3,"0");
+		columnDefinitions[idx] = columnDefinitions[idx].replace(sizeConstraints[idx][0],this.TABLE_LOB_LIMIT)
+        sizeConstraints[idx][0] = this.TABLE_LOB_LIMIT
       })
     }
   }
-
 
   generateTableInfo(tableMetadata) {
 	
@@ -198,55 +170,53 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
 	
 	// console.log(tableMetadata)
     
-	const columnNames           = tableMetadata.columnNames
-    const mappedDataTypes       = []
-	const columnDataTypes       = []
 	const insertOperators       = []
     const copyColumnDefinitions = []
 	const sizeConstraints       = [...tableMetadata.sizeConstraints]
 	const args                  = new Array(tableMetadata.columnNames.length).fill('?')
-      
-    const columnContentType = new Array(columnNames.length).fill(null);
-	
-	
-	const columnDefinitions = columnNames.map((columnName,idx) => {
-		
-      const column_suffix = String(idx+1).padStart(3,"0");
+    
+	const targetDataTypes = this.getTargetDataTypes(tableMetadata)
+	const columnDataTypes = [...targetDataTypes]
 
-   	  let mappedDataType = (tableMetadata.source) ? tableMetadata.dataTypes[idx] : this.getMappedDataType(tableMetadata.dataTypes[idx],idx,sizeConstraints)
-	  // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,tableMetadata.vendor,tableMetadata.dataTypes[idx],tableMetadata.sizeConstraints[idx]],`Mapped to "${mappedDataType}".`)
-      let columnDataType = mappedDataType
-      let length = parseInt(sizeConstraints[idx])
+    let poolUsage = 0;
+	  
+	const columnDefinitions = targetDataTypes.map((targetDataType,idx) => {
+		
+	  const columnName = tableMetadata.columnNames[idx]
+      const column_suffix = String(idx+1).padStart(3,"0");
+	  
 	  let checkConstraint = ''
 	  
-	  switch (mappedDataType) {
+	  switch (targetDataType) {
 		 case this.dbi.DATA_TYPES.XML_TYPE:
-		   columnDataType = this.dbi.DATA_TYPES.storageOptions.XML_TYPE
-		   sizeConstraints[idx] = this.dbi.DATA_TYPES.LOB_LENGTH.toString()
+		   columnDataTypes[idx] = this.dbi.DATA_TYPES.storageOptions.XML_TYPE
+		   sizeConstraints[idx][0] = this.dbi.DATA_TYPES.LOB_LENGTH
            checkConstraint = `check(YADAMU.IS_XML("${columnName}"))`
 		   break;
 		case this.dbi.DATA_TYPES.JSON_TYPE:
-		   columnDataType = this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
-		   sizeConstraints[idx] = this.dbi.DATA_TYPES.LOB_LENGTH.toString()
+		   columnDataTypes[idx] = this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
+		   sizeConstraints[idx][0] = this.dbi.DATA_TYPES.LOB_LENGTH
            checkConstraint = `check(YADAMU.IS_JSON("${columnName}"))`
 		   break;
 		case this.dbi.DATA_TYPES.CLOB_TYPE:
 		case this.dbi.DATA_TYPES.BLOB_TYPE:
-		   sizeConstraints[idx] = isNaN(length) ? this.dbi.DATA_TYPES.LOB_LENGTH.toString() : (((length < 1) || (length > this.dbi.DATA_TYPES.LOB_LENGTH)) ? this.dbi.DATA_TYPES.LOB_LENGTH:  length).toString()
+		   sizeConstraints[idx][0] = sizeConstraints[idx].length === 0 || sizeConstraints[idx][0] >  this.dbi.DATA_TYPES.LOB_LENGTH ? this.dbi.DATA_TYPES.LOB_LENGTH : sizeConstraints[idx][0]
+		   break;
 		default:
 	  }
 	  
-	  const columnDefinition = YadamuDataTypes.decomposeDataType(columnDataType)
+	  const columnDefinition = YadamuDataTypes.decomposeDataType(columnDataTypes[idx])
 	  
 	  switch (columnDefinition.type) {
         case this.dbi.DATA_TYPES.BINARY_TYPE:
         case this.dbi.DATA_TYPES.VARBINARY_TYPE:
         case this.dbi.DATA_TYPES.BLOB_TYPE:
-          length = ( isNaN(length) || ((length < 1) || (length > this.dbi.DATA_TYPES.LOB_LENGTH))) ? this.dbi.DATA_TYPES.LOB_LENGTH:  length
+		  const length = sizeConstraints[idx][0]
           let hexLength = length * 2
-          hexLength = ((hexLength < 2) || (hexLength > this.dbi.DATA_TYPES.LOB_LENGTH)) ? this.dbi.DATA_TYPES.LOB_LENGTH:  hexLength
-          switch (true) {
-             case (length > this.dbi.DATA_TYPES.LOB_LENGTH) :
+          hexLength = hexLength > this.dbi.DATA_TYPES.LOB_LENGTH ? this.dbi.DATA_TYPES.LOB_LENGTH:  hexLength
+		  poolUsage += hexLength;
+		  switch (true) {
+             case (length > this.dbi.DATA_TYPES.VARBINARY_LENGTH) :
                // LONG VARBINARY
                // copyColumnDefinitions[idx] = `"${columnName}" FORMAT 'HEX'`
                copyColumnDefinitions[idx] = `"YADAMU_COL_${column_suffix}" FILLER long varchar(${hexLength}), "${columnName}" as YADAMU.LONG_HEX_TO_BINARY("YADAMU_COL_${column_suffix}")`
@@ -261,7 +231,7 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
                // copyColumnDefinitions[idx] = `"${columnName}" FORMAT 'HEX'`
           }
           insertOperators[idx] = {
-            prefix:   'X'
+            prefix:   ''
           , suffix:   `::${columnDefinition.type.toUpperCase()}(${length})`
           }
           break
@@ -385,10 +355,10 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
 		  
       }
 	  // Generate the final storage clause based on the any adjustments made to the column length
-      mappedDataTypes.push(mappedDataType)     
-	  columnDataTypes.push(columnDataType)
-      return `"${columnName}" ${this.generateStorageClause(columnDataType,sizeConstraints[idx])}${checkConstraint ? ` ${checkConstraint}`:  ''}`
+      return `"${columnName}" ${this.generateStorageClause(columnDataTypes[idx],sizeConstraints[idx])}${checkConstraint ? ` ${checkConstraint}`:  ''}`
     })
+
+    this.dbi.applyDataTypeMappings(tableMetadata.tableName,tableMetadata.columnNames,targetDataTypes,this.dbi.IDENTIFIER_MAPPINGS,true)
 	
 	// Check Row Size and adjust as necessary
 	
@@ -396,30 +366,41 @@ class VerticaStatementGenerator extends YadamuStatementGenerator {
 	let bytesUsed = this.calculateFixedRowSize(columnDataTypes,sizeConstraints,lobList)
 	// console.log(tableMetadata.tableName,bytesUsed,lobList.length)
 	if (bytesUsed > this.dbi.DATA_TYPES.ROW_SIZE) {
-	  this.adjustLobSizes(tableMetadata.tableName,bytesUsed,lobList,columnDefinitions,sizeConstraints)
+	  this.adjustLobSizes(tableMetadata.tableName,bytesUsed,lobList,columnDefinitions,copyColumnDefinitions,sizeConstraints)
 	}
+
+    // Vertica Raises out of Memory if copy buffer is > 55M ?
 	
+	if (poolUsage > this.MAX_POOL_USAGE) {
+	  const poolAllowed = Math.floor(this.MAX_POOL_USAGE / lobList.length)
+	  copyColumnDefinitions.forEach((copyColumnDefinition,idx) => {
+        if (columnDefinitions[idx].indexOf(`" ${this.dbi.DATA_TYPES.BLOB_TYPE}`) > 0) {
+  		  copyColumnDefinitions[idx] = copyColumnDefinitions[idx].replace(/\(\d*?\)/,`(${poolAllowed})`)
+        } 
+      })
+	}
+
     // All remote paths must use POSIX/Linux seperators (Vertica does not run on MS-Windows)
 
 	const stagingFileName =  `YST-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
 	const stagingFilePath =  path.join(this.dbi.LOCAL_STAGING_AREA,stagingFileName)
 	const localPath       =  path.resolve(stagingFilePath)
-	let remotePath        =  path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName).split(path.sep).join(path.posix.sep)
+	const remotePath      =  path.join(this.dbi.REMOTE_STAGING_AREA,stagingFileName).split(path.sep).join(path.posix.sep)
 	
 	const maxLengths  = sizeConstraints.map((sizeConstraint) => {
-      const maxLength = parseInt(sizeConstraint) 
+      const maxLength = sizeConstraint[0]
       return maxLength > 0 ? maxLength : undefined
     })
 	
     const tableInfo = {
-      ddl            :  this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,mappedDataTypes)
-    , dml            :  this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,columnNames,insertOperators)
+      ddl            :  this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,targetDataTypes)
+    , dml            :  this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,tableMetadata.columnNames,insertOperators)
 	, copy           :  this.generateCopyOperation(tableMetadata,remotePath,copyColumnDefinitions)
     , mergeout:         `select do_tm_task('mergeout','${this.targetSchema}.${tableMetadata.tableName}')`
     , stagingFileName:  stagingFileName
     , localPath:        localPath
     , columnNames    :  tableMetadata.columnNames
-    , targetDataTypes:  mappedDataTypes
+    , targetDataTypes:  targetDataTypes
     , maxLengths:       maxLengths
     , insertOperators:  insertOperators
     , insertMode     :  insertMode

@@ -16,7 +16,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
   getMappedDataType(dataType,sizeConstraint) {
 	  
       const mappedDataType = super.getMappedDataType(dataType,sizeConstraint)
-      const length = parseInt(sizeConstraint)
+      const length = sizeConstraint[0]
       switch (mappedDataType) {
 
         case this.dbi.DATA_TYPES.NUMERIC_TYPE:        
@@ -50,7 +50,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
      
   }
 
-  generateCopyOperation(schema,tableName,datafile) {
+  generateCopyOperation(schema,tableName,dataFile) {
       
     /*
     let copyOperation 
@@ -58,11 +58,11 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
       copyOperation = `copy into "${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."${tableName}" from '@"${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,.dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
 	}
     */
-	
+
     let copyOperation
-	if (datafile) {
-	  if (Array.isArray(datafile)) {
-		const partitionCount = datafile.length
+	if (dataFile) {
+	  if (Array.isArray(dataFile)) {
+		const partitionCount = dataFile.length
         copyOperation = tableMetadata.dataFile.map((dataFile,idx) => {
 	      return  {
 	        dml             : `copy into "${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."${tableName}" from '@"${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
@@ -83,16 +83,20 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
   generateTableInfo(tableMetadata) {
 
     let parserRequired = false;
-    const columnNames = tableMetadata.columnNames
+
     const dataTypes = tableMetadata.dataTypes
 	
 	// Fill with Column Numbers (1..n)
+
     const insertOperators = Object.keys(new Array(dataTypes.length).fill(null)).map((idx) => {return(`COLUMN${parseInt(idx)+1}`)})
 	const columnClause = new Array(dataTypes.length).fill('')
-    const mappedDataTypes = [];
-	const columnDataTypes = [];
+    
+	const targetDataTypes = this.getTargetDataTypes(tableMetadata)
+	const columnDataTypes = [...targetDataTypes]
 	
-	const columnDefinitions = columnNames.map((columnName,idx) => {    
+	// this.debugStatementGenerator(null,null)
+
+    const columnDefinitions = targetDataTypes.map((targetDataType,idx) => {		
 
        // If the 'class' of a VARIANT datatype cannot be determned by insepecting the information available from Snowflake type it based on the incoming data stream 
        
@@ -102,25 +106,25 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
          }
        }
       
-       const mappedDataType = tableMetadata.source ? tableMetadata.dataTypes[idx] : this.getMappedDataType(tableMetadata.dataTypes[idx],tableMetadata.sizeConstraints[idx])
-	   let columnDataType = mappedDataType
-       switch (mappedDataType) {
+	   const columnName = tableMetadata.columnNames[idx]
+	   
+       switch (targetDataType) {
 		 case this.dbi.DATA_TYPES.JSON_TYPE:
            parserRequired =  true;
            insertOperators[idx] = `TRY_PARSE_JSON(${insertOperators[idx]})`
-		   columnDataType = this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
+		   columnDataTypes[idx] = this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
 		   break
 		 case this.dbi.DATA_TYPES.XML_TYPE:
-		   columnDataType = this.dbi.DATA_TYPES.storageOptions.XML_TYPE
+		   columnDataTypes[idx] = this.dbi.DATA_TYPES.storageOptions.XML_TYPE
 		   switch (true) {
-   	         case (columnDataType === SnowflakeConstants.VARIANT_DATA_TYPE):
+   	         case (columnDataTypes[idx] === SnowflakeConstants.VARIANT_DATA_TYPE):
 		       parserRequired =  true;
                insertOperators[idx] = `PARSE_XML("${insertOperators[idx]}")`
 			   columnClause[idx] = ''
 			   break
 		     default:
 		       insertOperators[idx] = `case when check_xml("${insertOperators[idx]}") is NULL then "${insertOperators[idx]}" else NULL end`
-		       columnClause[idx] = `check((CHECK_XML("${columnNames[idx]}") is NULL)) COMMENT 'CHECK(CHECK_XML("${columnNames[idx]}") IS NULL)'`
+		       columnClause[idx] = `check((CHECK_XML("${tableMetadata.columnNames[idx]}") is NULL)) COMMENT 'CHECK(CHECK_XML("${tableMetadata.columnNames[idx]}") IS NULL)'`
 		    } 
 			break
 		  case this.dbi.DATA_TYPES.SNOWFLAKE_VARIANT_TYPE:
@@ -136,20 +140,20 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
 				NULL
 			 end`
 	   }
-       mappedDataTypes.push(mappedDataType);
-       columnDataTypes.push(columnDataType);
-	   return `"${columnName}" ${this.generateStorageClause(columnDataType,tableMetadata.sizeConstraints[idx])} ${columnClause[idx]}`
+	   return `"${columnName}" ${this.generateStorageClause(columnDataTypes[idx],tableMetadata.sizeConstraints[idx])} ${columnClause[idx]}`
     })
 
-    const args = `(${columnNames.map((columnName) => {return '?'}).join(',')})`
-		
+    const args = `(${columnDefinitions.map((col) => {return '?'}).join(',')})`
+    
+	this.dbi.applyDataTypeMappings(tableMetadata.tableName,tableMetadata.columnNames,targetDataTypes,this.dbi.IDENTIFIER_MAPPINGS,true)
+    
 	const tableInfo = { 
-      ddl             : this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,mappedDataTypes)
-    , dml             : this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,columnNames,insertOperators,parserRequired)
-	, copy            : this.generateCopyOperation(this.targetSchema,tableMetadata.tableName,tableMetadata.datafile)
+      ddl             : this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,targetDataTypes)
+    , dml             : this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,tableMetadata.columnNames,insertOperators,parserRequired)
+	, copy            : this.generateCopyOperation(this.targetSchema,tableMetadata.tableName,tableMetadata.dataFile)
     , args            : args
-    , columnNames     : columnNames
-    , targetDataTypes : mappedDataTypes
+    , columnNames     : tableMetadata.columnNames
+    , targetDataTypes : targetDataTypes
     , insertMode      : 'Batch'
     , parserRequired  : parserRequired
     , _BATCH_SIZE     : this.dbi.BATCH_SIZE

@@ -22,7 +22,7 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
     let columnNames = tableMetadata.columnNames
     let dataTypes = tableMetadata.dataTypes
     let sizeConstraints = tableMetadata.sizeConstraints
-
+	
     /*
     **
     ** ARRAY_TO_DOCUMENT uses the column name, data types and size constraint information from the source database to set up 
@@ -35,13 +35,10 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
       dataTypes = tableMetadata.source.dataTypes;
       sizeConstraints = tableMetadata.source.sizeConstraints 
     }
-     
-	const mappedDataTypes = columnNames.map((columnName,idx) => { 
-	  const mappedDataType = tableMetadata.source ? tableMetadata.source.dataTypes[idx] : this.getMappedDataType(dataTypes[idx],sizeConstraints[idx])
-	  return mappedDataType
-	})
+
+	const targetDataTypes = this.getTargetDataTypes(tableMetadata)
    	
-    if ((columnNames.length === 1) && (dataTypes[0] === 'JSON')) {
+    if ((tableMetadata.columnNames.length === 1) && (dataTypes[0] === 'JSON')) {
         // If the source table consists of a single JSON Column then insert each row into MongoDB 'As Is'   
         insertMode = 'DOCUMENT'
     }
@@ -62,7 +59,7 @@ class MongoStatementGenerator extends YadamuStatementGenerator {
       ddl             : tableMetadata.tableName
     , dml             : `insertMany(${tableMetadata.tableName})`
     , columnNames     : columnNames
-    , targetDataTypes : mappedDataTypes
+    , targetDataTypes : targetDataTypes
     , sizeConstraints : sizeConstraints
     , insertMode      : insertMode
     , _BATCH_SIZE     : this.dbi.BATCH_SIZE

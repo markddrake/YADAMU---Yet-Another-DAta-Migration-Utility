@@ -41,32 +41,29 @@ class MariadbStatementLibrary {
                ) "DATA_TYPE_ARRAY"
               ,concat(
                 '[',
-                group_concat(
-                  json_quote(case 
+                group_concat(case 
                                when column_type = 'tinyint(1)' then
-                                 ${this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN ? "''" : "'3'"}
+                                 ${this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN ? 'json_array()' : 'json_array(3)'}
                                when column_type = 'bit(1)' then
-                                 ${this.dbi.DATA_TYPES.storageOptions.BIT1_IS_BOOLEAN ? "''" : "'1'"}
- 	   					       when (numeric_precision is not null) and (numeric_scale is not null) then
-                                 concat(numeric_precision,',',numeric_scale) 
-                               when (numeric_precision is not null) then 
+                                 ${this.dbi.DATA_TYPES.storageOptions.BIT1_IS_BOOLEAN ? 'json_array()' : 'json_array(1)'}
+                               when (numeric_precision is not null) and (numeric_scale is not null) then
+                                 json_array(numeric_precision,numeric_scale) 
+                               when (numeric_precision is not null) then
                                  case
-								   when data_type = 'bit' then
-                                     numeric_precision								   
-                                   when column_type like '%unsigned' then
-                                     numeric_precision
+                                   when data_type = 'bit' then
+                                     json_array(numeric_precision)
+                                   when column_type like '%unsigned' then 
+                                     json_array(numeric_precision)
                                    else
-                                     numeric_precision + 1
+                                     json_array(numeric_precision+1)
                                  end
-                               when (datetime_precision is not null) then 
-                                 datetime_precision
+                               when (datetime_precision is not null) then
+                                 json_array(datetime_precision)
                                when (character_maximum_length is not null) then
-                                 character_maximum_length
+                                 json_array(character_maximum_length)
                                else   
-                                 ''   
-                             end
-                            ) 
-                  order by ordinal_position separator ','
+                                 json_array()
+                             end order by ordinal_position separator ',' 
                 ),
                 ']'
                ) "SIZE_CONSTRAINT_ARRAY"

@@ -73,7 +73,7 @@ class OracleQA extends YadamuQALibrary.qaMixin(OracleDBI) {
 		
 	  let compareRules = this.yadamu.getCompareRules(rules)	  
 	  
-	  compareRules.objectsRule   = rules.OBJECTS_COMPARISSON_RULE || 'SKIP'
+	  compareRules.objectsRule   = rules.OBJECTS_COMPARISON_RULE || 'SKIP'
       compareRules.excludeMViews = ((rules.OPERATION  !== 'DBROUNDTRIP') && (rules.MODE === 'DATA_ONLY'))
    	  
 	  compareRules = this.JSON_PARSING_SUPPORTED ? JSON.stringify(compareRules) : this.yadamu.makeXML(compareRules)

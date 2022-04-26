@@ -22,15 +22,15 @@ class SnowflakeStatementLibrary {
                      ,concat('[',listagg(concat('"',case when c.comment = concat('CHECK(CHECK_XML("',c.column_name,'") IS NULL)') then 'XML' else data_type end,'"'),',') within group (order by ordinal_position),']') "DATA_TYPE_ARRAY"
                      ,concat('[',listagg(case
                                    when (numeric_precision is not null) and (numeric_scale is not null) 
-                                     then concat('"',numeric_precision,',',numeric_scale,'"')
+                                     then concat('[',numeric_precision,',',numeric_scale,']')
                                    when (numeric_precision is not null) 
-                                     then concat('"',numeric_precision,'"')
+                                     then concat('[',numeric_precision,']')
                                    when (datetime_precision is not null)
-                                     then concat('"',datetime_precision,'"')
+                                     then concat('[',datetime_precision,']')
                                    when (character_maximum_length is not null)
-                                     then concat('"',character_maximum_length,'"')
+                                     then concat('[',character_maximum_length,']')
                                    else
-                                     '""'
+                                     '[]'
                                  end
                                 ,','                   
                                ) within group (order by ordinal_position)

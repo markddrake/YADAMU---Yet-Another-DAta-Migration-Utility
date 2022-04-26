@@ -940,11 +940,12 @@ class YadamuDataTypes {
       type : dataType
     }    
 
-    if ((sizeConstraint !== null) && (sizeConstraint.length > 0)) {
-      const sizeComponents = sizeConstraint.split(',');
-      dataTypeDefinition.length = sizeComponents[0] === 'max' ? -1 :  parseInt(sizeComponents[0])
-      dataTypeDefinition.scale = (sizeComponents.length > 1) ? parseInt(sizeComponents[1]) : undefined
-    }
+    switch (sizeConstraint.length) {
+	  case 2:
+        dataTypeDefinition.scale = sizeConstraint[1]
+	  case 1:
+        dataTypeDefinition.length = sizeConstraint[0]
+    }	  
     
     return dataTypeDefinition
   }

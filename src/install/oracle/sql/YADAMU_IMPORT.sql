@@ -724,14 +724,18 @@ begin
     when P_ORACLE_TYPE = 'RAW'                       then return 
       case 
         when P_DATA_TYPE_LENGTH is NULL              then C_BLOB_TYPE  
-	    when P_DATA_TYPE_LENGTH = -1                 then C_BLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_RAW_LENGTH       then C_BLOB_TYPE  
 	                                                 else P_ORACLE_TYPE 
+	  end;
+    when P_ORACLE_TYPE = 'BLOB'                     then return 
+      case 
+        when P_DATA_TYPE_LENGTH is NULL              then C_BLOB_TYPE  
+	    when P_DATA_TYPE_LENGTH > C_RAW_LENGTH       then C_BLOB_TYPE  
+	                                                 else 'RAW'
 	  end;
     when P_ORACLE_TYPE  = 'CHAR'                     then return 
       case 
         when P_DATA_TYPE_LENGTH is NULL              then C_CLOB_TYPE  
-	    when P_DATA_TYPE_LENGTH = -1                 then C_CLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_VARCHAR_LENGTH   then C_CLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_CHAR_LENGTH      then 'VARCHAR2'
 	                                                 else 'CHAR'
@@ -739,14 +743,12 @@ begin
     when P_ORACLE_TYPE = 'VARCHAR2'                  then return               
       case 
         when P_DATA_TYPE_LENGTH is NULL              then C_CLOB_TYPE  
-	    when P_DATA_TYPE_LENGTH = -1                 then C_CLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_VARCHAR_LENGTH   then C_CLOB_TYPE  
 	                                                 else 'VARCHAR2'
       end;												   
     when P_ORACLE_TYPE = 'NCHAR'                     then return 
       case 
         when P_DATA_TYPE_LENGTH is NULL              then C_NCLOB_TYPE  
-	    when P_DATA_TYPE_LENGTH = -1                 then C_NCLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_NVARCHAR_LENGTH  then C_NCLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_NCHAR_LENGTH     then C_NVARCHAR_TYPE
 	                                                 else C_NCHAR_TYPE
@@ -754,10 +756,21 @@ begin
     when P_ORACLE_TYPE = 'NVARCHAR2'                 then return                  
       case 
         when P_DATA_TYPE_LENGTH is NULL              then C_NCLOB_TYPE  
-	    when P_DATA_TYPE_LENGTH = -1                 then C_NCLOB_TYPE  
 	    when P_DATA_TYPE_LENGTH > C_NVARCHAR_LENGTH  then C_NCLOB_TYPE  
 	                                                 else C_NVARCHAR_TYPE
       end;
+    when P_ORACLE_TYPE  = 'CLOB'                     then return 
+      case 
+        when P_DATA_TYPE_LENGTH is NULL              then C_CLOB_TYPE  
+	    when P_DATA_TYPE_LENGTH > C_NVARCHAR_LENGTH  then C_CLOB_TYPE  
+	                                                 else 'VARCHAR2'
+      end;												   
+    when P_ORACLE_TYPE  = 'NCLOB'                     then return 
+      case 
+        when P_DATA_TYPE_LENGTH is NULL              then C_NCLOB_TYPE  
+	    when P_DATA_TYPE_LENGTH > C_VARCHAR_LENGTH   then C_NCLOB_TYPE  
+	                                                 else 'NVARCHAR2'
+      end;												   
     when P_ORACLE_TYPE = 'DATE'                      then return
       case when P_DATA_TYPE_LENGTH > 0               then 'TIMESTAMP'
                                                      else P_ORACLE_TYPE
@@ -793,9 +806,9 @@ function GENERATE_SQL(
 , P_DATA_TYPE_ARRAY              CLOB
 , P_SIZE_CONSTRAINT_ARRAY        CLOB
 , P_JSON_DATA_TYPE               VARCHAR2 DEFAULT C_JSON_DATA_TYPE
-, P_XMLTYPE_STORAGE_CLAUSE            VARCHAR2 DEFAULT C_XMLTYPE_STORAGE_CLAUSE
+, P_XMLTYPE_STORAGE_CLAUSE       VARCHAR2 DEFAULT C_XMLTYPE_STORAGE_CLAUSE
 , P_SPATIAL_FORMAT               VARCHAR2 DEFAULT C_SPATIAL_FORMAT
-, P_BOOLEAN_DATA_TYPE        VARCHAR2 DEFAULT C_BOOLEAN_DATA_TYPE
+, P_BOOLEAN_DATA_TYPE            VARCHAR2 DEFAULT C_BOOLEAN_DATA_TYPE
 , P_CIRCLE_FORMAT                VARCHAR2 DEFAULT C_CIRCLE_FORMAT
 )
 --
@@ -894,20 +907,18 @@ end;';
 			 else
 		       m.ORACLE_TYPE
 		   end "ORACLE_TYPE"
-          ,case
-             when s.VALUE = '' then
-                NULL
-             when INSTR(s.VALUE,',') > 0 then
-                SUBSTR(s.VALUE,1,INSTR(s.VALUE,',')-1)
-             else
-               s.VALUE
-           end "DATA_TYPE_LENGTH"
-          ,case
-             when INSTR(s.VALUE,',') > 0 then
-                SUBSTR(s.VALUE, INSTR(s.VALUE,',')+1)
-             else
-               NULL
-           end "DATA_TYPE_SCALE"
+$IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN 
+--
+		  ,JSON_VALUE(s.VALUE,'$[0]' returning NUMBER) "DATA_TYPE_LENGTH" 
+		  ,JSON_VALUE(s.VALUE,'$[1]' returning NUMBER) "DATA_TYPE_SCALE"
+--
+$ELSE
+--
+		  ,s."DATA_TYPE_LENGTH" 
+		  ,s."DATA_TYPE_SCALE" 
+--
+$END       
+--
           ,case
              when (t.VALUE LIKE '"%"."%"')  then
                -- Data Type is a schema qualified object type
@@ -931,13 +942,13 @@ $IF YADAMU_FEATURE_DETECTION.JSON_PARSING_SUPPORTED $THEN
 --
          from JSON_TABLE(P_COLUMN_NAME_ARRAY,    '$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') c 
          join JSON_TABLE(P_DATA_TYPE_ARRAY,      '$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') t on (c."KEY" = t."KEY") 
-         join JSON_TABLE(P_SIZE_CONSTRAINT_ARRAY,'$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE PATH '$') s on (c."KEY" = s."KEY")
+         join JSON_TABLE(P_SIZE_CONSTRAINT_ARRAY,'$[*]' COLUMNS "KEY" FOR ORDINALITY, VALUE FORMAT JSON PATH '$') s on (c."KEY" = s."KEY")
 --
 $ELSE
 --
          from XMLTABLE('/columnNames/columnName'         passing P_COLUMN_NAME_XML     COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') c 
          join XMLTABLE('/dataTypes/dataType'             passing P_DATA_TYPE_XML       COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') t on (c."KEY" = t."KEY") 
-         join XMLTABLE('/sizeConstraints/sizeConstraint' passing P_SIZE_CONSTRAINT_XML COLUMNS "KEY" FOR ORDINALITY, VALUE VARCHAR2(128) PATH '.') s on (c."KEY" = s."KEY")
+         join XMLTABLE('/sizeConstraints/sizeConstraint' passing P_SIZE_CONSTRAINT_XML COLUMNS "KEY" FOR ORDINALITY, DATA_TYPE_LENGTH NUMBER PATH 'length', DATA_TYPE_SCALE NUMBER path 'scale') s on (c."KEY" = s."KEY")
 --
 $END       
 --
@@ -1548,8 +1559,8 @@ as
            '$'           
            COLUMNS(
              SOURCE_VENDOR           VARCHAR2(128)                      PATH '$.systemInformation.vendor',
-             SPATIAL_FORMAT          VARCHAR2(128)                      PATH '$.systemInformation.typeMappings.spatialFormat',   
-             CIRCLE_FORMAT           VARCHAR2(128)                      PATH '$.systemInformation.typeMappings.circleFormat',   
+             SPATIAL_FORMAT          VARCHAR2(128)                      PATH '$.systemInformation.driverSettings.spatialFormat',   
+             CIRCLE_FORMAT           VARCHAR2(128)                      PATH '$.systemInformation.driverSettings.circleFormat',   
              NESTED                                                     PATH '$.metadata.*'
                COLUMNS (
                  OWNER                        VARCHAR2(128)             PATH '$.tableSchema'

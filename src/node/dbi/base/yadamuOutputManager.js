@@ -214,8 +214,10 @@ class YadamuOutputManager extends Transform {
     // Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 
     // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.COPY_METRICS.cached],'cacheRow()')    
-      
+
+	// if (this.COPY_METRICS.cached === 0) console.log('CR1',row)      
     this.rowTransformation(row)
+	// if (this.COPY_METRICS.cached === 0) console.log('CR2',row)
     this.batch.push(row);
     this.COPY_METRICS.cached++
     return this.skipTable;

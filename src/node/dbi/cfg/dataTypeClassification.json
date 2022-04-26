@@ -18,7 +18,9 @@
 		"LONGBLOB",
 		"ROWVERSION",
 		"OBJECTID",
-		"BINDATA"
+		"BINDATA",
+		"BF",
+		"BV"
 	],
 	"date": [
 		"DATE",
@@ -91,7 +93,8 @@
 		"BLOB",
 		"LONGBINARY",
 		"MEDIUMBINARY",
-		"IMAGE"
+		"IMAGE",
+		"BO"
 	],
 	"spatial": [
 		"\"MDSYS\".\"SDO_GEOMETRY\"",

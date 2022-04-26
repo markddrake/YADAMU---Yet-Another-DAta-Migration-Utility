@@ -18,7 +18,6 @@ class DBIConstants {
 	, "LOCAL_STAGING_AREA"         : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
 	, "REMOTE_STAGING_AREA"        : process.env.TMP || process.env.TEMP || process.platform === 'win32' ? "c:\\temp" : "/tmp"
 	, "STAGING_FILE_RETENTION"     : "FAILED"
-	, "TIMESTAMP_PRECISION"        : 9
 	, "BYTE_TO_CHAR_RATIO"         : 1
     })
     return this._STATIC_PARAMETERS;
@@ -77,7 +76,6 @@ class DBIConstants {
   static get LOCAL_STAGING_AREA()         { return this.DBI_PARAMETERS.LOCAL_STAGING_AREA };
   static get REMOTE_STAGING_AREA()        { return this.DBI_PARAMETERS.REMOTE_STAGING_AREA };
   static get STAGING_FILE_RETENTION()     { return this.DBI_PARAMETERS.STAGING_FILE_RETENTION };
-  static get TIMESTAMP_PRECISION()        { return this.DBI_PARAMETERS.TIMESTAMP_PRECISION };
   static get BYTE_TO_CHAR_RATIO()         { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
   
   static get BATCH_COMPLETED()            { return 'batchCompleted' }

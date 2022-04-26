@@ -44,6 +44,10 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
 	return JSON.stringify({metadata : this.metadata})
   }
 
+  getSourceTypeMappings() {
+	 JSON.stringify(vendorTypeMappings)
+  }
+  
   async generateStatementCache () {
 
     await this.init()
@@ -54,7 +58,7 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
 	        inputs: [{
               name: 'METADATA',        type: sql.NVARCHAR, value: this.getMetadata()
 			},{
-              name: 'TYPE_MAPPINGS',   type: sql.NVARCHAR, value: JSON.stringify(vendorTypeMappings)
+              name: 'TYPE_MAPPINGS',   type: sql.NVARCHAR, value: this.getSourceTypeMappings()
 			},{
 			  name: 'TARGET_DATABASE', type: sql.VARCHAR,  value: this.targetSchema
 			},{
@@ -64,11 +68,13 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
 			}]
 	      }
     
+	// console.log(args)
+
     let results = await this.dbi.execute('master.dbo.sp_GENERATE_STATEMENTS',args,'SQL_STATEMENTS')
     results = results.output[Object.keys(results.output)[0]]
     const statementCache = JSON.parse(results)
 	
-    // await this.debugStatementGenerator(null,statementCache)
+    // this.debugStatementGenerator(null,statementCache)
 
 	const tables = Object.keys(this.metadata); 
     const ddlStatements = tables.map((table,idx) => {

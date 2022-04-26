@@ -105,7 +105,7 @@ class MongoOutputManager extends YadamuOutputManager {
             return typeof col === 'string' && (col.length > 0) ? JSON.parse(col) : col
 	      }
 		case this.dbi.DATA_TYPES.BINARY_TYPE:
-		  if ((this.tableInfo.columnNames[idx] === '_id') && (this.tableInfo.sizeConstraints[idx] === '12')) {
+		  if ((this.tableInfo.columnNames[idx] === '_id') && (this.tableInfo.sizeConstraints[idx][0] === 12)) {
   	        return (col,idx) => {
               return ObjectID(col)
 	        }

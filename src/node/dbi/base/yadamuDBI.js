@@ -126,8 +126,8 @@ class YadamuDBI extends EventEmitter {
   get PASSWORD_KEY_NAME()            { return 'password' };
   get STATEMENT_TERMINATOR()         { return ';' }
   get STATEMENT_SEPERATOR()          { return '\n--\n' }
+  get RETRY_COUNT()                  { return 3 }
   
-  get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT              || this.DATA_TYPES?.storageOptions.SPATIAL_FORMAT || this.DBIConstants.SPATIAL_FORMAT };
   get PARSE_DELAY()                  { return this.parameters.PARSE_DELAY                 || DBIConstants.PARSE_DELAY };
   get TABLE_MAX_ERRORS()             { return this.parameters.TABLE_MAX_ERRORS            || DBIConstants.TABLE_MAX_ERRORS };
   get TOTAL_MAX_ERRORS()             { return this.parameters.TOTAL_MAX_ERRORS            || DBIConstants.TOTAL_MAX_ERRORS };
@@ -135,9 +135,11 @@ class YadamuDBI extends EventEmitter {
   get ON_ERROR()                     { return this.parameters.ON_ERROR                    || DBIConstants.ON_ERROR }
   get INFINITY_MANAGEMENT()          { return this.parameters.INFINITY_MANAGEMENT         || DBIConstants.INFINITY_MANAGEMENT };
   get STAGING_FILE_RETENTION()       { return this.parameters.STAGING_FILE_RETENTION      || DBIConstants.STAGING_FILE_RETENTION }
-  get TIMESTAMP_PRECISION()          { return this.parameters.TIMESTAMP_PRECISION         || DBIConstants.TIMESTAMP_PRECISION }
   get BYTE_TO_CHAR_RATIO()           { return this.parameters.BYTE_TO_CHAR_RATIO          || DBIConstants.BYTE_TO_CHAR_RATIO }
-  get RETRY_COUNT()                  { return 3 }
+
+  get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT              || this.DATA_TYPES?.storageOptions.SPATIAL_FORMAT};
+  get CIRCLE_FORMAT()                { return this.parameters.CIRCLE_FORMAT               || this.DATA_TYPES?.storageOptions.CIRCLE_FORMAT};
+  get TIMESTAMP_PRECISION()          { return this.parameters.TIMESTAMP_PRECISION         || this.DATA_TYPES?.TIMESTAMP_PRECISION }
 
   get COMMIT_RATIO()                 { return this.parameters.hasOwnProperty('COMMIT_RATIO') ?  this.parameters.COMMIT_RATIO : DBIConstants.COMMIT_RATIO };
   get BATCH_LIMIT()                  { return this.parameters.hasOwnProperty('BATCH_LIMIT') ?  this.parameters.BATCH_LIMIT : DBIConstants.BATCH_LIMIT };
@@ -247,8 +249,12 @@ class YadamuDBI extends EventEmitter {
   get SPATIAL_SERIALIZER()            { return this._SPATIAL_SERIALIZER }
   set SPATIAL_SERIALIZER(v)           { this._SPATIAL_SERIALIZER = v }
    
-  get INBOUND_SPATIAL_FORMAT()        { return this.systemInformation?.typeMappings?.spatialFormat || this.SPATIAL_FORMAT};
-  get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation?.typeMappings?.circleFormat || null };
+  get IDENTIFIER_MAPPINGS()            { return this._IDENTIFIER_MAPPINGS }
+  set IDENTIFIER_MAPPINGS(v)           { this._IDENTIFIER_MAPPINGS = v }
+   
+  get INBOUND_SPATIAL_FORMAT()        { return this.systemInformation?.driverSettings?.spatialFormat       || this.DATA_TYPES.storageOptions.SPATIAL_FORMAT};
+  get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation?.driverSettings?.circleFormat        || this.DATA_TYPES.storageOptions.CIRCLE_FORMAT};
+  get INBOUND_TIMESTAMP_PRECISION()   { return this.systemInformation?.driverSettings?.timestampPrecision  || this.DATA_TYPES.TIMESTAMP_PRECISION};
 
   get TABLE_FILTER()                  { 
     this._TABLE_FILTER || this._TABLE_FILTER || (() => {
@@ -815,18 +821,9 @@ class YadamuDBI extends EventEmitter {
     const databaseMappings = this.generateDatabaseMappings(mappedMetadata)
     this.mergeMappings(databaseMappings, this.yadamu.IDENTIFIER_MAPPINGS)
 	this.metadata = YadamuLibrary.isEmpty(databaseMappings) ?  mappedMetadata : this.applyIdentifierMappings(mappedMetadata,databaseMappings,true)
-    this.setIdentifierMappings( this.mergeMappings(generatedMappings,databaseMappings))
-  }
-
-  setIdentifierMappings(identifierMappings) {
-    // console.log(this.constructor.name,identifierMappings)
-    this.identifierMappings = identifierMappings
+    this.IDENTIFIER_MAPPINGS = this.mergeMappings(generatedMappings,databaseMappings)
   }
  
-  getIdentifierMappings() {
-	return this.identifierMappings
-  }
-
   applyIdentifierMappings(metadata,mappings,reportMappedIdentifiers) {
 	  
 	// This function does not change the names of the keys in the metadata object.
@@ -847,18 +844,20 @@ class YadamuDBI extends EventEmitter {
           Object.keys(tableMappings.columnMappings).forEach((columnName) => {
             const idx = columnNames.indexOf(columnName)
             const mappedColumnName = tableMappings.columnMappings[columnName].name || columnNames[idx]
-			const mappedDataType = tableMappings.columnMappings[columnName].dataType || dataTypes[idx]
+			// const mappedDataType = tableMappings.columnMappings[columnName].dataType || dataTypes[idx]
             if (idx > -1) {
               if (reportMappedIdentifiers) { 
 			    if (columnNames[idx] !== mappedColumnName) {
                   this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Column name re-mapped to "${mappedColumnName}".`)
 				}
-			    if (dataTypes[idx] !== mappedDataType) {
+			    /*
+				if (dataTypes[idx] !== mappedDataType) {
                   this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Data type "${dataTypes[idx] }" re-mapped to "${mappedDataType}".`)
 				}
+				*/
               }
               columnNames[idx] = mappedColumnName          
-              dataTypes[idx] = mappedDataType       
+              // dataTypes[idx] = mappedDataType       
             }
           })
           // metadata[table].columnNames = columnNames
@@ -866,6 +865,58 @@ class YadamuDBI extends EventEmitter {
       }   
     })
     return metadata	
+  }
+  
+    applyIdentifierMappings(metadata,mappings,reportMappedIdentifiers) {
+	  
+	// This function does not change the names of the keys in the metadata object.
+	// It only changes the value of the tableName property associated with a mapped tables.
+    
+    Object.keys(metadata).forEach((table) => {
+      const tableMappings = mappings[table]
+      if (tableMappings) {
+		if ((tableMappings.tableName) && (metadata[table].tableName !== tableMappings.tableName)) {
+          if (reportMappedIdentifiers) { 
+            this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',metadata[table].tableName],`Table name re-mapped to "${tableMappings.tableName}".`)
+          }
+		  metadata[table].tableName = tableMappings.tableName
+		}
+        if (tableMappings.columnMappings) {
+          const columnNames = metadata[table].columnNames
+          Object.keys(tableMappings.columnMappings).forEach((columnName) => {
+            const idx = columnNames.indexOf(columnName)
+            const mappedColumnName = tableMappings.columnMappings[columnName].name || columnNames[idx]
+            if (idx > -1) {
+              if (reportMappedIdentifiers) { 
+			    if (columnNames[idx] !== mappedColumnName) {
+                  this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',table,columnName],`Column name re-mapped to "${mappedColumnName}".`)
+				}
+              }
+              columnNames[idx] = mappedColumnName          
+            }
+          })
+        }
+      }   
+    })
+    return metadata	
+  }
+  
+  applyDataTypeMappings(tableName,columnNames,mappedDataTypes,mappings,reportMappedIdentifiers) {
+	  
+    const tableMappings = mappings[tableName]
+    if (tableMappings && tableMappings.columnMappings) {
+      Object.keys(tableMappings.columnMappings).forEach((columnName) => {
+        const idx = columnNames.indexOf(columnName)
+        const mappedDataType = tableMappings.columnMappings[columnName].dataType || mappedDataTypes[idx]
+        if (idx > -1) {
+          if (mappedDataTypes[idx] !== mappedDataType) {
+            this.yadamuLogger.info([this.DATABASE_VENDOR,'IDENTIFIER MAPPING',tableName,columnName],`Data type "${mappedDataTypes[idx] }" re-mapped to "${mappedDataType}".`)
+          }
+          mappedDataTypes[idx] = mappedDataType       
+        }
+      })
+    }
+	return mappedDataTypes	
   }
   
   getMappedTableName(tableName,identifierMappings) {
@@ -1389,9 +1440,10 @@ class YadamuDBI extends EventEmitter {
   **
   */
   
-  getTypeMappings() {
+  getDriverSettings() {
 	return {
-      spatialFormat: this.SPATIAL_FORMAT
+      spatialFormat      : this.SPATIAL_FORMAT
+	, timestampPrecision : this.TIMESTAMP_PRECISION
 	}
   }
   
@@ -1401,13 +1453,13 @@ class YadamuDBI extends EventEmitter {
       yadamuVersion      : YadamuConstants.YADAMU_VERSION
     , date               : new Date().toISOString()
     , timeZoneOffset     : new Date().getTimezoneOffset()
-    , typeMappings       : this.getTypeMappings()
+    , schema             : this.CURRENT_SCHEMA
 	, tableFilter        : this.getTABLE_FILTER
-    , schema             : this.CURRENT_SCHEMA ? this.CURRENT_SCHEMA : this.CURRENT_SCHEMA
 	, dbiKey             : this.DATABASE_KEY
     , vendor             : this.DATABASE_VENDOR
 	, dbVersion          : this.DATABASE_VERSION
 	, softwareVendor     : this.SOFTWARE_VENDOR
+    , driverSettings     : this.getDriverSettings()
     , nodeClient         : {
         version          : process.version
        ,architecture     : process.arch
@@ -1541,7 +1593,7 @@ class YadamuDBI extends EventEmitter {
 	  const dataType = YadamuDataTypes.decomposeDataType(columnInfo[3])
       tableInfo.COLUMN_NAME_ARRAY.push(columnInfo[2])
 	  tableInfo.DATA_TYPE_ARRAY.push(dataType.typeQualifier ? `${dataType.type} ${dataType.typeQualifier}` : dataType.type)
-	  tableInfo.SIZE_CONSTRAINT_ARRAY.push(dataType.length ? dataType.scale ? `${dataType.length},${dataType.scale}` : `${dataType.length}` : '')
+	  tableInfo.SIZE_CONSTRAINT_ARRAY.push(dataType.length ? dataType.scale ? [dataType.length,dataType.scale] : [dataType.length] : [])
 	  tableInfo.CLIENT_SELECT_LIST = `${tableInfo.CLIENT_SELECT_LIST},${this.generateSelectListEntry(columnInfo)}`
     })
 	if (tableInfo) {
@@ -1633,7 +1685,7 @@ class YadamuDBI extends EventEmitter {
 	
 	// Statement Cache is keyed by actual table name so we need the mapped name if there is a mapping.
 
-	let mappedTableName = this.getMappedTableName(tableName,this.identifierMappings)
+	let mappedTableName = this.getMappedTableName(tableName,this.IDENTIFIER_MAPPINGS)
   	const tableInfo = this.statementCache[mappedTableName]
 	
 	// Add Some Common Settings
@@ -1658,7 +1710,7 @@ class YadamuDBI extends EventEmitter {
     // ### TESTING ONLY: Uncomment folllowing line to force Table Not Found condition
     // queryInfo.SQL_STATEMENT = queryInfo.SQL_STATEMENT.replace(queryInfo.TABLE_NAME,queryInfo.TABLE_NAME + "1")
 
-	queryInfo.MAPPED_TABLE_NAME = this.getMappedTableName(queryInfo.TABLE_NAME,this.identifierMappings) || queryInfo.TABLE_NAME
+	queryInfo.MAPPED_TABLE_NAME = this.getMappedTableName(queryInfo.TABLE_NAME,this.IDENTIFIER_MAPPINGS) || queryInfo.TABLE_NAME
     return queryInfo
   }   
 
@@ -1797,7 +1849,7 @@ class YadamuDBI extends EventEmitter {
     this.statementGenerator = this.manager.statementGenerator
 	this.partitionMetadata  = this.manager.partitionMetadata
 	
-	this.setIdentifierMappings(this.manager.getIdentifierMappings())
+	this.IDENTIFIER_MAPPINGS =  this.manager.IDENTIFIER_MAPPINGS
   }   
 
   workerDBI(workerNumber) {

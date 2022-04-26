@@ -26,8 +26,8 @@ class JSONOutputManager extends YadamuOutputManager {
 	// Mappings are defined in ../cfg/typeMapping.json
     
 	// Set up Transformation functions to be applied to the incoming rows
-
-    return dataTypes.map((dataType,idx) => {      
+	
+	return dataTypes.map((dataType,idx) => {      
       const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
 	  switch (true) {
 		case (YadamuDataTypes.isBinary(dataTypeDefinition.type)):
@@ -122,7 +122,7 @@ class JSONOutputManager extends YadamuOutputManager {
 		  // Timestamps are truncated to a maximum of 6 digits
           // Timestamps not explicitly marked as UTC are coerced to UTC.
 		  // Timestamps using a '+00:00' are converted are converted to 
-		  const tsMaxLength = 20 + this.dbi.TIMESTAMP_PRECISION
+		  const tsMaxLength = 20 + this.dbi.INBOUND_TIMESTAMP_PRECISION
 		  return (col,idx) =>  { 
 		    let ts
 		    switch (true) {
@@ -173,6 +173,7 @@ class JSONOutputManager extends YadamuOutputManager {
   }
   
   formatRow(row) {
+	// if (this.COPY_METRICS.committed === 0) console.log('JOM',row)
     return `${this.rowSeperator}${JSON.stringify(row)}`
   }
   

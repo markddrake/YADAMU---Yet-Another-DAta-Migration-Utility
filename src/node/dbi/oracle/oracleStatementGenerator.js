@@ -79,7 +79,7 @@ class OracleStatementGenerator extends YadamuStatementGenerator {
      return dataTypeDefinitions.map((dataTypeDefinition,idx) => {
 		 
        if (!dataTypeDefinition.length) {
-          dataTypeDefinition.length = parseInt(metadata.sizeConstraints[idx]);
+          dataTypeDefinition.length = metadata.sizeConstraints[idx][0]
        }
 	   
 	   switch (dataTypeDefinition.type) {
@@ -365,8 +365,6 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 	const metadata = await this.getMetadata()
 	const vendorTypeMappings = await this.getSourceTypeMappings()
     
-	// await this.debugStatementGenerator(this.STATEMENT_GENERATOR_OPTIONS)
-	
     const startTime = performance.now()
 	
 	const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadata, typeMappings:vendorTypeMappings, schema:this.targetSchema, options:this.STATEMENT_GENERATOR_OPTIONS});
@@ -376,6 +374,8 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 	await vendorTypeMappings.close()
 	
     const statementCache = JSON.parse(results.outBinds.sql)
+	
+	// this.debugStatementGenerator(this.STATEMENT_GENERATOR_OPTIONS,statementCache)
 	
 	const tables = Object.keys(this.metadata); 
     tables.forEach((table,idx) => {
@@ -480,7 +480,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
             }
             break
           case this.dbi.DATA_TYPES.BINARY_TYPE:
-		    const length = tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]*2
+		    const length = tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]][0]*2
 			switch (true) {
 			  case (length > 32767):
 		        externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
@@ -526,7 +526,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
           case this.dbi.DATA_TYPES.NVARCHAR_TYPE:
 		  case this.dbi.DATA_TYPES.CHAR_TYPE:
 		  case this.dbi.DATA_TYPES.VARCHAR_TYPE:
-		    copyColumnDefinition = `${copyColumnDefinition} CHAR(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]*this.dbi.BYTE_TO_CHAR_RATIO})${nullSettings}`
+		    copyColumnDefinition = `${copyColumnDefinition} CHAR(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]][0]*this.dbi.BYTE_TO_CHAR_RATIO})${nullSettings}`
 		    break; 
 		  case this.dbi.DATA_TYPES.BLOB_TYPE:
   	        externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
@@ -585,7 +585,7 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 		    }	
         } 
         // Append length to bounded datatypes if necessary
-        targetDataType = (this.dbi.DATA_TYPES.BOUNDED_TYPES.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]})` : targetDataType;
+        targetDataType = (this.dbi.DATA_TYPES.BOUNDED_TYPES.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]][0]})` : targetDataType;
 		values.push(value)
 		copyColumnDefinitions[tableInfo.bindOrdering[idx]]     = copyColumnDefinition
 		externalColumnDefinitions[tableInfo.bindOrdering[idx]] = `"${column}" ${externalDataType || targetDataType}`

@@ -1184,11 +1184,8 @@ class OracleDBI extends YadamuDBI {
   **
   */
 
-  getTypeMappings() {
-
-    const typeMappings = super.getTypeMappings()
-	typeMappings.objectFormat = this.DATA_TYPES.OBJECT_TYPE
-    return typeMappings;
+  getDriverSettings() {
+    return Object.assign(super.getDriverSettings(),{objectFormat : this.DATA_TYPES.OBJECT_TYPE})
   }
 
   async getSystemInformation() {

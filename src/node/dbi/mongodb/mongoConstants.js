@@ -15,10 +15,9 @@ class MongoConstants {
     , "MONGO_EXPORT_FORMAT"       : "ARRAY"
     , "MONGO_STRIP_ID"            : false
     , "MONGO_PARSE_STRINGS"       : true
-    , "DEFAULT_STRING_LENGTH"     : "32"
-    , "MAX_STRING_LENGTH"         : "16777216"
-	, "MAX_DOCUMENT_SIZE"         : "16777216"
-	, "TIMESTAMP_PRECISION"       : 6
+    , "DEFAULT_STRING_LENGTH"     : 32
+    , "MAX_STRING_LENGTH"         : 16777216
+	, "MAX_DOCUMENT_SIZE"         : 16777216
 	, "DEFAULT_DATABASE"          : "admin"
     })
     return this._STATIC_PARAMETERS

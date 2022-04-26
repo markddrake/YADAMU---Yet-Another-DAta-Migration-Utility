@@ -20,6 +20,7 @@
 , "limits" : {
 	"SCALAR_LENGTH"                                        : 16777216
   , "BINARY_LENGTH"                                        : 8388608
+  , "TIMESTAMP_PRECISION"                                  : 9
   }
 , "storageOptions": {
 	"SPATIAL_FORMAT"                                       : "WKB"

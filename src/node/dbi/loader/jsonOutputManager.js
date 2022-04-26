@@ -1,10 +1,11 @@
-"use strict"
 
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                          from 'perf_hooks';
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import _JSONOutputManager from '../file/jsonOutputManager.js';
+import Yadamu              from '../../core/yadamu.js';
+import YadamuLibrary       from '../../lib/yadamuLibrary.js';
+import _JSONOutputManager  from '../file/jsonOutputManager.js';
 
 class JSONOutputManager extends _JSONOutputManager{
 

@@ -52,6 +52,7 @@
     "SCALAR_LENGTH"                                        : 4000
   , "NUMERIC_PRECISION"                                    : 38
   , "NUMERIC_SCALE"                                        : 38
+  , "TIMESTAMP_PRECISION"                                  : 7
   }
 , "storageOptions": {
 	"SPATIAL_FORMAT"                                       : "WKB"

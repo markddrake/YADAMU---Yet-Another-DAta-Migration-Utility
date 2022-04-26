@@ -51,7 +51,16 @@ class OracleStatementGenerator extends _OracleStatementGenerator {
       const table = this.metadata[tableName]
       const columnsXML = table.columnNames.map((columnName) => {return `<columnName>${columnName}</columnName>`}).join('');
       const dataTypesXML = table.dataTypes.map((dataType) => {return `<dataType>${dataType}</dataType>`}).join('');
-      const sizeConstraintsXML = table.sizeConstraints.map((sizeConstraint) => {return `<sizeConstraint>${sizeConstraint === null ? '' : sizeConstraint}</sizeConstraint>`}).join('');
+      const sizeConstraintsXML = table.sizeConstraints.map((sizeConstraint) => {
+		switch (sizeConstraint.length) {
+		  case 0:
+			return `<sizeConstraint/>`
+		  case 1:
+		    return `<sizeConstraint><length>${sizeConstraint[0]}</length></sizeConstraint>`
+		  case 2:
+		    return `<sizeConstraint><length>${sizeConstraint[0]}</length><scale>${sizeConstraint[1]}</scale></sizeConstraint>`
+		}
+	  })
       return `<table><vendor>${table.vendor}</vendor><tableSchema>${table.tableSchema}</tableSchema><tableName>${table.tableName}</tableName><columnNames>${columnsXML}</columnNames><dataTypes>${dataTypesXML}</dataTypes><sizeConstraints>${sizeConstraintsXML}</sizeConstraints></table>`
     }).join('');
     return `<metadata>${metadataXML}</metadata>`
@@ -60,8 +69,7 @@ class OracleStatementGenerator extends _OracleStatementGenerator {
   
   async getMetadata() {
     const metadataXML = this.metadataToXML();    
-	// console.log(metadataXML)
-    return await this.dbi.stringToBlob(metadataXML);
+	return await this.dbi.stringToBlob(metadataXML);
   }
 
   getSourceTypeMappingsXML() {

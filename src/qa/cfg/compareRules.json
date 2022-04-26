@@ -2,7 +2,7 @@
 	"TIMESTAMP_PRECISION": {
 		"default": null,
 		"mariadb": 6,
-		"mssql": 9,
+		"mssql": 7,
 		"mongodb": 6,
 		"mysql": 6,
 		"oracle": 9,
@@ -124,7 +124,7 @@
 			"snowflake": true
 		}
 	},
-	"XML_COMPARISSON_RULE": {
+	"XML_COMPARISON_RULE": {
 	    "default"      : null
 	  , "oracle"       : {
 		  "mssql"      : "STRIP_XML_DECLARATION"
@@ -150,7 +150,7 @@
         "mssql": "DECODE_AND_STRIP_DECLARATION"
 	  }
 	}
-  , "OBJECTS_COMPARISSON_RULE": {
+  , "OBJECTS_COMPARISON_RULE": {
 	  "default": null
 	}
 }

@@ -149,7 +149,7 @@ class DBWriter extends Writable {
     this.doConstruct().then(() => { 
       callback() 
     }).catch((e) => { 
-      this.yadamuLogger.handleException([`WRITER`,`INITIALIZE`,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],e);
+      this.yadamuLogger.handleException([`WRITER`,`INITIALIZE`,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],e);
       callback(e)
     })
   }
@@ -255,7 +255,7 @@ class DBWriter extends Writable {
     this.doFinal().then(() => { 
       callback() 
     }).catch((e) => { 
-      this.yadamuLogger.handleException([`WRITER`,`FINAL`,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],e);
+      this.yadamuLogger.handleException([`WRITER`,`FINAL`,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],e);
       callback(e)
     })
   }
@@ -270,7 +270,7 @@ class DBWriter extends Writable {
     this.doDestroy(err).then((err) => {
       callback(err) 
     }).catch((e) => { 
-      this.yadamuLogger.handleException([`WRITER`,`DESTROY`,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],e);
+      this.yadamuLogger.handleException([`WRITER`,`DESTROY`,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],e);
       callback(e)
     })
   }    

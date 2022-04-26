@@ -327,7 +327,7 @@ class LoaderDBI extends YadamuDBI {
 		TABLE_SCHEMA          : this.metadata[tableName].tableSchema
 	  , TABLE_NAME            : tableName
       , DATA_TYPE_ARRAY       : this.metadata[tableName].dataTypes
-	  , SPATIAL_FORMAT        : this.systemInformation.typeMappings.spatialFormat 
+	  , SPATIAL_FORMAT        : this.INBOUND_SPATIAL_FORMAT
 	  } 
       if (this.yadamu.PARALLEL_ENABLED && this.PARTITION_LEVEL_OPERATIONS && Array.isArray(this.controlFile.data[tableName].files)) {
 	    const partitionInfo = this.controlFile.data[tableName].files.map((fileName,idx) => { return Object.assign({}, tableInfo, { PARTITION_COUNT: this.controlFile.data[tableName].files.length, PARTITION_NUMBER: idx+1 })})
@@ -352,7 +352,6 @@ class LoaderDBI extends YadamuDBI {
       , compression        : this.yadamu.COMPRESSION
 	  , encryption         : this.ENCRYPTED_CONTENT ? this.yadamu.CIPHER : 'NONE'
 	  , baseFolder         : this.IMPORT_FOLDER
-	  , timestampPrecision : this.TIMESTAMP_PRECISION
       },
 	}
   }
@@ -648,11 +647,11 @@ class LoaderDBI extends YadamuDBI {
   async generateStatementCache() {
 
 	this.statementCache = {}
-	
     Object.keys(this.metadata).forEach((table,idx) => {
       const tableMetadata = this.metadata[table];
-	  this.statementCache[tableMetadata.tableName] = {	tableName         : table
-	  , _SPATIAL_FORMAT   : this.systemInformation.typeMappings.spatialFormat 
+	  this.statementCache[tableMetadata.tableName] = {
+ 	    tableName         : table
+	  , _SPATIAL_FORMAT   : this.INBOUND_SPATIAL_FORMAT
 	  , _BATCH_SIZE       : this.BATCH_SIZE
       , insertMode        : 'JSON'
       , columnNames       : [... tableMetadata.columnNames]

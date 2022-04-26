@@ -25,7 +25,9 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 	
 	const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,?,@RESULTS); SELECT @RESULTS "INSERT_INFORMATION"`;                       
     let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),JSON.stringify(vendorTypeMappings),this.targetSchema, JSON.stringify(options)]);
-	
+
+    // this.debugStatementGenerator(options,null)
+
     results = results.pop();
     let statementCache = JSON.parse(results[0].INSERT_INFORMATION)
 
@@ -138,7 +140,8 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
             tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('(')) + ` set ` + setOperators.join(',');
             break;
         }
-       
+
+     
         if (tableMetadata.dataFile) {
 		  const loadColumnNames = []
 		  const setOperations = []
@@ -176,10 +179,11 @@ class MySQLStatementGenerator extends YadamuStatementGenerator {
 			    break
               case this.dbi.DATA_TYPES.BINARY_TYPE:
               case this.dbi.DATA_TYPES.VARBINARY_TYPE:
-              case this.dbi.DATA_TYPES.TINYBLOB_TYPE:
-              case this.dbi.DATA_TYPES.MEDIUMBLOB_TYPE:
               case this.dbi.DATA_TYPES.BLOB_TYPE:
-              case this.dbi.DATA_TYPES.LONGBLOB_TYPE:
+              case this.dbi.DATA_TYPES.MYSQL_TINYBLOB_TYPE:
+              case this.dbi.DATA_TYPES.MYSQL_MEDIUMBLOB_TYPE:
+              case this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE:
+              case this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE:
                 setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, UNHEX(${psuedoColumnName}))`
 			    break;
               case this.dbi.DATA_TYPES.TIME_TYPE:

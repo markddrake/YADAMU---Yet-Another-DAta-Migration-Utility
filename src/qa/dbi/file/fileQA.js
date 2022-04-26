@@ -123,8 +123,8 @@ class FileQA extends FileDBI {
   }
 
   async compareFiles(yadamuLogger,grandparent,parent,child,metrics) {
-	  
-    let colSizes = [128, 18, 12, 12, 12, 12]
+	 
+	let colSizes = [128, 18, 12, 12, 12, 12]
  
     let seperatorSize = (colSizes.length * 3) - 1;
     colSizes.forEach((size)  => {
@@ -144,7 +144,8 @@ class FileQA extends FileDBI {
       pstats = {size : -1}
     }
     try {
-      cStats = fs.statSync(path.resolve(child));
+     
+	 cStats = fs.statSync(path.resolve(child));
     }
     catch (err) {
       if (err.code !== 'ENOENT') {
@@ -180,13 +181,15 @@ class FileQA extends FileDBI {
 	const gMetadata = await this.getContentMetadata(grandparent)
     const pMetadata = await this.getContentMetadata(parent)
     const cMetadata = await this.getContentMetadata(child);
-	const tables = Object.keys(gMetadata).sort();     
-
-    const failedOperations = []
+	const tables = Object.keys(gMetadata).filter((tableName) => {
+      return ((this.TABLE_FILTER.length === 0) || (this.TABLE_FILTER.includes(tableName)))
+	}).sort();     
+	
+	const failedOperations = []
  
     tables.forEach((table,idx) => {
 	  const tableName = table;
- 	  const mappedTableName = this.getMappedTableName(tableName,this.identifierMappings)
+ 	  const mappedTableName = this.getMappedTableName(tableName,this.IDENTIFIER_MAPPINGS)
       const tableTimings = (metrics[0][tableName].elapsedTime.toString() + "ms").padStart(10) 
                          + (metrics[1][mappedTableName] ? (metrics[1][mappedTableName].elapsedTime.toString() + "ms") : "N/A").padStart(10)
                          + (metrics[2][mappedTableName] ? (metrics[2][mappedTableName].elapsedTime.toString() + "ms") : "N/A").padStart(10) 
@@ -211,21 +214,19 @@ class FileQA extends FileDBI {
       }
 
       	
-	  if (this.applyTableFilter(table)) {
-        this.yadamuLogger.writeDirect(`| ${table.padStart(colSizes[0])} |`
-                                    + ` ${gMetadata[table].rowCount.toString().padStart(colSizes[1])} |`
-                                    + ` ${pMetadata[mappedTableName].rowCount.toString().padStart(colSizes[2])} |`
-                                    + ` ${(gMetadata[table].rowCount - pMetadata[mappedTableName].rowCount).toString().padStart(colSizes[3])} |`
-                                    + ` ${cMetadata[mappedTableName].rowCount.toString().padStart(colSizes[4])} |`
-                                    + ` ${(pMetadata[mappedTableName].rowCount - cMetadata[mappedTableName].rowCount).toString().padStart(colSizes[5])} |`
-                                    + ` ${gMetadata[table].byteCount.toString().padStart(colSizes[6])} |`
-                                    + ` ${pMetadata[mappedTableName].byteCount.toString().padStart(colSizes[7])} |`
-                                    + ` ${(pMetadata[mappedTableName].byteCount - gMetadata[table].byteCount).toString().padStart(colSizes[8])} |`
-                                    + ` ${cMetadata[mappedTableName].byteCount.toString().padStart(colSizes[9])} |`
-                                    + ` ${(cMetadata[mappedTableName].byteCount - pMetadata[mappedTableName].byteCount).toString().padStart(colSizes[10])} |`
-                                    + ` ${tableTimings.padStart(colSizes[11])} |`
-                                    + '\n');
-	  }
+      this.yadamuLogger.writeDirect(`| ${table.padStart(colSizes[0])} |`
+                                  + ` ${gMetadata[table].rowCount.toString().padStart(colSizes[1])} |`
+                                  + ` ${pMetadata[mappedTableName].rowCount.toString().padStart(colSizes[2])} |`
+                                  + ` ${(gMetadata[table].rowCount - pMetadata[mappedTableName].rowCount).toString().padStart(colSizes[3])} |`
+                                  + ` ${cMetadata[mappedTableName].rowCount.toString().padStart(colSizes[4])} |`
+                                  + ` ${(pMetadata[mappedTableName].rowCount - cMetadata[mappedTableName].rowCount).toString().padStart(colSizes[5])} |`
+                                  + ` ${gMetadata[table].byteCount.toString().padStart(colSizes[6])} |`
+                                  + ` ${pMetadata[mappedTableName].byteCount.toString().padStart(colSizes[7])} |`
+                                  + ` ${(pMetadata[mappedTableName].byteCount - gMetadata[table].byteCount).toString().padStart(colSizes[8])} |`
+                                  + ` ${cMetadata[mappedTableName].byteCount.toString().padStart(colSizes[9])} |`
+                                  + ` ${(cMetadata[mappedTableName].byteCount - pMetadata[mappedTableName].byteCount).toString().padStart(colSizes[10])} |`
+                                  + ` ${tableTimings.padStart(colSizes[11])} |`
+                                  + '\n');
 	  
 	  if (gMetadata[table].rowCount !== pMetadata[mappedTableName].rowCount) {
 		failedOperations.push(['','',table,gMetadata[table].rowCount,pMetadata[mappedTableName].rowCount,gMetadata[table].rowCount > pMetadata[mappedTableName].rowCount ? gMetadata[table].rowCount - pMetadata[mappedTableName].rowCount : '' ,gMetadata[table].rowCount < pMetadata[mappedTableName].rowCount ? pMetadata[mappedTableName].rowCount - gMetadata[table].rowCount : '','Import #1'])

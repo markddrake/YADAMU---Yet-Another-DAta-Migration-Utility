@@ -162,7 +162,7 @@ class DBReader extends Readable {
 	  
 	  
 	} catch (err) {
-	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.yadamu.ON_ERROR,'FAILED'],`${err.constructor.name},${err.message}`)
+	  // this.yadamuLogger.trace([this.constructor.name,'PIPELINE',queryInfo.MAPPED_TABLE_NAME,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,readerDBI.ON_ERROR,'FAILED'],`${err.constructor.name},${err.message}`)
 	  
 	  // Wait for any outstanding DDL operations to complete. Throw DDL errors. If the DDL phase was successful this becomes a no-op.
 	  
@@ -321,7 +321,7 @@ class DBReader extends Readable {
   _read() {
     // this.yadamuLogger.trace([this.constructor.name,`READ`,this.dbi.DATABASE_VENDOR],this.nextPhase)
 	this.doRead().then(() => {}).catch((cause) => {
-	  this.yadamuLogger.handleException([`READER`,`READ`,this.nextPhase,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],cause);
+	  this.yadamuLogger.handleException([`READER`,`READ`,this.nextPhase,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],cause);
 	  this.underlyingError = cause;
       this.destroy(cause)
     })
@@ -331,6 +331,9 @@ class DBReader extends Readable {
     // this.yadamuLogger.trace([this.constructor.name,`destroy`,this.dbi.DATABASE_VENDOR],``)
 	try {
 	  // Try to clean up the DBI gracefully
+      // this.yadamuLogger.trace([this.constructor.name,this.nextPhase],'DDL COMPLETE: WAITING')
+      // await this.dbWriter.dbi.ddlComplete
+      // this.yadamuLogger.trace([this.constructor.name,this.nextPhase],'DDL COMPLETE: PROCESSING')
       await this.dbi.finalizeExport();
 	  await this.dbi.final()
 	}
@@ -352,7 +355,7 @@ class DBReader extends Readable {
         callback(cause)
 	  }
 	  else {
-        this.yadamuLogger.handleException([`READER`,`FINAL`,this.dbi.DATABASE_VENDOR,this.dbi.yadamu.ON_ERROR],cause);		
+        this.yadamuLogger.handleException([`READER`,`FINAL`,this.dbi.DATABASE_VENDOR,this.dbi.ON_ERROR],cause);		
         callback(err)
       }
     })

@@ -184,27 +184,14 @@ begin
     SELECT c."KEY" "INDEX"
           ,c."VALUE" "COLUMN_NAME"
           ,t."VALUE" "DATA_TYPE"
-		, case 
-		    when (@VENDOR = 'MSSQLSERVER') then
+		  ,case 
+		     when (@VENDOR = 'MSSQLSERVER') then
 			   t.VALUE
 			 else
 			   m."MSSQL_TYPE"
 		   end "MSSQL_TYPE"	 
-          ,CAST(case
-                  when s.VALUE = '' then
-                    NULL
-                  when CHARINDEX(',',s."VALUE") > 0 then
-                    LEFT(s."VALUE",CHARINDEX(',',s."VALUE")-1)
-                  else
-                    s."VALUE"
-                end 
-                as BIGINT) "DATA_TYPE_LENGTH"
-          ,case
-             when CHARINDEX(',',s."VALUE") > 0  then 
-               RIGHT(s."VALUE", CHARINDEX(',',REVERSE(s."VALUE"))-1)
-             else 
-               NULL
-           end "DATA_TYPE_SCALE"
+          ,CAST(JSON_VALUE(s.VALUE,'$[0]') as BIGINT) "DATA_TYPE_LENGTH" 
+		  ,CAST(JSON_VALUE(s.VALUE,'$[1]') as BIGINT) "DATA_TYPE_SCALE"
       FROM OPENJSON(@COLUMN_NAMES_ARRAY) c
       JOIN OPENJSON(@DATA_TYPES_ARRAY) t on c."KEY" = t."KEY"
       JOIN OPENJSON(@SIZE_CONSTRAINTS_ARRAY) s on c."KEY" = s."KEY"    
@@ -388,8 +375,8 @@ begin
          cross apply OPENJSON("DATA") 
          with (
            VENDOR         nvarchar(128) '$.systemInformation.vendor'
-          ,SPATIAL_FORMAT nvarchar(128) '$.systemInformation.typeMappings.spatialFormat'
-          ,CIRCLE_FORMAT  nvarchar(7)   '$.systemInformation.typeMappings.circleFormat'
+          ,SPATIAL_FORMAT nvarchar(128) '$.systemInformation.driverSettings.spatialFormat'
+          ,CIRCLE_FORMAT  nvarchar(7)   '$.systemInformation.driverSettings.circleFormat'
           ,METADATA       nvarchar(max) '$.metadata' as json
          ) x
          cross apply OPENJSON(x.METADATA) y

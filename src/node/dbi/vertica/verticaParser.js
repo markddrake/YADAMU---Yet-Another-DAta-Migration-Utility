@@ -9,11 +9,6 @@ class VerticaParser extends YadamuParser {
 	  
     return queryInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
       switch (dataType.toLowerCase()) {
-	    case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
-	    case this.dbi.DATA_TYPES.GEOGRAPHY_TYPE:
-	      return (row,idx) => {
-			row[idx] = Buffer.from(row[idx],'hex')
-		  }	
 	    case this.dbi.DATA_TYPES.INTERVAL_YEAR_TO_MONTH_TYPE:
 		  return (row,idx) => {
 			row[idx] = YadamuLibrary.intervalYearMonthTo8601(row[idx])

@@ -88,7 +88,6 @@ class VerticaDBI extends YadamuDBI {
    
   // Enable configuration via command line parameters
   
-  get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
   get COPY_TRIM_WHITEPSPACE()  { return this.parameters.COPY_TRIM_WHITEPSPACE || VerticaConstants.COPY_TRIM_WHITEPSPACE }
   get MERGEOUT_INSERT_COUNT()  { return this.parameters.MERGEOUT_INSERT_COUNT || VerticaConstants.MERGEOUT_INSERT_COUNT }
   
@@ -469,13 +468,6 @@ class VerticaDBI extends YadamuDBI {
   **
   */
   
-  getTypeMappings() {
-   
-    const typeMappings = super.getTypeMappings()
-	typeMappings.circleFormat = this.CIRCLE_FORMAT 
-    return typeMappings; 
-  }
-  
   async getSystemInformation() {     
   
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
@@ -523,24 +515,25 @@ class VerticaDBI extends YadamuDBI {
   generateSelectListEntry(columnInfo) {
 	const dataType = VerticaDataTypes.decomposeDataType(columnInfo[3])
 	switch (dataType.type) {
-	  case 'interval':
+	  case this.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
+	  case this.DATA_TYPES.INTERVAL_YEAR_TO_MONTH_TYPE:
 	    return `CAST("${columnInfo[2]}" AS VARCHAR) "${columnInfo[2]}"` 
 	  /*
 	  case 'numeric':
 	    return `CAST("${columnInfo[2]}" AS VARCHAR) "${columnInfo[2]}"` 
 	  */
-	  case 'date':
+	  case this.DATA_TYPES.DATE_TYPE:
 		return `TO_CHAR("${columnInfo[2]}",'YYYY-MM-DD"T"HH24:MI:SS"Z"') "${columnInfo[2]}"`
-	  case 'time':
-	  case 'timestamp':
+	  case this.DATA_TYPES.TIME_TYPE:
+	  case this.DATA_TYPES.TIMESTAMP_TYPE:
 	    return `TO_CHAR("${columnInfo[2]}",'YYYY-MM-DD"T"HH24:MI:SS.FF6"+00:00"') "${columnInfo[2]}"`
-	  case 'timetz':
-	  case 'timestamptz':
+	  case this.DATA_TYPES.TIME_TZ_TYPE:
+	  case this.DATA_TYPES.TIMESTAMP_TZ_TYPE:
 	    return `TO_CHAR("${columnInfo[2]}",'YYYY-MM-DD"T"HH24:MI:SS.FF6TZH:TZM') "${columnInfo[2]}"`
-	  case 'geometry':
-	  case 'geography':
+	  case this.DATA_TYPES.GEOMETRY_TYPE:
+	  case this.DATA_TYPES.GEOGRAPHY_TYPE:
 	    // TODO : Support Text / GeoJSON
-	    return `TO_HEX(ST_AsBinary("${columnInfo[2]}")) "${columnInfo[2]}"` 
+	    return `ST_AsBinary("${columnInfo[2]}") "${columnInfo[2]}"` 
 	  default:
 	    return `"${columnInfo[2]}"`
     }

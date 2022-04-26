@@ -12,31 +12,27 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
 
-  refactorByLength(mappedDataType,length) {
+  refactorBySizeConstraint(sourceDataType,targetDataType,sizeConstraint) {
 
-	  switch (mappedDataType) {
+	  switch (targetDataType) {
 
         case this.dbi.DATA_TYPES.CHAR_TYPE:
           switch (true) {
-            case (isNaN(length)):                                        return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length === undefined):                                 return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length === -1):                                        return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.MEDIUMTEXT_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.TEXT_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMTEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.VARCHAR_LENGTH):          return this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.CHAR_LENGTH):             return this.dbi.DATA_TYPES.VARCHAR_TYPE
-            default:                                                     return mappedDataType
+            case (sizeConstraint.length === 0):                                     return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.MEDIUMTEXT_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.TEXT_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMTEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.VARCHAR_LENGTH):          return this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.CHAR_LENGTH):             return this.dbi.DATA_TYPES.VARCHAR_TYPE
+            default:                                                                return targetDataType
           }
 		  
 		case this.dbi.DATA_TYPES.VARCHAR_TYPE:
           switch (true) {
-            case (isNaN(length)):                                        return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length === undefined):                                 return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length === -1):                                        return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.MEDIUMTEXT_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.TEXT_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMTEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.VARCHAR_LENGTH):          return this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE
-            default:                                                     return mappedDataType
+            case (sizeConstraint.length === 0):                                     return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.MEDIUMTEXT_LENGTH):      return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.TEXT_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMTEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.VARCHAR_LENGTH):          return this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE
+            default:                                                                return targetDataType
           }
 
         case this.dbi.DATA_TYPES.CLOB_TYPE:
@@ -45,37 +41,31 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
         case this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE:
         case this.dbi.DATA_TYPES.MYSQL_TINYTEXT_TYPE:
           switch (true) {
-            case (isNaN(length)):                                        return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length === undefined):                                 return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length === -1):                                        return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.MEDIUMTEXT_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.TEXT_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMTEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.TINYTEXT_LENGTH):         return this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE
-            case (length < this.dbi.DATA_TYPES.TINYTEXT_LENGTH):         return this.dbi.DATA_TYPES.VARCHAR_TYPE
-            default:                                                     return this.dbi.DATA_TYPES.MYSQL_TINYTEXT_TYPE
+            case (sizeConstraint.length === 0):                                     return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.MEDIUMTEXT_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.TEXT_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMTEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.TINYTEXT_LENGTH):         return this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE
+            case (sizeConstraint[0] < this.dbi.DATA_TYPES.TINYTEXT_LENGTH):         return this.dbi.DATA_TYPES.VARCHAR_TYPE
+            default:                                                                return this.dbi.DATA_TYPES.MYSQL_TINYTEXT_TYPE
           }
 
         case this.dbi.DATA_TYPES.BINARY_TYPE:
           switch (true) {
-            case (isNaN(length)):                                        return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length === undefined):                                 return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length === -1):                                        return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length > this.dbi.DATA_TYPES.MEDIUMBLOB_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length > this.dbi.DATA_TYPES.BLOB_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMBLOB_TYPE
-            case (length > this.dbi.DATA_TYPES.VARBINARY_LENGTH):        return this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE
-            case (length > this.dbi.DATA_TYPES.BINARY_LENGTH):           return this.dbi.DATA_TYPES.VARBINARY_TYPE
-            default:                                                     return mappedDataType
+            case (sizeConstraint.length === 0):                                     return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.MEDIUMBLOB_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.BLOB_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMBLOB_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.VARBINARY_LENGTH):        return this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.BINARY_LENGTH):           return this.dbi.DATA_TYPES.VARBINARY_TYPE
+            default:                                                                return targetDataType
           }
 
         case this.dbi.DATA_TYPES.VARBINARY_TYPE:
           switch (true) {
-            case (isNaN(length)):                                        return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length === undefined):                                 return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length === -1):                                        return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length > this.dbi.DATA_TYPES.MEDIUMBLOB_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length > this.dbi.DATA_TYPES.BLOB_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMBLOB_TYPE
-            case (length > this.dbi.DATA_TYPES.VARBINARY_LENGTH):        return this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE
-            default:                                                     return mappedDataType
+            case (sizeConstraint.length === 0):                                     return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.MEDIUMBLOB_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.BLOB_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMBLOB_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.VARBINARY_LENGTH):        return this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE
+            default:                                                                return targetDataType
           }
 
 		  
@@ -85,35 +75,30 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
         case this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE:
         case this.dbi.DATA_TYPES.MYSQL_TINYBLOB_TYPE:
           switch (true) {
-            case (isNaN(length)):                                        return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length === undefined):                                 return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length === -1):                                        return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length > this.dbi.DATA_TYPES.MEDIUMBLOB_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
-            case (length > this.dbi.DATA_TYPES.BLOB_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMBLOB_TYPE
-            case (length > this.dbi.DATA_TYPES.TINYBLOB_LENGTH):         return this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE
-            case (length < this.dbi.DATA_TYPES.TINYBLOB_LENGTH):         return this.dbi.DATA_TYPES.VARBINARY_TYPE
-            default:                                                     return this.dbi.DATA_TYPES.MYSQL_TINYBLOB_TYPE
+            case (sizeConstraint.length === 0):                                     return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.MEDIUMBLOB_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.BLOB_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMBLOB_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.TINYBLOB_LENGTH):         return this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE
+            case (sizeConstraint[0] < this.dbi.DATA_TYPES.TINYBLOB_LENGTH):         return this.dbi.DATA_TYPES.VARBINARY_TYPE
+            default:                                                                return this.dbi.DATA_TYPES.MYSQL_TINYBLOB_TYPE
           }
 		  
         case this.dbi.DATA_TYPES.NUMERIC_TYPE:        
           switch (true) {
 			// Need to address P,S and linits on P,S
-            case (isNaN(length)):                                        
-            case (length === undefined):                                 return this.dbi.DATA_TYPES.UNBOUNDED_NUMERIC_TYPE
-			default:                                                     return mappedDataType
+            case (sizeConstraint.length === 0):                                     
+			default:                                                                return targetDataType
 		  }
 		  
         case this.dbi.DATA_TYPES.BIT_STRING_TYPE:
         case this.dbi.DATA_TYPES.VARBIT_STRING_TYPE:
           switch (true) {
-            case (isNaN(length)):                                        return this.dbi.DATA_TYPES.C_LARGEST_VARCHAR_TYPE
-            case (length === undefined):                                 return this.dbi.DATA_TYPES.C_LARGEST_VARCHAR_TYPE
-            case (length === -1):                                        return this.dbi.DATA_TYPES.C_LARGEST_VARCHAR_TYPE
-            case (length > this.dbi.DATA_TYPES.MEDIUMTEXT_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.TEXT_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMTEXT_TYPE
-            case (length > this.dbi.DATA_TYPES.VARCHAR_LENGTH):          return this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE
-            case (length > 64):                                          return this.dbi.DATA_TYPES.MYSQL_VARCHAR_TYPE
-            default:                                                     return mappedDataType
+            case (sizeConstraint.length === 0):                                     return this.dbi.DATA_TYPES.C_LARGEST_VARCHAR_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.MEDIUMTEXT_LENGTH):       return this.dbi.DATA_TYPES.MYSQL_LONGTEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.TEXT_LENGTH):             return this.dbi.DATA_TYPES.MYSQL_MEDIUMTEXT_TYPE
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.VARCHAR_LENGTH):          return this.dbi.DATA_TYPES.MYSQL_TEXT_TYPE
+            case (sizeConstraint[0] > 64):                                          return this.dbi.DATA_TYPES.MYSQL_VARCHAR_TYPE
+            default:                                                                return targetDataType
           }
 
 	    // MySQL Timestamp limited to Unix EPOCH date range. Map to datetime when data comes from other sources.
@@ -122,31 +107,22 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
         case this.dbi.DATA_TYPES.TIMESTAMPTZ_TYPE:
           switch (true) {
             case this.SOURCE_VENDOR ===  'MariaDB':
-            case this.SOURCE_VENDOR === 'MySQL':                         return mappedDataType
-            case (length > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return `${this.dbi.DATA_TYPES.DATETIME_TYPE}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION})`
-            default:                                                     return `${this.dbi.DATA_TYPES.DATETIME_TYPE}`
+            case this.SOURCE_VENDOR === 'MySQL':                                    return targetDataType
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return `${this.dbi.DATA_TYPES.DATETIME_TYPE}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION})`
+            default:                                                                return `${this.dbi.DATA_TYPES.DATETIME_TYPE}`
           }
      
         case this.dbi.DATA_TYPES.TIME_TYPE:
         case this.dbi.DATA_TYPES.DATETIME_TYPE:
           switch (true) {
-            case (length > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return `${mappedDataType}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION})`
-            default:                                                     return mappedDataType
+            case (sizeConstraint[0] > this.dbi.DATA_TYPES.TIMESTAMP_PRECISION):     return `${targetDataType}(${this.dbi.DATA_TYPES.TIMESTAMP_PRECISION})`
+            default:                                                                return targetDataType
           }
-        default:                                                         return mappedDataType
+        default:                                                                    return targetDataType
       }   
      
   }
-
-  getColumnDataType(mappedDataType,sizeConstraint) {
-
-     if (mappedDataType === "boolean") {
-       return this.dbi.storageOptions.BOOLEAN_TYPE
-     }
-      
-     return super.getColumnDataType(mappedDataType,sizeConstraint)
-  }
-
+  
   generateDDLStatement(schema,tableName,columnDefinitions,mappedDataTypes) {
       
     return `create table  if not exists "${schema}"."${tableName}"(\n  ${columnDefinitions.join(',')})`;
@@ -193,28 +169,29 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
             default:
               return `ST_GeomFromWKB(UNHEX(${psuedoColumnName}))`;
           }  
-          return `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${spatialFunction})`
+          return `"${tableMetadata.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${spatialFunction})`
         case this.dbi.DATA_TYPES.BINARY_TYPE:
         case this.dbi.DATA_TYPES.VARBINARY_TYPE:
         case this.dbi.DATA_TYPES.BLOB_TYPE:
-        case this.dbi.DATA_TYPES.TINYBLOB_TYPE:
-        case this.dbi.DATA_TYPES.MEDIUMBLOB_TYPE:
-        case this.dbi.DATA_TYPES.LONGBLOB_TYPE:
-          return `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, UNHEX(${psuedoColumnName}))`
+        case this.dbi.DATA_TYPES.MYSQL_TINYBLOB_TYPE:
+        case this.dbi.DATA_TYPES.MYSQL_MEDIUMBLOB_TYPE:
+        case this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE:
+        case this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE:
+          return `"${tableMetadata.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, UNHEX(${psuedoColumnName}))`
         case this.dbi.DATA_TYPES.TIME_TYPE:
-          return `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
+          return `"${tableMetadata.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
         case this.dbi.DATA_TYPES.DATETIME_TYPE:
         case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
-          return `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
+          return `"${tableMetadata.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
         case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
-          return `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
-        case TINYINT_TYPE:
+          return `"${tableMetadata.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
+        case this.dbi.DATA_TYPES.TINYINT_TYPE:
           switch (true) {
             case ((dataType.length === 1) && this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN):
-              return `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
+              return `"${tableMetadata.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
           }
         default:
-          return `"${columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${psuedoColumnName})`
+          return `"${tableMetadata.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${psuedoColumnName})`
       }
     })
    
@@ -223,7 +200,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
     if (tableMetadata.hasOwnProperty('partitionCount')) {
       return tableMetadata.dataFile.map((filename,idx) => {
         return {
-          dml            :  this.generateCopyStatement(this.targetSchema,tableMetadata.tableName,columnNames,setOperations)
+          dml            :  this.generateCopyStatement(this.targetSchema,tableMetadata.tableName,filename,columnNames,setOperations)
         , partitionCount :  tableMetadata.partitionCount
         , partitionID    :  idx+1
         }
@@ -231,22 +208,19 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
     }
     else {
       return {
-        dml:  this.generateCopyStatement(this.targetSchema,tableMetadata.tableName,columnNames,setOperations)
+        dml:  this.generateCopyStatement(this.targetSchema,tableMetadata.tableName,tableMetadata.dataFile,columnNames,setOperations)
       }
     }  
   }
 
   validateRowSize(columnNames,mappedDataTypes,sizeConstraints,columnDefinitions) {
 
-    const rowSizes = sizeConstraints.map((sizeConstraint) => {
-      return parseInt(sizeConstraint)
-    })
+    const rowSizes = [...sizeConstraints]
+	// TODO: Add correct sizes for INT, FLOAT, NUMBER etc.
 
-    // TODO: Add correct sizes for INT, FLOAT, NUMBER etc.
-
-    let rowSize = rowSizes.reduce((sum, cv) => { return isNaN(cv) ? sum : sum + cv },0)
-    while (rowSize > 65535) {
-      const idx = rowSizes.reduce((idx, cv, cidx ) => {return cv > rowSizes[idx] ? cidx : idx}, 0);
+    let rowSize = rowSizes.reduce((sum, cv) => { return isNaN(cv[0]) ? sum : sum + cv[0] },0)
+	while (rowSize > 65535) {
+      const idx = rowSizes.reduce((idx, cv, cidx ) => {return cv[0] >= rowSizes[idx] ? cidx : idx}, 0);
       rowSize = rowSize - rowSizes[idx] + 8
       switch(mappedDataTypes[idx]) { 
         case this.dbi.DATA_TYPES.VARCHAR_TYPE:
@@ -258,7 +232,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
         default: 
           return
       }
-      columnDefinitions[idx] = `"${columnNames[idx]}" ${this.generateStorageClause(mappedDataTypes[idx])}`
+      columnDefinitions[idx] = `"${columnNames[idx]}" ${this.generateStorageClause(mappedDataTypes[idx],[])}`
     }
   }
 
@@ -266,18 +240,19 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
     
     let insertMode = 'Batch';
     	
-	const columnNames = tableMetadata.columnNames
-
-    const mappedDataTypes = [];
     const insertOperators = []
-    const columnDefinitions = columnNames.map((columnName,idx) => {
+
+	const targetDataTypes = this.getTargetDataTypes(tableMetadata)
+	const columnDataTypes = [...targetDataTypes]
+	
+	// this.debugStatementGenerator(null,null)
+
+    const columnDefinitions = targetDataTypes.map((targetDataType,idx) => {	
+	
       let addNullClause = false;
-      
-	  const mappedDataType = tableMetadata.source ? tableMetadata.dataTypes[idx]: this.getMappedDataType(tableMetadata.dataTypes[idx],tableMetadata.sizeConstraints[idx])
-	  let columnDataType = mappedDataType
-	  mappedDataTypes.push(mappedDataType)
-	  
-	  const dataTypeDefinition = YadamuDataTypes.decomposeDataType(mappedDataType)
+   	  const columnName = tableMetadata.columnNames[idx]
+
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(targetDataType)
 	  
 	  switch (dataTypeDefinition.type) {
         case this.dbi.DATA_TYPES.SPATIAL_TYPE:                
@@ -313,36 +288,38 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
           insertOperators.push('?')
           break;
         case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
-          columnDataType = this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+          columnDataTypes[idx] = this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE
           insertOperators.push('?')
           break;
         case this.dbi.DATA_TYPES.XML_TYPE:
-          columnDataType = this.dbi.DATA_TYPES.storageOptions.XML_TYPE
+          columnDataTypes[idx] = this.dbi.DATA_TYPES.storageOptions.XML_TYPE
           insertOperators.push('?')
           break;
         case this.dbi.DATA_TYPES.MYSQL_SET_TYPE:                         
-		  columnDataType = this.dbi.DATA_TYPES.storageOptions.SET_TYPE
+		  columnDataTypes[idx] = this.dbi.DATA_TYPES.storageOptions.SET_TYPE
           insertOperators.push('?')
           break;
         case this.dbi.DATA_TYPES.MYSQL_ENUM_TYPE:                       
-		  columnDataType = this.dbi.DATA_TYPES.storageOptions.ENUM_TYPE
+		  columnDataTypes[idx] = this.dbi.DATA_TYPES.storageOptions.ENUM_TYPE
           insertOperators.push('?')
           break;		  
         default:
           insertOperators.push('?')
       }
-	  return `"${columnName}" ${this.generateStorageClause(columnDataType,tableMetadata.sizeConstraints[idx])} ${addNullClause === true ? 'null':''}`      
+	  return `"${columnName}" ${this.generateStorageClause(columnDataTypes[idx],tableMetadata.sizeConstraints[idx])} ${addNullClause === true ? 'null':''}`      
     })
                                    
-  	this.validateRowSize(tableMetadata.columnNames,mappedDataTypes,tableMetadata.sizeConstraints,columnDefinitions)					          
+	this.dbi.applyDataTypeMappings(tableMetadata.tableName,tableMetadata.columnNames,targetDataTypes,this.dbi.IDENTIFIER_MAPPINGS,true)
+	
+  	this.validateRowSize(tableMetadata.columnNames,targetDataTypes,tableMetadata.sizeConstraints,columnDefinitions)					          
     								       
     const rowConstructor = `(${insertOperators.join(',')})`
 
     const tableInfo = {
-      ddl            :  this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,mappedDataTypes)
-    , dml            :  this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,columnNames,insertOperators)
+      ddl            :  this.generateDDLStatement(this.targetSchema,tableMetadata.tableName,columnDefinitions,targetDataTypes)
+    , dml            :  this.generateDMLStatement(this.targetSchema,tableMetadata.tableName,tableMetadata.columnNames,insertOperators)
     , columnNames    :  tableMetadata.columnNames
-    , targetDataTypes:  mappedDataTypes
+    , targetDataTypes:  targetDataTypes
     , insertMode     :  insertMode
 	, rowConstructor :  rowConstructor
     , _BATCH_SIZE    :  this.dbi.BATCH_SIZE
@@ -352,7 +329,7 @@ class MariadbStatementGenerator extends YadamuStatementGenerator {
     // Add Support for Copy based Operations
     
     if (tableMetadata.dataFile) {
-      tableInfo.copy = this.generateCopyStatements(tableMetadata,mappedDataTypes) 
+      tableInfo.copy = this.generateCopyOperation(tableMetadata,targetDataTypes) 
     }
     return tableInfo
   }      

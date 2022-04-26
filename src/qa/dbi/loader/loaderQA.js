@@ -77,7 +77,7 @@ class LoaderQA extends YadamuQALibrary.loaderQAMixin(LoaderDBI) {
       await fsp.rm(this.IMPORT_FOLDER,{recursive: true, force: true})
 	} catch(err) {
 	  if (err.code !== 'ENOENT') {
-	    throw new FileError(this.DRIVER_IDerr,stack,this.IMPORT_FOLDER);
+	    throw new FileError(this.DRIVER_ID,err,stack,this.IMPORT_FOLDER);
 	  }
 	}
 	try {

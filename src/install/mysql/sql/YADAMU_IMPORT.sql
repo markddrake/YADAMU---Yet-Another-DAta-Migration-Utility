@@ -39,8 +39,8 @@ BEGIN
            '$'
            COLUMNS (
              VENDOR                           VARCHAR(32) PATH '$.systemInformation.vendor',
-             SPATIAL_FORMAT                  VARCHAR(128) PATH '$.systemInformation.typeMappings.spatialFormat',
-             CIRCLE_FORMAT                   VARCHAR(128) PATH '$.systemInformation.typeMappings.circleFormat',
+             SPATIAL_FORMAT                  VARCHAR(128) PATH '$.systemInformation.driverSettings.spatialFormat',
+             CIRCLE_FORMAT                   VARCHAR(128) PATH '$.systemInformation.driverSettings.circleFormat',
              NESTED PATH '$.metadata.*' 
                COLUMNS (
                 OWNER                        VARCHAR(128) PATH '$.tableSchema'

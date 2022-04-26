@@ -96,6 +96,7 @@
   }
 , "storageOptions": {
 	"SPATIAL_FORMAT"                                       : "EWKB"
+  , "CIRCLE_FORMAT"                                        : "CIRCLE"
   , "JSON_TYPE"                                            : "jsonb"
   }
 }                                                                                                              

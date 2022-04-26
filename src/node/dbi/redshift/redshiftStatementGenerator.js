@@ -18,7 +18,7 @@ class RedshiftStatementGenerator extends YadamuStatementGenerator {
 	  
 	  
     const mappedDataType = super.getMappedDataType(dataType,sizeConstraints[idx])
-    const length = parseInt(sizeConstraint)
+    const length = sizeConstraint
 
 	mappedDataTypes.push(mappedDataType)
 	  
@@ -30,7 +30,7 @@ class RedshiftStatementGenerator extends YadamuStatementGenerator {
 	    if (targetLength > StatementGenerator.LARGEST_VARCHAR_SIZE) {
 		  targetLength = StatementGenerator.LARGEST_VARCHAR_SIZE
 		}
-		sizeConstraints[idx] = targetLength
+		sizeConstraints[idx] = [targetLength]
     }		
   }
   */

@@ -87,7 +87,7 @@ class PostgresOutputManager extends YadamuOutputManager  {
 			return col
 		  }
         case this.dbi.DATA_TYPES.BIT_STRING_TYPE:
-	      const fixedLength = this.tableInfo.sizeConstraints[idx]
+	      const fixedLength = this.tableInfo.sizeConstraints[idx][0]
 		  return (col,idx) => {
 			return col.padStart(fixedLength,'0')
 		  }

@@ -574,19 +574,16 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
-  getTypeMappings() {
-   
-    const typeMappings = super.getTypeMappings()
-	typeMappings.circleFormat = this.CIRCLE_FORMAT 
-    return typeMappings; 
-  }
   
+  getDriverSettings() {
+    return Object.assign(super.getDriverSettings(),{circleFormat : this.DATA_TYPES.storageOptions.CIRCLE_FORMAT})
+  }
+
   async getSystemInformation() {     
   
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
     const sysInfo = results.rows[0];
-	
-    return Object.assign(
+	return Object.assign(
 	  super.getSystemInformation()
 	, {
 	    currentUser                 : sysInfo[1]

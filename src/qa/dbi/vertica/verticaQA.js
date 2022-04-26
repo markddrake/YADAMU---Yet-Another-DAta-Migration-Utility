@@ -90,7 +90,7 @@ select t.table_schema, t.table_name, case when rows is null then 0 else rows end
 		  const columnName = tableMetadata.COLUMN_NAME_ARRAY[idx]
 		  switch (dataType) {
 			case (this.DATA_TYPES.XML_TYPE):
-			  return rules.XML_COMPARISSON_RULE === 'STRIP_XML_DECLARATION' ? `YADAMU.STRIP_XML_DECLARATION("${columnName}")` : `"${columnName}"`
+			  return rules.XML_COMPARISON_RULE === 'STRIP_XML_DECLARATION' ? `YADAMU.STRIP_XML_DECLARATION("${columnName}")` : `"${columnName}"`
 		    case this.DATA_TYPES.JSON_TYPE:
               return `case when "${columnName}" is NULL then NULL when SUBSTR("${columnName}",1,1) = '{' then MAPTOSTRING(MAPJSONEXTRACTOR("${columnName}")) when SUBSTR("${columnName}",1,1) = '[' then MAPTOSTRING(mapDelimitedExtractor(substr("${columnName}",2,length("${columnName}")-2) using parameters delimiter=',')) else "${columnName}" end`
             case this.DATA_TYPES.CHAR_TYPE :

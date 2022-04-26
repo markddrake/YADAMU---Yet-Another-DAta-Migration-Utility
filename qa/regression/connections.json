@@ -131,6 +131,14 @@
         }
       }
     },
+    "tera#1"                            : {
+	  "teradata"                        : {
+	    "host"                          : "TDATA17-01"
+      , "user"                          : "dbc"
+      , "password"                      : "dbc"
+      , "log"                           : "0"
+	  }
+    },
     "snow#1"                            : {
       "snowflake"                       : {
   	    "account"                       : "snowflake_account"

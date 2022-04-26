@@ -109,7 +109,9 @@ class VerticaWriter extends YadamuWriter {
         case 'string':
           return `'${arg.replace(/'/g,"''")}'`
         case 'object':
-          return arg === null ? 'null' : `'${JSON.stringify(arg).replace(/'/g,"''")}'`
+          return arg === null         ? 'null'
+     		   : Buffer.isBuffer(arg) ? `'${arg.toString('hex')}'` 
+			                          : `'${JSON.stringify(arg).replace(/'/g,"''")}'`
         case 'number':
           switch (arg) {
             case Infinity:

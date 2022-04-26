@@ -47,7 +47,6 @@ BEGIN
 
     when P_MYSQL_DATA_TYPE = 'char'                                   then return
 	case		
-	  when P_DATA_TYPE_LENGTH = -1                                    then 'longtext'
  	  when P_DATA_TYPE_LENGTH is null                                 then 'longtext'
       when P_DATA_TYPE_LENGTH > C_MEDIUMTEXT_LENGTH                   then 'longtext'
       when P_DATA_TYPE_LENGTH > C_TEXT_LENGTH                         then 'mediumtext'
@@ -58,7 +57,6 @@ BEGIN
 
     when P_MYSQL_DATA_TYPE = 'varchar'                                then return
 	case		
-	  when P_DATA_TYPE_LENGTH = -1                                    then 'longtext'
  	  when P_DATA_TYPE_LENGTH is null                                 then 'longtext'
       when P_DATA_TYPE_LENGTH > C_MEDIUMTEXT_LENGTH                   then 'longtext'
       when P_DATA_TYPE_LENGTH > C_TEXT_LENGTH                         then 'mediumtext'
@@ -73,7 +71,6 @@ BEGIN
       'tinytext'
 	)                                                                 then return
 	case		
-	  when P_DATA_TYPE_LENGTH = -1                                    then 'longtext'
  	  when P_DATA_TYPE_LENGTH is null                                 then 'longtext'
       when P_DATA_TYPE_LENGTH > C_MEDIUMTEXT_LENGTH                   then 'longtext'
       when P_DATA_TYPE_LENGTH > C_TEXT_LENGTH                         then 'mediumtext'
@@ -84,7 +81,6 @@ BEGIN
 
     when P_MYSQL_DATA_TYPE = 'binary'                                 then return
  	case		
-	  when P_DATA_TYPE_LENGTH = -1                                    then 'longblob'
       when P_DATA_TYPE_LENGTH is null                                 then 'longblob'
       when P_DATA_TYPE_LENGTH > C_MEDIUMBLOB_LENGTH                   then 'longblob'
       when P_DATA_TYPE_LENGTH > C_BLOB_LENGTH                         then 'mediumblob'
@@ -95,7 +91,6 @@ BEGIN
 
     when P_MYSQL_DATA_TYPE = 'varbinary'                              then return
  	case		
-	  when P_DATA_TYPE_LENGTH = -1                                    then 'longblob'
       when P_DATA_TYPE_LENGTH is null                                 then 'longblob'
       when P_DATA_TYPE_LENGTH > C_MEDIUMBLOB_LENGTH                   then 'longblob'
       when P_DATA_TYPE_LENGTH > C_BLOB_LENGTH                         then 'mediumblob'
@@ -110,7 +105,6 @@ BEGIN
       'tinyblob'
 	)                                                                 then return
     case		
-	  when P_DATA_TYPE_LENGTH = -1                                    then 'longblob'
       when P_DATA_TYPE_LENGTH is null                                 then 'longblob'
       when P_DATA_TYPE_LENGTH > C_MEDIUMBLOB_LENGTH                   then 'longblob'
       when P_DATA_TYPE_LENGTH > C_BLOB_LENGTH                         then 'mediumblob'

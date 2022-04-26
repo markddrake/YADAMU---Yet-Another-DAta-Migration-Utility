@@ -19,8 +19,7 @@ class CSVOutputManager extends JSONOutputManager {
     
     // Cache the transformations and set the transformations array to NULL. Transformations are applied when converting the row to CSV in formatRow(). No transformations are required when the genereated rows of CSV encoded data is processed by processRow().
 
-	this.csvTransformations = [...this.transformations]
-    this.transformations.fill(null)
+	this.csvTransformations = new Array(this.transformations.length).fill(null);
     this.pendingTransformations = this.transformations.map((c,i) => i)
   }
   

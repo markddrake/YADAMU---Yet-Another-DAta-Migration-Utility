@@ -147,7 +147,7 @@ class Yadamu extends _Yadamu {
 	, spatialPrecision     : rules.SPATIAL_PRECISION || 18
 	, timestampPrecision   : rules.TIMESTAMP_PRECISION || 9
 	, orderedJSON          : rules.hasOwnProperty("ORDERED_JSON") ? rules.ORDERED_JSON : false	
-	, xmlRule              : rules.XML_COMPARISSON_RULE || null
+	, xmlRule              : rules.XML_COMPARISON_RULE || null
     , infinityIsNull       : rules.hasOwnProperty("INFINITY_IS_NULL") ? rules.INFINITY_IS_NULL : false 
     }
   }

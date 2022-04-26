@@ -272,7 +272,7 @@ declare
   R                       RECORD;
   V_SQL_STATEMENT         TEXT = NULL;
   PLPGSQL_CTX             TEXT;
-  C_CHARACTER_MAX_LENGTH  character varying (20) = cast(1*1024*1024*1024 as character varying(20));
+  C_CHARACTER_MAX_LENGTH  int = 1*1024*1024*1024;
   V_SIZE_CONSTRAINTS      JSONB;
 begin
 
@@ -295,15 +295,17 @@ begin
                            ) "DATA_TYPE_ARRAY"
                  ,jsonb_agg(case
                               when (c.numeric_precision is not null) and (c.numeric_scale is not null) then
-                                cast(c.numeric_precision as varchar) || ',' || cast(c.numeric_scale as varchar)
+                                jsonb_build_array(c.numeric_precision,c.numeric_scale)
                               when (c.numeric_precision is not null) then 
-                                cast(c.numeric_precision as varchar)
+                                jsonb_build_array(c.numeric_precision)
                               when (c.character_maximum_length is not null) then 
-                                cast(c.character_maximum_length as varchar)
+                                jsonb_build_array(c.character_maximum_length)
                               when (c.datetime_precision is not null) then 
-                                cast(c.datetime_precision as varchar)
-							  when ((c.data_type in ('character','character varying','text')) and (c.character_maximum_length is null)) then
-							    C_CHARACTER_MAX_LENGTH
+                                jsonb_build_array(c.datetime_precision)
+							  when ((c.data_type in ('character','character varying','text','xml')) and (c.character_maximum_length is null)) then
+							    jsonb_build_array(C_CHARACTER_MAX_LENGTH)
+						      else
+							    jsonb_build_array()
                             end
                             order by ordinal_position
                           ) "SIZE_CONSTRAINT_ARRAY"
@@ -454,21 +456,23 @@ begin
     */
     select 'select jsonb_build_array(' 
         || string_agg(
-             case
-               when value = 'bytea' 
-                 then 'to_char(max(octet_length("' || (r."COLUMN_NAME_ARRAY" ->> cast((idx -1) as int)) || '")),''FM999999999999999999'')'
+		     case
+               when d.value = 'bytea' then 
+			     'case when max(octet_length("' || c.value || '")) is null then jsonb_build_array() else jsonb_build_array(max(octet_length("' || c.value || '"))) end'
                else
-                 '''' || COALESCE ((r."SIZE_CONSTRAINT_ARRAY" ->> cast((idx -1) as int)),'') || ''''
+                 '''' || s.value || '''::jsonb'
              end
             ,','
            ) 
         || ') FROM "' || r."TABLE_SCHEMA" || '"."' || r."TABLE_NAME" || '"'
-      from  jsonb_array_elements_text(r."DATA_TYPE_ARRAY") WITH ORDINALITY as c(value, idx)
+      from jsonb_array_elements_text(r."COLUMN_NAME_ARRAY") WITH ORDINALITY as c(value, idx)
+	  join jsonb_array_elements_text(r."DATA_TYPE_ARRAY")   WITH ORDINALITY as d(value, idx) on c.idx = d.idx
+	  join jsonb_array_elements_text(r."SIZE_CONSTRAINT_ARRAY")  WITH ORDINALITY as s(value, idx) on c.idx = s.idx
       into V_SQL_STATEMENT
      where r."DATA_TYPE_ARRAY" ? 'bytea';
 
     if (V_SQL_STATEMENT is not NULL) then
-      execute V_SQL_STATEMENT into V_SIZE_CONSTRAINTS;
+	  execute V_SQL_STATEMENT into V_SIZE_CONSTRAINTS;
     else
       V_SIZE_CONSTRAINTS := r."SIZE_CONSTRAINT_ARRAY";
     end if;
@@ -592,23 +596,11 @@ begin
 			 else 
 			   m."PGSQL_TYPE"
 		   end "PGSQL_TYPE"
-          ,case
-             when s.VALUE = ''
-               then NULL
-             when strpos(s.VALUE,',') > 0
-               then SUBSTR(s.VALUE,1,strpos(s.VALUE,',')-1)
-             else
-               s.VALUE
-            end DATA_TYPE_LENGTH
-          ,case
-             when strpos(s.VALUE,',') > 0
-               then SUBSTR(s.VALUE, strpos(s.VALUE,',')+1)
-              else
-                NULL
-           end DATA_TYPE_SCALE
+          ,cast(s.VALUE ->> 0 as BIGINT) DATA_TYPE_LENGTH
+          ,cast(s.VALUE ->> 1 as BIGINT) DATA_TYPE_SCALE
       from JSONB_ARRAY_ELEMENTS_TEXT(P_COLUMN_NAME_ARRAY)     WITH ORDINALITY as c(VALUE, IDX)
       join JSONB_ARRAY_ELEMENTS_TEXT(P_DATA_TYPE_ARRAY)       WITH ORDINALITY as t(VALUE, IDX) on c.IDX = t.IDX
-      join JSONB_ARRAY_ELEMENTS_TEXT(P_SIZE_CONSTRAINT_ARRAY) WITH ORDINALITY as s(VALUE, IDX) on c.IDX = s.IDX
+      join JSONB_ARRAY_ELEMENTS(P_SIZE_CONSTRAINT_ARRAY)      WITH ORDINALITY as s(VALUE, IDX) on c.IDX = s.IDX
       left outer join TYPE_MAPPING m on lower(t.VALUE) = lower(m."VENDOR_TYPE")
 	  -- left outer join TYPE_MAPPING m on t.VALUE = m."VENDOR_TYPE"
   ),
@@ -704,7 +696,7 @@ begin
   call SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS);
 
   for r in select "tableName"
-                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName", "columnNames", "dataTypes", "sizeConstraints", P_JSON #>> '{systemInformatio,typeMappings,spatialFormat}', P_OPTIONS ->> 'jsonStorageOption', TRUE) "TABLE_INFO"
+                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName", "columnNames", "dataTypes", "sizeConstraints", P_JSON #>> '{systemInformatio,driverSettings,spatialFormat}', P_OPTIONS ->> 'jsonStorageOption', TRUE) "TABLE_INFO"
              from JSONB_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSONB_TO_RECORD(value) as METADATA(
                                                                 "tableSchema"      VARCHAR, 
@@ -764,7 +756,7 @@ begin
   call SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS);
 
   for r in select "tableName"
-                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_JSON #>> '{systemInformation,typeMappings,spatialFormat}', P_OPTIONS ->> 'jsonStorageOption', FALSE) "TABLE_INFO"
+                 ,GENERATE_SQL(P_JSON #>> '{systemInformation,vendor}',P_TARGET_SCHEMA,"tableName","columnNames","dataTypes","sizeConstraints", P_JSON #>> '{systemInformation,driverSettings,spatialFormat}', P_OPTIONS ->> 'jsonStorageOption', FALSE) "TABLE_INFO"
              from JSON_EACH(P_JSON -> 'metadata')  
                   CROSS JOIN LATERAL JSON_TO_RECORD(value) as METADATA(
                                                                "tableSchema"      VARCHAR, 

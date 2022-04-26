@@ -427,7 +427,7 @@ class SnowflakeDBI extends YadamuDBI {
 	    const descOutput = await this.executeSQL(SQL_DESCRIBE_TABLE)
 	    dataTypes.forEach((dataType,idx) => {
           dataTypes[idx] = dataType === 'USER_DEFINED_TYPE' ? descOutput[idx].type : dataType
-          sizeConstraints[idx] = dataType === 'BINARY' ? '' + SnowflakeDataTypes.decomposeDataType(descOutput[idx].type).length : sizeConstraints[idx] 
+          sizeConstraints[idx] = dataType === 'BINARY' ? [ + SnowflakeDataTypes.decomposeDataType(descOutput[idx].type).length ] : sizeConstraints[idx] 
         })
 	  }
       /*
@@ -479,6 +479,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	  
 	let schemaInfo = await this.executeSQL(this.statementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA])
 	schemaInfo = await this.describeVariantColumns(schemaInfo)
+	// console.dir(schemaInfo,{depth:null})
     return schemaInfo
   }
   

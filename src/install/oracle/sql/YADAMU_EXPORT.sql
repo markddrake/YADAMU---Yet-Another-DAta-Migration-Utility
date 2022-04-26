@@ -261,31 +261,31 @@ $END
 			     when atc.DATA_TYPE in ('VARCHAR2', 'CHAR') then
                    case 
                      when (CHAR_LENGTH < DATA_LENGTH) then
-                       '"' || CHAR_LENGTH || '"'
+                       '[' || CHAR_LENGTH || ']'
                      else 
-                       '"' || DATA_LENGTH || '"'
+                       '[' || DATA_LENGTH || ']'
                    end
 			     when (atc.DATA_TYPE = 'TIMESTAMP') or (atc.DATA_TYPE LIKE  'TIMESTAMP(%)') or (atc.DATA_TYPE LIKE '%TIME ZONE')  then
-                   '"' || DATA_SCALE || '"'
+                   '[' || DATA_SCALE || ']'
                  when atc.DATA_TYPE in ('NVARCHAR2', 'NCHAR') then
-                   '"' || CHAR_LENGTH || '"'
+                   '[' || CHAR_LENGTH || ']'
                  when (atc.DATA_TYPE = 'RAW' and atc.DATA_LENGTH = 1 and V_TREAT_RAW1_AS_BOOLEAN = '01') then
-				   '""'
+				   '[]'
                  when atc.DATA_TYPE in ('UROWID', 'RAW') or  atc.DATA_TYPE LIKE 'INTERVAL%' then
-                   '"' || DATA_LENGTH || '"'
+                   '[' || DATA_LENGTH || ']'
                  when atc.DATA_TYPE = 'NUMBER' then
                    case 
                      when DATA_SCALE is NOT NULL and DATA_SCALE <> 0 then
-                       '"' || DATA_PRECISION || ',' || DATA_SCALE || '"'
+                       '[' || DATA_PRECISION || ',' || DATA_SCALE || ']'
                      when DATA_PRECISION is NOT NULL then
-                       '"' || DATA_PRECISION || '"'
+                       '[' || DATA_PRECISION || ']'
                      else 
-					   '""'
+					   '[]'
                    end 
                  when atc.DATA_TYPE = 'FLOAT' then
-                   '"' || DATA_PRECISION || '"'
+                   '[' || DATA_PRECISION || ']'
                  else
-                   '""'
+                   '[]'
                end
 	           ORDER BY INTERNAL_COLUMN_ID) as T_VC4000_TABLE) SIZE_CONSTRAINT_LIST
         ,cast(collect(

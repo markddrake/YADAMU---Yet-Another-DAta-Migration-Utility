@@ -12,7 +12,7 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
   }
   
   async generateStatementCache () {    
-    
+
 	await this.init()
 		
     const sqlStatement = `select GENERATE_STATEMENTS($1,$2,$3,$4)`
@@ -29,9 +29,8 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
     const results = await this.dbi.executeSQL(sqlStatement,[{metadata : this.metadata}, JSON.stringify(vendorTypeMappings), this.targetSchema, options])
     let statementCache = results.rows[0][0]
 
-    // await this.debugStatementGenerator(options,statementCache)
-	
-	 
+    // this.debugStatementGenerator(options,statementCache)
+ 
 	if (statementCache === null) {
       statementCache = {}
     }
@@ -166,7 +165,7 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
 			case this.dbi.DATA_TYPES.BIT_STRING_TYPE:
 			  switch (dataTypeDefinitions[idx].typeQualifier) {
 				 case null:
-		           const length = this.metadata[tableName].sizeConstraints[idx]
+		           const length = this.metadata[tableName].sizeConstraints[idx][0]
 			       return length ? `rpad($%,${length},'0')::bit(${length})` : `$%`
 			  }
               return '$%';
@@ -175,7 +174,6 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
           }            
         })
 		
-
         if (tableMetadata.dataFile) {
 		  const columnDefinitions = []
           const copyOperators = dataTypeDefinitions.map((dataTypeDefinition,idx) => {
@@ -191,10 +189,13 @@ class PostgresStatementGenerator extends YadamuStatementGenerator {
 		        return `"${tableInfo.columnNames[idx]}"`
 			  case this.dbi.DATA_TYPES.TIME_TYPE:
 		        columnDefinitions.push(`"${tableInfo.columnNames[idx]}" text`)
-		        return `case when position('1970-01-01T' in "${tableInfo.columnNames[idx]}") = 1 then substring("${tableInfo.columnNames[idx]}",12)::time else "${tableInfo.columnNames[idx]}"::time end`
-				
+		        return `case when length("${tableInfo.columnNames[idx]}") > 16 then substring("${tableInfo.columnNames[idx]}",12,15)::time when  length("${tableInfo.columnNames[idx]}") > 15 then substring("${tableInfo.columnNames[idx]}",1,15)::time else "${tableInfo.columnNames[idx]}"::time end`				
+			  case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
+		        columnDefinitions.push(`"${tableInfo.columnNames[idx]}" text`)
+		        return `case when length("${tableInfo.columnNames[idx]}") > 26 then substring("${tableInfo.columnNames[idx]}",1,26)::timestamp without time zone  else "${tableInfo.columnNames[idx]}"::timestamp without time zone end`				
+			  default:	
 		    }		  
-		    columnDefinitions.push(`"${tableInfo.columnNames[idx]}" ${tableInfo.targetdataTypeDefinitions[idx]}`)
+		    columnDefinitions.push(`"${tableInfo.columnNames[idx]}" ${tableInfo.targetDataTypes[idx]}`)
 		    return `"${tableInfo.columnNames[idx]}"`
 		  })
 

@@ -55,23 +55,11 @@ BEGIN
                else
 			     m.MYSQL_TYPE
 			  end "MYSQL_TYPE"
-            ,case
-               when s.VALUE in ('','null') then
-                 NULL
-               when INSTR(s.VALUE,',') > 0 then
-                 SUBSTR(s.VALUE,1,INSTR(s.VALUE,',')-1)
-               else
-                 s.VALUE
-             end "DATA_TYPE_LENGTH"
-            ,case
-               when INSTR(s.VALUE,',') > 0 then
-                 SUBSTR(s.VALUE, INSTR(s.VALUE,',')+1)
-               else
-                 NULL
-             end "DATA_TYPE_SCALE"
+			, JSON_EXTRACT(s.VALUE,'$[0]') "DATA_TYPE_LENGTH"
+			, JSON_EXTRACT(s.VALUE,'$[1]') "DATA_TYPE_SCALE"
            from JSON_TABLE(P_COLUMN_NAME_ARRAY,     '$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(128) PATH '$')) c
            join JSON_TABLE(P_DATA_TYPE_ARRAY,       '$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(128) PATH '$')) t on (c."KEY" = t."KEY") 
-           join JSON_TABLE(P_SIZE_CONSTRAINT_ARRAY, '$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" VARCHAR(32)  PATH '$')) s on (c."KEY" = s."KEY")
+           join JSON_TABLE(P_SIZE_CONSTRAINT_ARRAY, '$[*]' COLUMNS ("KEY" FOR ORDINALITY, "VALUE" JSON         PATH '$')) s on (c."KEY" = s."KEY")
 		   left outer join TYPE_MAPPINGS m on (lower(t."VALUE") = lower(m."VENDOR_TYPE"))
     ),
     "TARGET_TABLE_DEFINITIONS" 

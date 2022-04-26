@@ -30,8 +30,8 @@
   , "GEOGRAPHY_TYPE"                                       : "geography"                                                       
                                                                                                                          
   , "UUID_TYPE"                                            : "uuid"                                                            
-  , "PGSQL_MONEY_TYPE"                                     : "numeric(21,  2)"
-  , "MONGO_DECIMAL128_TYPE"                                : "numeric(68,  34)"
+  , "PGSQL_MONEY_TYPE"                                     : "numeric(21,2)"
+  , "MONGO_DECIMAL128_TYPE"                                : "numeric(68,34)"
   , "PGSQL_IDENTIFIER_TYPE"                                : "int"
   }
 , "limits": {

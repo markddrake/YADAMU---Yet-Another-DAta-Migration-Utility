@@ -140,7 +140,6 @@ class MsSQLDBI extends YadamuDBI {
 	this.EXPECTED_ROLLBACK         = false
 	this.TEDIOUS_TRANSACTION_ISSUE = false
 	this.BEGIN_TRANSACTION_ISSUE   = false
-	        
   }
   
   initializeManager() {
@@ -1419,8 +1418,7 @@ class MsSQLDBI extends YadamuDBI {
     const sysInfo =  results.recordsets[0][0];
     const serverProperties = JSON.parse(sysInfo.SERVER_PROPERTIES)  
     const dbProperties = JSON.parse(sysInfo.DATABASE_PROPERTIES)    
-    
-	return Object.assign(
+    return Object.assign(
 	  super.getSystemInformation()
 	, {
         sessionUser                 : sysInfo.SESSION_USER

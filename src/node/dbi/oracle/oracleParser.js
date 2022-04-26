@@ -93,7 +93,7 @@ class OracleParser extends YadamuParser {
     data = await super.doTransform(data)
 	const row = await Promise.all(data)
 	this.jsonTransformation(row)
-    return row
+	return row
   }
 }
 
