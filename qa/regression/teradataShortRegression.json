@@ -6,15 +6,12 @@
 , "createDirectory"                   : true
 , "verifyOperation"                   : true
 , "parameters"                      : {
-    "DIRECTORY"                     : "%operation%/json/%sourceConnection%"
+    "DIRECTORY"                     : "export/json/%location%"
   }
 , "tests" : [{
 	"operation" : "import"
   , "source": "file-staging"
   , "target": "tera#1"
-  , "parameters"                      : {
-      "DIRECTORY"                     : "export/json/oracle19c"
-    }
   , "tasks": [
        "HR","BI"
     ]
