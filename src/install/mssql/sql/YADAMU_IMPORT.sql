@@ -131,6 +131,22 @@ begin
         when (@DATA_TYPE_LENGTH > 38) and (@DATA_TYPE_SCALE > 0)                               then concat('numeric(38,',cast(round(@DATA_TYPE_SCALE*(38.0/@DATA_TYPE_LENGTH),0) as NUMERIC(2)),')')
                                                                                                else @MSSQL_DATA_TYPE
       end                                                                                     
+    when @MSSQL_DATA_TYPE in (                                                                       
+          'datetime'
+      )                                                                                        then
+      case                                                                                    
+        when (@DATA_TYPE_LENGTH > 3)                                                           then concat(@MSSQL_DATA_TYPE,'(3)')
+                                                                                               else @MSSQL_DATA_TYPE
+      end                                                                                     
+    when @MSSQL_DATA_TYPE in (                                                                       
+	      'time',
+          'datetime2',                                                                           
+          'datetimeoffset'                                                                            
+      )                                                                                        then
+      case                                                                                    
+        when (@DATA_TYPE_LENGTH > 7)                                                           then concat(@MSSQL_DATA_TYPE,'(7)')
+                                                                                               else @MSSQL_DATA_TYPE
+      end                                                                                     
                                                                                                else @MSSQL_DATA_TYPE
   end
 end;

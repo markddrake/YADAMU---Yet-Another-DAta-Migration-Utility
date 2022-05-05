@@ -21,6 +21,8 @@ class PostgresWriter extends YadamuWriter {
    
 	let repackBatch = false;
 
+    // console.log(batch)
+
 	if (this.tableInfo.insertMode === 'Batch') {
                
       try {

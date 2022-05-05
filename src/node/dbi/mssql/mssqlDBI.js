@@ -1091,7 +1091,7 @@ class MsSQLDBI extends YadamuDBI {
 	switch (this.DATABASE_VERSION) {
 	  case 12:
 	    this.StatementLibrary = (await import('./2014/mssqlStatementLibrary.js')).default
-		this.StatementGenerator = (await import('./2014/statementGenerator.js')).default
+		this.StatementGenerator = (await import('./2014/mssqlStatementGenerator.js')).default
 	    break;
       default:
 	}

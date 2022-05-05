@@ -6,7 +6,8 @@
 	"yadamuDBI": {
 		"ON_ERROR": "FLUSH",
 		"FEEDBACK": "COMMIT",
-		"COMMIT_RATIO": 5
+		"COMMIT_RATIO": 5,
+		"BATCH_LIMIT" : 3
 	},
 	"drivers": {
 		"file": "../dbi//file/fileQA.js",

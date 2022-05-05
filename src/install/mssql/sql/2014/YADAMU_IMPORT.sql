@@ -186,7 +186,24 @@ begin
         when (@DATA_TYPE_LENGTH > 38) and (@DATA_TYPE_SCALE > 0)                               then concat('numeric(38,',cast(round(@DATA_TYPE_SCALE*(38.0/@DATA_TYPE_LENGTH),0) as NUMERIC(2)),')')
                                                                                                else @MSSQL_DATA_TYPE
       end                                                                                     
+      when @MSSQL_DATA_TYPE in (                                                                       
+          'datetime'
+      )                                                                                        then
+      case                                                                                    
+        when (@DATA_TYPE_LENGTH > 3)                                                           then concat(@MSSQL_DATA_TYPE,'(3)')
                                                                                                else @MSSQL_DATA_TYPE
+      end                                                                                     
+    when @MSSQL_DATA_TYPE in (                                                                       
+	      'time',
+          'datetime2',                                                                           
+          'datetimeoffset'                                                                            
+      )                                                                                        then
+      case                                                                                    
+        when (@DATA_TYPE_LENGTH > 7)                                                           then concat(@MSSQL_DATA_TYPE,'(7)')
+                                                                                               else @MSSQL_DATA_TYPE
+      end                                                                                     
+                                                                                               else @MSSQL_DATA_TYPE
+else @MSSQL_DATA_TYPE
   end
 end;
 --
@@ -236,8 +253,8 @@ begin
   
   with TYPE_MAPPINGS as (
     select T."MAPPING_XML".query('vendorType').value('.','NVARCHAR(256)')   "VENDOR_TYPE"
-          ,T."MAPPING_XML".query('mssqlrType').value('.','NVARCHAR(256)')   "MSSQL_TYPE"
-	 from @XML_MAPPINGS.nodes('/typeMappings/typeMappongs') AS T("MAPPING_XML")
+          ,T."MAPPING_XML".query('mssqlType').value('.','NVARCHAR(256)')   "MSSQL_TYPE"
+	 from @XML_MAPPINGS.nodes('/typeMappings/typeMapping') AS T("MAPPING_XML")
   )
   insert into @MAPPING_TABLE
   select * from TYPE_MAPPINGS;

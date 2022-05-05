@@ -66,6 +66,8 @@ class OracleOutputManager extends YadamuOutputManager {
 
     // Set up Transformation functions to be applied to the incoming rows
 
+    let spatialFormat = this.SPATIAL_FORMAT	
+
     return targetDataTypes.map((targetDataType,idx) => {
 
       const dataType = YadamuDataTypes.decomposeDataType(targetDataType);
@@ -73,20 +75,29 @@ class OracleOutputManager extends YadamuOutputManager {
 	  switch (dataType.type.toUpperCase()) {
         case this.dbi.DATA_TYPES.SPATIAL_TYPE:
           // Metadata based decision
-          if ((this.dbi.DATABASE_VERSION < 12) && (this.SPATIAL_FORMAT === 'GeoJSON')) {
-            // SDO_UTIL does not support GeoJSON in 11.x database
-            return (col,idx) =>  {
-              return YadamuSpatialLibrary.geoJSONtoWKT(col)
-            }
+		  switch (true) {
+            case ((this.dbi.DATABASE_VERSION < 12) && (this.SPATIAL_FORMAT === 'GeoJSON')):
+              // SDO_UTIL does not support GeoJSON in 11.x database
+              spatialFormat = "WKT"
+			  return (col,idx) =>  {
+                return YadamuSpatialLibrary.geoJSONtoWKT(col)
+              }
+            case ((this.dbi.DATABASE_VERSION > 19) && (this.SPATIAL_FORMAT === 'EWKB')):
+              spatialFormat = "WKB"
+			  return (col,idx) =>  {
+                return YadamuSpatialLibrary.ewkbToWKB(col)
+              }
+			default:
+              return null
           }
-          else {
-            return null
-          }
-          break;
         case this.dbi.DATA_TYPES.ORACLE_BFILE_TYPE:
-          // Convert JSON representation to String.
+          return (col,idx) =>  {
+            return typeof col === 'object' ? JSON.stringify(col) : col
+          }
+	      break;
         case this.dbi.DATA_TYPES.SET_TYPE:
         case this.dbi.DATA_TYPES.JSON_TYPE:
+          // Convert JSON representation to String.
 		  switch (this.dbi.DATA_TYPES.storageOptions.JSON_TYPE) {
 			case this.dbi.DATA_TYPES.VARCHAR_TYPE:
 		    case this.dbi.DATA_TYPES.CLOB_TYPE:
@@ -105,6 +116,8 @@ class OracleOutputManager extends YadamuOutputManager {
 			  return (col,idx) => {
 			    return Buffer.isBuffer(col) ? col : Buffer.from(JSON.stringify(col))
 			 }
+		    default:
+			  return null
 		  }
           break;
         case this.dbi.DATA_TYPES.BINARY_TYPE:
@@ -171,6 +184,9 @@ class OracleOutputManager extends YadamuOutputManager {
           return null
       }
     })
+
+	this.tableInfo._SPATIAL_FORMAT = spatialFormat
+
   }
 
   generateLobTransformations() {

@@ -128,11 +128,26 @@ class StreamSwitcher extends Transform {
     }	
   }
   
+  convertSizeConstraints(sizeConstraints) {
+	return Array.isArray(sizeConstraints[0]) ? sizeConstraints : sizeConstraints.map((sizeConstraint) => {
+	  switch (sizeConstraint) {
+		case '':
+		case '-1':
+		case null:
+		case undefined:
+		  return []
+	    default:
+		  const sizeComponents = sizeConstraint.split(',')
+		  return (sizeComponents.length === 1) ? [parseInt(sizeComponents[0])] : [parseInt(sizeComponents[0]),parseInt(sizeComponents[1])]
+	  }
+	})
+  }  
+  
   filterTables(data) {
 	
 	// Restrict operations to the list of tables specified.
 	// Order operations according to the order in which the tables were specified
-		
+
     if (this.TABLE_FILTER.length > 0) {
 	  
 	  // Check table names are valid.
@@ -155,8 +170,14 @@ class StreamSwitcher extends Transform {
 	  this.TABLE_FILTER.forEach((table) => {
          metadata[table] = data.metadata[table]
 	  })
+	  Object.values(metadata).forEach((tableMetadata) => {
+		 tableMetadata.sizeConstraints = this.convertSizeConstraints(tableMetadata.sizeConstraints)
+	  })
 	  return {metadata: metadata}
 	}
+    Object.values(data.metadata).forEach((tableMetadata) => {
+	  tableMetadata.sizeConstraints = this.convertSizeConstraints(tableMetadata.sizeConstraints)
+	})
 	return data
   }
 

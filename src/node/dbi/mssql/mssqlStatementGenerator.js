@@ -70,7 +70,7 @@ class MsSQLStatementGenerator extends YadamuStatementGenerator {
 
     let results = await this.dbi.execute('master.dbo.sp_GENERATE_STATEMENTS',args,'SQL_STATEMENTS')
     results = results.output[Object.keys(results.output)[0]]
-    const statementCache = JSON.parse(results)
+	const statementCache = JSON.parse(results)
 	
     // this.debugStatementGenerator(null,statementCache)
 

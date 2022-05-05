@@ -375,8 +375,9 @@ class Yadamu {
   }
   
   recordMetrics(tableName,metrics) {
-	 
+	
 	const elapsedTime =  Math.round(metrics.writerEndTime - metrics.pipeStartTime)
+	
 	const tableSummary = {
 	  elapsedTime       : elapsedTime
 	, throughput        : Math.round((metrics.committed/elapsedTime) * 1000)
@@ -934,6 +935,8 @@ class Yadamu {
 	  results = this.metrics
 	  
 	} catch (e) {		
+  	  await source.destroy(e)
+	  await target.destroy(e)
 	  this.STATUS.operationSuccessful = false;
 	  this.STATUS.err = e;
       results = e;

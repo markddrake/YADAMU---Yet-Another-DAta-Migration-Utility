@@ -988,6 +988,25 @@ class YadamuDataTypes {
      })
   }
 
+  static recomposeDataType(typeDefinition) {
+      
+    // NUMBER(n,m) => {type:"NUMBER", length:n, scale:m}
+    // VARCHAR(n)  => {type:"VARCHAR", length:n}
+    // LONG VARCHAR(n) => {type:"LONG VARCHAR", length:n}
+    // TIMETSTAMP(n) WITH TIME ZONE => {type:"TIMESTAMP WITH TIME ZONE": length:n}
+    
+    // ### Need to test with "interval year(4) to month (2)"
+    
+	switch (true) {
+	  case typeDefinition.hasOwnProperty('scale'):
+         return `${typeDefinition.type}(${typeDefinition.length},${typeDefinition.scale})`
+	  case typeDefinition.hasOwnProperty('length'):
+	     return `${typeDefinition.type}(${typeDefinition.length})`
+      default:
+	     return typeDefinition.type
+    }
+  }
+  
   coalesceTypeMappings(typeList) {
     
     switch (true) {

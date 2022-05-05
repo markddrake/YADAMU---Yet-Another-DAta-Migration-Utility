@@ -63,7 +63,7 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
 	if (dataFile) {
 	  if (Array.isArray(dataFile)) {
 		const partitionCount = dataFile.length
-        copyOperation = tableMetadata.dataFile.map((dataFile,idx) => {
+        copyOperation = dataFile.map((dataFile,idx) => {
 	      return  {
 	        dml             : `copy into "${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."${tableName}" from '@"${this.dbi.parameters.YADAMU_DATABASE}"."${schema}"."YADAMU_STAGE"/${path.relative(this.dbi.REMOTE_STAGING_AREA,dataFile).split(path.sep).join(path.posix.sep)}' ON_ERROR = SKIP_FILE_${this.dbi.TABLE_MAX_ERRORS}`
 		  , partitionCount  : partitionCount

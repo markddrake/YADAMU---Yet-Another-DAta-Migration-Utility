@@ -20,7 +20,7 @@ class SnowflakeWriter extends YadamuOutputManager {
     // Set up Transformation functions to be applied to the incoming rows
 
     let spatialFormat = this.SPATIAL_FORMAT	
-
+	
     return dataTypes.map((dataType,idx) => {      
       const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
 	  switch (dataTypeDefinition.type.toUpperCase()) {
@@ -51,10 +51,6 @@ class SnowflakeWriter extends YadamuOutputManager {
 		      return null
 		  }
 		case this.dbi.DATA_TYPES.JSON_TYPE:
-		  return (col,idx) => {
-			return typeof col === 'object' ? JSON.stringify(col) : col
-		  }
-		case this.dbi.DATA_TYPES.SNOWFLAKE_VARIANT_TYPE:
 		  return (col,idx) => {
 			return typeof col === 'object' ? JSON.stringify(col) : col
 		  }
@@ -107,6 +103,12 @@ class SnowflakeWriter extends YadamuOutputManager {
             return col.toString()
 	      }
         default :
+		  switch (dataType) {
+			case this.dbi.DATA_TYPES.ORACLE_BFILE_TYPE:
+  		      return (col,idx) => {
+			    return typeof col === 'object' ? JSON.stringify(col) : col
+		     }
+		  }
 		  return null
       }
     })

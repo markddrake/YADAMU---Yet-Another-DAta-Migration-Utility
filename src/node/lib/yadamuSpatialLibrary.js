@@ -51,6 +51,10 @@ class YadamuSpatialLibrary {
     return WKX.Geometry.parse(geometry).toGeoJSON()
   }
   
+  static ewkbToWKB(geometry) {
+    return WKX.Geometry.parse(geometry).toWkb()
+  }
+    
   static geoJSONtoWKT(geometry) {
     return  WKX.Geometry.parseGeoJSON(typeof geometry === "string" ? JSON.parse(geometry) : geometry).toWkt();
   }
