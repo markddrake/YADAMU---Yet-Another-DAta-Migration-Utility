@@ -1,0 +1,31 @@
+SET SESSION SQL_MODE=ANSI_QUOTES;
+--
+DROP PROCEDURE IF EXISTS SET_VENDOR_TYPE_MAPPINGS;
+--
+DELIMITER $$
+--
+CREATE PROCEDURE SET_VENDOR_TYPE_MAPPINGS(P_TYPE_MAPPINGS JSON) 
+BEGIN
+  create temporary table if not exists TYPE_MAPPINGS (
+    VENDOR_TYPE      VARCHAR(256)
+   ,MYSQL_TYPE       VARCHAR(256)
+  );
+  
+  delete from TYPE_MAPPINGS;
+  
+  insert into TYPE_MAPPINGS
+  select VENDOR_TYPE, MYSQL_TYPE
+    from JSON_TABLE(
+	  P_TYPE_MAPPINGS,
+	  '$[*]'
+	  columns (
+	    VENDOR_TYPE VARCHAR(256) PATH '$[0]',
+		MYSQL_TYPE  VARCHAR(256) PATH '$[1]'
+      )
+	) mappings;
+  
+end;
+$$
+--
+DELIMITER ;
+--

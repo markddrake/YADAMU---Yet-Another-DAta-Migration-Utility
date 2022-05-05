@@ -14,19 +14,18 @@ class OracleConstants {
 
   static get STATIC_DEFAULTS() {
     this._STATIC_DEFAULTS = this._STATIC_DEFAULTS || Object.freeze({
-      "SPATIAL_FORMAT"             : "WKB"
-    , "TEMPLOB_BATCH_LIMIT"        : 8192
+      "TEMPLOB_BATCH_LIMIT"        : 8192
     , "CACHELOB_BATCH_LIMIT"       : 65336							  
     , "CACHELOB_MAX_SIZE"          : 32767
     , "LOB_MAX_SIZE"               : 16777216
     , "VARCHAR_MAX_SIZE_EXTENDED"  : 32767
     , "VARCHAR_MAX_SIZE_STANDARD"  : 4000
-    , "ORACLE_XML_TYPE"            : "XML"
-    , "ORACLE_JSON_TYPE"           : "JSON"
+    , "XML_STORAGE_OPTION"         : "XML"     // Optimize based on Database Version
+    , "JSON_STORAGE_OPTION"        : "JSON"    // Optimize based on Database Version
+    , "BOOLEAN_STORAGE_OPTION"     : "RAW(1)"  // Recommended Default in lieu of native support - 0x1: True, 0x0: False
+	, "OBJECT_STORAGE_OPTION"      : "NATIVE"  // Recommended Default, objects are stored as database objects
     , "MIGRATE_JSON_STORAGE"       : false
-    , "OBJECT_FORMAT"              : "NATIVE"
-    , "TREAT_RAW1_AS_BOOLEAN"      : true
-	, "PARTITION_LEVEL_OPERATIONS" : true
+    , "PARTITION_LEVEL_OPERATIONS" : true
 	, "BYTE_TO_CHAR_RATIO"         : 4
 	, "COPY_LOGFILE_DIRNAME"       : null
 	, "COPY_BADFILE_DIRNAME"       : null
@@ -41,7 +40,6 @@ class OracleConstants {
     return this.#_DBI_PARAMETERS
   }
 
-  static get SPATIAL_FORMAT()             { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get TEMPLOB_BATCH_LIMIT()        { return this.DBI_PARAMETERS.TEMPLOB_BATCH_LIMIT}
   static get CACHELOB_BATCH_LIMIT()       { return this.DBI_PARAMETERS.CACHELOB_BATCH_LIMIT}
   static get CACHELOB_MAX_SIZE()          { return this.DBI_PARAMETERS.CACHELOB_MAX_SIZE}
@@ -49,11 +47,15 @@ class OracleConstants {
   static get LOB_MAX_SIZE()               { return this.DBI_PARAMETERS.LOB_MAX_SIZE}
   static get VARCHAR_MAX_SIZE_EXTENDED()  { return this.DBI_PARAMETERS.VARCHAR_MAX_SIZE_EXTENDED}
   static get VARCHAR_MAX_SIZE_STANDARD()  { return this.DBI_PARAMETERS.VARCHAR_MAX_SIZE_STANDARD}
-  static get ORACLE_XML_TYPE()            { return this.DBI_PARAMETERS.ORACLE_XML_TYPE}
-  static get ORACLE_JSON_TYPE()           { return this.DBI_PARAMETERS.ORACLE_JSON_TYPE}
+  
+  static get XML_STORAGE_OPTION()         { return this.DBI_PARAMETERS.XML_STORAGE_OPTION}
+  static get JSON_STORAGE_OPTION()        { return this.DBI_PARAMETERS.JSON_STORAGE_OPTION}
+  static get BOOLEAN_STORAGE_OPTION()     { return this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION}
+  static get OBJECT_STORAGE_OPTION()      { return this.DBI_PARAMETERS.OBJECT_STORAGE_OPTION}
+  
   static get MIGRATE_JSON_STORAGE()       { return this.DBI_PARAMETERS.MIGRATE_JSON_STORAGE}
-  static get OBJECT_FORMAT()              { return this.DBI_PARAMETERS.OBJECT_FORMAT}
-  static get TREAT_RAW1_AS_BOOLEAN()      { return this.DBI_PARAMETERS.TREAT_RAW1_AS_BOOLEAN}
+  
+  
   static get PARTITION_LEVEL_OPERATIONS() { return this.DBI_PARAMETERS.PARTITION_LEVEL_OPERATIONS };
   static get BYTE_TO_CHAR_RATIO()         { return this.DBI_PARAMETERS.BYTE_TO_CHAR_RATIO };
   static get COPY_LOGFILE_DIRNAME()       { return this.DBI_PARAMETERS.COPY_LOGFILE_DIRNAME };
@@ -89,7 +91,7 @@ class OracleConstants {
     , MariaDB     : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
     , MongoDB     : 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"'
     , SNOWFLAKE   : 'YYYY-MM-DD"T"HH24:MI:SS.FF9"+00:00"'
-    , Teradata    : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"+00:00"'
+    , Teradata    : 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"'
     })
     return this._TIMESTAMP_FORMAT_MASKS
   }

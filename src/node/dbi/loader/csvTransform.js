@@ -5,8 +5,8 @@ import YadamuLibrary from '../../lib/yadamuLibrary.js'
 
 class CSVTransform extends YadamuParser {
 
-  constructor(tableInfo,yadamuLogger) {
-	super(tableInfo,yadamuLogger)
+  constructor(dbi,tableInfo,yadamuLogger,parseDelay) {
+	super(dbi,tableInfo,yadamuLogger,parseDelay)
 
 	this.transformations = tableInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
 

@@ -1,28 +1,37 @@
-"use strict" 
 
-import fs                      from 'fs';
-import { performance }         from 'perf_hooks';
+import fs                             from 'fs';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
+		
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import YadamuDBI               from '../base/yadamuDBI.js';
-import DBIConstants            from '../base/dbiConstants.js';
-import YadamuConstants         from '../../lib/yadamuConstants.js';
-import YadamuLibrary           from '../../lib/yadamuLibrary.js'
+import {
+  CopyOperationAborted.
+  UnimplementedMethod
+}                                     from '../../core/yadamuException.js'
 
-import {CopyOperationAborted, UnimplementedMethod} from '../../core/yadamuException.js'
+/* Yadamu DBI */                                    
 
-import ExampleConstants        from './ExampleConstants.js';
-import ExampleError            from './exampleException.js'
-import ExampleParser           from './exampleParser.js';
-import ExampleWriter           from './exampleWriter.js';
-import ExampleReader           from './exampleReader.js';
-import ExampleStatementLibrary from './exampleStatementLibrary.js'
-import StatementGenerator      from './statementGenerator.js';
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+
+import ExampleConstants               from './ExampleConstants.js'
+import ExampleDataTypes               from './ExampleDataTypes.js'
+import ExampleError                   from './exampleException.js'
+import ExampleParser                  from './exampleParser.js'
+import ExampleWriter                  from './exampleWriter.js'
+import ExampleReader                  from './exampleReader.js'
+import ExampleStatementLibrary        from './exampleStatementLibrary.js'
+import ExammpleStatementGenerator     from './exampleStatementGenerator.js'
 
 class ExampleDBI extends YadamuDBI {
    
@@ -37,15 +46,15 @@ class ExampleDBI extends YadamuDBI {
   static get SQL_RESTORE_SAVE_POINT()                         { return _SQL_RESTORE_SAVE_POINT }
   static get SQL_RELEASE_SAVE_POINT()                         { return _SQL_RELEASE_SAVE_POINT }
     
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,ExampleConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,ExampleConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return ExampleDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return ExampleDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -63,12 +72,11 @@ class ExampleDBI extends YadamuDBI {
 
   // Enable configuration via command line parameters
 
-  get SPATIAL_FORMAT()        { return this.parameters.SPATIAL_FORMAT || ExampleConstants.SPATIAL_FORMAT };
-
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
+	this.DATA_TYPES = ExampleDataTypes
 	this.StatementLibary = StatementLibary
   }
 
@@ -420,7 +428,7 @@ class ExampleDBI extends YadamuDBI {
   }   
 
   createParser(queryInfo,parseDelay) {
-    return new ExampleParser(queryInfo,this.yadamuLogger,parseDelay)
+    return new ExampleParser(this,queryInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -449,7 +457,7 @@ class ExampleDBI extends YadamuDBI {
   }
   
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator, schema)
+    return await super.generateStatementCache(ExampleStatementGenerator, schema)
   }
 
   getOutputStream(tableName,metrics) {
@@ -465,7 +473,7 @@ class ExampleDBI extends YadamuDBI {
   classFactory(yadamu) {
 	// Create a worker DBI that has it's own connection to the database (eg can begin and end transactions of it's own. 
 	// Ideally the connection should come from the same connection pool that provided the connection to this DBI.
-	return new ExampleDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new ExampleDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {

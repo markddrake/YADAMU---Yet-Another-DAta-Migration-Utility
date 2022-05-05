@@ -1,53 +1,77 @@
-"use strict" 
 
-import fs from 'fs';
-import fsp from 'fs/promises';
-import { performance } from 'perf_hooks';
-import crypto from 'crypto';
+import fs                             from 'fs';
+import fsp                            from 'fs/promises';
+import crypto                         from 'crypto';
 
-import { pipeline } from 'stream/promises';
+import { 
+  pipeline 
+}                                     from 'stream/promises';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
-
-import pg from 'pg';
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
+							          
+import pg                             from 'pg';
 const {Client,Pool} = pg;
-import Cursor  from 'pg-cursor'
-import QueryStream from 'pg-query-stream'
-import types from 'pg-types';
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+import QueryStream                    from 'pg-query-stream'
+import types                          from 'pg-types';
 
-import VerticaConstants from './verticaConstants.js'
-import VerticaInputStream from './verticaReader.js'
-import { VerticaError, VertiaCopyOperationFailure } from './verticaException.js'
-import VerticaParser from './verticaParser.js';
-import VerticaWriter from './verticaWriter.js';
-import VerticaOutputManager from './verticaOutputManager.js'
-import StatementGenerator from './statementGenerator.js';
-import VerticaStatementLibrary from './verticaStatementLibrary.js';
+import pgCopyStreams                  from 'pg-copy-streams'
+const CopyFrom = pgCopyStreams.from
 
-import {YadamuError} from '../../core/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
+/* Yadamu Core */                                    
+
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
+
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                    from '../file/fileException.js'
+
+/* Vendor Specific DBI Implimentation */                                   						          
+
+import VerticaConstants              from './verticaConstants.js'
+import VerticaDataTypes              from './verticaDataTypes.js'
+import VerticaInputStream            from './verticaReader.js'
+import VerticaParser                 from './verticaParser.js'
+import VerticaWriter                 from './verticaWriter.js'
+import VerticaOutputManager          from './verticaOutputManager.js'
+import VerticaStatementGenerator     from './verticaStatementGenerator.js'
+import VerticaStatementLibrary       from './verticaStatementLibrary.js'
+
+import { 
+  VerticaError,
+  VertiaCopyOperationFailure
+}                                    from './verticaException.js'
+
+
 
 class VerticaDBI extends YadamuDBI {
     
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,VerticaConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,VerticaConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return VerticaDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return VerticaDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -64,18 +88,18 @@ class VerticaDBI extends YadamuDBI {
    
   // Enable configuration via command line parameters
   
-  get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT || VerticaConstants.SPATIAL_FORMAT }
-  get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT || VerticaConstants.CIRCLE_FORMAT }
-  
-  get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
   get COPY_TRIM_WHITEPSPACE()  { return this.parameters.COPY_TRIM_WHITEPSPACE || VerticaConstants.COPY_TRIM_WHITEPSPACE }
   get MERGEOUT_INSERT_COUNT()  { return this.parameters.MERGEOUT_INSERT_COUNT || VerticaConstants.MERGEOUT_INSERT_COUNT }
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
-  constructor(yadamu,manager,connectionSettings,parameters) {
+ constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
+	this.DATA_TYPES = VerticaDataTypes
        
+	this.DATA_TYPES.storageOptions.JSON_TYPE    = this.parameters.VERTICA_JSON_STORAGE_OPTION     || this.DBI_PARAMETERS.JSON_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.JSON_TYPE
+	this.DATA_TYPES.storageOptions.XML_TYPE     = this.parameters.VERTICA_XML_STORAGE_OPTION      || this.DBI_PARAMETERS.XML_STORAGE_OPTION      || this.DATA_TYPES.storageOptions.XML_TYPE
+	   
     this.pgClient = undefined;
     
     /*
@@ -91,7 +115,6 @@ class VerticaDBI extends YadamuDBI {
     this.verticaStack = new Error().stack
     this.verticaOperation = undefined
 
- 
   }
 
   /*
@@ -110,7 +133,6 @@ class VerticaDBI extends YadamuDBI {
 	} catch (e) {
       throw e;
 	}
-	
   }
   
   async createConnectionPool() {
@@ -194,7 +216,7 @@ class VerticaDBI extends YadamuDBI {
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
 	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
-	this._DB_VERSION = results.rows[0][3];
+	this._DATABASE_VERSION = results.rows[0][3];
 	
   }
   
@@ -446,13 +468,6 @@ class VerticaDBI extends YadamuDBI {
   **
   */
   
-  getTypeMappings() {
-   
-    const typeMappings = super.getTypeMappings()
-	typeMappings.circleFormat = this.CIRCLE_FORMAT 
-    return typeMappings; 
-  }
-  
   async getSystemInformation() {     
   
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
@@ -490,7 +505,7 @@ class VerticaDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    return new VerticaParser(queryInfo,this.yadamuLogger,parseDelay)
+    return new VerticaParser(this,queryInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -498,26 +513,27 @@ class VerticaDBI extends YadamuDBI {
   }
 
   generateSelectListEntry(columnInfo) {
-	const dataType = YadamuLibrary.decomposeDataType(columnInfo[3])
+	const dataType = VerticaDataTypes.decomposeDataType(columnInfo[3])
 	switch (dataType.type) {
-	  case 'interval':
+	  case this.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
+	  case this.DATA_TYPES.INTERVAL_YEAR_TO_MONTH_TYPE:
 	    return `CAST("${columnInfo[2]}" AS VARCHAR) "${columnInfo[2]}"` 
 	  /*
 	  case 'numeric':
 	    return `CAST("${columnInfo[2]}" AS VARCHAR) "${columnInfo[2]}"` 
 	  */
-	  case 'date':
+	  case this.DATA_TYPES.DATE_TYPE:
 		return `TO_CHAR("${columnInfo[2]}",'YYYY-MM-DD"T"HH24:MI:SS"Z"') "${columnInfo[2]}"`
-	  case 'time':
-	  case 'timestamp':
+	  case this.DATA_TYPES.TIME_TYPE:
+	  case this.DATA_TYPES.TIMESTAMP_TYPE:
 	    return `TO_CHAR("${columnInfo[2]}",'YYYY-MM-DD"T"HH24:MI:SS.FF6"+00:00"') "${columnInfo[2]}"`
-	  case 'timetz':
-	  case 'timestamptz':
+	  case this.DATA_TYPES.TIME_TZ_TYPE:
+	  case this.DATA_TYPES.TIMESTAMP_TZ_TYPE:
 	    return `TO_CHAR("${columnInfo[2]}",'YYYY-MM-DD"T"HH24:MI:SS.FF6TZH:TZM') "${columnInfo[2]}"`
-	  case 'geometry':
-	  case 'geography':
+	  case this.DATA_TYPES.GEOMETRY_TYPE:
+	  case this.DATA_TYPES.GEOGRAPHY_TYPE:
 	    // TODO : Support Text / GeoJSON
-	    return `TO_HEX(ST_AsBinary("${columnInfo[2]}")) "${columnInfo[2]}"` 
+	    return `ST_AsBinary("${columnInfo[2]}") "${columnInfo[2]}"` 
 	  default:
 	    return `"${columnInfo[2]}"`
     }
@@ -593,7 +609,7 @@ class VerticaDBI extends YadamuDBI {
   }
    
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator, schema)
+    return await super.generateStatementCache(VerticaStatementGenerator, schema)
   }
 
   getOutputStream(tableName,metrics) {
@@ -605,7 +621,7 @@ class VerticaDBI extends YadamuDBI {
   }
  
   classFactory(yadamu) {
-	return new VerticaDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new VerticaDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {
@@ -613,7 +629,7 @@ class VerticaDBI extends YadamuDBI {
 	const pid = results.rows[0][0];
     return pid
   }
-    
+
   async reportCopyErrors(tableName,metrics) {
 
 	 const causes = []
@@ -653,7 +669,7 @@ class VerticaDBI extends YadamuDBI {
 	  const sqlStatement = `${copyOperation.dml} REJECTED DATA AS TABLE "${rejectedRecordsTableName}"  NO COMMIT`;
 	  metrics.writerStartTime = performance.now()
 	  let results = await this.beginTransaction()
-      metrics.stack = new Error().stack
+	  metrics.stack = new Error().stack
 	  results = await this.insertBatch(sqlStatement,rejectedRecordsTableName)
 	  metrics.writerEndTime = performance.now()
 	  metrics.written = results.inserted

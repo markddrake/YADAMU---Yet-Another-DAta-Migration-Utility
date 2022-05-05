@@ -1,0 +1,58 @@
+{
+  "mappings": {
+    "CHAR_TYPE"                                            : "CHAR"                                                            
+  , "NCHAR_TYPE"                                           : "NCHAR"                                                           
+  , "VARCHAR_TYPE"                                         : "VARCHAR2"                                                        
+  , "NVARCHAR_TYPE"                                        : "NVARCHAR2"                                                       
+  , "FLOAT_TYPE"                                           : "BINARY_FLOAT"                                                    
+  , "DOUBLE_TYPE"                                          : "BINARY_DOUBLE"                                                   
+  , "NUMERIC_TYPE"                                         : "NUMBER"                                                          
+  
+  , "BIGINT_TYPE"                                          : "NUMBER(19,0)"
+  , "INTEGER_TYPE"                                         : "NUMBER(10,0)"
+  , "MEDIUMINT_TYPE"                                       : "NUMBER(7,0)"
+  , "SMALLINT_TYPE"                                        : "NUMBER(5,0)"    
+  , "TINYINT_TYPE"                                         : "NUMBER(3,0)"
+  
+  , "DATETIME_TYPE"                                        : "DATE"                                                            
+  , "TIMESTAMP_TYPE"                                       : "TIMESTAMP"                                                       
+  , "TIMESTAMP_TZ_TYPE"                                    : "TIMESTAMP WITH TIME ZONE"                                        
+  , "TIMESTAMP_LTZ_TYPE"                                   : "TIMESTAMP WITH LOCAL TIME ZONE"                                  
+                                                                                                                            
+  , "INTERVAL_DAY_TO_SECOND_TYPE"                          : "INTERVAL DAY TO SECOND"                                          
+  , "INTERVAL_YEAR_TO_MONTH_TYPE"                          : "INTERVAL YEAR TO MONTH"                                          
+                                                                                                                            
+  , "BINARY_TYPE"                                          : "RAW"                                                             
+                                                                                                                            
+  , "CLOB_TYPE"                                            : "CLOB"                                                            
+  , "NCLOB_TYPE"                                           : "NCLOB"                                                           
+  , "BLOB_TYPE"                                            : "BLOB"                                                            
+  
+  , "UUID_TYPE"                                            : "VARCHAR2(36)"                                                            
+  , "USER_DEFINED_TYPE"                                    : "CLOB"                                                    
+  , "JSON_TYPE"                                            : "JSON"                                                            
+  , "XML_TYPE"                                             : "XMLTYPE"                                                         
+  , "SPATIAL_TYPE"                                         : "\"MDSYS\".\"SDO_GEOMETRY\""                                              
+                                                                                                                            
+  , "ORACLE_ROWID_TYPE"                                    : "ROWID"                                                           
+  , "ORACLE_BFILE_TYPE"                                    : "BFILE"                                                           
+  , "ORACLE_ANYDATA_TYPE"                                  : "ANYDATA"                                                         
+  , "ORACLE_OBJECT_TYPE"                                   : "\"%SCHEMA%\".\"%OBJECT_TYPE%\""  
+  
+  , "PGSQL_IDENTIFIER_TYPE"                                : "NUMBER(10,0)"
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "NUMBER"
+  }  
+, "limits": {
+    "SCALAR_LENGTH"                                        : 4000
+  , "NUMERIC_PRECISION"                                    : 38
+  , "NUMERIC_SCALE"                                        : 38
+  , "TIMESTAMP_PRECISION"                                  : 9
+  }
+, "storageOptions": {
+	"SPATIAL_FORMAT"                                       : "WKB"
+  , "BOOLEAN_TYPE"                                         : "RAW(1)"
+  , "ORACLE_OBJECT_TYPE"                                   : "NATIVE"
+  , "XML_TYPE"                                             : "XML"
+  , "JSON_TYPE"                                            : "JSON"
+  }
+}                                                        

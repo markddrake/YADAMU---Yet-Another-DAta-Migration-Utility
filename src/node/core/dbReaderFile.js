@@ -16,7 +16,6 @@ class DBReaderFile extends DBReader {
 
   constructor(dbi,yadamuLogger,options) {
     super(dbi,yadamuLogger,options); 
-    this.dbi.sqlTraceTag = `/* Manager */`;	
   }
      
   async pipelineTable(readerDBI,writerDBI,task) {

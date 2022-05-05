@@ -1,0 +1,126 @@
+{
+	"boolean": [
+		"BOOLEAN",
+		"BIT",
+		"RAW",
+		"TINYINT"
+	],
+	"binary": [
+		"RAW",
+		"BLOB",
+		"BINARY",
+		"VARBINARY",
+		"LONG VARBINARY",
+		"IMAGE",
+		"BYTEA",
+		"TINYBLOB",
+		"MEDIUMBLOB",
+		"LONGBLOB",
+		"ROWVERSION",
+		"OBJECTID",
+		"BINDATA",
+		"BF",
+		"BV"
+	],
+	"date": [
+		"DATE",
+		"SMALLDATE"
+	],
+	"time": [
+		"TIME",
+		"TIME WITHOUT TIME ZONE"
+	],
+	"datetime": [
+		"DATETIME",
+		"DATETIME2"
+	],
+	"timestamp": [
+		"TIMESTAMP",
+		"TIMESTAMP WITH TIME ZONE",
+		"TIMESTAMP WITH LOCAL TIME ZONE",
+		"TIMESTAMP WITHOUT TIME ZONE",
+		"DATETIMEOFFSET"
+	],
+	"interval": [
+	    "INTERVAL",
+		"INTERVAL DAY TO SECOND",
+		"INTERVAL YEAR TO MONTH"
+	],
+	"floatingPoint": [
+		"BINARY_FLOAT",
+		"BINARY_DOUBLE",
+		"REAL",
+		"FLOAT",
+		"DOUBLE",
+		"DOUBLE PRECISION"
+	],
+	"integer": [
+		"TINYINT",
+		"SMALLINT",
+		"INT",
+		"BIGINT",
+		"INTEGER",
+		"LONG"
+	],
+	"bcd": [
+		"NUMERIC",
+		"DECIMAL",
+		"NUMBER",
+		"MONEY",
+		"SMALLMONEY"
+	],
+	"xml": [
+		"XML",
+		"XMLTYPE"
+	],
+	"json": [
+		"JSON",
+		"JSONB",
+		"SET",
+		"BFILE",
+		"OBJECT",
+		"ARRAY"
+	],
+	"clob": [
+		"CLOB",
+		"NCLOB",
+		"JAVASCRIPTWITHSCOPE",
+		"LONGTEXT",
+		"MEDIUMTEXT",
+		"TEXT"
+	],
+	"blob": [
+		"BLOB",
+		"LONGBINARY",
+		"MEDIUMBINARY",
+		"IMAGE",
+		"BO"
+	],
+	"spatial": [
+		"\"MDSYS\".\"SDO_GEOMETRY\"",
+		"GEOGRAPHY",
+		"GEOMETRY",
+		"POINT",
+		"LSEG",
+		"BOX",
+		"PATH",
+		"POLYGON",
+		"CIRCLE",
+		"LINESTRING",
+		"GEOMCOLLECTION",
+		"GEOMETRYCOLLECTION",
+		"MULTIPOINT",
+		"MULTILINESTRING",
+		"MULTIPOLYGON"
+	],
+	"unboundedNumerics" : {
+	   "MariaDB"    : "decimal(65,32)"
+	 , "MongoDB"    : "decimal"
+	 , "MsSQL"      : "numeric(38,19)"
+	 , "MySQL"      : "decimal(65,30)"
+	 , "Oracle"     : "NUMBER"
+	 , "Postgres"   : "numeric"
+	 , "Snowflake"  : "NUMBER"
+	 , "Vertica"    : "numeric(1024,512)"
+    }
+}

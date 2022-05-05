@@ -1,22 +1,34 @@
-"use strict" 
 
-import path                  from 'path'
+import path                           from 'path';
 
-import { BlobServiceClient } from '@azure/storage-blob';
+import { 
+  performance 
+}                                     from 'perf_hooks';
 
-import CloudDBI              from '../cloud/cloudDBI.js';
-import DBIConstants          from '../base/dbiConstants.js';
-import YadamuConstants       from '../../lib/yadamuConstants.js';
-import YadamuLibrary         from '../../lib/yadamuLibrary.js'
+/* Database Vendors API */                                    
 
-import AzureConstants        from './azureConstants.js';
-import AzureStorageService   from './azureStorageService.js';
+import { 
+  BlobServiceClient
+}                                     from '@azure/storage-blob';
 
-/*
-**
-** YADAMU Database Inteface class skeleton
-**
-*/
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
+
+import {
+  YadamuError
+}                                     from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+
+import CloudDBI                       from '../cloud/cloudDBI.js';
+import DBIConstants                   from '../base/dbiConstants.js'
+
+/* Vendor Specific DBI Implimentation */                                    
+							          							          
+import AzureConstants                 from './azureConstants.js';
+import AzureStorageService            from './azureStorageService.js';
 
 class AzureDBI extends CloudDBI {
  
@@ -31,15 +43,15 @@ class AzureDBI extends CloudDBI {
   **
   */
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,AzureConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,AzureConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return AzureDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return AzureDBI.DBI_PARAMETERS
   }
 
   get DATABASE_KEY()          { return AzureConstants.DATABASE_KEY};
@@ -127,7 +139,7 @@ class AzureDBI extends CloudDBI {
   }
   
   classFactory(yadamu) {
-	return new AzureDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new AzureDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
     
 }

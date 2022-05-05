@@ -1,7 +1,6 @@
-"use strict"
 
-import YadamuCLI       from '../..//node/cli/yadamuCLI.js'
-import YadamuLibrary   from '../..//node/lib/yadamuLibrary.js'
+import YadamuCLI       from '../../node/cli/yadamuCLI.js'
+import YadamuLibrary   from '../../node/lib/yadamuLibrary.js'
 
 class Test extends YadamuCLI {}
 

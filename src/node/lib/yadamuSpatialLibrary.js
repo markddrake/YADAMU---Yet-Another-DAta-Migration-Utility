@@ -13,7 +13,7 @@ class YadamuSpatialLibrary {
   **
   */
  
-  static bufferToWkT(geometry) {
+  static bufferToWKT(geometry) {
     return WKX.Geometry.parse(geometry).toWkt()
   }
    
@@ -51,6 +51,10 @@ class YadamuSpatialLibrary {
     return WKX.Geometry.parse(geometry).toGeoJSON()
   }
   
+  static ewkbToWKB(geometry) {
+    return WKX.Geometry.parse(geometry).toWkb()
+  }
+    
   static geoJSONtoWKT(geometry) {
     return  WKX.Geometry.parseGeoJSON(typeof geometry === "string" ? JSON.parse(geometry) : geometry).toWkt();
   }
@@ -121,7 +125,7 @@ class YadamuSpatialLibrary {
         case ((sourceFormat === 'EWKB') && (targetFormat === 'WKT') && Buffer.isBuffer(testColumn)):
         case ((sourceFormat === 'WKB') && (targetFormat === 'EWKT') && Buffer.isBuffer(testColumn)):
         case ((sourceFormat === 'WKB') && (targetFormat === 'WKT') && Buffer.isBuffer(testColumn)):
-          spatialConversions[spatialIdx] = this.bufferToWkT
+          spatialConversions[spatialIdx] = this.bufferToWKT
           break;
         case ((sourceFormat === 'EWKB') && (targetFormat === 'EWKT')):
         case ((sourceFormat === 'EWKB') && (targetFormat === 'WKT')):

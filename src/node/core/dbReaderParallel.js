@@ -16,7 +16,6 @@ class DBReaderParallel extends DBReader {
 
   constructor(dbi,yadamuLogger,options) {
     super(dbi,yadamuLogger,options); 
-    this.dbi.sqlTraceTag = `/* Manager */`;	
   }
   
   async doCopyOperations(taskList,worker,idx) {
@@ -26,7 +25,7 @@ class DBReaderParallel extends DBReader {
     const writerDBI = worker.writerDBI
     const readerDBI = worker.readerDBI
 	
-	//this.yadamuLogger.trace([this.constructor.name,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),'WORKERS READY'],'WAITING')
+	// this.yadamuLogger.trace([this.constructor.name,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),'WORKERS READY'],'WAITING')
     await Promise.all([readerDBI.workerReady,writerDBI.workerReady])
 	// this.yadamuLogger.trace([this.constructor.name,readerDBI.DATABASE_VENDOR,writerDBI.DATABASE_VENDOR,idx,readerDBI.getWorkerNumber(),'WORKERS READY'],'PROCESSING')
 	

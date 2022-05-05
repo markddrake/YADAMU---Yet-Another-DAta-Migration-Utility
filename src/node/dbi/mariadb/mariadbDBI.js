@@ -1,29 +1,39 @@
-"use strict" 
 
-import fs                      from 'fs';
-import { performance }         from 'perf_hooks';
+import fs                             from 'fs';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
 
-import mariadb                 from 'mariadb';
+import mariadb                        from 'mariadb';
+	          
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import YadamuDBI               from '../base/yadamuDBI.js';
-import DBIConstants            from '../base/dbiConstants.js';
-import YadamuConstants         from '../../lib/yadamuConstants.js';
-import YadamuLibrary           from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted}  from '../../core/yadamuException.js'
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
 
-import MariadbConstants        from './mariadbConstants.js'
-import MariadbError            from './mariadbException.js'
-import MariadbParser           from './mariadbParser.js';
-import MariadbOutputManager    from './mariadbOutputManager.js';
-import MariadbWriter           from './mariadbWriter.js';
-import MariadbStatementLibrary from './mariadbStatementLibrary.js';
-import StatementGenerator      from '../shared/mysql/57/statementGenerator.js';
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+							          
+import MariadbConstants               from './mariadbConstants.js'
+import MariadbDataTypes               from './mariadbDataTypes.js'
+import MariadbError                   from './mariadbException.js'
+import MariadbParser                  from './mariadbParser.js'
+import MariadbOutputManager           from './mariadbOutputManager.js'
+import MariadbWriter                  from './mariadbWriter.js'
+import MariadbStatementLibrary        from './mariadbStatementLibrary.js'
+import MariadbStatementGenerator      from './mariadbStatementGenerator.js'
 
 class MariadbDBI extends YadamuDBI {
     
@@ -37,15 +47,15 @@ class MariadbDBI extends YadamuDBI {
   static get SQL_RESTORE_SAVE_POINT()                         { return _SQL_RESTORE_SAVE_POINT }
   static get SQL_RELEASE_SAVE_POINT()                         { return _SQL_RELEASE_SAVE_POINT }
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,MariadbConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,MariadbConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return MariadbDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return MariadbDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -56,16 +66,13 @@ class MariadbDBI extends YadamuDBI {
  
   // Override YadamuDBI
 
-  get DATABASE_KEY()           { return MariadbConstants.DATABASE_KEY};
+  get DATABASE_KEY()                 { return MariadbConstants.DATABASE_KEY};
   get DATABASE_VENDOR()              { return MariadbConstants.DATABASE_VENDOR};
   get SOFTWARE_VENDOR()              { return MariadbConstants.SOFTWARE_VENDOR};
   get SQL_COPY_OPERATIONS()          { return true }
   get STATEMENT_TERMINATOR()         { return MariadbConstants.STATEMENT_TERMINATOR };
 
   // Enable configuration via command line parameters
-
-  get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT            || MariadbConstants.SPATIAL_FORMAT }
-  get TREAT_TINYINT1_AS_BOOLEAN()    { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MariadbConstants.TREAT_TINYINT1_AS_BOOLEAN }
 
   // Not available until configureConnection() has been called 
 
@@ -78,6 +85,13 @@ class MariadbDBI extends YadamuDBI {
   constructor(yadamu,manager,connectionSettings,parameters) {
 
     super(yadamu,manager,connectionSettings,parameters)
+	this.DATA_TYPES = MariadbDataTypes
+	
+	this.DATA_TYPES.storageOptions.BOOLEAN_TYPE = this.parameters.MARIADB_BOOLEAN_STORAGE_OPTION || this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION || this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	this.DATA_TYPES.storageOptions.SET_TYPE     = this.parameters.MARIADB_SET_STORAGE_OPTION     || this.DBI_PARAMETERS.SET_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.SET_TYPE
+	this.DATA_TYPES.storageOptions.ENUM_TYPE    = this.parameters.MARIADB_ENUM_STORAGE_OPTION    || this.DBI_PARAMETERS.ENUM_STORAGE_OPTION    || this.DATA_TYPES.storageOptions.ENUM_TYPE
+	this.DATA_TYPES.storageOptions.XML_TYPE     = this.parameters.MARIADB_XML_STORAGE_OPTION     || this.DBI_PARAMETERS.XML_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.XML_TYPE
+
     this.pool = undefined;
 	
     this.StatementLibrary = MariadbStatementLibrary
@@ -100,7 +114,7 @@ class MariadbDBI extends YadamuDBI {
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)
 
     let results = await this.executeSQL(this.StatementLibrary.SQL_GET_CONNECTION_INFORMATION)
-    this._DB_VERSION = results[0]
+    this._DATABASE_VERSION = results[0]
 
     results = await this.executeSQL(this.StatementLibrary.SQL_SHOW_SYSTEM_VARIABLES)
 	results.forEach((row,i) => { 
@@ -311,6 +325,7 @@ class MariadbDBI extends YadamuDBI {
     await super.initialize(true)
     this.setSpatialSerializer(this.SPATIAL_FORMAT)
 	this.statementLibrary = new this.StatementLibrary(this)
+	
   }
 
   async finalizeRead(tableInfo) {
@@ -522,11 +537,11 @@ class MariadbDBI extends YadamuDBI {
   }
 
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator,schema) 
+    return await super.generateStatementCache(MariadbStatementGenerator,schema) 
   }
 
   createParser(queryInfo,parseDelay) {
-    return new MariadbParser(queryInfo,this.yadamuLogger,parseDelay)
+    return new MariadbParser(this,queryInfo,this.yadamuLogger,parseDelay)
   }  
 
   inputStreamError(cause,sqlStatement) {
@@ -569,7 +584,7 @@ class MariadbDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-	return new MariadbDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new MariadbDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {

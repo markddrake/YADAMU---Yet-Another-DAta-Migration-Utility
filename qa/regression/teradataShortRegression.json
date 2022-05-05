@@ -1,0 +1,35 @@
+{
+  "operation"                         : "dbRoundtrip"
+, "connections"                       : "connections.json"
+, "tasks"                             : "tasks.json"
+, "recreateSchema"                    : true
+, "createDirectory"                   : true
+, "verifyOperation"                   : true
+, "parameters"                      : {
+    "DIRECTORY"                     : "%operation%/json/%sourceConnection%"
+  }
+, "tests" : [{
+	"operation" : "import"
+  , "source": "file-staging"
+  , "target": "tera#1"
+  , "parameters"                      : {
+      "DIRECTORY"                     : "export/json/oracle19c"
+    }
+  , "tasks": [
+       "HR","BI"
+    ]
+  },{
+	"operation" : "export"
+  , "source": "tera#1"
+  , "target": "file-staging"
+  , "tasks": [
+      "HR", "BI"
+    ]
+  },{
+    "source": "tera#1"
+  , "target": "tera#1"
+  , "tasks": [
+       "HR","BI"
+    ]
+  }]
+}

@@ -1,7 +1,7 @@
-"use strict"
 
 import crypto                   from 'crypto';
 import { performance }          from 'perf_hooks';
+import fs                       from 'fs';
 import fsp                      from 'fs/promises';
 import path                     from 'path'
 
@@ -29,11 +29,6 @@ class VerticaWriter extends YadamuWriter {
     this.tableInfo.insertMode = 'Copy'
     this.copyStatement = this.tableInfo.copy.dml
     this.mergeoutInsertCount = this.dbi.MERGEOUT_INSERT_COUNT;
-
-    this.maxLengths = this.tableInfo.sizeConstraints.map((sizeConstraint) => {
-      const maxLength = parseInt(sizeConstraint) 
-      return maxLength > 0 ? maxLength : undefined
-    })
   }
 
   async initializeTable() {
@@ -51,13 +46,7 @@ class VerticaWriter extends YadamuWriter {
     // Use Slice to add first and last row, rather than first and last value.
     super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
   }
-  
-  recodeSpatialColumns(batch,msg) {
-    const targetFormat = 'WKT'
-    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,`COPY`,this.COPY_METRICS.cached,this.SPATIAL_FORMAT],`${msg} Converting to "${targetFormat}".`);
-    YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,targetFormat,this.tableInfo.targetDataTypes,batch,!this.tableInfo.parserRequired)
-  }  
-
+ 
   async writeBatchAsCSV(filename,batch) {
     const sw = new StringWriter();
     const csvTransformations = CSVLibrary.getCSVTransformations(batch)
@@ -83,7 +72,7 @@ class VerticaWriter extends YadamuWriter {
        const columnNameOffset = r[1].indexOf('column: [') + 9
        err.columnName = r[1].substring(columnNameOffset,r[1].indexOf(']',columnNameOffset+1))
        err.columnIdx = this.tableInfo.columnNames.indexOf(err.columnName)
-       err.columnLength = this.maxLengths[err.columnIdx]
+       err.columnLength = this.tableInfo.maxLengths[err.columnIdx]
        err.dataLength = parseInt(r[2])
        err.tags = []
        if (err.dataLength > err.columnLength) {
@@ -120,7 +109,9 @@ class VerticaWriter extends YadamuWriter {
         case 'string':
           return `'${arg.replace(/'/g,"''")}'`
         case 'object':
-          return arg === null ? 'null' : `'${JSON.stringify(arg).replace(/'/g,"''")}'`
+          return arg === null         ? 'null'
+     		   : Buffer.isBuffer(arg) ? `'${arg.toString('hex')}'` 
+			                          : `'${JSON.stringify(arg).replace(/'/g,"''")}'`
         case 'number':
           switch (arg) {
             case Infinity:
@@ -146,10 +137,9 @@ class VerticaWriter extends YadamuWriter {
   }
   
   async _writeBatch(batch,rowCount) {
-    // try {
+
+    // console.log(batch)
       
-    // console.log('Write Batch',this.tableName,this.COPY_METRICS.batchNumber,rowCount,'Copy',batch.copy.length,'Insert',batch.insert.length)
-    
     const emptyStringDataSets = Object.keys(batch).filter((key) => {return ((key !== 'copy') && (key !== 'insert'))})
     delete emptyStringDataSets.copy
     delete emptyStringDataSets.insert
@@ -181,7 +171,7 @@ class VerticaWriter extends YadamuWriter {
       columns.forEach((idx) => {
         const columnName = `"${this.tableInfo.columnNames[idx]}"`
         const fillerName = `"YADAMU_COL_${(parseInt(idx)+1).toString().padStart(3,"0")}"`
-        const fillerSize = this.tableInfo.sizeConstraints[idx]
+        const fillerSize = this.tableInfo.maxLengths[idx]
         const columnReplacement = `${fillerName} FILLER${fillerSize > 65000 ? ' LONG ': ' '}VARCHAR(${fillerSize}), ${columnName} AS NVL(${fillerName}, '')`
         sqlStatement = sqlStatement.replace(columnName,columnReplacement)
       }) 
@@ -192,7 +182,6 @@ class VerticaWriter extends YadamuWriter {
       }
     })
    
-
     const batchStagingFileName = `${this.STAGING_FILE}-${parseInt(this.BATCH_METRICS.batchNumber).toString().padStart(5,"0")}`
 	// results = await Promise.all(Object.keys(copyOperations).map(async(key,idx) => {
 	const keys = Object.keys(copyOperations)
@@ -205,6 +194,8 @@ class VerticaWriter extends YadamuWriter {
         await this.writeBatchAsCSV(stagingFilePath,batch[key])
         const stack = new Error().stack
         const sqlStatement = copyOperations[key].sql.replace(this.tableInfo.stagingFileName,stagingFileName)
+        // console.log(sqlStatement)
+        // console.log(fs.readFileSync(stagingFilePath).toString('utf8'))
         const results = await this.dbi.insertBatch(sqlStatement,copyOperations[key].errors);
 		if (results.rejected > 0) {
           await this.reportCopyErrors(results.errors,batch[key],stack,sqlStatement)
@@ -267,10 +258,7 @@ class VerticaWriter extends YadamuWriter {
     }
     this.releaseBatch(batch)
     return this.skipTable   
-	// } catch(e) { console.log(e); throw(e) }
-    
   }
-
-}
+}  
 
 export { VerticaWriter as default }

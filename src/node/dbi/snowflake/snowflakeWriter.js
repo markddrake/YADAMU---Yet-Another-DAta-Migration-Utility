@@ -22,28 +22,13 @@ class SnowflakeWriter extends YadamuWriter {
    	  super.reportBatchError(operation,cause,batch[0],batch[batch.length-1])
 	}
   }
-   
-  recodeSpatialColumns(batch,msg) {
-	const targetFormat = "WKT"
-    this.yadamuLogger.info([this.dbi.DATABASE_VENDOR,this.tableName,`INSERT MANY`,this.tableInfo.parserRequired,this.COPY_METRICS.cached,this.SPATIAL_FORMAT],`${msg} Converting to "${targetFormat}".`);
-    YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,targetFormat,this.tableInfo.targetDataTypes,batch,!this.tableInfo.parserRequired)
-  }  
- 
+    
   async _writeBatch(batch,rowCount) {
- 
-    // Snowflake's handling of WKB appears a little 'flaky' :)
-	
-    if (this.tableInfo.targetDataTypes.includes('GEOGRAPHY')) {
-      this.recodeSpatialColumns(batch,`Detected 'WKB' encoded spatial data.`)
-    }
-	
+	  
 	let sqlStatement
     if (this.tableInfo.insertMode === 'Batch') {
       try {
-		sqlStatement = this.tableInfo.dml
-		if (this.tableInfo.parserRequired) {
-		  sqlStatement = `${sqlStatement}  ${new Array(rowCount).fill(0).map(() => {return this.tableInfo.valuesBlock}).join(',')}`
-		}
+		sqlStatement = `${this.tableInfo.dml}  ${this.tableInfo.parserRequired ? new Array(rowCount).fill(0).map(() => {return this.tableInfo.args}).join(',') : this.tableInfo.args}`
 		const result = await this.dbi.executeSQL(sqlStatement,batch);
         this.endTime = performance.now();
         this.adjustRowCounts(rowCount);
@@ -94,7 +79,7 @@ class SnowflakeWriter extends YadamuWriter {
 		  nextBatch = batches.shift();
           rowNumbers = rowTracking.shift();
 		  batchRowCount = Math.ceil(nextBatch.length/columnCount)
-		  sqlStatement = `${this.tableInfo.dml} ${new Array(batchRowCount).fill(0).map(() => {return this.tableInfo.valuesBlock}).join(',')}`
+		  sqlStatement = `${this.tableInfo.dml} ${new Array(batchRowCount).fill(0).map(() => {return this.tableInfo.args}).join(',')}`
 		  const opStartTime = performance.now()
           operationCount++
           // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowNumbers[0],rowNumbers[rowNumbers.length-1],batchRowCount],`Operation ${operationCount}`)
@@ -131,7 +116,7 @@ class SnowflakeWriter extends YadamuWriter {
 		  const opStartTime = performance.now()
           operationCount++  
           // this.yadamuLogger.trace([this.dbi.DATABASE_VENDOR,this.tableName,'BINARY',this.tableInfo.parserRequired,rowNumbers[0],rowNumbers[rowNumbers.length-1]],`Operation ${operationCount}`)
-       	  sqlStatement = this.tableInfo.dml
+       	  sqlStatement = `${this.tableInfo.dml} ${this.tableInfo.args}`
 		  const result = await this.dbi.executeSQL(sqlStatement,nextBatch)
 		  sqlExectionTime+= performance.now() - opStartTime
           this.dbi.SQL_TRACE.disable()

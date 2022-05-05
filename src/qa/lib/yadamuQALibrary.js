@@ -13,9 +13,45 @@ import {
   Writable
 }                      from 'stream'
 
+
 import YadamuLibrary   from '../../node/lib/yadamuLibrary.js';
 import NullWriter      from '../../node/util/nullWritable.js';
 import RowCounter      from '../util/rowCounter.js';
+
+
+class SourceTableKeys extends Writable {
+	
+  constructor(hashTable) {
+	super({objectMode:true})
+    this.hashTable = hashTable
+	this.count = 0
+  }
+
+  _write(data,enc,callback) {
+	this.count++
+	const key = createHash('sha256').update(JSON.stringify(data)).digest('hex');
+	this.hashTable.get(key)?.count === -1 ? this.hashTable.delete(key) : this.hashTable.has(key) ? this.hashTable.get(key).count++ : this.hashTable.set(key,{count : 1})
+	callback()
+  }	
+
+} 
+
+class TargetTableKeys extends Writable {
+	
+  constructor(hashTable) {
+	super({objectMode:true})
+    this.hashTable = hashTable
+	this.count = 0
+  }
+
+  _write(data,enc,callback) {
+	this.count++
+	const key = createHash('sha256').update(JSON.stringify(data)).digest('hex');
+	this.hashTable.get(key)?.count === 1 ? this.hashTable.delete(key) : this.hashTable.has(key) ? this.hashTable.get(key).count-- : this.hashTable.set(key,{count : -1})
+	callback()
+  }	
+
+} 
 
 class YadamuQALibrary {
 
@@ -50,6 +86,26 @@ class YadamuQALibrary {
 	  return ['KILL',this.DATABASE_VENDOR,this.yadamu.killConfiguration.process,isNaN(workerId) ? 'SEQUENTIAL' : 'PARALLEL',this.ON_ERROR,workerId,this.yadamu.killConfiguration.delay,processId]
     }
 
+    async compareResultSets(tableName, sourceSQL, targetSQL) {
+	   	   
+      const queryInfo = {}
+      const resultTable =  new Map()
+	   
+	  queryInfo.SQL_STATEMENT = targetSQL
+	  const source = await this.getInputStream(queryInfo)
+	  const sourceKeys = new SourceTableKeys(resultTable);
+	  pipeline(source,sourceKeys)
+	   
+	  queryInfo.SQL_STATEMENT = targetSQL
+	  const target = await this.getInputStream(queryInfo)
+	  const targetKeys = new TargetTableKeys(resultTable)
+	  pipeline(target,targetKeys)
+	 
+      // console.log(source.constructor.name,sourceKeys.constructor.name,target.constructor.name,targetKeys.constructor.name)
+	 
+	  await Promise.all([finished(source),finished(sourceKeys),finished(target),finished(targetKeys)])
+	  return [ resultTable.size === 0 ? [tableName, sourceKeys.count, targetKeys.count, 0, 0] : [tablename, sourceKeys.count, targetKeys.count, -1, -1]]
+	}
   }	
   
   static loaderQAMixin = (superclass) => class extends superclass {

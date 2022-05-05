@@ -27,6 +27,10 @@ class SnowflakeError extends DatabaseError {
     return (this.cause.code && spatialErrorCodes.includes(this.cause.code))
   }
 
+ 
+  contentTooLarge() {
+    return ((this.cause.code && SnowflakeConstants.CONTENT_TOO_LARGE_ERROR.includes(this.cause.code)) && (this.cause.sqlState && SnowflakeConstants.CONTENT_TOO_LARGE_STATE.includes(this.cause.sqlState)))
+  }
 }
 
 export { SnowflakeError as default }

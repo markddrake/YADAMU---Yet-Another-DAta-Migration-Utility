@@ -1,60 +1,79 @@
-"use strict" 
 
-import fs from 'fs';
-import {Readable} from 'stream';
-import { performance } from 'perf_hooks';
+import fs                             from 'fs';
+import readline                       from 'readline';
 
-import Parser from '../../clarinet/clarinet.cjs';
-import readline from 'readline';
-import { once } from 'events';
+import { 
+  once 
+}                                     from 'events';
 
+import {
+  Readable,
+  PassThrough
+}                                     from 'stream';
 
-// import pipeline from util.promisifystream.pipeline;
-import { pipeline } from 'stream/promises';
+import {
+  pipeline
+}                                     from 'stream/promises';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
-
-import pg from 'pg';
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
+							          
+import pg                             from 'pg';
 const {Client,Pool} = pg;
 
-import QueryStream from 'pg-query-stream'
-import types from 'pg-types';
+import QueryStream                    from 'pg-query-stream'
+import types                          from 'pg-types';
 
-import pgCopyStreams from 'pg-copy-streams'
+import pgCopyStreams                  from 'pg-copy-streams'
 const CopyFrom = pgCopyStreams.from
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import PostgresConstants from './postgresConstants.js'
-import PostgresError from './postgresException.js'
-import PostgresParser from './postgresParser.js';
-import PostgresOutputManager from './postgresOutputManager.js';
-import PostgresWriter from './postgresWriter.js';
-import StatementGenerator from './statementGenerator.js';
-import PostgresStatementLibrary from './postgresStatementLibrary.js';
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                    from '../../core/yadamuException.js'
 
-import {YadamuError} from '../../core/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+import ExportFileHeader               from '../file/exportFileHeader.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                    from '../file/fileException.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+						          
+import PostgresConstants             from './postgresConstants.js'
+import PostgresDataTypes             from './postgresDataTypes.js'
+import PostgresError                 from './postgresException.js'
+import PostgresParser                from './postgresParser.js'
+import PostgresOutputManager         from './postgresOutputManager.js'
+import PostgresWriter                from './postgresWriter.js'
+import PostgresStatementGenerator    from './postgresStatementGenerator.js'
+import PostgresStatementLibrary      from './postgresStatementLibrary.js'
 
 class PostgresDBI extends YadamuDBI {
     
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,PostgresConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,PostgresConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return PostgresDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return PostgresDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -63,35 +82,38 @@ class PostgresDBI extends YadamuDBI {
  
   // Define Getters based on configuration settings here
  
-  get DATABASE_KEY()           { return PostgresConstants.DATABASE_KEY};
-  get DATABASE_VENDOR()        { return PostgresConstants.DATABASE_VENDOR};
-  get SOFTWARE_VENDOR()        { return PostgresConstants.SOFTWARE_VENDOR};
-  get SQL_COPY_OPERATIONS()    { return true }
-  get STATEMENT_TERMINATOR()   { return PostgresConstants.STATEMENT_TERMINATOR };
+  get DATABASE_KEY()                  { return PostgresConstants.DATABASE_KEY};
+  get DATABASE_VENDOR()               { return PostgresConstants.DATABASE_VENDOR};
+  get SOFTWARE_VENDOR()               { return PostgresConstants.SOFTWARE_VENDOR};
+  get SQL_COPY_OPERATIONS()           { return true }
+  get STATEMENT_TERMINATOR()          { return PostgresConstants.STATEMENT_TERMINATOR };
    
   // Enable configuration via command line parameters
   
-  get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT || PostgresConstants.CIRCLE_FORMAT }
-  get BYTEA_SIZING_MODEL()     { return this.parameters.BYTEA_SIZING_MODEL || PostgresConstants.BYTEA_SIZING_MODEL }
-  get COPY_SERVER_NAME()       { return this.parameters.COPY_SERVER_NAME || PostgresConstants.COPY_SERVER_NAME }
-   
-  get POSTGIS_VERSION()        { return this._POSTGIS_VERSION || "Not Installed" }
-  set POSTGIS_VERSION(v)       { this._POSTGIS_VERSION = v }
-  
-  get POSTGIS_INSTALLED()      { return this.POSTGIS_VERSION !== "Not Installed" }
+  get CIRCLE_FORMAT()                 { return this.parameters.CIRCLE_FORMAT || PostgresConstants.CIRCLE_FORMAT }
+  get BYTEA_SIZING_MODEL()            { return this.parameters.BYTEA_SIZING_MODEL || PostgresConstants.BYTEA_SIZING_MODEL }
+  get COPY_SERVER_NAME()              { return this.parameters.COPY_SERVER_NAME || PostgresConstants.COPY_SERVER_NAME }
+							         
+  get POSTGIS_VERSION()               { return this._POSTGIS_VERSION || "Not Installed" }
+  set POSTGIS_VERSION(v)              { this._POSTGIS_VERSION = v }
+							         
+  get POSTGIS_INSTALLED()             { return this.POSTGIS_VERSION !== "Not Installed" }
 
   // Standard Spatial formatting only available when PostGIS is installed.
 
-  get SPATIAL_FORMAT()         { return this.POSTGIS_INSTALLED === true ? this.parameters.SPATIAL_FORMAT || DBIConstants.SPATIAL_FORMAT :  "Native" };
-  get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
-
-  get JSON_DATA_TYPE()         { return this.parameters.POSTGRES_JSON_TYPE || PostgresConstants.POSTGRES_JSON_TYPE }
+  get SPATIAL_FORMAT()                { return this.POSTGIS_INSTALLED === true ? this.parameters.SPATIAL_FORMAT || this.DATA_TYPES.storageOptions.SPATIAL_FORMAT :  "Native" };
+  get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
+							          
+  get JSON_DATA_TYPE()                { return this.parameters.POSTGRES_JSON_TYPE || PostgresDataTypes.storageOptions.JSON_TYPE }
   
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
-       
+	this.DATA_TYPES = PostgresDataTypes
+
+	this.DATA_TYPES.storageOptions.JSON_TYPE    = this.parameters.PGSQL_JSON_STORAGE_OPTION    || this.DBI_PARAMETERS.JSON_STORAGE_OPTION    || this.DATA_TYPES.storageOptions.JSON_TYPE
+
     this.pgClient = undefined;
     this.useBinaryJSON = false
     
@@ -220,12 +242,12 @@ class PostgresDBI extends YadamuDBI {
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
 	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
-	this._DB_VERSION = results.rows[0][3];
+	this._DATABASE_VERSION = results.rows[0][3];
 	
 	this.POSTGIS_VERSION = await this.getPostgisInfo()
 	
 	if (this.isManager()) {
-      this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`PostGIS Version: ${this.POSTGIS_VERSION}.`)
+      this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`PostGIS Version: ${this.POSTGIS_VERSION}.`)
 	}
   }
   
@@ -447,16 +469,28 @@ class PostgresDBI extends YadamuDBI {
     this.SQL_TRACE.traceSQL(copyStatement)
 	try {
 	  // Create an Readable stream from an async interator based on the readline interface. This avoids issue with uploading Pretty Printed JSON 
-	  const is = fs.createReadStream(importFilePath)
-      await once(is, 'open')
-      const rl = readline.createInterface({input: is, crlfDelay: Infinity})
+   	  const is = await new Promise((resolve,reject) => {
+        const stack = new Error().stack
+        const inputStream = fs.createReadStream(importFilePath);
+        inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
+      })
+	  
+	  const rl = readline.createInterface({input: is, crlfDelay: Infinity})
       const rli = rl[Symbol.asyncIterator]()
       const rlis = Readable.from(rli)
+
+      const multiplexor = new PassThrough()
+	  const exportFileHeader = new ExportFileHeader (multiplexor, importFilePath, this.yadamuLogger)
 
 	  stack = new Error().stack		
       const outputStream = await this.executeSQL(CopyFrom(copyStatement))    
       const startTime = performance.now()
-	  await pipeline(rlis,outputStream)
+	  await pipeline(rlis,multiplexor,outputStream)
+
+      this.setSystemInformation(exportFileHeader.SYSTEM_INFORMATION)
+	  this.setMetadata(exportFileHeader.METADATA)
+	  const ddl = exportFileHeader.DDL
+      
       const elapsedTime = performance.now() - startTime
       is.close()
       return elapsedTime;
@@ -499,8 +533,16 @@ class PostgresDBI extends YadamuDBI {
   }
 
   async processStagingTable(schema) {  	
-  	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1) from "YADAMU_STAGING"`;
-  	var results = await this.executeSQL(sqlStatement,[schema])
+  
+	const options = {
+	  jsonStorageOption    : this.DATA_TYPES.storageOptions.JSON_TYPE
+	}
+	
+  	const sqlStatement = `select ${this.useBinaryJSON ? 'YADAMU_IMPORT_JSONB' : 'YADAMU_IMPORT_JSON'}(data,$1,$2,$3) from "YADAMU_STAGING"`;
+
+	const typeMappings = await this.getVendorDataTypeMappings(PostgresStatementGenerator)
+    
+  	var results = await this.executeSQL(sqlStatement,[typeMappings,schema,JSON.stringify(options)])
     if (results.rows.length > 0) {
       if (this.useBinaryJSON  === true) {
 	    return this.processLog(results.rows[0][0],'JSONB_EACH')  
@@ -532,19 +574,16 @@ class PostgresDBI extends YadamuDBI {
   **
   */
   
-  getTypeMappings() {
-   
-    const typeMappings = super.getTypeMappings()
-	typeMappings.circleFormat = this.CIRCLE_FORMAT 
-    return typeMappings; 
-  }
   
+  getDriverSettings() {
+    return Object.assign(super.getDriverSettings(),{circleFormat : this.DATA_TYPES.storageOptions.CIRCLE_FORMAT})
+  }
+
   async getSystemInformation() {     
   
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
     const sysInfo = results.rows[0];
-	
-    return Object.assign(
+	return Object.assign(
 	  super.getSystemInformation()
 	, {
 	    currentUser                 : sysInfo[1]
@@ -572,7 +611,12 @@ class PostgresDBI extends YadamuDBI {
   
   async getSchemaMetadata() {
     
-    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT,{"circleAsPolygon": this.INBOUND_CIRCLE_FORMAT === 'POLYGON',"calculateByteaSize":true}])
+	const options = {
+	  "circleAsPolygon"    : this.INBOUND_CIRCLE_FORMAT === 'POLYGON',
+	  "calculateByteaSize" : true
+	}
+	
+    const results = await this.executeSQL(this.StatementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA,this.SPATIAL_FORMAT,options])
 	if ((results.rowCount === 1) && Array.isArray(results.rows[0][6])) { // EXPORT_JSON returned Errors
        this.processLog(results.rows[0][6],`EXPORT_JSON('${this.CURRENT_SCHEMA}','${this.SPATIAL_FORMAT}')`)
 	}
@@ -581,7 +625,7 @@ class PostgresDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    return new PostgresParser(queryInfo,this.yadamuLogger,parseDelay)
+    return new PostgresParser(this,queryInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -638,9 +682,9 @@ class PostgresDBI extends YadamuDBI {
 	    this.connection.on('error',inputStreamError)
 		
         inputStream.on('end',() => { 
-		  this.connection.removeListener('error',inputStreamError)
+		  this.connection?.removeListener('error',inputStreamError)
 		}).on('error',() => { 
-		  this.connection.removeListener('error',inputStreamError)
+		  this.connection?.removeListener('error',inputStreamError)
 		})    		
 		
 		return inputStream
@@ -687,7 +731,7 @@ class PostgresDBI extends YadamuDBI {
   }
    
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator, schema)
+    return await super.generateStatementCache(PostgresStatementGenerator, schema)
   }
 
   getOutputManager(tableName,metrics) {
@@ -699,7 +743,7 @@ class PostgresDBI extends YadamuDBI {
   }
  
   classFactory(yadamu) {
-	return new PostgresDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new PostgresDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {

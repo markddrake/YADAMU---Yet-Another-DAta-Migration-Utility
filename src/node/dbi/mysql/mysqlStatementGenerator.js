@@ -1,47 +1,50 @@
-"use strict";
 
-import path from 'path';
+import path                     from 'path';
 
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
 
-class StatementGenerator {
+class MySQLStatementGenerator extends YadamuStatementGenerator {
   
-  constructor(dbi, targetSchema, metadata, yadamuLogger) {    
-    this.dbi = dbi;
-    this.targetSchema = targetSchema
-    this.metadata = metadata
-    this.yadamuLogger = yadamuLogger;
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {  
+    super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
-  
 
   async generateStatementCache() {    
-  
-    const typeMappings = {
-	  spatialFormat    : this.dbi.INBOUND_SPATIAL_FORMAT
-	, circleFormat     : this.dbi.INBOUND_CIRCLE_FORMAT
+
+    await this.init()
+	
+    const options = {
+	  spatialFormat        : this.dbi.INBOUND_SPATIAL_FORMAT
+	, circleFormat         : this.dbi.INBOUND_CIRCLE_FORMAT
+	, booleanStorageOption    : this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	, xmlStorageOption     : this.dbi.DATA_TYPES.storageOptions.XML_TYPE
 	}
 
-    const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,@RESULTS); SELECT @RESULTS "INSERT_INFORMATION"`;                       
-    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),this.targetSchema, JSON.stringify(typeMappings)]);
+	const vendorTypeMappings = Array.from(this.TYPE_MAPPINGS.entries())
 	
+	const sqlStatement = `SET @RESULTS = '{}'; CALL GENERATE_STATEMENTS(?,?,?,?,@RESULTS); SELECT @RESULTS "INSERT_INFORMATION"`;                       
+    let results = await this.dbi.executeSQL(sqlStatement,[JSON.stringify({metadata : this.metadata}),JSON.stringify(vendorTypeMappings),this.targetSchema, JSON.stringify(options)]);
+
+    // this.debugStatementGenerator(options,null)
+
     results = results.pop();
     let statementCache = JSON.parse(results[0].INSERT_INFORMATION)
-	
-   	if (statementCache === null) {
+
+    // this.debugStatementGenerator(options,statementCache)
+
+	if (statementCache === null) {
       statementCache = {}      
     }
     else {
-	
-		
       const tables = Object.keys(this.metadata); 
       const ddlStatements = tables.map((table,idx) => {
         const tableMetadata = this.metadata[table];
 		const tableName = tableMetadata.tableName;
         const tableInfo = statementCache[tableName];
-        tableInfo.columnNames = tableMetadata.columnNames
+		tableInfo.columnNames = tableMetadata.columnNames
 		
-		tableInfo.sourceDataTypes = tableMetadata.source?.dataTypes || []
-        const dataTypes = YadamuLibrary.decomposeDataTypes(tableInfo.targetDataTypes)
+		const dataTypes = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
 		
         tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
         tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
@@ -52,20 +55,17 @@ class StatementGenerator {
         **
         */
         const setOperators = dataTypes.map((dataType,idx) => {
-	      if (this.dbi.DB_VERSION < '8.0.19' || false) {
+	      if (this.dbi.DATABASE_VERSION < '8.0.19' || false) {
             switch (dataType.type) {
-              case 'geometry':
-			  case 'point':
-			  case 'lseg':
-			  case 'linestring':
-			  case 'box':
-			  case 'path':
-			  case 'polygon':
-			  case 'multipoint':
-			  case 'multilinestring':
-			  case 'multipolygon':
-			  case 'geomcollection':
-			  case 'geometrycollection':
+              case this.dbi.DATA_TYPES.POINT_TYPE:
+			  case this.dbi.DATA_TYPES.LINE_TYPE:
+			  case this.dbi.DATA_TYPES.POLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
+			  case this.dbi.DATA_TYPES.MULTIPOINT_TYPE:
+			  case this.dbi.DATA_TYPES.MULTILINE_TYPE:
+			  case this.dbi.DATA_TYPES.MULTPOLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:
+			  case this.dbi.DATA_TYPES.SPATIAL_TYPE:
                 tableInfo.insertMode = 'Iterative'; 
                 switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
                   case "WKB":
@@ -91,19 +91,15 @@ class StatementGenerator {
           }
           else {
             switch (dataType.type) {
-              case 'geometry':
-			  case 'point':
-			  
-			  case 'lseg':
-			  case 'linestring':
-			  case 'box':
-			  case 'path':
-			  case 'polygon':
-			  case 'multipoint':
-			  case 'multilinestring':
-			  case 'multipolygon':
-			  case 'geomcollection':
-			  case 'geometrycollection':
+              case this.dbi.DATA_TYPES.POINT_TYPE:
+			  case this.dbi.DATA_TYPES.LINE_TYPE:
+			  case this.dbi.DATA_TYPES.POLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
+			  case this.dbi.DATA_TYPES.MULTIPOINT_TYPE:
+			  case this.dbi.DATA_TYPES.MULTILINE_TYPE:
+			  case this.dbi.DATA_TYPES.MULTPOLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:
+			  case this.dbi.DATA_TYPES.SPATIAL_TYPE:
                 tableInfo.insertMode = 'Rows';  
                 switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
                   case "WKB":
@@ -113,10 +109,13 @@ class StatementGenerator {
                   case "WKT":
                   case "EWRT":
                     return 'ST_GeomFromText(?)';
-                    break;
+                    break;			
                   case "GeoJSON":
+				    // GeojSON recoded as WKB inMySQLOutput Manager
+ 				    /*
                     return 'ST_GeomFromGeoJSON(?)';
                     break;
+				    */
                   default:
                     return 'ST_GeomFromWKB(?)';
                 }              
@@ -128,8 +127,6 @@ class StatementGenerator {
             }
           }
         }) 
-
-        
 
         tableInfo.rowConstructor = `(${setOperators.join(',')})`
         switch (tableInfo.insertMode) {
@@ -143,7 +140,8 @@ class StatementGenerator {
             tableInfo.dml = tableInfo.dml.substring(0,tableInfo.dml.indexOf('(')) + ` set ` + setOperators.join(',');
             break;
         }
-       
+
+     
         if (tableMetadata.dataFile) {
 		  const loadColumnNames = []
 		  const setOperations = []
@@ -152,16 +150,15 @@ class StatementGenerator {
    	        loadColumnNames.push(psuedoColumnName);
 		    setOperations.push(`"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${psuedoColumnName})`)
 			switch (dataType.type.toLowerCase()) {
-			  case 'point':
-              case 'linestring':
-              case 'polygon':
-              case 'geometry':
-              case 'multipoint':
-              case 'multilinestring':
-              case 'multipolygon':
-              case 'geometry':                             
-              case 'geometrycollection':
-              case 'geomcollection':
+              case this.dbi.DATA_TYPES.POINT_TYPE:
+			  case this.dbi.DATA_TYPES.LINE_TYPE:
+			  case this.dbi.DATA_TYPES.POLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
+			  case this.dbi.DATA_TYPES.MULTIPOINT_TYPE:
+			  case this.dbi.DATA_TYPES.MULTILINE_TYPE:
+			  case this.dbi.DATA_TYPES.MULTPOLYGON_TYPE:
+			  case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:
+			  case this.dbi.DATA_TYPES.SPATIAL_TYPE:
 			    let spatialFunction
                 switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
                   case "WKB":
@@ -180,51 +177,29 @@ class StatementGenerator {
 				}
                 setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, ${spatialFunction})`
 			    break
-              case 'binary':                              
-              case 'varbinary':                              
-              case 'blob':                                 
-              case 'tinyblob':                             
-              case 'mediumblob':                           
-              case 'longblob':                             
+              case this.dbi.DATA_TYPES.BINARY_TYPE:
+              case this.dbi.DATA_TYPES.VARBINARY_TYPE:
+              case this.dbi.DATA_TYPES.BLOB_TYPE:
+              case this.dbi.DATA_TYPES.MYSQL_TINYBLOB_TYPE:
+              case this.dbi.DATA_TYPES.MYSQL_MEDIUMBLOB_TYPE:
+              case this.dbi.DATA_TYPES.MYSQL_BLOB_TYPE:
+              case this.dbi.DATA_TYPES.MYSQL_LONGBLOB_TYPE:
                 setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, UNHEX(${psuedoColumnName}))`
 			    break;
-			  case 'time':
+              case this.dbi.DATA_TYPES.TIME_TYPE:
                 setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
 			    break;
-			  case 'datetime':
-			  case 'timestamp':
+              case this.dbi.DATA_TYPES.DATETIME_TYPE:
+              case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
                 setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(INSTR(${psuedoColumnName},'.') > 0,str_to_date(${psuedoColumnName},'%Y-%m-%dT%T.%f'),str_to_date(${psuedoColumnName},'%Y-%m-%dT%T')))`
 			    break;
-  			  case 'tinyint':    
+              case this.dbi.DATA_TYPES.TINYINT_TYPE:
                 switch (true) {
-                  case ((dataType.length === 1) && this.dbi.TREAT_TINYINT1_AS_BOOLEAN):
-                     setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
-				     break;
+                  case ((dataType.length === 1) && this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN):
+                    setOperations[idx] = `"${tableInfo.columnNames[idx]}" = IF(CHAR_LENGTH(${psuedoColumnName}) = 0, NULL, IF(${psuedoColumnName} = 'true',1,0))`
+				    break;
 				}
                 break;				 
-            /*
-              case 'smallint':
-              case 'mediumint':
-              case 'integer':
-              case 'bigint':
-              case 'decimal':                                           
-              case 'float':                                           
-              case 'double':                                           
-              case 'bit':
-			  case 'date':
-              case 'year':                            
-              case 'char':                              
-              case 'varchar':                              
-              case 'text':                                 
-              case 'tinytext':
-			  case 'mediumtext':                           
-              case 'longtext':                             
-              case 'set':                                  
-              case 'enum':                                 
-              case 'json':                                 
-              case 'xml':                                  
-              
-			*/
 	          default:
 			}
 		  })
@@ -254,4 +229,4 @@ class StatementGenerator {
  
 }
 
-export { StatementGenerator as default }
+export { MySQLStatementGenerator as default }

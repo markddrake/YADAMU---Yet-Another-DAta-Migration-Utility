@@ -11,9 +11,10 @@ class MySQLConstants {
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "READ_KEEP_ALIVE"           : 0
-    , "TREAT_TINYINT1_AS_BOOLEAN" : true    
-    , "SPATIAL_FORMAT"            : "WKB"
-	, "TIMESTAMP_PRECISION"       : 6
+	, "BOOLEAN_STORAGE_OPTION"    : "tinyint(1)"
+	, "SET_STORAGE_OPTION"        : "json"
+	, "ENUM_STORAGE_OPTION"       : "varchar(512)"
+	, "XML_STORAGE_OPTION"        : "longtext"
     })
     return this._STATIC_PARAMETERS;
   }
@@ -26,8 +27,11 @@ class MySQLConstants {
   }
 
   static get READ_KEEP_ALIVE()            { return this.DBI_PARAMETERS.READ_KEEP_ALIVE}
-  static get TREAT_TINYINT1_AS_BOOLEAN()  { return this.DBI_PARAMETERS.TREAT_TINYINT1_AS_BOOLEAN}
-  static get SPATIAL_FORMAT()             { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
+  static get BOOLEAN_STORAGE_OPTION()     { return this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION}
+  static get SET_STORAGE_OPTION()         { return this.SET_STORAGE_OPTION}
+  static get ENUM_STORAGE_OPTION()        { return this.DBI_PARAMETERS.ENUM_STORAGE_OPTION}
+  static get XML_STORAGE_OPTION()         { return this.DBI_PARAMETERS.XML_STORAGE_OPTION}
+  
   static get STATEMENT_TERMINATOR()       { return ';' }
  
   static get CONNECTION_PROPERTY_DEFAULTS() { 

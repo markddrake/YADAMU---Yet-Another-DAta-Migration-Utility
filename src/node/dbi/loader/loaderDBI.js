@@ -1,29 +1,56 @@
-"use strict" 
+					                  
+import fs                             from 'fs';
+import fsp                            from 'fs/promises';
+import path                           from 'path';
+import crypto                         from 'crypto';
+					                  
+import {                              
+  finished,                           
+  PassThrough                         
+}                                     from 'stream'
+import {                              
+  pipeline                            
+}                                     from 'stream/promises'
+import {                              
+  createGzip,                         
+  createGunzip,                       
+  createDeflate,                      
+  createInflate                       
+}                                     from 'zlib';
+					                  
+import {                              
+  performance                         
+}                                     from 'perf_hooks';
 
-import fs from 'fs';
-import fsp from 'fs/promises';
-import path from 'path';
-import { performance } from 'perf_hooks';
-import crypto from 'crypto';
-import { PassThrough, finished} from 'stream'
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import { createGzip, createGunzip, createDeflate, createInflate } from 'zlib';
+import {
+  YadamuError
+}                                     from '../../core/yadamuException.js'
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+/* Yadamu DBI */                                    
 
-import LoaderConstants from './loaderConstants.js';
-import JSONParser from './jsonParser.js';
-import LoaderParser from './loaderParser.js';
-import JSONOutputManager from './jsonOutputManager.js';
-import ArrayOutputManager from './arrayOutputManager.js';
-import CSVOutputManager from './csvOutputManager.js';
-import CSVTransform from './csvTransform.js';
-import {YadamuError, CommandLineError} from '../../core/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                    from '../file/fileException.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+
+import LoaderConstants                from './loaderConstants.js'
+import JSONParser                     from './jsonParser.js'
+import LoaderParser                   from './loaderParser.js'
+import JSONOutputManager              from './jsonOutputManager.js'
+import ArrayOutputManager             from './arrayOutputManager.js'
+import CSVOutputManager               from './csvOutputManager.js'
+import CSVTransform                   from './csvTransform.js'
 
 /*
 **
@@ -85,15 +112,15 @@ class LoaderDBI extends YadamuDBI {
   static get SOFTWARE_VENDOR()       { return LoaderConstants.SOFTWARE_VENDOR};
   static get PROTOCOL()              { return LoaderConstants.PROTOCOL }
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return LoaderDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return LoaderDBI.DBI_PARAMETERS
   }
     
   get DATABASE_KEY()               { return LoaderDBI.DATABASE_KEY };
@@ -103,9 +130,9 @@ class LoaderDBI extends YadamuDBI {
   get PARTITION_LEVEL_OPERATIONS() { return true }
   get PROTOCOL()                   { return LoaderDBI.PROTOCOL };
   
-  get YADAMU_DBI_PARAMETERS()    { 
-	this._YADAMU_DBI_PARAMETERS = this._YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},super.YADAMU_DBI_PARAMETERS,{}))
-	return this._YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS()    { 
+	this._DBI_PARAMETERS = this._DBI_PARAMETERS || Object.freeze(Object.assign({},super.DBI_PARAMETERS,{}))
+	return this._DBI_PARAMETERS
   }
   
   get JSON_OUTPUT()              { return this.OUTPUT_FORMAT === 'JSON' }
@@ -214,7 +241,7 @@ class LoaderDBI extends YadamuDBI {
     super(yadamu,manager,connectionSettings,parameters)
 	this.yadamuProperties = {}
 	this.baseDirectory = path.resolve(this.vendorProperties.directory || "")
-	this._DB_VERSION = YadamuConstants.YADAMU_VERSION
+	this._DATABASE_VERSION = YadamuConstants.YADAMU_VERSION
   }    	
  
   isValidDDL() {
@@ -256,10 +283,8 @@ class LoaderDBI extends YadamuDBI {
 	return path.join(this.EXPORT_FOLDER,path.relative(this.controlFile.settings.baseFolder,target))
   }
   
-  getDataFileName(tableName,partitionNumber) {
-	 
-	 return Array.isArray(this.controlFile.data[tableName].files) ?  this.controlFile.data[tableName].files.shift() : this.controlFile.data[tableName].file 
-	 
+  getDataFileName(tableName,partitionNumber) {	 
+    return Array.isArray(this.controlFile.data[tableName].files) ?  this.controlFile.data[tableName].files.shift() : this.controlFile.data[tableName].file 
   }
 
   async loadMetadataFiles(copyStagedData) {
@@ -302,7 +327,7 @@ class LoaderDBI extends YadamuDBI {
 		TABLE_SCHEMA          : this.metadata[tableName].tableSchema
 	  , TABLE_NAME            : tableName
       , DATA_TYPE_ARRAY       : this.metadata[tableName].dataTypes
-	  , SPATIAL_FORMAT        : this.systemInformation.typeMappings.spatialFormat 
+	  , SPATIAL_FORMAT        : this.INBOUND_SPATIAL_FORMAT
 	  } 
       if (this.yadamu.PARALLEL_ENABLED && this.PARTITION_LEVEL_OPERATIONS && Array.isArray(this.controlFile.data[tableName].files)) {
 	    const partitionInfo = this.controlFile.data[tableName].files.map((fileName,idx) => { return Object.assign({}, tableInfo, { PARTITION_COUNT: this.controlFile.data[tableName].files.length, PARTITION_NUMBER: idx+1 })})
@@ -319,7 +344,7 @@ class LoaderDBI extends YadamuDBI {
   **
   */
 
-  async createControlFile() {
+  createControlFile() {
 
 	this.controlFile = { 
   	  settings : {
@@ -327,7 +352,6 @@ class LoaderDBI extends YadamuDBI {
       , compression        : this.yadamu.COMPRESSION
 	  , encryption         : this.ENCRYPTED_CONTENT ? this.yadamu.CIPHER : 'NONE'
 	  , baseFolder         : this.IMPORT_FOLDER
-	  , timestampPrecision : this.TIMESTAMP_PRECISION
       },
 	}
   }
@@ -353,8 +377,8 @@ class LoaderDBI extends YadamuDBI {
   }
   
   async writeMetadata() {
-    
-    // this.yadamuLogger.trace([this.constructor.name],`writeMetadata()`)
+	  
+	// this.yadamuLogger.trace([this.constructor.name],`writeMetadata()`)
     Object.values(this.metadata).forEach((table) => {delete table.source})
 
     this.controlFile.systemInformation = this.systemInformation
@@ -400,6 +424,7 @@ class LoaderDBI extends YadamuDBI {
 	} catch (err) {
       throw err.code === 'ENOENT' ? new DirectoryNotFound(this.DRIVER_ID,err,stack,file) : new FileError(this.DRIVER_ID,err,stack,file)
 	}
+	this.emit(YadamuConstants.DDL_UNNECESSARY)
 	this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created Control File: "${this.getURI(this.CONTROL_FILE_PATH)}"`)
   }
 
@@ -434,6 +459,10 @@ class LoaderDBI extends YadamuDBI {
     
 	this.yadamuLogger.info(['IMPORT',this.DATABASE_VENDOR],`Created directory: "${this.PROTOCOL}${this.resolve(this.IMPORT_FOLDER)}"`)
     this.createControlFile()
+  }
+  
+  async initializeData() {
+    const result = await this.writeMetadata()
   }
   
   getOutputStream(tableName,metrics) {
@@ -550,7 +579,7 @@ class LoaderDBI extends YadamuDBI {
     throw new YadamuError('Loading of "CSV" data sets not supported')
   }
   
-  async getInputStreams(tableInfo) {
+  async getInputStreams(tableInfo,parseDelay) {
 	const streams = []
 	const filename = this.makeAbsolute(this.getDataFileName(tableInfo.TABLE_NAME))
 
@@ -588,11 +617,11 @@ class LoaderDBI extends YadamuDBI {
 	switch (this.controlFile.settings.contentType) {
 	  case 'CSV':
 	    parser = this.getCSVParser()
-		transform =  new CSVTransform(tableInfo,this.yadamuLogger)
+		transform =  new CSVTransform(this,tableInfo,this.yadamuLogger,parseDelay)
 		break;
 	  case 'JSON':
 	    parser =  new JSONParser(this.yadamuLogger, this.MODE, filename)
-	    transform = new LoaderParser(tableInfo,this.yadamuLogger)
+	    transform = new LoaderParser(this,tableInfo,this.yadamuLogger,parseDelay)
 	}  
 	  
     parser.COPY_METRICS = metrics
@@ -618,11 +647,11 @@ class LoaderDBI extends YadamuDBI {
   async generateStatementCache() {
 
 	this.statementCache = {}
-	
     Object.keys(this.metadata).forEach((table,idx) => {
       const tableMetadata = this.metadata[table];
-	  this.statementCache[tableMetadata.tableName] = {	tableName         : table
-	  , _SPATIAL_FORMAT   : this.systemInformation.typeMappings.spatialFormat 
+	  this.statementCache[tableMetadata.tableName] = {
+ 	    tableName         : table
+	  , _SPATIAL_FORMAT   : this.INBOUND_SPATIAL_FORMAT
 	  , _BATCH_SIZE       : this.BATCH_SIZE
       , insertMode        : 'JSON'
       , columnNames       : [... tableMetadata.columnNames]
@@ -637,9 +666,7 @@ class LoaderDBI extends YadamuDBI {
 
   async executeDDL(ddl) {
 	this.ddl = ddl
-    const result = await this.writeMetadata()
-	this.emit(YadamuConstants.DDL_UNNECESSARY)
-	return [result]
+    return [true]
   }
   
   parseJSON(fileContents) {
@@ -647,7 +674,7 @@ class LoaderDBI extends YadamuDBI {
   }  
   
   classFactory(yadamu) {
-	return new LoaderDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new LoaderDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async cloneSettings() {

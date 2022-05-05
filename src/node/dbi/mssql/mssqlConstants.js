@@ -14,7 +14,7 @@ class MsSQLConstants {
   static get STATIC_PARAMETERS() { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
       "SPATIAL_MAKE_VALID"        : false
-    , "SPATIAL_FORMAT"            : "WKB"
+  , "ROW_LIMIT"                 : 8060
     })
     return this._STATIC_PARAMETERS;
   }
@@ -26,8 +26,9 @@ class MsSQLConstants {
     return this.#_DBI_PARAMETERS
   }
 
-  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
   static get SPATIAL_MAKE_VALID()     { return this.DBI_PARAMETERS.SPATIAL_MAKE_VALID };
+  static get ROW_LIMIT()              { return this.DBI_PARAMETERS.ROW_LIMIT };
+
   static get STATEMENT_TERMINATOR()   { return ';' }
  
   static get STAGING_TABLE () { 
@@ -41,6 +42,11 @@ class MsSQLConstants {
   static get MISSING_TABLE_ERROR() {
     this._MISSING_TABLE_ERROR = this._MISSING_TABLE_ERROR || Object.freeze([208])
     return this._MISSING_TABLE_ERROR
+  }
+
+  static get CONTENT_TOO_LARGE_ERROR() {
+    this._CONTENT_TOO_LARGE_ERROR = this._CONTENT_TOO_LARGE_ERROR || Object.freeze([511])
+    return this._CONTENT_TOO_LARGE_ERROR
   }
 
   static get LOST_CONNECTION_ERROR() {

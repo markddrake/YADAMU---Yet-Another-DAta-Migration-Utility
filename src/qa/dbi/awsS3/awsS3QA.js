@@ -8,15 +8,15 @@ import YadamuQALibrary   from '../../lib/yadamuQALibrary.js'
 
 class AWSS3QA extends YadamuQALibrary.loaderQAMixin(AWSS3DBI) {
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
   
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,AWSS3Constants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[AWSS3Constants.DATABASE_KEY] || {},{RDBMS: AWSS3Constants.DATABASE_KEY}))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.DBI_PARAMETERS,AWSS3Constants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[AWSS3Constants.DATABASE_KEY] || {},{RDBMS: AWSS3Constants.DATABASE_KEY}))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-    return AWSS3QA.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+    return AWSS3QA.DBI_PARAMETERS
   }	
 	 	
   constructor(yadamu,manager,connectionSettings,parameters) {
@@ -43,7 +43,7 @@ class AWSS3QA extends YadamuQALibrary.loaderQAMixin(AWSS3DBI) {
   }
 
   classFactory(yadamu) {
-    return new AWSS3QA(yadamu,this,this.connectionSettings,this.parameters)
+    return new AWSS3QA(yadamu,this,this.connectionParameters,this.parameters)
   }}
  
 export { AWSS3QA as default }

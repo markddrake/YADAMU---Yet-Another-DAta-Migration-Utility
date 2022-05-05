@@ -23,19 +23,21 @@ class MsSQLStatementLibrary {
                                             end
                                           ,',') within group (order by "ORDINAL_POSITION"),']') "DATA_TYPE_ARRAY"
                    ,concat('[',string_agg(concat('"',"COLLATION_NAME",'"'),',') within group (order by "ORDINAL_POSITION"),']') "COLLATION_NAME_ARRAY"
-                   ,concat('[',string_agg(case
-                                  when ("NUMERIC_PRECISION" is not null) and ("NUMERIC_SCALE" is not null) 
-                                    then concat('"',"NUMERIC_PRECISION",',',"NUMERIC_SCALE",'"')
-                                  when ("NUMERIC_PRECISION" is not null) 
-                                    then concat('"',"NUMERIC_PRECISION",'"')
-                                  when ("DATETIME_PRECISION" is not null)
-                                    then concat('"',"DATETIME_PRECISION",'"')
-                                  when ("CHARACTER_MAXIMUM_LENGTH" is not null)
-                                    then concat('"',"CHARACTER_MAXIMUM_LENGTH",'"')
-                                  else
-                                    '""'
-                                end
-                               ,','
+                   ,concat('[',string_agg(
+				                concat('[',
+				                  case
+                                    when ("NUMERIC_PRECISION" is not null) and ("NUMERIC_SCALE" is not null) then
+                                      concat(cast("NUMERIC_PRECISION" as VARCHAR(16)),',',cast("NUMERIC_SCALE" as VARCHAR(16)))
+                                    when ("NUMERIC_PRECISION" is not null) then
+                                       cast("NUMERIC_PRECISION" as VARCHAR(16))
+                                    when ("DATETIME_PRECISION" is not null)then
+                                      cast("DATETIME_PRECISION" as VARCHAR(16))
+                                    when ("CHARACTER_MAXIMUM_LENGTH" is not null) and("CHARACTER_MAXIMUM_LENGTH"  > -1) then
+                                      cast("CHARACTER_MAXIMUM_LENGTH" as VARCHAR(16))
+                                  end
+                                  ,']'
+								)
+							   ,','
                               )
                      within group (order by "ORDINAL_POSITION"),']') "SIZE_CONSTRAINT_ARRAY"
                     ,string_agg(case 

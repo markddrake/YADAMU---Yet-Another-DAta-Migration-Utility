@@ -7,7 +7,7 @@ import MsSQLDBI        from '../../../node/dbi//mssql/mssqlDBI.js';
 import MsSQLError      from '../../../node/dbi//mssql/mssqlException.js'
 import MsSQLConstants  from '../../../node/dbi//mssql/mssqlConstants.js';
 
-import YadamuTest      from '../../core/yadamu.js';
+import Yadamu          from '../../core/yadamu.js';
 import YadamuQALibrary from '../../lib/yadamuQALibrary.js'
 
 class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
@@ -15,15 +15,15 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
     static get SQL_SCHEMA_TABLE_ROWS()     { return _SQL_SCHEMA_TABLE_ROWS }
     static get SQL_COMPARE_SCHEMAS()       { return _SQL_COMPARE_SCHEMAS }
 
-    static #_YADAMU_DBI_PARAMETERS
+    static #_DBI_PARAMETERS
     
-    static get YADAMU_DBI_PARAMETERS()  { 
-       this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[MsSQLConstants.DATABASE_KEY] || {},{RDBMS: MsSQLConstants.DATABASE_KEY}))
-       return this.#_YADAMU_DBI_PARAMETERS
+    static get DBI_PARAMETERS()  { 
+       this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[MsSQLConstants.DATABASE_KEY] || {},{RDBMS: MsSQLConstants.DATABASE_KEY}))
+       return this.#_DBI_PARAMETERS
     }
    
-    get YADAMU_DBI_PARAMETERS() {
-      return MsSQLQA.YADAMU_DBI_PARAMETERS
+    get DBI_PARAMETERS() {
+      return MsSQLQA.DBI_PARAMETERS
     }   
         
     constructor(yadamu,manager,connectionSettings,parameters) {
@@ -88,7 +88,7 @@ class MsSQLQA extends YadamuQALibrary.qaMixin(MsSQLDBI) {
       await this.useDatabase(source.database);
       
       let compareRules = this.yadamu.getCompareRules(rules)   
-      compareRules = this.DB_VERSION  > 12 ? JSON.stringify(compareRules) : this.yadamu.makeXML(compareRules)
+      compareRules = this.DATABASE_VERSION  > 12 ? JSON.stringify(compareRules) : this.yadamu.makeXML(compareRules)
 
       
       let args = 

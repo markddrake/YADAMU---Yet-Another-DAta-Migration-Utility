@@ -52,6 +52,7 @@ class MariadbWriter extends YadamuWriter {
   }
   	
   async _writeBatch(batch,rowCount) {
+	  
    // console.log(batch.slice(0,this.tableInfo.columnCount))
 
    let repackBatch = false
@@ -76,13 +77,12 @@ class MariadbWriter extends YadamuWriter {
           this.tableInfo.insertMode = 'Iterative'
           repackBatch = true;
         }
-        break;  
       case 'Iterative':     
         const sqlStatement = `${this.tableInfo.dml} ${this.tableInfo.rowConstructor}`
         for (let row =0; row < rowCount; row++) {
           const nextRow = repackBatch ?  batch.splice(0,this.tableInfo.columnCount) : batch[row]
           try {
-            const results = await this.dbi.executeSQL(this.tableInfo.dml,nextRow);
+            const results = await this.dbi.executeSQL(sqlStatement,nextRow);
             await this.processWarnings(results,nextRow);
 		    this.adjustRowCounts(1);
           } catch (cause) {
@@ -96,9 +96,8 @@ class MariadbWriter extends YadamuWriter {
       default:
     }     
    
-    this.endTime = performance.now();
-    this.releaseBatch(batch)
-    return this.skipTable          
+        
+	
   }
 
 }

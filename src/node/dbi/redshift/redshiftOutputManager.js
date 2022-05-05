@@ -1,10 +1,13 @@
-"use strict"
 
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                               from 'perf_hooks';
+						
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
+import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js'
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuOutputManager from '../base/yadamuWriter.js';
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class RedshiftWriter extends YadamuOutputManager {
 
@@ -16,7 +19,7 @@ class RedshiftWriter extends YadamuOutputManager {
     // Set up Transformation functions to be applied to the incoming rows
  
     return  targetDataTypes.map((targetDataType,idx) => {
-      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
+      const dataType = YadamuDataTypes.decomposeDataType(targetDataType);
       switch (dataType.type.toLowerCase()) {
 		case "tsvector":
         case "json" :

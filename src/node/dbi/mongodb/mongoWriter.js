@@ -120,7 +120,7 @@ class MongoWriter extends YadamuWriter {
   async _writeBatch(batch,rowCount) {
 	      
      // ### Todo: ERROR HANDLING and Iterative Mode.
-	
+	 
     try {
 	  const results = await this.dbi.insertMany(this.tableInfo.tableName,batch);
       this.endTime = performance.now();

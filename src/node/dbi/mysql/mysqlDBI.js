@@ -1,40 +1,62 @@
-"use strict" 
 
-import fs from 'fs';
-import { performance } from 'perf_hooks';
+import fs                             from 'fs';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
-import mysql from 'mysql';
+import {
+  finished
+}                                     from 'stream/promises';
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
 
-import MySQLConstants from './mysqlConstants.js'
-import MySQLError from './mysqlException.js'
-import MySQLParser from './mysqlParser.js';
-import MySQLWriter from './mysqlWriter.js';
-import MySQLOutputManager from './mysqlOutputManager.js';
-import StatementGenerator from './statementGenerator.js';
-import MySQLStatementLibrary from './mysqlStatementLibrary.js';
+import mysql from 'mysql';	          
+
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
+
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+import ExportFileHeader               from '../file/exportFileHeader.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                     from '../file/fileException.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+	
+import MySQLConstants                 from './mysqlConstants.js'
+import MySQLDataTypes                 from './mysqlDataTypes.js'
+import MySQLError                     from './mysqlException.js'
+import MySQLParser                    from './mysqlParser.js'
+import MySQLWriter                    from './mysqlWriter.js'
+import MySQLOutputManager             from './mysqlOutputManager.js'
+import MySQLStatementGenerator        from './mysqlStatementGenerator.js'
+import MySQLStatementLibrary          from './mysqlStatementLibrary.js'
 
 class MySQLDBI extends YadamuDBI {
    
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,MySQLConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,MySQLConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return MySQLDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return MySQLDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -52,10 +74,8 @@ class MySQLDBI extends YadamuDBI {
   get STATEMENT_TERMINATOR()         { return MySQLConstants.STATEMENT_TERMINATOR };
   
   // Enable configuration via command line parameters
-  get SPATIAL_FORMAT()               { return this.parameters.SPATIAL_FORMAT            || MySQLConstants.SPATIAL_FORMAT }
   get READ_KEEP_ALIVE()              { return this.parameters.READ_KEEP_ALIVE           || MySQLConstants.READ_KEEP_ALIVE}
-  get TREAT_TINYINT1_AS_BOOLEAN()    { return this.parameters.TREAT_TINYINT1_AS_BOOLEAN || MySQLConstants.TREAT_TINYINT1_AS_BOOLEAN }
-
+  
   // Not available until configureConnection() has been called 
 
   get LOWER_CASE_TABLE_NAMES()       { this._LOWER_CASE_TABLE_NAMES }
@@ -65,7 +85,15 @@ class MySQLDBI extends YadamuDBI {
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.LOADER_STAGING }
 
   constructor(yadamu,manager,connectionSettings,parameters) {
+
     super(yadamu,manager,connectionSettings,parameters)
+	this.DATA_TYPES = MySQLDataTypes
+
+	this.DATA_TYPES.storageOptions.BOOLEAN_TYPE = this.parameters.MYSQL_BOOLEAN_STORAGE_OPTION || this.DBI_PARAMETERS.BOOLEAN_STORAGE_OPTION || this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	this.DATA_TYPES.storageOptions.SET_TYPE     = this.parameters.MYSQL_SET_STORAGE_OPTION     || this.DBI_PARAMETERS.SET_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.SET_TYPE
+	this.DATA_TYPES.storageOptions.ENUM_TYPE    = this.parameters.MYSQL_ENUM_STORAGE_OPTION    || this.DBI_PARAMETERS.ENUM_STORAGE_OPTION    || this.DATA_TYPES.storageOptions.ENUM_TYPE
+	this.DATA_TYPES.storageOptions.XML_TYPE     = this.parameters.MYSQL_XML_STORAGE_OPTION     || this.DBI_PARAMETERS.XML_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.XML_TYPE
+	
     this.keepAliveInterval = this.parameters.READ_KEEP_ALIVE ? this.parameters.READ_KEEP_ALIVE : 0
     this.keepAliveHdl = undefined
 	
@@ -75,7 +103,7 @@ class MySQLDBI extends YadamuDBI {
 
   initializeManager() {
 	super.initializeManager()
-	this.StatementGenerator = StatementGenerator
+	this.StatementGenerator = MySQLStatementGenerator
 	this.StatementLibrary = MySQLStatementLibrary
 	this.statementLibrary = undefined
   }	 
@@ -103,7 +131,7 @@ class MySQLDBI extends YadamuDBI {
 
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)
     let results = await this.executeSQL(this.StatementLibrary.SQL_GET_CONNECTION_INFORMATION)
-	this._DB_VERSION = results[0].DATABASE_VERSION
+	this._DATABASE_VERSION = results[0].DATABASE_VERSION
     
     results = await this.executeSQL(this.StatementLibrary.SQL_SHOW_SYSTEM_VARIABLES)
     results.forEach((row) => {
@@ -388,7 +416,7 @@ class MySQLDBI extends YadamuDBI {
   async setLibraries() {
 	this.setSpatialSerializer(this.SPATIAL_FORMAT)
 	switch (true) {
-	  case (this.DB_VERSION < 8.0):
+	  case (this.DATABASE_VERSION < 8.0):
 	    this.StatementLibrary = (await import('./57/mssqlStatementLibrary.js')).default
 		this.StatementGenerator = (await import('../../dbShared/mysql/57statementGenerator.js')).default;
 	    break;
@@ -529,6 +557,21 @@ class MySQLDBI extends YadamuDBI {
  
   async uploadFile(importFilePath) {
 
+	const is = await new Promise((resolve,reject) => {
+      const stack = new Error().stack
+      const inputStream = fs.createReadStream(importFilePath);
+      inputStream.once('open',() => {resolve(inputStream)}).once('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
+    })
+	
+    const exportFileHeader = new ExportFileHeader (is, importFilePath, this.yadamuLogger)
+
+	try {
+	  await finished(exportFileHeader);
+	} catch (e) { /* Expected to throw Premature Close */}
+
+    this.setSystemInformation(exportFileHeader.SYSTEM_INFORMATION)
+    this.setMetadata(exportFileHeader.METADATA)
+    
     let results = await this.createStagingTable()
     results = await this.loadStagingTable(importFilePath,true)
     return results;
@@ -552,8 +595,16 @@ class MySQLDBI extends YadamuDBI {
   }
 
   async processFile(hndl) {
-    const sqlStatement = `SET @RESULTS = ''; CALL YADAMU_IMPORT(?,@RESULTS); SELECT @RESULTS "logRecords";`;                     
-    let results = await  this.executeSQL(sqlStatement,this.CURRENT_SCHEMA)
+
+    const options = {
+      booleanStorgeOption  : this.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	, xmlStorageOption     : this.DATA_TYPES.storageOptions.XML_TYPE
+	}
+	
+	const typeMappings = await this.getVendorDataTypeMappings(MySQLStatementGenerator)
+	 
+    const sqlStatement = `SET @RESULTS = ''; CALL YADAMU_IMPORT(?,?,?,@RESULTS); SELECT @RESULTS "logRecords";`;                     
+    let results = await  this.executeSQL(sqlStatement,[typeMappings,this.CURRENT_SCHEMA, JSON.stringify(options)])
     results = results.pop()
     return this.processLog(results,'JSON_TABLE')
   }
@@ -686,7 +737,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   createParser(queryInfo,parseDelay) {
-    this.parser = new MySQLParser(queryInfo,this.yadamuLogger,parseDelay)
+    this.parser = new MySQLParser(this,queryInfo,this.yadamuLogger,parseDelay)
     return this.parser;
   }  
     
@@ -701,7 +752,7 @@ class MySQLDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-    return new MySQLDBI(yadamu,this,this.connectionSettings,this.parameters)
+    return new MySQLDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {

@@ -30,10 +30,6 @@ class MsSQLWriter extends YadamuWriter {
     // console.log(this.constructor.name,'writeBatch()',this.tableInfo.bulkSupported,)
     // console.dir(batch,{depth:null})
     
-    if (this.SPATIAL_FORMAT === 'GeoJSON') {
-      YadamuSpatialLibrary.recodeSpatialColumns(this.SPATIAL_FORMAT,'WKT',this.tableInfo.targetDataTypes,batch.rows,true)
-    } 
-
     if (this.tableInfo.insertMode === 'BCP') {
       try {       
         await this.dbi.createSavePoint()
@@ -43,16 +39,16 @@ class MsSQLWriter extends YadamuWriter {
 		this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
-		if (this.dbi.isExpectedCancellation(cause)) {
+        if (this.dbi.isExpectedCancellation(cause)) {
 	      await this.dbi.restoreSavePoint(cause);
           this.endTime = performance.now();
           this.releaseBatch(batch)
           return this.skipTable          
 	    }
-		// Reminder Report Batch Error throws cause if there are lost rows
+        // Reminder Report Batch Error throws cause if there are lost rows
 		this.reportBatchError(batch,`INSERT MANY`,cause)
 	    await this.dbi.restoreSavePoint(cause);
-		if (this.dbi.TRANSACTION_IN_PROGRESS && this.dbi.tediousTransactionError) {
+		if (this.dbi.TEDIOUS_TRANSACTION_ISSUE) {
 		  // this.yadamuLogger.trace([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],`Unexpected ROLLBACK during BCP Operation. Starting new Transaction`);          
 		  await this.dbi.recoverTransactionState(true)
 		}	
@@ -64,7 +60,7 @@ class MsSQLWriter extends YadamuWriter {
     // Cannot process table using BCP Mode. Prepare a statement use with record by record processing.
  
     try {
-      await this.dbi.cachePreparedStatement(this.tableInfo.dml, this.tableInfo.decomposedDataTypes, this.SPATIAL_FORMAT) 
+      await this.dbi.cachePreparedStatement(this.tableInfo.dml, this.tableInfo.dataTypeDefinitions, this.SPATIAL_FORMAT) 
     } catch (cause) {
       if (this.rowsLost()) {
 		throw cause
@@ -87,7 +83,7 @@ class MsSQLWriter extends YadamuWriter {
 		this.adjustRowCounts(1)
         this.dbi.SQL_TRACE.disable()
       } catch (cause) {
-		if (this.dbi.TRANSACTION_IN_PROGRESS && this.dbi.tediousTransactionError) {
+		if (this.dbi.TRANSACTION_IN_PROGRESS && this.dbi.TEDIOUS_TRANSACTION_ISSUE) {
 		  // this.yadamuLogger.trace([`${this.dbi.DATABASE_VENDOR}`,`WRITE`,`"${this.tableName}"`],`Unexpected ROLLBACK during BCP Operation. Starting new Transaction`);          
 		  await this.dbi.recoverTransactionState(true)
 		}	

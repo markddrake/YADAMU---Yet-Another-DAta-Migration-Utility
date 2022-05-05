@@ -1,16 +1,23 @@
-"use strict"
 
-import { performance } from 'perf_hooks';
-
+import { 
+  performance 
+}                               from 'perf_hooks';
+						
 import WKX from 'wkx';
 
-import mongodb from 'mongodb'
-const { ObjectID, Decimal128, Long} = mongodb
+import mongodb                  from 'mongodb'
+const { 
+  ObjectID, 
+  Decimal128, 
+  Long, 
+  Int32, 
+  Double
+} = mongodb
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuOutputManager from '../base/yadamuOutputManager.js';
-import {BatchInsertError} from '../../core/yadamuException.js'
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
+
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class MongoOutputManager extends YadamuOutputManager {
 
@@ -41,43 +48,37 @@ class MongoOutputManager extends YadamuOutputManager {
     super(dbi,tableName,metrics,status,yadamuLogger)
   }
   
-  generateTransformations(targetDataTypes) {
+  generateTransformations(dataTypes) {
 
     // Set up Transformation functions to be applied to the incoming rows
- 	  
-	const transformations = this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
-	   switch(targetDataType.toLowerCase()){
-        case 'objectid':
+  
+	const transformations = dataTypes.map((dataType,idx) => {      
+	
+	   switch(dataType.toLowerCase()){
+        case this.dbi.DATA_TYPES.MONGO_OBJECTID_TYPE:
 	      return (col,idx) => {
 			return ObjectID(col)
 	      }
           break;
-		case 'numeric':
-		case 'decimal':
+		case this.dbi.DATA_TYPES.INTEGER_TYPE:
+          return (col,idx) => {
+            return new Int32(col)
+	      }		
+    	case this.dbi.DATA_TYPES.DOUBLE_TYPE:
+          return (col,idx) => {
+            return new Double(col)
+	      }		
+		case this.dbi.DATA_TYPES.MONGO_DECIMAL128_TYPE:
 		  return (col,idx) => {
-			 return Decimal128.fromString(col)
+			 return Decimal128.fromString( typeof col === 'string' ? col : col.toString()) 
 	      }
           break;
-		case 'long':
+		case this.dbi.DATA_TYPES.MONGO_BIGINT_TYPE:
 		  return (col,idx) => {
 			 return Long.fromString(col)
 	      }
           break;
-        case 'geometry':
-        case 'geography':
-		case 'point':
-        case 'lseg':
-		case 'box':
-		case 'path':
-		case 'polygon':
-		case 'circle':
-        case 'linestring':
-		case 'multipoint':
-        case 'multilinestring':
-		case 'multipolygon':
-        case 'geometrycollection':
-        case 'geomcollection':
-        case '"MDSYS"."SDO_GEOMETRY"':
+        case this.dbi.DATA_TYPES.SPATIAL_TYPE:
           switch (this.dbi.INBOUND_SPATIAL_FORMAT) {
             case "WKB":
             case "EWKB":
@@ -94,30 +95,32 @@ class MongoOutputManager extends YadamuOutputManager {
             default:
           }
 		  return null
-        case 'boolean':
+        case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
           return (col,idx) => {
             return YadamuLibrary.toBoolean(col)
 	      }
-        case 'object':
+        case this.dbi.DATA_TYPES.MONGO_OBJECT_TYPE:
+        case this.dbi.DATA_TYPES.MONGO_ARRAY_TYPE:
           return (col,idx) => {
             return typeof col === 'string' && (col.length > 0) ? JSON.parse(col) : col
 	      }
-		case 'bindata':
-		  if ((this.tableInfo.columnNames[idx] === '_id') && (this.tableInfo.sizeConstraints[idx] === '12')) {
+		case this.dbi.DATA_TYPES.BINARY_TYPE:
+		  if ((this.tableInfo.columnNames[idx] === '_id') && (this.tableInfo.sizeConstraints[idx][0] === 12)) {
   	        return (col,idx) => {
               return ObjectID(col)
 	        }
 		  }
 		  return null
-		case 'date':
+		case this.dbi.DATA_TYPES.DATE_TYPE:
 		  if (this.dbi.MONGO_NATIVEJS_DATE) {
 	        return (col,idx) => {
               return new Date(col)
 	        }		
           }			
 		  return null
-		default:
-		  if (YadamuLibrary.isNumericType(targetDataType)) {
+    	default:
+		  /*
+		  if (this.dbi.DATA_TYPES.isNumericType(dataType)) {
 			return (col,idx) => {
 			  if (typeof col === 'string') {
 			    transformations[idx] = (col,idx) => {
@@ -130,7 +133,8 @@ class MongoOutputManager extends YadamuOutputManager {
 				return col
 			  }
 			}
-          }			
+          }	
+          */		  
           // First time through test if data is string and first character is '[' or ']'
 		  // TODO ### Trim and test last character is matching ']' or '}'
 		  if (this.dbi.MONGO_PARSE_STRINGS) {

@@ -1,0 +1,30 @@
+{
+  "mappings": {
+    "CHAR_TYPE"                                            :  "CHAR"                               
+  , "VARCHAR_TYPE"                                         :  "VARCHAR"                               
+  , "CLOB_TYPE"                                            :  "TEXT"                               
+  , "INTEGER_TYPE"                                         :  "INT"                                  
+  , "NUMERIC_TYPE"                                         :  "NUMBER"
+  , "DOUBLE_TYPE"                                          :  "FLOAT"                               
+  , "BINARY_TYPE"                                          :  "BINARY"                              
+  , "BOOLEAN_TYPE"                                         :  "BOOLEAN"                              
+  , "DATE_TYPE"                                            :  "DATE"                              
+  , "TIME_TYPE"                                            :  "TIME"                              
+  , "TIMESTAMP_TYPE"                                       :  "TIMESTAMP_NTZ"                              
+  , "TIMESTAMP_TZ_TYPE"                                    :  "TIMESTAMP_TZ"                              
+  , "TIMESTAMP_LTZ_TYPE"                                   :  "TIMESTAMP_LTZ"                              
+  , "SNOWFLAKE_VARIANT_TYPE"                               :  "VARIANT"	 
+  , "UNBOUNDED_NUMERIC_TYPE"                               :  "NUMBER(38,19)"
+  , "SPATIAL_TYPE"                                         :  "GEOGRAPHY"
+  }
+, "limits" : {
+	"SCALAR_LENGTH"                                        : 16777216
+  , "BINARY_LENGTH"                                        : 8388608
+  , "TIMESTAMP_PRECISION"                                  : 9
+  }
+, "storageOptions": {
+	"SPATIAL_FORMAT"                                       : "WKB"
+   ,"XML_TYPE"                                             : "VARIANT"
+   ,"JSON_TYPE"                                            : "VARIANT"
+  }
+}

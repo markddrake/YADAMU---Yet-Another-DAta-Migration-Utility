@@ -1,24 +1,23 @@
-"use strict";
 
-import path from 'path';
-import crypto from 'crypto';
-import { performance } from 'perf_hooks';
+import path                     from 'path';
+import crypto                   from 'crypto';
+
+import { 
+  performance 
+}                               from 'perf_hooks';
 
 import oracledb from 'oracledb';
 oracledb.fetchAsString = [ oracledb.DATE, oracledb.NUMBER ]
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-     
-class StatementGenerator {
+import YadamuLibrary            from '../../lib/yadamuLibrary.js';
 
-  static get LOB_TYPES()   { 
-    StatementGenerator._LOB_TYPES = StatementGenerator._LOB_TYPES || Object.freeze([oracledb.CLOB,oracledb.BLOB])
-    return StatementGenerator._LOB_TYPES
-  }
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuStatementGenerator from '../base/yadamuStatementGenerator.js'
+
+class OracleStatementGenerator extends YadamuStatementGenerator {
 
   get BIND_LENGTH() {     
-    StatementGenerator._BIND_LENGTH = StatementGenerator._BIND_LENGTH || Object.freeze({
+    this._BIND_LENGTH = this._BIND_LENGTH || Object.freeze({
       BLOB          : this.dbi.LOB_MAX_SIZE
     , CLOB          : this.dbi.LOB_MAX_SIZE
     , JSON          : this.dbi.LOB_MAX_SIZE
@@ -34,16 +33,11 @@ class StatementGenerator {
     , TIMESTAMP     : 35
     , INTERVAL      : 12
     })
-    return StatementGenerator._BIND_LENGTH
+    return this._BIND_LENGTH
   }
   
-  static get BOUNDED_TYPES() { 
-    StatementGenerator._BOUNDED_TYPES = StatementGenerator._BOUNDED_TYPES || Object.freeze( ['CHAR','NCHAR','VARCHAR2','NVARCHAR2','RAW'])
-    return StatementGenerator._BOUNDED_TYPES;
-  }
-
-
   // This is the spatial format of the incoming data, not the format used by this driver
+  
   get SPATIAL_FORMAT()               { return this.dbi.INBOUND_SPATIAL_FORMAT } 
   get OBJECTS_AS_JSON()              { return this.dbi.systemInformation.objectFormat === 'JSON'}
 
@@ -59,95 +53,124 @@ class StatementGenerator {
   get LOADER_CLOB_SIZE()             { return 67108864 }
   get LOADER_CLOB_TYPE()             { return `CHAR(${this.LOADER_CLOB_SIZE})`}
     
-  constructor(dbi, targetSchema, metadata, yadamuLogger) {
-    this.dbi = dbi;
-    this.targetSchema = targetSchema
-    this.metadata = metadata
-    this.yadamuLogger = yadamuLogger
+  get STATEMENT_GENERATOR_OPTIONS() {
+
+    const options = {
+	  spatialFormat        : this.dbi.INBOUND_SPATIAL_FORMAT
+	, circleFormat         : this.dbi.INBOUND_CIRCLE_FORMAT
+	, xmlStorageClause     : this.dbi.XMLTYPE_STORAGE_CLAUSE
+	, jsonStorageOption    : this.dbi.DATA_TYPES.storageOptions.JSON_TYPE
+	, booleanStorgeOption  : this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE
+	, objectStorgeOption   : this.dbi.DATA_TYPES.storageOptions.OBJECT_TYPE
+	}
+	
+	return JSON.stringify(options); 
   }
-   
-  generateBinds(dataTypes, tableInfo, metadata) {
+  	
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {  
+    super(dbi, vendor, targetSchema, metadata, yadamuLogger)
+  }
+
+     
+  generateBinds(dataTypeDefinitions, tableInfo, metadata) {
       
      // Binds describe the format that will be used to supply the data. Eg with SQLServer BIGINT values will be presented as String
 	 tableInfo.lobColumns = false;
-     return dataTypes.map((dataType,idx) => {
-       if (!dataType.length) {
-          dataType.length = parseInt(metadata.sizeConstraints[idx]);
+     return dataTypeDefinitions.map((dataTypeDefinition,idx) => {
+		 
+       if (!dataTypeDefinition.length) {
+          dataTypeDefinition.length = metadata.sizeConstraints[idx][0]
        }
-       switch (dataType.type) {
-         case 'NUMBER':
+	   
+	   switch (dataTypeDefinition.type) {
+         case this.dbi.DATA_TYPES.NUMBER_TYPE:
            return { type: oracledb.DB_TYPE_NUMBER }
 		   // return { type: oracledb.STRING, maxSize : this.BIND_LENGTH.NUMBER}
-         case 'FLOAT':
-         case 'BINARY_FLOAT':
+         case this.dbi.DATA_TYPES.FLOAT_TYPE:
            return { type: oracledb.DB_TYPE_BINARY_FLOAT }
-         case 'BINARY_DOUBLE':
+         case this.dbi.DATA_TYPES.DOUBLE_TYPE:
            /*
            // Peek numeric binds to check for strings when writing
-           if ((metadata.source.vendor === 'SNOWFLAKE') && ['NUMBER','DECIMAL','NUMERIC','FLOAT', 'FLOAT4', 'FLOAT8', 'DOUBLE','DOUBLE PRECISION', 'REAL'].includes(metadata.source.dataTypes[idx])) {
-             return { type: oracledb.STRING, maxSize : dataType.length + 3}
+           if ((metadata.source.vendor === 'SNOWFLAKE') && ['NUMBER','DECIMAL','NUMERIC','FLOAT', 'FLOAT4', 'FLOAT8', 'DOUBLE','DOUBLE PRECISION', 'REAL'].includes(metadata.source.dataTypeDefinitions[idx])) {
+             return { type: oracledb.STRING, maxSize : dataTypeDefinition.length + 3}
            }
            */
            return { type: oracledb.DB_TYPE_BINARY_DOUBLE }
-         case 'RAW':
-           return { type: oracledb.DB_TYPE_RAW, maxSize : dataType.length}
-         case 'CHAR':
-           return { type: oracledb.DB_TYPE_CHAR, maxSize : dataType.length * 2}
-         case 'VARCHAR':
-         case 'VARCHAR2':
-           return { type: oracledb.DB_TYPE_VARCHAR, maxSize : dataType.length * 2}
-         case 'NCHAR':
-           return { type: oracledb.DB_TYPE_NCHAR, maxSize : dataType.length * 2}
-         case 'NVARCHAR2':
-           return { type: oracledb.DB_TYPE_VARCHAR, maxSize : dataType.length * 2}
-         case 'DATE':
-         case 'TIMESTAMP':
+         case this.dbi.DATA_TYPES.BINARY_TYPE:
+           return { type: oracledb.DB_TYPE_RAW, maxSize : dataTypeDefinition.length}
+         case this.dbi.DATA_TYPES.CHAR_TYPE:
+           return { type: oracledb.DB_TYPE_CHAR, maxSize : dataTypeDefinition.length * 2}
+         case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+         case this.dbi.DATA_TYPES.VARCHAR2_TYPE:
+           return { type: oracledb.DB_TYPE_VARCHAR, maxSize : dataTypeDefinition.length * 2}
+         case this.dbi.DATA_TYPES.NCHAR_TYPE:
+           return { type: oracledb.DB_TYPE_NCHAR, maxSize : dataTypeDefinition.length * 2}
+         case this.dbi.DATA_TYPES.NVARCHAR_TYPE:
+           return { type: oracledb.DB_TYPE_NVARCHAR, maxSize : dataTypeDefinition.length * 2}
+         case this.dbi.DATA_TYPES.DATE_TYPE:
+         case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
+         case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
+         case this.dbi.DATA_TYPES.TIMESTAMP_LTZ_TYPE:
            return { type: oracledb.STRING, maxSize : this.BIND_LENGTH.TIMESTAMP}
-         case 'INTERVAL':
+         case this.dbi.DATA_TYPES.INTERVAL_TYPE: // Legacy
+         case this.dbi.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
+         case this.dbi.DATA_TYPES.INTERVAL_YEAR_TO_MONTH_TYPE:
             return { type: oracledb.STRING, maxSize : this.BIND_LENGTH.INTERVAL}
-         case 'CLOB':
+         case this.dbi.DATA_TYPES.CLOB_TYPE:
            tableInfo.lobColumns = true;
            return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.CLOB }
-         case 'NCLOB':
+         case this.dbi.DATA_TYPES.NCLOB_TYPE:
            tableInfo.lobColumns = true;
            // return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.NCLOB }
            return {type : oracledb.DB_TYPE_NCLOB, maxSize : this.BIND_LENGTH.NCLOB }
-         case 'ANYDATA':
+         case this.dbi.DATA_TYPES.ORACLE_ANYDATA_TYPE:
            tableInfo.lobColumns = true;
            return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.ANYDATA }
-         case 'XMLTYPE':
+         case this.dbi.DATA_TYPES.XML_TYPE:
            // Cannot Bind XMLTYPE > 32K as String: ORA-01461: can bind a LONG value only for insert into a LONG column when constructing XMLTYPE
            tableInfo.lobColumns = true;
            // return {type : oracledb.CLOB}
            return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.CLOB}
-         case 'JSON':
+         case this.dbi.DATA_TYPES.JSON_TYPE:
            // Defalt JSON Storeage model: JSON store as CLOB
            // JSON store as BLOB can lead to Error: ORA-40479: internal JSON serializer error during export operations.
            // return {type : oracledb.CLOB}
 		   switch (this.dbi.JSON_DATA_TYPE) {
-			  case 'JSON':
-			  case 'BLOB':
+			  case this.dbi.DATA_TYPES.JSON_TYPE:
+			  case this.dbi.DATA_TYPES.BLOB_TYPE:
                 tableInfo.lobColumns = true;
                 return {type : oracledb.DB_TYPE_BLOB, maxSize : this.BIND_LENGTH.JSON}
-			  case 'CLOB':
+			  case this.dbi.DATA_TYPES.CLOB_TYPE:
                 tableInfo.lobColumns = true;
                 return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.JSON}
 			  default:
 			    return {type : oracledb.DB_TYPE_VARCHAR, maxSize : 32767 }
 		   }
-         case 'BLOB':
+         case this.dbi.DATA_TYPES.BLOB_TYPE:
            // return {type : oracledb.BUFFER}
            // return {type : oracledb.BUFFER, maxSize : BIND_LENGTH.BLOB }
            tableInfo.lobColumns = true;
            return {type : oracledb.DB_TYPE_BLOB, maxSize : this.BIND_LENGTH.BLOB}
-         case 'BFILE':
+         case this.dbi.DATA_TYPES.ORACLE_BFILE_TYPE:
            return { type :oracledb.DB_TYPE_VARCHAR, maxSize : this.BIND_LENGTH.BFILE }
-         case 'BOOLEAN':
-            return { type: oracledb.BUFFER, maxSize :  this.BIND_LENGTH.BOOLEAN }         
-         case 'GEOMETRY':
-         case 'GEOGRAPHY':
-         case "\"MDSYS\".\"SDO_GEOMETRY\"":
-           tableInfo.lobColumns = true;
+         case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
+		   switch (true) {
+             case this.dbi.DATA_TYPES.BOOLEAN_AS_RAW1:
+               return { type: oracledb.BUFFER, maxSize :  this.BIND_LENGTH.BOOLEAN }         
+			 // ### TODO: Map other Boolean Storage Options here
+             // case this.dbi.DATA_TYPES.BOOLEAN_AS_NUMBER1:
+             //   return { type: oracledb.NUMBER, maxSize :  this.BIND_LENGTH.BOOLEAN }         
+			 // case this.dbi.DATA_TYPES.BOOLEAN_AS_VARCHAR5:
+			 //   return { type: oracledb.VARCHAR2, maxSize :  5 }         
+			 // case this.dbi.DATA_TYPES.BOOLEAN_AS_TF
+			 // case this.dbi.DATA_TYPES.BOOLEAN_AS_YN
+			 //   return { type: oracledb.VARCHAR2, maxSize :  this.BIND_LENGTH.BOOLEAN }         
+			 default:
+               return { type: oracledb.BUFFER, maxSize :  this.BIND_LENGTH.BOOLEAN }   
+		   }			   
+         case this.dbi.DATA_TYPES.SPATIAL_TYPE:
+		 case this.dbi.DATA_TYPES.YADAMU_SPATIAL_TYPE:
+		   tableInfo.lobColumns = true;
            // return {type : oracledb.CLOB}
            switch (this.SPATIAL_FORMAT) { 
              case "WKB":
@@ -163,23 +186,17 @@ class StatementGenerator {
            }
            break;   
          default:
-           if (dataType.type.indexOf('.') > -1) {
+           if (dataTypeDefinition.type.indexOf('.') > -1) {
              // return {type : oracledb.CLOB}
              tableInfo.lobColumns = true
 			 return {type : oracledb.DB_TYPE_CLOB, maxSize : this.BIND_LENGTH.OBJECT}
            }
-           return {type : oracledb.DB_TYPE_VARCHAR, maxSize :  dataType.length}
+           return {type : oracledb.DB_TYPE_VARCHAR, maxSize :  dataTypeDefinition.length}
        }
      })
   
   }
   
-  async getMetadataLob() {
-
-    return await this.dbi.jsonToBlob({metadata: this.metadata});  
-      
-  }
- 
   getPLSQL(dml) {    
 	const withOffset = dml.indexOf('\nWITH\n')
     return withOffset > -1 ? dml.substring(withOffset+5,dml.indexOf('\nselect')) : null
@@ -210,15 +227,15 @@ class StatementGenerator {
     for (const colIdx in tableInfo.lobBinds) {
 	  switch (tableInfo.targetDataTypes[colIdx]) {
 		// GEOMETRY is inserted by Stored Procedure.. Do not move to end of List.
-        case "GEOMETRY":
-        case "\"MDSYS\".\"SDO_GEOMETRY\"":
-		  bindOrdering.push(parseInt(colIdx))
-		  break
-        case "XMLTYPE":
+        case this.dbi.DATA_TYPES.SPATIAL_TYPE:
+        case this.dbi.DATA_TYPES.XML_TYPE:
+        case this.dbi.DATA_TYPES.CLOB_TYPE:
+        case this.dbi.DATA_TYPES.BLOB_TYPE:
+        case this.dbi.DATA_TYPES.NCLOB_TYPE:
 		  bindOrdering.push(parseInt(colIdx))
 		  break
 		default:
-          if (!StatementGenerator.LOB_TYPES.includes(tableInfo.lobBinds[colIdx].type)) {
+          if (!this.dbi.DATA_TYPES.LOB_TYPES.includes(tableInfo.lobBinds[colIdx].type)) {
             bindOrdering.push(parseInt(colIdx))
 		  }
 	  }
@@ -258,19 +275,12 @@ class StatementGenerator {
     return tableInfo
   }
 
-  getTypeMappings() {
+  async getMetadata() {
 
-    const typeMappings = {
-	  spatialFormat    : this.SPATIAL_FORMAT
-	, raw1AsBoolean    : new Boolean(this.dbi.TREAT_RAW1_AS_BOOLEAN).toString().toUpperCase()
-	, jsonDataType     : this.dbi.JSON_DATA_TYPE
-	, xmlStorageModel  : this.dbi.XML_STORAGE_CLAUSE
-	, circleFormat     : this.dbi.INBOUND_CIRCLE_FORMAT
-	}
-	
-	return JSON.stringify(typeMappings); 
+    return await this.dbi.jsonToBlob({metadata: this.metadata});  
+      
   }
-  
+ 
   generateExternalTableDefinition(tableMetadata,externalTableName,externalColumnDefinitions,copyColumnDefinitions) {
 	 return `
 CREATE TABLE ${externalTableName} (
@@ -313,19 +323,24 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 	, drop         : `drop table ${externalTableName}`
 	}
   }
-
-  async generateStatementCache(vendor) {
+  
+  async getSourceTypeMappings() {
+	 return await this.dbi.jsonToBlob(Array.from(this.TYPE_MAPPINGS.entries()))
+  } 
+  
+  async generateStatementCache() {
 	  
      /*
      **
      ** Turn the generated DDL Statements into an array and execute them as single batch via YADAMU_EXPORT_DDL.APPLY_DDL_STATEMENTS()
      **
      */
-	 
+    await this.init()
+	
 	this.SQL_DIRECTORY_NAME = `"YDIR-${crypto.randomBytes(this.RANDOM_OBJECT_LENGTH).toString("hex").toUpperCase()}"`
 	
-    const sourceDateFormatMask = this.dbi.getDateFormatMask(vendor);
-    const sourceTimeStampFormatMask = this.dbi.getTimeStampFormatMask(vendor);
+    const sourceDateFormatMask = this.dbi.getDateFormatMask(this.SOURCE_VENDOR);
+    const sourceTimeStampFormatMask = this.dbi.getTimeStampFormatMask(this.SOURCE_VENDOR);
     const oracleDateFormatMask = this.dbi.getDateFormatMask('Oracle');
     const oracleTimeStampFormatMask = this.dbi.getTimeStampFormatMask('Oracle');
     
@@ -345,21 +360,28 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
       setSourceTimeStampMask = `;\n  execute immediate 'ALTER SESSION SET NLS_TIMESTAMP_FORMAT = ''${sourceTimeStampFormatMask}'''`; 
     }
 
-    const typeMappings = this.getTypeMappings();
-	const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :schema, :typeMappings);end;`;
+	const sqlStatement = `begin :sql := YADAMU_IMPORT.GENERATE_STATEMENTS(:metadata, :typeMappings, :schema, :options);end;`;
 
-    // console.log(JSON.stringify(this.metadata," ",2));
-    const metadataLob = await this.getMetadataLob()
-	const startTime = performance.now()
-    const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadataLob, schema:this.targetSchema, typeMappings:typeMappings});
-	// this.dbi.yadamuLogger.trace([this.constructor.name],`${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
-    await metadataLob.close();
-    const statementCache = JSON.parse(results.outBinds.sql);
+	const metadata = await this.getMetadata()
+	const vendorTypeMappings = await this.getSourceTypeMappings()
     
-    const tables = Object.keys(this.metadata); 
+    const startTime = performance.now()
+	
+	const results = await this.dbi.executeSQL(sqlStatement,{sql:{dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 16 * 1024 * 1024} , metadata:metadata, typeMappings:vendorTypeMappings, schema:this.targetSchema, options:this.STATEMENT_GENERATOR_OPTIONS});
+	// this.dbi.yadamuLogger.trace([this.constructor.name],`${YadamuLibrary.stringifyDuration(performance.now() - startTime)}s.`);
+    
+	await metadata.close()
+	await vendorTypeMappings.close()
+	
+    const statementCache = JSON.parse(results.outBinds.sql)
+	
+	// this.debugStatementGenerator(this.STATEMENT_GENERATOR_OPTIONS,statementCache)
+	
+	const tables = Object.keys(this.metadata); 
     tables.forEach((table,idx) => {
       
 	  const tableMetadata = this.metadata[table];
+	  
       const tableName = tableMetadata.tableName;
 	  const tableInfo = statementCache[tableName];
 	  
@@ -370,12 +392,12 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
       tableInfo._BATCH_SIZE     = this.dbi.BATCH_SIZE
       tableInfo._SPATIAL_FORMAT = this.dbi.INBOUND_SPATIAL_FORMAT
       
-	  const dataTypes           = YadamuLibrary.decomposeDataTypes(tableInfo.targetDataTypes)
-      tableInfo.binds           = this.generateBinds(dataTypes,tableInfo,tableMetadata);
-
-	  if (tableInfo.lobColumns) {
+	  const dataTypeDefinitions = YadamuDataTypes.decomposeDataTypes(tableInfo.targetDataTypes)
+      tableInfo.binds           = this.generateBinds(dataTypeDefinitions,tableInfo,tableMetadata);
+	  
+      if (tableInfo.lobColumns) {
 		// Do not 'copy' binds to lobBinds. binds is a collection of objects and we do not want to change properties of the objects in binds when we modify corresponding properties in lobBinds.
-		tableInfo.lobBinds = this.generateBinds(dataTypes, tableInfo,tableMetadata);
+		tableInfo.lobBinds = this.generateBinds(dataTypeDefinitions, tableInfo,tableMetadata);
 
         // Reorder select list to enable LOB optimization.
         // Columns with LOB data types must come last in the insert column list
@@ -425,17 +447,19 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 	  const externalColumnNames = []
 	  
 	  const declarations = tableInfo.columnNames.map((column,idx) => {
+
         variables.push(`"V_${column}"`);
+
         let targetDataType = tableInfo.targetDataTypes[idx];
         let externalDataType = undefined
 		let copyColumnDefinition = `"${column}"`
 		let value = `:${(idx+1)}`
 	    let externalSelect = copyColumnDefinition
+
         switch (targetDataType) {
-          case "GEOMETRY":
-          case "GEOGRAPHY":
-          case "\"MDSYS\".\"SDO_GEOMETRY\"":
-		     externalDataType = "CLOB"
+          case this.dbi.DATA_TYPES.SPATIAL_TYPE:
+		  case this.dbi.DATA_TYPES.YADAMU_SPATIAL_TYPE:
+		     externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
 			 copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
 		     switch (this.SPATIAL_FORMAT) {       
                case "WKB":
@@ -455,12 +479,12 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
                default:
             }
             break
-          case "RAW":
-		    const length = tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]*2
+          case this.dbi.DATA_TYPES.BINARY_TYPE:
+		    const length = tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]][0]*2
 			switch (true) {
 			  case (length > 32767):
-		        externalDataType =  'CLOB'
-		        copyColumnDefinition = `${copyColumnDefinition}  ${this.LOADER_CLOB_TYPE}`
+		        externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
+			 copyColumnDefinition = `${copyColumnDefinition}  ${this.LOADER_CLOB_TYPE}`
 	            externalSelect = `OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("${column}")`
 				break;
 			  default:
@@ -469,13 +493,13 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
 	            externalSelect = `HEXTORAW(TRIM("${column}"))`
 		    }
 			break;
-          case "XMLTYPE":
-		    externalDataType = "CLOB"
+          case this.dbi.DATA_TYPES.XML_TYPE:
+		    externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
             copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
 		    value = `OBJECT_SERIALIZATION.DESERIALIZE_XML(:${(idx+1)})`;
 	        externalSelect = `case when LENGTH("${column}") > 0 then OBJECT_SERIALIZATION.DESERIALIZE_XML("${column}") else NULL end`
             break
-          case "BFILE":
+          case this.dbi.DATA_TYPES.ORACLE_BFILE_TYPE:
 		    if (this.OBJECTS_AS_JSON) {
               value = `OBJECT_TO_JSON.DESERIALIZE_BFILE(:${(idx+1)})`;
 			}
@@ -486,79 +510,82 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
   		    copyColumnDefinition = `"${column}" CHAR(2048)`
             externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
             break;
-          case "JSON":
-            // value = this.dbi.DB_VERSION > 19  ? `JSON(:${(idx+1)})` : value
-  	        externalDataType = 'BLOB'
+          case this.dbi.DATA_TYPES.JSON_TYPE:
+            // value = this.dbi.DATABASE_VERSION > 19  ? `JSON(:${(idx+1)})` : value
+  	        externalDataType = this.dbi.DATA_TYPES.BLOB_TYPE
             copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}` 
             externalSelect = `case when LENGTH("${column}") > 0 then "${column}" else NULL end`
 			break
-          case "ANYDATA":
-  	        externalDataType = 'CLOB'
+          case this.dbi.DATA_TYPES.ORACLE_ANYDATA_TYPE:
+  	        externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
   		    copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}`
             value = `ANYDATA.convertVARCHAR2(:${(idx+1)})`;
   		    externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
             break;
-		  case 'NCHAR':
-          case 'NVARCHAR2':
-		  case 'CHAR':
-		  case 'VARCHAR2':
-		    copyColumnDefinition = `${copyColumnDefinition} CHAR(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]*this.dbi.BYTE_TO_CHAR_RATIO})${nullSettings}`
+		  case this.dbi.DATA_TYPES.NCHAR_TYPE:
+          case this.dbi.DATA_TYPES.NVARCHAR_TYPE:
+		  case this.dbi.DATA_TYPES.CHAR_TYPE:
+		  case this.dbi.DATA_TYPES.VARCHAR_TYPE:
+		    copyColumnDefinition = `${copyColumnDefinition} CHAR(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]][0]*this.dbi.BYTE_TO_CHAR_RATIO})${nullSettings}`
 		    break; 
-		  case 'BLOB':
-  	        externalDataType = 'CLOB'
+		  case this.dbi.DATA_TYPES.BLOB_TYPE:
+  	        externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
   		    copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}`
             externalSelect = `case when LENGTH("${column}") > 0 then OBJECT_SERIALIZATION.DESERIALIZE_HEX_BLOB("${column}") else NULL end`
 		    break; 		  
-		  case 'NCLOB':
-		  case 'CLOB':
+		  case this.dbi.DATA_TYPES.NCLOB_TYPE:
+		  case this.dbi.DATA_TYPES.CLOB_TYPE:
             copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}${nullSettings}`
             externalSelect = `case when LENGTH("${column}") > 0 then "${column}" else NULL end`
             break;
-          case "DATE":
+          case this.dbi.DATA_TYPES.DATE_TYPE:
   	        externalDataType = 'CHAR(32)'
   		    copyColumnDefinition = `"${column}" ${externalDataType}`
             externalSelect = `to_date(substr("${column}",1,19),'YYYY-MM-DD"T"HH24:MI:SS')` 
             // copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT DATE 'YYYY-MM_DD"T"HH24:MI:SS#########"Z"'`
 		    break;
-          case "BOOLEAN":
+          case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
   	        externalDataType = 'CHAR(5)'
   		    copyColumnDefinition = `"${column}" ${externalDataType}`
             externalSelect = `case when "${column}" is NULL then NULL when LENGTH("${column}") = 0 then NULL when "${column}" = 'true' then HEXTORAW('01') else HEXTORAW('00') end` 
 		    break;
-          default:
-		    if ((targetDataType.indexOf('TIMESTAMP') === 0) ) {
-		      externalDataType = 'CHAR(36)'
+          case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
+  	      case this.dbi.DATA_TYPES.TIMESTAMP_TZ_TYPE:
+  	      case this.dbi.DATA_TYPES.TIMESTAMP_LTZ_TYPE:
+		    externalDataType = 'CHAR(36)'
+			copyColumnDefinition = `"${column}" ${externalDataType}`
+		    externalSelect = targetDataType.indexOf('ZONE') > 0 ? `to_timestamp_tz("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM')` : `to_timestamp("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')` 
+			/*
+			switch (true) {
+			  case (targetDataType.indexOf('LOCAL') > 0):
+				copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP WITH LOCAL TIME ZONE 'YYYY-MM_DD"T"HH24:MI:SS.FF9"Z"'`
+    		    break;
+		      case (targetDataType.indexOf('ZONE') > 0):
+				copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP WITH TIME ZONE 'YYYY-MM_DD"T"HH24:MI:SS.FF9"Z"'`
+    		    break;
+			  default:
+				copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP 'YYYY-MM_DD"T"HH24:MI:SS.FF9'`
+    		    break;
+            }
+			*/
+		    break;
+          case this.dbi.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
+  	          externalDataType = 'CHAR(36)'
 			  copyColumnDefinition = `"${column}" ${externalDataType}`
-		      externalSelect = targetDataType.indexOf('ZONE') > 0 ? `to_timestamp_tz("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM')` : `to_timestamp("${column}",'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')` 
-			  /*
-			  switch (true) {
-				case (targetDataType.indexOf('LOCAL') > 0):
-				   copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP WITH LOCAL TIME ZONE 'YYYY-MM_DD"T"HH24:MI:SS.FF9"Z"'`
-    		       break;
-				case (targetDataType.indexOf('ZONE') > 0):
-				   copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP WITH TIME ZONE 'YYYY-MM_DD"T"HH24:MI:SS.FF9"Z"'`
-    		       break;
-				default:
-				   copyColumnDefinition = `"${column}" CHAR(36) DATE_FORMAT TIMESTAMP 'YYYY-MM_DD"T"HH24:MI:SS.FF9'`
-    		       break;
-			  }
-			  */
-		    }
-		    if ((targetDataType.indexOf('INTERVAL') === 0) && (targetDataType.indexOf('DAY') > 0) && (targetDataType.indexOf('SECOND') > 0)) {
-              value = `OBJECT_SERIALIZATION.DESERIALIZE_ISO8601_DSINTERVAL(:${(idx+1)})`;
+		      value = `OBJECT_SERIALIZATION.DESERIALIZE_ISO8601_DSINTERVAL(:${(idx+1)})`;
 		      break;
-		    }
+	      default:
 		    if (targetDataType.indexOf('.') > -1) {
 		      includesObjectTypes = true;
- 		      externalDataType = "CLOB"
+ 		      externalDataType = this.dbi.DATA_TYPES.CLOB_TYPE
 			  copyColumnDefinition = `${copyColumnDefinition} ${this.LOADER_CLOB_TYPE}`
               value = `"#${targetDataType.slice(targetDataType.indexOf(".")+2,-1)}"(:${(idx+1)})`;
 			  externalSelect = value.replace(`:${idx+1}`,`"${column}"`)
 			  break;
-		    }
+		    }	
         } 
         // Append length to bounded datatypes if necessary
-        targetDataType = (StatementGenerator.BOUNDED_TYPES.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]]})` : targetDataType;
+        targetDataType = (this.dbi.DATA_TYPES.BOUNDED_TYPES.includes(targetDataType) && targetDataType.indexOf('(') === -1)  ? `${targetDataType}(${tableMetadata.sizeConstraints[tableInfo.bindOrdering[idx]][0]})` : targetDataType;
 		values.push(value)
 		copyColumnDefinitions[tableInfo.bindOrdering[idx]]     = copyColumnDefinition
 		externalColumnDefinitions[tableInfo.bindOrdering[idx]] = `"${column}" ${externalDataType || targetDataType}`
@@ -592,4 +619,4 @@ ${tableMetadata.partitionCount ? `PARALLEL ${(tableMetadata.partitionCount > thi
   }  
 }
 
-export {StatementGenerator as default }
+export { OracleStatementGenerator as default }

@@ -1,9 +1,9 @@
 
 import { 
   performance 
-}                   from 'perf_hooks';
+}                        from 'perf_hooks'
 
-import YadamuParser from '../base/yadamuParser.js'
+import YadamuParser      from '../base/yadamuParser.js'
 
 class SnowflakeParser extends YadamuParser {
 
@@ -84,9 +84,9 @@ class SnowflakeParser extends YadamuParser {
     }
   }
   
-  constructor(queryInfo,yadamuLogger,parseDelay) {
-    super(queryInfo,yadamuLogger,parseDelay);      	
-	if (global.gc) {
+  constructor(dbi,queryInfo,yadamuLogger,parseDelay) {
+    super(dbi,queryInfo,yadamuLogger,parseDelay)     	
+  	if (global.gc) {
       this.collectTheGarbage = () => {
 	    if ((this.COPY_METRICS.parsed % 100000) === 0) {
 	      const startTime = performance.now()
@@ -101,7 +101,7 @@ class SnowflakeParser extends YadamuParser {
   
   async doTransform(data) {
     // Snowflake generates o4bject based output, not array based outout. Transform object to array based on columnList
-	this.collectTheGarbage()
+	// this.collectTheGarbage()
     data = Object.values(data)
 	return super.doTransform(data)
   }

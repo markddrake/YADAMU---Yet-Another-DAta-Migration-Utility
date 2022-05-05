@@ -11,13 +11,10 @@ class SnowflakeConstants {
 
   static get STATIC_PARAMETERS()      { 
     this._STATIC_PARAMETERS = this._STATIC_PARAMETERS || Object.freeze({
-      "MAX_CHARACTER_SIZE"        : 16777216
-	, "MAX_BINARY_SIZE"           : 8388608 
-    , "TRANSIENT_TABLES"          : true
+      "TRANSIENT_TABLES"          : true
     , "DATA_RETENTION_TIME"       : 0
-    , "SPATIAL_FORMAT"            : "WKB"
-	, "SNOWFLAKE_XML_TYPE"        : this.VARIANT_DATA_TYPE
-	, "SNOWFLAKE_JSON_TYPE"       : this.VARIANT_DATA_TYPE
+	, "XML_STORAGE_OPTION"        : this.VARIANT_DATA_TYPE
+	, "JSON_STORAGE_OPTION"       : this.VARIANT_DATA_TYPE
     })
     return this._STATIC_PARAMETERS;
   }
@@ -42,20 +39,16 @@ class SnowflakeConstants {
 	return this.#_DBI_PARAMETERS
   }
 
-  static get MAX_CHARACTER_SIZE()     { return this.DBI_PARAMETERS.MAX_CHARACTER_SIZE}
-  static get MAX_BINARY_SIZE()        { return this.DBI_PARAMETERS.MAX_BINARY_SIZE}
   static get TRANSIENT_TABLES()       { return this.DBI_PARAMETERS.TRANSIENT_TABLES}
   static get DATA_RETENTION_TIME()    { return this.DBI_PARAMETERS.DATA_RETENTION_TIME}
-  static get SPATIAL_FORMAT()         { return this.DBI_PARAMETERS.SPATIAL_FORMAT };
-  static get SNOWFLAKE_XML_TYPE()     { return this.DBI_PARAMETERS.SNOWFLAKE_XML_TYPE };
-  static get SNOWFLAKE_JSON_TYPE()    { return this.DBI_PARAMETERS.SNOWFLAKE_JSON_TYPE };
+
+  static get XML_STORAGE_OPTION()     { return this.DBI_PARAMETERS.XML_STORAGE_OPTION };
+  static get JSON_STORAGE_OPTION()    { return this.DBI_PARAMETERS.JSON_STORAGE_OPTION };
+
   static get STATEMENT_TERMINATOR()   { return ';' }
 
-  static get CLOB_TYPE()              { return `VARCHAR(${this.MAX_CHARACTER_SIZE})`}
-  static get BLOB_TYPE()              { return `BINARY(${this.MAX_BINARY_SIZE})`}
-  
   static get LOST_CONNECTION_ERROR() {
-    this._LOST_CONNECTION_ERROR = this._LOST_CONNECTION_ERROR || Object.freeze([407002,401001])
+    this._LOST_CONNECTION_ERROR = this._LOST_CONNECTION_ERROR || Object.freeze(['407002','401001'])
     return this._LOST_CONNECTION_ERROR
   }
 
@@ -71,6 +64,19 @@ class SnowflakeConstants {
   static get SERVER_UNAVAILABLE_STATE() {
 	return this.LOST_CONNECTION_STATE()
   }
+
+  static get CONTENT_TOO_LARGE_ERROR() {
+	/*  errorCode: '100078', sqlState: '22000' */
+    this._CONTENT_TOO_LARGE_ERROR = this._CONTENT_TOO_LARGE_ERROR || Object.freeze(['100078'])
+    return this._CONTENT_TOO_LARGE_ERROR
+  }
+  
+  static get CONTENT_TOO_LARGE_STATE() {
+	/*  errorCode: '100078', sqlState: '22000' */
+    this._CONTENT_TOO_LARGE_STATE = this._CONTENT_TOO_LARGE_STATE || Object.freeze(['22000'])
+    return this._CONTENT_TOO_LARGE_STATE
+  }
+
 
 }
 

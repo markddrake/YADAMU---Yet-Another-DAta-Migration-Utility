@@ -68,10 +68,12 @@ class MySQLWriter extends YadamuWriter {
   
   async _writeBatch(batch,rowCount) {     
 
+    // console.log(batch[0])
+
 	// this.yadamuLogger.trace([this.constructor.name,'_writeBatch',this.tableName,this.tableInfo.insertMode,this.COPY_METRICS.batchNumber,rowCount,batch.length],'Start')    
 	
     let recodedBatch = false;
-    
+	
 	switch (this.tableInfo.insertMode) {
       case 'Batch':
         try {
@@ -92,11 +94,6 @@ class MySQLWriter extends YadamuWriter {
           batch = batch.flat()
         }
       case 'Rows':
-	    if (this.SPATIAL_FORMAT === 'GeoJSON') {
-	      recodedBatch = true
-          this.recodeSpatialColumns(batch,'Recoding GeoJSON as WKT')
-		  this.tableInfo.rowConstructor = this.tableInfo.rowConstructor.replace(/ST_GeomFromGeoJSON\(\?\)/g,'ST_GeomFromText(?)')
-		}
 	    while (true) {
           try {
             await this.dbi.createSavePoint();    

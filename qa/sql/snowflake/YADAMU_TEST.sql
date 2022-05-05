@@ -13,7 +13,7 @@ const spatialPrecision = rules.spatialPrecision;
 
 const SQL_LIST_COLUMNS = 
 `with COLUMNS as (
- select distinct c.table_catalog, c.table_schema, c.table_name,column_name,ordinal_position,data_type,character_maximum_length,numeric_precision,numeric_scale,datetime_precision
+ select distinct c.table_catalog, c.table_schema, c.table_name,column_name,ordinal_position,case when c.comment = concat('CHECK(CHECK_XML("',c.column_name,'") IS NULL)') then 'XML' else c.data_type end data_type,character_maximum_length,numeric_precision,numeric_scale,datetime_precision
        from "${P_DATABASE}".information_schema.columns c, "${P_DATABASE}".information_schema.tables t
        where t.table_name = c.table_name 
          and t.table_schema = c.table_schema
@@ -22,6 +22,8 @@ const SQL_LIST_COLUMNS =
 )
 select table_name, listagg(
                      case 
+                       when data_type = 'XML' then
+                         'TO_VARCHAR(PARSE_XML("' || column_name || '"))'
                        when data_type = 'GEOGRAPHY' then
                          ${rules.spatialPrecision < 18 ? `'case when "'  || column_name || '" is NULL then NULL else YADAMU_SYSTEM.PUBLIC.ROUND_GEOJSON(ST_ASGEOJSON("'  || column_name || '")::VARCHAR,${rules.spatialPrecision}) end'` : `'ST_ASWKT("'  || column_name || '")'`} || ' "' || column_name || '"'
                        when data_type in ('TIMESTAMP_NTZ') then

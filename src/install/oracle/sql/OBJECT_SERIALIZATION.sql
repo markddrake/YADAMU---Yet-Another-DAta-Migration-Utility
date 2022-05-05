@@ -1,32 +1,41 @@
 create or replace package OBJECT_SERIALIZATION
 AUTHID CURRENT_USER
 as
-  TYPE T_TABLE_INFO_RECORD is RECORD (
+--
+$IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+--
+   -- Cannot use package local objects from SQL in 11.2.x, so TABLE_INFO_RECORD, TABLE_INFO_TABLE and TYPE_LIST are defined as global objects in YADAMU_11020.sql in 11.2.x
+--
+$ELSE
+--
+  TYPE TABLE_INFO_RECORD is RECORD (
     OWNER      VARCHAR2(128)
    ,TABLE_NAME VARCHAR2(128)
    );  
 
-  TYPE T_TABLE_INFO_TABLE is TABLE of T_TABLE_INFO_RECORD;
+  TYPE TABLE_INFO_TABLE is TABLE of TABLE_INFO_RECORD;
   
-  TYPE TYPE_LIST_T is RECORD (
+  TYPE TYPE_LIST is RECORD (
     OWNER               VARCHAR2(128)
   , TYPE_NAME           VARCHAR2(128)
   , ATTR_COUNT          NUMBER
   , TYPECODE            VARCHAR2(32)
   );
 
-  TYPE TYPE_LIST_TAB is TABLE of TYPE_LIST_T;
-  
+  TYPE TYPE_LIST_TABLE is TABLE of TYPE_LIST;
+--
+$END
+--  
   function SERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2) return CLOB;
   function SERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
-  function SERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE) return CLOB;
+  function SERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE) return CLOB;
 
   function DESERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2) return VARCHAR2;
   function DESERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2) return CLOB;
-  function DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE) return CLOB;
+  function DESERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE) return CLOB;
   procedure DESERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2, P_PLSQL_BLOCK IN OUT NOCOPY CLOB);
   procedure DESERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2, P_PLSQL_BLOCK IN OUT NOCOPY CLOB);
-  procedure DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE, P_PLSQL_BLOCK IN OUT NOCOPY CLOB);
+  procedure DESERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE, P_PLSQL_BLOCK IN OUT NOCOPY CLOB);
 
   function DESERIALIZE_XML(P_SERIALIZATION CLOB) return XMLTYPE;
   function DESERIALIZE_XML(P_SERIALIZATION VARCHAR2) return XMLTYPE;
@@ -150,7 +159,7 @@ return VARCHAR2
 as
 begin 
   return 'P'
-	  || extract(YEAR  FROM P_INTERVAL) || 'Y'
+      || extract(YEAR  FROM P_INTERVAL) || 'Y'
       || case when extract(MONTH FROM  P_INTERVAL) <> 0 then extract(MONTH FROM P_INTERVAL) || 'M' end;
 end;
 --
@@ -165,9 +174,9 @@ begin
   return 'P'
       || V_DAYS || 'D'
       || case when (V_HOURS + V_MINUTES + V_SECONDS) > 0 then 'T' end
-	  || case when (V_HOURS)   > 0 then V_HOURS   || 'H' end
-	  || case when (V_MINUTES) > 0 then V_MINUTES || 'M' end
-	  || case when (V_SECONDS) > 0 then V_SECONDS || 'S' end;
+      || case when (V_HOURS)   > 0 then V_HOURS   || 'H' end
+      || case when (V_MINUTES) > 0 then V_MINUTES || 'M' end
+      || case when (V_SECONDS) > 0 then V_SECONDS || 'S' end;
 end;    
 --
 function DESERIALIZE_ISO8601_DSINTERVAL(P_INTERVAL VARCHAR2) 
@@ -308,12 +317,12 @@ begin
   while (V_OFFSET <= V_BLOB_LENGTH) loop
     V_AMOUNT := C_CHUNK_SIZE;
     DBMS_LOB.READ(P_BLOB,V_AMOUNT,V_OFFSET,V_RAW_DATA);
-	V_OFFSET := V_OFFSET + V_AMOUNT;
+    V_OFFSET := V_OFFSET + V_AMOUNT;
     V_CHUNK := YADAMU_UTILITIES.C_SINGLE_QUOTE || RAWTOHEX(V_RAW_DATA) || YADAMU_UTILITIES.C_SINGLE_QUOTE; 
     if (V_OFFSET < V_BLOB_LENGTH) then 
       V_CHUNK := V_CHUNK || ','; 
     end if; 
-	DBMS_LOB.WRITEAPPEND(V_CLOB,length(V_CHUNK),V_CHUNK); 
+    DBMS_LOB.WRITEAPPEND(V_CLOB,length(V_CHUNK),V_CHUNK); 
   end loop;
   DBMS_LOB.WRITEAPPEND(V_CLOB,2,'))'); 
   return V_CLOB;
@@ -355,7 +364,7 @@ begin
     if (V_OFFSET < V_CLOB_LENGTH) then 
       V_CHUNK := V_CHUNK || ','; 
     end if; 
-	DBMS_LOB.WRITEAPPEND(V_CLOB,length(V_CHUNK),V_CHUNK); 
+    DBMS_LOB.WRITEAPPEND(V_CLOB,length(V_CHUNK),V_CHUNK); 
   end loop; 
   DBMS_LOB.WRITEAPPEND(V_CLOB,2,'))'); 
   return V_CLOB;
@@ -450,54 +459,54 @@ begin
   case V_TYPE_ID
     when DBMS_TYPES.TYPECODE_BDOUBLE then
       V_RESULT := P_ANYDATA.getBDouble(V_BDOUBLE);
-	  V_ANYDATA_PAYLOAD := TO_CHAR(V_BDOUBLE);
+      V_ANYDATA_PAYLOAD := TO_CHAR(V_BDOUBLE);
     when DBMS_TYPES.TYPECODE_BFILE then
       V_RESULT := P_ANYDATA.getBFile(V_BFILE);
-	  V_ANYDATA_PAYLOAD := OBJECT_SERIALIZATION.SERIALIZE_BFILE(V_BFILE);
-	when DBMS_TYPES.TYPECODE_BFLOAT then
+      V_ANYDATA_PAYLOAD := OBJECT_SERIALIZATION.SERIALIZE_BFILE(V_BFILE);
+    when DBMS_TYPES.TYPECODE_BFLOAT then
       V_RESULT := P_ANYDATA.getBFloat(V_BFLOAT);
-	  V_ANYDATA_PAYLOAD := TO_CHAR(V_BFLOAT);
+      V_ANYDATA_PAYLOAD := TO_CHAR(V_BFLOAT);
     when DBMS_TYPES.TYPECODE_BLOB then
-	  V_RESULT := P_ANYDATA.getBLOB(V_BLOB);
+      V_RESULT := P_ANYDATA.getBLOB(V_BLOB);
       DBMS_LOB.CREATETEMPORARY(V_ANYDATA_PAYLOAD,TRUE,DBMS_LOB.CALL);
       DBMS_LOB.WRITEAPPEND(V_ANYDATA_PAYLOAD,1,V_SINGLE_QUOTE);
-	     DBMS_LOB.APPEND(V_ANYDATA_PAYLOAD,SERIALIZE_BLOB_HEX(V_BLOB));
-	     DBMS_LOB.WRITEAPPEND(V_ANYDATA_PAYLOAD,1,V_SINGLE_QUOTE);
+         DBMS_LOB.APPEND(V_ANYDATA_PAYLOAD,SERIALIZE_BLOB_HEX(V_BLOB));
+         DBMS_LOB.WRITEAPPEND(V_ANYDATA_PAYLOAD,1,V_SINGLE_QUOTE);
     when DBMS_TYPES.TYPECODE_CHAR then
       V_RESULT := P_ANYDATA.getCHAR(V_CHAR);
     V_ANYDATA_PAYLOAD :=  V_SINGLE_QUOTE || V_CHAR || V_SINGLE_QUOTE;
     when DBMS_TYPES.TYPECODE_CLOB then
-	  V_RESULT := P_ANYDATA.getCLOB(V_CLOB);
+      V_RESULT := P_ANYDATA.getCLOB(V_CLOB);
       DBMS_LOB.CREATETEMPORARY(V_ANYDATA_PAYLOAD,TRUE,DBMS_LOB.CALL);
-	     DBMS_LOB.WRITEAPPEND(V_ANYDATA_PAYLOAD,1,V_SINGLE_QUOTE);
-	     DBMS_LOB.APPEND(V_ANYDATA_PAYLOAD,V_CLOB);
-	     DBMS_LOB.WRITEAPPEND(V_ANYDATA_PAYLOAD,1,V_SINGLE_QUOTE);
+         DBMS_LOB.WRITEAPPEND(V_ANYDATA_PAYLOAD,1,V_SINGLE_QUOTE);
+         DBMS_LOB.APPEND(V_ANYDATA_PAYLOAD,V_CLOB);
+         DBMS_LOB.WRITEAPPEND(V_ANYDATA_PAYLOAD,1,V_SINGLE_QUOTE);
     when DBMS_TYPES.TYPECODE_DATE then
       V_RESULT := P_ANYDATA.getDate(V_DATE);
-	  V_ANYDATA_PAYLOAD := TO_CHAR(V_DATE);
+      V_ANYDATA_PAYLOAD := TO_CHAR(V_DATE);
     when DBMS_TYPES.TYPECODE_INTERVAL_DS then
       V_RESULT := P_ANYDATA.getIntervalDS(V_INTERVAL_DS);
-	  V_ANYDATA_PAYLOAD := TO_CHAR(V_INTERVAL_DS);
+      V_ANYDATA_PAYLOAD := TO_CHAR(V_INTERVAL_DS);
     when DBMS_TYPES.TYPECODE_INTERVAL_YM then
       V_RESULT := P_ANYDATA.getIntervalYM(V_INTERVAL_YM);
-	  V_ANYDATA_PAYLOAD := TO_CHAR(V_INTERVAL_YM);
+      V_ANYDATA_PAYLOAD := TO_CHAR(V_INTERVAL_YM);
     when DBMS_TYPES.TYPECODE_NCHAR then
       V_RESULT := P_ANYDATA.getNCHAR(V_NCHAR);
       V_ANYDATA_PAYLOAD :=  V_SINGLE_QUOTE || TO_CHAR(V_NCHAR) || V_SINGLE_QUOTE;
     when DBMS_TYPES.TYPECODE_NCLOB then
       V_RESULT := P_ANYDATA.getNCLOB(V_NCLOB);
       DBMS_LOB.CREATETEMPORARY(V_ANYDATA_PAYLOAD,TRUE,DBMS_LOB.CALL);
-	     DBMS_LOB.WRITEAPPEND(V_ANYDATA_PAYLOAD,1,V_SINGLE_QUOTE);
-	     DBMS_LOB.APPEND(V_ANYDATA_PAYLOAD,TO_CLOB(V_NCLOB));
-	     DBMS_LOB.WRITEAPPEND(V_ANYDATA_PAYLOAD,1,V_SINGLE_QUOTE);
+         DBMS_LOB.WRITEAPPEND(V_ANYDATA_PAYLOAD,1,V_SINGLE_QUOTE);
+         DBMS_LOB.APPEND(V_ANYDATA_PAYLOAD,TO_CLOB(V_NCLOB));
+         DBMS_LOB.WRITEAPPEND(V_ANYDATA_PAYLOAD,1,V_SINGLE_QUOTE);
     when DBMS_TYPES.TYPECODE_NUMBER then
       V_RESULT := P_ANYDATA.getNumber(V_NUMBER);
-	  V_ANYDATA_PAYLOAD := TO_CHAR(V_NUMBER);
+      V_ANYDATA_PAYLOAD := TO_CHAR(V_NUMBER);
     when DBMS_TYPES.TYPECODE_NVARCHAR2 then
       V_RESULT := P_ANYDATA.getNVarchar2(V_NVARCHAR2);
       V_ANYDATA_PAYLOAD :=  V_SINGLE_QUOTE || TO_CHAR(V_NVARCHAR2) || V_SINGLE_QUOTE;
     when DBMS_TYPES.TYPECODE_RAW then
-	  V_RESULT := P_ANYDATA.getRaw(V_RAW);
+      V_RESULT := P_ANYDATA.getRaw(V_RAW);
       V_ANYDATA_PAYLOAD :=  V_SINGLE_QUOTE || TO_CHAR(V_RAW) || V_SINGLE_QUOTE;
     when DBMS_TYPES.TYPECODE_TIMESTAMP then
       V_RESULT := P_ANYDATA.getTimestamp(V_TIMESTAMP);
@@ -510,7 +519,7 @@ begin
       V_ANYDATA_PAYLOAD :=  V_SINGLE_QUOTE || TO_CHAR(V_TIMESTAMP_TZ) || V_SINGLE_QUOTE;
     when DBMS_TYPES.TYPECODE_UROWID then
       -- V_RESULT := P_ANYDATA.getROWID(V_ROWID);
-	  V_UROWID := P_ANYDATA.accessUROWID();
+      V_UROWID := P_ANYDATA.accessUROWID();
       V_ANYDATA_PAYLOAD :=  V_SINGLE_QUOTE || TO_CHAR(V_UROWID) || V_SINGLE_QUOTE;
     when DBMS_TYPES.TYPECODE_VARCHAR2 then
       V_RESULT := P_ANYDATA.getVARCHAR2(V_VARCHAR2);
@@ -540,8 +549,8 @@ begin
     when DBMS_TYPES.TYPECODE_VARRAY then
       V_ANYDATA_CONTENT_TYPE := V_SINGLE_QUOTE || '"' || V_TYPE_INFO.SCHEMA_NAME || '"."' || V_TYPE_INFO.TYPE_NAME || '"' || V_SINGLE_QUOTE;
       V_ANYDATA_PAYLOAD := 'Unsupported ANYDATA content ['|| V_TYPE_ID || ']: VARRAY.';
-	else
-	  V_ANYDATA_PAYLOAD := 'Unsupported ANYDATA content ['|| V_TYPE_ID || ']: UNKNOWN.';
+    else
+      V_ANYDATA_PAYLOAD := 'Unsupported ANYDATA content ['|| V_TYPE_ID || ']: UNKNOWN.';
   end case;
   DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_ANYDATA_CONTENT_TYPE),V_ANYDATA_CONTENT_TYPE);
   DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,1,',');
@@ -572,7 +581,7 @@ begin
   while (V_OFFSET <= V_BLOB_SIZE) loop
     V_AMOUNT := 2000;
     DBMS_LOB.READ(P_BLOB,V_AMOUNT,V_OFFSET,V_RAW_CONTENT);
-	V_OFFSET := V_OFFSET + V_AMOUNT;
+    V_OFFSET := V_OFFSET + V_AMOUNT;
     DBMS_LOB.APPEND(V_HEXBINARY_CLOB,TO_CLOB(RAWTOHEX(V_RAW_CONTENT)));
   end loop;
   return V_HEXBINARY_CLOB;
@@ -598,7 +607,7 @@ begin
   return V_BLOB;
 end;
 --
-function extendTypeList(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB, P_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2)
+function extendTypeList(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE, P_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2)
 return VARCHAR2
 as
   V_COUNT     NUMBER;
@@ -651,19 +660,27 @@ $END
   for t in getTypeHeirachy() loop 
     $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('extendTypeList(): Adding "' || t.OWNER || '"."' || t.TYPE_NAME || '": Type = "' || t.TYPECODE || '". Type count = ' || t.ATTRIBUTES); $END
     if (V_TYPECODE is NULL) then
-	  V_TYPECODE := t.TYPECODE;
-	end if;
+      V_TYPECODE := t.TYPECODE;
+    end if;
     P_TYPE_LIST.extend();
+    $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+	--
+    P_TYPE_LIST(P_TYPE_LIST.count) := TYPE_LIST(t.OWNER,t.TYPE_NAME,t.ATTRIBUTES,t.TYPECODE);
+	--
+	$ELSE
+	--
     P_TYPE_LIST(P_TYPE_LIST.count).OWNER := t.OWNER;
     P_TYPE_LIST(P_TYPE_LIST.count).TYPE_NAME := t.TYPE_NAME;
     P_TYPE_LIST(P_TYPE_LIST.count).ATTR_COUNT := t.ATTRIBUTES;
     P_TYPE_LIST(P_TYPE_LIST.count).TYPECODE := t.TYPECODE;
-	
+	--
+	$END
+    
   end loop;
   return V_TYPECODE;
 end;
 --
-function serializeAttr(P_ATTR_NAME VARCHAR2, P_ATTR_TYPE_OWNER VARCHAR2, P_ATTR_TYPE_NAME VARCHAR2, P_ATTR_TYPE_MOD VARCHAR2, P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function serializeAttr(P_ATTR_NAME VARCHAR2, P_ATTR_TYPE_OWNER VARCHAR2, P_ATTR_TYPE_NAME VARCHAR2, P_ATTR_TYPE_MOD VARCHAR2, P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE)
 return VARCHAR2
 as
   V_PLSQL VARCHAR2(32767);
@@ -773,10 +790,10 @@ begin
           DBMS_OUTPUT.PUT_LINE('Unsupported Type: "' || P_ATTR_TYPE_NAME || '".');
       end case;
     when P_ATTR_TYPE_MOD = 'REF' then
-	  -- The serialzied form needs to include the decode function eg "HEXTOREF(' || REF_VALUE || ')" to that it will be correctly deserialized 
-	  V_PLSQL := V_PLSQL
+      -- The serialzied form needs to include the decode function eg "HEXTOREF(' || REF_VALUE || ')" to that it will be correctly deserialized 
+      V_PLSQL := V_PLSQL
               ||'          -- V_SERIALIZED_VALUE := REFTOHEX(' || P_ATTR_NAME || ');' || YADAMU_UTILITIES.C_NEWLINE
-		      ||'          select ''HEXTOREF('' || V_SINGLE_QUOTE || REFTOHEX(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE || '')'' into V_SERIALIZED_VALUE from dual;' || YADAMU_UTILITIES.C_NEWLINE
+              ||'          select ''HEXTOREF('' || V_SINGLE_QUOTE || REFTOHEX(' || P_ATTR_NAME || ') || V_SINGLE_QUOTE || '')'' into V_SERIALIZED_VALUE from dual;' || YADAMU_UTILITIES.C_NEWLINE
               ||'          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_SERIALIZED_VALUE),V_SERIALIZED_VALUE);' || YADAMU_UTILITIES.C_NEWLINE;
     when P_ATTR_TYPE_OWNER is not NULL then
       V_TYPECODE := extendTypeList(P_TYPE_LIST, P_ATTR_TYPE_OWNER, P_ATTR_TYPE_NAME);
@@ -800,7 +817,7 @@ begin
 
 end;
 
-function serializeType(P_TYPE_RECORD TYPE_LIST_T,P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function serializeType(P_TYPE_RECORD TYPE_LIST,P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE)
 return CLOB
 /*
 **
@@ -852,12 +869,12 @@ begin
           || '          DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,4,''NULL'');' || YADAMU_UTILITIES.C_NEWLINE
           || '          return;' || YADAMU_UTILITIES.C_NEWLINE
           || '        end if; ' || YADAMU_UTILITIES.C_NEWLINE
-		  || '        if (P_TABLE_OWNER = ''' || P_TYPE_RECORD.OWNER || ''') then ' || YADAMU_UTILITIES.C_NEWLINE
-		  || '   	    V_OBJECT_CONSTRUCTOR := ''"'|| P_TYPE_RECORD.TYPE_NAME || '"('';' || YADAMU_UTILITIES.C_NEWLINE
-		  || '        else' || YADAMU_UTILITIES.C_NEWLINE
-		  || '   	    V_OBJECT_CONSTRUCTOR := ''"' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '"('';' || YADAMU_UTILITIES.C_NEWLINE
-		  || '        end if;' ||YADAMU_UTILITIES.C_NEWLINE;
-		  
+          || '        if (P_TABLE_OWNER = ''' || P_TYPE_RECORD.OWNER || ''') then ' || YADAMU_UTILITIES.C_NEWLINE
+          || '          V_OBJECT_CONSTRUCTOR := ''"'|| P_TYPE_RECORD.TYPE_NAME || '"('';' || YADAMU_UTILITIES.C_NEWLINE
+          || '        else' || YADAMU_UTILITIES.C_NEWLINE
+          || '          V_OBJECT_CONSTRUCTOR := ''"' || P_TYPE_RECORD.OWNER || '"."' || P_TYPE_RECORD.TYPE_NAME || '"('';' || YADAMU_UTILITIES.C_NEWLINE
+          || '        end if;' ||YADAMU_UTILITIES.C_NEWLINE;
+          
   V_PLSQL := V_PLSQL
 
   || '        DBMS_LOB.WRITEAPPEND(P_SERIALIZATION,length(V_OBJECT_CONSTRUCTOR),V_OBJECT_CONSTRUCTOR);' || YADAMU_UTILITIES.C_NEWLINE;
@@ -907,7 +924,7 @@ begin
 
 end;
 --
-function serializeTypes(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function serializeTypes(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE)
 return CLOB
 as
 --
@@ -950,76 +967,105 @@ end;
 function SERIALIZE_TYPE(P_TYPE_OWNER VARCHAR2, P_TYPE_NAME VARCHAR2)
 return CLOB
 as
-  V_TYPE_LIST TYPE_LIST_TAB;
+  V_TYPE_LIST TYPE_LIST_TABLE;
 begin
-   select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
-     bulk collect into V_TYPE_LIST
-     from ALL_TYPES
-          start with OWNER = P_TYPE_OWNER and TYPE_NAME = P_TYPE_NAME
-          connect by prior TYPE_NAME = SUPERTYPE_NAME
-                 and prior OWNER = SUPERTYPE_OWNER;
+  --
+  $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  select TYPE_LIST(OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE)
+  --
+  $ELSE
+  --
+  select OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  --
+  $END
+  --
+    bulk collect into V_TYPE_LIST
+    from (
+      select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+        from ALL_TYPES
+       start with OWNER = P_TYPE_OWNER and TYPE_NAME = P_TYPE_NAME
+             connect by prior TYPE_NAME = SUPERTYPE_NAME
+                 and prior OWNER = SUPERTYPE_OWNER
+    );
   return serializeTypes(V_TYPE_LIST);
 end;
 --
 function SERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2, P_TABLE_NAME VARCHAR2)
 return CLOB
 as
-  V_TYPE_LIST TYPE_LIST_TAB;
+  V_TYPE_LIST TYPE_LIST_TABLE;
 begin
-  select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  --
+  $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  select TYPE_LIST(OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE)
+  --
+  $ELSE
+  --
+  select OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  $END
+  --
     bulk collect into V_TYPE_LIST
-  from ALL_TYPES at,
-       (
-         select distinct DATA_TYPE_OWNER,  DATA_TYPE
-           from ALL_TAB_COLS atc
-          where atc.DATA_TYPE_OWNER is not NULL
-		    and atc.DATA_TYPE_OWNER not in 'MDSYS'
-            and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-	        and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-            and atc.OWNER = P_TABLE_OWNER
-            and atc.TABLE_NAME = P_TABLE_NAME
-       ) tlt
+    from (
+      select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE  
+        from ALL_TYPES at, ( 
+          select distinct DATA_TYPE_OWNER,  DATA_TYPE
+            from ALL_TAB_COLS atc
+           where atc.DATA_TYPE_OWNER is not NULL
+             and atc.DATA_TYPE_OWNER not in 'MDSYS'
+             and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
+             and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+             and atc.OWNER = P_TABLE_OWNER
+             and atc.TABLE_NAME = P_TABLE_NAME
+        ) tlt
        start with at.TYPE_NAME = tlt.DATA_TYPE
-              and at.OWNER = tlt.DATA_TYPE_OWNER
-                  connect by prior at.TYPE_NAME = SUPERTYPE_NAME
-                         and prior at.OWNER = SUPERTYPE_OWNER;
-
+         and at.OWNER = tlt.DATA_TYPE_OWNER
+             connect by prior at.TYPE_NAME = SUPERTYPE_NAME
+                 and prior at.OWNER = SUPERTYPE_OWNER
+    ); 
   return serializeTypes(V_TYPE_LIST);
 end;
 --
-function SERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE)
+function SERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE)
 return CLOB
 as
-  V_TYPE_LIST TYPE_LIST_TAB;
+  V_TYPE_LIST TYPE_LIST_TABLE;
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
-  -- Cannot use local types in SQL in 11.2.x
-  V_TABLE_LIST TABLE_INFO_TABLE_GT := TABLE_INFO_TABLE_GT();
+  V_TABLE_LIST TABLE_INFO_TABLE := TABLE_INFO_TABLE();
 begin
   V_TABLE_LIST.extend(P_TABLE_LIST.count);
   for i in P_TABLE_LIST.first .. P_TABLE_LIST.last loop
-     V_TABLE_LIST(i) := TABLE_INFO_RECORD_GT(P_TABLE_LIST(i).OWNER,P_TABLE_LIST(i).TABLE_NAME);
+     V_TABLE_LIST(i) := TABLE_INFO_RECORD(P_TABLE_LIST(i).OWNER,P_TABLE_LIST(i).TABLE_NAME);
   end loop;
 $ELSE
-  V_TABLE_LIST T_TABLE_INFO_TABLE := P_TABLE_LIST;
+  V_TABLE_LIST TABLE_INFO_TABLE := P_TABLE_LIST;
 begin
 $END  
-  select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  --
+  $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  select TYPE_LIST(OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE)
+  --
+  $ELSE
+  --
+  select OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+  $END
+  --
     bulk collect into V_TYPE_LIST
-  from ALL_TYPES at,
-       (
-         select distinct DATA_TYPE_OWNER,  DATA_TYPE
-           from ALL_TAB_COLS atc, TABLE(V_TABLE_LIST) tl
-          where atc.DATA_TYPE_OWNER is not NULL
-            and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-	        and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-            and atc.OWNER = tl.OWNER
-            and atc.TABLE_NAME = tl.TABLE_NAME
-       ) tlt
+    from (
+      select distinct OWNER, TYPE_NAME, ATTRIBUTES, TYPECODE
+        from ALL_TYPES at, (
+          select distinct DATA_TYPE_OWNER,  DATA_TYPE
+            from ALL_TAB_COLS atc, TABLE(V_TABLE_LIST) tl
+           where atc.DATA_TYPE_OWNER is not NULL
+             and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
+             and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+             and atc.OWNER = tl.OWNER
+             and atc.TABLE_NAME = tl.TABLE_NAME
+        ) tlt
        start with at.TYPE_NAME = tlt.DATA_TYPE
-              and at.OWNER = tlt.DATA_TYPE_OWNER
-                  connect by prior at.TYPE_NAME = SUPERTYPE_NAME
-                         and prior at.OWNER = SUPERTYPE_OWNER;
-
+         and at.OWNER = tlt.DATA_TYPE_OWNER
+             connect by prior at.TYPE_NAME = SUPERTYPE_NAME
+                 and prior at.OWNER = SUPERTYPE_OWNER
+    );
   return serializeTypes(V_TYPE_LIST);
 end;
 --
@@ -1031,16 +1077,16 @@ as
 begin
     V_TYPE_REFERENCE := '"' || P_TYPE_OWNER || '"."' || P_TYPE_NAME || '"';
 
-	V_SQL_FRAGMENT := 'function "#' || P_TYPE_NAME || '"(P_SERIALIZATION CLOB)' || YADAMU_UTILITIES.C_NEWLINE
-	               || 'return ' ||  V_TYPE_REFERENCE || YADAMU_UTILITIES.C_NEWLINE
-				   || 'as' || YADAMU_UTILITIES.C_NEWLINE
-				   || '   V_OBJECT ' || V_TYPE_REFERENCE ||';' || YADAMU_UTILITIES.C_NEWLINE
-				   || 'begin' || YADAMU_UTILITIES.C_NEWLINE
-				   || '  if (P_SERIALIZATION is NULL) then return NULL; end if;' || YADAMU_UTILITIES.C_NEWLINE  
-                   || '  if (DBMS_LOB.SUBSTR(P_SERIALIZATION,17,1) = ''SERIALIZE_OBJECT:'') then return NULL; end if;	'|| YADAMU_UTILITIES.C_NEWLINE			   
-				   || '  EXECUTE IMMEDIATE ''SELECT '' || P_SERIALIZATION || '' FROM DUAL'' into V_OBJECT;' || YADAMU_UTILITIES.C_NEWLINE
-				   || '  return V_OBJECT;' || YADAMU_UTILITIES.C_NEWLINE
-				   || 'end;' || YADAMU_UTILITIES.C_NEWLINE;
+    V_SQL_FRAGMENT := 'function "#' || P_TYPE_NAME || '"(P_SERIALIZATION CLOB)' || YADAMU_UTILITIES.C_NEWLINE
+                   || 'return ' ||  V_TYPE_REFERENCE || YADAMU_UTILITIES.C_NEWLINE
+                   || 'as' || YADAMU_UTILITIES.C_NEWLINE
+                   || '   V_OBJECT ' || V_TYPE_REFERENCE ||';' || YADAMU_UTILITIES.C_NEWLINE
+                   || 'begin' || YADAMU_UTILITIES.C_NEWLINE
+                   || '  if (P_SERIALIZATION is NULL) then return NULL; end if;' || YADAMU_UTILITIES.C_NEWLINE  
+                   || '  if (DBMS_LOB.SUBSTR(P_SERIALIZATION,17,1) = ''SERIALIZE_OBJECT:'') then return NULL; end if;   '|| YADAMU_UTILITIES.C_NEWLINE             
+                   || '  EXECUTE IMMEDIATE ''SELECT '' || P_SERIALIZATION || '' FROM DUAL'' into V_OBJECT;' || YADAMU_UTILITIES.C_NEWLINE
+                   || '  return V_OBJECT;' || YADAMU_UTILITIES.C_NEWLINE
+                   || 'end;' || YADAMU_UTILITIES.C_NEWLINE;
                    
   return V_SQL_FRAGMENT;
 end;
@@ -1053,7 +1099,7 @@ begin
   DBMS_LOB.WRITEAPPEND(P_PLSQL_BLOCK,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
 end;
 --
-procedure DESERIALIZE_TYPES(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB, P_PLSQL_BLOCK IN OUT NOCOPY CLOB)
+procedure DESERIALIZE_TYPES(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE, P_PLSQL_BLOCK IN OUT NOCOPY CLOB)
 as
 --
   V_SQL_FRAGMENT   VARCHAR2(4000);
@@ -1063,7 +1109,7 @@ begin
   $IF $$DEBUG $THEN DBMS_OUTPUT.PUT_LINE('OBJECT_SERIALIZATION.DESERIALIZE_TYPES(): Type count = ' || P_TYPE_LIST.count); $END
  
   for V_IDX in 1 .. P_TYPE_LIST.count loop
-      V_SQL_FRAGMENT := DESERIALIZE_TYPE(P_TYPE_LIST(V_IDX).OWNER,P_TYPE_LIST(V_IDX).TYPE_NAME);			
+      V_SQL_FRAGMENT := DESERIALIZE_TYPE(P_TYPE_LIST(V_IDX).OWNER,P_TYPE_LIST(V_IDX).TYPE_NAME);            
       DBMS_LOB.WRITEAPPEND(P_PLSQL_BLOCK,length(V_SQL_FRAGMENT),V_SQL_FRAGMENT);
   end loop;
 
@@ -1071,7 +1117,7 @@ begin
 
 end;
 --
-function DESERIALIZE_TYPES(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TAB)
+function DESERIALIZE_TYPES(P_TYPE_LIST IN OUT NOCOPY TYPE_LIST_TABLE)
 return CLOB
 as
   V_PLSQL_BLOCK    CLOB;
@@ -1083,17 +1129,27 @@ end;
 --
 procedure DESERIALIZE_TABLE_TYPES(P_TABLE_OWNER VARCHAR2,P_TABLE_NAME VARCHAR2, P_PLSQL_BLOCK IN OUT NOCOPY CLOB)
 as
-  V_TYPE_LIST TYPE_LIST_TAB;
+  V_TYPE_LIST TYPE_LIST_TABLE;
 begin
-  select distinct DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+  $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  select TYPE_LIST(DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL)
+  --
+  $ELSE
+  --
+  select DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+  $END
+  --
     bulk collect into V_TYPE_LIST
-    from ALL_TAB_COLS atc
-   where atc.DATA_TYPE_OWNER is not NULL
-     and atc.DATA_TYPE_OWNER not in ('MDSYS')
-     and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-     and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-     and atc.OWNER = P_TABLE_OWNER
-     and atc.TABLE_NAME = P_TABLE_NAME;
+    from (
+      select distinct DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+        from ALL_TAB_COLS atc
+       where atc.DATA_TYPE_OWNER is not NULL
+         and atc.DATA_TYPE_OWNER not in ('MDSYS')
+         and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
+         and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+         and atc.OWNER = P_TABLE_OWNER
+         and atc.TABLE_NAME = P_TABLE_NAME
+   );
   DESERIALIZE_TYPES(V_TYPE_LIST, P_PLSQL_BLOCK);
 end;
 --
@@ -1107,34 +1163,44 @@ begin
   return V_PLSQL_BLOCK;
 end;
 --
-procedure DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE,P_PLSQL_BLOCK IN OUT NOCOPY CLOB)
+procedure DESERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE,P_PLSQL_BLOCK IN OUT NOCOPY CLOB)
 as
-  V_TYPE_LIST TYPE_LIST_TAB;
+  V_TYPE_LIST TYPE_LIST_TABLE;
 $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
-  -- Cannot use local types in SQL in 11.2.x
-  V_TABLE_LIST TABLE_INFO_TABLE_GT := TABLE_INFO_TABLE_GT();
+  V_TABLE_LIST TABLE_INFO_TABLE := TABLE_INFO_TABLE();
 begin
   V_TABLE_LIST.extend(P_TABLE_LIST.count);
   for i in P_TABLE_LIST.first .. P_TABLE_LIST.last loop
-     V_TABLE_LIST(i) := TABLE_INFO_RECORD_GT(P_TABLE_LIST(i).OWNER,P_TABLE_LIST(i).TABLE_NAME);
+     V_TABLE_LIST(i) := TABLE_INFO_RECORD(P_TABLE_LIST(i).OWNER,P_TABLE_LIST(i).TABLE_NAME);
   end loop;
 $ELSE
-  V_TABLE_LIST T_TABLE_INFO_TABLE := P_TABLE_LIST;
+  V_TABLE_LIST TABLE_INFO_TABLE := P_TABLE_LIST;
 begin
 $END  
-  select distinct DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+  --
+  $IF DBMS_DB_VERSION.VER_LE_11_2 $THEN
+  select TYPE_LIST(DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL)
+  --
+  $ELSE
+  --
+  select DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+  $END
+  --
     bulk collect into V_TYPE_LIST
-    from ALL_TAB_COLS atc, TABLE(V_TABLE_LIST) tl
-   where atc.DATA_TYPE_OWNER is not NULL
-     and atc.DATA_TYPE_OWNER not in ('MDSYS')
-     and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
-    and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
-     and atc.OWNER = tl.OWNER
-     and atc.TABLE_NAME = tl.TABLE_NAME;
+    from (
+       select distinct DATA_TYPE_OWNER, DATA_TYPE, NULL, NULL
+         from ALL_TAB_COLS atc, TABLE(V_TABLE_LIST) tl
+        where atc.DATA_TYPE_OWNER is not NULL
+          and atc.DATA_TYPE_OWNER not in ('MDSYS')
+          and atc.DATA_TYPE not in ('RAW','XMLTYPE','ANYDATA')
+          and ((HIDDEN_COLUMN = 'NO') or (COLUMN_NAME = 'SYS_NC_ROWINFO$'))
+          and atc.OWNER = tl.OWNER
+          and atc.TABLE_NAME = tl.TABLE_NAME
+    );
   DESERIALIZE_TYPES(V_TYPE_LIST, P_PLSQL_BLOCK);
 end;
 --
-function DESERIALIZE_TABLE_TYPES(P_TABLE_LIST T_TABLE_INFO_TABLE)
+function DESERIALIZE_TABLE_TYPES(P_TABLE_LIST TABLE_INFO_TABLE)
 return CLOB
 as
   V_PLSQL_BLOCK    CLOB;

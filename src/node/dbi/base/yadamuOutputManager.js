@@ -1,4 +1,3 @@
-"use strict"
 
 import fs              from 'fs'
 import assert          from 'assert'
@@ -26,7 +25,7 @@ class YadamuOutputManager extends Transform {
   
   constructor(dbi,tableName,metrics,status,yadamuLogger) {
     const options = {
-	  objectMode             : true
+	  objectMode               : true
 	  , readableHighWaterMark  : 1024
 	  , writableHighWaterMark  : dbi.BATCH_LIMIT
 	}
@@ -47,29 +46,29 @@ class YadamuOutputManager extends Transform {
 	this.processRow = this._cacheOutOfSequenceMessages
     this.outOfSequenceMessageCache = []
   }
-
+  
   createBatch() {
 	return []
   }
   
-  resetBatch(batch) {
+  resetBatch(batch) {  
 	batch.length = 0
   }
 
   initializeBatchCache() {
-	this.batchCache = Array(this.dbi.BATCH_LIMIT).fill(0).map((x) => { return this.createBatch()})	
+	this.batchCache = Array(this.dbi.BATCH_LIMIT || 1).fill(0).map((x) => { return this.createBatch()})	
   }	  
   
   async nextBatch() {
     this.COPY_METRICS.batchNumber++;
 	if (this.batchCache.length === 0) {  
-      // this.yadamuLogger.trace([this.constructor.name,'newBatch()','BATCH_RELEASED',this.dbi.getWorkerNumber(),this.Name,this.COPY_METRICS.batchNumber],'WAITING')       
+      // this.yadamuLogger.trace([this.constructor.name,'newBatch()',this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),this.tableName,this.COPY_METRICS.batchNumber,'BATCH_RELEASED'],'WAITING')       
 	  await new Promise((resolve,reject) => {
 		this.once(DBIConstants.BATCH_RELEASED,() => {
 	      resolve()
 		})
 	  })
-      // this.yadamuLogger.trace([this.constructor.name,'newBatch()','BATCH_RELEASED',this.dbi.getWorkerNumber(),this.tableName,this.COPY_METRICS.batchNumber],'PROCESSING')
+      // this.yadamuLogger.trace([this.constructor.name,'newBatch()',this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),this.tableName,this.COPY_METRICS.batchNumber,'BATCH_RELEASED'],'PROCESSING')
 	}
 	this.COPY_METRICS.cached = 0;
 	const nextBatch = this.batchCache.shift()
@@ -77,13 +76,17 @@ class YadamuOutputManager extends Transform {
   }
   
   releaseBatch(batch) {
-	this.resetBatch(batch)
-	this.batchCache.push(batch)
+	if (batch) {
+	  this.resetBatch(batch)
+	  this.batchCache.push(batch)
+	}
 	this.emit(DBIConstants.BATCH_RELEASED)
   }
-  
+
   async setTableInfo(tableName) {
-	await this.dbi.cacheLoaded
+    // this.yadamuLogger.trace([this.constructor.name,this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),'CACHE_LOADED'],'WAITING')
+    await this.dbi.cacheLoaded
+    // this.yadamuLogger.trace([this.constructor.name,this.dbi.DATABASE_VENDOR,this.dbi.ROLE,this.dbi.getWorkerNumber(),'CACHE_LOADED'],'PROCESSING')
     this.tableInfo = this.dbi.getTableInfo(tableName)
     this.initializeBatchCache() 
     this.batch = await this.nextBatch()
@@ -91,15 +94,15 @@ class YadamuOutputManager extends Transform {
 	this.rowTransformation  = this.setTransformations(this.tableInfo.targetDataTypes)
   }
      
-  generateTransformations(targetDataTypes) {
+  generateTransformations(dataTypes) {
 	
-	return Array(targetDataTypes.columnNames.length).fill(null);
+	return Array(dataTypes.columnNames.length).fill(null);
 
   }
   
-  setTransformations(targetDataTypes) {
+  setTransformations(dataTypes) {
 	 	  
-	this.transformations = this.generateTransformations(targetDataTypes) 
+	this.transformations = this.generateTransformations(dataTypes) 
 	
      // Use a dummy rowTransformation function if there are no transformations required.
 
@@ -113,21 +116,6 @@ class YadamuOutputManager extends Transform {
       }) 
     }
 
-  }
-
-  setWriter(writer) {
-    this.writer = writer
-  }
-
-  async throttleThroughput() {
-
-    while ((this.COPY_METRICS.batchNumber - this.COPY_METRICS.batchWritten) > this.writableHighWaterMark) {
-      await new Promise((resolve, reject) => {
-        this.writer.on(DBIConstants.BATCH_COMPLETED,() => {
-          resolve() 
-        })
-      })
-    }
   }
    
   abortTable() {
@@ -226,8 +214,10 @@ class YadamuOutputManager extends Transform {
     // Avoid uneccesary data copy at all cost as this code is executed for every column in every row.
 
     // this.yadamuLogger.trace([this.constructor.name,'YADAMU WRITER',this.COPY_METRICS.cached],'cacheRow()')    
-      
+
+	// if (this.COPY_METRICS.cached === 0) console.log('CR1',row)      
     this.rowTransformation(row)
+	// if (this.COPY_METRICS.cached === 0) console.log('CR2',row)
     this.batch.push(row);
     this.COPY_METRICS.cached++
     return this.skipTable;
@@ -260,22 +250,21 @@ class YadamuOutputManager extends Transform {
 	throw new InvalidMessageSequence(this.tableName,'data','table')
   }
   
-  async _skipRow(data) {
-  }
+  async _skipRow(data) {}
   
   async _processRow(data) {
     // Be very careful about adding unecessary code here. This is executed once for each row processed by YADAMU. Keep it as lean as possible.
     this.COPY_METRICS.received++;
-	this.checkColumnCount(data)
+    this.checkColumnCount(data)
     this.cacheRow(data)
-    if (this.flushBatch()) {
+	if (this.flushBatch()) {
       if (this.dbi.REPORT_BATCHES) {
         this.yadamuLogger.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows written:  ${this.COPY_METRICS.written}.`);
 	  }
 	  this.COPY_METRICS.pending+= this.COPY_METRICS.cached
 	  const pushResult = this.push({batch:this.batch, snapshot: Object.assign({}, this.COPY_METRICS)})
       this.batch = await this.nextBatch();	
-    }	  
+	  }	  
     else {
 	  if ((this.dbi.FEEDBACK_MODEL === 'ALL') && (this.COPY_METRICS.received % this.dbi.FEEDBACK_INTERVAL === 0)) {
         this.yadamuLogger.info([`${this.displayName}`,this.tableInfo.insertMode],`Rows Cached: ${this.COPY_METRICS.cached}.`);
@@ -283,7 +272,6 @@ class YadamuOutputManager extends Transform {
 	}
   }
   
- 
   async endTable() {}
         
   async doConstruct() {}

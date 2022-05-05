@@ -1,20 +1,35 @@
-"use strict" 
 
-import { Readable, Transform} from 'stream';
-import { pipeline } from 'stream/promises';
-import {compose} from 'stream';
+import { 
+  performance 
+}                          from 'perf_hooks';
 
-import { performance } from 'perf_hooks';
+import { 
+  Readable, 
+  Transform
+}                          from 'stream';
 
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import DBIConstants from '../base/dbiConstants.js';
-import {CommandLineError} from '../../core/yadamuException.js';
-import NullWritable from '../../util/nullWritable.js';
+import { 
+  pipeline 
+}                          from 'stream/promises'
+
+import { 
+  compose
+}                          from 'stream'
+
+import {CommandLineError}  from '../../core/yadamuException.js';
+import YadamuLibrary       from '../../lib/yadamuLibrary.js';
+import YadamuConstants     from '../../lib/yadamuConstants.js';
+import NullWritable        from '../../util/nullWritable.js';
+
+import DBIConstants        from '../base/dbiConstants.js';
+import YadamuDataTypes     from '../base/yadamuDataTypes.js';
 
 class StreamSwitcher extends Transform {
   
   get TABLE_FILTER()                  { return this.dbWriter.dbi.TABLE_FILTER }
+  
+  get INBOUND_SPATIAL_FORMAT()        { return this.systemInformation.driverSettings.spatialFormat }
+  get INBOUND_CIRCLE_FORMAT()         { return this.systemInformation.driverSettings.circleFormat }
 
   /*
   **
@@ -45,73 +60,54 @@ class StreamSwitcher extends Transform {
   generateTransformations(tableName) {
 
     // this.yadamuLogger.trace([this.constructor.name,tableName],'generateTransformations()')
-	 
-	const tableMetadata = this.metadata[tableName]
-	return tableMetadata.dataTypes.map((targetDataType,idx) => {	  
 	
-      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-
-	  if (YadamuLibrary.isBinaryType(dataType.type)) {
-        return (row,idx) =>  {
-  		  row[idx] = Buffer.from(row[idx],'hex')
-		}
-      }
-
-	  switch (dataType.type.toUpperCase()) {
-        case "GEOMETRY":
-        case "GEOGRAPHY":
-		case "POINT":
-        case "LSEG":
-        case "BOX":
-        case "PATH":
-        case "POLYGON":
-        case "LINESTRING":
-		case "MULTIPOINT":
-        case "MULTILINESTRING":
-        case "MULTIPOLYGON":
-        case "GEOMETRYCOLLECTION":
-        case "GEOMCOLLECTION":
-        case '"MDSYS"."SDO_GEOMETRY"':
-          if (this.spatialFormat.endsWith('WKB')) {
-            return (row,idx)  => {
-  		      row[idx] = Buffer.from(row[idx],'hex')
-			}
-          }
-		  return null;
-        case "CIRCLE":
-		  if (this.circleFormat === 'CIRCLE') { 
+	const tableMetadata = this.metadata[tableName]
+	return tableMetadata.dataTypes.map((dataType,idx) => {	  
+	
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
+	 
+	  switch (true) {
+        case (dataTypeDefinition.type.toUpperCase() === "CIRCLE"):
+   		  if (this.INBOUND_CIRCLE_FORMAT === 'CIRCLE') {
+			// console.log(tableMetadata.columnNames[idx],dataType,'==>','CIRCLE')
             return null;
 		  }
-          if (this.spatialFormat.endsWith('WKB')) {
+		  // Deliberate FALL through to SPATIAL 
+	    case (YadamuDataTypes.isSpatial(dataTypeDefinition.type)):
+          // console.log(tableMetadata.columnNames[idx],dataType,'==>','isSpatial')
+          if (this.INBOUND_SPATIAL_FORMAT.endsWith('WKB')) {
             return (row,idx)  => {
   		      row[idx] = Buffer.from(row[idx],'hex')
 			}
           }
+		  return null
+	    case (YadamuDataTypes.isBoolean(dataTypeDefinition.type,tableMetadata.sizeConstraints[idx][0],tableMetadata.vendor)):
+          // console.log(tableMetadata.columnNames[idx],dataType,'==>','isBoolean')
 		  return null;
-		case "REAL":
-        case "FLOAT":
-		case "DOUBLE":
-		case "DOUBLE PRECISION":
-		case "BINARY_FLOAT":
-		case "BINARY_DOUBLE":
-		   return (row, idx) => {
-//			 if (!isFinite(row[idx])) {
-			   switch (row[idx]) {
-		         case "NaN":
-		   	       row[idx] = NaN
-				   break;
-			     case "Infinity":
-				   row[idx] = Number.POSITIVE_INFINITY
-				   break;
-				 case "-Infinity":
-				   row[idx] = Number.NEGATIVE_INFINITY
-				   break;
-				 default:
-			   }   
-//		     }
-		   }			 
-   		 default:
-		   return null
+	    case (YadamuDataTypes.isBinary(dataTypeDefinition.type)):
+          // console.log(tableMetadata.columnNames[idx],dataType,'==>','isBinary')
+  		  return (row,idx) =>  {
+			row[idx] = Buffer.from(row[idx],'hex')
+		  }
+	    case (YadamuDataTypes.isFloatingPoint(dataTypeDefinition.type)):
+  		  // console.log(tableMetadata.columnNames[idx],dataType,'==>','isFloatingPoint')
+  		  return (row, idx) => {
+		    switch (row[idx]) {
+		      case "NaN":
+			    row[idx] = NaN
+			    break;
+			  case "Infinity":
+				row[idx] = Number.POSITIVE_INFINITY
+				break;
+		      case "-Infinity":
+				row[idx] = Number.NEGATIVE_INFINITY
+				break;
+		      default:
+			}
+          }			
+		default:
+  		  // console.log(tableMetadata.columnNames[idx],dataType,'==>','isDefault')
+		  return null
       }
     }) 
 		
@@ -132,11 +128,26 @@ class StreamSwitcher extends Transform {
     }	
   }
   
+  convertSizeConstraints(sizeConstraints) {
+	return Array.isArray(sizeConstraints[0]) ? sizeConstraints : sizeConstraints.map((sizeConstraint) => {
+	  switch (sizeConstraint) {
+		case '':
+		case '-1':
+		case null:
+		case undefined:
+		  return []
+	    default:
+		  const sizeComponents = sizeConstraint.split(',')
+		  return (sizeComponents.length === 1) ? [parseInt(sizeComponents[0])] : [parseInt(sizeComponents[0]),parseInt(sizeComponents[1])]
+	  }
+	})
+  }  
+  
   filterTables(data) {
 	
 	// Restrict operations to the list of tables specified.
 	// Order operations according to the order in which the tables were specified
-		
+
     if (this.TABLE_FILTER.length > 0) {
 	  
 	  // Check table names are valid.
@@ -159,8 +170,14 @@ class StreamSwitcher extends Transform {
 	  this.TABLE_FILTER.forEach((table) => {
          metadata[table] = data.metadata[table]
 	  })
+	  Object.values(metadata).forEach((tableMetadata) => {
+		 tableMetadata.sizeConstraints = this.convertSizeConstraints(tableMetadata.sizeConstraints)
+	  })
 	  return {metadata: metadata}
 	}
+    Object.values(data.metadata).forEach((tableMetadata) => {
+	  tableMetadata.sizeConstraints = this.convertSizeConstraints(tableMetadata.sizeConstraints)
+	})
 	return data
   }
 
@@ -207,8 +224,7 @@ class StreamSwitcher extends Transform {
  	      break;
         case 'systemInformation' :
           this.push(obj)
-	  	  this.spatialFormat = obj.systemInformation.typeMappings.spatialFormat
-		  this.circleFormat = obj.systemInformation.typeMappings.circleFormat
+		  this.systemInformation = obj.systemInformation
 	  	  this.yadamu.REJECTION_MANAGER.setSystemInformation(obj.systemInformation)
 	  	  this.yadamu.WARNING_MANAGER.setSystemInformation(obj.systemInformation)
  	      break;

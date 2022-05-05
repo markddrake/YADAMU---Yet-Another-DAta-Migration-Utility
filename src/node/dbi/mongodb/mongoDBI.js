@@ -1,29 +1,39 @@
 
-"use strict" 
-import fs from 'fs';
-import { performance } from 'perf_hooks';
+import fs                             from 'fs';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
 
 import mongodb from 'mongodb'
 const { MongoClient } = mongodb;
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import MongoConstants from './mongoConstants.js'
-import MongoError from './mongoException.js'
-import MongoOutputManager from './mongoOutputManager.js';
-import MongoWriter from './mongoWriter.js';
-import MongoParser from './mongoParser.js';
-import StatementGenerator from './statementGenerator.js';
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+					
+import MongoConstants 				 from './mongoConstants.js'
+import MongoDataTypes 				 from './mongoDataTypes.js'
+import MongoError                    from './mongoException.js'
+import MongoOutputManager            from './mongoOutputManager.js'
+import MongoWriter                   from './mongoWriter.js'
+import MongoParser                   from './mongoParser.js'
+import MongoStatementGenerator       from './mongoStatementGenerator.js'
 
 /*
 **
@@ -56,22 +66,22 @@ import StatementGenerator from './statementGenerator.js';
 
 class MongoDBI extends YadamuDBI {
     
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,MongoConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,MongoConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return MongoDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return MongoDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
 
   // Not available until configureConnection() has been called 
  
-  get DB_VERSION()             { return this._DB_VERSION }
+  get DATABASE_VERSION()             { return this._DATABASE_VERSION }
 
   // Override YadamuDBI
 
@@ -123,6 +133,7 @@ class MongoDBI extends YadamuDBI {
     
   constructor(yadamu,manager,connectionSettings,parameters) {	  
     super(yadamu,manager,connectionSettings,parameters)
+    this.DATA_TYPES = MongoDataTypes
   }
                                                              ;
   async _executeDDL(collectionList) {
@@ -259,39 +270,6 @@ class MongoDBI extends YadamuDBI {
       throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
     }
   }
-
-  async yadamuInstanceId() {
-      
-    //  Wrapper for db.admin().buildInfo()  
-      
-	let stack
-    const operation = `db().collection('system.js').mapReduce()`
-    try {
-	  const ydb = await this.client.db('yadamu')
-      this.SQL_TRACE.trace(this.traceMongo(operation))    
-      const sqlStartTime = performance.now()
-   
-      const results = await ydb.collection('system.js').aggregate(
-	  [
-       { "$match"   : { _id : "yadamu_instance_id"}},
-       { "$project" : { _id : 0, instance_id : { "$function" : { body: `function(f) { return f() }`, args : ["$value"], lang: "js"}}}},
-       { "$lookup"  : {
-           from: "system.js",
-           pipeline: [
-              { "$match"   : { _id : "yadamu_installation_timestamp" } },
-              { "$project" : { _id : 0, timestamp : { "$function" : { body: `function(f) { return f() }`, args : ["$value"], lang: "js"}}}}
-           ],
-           as: "timestamp"
-       }},
-       { "$project" : { _id : 0, instance_id: "$instance_id", timestamp: { $first : "$timestamp.timestamp"}}}
-      ]).toArray()
-	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
-      return results[0]
-    } catch (e) {
-      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
-    }
-  }
-  
 
   async serverInfo() {
       
@@ -499,7 +477,7 @@ class MongoDBI extends YadamuDBI {
     // this.yadamuLogger.trace([this.DATABASE_VENDOR,this.ROLE,this.getWorkerNumber()],`configureConnection()`)
 
     const serverInfo = await this.serverInfo()
-    this._DB_VERSION = serverInfo.version
+    this._DATABASE_VERSION = serverInfo.version
   }
   
   async closeConnection() {
@@ -520,6 +498,36 @@ class MongoDBI extends YadamuDBI {
     }
   }
   
+  async yadamuInstanceId() {
+      
+	let stack
+    const operation = `db().collection('system.js').mapReduce()`
+    try {
+	  const ydb = await this.client.db('yadamu')
+      this.SQL_TRACE.trace(this.traceMongo(operation))    
+      const sqlStartTime = performance.now()
+   
+      const results = await ydb.collection('system.js').aggregate(
+	  [
+       { "$match"   : { _id : "yadamu_instance_id"}},
+       { "$project" : { _id : 0, instance_id : { "$function" : { body: `function(f) { return f() }`, args : ["$value"], lang: "js"}}}},
+       { "$lookup"  : {
+           from: "system.js",
+           pipeline: [
+              { "$match"   : { _id : "yadamu_installation_timestamp" } },
+              { "$project" : { _id : 0, timestamp : { "$function" : { body: `function(f) { return f() }`, args : ["$value"], lang: "js"}}}}
+           ],
+           as: "timestamp"
+       }},
+       { "$project" : { _id : 0, instance_id: "$instance_id", timestamp: { $first : "$timestamp.timestamp"}}}
+      ]).toArray()
+	  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
+      return results[0]
+    } catch (e) {
+      throw this.trackExceptions(new MongoError(this.DRIVER_ID,e,stack,this.traceMongo(operation)))
+    }
+  }
+    
   updateVendorProperties(vendorProperties) {
 
     vendorProperties.host             = this.parameters.HOSTNAME || vendorProperties.host 
@@ -539,9 +547,9 @@ class MongoDBI extends YadamuDBI {
 	
 	await super.initialize(false)   
     
-    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Document ID Tranformation: ${this.ID_TRANSFORMATION}.`)
-    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Read Tranformation: ${this.READ_TRANSFORMATION}.`)
-    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`Write Tranformation: ${this.WRITE_TRANSFORMATION}.`)    
+    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Document ID Tranformation: ${this.ID_TRANSFORMATION}.`)
+    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Read Tranformation: ${this.READ_TRANSFORMATION}.`)
+    this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`Write Tranformation: ${this.WRITE_TRANSFORMATION}.`)    
   }
 
   /*
@@ -591,7 +599,7 @@ class MongoDBI extends YadamuDBI {
 
    const stats = await this.stats()
    const serverInfo = await this.serverInfo()
-   const buildInfo = await this.builInfo
+   const buildInfo = await this.buildInfo()
    const clientMetadata = this.client.topology.s.options.metadata;
    // Object.getOwnPropertySymbols(this.client).forEach((k) => {console.log(this.client[k]); clientMetadata = clientMetadata || (this.client[k]?.metadata)})
    return Object.assign(
@@ -617,7 +625,7 @@ class MongoDBI extends YadamuDBI {
     return undefined
   }
 
-  normalizeTypeInfo(typeInfo) {
+  coalesceTypeInfo(typeInfo) {
     // Check for NULL and something. Remove NULL and returns what's left Note we _ARE_ searching for the string 'null' not the value null
 	const nullIdx = typeInfo.indexOf('null')
 	if (nullIdx >= 0) {
@@ -654,7 +662,7 @@ class MongoDBI extends YadamuDBI {
     let result = s === 0 ? MongoConstants.DEFAULT_STRING_LENGTH :  Math.pow(2, Math.ceil(Math.log(s)/Math.log(2)))
     result = ((result === 4096) && (s < 4001)) ? 4000 : result
     result = ((result === 32768) && (s < 32768)) ? 32767 : result
-    return result.toString()
+    return result
   }
 
   async getSchemaMetadata() {
@@ -665,59 +673,11 @@ class MongoDBI extends YadamuDBI {
 	
     const loopStartTime = performance.now()
     const schemaInfo = await Promise.all(collections.map(async (collection,idx) => {    // const dbMetadata = await Promise.all(collections.map(async (collection) => {    
-      const tableInfo = {TABLE_SCHEMA: this.connection.databaseName, TABLE_NAME: collection.collectionName, COLUMN_NAME_ARRAY: ["JSON_DATA"], DATA_TYPE_ARRAY: ["json"], SIZE_CONSTRAINT_ARRAY: [""]}
+      const tableInfo = {TABLE_SCHEMA: this.connection.databaseName, TABLE_NAME: collection.collectionName, COLUMN_NAME_ARRAY: ["JSON_DATA"], DATA_TYPE_ARRAY: ["json"], SIZE_CONSTRAINT_ARRAY: [[]]}
       if ((this.MONGO_STORAGE_FORMAT === 'DOCUMENT') && (this.MONGO_EXPORT_FORMAT === 'ARRAY')) {       
         let stack
         let operation
         try {
-		
-          /*
-          **
-          ** Aggreation Pipeline cannot be used to get (ordered) list of keys since $addToSet() does not maintain the order of the rows generated by the $unwind
-          **
-
-		  const keyNamePipeline = [{
-			"$project" : {
-			  "docAsKeyValue" : {
-				"$objectToArray" : "$$ROOT"
-			  }
-			}
-		  },{
-			"$unwind" : "$docAsKeyValue"
-		  },{
-			"$group" : {
-			  "_id"  : null
-			, "keys" : {
-			     "$addToSet" : "$docAsKeyValue.k"
-			   }
-			}
-	      }]
-
-          switch (this.MONGO_SAMPLE_LIMIT) {
-			case 0:
-			  break;
-			case undefined:
-			  keyNamePipeline.unshift({ "$sample" : { size: 1000}})
-			  break;
-			default:
-			  keyNamePipeline.unshift({ "$sample" : { size : this.MONGO_SAMPLE_LIMIT}})
-		  }
-			
-          operation = `db(${this.connection.databaseName}).collection(${collection.collectionName}.aggregate(${JSON.stringify(keyNamePipeline," ",2)})`
-          this.SQL_TRACE.trace(this.traceMongo(operation))    
-          let sqlStartTime = performance.now()
-    	  stack =  new Error().stack
-		  
-		  const keys = await collection.aggregate(keyNamePipeline).toArray()
-		  this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
-          
-		  if (keys.length > 0) {
-   		    const collectionMetadata = {COLUMN_NAME_ARRAY : keys[0].keys, DATA_TYPE_ARRAY: [], SIZE_CONSTRAINT_ARRAY: []}         
-		    Object.assign(tableInfo,collectionMetadata)
-
-          **
-          */		  
-	
           operation = `${collection.collectionName}.mapReduce()`;
           this.SQL_TRACE.trace(this.traceMongo(operation))    
           let sqlStartTime = performance.now()
@@ -816,16 +776,36 @@ class MongoDBI extends YadamuDBI {
 			// console.dir(typeInformation,{depth:null})
 			if (typeInformation.length > 0) {
 			  tableInfo.COLUMN_NAME_ARRAY.forEach((col,idx) => {
-			    let dataType = typeInformation[0][col].type.length == 1 ? typeInformation[0][col].type[0] : this.normalizeTypeInfo(typeInformation[0][col].type)
-                let size = typeInformation[0][col].size
-                size = dataType ===  'null' ? MongoConstants.DEFAULT_STRING_LENGTH : size                  
+			    let dataType = typeInformation[0][col].type.length == 1 ? typeInformation[0][col].type[0] : this.coalesceTypeInfo(typeInformation[0][col].type)
+				switch (dataType) {
+				   case 'string':
+				   case 'binData':
+				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([this.roundP2(typeInformation[0][col].size)])
+					 break
+				   case 'null':
+                     tableInfo.SIZE_CONSTRAINT_ARRAY.push([MongoConstants.DEFAULT_STRING_LENGTH]) 
+					 break
+				   case 'objectId':
+				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([12]) 
+					 break
+				   case 'int':
+				   case 'long':
+				   case 'decimal':
+				   case 'double':
+				   case 'bool':
+				   case 'object':
+				   case 'array':
+				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([]) 
+					 break
+				   default:
+				     tableInfo.SIZE_CONSTRAINT_ARRAY.push([typeInformation[0][col].size])
+				}
 			    dataType = dataType ===  'null' ? 'string' : dataType                  
 			    tableInfo.DATA_TYPE_ARRAY.push(dataType)
-			    tableInfo.SIZE_CONSTRAINT_ARRAY.push (dataType === 'string' || dataType === 'binData' ? this.roundP2(size) : '')
 			  })
             }
             else {
-              tableInfo.SIZE_CONSTRAINT_ARRAY = new Array(tableInfo.COLUMN_NAME_ARRAY.length).fill('')
+              tableInfo.SIZE_CONSTRAINT_ARRAY = new Array(tableInfo.COLUMN_NAME_ARRAY.length).fill([])
             }
           }
         } catch(e) {		
@@ -850,7 +830,7 @@ class MongoDBI extends YadamuDBI {
   createParser(tableInfo,parseDelay) {
     tableInfo.READ_TRANSFORMATION = this.READ_TRANSFORMATION
     tableInfo.ID_TRANSFORMATION = this.ID_TRANSFORMATION
-    return new MongoParser(tableInfo,this.yadamuLogger,parseDelay)
+    return new MongoParser(this,tableInfo,this.yadamuLogger,parseDelay)
   }  
 
   generateQueryInformation(tableMetadata) {
@@ -887,7 +867,7 @@ class MongoDBI extends YadamuDBI {
   */
     
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator,schema) 
+    return await super.generateStatementCache(MongoStatementGenerator,schema) 
   }
   
   getOutputStream(collectionName,metrics) {
@@ -920,7 +900,7 @@ class MongoDBI extends YadamuDBI {
     Object.keys(metadata).forEach((table) => {
       const mappedTableName = metadata[table].tableName.indexOf('$') > -1 ? metadata[table].tableName.replace(/\$/g,'') : undefined
       if (mappedTableName) {
-		this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,this.DB_VERSION,'IDENTIFIER INVALID',metadata[table].tableName],`Identifier contains invalid character "$". Identifier re-mapped as "${mappedTableName}".`)
+		this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,this.DATABASE_VERSION,'IDENTIFIER INVALID',metadata[table].tableName],`Identifier contains invalid character "$". Identifier re-mapped as "${mappedTableName}".`)
         dbMappings[table] = {
   	      tableName : mappedTableName
 		}

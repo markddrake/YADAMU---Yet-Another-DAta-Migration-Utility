@@ -1,67 +1,39 @@
-"use strict" 
 
-import YadamuParser from '../base/yadamuParser.js'
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
+import YadamuLibrary      from '../../lib/yadamuLibrary.js'
+
+import YadamuParser       from '../base/yadamuParser.js'
 
 class VerticaParser extends YadamuParser {
 
-  generateTransformations(queryInfo) {
+  generateTransformations(queryInfo) {  
 	  
     return queryInfo.DATA_TYPE_ARRAY.map((dataType,idx) => {
       switch (dataType.toLowerCase()) {
-	    case 'geometry':
-	    case 'geography':
-	      return (row,idx) => {
-			row[idx] = Buffer.from(row[idx],'hex')
-		  }	
-		case 'interval year to month':
+	    case this.dbi.DATA_TYPES.INTERVAL_YEAR_TO_MONTH_TYPE:
 		  return (row,idx) => {
 			row[idx] = YadamuLibrary.intervalYearMonthTo8601(row[idx])
 		  }
-		case 'interval day to second':
+		case this.dbi.DATA_TYPES.INTERVAL_DAY_TO_SECOND_TYPE:
  		  return (row,idx) => {
-		    row[idx] = YadamuLibrary.intervaDaySecondTo8601(row[idx])
+		    row[idx] = YadamuLibrary.intervalDaySecondTo8601(row[idx])
 		  }
-		case 'interval':
-          switch (true) {
-            case (queryInfo.TARGET_DATA_TYPE.length === 0):
-		      return (row,idx) => {
-			    row[idx] = YadamuLibrary.intervalYearMonthTo8601(row[idx])
-		      }
-            case (queryInfo.TARGET_DATA_TYPES[idx].toLowerCase().startsWith('interval year')):
-		      return (row,idx) => {
-			    row[idx] = YadamuLibrary.intervalYearMonthTo8601(row[idx])
-		     }
-		   case (queryInfo.TARGET_DATA_TYPES[idx].startsWith('interval day')):
-   		     return (row,idx) => {
-			   row[idx] = YadamuLibrary.intervaDaySecondTo8601(row[idx])
-		     }
-		   default:
-		      return (row,idx) => {
-			    row[idx] = YadamuLibrary.intervalYearMonthTo8601(row[idx])
-		     }
+		case this.dbi.DATA_TYPES.INTERVAL_TYPE:
+          return (row,idx) => {
+            row[idx] = YadamuLibrary.intervalDaySecondTo8601(row[idx])
 	      }
+   	    case this.dbi.DATA_TYPES.NUMERIC_TYPE:
+		  // Trim excessive insiginicant zeros resulting from mapping for unbounded numbers
+		  return (row,idx) => {
+		    row[idx] = typeof row[idx] === 'string' ? row[idx].replace(/(\.0*|(?<=(\..*))0*)$/, '') : row[idx]
+		  }
 		default:
 		  return null;
       }
     })
   }
 
-  constructor(queryInfo,yadamuLogger,parseDelay) {
-    super(queryInfo,yadamuLogger,parseDelay);     
-	
-    queryInfo.TARGET_DATA_TYPES?.forEach((dataType,idx) => {
-	  switch (dataType.toUpperCase()) {
-		 case 'XML':
-		 case 'XMLTYPE':
-		    // Replace xsl:space with xml:space
-		   this.transformations[idx] = (row,idx)  => {
-             row[idx] = row[idx].replace(/>\\n/g,'>\n')
-		   }     
-		default:
-  		   return null;
-      }
-    })
+  constructor(dbi,queryInfo,yadamuLogger,parseDelay) {
+    super(dbi,queryInfo,yadamuLogger,parseDelay)    
   }
 }
 

@@ -1,47 +1,74 @@
-"use strict" 
-import                          fs from 'fs';
-import { performance }          from 'perf_hooks';
-import { pipeline }             from 'stream/promises';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
-import pg                       from 'pg';
+import fs                             from 'fs';
+import readline                       from 'readline';
+
+import { 
+  once 
+}                                     from 'events';
+
+import {
+  Readable
+}                                     from 'stream';
+
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
+							          
+import pg                             from 'pg';
 const {Client,Pool} = pg;
-import QueryStream              from 'pg-query-stream'
-import types from 'pg-types';
 
-import YadamuDBI                from '../base/yadamuDBI.js';
-import DBIConstants             from '../base/dbiConstants.js';
-import YadamuConstants          from '../../lib/yadamuConstants.js';
-import AWSS3Constants           from '../awsS3/awsS3Constants.js';
-import YadamuLibrary            from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted}   from '../../core/yadamuException.js'
-import {YadamuError}            from '../../core/yadamuException.js';
-import {FileError, FileNotFound, DirectoryNotFound} from '../file/fileException.js';
+import QueryStream                    from 'pg-query-stream'
+import types                          from 'pg-types';
 
-import RedshiftConstants        from './redshiftConstants.js'
-import RedshiftError            from './redshiftException.js'
-import RedshiftParser           from './redshiftParser.js';
-import RedshiftWriter           from './redshiftWriter.js';
-import RedshiftOutputManager    from './redshiftOutputManager.js';
-import StatementGenerator       from './statementGenerator.js';
-import RedshiftStatementLibrary from './redshiftStatementLibrary.js';
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                    from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+import YadamuDataTypes                from '../base/yadamuDataTypes.js'
+
+import {
+	
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                    from '../file/fileException.js'
+
+import AWSS3Constants                from '../awsS3/awsS3Constants.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+						          
+import RedshiftConstants             from './redshiftConstants.js'
+import RedshiftDataTypes             from './redshiftDataTypes.js'
+import RedshiftError                 from './redshiftException.js'
+import RedshiftParser                from './redshiftParser.js'
+import RedshiftWriter                from './redshiftWriter.js'
+import RedshiftOutputManager         from './redshiftOutputManager.js'
+import RedshiftStatementGenerator    from './redshiftStatementGenerator.js'
+import RedshiftStatementLibrary      from './redshiftStatementLibrary.js'
 
 class RedshiftDBI extends YadamuDBI {
     
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,RedshiftConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,RedshiftConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return RedshiftDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return RedshiftDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -58,11 +85,9 @@ class RedshiftDBI extends YadamuDBI {
    
   // Enable configuration via command line parameters
   
-  get CIRCLE_FORMAT()          { return this.parameters.CIRCLE_FORMAT      || RedshiftConstants.CIRCLE_FORMAT }
   get BYTEA_SIZING_MODEL()     { return this.parameters.BYTEA_SIZING_MODEL || RedshiftConstants.BYTEA_SIZING_MODEL }
   get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM   || RedshiftConstants.STAGING_PLATFORM } 
   
-  get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT || DBIConstants.SPATIAL_FORMAT };
   get INBOUND_CIRCLE_FORMAT()  { return this.systemInformation?.typeMappings?.circleFormat || this.CIRCLE_FORMAT};
 
   get JSON_DATA_TYPE()         { return this.parameters.REDSHIFT_JSON_TYPE || RedshiftConstants.REDSHIFT_JSON_TYPE }
@@ -76,10 +101,11 @@ class RedshiftDBI extends YadamuDBI {
 	return this._BUCKET
   }
 
-  get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.CLOUD_STAGING }
+  get SUPPORTED_STAGING_PLATFORMS()   { return RedshiftConstants.STAGED_DATA_SOURCES }
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
+	this.DATA_TYPES = RedshiftDataTypes
        
     this.pgClient = undefined;
     this.useBinaryJSON = false
@@ -197,7 +223,7 @@ class RedshiftDBI extends YadamuDBI {
     await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)				
 	
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
-	this._DB_VERSION = results.rows[0][3];
+	this._DATABASE_VERSION = results.rows[0][3];
 	
   }
   
@@ -443,14 +469,7 @@ class RedshiftDBI extends YadamuDBI {
   **  Generate the SystemInformation object for an Export operation
   **
   */
-  
-  getTypeMappings() {
-   
-    const typeMappings = super.getTypeMappings()
-	typeMappings.circleFormat = this.CIRCLE_FORMAT 
-    return typeMappings; 
-  }
-  
+
   async getSystemInformation() {     
   
     const results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION)
@@ -482,7 +501,7 @@ class RedshiftDBI extends YadamuDBI {
   }
   
   generateSelectListEntry(columnInfo) {
-	const dataType = YadamuLibrary.decomposeDataType(columnInfo[3])
+	const dataType = RedshiftDataTypes.decomposeDataType(columnInfo[3])
 	switch (dataType.type) {
 	  case 'date':
 		return `TO_CHAR("${columnInfo[2]}",'YYYY-MM-DD"T"HH24:MI:SS"Z"') "${columnInfo[2]}"`
@@ -511,7 +530,7 @@ class RedshiftDBI extends YadamuDBI {
   }
 
   createParser(tableInfo,parseDelay) {
-    return new RedshiftParser(tableInfo,this.yadamuLogger,parseDelay)
+    return new RedshiftParser(this,tableInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -602,7 +621,7 @@ class RedshiftDBI extends YadamuDBI {
   }
    
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator, schema)
+    return await super.generateStatementCache(RedshiftStatementGenerator, schema)
   }
 
   getOutputStream(tableName,metrics) {
@@ -614,7 +633,7 @@ class RedshiftDBI extends YadamuDBI {
   }
  
   classFactory(yadamu) {
-	return new RedshiftDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new RedshiftDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
 
   async reportCopyErrors(tableName,metrics) {
@@ -667,7 +686,7 @@ class RedshiftDBI extends YadamuDBI {
 	  metrics.skipped = parseInt(results.rows[0][0])
 	  metrics.read = metrics.committed + metrics.skipped
   	} catch(cause) {
-	  metrics.writerError = e
+	  metrics.writerError = cause
 	  try {
         if ((cause instanceof RedshiftError) && cause.detailedErrorAvailable()) {
 		  try {

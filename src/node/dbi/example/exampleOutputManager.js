@@ -1,11 +1,13 @@
-"use strict"
 
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                               from 'perf_hooks';
+						
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
+import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js'
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuOutputManager from '../base/yadamuOutputManager.js';
-import {BatchInsertError} from '../../core/yadamuException.js'
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
 class ExampleWriter extends YadamuOutputManager {
 
@@ -18,9 +20,9 @@ class ExampleWriter extends YadamuOutputManager {
     // Set up Transformation functions to be applied to the incoming rows
  
     return  this.tableInfo.targetDataTypes.map((targetDataType,idx) => {        
-      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
+      const dataType = YadamuDataTypes.decomposeDataType(targetDataType);
       /*    
-      if (YadamuLibrary.isBinaryType(dataType.type)){
+      if (YadamuLibrary.isBinary(dataType.type)){
         // For Interfaces that what Binary content rendered as hexBinary string 
         return (col,idx) => {
           return (Buffer.isBuffer(col)) return col.toString('hex') : col

@@ -26,8 +26,11 @@ class MariadbStatementLibrary {
                    json_quote(case 
                                 when cc.check_clause is not null then 
                                   'json'
-                                when c.column_type = 'tinyint(1)' then 
-                                  '${this.dbi.TREAT_TINYINT1_AS_BOOLEAN ? 'boolean' : 'tinyint(1)'}'
+                                when column_type = 'tinyint(1)' then 
+                                  -- json_quote('${this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN ? 'boolean' : 'tinyint(1)'}')
+                                  '${this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN ? 'boolean' : 'tinyint(1)'}'
+                                when column_type = 'bit(1)' then 
+                                  '${this.dbi.DATA_TYPES.storageOptions.BIT1_IS_BOOLEAN ? 'boolean' : 'bit(1)'}'
                                 else 
                                   data_type
                               end
@@ -38,30 +41,29 @@ class MariadbStatementLibrary {
                ) "DATA_TYPE_ARRAY"
               ,concat(
                 '[',
-                group_concat(
-                  json_quote(case 
+                group_concat(case 
                                when column_type = 'tinyint(1)' then
-                                 ${this.dbi.TREAT_TINYINT1_AS_BOOLEAN ? "''" : "'3'"}
-	   					      when (numeric_precision is not null) and (numeric_scale is not null) then
-                                 concat(numeric_precision,',',numeric_scale) 
-                               when (numeric_precision is not null) then 
+                                 ${this.dbi.DATA_TYPES.storageOptions.TINYINT1_IS_BOOLEAN ? 'json_array()' : 'json_array(3)'}
+                               when column_type = 'bit(1)' then
+                                 ${this.dbi.DATA_TYPES.storageOptions.BIT1_IS_BOOLEAN ? 'json_array()' : 'json_array(1)'}
+                               when (numeric_precision is not null) and (numeric_scale is not null) then
+                                 json_array(numeric_precision,numeric_scale) 
+                               when (numeric_precision is not null) then
                                  case
-								   when data_type = 'bit' then
-                                     numeric_precision								   
-                                   when column_type like '%unsigned' then
-                                     numeric_precision
+                                   when data_type = 'bit' then
+                                     json_array(numeric_precision)
+                                   when column_type like '%unsigned' then 
+                                     json_array(numeric_precision)
                                    else
-                                     numeric_precision + 1
+                                     json_array(numeric_precision+1)
                                  end
-                               when (datetime_precision is not null) then 
-                                 datetime_precision
+                               when (datetime_precision is not null) then
+                                 json_array(datetime_precision)
                                when (character_maximum_length is not null) then
-                                 character_maximum_length
+                                 json_array(character_maximum_length)
                                else   
-                                 ''   
-                             end
-                            ) 
-                  order by ordinal_position separator ','
+                                 json_array()
+                             end order by ordinal_position separator ',' 
                 ),
                 ']'
                ) "SIZE_CONSTRAINT_ARRAY"
@@ -70,9 +72,12 @@ class MariadbStatementLibrary {
                       when data_type in ('time') then
                          -- Force ISO 8601 rendering of value 
                          concat('DATE_FORMAT(convert_tz(addtime(''1970-01-01 00:00:00'',"', column_name, '"), @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')',' "',column_name,'"')
-                      when data_type in ('date','datetime','timestamp') then
+                      when data_type in ('date','datetime') then
                         -- Force ISO 8601 rendering of value 
                         concat('DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'')',' "',column_name,'"')
+                      when data_type in ('date','datetime','timestamp') then
+                        -- Force ISO 8601 rendering of value 
+                        concat('case when "', column_name, '" is not null and convert_tz("', column_name, '", @@session.time_zone, ''+00:00'') is null then ''1970-01-01T00:00:00.000000Z''else DATE_FORMAT(convert_tz("', column_name, '", @@session.time_zone, ''+00:00''),''%Y-%m-%dT%T.%fZ'') end',' "',column_name,'"')
   					  when data_type = 'bit' then 
 						concat('BIN("', column_name, '") "',column_name,'"')
                       when data_type = 'year' then

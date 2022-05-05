@@ -1,43 +1,66 @@
-"use strict" 
-
-import fs from 'fs';
-import fsp from 'fs/promises';
-import path from 'path';
-import crypto from 'crypto';
-import { performance } from 'perf_hooks';
-
-import {finished, compose,  Readable, PassThrough} from 'stream'
-import {pipeline} from 'stream/promises'
-import { createGzip, createGunzip, createDeflate, createInflate } from 'zlib';
+					                  
+import fs                             from 'fs';
+import fsp                            from 'fs/promises';
+import path                           from 'path';
+import crypto                         from 'crypto';
+					                  
+import {                              
+  finished,                           
+  compose,                            
+  Readable,                           
+  PassThrough                         
+}                                     from 'stream'
+import {                              
+  pipeline                            
+}                                     from 'stream/promises'
+import {                              
+  createGzip,                         
+  createGunzip,                       
+  createDeflate,                      
+  createInflate                       
+}                                     from 'zlib';
+					                  
+import {                              
+  performance                         
+}                                     from 'perf_hooks';
 
 /*
 **
-** Obtain YADAMU_DBI_PARAMETERS and YADAMU_CONFIGURATION directly from YadamuConstants to avoid circular depandancy between FileDBI.js and Yadamu.js. 
+** Obtain DBI_PARAMETERS and YADAMU_CONFIGURATION directly from YadamuConstants to avoid circular depandancy between FileDBI.js and Yadamu.js. 
 ** Importing Yadamu into FileDBI sets up a circular dependancy that causes deferred resolution of Yadamu class. This means attempts to refereence
 ** static GETTER methods result in undefined values.
 **
 
-import Yadamu from '../../core/yadamu.js';
+import Yadamu from '../../core/yadamu.js'
 
 **
 */
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import { YadamuError } from '../../core/yadamuException.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import JSONParser from './jsonParser.js';
-import StreamSwitcher from './streamSwitcher.js';
-import JSONOutputManager from './jsonOutputManager.js';
-import {FileError, FileNotFound, DirectoryNotFound} from './fileException.js';
 
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-/*
-**
-** YADAMU Database Inteface class skeleton
-**
-*/
+import {
+  YadamuError
+}                                     from '../../core/yadamuException.js'
 
+/* Yadamu DBI */                                    
+
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+
+import JSONParser                     from './jsonParser.js'
+import StreamSwitcher                 from './streamSwitcher.js'
+import JSONOutputManager              from './jsonOutputManager.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                     from './fileException.js'
 
 class ExportWriter extends Readable {
 
@@ -101,15 +124,15 @@ class FileDBI extends YadamuDBI {
   static get DATABASE_VENDOR()       { return 'YABASC' };
   static get SOFTWARE_VENDOR()       { return 'YABASC - Yet Another Bay Area Software Compsny'};
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  {
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  {
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,YadamuConstants.YADAMU_CONFIGURATION[this.DATABASE_KEY] || {}))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-    return FileDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+    return FileDBI.DBI_PARAMETERS
   }
 
   get DATABASE_KEY()               { return FileDBI.DATABASE_KEY };
@@ -174,20 +197,15 @@ class FileDBI extends YadamuDBI {
   }
   
   set FILE(v)            { this._FILE = v }
-  set ROLE(v)            { this._ROLE = v }
   
-  get IS_READER()        { this._ROLE === YadamuConstants.READER_ROLE }
-  get IS_WRITER()        { this._ROLE === YadamuConstants.WRITER_ROLE}
-  
-  constructor(yadamu,role,connectionSettings,parameters) {
-    super(yadamu,null,connectionSettings,parameters)
-	this.ROLE = role
-    this.outputStream = undefined;
+  constructor(yadamu,connectionSettings,parameters) {
+	super(yadamu,null,connectionSettings,parameters)
+	this.outputStream = undefined;
     this.inputStream = undefined;
 	this.firstTable = true;
 	this.ddl = undefined;
 	this.baseDirectory = path.resolve(this.vendorProperties.directory || "")
-	this._DB_VERSION = YadamuConstants.YADAMU_VERSION
+	this._DATABASE_VERSION = YadamuConstants.YADAMU_VERSION
   }
 
   setDescription(description) {
@@ -253,7 +271,6 @@ class FileDBI extends YadamuDBI {
   }
     
   setMetadata(metadata) {
-    // Object.values(metadata).forEach((table) => {delete table.source})
 	super.setMetadata(metadata)
   }
  
@@ -365,7 +382,7 @@ class FileDBI extends YadamuDBI {
 
     const sourceInfo = {}
     Object.keys(this.metadata).forEach((key) => {
-	  if (this.metadata[key].source) {
+	  if (this.metadata[key].source || this.metadata[key].partitionCount) {
 		sourceInfo[key] = this.metadata[key].source; 
 	    delete this.metadata[key].source
 		delete this.metadata[key].partitionCount
@@ -496,11 +513,12 @@ class FileDBI extends YadamuDBI {
 	// Include a dummy dataTypes array of the correct length to ensure the column count assertion does not throw
 	return { 
 	  tableName         : tableName
-	, _SPATIAL_FORMAT   : this.systemInformation.typeMappings.spatialFormat 
+	, _SPATIAL_FORMAT   : this.INBOUND_SPATIAL_FORMAT
     , columnNames       : [... this.metadata[tableName].columnNames]
 	, insertMode        : 'Batch'
 	, columnCount       : this.metadata[tableName].columnNames.length
     , targetDataTypes   : [... this.metadata[tableName].dataTypes]
+	, vendor            : this.systemInformation.vendor
     }
   }
 

@@ -1,0 +1,84 @@
+{
+  "mappings": {
+    "CHAR_TYPE"                                            : "char"                                             
+  , "VARCHAR_TYPE"                                         : "varchar"                                          
+                                                                                                           
+  , "BINARY_TYPE"                                          : "binary"                                           
+  , "VARBINARY_TYPE"                                       : "varbinary"                                        
+  , "BIT_STRING_TYPE"                                      : "bit"                                              
+                                                                                                           
+  , "TINYINT_TYPE"                                         : "tinyint"                                          
+  , "SMALLINT_TYPE"                                        : "smallint"                                         
+  , "MEDIUMINT_TYPE"                                       : "mediumint"                                        
+  , "INTEGER_TYPE"                                         : "int"                                              
+  , "BIGINT_TYPE"                                          : "bigint"                                           
+                                                                                                           
+  , "NUMERIC_TYPE"                                         : "decimal"                                          
+                                                                                                           
+  , "FLOAT_TYPE"                                           : "float"                                            
+  , "DOUBLE_TYPE"                                          : "double"                                           
+                                                                                                           
+  , "DATE_TYPE"                                            : "date"                                             
+  , "TIME_TYPE"                                            : "time"                                             
+  , "DATETIME_TYPE"                                        : "datetime"                                         
+  , "TIMESTAMP_TYPE"                                       : "timestamp"
+  , "YEAR_TYPE"                                            : "year"                                             
+                                                                                                           
+  , "BOOLEAN_TYPE"                                         : "boolean"                                          
+
+  , "CLOB_TYPE"                                            : "longtext"
+  , "BLOB_TYPE"                                            : "longblob"
+                                                                                                           
+  , "MYSQL_LONGTEXT_TYPE"                                  : "longtext"                                         
+  , "MYSQL_MEDIUMTEXT_TYPE"                                : "mediumtext"                                       
+  , "MYSQL_TEXT_TYPE"                                      : "text"                                             
+  , "MYSQL_TINYTEXT_TYPE"                                  : "tinytext"                                         
+                                                                                                           
+  , "MYSQL_LONGBLOB_TYPE"                                  : "longblob"                                         
+  , "MYSQL_MEDIUMBLOB_TYPE"                                : "mediumblob"                                       
+  , "MYSQL_BLOB_TYPE"                                      : "blob"                                             
+  , "MYSQL_TINYBLOB_TYPE"                                  : "tinyblob"                                         
+                                                                                                           
+  , "JSON_TYPE"                                            : "json"                                             
+
+  , "SPATIAL_TYPE"                                         : "geometry"                                                                                                                                                          
+  , "POINT_TYPE"                                           : "point"                                            
+  , "LINE_TYPE"                                            : "linestring"                                       
+  , "POLYGON_TYPE"                                         : "polygon"                                          
+  , "GEOMETRY_TYPE"                                        : "geometry"                                         
+  , "MULTI_POINT_TYPE"                                     : "multipoint"                                       
+  , "MULTI_LINE_TYPE"                                      : "multilinestring"                                  
+  , "MULTI_POLYGON_TYPE"                                   : "multipolygon"                                     
+  , "GEOMETRY_COLLECTION_TYPE"                             : "geometrycollection"                               
+                                                                                                           
+  , "MYSQL_SET_TYPE"                                       : "set"                                              
+  , "MYSQL_ENUM_TYPE"                                      : "enum"                                             
+
+  , "PGSQL_IDENTIFIER_TYPE"                                : "int unsigned"
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "decimal(65,32)"
+
+  }
+, "limits": {
+    "SCALAR_LENGTH"                                        : 65532
+  , "CHAR_LENGTH"                                          : 255
+  , "VARCHAR_LENGTH"                                       : 65532
+  , "BINARY_LENGTH"                                        : 255
+  , "VARBINARY_LENGTH"                                     : 65532
+  , "NUMERIC_PRECISION"                                    : 65
+  , "NUMERIC_SCALE"                                        : 38
+  , "TIMESTAMP_PRECISION"                                  : 6
+  , "LONGBLOB_LENGTH"                                      : 4294967295
+  , "MEDIUMBLOB_LENGTH"                                    : 16777215
+  , "BLOB_LENGTH"                                          : 65535
+  , "TINYBLOB_LENGTH"                                      : 255
+  , "LONGTEXT_LENGTH"                                      : 4294967295
+  , "MEDIUMTEXT_LENGTH"                                    : 16777215
+  , "TEXT_LENGTH"                                          : 65535
+  , "TINYTEXT_LENGTH"                                      : 255      
+  , "BIT_STRING_LENGTH"                                    : 64
+  }
+, "storageOptions": {
+	"SPATIAL_FORMAT"                                       : "WKB"
+  , "BOOLEAN_TYPE"                                         : "bit(1)"
+  }
+}

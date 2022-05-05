@@ -1,40 +1,51 @@
-"use strict" 
-import fs from 'fs';
-import { performance } from 'perf_hooks';
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
+import fs                             from 'fs';
+
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							          
+/* Database Vendors API */                                    
+		
 import snowflake from 'snowflake-sdk';
 
+/* Yadamu Core */                                    
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import SnowflakeConstants from './snowflakeConstants.js';
-import SnowflakeError from './snowflakeException.js'
-import SnowflakeParser from './snowflakeParser.js';
-import SnowflakeWriter from './snowflakeWriter.js';
-import SnowflakeOutputManager from './snowflakeOutputManager.js';
-import StatementGenerator from './statementGenerator.js';
-import SnowflakeStatementLibrary from './snowflakeStatementLibrary.js';
+/* Yadamu DBI */  
+
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+
+import {
+  YadamuError,
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
+
+/* Vendor Specific DBI Implimentation */  
+
+import SnowflakeConstants             from './snowflakeConstants.js'
+import SnowflakeDataTypes             from './snowflakeDataTypes.js'
+import SnowflakeError                 from './snowflakeException.js'
+import SnowflakeParser                from './snowflakeParser.js'
+import SnowflakeWriter                from './snowflakeWriter.js'
+import SnowflakeOutputManager         from './snowflakeOutputManager.js'
+import SnowflakeStatementGenerator    from './snowflakeStatementGenerator.js'
+import SnowflakeStatementLibrary      from './snowflakeStatementLibrary.js'
 
 class SnowflakeDBI extends YadamuDBI {
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,SnowflakeConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,SnowflakeConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return SnowflakeDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return SnowflakeDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -53,14 +64,9 @@ class SnowflakeDBI extends YadamuDBI {
 
   // Enable configuration via command line parameters
 
-  get SPATIAL_FORMAT()         { return this.parameters.SPATIAL_FORMAT || SnowflakeConstants.SPATIAL_FORMAT };
-  
   // SNOWFLAKE XML TYPE can be set to TEXT to avoid multiple XML Fidelity issues with persisting XML data as VARIANT
   
-  get SNOWFLAKE_XML_TYPE()     { return this.parameters.SNOWFLAKE_XML_TYPE || SnowflakeConstants.SNOWFLAKE_XML_TYPE }
-  get SNOWFLAKE_JSON_TYPE()    { return this.parameters.SNOWFLAKE_JSON_TYPE || SnowflakeConstants.SNOWFLAKE_JSON_TYPE }
-
-  get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM || VerticaConstants.STAGING_PLATFORM } 
+  get STAGING_PLATFORM()       { return this.parameters.STAGING_PLATFORM || SnowflakeConstants.STAGING_PLATFORM } 
 
   get SPATIAL_SERIALIZER()     { return this._SPATIAL_SERIALIZER || "ST_AsWKB"; }
 
@@ -86,9 +92,14 @@ class SnowflakeDBI extends YadamuDBI {
   }    
 
   get SUPPORTED_STAGING_PLATFORMS()   { return DBIConstants.CLOUD_STAGING }
-
+    
   constructor(yadamu,manager,connectionSettings,parameters) {	  
     super(yadamu,manager,connectionSettings,parameters)
+    this.DATA_TYPES = SnowflakeDataTypes
+       
+	this.DATA_TYPES.storageOptions.XML_TYPE     = this.parameters.SNOWFLAKE_XML_STORAGE_OPTION      || this.DBI_PARAMETERS.XML_STORAGE_OPTION      || this.DATA_TYPES.storageOptions.XML_TYPE
+	this.DATA_TYPES.storageOptions.JSON_TYPE    = this.parameters.SNOWFLAKE_JSON_STORAGE_OPTION     || this.DBI_PARAMETERS.JSON_STORAGE_OPTION     || this.DATA_TYPES.storageOptions.JSON_TYPE
+	
 	this.StatementLibrary = SnowflakeStatementLibrary
 	this.statementLibrary = undefined
   }
@@ -160,14 +171,10 @@ class SnowflakeDBI extends YadamuDBI {
     // Perform connection specific configuration such as setting sesssion time zone to UTC...
 	let results = await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION)
     results = await this.executeSQL(this.StatementLibrary.SQL_SYSTEM_INFORMATION,[])    
-    this._DB_VERSION = results[0].DATABASE_VERSION
+    this._DATABASE_VERSION = results[0].DATABASE_VERSION
 
-    if ((this.isManager()) && (this.SNOWFLAKE_XML_TYPE !== SnowflakeConstants.SNOWFLAKE_XML_TYPE )) {
-       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_XML_TYPE}.`)
-    }	
-
-    if ((this.isManager()) && (this.SNOWFLAKE_JSON_TYPE !== SnowflakeConstants.SNOWFLAKE_JSON_TYPE )) {
-       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DB_VERSION,`Configuration`],`XMLType storage model is ${this.SNOWFLAKE_JSON_TYPE}.`)
+    if ((this.isManager()) && (this.DATA_TYPES.storageOptions.XML_TYPE !== SnowflakeConstants.SNOWFLAKE_XML_TYPE )) {
+       this.yadamuLogger.info([this.DATABASE_VENDOR,this.DATABASE_VERSION,`Configuration`],`XMLType storage model is ${this.DATA_TYPES.storageOptions.XML_TYPE}.`)
     }	
 
   }
@@ -264,11 +271,11 @@ class SnowflakeDBI extends YadamuDBI {
   
   async initialize() {
     await super.initialize(true)   
-	await this.useDatabase(this.parameters.YADAMU_DATABASE)
+    await this.useDatabase(this.parameters.YADAMU_DATABASE ||this.vendorProperties.database )
 	this.statementLibrary = new this.StatementLibrary(this)
 	this.SPATIAL_SERIALIZER = this.SPATIAL_FORMAT
   }
-
+    
   /*
   **
   ** Begin a transaction
@@ -420,7 +427,7 @@ class SnowflakeDBI extends YadamuDBI {
 	    const descOutput = await this.executeSQL(SQL_DESCRIBE_TABLE)
 	    dataTypes.forEach((dataType,idx) => {
           dataTypes[idx] = dataType === 'USER_DEFINED_TYPE' ? descOutput[idx].type : dataType
-          sizeConstraints[idx] = dataType === 'BINARY' ? '' + YadamuLibrary.decomposeDataType(descOutput[idx].type).length : sizeConstraints[idx] 
+          sizeConstraints[idx] = dataType === 'BINARY' ? [ + SnowflakeDataTypes.decomposeDataType(descOutput[idx].type).length ] : sizeConstraints[idx] 
         })
 	  }
       /*
@@ -428,10 +435,10 @@ class SnowflakeDBI extends YadamuDBI {
       ** Sucky DUCK-TYPING of VARIANT columns.. Basically if 1000 random rows contain JSON it's JSON otherwise it's XML !
       **
       */
-      if (dataTypes.includes('VARIANT')) {
+      if (dataTypes.includes(this.DATA_TYPES.SNOWFLAKE_VARIANT_TYPE)) {
 	    // -- Use TRY_PARSE_JSON test a random sample of non null columns to see of they contain valid JSON, if so, assume JSON otherwise assume XML.
 	    dataTypes = await Promise.all(dataTypes.map(async (dataType,idx) => {
-           if (dataType === 'VARIANT') {
+           if (dataType === this.DATA_TYPES.SNOWFLAKE_VARIANT_TYPE) {
              const columnName = columnNames[idx]
              const SQL_ANALYZE_VARIANT = `with SAMPLE_DATA_SET as (
   select "${columnName}" from "${this.parameters.YADAMU_DATABASE}"."${tableInfo.TABLE_SCHEMA}"."${tableInfo.TABLE_NAME}" 
@@ -471,7 +478,8 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   async getSchemaMetadata() {
 	  
 	let schemaInfo = await this.executeSQL(this.statementLibrary.SQL_SCHEMA_INFORMATION,[this.CURRENT_SCHEMA])
-    schemaInfo = await this.describeVariantColumns(schemaInfo)
+	schemaInfo = await this.describeVariantColumns(schemaInfo)
+	// console.dir(schemaInfo,{depth:null})
     return schemaInfo
   }
   
@@ -480,8 +488,9 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
 	tableInfo.SQL_STATEMENT = `select ${tableMetadata.CLIENT_SELECT_LIST} from "${this.parameters.YADAMU_DATABASE}"."${tableMetadata.TABLE_SCHEMA}"."${tableMetadata.TABLE_NAME}" t`; 
 	return tableInfo
   }     
-  createParser(queryInfo) {
-    return new SnowflakeParser(queryInfo,this.yadamuLogger)
+  
+  createParser(queryInfo,parseDelay) {
+    return new SnowflakeParser(this,queryInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -494,7 +503,6 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
     this.SQL_TRACE.traceSQL(queryInfo.SQL_STATEMENT)
     const statement = this.connection.execute({sqlText: queryInfo.SQL_STATEMENT,  fetchAsString: ['Number','Date'], streamResult: true})
     return statement.streamRows();
-    // return new SnowflakeReader(this.connection,queryInfo.SQL_STATEMENT)
   }  
   
   /*
@@ -509,7 +517,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   }
    
   async generateStatementCache(schema) {
-    return await super.generateStatementCache(StatementGenerator,schema) 
+    return await super.generateStatementCache(SnowflakeStatementGenerator,schema) 
   }
  
   getOutputStream(tableName,metrics) {
@@ -527,7 +535,7 @@ select (select count(*) from SAMPLE_DATA_SET) "SAMPLED_ROWS",
   }
   
   classFactory(yadamu) {
-	return new SnowflakeDBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new SnowflakeDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {

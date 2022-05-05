@@ -40,15 +40,15 @@ class MsSQLStatementLibrary extends DefaultStatmentLibrary {
                         select concat(',',
                                  case
                                    when ("NUMERIC_PRECISION" is not null) and ("NUMERIC_SCALE" is not null) then
-                                     concat('"',"NUMERIC_PRECISION",',',"NUMERIC_SCALE",'"')
+                                     concat('[',"NUMERIC_PRECISION",',',"NUMERIC_SCALE",']')
                                    when ("NUMERIC_PRECISION" is not null) then
-                                     concat('"',"NUMERIC_PRECISION",'"')
+                                     concat('[',"NUMERIC_PRECISION",']')
                                    when ("DATETIME_PRECISION" is not null) then
-                                     concat('"',"DATETIME_PRECISION",'"')
-                                   when ("CHARACTER_MAXIMUM_LENGTH" is not null) then
-                                     concat('"',"CHARACTER_MAXIMUM_LENGTH",'"')
+                                     concat('[',"DATETIME_PRECISION",']')
+                                   when ("CHARACTER_MAXIMUM_LENGTH" is not null) and("CHARACTER_MAXIMUM_LENGTH"  > -1) then
+                                     concat('[',"CHARACTER_MAXIMUM_LENGTH",']')
                                    else
-                                     '""'
+                                     '[]'
                                  end
                                ) as "data()"
                           from "INFORMATION_SCHEMA"."COLUMNS" c

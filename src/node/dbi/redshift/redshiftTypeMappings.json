@@ -1,0 +1,40 @@
+{
+  "mappings": {
+    "CHAR_TYPE"                                            : "character"                                        
+  , "VARCHAR_TYPE"                                         : "character varying"                                
+                                                                                                             
+  , "BINARY_TYPE"                                          : "bytea"                                            
+                                                                                                             
+  , "SMALLINT_TYPE"                                        : "smallint"                                         
+  , "INTEGER_TYPE"                                         : "integer"                                          
+  , "BIGINT_TYPE"                                          : "bigint"                                           
+  , "FLOAT_TYPE"                                           : "real"                                             
+  , "DOUBLE_TYPE"                                          : "double precision"                                 
+  , "NUMERIC_TYPE"                                         : "numeric"                                          
+                                                                                                             
+  , "DATE_TYPE"                                            : "date"                                             
+  , "TIMESTAMP_TYPE"                                       : "timestamp without time zone"                      
+  , "TIMESTAMP_TZ_TYPE"                                    : "timestamp with time zone"                         
+  , "TIME_TYPE"                                            : "time without time zone"                           
+  , "TIME_TZ_TYPE"                                         : "time with time zone"                              
+                                                                                                                         
+  , "BOOLEAN_TYPE"                                         : "boolean"                                          
+                                                                                                             
+  , "CLOB_TYPE"                                            : "text"                                             
+  , "BLOB_TYPE"                                            : "bytea"                                             
+                                                                                                                                                                                                                                                                                                                                      
+  , "UUID_TYPE"                                            : "uuid"                                             
+                                                                                                             
+  , "UNBOUNDED_NUMERIC_TYPE"                               : "numeric"
+  }
+, "limits": {
+    "SCALAR_LENGTH"                                        : 10485760
+  , "NUMERIC_PRECISION"                                    : 1000
+  , "NUMERIC_SCALE"                                        : 1000
+  , "TIMESTAMP_PRECISION"                                  : 6
+  }
+, "storageOptions": {
+	"SPATIAL_FORMAT"                                       : "EWKB"
+  , "JSON_TYPE"                                            : "jsonb"
+  }
+}                                                                                                              

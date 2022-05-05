@@ -15,22 +15,22 @@ import MongoDBI        from '../../../node/dbi//mongodb/mongoDBI.js';
 import MongoError      from '../../../node/dbi//mongodb/mongoException.js'
 import MongoConstants  from '../../../node/dbi//mongodb/mongoConstants.js';
 
-import YadamuTest      from '../../core/yadamu.js';
+import Yadamu          from '../../core/yadamu.js';
 import YadamuQALibrary from '../../lib/yadamuQALibrary.js'
 
 class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
     
 	get QA_COMPARE_DBNAME() { return 'YADAMU_QA' }
     
-    static #_YADAMU_DBI_PARAMETERS
+    static #_DBI_PARAMETERS
     
-    static get YADAMU_DBI_PARAMETERS()  { 
-       this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},YadamuTest.YADAMU_DBI_PARAMETERS,MongoConstants.DBI_PARAMETERS,YadamuTest.QA_CONFIGURATION[MongoConstants.DATABASE_KEY] || {},{RDBMS: MongoConstants.DATABASE_KEY}))
-       return this.#_YADAMU_DBI_PARAMETERS
+    static get DBI_PARAMETERS()  { 
+       this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},Yadamu.DBI_PARAMETERS,MongoConstants.DBI_PARAMETERS,Yadamu.QA_CONFIGURATION[MongoConstants.DATABASE_KEY] || {},{RDBMS: MongoConstants.DATABASE_KEY}))
+       return this.#_DBI_PARAMETERS
     }
    
-    get YADAMU_DBI_PARAMETERS() {
-      return MongoQA.YADAMU_DBI_PARAMETERS
+    get DBI_PARAMETERS() {
+      return MongoQA.DBI_PARAMETERS
     }   
         
     constructor(yadamu,manager,connectionSettings,parameters) {
@@ -455,7 +455,7 @@ class MongoQA extends YadamuQALibrary.qaMixin(MongoDBI) {
     }
 
     classFactory(yadamu) {
-      return new MongoQA(yadamu,this,this.connectionSettings,this.parameters)
+      return new MongoQA(yadamu,this,this.connectionParameters,this.parameters)
     }
 	
 	async getConnectionID() {

@@ -1,53 +1,63 @@
-"use strict"
 
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                               from 'perf_hooks'
 
-import YadamuOutputManger from '../base/yadamuOutputManager.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import {DatabaseError,RejectedColumnValue} from '../../core/yadamuException.js';
+import YadamuLibrary            from '../../lib/yadamuLibrary.js'
+						
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManger       from '../base/yadamuOutputManager.js'
+
+import {
+  DatabaseError,
+  RejectedColumnValue
+}                         from '../../core/yadamuException.js'
 																				   
-
 class MariadbOutputManger extends YadamuOutputManger {
 
   constructor(dbi,tableName,metrics,status,yadamuLogger) {
     super(dbi,tableName,metrics,status,yadamuLogger)
   }
   
-  generateTransformations(targetDataTypes) {
-
+  generateTransformations(dataTypes) {
+	  
     // Set up Transformation functions to be applied to the incoming rows
- 
-	return targetDataTypes.map((targetDataType,idx) => {
-      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-      switch (dataType.type.toLowerCase()) {
-        case "json" :
+	
+	return dataTypes.map((dataType,idx) => {
+
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
+
+      switch (dataTypeDefinition.type.toLowerCase()) {
+        case this.dbi.DATA_TYPES.JSON_TYPE:
+		case this.dbi.DATA_TYPES.MYSQL_ENUM_TYPE:
+        case this.dbi.DATA_TYPES.MYSQL_SET_TYPE:
           return (col,idx) => {
             return typeof col === 'object' ? JSON.stringify(col) : col
 	      }
           break;
-        case "geometry" :
-  	    case 'point':
-		case 'linestring':
-		case 'polygon':
-		case 'multipoint':
-		case 'multilinestring':
-		case 'multipolygon':
-		case 'geometrycollection':
+        case this.dbi.DATA_TYPES.GEOMETRY_TYPE:
+  	    case this.dbi.DATA_TYPES.POINT_TYPE:
+		case this.dbi.DATA_TYPES.LINE_TYPE:
+		case this.dbi.DATA_TYPES.POLYGON_TYPE:
+		case this.dbi.DATA_TYPES.MULTI_POINT_TYPE:
+		case this.dbi.DATA_TYPES.MULTI_LINE_TYPE:
+		case this.dbi.DATA_TYPES.MULTI_POLYGON_TYPE:
+		case this.dbi.DATA_TYPES.GEOMETRY_COLLECTION_TYPE:
 		  if (this.SPATIAL_FORMAT === 'GeoJSON') {
             return (col,idx) => {
               return typeof col === 'object' ? JSON.stringify(col) : col
 	        }
           }
           return null;
-        case "boolean":
+        case this.dbi.DATA_TYPES.BOOLEAN_TYPE:
           return (col,idx) => {
             return YadamuLibrary.booleanToInt(col)
 	      }
           break;
-        case "date":
-        case "time":
-        case "datetime":
-        case "timestamp":
+        case this.dbi.DATA_TYPES.DATE_TYPE:
+        case this.dbi.DATA_TYPES.TIME_TYPE:
+        case this.dbi.DATA_TYPES.DATETIME_TYPE:
+        case this.dbi.DATA_TYPES.TIMESTAMP_TYPE:
           return (col,idx) => {
             // If the the input is a string, assume 8601 Format with "T" seperating Date and Time and Timezone specified as 'Z' or +00:00
             // Neeed to convert it into a format that avoiods use of convert_tz and str_to_date, since using these operators prevents the use of Bulk Insert.
@@ -61,25 +71,27 @@ class MariadbOutputManger extends YadamuOutputManger {
             return col.substring(0,26);
 		  }
 		  break;
- 		case "real":
-        case "float":
-		case "double":
-		case "double precision":
-		case "binary_float":
-		case "binary_double":
+ 		case this.dbi.DATA_TYPES.FLOAT_TYPE:
+        case this.dbi.DATA_TYPES.DOUBLE_TYPE:
 		  switch (this.dbi.INFINITY_MANAGEMENT) {
 		    case 'REJECT':
               return (col, idx) => {
-			    if (!isFinite(col)) {
-			      throw new RejectedColumnValue(this.tableInfo.columnNames[idx],col);
-			    }
+                switch (true) {
+				  // case (typeof col === "string" && !isInfite(parseInt(col))):
+			      case (!isFinite(col)):
+                    throw new RejectedColumnValue(this.tableInfo.columnNames[idx],col);
+				  default:
+				}
 				return col;
 		      }
 		    case 'NULLIFY':
 			  return (col, idx) => {
-			    if (!isFinite(col)) {
-                  this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
-	  		      return null;
+				switch (true) {
+				  // case (typeof col === "string" && !isInfite(parseInt(col))):
+			      case (!isFinite(col)):
+                    this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName],`Column "${this.tableInfo.columnNames[idx]}" contains unsupported value "${col}". Column nullified.`);
+	  		        return null;
+				  default:
 				}
 			    return col
 		      }   

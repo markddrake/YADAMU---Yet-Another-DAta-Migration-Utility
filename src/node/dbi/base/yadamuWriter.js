@@ -1,23 +1,27 @@
-"use strict"
 
-import fs              from 'fs'
-import assert          from 'assert'
+import fs                from 'fs'
+import assert            from 'assert'
+
 import { 
   performance 
-}                      from 'perf_hooks';
+}                        from 'perf_hooks';
 
 import {
   Readable, 
   Writable, 
   Transform 
-}                      from 'stream'
+}                        from 'stream'
 
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary   from '../../lib/yadamuLibrary.js';
+import YadamuConstants   from '../../lib/yadamuConstants.js';
+import YadamuLibrary     from '../../lib/yadamuLibrary.js';
 
-import {YadamuError, BatchInsertError, IterativeInsertError, DatabaseError} from '../../core/yadamuException.js'
+import {
+  YadamuError, 
+  BatchInsertError, 
+  IterativeInsertError, 
+  DatabaseError}         from '../../core/yadamuException.js'
 
-import DBIConstants    from './dbiConstants.js';
+import DBIConstants      from './dbiConstants.js';
 
 
 class YadamuWriter extends Writable {
@@ -53,7 +57,7 @@ class YadamuWriter extends Writable {
 		 this.dbi.activeWriters.delete(writeOperation)
 	  })
 	})
-
+	
     this.on('pipe',(src) => {
       this.batchManager = src
     })
@@ -96,11 +100,11 @@ class YadamuWriter extends Writable {
 	this.tableInfo.partitionCount = partitionInfo.partitionCount
 	this.tableInfo.partitionsRemaining = this.tableInfo.partitionsRemaining || partitionInfo.partitionCount
   }
-   
+     
   releaseBatch(batch) {
 	this.batchManager.releaseBatch(batch)
   }
-   
+  
   abortTable() {
 	  
     // this.yadamuLogger.trace([this.constructor.name,this.displayName,this.dbi.getWorkerNumber()],'abortTable()')
@@ -275,7 +279,7 @@ class YadamuWriter extends Writable {
 	if (!this.skipTable) {
 	  try {
 	    this.skipTable = await this._writeBatch(batch,this.BATCH_METRICS.cached)
-        this.COPY_METRICS.batchWritten++
+		this.COPY_METRICS.batchWritten++
         if (this.skipTable) {
           await this.rollbackTransaction();
         }	                     
@@ -348,7 +352,7 @@ class YadamuWriter extends Writable {
 	    this.COPY_METRICS.idleTime+= ( this.waitTime - performance.now() )  
 		this.setWriting();
 	    await this.processBatch(obj.batch,obj.snapshot)
-        this.emit(DBIConstants.BATCH_COMPLETED,DBIConstants.BATCH_WRITTEN)
+		this.emit(DBIConstants.BATCH_COMPLETED,DBIConstants.BATCH_WRITTEN)
 		this.waitTime = performance.now()
 		break
 	  case obj.hasOwnProperty('table'):

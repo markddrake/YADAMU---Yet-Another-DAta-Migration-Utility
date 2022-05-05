@@ -1,12 +1,14 @@
-"use strict"
 
-import { performance } from 'perf_hooks';
+import { 
+  performance 
+}                            from 'perf_hooks';
 
-import Yadamu from '../../core/yadamu.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuOutputManager from '../base/yadamuOutputManager.js';
-import PerformanceReporter from '../../util/performanceReporter.js';
+import Yadamu                from '../../core/yadamu.js';
+import YadamuConstants       from '../../lib/yadamuConstants.js';
+import PerformanceReporter   from '../../util/performanceReporter.js';
+
+import YadamuDataTypes       from '../base/yadamuDataTypes.js';
+import YadamuOutputManager   from '../base/yadamuOutputManager.js';
 
 class JSONOutputManager extends YadamuOutputManager {
 	     
@@ -17,33 +19,22 @@ class JSONOutputManager extends YadamuOutputManager {
 	this.rowCount = 0
   }
     
-  generateTransformations(targetDataTypes) {
-
-    // Set up Transformation functions to be applied to the incoming rows
-    return this.tableInfo.targetDataTypes.map((targetDataType,idx) => {      
-      const dataType = YadamuLibrary.decomposeDataType(targetDataType);
-	  if (YadamuLibrary.isBinaryType(dataType.type)) {
-		return (col,idx) =>  {
-          return col.toString('hex')
-		}
-      }
-      
-	  switch (dataType.type.toUpperCase()) {
-        case "GEOMETRY":
-        case "GEOGRAPHY":
-        case "POINT":
-        case "LSEG":
-        case "BOX":
-        case "PATH":
-        case "POLYGON":
-        case "CIRCLE":
-        case "LINESTRING":
-        case "MULTIPOINT":
-        case "MULTILINESTRING":
-        case "MULTIPOLYGON":
-		case "GEOMCOLLECTION":
-		case "GEOMETRYCOLLECTION":
-        case '"MDSYS"."SDO_GEOMETRY"':
+  generateTransformations(dataTypes) {
+	  
+    // RDBMS based implementations are driven off metadata dericed from the database catalog
+	// File based implementatins must work with the metadata contained in the export file. 
+	// Mappings are defined in ../cfg/typeMapping.json
+    
+	// Set up Transformation functions to be applied to the incoming rows
+	
+	return dataTypes.map((dataType,idx) => {      
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(dataType);
+	  switch (true) {
+		case (YadamuDataTypes.isBinary(dataTypeDefinition.type)):
+		  return (col,idx) =>  {
+            return col.toString('hex')
+		  }
+		case (YadamuDataTypes.isSpatial(dataTypeDefinition.type)):
           if (this.SPATIAL_FORMAT.endsWith('WKB')) {
             return (col,idx)  => {
 			  if (Buffer.isBuffer(col)) {
@@ -52,7 +43,7 @@ class JSONOutputManager extends YadamuOutputManager {
 			  return col
 			}
           }
-          if (this.SPATIAL_FORMAT.endsWith('GeoJSON')) {
+          if (this.SPATIAL_FORMAT === ('GeoJSON')) {
             return (col,idx)  => {
 			  if (typeof col === 'string') {
 				try {
@@ -63,88 +54,85 @@ class JSONOutputManager extends YadamuOutputManager {
 			}
           }
 		  return null;
-		case "REAL":
-        case "FLOAT":
-		case "DOUBLE":
-		case "DOUBLE PRECISION":
-		case "BINARY_FLOAT":
-		case "BINARY_DOUBLE":
-		   return (col,idx) => {
-			 if (!isFinite(col)) {
-			   switch (true) {
-		         case isNaN(col): 
-		   	       return "NaN"
-				   break;
-			     case (col === Infinity):
-				   return "Infinity"
-				   break;
-				 case (col === -Infinity):
-				   return "-Infinity"
-				   break;
-				 default:
-			   }   
-		     }
-  		     return col
-		   }			 
-        case "JSON":
-          return (col,idx) =>  {
-			try {
+	    case (YadamuDataTypes.isFloatingPoint(dataTypeDefinition.type)):
+		  return (col,idx) => {
+			if (!isFinite(col)) {
+			  switch (true) {
+		        case isNaN(col): 
+		   	      return "NaN"
+			      break;
+			    case (col === Infinity):
+				  return "Infinity"
+				  break;
+			    case (col === -Infinity):
+				  return "-Infinity"
+				  break;
+			    default:
+			  }   
+		    }
+  		    return col
+		  }
+	    case (YadamuDataTypes.isJSON(dataTypeDefinition.type)):
+		  return (col,idx) =>  {
+		    try {
               if (typeof col === 'string') {
                 return JSON.parse(col)
               } 
 			  if (Buffer.isBuffer(col)) {
 			    return JSON.parse(col.toString('utf8'))
-			  }
-			} catch (e) { return { "YADAMU_INVALID_JSON_VALUE" : col }}
+ 			  }
+		    } catch (e) { return { "YADAMU_INVALID_JSON_VALUE" : col }}
    		    return col
           }
-        case "BOOLEAN":
+        // case (YadamuDataTypes.isBoolean(dataTypeDefinition.type,dataTypeDefinition.length,this.tableInfo.vendor)):
+        case dataTypeDefinition.type.toUpperCase() === 'BOOLEAN':
           return (col,idx) =>  {
 		    const bool = (typeof col === 'string') ? col.toUpperCase() : (Buffer.isBuffer(col)) ? col.toString('hex') : col
-			switch(bool) {
+		    switch(bool) {
               case true:
               case "TRUE":
               case "01":
               case "1":
-			  case 1:
+ 			  case 1:
                 return true;
-				break;
+	 		    break;
               case false:
               case "FALSE":
               case "00":
               case "0":
 			  case 0:
                 return false;
-				break;
+			    break;
               default: 
             }
             return col
           }
-        case "DATE":
+        case (YadamuDataTypes.isDate(dataTypeDefinition.type)):
           return (col,idx) =>  { 
             if (col instanceof Date) {
               return col.toISOString()
             }
 		    return col
           }
-        case "DATETIME":
-        case "DATETIME2":
-        case "TIMESTAMP":
+        case (YadamuDataTypes.isTimestamp(dataTypeDefinition.type)):
+          // case "DATETIME":
+          // case "DATETIME2":
+          // case "TIMESTAMP":
 		  // YYYY-MM-DDTHH24:MI:SS.nnnnnnnnn
 		  // Timestamps are truncated to a maximum of 6 digits
           // Timestamps not explicitly marked as UTC are coerced to UTC.
 		  // Timestamps using a '+00:00' are converted are converted to 
-		  const tsMaxLength = 20 + this.dbi.TIMESTAMP_PRECISION
+		  const tsMaxLength = 20 + this.dbi.INBOUND_TIMESTAMP_PRECISION
 		  return (col,idx) =>  { 
 		    let ts
-			switch (true) {
+		    switch (true) {
 			  case (col === null):
 			    return null
               case (col instanceof Date):
                 return col.toISOString()
               case col.endsWith('+00:00'):
 			    ts = col.slice(0,-6) 
-				return `${ts.slice(0,tsMaxLength)}Z`
+			    return `${ts.slice(0,tsMaxLength)}Z`
               case col.endsWith('Z'):
 			    ts = col.slice(0,-1) 
 			    return `${ts.slice(0,tsMaxLength)}Z`
@@ -152,13 +140,11 @@ class JSONOutputManager extends YadamuOutputManager {
 			    return `${col.slice(0,tsMaxLength)}Z`
             }
           }
-		default:
+	    default:
 		  return null
       }
     }) 
 	
-    // Use a dummy rowTransformation function if there are no transformations required.
-
   }
 		
   async setTableInfo(tableName) {
@@ -187,6 +173,7 @@ class JSONOutputManager extends YadamuOutputManager {
   }
   
   formatRow(row) {
+	// if (this.COPY_METRICS.committed === 0) console.log('JOM',row)
     return `${this.rowSeperator}${JSON.stringify(row)}`
   }
   

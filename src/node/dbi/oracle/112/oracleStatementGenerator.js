@@ -1,4 +1,3 @@
-"use strict";
 
 // Support for Oracle 11.2 
 // Oracle 11g has not support for parsing JSON so we send the metadata as XML !!!
@@ -10,20 +9,31 @@
 // Since the Wrappers have to be dropped and recreated for each table a unique ID is generated for each table.
 //
 
-import {Readable} from 'stream';
+import _OracleStatementGenerator from '../oracleStatementGenerator.js';
 
-import DefaultStatementGenerator from '../statementGenerator.js';
-
-class StatementGenerator extends DefaultStatementGenerator {
+class OracleStatementGenerator extends _OracleStatementGenerator {
     
   // 11.x does not support GeoJSON. We need to use WKX to convert GeoJSON to WKT
 
   get GEOJSON_FUNCTION()             { return 'DESERIALIZE_WKTGEOMETRY' }
   get RANDOM_OBJECT_LENGTH()         { return 12 }
   get ORACLE_CSV_SPECIFICATION()     { return `TERMINATED  BY ',' OPTIONALLY ENCLOSED BY '"'` }
-  
-  constructor(dbi, targetSchema, metadata, yadamuLogger) {
-    super(dbi, targetSchema, metadata, yadamuLogger)
+
+  	
+  get STATEMENT_GENERATOR_OPTIONS() {
+	  
+    return `<options>
+	           <spatialFormat>${this.SPATIAL_FORMAT}</spatialFormat>
+			   <circleFormat>${this.dbi.INBOUND_CIRCLE_FORMAT}</circleFormat>
+			   <xmlStorageClause>${this.dbi.XMLTYPE_STORAGE_CLAUSE}</xmlStorageClause>
+	           <jsonStorageOption>${this.dbi.DATA_TYPES.storageOptions.JSON_TYPE}</jsonStorageOption>
+			   <booleanStorgeOption>${this.dbi.DATA_TYPES.storageOptions.BOOLEAN_TYPE}</booleanStorgeOption>
+	           <objectStorgeOption>${this.dbi.DATA_TYPES.storageOptions.OBJECT_TYPE}</objectStorgeOption>
+			 </options>`;
+  }
+    
+  constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
+    super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
 
   // In 11g the seperator character appears to be \r rather than \n
@@ -41,13 +51,35 @@ class StatementGenerator extends DefaultStatementGenerator {
       const table = this.metadata[tableName]
       const columnsXML = table.columnNames.map((columnName) => {return `<columnName>${columnName}</columnName>`}).join('');
       const dataTypesXML = table.dataTypes.map((dataType) => {return `<dataType>${dataType}</dataType>`}).join('');
-      const sizeConstraintsXML = table.sizeConstraints.map((sizeConstraint) => {return `<sizeConstraint>${sizeConstraint === null ? '' : sizeConstraint}</sizeConstraint>`}).join('');
+      const sizeConstraintsXML = table.sizeConstraints.map((sizeConstraint) => {
+		switch (sizeConstraint.length) {
+		  case 0:
+			return `<sizeConstraint/>`
+		  case 1:
+		    return `<sizeConstraint><length>${sizeConstraint[0]}</length></sizeConstraint>`
+		  case 2:
+		    return `<sizeConstraint><length>${sizeConstraint[0]}</length><scale>${sizeConstraint[1]}</scale></sizeConstraint>`
+		}
+	  })
       return `<table><vendor>${table.vendor}</vendor><tableSchema>${table.tableSchema}</tableSchema><tableName>${table.tableName}</tableName><columnNames>${columnsXML}</columnNames><dataTypes>${dataTypesXML}</dataTypes><sizeConstraints>${sizeConstraintsXML}</sizeConstraints></table>`
     }).join('');
     return `<metadata>${metadataXML}</metadata>`
     
   }
   
+  async getMetadata() {
+    const metadataXML = this.metadataToXML();    
+	return await this.dbi.stringToBlob(metadataXML);
+  }
+
+  getSourceTypeMappingsXML() {
+     return `<typeMappings>${Array.from(this.TYPE_MAPPINGS.entries()).map((mapping) => { return `<typeMapping><vendorType>${mapping[0]}</vendorType><oracleType>${mapping[1]}</oracleType></typeMapping>` }).join('')}</typeMappings>`
+  }
+  
+  async getSourceTypeMappings() {
+	 return await this.dbi.stringToBlob(this.getSourceTypeMappingsXML())
+  }
+ 
   generateCopyStatement(targetSchema,tableName,externalTableName,externalColumnNames,externalSelectList,plsql) {
 	return `insert /*+ APPEND */ into "${targetSchema}"."${tableName}" (${externalColumnNames.join(",")})\nselect ${externalSelectList.join(",")} from ${externalTableName}`
   }
@@ -70,21 +102,7 @@ class StatementGenerator extends DefaultStatementGenerator {
 	}
   }
   
-  getTypeMappings() {
-    return `<typeMappings>
-	           <spatialFormat>${this.SPATIAL_FORMAT}</spatialFormat>
-	           <raw1AsBoolean>${new Boolean(this.dbi.TREAT_RAW1_AS_BOOLEAN).toString().toLowerCase()}</raw1AsBoolean>
-			   <jsonDataType>${this.dbi.JSON_DATA_TYPE}</jsonDataType>
-			   <xmlStorageModel>${this.dbi.XML_STORAGE_CLAUSE}</xmlStorageModel>
-			   <circleFormat>${this.dbi.INBOUND_CIRCLE_FORMAT}</circleFormat>
-			 </typeMappings>`;
-  }
 	
-  async getMetadataLob() {
-    const metadataXML = this.metadataToXML();    
-    return await this.dbi.stringToBlob(metadataXML);
-  }
-      
 }
 
-export {StatementGenerator as default }
+export { OracleStatementGenerator as default } 

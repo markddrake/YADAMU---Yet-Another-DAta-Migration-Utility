@@ -5,7 +5,7 @@ import DefaultStatmentLibrary from '../oracleStatementLibrary.js'
 
 class OracleStatementLibrary extends DefaultStatmentLibrary{
 
-  static get DB_VERSION()                 { return 11.2 }
+  static get DATABASE_VERSION()                 { return 11.2 }
   static get SQL_GET_DLL_STATEMENTS()     { return _SQL_GET_DLL_STATEMENTS }
   static get SQL_DROP_WRAPPERS()          { return _SQL_DROP_WRAPPERS } 
 

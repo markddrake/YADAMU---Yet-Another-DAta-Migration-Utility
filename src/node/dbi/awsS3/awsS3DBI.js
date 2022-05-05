@@ -1,22 +1,32 @@
-"use strict" 
 
-import path                from 'path'
+import path                           from 'path';
+
+import { 
+  performance 
+}                                     from 'perf_hooks';
+
+/* Database Vendors API */                                    
 
 import AWS                 from 'aws-sdk';
 
-import CloudDBI            from '../cloud/cloudDBI.js';
-import DBIConstants        from '../base/dbiConstants.js';
-import YadamuConstants     from '../../lib/yadamuConstants.js';
-import YadamuLibrary       from '../../lib/yadamuLibrary.js'
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
+import {
+  YadamuError
+}                                     from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+
+import CloudDBI                       from '../cloud/cloudDBI.js';
+import DBIConstants                   from '../base/dbiConstants.js'
+
+/* Vendor Specific DBI Implimentation */                                    
+							          							          
 import AWSS3Constants      from './awsS3Constants.js';
 import AWSS3StorageService from './awsS3StorageService.js';
-
-/*
-**
-** YADAMU Database Inteface class skeleton
-**
-*/
 
 class AWSS3DBI extends CloudDBI {
  
@@ -31,15 +41,15 @@ class AWSS3DBI extends CloudDBI {
   **
   */
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,AWSS3Constants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,AWSS3Constants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return AWSS3DBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return AWSS3DBI.DBI_PARAMETERS
   }
 
   get DATABASE_KEY()          { return AWSS3Constants.DATABASE_KEY};
@@ -115,7 +125,7 @@ class AWSS3DBI extends CloudDBI {
   }
 
   classFactory(yadamu) {
-	return new AWSS3DBI(yadamu,this,this.connectionSettings,this.parameters)
+	return new AWSS3DBI(yadamu,this,this.connectionParameters,this.parameters)
   }
    
   getCredentials(vendorKey) {

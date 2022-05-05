@@ -1,22 +1,26 @@
-"use strict" 
 
-import fs                     from 'fs';
-
-import { 
-  performance 
-}                             from 'perf_hooks';
+import fs                             from 'fs';
 
 import {
   setTimeout 
 }                             from "timers/promises"
 
-/* 
-**
-** from  Database Vendors API 
-**
-*/
+import { 
+  performance 
+}                                     from 'perf_hooks';
+							 
+import {
+  PassThrough
+}                                     from 'stream';
 
-import sql from 'mssql';
+import {
+  pipeline
+}                                     from 'stream/promises';
+
+							 
+/* Database Vendors API */                                    
+
+import sql                            from 'mssql';
 
 /*
 **
@@ -32,36 +36,54 @@ import sql from 'mssql';
 **
 */
 
-import YadamuDBI from '../base/yadamuDBI.js';
-import DBIConstants from '../base/dbiConstants.js';
-import YadamuConstants from '../../lib/yadamuConstants.js';
-import YadamuLibrary from '../../lib/yadamuLibrary.js'
-import {CopyOperationAborted} from '../../core/yadamuException.js'
+/* Yadamu Core */                                    
+							          
+import YadamuConstants                from '../../lib/yadamuConstants.js'
+import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
-import MsSQLConstants from './mssqlConstants.js'
-import MsSQLError from './mssqlException.js'
-import MsSQLParser from './mssqlParser.js';
-import MsSQLOutputManager from './mssqlOutputManager.js';
-import MsSQLWriter from './mssqlWriter.js';
-import StatementGenerator from './statementGenerator.js';
-import StagingTable from './stagingTable.js';
-import MsSQLReader from './mssqlReader.js';
-import StatementLibrary from './mssqlStatementLibrary.js'
+import {
+  CopyOperationAborted
+}                                     from '../../core/yadamuException.js'
+
+/* Yadamu DBI */                                    
+							          							          
+import YadamuDBI                      from '../base/yadamuDBI.js'
+import DBIConstants                   from '../base/dbiConstants.js'
+import ExportFileHeader               from '../file/exportFileHeader.js'
+
+import {
+  FileError, 
+  FileNotFound, 
+  DirectoryNotFound
+}                                    from '../file/fileException.js'
+
+/* Vendor Specific DBI Implimentation */                                   
+					
+import MsSQLConstants                 from './mssqlConstants.js'
+import MsSQLDataTypes                 from './mssqlDataTypes.js'
+import MsSQLError                     from './mssqlException.js'
+import MsSQLParser                    from './mssqlParser.js'
+import MsSQLOutputManager             from './mssqlOutputManager.js'
+import MsSQLWriter                    from './mssqlWriter.js'
+import MsSQLStatementGenerator        from './mssqlStatementGenerator.js'
+import MsSQLReader                    from './mssqlReader.js'
+import MsSQLFileLoader                from './mssqlFileLoader.js'
+import MsSQLStatementLibrary          from './mssqlStatementLibrary.js'
 
 import {ConnectionError} from '../../core/yadamuException.js'
 
 
 class MsSQLDBI extends YadamuDBI {
 
-  static #_YADAMU_DBI_PARAMETERS
+  static #_DBI_PARAMETERS
 
-  static get YADAMU_DBI_PARAMETERS()  { 
-	this.#_YADAMU_DBI_PARAMETERS = this.#_YADAMU_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.YADAMU_DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS))
-	return this.#_YADAMU_DBI_PARAMETERS
+  static get DBI_PARAMETERS()  { 
+	this.#_DBI_PARAMETERS = this.#_DBI_PARAMETERS || Object.freeze(Object.assign({},DBIConstants.DBI_PARAMETERS,MsSQLConstants.DBI_PARAMETERS))
+	return this.#_DBI_PARAMETERS
   }
    
-  get YADAMU_DBI_PARAMETERS() {
-	return MsSQLDBI.YADAMU_DBI_PARAMETERS
+  get DBI_PARAMETERS() {
+	return MsSQLDBI.DBI_PARAMETERS
   }
 
   // Instance level getters.. invoke as this.METHOD
@@ -81,10 +103,11 @@ class MsSQLDBI extends YadamuDBI {
 
   // Enable configuration via command line parameters
 
-  get SPATIAL_FORMAT()                { return this.parameters.SPATIAL_FORMAT        || MsSQLConstants.SPATIAL_FORMAT }
+  get ROW_LIMIT()                     { return this.parameters.ROW_LIMIT             || MsSQLConstants.ROW_LIMIT }
   get SPATIAL_MAKE_VALID()            { return this.parameters.SPATIAL_MAKE_VALID    || MsSQLConstants.SPATIAL_MAKE_VALID }
 
   get DATABASE_NAME()                 { return this.parameters.YADAMU_DATABASE ? this.parameters.YADAMU_DATABASE : this.vendorProperties.database }
+  get DEFAULT_COLATION()              { return this.DATABASE_VERSION < 15 ? 'Latin1_General_100_CS_AS_SC' : 'Latin1_General_100_CS_AS_SC_UTF8' }
 
   // get TRANSACTION_IN_PROGRESS()       { return super.TRANSACTION_IN_PROGRESS || this.TEDIOUS_TRANSACTION_ISSUE  }
   // set TRANSACTION_IN_PROGRESS(v)      { super.TRANSACTION_IN_PROGRESS = v }
@@ -100,6 +123,7 @@ class MsSQLDBI extends YadamuDBI {
 
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
+	this.DATA_TYPES = MsSQLDataTypes
 
     this.yadamuRollack = false
 
@@ -116,14 +140,13 @@ class MsSQLDBI extends YadamuDBI {
 	this.EXPECTED_ROLLBACK         = false
 	this.TEDIOUS_TRANSACTION_ISSUE = false
 	this.BEGIN_TRANSACTION_ISSUE   = false
-	        
   }
   
   initializeManager() {
 	super.initializeManager()
-	this.StatementGenerator = StatementGenerator
-    this.StatementLibrary = StatementLibrary
-    this.statementLibrary = undefined
+	this.StatementGenerator = MsSQLStatementGenerator
+    this.StatementLibrary   = MsSQLStatementLibrary
+    this.statementLibrary   = undefined
   }	 
 
   getSchemaIdentifer() {
@@ -169,10 +192,9 @@ class MsSQLDBI extends YadamuDBI {
     
     statement = `select CONVERT(NVARCHAR(20),SERVERPROPERTY('ProductVersion')) "DATABASE_VERSION", CONVERT(NVARCHAR(32),DATABASEPROPERTYEX(DB_NAME(),'collation')) "DB_COLLATION"`
     results = await this.executeSQL(statement)
-    this._DB_VERSION =  parseInt(results.recordsets[0][0].DATABASE_VERSION)
+    this._DATABASE_VERSION =  parseInt(results.recordsets[0][0].DATABASE_VERSION)
     this._DB_COLLATION = results.recordsets[0][0].DB_COLLATION
     
-    this.defaultCollation = this.DB_VERSION < 15 ? 'Latin1_General_100_CS_AS_SC' : 'Latin1_General_100_CS_AS_SC_UTF8';
   }
   
   setTargetDatabase() {  
@@ -258,24 +280,24 @@ class MsSQLDBI extends YadamuDBI {
         const length = dataType.length > 0 && dataType.length < 65535 ? dataType.length : sql.MAX
         const column = 'C' + idx;
 		switch (dataType.type.toLowerCase()) {
-          case 'bit':
+          case this.DATA_TYPES.BOOLEAN_TYPE:
             statement.input(column,sql.Bit)
             break;
-          case 'bigint':
+          case this.DATA_TYPES.BIGINT_TYPE:
             // statement.input(column,sql.BigInt)
 			statement.input(column,sql.VarChar(20))
             break;
-          case 'float':
+          case this.DATA_TYPES.FLOAT_TYPE:
             statement.input(column,sql.Float)
             break;
-          case 'int':
+          case this.DATA_TYPES.INTEGER_TYPE:
             statement.input(column,sql.Int)
             break;
-          case 'money':
+          case this.DATA_TYPES.MSSQL_MONEY_TYPE:
             // statement.input(column,sql.Money)
             statement.input(column,sql.Decimal(19,4))
             break
-          case 'decimal':
+          case this.DATA_TYPES.DECIMAL_TYPE:
             // sql.Decimal ([precision], [scale])
 			precision = dataType.length || 18;
 		    if ((precision) > 15) {
@@ -284,7 +306,7 @@ class MsSQLDBI extends YadamuDBI {
 			}
             statement.input(column,sql.Decimal(dataType.length || 15,dataType.scale || 0))
             break;
-          case 'numeric':
+          case this.DATA_TYPES.NUMERIC_TYPE:
             // sql.Numeric ([precision], [scale])
 			precision = dataType.length || 18;
 		    if ((precision) > 15) {
@@ -293,95 +315,99 @@ class MsSQLDBI extends YadamuDBI {
 			}
             statement.input(column,sql.Numeric(dataType.length || 15,dataType.scale || 0))
             break;
-          case 'smallint':
+          case this.DATA_TYPES.SMALLINT_TYPE:
             statement.input(column,sql.SmallInt)
             break;
-          case 'smallmoney':
+          case this.DATA_TYPES.MSSQL_SMALLMONEY_TYPE:
             // statement.input(column,sql.SmallMoney)
             statement.input(column,sql.Decimal(10,4))
             break;
-          case 'real':
+          case this.DATA_TYPES.FLOAT_TYPE:
             statement.input(column,sql.Real)
             break;
-          case 'tinyint':
+          case this.DATA_TYPES.DOUBLE_TYPE:
+            statement.input(column,sql.Float)
+            break;
+          case this.DATA_TYPES.TINYINT_TYPE:
             statement.input(column,sql.TinyInt)
             break;
-          case 'char':
+          case this.DATA_TYPES.CHAR_TYPE:
             statement.input(column,sql.Char(dataType.length))
             break;
-          case 'nchar':
+          case this.DATA_TYPES.NCHAR_TYPE:
             statement.input(column,sql.NChar(dataType.length))
             break;
-          case 'text':
+          case this.DATA_TYPES.TEXT_TYPE:
             statement.input(column,sql.Text)
             break;
-          case 'ntext':
+          case this.DATA_TYPES.NEXT_TYPE:
             statement.input(column,sql.NText)
             break;
-          case 'varchar':
+          case this.DATA_TYPES.VARCHAR_TYPE:
             statement.input(column,sql.VarChar(length))
             break;
-          case 'nvarchar':
+          case this.DATA_TYPES.NVARCHAR_TYPE:
             statement.input(column,sql.NVarChar(length))
             break;
-          case 'json':
-            statement.input(column,sql.NVarChar(sql.MAX))
-			break;
-          case 'xml':
+          case this.DATA_TYPES.JSON_TYPE:
             // statement.input(column,sql.Xml)
             statement.input(column,sql.NVarChar(sql.MAX))
             break;
-          case 'time':
+          case this.DATA_TYPES.XML_TYPE:
+            // statement.input(column,sql.Xml)
+            statement.input(column,sql.NVarChar(sql.MAX))
+            break;
+          case this.DATA_TYPES.TIME_TYPE:
             // sql.Time ([scale])
             // statement.input(column,sql.Time(dataType.length))
             statement.input(column,sql.VarChar(32))
             break;
-          case 'date':
+          case this.DATA_TYPES.DATE_TYPE:
             // statement.input(column,sql.Date)
             statement.input(column,sql.VarChar(32))
             break;
-          case 'datetime':
-            // statement.input(column,sql.DateTime)
-            statement.input(column,sql.VarChar(32))
-            break;
-          case 'datetime2':
+          case this.DATA_TYPES.DATETIME_TYPE:
             // sql.DateTime2 ([scale]
             // statement.input(column,sql.DateTime2())
             statement.input(column,sql.VarChar(32))
             break;
-          case 'datetimeoffset':
+          case this.DATA_TYPES.MSSQL_DATETIME_TYPE:
+            // statement.input(column,sql.DateTime)
+            statement.input(column,sql.VarChar(32))
+            break;
+          case this.DATA_TYPES.TIMESTAMP_TYPE:
             // sql.DateTimeOffset ([scale])
             // statement.input(column,sql.DateTimeOffset(dataType.length))
             statement.input(column,sql.VarChar(32))
             break;
-          case 'smalldatetime':
+          case this.DATA_TYPES.SMALLDATETIME_TYPE:
             // statement.input(column,sql.SmallDateTime)
             statement.input(column,sql.VarChar(32))
             break;
-          case 'uniqueidentifier':
+          case this.DATA_TYPES.UUID_TYPE:
             // statement.input(column,sql.UniqueIdentifier)
             // TypeError: parameter.type.validate is not a function
             statement.input(column,sql.Char(36))
             break;
-          case 'variant':
+          case this.DATA_TYPES.VARIANT_TYPE:
             statement.input(column,sql.Variant)
             break;
-          case 'binary':
+          case this.DATA_TYPES.BINARY_TYPE:
             statement.input(column,sql.Binary(dataType.length))
             break;
-          case 'varbinary':
+          case this.DATA_TYPES.VARBINARY_TYPE:
             // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
             // sql.VarBinary ([length])
              statement.input(column,sql.VarBinary(length))
             break;
-          case 'image':
+          case this.DATA_TYPES.IMAGE_TYPE:
             // statement.input(column,sql.Image)
             statement.input(column,sql.VarBinary(sql.MAX))
             break;
-          case 'udt':
+          case this.DATA_TYPES.USER_DEFINED_TYPE:
             statement.input(column,sql.UDT)
             break;
-          case 'geography':
+          case this.DATA_TYPES.GEOGRAPHY_TYPE:
             // statement.input(column,sql.Geography)
             // Upload Geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
             switch (spatialFormat) {
@@ -393,7 +419,7 @@ class MsSQLDBI extends YadamuDBI {
                 statement.input(column,sql.VarChar(sql.MAX))
             }
             break;
-          case 'geometry':
+          case this.DATA_TYPES.GEOMETRY_TYPE:
             // statement.input(column,sql.Geometry)
             // Upload Geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer.
             switch (spatialFormat) {
@@ -405,7 +431,7 @@ class MsSQLDBI extends YadamuDBI {
                 statement.input(column,sql.VarChar(sql.MAX))
             }
             break;
-          case 'hierarchyid':
+          case this.DATA_TYPES.MSSSQL_HEIRACHY_TYPE:
             statement.input(column,sql.VarChar(4000))
             break;
           default:
@@ -620,192 +646,196 @@ class MsSQLDBI extends YadamuDBI {
   }
   
   createBulkOperation(database, tableName, columnList, dataTypes) {
-
-    const table = new sql.Table(database + '.' + this.CURRENT_SCHEMA + '.' + tableName)
+    
+	const table = new sql.Table(database + '.' + this.CURRENT_SCHEMA + '.' + tableName)
     table.create = false
     let precision
     dataTypes.forEach((dataType,idx) => {
       const length = dataType.length > 0 && dataType.length < 65535 ? dataType.length : sql.MAX
       switch (dataType.type.toLowerCase()) {
-        case 'bit':
-          table.columns.add(columnList[idx],sql.Bit)
+        case this.DATA_TYPES.BOOLEAN_TYPE:
+          table.columns.add(columnList[idx],sql.Bit);
           break;
-        case 'bigint':
+        case this.DATA_TYPES.BIGINT_TYPE:
 		  // Bind as VarChar to avoid rounding issues
-          // table.columns.add(columnList[idx],sql.BigInt, {nullable: true})
-		  table.columns.add(columnList[idx],sql.VarChar(21), {nullable: true})  
+          // table.columns.add(columnList[idx],sql.BigInt, {nullable: true});
+		  table.columns.add(columnList[idx],sql.VarChar(21), {nullable: true});  
           break;
-        case 'float':
-          table.columns.add(columnList[idx],sql.Float, {nullable: true})
+        case this.DATA_TYPES.FLOAT_TYPE:
+          table.columns.add(columnList[idx],sql.Float, {nullable: true});
           break;
-        case 'int':
-          table.columns.add(columnList[idx],sql.Int, {nullable: true})
+        case this.DATA_TYPES.INTEGER_TYPE:
+          table.columns.add(columnList[idx],sql.Int, {nullable: true});
           break;
-        case 'money':
-          // table.columns.add(columnList[idx],sql.Money, {nullable: true})
-          table.columns.add(columnList[idx],sql.Decimal(19,4), {nullable: true})
+        case this.DATA_TYPES.MSSQL_MONEY_TYPE:
+          // table.columns.add(columnList[idx],sql.Money, {nullable: true});
+          table.columns.add(columnList[idx],sql.Decimal(19,4), {nullable: true});
           break
-        case 'decimal':
+        case this.DATA_TYPES.DECIMAL_TYPE:
 		  precision = dataType.length || 18
 		  if (precision > 15) {
 			// Bind as VarChar to avoid rounding issues
-			table.columns.add(columnList[idx],sql.VarChar(precision+2), {nullable: true})  
+			table.columns.add(columnList[idx],sql.VarChar(precision+2), {nullable: true});  
 		  }
 		  else {
             // sql.Decimal ([precision], [scale])
-            table.columns.add(columnList[idx],sql.Decimal(dataType.length || 18,dataType.scale || 0), {nullable: true})
+            table.columns.add(columnList[idx],sql.Decimal(dataType.length || 18,dataType.scale || 0), {nullable: true});
 		  }
           break;
-        case 'numeric':
+        case this.DATA_TYPES.NUMERIC_TYPE:
 		  precision = dataType.length || 18
 		  if (precision > 15) {
 			// Bind as VarChar to avoid rounding issues
-			table.columns.add(columnList[idx],sql.VarChar(precision+2), {nullable: true})  
+			table.columns.add(columnList[idx],sql.VarChar(precision+2), {nullable: true});  
 		  }
 		  else {
             // sql.Numeric ([precision], [scale])
-            table.columns.add(columnList[idx],sql.Numeric(dataType.length || 18,dataType.scale || 0), {nullable: true})
+            table.columns.add(columnList[idx],sql.Numeric(dataType.length || 18,dataType.scale || 0), {nullable: true});
 		  }
           break;
-        case 'smallint':
-          table.columns.add(columnList[idx],sql.SmallInt, {nullable: true})
+        case this.DATA_TYPES.SMALLINT_TYPE:
+          table.columns.add(columnList[idx],sql.SmallInt, {nullable: true});
           break;
-        case 'smallmoney':
-          // table.columns.add(columnList[idx],sql.SmallMoney, {nullable: true})
-          table.columns.add(columnList[idx],sql.Decimal(10,4), {nullable: true})
+        case this.DATA_TYPES.MSSQL_SMALLMONEY_TYPE:
+          // table.columns.add(columnList[idx],sql.SmallMoney, {nullable: true});
+          table.columns.add(columnList[idx],sql.Decimal(10,4), {nullable: true});
           break;
-        case 'real':
-          table.columns.add(columnList[idx],sql.Real, {nullable: true}, {nullable: true})
+        case this.DATA_TYPES.FLOAT_TYPE:
+          table.columns.add(columnList[idx],sql.Real, {nullable: true}, {nullable: true});
           break;
-        case 'tinyint':
-          table.columns.add(columnList[idx],sql.TinyInt, {nullable: true})
+        case this.DATA_TYPES.DOUBLE_TYPE:
+          table.columns.add(columnList[idx],sql.Float, {nullable: true}, {nullable: true});
           break;
-        case 'char':
-          table.columns.add(columnList[idx],sql.Char(length), {nullable: true})
+        case this.DATA_TYPES.TINYINT_TYPE:
+          table.columns.add(columnList[idx],sql.TinyInt, {nullable: true});
           break;
-        case 'nchar':
-          table.columns.add(columnList[idx],sql.NChar(length), {nullable: true})
+        case this.DATA_TYPES.CHAR_TYPE:
+          table.columns.add(columnList[idx],sql.Char(length), {nullable: true});
           break;
-        case 'text':
-          table.columns.add(columnList[idx],sql.Text, {nullable: true})
+        case this.DATA_TYPES.NCHAR_TYPE:
+          table.columns.add(columnList[idx],sql.NChar(length), {nullable: true});
           break;
-        case 'ntext':
-          table.columns.add(columnList[idx],sql.NText, {nullable: true})
+        case this.DATA_TYPES.TEXT_TYPE:
+          table.columns.add(columnList[idx],sql.Text, {nullable: true});
           break;
-        case 'varchar':
-          table.columns.add(columnList[idx],sql.VarChar(length), {nullable: true})
+        case this.DATA_TYPES.NTEXT_TYPE:
+          table.columns.add(columnList[idx],sql.NText, {nullable: true});
           break;
-        case 'nvarchar':
-          table.columns.add(columnList[idx],sql.NVarChar(length), {nullable: true})
+        case this.DATA_TYPES.VARCHAR_TYPE:
+          table.columns.add(columnList[idx],sql.VarChar(length), {nullable: true});
           break;
-        case 'json':
-          table.columns.add(columnList[idx],sql.NVarChar(sql.MAX), {nullable: true})
+        case this.DATA_TYPES.NVARCHAR_TYPE:
+          table.columns.add(columnList[idx],sql.NVarChar(length), {nullable: true});
           break;
-        case 'xml':
+        case this.DATA_TYPES.JSON_TYPE:
+          table.columns.add(columnList[idx],sql.NVarChar(sql.MAX), {nullable: true});
+          break;
+        case this.DATA_TYPES.XML_TYPE:
           // Added to Unsupported
-          // Invalid column data type for bulk load
-          table.columns.add(columnList[idx],sql.Xml, {nullable: true})
+          // Invalid column data type for BCP
+          table.columns.add(columnList[idx],sql.Xml, {nullable: true});
           break;
-        case 'time':
+        case this.DATA_TYPES.TIME_TYPE:
           // sql.Time ([scale])
           // Binding as sql.Time must supply values as type Date. 
-          // table.columns.add(columnList[idx],sql.Time(length), {nullable: true})
+          // table.columns.add(columnList[idx],sql.Time(length), {nullable: true});
           // Use String to avoid possible loss of precision
-          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true})
+          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
           break;
-        case 'date':
+        case this.DATA_TYPES.DATE_TYPE:
           // Binding as sql.Date must supply values as type Date. 
-          // table.columns.add(columnList[idx],sql.Date, {nullable: true})
+          // table.columns.add(columnList[idx],sql.Date, {nullable: true});
           // Use String to avoid possible loss of precision
-          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true})
+          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
           break;
-        case 'datetime':
-          // Binding as sql.DateTime must supply values as type Date. 
-          // table.columns.add(columnList[idx],sql.DateTime, {nullable: true})
-          // Use String to avoid possible loss of precision
-          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true})
-          break;
-        case 'datetime2':
-          // sql.DateTime2 ([scale]
+        case this.DATA_TYPES.DATETIME_TYPE:
           // Binding as sql.DateTime2 must supply values as type Date. 
-          // table.columns.add(columnList[idx],sql.DateTime2(), {nullable: true})
+          // sql.DateTime2 ([scale]
+          // table.columns.add(columnList[idx],sql.DateTime2(), {nullable: true});
           // Use String to avoid possible loss of precision
-          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true})
+          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
           break;
-        case 'datetimeoffset':
+        case this.DATA_TYPES.MSSQL_DATETIME_TYPE:
+          // Binding as sql.DateTime must supply values as type Date. 
+          // sql.DateTime ([scale]
+          // table.columns.add(columnList[idx],sql.DateTime, {nullable: true});
+          // Use String to avoid possible loss of precision
+          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
+          break;
+        case this.DATA_TYPES.TIMESTAMP_TYPE:
           // sql.DateTimeOffset ([scale])
           // Binding as sql.DateTime2 must supply values as type Date. 
-          // table.columns.add(columnList[idx],sql.DateTimeOffset(length), {nullable: true})
+          // table.columns.add(columnList[idx],sql.DateTimeOffset(length), {nullable: true});
           // Use String to avoid possible loss of precision
-          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true})
+          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
           break;
-        case 'smalldatetime':
+        case this.DATA_TYPES.MSSQL_SMALLDATETIME_TYPE:
           // Binding as sql.SamllDateTime must supply values as type Date. 
-          // table.columns.add(columnList[idx],sql.SmallDateTime, {nullable: true})
+          // table.columns.add(columnList[idx],sql.SmallDateTime, {nullable: true});
           // Use String to avoid possible loss of precision
-          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true})
+          table.columns.add(columnList[idx],sql.VarChar(32), {nullable: true});
           break;
-        case 'uniqueidentifier':
-          // table.columns.add(columnList[idx],sql.UniqueIdentifier, {nullable: true})
+        case this.DATA_TYPES.UUID_TYPE:
+          // table.columns.add(columnList[idx],sql.UniqueIdentifier, {nullable: true});
           // TypeError: parameter.type.validate is not a function
-          table.columns.add(columnList[idx],sql.Char(36), {nullable: true})
+          table.columns.add(columnList[idx],sql.Char(36), {nullable: true});
           break;
-        case 'variant':
-          table.columns.add(columnList[idx],sql.Variant, {nullable: true})
+        case this.DATA_TYPES.MSSQL_VARIANT_TYPE:
+          table.columns.add(columnList[idx],sql.Variant, {nullable: true});
           break;
-        case 'binary':
-          table.columns.add(columnList[idx],sql.Binary(length), {nullable: true})
+        case this.DATA_TYPES.BINARY_TYPE:
+          table.columns.add(columnList[idx],sql.Binary(length), {nullable: true});
           break;
-        case 'varbinary':
+        case this.DATA_TYPES.VARBINARY_TYPE:
           // sql.VarBinary ([length])
-           table.columns.add(columnList[idx],sql.VarBinary(length), {nullable: true})
+           table.columns.add(columnList[idx],sql.VarBinary(length), {nullable: true});
           break;
-        case 'image':
-  	      // Upload images as VarBinary(MAX). Convert data to Buffer. This enables bulk upload and avoids Collation issues...
-          // table.columns.add(columnList[idx],sql.Image, {nullable: true})
-          table.columns.add(columnList[idx],sql.VarBinary(sql.MAX), {nullable: true})
+        case this.DATA_TYPES.IMAGE_TYPE:
+  	      // Upload images as VarBinary(MAX). Convert data to Buffer. This enables BCP operationa and avoids Collation issues..
+          // table.columns.add(columnList[idx],sql.Image, {nullable: true});
+          table.columns.add(columnList[idx],sql.VarBinary(sql.MAX), {nullable: true});
           break;
-        case 'udt':
-          table.columns.add(columnList[idx],sql.UDT, {nullable: true})
+        case this.DATA_TYPES.MSSQL_UDT_TYPE:
+          table.columns.add(columnList[idx],sql.UDT, {nullable: true});
           break;
-        case 'geography':
+        case this.DATA_TYPES.GEOGRAPHY_TYPE:
           // Added to Unsupported
           // TypeError: parameter.type.validate is not a function
-          // table.columns.add(columnList[idx],sql.Geography, {nullable: true})
-  	      // Upload geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables bulk upload.
+          // table.columns.add(columnList[idx],sql.Geography, {nullable: true});
+  	      // Upload geography as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables BCP Operations.
 		  switch (this.INBOUND_SPATIAL_FORMAT) {
 			case "WKB":
             case "EWKB":
-              table.columns.add(columnList[idx],sql.VarBinary(sql.MAX), {nullable: true})
+              table.columns.add(columnList[idx],sql.VarBinary(sql.MAX), {nullable: true});
 			  break;
 			default:
-		      table.columns.add(columnList[idx],sql.VarChar(sql.MAX), {nullable: true})
+		      table.columns.add(columnList[idx],sql.VarChar(sql.MAX), {nullable: true});
 		  }
           break;
-        case 'geometry':
+        case this.DATA_TYPES.GEOMETRY_TYPE:
           // Added to Unsupported
           // TypeError: parameter.type.validate is not a function
-          // table.columns.add(columnList[idx],sql.Geometry, {nullable: true})
-  	      // Upload geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables bulk upload.
+          // table.columns.add(columnList[idx],sql.Geometry, {nullable: true});
+  	      // Upload geometry as VarBinary(MAX) or VarChar(MAX). Convert data to Buffer. This enables BCP Operations.
 		  switch (this.INBOUND_SPATIAL_FORMAT) {
 			case "WKB":
             case "EWKB":
-              table.columns.add(columnList[idx],sql.VarBinary(sql.MAX), {nullable: true})
+              table.columns.add(columnList[idx],sql.VarBinary(sql.MAX), {nullable: true});
 			  break;
 			default:
-		      table.columns.add(columnList[idx],sql.VarChar(sql.MAX), {nullable: true})
+		      table.columns.add(columnList[idx],sql.VarChar(sql.MAX), {nullable: true});
 		  }
           break;
-        case 'hierarchyid':
-          table.columns.add(columnList[idx],sql.VarChar(4000),{nullable: true})
+        case this.DATA_TYPES.MSSQL_HIERARCHY_ID_TYPE:
+          table.columns.add(columnList[idx],sql.VarChar(4000),{nullable: true});
           break;
         default:
-          this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,`BULK OPERATION`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`)
+          this.yadamuLogger.warning([this.DATABASE_VENDOR,`BCP`,`"${tableName}"`],`Unmapped data type [${dataType.type}].`);
       }
     })
     return table
   }
-
+ 
   releaseBatch(batch) {
 	if (Array.isArray(batch.rows)) {
 	  batch.rows.length = 0;
@@ -1030,14 +1060,6 @@ class MsSQLDBI extends YadamuDBI {
     }     
   }
   
-  decomposeDataType(targetDataType) {
-    const dataType = super.decomposeDataType(targetDataType)
-    if (dataType.length === -1) {
-      dataType.length = sql.MAX;
-    }
-    return dataType;
-  }
-
   /*  
   **
   **  Connect to the database. Set global setttings
@@ -1066,10 +1088,10 @@ class MsSQLDBI extends YadamuDBI {
 
   async setLibraries() {
 	  
-	switch (this.DB_VERSION) {
+	switch (this.DATABASE_VERSION) {
 	  case 12:
 	    this.StatementLibrary = (await import('./2014/mssqlStatementLibrary.js')).default
-		this.StatementGenerator = (await import('./2014/statementGenerator.js')).default
+		this.StatementGenerator = (await import('./2014/mssqlStatementGenerator.js')).default
 	    break;
       default:
 	}
@@ -1173,7 +1195,6 @@ class MsSQLDBI extends YadamuDBI {
 	  this.yadamuLogger.warning([this.DATABASE_VENDOR,this.ROLE,'TRANSACTION MANAGER','COMMIT'],`Unable to COMMIT following TEDIOUS FORCED ROLLBACK operation.`)
 	  return;
 	}
-
 
     let stack
     const psuedoSQL = 'commit transaction'
@@ -1306,9 +1327,47 @@ class MsSQLDBI extends YadamuDBI {
   
   async uploadFile(importFilePath) {
 
-    const stagingTable = new StagingTable(this,MsSQLConstants.STAGING_TABLE,importFilePath,this.status) 
-    let results = await stagingTable.uploadFile()
+    let results
+	let stack
+	await this.beginTransaction();
+
+    let statement = `drop table if exists "${MsSQLConstants.STAGING_TABLE.tableName}"`;
+	results = await this.executeBatch(statement)
+
+	statement = `create table "${MsSQLConstants.STAGING_TABLE.tableName}" ("${MsSQLConstants.STAGING_TABLE.columnName}" NVARCHAR(MAX) collate ${this.DEFAULT_COLATION})`;
+    results = await this.executeBatch(statement)
+
+    statement = `insert into "${MsSQLConstants.STAGING_TABLE.tableName}" values ('')`;
+    results = await this.executeBatch(statement)
+  
+    statement = `update "${MsSQLConstants.STAGING_TABLE.tableName}" set "${MsSQLConstants.STAGING_TABLE.columnName}" .write(@C0,null,null)`;  
+	await this.cachePreparedStatement(statement, [{type : "nvarchar"}]) 
+	
+    const is = await new Promise((resolve,reject) => {
+      const stack = new Error().stack
+	  const inputStream = fs.createReadStream(importFilePath);
+      inputStream.on('open',() => {resolve(inputStream)}).on('error',(err) => {reject(err.code === 'ENOENT' ? new FileNotFound(err,stack,importFilePath) : new FileError(err,stack,importFilePath) )})
+    })
+
+    const loader = new MsSQLFileLoader(this,this.status);
+    const multiplexor = new PassThrough()
+    const exportFileHeader = new ExportFileHeader (multiplexor, importFilePath, this.yadamuLogger)
+
+	stack = new Error().stack		
+    const startTime = performance.now()
+	await pipeline(is,multiplexor,loader)
+
     // results = await this.verifyDataLoad(this.generateRequest(),MsSQLConstants.STAGING_TABLE)
+
+    this.setSystemInformation(exportFileHeader.SYSTEM_INFORMATION)
+	this.setMetadata(exportFileHeader.METADATA)
+	const ddl = exportFileHeader.DDL
+      
+    const elapsedTime = performance.now() - startTime
+    is.close() 
+    await this.clearCachedStatement(); 
+    await this.commitTransaction();
+	return elapsedTime;
   }
   
   /*
@@ -1319,20 +1378,26 @@ class MsSQLDBI extends YadamuDBI {
 
 
   async processFile(hndl) {
-     
-     const args = { 
-             inputs: [{
-                name: 'TARGET_DATABASE', type: sql.VarChar,  value: this.CURRENT_SCHEMA
-             },{
-                name: 'DB_COLLATION',    type: sql.VarChar,  value: this.DB_COLLATION  
-             }]
-           }    
+    try {
+    
+	const typeMappings = await this.getVendorDataTypeMappings(MsSQLStatementGenerator)
+    
+    const args = { 
+            inputs: [{
+  			  name: 'TYPE_MAPPINGS',   type: sql.VarChar,  value: typeMappings
+			},{
+              name: 'TARGET_DATABASE', type: sql.VarChar,  value: this.CURRENT_SCHEMA
+            },{
+              name: 'DB_COLLATION',    type: sql.VarChar,  value: this.DB_COLLATION  
+            }]
+          }    
 
      let results = await this.execute('sp_YADAMU_IMPORT',args,'')                   
      results = results.recordset;
      const log = JSON.parse(results[0][Object.keys(results[0])[0]])
-     super.processLog(log,'OPENJSON',this.status, this.yadamuLogger)
+	 super.processLog(log,'OPENJSON',this.status, this.yadamuLogger)
      return log
+    } catch(e) {console.log(e)}
   }
   
   /*
@@ -1353,8 +1418,7 @@ class MsSQLDBI extends YadamuDBI {
     const sysInfo =  results.recordsets[0][0];
     const serverProperties = JSON.parse(sysInfo.SERVER_PROPERTIES)  
     const dbProperties = JSON.parse(sysInfo.DATABASE_PROPERTIES)    
-    
-	return Object.assign(
+    return Object.assign(
 	  super.getSystemInformation()
 	, {
         sessionUser                 : sysInfo.SESSION_USER
@@ -1392,15 +1456,15 @@ class MsSQLDBI extends YadamuDBI {
   async getSchemaMetadata() {
 
     this.SQL_TRACE.comment(`@SCHEMA="${this.CURRENT_SCHEMA}"`)
-      
+   
     const statement = this.statementLibrary.SQL_SCHEMA_INFORMATION
+	
     const results = await this.executeSQL(statement, { inputs: [{name: "SCHEMA", type: sql.VarChar, value: this.CURRENT_SCHEMA}]})
     return results.recordsets[0]
-  
   }
   
   createParser(queryInfo,parseDelay) {
-    return new MsSQLParser(queryInfo,this.yadamuLogger,parseDelay)
+    return new MsSQLParser(this,queryInfo,this.yadamuLogger,parseDelay)
   }  
   
   inputStreamError(cause,sqlStatement) {
@@ -1428,7 +1492,7 @@ class MsSQLDBI extends YadamuDBI {
     
   async generateStatementCache(schema) {
     /* ### OVERRIDE ### Pass additional parameter Database Name */
-    const statementGenerator = new this.StatementGenerator(this, schema, this.metadata ,this.yadamuLogger)
+    const statementGenerator = new this.StatementGenerator(this, this.systemInformation.vendor, schema, this.metadata ,this.yadamuLogger)
     this.statementCache = await statementGenerator.generateStatementCache(this.DATABASE_NAME)
 	this.emit(YadamuConstants.CACHE_LOADED)
 	return this.statementCache
@@ -1451,7 +1515,7 @@ class MsSQLDBI extends YadamuDBI {
   }
 
   classFactory(yadamu) {
-    return new MsSQLDBI(yadamu,this,this.connectionSettings,this.parameters)
+    return new MsSQLDBI(yadamu,this,this.connectionParameters,this.parameters)
   }
   
   async getConnectionID() {

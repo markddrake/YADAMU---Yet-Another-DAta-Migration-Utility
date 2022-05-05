@@ -23,13 +23,13 @@ class RedshiftStatementLibrary {
 
 export { RedshiftStatementLibrary as default }
 
-const _SQL_CONFIGURE_CONNECTION = `set timezone to 'UTC'; SET extra_float_digits to 2; SET enable_case_sensitive_identifier TO true;`
+const _SQL_CONFIGURE_CONNECTION = `SET timezone to 'UTC'; SET extra_float_digits to 2; SET enable_case_sensitive_identifier TO true;`
 
  const _SQL_SCHEMA_INFORMATION  =
-`           select t.table_schema "TABLE_SCHEMA"
-                 ,t.table_name "TABLE_NAME"
-	             ,c.column_name "COLUMN_NAME"
-	             ,c.data_type "DATA_TYPE"
+`           select t.table_schema as "TABLE_SCHEMA"
+                 ,t.table_name as "TABLE_NAME"
+	             ,c.column_name as "COLUMN_NAME"
+	             ,c.data_type as "DATA_TYPE"
                  ,case
                               when (c.numeric_precision is not null) and (c.numeric_scale is not null) then
                                 cast(c.numeric_precision as varchar) || ',' || cast(c.numeric_scale as varchar)
@@ -40,7 +40,7 @@ const _SQL_CONFIGURE_CONNECTION = `set timezone to 'UTC'; SET extra_float_digits
                               when (c.datetime_precision is not null) then 
                                 cast(c.datetime_precision as varchar)
                             end
-                  "SIZE_CONSTRAINT"
+                  as "SIZE_CONSTRAINT"
             from SVV_COLUMNS c
   			left join SVV_TABLES t
 			  on ((t.table_schema, t.table_name) = (c.table_schema, c.table_name))
@@ -48,7 +48,7 @@ const _SQL_CONFIGURE_CONNECTION = `set timezone to 'UTC'; SET extra_float_digits
              and t.table_schema =  $1
             order by t.table_schema, t.table_name, c.ORDINAL_POSITION`
 			
-const _SQL_SYSTEM_INFORMATION   = `select current_database() database_name,current_user, session_user, version() database_version, right(to_char(current_timestamp,'YYYY-MM-DD"T"HH24:MI:SSOF'),6) timezone, YADAMU_INSTANCE_ID() YADAMU_INSTANCE_ID, YADAMU_INSTALLATION_TIMESTAMP() YADAMU_INSTALLATION_TIMESTAMP`;
+const _SQL_SYSTEM_INFORMATION   = `select current_database() as database_name,current_user, session_user, version() as database_version, right(to_char(current_timestamp,'YYYY-MM-DD"T"HH24:MI:SSOF')::char(39),6) as timezone, YADAMU_INSTANCE_ID() as YADAMU_INSTANCE_ID, YADAMU_INSTALLATION_TIMESTAMP() as YADAMU_INSTALLATION_TIMESTAMP`;
 
 const _SQL_BEGIN_TRANSACTION    = `begin transaction`
 
