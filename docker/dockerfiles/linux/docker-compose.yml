@@ -5,8 +5,10 @@ services:
     container_name: ORA2103-01
     # image:  oracle/database:21.3.0-ee
     image:  yadamu/oracle:21.3.0
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
@@ -28,8 +30,10 @@ services:
     container_name: ORA1903-01
     # image:  oracle/database:19.3.0-ee
     image:  yadamu/oracle:19.3.0
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
@@ -51,8 +55,10 @@ services:
     container_name: ORA1803-01
     # image:  oracle/database:18.3.0-ee
     image:  yadamu/oracle:18.3.0
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
@@ -74,9 +80,10 @@ services:
     container_name: ORA1220-01
     # image:  oracle/database:12.2.0.1-ee 
     image:  yadamu/oracle:12.2.0
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
-    
+    security_opt:
+      - seccomp:unconfined
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
@@ -98,8 +105,10 @@ services:
     container_name: ORA1120-01
     # image:  oracle/database:11.2.0.4-ee
     image:  yadamu/oracle:11.2.0.4
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
     tmpfs: /dev/shm/:rw,nosuid,nodev,exec,size=4g
     networks:
       - YADAMU-NET
@@ -120,8 +129,10 @@ services:
   MSSQL17-01: 
     container_name: MSSQL17-01
     image:  mcr.microsoft.com/mssql/server:2017-latest
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
     networks:
       - YADAMU-NET
     ports: 
@@ -138,8 +149,10 @@ services:
   MSSQL19-01: 
     container_name: MSSQL19-01
     image:  mcr.microsoft.com/mssql/server:2019-latest
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
     networks:
       - YADAMU-NET
     ports: 
@@ -156,8 +169,10 @@ services:
   PGSQL14-01: 
     container_name: PGSQL14-01
     image:  yadamu/postgres:14 
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
     networks:
       - YADAMU-NET
     ports: 
@@ -173,8 +188,10 @@ services:
     container_name: MYSQL80-01
     image:  mysql:latest
     command: --secure-file-priv=/mnt/shared  
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
     cap_add:
       - SYS_NICE  # CAP_SYS_NICE
     networks:
@@ -191,8 +208,10 @@ services:
   MARIA10-01: 
     container_name: MARIA10-01
     image:  mariadb:latest
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
     networks:
       - YADAMU-NET
     ports: 
@@ -208,8 +227,10 @@ services:
   MONGO50-01: 
     container_name: MONGO50-01
     image:  mongo:latest 
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
     networks:
       - YADAMU-NET
     ports: 
@@ -221,7 +242,7 @@ services:
   VRTCA10-01: 
     container_name: VRTCA10-01
     image: vertica/vertica-ce:10.1.1-0
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
     networks:
       - YADAMU-NET
@@ -242,8 +263,10 @@ services:
   VRTCA11-01: 
     container_name: VRTCA11-01
     image:  vertica/vertica-ce:latest 
-    mem_limit: '16gb'
+    mem_limit: '10gb'
     shm_size: '4gb'
+    security_opt:
+      - seccomp:unconfined
     networks:
      - YADAMU-NET
     ports: 
