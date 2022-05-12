@@ -13,7 +13,7 @@ import YadamuConstants                from '../../lib/yadamuConstants.js'
 import YadamuLibrary                  from '../../lib/yadamuLibrary.js'
 
 import {
-  CopyOperationAborted.
+  CopyOperationAborted,
   UnimplementedMethod
 }                                     from '../../core/yadamuException.js'
 
@@ -24,28 +24,18 @@ import DBIConstants                   from '../base/dbiConstants.js'
 
 /* Vendor Specific DBI Implimentation */                                   
 
-import ExampleConstants               from './ExampleConstants.js'
-import ExampleDataTypes               from './ExampleDataTypes.js'
+import ExampleConstants               from './exampleConstants.js'
+import ExampleDataTypes               from './exampleDataTypes.js'
 import ExampleError                   from './exampleException.js'
 import ExampleParser                  from './exampleParser.js'
 import ExampleWriter                  from './exampleWriter.js'
 import ExampleReader                  from './exampleReader.js'
+import ExampleOutputManager           from './exampleOutputManager.js'
 import ExampleStatementLibrary        from './exampleStatementLibrary.js'
 import ExammpleStatementGenerator     from './exampleStatementGenerator.js'
 
 class ExampleDBI extends YadamuDBI {
-   
-  static get SQL_CONFIGURE_CONNECTION()                       { return _SQL_CONFIGURE_CONNECTION }
-  static get SQL_SYSTEM_INFORMATION()                         { return _SQL_SYSTEM_INFORMATION }
-  static get SQL_SCHEMA_INFORMATION()                         { return _SQL_SCHEMA_INFORMATION } 
-  static get SQL_GET_DLL_STATEMENTS()                         { return _SQL_GET_DLL_STATEMENTS }
-  static get SQL_BEGIN_TRANSACTION()                          { return _SQL_BEGIN_TRANSACTION }  
-  static get SQL_COMMIT_TRANSACTION()                         { return _SQL_COMMIT_TRANSACTION }
-  static get SQL_ROLLBACK_TRANSACTION()                       { return _SQL_SQL_ROLLBACK_TRANSACTION }
-  static get SQL_CREATE_SAVE_POINT()                          { return _SQL_CREATE_SAVE_POINT }  
-  static get SQL_RESTORE_SAVE_POINT()                         { return _SQL_RESTORE_SAVE_POINT }
-  static get SQL_RELEASE_SAVE_POINT()                         { return _SQL_RELEASE_SAVE_POINT }
-    
+       
   static #_DBI_PARAMETERS
 
   static get DBI_PARAMETERS()  { 
@@ -77,7 +67,6 @@ class ExampleDBI extends YadamuDBI {
   constructor(yadamu,manager,connectionSettings,parameters) {
     super(yadamu,manager,connectionSettings,parameters)
 	this.DATA_TYPES = ExampleDataTypes
-	this.StatementLibary = StatementLibary
   }
 
   /*
@@ -140,11 +129,11 @@ class ExampleDBI extends YadamuDBI {
       try {
         const sqlStartTime = performance.now()
 		stack = new Error().stack
-        const results = await /* EXECUTE_SQL_STATEMENT */
+        const results = await this.connection... /* EXECUTE_SQL_STATEMENT */
         this.SQL_TRACE.traceTiming(sqlStartTime,performance.now())
 		return results;
       } catch (e) {
-		const cause = this.trackExceptions(this.trackExceptions(new ExampleError(e,stack,sqlStatement)))
+		const cause = this.trackExceptions(this.trackExceptions(new ExampleError(this.DRIVER_ID,e,stack,sqlStatement)))
 		if (attemptReconnect && cause.lostConnection()) {
           attemptReconnect = false;
 		  // reconnect() throws cause if it cannot reconnect...
@@ -207,7 +196,7 @@ class ExampleDBI extends YadamuDBI {
 	**
 	*/
 	
-    await this.executeSQL(this.StatementLibrary.SQL_BEGIN_TRANSACTION)
+    await this.executeSQL(ExampleStatementLibrary.SQL_BEGIN_TRANSACTION)
 	super.beginTransaction()
 
   }
@@ -230,7 +219,7 @@ class ExampleDBI extends YadamuDBI {
 	*/
 	
 	super.commitTransaction()
-    await this.executeSQL(this.StatementLibrary.SQL_COMMIT_TRANSACTION)
+    await this.executeSQL(ExampleStatementLibrary.SQL_COMMIT_TRANSACTION)
 	
   }
 
@@ -259,7 +248,7 @@ class ExampleDBI extends YadamuDBI {
      
 	try {
       super.rollbackTransaction()
-      await this.executeSQL(this.StatementLibrary.SQL_ROLLBACK_TRANSACTION)
+      await this.executeSQL(ExampleStatementLibrary.SQL_ROLLBACK_TRANSACTION)
 	} catch (newIssue) {
 	  this.checkCause('ROLLBACK TRANSACTION',cause,newIssue)								   
 	}
@@ -276,7 +265,7 @@ class ExampleDBI extends YadamuDBI {
 	**
 	*/
 	 
-    await this.executeSQL(this.StatementLibrary.SQL_CREATE_SAVE_POINT)
+    await this.executeSQL(ExampleStatementLibrary.SQL_CREATE_SAVE_POINT)
     super.createSavePoint()
   }
   
@@ -300,7 +289,7 @@ class ExampleDBI extends YadamuDBI {
 		
     let stack
     try {
-      await this.executeSQL(his.StatementLibrary.SQL_RESTORE_SAVE_POINT)
+      await this.executeSQL(ExampleStatementLibrary.SQL_RESTORE_SAVE_POINT)
       super.restoreSavePoint()
 	} catch (newIssue) {
 	  this.checkCause('RESTORE SAVPOINT',cause,newIssue)
@@ -372,7 +361,7 @@ class ExampleDBI extends YadamuDBI {
   
     // Get Information about the target server
 	
-	const sysInfo = await this.executeSQL('SELECT SYSTEM INFORMATION')
+	const sysInfo = await this.executeSQL(ExampleStatementLibrary.SQL_SELECT_SYSTEM_INFORMATION)
     
 	return Object.assign(
 	  super.getSystemInformation()
@@ -387,7 +376,7 @@ class ExampleDBI extends YadamuDBI {
   */
 
   async getDDLOperations() {
-    return await this.executeSQL('GENERATE DDL STATEMENTS')
+    return await this.executeSQL(ExampleStatementLibrary.SQL_GENERATE_STATEMENTS,this.CURRENT_SCHEMA)
   }
   
   generateTableInfo() {
@@ -419,7 +408,7 @@ class ExampleDBI extends YadamuDBI {
     **
     */
           
-    return await this.executeSQL('GENERATE METADATA FROM SCHEMA',this.CURRENT_SCHEMA)
+    return await this.executeSQL(DB2StatementLibrary.SQL_SCHEMA_METADATA,this.CURRENT_SCHEMA)
   }
    
   generateSQLQuery(tableMetadata) {
@@ -432,7 +421,7 @@ class ExampleDBI extends YadamuDBI {
   }  
   
   inputStreamError(cause,sqlStatement) {
-    return this.trackExceptions(((cause instanceof ExampleError) || (cause instanceof CopyOperationAborted)) ? cause : new ExampleError(cause,this.streamingStackTrace,sqlStatement))
+    return this.trackExceptions(((cause instanceof ExampleError) || (cause instanceof CopyOperationAborted)) ? cause : new ExampleError(this.DRIVER_ID,cause,this.streamingStackTrace,sqlStatement))
   }
   
   async getInputStream(queryInfo) {
@@ -453,7 +442,7 @@ class ExampleDBI extends YadamuDBI {
    
   async createSchema(schema) {
 	// Create a schema 
-    throw new Error('Unimplemented Method')
+    throw new UnimplementedMethod('createSchema()',`YadamuDBI`,this.constructor.name)
   }
   
   async generateStatementCache(schema) {
@@ -483,4 +472,4 @@ class ExampleDBI extends YadamuDBI {
 	  
 }
 
-export { ExampleDBI }
+export { ExampleDBI as default }

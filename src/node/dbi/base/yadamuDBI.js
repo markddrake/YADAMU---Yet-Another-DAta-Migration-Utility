@@ -658,8 +658,15 @@ class YadamuDBI extends EventEmitter {
     delete pwRedacted.password
     this.SQL_TRACE.comment(`CONNECT : Properies: ${JSON.stringify(pwRedacted)}`)
   }
-  
+    
   updateVendorProperties(vendorProperties) {
+
+    vendorProperties.username  = this.parameters.USERNAME  || vendorProperties.user
+    vendorProperties.hostname  = this.parameters.HOSTNAME  || vendorProperties.host
+    vendorProperties.database  = this.parameters.DATABASE  || vendorProperties.database 
+    vendorProperties.password  = this.parameters.PASSWORD  || vendorProperties.password
+    vendorProperties.port      = this.parameters.PORT      || vendorProperties.port 
+	
   }
 
   getVendorProperties() {

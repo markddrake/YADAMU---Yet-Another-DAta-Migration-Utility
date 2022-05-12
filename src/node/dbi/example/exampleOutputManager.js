@@ -9,7 +9,7 @@ import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js'
 import YadamuDataTypes          from '../base/yadamuDataTypes.js'
 import YadamuOutputManager      from '../base/yadamuOutputManager.js'
 
-class ExampleWriter extends YadamuOutputManager {
+class ExampleOutputManager extends YadamuOutputManager {
 
   constructor(dbi,tableName,metrics,status,yadamuLogger) {
     super(dbi,tableName,metrics,status,yadamuLogger)
@@ -19,29 +19,13 @@ class ExampleWriter extends YadamuOutputManager {
 
     // Set up Transformation functions to be applied to the incoming rows
  
+rmations(targetDataTypes) {
+
+    // Set up Transformation functions to be applied to the incoming rows
+ 
     return  this.tableInfo.targetDataTypes.map((targetDataType,idx) => {        
-      const dataType = YadamuDataTypes.decomposeDataType(targetDataType);
-      /*    
-      if (YadamuLibrary.isBinary(dataType.type)){
-        // For Interfaces that what Binary content rendered as hexBinary string 
-        return (col,idx) => {
-          return (Buffer.isBuffer(col)) return col.toString('hex') : col
-          }
-        } 
-      }
-      */
-      switch (dataType.type.toLowerCase()) {
-        case "json":
-          return (col,idx) => {
-            return typeof col === 'object' ? JSON.stringify(col) : col
-          }
-          break;
-        case 'bit':
-        case 'boolean':
-          return (col,idx) => {
-            return YadamuLibrary.toBoolean(col)
-          }
-          break;
+      const dataTypeDefinition = YadamuDataTypes.decomposeDataType(targetDataType);
+	  switch (dataTypeDefinition.type.toUpperCase()) {
         default :
           return null
       }
@@ -82,4 +66,4 @@ class ExampleWriter extends YadamuOutputManager {
       
 }
 
-export { ExampleWriter;
+export { ExampleOutputManager as default }

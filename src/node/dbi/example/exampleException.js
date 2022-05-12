@@ -4,8 +4,8 @@ import {DatabaseError} from '../../core/yadamuException.js'
 
 class ExampleError extends DatabaseError {
   
-  constructor(cause,stack,sql) {
-    super(cause,stack,sql);
+  constructor(driverId,cause,stack,sql) {
+    super(driverId,cause,stack,sql);
   }
 
 }

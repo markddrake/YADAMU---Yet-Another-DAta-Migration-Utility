@@ -533,7 +533,7 @@ class OracleDBI extends YadamuDBI {
 
     result = await this.executeSQL(this.StatementLibrary.SQL_CONFIGURE_CONNECTION,args)
 
-    this._DATABASE_VERSION                = parseFloat(result.outBinds.DATABASE_VERSION)
+    this._DATABASE_VERSION          = parseFloat(result.outBinds.DATABASE_VERSION)
     this._MAX_STRING_SIZE           = result.outBinds.MAX_STRING_SIZE
     this._JSON_DB_STORAGE_MODEL     = result.outBinds.JSON_DB_STORAGE_MODEL
     this._XMLTYPE_DB_STORAGE_CLAUSE = result.outBinds.XMLTYPE_DB_STORAGE_CLAUSE

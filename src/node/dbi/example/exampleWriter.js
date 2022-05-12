@@ -35,7 +35,7 @@ class ExampleWriter extends YadamuWriter {
         this.releaseBatch(batch)
         return this.skipTable
       } catch (cause) {
-  		this.reportBatchError(batch,`INSERT MANY`,cause)
+  		this.reportBatchError(`INSERT MANY`,cause,batch[0],batch[batch.length-1])
         await this.dbi.restoreSavePoint(cause);
         this.yadamuLogger.warning([this.dbi.DATABASE_VENDOR,this.tableName,this.tableInfo.insertMode],`Switching to Iterative mode.`);          
         this.tableInfo.insertMode = 'Iterative'    

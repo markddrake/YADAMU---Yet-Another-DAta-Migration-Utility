@@ -1,7 +1,7 @@
 
 import YadamuStatementGenerator  from '../base/yadamuStatementGenerator.js'
 
-class ExampleStatementGenerator {
+class ExampleStatementGenerator extends YadamuStatementGenerator {
   
   constructor(dbi, vendor, targetSchema, metadata, yadamuLogger) {
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)

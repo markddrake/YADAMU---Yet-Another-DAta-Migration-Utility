@@ -10,6 +10,7 @@
 		"BATCH_LIMIT" : 3
 	},
 	"drivers": {
+		"db2": "../dbi//db2/db2QA.js",
 		"file": "../dbi//file/fileQA.js",
 		"loader": "../dbi/loader/loaderQA.js",
 		"awsS3": "../dbi/awsS3/awsS3QA.js",

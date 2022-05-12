@@ -38,5 +38,10 @@
 	"Redshift": {
 	  "class" : "../redshift/redshiftDataTypes.js"
 	, "file": "src/node/dbi/redshift/redshiftTypeMappings.json"
+	},
+	"DB2": {
+	  "class" : "../db2/db2DataTypes.js"
+	, "file": "src/node/dbi/db2/db2TypeMappings.json"
 	}
+
 }

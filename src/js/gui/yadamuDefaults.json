@@ -11,6 +11,7 @@
 		"COMMIT_RATIO": 1
 	},
 	"drivers": {
+		"db2": "../dbi/db2/db2DBI.js",
 		"file": "../dbi/file/fileDBI.js",
 		"loader": "../dbi/loader/loaderDBI.js",
 		"awsS3": "../dbi/awsS3/awsS3DBI.js",
