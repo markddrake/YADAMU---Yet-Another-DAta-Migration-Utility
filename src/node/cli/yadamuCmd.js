@@ -1,8 +1,7 @@
-"use strict"
 
-import path from 'path';
-import Yadamu from './yadamu.js';
-import YadamuCLI from './yadamuCLI.js'
+import path          from 'path';
+import Yadamu        from './yadamu.js';
+import YadamuCLI     from './yadamuCLI.js'
 
 class YadamuCmd extends YadamuCLI {}
 

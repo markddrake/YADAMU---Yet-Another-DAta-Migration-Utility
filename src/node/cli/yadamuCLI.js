@@ -1,20 +1,28 @@
-"use strict" 
 
-import fs               from 'fs';
-import path             from 'path';
-import { performance }  from 'perf_hooks';
-import assert           from 'assert';
+import fs                 from 'fs';
+import path               from 'path';
 
-import Yadamu           from '../core/yadamu.js';
-import YadamuLogger     from '../core/yadamuLogger.js';
-import YadamuConstants  from '../lib/yadamuConstants.js';
-import YadamuLibrary    from '../lib/yadamuLibrary.js';
+import { 
+  performance
+}                         from 'perf_hooks';
 
-import {CommandLineError, ConfigurationFileError}  from '../core/yadamuException.js';
+import assert             from 'assert';
 
-import {FileNotFound} from '../dbi/file/fileException.js';
+import Yadamu             from '../core/yadamu.js';
+import YadamuLogger       from '../core/yadamuLogger.js';
+import YadamuConstants    from '../lib/yadamuConstants.js';
+import YadamuLibrary      from '../lib/yadamuLibrary.js';
 
-import YadamuCompare from '../../qa/core/yadamuQA.js'
+import {
+  CommandLineError, 
+  ConfigurationFileError
+}                         from '../core/yadamuException.js';
+
+import {
+  FileNotFound
+}                         from '../dbi/file/fileException.js';
+
+import YadamuCompare      from '../../qa/core/yadamuQA.js'
 
 
 /*

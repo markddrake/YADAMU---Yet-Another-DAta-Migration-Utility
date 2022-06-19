@@ -1,4 +1,3 @@
-"use strict" 
 
 import {Writable}                 from 'stream'
 import { performance }            from 'perf_hooks';

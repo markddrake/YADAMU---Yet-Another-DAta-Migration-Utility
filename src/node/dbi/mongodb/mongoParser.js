@@ -12,7 +12,7 @@ class MongoParser extends YadamuParser {
 		   return (row,idx)  => {
              row[idx] = row[idx].buffer;
 		   }
-         case 'objectId':0
+         case 'objectId':
 		   return (row,idx)  => {
              row[idx] = Buffer.from(row[idx].toHexString(),'hex')
 		   }

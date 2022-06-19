@@ -1,4 +1,3 @@
-"use strict";
 
 import { performance }            from 'perf_hooks';
 import { Readable, PassThrough  } from 'stream'

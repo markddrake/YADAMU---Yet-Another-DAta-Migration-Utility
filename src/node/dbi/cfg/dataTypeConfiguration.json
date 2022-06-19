@@ -42,6 +42,10 @@
 	"DB2": {
 	  "class" : "../db2/db2DataTypes.js"
 	, "file": "src/node/dbi/db2/db2TypeMappings.json"
+	},
+	"Yugabyte": {
+	  "class" : "../postgres/postgresDataTypes.js"
+	, "file": "src/node/dbi/yugabyte/yugabyteTypeMappings.json"
 	}
 
 }

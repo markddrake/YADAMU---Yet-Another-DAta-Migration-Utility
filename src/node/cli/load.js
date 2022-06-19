@@ -1,7 +1,7 @@
-"use strict"
 
-import YadamuCLI from './yadamuCLI.js'
-import YadamuLibrary from '../lib/yadamuLibrary.js'
+import YadamuLibrary      from '../lib/yadamuLibrary.js'
+
+import YadamuCLI          from './yadamuCLI.js'
 
 class Load extends YadamuCLI {}
 

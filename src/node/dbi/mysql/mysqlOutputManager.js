@@ -2,9 +2,15 @@
 import { 
   performance 
 }                               from 'perf_hooks';
+
 						
 import YadamuLibrary            from '../../lib/yadamuLibrary.js'
 import YadamuSpatialLibrary     from '../../lib/yadamuSpatialLibrary.js'
+
+import {
+  DatabaseError,
+  RejectedColumnValue
+}                               from '../../core/yadamuException.js'
 
 import YadamuDataTypes          from '../base/yadamuDataTypes.js'
 import YadamuOutputManager      from '../base/yadamuOutputManager.js'

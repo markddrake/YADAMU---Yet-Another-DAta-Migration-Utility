@@ -4,15 +4,16 @@ import {
 }                               from 'perf_hooks'
 
 import YadamuLibrary            from '../../lib/yadamuLibrary.js'
-						
-import YadamuDataTypes          from '../base/yadamuDataTypes.js'
-import YadamuOutputManger       from '../base/yadamuOutputManager.js'
 
 import {
   DatabaseError,
   RejectedColumnValue
-}                         from '../../core/yadamuException.js'
+}                               from '../../core/yadamuException.js'
 																				   
+						
+import YadamuDataTypes          from '../base/yadamuDataTypes.js'
+import YadamuOutputManger       from '../base/yadamuOutputManager.js'
+
 class MariadbOutputManger extends YadamuOutputManger {
 
   constructor(dbi,tableName,metrics,status,yadamuLogger) {

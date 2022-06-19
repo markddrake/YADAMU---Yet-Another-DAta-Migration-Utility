@@ -13,28 +13,6 @@ class RedshiftStatementGenerator extends YadamuStatementGenerator {
     this.dbi.IAM_ROLE = 'arn:aws:iam::437125103918:role/RedshiftFastLoad'	
   }
 
-  /*
-  getMappedDataType(dataType,sizeConstraint) {
-	  
-	  
-    const mappedDataType = super.getMappedDataType(dataType,sizeConstraints[idx])
-    const length = sizeConstraint
-
-	mappedDataTypes.push(mappedDataType)
-	  
-    let targetLength = dataType.length
-	 
-	switch (mappedDataType) {
-	  case this.dbi.DATATYPES.VARCHAR_TYPE:
-        targetLength = tableMetadata.vendor === 'Redshift' ? targetLength : Math.ceil(targetLength * this.dbi.BYTE_TO_CHAR_RATIO);
-	    if (targetLength > StatementGenerator.LARGEST_VARCHAR_SIZE) {
-		  targetLength = StatementGenerator.LARGEST_VARCHAR_SIZE
-		}
-		sizeConstraints[idx] = [targetLength]
-    }		
-  }
-  */
-  
   generateDDLStatement(schema,tableName,columnDefinitions,mappedDataTypes) {
 	  
     return `create table if not exists "${schema}"."${tableName}"(\n  ${columnDefinitions.join(',')})`;

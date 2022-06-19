@@ -13,23 +13,6 @@ class SnowflakeStatementGenerator extends YadamuStatementGenerator {
     super(dbi, vendor, targetSchema, metadata, yadamuLogger)
   }
   
-  getMappedDataType(dataType,sizeConstraint) {
-	  
-      const mappedDataType = super.getMappedDataType(dataType,sizeConstraint)
-      const length = sizeConstraint[0]
-      switch (mappedDataType) {
-
-        case this.dbi.DATA_TYPES.NUMERIC_TYPE:        
-          switch (true) {
-			// Need to address P,S and linits on P,S
-            case (isNaN(length)):                                        
-            case (length === undefined):                                 return this.dbi.DATA_TYPES.UNBOUNDED_NUMERIC_TYPE
-			default:                                                     return mappedDataType
-		  }
-		default:                                                         return mappedDataType
-	  }
-  }
-  
   generateDDLStatement(schema,tableName,columnDefinitions,mappedDataTypes) {	  
     return `create ${this.dbi.TRANSIENT_TABLES ? 'transient ' : ''}table if not exists "%%YADAMU_DATABASE%%"."${schema}"."${tableName}"(\n  ${columnDefinitions.join(',')}) ${this.dbi.DATA_RETENTION_TIME !== undefined ? `DATA_RETENTION_TIME_IN_DAYS=${this.dbi.DATA_RETENTION_TIME}` : ''} `
   }

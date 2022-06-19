@@ -1,6 +1,7 @@
-"use strict";
 
-import { performance }            from 'perf_hooks';
+import { 
+  performance 
+}                                 from 'perf_hooks';
 
 import YadamuLibrary              from '../lib/yadamuLibrary.js'
 import YadamuConstants            from '../lib/yadamuConstants.js'
@@ -8,9 +9,12 @@ import YadamuWriter               from '../dbi/base/yadamuWriter.js'
 
 import Yadamu                     from './yadamu.js'
 
-import {YadamuError, CopyOperationAborted} from './yadamuException.js'
+import {
+  YadamuError, 
+  CopyOperationAborted
+}                                 from './yadamuException.js'
 
-import DBReader from './dbReader.js';									 
+import DBReader                   from './dbReader.js';									 
 
 class DBReaderParallel extends DBReader {  
 
